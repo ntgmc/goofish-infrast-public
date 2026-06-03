@@ -39,7 +39,7 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
       const potential = await runOptimize(true)
       const serverSuggestions = (potential as unknown as Record<string, unknown>).upgrade_suggestions as Record<string, unknown>[] | undefined
       if (serverSuggestions && serverSuggestions.length > 0) {
-        const upgradeList: UpgradeSuggestion[] = serverSuggestions.map((s) => {
+        const upgradeList: UpgradeSuggestion[] = serverSuggestions.map((s, idx) => {
           if (s.type === 'single') {
             return {
               type: 'single' as const,
@@ -53,6 +53,7 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
           }
           return {
             type: 'bundle' as const,
+            id: `bundle-${idx}`,
             gain: Math.round(s.gain as number),
             desc: (s.ops as {name:string;current:number;target:number}[])?.map(o => `${o.name}: 精${o.current}→精${o.target}`).join(', ') || '',
             ops: (s.ops as {id?:string;name:string;current:number;target:number}[])?.map(o => ({
@@ -81,10 +82,9 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
       if (s.type === 'single' && s.id && selectedIds.includes(s.id) && s.target_elite !== undefined) {
         newOverrides[s.id] = s.target_elite
       }
-      if (s.type === 'bundle' && s.ops) {
-        const allSelected = s.ops.every(op => selectedIds.includes(op.id))
-        if (allSelected) {
-          for (const op of s.ops) {
+      if (s.type === 'bundle' && s.id && s.ops && selectedIds.includes(s.id)) {
+        for (const op of s.ops) {
+          if (op.id && op.target_elite !== undefined) {
             newOverrides[op.id] = op.target_elite
           }
         }

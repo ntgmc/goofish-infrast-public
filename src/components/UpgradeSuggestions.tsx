@@ -33,10 +33,9 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
           const badge = getBadge(s.gain)
           const id = s.id || `bundle-${i}`
           return (
-            <div
+            <label
               key={id}
               className="bg-gray-800 border border-gray-700 rounded-lg p-4 flex items-center gap-4 cursor-pointer hover:border-gray-500 transition"
-              onClick={() => toggle(id)}
             >
               <input
                 type="checkbox"
@@ -51,7 +50,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
               <span className={`px-3 py-1 rounded text-sm font-bold border ${badge.cls}`}>
                 {badge.icon} {badge.label} +{s.gain}%
               </span>
-            </div>
+            </label>
           )
         })}
       </div>

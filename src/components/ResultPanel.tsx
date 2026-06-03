@@ -18,7 +18,7 @@ const ROOM_LABELS: Record<string, string> = {
 }
 
 export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Props) {
-  const totalEff = result.raw_results?.reduce((s, r) => s + r.total_efficiency, 0) || 0
+  const totalEff = result?.raw_results?.reduce((s, r) => s + (r?.total_efficiency ?? 0), 0) ?? 0
 
   return (
     <div>
@@ -29,13 +29,13 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
         </div>
         <div className="bg-gray-800 rounded-lg p-4">
           <p className="text-gray-400 text-sm">建筑类型</p>
-          <p className="text-3xl font-bold">{result.buildingType}</p>
+          <p className="text-3xl font-bold">{result?.buildingType ?? '-'}</p>
         </div>
       </div>
 
       <h3 className="text-lg font-bold mb-3">排班详情</h3>
       <div className="space-y-4 mb-6">
-        {result.plans?.map((plan, i) => (
+        {(result?.plans ?? []).map((plan, i) => (
           <div key={i} className="bg-gray-800 rounded-lg p-4">
             <div className="flex justify-between items-center mb-3">
               <span className="font-bold text-lg">{plan.name || `班次 ${i + 1}`}</span>
@@ -46,13 +46,14 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
               )}
             </div>
             {plan.rooms && Object.entries(plan.rooms).flatMap(([roomType, rooms]) =>
-              (rooms || []).map((room: Record<string, unknown>, j: number) => {
+              (!Array.isArray(rooms) ? [] : rooms).map((room: Record<string, unknown>, j: number) => {
+                if (!room || typeof room !== 'object') return null
                 const ops = room.operators as string[] | undefined
-                if (!ops || ops.length === 0) return null
+                if (!ops || !Array.isArray(ops) || ops.length === 0) return null
                 return (
                   <div key={`${roomType}-${j}`} className="flex justify-between text-sm text-gray-300 py-1 border-t border-gray-700/50">
                     <span>{ROOM_LABELS[roomType] || roomType}{(rooms || []).length > 1 ? ` ${j + 1}` : ''} ({(room.product as string) || '-'})</span>
-                    <span>{ops.join(', ')} — {((room.efficiency as number) || 0).toFixed(1)}%</span>
+                    <span>{ops.join(', ')} — {(typeof room.efficiency === 'number' ? room.efficiency : 0).toFixed(1)}%</span>
                   </div>
                 )
               })
