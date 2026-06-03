@@ -45,13 +45,13 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
                 </span>
               )}
             </div>
-            {plan.rooms && Object.entries(plan.rooms).map(([roomType, rooms]) =>
-              rooms?.map((room: Record<string, unknown>, j: number) => {
+            {plan.rooms && Object.entries(plan.rooms).flatMap(([roomType, rooms]) =>
+              (rooms || []).map((room: Record<string, unknown>, j: number) => {
                 const ops = room.operators as string[] | undefined
                 if (!ops || ops.length === 0) return null
                 return (
                   <div key={`${roomType}-${j}`} className="flex justify-between text-sm text-gray-300 py-1 border-t border-gray-700/50">
-                    <span>{ROOM_LABELS[roomType] || roomType}{rooms.length > 1 ? ` ${j + 1}` : ''} ({(room.product as string) || '-'})</span>
+                    <span>{ROOM_LABELS[roomType] || roomType}{(rooms || []).length > 1 ? ` ${j + 1}` : ''} ({(room.product as string) || '-'})</span>
                     <span>{ops.join(', ')} — {((room.efficiency as number) || 0).toFixed(1)}%</span>
                   </div>
                 )
