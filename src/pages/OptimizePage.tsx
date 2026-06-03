@@ -43,7 +43,7 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
           if (s.type === 'single') {
             return {
               type: 'single' as const,
-              id: (s.name as string) || '',
+              id: (s.id as string) || (s.name as string) || '',
               name: s.name as string,
               current_elite: s.current as number,
               target_elite: s.target as number,
@@ -55,8 +55,8 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
             type: 'bundle' as const,
             gain: Math.round(s.gain as number),
             desc: (s.ops as {name:string;current:number;target:number}[])?.map(o => `${o.name}: 精${o.current}→精${o.target}`).join(', ') || '',
-            ops: (s.ops as {name:string;current:number;target:number}[])?.map(o => ({
-              id: o.name,
+            ops: (s.ops as {id?:string;name:string;current:number;target:number}[])?.map(o => ({
+              id: o.id || o.name,
               name: o.name,
               current_elite: o.current,
               target_elite: o.target,
