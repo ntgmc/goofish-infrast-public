@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function UpgradeSuggestions({ suggestions, onApply, loading }: Props) {
-  const [selected, setSelected] = useState<Set<string>>(new Set(suggestions.map(s => s.id || '')))
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const toggle = (id: string) => {
     const next = new Set(selected)

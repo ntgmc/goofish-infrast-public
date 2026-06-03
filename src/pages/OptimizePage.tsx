@@ -37,15 +37,43 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
       const current = await runOptimize(false)
       setCurrentResult(current)
       const potential = await runOptimize(true)
-      const upgradeList = calculateUpgradeSuggestions(current, potential, license.operators)
-      setSuggestions(upgradeList)
+      const serverSuggestions = (potential as unknown as Record<string, unknown>).upgrade_suggestions as Record<string, unknown>[] | undefined
+      if (serverSuggestions && serverSuggestions.length > 0) {
+        const upgradeList: UpgradeSuggestion[] = serverSuggestions.map((s) => {
+          if (s.type === 'single') {
+            return {
+              type: 'single' as const,
+              id: (s.name as string) || '',
+              name: s.name as string,
+              current_elite: s.current as number,
+              target_elite: s.target as number,
+              gain: Math.round(s.gain as number),
+              desc: `${s.name}: 精${s.current} → 精${s.target}`,
+            }
+          }
+          return {
+            type: 'bundle' as const,
+            gain: Math.round(s.gain as number),
+            desc: (s.ops as {name:string;current:number;target:number}[])?.map(o => `${o.name}: 精${o.current}→精${o.target}`).join(', ') || '',
+            ops: (s.ops as {name:string;current:number;target:number}[])?.map(o => ({
+              id: o.name,
+              name: o.name,
+              current_elite: o.current,
+              target_elite: o.target,
+            })),
+          }
+        })
+        setSuggestions(upgradeList.sort((a, b) => b.gain - a.gain).slice(0, 20))
+      } else {
+        setSuggestions([])
+      }
       setPhase('suggestions')
     } catch (e) {
       alert('优化失败: ' + (e as Error).message)
     } finally {
       setLoading(false)
     }
-  }, [runOptimize, license.operators])
+  }, [runOptimize])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
     const newOverrides = { ...eliteOverrides }
@@ -173,40 +201,4 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
   )
 }
 
-function calculateUpgradeSuggestions(
-  current: OptimizeResult,
-  potential: OptimizeResult,
-  operators: { id: string; name: string; own: boolean; elite: number }[]
-): UpgradeSuggestion[] {
-  const suggestions: UpgradeSuggestion[] = []
-  const currentScore = current.raw_results?.reduce((s, r) => s + r.total_efficiency, 0) || 0
-  const potentialScore = potential.raw_results?.reduce((s, r) => s + r.total_efficiency, 0) || 0
 
-  if (potentialScore <= currentScore) return []
-
-  const seen = new Set<string>()
-  for (const res of potential.raw_results || []) {
-    for (const detail of res.assignment_detail || []) {
-      for (const opName of detail.ops || []) {
-        if (seen.has(opName)) continue
-        seen.add(opName)
-        const op = operators.find(o => o.name === opName)
-        if (!op || !op.own) continue
-        if (op.elite < 2) {
-          const gain = Math.round((potentialScore - currentScore) * 100 / currentScore)
-          suggestions.push({
-            type: 'single',
-            id: op.id,
-            name: op.name,
-            current_elite: op.elite,
-            target_elite: 2,
-            gain,
-            desc: `${op.name}: 精${op.elite} → 精2`,
-          })
-        }
-      }
-    }
-  }
-
-  return suggestions.sort((a, b) => b.gain - a.gain).slice(0, 20)
-}
