@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.idea/
+*.pyc
+__pycache__/
+_fix.py
+_tmp.py
+.env
+.env.*
