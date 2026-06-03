@@ -83,14 +83,10 @@ export interface OptimizeResult {
 
 export interface ShiftPlan {
   name: string;
-  rooms: RoomAssignment[];
-}
-
-export interface RoomAssignment {
-  room: string;
-  operators: string[];
-  efficiency: number;
-  product?: string;
+  description?: string;
+  rooms: Record<string, { operators?: string[]; product?: string; efficiency?: number; autofill?: boolean }[]>;
+  Fiammetta?: { enable: boolean; target: string; order: string };
+  drones?: { enable: boolean; room: string; index: number; order: string };
 }
 
 // 升级建议
