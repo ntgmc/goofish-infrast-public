@@ -7,3 +7,7 @@ _fix.py
 _tmp.py
 .env
 .env.*
+.agents
+
+# Local Netlify folder
+.netlify

@@ -1,1 +1,57 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
+
+@theme {
+  /* Brand: Cyan/teal inspired by Rhodes Island */
+  --color-brand-50: oklch(97% 0.01 195);
+  --color-brand-100: oklch(93% 0.02 195);
+  --color-brand-200: oklch(87% 0.04 195);
+  --color-brand-300: oklch(78% 0.07 195);
+  --color-brand-400: oklch(68% 0.10 195);
+  --color-brand-500: oklch(58% 0.12 195);
+  --color-brand-600: oklch(50% 0.12 195);
+  --color-brand-700: oklch(43% 0.10 195);
+  --color-brand-800: oklch(36% 0.08 195);
+  --color-brand-900: oklch(28% 0.05 195);
+  --color-brand-950: oklch(20% 0.03 195);
+
+  /* Tinted neutrals (cyan-tinted) */
+  --color-surface-0: oklch(14% 0.008 195);
+  --color-surface-1: oklch(18% 0.010 195);
+  --color-surface-2: oklch(22% 0.012 195);
+  --color-surface-3: oklch(26% 0.014 195);
+  --color-surface-4: oklch(30% 0.016 195);
+
+  /* Text */
+  --color-ink-primary: oklch(95% 0.005 195);
+  --color-ink-secondary: oklch(72% 0.010 195);
+  --color-ink-muted: oklch(58% 0.012 195);
+
+  /* Semantic */
+  --color-success: oklch(62% 0.15 145);
+  --color-error: oklch(58% 0.18 25);
+  --color-warning: oklch(72% 0.15 75);
+}
+
+/* Base styles */
+body {
+  background-color: var(--color-surface-0);
+  color: var(--color-ink-primary);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

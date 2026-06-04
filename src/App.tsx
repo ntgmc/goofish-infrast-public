@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+﻿import { useState, useCallback } from 'react'
 import type { LicenseFile, AppStep } from './lib/types'
 import { parseFileContent, extractLicense, extractEliteOverrides } from './lib/license'
 import UploadPage from './pages/UploadPage'
@@ -30,7 +30,7 @@ function App() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-surface-0 text-ink-primary">
       {step === 'upload' && (
         <UploadPage onFileLoaded={handleFileLoaded} error={error} />
       )}
@@ -47,5 +47,3 @@ function App() {
 }
 
 export default App
-
-
