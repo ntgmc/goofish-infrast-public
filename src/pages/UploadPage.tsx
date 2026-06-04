@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+﻿import { useState, useRef, useCallback } from 'react'
 
 interface Props {
   onFileLoaded: (content: string) => Promise<void>;
@@ -39,48 +39,107 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="bg-gray-800 rounded-xl p-8 w-full max-w-md shadow-2xl">
-        <h1 className="text-2xl font-bold text-center mb-2">🏭 MAA 基建排班优化器</h1>
-        <p className="text-gray-400 text-center text-sm mb-6">VIP 基建售后服务</p>
-
-        {error && (
-          <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded mb-4">
-            ❌ {error}
+    <div className="flex items-center justify-center min-h-screen p-6">
+      <div className="w-full max-w-md">
+        {/* Header with breathing room */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface-2 mb-6">
+            <span className="text-3xl" role="img" aria-label="MAA">🚀</span>
           </div>
-        )}
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-300 mb-1">授权文件 / 工作文件</label>
-            <div
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={() => setDragActive(false)}
-              className={`border-2 border-dashed rounded-lg p-6 text-center transition cursor-pointer ${
-                dragActive ? 'border-blue-400 bg-blue-900/20' : 'border-gray-600 hover:border-gray-500'
-              }`}
-              onClick={() => fileRef.current?.click()}
-            >
-              <p className="text-gray-400 text-sm">拖拽 .maa 文件到此处，或点击选择</p>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".maa"
-                onChange={handleUpload}
-                className="hidden"
-              />
-            </div>
-          </div>
-
-          <button
-            onClick={handleUpload}
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-bold py-2 px-4 rounded transition"
-          >
-            {loading ? '验证中...' : '验证并进入'}
-          </button>
+          <h1 className="text-3xl font-bold text-ink-primary mb-3">
+            MAA 基建排班优化器
+          </h1>
+          <p className="text-ink-secondary text-base">
+            VIP 基建售后服务
+          </p>
         </div>
+
+        {/* Upload card */}
+        <div className="bg-surface-1 rounded-xl p-8">
+          {error && (
+            <div 
+              className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg mb-6"
+              role="alert"
+            >
+              ❌ {error}
+            </div>
+          )}
+
+          <div className="space-y-6">
+            <div>
+              <label 
+                htmlFor="file-upload"
+                className="block text-sm font-medium text-ink-secondary mb-3"
+              >
+                授权文件 / 工作文件
+              </label>
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={() => setDragActive(false)}
+                onClick={() => fileRef.current?.click()}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click() }}
+                role="button"
+                tabIndex={0}
+                aria-label="上传 .maa 文件"
+                className={`
+                  border-2 border-dashed rounded-xl p-8 text-center cursor-pointer
+                  transition-colors duration-150
+                  ${dragActive 
+                    ? 'border-brand-400 bg-brand-500/10' 
+                    : 'border-surface-4 hover:border-brand-500/50'
+                  }
+                `}
+              >
+                <div className="space-y-3">
+                  <div className="text-ink-muted">
+                    <svg className="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                  </div>
+                  <p className="text-ink-secondary text-sm">
+                    拖拽 .maa 文件到此处，或点击选择
+                  </p>
+                  <p className="text-ink-muted text-xs">
+                    支持 MAA-V1 授权文件和 MAA-W1 工作文件
+                  </p>
+                </div>
+                <input
+                  ref={fileRef}
+                  id="file-upload"
+                  type="file"
+                  accept=".maa"
+                  onChange={handleUpload}
+                  className="hidden"
+                  aria-label="选择 .maa 文件"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleUpload}
+              disabled={loading}
+              className="w-full bg-brand-600 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-150"
+            >
+              {loading ? (
+                <span className="inline-flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  验证中...
+                </span>
+              ) : (
+                '验证并进入'
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Help text */}
+        <p className="text-center text-ink-muted text-xs mt-6">
+          上传卖家下发的 .maa 授权文件或工作文件
+        </p>
       </div>
     </div>
   )
