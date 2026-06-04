@@ -44,6 +44,16 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
                 className="w-5 h-5 accent-blue-500"
               />
               <div className="flex-1">
+                {s.type === 'single' && s.id && (
+                  <img src={`/webp96/${s.id}.webp`} alt="" className="w-10 h-10 rounded bg-gray-700 object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                )}
+                {s.type === 'bundle' && s.ops && (
+                  <div className="flex -space-x-2">
+                    {s.ops.slice(0, 4).map((op) => (
+                      <img key={op.id} src={`/webp96/${op.id}.webp`} alt="" className="w-8 h-8 rounded bg-gray-700 object-cover border border-gray-800" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                    ))}
+                  </div>
+                )}
                 <span className="font-bold text-lg">{s.name || s.ops?.map(o => o.name).join('+')}</span>
                 <span className="text-gray-400 ml-3 text-sm">{s.desc}</span>
               </div>
