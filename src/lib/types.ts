@@ -1,4 +1,3 @@
-// 干员数据（license 中的）
 export interface LicenseOperator {
   id: string;
   name: string;
@@ -8,7 +7,6 @@ export interface LicenseOperator {
   [key: string]: unknown;
 }
 
-// 配置数据
 export interface LicenseConfig {
   layout: string;
   desc: string;
@@ -27,37 +25,36 @@ export interface LicenseConfig {
   [key: string]: unknown;
 }
 
-// License 文件结构（解密后）
+export type PermissionMode = 'basic' | 'premium' | 'admin';
+
 export interface LicenseFile {
   version: number;
   order_hash: string;
   operators: LicenseOperator[];
   config: LicenseConfig;
+  permission?: PermissionMode;
   issued_at: string;
   sig: string;
 }
 
-// 用户态覆盖（仅 elite）
 export interface ClientState {
   operator_elite_overrides: Record<string, number>;
+  config_override?: LicenseConfig;
   updated_at: string;
   client_sig: string;
 }
 
-// Workfile 结构（解密后）
 export interface WorkFile {
   license: LicenseFile;
   client_state: ClientState;
 }
 
-// 优化请求参数
 export interface OptimizeRequest {
   operators: LicenseOperator[];
   config: LicenseConfig;
   ignore_elite: boolean;
 }
 
-// 排班结果
 export interface AssignmentResult {
   total_efficiency: number;
   assignment_detail: AssignmentDetail[];
@@ -89,7 +86,6 @@ export interface ShiftPlan {
   drones?: { enable: boolean; room: string; index: number; order: string };
 }
 
-// 升级建议
 export interface UpgradeSuggestion {
   type: 'single' | 'bundle';
   id?: string;
@@ -101,5 +97,4 @@ export interface UpgradeSuggestion {
   desc?: string;
 }
 
-// 应用状态
 export type AppStep = 'upload' | 'optimize';

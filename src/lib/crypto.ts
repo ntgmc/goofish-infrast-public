@@ -95,18 +95,26 @@ export async function deriveClientKey(licenseSig: string): Promise<string> {
 
 export async function signClientState(
   derivedKey: string,
-  eliteOverrides: Record<string, number>
+  eliteOverrides: Record<string, number>,
+  configOverride?: unknown
 ): Promise<string> {
-  const payload = canonicalJson({ operator_elite_overrides: eliteOverrides });
+  const payloadData: Record<string, unknown> = {
+    operator_elite_overrides: eliteOverrides,
+  };
+  if (configOverride) {
+    payloadData.config_override = configOverride;
+  }
+  const payload = canonicalJson(payloadData);
   return hmacSha256(derivedKey, payload);
 }
 
 export async function verifyClientState(
   derivedKey: string,
   eliteOverrides: Record<string, number>,
+  configOverride: unknown | undefined,
   expectedSig: string
 ): Promise<boolean> {
-  const actual = await signClientState(derivedKey, eliteOverrides);
+  const actual = await signClientState(derivedKey, eliteOverrides, configOverride);
   return actual === expectedSig;
 }
 

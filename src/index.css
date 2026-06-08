@@ -47,6 +47,18 @@ body {
   outline-offset: 2px;
 }
 
+.number-input-clean {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.number-input-clean::-webkit-outer-spin-button,
+.number-input-clean::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

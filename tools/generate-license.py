@@ -148,6 +148,13 @@ def main():
         config_type = "243"
 
     config = CONFIG_TEMPLATES[config_type].copy()
+
+    print("\nAvailable permissions: basic, premium, admin")
+    permission = input("Permission [basic]: ").strip().lower() or "basic"
+    if permission not in {"basic", "premium", "admin"}:
+        print(f"Warning: unknown permission '{permission}', using basic")
+        permission = "basic"
+
     order_hash = generate_order_hash(order_id)
 
     # Build license (without sig)
@@ -156,6 +163,7 @@ def main():
         "order_hash": order_hash,
         "operators": operators,
         "config": config,
+        "permission": permission,
         "issued_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     }
 
@@ -177,6 +185,7 @@ def main():
     print(f"  Order ID:   {order_id}")
     print(f"  Order Hash: {order_hash}")
     print(f"  Config:     {config['desc']}")
+    print(f"  Permission: {permission}")
     print(f"  Operators:  {len(operators)}")
     print(f"  Output:     {output_path}")
 
