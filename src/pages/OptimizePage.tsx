@@ -174,33 +174,37 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
 
       {/* Idle state */}
       {phase === 'idle' && !currentResult && (
-        <div className="text-center py-20">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-surface-2 mb-8">
-            <span className="text-4xl" role="img" aria-label="生成">🤖</span>
+        <div className="bg-surface-1 rounded-xl p-6 sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-brand-400 mb-2">
+                文件已载入
+              </p>
+              <h2 className="text-xl font-semibold text-ink-primary mb-2">
+                生成基建排班方案
+              </h2>
+              <p className="text-ink-secondary text-sm max-w-xl">
+                基于当前干员配置和基建布局计算排班方案，完成后可直接下载给 MAA 使用的结果文件。
+              </p>
+            </div>
+            <button
+              onClick={handleGenerate}
+              disabled={loading}
+              className="bg-brand-600 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted text-white font-semibold py-3 px-6 rounded-xl transition-colors duration-150 lg:flex-shrink-0"
+            >
+              {loading ? (
+                <span className="inline-flex items-center gap-3">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  正在分析基建潜力...
+                </span>
+              ) : (
+                '生成排班方案'
+              )}
+            </button>
           </div>
-          <h2 className="text-xl font-semibold text-ink-primary mb-4">
-            准备生成排班方案
-          </h2>
-          <p className="text-ink-secondary mb-8 max-w-md mx-auto">
-            基于当前干员配置和基建布局，计算最优排班方案
-          </p>
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="bg-brand-600 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted text-white font-semibold py-4 px-10 rounded-xl text-lg transition-colors duration-150"
-          >
-            {loading ? (
-              <span className="inline-flex items-center gap-3">
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                正在分析基建潜力...
-              </span>
-            ) : (
-              '🚀 生成排班方案'
-            )}
-          </button>
         </div>
       )}
 
@@ -215,16 +219,11 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
 
       {/* No suggestions */}
       {phase === 'suggestions' && suggestions.length === 0 && (
-        <div className="text-center py-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-6">
-            <span className="text-3xl" role="img" aria-label="完成">✅</span>
+        <div>
+          <div className="bg-success/10 border border-success/30 rounded-xl p-5 mb-8">
+            <p className="font-semibold text-success">当前练度已是最佳配置</p>
+            <p className="text-success/80 text-sm mt-1">无需应用升级建议，可直接下载优化结果。</p>
           </div>
-          <h2 className="text-xl font-semibold text-success mb-4">
-            当前练度已是最佳配置
-          </h2>
-          <p className="text-ink-secondary mb-8">
-            无需升级建议，直接查看优化结果
-          </p>
           <ResultPanel result={currentResult!} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />
         </div>
       )}
@@ -233,13 +232,8 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
       {phase === 'final' && finalResult && (
         <div>
           <div className="bg-success/10 border border-success/30 rounded-xl p-5 mb-8">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl" role="img" aria-label="成功">✅</span>
-              <div>
-                <p className="font-semibold text-success">排班方案已生成</p>
-                <p className="text-success/80 text-sm mt-1">已应用练度修改</p>
-              </div>
-            </div>
+            <p className="font-semibold text-success">排班方案已生成</p>
+            <p className="text-success/80 text-sm mt-1">已应用练度修改。</p>
           </div>
           <ResultPanel result={finalResult} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />
         </div>

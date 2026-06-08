@@ -22,9 +22,9 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
   }, [])
 
   const getBadge = (gain: number) => {
-    if (gain >= 20) return { cls: 'bg-warning/10 text-warning border-warning/30', icon: '🔥', label: '极大提升' }
-    if (gain >= 10) return { cls: 'bg-brand-500/10 text-brand-400 border-brand-500/30', icon: '✅', label: '显著提升' }
-    return { cls: 'bg-surface-3 text-ink-secondary border-surface-4', icon: '📊', label: '效率提升' }
+    if (gain >= 20) return { cls: 'bg-warning/10 text-warning border-warning/30', label: '极大提升' }
+    if (gain >= 10) return { cls: 'bg-brand-500/10 text-brand-400 border-brand-500/30', label: '显著提升' }
+    return { cls: 'bg-surface-3 text-ink-secondary border-surface-4', label: '效率提升' }
   }
 
   return (
@@ -32,7 +32,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
       {/* Header */}
       <div>
         <h2 className="text-xl font-semibold text-ink-primary mb-2">
-          🎯 练度优化建议
+          练度优化建议
         </h2>
         <p className="text-ink-secondary text-sm">
           勾选要应用的建议，然后点击「应用选中建议」
@@ -109,7 +109,6 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
 
               {/* Badge */}
               <div className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold border ${badge.cls}`}>
-                <span className="mr-1.5">{badge.icon}</span>
                 {badge.label}
                 <span className="ml-2 font-mono">+{s.gain}%</span>
               </div>
