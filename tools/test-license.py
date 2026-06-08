@@ -93,8 +93,12 @@ def verify_client_state(workfile_data: dict, admin_secret: str) -> bool:
     
     # Verify client signature
     overrides = client_state.get("operator_elite_overrides", {})
+    config_override = client_state.get("config_override")
     client_sig = client_state.get("client_sig", "")
-    payload = canonical_json({"operator_elite_overrides": overrides})
+    payload_data = {"operator_elite_overrides": overrides}
+    if config_override:
+        payload_data["config_override"] = config_override
+    payload = canonical_json(payload_data)
     expected_client_sig = hmac_sha256(derived_key, payload)
     
     if client_sig != expected_client_sig:
@@ -163,6 +167,7 @@ def main():
         print(f"\n--- License Content ---")
         print(f"Version:    {data.get('version')}")
         print(f"Order Hash: {data.get('order_hash')}")
+        print(f"Permission: {data.get('permission', 'basic')}")
         print(f"Issued At:  {data.get('issued_at')}")
         print(f"Signature:  {data.get('sig')}")
         
@@ -199,6 +204,7 @@ def main():
         # Display
         print(f"\n--- Workfile Content ---")
         print(f"License Order Hash: {license_data.get('order_hash')}")
+        print(f"License Permission: {license_data.get('permission', 'basic')}")
         print(f"License Operators:  {len(license_data.get('operators', []))}")
         
         overrides = client_state.get('operator_elite_overrides', {})
@@ -208,6 +214,19 @@ def main():
             op_name = ops_by_id.get(op_id, {}).get('name', op_id)
             original_elite = ops_by_id.get(op_id, {}).get('elite', '?')
             print(f"  {op_name:20s} E{original_elite} -> E{elite}")
+
+        config_override = client_state.get('config_override')
+        if config_override:
+            print(f"\nConfig Override:")
+            print(f"  Layout:      {config_override.get('layout')}")
+            print(f"  Description: {config_override.get('desc')}")
+            print(f"  Trading:     {config_override.get('trading_stations_count')} stations")
+            print(f"  Manufacturing: {config_override.get('manufacturing_stations_count')} stations")
+            reqs = config_override.get('product_requirements', {})
+            print(f"  Products:")
+            for stype, prods in reqs.items():
+                for prod, count in prods.items():
+                    print(f"    {stype}: {prod} x{count}")
         
         print(f"\nUpdated At:  {client_state.get('updated_at')}")
         print(f"Client Sig:  {client_state.get('client_sig', '')[:32]}...")

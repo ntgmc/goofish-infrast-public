@@ -1,4 +1,4 @@
-import type { LicenseFile, LicenseOperator, WorkFile } from "./types";
+import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, WorkFile } from "./types";
 import { decryptPayload } from "./crypto";
 
 const LICENSE_PREFIX = "MAA-V1:";
@@ -65,6 +65,26 @@ function validateLicenseStructure(
   if (!Array.isArray(license.operators) || license.operators.length === 0) {
     return { ok: false, error: { code: "INVALID_DATA", message: "授权文件中的干员列表为空。" } };
   }
+  if (license.permission && !["basic", "premium", "admin"].includes(license.permission)) {
+    return { ok: false, error: { code: "INVALID_PERMISSION", message: "授权文件包含未知权限类型。" } };
+  }
+  const configCheck = validateConfigStructure(license.config);
+  if (!configCheck.ok) return configCheck;
+  return { ok: true };
+}
+
+function validateConfigStructure(
+  config: LicenseConfig
+): { ok: true } | { ok: false; error: ValidateError } {
+  if (!config.layout || !config.product_requirements) {
+    return { ok: false, error: { code: "INVALID_CONFIG", message: "基建配置缺少必要信息。" } };
+  }
+  if (
+    typeof config.trading_stations_count !== "number" ||
+    typeof config.manufacturing_stations_count !== "number"
+  ) {
+    return { ok: false, error: { code: "INVALID_CONFIG", message: "基建配置中的建筑数量不正确。" } };
+  }
   return { ok: true };
 }
 
@@ -80,6 +100,14 @@ function validateWorkFileStructure(
 
   if (!workfile.client_state.operator_elite_overrides || !workfile.client_state.client_sig) {
     return { ok: false, error: { code: "MISSING_FIELDS", message: "工作文件缺少上次保存的调整信息。" } };
+  }
+
+  if (workfile.client_state.config_override) {
+    if (!canEditConfig(workfile.license)) {
+      return { ok: false, error: { code: "PERMISSION_DENIED", message: "当前授权不允许修改基建配置。" } };
+    }
+    const configCheck = validateConfigStructure(workfile.client_state.config_override);
+    if (!configCheck.ok) return configCheck;
   }
 
   const overrides = workfile.client_state.operator_elite_overrides;
@@ -115,4 +143,18 @@ export function extractLicense(parsed: ParsedFile): LicenseFile {
 export function extractEliteOverrides(parsed: ParsedFile): Record<string, number> {
   if (parsed.kind === "workfile") return parsed.data.client_state.operator_elite_overrides;
   return {};
+}
+
+export function extractConfigOverride(parsed: ParsedFile): LicenseConfig | null {
+  if (parsed.kind !== "workfile") return null;
+  return parsed.data.client_state.config_override ?? null;
+}
+
+export function getPermissionMode(license: LicenseFile): PermissionMode {
+  return license.permission ?? "basic";
+}
+
+export function canEditConfig(license: LicenseFile): boolean {
+  const permission = getPermissionMode(license);
+  return permission === "premium" || permission === "admin";
 }

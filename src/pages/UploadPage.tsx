@@ -8,6 +8,7 @@ interface Props {
 export default function UploadPage({ onFileLoaded, error }: Props) {
   const [loading, setLoading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const processFile = useCallback(async (file: File) => {
@@ -22,7 +23,10 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
 
   const handleUpload = async () => {
     const file = fileRef.current?.files?.[0]
-    if (!file) return
+    if (!file) {
+      fileRef.current?.click()
+      return
+    }
     await processFile(file)
   }
 
@@ -30,6 +34,15 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
     e.preventDefault()
     setDragActive(false)
     const file = e.dataTransfer.files?.[0]
+    if (file) {
+      setSelectedFileName(file.name)
+      await processFile(file)
+    }
+  }
+
+  const handleFileChange = async () => {
+    const file = fileRef.current?.files?.[0]
+    setSelectedFileName(file?.name ?? null)
     if (file) await processFile(file)
   }
 
@@ -105,13 +118,18 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
                   <p className="text-ink-muted text-xs">
                     支持卖家下发的授权文件，或本工具保存的工作文件
                   </p>
+                  {selectedFileName && (
+                    <p className="text-brand-400 text-xs font-medium">
+                      已选择：{selectedFileName}
+                    </p>
+                  )}
                 </div>
                 <input
                   ref={fileRef}
                   id="file-upload"
                   type="file"
                   accept=".maa"
-                  onChange={handleUpload}
+                  onChange={handleFileChange}
                   className="hidden"
                   aria-label="选择 .maa 文件"
                 />
@@ -146,7 +164,7 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
                   验证中...
                 </span>
               ) : (
-                '验证并进入'
+                selectedFileName ? '验证并进入' : '选择 .maa 文件'
               )}
             </button>
           </div>

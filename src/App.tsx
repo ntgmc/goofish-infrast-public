@@ -1,6 +1,6 @@
-﻿import { lazy, Suspense, useState, useCallback } from 'react'
-import type { LicenseFile, AppStep } from './lib/types'
-import { parseFileContent, extractLicense, extractEliteOverrides } from './lib/license'
+import { lazy, Suspense, useState, useCallback } from 'react'
+import type { LicenseConfig, LicenseFile, AppStep } from './lib/types'
+import { parseFileContent, extractLicense, extractEliteOverrides, extractConfigOverride } from './lib/license'
 import UploadPage from './pages/UploadPage'
 
 const OptimizePage = lazy(() => import('./pages/OptimizePage'))
@@ -9,6 +9,7 @@ function App() {
   const [step, setStep] = useState<AppStep>('upload')
   const [license, setLicense] = useState<LicenseFile | null>(null)
   const [eliteOverrides, setEliteOverrides] = useState<Record<string, number>>({})
+  const [configOverride, setConfigOverride] = useState<LicenseConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleFileLoaded = useCallback(async (content: string) => {
@@ -20,6 +21,7 @@ function App() {
     }
     setLicense(extractLicense(result.data))
     setEliteOverrides(extractEliteOverrides(result.data))
+    setConfigOverride(extractConfigOverride(result.data))
     setStep('optimize')
   }, [])
 
@@ -27,6 +29,7 @@ function App() {
     setStep('upload')
     setLicense(null)
     setEliteOverrides({})
+    setConfigOverride(null)
     setError(null)
   }, [])
 
@@ -45,6 +48,8 @@ function App() {
             license={license}
             eliteOverrides={eliteOverrides}
             setEliteOverrides={setEliteOverrides}
+            configOverride={configOverride}
+            setConfigOverride={setConfigOverride}
             onReset={handleReset}
           />
         </Suspense>

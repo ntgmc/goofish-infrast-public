@@ -66,7 +66,7 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
               排班方案已就绪
             </h2>
             <p className="mt-1 text-sm text-ink-secondary">
-              排班 JSON 用于导入或交给 MAA 使用；工作文件用于下次回到本工具继续调整，不是给 MAA 导入的结果文件。
+              排班 JSON 用于导入或交给 MAA 使用；工作文件用于下次回到本工具继续调整练度与基建配置。
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
