@@ -1,4 +1,4 @@
-﻿import { useState, useCallback } from 'react'
+﻿import { useState, useCallback, useMemo } from 'react'
 import type { LicenseFile, OptimizeResult, UpgradeSuggestion } from '../lib/types'
 import { mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
@@ -19,7 +19,10 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
   const [loading, setLoading] = useState(false)
   const [phase, setPhase] = useState<'idle' | 'suggestions' | 'final'>('idle')
 
-  const mergedOperators = mergeOperators(license.operators, eliteOverrides)
+  const mergedOperators = useMemo(
+    () => mergeOperators(license.operators, eliteOverrides),
+    [license.operators, eliteOverrides]
+  )
 
   const runOptimize = useCallback(async (ignoreElite: boolean) => {
     const resp = await fetch('/api/optimize', {
@@ -77,12 +80,13 @@ export default function OptimizePage({ license, eliteOverrides, setEliteOverride
   }, [runOptimize])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
+    const selectedSet = new Set(selectedIds)
     const newOverrides = { ...eliteOverrides }
     for (const s of suggestions) {
-      if (s.type === 'single' && s.id && selectedIds.includes(s.id) && s.target_elite !== undefined) {
+      if (s.type === 'single' && s.id && selectedSet.has(s.id) && s.target_elite !== undefined) {
         newOverrides[s.id] = s.target_elite
       }
-      if (s.type === 'bundle' && s.id && s.ops && selectedIds.includes(s.id)) {
+      if (s.type === 'bundle' && s.id && s.ops && selectedSet.has(s.id)) {
         for (const op of s.ops) {
           if (op.id && op.target_elite !== undefined) {
             newOverrides[op.id] = op.target_elite
