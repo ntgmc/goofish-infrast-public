@@ -58,6 +58,34 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
 
   return (
     <div className="space-y-8">
+      {/* Result actions */}
+      <div className="bg-surface-1 rounded-xl p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-ink-primary">
+              排班方案已就绪
+            </h2>
+            <p className="mt-1 text-sm text-ink-secondary">
+              可直接下载给 MAA 使用的排班文件，或保存工作文件下次继续调整。
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
+            <button
+              onClick={onDownload}
+              className="bg-brand-600 hover:bg-brand-500 text-white font-semibold py-3 px-5 rounded-xl transition-colors duration-150"
+            >
+              下载排班 JSON
+            </button>
+            <button
+              onClick={onSaveWorkfile}
+              className="bg-surface-2 hover:bg-surface-3 text-ink-primary font-semibold py-3 px-5 rounded-xl transition-colors duration-150"
+            >
+              保存工作文件
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Stats cards */}
       <div className="grid grid-cols-2 gap-5">
         <div className="bg-surface-1 rounded-xl p-6">
@@ -125,7 +153,9 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
                 {/* Drones */}
                 {plan.drones?.enable && (
                   <div className="flex items-center gap-2 pt-3 mt-2 border-t border-surface-3/50">
-                    <span className="text-lg" role="img" aria-label="无人机">🤖</span>
+                    <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-medium text-ink-secondary">
+                      无人机
+                    </span>
                     <span className="text-ink-secondary text-sm">
                       无人机 → {plan.drones.room} {plan.drones.index}
                     </span>
@@ -138,22 +168,6 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-4 pt-2">
-        <button
-          onClick={onDownload}
-          className="flex-1 bg-brand-600 hover:bg-brand-500 text-white font-semibold py-3.5 px-6 rounded-xl transition-colors duration-150"
-        >
-          📋 下载 MAA 排班 JSON
-        </button>
-        <button
-          onClick={onSaveWorkfile}
-          className="flex-1 bg-surface-2 hover:bg-surface-3 text-ink-primary font-semibold py-3.5 px-6 rounded-xl transition-colors duration-150"
-        >
-          💾 保存工作文件
-        </button>
       </div>
     </div>
   )

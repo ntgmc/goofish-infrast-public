@@ -44,7 +44,9 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
         {/* Header with breathing room */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface-2 mb-6">
-            <span className="text-3xl" role="img" aria-label="MAA">🚀</span>
+            <svg className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
           </div>
           <h1 className="text-3xl font-bold text-ink-primary mb-3">
             MAA 基建排班优化器
@@ -61,7 +63,7 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
               className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg mb-6"
               role="alert"
             >
-              ❌ {error}
+              {error}
             </div>
           )}
 
