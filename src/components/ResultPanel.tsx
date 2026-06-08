@@ -1,4 +1,5 @@
-﻿import type { OptimizeResult } from '../lib/types'
+﻿import { useMemo } from 'react'
+import type { OptimizeResult } from '../lib/types'
 
 interface Props {
   result: OptimizeResult;
@@ -17,8 +18,43 @@ const ROOM_LABELS: Record<string, string> = {
   hire: '办公室',
 }
 
+type RoomRow = {
+  key: string;
+  label: string;
+  indexLabel: string;
+  product: string;
+  operators: string;
+  efficiency: string;
+}
+
+type PreparedPlan = OptimizeResult['plans'][number] & {
+  rows: RoomRow[];
+}
+
 export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Props) {
-  const totalEff = result?.raw_results?.reduce((s, r) => s + (r?.total_efficiency ?? 0), 0) ?? 0
+  const { totalEff, plans } = useMemo(() => {
+    const totalEff = result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
+    const plans: PreparedPlan[] = result.plans.map((plan) => ({
+      ...plan,
+      rows: Object.entries(plan.rooms ?? {}).flatMap(([roomType, rooms]) => {
+        if (!Array.isArray(rooms)) return []
+        return rooms.flatMap((room, index) => {
+          const ops = room.operators
+          if (!Array.isArray(ops) || ops.length === 0) return []
+          return {
+            key: `${roomType}-${index}`,
+            label: ROOM_LABELS[roomType] || roomType,
+            indexLabel: rooms.length > 1 ? String(index + 1) : '',
+            product: room.product || '-',
+            operators: ops.join(', '),
+            efficiency: `${(typeof room.efficiency === 'number' ? room.efficiency : 0).toFixed(1)}%`,
+          }
+        })
+      }),
+    }))
+
+    return { totalEff, plans }
+  }, [result])
 
   return (
     <div className="space-y-8">
@@ -43,7 +79,7 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
       <div>
         <h3 className="text-lg font-semibold text-ink-primary mb-5">排班详情</h3>
         <div className="space-y-5">
-          {(result?.plans ?? []).map((plan, i) => (
+          {plans.map((plan, i) => (
             <div key={i} className="bg-surface-1 rounded-xl overflow-hidden">
               {/* Plan header */}
               <div className="flex items-center justify-between px-6 py-4 bg-surface-2/50">
@@ -59,39 +95,32 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
 
               {/* Rooms */}
               <div className="px-6 py-4 space-y-1">
-                {plan.rooms && Object.entries(plan.rooms).flatMap(([roomType, rooms]) =>
-                  (!Array.isArray(rooms) ? [] : rooms).map((room: Record<string, unknown>, j: number) => {
-                    if (!room || typeof room !== 'object') return null
-                    const ops = room.operators as string[] | undefined
-                    if (!ops || !Array.isArray(ops) || ops.length === 0) return null
-                    return (
-                      <div 
-                        key={`${roomType}-${j}`} 
-                        className="flex items-center justify-between py-3 border-t border-surface-3/50 first:border-0"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-ink-secondary text-sm">
-                            {ROOM_LABELS[roomType] || roomType}
-                            {(rooms || []).length > 1 && (
-                              <span className="text-ink-muted ml-1">{j + 1}</span>
-                            )}
-                          </span>
-                          <span className="text-ink-muted text-xs">
-                            ({(room.product as string) || '-'})
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-ink-primary text-sm">
-                            {ops.join(', ')}
-                          </span>
-                          <span className="text-brand-400 text-sm font-mono font-medium">
-                            {(typeof room.efficiency === 'number' ? room.efficiency : 0).toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
+                {plan.rows.map((row) => (
+                  <div
+                    key={row.key}
+                    className="flex items-center justify-between py-3 border-t border-surface-3/50 first:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-ink-secondary text-sm">
+                        {row.label}
+                        {row.indexLabel && (
+                          <span className="text-ink-muted ml-1">{row.indexLabel}</span>
+                        )}
+                      </span>
+                      <span className="text-ink-muted text-xs">
+                        ({row.product})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-ink-primary text-sm">
+                        {row.operators}
+                      </span>
+                      <span className="text-brand-400 text-sm font-mono font-medium">
+                        {row.efficiency}
+                      </span>
+                    </div>
+                  </div>
+                ))}
 
                 {/* Drones */}
                 {plan.drones?.enable && (

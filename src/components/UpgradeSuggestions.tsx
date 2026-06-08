@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useCallback, useMemo, useState } from 'react'
 import type { UpgradeSuggestion } from '../lib/types'
 
 interface Props {
@@ -10,12 +10,16 @@ interface Props {
 export default function UpgradeSuggestions({ suggestions, onApply, loading }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  const toggle = (id: string) => {
-    const next = new Set(selected)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setSelected(next)
-  }
+  const selectedIds = useMemo(() => Array.from(selected), [selected])
+
+  const toggle = useCallback((id: string) => {
+    setSelected((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   const getBadge = (gain: number) => {
     if (gain >= 20) return { cls: 'bg-warning/10 text-warning border-warning/30', icon: '🔥', label: '极大提升' }
@@ -67,6 +71,10 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
                     src={`/webp96/${s.id}.webp`} 
                     alt="" 
                     className="w-12 h-12 rounded-lg bg-surface-2 object-cover"
+                    width={48}
+                    height={48}
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => (e.currentTarget.style.display = 'none')} 
                   />
                 )}
@@ -78,6 +86,10 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
                         src={`/webp96/${op.id}.webp`} 
                         alt="" 
                         className="w-10 h-10 rounded-lg bg-surface-2 object-cover border-2 border-surface-1"
+                        width={40}
+                        height={40}
+                        loading="lazy"
+                        decoding="async"
                         onError={(e) => (e.currentTarget.style.display = 'none')} 
                       />
                     ))}
@@ -109,7 +121,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
       {/* Apply button */}
       <div className="sticky bottom-6 pt-4">
         <button
-          onClick={() => onApply(Array.from(selected))}
+          onClick={() => onApply(selectedIds)}
           disabled={loading || selected.size === 0}
           className="w-full bg-success hover:bg-success/90 disabled:bg-surface-3 disabled:text-ink-muted text-white font-semibold py-4 px-8 rounded-xl text-lg transition-colors duration-150 shadow-lg shadow-success/20"
         >

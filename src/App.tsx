@@ -1,8 +1,9 @@
-﻿import { useState, useCallback } from 'react'
+﻿import { lazy, Suspense, useState, useCallback } from 'react'
 import type { LicenseFile, AppStep } from './lib/types'
 import { parseFileContent, extractLicense, extractEliteOverrides } from './lib/license'
 import UploadPage from './pages/UploadPage'
-import OptimizePage from './pages/OptimizePage'
+
+const OptimizePage = lazy(() => import('./pages/OptimizePage'))
 
 function App() {
   const [step, setStep] = useState<AppStep>('upload')
@@ -35,12 +36,18 @@ function App() {
         <UploadPage onFileLoaded={handleFileLoaded} error={error} />
       )}
       {step === 'optimize' && license && (
-        <OptimizePage
-          license={license}
-          eliteOverrides={eliteOverrides}
-          setEliteOverrides={setEliteOverrides}
-          onReset={handleReset}
-        />
+        <Suspense fallback={
+          <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
+            正在载入排班工具...
+          </div>
+        }>
+          <OptimizePage
+            license={license}
+            eliteOverrides={eliteOverrides}
+            setEliteOverrides={setEliteOverrides}
+            onReset={handleReset}
+          />
+        </Suspense>
       )}
     </div>
   )
