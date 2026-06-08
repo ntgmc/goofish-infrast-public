@@ -27,7 +27,7 @@ export async function parseFileContent(
       if (!check.ok) return check;
       return { ok: true, data: { kind: "license", data } };
     } catch {
-      return { ok: false, error: { code: "DECRYPT_FAILED", message: "授权文件解密失败，文件可能已损坏" } };
+      return { ok: false, error: { code: "DECRYPT_FAILED", message: "授权文件无法读取，文件可能已损坏。" } };
     }
   }
 
@@ -40,24 +40,30 @@ export async function parseFileContent(
       if (!check.ok) return check;
       return { ok: true, data: { kind: "workfile", data } };
     } catch {
-      return { ok: false, error: { code: "DECRYPT_FAILED", message: "工作文件解密失败，文件可能已损坏" } };
+      return { ok: false, error: { code: "DECRYPT_FAILED", message: "工作文件无法读取，文件可能已损坏。" } };
     }
   }
 
-  return { ok: false, error: { code: "INVALID_PREFIX", message: "不识别的文件格式，请上传 .maa 文件" } };
+  return {
+    ok: false,
+    error: {
+      code: "INVALID_PREFIX",
+      message: "无法识别这个 .maa 文件。请上传卖家下发的授权文件，或本工具保存的工作文件。",
+    },
+  };
 }
 
 function validateLicenseStructure(
   license: LicenseFile
 ): { ok: true } | { ok: false; error: ValidateError } {
   if (!license.order_hash || !license.operators || !license.config || !license.sig) {
-    return { ok: false, error: { code: "MISSING_FIELDS", message: "授权文件缺少必要字段" } };
+    return { ok: false, error: { code: "MISSING_FIELDS", message: "授权文件缺少必要信息。" } };
   }
   if (license.version !== 1) {
-    return { ok: false, error: { code: "VERSION_MISMATCH", message: "不支持的授权文件版本" } };
+    return { ok: false, error: { code: "VERSION_MISMATCH", message: "不支持这个授权文件版本。" } };
   }
   if (!Array.isArray(license.operators) || license.operators.length === 0) {
-    return { ok: false, error: { code: "INVALID_DATA", message: "授权文件干员列表为空" } };
+    return { ok: false, error: { code: "INVALID_DATA", message: "授权文件中的干员列表为空。" } };
   }
   return { ok: true };
 }
@@ -66,14 +72,14 @@ function validateWorkFileStructure(
   workfile: WorkFile
 ): { ok: true } | { ok: false; error: ValidateError } {
   if (!workfile.license || !workfile.client_state) {
-    return { ok: false, error: { code: "MISSING_FIELDS", message: "工作文件缺少必要字段" } };
+    return { ok: false, error: { code: "MISSING_FIELDS", message: "工作文件缺少必要信息。" } };
   }
 
   const licenseCheck = validateLicenseStructure(workfile.license);
   if (!licenseCheck.ok) return licenseCheck;
 
   if (!workfile.client_state.operator_elite_overrides || !workfile.client_state.client_sig) {
-    return { ok: false, error: { code: "MISSING_FIELDS", message: "工作文件缺少用户状态字段" } };
+    return { ok: false, error: { code: "MISSING_FIELDS", message: "工作文件缺少上次保存的调整信息。" } };
   }
 
   const overrides = workfile.client_state.operator_elite_overrides;

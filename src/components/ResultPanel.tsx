@@ -66,7 +66,7 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
               排班方案已就绪
             </h2>
             <p className="mt-1 text-sm text-ink-secondary">
-              可直接下载给 MAA 使用的排班文件，或保存工作文件下次继续调整。
+              排班 JSON 用于导入或交给 MAA 使用；工作文件用于下次回到本工具继续调整，不是给 MAA 导入的结果文件。
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
@@ -74,13 +74,13 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
               onClick={onDownload}
               className="bg-brand-600 hover:bg-brand-500 text-white font-semibold py-3 px-5 rounded-xl transition-colors duration-150"
             >
-              下载排班 JSON
+              下载给 MAA 使用的排班 JSON
             </button>
             <button
               onClick={onSaveWorkfile}
               className="bg-surface-2 hover:bg-surface-3 text-ink-primary font-semibold py-3 px-5 rounded-xl transition-colors duration-150"
             >
-              保存工作文件
+              保存可继续编辑的工作文件
             </button>
           </div>
         </div>
