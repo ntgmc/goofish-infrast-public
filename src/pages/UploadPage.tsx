@@ -73,7 +73,7 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
                 htmlFor="file-upload"
                 className="block text-sm font-medium text-ink-secondary mb-3"
               >
-                授权文件 / 工作文件
+                .maa 文件
               </label>
               <div
                 onDrop={handleDrop}
@@ -103,7 +103,7 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
                     拖拽 .maa 文件到此处，或点击选择
                   </p>
                   <p className="text-ink-muted text-xs">
-                    支持 MAA-V1 授权文件和 MAA-W1 工作文件
+                    支持卖家下发的授权文件，或本工具保存的工作文件
                   </p>
                 </div>
                 <input
@@ -115,6 +115,20 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
                   className="hidden"
                   aria-label="选择 .maa 文件"
                 />
+              </div>
+              <div className="mt-4 grid gap-3 text-left sm:grid-cols-2">
+                <div className="rounded-lg bg-surface-2/60 p-3">
+                  <p className="text-sm font-medium text-ink-primary">第一次使用</p>
+                  <p className="mt-1 text-xs text-ink-secondary">
+                    上传卖家给你的授权文件，用于生成排班。
+                  </p>
+                </div>
+                <div className="rounded-lg bg-surface-2/60 p-3">
+                  <p className="text-sm font-medium text-ink-primary">继续调整</p>
+                  <p className="mt-1 text-xs text-ink-secondary">
+                    上传之前保存的工作文件，继续上次的练度调整。
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -140,7 +154,7 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
 
         {/* Help text */}
         <p className="text-center text-ink-muted text-xs mt-6">
-          上传卖家下发的 .maa 授权文件或工作文件
+          .maa 是本工具识别的上传格式，文件内容已加密，无需打开查看。
         </p>
       </div>
     </div>
