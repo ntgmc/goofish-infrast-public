@@ -86,6 +86,7 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
             </button>
           </div>
         </div>
+        <MaaImportGuide />
       </div>
 
       {/* Stats cards */}
@@ -169,6 +170,34 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function MaaImportGuide() {
+  return (
+    <div className="mt-6 border-t border-surface-3/60 pt-5">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.25fr)] lg:items-start">
+        <div>
+          <h3 className="text-base font-semibold text-ink-primary">
+            如何在 MAA 中使用排班 JSON
+          </h3>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-ink-secondary">
+            <li>在 MAA 左侧勾选 <span className="font-medium text-ink-primary">基建换班</span></li>
+            <li><span className="font-medium text-ink-primary">其他模式</span> 选择 <span className="font-medium text-ink-primary">自定义基建配置</span></li>
+            <li><span className="font-medium text-ink-primary">内容配置</span> 选择 <span className="font-medium text-ink-primary">自定义</span></li>
+            <li>点击选择，选择本站下载的排班 JSON</li>
+          </ol>
+        </div>
+        <div className="overflow-hidden rounded-lg border border-surface-3 bg-surface-0">
+          <img
+            src="/assets/maa-import-schedule-json.png"
+            alt="MAA 自定义基建配置中选择排班 JSON 的位置示意图"
+            className="block h-auto w-full"
+            loading="lazy"
+          />
         </div>
       </div>
     </div>

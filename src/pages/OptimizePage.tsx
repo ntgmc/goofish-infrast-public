@@ -4,7 +4,7 @@ import { canEditConfig, getPermissionMode, mergeOperators } from '../lib/license
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS } from '../components/ConfigEditor'
 import UpgradeSuggestions from '../components/UpgradeSuggestions'
-import ResultPanel from '../components/ResultPanel'
+import ResultPanel, { MaaImportGuide } from '../components/ResultPanel'
 
 interface Props {
   license: LicenseFile;
@@ -371,7 +371,7 @@ function AdminOperatorPanel({
 }) {
   return (
     <section className="mb-8 rounded-xl bg-surface-1 p-5 sm:p-6">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-ink-primary">Admin 干员数据</h2>
@@ -465,6 +465,7 @@ function CurrentPlanActions({
           </button>
         </div>
       </div>
+      <MaaImportGuide />
     </div>
   )
 }
