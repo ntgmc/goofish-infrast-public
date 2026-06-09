@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from 'react'
-import type { LicenseConfig, LicenseFile, OptimizeResult, UpgradeSuggestion } from '../lib/types'
+import { useState, useCallback, useMemo, useRef } from 'react'
+import type { LicenseConfig, LicenseFile, LicenseOperator, OptimizeResult, UpgradeSuggestion } from '../lib/types'
 import { canEditConfig, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS } from '../components/ConfigEditor'
@@ -8,6 +8,7 @@ import ResultPanel from '../components/ResultPanel'
 
 interface Props {
   license: LicenseFile;
+  setLicense: (v: LicenseFile) => void;
   eliteOverrides: Record<string, number>;
   setEliteOverrides: (v: Record<string, number>) => void;
   configOverride: LicenseConfig | null;
@@ -17,6 +18,7 @@ interface Props {
 
 export default function OptimizePage({
   license,
+  setLicense,
   eliteOverrides,
   setEliteOverrides,
   configOverride,
@@ -28,8 +30,11 @@ export default function OptimizePage({
   const [finalResult, setFinalResult] = useState<OptimizeResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [phase, setPhase] = useState<'idle' | 'suggestions' | 'final'>('idle')
+  const [operatorUploadStatus, setOperatorUploadStatus] = useState<string | null>(null)
+  const operatorFileRef = useRef<HTMLInputElement>(null)
 
   const permission = getPermissionMode(license)
+  const userCanReplaceOperators = permission === 'admin'
   const userCanEditConfig = canEditConfig(license)
   const activeConfig = useMemo(
     () => normalizeConfig(configOverride ?? license.config),
@@ -53,6 +58,27 @@ export default function OptimizePage({
     setFinalResult(null)
     setPhase('idle')
   }, [])
+
+  const handleReplaceOperators = useCallback(async () => {
+    if (!userCanReplaceOperators) return
+    const file = operatorFileRef.current?.files?.[0]
+    if (!file) {
+      operatorFileRef.current?.click()
+      return
+    }
+    try {
+      const nextOperators = parseOperatorsFile(await file.text())
+      setLicense({ ...license, operators: nextOperators })
+      setEliteOverrides({})
+      clearGeneratedResult()
+      setOperatorUploadStatus(`已重新载入 ${nextOperators.length} 名干员。`)
+      if (operatorFileRef.current) {
+        operatorFileRef.current.value = ''
+      }
+    } catch (error) {
+      setOperatorUploadStatus((error as Error).message)
+    }
+  }, [clearGeneratedResult, license, setEliteOverrides, setLicense, userCanReplaceOperators])
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
     if (!userCanEditConfig) return
@@ -234,6 +260,15 @@ export default function OptimizePage({
         </button>
       </header>
 
+      {userCanReplaceOperators && (
+        <AdminOperatorPanel
+          operatorCount={license.operators.length}
+          status={operatorUploadStatus}
+          fileRef={operatorFileRef}
+          onReplace={handleReplaceOperators}
+        />
+      )}
+
       <ConfigEditor
         config={activeConfig}
         permission={permission}
@@ -321,6 +356,78 @@ export default function OptimizePage({
       )}
     </div>
   )
+}
+
+function AdminOperatorPanel({
+  operatorCount,
+  status,
+  fileRef,
+  onReplace,
+}: {
+  operatorCount: number;
+  status: string | null;
+  fileRef: React.RefObject<HTMLInputElement>;
+  onReplace: () => void;
+}) {
+  return (
+    <section className="mb-8 rounded-xl bg-surface-1 p-5 sm:p-6">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold text-ink-primary">Admin 干员数据</h2>
+            <span className="rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-medium text-brand-300">
+              {operatorCount} 名干员
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-ink-secondary">
+            Admin 授权允许重新上传 operators.json 或 .txt，上传后会清空当前练度调整并重新计算排班。
+          </p>
+          {status && (
+            <p className="mt-3 text-sm text-brand-300">{status}</p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onReplace}
+          className="rounded-xl bg-surface-2 px-5 py-3 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3 lg:flex-shrink-0"
+        >
+          重新上传干员数据
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,.txt,application/json,text/plain"
+          onChange={onReplace}
+          className="hidden"
+        />
+      </div>
+    </section>
+  )
+}
+
+function parseOperatorsFile(text: string): LicenseOperator[] {
+  const data = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('干员数据不能为空。')
+  }
+  const requiredKeys = ['id', 'name', 'own', 'elite', 'rarity'] as const
+  for (const [index, raw] of data.entries()) {
+    if (!raw || typeof raw !== 'object') {
+      throw new Error(`第 ${index + 1} 个干员不是对象。`)
+    }
+    const op = raw as Record<string, unknown>
+    const missing = requiredKeys.filter((key) => !(key in op))
+    if (missing.length > 0) {
+      throw new Error(`干员 ${String(op.name ?? index + 1)} 缺少字段: ${missing.join(', ')}。`)
+    }
+    if (typeof op.id !== 'string' || typeof op.name !== 'string' || typeof op.own !== 'boolean') {
+      throw new Error(`干员 ${String(op.name ?? index + 1)} 的 id/name/own 格式不正确。`)
+    }
+    if (!Number.isFinite(op.elite) || !Number.isFinite(op.rarity)) {
+      throw new Error(`干员 ${String(op.name)} 的 elite/rarity 必须是数字。`)
+    }
+  }
+  return data as LicenseOperator[]
 }
 
 function CurrentPlanActions({

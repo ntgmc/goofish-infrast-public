@@ -73,6 +73,7 @@ function App() {
         }>
           <OptimizePage
             license={license}
+            setLicense={setLicense}
             eliteOverrides={eliteOverrides}
             setEliteOverrides={setEliteOverrides}
             configOverride={configOverride}

@@ -326,7 +326,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>运行 MAA 干员识别功能</li>
-            <li>导出到剪贴板后粘贴到 <span className="font-mono text-ink-primary">operators.json</span>，或直接导出 JSON 文件（支持 UTF-8 BOM 格式）</li>
+            <li>新建 <span className="font-mono text-ink-primary">TXT/JSON</span> 文件，导出到剪贴板后粘贴，或直接导出 JSON 文件（支持 UTF-8 BOM 格式）</li>
           </ul>
         </div>
       </section>
