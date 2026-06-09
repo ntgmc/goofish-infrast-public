@@ -230,7 +230,7 @@ export default function OptimizePage({
           onClick={onReset}
           className="self-start text-ink-secondary hover:text-ink-primary text-sm px-4 py-2 rounded-lg hover:bg-surface-2 transition-colors duration-150 sm:self-auto"
         >
-          退出登录
+          重新选择文件
         </button>
       </header>
 

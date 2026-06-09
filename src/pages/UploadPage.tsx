@@ -26,7 +26,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error }: P
             MAA 基建排班优化器
           </h1>
           <p className="text-base text-ink-secondary">
-            VIP 基建售后服务
+            上传授权文件或使用 CDK 生成排班
           </p>
         </div>
 
