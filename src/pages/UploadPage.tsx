@@ -1,11 +1,73 @@
-﻿import { useState, useRef, useCallback } from 'react'
+import { useMemo, useState, useRef, useCallback } from 'react'
+import type { LicenseConfig, LicenseFile, LicenseOperator } from '../lib/types'
+import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 
 interface Props {
   onFileLoaded: (content: string) => Promise<void>;
+  onLicenseRedeemed: (license: LicenseFile) => void;
   error: string | null;
 }
 
-export default function UploadPage({ onFileLoaded, error }: Props) {
+type EntryMode = 'license' | 'cdk'
+
+export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error }: Props) {
+  const [mode, setMode] = useState<EntryMode>('license')
+
+  return (
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="w-full max-w-5xl">
+        <div className="mb-8 text-center">
+          <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2">
+            <svg className="h-8 w-8 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h1 className="mb-3 text-3xl font-bold text-ink-primary">
+            MAA 基建排班优化器
+          </h1>
+          <p className="text-base text-ink-secondary">
+            VIP 基建售后服务
+          </p>
+        </div>
+
+        <div className="mb-5 flex justify-center">
+          <div className="inline-flex rounded-lg bg-surface-1 p-1">
+            <ModeButton label="上传 .maa 文件" active={mode === 'license'} onClick={() => setMode('license')} />
+            <ModeButton label="使用 CDK 生成 .maa" active={mode === 'cdk'} onClick={() => setMode('cdk')} />
+          </div>
+        </div>
+
+        {mode === 'license' ? (
+          <LicenseUploadPanel onFileLoaded={onFileLoaded} error={error} />
+        ) : (
+          <CdkRedeemPanel onLicenseRedeemed={onLicenseRedeemed} />
+        )}
+
+        <p className="mt-6 text-center text-xs text-ink-muted">
+          .maa 是本工具识别的上传格式，文件内容已加密，无需打开查看。
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function ModeButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors duration-150 ${
+        active
+          ? 'bg-brand-600 text-white'
+          : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+function LicenseUploadPanel({ onFileLoaded, error }: { onFileLoaded: (content: string) => Promise<void>; error: string | null }) {
   const [loading, setLoading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
@@ -46,135 +108,258 @@ export default function UploadPage({ onFileLoaded, error }: Props) {
     if (file) await processFile(file)
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setDragActive(true)
-  }
-
   return (
-    <div className="flex items-center justify-center min-h-screen p-6">
-      <div className="w-full max-w-md">
-        {/* Header with breathing room */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface-2 mb-6">
-            <svg className="w-8 h-8 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold text-ink-primary mb-3">
-            MAA 基建排班优化器
-          </h1>
-          <p className="text-ink-secondary text-base">
-            VIP 基建售后服务
-          </p>
+    <div className="mx-auto max-w-md rounded-xl bg-surface-1 p-8">
+      {error && (
+        <div className="mb-6 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-error" role="alert">
+          {error}
         </div>
+      )}
 
-        {/* Upload card */}
-        <div className="bg-surface-1 rounded-xl p-8">
-          {error && (
-            <div 
-              className="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg mb-6"
-              role="alert"
-            >
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-6">
-            <div>
-              <label 
-                htmlFor="file-upload"
-                className="block text-sm font-medium text-ink-secondary mb-3"
-              >
-                .maa 文件
-              </label>
-              <div
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={() => setDragActive(false)}
-                onClick={() => fileRef.current?.click()}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileRef.current?.click() }}
-                role="button"
-                tabIndex={0}
-                aria-label="上传 .maa 文件"
-                className={`
-                  border-2 border-dashed rounded-xl p-8 text-center cursor-pointer
-                  transition-colors duration-150
-                  ${dragActive 
-                    ? 'border-brand-400 bg-brand-500/10' 
-                    : 'border-surface-4 hover:border-brand-500/50'
-                  }
-                `}
-              >
-                <div className="space-y-3">
-                  <div className="text-ink-muted">
-                    <svg className="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                  </div>
-                  <p className="text-ink-secondary text-sm">
-                    拖拽 .maa 文件到此处，或点击选择
-                  </p>
-                  <p className="text-ink-muted text-xs">
-                    支持卖家下发的授权文件，或本工具保存的工作文件
-                  </p>
-                  {selectedFileName && (
-                    <p className="text-brand-400 text-xs font-medium">
-                      已选择：{selectedFileName}
-                    </p>
-                  )}
-                </div>
-                <input
-                  ref={fileRef}
-                  id="file-upload"
-                  type="file"
-                  accept=".maa"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  aria-label="选择 .maa 文件"
-                />
+      <div className="space-y-6">
+        <div>
+          <label htmlFor="file-upload" className="mb-3 block text-sm font-medium text-ink-secondary">
+            .maa 文件
+          </label>
+          <div
+            onDrop={handleDrop}
+            onDragOver={(event) => {
+              event.preventDefault()
+              setDragActive(true)
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onClick={() => fileRef.current?.click()}
+            onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') fileRef.current?.click() }}
+            role="button"
+            tabIndex={0}
+            aria-label="上传 .maa 文件"
+            className={`cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors duration-150 ${
+              dragActive
+                ? 'border-brand-400 bg-brand-500/10'
+                : 'border-surface-4 hover:border-brand-500/50'
+            }`}
+          >
+            <div className="space-y-3">
+              <div className="text-ink-muted">
+                <svg className="mx-auto h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
               </div>
-              <div className="mt-4 grid gap-3 text-left sm:grid-cols-2">
-                <div className="rounded-lg bg-surface-2/60 p-3">
-                  <p className="text-sm font-medium text-ink-primary">第一次使用</p>
-                  <p className="mt-1 text-xs text-ink-secondary">
-                    上传卖家给你的授权文件，用于生成排班。
-                  </p>
-                </div>
-                <div className="rounded-lg bg-surface-2/60 p-3">
-                  <p className="text-sm font-medium text-ink-primary">继续调整</p>
-                  <p className="mt-1 text-xs text-ink-secondary">
-                    上传之前保存的工作文件，继续上次的练度调整。
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleUpload}
-              disabled={loading}
-              className="w-full bg-brand-600 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-150"
-            >
-              {loading ? (
-                <span className="inline-flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  验证中...
-                </span>
-              ) : (
-                selectedFileName ? '验证并进入' : '选择 .maa 文件'
+              <p className="text-sm text-ink-secondary">
+                拖拽 .maa 文件到此处，或点击选择
+              </p>
+              <p className="text-xs text-ink-muted">
+                支持卖家下发的授权文件，或本工具保存的工作文件
+              </p>
+              {selectedFileName && (
+                <p className="text-xs font-medium text-brand-400">
+                  已选择：{selectedFileName}
+                </p>
               )}
-            </button>
+            </div>
+            <input
+              ref={fileRef}
+              id="file-upload"
+              type="file"
+              accept=".maa"
+              onChange={handleFileChange}
+              className="hidden"
+              aria-label="选择 .maa 文件"
+            />
+          </div>
+          <div className="mt-4 grid gap-3 text-left sm:grid-cols-2">
+            <div className="rounded-lg bg-surface-2/60 p-3">
+              <p className="text-sm font-medium text-ink-primary">第一次使用</p>
+              <p className="mt-1 text-xs text-ink-secondary">
+                上传卖家给你的授权文件，用于生成排班。
+              </p>
+            </div>
+            <div className="rounded-lg bg-surface-2/60 p-3">
+              <p className="text-sm font-medium text-ink-primary">继续调整</p>
+              <p className="mt-1 text-xs text-ink-secondary">
+                上传之前保存的工作文件，继续上次的练度调整。
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Help text */}
-        <p className="text-center text-ink-muted text-xs mt-6">
-          .maa 是本工具识别的上传格式，文件内容已加密，无需打开查看。
-        </p>
+        <button
+          onClick={handleUpload}
+          disabled={loading}
+          className="w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+        >
+          {loading ? '验证中...' : selectedFileName ? '验证并进入' : '选择 .maa 文件'}
+        </button>
       </div>
     </div>
   )
+}
+
+function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: LicenseFile) => void }) {
+  const [code, setCode] = useState('')
+  const [operators, setOperators] = useState<LicenseOperator[] | null>(null)
+  const [operatorsFileName, setOperatorsFileName] = useState<string | null>(null)
+  const [config, setConfig] = useState<LicenseConfig>(() => cloneConfig(CONFIG_PRESETS['243']))
+  const [confirmed, setConfirmed] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const operatorsRef = useRef<HTMLInputElement>(null)
+
+  const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
+  const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
+
+  const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
+    const next = normalizeConfig(normalizedConfig)
+    mutate(next)
+    setConfig(next)
+  }, [normalizedConfig])
+
+  const handleOperatorsFile = async () => {
+    const file = operatorsRef.current?.files?.[0]
+    setOperatorsFileName(file?.name ?? null)
+    setOperators(null)
+    setError(null)
+    if (!file) return
+    try {
+      const data = JSON.parse(await file.text()) as unknown
+      if (!Array.isArray(data)) {
+        throw new Error('operators.json 顶层必须是数组。')
+      }
+      setOperators(data as LicenseOperator[])
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setError(null)
+    if (!operators) {
+      setError('请先上传 operators.json。')
+      return
+    }
+    if (!confirmed) {
+      setError('请先确认 CDK 仅可使用一次。')
+      return
+    }
+    if (!configValidation.ok) {
+      setError(configValidation.message)
+      return
+    }
+    setLoading(true)
+    try {
+      const resp = await fetch('/api/redeem-cdk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          operators,
+          config: normalizedConfig,
+        }),
+      })
+      const data = await resp.json() as {
+        error?: string;
+        license_file_content?: string;
+        license?: LicenseFile;
+      }
+      if (!resp.ok) {
+        throw new Error(data.error || `兑换失败: ${resp.status}`)
+      }
+      if (!data.license_file_content || !data.license) {
+        throw new Error('兑换响应缺少授权文件。')
+      }
+      downloadLicense(data.license_file_content, data.license.order_hash)
+      onLicenseRedeemed(data.license)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="mx-auto max-w-3xl rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">
+          {error}
+        </div>
+      )}
+
+      <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK</span>
+            <input
+              type="text"
+              value={code}
+              onChange={(event) => setCode(event.currentTarget.value)}
+              className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink-primary placeholder:text-ink-muted"
+              placeholder="MAA-XXXX-XXXX-XXXX"
+              required
+            />
+          </label>
+          <div>
+            <span className="mb-2 block text-sm font-medium text-ink-secondary">operators.json</span>
+            <button
+              type="button"
+              onClick={() => operatorsRef.current?.click()}
+              className="w-full rounded-lg bg-surface-2 px-4 py-2 text-left text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
+            >
+              {operatorsFileName ? `已选择：${operatorsFileName}` : '选择干员数据文件'}
+            </button>
+            {operators && (
+              <p className="mt-2 text-xs text-brand-400">已载入 {operators.length} 名干员</p>
+            )}
+            <input
+              ref={operatorsRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={handleOperatorsFile}
+              className="hidden"
+            />
+          </div>
+        </div>
+      </section>
+
+      <ConfigEditor
+        config={normalizedConfig}
+        canEdit
+        changed={false}
+        validation={configValidation}
+        onUpdate={updateConfig}
+        note="提交前可选择或调整基建配置；提交成功后本次导入的干员和配置不能再次修改。"
+      />
+
+      <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
+        <label className="flex items-start gap-3 text-sm text-ink-secondary">
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={(event) => setConfirmed(event.currentTarget.checked)}
+            className="mt-1 h-4 w-4 flex-shrink-0 accent-brand-500"
+          />
+          <span>
+            我确认 CDK 仅可使用一次，提交后本次导入的干员和配置不能再次修改。
+          </span>
+        </label>
+        <button
+          type="submit"
+          disabled={loading || !confirmed || !operators || !code.trim() || !configValidation.ok}
+          className="mt-5 w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+        >
+          {loading ? '正在生成 .maa...' : '兑换并生成 .maa'}
+        </button>
+      </section>
+    </form>
+  )
+}
+
+function downloadLicense(content: string, orderHash: string) {
+  const blob = new Blob([content], { type: 'application/octet-stream' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `maa-license-${orderHash.slice(0, 8)}.maa`
+  a.click()
+  URL.revokeObjectURL(url)
 }

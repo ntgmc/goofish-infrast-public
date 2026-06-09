@@ -4,6 +4,7 @@ import { parseFileContent, extractLicense, extractEliteOverrides, extractConfigO
 import UploadPage from './pages/UploadPage'
 
 const OptimizePage = lazy(() => import('./pages/OptimizePage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
 
 function App() {
   const [step, setStep] = useState<AppStep>('upload')
@@ -33,10 +34,36 @@ function App() {
     setError(null)
   }, [])
 
+  const handleLicenseRedeemed = useCallback((redeemedLicense: LicenseFile) => {
+    setError(null)
+    setLicense(redeemedLicense)
+    setEliteOverrides({})
+    setConfigOverride(null)
+    setStep('optimize')
+  }, [])
+
+  if (window.location.pathname === '/admin') {
+    return (
+      <div className="min-h-screen bg-surface-0 text-ink-primary">
+        <Suspense fallback={
+          <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
+            正在载入管理后台...
+          </div>
+        }>
+          <AdminPage />
+        </Suspense>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">
       {step === 'upload' && (
-        <UploadPage onFileLoaded={handleFileLoaded} error={error} />
+        <UploadPage
+          onFileLoaded={handleFileLoaded}
+          onLicenseRedeemed={handleLicenseRedeemed}
+          error={error}
+        />
       )}
       {step === 'optimize' && license && (
         <Suspense fallback={

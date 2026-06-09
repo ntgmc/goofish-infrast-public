@@ -8,6 +8,7 @@ _tmp.py
 .env
 .env.*
 .agents
+.vite-dev.*
 
 # Local Netlify folder
 .netlify
