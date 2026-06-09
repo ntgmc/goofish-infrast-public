@@ -357,7 +357,13 @@ export default function OptimizePage({
       )}
 
       {phase === 'suggestions' && suggestions.length > 0 && (
-        <div className="mt-8">
+        <div className="mt-8 space-y-8">
+          {currentResult && (
+            <CurrentPlanActions
+              onDownload={handleDownloadMAA}
+              onSaveWorkfile={handleSaveWorkfile}
+            />
+          )}
           <UpgradeSuggestions
             suggestions={suggestions}
             onApply={handleApplySuggestions}
@@ -385,6 +391,45 @@ export default function OptimizePage({
           <ResultPanel result={finalResult} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />
         </div>
       )}
+    </div>
+  )
+}
+
+function CurrentPlanActions({
+  onDownload,
+  onSaveWorkfile,
+}: {
+  onDownload: () => void;
+  onSaveWorkfile: () => void;
+}) {
+  return (
+    <div className="bg-surface-1 rounded-xl p-5 sm:p-6">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-ink-primary">
+            当前排班已生成
+          </h2>
+          <p className="mt-1 text-sm text-ink-secondary">
+            可先下载当前方案，或保存工作文件继续保留练度与基建配置。
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
+          <button
+            type="button"
+            onClick={onDownload}
+            className="bg-brand-600 hover:bg-brand-500 text-white font-semibold py-3 px-5 rounded-xl transition-colors duration-150"
+          >
+            下载当前排班
+          </button>
+          <button
+            type="button"
+            onClick={onSaveWorkfile}
+            className="bg-surface-2 hover:bg-surface-3 text-ink-primary font-semibold py-3 px-5 rounded-xl transition-colors duration-150"
+          >
+            保存工作文件
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

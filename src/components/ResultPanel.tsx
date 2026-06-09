@@ -71,16 +71,18 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
           </div>
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
             <button
+              type="button"
               onClick={onDownload}
               className="bg-brand-600 hover:bg-brand-500 text-white font-semibold py-3 px-5 rounded-xl transition-colors duration-150"
             >
-              下载给 MAA 使用的排班 JSON
+              下载排班 JSON
             </button>
             <button
+              type="button"
               onClick={onSaveWorkfile}
               className="bg-surface-2 hover:bg-surface-3 text-ink-primary font-semibold py-3 px-5 rounded-xl transition-colors duration-150"
             >
-              保存可继续编辑的工作文件
+              保存工作文件
             </button>
           </div>
         </div>
