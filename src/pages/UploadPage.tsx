@@ -299,7 +299,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
             />
           </label>
           <div>
-            <span className="mb-2 block text-sm font-medium text-ink-secondary">operators.json</span>
+            <span className="mb-2 block text-sm font-medium text-ink-secondary">operators.json / .txt</span>
             <button
               type="button"
               onClick={() => operatorsRef.current?.click()}
@@ -313,11 +313,21 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
             <input
               ref={operatorsRef}
               type="file"
-              accept=".json,application/json"
+              accept=".json,.txt,application/json,text/plain"
               onChange={handleOperatorsFile}
               className="hidden"
             />
           </div>
+        </div>
+        <div className="mt-5 rounded-lg bg-surface-2/60 p-4 text-sm text-ink-secondary">
+          <p className="font-medium text-ink-primary">1. 导出干员数据</p>
+          <p className="mt-2">
+            通过 <a className="text-brand-400 underline-offset-4 hover:underline" href="https://github.com/MaaAssistantArknights/MaaAssistantArknights" target="_blank" rel="noreferrer">MAA</a> 导出干员数据到 <span className="font-mono text-ink-primary">operators.json</span>。
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>运行 MAA 干员识别功能</li>
+            <li>导出到剪贴板后粘贴到 <span className="font-mono text-ink-primary">operators.json</span>，或直接导出 JSON 文件（支持 UTF-8 BOM 格式）</li>
+          </ul>
         </div>
       </section>
 
