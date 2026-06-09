@@ -11,7 +11,7 @@ installUnhandledRejectionLogger()
 export interface CdkRecord {
   version: 1;
   code_hash: string;
-  permission: Extract<PermissionMode, 'basic' | 'premium'>;
+  permission: PermissionMode;
   status: 'unused' | 'used';
   created_at: string;
   used_at: string | null;
@@ -194,7 +194,7 @@ export function createSignedLicenseFile({
   adminSecret: string;
   operators: LicenseOperator[];
   config: LicenseConfig;
-  permission: Extract<PermissionMode, 'basic' | 'premium'>;
+  permission: PermissionMode;
   codeHash: string;
 }): { license: LicenseFile; licenseFileContent: string } {
   const issuedAt = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')

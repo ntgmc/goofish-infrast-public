@@ -28,8 +28,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     if (admin_password !== adminPassword) {
       return jsonResponse({ error: '管理口令错误。' }, 401)
     }
-    if (permission !== 'basic' && permission !== 'premium') {
-      return jsonResponse({ error: 'CDK 类型必须是 basic 或 premium。' }, 400)
+    if (permission !== 'basic' && permission !== 'premium' && permission !== 'admin') {
+      return jsonResponse({ error: 'CDK 类型必须是 basic、premium 或 admin。' }, 400)
     }
 
     const store = await getCdkRecordStore()

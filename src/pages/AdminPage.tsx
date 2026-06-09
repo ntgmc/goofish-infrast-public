@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-type Permission = 'basic' | 'premium'
+type Permission = 'basic' | 'premium' | 'admin'
 
 export default function AdminPage() {
   const [adminPassword, setAdminPassword] = useState('')
@@ -96,7 +96,7 @@ export default function AdminPage() {
             <div>
               <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK 类型</span>
               <div className="inline-flex rounded-lg bg-surface-2 p-1">
-                {(['basic', 'premium'] as const).map((item) => (
+                {(['basic', 'premium', 'admin'] as const).map((item) => (
                   <button
                     key={item}
                     type="button"
@@ -107,10 +107,13 @@ export default function AdminPage() {
                         : 'text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'
                     }`}
                   >
-                    {item === 'basic' ? 'Basic' : 'Premium'}
+                    {item === 'basic' ? 'Basic' : item === 'premium' ? 'Premium' : 'Admin'}
                   </button>
                 ))}
               </div>
+              <p className="mt-2 text-xs text-ink-muted">
+                Admin 允许客户重新上传干员数据，并继续修改基建配置。
+              </p>
             </div>
 
             <label className="block">
@@ -155,7 +158,9 @@ export default function AdminPage() {
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-ink-muted">类型</dt>
-                <dd className="mt-1 text-ink-primary">{result.permission === 'basic' ? 'Basic' : 'Premium'}</dd>
+                <dd className="mt-1 text-ink-primary">
+                  {result.permission === 'basic' ? 'Basic' : result.permission === 'premium' ? 'Premium' : 'Admin'}
+                </dd>
               </div>
               <div>
                 <dt className="text-ink-muted">生成时间</dt>
