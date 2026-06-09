@@ -8,11 +8,13 @@ export default function AdminPage() {
   const [orderNote, setOrderNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [copyStatus, setCopyStatus] = useState<string | null>(null)
   const [result, setResult] = useState<{ code: string; permission: Permission; created_at: string } | null>(null)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
+    setCopyStatus(null)
     setResult(null)
     setLoading(true)
     try {
@@ -38,6 +40,17 @@ export default function AdminPage() {
       setError((e as Error).message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCopyCode = async () => {
+    if (!result?.code) return
+    setCopyStatus(null)
+    try {
+      await navigator.clipboard.writeText(result.code)
+      setCopyStatus('已复制到剪贴板')
+    } catch {
+      setCopyStatus('复制失败，请手动选择 CDK')
     }
   }
 
@@ -124,9 +137,21 @@ export default function AdminPage() {
         {result && (
           <section className="mt-6 rounded-xl border border-warning/30 bg-warning/10 p-5 sm:p-6">
             <p className="text-sm font-semibold text-warning">请立即复制保存，刷新后不会再次显示明文。</p>
-            <div className="mt-4 rounded-lg bg-surface-0 px-4 py-3 font-mono text-lg font-semibold tracking-wide text-ink-primary">
-              {result.code}
+            <div className="mt-4 flex flex-col gap-3 rounded-lg bg-surface-0 p-3 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1 break-all px-1 font-mono text-lg font-semibold tracking-wide text-ink-primary">
+                {result.code}
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
+              >
+                复制 CDK
+              </button>
             </div>
+            {copyStatus && (
+              <p className="mt-2 text-sm text-ink-secondary">{copyStatus}</p>
+            )}
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-ink-muted">类型</dt>
