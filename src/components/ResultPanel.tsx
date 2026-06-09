@@ -125,37 +125,42 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
               </div>
 
               {/* Rooms */}
-              <div className="px-6 py-4 space-y-1">
+              <div className="px-4 py-3 sm:px-6 sm:py-4">
+                <div className="hidden grid-cols-[minmax(120px,0.8fr)_minmax(110px,0.7fr)_minmax(0,2fr)_90px] gap-4 border-b border-surface-3/60 pb-2 text-xs font-medium text-ink-muted md:grid">
+                  <span>房间</span>
+                  <span>产物</span>
+                  <span>干员</span>
+                  <span className="text-right">效率</span>
+                </div>
                 {plan.rows.map((row) => (
                   <div
                     key={row.key}
-                    className="flex items-center justify-between py-3 border-t border-surface-3/50 first:border-0"
+                    className="border-t border-surface-3/50 py-3 first:border-0 md:grid md:grid-cols-[minmax(120px,0.8fr)_minmax(110px,0.7fr)_minmax(0,2fr)_90px] md:items-center md:gap-4 md:first:border-t"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-ink-secondary text-sm">
+                    <div className="flex items-center justify-between gap-3 md:block">
+                      <span className="text-sm font-medium text-ink-secondary">
                         {row.label}
                         {row.indexLabel && (
                           <span className="text-ink-muted ml-1">{row.indexLabel}</span>
                         )}
                       </span>
-                      <span className="text-ink-muted text-xs">
-                        ({row.product})
-                      </span>
+                      <span className="text-xs text-ink-muted md:hidden">{row.product}</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-ink-primary text-sm">
+                    <div className="hidden text-sm text-ink-muted md:block">
+                      {row.product}
+                    </div>
+                    <div className="mt-1 min-w-0 text-sm leading-6 text-ink-primary md:mt-0">
                         {row.operators}
-                      </span>
-                      <span className="text-brand-400 text-sm font-mono font-medium">
-                        {row.efficiency}
-                      </span>
+                    </div>
+                    <div className="mt-2 text-sm font-medium text-brand-400 md:mt-0 md:text-right md:font-mono">
+                      {row.efficiency}
                     </div>
                   </div>
                 ))}
 
                 {/* Drones */}
                 {plan.drones?.enable && (
-                  <div className="flex items-center gap-2 pt-3 mt-2 border-t border-surface-3/50">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-surface-3/50 pt-3">
                     <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-medium text-ink-secondary">
                       无人机
                     </span>
