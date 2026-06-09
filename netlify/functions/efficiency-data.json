@@ -1,4 +1,5 @@
-{  "workplaces": {
+{
+  "workplaces": {
     "trading_stations": [
       {
         "id": "trading_1",
@@ -399,7 +400,11 @@
               "渡桥/2",
               "瑰盐/2",
               "新约能天使/2",
-              "贝洛内/2"
+              "贝洛内/2",
+              "衡沙/2",
+              "可颂/2",
+              "拜松/2",
+              "空/2"
             ],
             "efficiency": 105,
             "apply_each": true,
@@ -429,7 +434,8 @@
               "蛇屠箱/1",
               "衡沙",
               "风絮",
-              "香草/1"
+              "香草/1",
+              "空弦"
             ],
             "efficiency": 93,
             "apply_each": true,
@@ -792,8 +798,21 @@
           },
           {
             "combo": [
-              "可颂/2"
+              "可颂/2",
+              "衡沙/2",
+              "拜松/2"
             ],
+            "apply_each": true,
+            "efficiency": 34,
+            "priority": 54
+          },
+          {
+            "combo": [
+              "梓兰/1",
+              "玫兰莎",
+              "远山"
+            ],
+            "apply_each": true,
             "efficiency": 34,
             "priority": 54
           }
@@ -1057,7 +1076,11 @@
             "渡桥/2",
             "瑰盐/2",
             "新约能天使/2",
-            "贝洛内/2"
+            "贝洛内/2",
+            "衡沙/2",
+            "可颂/2",
+            "拜松/2",
+            "空/2"
           ],
           "efficiency": 30,
           "apply_each": true,
@@ -1088,7 +1111,8 @@
             "蛇屠箱/1",
             "衡沙",
             "风絮",
-            "香草/1"
+            "香草/1",
+            "空弦"
           ],
           "efficiency": 20,
           "apply_each": true,
@@ -2497,18 +2521,13 @@
         },
         {
           "combo": [
-            "宴/1"
-          ],
-          "efficiency": 22,
-          "priority": 79
-        },
-        {
-          "combo": [
+            "宴/1",
             "暗索",
             "杰克/1",
             "梅",
             "白雪",
-            "行箸/2"
+            "行箸/2",
+            "12F"
           ],
           "apply_each": true,
           "efficiency": 22,
@@ -2538,6 +2557,46 @@
             "凛视/2"
           ],
           "efficiency": 49,
+          "priority": 80
+        }
+      ]
+    },
+    "hire": {
+      "单人": [
+        {
+          "combo": [
+            "斥罪"
+          ],
+          "efficiency": 50,
+          "priority": 100
+        },
+        {
+          "combo": [
+            "遥/2",
+            "普罗旺斯/2",
+            "艾雅法拉/2"
+          ],
+          "apply_each": true,
+          "efficiency": 45,
+          "priority": 89
+        },
+        {
+          "combo": [
+            "地灵/1"
+          ],
+          "efficiency": 45,
+          "priority": 88
+        },
+        {
+          "combo": [
+            "淬羽赫默",
+            "伊桑",
+            "酸糖",
+            "夜魔/2",
+            "宴",
+            "梓兰"
+          ],
+          "efficiency": 40,
           "priority": 80
         }
       ]
@@ -2821,6 +2880,32 @@
           "efficiency": 5,
           "exclusive": false,
           "group": "control_mood_recovery_base"
+        }
+      ]
+    },
+    {
+      "operator": "八幡海铃",
+      "description": "进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高）",
+      "priority": 999,
+      "effects": [
+        {
+          "target": "hire",
+          "efficiency": 10,
+          "exclusive": true,
+          "group": "hire_global_buff"
+        }
+      ]
+    },
+    {
+      "operator": "焰狐龙梓兰",
+      "description": "进驻控制中枢时，人力办公室联络速度+10%（同种效果取最高）",
+      "priority": 999,
+      "effects": [
+        {
+          "target": "hire",
+          "efficiency": 10,
+          "exclusive": true,
+          "group": "hire_global_buff"
         }
       ]
     }
