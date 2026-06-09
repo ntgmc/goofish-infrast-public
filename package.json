@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "generate:data": "node scripts/generate-data.mjs",
+    "predev": "npm run generate:data",
     "dev": "vite",
+    "prebuild": "npm run generate:data",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
