@@ -275,6 +275,11 @@ export default function ConfigEditor({
                 className="h-4 w-4 accent-brand-500"
               />
             </label>
+            {config.Fiammetta?.enable && (
+              <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
+                使用菲亚梅塔需要保证换班时间固定；如果使用 MAA 自带定时换班，请将换班间隔设为 8 小时或 12 小时。
+              </p>
+            )}
             <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
               <span>无人机</span>
               <input
