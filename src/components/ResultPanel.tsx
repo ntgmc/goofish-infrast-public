@@ -191,8 +191,9 @@ export function MaaImportGuide() {
           </h3>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-ink-secondary">
             <li>在 MAA 左侧勾选 <span className="font-medium text-ink-primary">基建换班</span></li>
-            <li><span className="font-medium text-ink-primary">其他模式</span> 选择 <span className="font-medium text-ink-primary">自定义基建配置</span></li>
-            <li><span className="font-medium text-ink-primary">内容配置</span> 选择 <span className="font-medium text-ink-primary">自定义</span></li>
+            <li>点击 <span className="font-medium text-ink-primary">基建换班</span> 右侧 <span className="font-medium text-ink-primary">小齿轮</span></li>
+            <li><span className="font-medium text-ink-primary">基建模式</span> 选择 <span className="font-medium text-ink-primary">自定义基建配置</span></li>
+            <li><span className="font-medium text-ink-primary">内置配置</span> 选择 <span className="font-medium text-ink-primary">自定义</span></li>
             <li>点击选择，选择本站下载的排班 JSON</li>
           </ol>
         </div>
