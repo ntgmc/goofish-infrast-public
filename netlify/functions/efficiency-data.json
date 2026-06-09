@@ -219,7 +219,7 @@
         "base_combo": [
           "可露希尔/2"
         ],
-        "note": "基础效率80%则12小时爆仓，60-210,70-222，80-234，90-245，100-257",
+        "base_efficiency": 10,
         "rules": [
           {
             "combo": [
@@ -230,8 +230,9 @@
               "八幡海铃/2"
             ],
             "note": "基础效率90%，但+2订单上限，13.7h爆仓",
-            "efficiency": 246,
-            "priority": 135
+            "efficiency": 90,
+            "priority": 135,
+            "order_limit_delta": 2
           },
           {
             "combo": [
@@ -242,8 +243,9 @@
               "灵知/2"
             ],
             "note": "基础效率85%，不爆仓",
-            "efficiency": 240,
-            "priority": 132
+            "efficiency": 85,
+            "priority": 132,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -251,8 +253,9 @@
               "贝洛内/2"
             ],
             "note": "基础效率80%，但+2订单上限",
-            "efficiency": 234,
-            "priority": 130
+            "efficiency": 80,
+            "priority": 130,
+            "order_limit_delta": 2
           },
           {
             "combo": [
@@ -260,7 +263,7 @@
               "能天使/2"
             ],
             "note": "基础效率80%",
-            "efficiency": 234,
+            "efficiency": 80,
             "priority": 129
           },
           {
@@ -269,7 +272,7 @@
               "摩根/2"
             ],
             "note": "基础效率75%",
-            "efficiency": 228,
+            "efficiency": 75,
             "priority": 125
           },
           {
@@ -280,16 +283,18 @@
             "control_center": [
               "八幡海铃/2"
             ],
-            "efficiency": 222,
-            "priority": 120
+            "efficiency": 70,
+            "priority": 120,
+            "order_limit_delta": 2
           },
           {
             "combo": [
               "德克萨斯",
               "拉普兰德"
             ],
-            "efficiency": 216,
-            "priority": 115
+            "efficiency": 65,
+            "priority": 115,
+            "order_limit_delta": 2
           },
           {
             "combo": [
@@ -298,35 +303,35 @@
             "control_center": [
               "八幡海铃/2"
             ],
-            "efficiency": 123,
+            "efficiency": 45,
             "priority": 51
           },
           {
             "combo": [
               "伺夜/2"
             ],
-            "efficiency": 117,
+            "efficiency": 40,
             "priority": 50
           },
           {
             "combo": [
               "空弦/2"
             ],
-            "efficiency": 117,
+            "efficiency": 40,
             "priority": 50
           },
           {
             "combo": [
               "吉星/2"
             ],
-            "efficiency": 117,
+            "efficiency": 40,
             "priority": 50
           },
           {
             "combo": [
               "深巡/2"
             ],
-            "efficiency": 117,
+            "efficiency": 40,
             "note": "30%-40%",
             "priority": 49
           },
@@ -334,7 +339,7 @@
             "combo": [
               "赫德雷/2"
             ],
-            "efficiency": 117,
+            "efficiency": 40,
             "note": "30%-40%",
             "priority": 49
           },
@@ -342,7 +347,7 @@
             "combo": [
               "能天使/2"
             ],
-            "efficiency": 111,
+            "efficiency": 35,
             "priority": 48
           },
           {
@@ -352,9 +357,10 @@
             "dormitory": [
               "森西/2"
             ],
-            "efficiency": 111,
+            "efficiency": 35,
             "note": "31%-35%，需宿舍有森西",
-            "priority": 48
+            "priority": 48,
+            "order_limit_delta": 1
           },
           {
             "combo": [
@@ -363,28 +369,29 @@
             "control_center": [
               "八幡海铃/2"
             ],
-            "efficiency": 111,
-            "priority": 48
+            "efficiency": 35,
+            "priority": 48,
+            "order_limit_delta": 2
           },
           {
             "combo": [
               "海蒂/2"
             ],
-            "efficiency": 111,
+            "efficiency": 35,
             "priority": 48
           },
           {
             "combo": [
               "雪雉/2"
             ],
-            "efficiency": 111,
+            "efficiency": 35,
             "priority": 48
           },
           {
             "combo": [
               "石英/1"
             ],
-            "efficiency": 110,
+            "efficiency": 34,
             "priority": 47
           },
           {
@@ -400,15 +407,31 @@
               "渡桥/2",
               "瑰盐/2",
               "新约能天使/2",
-              "贝洛内/2",
-              "衡沙/2",
-              "可颂/2",
-              "拜松/2",
               "空/2"
             ],
-            "efficiency": 105,
+            "efficiency": 30,
             "apply_each": true,
             "priority": 46
+          },
+          {
+            "combo": [
+              "贝洛内/2"
+            ],
+            "efficiency": 30,
+            "apply_each": true,
+            "priority": 46,
+            "order_limit_delta": 2
+          },
+          {
+            "combo": [
+              "衡沙/2",
+              "可颂/2",
+              "拜松/2"
+            ],
+            "efficiency": 30,
+            "apply_each": true,
+            "priority": 46,
+            "order_limit_delta": 1
           },
           {
             "combo": [
@@ -416,9 +439,10 @@
               "玫兰莎",
               "远山"
             ],
-            "efficiency": 99,
+            "efficiency": 25,
             "apply_each": true,
-            "priority": 40
+            "priority": 40,
+            "order_limit_delta": 1
           },
           {
             "combo": [
@@ -431,13 +455,20 @@
               "琳琅诗怀雅",
               "真言",
               "蕾缪安",
-              "蛇屠箱/1",
               "衡沙",
               "风絮",
               "香草/1",
               "空弦"
             ],
-            "efficiency": 93,
+            "efficiency": 20,
+            "apply_each": true,
+            "priority": 34
+          },
+          {
+            "combo": [
+              "蛇屠箱/1"
+            ],
+            "efficiency": 20,
             "apply_each": true,
             "priority": 34
           },
@@ -447,9 +478,10 @@
               "讯使",
               "银灰"
             ],
-            "efficiency": 87,
+            "efficiency": 15,
             "apply_each": true,
-            "priority": 22
+            "priority": 22,
+            "order_limit_delta": 2
           }
         ]
       },
@@ -563,7 +595,8 @@
               "八幡海铃/2"
             ],
             "efficiency": 195,
-            "priority": 120
+            "priority": 120,
+            "order_limit_delta": 2
           },
           {
             "combo": [
@@ -574,7 +607,8 @@
               "灵知/2"
             ],
             "efficiency": 192,
-            "priority": 118
+            "priority": 118,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -593,7 +627,8 @@
               "伺夜/2"
             ],
             "efficiency": 185,
-            "priority": 115
+            "priority": 115,
+            "order_limit_delta": 2
           },
           {
             "combo": [
@@ -636,7 +671,8 @@
               "灵知/2"
             ],
             "efficiency": 45,
-            "priority": 68
+            "priority": 68,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -656,7 +692,8 @@
               "灵知/2"
             ],
             "efficiency": 40,
-            "priority": 66
+            "priority": 66,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -666,7 +703,8 @@
               "灵知/2"
             ],
             "efficiency": 36,
-            "priority": 65
+            "priority": 65,
+            "order_limit_delta": -6
           },
           {
             "combo": [
@@ -676,7 +714,8 @@
               "灵知/2"
             ],
             "efficiency": 32,
-            "priority": 60
+            "priority": 60,
+            "order_limit_delta": 2
           },
           {
             "combo": [
@@ -686,7 +725,8 @@
               "灵知/2"
             ],
             "efficiency": 32,
-            "priority": 60
+            "priority": 60,
+            "order_limit_delta": 2
           },
           {
             "combo": [
@@ -697,7 +737,8 @@
               "八幡海铃/2"
             ],
             "efficiency": 62,
-            "priority": 59
+            "priority": 59,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -705,7 +746,8 @@
               "拉普兰德/2"
             ],
             "efficiency": 57,
-            "priority": 59
+            "priority": 59,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -713,7 +755,8 @@
               "崖心"
             ],
             "efficiency": 55,
-            "priority": 58
+            "priority": 58,
+            "order_limit_delta": 2
           }
         ]
       },
@@ -731,7 +774,8 @@
               "灵知/2"
             ],
             "efficiency": 45,
-            "priority": 68
+            "priority": 68,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -741,7 +785,8 @@
               "灵知/2"
             ],
             "efficiency": 40,
-            "priority": 67
+            "priority": 67,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -761,7 +806,8 @@
               "灵知/2"
             ],
             "efficiency": 60,
-            "priority": 70
+            "priority": 70,
+            "order_limit_delta": -6
           },
           {
             "combo": [
@@ -772,7 +818,8 @@
               "八幡海铃/2"
             ],
             "efficiency": 86,
-            "priority": 68
+            "priority": 68,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -780,7 +827,8 @@
               "拉普兰德/2"
             ],
             "efficiency": 81,
-            "priority": 66
+            "priority": 66,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -794,7 +842,8 @@
               "银灰/2"
             ],
             "efficiency": 36,
-            "priority": 56
+            "priority": 56,
+            "order_limit_delta": 4
           },
           {
             "combo": [
@@ -804,7 +853,8 @@
             ],
             "apply_each": true,
             "efficiency": 34,
-            "priority": 54
+            "priority": 54,
+            "order_limit_delta": 1
           },
           {
             "combo": [
@@ -814,7 +864,8 @@
             ],
             "apply_each": true,
             "efficiency": 34,
-            "priority": 54
+            "priority": 54,
+            "order_limit_delta": 1
           }
         ]
       },
@@ -871,7 +922,8 @@
             "八幡海铃/2"
           ],
           "efficiency": 90,
-          "priority": 85
+          "priority": 85,
+          "order_limit_delta": 2
         },
         {
           "combo": [
@@ -879,7 +931,8 @@
             "伺夜/2"
           ],
           "efficiency": 80,
-          "priority": 81
+          "priority": 81,
+          "order_limit_delta": 2
         },
         {
           "combo": [
@@ -924,7 +977,8 @@
             "八幡海铃/2"
           ],
           "efficiency": 70,
-          "priority": 75
+          "priority": 75,
+          "order_limit_delta": 2
         },
         {
           "combo": [
@@ -932,7 +986,8 @@
             "拉普兰德"
           ],
           "efficiency": 65,
-          "priority": 75
+          "priority": 75,
+          "order_limit_delta": 2
         }
       ],
       "通用单人": [
@@ -1030,7 +1085,8 @@
           ],
           "efficiency": 35,
           "note": "31%-35%，需宿舍有森西",
-          "priority": 45
+          "priority": 45,
+          "order_limit_delta": 1
         },
         {
           "combo": [
@@ -1040,7 +1096,8 @@
             "八幡海铃/2"
           ],
           "efficiency": 35,
-          "priority": 45
+          "priority": 45,
+          "order_limit_delta": 2
         },
         {
           "combo": [
@@ -1068,23 +1125,41 @@
             "月见夜",
             "古米",
             "夜刀",
+            "夜烟/1",
             "空爆",
             "慕斯",
             "缠丸/1",
             "安比尔/1",
             "芬/1",
+            "维娜·维多利亚",
             "渡桥/2",
             "瑰盐/2",
             "新约能天使/2",
-            "贝洛内/2",
-            "衡沙/2",
-            "可颂/2",
-            "拜松/2",
             "空/2"
           ],
           "efficiency": 30,
           "apply_each": true,
           "priority": 40
+        },
+        {
+          "combo": [
+            "贝洛内/2"
+          ],
+          "efficiency": 30,
+          "apply_each": true,
+          "priority": 40,
+          "order_limit_delta": 2
+        },
+        {
+          "combo": [
+            "衡沙/2",
+            "可颂/2",
+            "拜松/2"
+          ],
+          "efficiency": 30,
+          "apply_each": true,
+          "priority": 40,
+          "order_limit_delta": 1
         },
         {
           "combo": [
@@ -1094,7 +1169,8 @@
           ],
           "efficiency": 25,
           "apply_each": true,
-          "priority": 35
+          "priority": 35,
+          "order_limit_delta": 1
         },
         {
           "combo": [
@@ -1108,11 +1184,18 @@
             "琳琅诗怀雅",
             "真言",
             "蕾缪安",
-            "蛇屠箱/1",
             "衡沙",
             "风絮",
             "香草/1",
             "空弦"
+          ],
+          "efficiency": 20,
+          "apply_each": true,
+          "priority": 30
+        },
+        {
+          "combo": [
+            "蛇屠箱/1"
           ],
           "efficiency": 20,
           "apply_each": true,
@@ -1126,7 +1209,8 @@
           ],
           "efficiency": 15,
           "apply_each": true,
-          "priority": 25
+          "priority": 25,
+          "order_limit_delta": 2
         }
       ]
     },
@@ -1222,7 +1306,8 @@
             ],
             "note": "39%-49%",
             "efficiency": 49,
-            "priority": 50
+            "priority": 50,
+            "storage_capacity_delta": 20
           },
           {
             "combo": [
@@ -1232,14 +1317,16 @@
               "Battle Record"
             ],
             "efficiency": 41,
-            "priority": 49
+            "priority": 49,
+            "storage_capacity_delta": 16
           },
           {
             "combo": [
               "刻俄柏/2"
             ],
             "efficiency": 41,
-            "priority": 48
+            "priority": 48,
+            "storage_capacity_delta": 16
           },
           {
             "combo": [
@@ -1247,7 +1334,8 @@
             ],
             "note": "宿舍满级",
             "efficiency": 40,
-            "priority": 47
+            "priority": 47,
+            "storage_capacity_delta": 18
           },
           {
             "combo": [
@@ -1257,42 +1345,48 @@
               "Battle Record"
             ],
             "efficiency": 38,
-            "priority": 46
+            "priority": 46,
+            "storage_capacity_delta": 12
           },
           {
             "combo": [
               "裁度/2"
             ],
             "efficiency": 37,
-            "priority": 45
+            "priority": 45,
+            "storage_capacity_delta": 14
           },
           {
             "combo": [
               "钼铅/2"
             ],
             "efficiency": 36,
-            "priority": 44
+            "priority": 44,
+            "storage_capacity_delta": 24
           },
           {
             "combo": [
               "洋灰/2"
             ],
             "efficiency": 35,
-            "priority": 43
+            "priority": 43,
+            "storage_capacity_delta": 18
           },
           {
             "combo": [
               "火神/2"
             ],
             "efficiency": 33,
-            "priority": 42
+            "priority": 42,
+            "storage_capacity_delta": 27
           },
           {
             "combo": [
               "豆苗/2"
             ],
             "efficiency": 31,
-            "priority": 41
+            "priority": 41,
+            "storage_capacity_delta": 16
           },
           {
             "combo": [
@@ -1302,21 +1396,24 @@
               "Battle Record"
             ],
             "efficiency": 30,
-            "priority": 40
+            "priority": 40,
+            "storage_capacity_delta": 23
           },
           {
             "combo": [
               "黑角/2"
             ],
             "efficiency": 30,
-            "priority": 40
+            "priority": 40,
+            "storage_capacity_delta": 18
           },
           {
             "combo": [
               "蛇屠箱/2"
             ],
             "efficiency": 30,
-            "priority": 40
+            "priority": 40,
+            "storage_capacity_delta": 18
           }
         ]
       },
@@ -1331,7 +1428,8 @@
               "火神/2"
             ],
             "efficiency": 52,
-            "priority": 50
+            "priority": 50,
+            "storage_capacity_delta": 29
           },
           {
             "combo": [
@@ -1341,35 +1439,40 @@
               "Battle Record"
             ],
             "efficiency": 34,
-            "priority": 46
+            "priority": 46,
+            "storage_capacity_delta": 14
           },
           {
             "combo": [
               "刻俄柏/2"
             ],
             "efficiency": 33,
-            "priority": 45
+            "priority": 45,
+            "storage_capacity_delta": 18
           },
           {
             "combo": [
               "贝娜"
             ],
             "efficiency": 31,
-            "priority": 44
+            "priority": 44,
+            "storage_capacity_delta": 27
           },
           {
             "combo": [
               "石棉/2"
             ],
             "efficiency": 29,
-            "priority": 43
+            "priority": 43,
+            "storage_capacity_delta": 26
           },
           {
             "combo": [
               "钼铅/2"
             ],
             "efficiency": 28,
-            "priority": 42
+            "priority": 42,
+            "storage_capacity_delta": 26
           }
         ]
       },
@@ -1508,7 +1611,8 @@
             "冬时/1"
           ],
           "efficiency": 30,
-          "priority": 45
+          "priority": 45,
+          "storage_capacity_delta": 5
         },
         {
           "combo": [
@@ -1742,6 +1846,18 @@
         },
         {
           "combo": [
+            "引星棘刺",
+            "苍苔"
+          ],
+          "efficiency": 30,
+          "product": [
+            "Pure Gold"
+          ],
+          "apply_each": true,
+          "priority": 48
+        },
+        {
+          "combo": [
             "斑点/1"
           ],
           "efficiency": 30,
@@ -1824,7 +1940,38 @@
         },
         {
           "combo": [
+            "裂响/2"
+          ],
+          "efficiency": 35,
+          "product": [
+            "Battle Record"
+          ],
+          "priority": 50
+        },
+        {
+          "combo": [
+            "酒神/2"
+          ],
+          "efficiency": 35,
+          "product": [
+            "Battle Record"
+          ],
+          "priority": 50
+        },
+        {
+          "combo": [
             "圣约送葬人/2"
+          ],
+          "efficiency": 30,
+          "product": [
+            "Battle Record"
+          ],
+          "priority": 48,
+          "storage_capacity_delta": 4
+        },
+        {
+          "combo": [
+            "怒潮凛冬"
           ],
           "efficiency": 30,
           "product": [
@@ -1881,6 +2028,37 @@
             "Battle Record"
           ],
           "priority": 48
+        },
+        {
+          "combo": [
+            "帕拉斯/2"
+          ],
+          "efficiency": 25,
+          "product": [
+            "Battle Record"
+          ],
+          "priority": 46,
+          "storage_capacity_delta": 8
+        },
+        {
+          "combo": [
+            "酒神"
+          ],
+          "efficiency": 20,
+          "product": [
+            "Battle Record"
+          ],
+          "priority": 30
+        },
+        {
+          "combo": [
+            "圣约送葬人"
+          ],
+          "efficiency": 20,
+          "product": [
+            "Battle Record"
+          ],
+          "priority": 30
         },
         {
           "combo": [
@@ -1961,6 +2139,13 @@
         },
         {
           "combo": [
+            "雪猎/2"
+          ],
+          "efficiency": 30,
+          "priority": 48
+        },
+        {
+          "combo": [
             "白面鸮/2"
           ],
           "efficiency": 25,
@@ -2025,21 +2210,24 @@
             "泡普卡"
           ],
           "efficiency": 25,
-          "priority": 46
+          "priority": 46,
+          "storage_capacity_delta": -12
         },
         {
           "combo": [
             "石棉"
           ],
           "efficiency": 25,
-          "priority": 46
+          "priority": 46,
+          "storage_capacity_delta": -12
         },
         {
           "combo": [
             "裁度/2"
           ],
           "efficiency": 25,
-          "priority": 46
+          "priority": 46,
+          "storage_capacity_delta": 6
         },
         {
           "combo": [
@@ -2075,6 +2263,31 @@
           ],
           "efficiency": 25,
           "priority": 46
+        },
+        {
+          "combo": [
+            "多萝西/2",
+            "娜斯提",
+            "水月/2",
+            "海沫/2",
+            "溯光星源/2",
+            "灰毫/2",
+            "远牙/2",
+            "野鬃/2"
+          ],
+          "efficiency": 25,
+          "apply_each": true,
+          "priority": 46
+        },
+        {
+          "combo": [
+            "裁度",
+            "玛露西尔",
+            "雪猎"
+          ],
+          "efficiency": 20,
+          "apply_each": true,
+          "priority": 42
         },
         {
           "combo": [
@@ -2121,14 +2334,39 @@
         },
         {
           "combo": [
-            "蛇屠箱",
-            "黑角",
+            "蛇屠箱"
+          ],
+          "efficiency": 10,
+          "apply_each": true,
+          "priority": 30,
+          "storage_capacity_delta": 10
+        },
+        {
+          "combo": [
+            "黑角"
+          ],
+          "efficiency": 10,
+          "apply_each": true,
+          "priority": 30,
+          "storage_capacity_delta": 10
+        },
+        {
+          "combo": [
             "卡缇",
             "米格鲁"
           ],
           "efficiency": 10,
           "apply_each": true,
-          "priority": 30
+          "priority": 30,
+          "storage_capacity_delta": 6
+        },
+        {
+          "combo": [
+            "钼铅"
+          ],
+          "efficiency": 20,
+          "storage_capacity_delta": -8,
+          "priority": 42
         }
       ]
     },
@@ -2193,7 +2431,7 @@
         },
         {
           "combo": [
-            "浊煌/2"
+            "烛煌/2"
           ],
           "efficiency": 20,
           "priority": 60
@@ -2403,6 +2641,13 @@
         },
         {
           "combo": [
+            "GALLUS²"
+          ],
+          "efficiency": 10,
+          "priority": 40
+        },
+        {
+          "combo": [
             "正义骑士号"
           ],
           "efficiency": 10,
@@ -2418,6 +2663,22 @@
           ],
           "efficiency": 39,
           "priority": 90
+        },
+        {
+          "combo": [
+            "陈/2",
+            "伺夜"
+          ],
+          "apply_each": true,
+          "efficiency": 25,
+          "priority": 85
+        },
+        {
+          "combo": [
+            "远山/1"
+          ],
+          "efficiency": 25,
+          "priority": 84
         },
         {
           "combo": [
@@ -2527,11 +2788,49 @@
             "梅",
             "白雪",
             "行箸/2",
+            "莱欧斯",
             "12F"
           ],
           "apply_each": true,
           "efficiency": 22,
           "priority": 79
+        },
+        {
+          "combo": [
+            "风丸"
+          ],
+          "efficiency": 15,
+          "priority": 75
+        },
+        {
+          "combo": [
+            "信仰搅拌机"
+          ],
+          "efficiency": 15,
+          "priority": 75
+        },
+        {
+          "combo": [
+            "哈洛德",
+            "因陀罗",
+            "塞雷娅",
+            "守林人",
+            "安洁莉娜",
+            "微风",
+            "忍冬",
+            "断崖",
+            "星极",
+            "松桐",
+            "耶拉",
+            "芙兰卡",
+            "莫斯提马",
+            "见行者",
+            "谜图",
+            "跃跃"
+          ],
+          "apply_each": true,
+          "efficiency": 10,
+          "priority": 70
         }
       ],
       "组合": [
@@ -2574,7 +2873,8 @@
           "combo": [
             "遥/2",
             "普罗旺斯/2",
-            "艾雅法拉/2"
+            "艾雅法拉/2",
+            "水灯心/2"
           ],
           "apply_each": true,
           "efficiency": 45,
@@ -2597,7 +2897,50 @@
             "梓兰"
           ],
           "efficiency": 40,
+          "apply_each": true,
           "priority": 80
+        },
+        {
+          "combo": [
+            "伊内丝"
+          ],
+          "efficiency": 35,
+          "priority": 75
+        },
+        {
+          "combo": [
+            "地灵",
+            "普罗旺斯",
+            "月禾",
+            "水灯心",
+            "深律/2",
+            "行箸/2",
+            "雪绒"
+          ],
+          "efficiency": 30,
+          "apply_each": true,
+          "priority": 70
+        },
+        {
+          "combo": [
+            "圣聆初雪",
+            "巡林者",
+            "林",
+            "桑葚/1",
+            "行箸"
+          ],
+          "efficiency": 20,
+          "apply_each": true,
+          "priority": 60
+        },
+        {
+          "combo": [
+            "桑葚",
+            "深律"
+          ],
+          "efficiency": 10,
+          "apply_each": true,
+          "priority": 50
         }
       ]
     }
