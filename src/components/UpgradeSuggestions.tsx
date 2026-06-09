@@ -5,9 +5,11 @@ interface Props {
   suggestions: UpgradeSuggestion[];
   onApply: (selectedIds: string[]) => void;
   loading: boolean;
+  error?: string | null;
+  onReset: () => void;
 }
 
-export default function UpgradeSuggestions({ suggestions, onApply, loading }: Props) {
+export default function UpgradeSuggestions({ suggestions, onApply, loading, error, onReset }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const selectedIds = useMemo(() => Array.from(selected), [selected])
@@ -29,15 +31,57 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h2 className="text-xl font-semibold text-ink-primary mb-2">
-          练度优化建议
-        </h2>
-        <p className="text-ink-secondary text-sm">
-          勾选要应用的建议，然后点击「应用选中建议」
-        </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-ink-primary mb-2">
+            练度优化建议
+          </h2>
+          <p className="text-ink-secondary text-sm">
+            可选路径：先下载当前方案离开，或勾选建议后重新计算。
+          </p>
+        </div>
+        <button
+          onClick={() => onApply(selectedIds)}
+          disabled={loading || selected.size === 0}
+          className="rounded-xl bg-surface-2 px-5 py-3 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3 disabled:cursor-not-allowed disabled:text-ink-muted lg:flex-shrink-0"
+        >
+          {loading ? (
+            <span className="inline-flex items-center gap-3">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              重新计算中...
+            </span>
+          ) : (
+            `应用练度建议后重新计算 (${selected.size})`
+          )}
+        </button>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-error/40 bg-error/10 p-4">
+          <p className="text-sm font-semibold text-error">应用建议失败</p>
+          <p className="mt-1 text-sm leading-6 text-ink-secondary">{error}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onApply(selectedIds)}
+              disabled={loading || selected.size === 0}
+              className="rounded-lg bg-error px-3 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-error/90 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted"
+            >
+              重试
+            </button>
+            <button
+              type="button"
+              onClick={onReset}
+              className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
+            >
+              重新选择文件
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Suggestions list */}
       <div className="space-y-3">
@@ -117,25 +161,8 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading }: Pr
         })}
       </div>
 
-      {/* Apply button */}
-      <div className="sticky bottom-6 pt-4">
-        <button
-          onClick={() => onApply(selectedIds)}
-          disabled={loading || selected.size === 0}
-          className="w-full bg-success hover:bg-success/90 disabled:bg-surface-3 disabled:text-ink-muted text-white font-semibold py-4 px-8 rounded-xl text-lg transition-colors duration-150 shadow-lg shadow-success/20"
-        >
-          {loading ? (
-            <span className="inline-flex items-center gap-3">
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              计算中...
-            </span>
-          ) : (
-            `应用选中建议 (${selected.size})`
-          )}
-        </button>
+      <div className="rounded-lg bg-surface-1 p-4 text-sm text-ink-secondary">
+        已选 {selected.size} 项。下载当前方案仍是主出口；应用建议会生成一份新的方案，不覆盖当前结果。
       </div>
     </div>
   )

@@ -31,7 +31,10 @@ export default function OptimizePage({
   const [loading, setLoading] = useState(false)
   const [phase, setPhase] = useState<'idle' | 'suggestions' | 'final'>('idle')
   const [operatorUploadStatus, setOperatorUploadStatus] = useState<string | null>(null)
+  const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
+  const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const operatorFileRef = useRef<HTMLInputElement>(null)
+  const optimizeInFlightRef = useRef(false)
 
   const permission = getPermissionMode(license)
   const userCanReplaceOperators = permission === 'admin'
@@ -51,12 +54,20 @@ export default function OptimizePage({
     () => mergeOperators(license.operators, eliteOverrides),
     [license.operators, eliteOverrides]
   )
+  const optimizeSignature = useMemo(
+    () => buildOptimizeSignature(mergedOperators, activeConfig),
+    [activeConfig, mergedOperators]
+  )
+  const hasResult = Boolean(finalResult || currentResult)
+  const resultIsCurrent = hasResult && lastGeneratedSignature === optimizeSignature
 
   const clearGeneratedResult = useCallback(() => {
     setSuggestions([])
     setCurrentResult(null)
     setFinalResult(null)
     setPhase('idle')
+    setInlineError(null)
+    setLastGeneratedSignature(null)
   }, [])
 
   const handleReplaceOperators = useCallback(async () => {
@@ -105,10 +116,14 @@ export default function OptimizePage({
   }, [activeConfig, mergedOperators])
 
   const handleGenerate = useCallback(async () => {
+    if (loading || optimizeInFlightRef.current) return
+    if (hasResult && lastGeneratedSignature === optimizeSignature) return
     if (!configValidation.ok) {
-      alert(configValidation.message)
+      setInlineError({ scope: 'generate', message: configValidation.message })
       return
     }
+    optimizeInFlightRef.current = true
+    setInlineError(null)
     setLoading(true)
     try {
       const current = await runOptimize(false)
@@ -146,14 +161,19 @@ export default function OptimizePage({
         setSuggestions([])
       }
       setPhase('suggestions')
+      setLastGeneratedSignature(optimizeSignature)
     } catch (e) {
-      alert('优化失败: ' + (e as Error).message)
+      setInlineError({ scope: 'generate', message: '优化失败: ' + (e as Error).message })
     } finally {
+      optimizeInFlightRef.current = false
       setLoading(false)
     }
-  }, [configValidation, runOptimize])
+  }, [configValidation, hasResult, lastGeneratedSignature, loading, optimizeSignature, runOptimize])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
+    if (loading || optimizeInFlightRef.current) return
+    optimizeInFlightRef.current = true
+    setInlineError(null)
     const selectedSet = new Set(selectedIds)
     const newOverrides = { ...eliteOverrides }
     for (const s of suggestions) {
@@ -184,12 +204,14 @@ export default function OptimizePage({
       const data = await result.json() as OptimizeResult
       setFinalResult(data)
       setPhase('final')
+      setLastGeneratedSignature(buildOptimizeSignature(mergeOperators(license.operators, newOverrides), activeConfig))
     } catch (e) {
-      alert('优化失败: ' + (e as Error).message)
+      setInlineError({ scope: 'apply', message: '优化失败: ' + (e as Error).message })
     } finally {
+      optimizeInFlightRef.current = false
       setLoading(false)
     }
-  }, [activeConfig, eliteOverrides, suggestions, license.operators, setEliteOverrides])
+  }, [activeConfig, eliteOverrides, loading, suggestions, license.operators, setEliteOverrides])
 
   const handleDownloadMAA = useCallback(() => {
     const data = finalResult || currentResult
@@ -260,6 +282,51 @@ export default function OptimizePage({
         </button>
       </header>
 
+      <CommandBand
+        config={activeConfig}
+        configChanged={configChanged}
+        operatorCount={license.operators.length}
+        fileId={license.order_hash.slice(0, 8)}
+        validation={configValidation}
+        loading={loading}
+        hasResult={hasResult}
+        resultIsCurrent={resultIsCurrent}
+        error={inlineError?.scope === 'generate' ? inlineError.message : null}
+        onGenerate={handleGenerate}
+        onReset={onReset}
+      />
+
+      <details
+        className="mt-6 rounded-xl bg-surface-1"
+        open={!configValidation.ok}
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
+          <span className="flex flex-wrap items-center gap-2">
+            调整基建配置
+            {configChanged && (
+              <span className="rounded-full bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning">
+                已修改
+              </span>
+            )}
+          </span>
+          <span className="text-xs font-medium text-ink-muted">
+            {activeConfig.layout} · {activeConfig.desc}
+          </span>
+        </summary>
+        <div className="border-t border-surface-3/60 p-4 sm:p-5">
+          <ConfigEditor
+            config={activeConfig}
+            permission={permission}
+            canEdit={userCanEditConfig}
+            changed={configChanged}
+            validation={configValidation}
+            onUpdate={updateConfig}
+            onReset={resetConfig}
+            embedded
+          />
+        </div>
+      </details>
+
       {userCanReplaceOperators && (
         <AdminOperatorPanel
           operatorCount={license.operators.length}
@@ -267,56 +334,6 @@ export default function OptimizePage({
           fileRef={operatorFileRef}
           onReplace={handleReplaceOperators}
         />
-      )}
-
-      <ConfigEditor
-        config={activeConfig}
-        permission={permission}
-        canEdit={userCanEditConfig}
-        changed={configChanged}
-        validation={configValidation}
-        onUpdate={updateConfig}
-        onReset={resetConfig}
-      />
-
-      {phase === 'idle' && !currentResult && (
-        <div className="mt-8 bg-surface-1 rounded-xl p-6 sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-brand-400 mb-2">
-                文件已载入
-              </p>
-              <h2 className="text-xl font-semibold text-ink-primary mb-2">
-                生成基建排班方案
-              </h2>
-              <p className="text-ink-secondary text-sm max-w-xl">
-                基于当前干员配置和基建布局计算排班方案，完成后可直接下载排班 JSON。
-              </p>
-              {!configValidation.ok && (
-                <p className="mt-3 text-sm text-warning">
-                  {configValidation.message}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={handleGenerate}
-              disabled={loading || !configValidation.ok}
-              className="bg-brand-600 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted text-white font-semibold py-3 px-6 rounded-xl transition-colors duration-150 lg:flex-shrink-0"
-            >
-              {loading ? (
-                <span className="inline-flex items-center gap-3">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  正在分析基建潜力...
-                </span>
-              ) : (
-                '生成排班方案'
-              )}
-            </button>
-          </div>
-        </div>
       )}
 
       {phase === 'suggestions' && suggestions.length > 0 && (
@@ -331,6 +348,8 @@ export default function OptimizePage({
             suggestions={suggestions}
             onApply={handleApplySuggestions}
             loading={loading}
+            error={inlineError?.scope === 'apply' ? inlineError.message : null}
+            onReset={onReset}
           />
         </div>
       )}
@@ -358,6 +377,122 @@ export default function OptimizePage({
   )
 }
 
+function CommandBand({
+  config,
+  configChanged,
+  operatorCount,
+  fileId,
+  validation,
+  loading,
+  hasResult,
+  resultIsCurrent,
+  error,
+  onGenerate,
+  onReset,
+}: {
+  config: LicenseConfig;
+  configChanged: boolean;
+  operatorCount: number;
+  fileId: string;
+  validation: { ok: true } | { ok: false; message: string };
+  loading: boolean;
+  hasResult: boolean;
+  resultIsCurrent: boolean;
+  error: string | null;
+  onGenerate: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <section className="rounded-xl bg-surface-1 p-5 sm:p-6">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-brand-400">文件已载入</p>
+          <h2 className="mt-1 text-xl font-semibold text-ink-primary">
+            排班方案
+          </h2>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink-secondary">
+            <span className="rounded-full bg-surface-2 px-2.5 py-1">ID {fileId}</span>
+            <span className="rounded-full bg-surface-2 px-2.5 py-1">{operatorCount} 名干员</span>
+            <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.layout}</span>
+            <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.desc}</span>
+            {configChanged && (
+              <span className="rounded-full bg-warning/10 px-2.5 py-1 text-warning">配置已调整</span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={loading || !validation.ok || resultIsCurrent}
+            className="rounded-xl bg-surface-2 px-5 py-3 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3 disabled:cursor-not-allowed disabled:text-ink-muted"
+          >
+            {loading ? (
+              <span className="inline-flex items-center gap-3">
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                正在计算...
+              </span>
+            ) : (
+              resultIsCurrent ? '方案已是最新' : hasResult ? '重新计算排班' : '生成排班方案'
+            )}
+          </button>
+        </div>
+      </div>
+      {resultIsCurrent && (
+        <p className="mt-3 text-xs text-ink-muted">
+          修改基建配置或干员数据后才需要重新计算。
+        </p>
+      )}
+      {!validation.ok && (
+        <InlineErrorPanel message={validation.message} onRetry={onGenerate} onReset={onReset} />
+      )}
+      {error && validation.ok && (
+        <InlineErrorPanel message={error} onRetry={onGenerate} onReset={onReset} />
+      )}
+    </section>
+  )
+}
+
+function buildOptimizeSignature(operators: LicenseOperator[], config: LicenseConfig): string {
+  return canonicalJson({ operators, config })
+}
+
+function InlineErrorPanel({
+  message,
+  onRetry,
+  onReset,
+}: {
+  message: string;
+  onRetry: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="mt-4 rounded-lg border border-error/40 bg-error/10 p-4">
+      <p className="text-sm font-semibold text-error">处理失败</p>
+      <p className="mt-1 text-sm leading-6 text-ink-secondary">{message}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-lg bg-error px-3 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-error/90"
+        >
+          重试
+        </button>
+        <button
+          type="button"
+          onClick={onReset}
+          className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
+        >
+          重新选择文件
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function AdminOperatorPanel({
   operatorCount,
   status,
@@ -370,17 +505,24 @@ function AdminOperatorPanel({
   onReplace: () => void;
 }) {
   return (
-    <section className="mb-8 rounded-xl bg-surface-1 p-5 sm:p-6">
+    <details className="mt-6 rounded-xl bg-surface-1">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
+        <span className="flex flex-wrap items-center gap-2">
+          Admin 干员数据
+          <span className="rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-medium text-brand-300">
+            {operatorCount} 名干员
+          </span>
+        </span>
+        <span className="text-xs font-medium text-ink-muted">替换 operators.json</span>
+      </summary>
+      <div className="border-t border-surface-3/60 p-5 sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold text-ink-primary">Admin 干员数据</h2>
-            <span className="rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-medium text-brand-300">
-              {operatorCount} 名干员
-            </span>
+            <h2 className="text-lg font-semibold text-ink-primary">替换干员数据</h2>
           </div>
           <p className="mt-1 text-sm text-ink-secondary">
-            Admin 授权允许重新上传 operators.json 或 .txt，上传后会清空当前练度调整并重新计算排班。
+            上传 operators.json 或 .txt 后会清空当前练度调整，下一次生成时使用新的干员数据。
           </p>
           {status && (
             <p className="mt-3 text-sm text-brand-300">{status}</p>
@@ -391,7 +533,7 @@ function AdminOperatorPanel({
           onClick={onReplace}
           className="rounded-xl bg-surface-2 px-5 py-3 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3 lg:flex-shrink-0"
         >
-          重新上传干员数据
+          选择干员数据文件
         </button>
         <input
           ref={fileRef}
@@ -401,7 +543,8 @@ function AdminOperatorPanel({
           className="hidden"
         />
       </div>
-    </section>
+      </div>
+    </details>
   )
 }
 
@@ -454,7 +597,7 @@ function CurrentPlanActions({
             onClick={onDownload}
             className="bg-brand-600 hover:bg-brand-500 text-white font-semibold py-3 px-5 rounded-xl transition-colors duration-150"
           >
-            下载当前排班
+            下载当前方案
           </button>
           <button
             type="button"

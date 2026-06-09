@@ -120,6 +120,7 @@ interface ConfigEditorProps {
   onReset?: () => void;
   resetLabel?: string;
   note?: string;
+  embedded?: boolean;
 }
 
 export default function ConfigEditor({
@@ -132,6 +133,7 @@ export default function ConfigEditor({
   onReset,
   resetLabel = '恢复授权配置',
   note,
+  embedded = false,
 }: ConfigEditorProps) {
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
@@ -172,7 +174,7 @@ export default function ConfigEditor({
   }
 
   return (
-    <section className="bg-surface-1 rounded-xl p-5 sm:p-6">
+    <section className={embedded ? '' : 'bg-surface-1 rounded-xl p-5 sm:p-6'}>
       <div className="flex flex-col gap-4 border-b border-surface-3/60 pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
