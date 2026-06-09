@@ -2,37 +2,103 @@
 
 @theme {
   /* Brand: Cyan/teal inspired by Rhodes Island */
-  --color-brand-50: oklch(97% 0.01 195);
-  --color-brand-100: oklch(93% 0.02 195);
-  --color-brand-200: oklch(87% 0.04 195);
-  --color-brand-300: oklch(78% 0.07 195);
-  --color-brand-400: oklch(68% 0.10 195);
-  --color-brand-500: oklch(58% 0.12 195);
-  --color-brand-600: oklch(50% 0.12 195);
-  --color-brand-700: oklch(43% 0.10 195);
-  --color-brand-800: oklch(36% 0.08 195);
-  --color-brand-900: oklch(28% 0.05 195);
-  --color-brand-950: oklch(20% 0.03 195);
+  --color-brand-50: var(--theme-brand-50);
+  --color-brand-100: var(--theme-brand-100);
+  --color-brand-200: var(--theme-brand-200);
+  --color-brand-300: var(--theme-brand-300);
+  --color-brand-400: var(--theme-brand-400);
+  --color-brand-500: var(--theme-brand-500);
+  --color-brand-600: var(--theme-brand-600);
+  --color-brand-700: var(--theme-brand-700);
+  --color-brand-800: var(--theme-brand-800);
+  --color-brand-900: var(--theme-brand-900);
+  --color-brand-950: var(--theme-brand-950);
 
   /* Tinted neutrals (cyan-tinted) */
-  --color-surface-0: oklch(14% 0.008 195);
-  --color-surface-1: oklch(18% 0.010 195);
-  --color-surface-2: oklch(22% 0.012 195);
-  --color-surface-3: oklch(26% 0.014 195);
-  --color-surface-4: oklch(30% 0.016 195);
+  --color-surface-0: var(--theme-surface-0);
+  --color-surface-1: var(--theme-surface-1);
+  --color-surface-2: var(--theme-surface-2);
+  --color-surface-3: var(--theme-surface-3);
+  --color-surface-4: var(--theme-surface-4);
 
   /* Text */
-  --color-ink-primary: oklch(95% 0.005 195);
-  --color-ink-secondary: oklch(72% 0.010 195);
-  --color-ink-muted: oklch(58% 0.012 195);
+  --color-ink-primary: var(--theme-ink-primary);
+  --color-ink-secondary: var(--theme-ink-secondary);
+  --color-ink-muted: var(--theme-ink-muted);
 
   /* Semantic */
-  --color-success: oklch(62% 0.15 145);
-  --color-error: oklch(58% 0.18 25);
-  --color-warning: oklch(72% 0.15 75);
+  --color-success: var(--theme-success);
+  --color-error: var(--theme-error);
+  --color-warning: var(--theme-warning);
+}
+
+:root {
+  color-scheme: light;
+
+  --theme-brand-50: oklch(98% 0.010 195);
+  --theme-brand-100: oklch(94% 0.020 195);
+  --theme-brand-200: oklch(88% 0.040 195);
+  --theme-brand-300: oklch(76% 0.070 195);
+  --theme-brand-400: oklch(63% 0.100 195);
+  --theme-brand-500: oklch(52% 0.120 195);
+  --theme-brand-600: oklch(43% 0.115 195);
+  --theme-brand-700: oklch(36% 0.095 195);
+  --theme-brand-800: oklch(29% 0.070 195);
+  --theme-brand-900: oklch(23% 0.050 195);
+  --theme-brand-950: oklch(17% 0.035 195);
+
+  --theme-surface-0: oklch(98% 0.006 195);
+  --theme-surface-1: oklch(100% 0 0);
+  --theme-surface-2: oklch(94% 0.010 195);
+  --theme-surface-3: oklch(89% 0.014 195);
+  --theme-surface-4: oklch(80% 0.018 195);
+
+  --theme-ink-primary: oklch(21% 0.020 195);
+  --theme-ink-secondary: oklch(40% 0.025 195);
+  --theme-ink-muted: oklch(51% 0.022 195);
+
+  --theme-success: oklch(42% 0.120 145);
+  --theme-error: oklch(48% 0.170 25);
+  --theme-warning: oklch(48% 0.120 75);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --theme-brand-50: oklch(97% 0.010 195);
+    --theme-brand-100: oklch(93% 0.020 195);
+    --theme-brand-200: oklch(87% 0.040 195);
+    --theme-brand-300: oklch(78% 0.070 195);
+    --theme-brand-400: oklch(68% 0.100 195);
+    --theme-brand-500: oklch(58% 0.120 195);
+    --theme-brand-600: oklch(50% 0.120 195);
+    --theme-brand-700: oklch(43% 0.100 195);
+    --theme-brand-800: oklch(36% 0.080 195);
+    --theme-brand-900: oklch(28% 0.050 195);
+    --theme-brand-950: oklch(20% 0.030 195);
+
+    --theme-surface-0: oklch(14% 0.008 195);
+    --theme-surface-1: oklch(18% 0.010 195);
+    --theme-surface-2: oklch(22% 0.012 195);
+    --theme-surface-3: oklch(26% 0.014 195);
+    --theme-surface-4: oklch(30% 0.016 195);
+
+    --theme-ink-primary: oklch(95% 0.005 195);
+    --theme-ink-secondary: oklch(72% 0.010 195);
+    --theme-ink-muted: oklch(58% 0.012 195);
+
+    --theme-success: oklch(62% 0.150 145);
+    --theme-error: oklch(58% 0.180 25);
+    --theme-warning: oklch(72% 0.150 75);
+  }
 }
 
 /* Base styles */
+html {
+  background-color: var(--color-surface-0);
+}
+
 body {
   background-color: var(--color-surface-0);
   color: var(--color-ink-primary);
