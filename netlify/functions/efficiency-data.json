@@ -141,76 +141,148 @@
             "combo": [
               "柏喙/2"
             ],
-            "efficiency": 235,
+            "efficiency": 140,
             "priority": 131,
             "control_center": [
               "八幡海铃/2"
-            ]
+            ],
+            "stable_position_operators": [
+              "巫恋",
+              "柏喙"
+            ],
+            "mood_consumption_delta": {
+              "巫恋": -0.25,
+              "龙舌兰": -0.25,
+              "柏喙": -0.25
+            }
           },
           {
             "//": "情况2：普通情况，无中枢加成，优先级较低(128)",
             "combo": [
               "柏喙/2"
             ],
-            "efficiency": 229,
-            "priority": 128
+            "efficiency": 135,
+            "priority": 128,
+            "stable_position_operators": [
+              "巫恋",
+              "柏喙"
+            ],
+            "mood_consumption_delta": {
+              "巫恋": -0.25,
+              "龙舌兰": -0.25,
+              "柏喙": -0.25
+            }
           },
           {
             "//": "卡夫卡 - 有Buff",
             "combo": [
               "卡夫卡/2"
             ],
-            "efficiency": 235,
+            "efficiency": 140,
             "priority": 131,
             "control_center": [
               "八幡海铃/2"
-            ]
+            ],
+            "stable_position_operators": [
+              "巫恋",
+              "卡夫卡"
+            ],
+            "mood_consumption_delta": {
+              "巫恋": -0.25,
+              "龙舌兰": -0.25,
+              "卡夫卡": -0.25
+            }
           },
           {
             "//": "卡夫卡 - 普通",
             "combo": [
               "卡夫卡/2"
             ],
-            "efficiency": 229,
-            "priority": 128
+            "efficiency": 135,
+            "priority": 128,
+            "stable_position_operators": [
+              "巫恋",
+              "卡夫卡"
+            ],
+            "mood_consumption_delta": {
+              "巫恋": -0.25,
+              "龙舌兰": -0.25,
+              "卡夫卡": -0.25
+            }
           },
           {
             "//": "明椒 - 有Buff",
             "combo": [
               "明椒/2"
             ],
-            "efficiency": 235,
+            "efficiency": 140,
             "priority": 131,
             "control_center": [
               "八幡海铃/2"
-            ]
+            ],
+            "stable_position_operators": [
+              "巫恋",
+              "明椒"
+            ],
+            "mood_consumption_delta": {
+              "巫恋": -0.25,
+              "龙舌兰": -0.25,
+              "明椒": -0.25
+            }
           },
           {
             "//": "明椒 - 普通",
             "combo": [
               "明椒/2"
             ],
-            "efficiency": 229,
-            "priority": 128
+            "efficiency": 135,
+            "priority": 128,
+            "stable_position_operators": [
+              "巫恋",
+              "明椒"
+            ],
+            "mood_consumption_delta": {
+              "巫恋": -0.25,
+              "龙舌兰": -0.25,
+              "明椒": -0.25
+            }
           },
           {
             "//": "折光 - 有Buff",
             "combo": [
               "折光/2"
             ],
-            "efficiency": 235,
+            "efficiency": 140,
             "priority": 131,
             "control_center": [
               "八幡海铃/2"
-            ]
+            ],
+            "stable_position_operators": [
+              "巫恋",
+              "折光"
+            ],
+            "mood_consumption_delta": {
+              "巫恋": -0.25,
+              "龙舌兰": -0.25,
+              "折光": -0.25
+            }
           },
           {
             "//": "折光 - 普通",
             "combo": [
               "折光/2"
             ],
-            "efficiency": 229,
-            "priority": 128
+            "efficiency": 135,
+            "priority": 128,
+            "stable_position_operators": [
+              "巫恋",
+              "折光"
+            ],
+            "mood_consumption_delta": {
+              "巫恋": -0.25,
+              "龙舌兰": -0.25,
+              "折光": -0.25
+            }
           }
         ]
       },
@@ -232,7 +304,10 @@
             "note": "基础效率90%，但+2订单上限，13.7h爆仓",
             "efficiency": 90,
             "priority": 135,
-            "order_limit_delta": 2
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "贝洛内": -0.1
+            }
           },
           {
             "combo": [
@@ -255,7 +330,10 @@
             "note": "基础效率80%，但+2订单上限",
             "efficiency": 80,
             "priority": 130,
-            "order_limit_delta": 2
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "贝洛内": -0.1
+            }
           },
           {
             "combo": [
@@ -285,7 +363,11 @@
             ],
             "efficiency": 70,
             "priority": 120,
-            "order_limit_delta": 2
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "德克萨斯": 0.3,
+              "拉普兰德": -0.1
+            }
           },
           {
             "combo": [
@@ -294,7 +376,11 @@
             ],
             "efficiency": 65,
             "priority": 115,
-            "order_limit_delta": 2
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "德克萨斯": 0.3,
+              "拉普兰德": -0.1
+            }
           },
           {
             "combo": [
@@ -371,7 +457,10 @@
             ],
             "efficiency": 35,
             "priority": 48,
-            "order_limit_delta": 2
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "贝洛内": -0.1
+            }
           },
           {
             "combo": [
@@ -411,7 +500,17 @@
             ],
             "efficiency": 30,
             "apply_each": true,
-            "priority": 46
+            "priority": 46,
+            "stable_position_operators": [
+              "芬",
+              "渡桥"
+            ],
+            "mood_consumption_delta": {
+              "月见夜": -0.25,
+              "古米": -0.25,
+              "空爆": -0.25,
+              "渡桥": -0.25
+            }
           },
           {
             "combo": [
@@ -420,7 +519,10 @@
             "efficiency": 30,
             "apply_each": true,
             "priority": 46,
-            "order_limit_delta": 2
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "贝洛内": -0.1
+            }
           },
           {
             "combo": [
@@ -516,7 +618,7 @@
             "process": [
               "年"
             ],
-            "efficiency": 270,
+            "efficiency": 135,
             "note": "搭配满烟火乌有95+40%",
             "priority": 130
           },
@@ -541,7 +643,7 @@
             "process": [
               "年"
             ],
-            "efficiency": 219,
+            "efficiency": 84,
             "note": "黑键乌有混用满挂件（迷迭香）",
             "priority": 140
           },
@@ -553,7 +655,7 @@
             "control_center": [
               "戴菲恩/2"
             ],
-            "efficiency": 208,
+            "efficiency": 95,
             "priority": 125
           },
           {
@@ -594,9 +696,12 @@
             "control_center": [
               "八幡海铃/2"
             ],
-            "efficiency": 195,
+            "efficiency": 90,
             "priority": 120,
-            "order_limit_delta": 2
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "贝洛内": -0.1
+            }
           },
           {
             "combo": [
@@ -606,7 +711,7 @@
             "control_center": [
               "灵知/2"
             ],
-            "efficiency": 192,
+            "efficiency": 85,
             "priority": 118,
             "order_limit_delta": 4
           },
@@ -618,7 +723,7 @@
             "control_center": [
               "八幡海铃/2"
             ],
-            "efficiency": 190,
+            "efficiency": 90,
             "priority": 117
           },
           {
@@ -626,16 +731,19 @@
               "贝洛内/2",
               "伺夜/2"
             ],
-            "efficiency": 185,
+            "efficiency": 80,
             "priority": 115,
-            "order_limit_delta": 2
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "贝洛内": -0.1
+            }
           },
           {
             "combo": [
               "空弦/2",
               "伺夜/2"
             ],
-            "efficiency": 185,
+            "efficiency": 85,
             "priority": 115
           },
           {
@@ -643,7 +751,7 @@
               "蕾缪安/2",
               "能天使/2"
             ],
-            "efficiency": 185,
+            "efficiency": 80,
             "priority": 115
           },
           {
@@ -738,7 +846,11 @@
             ],
             "efficiency": 62,
             "priority": 59,
-            "order_limit_delta": 4
+            "order_limit_delta": 4,
+            "mood_consumption_delta": {
+              "德克萨斯": 0.3,
+              "拉普兰德": -0.1
+            }
           },
           {
             "combo": [
@@ -747,7 +859,11 @@
             ],
             "efficiency": 57,
             "priority": 59,
-            "order_limit_delta": 4
+            "order_limit_delta": 4,
+            "mood_consumption_delta": {
+              "德克萨斯": 0.3,
+              "拉普兰德": -0.1
+            }
           },
           {
             "combo": [
@@ -819,7 +935,11 @@
             ],
             "efficiency": 86,
             "priority": 68,
-            "order_limit_delta": 4
+            "order_limit_delta": 4,
+            "mood_consumption_delta": {
+              "德克萨斯": 0.3,
+              "拉普兰德": -0.1
+            }
           },
           {
             "combo": [
@@ -828,7 +948,11 @@
             ],
             "efficiency": 81,
             "priority": 66,
-            "order_limit_delta": 4
+            "order_limit_delta": 4,
+            "mood_consumption_delta": {
+              "德克萨斯": 0.3,
+              "拉普兰德": -0.1
+            }
           },
           {
             "combo": [
@@ -923,7 +1047,10 @@
           ],
           "efficiency": 90,
           "priority": 85,
-          "order_limit_delta": 2
+          "order_limit_delta": 2,
+          "mood_consumption_delta": {
+            "贝洛内": -0.1
+          }
         },
         {
           "combo": [
@@ -932,7 +1059,10 @@
           ],
           "efficiency": 80,
           "priority": 81,
-          "order_limit_delta": 2
+          "order_limit_delta": 2,
+          "mood_consumption_delta": {
+            "贝洛内": -0.1
+          }
         },
         {
           "combo": [
@@ -978,7 +1108,11 @@
           ],
           "efficiency": 70,
           "priority": 75,
-          "order_limit_delta": 2
+          "order_limit_delta": 2,
+          "mood_consumption_delta": {
+            "德克萨斯": 0.3,
+            "拉普兰德": -0.1
+          }
         },
         {
           "combo": [
@@ -987,7 +1121,11 @@
           ],
           "efficiency": 65,
           "priority": 75,
-          "order_limit_delta": 2
+          "order_limit_delta": 2,
+          "mood_consumption_delta": {
+            "德克萨斯": 0.3,
+            "拉普兰德": -0.1
+          }
         }
       ],
       "通用单人": [
@@ -1097,7 +1235,10 @@
           ],
           "efficiency": 35,
           "priority": 45,
-          "order_limit_delta": 2
+          "order_limit_delta": 2,
+          "mood_consumption_delta": {
+            "贝洛内": -0.1
+          }
         },
         {
           "combo": [
@@ -1139,7 +1280,17 @@
           ],
           "efficiency": 30,
           "apply_each": true,
-          "priority": 40
+          "priority": 40,
+          "stable_position_operators": [
+            "芬",
+            "渡桥"
+          ],
+          "mood_consumption_delta": {
+            "月见夜": -0.25,
+            "古米": -0.25,
+            "空爆": -0.25,
+            "渡桥": -0.25
+          }
         },
         {
           "combo": [
@@ -1148,7 +1299,10 @@
           "efficiency": 30,
           "apply_each": true,
           "priority": 40,
-          "order_limit_delta": 2
+          "order_limit_delta": 2,
+          "mood_consumption_delta": {
+            "贝洛内": -0.1
+          }
         },
         {
           "combo": [
@@ -1288,7 +1442,10 @@
             "涤火杰西卡/2"
           ],
           "efficiency": 96,
-          "priority": 49
+          "priority": 49,
+          "mood_consumption_delta": {
+            "杏仁": -0.15
+          }
         }
       ],
       "红云组": {
@@ -1307,7 +1464,13 @@
             "note": "39%-49%",
             "efficiency": 49,
             "priority": 50,
-            "storage_capacity_delta": 20
+            "storage_capacity_delta": 20,
+            "stable_position_operators": [
+              "稀音"
+            ],
+            "mood_consumption_delta": {
+              "红云": -0.25
+            }
           },
           {
             "combo": [
@@ -1318,7 +1481,11 @@
             ],
             "efficiency": 41,
             "priority": 49,
-            "storage_capacity_delta": 16
+            "storage_capacity_delta": 16,
+            "mood_consumption_delta": {
+              "红云": -0.25,
+              "帕拉斯": -0.25
+            }
           },
           {
             "combo": [
@@ -1326,7 +1493,14 @@
             ],
             "efficiency": 41,
             "priority": 48,
-            "storage_capacity_delta": 16
+            "storage_capacity_delta": 16,
+            "stable_position_operators": [
+              "刻俄柏"
+            ],
+            "mood_consumption_delta": {
+              "红云": -0.25,
+              "刻俄柏": -0.25
+            }
           },
           {
             "combo": [
@@ -1335,7 +1509,11 @@
             "note": "宿舍满级",
             "efficiency": 40,
             "priority": 47,
-            "storage_capacity_delta": 18
+            "storage_capacity_delta": 18,
+            "mood_consumption_delta": {
+              "红云": -0.25,
+              "娜仁图亚": -0.25
+            }
           },
           {
             "combo": [
@@ -1346,7 +1524,10 @@
             ],
             "efficiency": 38,
             "priority": 46,
-            "storage_capacity_delta": 12
+            "storage_capacity_delta": 12,
+            "mood_consumption_delta": {
+              "红云": -0.25
+            }
           },
           {
             "combo": [
@@ -1354,7 +1535,11 @@
             ],
             "efficiency": 37,
             "priority": 45,
-            "storage_capacity_delta": 14
+            "storage_capacity_delta": 14,
+            "mood_consumption_delta": {
+              "红云": -0.25,
+              "裁度": 0.25
+            }
           },
           {
             "combo": [
@@ -1362,7 +1547,11 @@
             ],
             "efficiency": 36,
             "priority": 44,
-            "storage_capacity_delta": 24
+            "storage_capacity_delta": 24,
+            "mood_consumption_delta": {
+              "红云": -0.25,
+              "钼铅": -0.25
+            }
           },
           {
             "combo": [
@@ -1370,7 +1559,11 @@
             ],
             "efficiency": 35,
             "priority": 43,
-            "storage_capacity_delta": 18
+            "storage_capacity_delta": 18,
+            "mood_consumption_delta": {
+              "红云": -0.25,
+              "洋灰": -0.25
+            }
           },
           {
             "combo": [
@@ -1378,7 +1571,11 @@
             ],
             "efficiency": 33,
             "priority": 42,
-            "storage_capacity_delta": 27
+            "storage_capacity_delta": 27,
+            "mood_consumption_delta": {
+              "红云": -0.25,
+              "火神": -0.25
+            }
           },
           {
             "combo": [
@@ -1386,7 +1583,11 @@
             ],
             "efficiency": 31,
             "priority": 41,
-            "storage_capacity_delta": 16
+            "storage_capacity_delta": 16,
+            "mood_consumption_delta": {
+              "红云": -0.25,
+              "豆苗": -0.25
+            }
           },
           {
             "combo": [
@@ -1397,7 +1598,11 @@
             ],
             "efficiency": 30,
             "priority": 40,
-            "storage_capacity_delta": 23
+            "storage_capacity_delta": 23,
+            "mood_consumption_delta": {
+              "红云": -0.25,
+              "卡达": -0.25
+            }
           },
           {
             "combo": [
@@ -1405,7 +1610,10 @@
             ],
             "efficiency": 30,
             "priority": 40,
-            "storage_capacity_delta": 18
+            "storage_capacity_delta": 18,
+            "mood_consumption_delta": {
+              "红云": -0.25
+            }
           },
           {
             "combo": [
@@ -1413,7 +1621,10 @@
             ],
             "efficiency": 30,
             "priority": 40,
-            "storage_capacity_delta": 18
+            "storage_capacity_delta": 18,
+            "mood_consumption_delta": {
+              "红云": -0.25
+            }
           }
         ]
       },
@@ -1429,7 +1640,11 @@
             ],
             "efficiency": 52,
             "priority": 50,
-            "storage_capacity_delta": 29
+            "storage_capacity_delta": 29,
+            "mood_consumption_delta": {
+              "泡泡": -0.25,
+              "火神": -0.25
+            }
           },
           {
             "combo": [
@@ -1440,7 +1655,10 @@
             ],
             "efficiency": 34,
             "priority": 46,
-            "storage_capacity_delta": 14
+            "storage_capacity_delta": 14,
+            "mood_consumption_delta": {
+              "泡泡": -0.25
+            }
           },
           {
             "combo": [
@@ -1448,7 +1666,14 @@
             ],
             "efficiency": 33,
             "priority": 45,
-            "storage_capacity_delta": 18
+            "storage_capacity_delta": 18,
+            "stable_position_operators": [
+              "刻俄柏"
+            ],
+            "mood_consumption_delta": {
+              "泡泡": -0.25,
+              "刻俄柏": -0.25
+            }
           },
           {
             "combo": [
@@ -1456,7 +1681,14 @@
             ],
             "efficiency": 31,
             "priority": 44,
-            "storage_capacity_delta": 27
+            "storage_capacity_delta": 27,
+            "stable_position_operators": [
+              "贝娜"
+            ],
+            "mood_consumption_delta": {
+              "泡泡": -0.25,
+              "贝娜": -0.25
+            }
           },
           {
             "combo": [
@@ -1464,7 +1696,11 @@
             ],
             "efficiency": 29,
             "priority": 43,
-            "storage_capacity_delta": 26
+            "storage_capacity_delta": 26,
+            "mood_consumption_delta": {
+              "泡泡": -0.25,
+              "石棉": -0.25
+            }
           },
           {
             "combo": [
@@ -1472,7 +1708,11 @@
             ],
             "efficiency": 28,
             "priority": 42,
-            "storage_capacity_delta": 26
+            "storage_capacity_delta": 26,
+            "mood_consumption_delta": {
+              "泡泡": -0.25,
+              "钼铅": -0.25
+            }
           }
         ]
       },
@@ -1787,7 +2027,13 @@
             "Pure Gold"
           ],
           "note": "25%-45%",
-          "priority": 58
+          "priority": 58,
+          "stable_position_operators": [
+            "阿罗玛"
+          ],
+          "mood_consumption_delta": {
+            "阿罗玛": 0.25
+          }
         },
         {
           "combo": [
@@ -1832,7 +2078,10 @@
             "Pure Gold"
           ],
           "note": "31%-36%",
-          "priority": 49
+          "priority": 49,
+          "mood_consumption_delta": {
+            "杏仁": -0.15
+          }
         },
         {
           "combo": [
@@ -1884,7 +2133,10 @@
           "product": [
             "Pure Gold"
           ],
-          "priority": 30
+          "priority": 30,
+          "mood_consumption_delta": {
+            "杏仁": 0.25
+          }
         },
         {
           "combo": [
@@ -1894,7 +2146,13 @@
           "product": [
             "Pure Gold"
           ],
-          "priority": 30
+          "priority": 30,
+          "stable_position_operators": [
+            "阿罗玛"
+          ],
+          "mood_consumption_delta": {
+            "阿罗玛": 0.25
+          }
         },
         {
           "combo": [
@@ -1946,7 +2204,10 @@
           "product": [
             "Battle Record"
           ],
-          "priority": 50
+          "priority": 50,
+          "mood_consumption_delta": {
+            "裂响": 0.25
+          }
         },
         {
           "combo": [
@@ -1956,7 +2217,10 @@
           "product": [
             "Battle Record"
           ],
-          "priority": 50
+          "priority": 50,
+          "mood_consumption_delta": {
+            "酒神": -0.25
+          }
         },
         {
           "combo": [
@@ -2038,7 +2302,10 @@
             "Battle Record"
           ],
           "priority": 46,
-          "storage_capacity_delta": 8
+          "storage_capacity_delta": 8,
+          "mood_consumption_delta": {
+            "帕拉斯": -0.25
+          }
         },
         {
           "combo": [
@@ -2048,7 +2315,10 @@
           "product": [
             "Battle Record"
           ],
-          "priority": 30
+          "priority": 30,
+          "mood_consumption_delta": {
+            "酒神": -0.25
+          }
         },
         {
           "combo": [
@@ -2142,7 +2412,10 @@
             "雪猎/2"
           ],
           "efficiency": 30,
-          "priority": 48
+          "priority": 48,
+          "mood_consumption_delta": {
+            "雪猎": 0.25
+          }
         },
         {
           "combo": [
@@ -2211,7 +2484,10 @@
           ],
           "efficiency": 25,
           "priority": 46,
-          "storage_capacity_delta": -12
+          "storage_capacity_delta": -12,
+          "mood_consumption_delta": {
+            "泡普卡": 0.25
+          }
         },
         {
           "combo": [
@@ -2219,7 +2495,10 @@
           ],
           "efficiency": 25,
           "priority": 46,
-          "storage_capacity_delta": -12
+          "storage_capacity_delta": -12,
+          "mood_consumption_delta": {
+            "石棉": 0.25
+          }
         },
         {
           "combo": [
@@ -2227,7 +2506,10 @@
           ],
           "efficiency": 25,
           "priority": 46,
-          "storage_capacity_delta": 6
+          "storage_capacity_delta": 6,
+          "mood_consumption_delta": {
+            "裁度": 0.25
+          }
         },
         {
           "combo": [
@@ -2287,28 +2569,41 @@
           ],
           "efficiency": 20,
           "apply_each": true,
-          "priority": 42
+          "priority": 42,
+          "mood_consumption_delta": {
+            "裁度": 0.25,
+            "雪猎": 0.25
+          }
         },
         {
           "combo": [
             "芬"
           ],
           "efficiency": 25,
-          "priority": 45
+          "priority": 45,
+          "stable_position_operators": [
+            "芬"
+          ]
         },
         {
           "combo": [
             "稀音"
           ],
           "efficiency": 25,
-          "priority": 45
+          "priority": 45,
+          "stable_position_operators": [
+            "稀音"
+          ]
         },
         {
           "combo": [
             "克洛丝"
           ],
           "efficiency": 25,
-          "priority": 45
+          "priority": 45,
+          "stable_position_operators": [
+            "克洛丝"
+          ]
         },
         {
           "combo": [
@@ -2448,7 +2743,10 @@
             "空构/2"
           ],
           "efficiency": 20,
-          "priority": 59
+          "priority": 59,
+          "mood_consumption_delta": {
+            "空构": -0.3
+          }
         },
         {
           "combo": [
@@ -2525,7 +2823,10 @@
             "空构"
           ],
           "efficiency": 15,
-          "priority": 49
+          "priority": 49,
+          "mood_consumption_delta": {
+            "空构": -0.3
+          }
         },
         {
           "combo": [
@@ -2637,7 +2938,10 @@
             "THRM-EX"
           ],
           "efficiency": 10,
-          "priority": 40
+          "priority": 40,
+          "mood_consumption_delta": {
+            "THRM-EX": -0.52
+          }
         },
         {
           "combo": [
@@ -2662,7 +2966,10 @@
             "见行者/2"
           ],
           "efficiency": 39,
-          "priority": 90
+          "priority": 90,
+          "mood_consumption_delta": {
+            "见行者": 2.0
+          }
         },
         {
           "combo": [
@@ -2856,7 +3163,11 @@
             "凛视/2"
           ],
           "efficiency": 49,
-          "priority": 80
+          "priority": 80,
+          "mood_consumption_delta": {
+            "提丰": 0.5,
+            "凛视": 0.5
+          }
         }
       ]
     },
