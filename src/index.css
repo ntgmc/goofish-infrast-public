@@ -125,6 +125,84 @@ body {
   margin: 0;
 }
 
+.landing-reveal {
+  opacity: 0.86;
+  transform: translateY(16px);
+  transition:
+    opacity 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms ease-out,
+    background-color 180ms ease-out;
+}
+
+.landing-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.landing-float {
+  animation: landing-float 7s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
+}
+
+.landing-scroll-cue {
+  position: relative;
+}
+
+.landing-scroll-cue::after {
+  animation: landing-scroll-dot 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  background: rgb(103 232 249);
+  border-radius: 999px;
+  content: "";
+  height: 6px;
+  left: 50%;
+  position: absolute;
+  top: 7px;
+  transform: translateX(-50%);
+  width: 3px;
+}
+
+.landing-preview-slot::before {
+  animation: landing-sheen 4.5s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  background: linear-gradient(110deg, transparent 12%, rgba(103, 232, 249, 0.13) 42%, transparent 70%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
+@keyframes landing-float {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes landing-scroll-dot {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+}
+
+@keyframes landing-sheen {
+  0%, 35% {
+    transform: translateX(-100%);
+  }
+  70%, 100% {
+    transform: translateX(100%);
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
