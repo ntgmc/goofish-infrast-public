@@ -297,6 +297,23 @@ export default function ConfigEditor({
                   next.drones = {
                     ...(next.drones ?? { order: 'pre', targets: [] }),
                     enable: event.currentTarget.checked,
+                    auto: next.drones?.auto ?? true,
+                  }
+                  applyCounts(next)
+                })}
+                className="h-4 w-4 accent-brand-500"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
+              <span>无人机 Auto</span>
+              <input
+                type="checkbox"
+                checked={config.drones?.auto ?? false}
+                disabled={!canEdit || !config.drones?.enable}
+                onChange={(event) => onUpdate((next) => {
+                  next.drones = {
+                    ...(next.drones ?? { enable: true, order: 'pre', targets: [] }),
+                    auto: event.currentTarget.checked,
                   }
                   applyCounts(next)
                 })}
@@ -332,7 +349,7 @@ export default function ConfigEditor({
                 id="drone-targets"
                 type="text"
                 value={droneTargets}
-                disabled={!canEdit || !config.drones?.enable}
+                disabled={!canEdit || !config.drones?.enable || config.drones?.auto}
                 onChange={(event) => onUpdate((next) => {
                   next.drones = {
                     ...(next.drones ?? { enable: true, order: 'pre' }),
