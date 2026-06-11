@@ -48,7 +48,7 @@ export async function parseFileContent(
     ok: false,
     error: {
       code: "INVALID_PREFIX",
-      message: "无法识别这个 .maa 文件。请上传卖家下发的授权文件，或本工具保存的工作文件。",
+      message: "无法识别这个文件。请上传卖家下发的授权文件，或本工具保存的工作文件。",
     },
   };
 }

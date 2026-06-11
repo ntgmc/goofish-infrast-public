@@ -32,8 +32,8 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error }: P
 
         <div className="mb-5 flex justify-center">
           <div className="inline-flex rounded-lg bg-surface-1 p-1">
-            <ModeButton label="上传 .maa 文件" active={mode === 'license'} onClick={() => setMode('license')} />
-            <ModeButton label="使用 CDK 生成 .maa" active={mode === 'cdk'} onClick={() => setMode('cdk')} />
+            <ModeButton label="上传授权文件" active={mode === 'license'} onClick={() => setMode('license')} />
+            <ModeButton label="使用 CDK 生成工作文件" active={mode === 'cdk'} onClick={() => setMode('cdk')} />
           </div>
         </div>
 
@@ -44,7 +44,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error }: P
         )}
 
         <p className="mt-6 text-center text-xs text-ink-muted">
-          .maa 是本工具识别的上传格式，文件内容已加密，无需打开查看。
+          授权文件和工作文件通常以 .maa 结尾，文件内容已加密，无需打开查看。
         </p>
       </div>
     </div>
@@ -119,7 +119,7 @@ function LicenseUploadPanel({ onFileLoaded, error }: { onFileLoaded: (content: s
       <div className="space-y-6">
         <div>
           <label htmlFor="file-upload" className="mb-3 block text-sm font-medium text-ink-secondary">
-            .maa 文件
+            授权文件或工作文件
           </label>
           <div
             onDrop={handleDrop}
@@ -132,7 +132,7 @@ function LicenseUploadPanel({ onFileLoaded, error }: { onFileLoaded: (content: s
             onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') fileRef.current?.click() }}
             role="button"
             tabIndex={0}
-            aria-label="上传 .maa 文件"
+            aria-label="上传授权文件或工作文件"
             className={`cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors duration-150 ${
               dragActive
                 ? 'border-brand-400 bg-brand-500/10'
@@ -146,7 +146,7 @@ function LicenseUploadPanel({ onFileLoaded, error }: { onFileLoaded: (content: s
                 </svg>
               </div>
               <p className="text-sm text-ink-secondary">
-                拖拽 .maa 文件到此处，或点击选择
+                拖拽授权文件或工作文件到此处，或点击选择
               </p>
               <p className="text-xs text-ink-muted">
                 支持卖家下发的授权文件，或本工具保存的工作文件
@@ -164,7 +164,7 @@ function LicenseUploadPanel({ onFileLoaded, error }: { onFileLoaded: (content: s
               accept=".maa"
               onChange={handleFileChange}
               className="hidden"
-              aria-label="选择 .maa 文件"
+              aria-label="选择授权文件或工作文件"
             />
           </div>
           <div className="mt-4 grid gap-3 text-left sm:grid-cols-2">
@@ -188,7 +188,7 @@ function LicenseUploadPanel({ onFileLoaded, error }: { onFileLoaded: (content: s
           disabled={loading}
           className="w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
         >
-          {loading ? '验证中...' : selectedFileName ? '验证并进入' : '选择 .maa 文件'}
+          {loading ? '验证中...' : selectedFileName ? '验证并进入' : '选择授权文件'}
         </button>
       </div>
     </div>
@@ -357,7 +357,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
           disabled={loading || !confirmed || !operators || !code.trim() || !configValidation.ok}
           className="mt-5 w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
         >
-          {loading ? '正在生成 .maa...' : '兑换并生成 .maa'}
+          {loading ? '正在生成工作文件...' : '兑换并生成工作文件'}
         </button>
       </section>
     </form>
