@@ -273,7 +273,7 @@ export function validateConfig(value: unknown): { ok: true; config: LicenseConfi
   if (manufacturingTotal !== config.manufacturing_stations_count) {
     return { ok: false, message: `制造产物数量合计为 ${manufacturingTotal}，需要等于 ${config.manufacturing_stations_count}。` }
   }
-  if (config.drones?.enable && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
+  if (config.drones?.enable && !config.drones.auto && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
     return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
   }
   return { ok: true, config }
