@@ -30,7 +30,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
       manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 2 },
     },
     Fiammetta: { enable: true },
-    drones: { enable: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
   },
   '243-1': {
     layout: '2-4-3',
@@ -42,7 +42,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
       manufacturing_stations: { 'Pure Gold': 2, 'Originium Shard': 2 },
     },
     Fiammetta: { enable: true },
-    drones: { enable: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
   },
   '333': {
     layout: '3-3-3',
@@ -54,7 +54,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
       manufacturing_stations: { 'Pure Gold': 2, 'Originium Shard': 1 },
     },
     Fiammetta: { enable: true },
-    drones: { enable: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
   },
 }
 
@@ -77,7 +77,12 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
   next.desc = next.desc || `${next.layout} 基建配置`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
-  next.drones = next.drones ?? { enable: false, order: 'pre', targets: [] }
+  next.drones = {
+    enable: next.drones?.enable ?? false,
+    auto: next.drones?.auto ?? false,
+    order: next.drones?.order ?? 'pre',
+    targets: Array.isArray(next.drones?.targets) ? next.drones.targets : [],
+  }
   return next
 }
 
@@ -104,7 +109,7 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
   if (manufacturingTotal !== manufacturingCount) {
     return { ok: false, message: `制造产物数量合计为 ${manufacturingTotal}，需要等于 ${manufacturingCount}。` }
   }
-  if (config.drones?.enable && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
+  if (config.drones?.enable && !config.drones.auto && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
     return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
   }
   return { ok: true }

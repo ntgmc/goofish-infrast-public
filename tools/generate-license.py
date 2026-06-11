@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """MAA License Generator - Seller Tool
 Generates AES-GCM encrypted .maa license files for customers.
 
@@ -77,7 +77,7 @@ CONFIG_TEMPLATES = {
             "manufacturing_stations": {"Pure Gold": 2, "Battle Record": 2}
         },
         "Fiammetta": {"enable": True},
-        "drones": {"enable": True, "order": "pre", "targets": ["LMD", "Pure Gold", "LMD"]}
+        "drones": {"enable": True, "auto": True, "order": "pre", "targets": ["LMD", "Pure Gold", "LMD"]}
     },
     "243-1": {
         "layout": "2-4-3",
@@ -89,7 +89,7 @@ CONFIG_TEMPLATES = {
             "manufacturing_stations": {"Pure Gold": 2, "Originium Shard": 2}
         },
         "Fiammetta": {"enable": True},
-        "drones": {"enable": True, "order": "pre", "targets": ["LMD", "Pure Gold", "LMD"]}
+        "drones": {"enable": True, "auto": True, "order": "pre", "targets": ["LMD", "Pure Gold", "LMD"]}
     },
     "333": {
         "layout": "3-3-3",
@@ -101,7 +101,7 @@ CONFIG_TEMPLATES = {
             "manufacturing_stations": {"Pure Gold": 2, "Originium Shard": 1}
         },
         "Fiammetta": {"enable": True},
-        "drones": {"enable": True, "order": "pre", "targets": ["LMD", "Pure Gold", "LMD"]}
+        "drones": {"enable": True, "auto": True, "order": "pre", "targets": ["LMD", "Pure Gold", "LMD"]}
     }
 }
 
