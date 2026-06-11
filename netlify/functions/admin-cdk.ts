@@ -8,9 +8,14 @@ import {
   type CdkRecord,
 } from './license-utils'
 
+type CdkStatusFilter = 'unused' | 'used' | 'all'
+
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return jsonResponse(null, 204)
+  }
+  if (req.method === 'GET') {
+    return handleList(req)
   }
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405)
@@ -64,5 +69,53 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     console.error('admin cdk error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
+  }
+}
+
+async function handleList(req: Request): Promise<Response> {
+  try {
+    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
+    const providedPassword = req.headers.get('X-Admin-Password')
+    if (providedPassword !== adminPassword) {
+      return jsonResponse({ error: '管理口令错误。' }, 401)
+    }
+
+    const status = normalizeStatusFilter(req.headers.get('X-Cdk-Status'), req.url)
+    const store = await getCdkRecordStore()
+    const records = (await store.list('cdk/'))
+      .filter((record) => status === 'all' || record.status === status)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+
+    return jsonResponse({
+      status,
+      total: records.length,
+      cdks: records.map(toAdminCdkRecord),
+    })
+  } catch (error) {
+    console.error('admin cdk list error:', error)
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return jsonResponse({ error: message }, 500)
+  }
+}
+
+function normalizeStatusFilter(headerValue: string | null, requestUrl: string): CdkStatusFilter {
+  if (headerValue === 'used' || headerValue === 'all') return headerValue
+  const queryValue = new URL(requestUrl).searchParams.get('status')
+  if (queryValue === 'used' || queryValue === 'all') return queryValue
+  return 'unused'
+}
+
+function toAdminCdkRecord(record: CdkRecord) {
+  return {
+    code_hash: record.code_hash,
+    cdk_id: record.code_hash.slice(0, 12),
+    permission: record.permission,
+    status: record.status,
+    created_at: record.created_at,
+    used_at: record.used_at,
+    order_note: record.order_note,
+    license_order_hash: record.license_order_hash,
+    operator_count: record.operator_count,
+    config_desc: record.config_desc,
   }
 }
