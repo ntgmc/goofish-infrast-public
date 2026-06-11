@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties, type PointerEvent } from 'react'
 
 interface Props {
   onStart: () => void;
@@ -91,7 +91,7 @@ export default function LandingPage({ onStart }: Props) {
             <button
               type="button"
               onClick={onStart}
-              className="hidden rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#080a0f] transition duration-150 hover:bg-cyan-100 active:scale-[0.98] sm:inline-flex"
+              className="landing-cta hidden rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#080a0f] transition duration-150 hover:bg-cyan-100 active:scale-[0.98] sm:inline-flex"
             >
               开始使用
             </button>
@@ -114,7 +114,7 @@ export default function LandingPage({ onStart }: Props) {
                 <button
                   type="button"
                   onClick={onStart}
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#061013] transition duration-150 hover:bg-cyan-200 active:scale-[0.98]"
+                  className="landing-cta inline-flex min-h-11 items-center justify-center rounded-lg bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#061013] transition duration-150 hover:bg-cyan-200 active:scale-[0.98]"
                 >
                   一键生成排班
                 </button>
@@ -236,7 +236,7 @@ export default function LandingPage({ onStart }: Props) {
                 <button
                   type="button"
                   onClick={onStart}
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#080a0f] transition duration-150 hover:bg-cyan-100 active:scale-[0.98]"
+                  className="landing-cta inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#080a0f] transition duration-150 hover:bg-cyan-100 active:scale-[0.98]"
                 >
                   进入上传页面
                 </button>
@@ -250,8 +250,37 @@ export default function LandingPage({ onStart }: Props) {
 }
 
 function HeroPreview() {
+  const [previewStyle, setPreviewStyle] = useState<CSSProperties>({})
+
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = (event.clientX - rect.left) / rect.width
+    const y = (event.clientY - rect.top) / rect.height
+    setPreviewStyle({
+      '--tilt-x': `${(x - 0.5) * 5}deg`,
+      '--tilt-y': `${(0.5 - y) * 5}deg`,
+      '--glow-x': `${x * 100}%`,
+      '--glow-y': `${y * 100}%`,
+    } as CSSProperties)
+  }
+
+  const handlePointerLeave = () => {
+    setPreviewStyle({
+      '--tilt-x': '0deg',
+      '--tilt-y': '0deg',
+      '--glow-x': '50%',
+      '--glow-y': '34%',
+    } as CSSProperties)
+  }
+
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#0d1118]">
+    <div
+      className="landing-hero-preview relative overflow-hidden rounded-2xl border border-white/10 bg-[#0d1118]"
+      style={previewStyle}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+    >
+      <span className="landing-hero-glow" aria-hidden="true" />
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
@@ -264,9 +293,9 @@ function HeroPreview() {
         <div className="border-b border-white/10 p-5 lg:border-b-0 lg:border-r">
           <p className="text-sm font-semibold text-white">从数据到排班文件</p>
           <div className="mt-5 space-y-4">
-            <PreviewRow label="输入" value="授权文件 / CDK" tone="cyan" />
-            <PreviewRow label="计算" value="自动计算最优排班方案" tone="violet" />
-            <PreviewRow label="输出" value="MAA 排班 JSON" tone="emerald" />
+            <PreviewRow label="输入" value="授权文件 / CDK" tone="cyan" index={0} />
+            <PreviewRow label="计算" value="自动计算最优排班方案" tone="violet" index={1} />
+            <PreviewRow label="输出" value="MAA 排班 JSON" tone="emerald" index={2} />
           </div>
           <div className="mt-6 rounded-xl bg-white/[0.045] p-4">
             <p className="text-xs font-medium text-white/48">核心收益</p>
@@ -277,7 +306,7 @@ function HeroPreview() {
           </div>
         </div>
         <div className="p-5">
-          <div className="rounded-xl border border-cyan-200/14 bg-[#071016] p-4">
+          <div className="landing-generate-card rounded-xl border border-cyan-200/14 p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-white">一键生成</p>
@@ -298,17 +327,17 @@ function HeroPreview() {
 
           <div className="landing-result-reveal">
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <PreviewMetric label="预计总效率" value="5280%" />
-              <PreviewMetric label="每日产出" value="96,800 龙门币" />
+              <PreviewMetric label="预计总效率" value="5280%" index={0} />
+              <PreviewMetric label="每日产出" value="96,800 龙门币" index={1} />
             </div>
 
-            <div className="mt-4 rounded-xl bg-white/[0.045] p-4">
+            <div className="landing-download-card mt-4 rounded-xl bg-white/[0.045] p-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium text-white/48">下一步</p>
                   <p className="mt-1 text-sm font-semibold text-white">下载排班 JSON</p>
                 </div>
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#080a0f]">
+                <span className="landing-download-icon inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#080a0f]">
                   ↓
                 </span>
               </div>
@@ -324,7 +353,11 @@ function PreviewStep({ label, index }: { label: string; index: number }) {
   return (
     <div
       className="landing-preview-step flex items-center justify-between gap-4 rounded-lg bg-white/[0.035] px-3 py-2.5"
-      style={{ '--step-index': index } as CSSProperties}
+      style={{
+        '--step-delay': `${index * 1050}ms`,
+        '--step-check-delay': `${index * 1050 + 610}ms`,
+        '--step-done-delay': `${index * 1050 + 460}ms`,
+      } as CSSProperties}
     >
       <div className="flex items-center gap-3">
         <span className="landing-step-mark relative flex h-5 w-5 items-center justify-center rounded-full" aria-hidden="true">
@@ -343,9 +376,9 @@ function PreviewStep({ label, index }: { label: string; index: number }) {
   )
 }
 
-function PreviewMetric({ label, value }: { label: string; value: string }) {
+function PreviewMetric({ label, value, index }: { label: string; value: string; index: number }) {
   return (
-    <div className="rounded-xl bg-white/[0.045] p-4">
+    <div className="landing-metric-reveal rounded-xl bg-white/[0.045] p-4" style={{ '--metric-delay': `${5100 + index * 220}ms` } as CSSProperties}>
       <p className="text-xs font-medium text-white/48">{label}</p>
       <p className="mt-2 text-xl font-semibold text-white">{value}</p>
     </div>
@@ -389,7 +422,7 @@ function ScreenshotSlot({ title, description, src }: { title: string; descriptio
   )
 }
 
-function PreviewRow({ label, value, tone }: { label: string; value: string; tone: 'cyan' | 'violet' | 'emerald' }) {
+function PreviewRow({ label, value, tone, index }: { label: string; value: string; tone: 'cyan' | 'violet' | 'emerald'; index: number }) {
   const tones = {
     cyan: 'bg-cyan-300',
     violet: 'bg-violet-300',
@@ -397,9 +430,9 @@ function PreviewRow({ label, value, tone }: { label: string; value: string; tone
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg bg-white/[0.035] px-3 py-2.5">
+    <div className="landing-flow-row flex items-center justify-between gap-4 rounded-lg bg-white/[0.035] px-3 py-2.5" style={{ '--row-delay': `${420 + index * 780}ms` } as CSSProperties}>
       <div className="flex items-center gap-3">
-        <span className={`h-2 w-2 rounded-full ${tones[tone]}`} aria-hidden="true" />
+        <span className={`landing-flow-dot h-2 w-2 rounded-full ${tones[tone]}`} aria-hidden="true" />
         <span className="text-sm text-white/62">{label}</span>
       </div>
       <span className="text-sm font-medium text-white">{value}</span>

@@ -171,8 +171,114 @@ body {
   transform: translateX(-100%);
 }
 
+.landing-cta {
+  overflow: hidden;
+  position: relative;
+}
+
+.landing-cta::after {
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.42) 48%, transparent 72%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-120%);
+  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.landing-cta:hover::after {
+  transform: translateX(120%);
+}
+
+.landing-hero-preview {
+  transform: perspective(1100px) rotateX(var(--tilt-y, 0deg)) rotateY(var(--tilt-x, 0deg));
+  transform-style: preserve-3d;
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms ease-out;
+}
+
+.landing-hero-preview:hover {
+  border-color: rgba(103, 232, 249, 0.28);
+}
+
+.landing-hero-glow {
+  background: radial-gradient(circle at var(--glow-x, 50%) var(--glow-y, 34%), rgba(103, 232, 249, 0.18), transparent 34%);
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 180ms ease-out;
+  z-index: 1;
+}
+
+.landing-hero-preview:hover .landing-hero-glow {
+  opacity: 1;
+}
+
+.landing-hero-preview > :not(.landing-hero-glow) {
+  position: relative;
+  z-index: 2;
+}
+
+.landing-flow-row {
+  animation: landing-flow-row 1100ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--row-delay);
+  overflow: hidden;
+  position: relative;
+}
+
+.landing-flow-row::after {
+  animation: landing-flow-scan 1120ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--row-delay);
+  background: linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.16), transparent);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
+.landing-flow-dot {
+  animation: landing-flow-dot 1100ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--row-delay);
+}
+
+.landing-generate-card {
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
+}
+
+.landing-generate-card::before,
+.landing-generate-card::after {
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.landing-generate-card::before {
+  background: #071016;
+  z-index: -1;
+}
+
+.landing-generate-card::after {
+  animation: landing-generate-sheen 2.4s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
+  background: linear-gradient(110deg, transparent 5%, rgba(103, 232, 249, 0.34) 36%, rgba(255, 255, 255, 0.26) 50%, transparent 72%);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translateX(-110%);
+  z-index: 4;
+}
+
+.landing-generate-card > * {
+  position: relative;
+  z-index: 2;
+}
+
 .landing-ready-pill {
-  animation: landing-ready-shell 680ms cubic-bezier(0.16, 1, 0.3, 1) 2.2s forwards;
+  animation: landing-ready-shell 980ms cubic-bezier(0.16, 1, 0.3, 1) 4.15s forwards;
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.62);
   min-width: 58px;
@@ -180,7 +286,7 @@ body {
 }
 
 .landing-ready-pill::before {
-  animation: landing-ready-fill 680ms cubic-bezier(0.16, 1, 0.3, 1) 2.2s forwards;
+  animation: landing-ready-fill 980ms cubic-bezier(0.16, 1, 0.3, 1) 4.15s forwards;
   background: rgb(103 232 249);
   content: "";
   inset: 0;
@@ -196,11 +302,11 @@ body {
 }
 
 .landing-ready-pending {
-  animation: landing-ready-pending 220ms ease-out 2.2s forwards;
+  animation: landing-ready-pending 360ms ease-out 4.15s forwards;
 }
 
 .landing-ready-done {
-  animation: landing-ready-done 280ms ease-out 2.34s forwards;
+  animation: landing-ready-done 460ms ease-out 4.42s forwards;
   color: #061013;
   inset: 0;
   opacity: 0;
@@ -209,8 +315,8 @@ body {
 }
 
 .landing-preview-step {
-  animation: landing-step-surface 620ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: calc(var(--step-index) * 620ms);
+  animation: landing-step-surface 920ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--step-delay);
 }
 
 .landing-step-mark {
@@ -227,8 +333,8 @@ body {
 }
 
 .landing-step-ring {
-  animation: landing-step-ring 560ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: calc(var(--step-index) * 620ms);
+  animation: landing-step-ring 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--step-delay);
   opacity: 0.42;
   stroke-dasharray: 50.3;
   stroke-dashoffset: 50.3;
@@ -236,8 +342,8 @@ body {
 }
 
 .landing-step-check {
-  animation: landing-step-check 420ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: calc(var(--step-index) * 620ms + 360ms);
+  animation: landing-step-check 680ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--step-check-delay);
   opacity: 0;
   stroke-dasharray: 12;
   stroke-dashoffset: 12;
@@ -254,13 +360,13 @@ body {
 }
 
 .landing-step-pending {
-  animation: landing-step-pending 220ms ease-out forwards;
-  animation-delay: calc(var(--step-index) * 620ms);
+  animation: landing-step-pending 340ms ease-out forwards;
+  animation-delay: var(--step-delay);
 }
 
 .landing-step-done {
-  animation: landing-step-done 260ms ease-out forwards;
-  animation-delay: calc(var(--step-index) * 620ms + 260ms);
+  animation: landing-step-done 420ms ease-out forwards;
+  animation-delay: var(--step-done-delay);
   color: rgb(167 243 208);
   inset: 0;
   opacity: 0;
@@ -268,9 +374,27 @@ body {
 }
 
 .landing-result-reveal {
-  animation: landing-result-reveal 520ms cubic-bezier(0.16, 1, 0.3, 1) 2.72s forwards;
+  animation: landing-result-reveal 820ms cubic-bezier(0.16, 1, 0.3, 1) 4.95s forwards;
   opacity: 0;
   transform: translateY(10px);
+}
+
+.landing-metric-reveal {
+  animation: landing-metric-reveal 720ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--metric-delay);
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+}
+
+.landing-download-card {
+  animation: landing-download-card 760ms cubic-bezier(0.16, 1, 0.3, 1) 5.46s forwards;
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.landing-download-icon {
+  animation: landing-download-icon 900ms cubic-bezier(0.16, 1, 0.3, 1) 5.72s forwards;
+  transform: translateY(-4px);
 }
 
 @keyframes landing-float {
@@ -302,6 +426,56 @@ body {
   }
   70%, 100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes landing-flow-row {
+  0% {
+    background: rgba(255, 255, 255, 0.035);
+    transform: translateX(0);
+  }
+  48% {
+    background: rgba(103, 232, 249, 0.095);
+    transform: translateX(2px);
+  }
+  100% {
+    background: rgba(255, 255, 255, 0.052);
+    transform: translateX(0);
+  }
+}
+
+@keyframes landing-flow-scan {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes landing-flow-dot {
+  0% {
+    box-shadow: 0 0 0 0 rgba(103, 232, 249, 0);
+    transform: scale(1);
+  }
+  48% {
+    box-shadow: 0 0 0 5px rgba(103, 232, 249, 0.14);
+    transform: scale(1.2);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(103, 232, 249, 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes landing-generate-sheen {
+  0%, 18% {
+    opacity: 0;
+    transform: translateX(-110%);
+  }
+  32% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.35;
+    transform: translateX(110%);
   }
 }
 
@@ -403,6 +577,32 @@ body {
 @keyframes landing-result-reveal {
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-metric-reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes landing-download-card {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-download-icon {
+  0% {
+    transform: translateY(-4px);
+  }
+  58% {
+    transform: translateY(2px);
+  }
+  100% {
     transform: translateY(0);
   }
 }
