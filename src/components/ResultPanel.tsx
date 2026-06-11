@@ -5,6 +5,7 @@ interface Props {
   result: OptimizeResult;
   onDownload: () => void;
   onSaveWorkfile: () => void;
+  detailDefaultOpen?: boolean;
 }
 
 const ROOM_LABELS: Record<string, string> = {
@@ -49,8 +50,8 @@ type PreparedPlan = OptimizeResult['plans'][number] & {
   rows: RoomRow[];
 }
 
-export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Props) {
-  const { totalEff, plans, productionStats } = useMemo(() => {
+export default function ResultPanel({ result, onDownload, onSaveWorkfile, detailDefaultOpen = false }: Props) {
+  const { totalEff, plans, productionStats, detailStats } = useMemo(() => {
     const totalEff = result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
     const plans: PreparedPlan[] = result.plans.map((plan) => ({
       ...plan,
@@ -88,7 +89,12 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
       droneMinutes: daily.drones?.acceleration_minutes ?? 0,
     }
 
-    return { totalEff, plans, productionStats }
+    const detailStats = {
+      planCount: plans.length,
+      roomCount: plans.reduce((sum, plan) => sum + plan.rows.length, 0),
+    }
+
+    return { totalEff, plans, productionStats, detailStats }
   }, [result])
 
   return (
@@ -145,9 +151,14 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
         />
       </div>
 
-      <div>
-        <h3 className="mb-5 text-lg font-semibold text-ink-primary">排班详情</h3>
-        <div className="space-y-5">
+      <details className="overflow-hidden rounded-xl bg-surface-1" open={detailDefaultOpen}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
+          <span>排班详情</span>
+          <span className="text-xs font-medium text-ink-muted">
+            {detailStats.planCount} 个班次，{detailStats.roomCount} 个房间
+          </span>
+        </summary>
+        <div className="space-y-5 border-t border-surface-3/60 p-4 sm:p-5">
           {plans.map((plan, i) => (
             <div key={i} className="overflow-hidden rounded-xl bg-surface-1">
               <div className="flex items-center justify-between px-6 py-4 bg-surface-2/50">
@@ -211,7 +222,7 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile }: Prop
             </div>
           ))}
         </div>
-      </div>
+      </details>
     </div>
   )
 }
