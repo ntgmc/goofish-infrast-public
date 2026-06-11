@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 
 interface Props {
   onStart: () => void;
@@ -283,32 +283,35 @@ function HeroPreview() {
                 <p className="text-sm font-semibold text-white">一键生成</p>
                 <p className="mt-1 text-xs text-white/48">上传后自动计算 3 班方案</p>
               </div>
-              <span className="rounded-full bg-cyan-300 px-3 py-1 text-xs font-semibold text-[#061013]">
-                已就绪
+              <span className="landing-ready-pill relative overflow-hidden rounded-full px-3 py-1 text-xs font-semibold">
+                <span className="landing-ready-pending">未就绪</span>
+                <span className="landing-ready-done">已就绪</span>
               </span>
             </div>
 
             <div className="mt-5 space-y-3">
-              <PreviewStep label="读取干员与练度" state="完成" />
-              <PreviewStep label="匹配基建房间配置" state="完成" />
-              <PreviewStep label="生成排班 JSON" state="完成" />
+              <PreviewStep label="读取干员与练度" index={0} />
+              <PreviewStep label="匹配基建房间配置" index={1} />
+              <PreviewStep label="生成排班 JSON" index={2} />
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <PreviewMetric label="预计总效率" value="5280%" />
-            <PreviewMetric label="每日产出" value="96,800 龙门币" />
-          </div>
+          <div className="landing-result-reveal">
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <PreviewMetric label="预计总效率" value="5280%" />
+              <PreviewMetric label="每日产出" value="96,800 龙门币" />
+            </div>
 
-          <div className="mt-4 rounded-xl bg-white/[0.045] p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-medium text-white/48">下一步</p>
-                <p className="mt-1 text-sm font-semibold text-white">下载排班 JSON</p>
+            <div className="mt-4 rounded-xl bg-white/[0.045] p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-medium text-white/48">下一步</p>
+                  <p className="mt-1 text-sm font-semibold text-white">下载排班 JSON</p>
+                </div>
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#080a0f]">
+                  ↓
+                </span>
               </div>
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#080a0f]">
-                ↓
-              </span>
             </div>
           </div>
         </div>
@@ -317,16 +320,25 @@ function HeroPreview() {
   )
 }
 
-function PreviewStep({ label, state }: { label: string; state: string }) {
+function PreviewStep({ label, index }: { label: string; index: number }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg bg-white/[0.035] px-3 py-2.5">
+    <div
+      className="landing-preview-step flex items-center justify-between gap-4 rounded-lg bg-white/[0.035] px-3 py-2.5"
+      style={{ '--step-index': index } as CSSProperties}
+    >
       <div className="flex items-center gap-3">
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-300 text-[11px] font-bold text-[#061013]">
-          ✓
+        <span className="landing-step-mark relative flex h-5 w-5 items-center justify-center rounded-full" aria-hidden="true">
+          <svg className="h-5 w-5" viewBox="0 0 20 20">
+            <circle className="landing-step-ring" cx="10" cy="10" r="8" />
+            <path className="landing-step-check" d="M6 10.35l2.35 2.35L14.2 7.3" />
+          </svg>
         </span>
         <span className="text-sm text-white/66">{label}</span>
       </div>
-      <span className="text-xs font-medium text-emerald-200">{state}</span>
+      <span className="landing-step-state relative min-w-8 text-right text-xs font-medium">
+        <span className="landing-step-pending">等待</span>
+        <span className="landing-step-done">完成</span>
+      </span>
     </div>
   )
 }
