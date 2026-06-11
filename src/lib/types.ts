@@ -19,6 +19,7 @@ export interface LicenseConfig {
   Fiammetta?: { enable: boolean };
   drones?: {
     enable: boolean;
+    auto?: boolean;
     order: string;
     targets: string[];
   };
@@ -76,14 +77,57 @@ export interface OptimizeResult {
   planTimes: string;
   plans: ShiftPlan[];
   raw_results: AssignmentResult[];
+  daily_production?: DailyProduction;
+}
+
+export interface RoomOverflow {
+  final_efficiency?: number;
+  speed_efficiency?: number;
+  display_efficiency?: number;
+  speed_efficiency_adjusted?: boolean;
+  expected_order_time?: string;
+  time?: string;
+  strategy?: string;
+  [key: string]: unknown;
+}
+
+export interface ShiftRoom {
+  operators?: string[];
+  product?: string;
+  efficiency?: number;
+  final_efficiency?: number;
+  overflow?: RoomOverflow;
+  autofill?: boolean;
+}
+
+export interface DroneAssignment {
+  enable: boolean;
+  room: string;
+  index: number;
+  order: string;
+  mode?: 'auto' | 'manual';
+  product?: string;
+  efficiency?: number;
+  display_efficiency?: number;
+  candidate_count?: number;
+  reason?: string;
+}
+
+export interface DailyProduction {
+  manufacturing?: Record<string, number>;
+  trading?: Record<string, number>;
+  consumption?: Record<string, number>;
+  net?: Record<string, number>;
+  drones?: Record<string, number>;
+  details?: Record<string, unknown>[];
 }
 
 export interface ShiftPlan {
   name: string;
   description?: string;
-  rooms: Record<string, { operators?: string[]; product?: string; efficiency?: number; autofill?: boolean }[]>;
+  rooms: Record<string, ShiftRoom[]>;
   Fiammetta?: { enable: boolean; target: string; order: string };
-  drones?: { enable: boolean; room: string; index: number; order: string };
+  drones?: DroneAssignment;
 }
 
 export interface UpgradeSuggestion {
