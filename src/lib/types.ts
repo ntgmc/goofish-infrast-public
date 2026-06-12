@@ -16,7 +16,7 @@ export interface LicenseConfig {
     trading_stations: Record<string, number>;
     manufacturing_stations: Record<string, number>;
   };
-  Fiammetta?: { enable: boolean };
+  Fiammetta?: { enable: boolean; candidate_mode?: string };
   drones?: {
     enable: boolean;
     auto?: boolean;
@@ -126,7 +126,15 @@ export interface ShiftPlan {
   name: string;
   description?: string;
   rooms: Record<string, ShiftRoom[]>;
-  Fiammetta?: { enable: boolean; target: string; order: string };
+  Fiammetta?: {
+    enable: boolean;
+    requested?: boolean;
+    available?: boolean;
+    target: string;
+    order: string;
+    status?: string;
+    reason?: string;
+  };
   drones?: DroneAssignment;
 }
 
