@@ -397,6 +397,20 @@ body {
   transform: translateY(-4px);
 }
 
+.schedule-progress-fill {
+  overflow: hidden;
+  position: relative;
+}
+
+.schedule-progress-fill::after {
+  animation: schedule-progress-sheen 1.35s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+  content: "";
+  inset: 0;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
 @keyframes landing-float {
   from {
     transform: translateY(0);
@@ -604,6 +618,15 @@ body {
   }
   100% {
     transform: translateY(0);
+  }
+}
+
+@keyframes schedule-progress-sheen {
+  0%, 25% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
   }
 }
 

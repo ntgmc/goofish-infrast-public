@@ -13,6 +13,11 @@ export const PRODUCT_LABELS: Record<string, string> = {
   'Originium Shard': '源石碎片',
 }
 
+export const SCHEDULE_MODE_LABELS: Record<string, string> = {
+  maa: 'MAA 排班表',
+  rotation: '游戏内轮换',
+}
+
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   basic: 'Basic',
   premium: 'Premium',
@@ -23,6 +28,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   '243': {
     layout: '2-4-3',
     desc: '243 均衡流 (2赤金/2经验)',
+    schedule_mode: 'maa',
     trading_stations_count: 2,
     manufacturing_stations_count: 4,
     product_requirements: {
@@ -35,6 +41,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   '243-1': {
     layout: '2-4-3',
     desc: '243 搓玉 (2赤金/2源石)',
+    schedule_mode: 'maa',
     trading_stations_count: 2,
     manufacturing_stations_count: 4,
     product_requirements: {
@@ -47,6 +54,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   '333': {
     layout: '3-3-3',
     desc: '333 搓玉流',
+    schedule_mode: 'maa',
     trading_stations_count: 3,
     manufacturing_stations_count: 3,
     product_requirements: {
@@ -62,6 +70,13 @@ export function cloneConfig(config: LicenseConfig): LicenseConfig {
   return JSON.parse(JSON.stringify(config)) as LicenseConfig
 }
 
+export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' {
+  const modeText = String(mode ?? 'maa').trim().toLowerCase()
+  return ['rotation', 'rotate', 'game_rotation', 'in_game_rotation', '轮换', '轮换模式', '游戏内轮换'].includes(modeText)
+    ? 'rotation'
+    : 'maa'
+}
+
 function sumCounts(counts: Record<string, number> | undefined): number {
   return Object.values(counts ?? {}).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0)
 }
@@ -74,6 +89,7 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   }
   next.trading_stations_count = Number.isFinite(next.trading_stations_count) ? next.trading_stations_count : 2
   next.manufacturing_stations_count = Number.isFinite(next.manufacturing_stations_count) ? next.manufacturing_stations_count : 4
+  next.schedule_mode = normalizeScheduleMode(next.schedule_mode ?? next.mode)
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
   next.desc = next.desc || `${next.layout} 基建配置`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
@@ -143,6 +159,9 @@ export default function ConfigEditor({
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
   const droneTargets = (config.drones?.targets ?? []).join(', ')
+  const scheduleMode = normalizeScheduleMode(config.schedule_mode)
+  const rotationMode = scheduleMode === 'rotation'
+  const validationMessage = validation.ok === false ? validation.message : null
 
   const applyPreset = (preset: LicenseConfig) => {
     onUpdate((next) => {
@@ -269,12 +288,38 @@ export default function ConfigEditor({
         <div className="rounded-lg bg-surface-2/60 p-4">
           <h3 className="font-semibold text-ink-primary">特殊策略</h3>
           <div className="mt-4 space-y-4">
+            <div>
+              <p className="mb-2 text-xs font-medium text-ink-muted">排班模式</p>
+              <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
+                {(['maa', 'rotation'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={!canEdit}
+                    onClick={() => onUpdate((next) => {
+                      next.schedule_mode = mode
+                      if (mode === 'rotation') {
+                        next.Fiammetta = { ...(next.Fiammetta ?? {}), enable: false }
+                      }
+                      applyCounts(next)
+                    })}
+                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed ${
+                      scheduleMode === mode
+                        ? 'bg-brand-600 text-white'
+                        : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
+                    }`}
+                  >
+                    {SCHEDULE_MODE_LABELS[mode]}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
               <span>菲亚梅塔</span>
               <input
                 type="checkbox"
-                checked={config.Fiammetta?.enable ?? false}
-                disabled={!canEdit}
+                checked={!rotationMode && (config.Fiammetta?.enable ?? false)}
+                disabled={!canEdit || rotationMode}
                 onChange={(event) => onUpdate((next) => {
                   next.Fiammetta = { enable: event.currentTarget.checked }
                   applyCounts(next)
@@ -282,7 +327,11 @@ export default function ConfigEditor({
                 className="h-4 w-4 accent-brand-500"
               />
             </label>
-            {config.Fiammetta?.enable && (
+            {rotationMode ? (
+              <p className="rounded-lg bg-surface-1 px-3 py-2 text-xs leading-5 text-ink-muted">
+                游戏内轮换按两班生成，菲亚梅塔不会参与计算。
+              </p>
+            ) : config.Fiammetta?.enable && (
               <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
                 使用菲亚梅塔需要保证换班时间固定；如果使用 MAA 自带定时换班，请将换班间隔设为 8 小时或 12 小时。
               </p>
@@ -365,8 +414,8 @@ export default function ConfigEditor({
         </div>
       </div>
 
-      {!validation.ok && (
-        <p className="mt-4 text-sm text-warning">{validation.message}</p>
+      {validationMessage && (
+        <p className="mt-4 text-sm text-warning">{validationMessage}</p>
       )}
     </section>
   )

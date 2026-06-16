@@ -51,6 +51,7 @@ type PreparedPlan = OptimizeResult['plans'][number] & {
 }
 
 export default function ResultPanel({ result, onDownload, onSaveWorkfile, detailDefaultOpen = false }: Props) {
+  const isRotationMode = result.schedule_mode === 'rotation'
   const { totalEff, plans, productionStats, detailStats } = useMemo(() => {
     const totalEff = result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
     const plans: PreparedPlan[] = result.plans.map((plan) => ({
@@ -62,6 +63,9 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
           if (!Array.isArray(ops) || ops.length === 0) return []
           const efficiency = getDisplayEfficiency(room)
           const speedEfficiency = getEffectiveEfficiency(roomType, room)
+          const detail = [getEfficiencyDetail(roomType, room), getMoodDetail(room)]
+            .filter(Boolean)
+            .join(' · ')
           return {
             key: `${roomType}-${index}`,
             label: ROOM_LABELS[roomType] || roomType,
@@ -70,7 +74,7 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
             operators: ops.join(', '),
             efficiency: formatPercent(efficiency),
             speedEfficiency: formatPercent(speedEfficiency),
-            detail: getEfficiencyDetail(roomType, room),
+            detail,
             hasAdjustedSpeed: Math.abs(speedEfficiency - efficiency) >= 0.05,
           }
         })
@@ -106,17 +110,22 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
               排班方案已就绪
             </h2>
             <p className="mt-1 text-sm text-ink-secondary">
-              排班 JSON 用于导入或交给 MAA 使用；工作文件用于下次回到本工具继续调整练度与基建配置。
+              {result.schedule_mode_name ?? 'MAA排班表'} · {result.planTimes ?? `${detailStats.planCount} 个班次`}。
+              {isRotationMode
+                ? '按下方排班详情在游戏内手动设置；工作文件用于下次回到本工具继续调整练度与基建配置。'
+                : '排班 JSON 用于导入或交给 MAA 使用；工作文件用于下次回到本工具继续调整练度与基建配置。'}
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
-            <button
-              type="button"
-              onClick={onDownload}
-              className="rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
-            >
-              下载排班 JSON
-            </button>
+            {!isRotationMode && (
+              <button
+                type="button"
+                onClick={onDownload}
+                className="rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
+              >
+                下载排班 JSON
+              </button>
+            )}
             <button
               type="button"
               onClick={onSaveWorkfile}
@@ -126,7 +135,7 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
             </button>
           </div>
         </div>
-        <MaaImportGuide />
+        {isRotationMode ? <RotationManualGuide /> : <MaaImportGuide />}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -151,11 +160,11 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
         />
       </div>
 
-      <details className="overflow-hidden rounded-xl bg-surface-1" open={detailDefaultOpen}>
+      <details className="overflow-hidden rounded-xl bg-surface-1" open={detailDefaultOpen || isRotationMode}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
           <span>排班详情</span>
           <span className="text-xs font-medium text-ink-muted">
-            {detailStats.planCount} 个班次，{detailStats.roomCount} 个房间
+            {result.planTimes ?? `${detailStats.planCount} 个班次`}，{detailStats.roomCount} 个房间
           </span>
         </summary>
         <div className="space-y-5 border-t border-surface-3/60 p-4 sm:p-5">
@@ -275,6 +284,28 @@ function getEfficiencyDetail(roomType: string, room: ShiftRoom): string {
   return ''
 }
 
+function getMoodDetail(room: ShiftRoom): string {
+  const mood = room.mood ?? {}
+  const entries = Object.values(mood)
+  if (entries.length === 0) return ''
+  const minEnd = Math.min(...entries.map((item) => Number(item.end ?? MAX_MOOD_FALLBACK)))
+  const maxCost = Math.max(...entries.map((item) => Number(item.cost_per_hour ?? 0)))
+  const redOps = Object.entries(mood)
+    .filter(([, item]) => item.red_face)
+    .map(([name]) => name)
+  const parts = [`心情≥${formatCompactNumber(minEnd)}`, `最高消耗/时 ${formatCompactNumber(maxCost)}`]
+  if (room.rotation?.work_hours_to_zero !== undefined && room.rotation.work_hours_to_zero !== null) {
+    const triggers = room.rotation.trigger_operators?.length
+      ? ` (${room.rotation.trigger_operators.join(', ')})`
+      : ''
+    parts.push(`轮换到零 ${formatCompactNumber(room.rotation.work_hours_to_zero)}h${triggers}`)
+  }
+  if (redOps.length > 0) parts.push(`红脸风险 ${redOps.join(', ')}`)
+  return parts.join('，')
+}
+
+const MAX_MOOD_FALLBACK = 24
+
 function formatProduct(product?: string): string {
   if (!product) return '-'
   return PRODUCT_LABELS[product] ?? product
@@ -288,6 +319,11 @@ function formatAmount(value: number): string {
   if (!Number.isFinite(value)) return '0'
   if (Math.abs(value) >= 1000) return Math.round(value).toLocaleString('zh-CN')
   return value.toFixed(value % 1 === 0 ? 0 : 1)
+}
+
+function formatCompactNumber(value: number): string {
+  if (!Number.isFinite(value)) return '0'
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '')
 }
 
 function formatSigned(value: number): string {
@@ -340,6 +376,21 @@ function DroneSummary({ drones }: { drones: DroneAssignment }) {
               : ''}
           </p>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function RotationManualGuide() {
+  return (
+    <div className="mt-6 border-t border-surface-3/60 pt-5">
+      <div className="rounded-lg bg-surface-2/60 px-4 py-4">
+        <h3 className="text-base font-semibold text-ink-primary">
+          游戏内手动设置
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">
+          游戏内轮换不生成排班 JSON。按下方排班详情中的两个班次，逐个房间设置产物和干员；无人机加速按班次底部的无人机摘要手动处理。
+        </p>
       </div>
     </div>
   )
