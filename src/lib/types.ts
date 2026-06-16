@@ -10,6 +10,7 @@ export interface LicenseOperator {
 export interface LicenseConfig {
   layout: string;
   desc: string;
+  schedule_mode?: 'maa' | 'rotation' | string;
   trading_stations_count: number;
   manufacturing_stations_count: number;
   product_requirements: {
@@ -73,6 +74,8 @@ export interface OptimizeResult {
   author: string;
   title: string;
   description: string;
+  schedule_mode?: string;
+  schedule_mode_name?: string;
   buildingType: number;
   planTimes: string;
   plans: ShiftPlan[];
@@ -97,6 +100,17 @@ export interface ShiftRoom {
   efficiency?: number;
   final_efficiency?: number;
   overflow?: RoomOverflow;
+  mood?: Record<string, {
+    start?: number;
+    cost_per_hour?: number;
+    consumed?: number;
+    end?: number;
+    red_face?: boolean;
+  }>;
+  rotation?: {
+    trigger_operators?: string[];
+    work_hours_to_zero?: number | null;
+  };
   autofill?: boolean;
 }
 
@@ -125,6 +139,7 @@ export interface DailyProduction {
 export interface ShiftPlan {
   name: string;
   description?: string;
+  schedule_mode?: string;
   rooms: Record<string, ShiftRoom[]>;
   Fiammetta?: {
     enable: boolean;
@@ -136,6 +151,14 @@ export interface ShiftPlan {
     reason?: string;
   };
   drones?: DroneAssignment;
+  mood_valid?: boolean;
+  mood_errors?: Record<string, unknown>[];
+  mood_assumptions?: {
+    max_mood?: number;
+    shift_hours?: number;
+    resting_operator_recovers_full?: boolean;
+    fiammetta_target_recovers_full?: boolean;
+  };
 }
 
 export interface UpgradeSuggestion {

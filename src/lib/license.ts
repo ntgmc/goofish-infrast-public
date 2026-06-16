@@ -24,7 +24,7 @@ export async function parseFileContent(
       const json = await decryptPayload(base64);
       const data = JSON.parse(json) as LicenseFile;
       const check = validateLicenseStructure(data);
-      if (!check.ok) return check;
+      if (check.ok === false) return { ok: false, error: check.error };
       return { ok: true, data: { kind: "license", data } };
     } catch {
       return { ok: false, error: { code: "DECRYPT_FAILED", message: "授权文件无法读取，文件可能已损坏。" } };
@@ -37,7 +37,7 @@ export async function parseFileContent(
       const json = await decryptPayload(base64);
       const data = JSON.parse(json) as WorkFile;
       const check = validateWorkFileStructure(data);
-      if (!check.ok) return check;
+      if (check.ok === false) return { ok: false, error: check.error };
       return { ok: true, data: { kind: "workfile", data } };
     } catch {
       return { ok: false, error: { code: "DECRYPT_FAILED", message: "工作文件无法读取，文件可能已损坏。" } };

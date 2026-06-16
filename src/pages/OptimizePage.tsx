@@ -2,9 +2,13 @@ import { useState, useCallback, useMemo, useRef } from 'react'
 import type { LicenseConfig, LicenseFile, LicenseOperator, OptimizeResult, UpgradeSuggestion } from '../lib/types'
 import { canEditConfig, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
-import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS } from '../components/ConfigEditor'
+import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
 import UpgradeSuggestions from '../components/UpgradeSuggestions'
 import ResultPanel from '../components/ResultPanel'
+import ScheduleProgress, {
+  SCHEDULE_PROGRESS_COMPLETION_DURATION_MS,
+  type ScheduleProgressState,
+} from '../components/ScheduleProgress'
 
 interface Props {
   license: LicenseFile;
@@ -29,6 +33,7 @@ export default function OptimizePage({
   const [currentResult, setCurrentResult] = useState<OptimizeResult | null>(null)
   const [finalResult, setFinalResult] = useState<OptimizeResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [progress, setProgress] = useState<ScheduleProgressState | null>(null)
   const [phase, setPhase] = useState<'idle' | 'suggestions' | 'final'>('idle')
   const [operatorUploadStatus, setOperatorUploadStatus] = useState<string | null>(null)
   const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
@@ -49,6 +54,7 @@ export default function OptimizePage({
     [activeConfig, baseConfig]
   )
   const configValidation = useMemo(() => validateConfig(activeConfig), [activeConfig])
+  const configValidationMessage = configValidation.ok === false ? configValidation.message : null
 
   const mergedOperators = useMemo(
     () => mergeOperators(license.operators, eliteOverrides),
@@ -60,11 +66,14 @@ export default function OptimizePage({
   )
   const hasResult = Boolean(finalResult || currentResult)
   const resultIsCurrent = hasResult && lastGeneratedSignature === optimizeSignature
+  const currentResultIsRotation = normalizeScheduleMode(currentResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
+  const finalResultIsRotation = normalizeScheduleMode(finalResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
 
   const clearGeneratedResult = useCallback(() => {
     setSuggestions([])
     setCurrentResult(null)
     setFinalResult(null)
+    setProgress(null)
     setPhase('idle')
     setInlineError(null)
     setLastGeneratedSignature(null)
@@ -118,20 +127,23 @@ export default function OptimizePage({
   const handleGenerate = useCallback(async () => {
     if (loading || optimizeInFlightRef.current) return
     if (hasResult && lastGeneratedSignature === optimizeSignature) return
-    if (!configValidation.ok) {
-      setInlineError({ scope: 'generate', message: configValidation.message })
+    if (configValidationMessage) {
+      setInlineError({ scope: 'generate', message: configValidationMessage })
       return
     }
     optimizeInFlightRef.current = true
     setInlineError(null)
     setLoading(true)
+    const startedAt = Date.now()
+    setProgress({ mode: 'generate', startedAt })
+    let completed = false
     try {
       const current = await runOptimize(false)
       setCurrentResult(current)
       const potential = await runOptimize(true)
       const serverSuggestions = (potential as unknown as Record<string, unknown>).upgrade_suggestions as Record<string, unknown>[] | undefined
-      if (serverSuggestions && serverSuggestions.length > 0) {
-        const upgradeList: UpgradeSuggestion[] = serverSuggestions.map((s, idx) => {
+      const upgradeList: UpgradeSuggestion[] = serverSuggestions && serverSuggestions.length > 0
+        ? serverSuggestions.map((s, idx) => {
           if (s.type === 'single') {
             return {
               type: 'single' as const,
@@ -156,10 +168,11 @@ export default function OptimizePage({
             })),
           }
         })
-        setSuggestions(upgradeList.sort((a, b) => b.gain - a.gain).slice(0, 20))
-      } else {
-        setSuggestions([])
-      }
+        : []
+      completed = true
+      setProgress({ mode: 'generate', startedAt, completedAt: Date.now() })
+      await waitForProgressCompletion()
+      setSuggestions(upgradeList.sort((a, b) => b.gain - a.gain).slice(0, 20))
       setPhase('suggestions')
       setLastGeneratedSignature(optimizeSignature)
     } catch (e) {
@@ -167,13 +180,19 @@ export default function OptimizePage({
     } finally {
       optimizeInFlightRef.current = false
       setLoading(false)
+      if (!completed) {
+        setProgress(null)
+      }
     }
-  }, [configValidation, hasResult, lastGeneratedSignature, loading, optimizeSignature, runOptimize])
+  }, [configValidationMessage, hasResult, lastGeneratedSignature, loading, optimizeSignature, runOptimize])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
     if (loading || optimizeInFlightRef.current) return
     optimizeInFlightRef.current = true
     setInlineError(null)
+    const startedAt = Date.now()
+    setProgress({ mode: 'apply', startedAt })
+    let completed = false
     const selectedSet = new Set(selectedIds)
     const newOverrides = { ...eliteOverrides }
     for (const s of suggestions) {
@@ -202,6 +221,9 @@ export default function OptimizePage({
       })
       if (!result.ok) throw new Error('优化失败')
       const data = await result.json() as OptimizeResult
+      completed = true
+      setProgress({ mode: 'apply', startedAt, completedAt: Date.now() })
+      await waitForProgressCompletion()
       setFinalResult(data)
       setPhase('final')
       setLastGeneratedSignature(buildOptimizeSignature(mergeOperators(license.operators, newOverrides), activeConfig))
@@ -210,6 +232,9 @@ export default function OptimizePage({
     } finally {
       optimizeInFlightRef.current = false
       setLoading(false)
+      if (!completed) {
+        setProgress(null)
+      }
     }
   }, [activeConfig, eliteOverrides, loading, suggestions, license.operators, setEliteOverrides])
 
@@ -289,6 +314,7 @@ export default function OptimizePage({
         fileId={license.order_hash.slice(0, 8)}
         validation={configValidation}
         loading={loading}
+        progress={progress?.mode === 'generate' ? progress : null}
         hasResult={hasResult}
         resultIsCurrent={resultIsCurrent}
         error={inlineError?.scope === 'generate' ? inlineError.message : null}
@@ -310,7 +336,7 @@ export default function OptimizePage({
             )}
           </span>
           <span className="text-xs font-medium text-ink-muted">
-            {activeConfig.layout} · {activeConfig.desc}
+            {SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · {activeConfig.layout} · {activeConfig.desc}
           </span>
         </summary>
         <div className="border-t border-surface-3/60 p-4 sm:p-5">
@@ -349,6 +375,7 @@ export default function OptimizePage({
             suggestions={suggestions}
             onApply={handleApplySuggestions}
             loading={loading}
+            progress={progress?.mode === 'apply' ? progress : null}
             error={inlineError?.scope === 'apply' ? inlineError.message : null}
             onReset={onReset}
           />
@@ -359,7 +386,11 @@ export default function OptimizePage({
         <div className="mt-8">
           <div className="bg-success/10 border border-success/30 rounded-xl p-5 mb-8">
             <p className="font-semibold text-success">当前练度已是最佳配置</p>
-            <p className="text-success/80 text-sm mt-1">无需应用升级建议，可直接下载优化结果。</p>
+            <p className="text-success/80 text-sm mt-1">
+              {currentResultIsRotation
+                ? '无需应用升级建议，请按排班详情在游戏内手动设置。'
+                : '无需应用升级建议，可直接下载优化结果。'}
+            </p>
           </div>
           <ResultPanel result={currentResult!} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />
         </div>
@@ -369,7 +400,11 @@ export default function OptimizePage({
         <div className="mt-8">
           <div className="bg-success/10 border border-success/30 rounded-xl p-5 mb-8">
             <p className="font-semibold text-success">排班方案已生成</p>
-            <p className="text-success/80 text-sm mt-1">已应用练度修改。</p>
+            <p className="text-success/80 text-sm mt-1">
+              {finalResultIsRotation
+                ? '已应用练度修改，请按排班详情在游戏内手动设置。'
+                : '已应用练度修改。'}
+            </p>
           </div>
           <ResultPanel result={finalResult} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />
         </div>
@@ -385,6 +420,7 @@ function CommandBand({
   fileId,
   validation,
   loading,
+  progress,
   hasResult,
   resultIsCurrent,
   error,
@@ -397,12 +433,15 @@ function CommandBand({
   fileId: string;
   validation: { ok: true } | { ok: false; message: string };
   loading: boolean;
+  progress: ScheduleProgressState | null;
   hasResult: boolean;
   resultIsCurrent: boolean;
   error: string | null;
   onGenerate: () => void;
   onReset: () => void;
 }) {
+  const validationMessage = validation.ok === false ? validation.message : null
+
   return (
     <section className="rounded-xl bg-surface-1 p-5 sm:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -414,6 +453,9 @@ function CommandBand({
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink-secondary">
             <span className="rounded-full bg-surface-2 px-2.5 py-1">ID {fileId}</span>
             <span className="rounded-full bg-surface-2 px-2.5 py-1">{operatorCount} 名干员</span>
+            <span className="rounded-full bg-surface-2 px-2.5 py-1">
+              {SCHEDULE_MODE_LABELS[normalizeScheduleMode(config.schedule_mode)]}
+            </span>
             <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.layout}</span>
             <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.desc}</span>
             {configChanged && (
@@ -447,10 +489,13 @@ function CommandBand({
           修改基建配置或干员数据后才需要重新计算。
         </p>
       )}
-      {!validation.ok && (
-        <InlineErrorPanel message={validation.message} onRetry={onGenerate} onReset={onReset} />
+      {loading && progress && (
+        <ScheduleProgress progress={progress} className="mt-5" />
       )}
-      {error && validation.ok && (
+      {validationMessage && (
+        <InlineErrorPanel message={validationMessage} onRetry={onGenerate} onReset={onReset} />
+      )}
+      {error && !validationMessage && (
         <InlineErrorPanel message={error} onRetry={onGenerate} onReset={onReset} />
       )}
     </section>
@@ -459,6 +504,10 @@ function CommandBand({
 
 function buildOptimizeSignature(operators: LicenseOperator[], config: LicenseConfig): string {
   return canonicalJson({ operators, config })
+}
+
+function waitForProgressCompletion(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, SCHEDULE_PROGRESS_COMPLETION_DURATION_MS))
 }
 
 function InlineErrorPanel({

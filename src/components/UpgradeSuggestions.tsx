@@ -1,15 +1,17 @@
 ﻿import { useCallback, useMemo, useState } from 'react'
 import type { UpgradeSuggestion } from '../lib/types'
+import ScheduleProgress, { type ScheduleProgressState } from './ScheduleProgress'
 
 interface Props {
   suggestions: UpgradeSuggestion[];
   onApply: (selectedIds: string[]) => void;
   loading: boolean;
+  progress?: ScheduleProgressState | null;
   error?: string | null;
   onReset: () => void;
 }
 
-export default function UpgradeSuggestions({ suggestions, onApply, loading, error, onReset }: Props) {
+export default function UpgradeSuggestions({ suggestions, onApply, loading, progress, error, onReset }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const selectedIds = useMemo(() => Array.from(selected), [selected])
@@ -58,6 +60,10 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, erro
           )}
         </button>
       </div>
+
+      {loading && progress && (
+        <ScheduleProgress progress={progress} />
+      )}
 
       {error && (
         <div className="rounded-lg border border-error/40 bg-error/10 p-4">
