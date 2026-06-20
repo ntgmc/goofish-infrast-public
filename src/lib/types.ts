@@ -51,11 +51,37 @@ export interface WorkFile {
   client_state: ClientState;
 }
 
+export interface AppBuildMeta {
+  frontend_version: string;
+  backend_version: string;
+  data_version: string;
+  generated_at: string;
+  source_summary: string;
+  git_sha?: string | null;
+  build_context?: string;
+}
+
 export interface OptimizeRequest {
   operators: LicenseOperator[];
   config: LicenseConfig;
   ignore_elite: boolean;
   include_current?: boolean;
+  suggestions_only?: boolean;
+  upgrade_task_payload?: UpgradeTaskPayload;
+}
+
+export interface UpgradeTaskPayload {
+  tasks: RawUpgradeTask[];
+  baselineScore: number;
+  currentFiammettaTargets?: string[];
+  potentialFiammettaTargets?: string[];
+}
+
+export interface RawUpgradeTask {
+  bundle: { id?: string; name: string; current: number; target: number }[];
+  rule: unknown | null;
+  roomName: string;
+  estimatedGain: number;
 }
 
 export interface AssignmentResult {
@@ -85,6 +111,8 @@ export interface OptimizeResult {
   total_efficiency?: number;
   upgrade_suggestions?: RawUpgradeSuggestion[];
   current_result?: OptimizeResult;
+  upgrade_task_payload?: UpgradeTaskPayload;
+  build_meta?: AppBuildMeta;
 }
 
 export type RawUpgradeSuggestion =
@@ -107,6 +135,12 @@ export type RawUpgradeSuggestion =
     };
 
 export interface RoomOverflow {
+  equivalent?: {
+    equivalent_efficiency?: number;
+    equivalent_efficiency_delta?: number;
+    manufacturing_equivalent_efficiency?: number;
+    [key: string]: unknown;
+  };
   final_efficiency?: number;
   speed_efficiency?: number;
   display_efficiency?: number;
