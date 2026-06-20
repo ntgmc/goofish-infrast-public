@@ -56,8 +56,6 @@ export interface OptimizeRequest {
   config: LicenseConfig;
   ignore_elite: boolean;
   include_current?: boolean;
-  suggestions_only?: boolean;
-  upgrade_task_payload?: UpgradeTaskPayload;
 }
 
 export interface AssignmentResult {
@@ -86,20 +84,7 @@ export interface OptimizeResult {
   daily_production?: DailyProduction;
   total_efficiency?: number;
   upgrade_suggestions?: RawUpgradeSuggestion[];
-  upgrade_task_payload?: UpgradeTaskPayload;
   current_result?: OptimizeResult;
-}
-
-export interface UpgradeTaskPayload {
-  tasks: RawUpgradeTask[];
-  baselineScore: number;
-}
-
-export interface RawUpgradeTask {
-  bundle: { id?: string; name: string; current: number; target: number }[];
-  rule: Record<string, unknown> | null;
-  roomName: string;
-  estimatedGain: number;
 }
 
 export type RawUpgradeSuggestion =

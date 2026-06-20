@@ -1,4 +1,3 @@
-import { Worker } from 'node:worker_threads';
 import * as esbuild from 'esbuild';
 
 const optimizeEntry = 'netlify/functions/optimize.ts';
@@ -81,18 +80,11 @@ try {
   });
   assertOptimizeShape(potential, 'potential result');
   assertOptimizeShape(potential.current_result, 'current_result');
-  if (!potential.upgrade_task_payload || !Array.isArray(potential.upgrade_task_payload.tasks)) {
-    throw new Error('potential result: missing upgrade_task_payload');
-  }
-  const suggestions = await callOptimize({
-    operators: [],
-    config,
-    ignore_elite: true,
-    suggestions_only: true,
-    upgrade_task_payload: potential.upgrade_task_payload,
-  });
-  if (!Array.isArray(suggestions.upgrade_suggestions)) {
-    throw new Error('suggestions_only result: missing upgrade_suggestions array');
+  if (
+    potential.upgrade_suggestions !== undefined &&
+    !Array.isArray(potential.upgrade_suggestions)
+  ) {
+    throw new Error('potential result: invalid upgrade_suggestions');
   }
 } finally {
   if (previousNetlify === undefined) {
@@ -100,30 +92,6 @@ try {
   } else {
     process.env.NETLIFY = previousNetlify;
   }
-}
-
-const worker = new Worker(new URL(functionUrl), {
-  workerData: {
-    kind: 'upgrade-simulation',
-    operators: [],
-    config,
-    tasks: [],
-    baselineScore: 0,
-    deadlineAt: Date.now() + 1000,
-    reserveMs: 100,
-  },
-});
-
-const workerMessage = await new Promise((resolve, reject) => {
-  worker.once('message', resolve);
-  worker.once('error', reject);
-  worker.once('exit', (code) => {
-    if (code !== 0) reject(new Error(`worker exited with ${code}`));
-  });
-});
-
-if (!workerMessage || !Array.isArray(workerMessage.results)) {
-  throw new Error('worker smoke check returned an invalid message');
 }
 
 console.log('optimize function smoke check ok');
