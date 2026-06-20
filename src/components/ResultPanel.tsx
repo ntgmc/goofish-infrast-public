@@ -262,12 +262,18 @@ function MetricCard({
 }
 
 function getDisplayEfficiency(room: ShiftRoom): number {
-  return Number(room.overflow?.display_efficiency ?? room.overflow?.final_efficiency ?? room.efficiency ?? 0)
+  return Number(
+    room.overflow?.equivalent?.equivalent_efficiency ??
+    room.overflow?.final_efficiency ??
+    room.final_efficiency ??
+    room.efficiency ??
+    0,
+  )
 }
 
 function getEffectiveEfficiency(roomType: string, room: ShiftRoom): number {
   if (roomType === 'trading') {
-    return Number(room.overflow?.speed_efficiency ?? room.final_efficiency ?? room.efficiency ?? 0)
+    return Number(room.overflow?.speed_efficiency ?? room.overflow?.final_efficiency ?? room.final_efficiency ?? room.efficiency ?? 0)
   }
   return Number(room.overflow?.final_efficiency ?? room.final_efficiency ?? room.efficiency ?? 0)
 }
