@@ -64,8 +64,11 @@ Quality Checks 拆分为两个检查项：
 
 | Job | Command | Purpose |
 | --- | --- | --- |
+| `Deploy Relevance` | `npm run check:deploy-relevance` | 判断本次变更是否需要 Netlify 重新部署 |
 | `Web Build` | `npm run build` | 生成效率数据、执行 TypeScript 检查并构建 Vite 前端 |
 | `Functions Smoke Test` | `npm run generate:data` + `npm run check:functions` | 生成共享版本元数据，并验证 Netlify Optimize Function 可打包、可调用 |
+
+`Web Build` 和 `Functions Smoke Test` 只在 `Deploy Relevance` 判断为需要部署时运行。只修改文档或仓库元数据时，Quality Checks 会保留发布相关性检查，但跳过前端构建和函数 smoke test。
 
 Quality Checks 会在执行检查前注入构建元数据：
 
@@ -88,6 +91,7 @@ Quality Checks 会在执行检查前注入构建元数据：
 | --- | --- |
 | Base directory | repository root |
 | Build command | `npm run build` |
+| Ignore command | `node scripts/netlify-ignore-build.mjs` |
 | Publish directory | `dist` |
 | Node version | `20` |
 | Functions directory | `netlify/functions` |
@@ -112,6 +116,16 @@ Quality Checks 会在执行检查前注入构建元数据：
 ## 发布流程
 
 本项目使用 Netlify Git-based deploy，不在 GitHub Actions 中手动上传构建产物。
+
+Netlify 会在构建前执行 `node scripts/netlify-ignore-build.mjs`。该脚本根据上一次部署提交和当前提交之间的文件变化决定是否继续构建：
+
+| Change type | Examples | Result |
+| --- | --- | --- |
+| 前端运行时代码 | `src/`, `public/`, `index.html`, `vite.config.ts`, `tsconfig.json` | 继续部署 |
+| 后端函数或数据 | `netlify/`, `scripts/generate-data.mjs` | 继续部署 |
+| 构建依赖或站点配置 | `package.json`, `package-lock.json`, `netlify.toml` | 继续部署 |
+| 文档和仓库元数据 | `README.md`, `PRODUCT.md`, `optimize.md`, `.github/`, `.agents/` | 跳过 Netlify 部署 |
+| 首次部署或无法读取比较提交 | 缺少 `CACHED_COMMIT_REF` / `COMMIT_REF` | 继续部署 |
 
 推荐流程：
 
