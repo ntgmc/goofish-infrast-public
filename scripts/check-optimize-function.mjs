@@ -90,6 +90,18 @@ try {
     if (!Array.isArray(potential.upgrade_task_payload.tasks)) {
       throw new Error('potential result: invalid upgrade_task_payload');
     }
+    if (
+      potential.upgrade_task_payload.currentFiammettaTargets !== undefined &&
+      !Array.isArray(potential.upgrade_task_payload.currentFiammettaTargets)
+    ) {
+      throw new Error('potential result: invalid currentFiammettaTargets');
+    }
+    if (
+      potential.upgrade_task_payload.potentialFiammettaTargets !== undefined &&
+      !Array.isArray(potential.upgrade_task_payload.potentialFiammettaTargets)
+    ) {
+      throw new Error('potential result: invalid potentialFiammettaTargets');
+    }
     const suggestionResult = await callOptimize({
       operators: [],
       config,
