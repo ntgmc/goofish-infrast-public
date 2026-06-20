@@ -21,8 +21,41 @@ env:
   NODE_VERSION: "20"
 
 jobs:
+  deploy-relevance:
+    name: Deploy Relevance
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deploy_required: ${{ steps.check.outputs.deploy_required }}
+      reason: ${{ steps.check.outputs.reason }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Check deploy relevance
+        id: check
+        env:
+          CACHED_COMMIT_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          COMMIT_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/netlify-ignore-build.mjs --check
+
+      - name: Write summary
+        run: |
+          echo "Deploy required: ${{ steps.check.outputs.deploy_required }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Reason: ${{ steps.check.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+
   web-build:
     name: Web Build
+    needs: deploy-relevance
+    if: needs.deploy-relevance.outputs.deploy_required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -55,6 +88,8 @@ jobs:
 
   functions-smoke-test:
     name: Functions Smoke Test
+    needs: deploy-relevance
+    if: needs.deploy-relevance.outputs.deploy_required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

@@ -4,7 +4,7 @@ export const APP_BUILD_META = {
   "frontend_version": "1.0.0+local",
   "backend_version": "1.0.0+local",
   "data_version": "data.854eea5017a4",
-  "generated_at": "2026-06-20T19:40:31.476Z",
+  "generated_at": "2026-06-20T19:46:42.905Z",
   "source_summary": "source=netlify/functions/efficiency-data.json; sha256=854eea5017a4; workplaces=14; trading_rule_groups=7; manufacturing_rule_groups=9; control_center_rules=13",
   "git_sha": null,
   "build_context": "local"
