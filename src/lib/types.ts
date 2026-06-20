@@ -63,6 +63,8 @@ export interface OptimizeRequest {
 export interface UpgradeTaskPayload {
   tasks: RawUpgradeTask[];
   baselineScore: number;
+  currentFiammettaTargets?: string[];
+  potentialFiammettaTargets?: string[];
 }
 
 export interface RawUpgradeTask {
