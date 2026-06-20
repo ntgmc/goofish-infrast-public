@@ -1,5 +1,7 @@
 # goofish-infrast-v1
 
+[![Quality Checks](https://github.com/ntgmc/goofish-infrast-v1/actions/workflows/quality-checks.yml/badge.svg)](https://github.com/ntgmc/goofish-infrast-v1/actions/workflows/quality-checks.yml)
+
 MAA 基建排班优化器是一个面向《明日方舟》玩家的 Web 工具。用户可以上传授权文件或通过 CDK 兑换生成工作文件，应用会根据干员、基建房间、产物需求和无人机策略计算可导入 MAA 的排班 JSON，并给出精英化升级建议。
 
 ## 在线地址
@@ -47,6 +49,37 @@ npm run check:local
 
 `check:local` 会先执行生产构建，再对 `netlify/functions/optimize.ts` 做一次 smoke check，确认优化函数可以被打包和调用。
 
+## Quality Checks
+
+仓库使用 GitHub Actions 执行质量检查，配置文件位于 `.github/workflows/quality-checks.yml`。
+
+Quality Checks 会在以下场景触发：
+
+- 向 `main` 发起 pull request
+- 推送到 `main`
+- 推送到 `dev`
+- 手动触发 Quality Checks
+
+Quality Checks 拆分为两个检查项：
+
+| Job | Command | Purpose |
+| --- | --- | --- |
+| `Web Build` | `npm run build` | 生成效率数据、执行 TypeScript 检查并构建 Vite 前端 |
+| `Functions Smoke Test` | `npm run generate:data` + `npm run check:functions` | 生成共享版本元数据，并验证 Netlify Optimize Function 可打包、可调用 |
+
+Quality Checks 会在执行检查前注入构建元数据：
+
+| Variable | Example | Purpose |
+| --- | --- | --- |
+| `FRONTEND_VERSION` | `frontend.123.abcdef1` | 前端版本号 |
+| `BACKEND_VERSION` | `backend.123.abcdef1` | 后端版本号 |
+| `DATA_VERSION` | `data.123.abcdef1` | 规则数据版本号 |
+| `GENERATED_AT` | `2026-06-21T00:00:00Z` | 规则数据生成时间 |
+| `GIT_SHA` | commit SHA | 版本对应的 Git 提交 |
+| `BUILD_CONTEXT` | `pull_request` / `push` | 构建上下文 |
+
+`npm run generate:data` 会根据这些变量生成 `src/lib/build-meta.ts`，并在 `netlify/functions/data.ts` 中写入 `data_version`、`generated_at` 和来源摘要。前端会显示“当前规则数据更新于 YYYY-MM-DD”，优化 API 响应也会带上同一份版本元数据。
+
 ## Netlify Build & deploy settings
 
 当前仓库已包含 `netlify.toml`，部署配置以该文件为准：
@@ -75,6 +108,20 @@ npm run check:local
 | Production branch | `main` |
 | Branch deploys | Deploy only the production branch |
 | Deploy Previews | Any pull request against the production branch or branch deploy branches |
+
+## 发布流程
+
+本项目使用 Netlify Git-based deploy，不在 GitHub Actions 中手动上传构建产物。
+
+推荐流程：
+
+1. 在 `dev` 或功能分支完成开发。
+2. 本地运行 `npm run check:local`。
+3. 向 `main` 发起 pull request。
+4. 等待 GitHub Actions Quality Checks 通过。
+5. 使用 Netlify Deploy Preview 验证 PR 预览环境。
+6. 合并到 `main` 后，由 Netlify 自动触发生产部署。
+7. 部署完成后访问 <https://goofish-infrast-v1.netlify.app/> 做生产冒烟验证。
 
 ## 环境变量
 

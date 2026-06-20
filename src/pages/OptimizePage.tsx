@@ -5,6 +5,7 @@ import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from 
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
 import UpgradeSuggestions from '../components/UpgradeSuggestions'
 import ResultPanel from '../components/ResultPanel'
+import BuildMetaStrip from '../components/BuildMetaStrip'
 import ScheduleProgress, {
   SCHEDULE_PROGRESS_COMPLETION_DURATION_MS,
   type ScheduleProgressState,
@@ -68,6 +69,7 @@ export default function OptimizePage({
   const resultIsCurrent = hasResult && lastGeneratedSignature === optimizeSignature
   const currentResultIsRotation = normalizeScheduleMode(currentResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
   const finalResultIsRotation = normalizeScheduleMode(finalResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
+  const serverBuildMeta = finalResult?.build_meta ?? currentResult?.build_meta
 
   const clearGeneratedResult = useCallback(() => {
     setSuggestions([])
@@ -324,6 +326,7 @@ export default function OptimizePage({
           <p className="text-ink-secondary text-sm">
             配置: {activeConfig.desc} · ID: {license.order_hash.slice(0, 8)}...
           </p>
+          <BuildMetaStrip meta={serverBuildMeta} className="mt-3" />
         </div>
         <button
           onClick={onReset}

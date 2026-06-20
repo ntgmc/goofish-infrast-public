@@ -60,6 +60,14 @@ function assertOptimizeShape(result, label) {
   if (typeof result.title !== 'string') {
     throw new Error(`${label}: missing title`);
   }
+  if (!result.build_meta || typeof result.build_meta !== 'object') {
+    throw new Error(`${label}: missing build_meta`);
+  }
+  for (const key of ['frontend_version', 'backend_version', 'data_version', 'generated_at', 'source_summary']) {
+    if (typeof result.build_meta[key] !== 'string' || result.build_meta[key].length === 0) {
+      throw new Error(`${label}: invalid build_meta.${key}`);
+    }
+  }
 }
 
 const current = await callOptimize({
@@ -111,6 +119,9 @@ try {
     });
     if (!Array.isArray(suggestionResult.upgrade_suggestions)) {
       throw new Error('suggestions_only result: invalid upgrade_suggestions');
+    }
+    if (!suggestionResult.build_meta?.backend_version) {
+      throw new Error('suggestions_only result: missing build_meta');
     }
   }
 } finally {

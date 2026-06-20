@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useCallback } from 'react'
 import type { LicenseConfig, LicenseFile, LicenseOperator } from '../lib/types'
 import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
+import BuildMetaStrip from '../components/BuildMetaStrip'
 
 interface Props {
   onFileLoaded: (content: string) => Promise<void>;
@@ -28,6 +29,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error }: P
           <p className="text-base text-ink-secondary">
             上传授权文件或使用 CDK 生成排班
           </p>
+          <BuildMetaStrip className="mt-4 justify-center" />
         </div>
 
         <div className="mb-5 flex justify-center">
