@@ -124,6 +124,12 @@ export type RawUpgradeSuggestion =
     };
 
 export interface RoomOverflow {
+  equivalent?: {
+    equivalent_efficiency?: number;
+    equivalent_efficiency_delta?: number;
+    manufacturing_equivalent_efficiency?: number;
+    [key: string]: unknown;
+  };
   final_efficiency?: number;
   speed_efficiency?: number;
   display_efficiency?: number;
