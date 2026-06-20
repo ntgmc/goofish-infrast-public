@@ -275,6 +275,9 @@ function getEffectiveEfficiency(roomType: string, room: ShiftRoom): number {
 function getEfficiencyDetail(roomType: string, room: ShiftRoom): string {
   const overflow = room.overflow
   if (!overflow) return ''
+  if (roomType === 'trading' && typeof overflow.time === 'string') {
+    return `满单 ${overflow.time}`
+  }
   if (roomType === 'trading' && typeof overflow.expected_order_time === 'string') {
     return `单均 ${overflow.expected_order_time}`
   }
