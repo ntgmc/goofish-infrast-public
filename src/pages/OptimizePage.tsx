@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
-import type { LicenseConfig, LicenseFile, LicenseOperator, OptimizeResult, UpgradeSuggestion } from '../lib/types'
+import type { LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion } from '../lib/types'
 import { canEditConfig, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
@@ -114,11 +114,17 @@ export default function OptimizePage({
     clearGeneratedResult()
   }, [clearGeneratedResult, setConfigOverride])
 
-  const runOptimize = useCallback(async (ignoreElite: boolean) => {
+  const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false) => {
+    const payload: OptimizeRequest = {
+      operators: mergedOperators,
+      config: activeConfig,
+      ignore_elite: ignoreElite,
+      ...(includeCurrent && { include_current: true }),
+    }
     const resp = await fetch('/api/optimize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ operators: mergedOperators, config: activeConfig, ignore_elite: ignoreElite }),
+      body: JSON.stringify(payload),
     })
     if (!resp.ok) throw new Error(`优化请求失败: ${resp.status}`)
     return resp.json() as Promise<OptimizeResult>
@@ -138,29 +144,29 @@ export default function OptimizePage({
     setProgress({ mode: 'generate', startedAt })
     let completed = false
     try {
-      const current = await runOptimize(false)
+      const potential = await runOptimize(true, true)
+      const current = potential.current_result ?? (await runOptimize(false))
       setCurrentResult(current)
-      const potential = await runOptimize(true)
-      const serverSuggestions = (potential as unknown as Record<string, unknown>).upgrade_suggestions as Record<string, unknown>[] | undefined
+      const serverSuggestions = potential.upgrade_suggestions
       const upgradeList: UpgradeSuggestion[] = serverSuggestions && serverSuggestions.length > 0
         ? serverSuggestions.map((s, idx) => {
           if (s.type === 'single') {
             return {
               type: 'single' as const,
-              id: (s.id as string) || (s.name as string) || '',
-              name: s.name as string,
-              current_elite: s.current as number,
-              target_elite: s.target as number,
-              gain: Math.round(s.gain as number),
+              id: s.id || s.name || '',
+              name: s.name,
+              current_elite: s.current,
+              target_elite: s.target,
+              gain: Math.round(s.gain),
               desc: `${s.name}: 精${s.current} → 精${s.target}`,
             }
           }
           return {
             type: 'bundle' as const,
             id: `bundle-${idx}`,
-            gain: Math.round(s.gain as number),
-            desc: (s.ops as {name:string;current:number;target:number}[])?.map(o => `${o.name}: 精${o.current}→精${o.target}`).join(', ') || '',
-            ops: (s.ops as {id?:string;name:string;current:number;target:number}[])?.map(o => ({
+            gain: Math.round(s.gain),
+            desc: s.ops?.map(o => `${o.name}: 精${o.current}→精${o.target}`).join(', ') || '',
+            ops: s.ops?.map(o => ({
               id: o.id || o.name,
               name: o.name,
               current_elite: o.current,

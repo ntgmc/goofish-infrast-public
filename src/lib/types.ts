@@ -55,6 +55,7 @@ export interface OptimizeRequest {
   operators: LicenseOperator[];
   config: LicenseConfig;
   ignore_elite: boolean;
+  include_current?: boolean;
 }
 
 export interface AssignmentResult {
@@ -81,7 +82,29 @@ export interface OptimizeResult {
   plans: ShiftPlan[];
   raw_results: AssignmentResult[];
   daily_production?: DailyProduction;
+  total_efficiency?: number;
+  upgrade_suggestions?: RawUpgradeSuggestion[];
+  current_result?: OptimizeResult;
 }
+
+export type RawUpgradeSuggestion =
+  | {
+      type: 'single';
+      id?: string;
+      name: string;
+      current: number;
+      target: number;
+      gain: number;
+      rooms?: string;
+      specialType?: string;
+    }
+  | {
+      type: 'bundle';
+      ops: { id?: string; name: string; current: number; target: number }[];
+      gain: number;
+      rooms?: string;
+      specialType?: string;
+    };
 
 export interface RoomOverflow {
   final_efficiency?: number;
