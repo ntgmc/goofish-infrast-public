@@ -29,7 +29,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error }: P
           <p className="text-base text-ink-secondary">
             上传授权文件或使用 CDK 生成排班
           </p>
-          <BuildMetaStrip className="mt-4 justify-center" />
+          <BuildMetaStrip placement="corner" />
         </div>
 
         <div className="mb-5 flex justify-center">

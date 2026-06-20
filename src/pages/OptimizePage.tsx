@@ -326,7 +326,7 @@ export default function OptimizePage({
           <p className="text-ink-secondary text-sm">
             配置: {activeConfig.desc} · ID: {license.order_hash.slice(0, 8)}...
           </p>
-          <BuildMetaStrip meta={serverBuildMeta} className="mt-3" />
+          <BuildMetaStrip meta={serverBuildMeta} placement="corner" />
         </div>
         <button
           onClick={onReset}
