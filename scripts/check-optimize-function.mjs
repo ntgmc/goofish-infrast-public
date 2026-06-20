@@ -81,6 +81,19 @@ try {
   });
   assertOptimizeShape(potential, 'potential result');
   assertOptimizeShape(potential.current_result, 'current_result');
+  if (!potential.upgrade_task_payload || !Array.isArray(potential.upgrade_task_payload.tasks)) {
+    throw new Error('potential result: missing upgrade_task_payload');
+  }
+  const suggestions = await callOptimize({
+    operators: [],
+    config,
+    ignore_elite: true,
+    suggestions_only: true,
+    upgrade_task_payload: potential.upgrade_task_payload,
+  });
+  if (!Array.isArray(suggestions.upgrade_suggestions)) {
+    throw new Error('suggestions_only result: missing upgrade_suggestions array');
+  }
 } finally {
   if (previousNetlify === undefined) {
     delete process.env.NETLIFY;

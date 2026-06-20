@@ -130,6 +130,23 @@ export default function OptimizePage({
     return resp.json() as Promise<OptimizeResult>
   }, [activeConfig, mergedOperators])
 
+  const runUpgradeSuggestions = useCallback(async (payload: NonNullable<OptimizeResult['upgrade_task_payload']>) => {
+    const requestBody: OptimizeRequest = {
+      operators: mergedOperators,
+      config: activeConfig,
+      ignore_elite: true,
+      suggestions_only: true,
+      upgrade_task_payload: payload,
+    }
+    const resp = await fetch('/api/optimize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    })
+    if (!resp.ok) throw new Error(`优化建议请求失败: ${resp.status}`)
+    return resp.json() as Promise<Pick<OptimizeResult, 'upgrade_suggestions'>>
+  }, [activeConfig, mergedOperators])
+
   const handleGenerate = useCallback(async () => {
     if (loading || optimizeInFlightRef.current) return
     if (hasResult && lastGeneratedSignature === optimizeSignature) return
@@ -147,7 +164,10 @@ export default function OptimizePage({
       const potential = await runOptimize(true, true)
       const current = potential.current_result ?? (await runOptimize(false))
       setCurrentResult(current)
-      const serverSuggestions = potential.upgrade_suggestions
+      const suggestionResult = potential.upgrade_task_payload
+        ? await runUpgradeSuggestions(potential.upgrade_task_payload)
+        : potential
+      const serverSuggestions = suggestionResult.upgrade_suggestions
       const upgradeList: UpgradeSuggestion[] = serverSuggestions && serverSuggestions.length > 0
         ? serverSuggestions.map((s, idx) => {
           if (s.type === 'single') {
@@ -190,7 +210,7 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [configValidationMessage, hasResult, lastGeneratedSignature, loading, optimizeSignature, runOptimize])
+  }, [configValidationMessage, hasResult, lastGeneratedSignature, loading, optimizeSignature, runOptimize, runUpgradeSuggestions])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
     if (loading || optimizeInFlightRef.current) return
