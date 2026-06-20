@@ -9,6 +9,9 @@
     "dev": "vite",
     "prebuild": "npm run generate:data",
     "build": "tsc && vite build",
+    "check:deploy-relevance": "node scripts/netlify-ignore-build.mjs --check",
+    "check:functions": "node scripts/check-optimize-function.mjs",
+    "check:local": "npm run build && npm run check:functions",
     "preview": "vite preview"
   },
   "dependencies": {

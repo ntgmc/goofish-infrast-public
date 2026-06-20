@@ -1,10 +1,11 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
-import type { LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion } from '../lib/types'
+import type { LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
 import { canEditConfig, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
 import UpgradeSuggestions from '../components/UpgradeSuggestions'
 import ResultPanel from '../components/ResultPanel'
+import BuildMetaStrip from '../components/BuildMetaStrip'
 import ScheduleProgress, {
   SCHEDULE_PROGRESS_COMPLETION_DURATION_MS,
   type ScheduleProgressState,
@@ -68,6 +69,7 @@ export default function OptimizePage({
   const resultIsCurrent = hasResult && lastGeneratedSignature === optimizeSignature
   const currentResultIsRotation = normalizeScheduleMode(currentResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
   const finalResultIsRotation = normalizeScheduleMode(finalResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
+  const serverBuildMeta = finalResult?.build_meta ?? currentResult?.build_meta
 
   const clearGeneratedResult = useCallback(() => {
     setSuggestions([])
@@ -130,6 +132,23 @@ export default function OptimizePage({
     return resp.json() as Promise<OptimizeResult>
   }, [activeConfig, mergedOperators])
 
+  const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
+    const payload: OptimizeRequest = {
+      operators: mergedOperators,
+      config: activeConfig,
+      ignore_elite: true,
+      suggestions_only: true,
+      upgrade_task_payload: taskPayload,
+    }
+    const resp = await fetch('/api/optimize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!resp.ok) throw new Error(`upgrade suggestions request failed: ${resp.status}`)
+    return resp.json() as Promise<OptimizeResult>
+  }, [activeConfig, mergedOperators])
+
   const handleGenerate = useCallback(async () => {
     if (loading || optimizeInFlightRef.current) return
     if (hasResult && lastGeneratedSignature === optimizeSignature) return
@@ -147,7 +166,10 @@ export default function OptimizePage({
       const potential = await runOptimize(true, true)
       const current = potential.current_result ?? (await runOptimize(false))
       setCurrentResult(current)
-      const serverSuggestions = potential.upgrade_suggestions
+      const suggestionResult = potential.upgrade_task_payload
+        ? await runUpgradeSuggestions(potential.upgrade_task_payload)
+        : potential
+      const serverSuggestions = suggestionResult.upgrade_suggestions
       const upgradeList: UpgradeSuggestion[] = serverSuggestions && serverSuggestions.length > 0
         ? serverSuggestions.map((s, idx) => {
           if (s.type === 'single') {
@@ -190,7 +212,7 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [configValidationMessage, hasResult, lastGeneratedSignature, loading, optimizeSignature, runOptimize])
+  }, [configValidationMessage, hasResult, lastGeneratedSignature, loading, optimizeSignature, runOptimize, runUpgradeSuggestions])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
     if (loading || optimizeInFlightRef.current) return
@@ -304,6 +326,7 @@ export default function OptimizePage({
           <p className="text-ink-secondary text-sm">
             配置: {activeConfig.desc} · ID: {license.order_hash.slice(0, 8)}...
           </p>
+          <BuildMetaStrip meta={serverBuildMeta} className="mt-3" />
         </div>
         <button
           onClick={onReset}
