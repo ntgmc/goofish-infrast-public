@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { DroneAssignment, OptimizeResult, ShiftRoom } from '../lib/types'
+import type { DailyProduction, DroneAssignment, OptimizeResult, ShiftRoom } from '../lib/types'
 
 interface Props {
   result: OptimizeResult;
@@ -83,14 +83,14 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
 
     const daily = result.daily_production ?? {}
     const manufacturing = daily.manufacturing ?? {}
+    const droneGain = summarizeDroneGains(daily.details ?? [])
     const productionStats = {
       manufacturing,
       manufacturingTotal: Object.values(manufacturing).reduce((sum, value) => sum + value, 0),
       lmd: daily.trading?.LMD ?? 0,
       orundum: daily.trading?.Orundum ?? 0,
       goldNet: daily.net?.['Pure Gold'] ?? 0,
-      dronesUsed: daily.drones?.used ?? 0,
-      droneMinutes: daily.drones?.acceleration_minutes ?? 0,
+      droneGain,
     }
 
     const detailStats = {
@@ -153,10 +153,10 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
           note={`赤金净变动 ${formatSigned(productionStats.goldNet)}${productionStats.orundum > 0 ? `，合成玉 ${formatAmount(productionStats.orundum)}` : ''}`}
         />
         <MetricCard
-          label="无人机加速"
-          value={formatAmount(productionStats.dronesUsed)}
-          suffix="架"
-          note={`折合 ${formatAmount(productionStats.droneMinutes)} 分钟`}
+          label="无人机收益"
+          value={productionStats.droneGain.value}
+          suffix={productionStats.droneGain.suffix}
+          note={productionStats.droneGain.note}
         />
       </div>
 
@@ -348,6 +348,70 @@ function formatProductionBreakdown(manufacturing: Record<string, number>): strin
     })
     .filter(Boolean)
   return parts.length > 0 ? parts.join('，') : '暂无制造站产出'
+}
+
+type DroneGainSummary = {
+  value: string;
+  suffix: string;
+  note: string;
+}
+
+function summarizeDroneGains(details: NonNullable<DailyProduction['details']>): DroneGainSummary {
+  const produced: Record<string, number> = {}
+  const consumed: Record<string, number> = {}
+
+  for (const detail of details) {
+    if (detail.source !== 'drones') continue
+    const product = typeof detail.product === 'string' ? detail.product : ''
+    const amount = typeof detail.amount === 'number' ? detail.amount : 0
+    if (product && amount > 0) {
+      produced[product] = (produced[product] ?? 0) + amount
+    }
+    if (isRecord(detail.consume)) {
+      for (const [productName, rawAmount] of Object.entries(detail.consume)) {
+        if (typeof rawAmount === 'number' && rawAmount > 0) {
+          consumed[productName] = (consumed[productName] ?? 0) + rawAmount
+        }
+      }
+    }
+  }
+
+  const productOrder = ['LMD', 'Pure Gold', 'Battle Record', 'Orundum', 'Originium Shard']
+  const producedParts = formatResourceParts(produced, productOrder)
+  const consumedParts = formatResourceParts(consumed, productOrder)
+  const primaryProduct = productOrder.find((product) => (produced[product] ?? 0) > 0) ??
+    Object.keys(produced).find((product) => produced[product] > 0)
+
+  if (!primaryProduct) {
+    return {
+      value: '0',
+      suffix: '收益',
+      note: '未产生无人机加速收益',
+    }
+  }
+
+  return {
+    value: `+${formatAmount(produced[primaryProduct])}`,
+    suffix: formatProduct(primaryProduct),
+    note: [
+      producedParts.length > 0 ? `额外产出 ${producedParts.join('，')}` : '',
+      consumedParts.length > 0 ? `消耗 ${consumedParts.join('，')}` : '',
+    ].filter(Boolean).join('；'),
+  }
+}
+
+function formatResourceParts(values: Record<string, number>, preferredOrder: string[]): string[] {
+  const orderedProducts = [
+    ...preferredOrder,
+    ...Object.keys(values).filter((product) => !preferredOrder.includes(product)).sort(),
+  ]
+  return orderedProducts
+    .filter((product) => (values[product] ?? 0) > 0)
+    .map((product) => `${formatProduct(product)} ${formatAmount(values[product])}`)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
 function DroneSummary({ drones }: { drones: DroneAssignment }) {
