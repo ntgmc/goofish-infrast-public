@@ -51,6 +51,16 @@ export interface WorkFile {
   client_state: ClientState;
 }
 
+export interface AppBuildMeta {
+  frontend_version: string;
+  backend_version: string;
+  data_version: string;
+  generated_at: string;
+  source_summary: string;
+  git_sha?: string | null;
+  build_context?: string;
+}
+
 export interface OptimizeRequest {
   operators: LicenseOperator[];
   config: LicenseConfig;
@@ -102,6 +112,7 @@ export interface OptimizeResult {
   upgrade_suggestions?: RawUpgradeSuggestion[];
   current_result?: OptimizeResult;
   upgrade_task_payload?: UpgradeTaskPayload;
+  build_meta?: AppBuildMeta;
 }
 
 export type RawUpgradeSuggestion =
