@@ -86,6 +86,21 @@ try {
   ) {
     throw new Error('potential result: invalid upgrade_suggestions');
   }
+  if (potential.upgrade_task_payload !== undefined) {
+    if (!Array.isArray(potential.upgrade_task_payload.tasks)) {
+      throw new Error('potential result: invalid upgrade_task_payload');
+    }
+    const suggestionResult = await callOptimize({
+      operators: [],
+      config,
+      ignore_elite: true,
+      suggestions_only: true,
+      upgrade_task_payload: potential.upgrade_task_payload,
+    });
+    if (!Array.isArray(suggestionResult.upgrade_suggestions)) {
+      throw new Error('suggestions_only result: invalid upgrade_suggestions');
+    }
+  }
 } finally {
   if (previousNetlify === undefined) {
     delete process.env.NETLIFY;
