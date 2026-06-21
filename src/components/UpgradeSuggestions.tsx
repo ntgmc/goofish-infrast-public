@@ -168,7 +168,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
       </div>
 
       <div className="rounded-lg bg-surface-1 p-4 text-sm text-ink-secondary">
-        已选 {selected.size} 项。下载当前方案仍是主出口；应用建议会生成一份新的方案，不覆盖当前结果。
+        已选 {selected.size} 项。建议先下载当前方案留底；应用建议后，系统会重新计算并生成一份新方案，不会覆盖现在这份结果。
       </div>
     </div>
   )
