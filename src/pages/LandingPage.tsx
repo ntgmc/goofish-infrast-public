@@ -22,7 +22,7 @@ const strengths = [
 const workflow = [
   {
     title: '准备数据',
-    description: '上传授权文件，或用 CDK 加 MAA 导出的干员数据文件生成工作文件。',
+    description: '上传授权文件，或用 CDK 加 MAA 导出的干员数据文件生成授权文件。',
     detail: '按页面提示上传文件，就能进入生成流程。',
   },
   {
@@ -45,12 +45,12 @@ const workflow = [
 const screenshotSlots = [
   {
     title: '上传与 CDK 入口',
-    description: '进入工具后可以直接上传授权文件，也可以切换到 CDK 模式生成工作文件，适合首次使用和继续调整两种场景。',
+    description: '进入工具后可以直接上传授权文件，也可以切换到 CDK 模式生成授权文件，适合首次使用和继续调整两种场景。',
     src: '/assets/previews/upload-entry.png',
   },
   {
     title: '优化结果面板',
-    description: '结果页集中展示排班 JSON 下载、工作文件保存、MAA 导入指引、效率指标和练度优化建议。',
+    description: '结果页集中展示排班 JSON 下载、保存进度文件、MAA 导入指引、效率指标和练度优化建议。',
     src: '/assets/previews/optimize-result.png',
   },
 ]
@@ -107,7 +107,7 @@ export default function LandingPage({ onStart }: Props) {
                 一键生成可导入 MAA 的基建排班
               </h1>
               <p className="mt-6 max-w-[58ch] text-base leading-8 text-white/66 sm:text-lg">
-                上传授权文件或通过 CDK 生成工作文件，工具会自动计算干员、房间和无人机配置，直接导出可执行的排班 JSON。
+                上传授权文件或通过 CDK 生成授权文件，工具会自动计算干员、房间和无人机配置，直接导出可执行的排班 JSON。
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">

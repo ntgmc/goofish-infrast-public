@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 
 type Permission = 'basic' | 'premium' | 'admin'
-type CdkStatus = 'unused' | 'used'
+type CdkStatus = 'unused' | 'used' | 'revoked'
 type StatusFilter = CdkStatus | 'all'
 
 interface AdminCdkRecord {
@@ -11,6 +11,7 @@ interface AdminCdkRecord {
   status: CdkStatus;
   created_at: string;
   used_at: string | null;
+  revoked_at: string | null;
   order_note: string | null;
   license_order_hash: string | null;
   operator_count: number | null;
@@ -31,6 +32,17 @@ interface GenerateCdkResponse {
   created_at?: string;
 }
 
+interface DeleteCdkResponse {
+  error?: string;
+  deleted?: boolean;
+}
+
+interface RevokeCdkResponse {
+  error?: string;
+  revoked?: boolean;
+  already_revoked?: boolean;
+}
+
 const permissionLabels: Record<Permission, string> = {
   basic: 'Basic',
   premium: 'Premium',
@@ -40,11 +52,13 @@ const permissionLabels: Record<Permission, string> = {
 const statusLabels: Record<CdkStatus, string> = {
   unused: '未使用',
   used: '已使用',
+  revoked: '已撤销',
 }
 
 const statusFilterLabels: Record<StatusFilter, string> = {
   unused: '未使用',
   used: '已使用',
+  revoked: '已撤销',
   all: '全部',
 }
 
@@ -57,6 +71,8 @@ export default function AdminPage() {
   const [records, setRecords] = useState<AdminCdkRecord[]>([])
   const [listLoading, setListLoading] = useState(false)
   const [generateLoading, setGenerateLoading] = useState(false)
+  const [deletingCdkHash, setDeletingCdkHash] = useState<string | null>(null)
+  const [revokingCdkHash, setRevokingCdkHash] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copyStatus, setCopyStatus] = useState<string | null>(null)
   const [result, setResult] = useState<{ code: string; permission: Permission; created_at: string } | null>(null)
@@ -64,7 +80,8 @@ export default function AdminPage() {
   const summary = useMemo(() => {
     const unused = records.filter((record) => record.status === 'unused').length
     const used = records.filter((record) => record.status === 'used').length
-    return { unused, used, total: records.length }
+    const revoked = records.filter((record) => record.status === 'revoked').length
+    return { unused, used, revoked, total: records.length }
   }, [records])
 
   const loadCdkRecords = useCallback(async (password: string, filter: StatusFilter) => {
@@ -161,6 +178,65 @@ export default function AdminPage() {
     }
   }
 
+  const handleDeleteRecord = async (record: AdminCdkRecord) => {
+    if (record.status !== 'unused') return
+    const confirmed = window.confirm(`确认删除未使用 CDK ${record.cdk_id}？此操作不可恢复。`)
+    if (!confirmed) return
+
+    setError(null)
+    setCopyStatus(null)
+    setDeletingCdkHash(record.code_hash)
+    try {
+      const resp = await fetch('/api/admin/cdk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_password: adminPassword,
+          code_hash: record.code_hash,
+        }),
+      })
+      const data = await resp.json() as DeleteCdkResponse
+      if (!resp.ok) {
+        throw new Error(data.error || `删除失败: ${resp.status}`)
+      }
+      await loadCdkRecords(adminPassword, statusFilter)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setDeletingCdkHash(null)
+    }
+  }
+
+  const handleRevokeRecord = async (record: AdminCdkRecord) => {
+    if (record.status !== 'used') return
+    const confirmed = window.confirm(`确认撤销授权 ${record.cdk_id}？撤销后不可恢复，用户将无法继续生成排班。`)
+    if (!confirmed) return
+
+    setError(null)
+    setCopyStatus(null)
+    setRevokingCdkHash(record.code_hash)
+    try {
+      const resp = await fetch('/api/admin/cdk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_password: adminPassword,
+          code_hash: record.code_hash,
+          action: 'revoke',
+        }),
+      })
+      const data = await resp.json() as RevokeCdkResponse
+      if (!resp.ok) {
+        throw new Error(data.error || `撤销失败: ${resp.status}`)
+      }
+      await loadCdkRecords(adminPassword, statusFilter)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setRevokingCdkHash(null)
+    }
+  }
+
   const handleLogout = () => {
     setAuthenticated(false)
     setAdminPassword('')
@@ -168,6 +244,7 @@ export default function AdminPage() {
     setResult(null)
     setError(null)
     setCopyStatus(null)
+    setRevokingCdkHash(null)
   }
 
   if (!authenticated) {
@@ -349,7 +426,7 @@ export default function AdminPage() {
                 </p>
               </div>
               <div className="inline-flex self-start rounded-lg bg-surface-2 p-1 sm:self-auto">
-                {(['unused', 'used', 'all'] as const).map((item) => (
+                {(['unused', 'used', 'revoked', 'all'] as const).map((item) => (
                   <button
                     key={item}
                     type="button"
@@ -366,9 +443,10 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 border-b border-surface-3 text-sm">
+            <div className="grid grid-cols-4 border-b border-surface-3 text-sm">
               <SummaryCell label="未使用" value={summary.unused} />
               <SummaryCell label="已使用" value={summary.used} />
+              <SummaryCell label="已撤销" value={summary.revoked} />
               <SummaryCell label="当前列表" value={summary.total} />
             </div>
 
@@ -383,13 +461,14 @@ export default function AdminPage() {
                     <th className="whitespace-nowrap px-4 py-3">使用时间</th>
                     <th className="whitespace-nowrap px-4 py-3">备注</th>
                     <th className="whitespace-nowrap px-4 py-3">使用信息</th>
+                    <th className="whitespace-nowrap px-4 py-3">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-3">
                   {listLoading && records.length === 0 ? (
                     Array.from({ length: 4 }).map((_, index) => (
                       <tr key={index}>
-                        <td className="px-4 py-4" colSpan={7}>
+                        <td className="px-4 py-4" colSpan={8}>
                           <div className="h-5 rounded bg-surface-2" />
                         </td>
                       </tr>
@@ -403,6 +482,8 @@ export default function AdminPage() {
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                             record.status === 'unused'
                               ? 'bg-success/10 text-success'
+                              : record.status === 'revoked'
+                                ? 'bg-error/10 text-error'
                               : 'bg-surface-3 text-ink-secondary'
                           }`}
                           >
@@ -415,11 +496,34 @@ export default function AdminPage() {
                         <td className="min-w-[200px] px-4 py-3 text-ink-secondary">
                           {formatUsage(record)}
                         </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          {record.status === 'unused' ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRecord(record)}
+                              disabled={deletingCdkHash === record.code_hash}
+                              className="rounded-lg bg-error/10 px-3 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                            >
+                              {deletingCdkHash === record.code_hash ? '删除中...' : '删除'}
+                            </button>
+                          ) : record.status === 'used' ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeRecord(record)}
+                              disabled={revokingCdkHash === record.code_hash}
+                              className="rounded-lg bg-error/10 px-3 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                            >
+                              {revokingCdkHash === record.code_hash ? '撤销中...' : '撤销授权'}
+                            </button>
+                          ) : (
+                            <span className="text-ink-muted">-</span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td className="px-4 py-10 text-center text-sm text-ink-secondary" colSpan={7}>
+                      <td className="px-4 py-10 text-center text-sm text-ink-secondary" colSpan={8}>
                         当前筛选下没有 CDK 记录。
                       </td>
                     </tr>
@@ -456,6 +560,7 @@ function formatUsage(record: AdminCdkRecord): string {
     record.operator_count !== null ? `${record.operator_count} 干员` : null,
     record.config_desc,
     record.license_order_hash ? `订单 ${record.license_order_hash}` : null,
+    record.status === 'revoked' && record.revoked_at ? `撤销 ${formatDate(record.revoked_at)}` : null,
   ].filter(Boolean)
   return parts.length > 0 ? parts.join(' / ') : '-'
 }

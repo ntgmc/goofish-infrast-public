@@ -1,6 +1,9 @@
 import * as esbuild from 'esbuild';
+import { createHmac } from 'node:crypto';
 
 const optimizeEntry = 'netlify/functions/optimize.ts';
+const adminSecret = 'check-optimize-secret';
+process.env.MAA_ADMIN_SECRET = adminSecret;
 
 const buildResult = await esbuild.build({
   entryPoints: [optimizeEntry],
@@ -34,6 +37,33 @@ const config = {
   },
   Fiammetta: { enable: false },
   drones: { enable: false, order: '', targets: [] },
+};
+
+function canonicalJson(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+}
+
+function signLicense(unsignedLicense) {
+  const digest = createHmac('sha256', adminSecret)
+    .update(canonicalJson(unsignedLicense))
+    .digest('hex');
+  return `skadi-${digest.slice(0, 8)}-${digest.slice(8, 16)}`;
+}
+
+const unsignedLicense = {
+  version: 1,
+  order_hash: 'legacy-smoke-test',
+  operators: [],
+  config,
+  permission: 'basic',
+  issued_at: '2026-01-01T00:00:00Z',
+};
+
+const license = {
+  ...unsignedLicense,
+  sig: signLicense(unsignedLicense),
 };
 
 async function callOptimize(body) {
@@ -71,6 +101,7 @@ function assertOptimizeShape(result, label) {
 }
 
 const current = await callOptimize({
+  license,
   operators: [],
   config,
   ignore_elite: false,
@@ -81,6 +112,7 @@ const previousNetlify = process.env.NETLIFY;
 process.env.NETLIFY = 'true';
 try {
   const potential = await callOptimize({
+    license,
     operators: [],
     config,
     ignore_elite: true,
@@ -111,6 +143,7 @@ try {
       throw new Error('potential result: invalid potentialFiammettaTargets');
     }
     const suggestionResult = await callOptimize({
+      license,
       operators: [],
       config,
       ignore_elite: true,

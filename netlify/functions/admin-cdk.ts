@@ -6,9 +6,10 @@ import {
   jsonResponse,
   requireEnv,
   type CdkRecord,
+  type CdkStatus,
 } from './license-utils'
 
-type CdkStatusFilter = 'unused' | 'used' | 'all'
+type CdkStatusFilter = CdkStatus | 'all'
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -16,6 +17,12 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   }
   if (req.method === 'GET') {
     return handleList(req)
+  }
+  if (req.method === 'DELETE') {
+    return handleDelete(req)
+  }
+  if (req.method === 'PATCH') {
+    return handlePatch(req)
   }
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405)
@@ -57,6 +64,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       status: 'unused',
       created_at: createdAt,
       used_at: null,
+      revoked_at: null,
       order_note: order_note?.trim() || null,
       license_order_hash: null,
       operator_count: null,
@@ -98,10 +106,103 @@ async function handleList(req: Request): Promise<Response> {
   }
 }
 
+async function handlePatch(req: Request): Promise<Response> {
+  try {
+    const { admin_password, code_hash, action } = await req.json() as {
+      admin_password?: string;
+      code_hash?: string;
+      action?: string;
+    }
+    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
+
+    if (admin_password !== adminPassword) {
+      return jsonResponse({ error: 'Invalid admin password.' }, 401)
+    }
+    if (action !== 'revoke') {
+      return jsonResponse({ error: 'Unsupported action.' }, 400)
+    }
+    if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
+      return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
+    }
+
+    const store = await getCdkRecordStore()
+    const key = `cdk/${code_hash}.json`
+    const existing = await store.get(key) as CdkRecord | null
+
+    if (!existing) {
+      return jsonResponse({ error: 'CDK not found.' }, 404)
+    }
+    if (existing.status === 'revoked') {
+      return jsonResponse({
+        revoked: true,
+        already_revoked: true,
+        cdk_id: existing.code_hash.slice(0, 12),
+        revoked_at: existing.revoked_at ?? null,
+      })
+    }
+    if (existing.status !== 'used') {
+      return jsonResponse({ error: 'Only used CDKs can be revoked.' }, 409)
+    }
+
+    const revokedAt = new Date().toISOString()
+    const updated: CdkRecord = {
+      ...existing,
+      status: 'revoked',
+      revoked_at: revokedAt,
+    }
+    await store.set(key, updated)
+    return jsonResponse({
+      revoked: true,
+      already_revoked: false,
+      cdk_id: existing.code_hash.slice(0, 12),
+      revoked_at: revokedAt,
+    })
+  } catch (error) {
+    console.error('admin cdk revoke error:', error)
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return jsonResponse({ error: message }, 500)
+  }
+}
+
+async function handleDelete(req: Request): Promise<Response> {
+  try {
+    const { admin_password, code_hash } = await req.json() as {
+      admin_password?: string;
+      code_hash?: string;
+    }
+    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
+
+    if (admin_password !== adminPassword) {
+      return jsonResponse({ error: 'Invalid admin password.' }, 401)
+    }
+    if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
+      return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
+    }
+
+    const store = await getCdkRecordStore()
+    const key = `cdk/${code_hash}.json`
+    const existing = await store.get(key) as CdkRecord | null
+
+    if (!existing) {
+      return jsonResponse({ error: 'CDK not found.' }, 404)
+    }
+    if (existing.status !== 'unused') {
+      return jsonResponse({ error: 'Only unused CDKs can be deleted.' }, 409)
+    }
+
+    await store.delete(key)
+    return jsonResponse({ deleted: true, cdk_id: existing.code_hash.slice(0, 12) })
+  } catch (error) {
+    console.error('admin cdk delete error:', error)
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return jsonResponse({ error: message }, 500)
+  }
+}
+
 function normalizeStatusFilter(headerValue: string | null, requestUrl: string): CdkStatusFilter {
-  if (headerValue === 'used' || headerValue === 'all') return headerValue
+  if (headerValue === 'used' || headerValue === 'revoked' || headerValue === 'all') return headerValue
   const queryValue = new URL(requestUrl).searchParams.get('status')
-  if (queryValue === 'used' || queryValue === 'all') return queryValue
+  if (queryValue === 'used' || queryValue === 'revoked' || queryValue === 'all') return queryValue
   return 'unused'
 }
 
@@ -113,6 +214,7 @@ function toAdminCdkRecord(record: CdkRecord) {
     status: record.status,
     created_at: record.created_at,
     used_at: record.used_at,
+    revoked_at: record.revoked_at ?? null,
     order_note: record.order_note,
     license_order_hash: record.license_order_hash,
     operator_count: record.operator_count,

@@ -118,6 +118,7 @@ export default function OptimizePage({
 
   const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false) => {
     const payload: OptimizeRequest = {
+      license,
       operators: mergedOperators,
       config: activeConfig,
       ignore_elite: ignoreElite,
@@ -128,12 +129,13 @@ export default function OptimizePage({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!resp.ok) throw new Error(`优化请求失败: ${resp.status}`)
+    if (!resp.ok) throw new Error(await readResponseError(resp, `优化请求失败: ${resp.status}`))
     return resp.json() as Promise<OptimizeResult>
-  }, [activeConfig, mergedOperators])
+  }, [activeConfig, license, mergedOperators])
 
   const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
     const payload: OptimizeRequest = {
+      license,
       operators: mergedOperators,
       config: activeConfig,
       ignore_elite: true,
@@ -145,9 +147,9 @@ export default function OptimizePage({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!resp.ok) throw new Error(`upgrade suggestions request failed: ${resp.status}`)
+    if (!resp.ok) throw new Error(await readResponseError(resp, `upgrade suggestions request failed: ${resp.status}`))
     return resp.json() as Promise<OptimizeResult>
-  }, [activeConfig, mergedOperators])
+  }, [activeConfig, license, mergedOperators])
 
   const handleGenerate = useCallback(async () => {
     if (loading || optimizeInFlightRef.current) return
@@ -242,12 +244,13 @@ export default function OptimizePage({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          license,
           operators: mergeOperators(license.operators, newOverrides),
           config: activeConfig,
           ignore_elite: false,
         }),
       })
-      if (!result.ok) throw new Error('优化失败')
+      if (!result.ok) throw new Error(await readResponseError(result, '优化失败'))
       const data = await result.json() as OptimizeResult
       completed = true
       setProgress({ mode: 'apply', startedAt, completedAt: Date.now() })
@@ -264,7 +267,7 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [activeConfig, eliteOverrides, loading, suggestions, license.operators, setEliteOverrides])
+  }, [activeConfig, eliteOverrides, loading, suggestions, license, setEliteOverrides])
 
   const handleDownloadMAA = useCallback(() => {
     const data = finalResult || currentResult
@@ -306,7 +309,7 @@ export default function OptimizePage({
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'maa-workfile.maa'
+    a.download = `maa-workfile-${formatLocalDate(new Date())}.maa`
     a.click()
     URL.revokeObjectURL(url)
   }, [activeConfig, configChanged, eliteOverrides, license, userCanEditConfig])
@@ -326,7 +329,7 @@ export default function OptimizePage({
           <p className="text-ink-secondary text-sm">
             配置: {activeConfig.desc} · ID: {license.order_hash.slice(0, 8)}...
           </p>
-          <BuildMetaStrip meta={serverBuildMeta} className="mt-3" />
+          <BuildMetaStrip meta={serverBuildMeta} placement="corner" />
         </div>
         <button
           onClick={onReset}
@@ -625,6 +628,22 @@ function AdminOperatorPanel({
       </div>
     </details>
   )
+}
+
+async function readResponseError(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = await response.json() as { error?: string }
+    return data.error || fallback
+  } catch {
+    return fallback
+  }
+}
+
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function parseOperatorsFile(text: string): LicenseOperator[] {
