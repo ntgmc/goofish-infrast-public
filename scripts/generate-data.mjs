@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,10 +17,13 @@ const packageJson = JSON.parse(await readFile(packagePath, 'utf8'))
 const sourceHash = createHash('sha256').update(source).digest('hex')
 const shortSha = getShortSha()
 const baseVersion = String(packageJson.version || '0.0.0')
+const semanticVersion = buildSemanticVersion(baseVersion)
 const buildId = process.env.GITHUB_RUN_NUMBER || process.env.DEPLOY_ID || process.env.BUILD_ID || 'local'
 const defaultBuildVersion = shortSha
-  ? `${baseVersion}+${buildId}.${shortSha}`
-  : `${baseVersion}+${buildId}`
+  ? `${semanticVersion}+${buildId}.${shortSha}`
+  : buildId === 'local'
+    ? semanticVersion
+    : `${semanticVersion}+${buildId}`
 const dataVersion = process.env.DATA_VERSION || `data.${sourceHash.slice(0, 12)}`
 const sourceSummary = buildSourceSummary(data, sourceHash)
 const generatedAt = process.env.GENERATED_AT ||
@@ -63,6 +67,41 @@ await writeFile(buildMetaPath, buildMetaOutput, 'utf8')
 function getShortSha() {
   const sha = process.env.GIT_SHA || process.env.GITHUB_SHA || process.env.COMMIT_REF
   return sha ? sha.slice(0, 7) : ''
+}
+
+function buildSemanticVersion(baseVersion) {
+  const match = baseVersion.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/)
+  if (!match) return baseVersion
+
+  const [, major, minor, patch] = match
+  const autoPatch = getAutoPatchNumber()
+  return `${major}.${minor}.${autoPatch ?? patch}`
+}
+
+function getAutoPatchNumber() {
+  const explicitPatch = readPositiveInteger(process.env.VERSION_PATCH)
+  if (explicitPatch !== null) return explicitPatch
+
+  const buildPatch = readPositiveInteger(process.env.BUILD_NUMBER) ??
+    readPositiveInteger(process.env.GITHUB_RUN_NUMBER)
+  if (buildPatch !== null) return buildPatch
+
+  try {
+    const output = execFileSync('git', ['rev-list', '--count', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    return readPositiveInteger(output.trim())
+  } catch {
+    return null
+  }
+}
+
+function readPositiveInteger(value) {
+  if (value === undefined || value === null || value === '') return null
+  const number = Number.parseInt(String(value), 10)
+  return Number.isInteger(number) && number >= 0 ? number : null
 }
 
 async function readExistingGeneratedAt(dataVersion, sourceSummary) {
