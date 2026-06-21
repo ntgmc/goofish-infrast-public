@@ -295,7 +295,8 @@ export default function ConfigEditor({
                   <button
                     key={mode}
                     type="button"
-                    disabled={!canEdit}
+                    disabled={!canEdit || mode === 'rotation'}
+                    title={mode === 'rotation' ? '游戏内轮换暂不可用' : undefined}
                     onClick={() => onUpdate((next) => {
                       next.schedule_mode = mode
                       if (mode === 'rotation') {
@@ -313,6 +314,9 @@ export default function ConfigEditor({
                   </button>
                 ))}
               </div>
+              <p className="mt-2 text-xs leading-5 text-ink-muted">
+                游戏内轮换暂不可用，当前仅支持生成 MAA 排班表。
+              </p>
             </div>
             <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
               <span>菲亚梅塔</span>
