@@ -211,7 +211,7 @@ export default function ConfigEditor({
           </div>
           <p className="mt-1 text-sm text-ink-secondary">
             {note ?? (canEdit
-              ? '修改配置后重新生成，保存工作文件会保留这次配置。'
+              ? '修改配置后重新生成，保存进度文件会保留这次配置。'
               : `当前为 ${permission ? PERMISSION_LABELS[permission] : 'Basic'} 权限，使用授权文件内的固定配置。`)}
           </p>
         </div>

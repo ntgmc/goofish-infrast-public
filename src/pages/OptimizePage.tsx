@@ -309,7 +309,7 @@ export default function OptimizePage({
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'maa-workfile.maa'
+    a.download = `maa-workfile-${formatLocalDate(new Date())}.maa`
     a.click()
     URL.revokeObjectURL(url)
   }, [activeConfig, configChanged, eliteOverrides, license, userCanEditConfig])
@@ -637,6 +637,13 @@ async function readResponseError(response: Response, fallback: string): Promise<
   } catch {
     return fallback
   }
+}
+
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function parseOperatorsFile(text: string): LicenseOperator[] {
