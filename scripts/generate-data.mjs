@@ -14,7 +14,6 @@ const source = await readFile(sourcePath, 'utf8')
 const data = JSON.parse(source.replace(/^\uFEFF/, ''))
 const packageJson = JSON.parse(await readFile(packagePath, 'utf8'))
 const sourceHash = createHash('sha256').update(source).digest('hex')
-const generatedAt = process.env.GENERATED_AT || new Date().toISOString()
 const shortSha = getShortSha()
 const baseVersion = String(packageJson.version || '0.0.0')
 const buildId = process.env.GITHUB_RUN_NUMBER || process.env.DEPLOY_ID || process.env.BUILD_ID || 'local'
@@ -22,12 +21,16 @@ const defaultBuildVersion = shortSha
   ? `${baseVersion}+${buildId}.${shortSha}`
   : `${baseVersion}+${buildId}`
 const dataVersion = process.env.DATA_VERSION || `data.${sourceHash.slice(0, 12)}`
+const sourceSummary = buildSourceSummary(data, sourceHash)
+const generatedAt = process.env.GENERATED_AT ||
+  await readExistingGeneratedAt(dataVersion, sourceSummary) ||
+  new Date().toISOString()
 const appBuildMeta = {
   frontend_version: process.env.FRONTEND_VERSION || process.env.APP_VERSION || defaultBuildVersion,
   backend_version: process.env.BACKEND_VERSION || process.env.APP_VERSION || defaultBuildVersion,
   data_version: dataVersion,
   generated_at: generatedAt,
-  source_summary: buildSourceSummary(data, sourceHash),
+  source_summary: sourceSummary,
   git_sha: process.env.GIT_SHA || process.env.GITHUB_SHA || process.env.COMMIT_REF || null,
   build_context: process.env.BUILD_CONTEXT || process.env.GITHUB_EVENT_NAME || process.env.CONTEXT || 'local',
 }
@@ -60,6 +63,36 @@ await writeFile(buildMetaPath, buildMetaOutput, 'utf8')
 function getShortSha() {
   const sha = process.env.GIT_SHA || process.env.GITHUB_SHA || process.env.COMMIT_REF
   return sha ? sha.slice(0, 7) : ''
+}
+
+async function readExistingGeneratedAt(dataVersion, sourceSummary) {
+  try {
+    const content = await readFile(buildMetaPath, 'utf8')
+    const existingDataVersion = readJsonStringField(content, 'data_version')
+    const existingSourceSummary = readJsonStringField(content, 'source_summary')
+    const existingGeneratedAt = readJsonStringField(content, 'generated_at')
+    if (
+      existingDataVersion === dataVersion &&
+      existingSourceSummary === sourceSummary &&
+      existingGeneratedAt
+    ) {
+      return existingGeneratedAt
+    }
+  } catch {
+    // First generation, or a broken generated file, should fall back to a fresh timestamp.
+  }
+  return null
+}
+
+function readJsonStringField(content, fieldName) {
+  const fieldPattern = new RegExp(`"${escapeRegExp(fieldName)}"\\s*:\\s*("(?:\\\\.|[^"\\\\])*")`)
+  const match = content.match(fieldPattern)
+  if (!match) return null
+  return JSON.parse(match[1])
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function buildSourceSummary(rawData, hash) {
