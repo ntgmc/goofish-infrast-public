@@ -321,16 +321,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
             />
           </div>
         </div>
-        <div className="mt-5 rounded-lg bg-surface-2/60 p-4 text-sm text-ink-secondary">
-          <p className="font-medium text-ink-primary">1. 导出干员数据</p>
-          <p className="mt-2">
-            通过 <a className="text-brand-400 underline-offset-4 hover:underline" href="https://github.com/MaaAssistantArknights/MaaAssistantArknights" target="_blank" rel="noreferrer">MAA</a> 导出干员数据到 <span className="font-mono text-ink-primary">operators.json</span>。
-          </p>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>运行 MAA 干员识别功能</li>
-            <li>新建 <span className="font-mono text-ink-primary">TXT/JSON</span> 文件，导出到剪贴板后粘贴，或直接导出 JSON 文件（支持 UTF-8 BOM 格式）</li>
-          </ul>
-        </div>
+        <OperatorDataGuide />
       </section>
 
       <ConfigEditor
@@ -363,6 +354,37 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
         </button>
       </section>
     </form>
+  )
+}
+
+function OperatorDataGuide() {
+  return (
+    <div className="mt-5 rounded-lg bg-surface-2/60 p-4 text-sm text-ink-secondary">
+      <p className="font-medium text-ink-primary">1. 导出干员数据</p>
+      <p className="mt-2">
+        通过 <a className="text-brand-400 underline-offset-4 hover:underline" href="https://github.com/MaaAssistantArknights/MaaAssistantArknights" target="_blank" rel="noreferrer">MAA</a> 导出干员数据到 <span className="font-mono text-ink-primary">operators.json</span>。
+      </p>
+      <details className="mt-3 rounded-lg border border-surface-3 bg-surface-1/70">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-brand-500 transition-colors duration-150 hover:text-brand-400">
+          找不到干员识别入口？展开查看
+        </summary>
+        <div className="border-t border-surface-3 px-3 pb-3 pt-3">
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>打开 MAA 顶部的 <span className="font-medium text-ink-primary">小工具</span> 页签。</li>
+            <li>进入 <span className="font-medium text-ink-primary">干员识别</span>，点击开始识别并等待识别完成。</li>
+            <li>导出到剪贴板后粘贴到新建的 <span className="font-mono text-ink-primary">TXT/JSON</span> 文件，或直接导出 JSON 文件。</li>
+          </ol>
+          <div className="mt-3 overflow-hidden rounded-lg border border-surface-3 bg-surface-0">
+            <img
+              src="/assets/maa-operator-recognition-guide.png"
+              alt="MAA 小工具页签中的干员识别入口和导出位置示意图"
+              className="block h-auto w-full"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </details>
+    </div>
   )
 }
 
