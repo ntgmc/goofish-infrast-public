@@ -112,8 +112,8 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
             <p className="mt-1 text-sm text-ink-secondary">
               {result.schedule_mode_name ?? 'MAA排班表'} · {result.planTimes ?? `${detailStats.planCount} 个班次`}。
               {isRotationMode
-                ? '按下方排班详情在游戏内手动设置；工作文件用于下次回到本工具继续调整练度与基建配置。'
-                : '排班 JSON 用于导入或交给 MAA 使用；工作文件用于下次回到本工具继续调整练度与基建配置。'}
+                ? '按下方排班详情在游戏内手动设置；保存进度文件后，下次可直接上传继续调整。'
+                : '排班 JSON 用于导入或交给 MAA 使用；保存进度文件后，下次可直接上传继续调整。'}
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
@@ -131,7 +131,7 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
               onClick={onSaveWorkfile}
               className="rounded-xl bg-surface-2 px-5 py-3 font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
             >
-              保存工作文件
+              保存进度文件
             </button>
           </div>
         </div>

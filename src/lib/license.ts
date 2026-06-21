@@ -40,7 +40,7 @@ export async function parseFileContent(
       if (check.ok === false) return { ok: false, error: check.error };
       return { ok: true, data: { kind: "workfile", data } };
     } catch {
-      return { ok: false, error: { code: "DECRYPT_FAILED", message: "工作文件无法读取，文件可能已损坏。" } };
+      return { ok: false, error: { code: "DECRYPT_FAILED", message: "保存进度文件无法读取，文件可能已损坏。" } };
     }
   }
 
@@ -48,7 +48,7 @@ export async function parseFileContent(
     ok: false,
     error: {
       code: "INVALID_PREFIX",
-      message: "无法识别这个文件。请上传卖家下发的授权文件，或本工具保存的工作文件。",
+      message: "无法识别这个文件。请上传卖家下发的授权文件，或本工具保存的进度文件。",
     },
   };
 }
@@ -92,14 +92,14 @@ function validateWorkFileStructure(
   workfile: WorkFile
 ): { ok: true } | { ok: false; error: ValidateError } {
   if (!workfile.license || !workfile.client_state) {
-    return { ok: false, error: { code: "MISSING_FIELDS", message: "工作文件缺少必要信息。" } };
+    return { ok: false, error: { code: "MISSING_FIELDS", message: "保存进度文件缺少必要信息。" } };
   }
 
   const licenseCheck = validateLicenseStructure(workfile.license);
   if (!licenseCheck.ok) return licenseCheck;
 
   if (!workfile.client_state.operator_elite_overrides || !workfile.client_state.client_sig) {
-    return { ok: false, error: { code: "MISSING_FIELDS", message: "工作文件缺少上次保存的调整信息。" } };
+    return { ok: false, error: { code: "MISSING_FIELDS", message: "保存进度文件缺少上次保存的调整信息。" } };
   }
 
   if (workfile.client_state.config_override) {
@@ -115,7 +115,7 @@ function validateWorkFileStructure(
 
   for (const id of Object.keys(overrides)) {
     if (!licenseIds.has(id)) {
-      return { ok: false, error: { code: "UNKNOWN_OPERATOR", message: `工作文件包含未知干员: ${id}` } };
+      return { ok: false, error: { code: "UNKNOWN_OPERATOR", message: `保存进度文件包含未知干员: ${id}` } };
     }
   }
 
