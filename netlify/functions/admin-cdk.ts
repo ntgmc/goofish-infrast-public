@@ -17,6 +17,9 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method === 'GET') {
     return handleList(req)
   }
+  if (req.method === 'DELETE') {
+    return handleDelete(req)
+  }
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405)
   }
@@ -93,6 +96,41 @@ async function handleList(req: Request): Promise<Response> {
     })
   } catch (error) {
     console.error('admin cdk list error:', error)
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return jsonResponse({ error: message }, 500)
+  }
+}
+
+async function handleDelete(req: Request): Promise<Response> {
+  try {
+    const { admin_password, code_hash } = await req.json() as {
+      admin_password?: string;
+      code_hash?: string;
+    }
+    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
+
+    if (admin_password !== adminPassword) {
+      return jsonResponse({ error: 'Invalid admin password.' }, 401)
+    }
+    if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
+      return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
+    }
+
+    const store = await getCdkRecordStore()
+    const key = `cdk/${code_hash}.json`
+    const existing = await store.get(key) as CdkRecord | null
+
+    if (!existing) {
+      return jsonResponse({ error: 'CDK not found.' }, 404)
+    }
+    if (existing.status !== 'unused') {
+      return jsonResponse({ error: 'Only unused CDKs can be deleted.' }, 409)
+    }
+
+    await store.delete(key)
+    return jsonResponse({ deleted: true, cdk_id: existing.code_hash.slice(0, 12) })
+  } catch (error) {
+    console.error('admin cdk delete error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
   }
