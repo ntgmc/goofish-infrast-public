@@ -1,5 +1,5 @@
 import { createCipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode } from '../../src/lib/types'
 
@@ -24,6 +24,7 @@ export interface CdkRecord {
 export interface CdkRecordStore {
   get: (key: string) => Promise<CdkRecord | null>;
   set: (key: string, record: CdkRecord) => Promise<void>;
+  delete: (key: string) => Promise<void>;
   list: (prefix: string) => Promise<CdkRecord[]>;
 }
 
@@ -52,7 +53,7 @@ export function jsonResponse(body: unknown, status = 200): Response {
     headers: {
       ...(status === 204 ? {} : { 'Content-Type': 'application/json' }),
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Password, X-Cdk-Status',
     },
   })
@@ -67,6 +68,9 @@ export async function getCdkRecordStore(): Promise<CdkRecordStore> {
       set: async (key, record) => {
         await store.setJSON(key, record)
       },
+      delete: async (key) => {
+        await store.delete(key)
+      },
       list: async (prefix) => {
         const { blobs } = await store.list({ prefix })
         const records = await Promise.all(
@@ -80,6 +84,7 @@ export async function getCdkRecordStore(): Promise<CdkRecordStore> {
   return {
     get: async (key) => readLocalCdkRecord(key),
     set: async (key, record) => writeLocalCdkRecord(key, record),
+    delete: async (key) => deleteLocalCdkRecord(key),
     list: async (prefix) => readLocalCdkRecords(prefix),
   }
 }
@@ -126,6 +131,11 @@ function writeLocalCdkRecord(key: string, record: CdkRecord): void {
   const path = localCdkPath(key)
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, JSON.stringify(record, null, 2), 'utf8')
+}
+
+function deleteLocalCdkRecord(key: string): void {
+  const path = localCdkPath(key)
+  if (existsSync(path)) unlinkSync(path)
 }
 
 function readLocalCdkRecords(prefix: string): CdkRecord[] {

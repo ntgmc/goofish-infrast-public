@@ -31,6 +31,11 @@ interface GenerateCdkResponse {
   created_at?: string;
 }
 
+interface DeleteCdkResponse {
+  error?: string;
+  deleted?: boolean;
+}
+
 const permissionLabels: Record<Permission, string> = {
   basic: 'Basic',
   premium: 'Premium',
@@ -57,6 +62,7 @@ export default function AdminPage() {
   const [records, setRecords] = useState<AdminCdkRecord[]>([])
   const [listLoading, setListLoading] = useState(false)
   const [generateLoading, setGenerateLoading] = useState(false)
+  const [deletingCdkHash, setDeletingCdkHash] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copyStatus, setCopyStatus] = useState<string | null>(null)
   const [result, setResult] = useState<{ code: string; permission: Permission; created_at: string } | null>(null)
@@ -158,6 +164,35 @@ export default function AdminPage() {
       setCopyStatus('已复制到剪贴板')
     } catch {
       setCopyStatus('复制失败，请手动选择 CDK')
+    }
+  }
+
+  const handleDeleteRecord = async (record: AdminCdkRecord) => {
+    if (record.status !== 'unused') return
+    const confirmed = window.confirm(`确认删除未使用 CDK ${record.cdk_id}？此操作不可恢复。`)
+    if (!confirmed) return
+
+    setError(null)
+    setCopyStatus(null)
+    setDeletingCdkHash(record.code_hash)
+    try {
+      const resp = await fetch('/api/admin/cdk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_password: adminPassword,
+          code_hash: record.code_hash,
+        }),
+      })
+      const data = await resp.json() as DeleteCdkResponse
+      if (!resp.ok) {
+        throw new Error(data.error || `删除失败: ${resp.status}`)
+      }
+      await loadCdkRecords(adminPassword, statusFilter)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setDeletingCdkHash(null)
     }
   }
 
@@ -383,13 +418,14 @@ export default function AdminPage() {
                     <th className="whitespace-nowrap px-4 py-3">使用时间</th>
                     <th className="whitespace-nowrap px-4 py-3">备注</th>
                     <th className="whitespace-nowrap px-4 py-3">使用信息</th>
+                    <th className="whitespace-nowrap px-4 py-3">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-3">
                   {listLoading && records.length === 0 ? (
                     Array.from({ length: 4 }).map((_, index) => (
                       <tr key={index}>
-                        <td className="px-4 py-4" colSpan={7}>
+                        <td className="px-4 py-4" colSpan={8}>
                           <div className="h-5 rounded bg-surface-2" />
                         </td>
                       </tr>
@@ -415,11 +451,25 @@ export default function AdminPage() {
                         <td className="min-w-[200px] px-4 py-3 text-ink-secondary">
                           {formatUsage(record)}
                         </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          {record.status === 'unused' ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRecord(record)}
+                              disabled={deletingCdkHash === record.code_hash}
+                              className="rounded-lg bg-error/10 px-3 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                            >
+                              {deletingCdkHash === record.code_hash ? '删除中...' : '删除'}
+                            </button>
+                          ) : (
+                            <span className="text-ink-muted">-</span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td className="px-4 py-10 text-center text-sm text-ink-secondary" colSpan={7}>
+                      <td className="px-4 py-10 text-center text-sm text-ink-secondary" colSpan={8}>
                         当前筛选下没有 CDK 记录。
                       </td>
                     </tr>
