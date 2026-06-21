@@ -5,6 +5,7 @@ import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode } from
 
 const OBFUSCATE_KEY_SEED = 'maa-obfuscate-v1'
 const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const
+export type CdkStatus = 'unused' | 'used' | 'revoked'
 
 installUnhandledRejectionLogger()
 
@@ -12,9 +13,10 @@ export interface CdkRecord {
   version: 1;
   code_hash: string;
   permission: PermissionMode;
-  status: 'unused' | 'used';
+  status: CdkStatus;
   created_at: string;
   used_at: string | null;
+  revoked_at?: string | null;
   order_note: string | null;
   license_order_hash: string | null;
   operator_count: number | null;
@@ -53,7 +55,7 @@ export function jsonResponse(body: unknown, status = 200): Response {
     headers: {
       ...(status === 204 ? {} : { 'Content-Type': 'application/json' }),
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Password, X-Cdk-Status',
     },
   })
@@ -201,6 +203,48 @@ function hmacSha256(key: string, data: string): string {
 
 function formatSig(hexDigest: string): string {
   return `skadi-${hexDigest.slice(0, 8)}-${hexDigest.slice(8, 16)}`
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+export function verifyLicenseSignature(license: unknown, adminSecret: string): license is LicenseFile {
+  if (!isRecord(license)) return false
+  const sig = license.sig
+  if (typeof sig !== 'string' || sig.length === 0) return false
+  const unsigned = { ...license }
+  delete unsigned.sig
+  const expected = formatSig(hmacSha256(adminSecret, canonicalJson(unsigned)))
+  return sig === expected
+}
+
+export function validateLicenseForRequest(license: unknown): { ok: true; license: LicenseFile } | { ok: false; message: string } {
+  if (!isRecord(license)) {
+    return { ok: false, message: '授权信息不能为空。' }
+  }
+  const candidate = license as Partial<LicenseFile>
+  if (
+    candidate.version !== 1 ||
+    typeof candidate.order_hash !== 'string' ||
+    !Array.isArray(candidate.operators) ||
+    !candidate.config ||
+    typeof candidate.config !== 'object' ||
+    typeof candidate.issued_at !== 'string' ||
+    typeof candidate.sig !== 'string'
+  ) {
+    return { ok: false, message: '授权信息格式不正确。' }
+  }
+  if (candidate.permission !== undefined && candidate.permission !== 'basic' && candidate.permission !== 'premium' && candidate.permission !== 'admin') {
+    return { ok: false, message: '授权信息包含未知权限类型。' }
+  }
+  return { ok: true, license: candidate as LicenseFile }
+}
+
+export async function findCdkRecordByLicenseOrderHash(orderHash: string): Promise<CdkRecord | null> {
+  const store = await getCdkRecordStore()
+  const records = await store.list('cdk/')
+  return records.find((record) => record.license_order_hash === orderHash) ?? null
 }
 
 function encryptLicensePayload(payload: string): string {

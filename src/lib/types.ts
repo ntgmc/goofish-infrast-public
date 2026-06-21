@@ -62,6 +62,7 @@ export interface AppBuildMeta {
 }
 
 export interface OptimizeRequest {
+  license: LicenseFile;
   operators: LicenseOperator[];
   config: LicenseConfig;
   ignore_elite: boolean;
