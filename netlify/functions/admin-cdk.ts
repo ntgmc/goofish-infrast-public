@@ -1,6 +1,9 @@
 import type { Context } from '@netlify/functions'
+import type { ProductPermissionMode } from '../../src/lib/types'
 import {
+  CDK_PRODUCT_PERMISSIONS,
   generateCdk,
+  getOperatorUpdateGrantRemaining,
   getCdkRecordStore,
   hashCdk,
   jsonResponse,
@@ -10,6 +13,13 @@ import {
 } from './license-utils'
 
 type CdkStatusFilter = CdkStatus | 'all'
+
+const PRODUCT_PERMISSION_RANK: Record<ProductPermissionMode, number> = {
+  recommended: 0,
+  growth: 1,
+  advanced: 2,
+  ultimate: 3,
+}
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -40,9 +50,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     if (admin_password !== adminPassword) {
       return jsonResponse({ error: '管理口令错误。' }, 401)
     }
-    if (permission !== 'basic' && permission !== 'premium' && permission !== 'admin') {
-      return jsonResponse({ error: 'CDK 类型必须是 basic、premium 或 admin。' }, 400)
+    if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
+      return jsonResponse({ error: 'CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
     }
+    const cdkPermission = permission as ProductPermissionMode
 
     const store = await getCdkRecordStore()
     let code = generateCdk()
@@ -60,7 +71,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     const record: CdkRecord = {
       version: 1,
       code_hash: codeHash,
-      permission,
+      permission: cdkPermission,
       status: 'unused',
       created_at: createdAt,
       used_at: null,
@@ -69,10 +80,11 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       license_order_hash: null,
       operator_count: null,
       config_desc: null,
+      schedule_generate_count: 0,
     }
     await store.set(key, record)
 
-    return jsonResponse({ code, permission, created_at: createdAt })
+    return jsonResponse({ code, permission: cdkPermission, created_at: createdAt })
   } catch (error) {
     console.error('admin cdk error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
@@ -108,17 +120,18 @@ async function handleList(req: Request): Promise<Response> {
 
 async function handlePatch(req: Request): Promise<Response> {
   try {
-    const { admin_password, code_hash, action } = await req.json() as {
+    const { admin_password, code_hash, action, permission } = await req.json() as {
       admin_password?: string;
       code_hash?: string;
       action?: string;
+      permission?: string;
     }
     const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
 
     if (admin_password !== adminPassword) {
-      return jsonResponse({ error: 'Invalid admin password.' }, 401)
+      return jsonResponse({ error: '管理口令错误。' }, 401)
     }
-    if (action !== 'revoke') {
+    if (action !== 'revoke' && action !== 'upgrade' && action !== 'grant_operator_update') {
       return jsonResponse({ error: 'Unsupported action.' }, 400)
     }
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
@@ -132,6 +145,73 @@ async function handlePatch(req: Request): Promise<Response> {
     if (!existing) {
       return jsonResponse({ error: 'CDK not found.' }, 404)
     }
+    if (action === 'upgrade') {
+      if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
+        return jsonResponse({ error: '目标 CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
+      }
+      if (existing.status === 'revoked') {
+        return jsonResponse({ error: '已撤销授权不能升级。' }, 409)
+      }
+      const currentPermission = normalizeProductPermission(existing.permission)
+      if (!currentPermission) {
+        return jsonResponse({ error: '当前授权类型不支持后台升级。' }, 409)
+      }
+      const nextPermission = permission as ProductPermissionMode
+      if (PRODUCT_PERMISSION_RANK[nextPermission] <= PRODUCT_PERMISSION_RANK[currentPermission]) {
+        return jsonResponse({ error: '只能升级到更高等级的授权。' }, 409)
+      }
+
+      const updated: CdkRecord = {
+        ...existing,
+        permission: nextPermission,
+      }
+      await store.set(key, updated)
+      return jsonResponse({
+        upgraded: true,
+        cdk_id: existing.code_hash.slice(0, 12),
+        previous_permission: currentPermission,
+        permission: nextPermission,
+      })
+    }
+
+    if (action === 'grant_operator_update') {
+      if (existing.status === 'revoked') {
+        return jsonResponse({ error: '已撤销授权不能发放干员更新权限。' }, 409)
+      }
+      if (existing.status !== 'used') {
+        return jsonResponse({ error: '只能给已使用 CDK 发放干员更新权限。' }, 409)
+      }
+      if (!existing.license_order_hash) {
+        return jsonResponse({ error: '授权记录缺少订单标识，无法发放干员更新权限。' }, 409)
+      }
+
+      const remaining = getOperatorUpdateGrantRemaining(existing)
+      if (remaining > 0) {
+        return jsonResponse({
+          granted: true,
+          already_granted: true,
+          cdk_id: existing.code_hash.slice(0, 12),
+          operator_update_grant_remaining: remaining,
+          operator_update_granted_at: existing.operator_update_granted_at ?? null,
+        })
+      }
+
+      const grantedAt = new Date().toISOString()
+      const updated: CdkRecord = {
+        ...existing,
+        operator_update_grant_count: (existing.operator_update_grant_count ?? 0) + 1,
+        operator_update_granted_at: grantedAt,
+      }
+      await store.set(key, updated)
+      return jsonResponse({
+        granted: true,
+        already_granted: false,
+        cdk_id: existing.code_hash.slice(0, 12),
+        operator_update_grant_remaining: getOperatorUpdateGrantRemaining(updated),
+        operator_update_granted_at: grantedAt,
+      })
+    }
+
     if (existing.status === 'revoked') {
       return jsonResponse({
         revoked: true,
@@ -219,5 +299,18 @@ function toAdminCdkRecord(record: CdkRecord) {
     license_order_hash: record.license_order_hash,
     operator_count: record.operator_count,
     config_desc: record.config_desc,
+    schedule_generate_count: record.schedule_generate_count ?? 0,
+    operator_update_grant_count: record.operator_update_grant_count ?? 0,
+    operator_update_used_count: record.operator_update_used_count ?? 0,
+    operator_update_grant_remaining: getOperatorUpdateGrantRemaining(record),
+    operator_update_granted_at: record.operator_update_granted_at ?? null,
+    operator_update_consumed_at: record.operator_update_consumed_at ?? null,
   }
+}
+
+function normalizeProductPermission(permission: CdkRecord['permission']): ProductPermissionMode | null {
+  if (permission === 'basic') return 'growth'
+  if (permission === 'premium') return 'advanced'
+  if ((CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) return permission as ProductPermissionMode
+  return null
 }

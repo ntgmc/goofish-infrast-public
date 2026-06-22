@@ -1,18 +1,80 @@
 import { createCipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode } from '../../src/lib/types'
+import type {
+  LicenseConfig,
+  LicenseFile,
+  LicenseOperator,
+  OperatorUpdateGrant,
+  PermissionMode,
+  ProductPermissionMode,
+  RawPermissionMode,
+} from '../../src/lib/types'
 
 const OBFUSCATE_KEY_SEED = 'maa-obfuscate-v1'
 const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const
+const VALID_PERMISSION_MODES: RawPermissionMode[] = [
+  'recommended',
+  'growth',
+  'advanced',
+  'ultimate',
+  'basic',
+  'premium',
+  'admin',
+]
+export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = ['recommended', 'growth', 'advanced', 'ultimate']
 export type CdkStatus = 'unused' | 'used' | 'revoked'
+
+const PRESET_CONFIGS: LicenseConfig[] = [
+  {
+    layout: '2-4-3',
+    desc: '243 均衡流 (2赤金/2经验)',
+    schedule_mode: 'maa',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 4,
+    product_requirements: {
+      trading_stations: { LMD: 2 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 2 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+  },
+  {
+    layout: '2-4-3',
+    desc: '243 搓玉 (2赤金/2源石)',
+    schedule_mode: 'maa',
+    trading_stations_count: 2,
+    manufacturing_stations_count: 4,
+    product_requirements: {
+      trading_stations: { LMD: 1, Orundum: 1 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Originium Shard': 2 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+  },
+  {
+    layout: '3-3-3',
+    desc: '333 搓玉流',
+    schedule_mode: 'maa',
+    trading_stations_count: 3,
+    manufacturing_stations_count: 3,
+    product_requirements: {
+      trading_stations: { LMD: 2, Orundum: 1 },
+      manufacturing_stations: { 'Pure Gold': 2, 'Originium Shard': 1 },
+    },
+    Fiammetta: { enable: true },
+    drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+  },
+]
+const TRADING_PRODUCTS = ['LMD', 'Orundum']
+const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
 
 installUnhandledRejectionLogger()
 
 export interface CdkRecord {
   version: 1;
   code_hash: string;
-  permission: PermissionMode;
+  permission: RawPermissionMode;
   status: CdkStatus;
   created_at: string;
   used_at: string | null;
@@ -21,6 +83,11 @@ export interface CdkRecord {
   license_order_hash: string | null;
   operator_count: number | null;
   config_desc: string | null;
+  schedule_generate_count?: number;
+  operator_update_grant_count?: number;
+  operator_update_used_count?: number;
+  operator_update_granted_at?: string | null;
+  operator_update_consumed_at?: string | null;
 }
 
 export interface CdkRecordStore {
@@ -55,7 +122,7 @@ export function jsonResponse(body: unknown, status = 200): Response {
     headers: {
       ...(status === 204 ? {} : { 'Content-Type': 'application/json' }),
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Password, X-Cdk-Status',
     },
   })
@@ -235,16 +302,155 @@ export function validateLicenseForRequest(license: unknown): { ok: true; license
   ) {
     return { ok: false, message: '授权信息格式不正确。' }
   }
-  if (candidate.permission !== undefined && candidate.permission !== 'basic' && candidate.permission !== 'premium' && candidate.permission !== 'admin') {
+  if (candidate.permission !== undefined && !isRawPermissionMode(candidate.permission)) {
     return { ok: false, message: '授权信息包含未知权限类型。' }
   }
   return { ok: true, license: candidate as LicenseFile }
+}
+
+export function normalizePermissionMode(permission?: RawPermissionMode): PermissionMode {
+  switch (permission) {
+    case 'recommended':
+    case 'growth':
+    case 'advanced':
+    case 'ultimate':
+    case 'admin':
+      return permission
+    case 'premium':
+      return 'advanced'
+    case 'basic':
+    default:
+      return 'growth'
+  }
+}
+
+export function getPermissionMode(license: LicenseFile): PermissionMode {
+  return normalizePermissionMode(license.permission)
+}
+
+export function canUseUpgradeFeatures(license: LicenseFile): boolean {
+  return getPermissionMode(license) !== 'recommended'
+}
+
+export function canEditConfig(license: LicenseFile): boolean {
+  return canEditConfigForPermission(getPermissionMode(license))
+}
+
+export function canEditConfigForPermission(permission: PermissionMode): boolean {
+  return permission === 'advanced' || permission === 'ultimate' || permission === 'admin'
+}
+
+export function resolveConfigForPermission(
+  permission: PermissionMode,
+  config: LicenseConfig,
+): { ok: true; config: LicenseConfig } | { ok: false; message: string } {
+  if (canEditConfigForPermission(permission)) {
+    return { ok: true, config }
+  }
+  const preset = PRESET_CONFIGS.find((item) => isPresetConfigMatch(config, item))
+  if (!preset) {
+    return { ok: false, message: '当前 CDK 版本仅支持 243 均衡、243 搓玉或 333 搓玉预设配置。' }
+  }
+  return { ok: true, config: cloneConfig(preset) }
+}
+
+function isRawPermissionMode(value: string): value is RawPermissionMode {
+  return (VALID_PERMISSION_MODES as string[]).includes(value)
+}
+
+function cloneConfig(config: LicenseConfig): LicenseConfig {
+  return JSON.parse(JSON.stringify(config)) as LicenseConfig
+}
+
+function isPresetConfigMatch(config: LicenseConfig, preset: LicenseConfig): boolean {
+  return config.layout === preset.layout
+    && normalizeScheduleMode(config.schedule_mode) === normalizeScheduleMode(preset.schedule_mode)
+    && config.trading_stations_count === preset.trading_stations_count
+    && config.manufacturing_stations_count === preset.manufacturing_stations_count
+    && countsMatch(config.product_requirements?.trading_stations, preset.product_requirements.trading_stations, TRADING_PRODUCTS)
+    && countsMatch(config.product_requirements?.manufacturing_stations, preset.product_requirements.manufacturing_stations, MANUFACTURING_PRODUCTS)
+    && Boolean(config.Fiammetta?.enable) === Boolean(preset.Fiammetta?.enable)
+    && dronesMatch(config.drones, preset.drones)
+}
+
+function normalizeScheduleMode(mode: unknown): string {
+  const modeText = String(mode ?? 'maa').trim().toLowerCase()
+  return ['rotation', 'rotate', 'game_rotation', 'in_game_rotation', '轮换', '轮换模式', '游戏内轮换'].includes(modeText)
+    ? 'rotation'
+    : 'maa'
+}
+
+function countsMatch(
+  actual: Record<string, number> | undefined,
+  expected: Record<string, number>,
+  products: string[],
+): boolean {
+  const keys = new Set([...products, ...Object.keys(actual ?? {}), ...Object.keys(expected)])
+  for (const key of keys) {
+    if ((actual?.[key] ?? 0) !== (expected[key] ?? 0)) return false
+  }
+  return true
+}
+
+function dronesMatch(actual: LicenseConfig['drones'], expected: LicenseConfig['drones']): boolean {
+  if (Boolean(actual?.enable) !== Boolean(expected?.enable)) return false
+  if (Boolean(actual?.auto) !== Boolean(expected?.auto)) return false
+  if ((actual?.order ?? 'pre') !== (expected?.order ?? 'pre')) return false
+  const actualTargets = actual?.targets ?? []
+  const expectedTargets = expected?.targets ?? []
+  return actualTargets.length === expectedTargets.length
+    && actualTargets.every((target, index) => target === expectedTargets[index])
 }
 
 export async function findCdkRecordByLicenseOrderHash(orderHash: string): Promise<CdkRecord | null> {
   const store = await getCdkRecordStore()
   const records = await store.list('cdk/')
   return records.find((record) => record.license_order_hash === orderHash) ?? null
+}
+
+export async function findCdkRecordByCode(code: string, hashSecret: string): Promise<CdkRecord | null> {
+  const codeHash = hashCdk(normalizeCode(code), hashSecret)
+  const store = await getCdkRecordStore()
+  return store.get(`cdk/${codeHash}.json`)
+}
+
+export async function incrementCdkScheduleGenerateCount(record: CdkRecord): Promise<void> {
+  const store = await getCdkRecordStore()
+  await store.set(`cdk/${record.code_hash}.json`, {
+    ...record,
+    schedule_generate_count: (record.schedule_generate_count ?? 0) + 1,
+  })
+}
+
+export function getOperatorUpdateGrantRemaining(record: CdkRecord | null | undefined): number {
+  if (!record) return 0
+  return Math.max(0, (record.operator_update_grant_count ?? 0) - (record.operator_update_used_count ?? 0))
+}
+
+export function getOperatorUpdateGrant(record: CdkRecord | null | undefined): OperatorUpdateGrant | null {
+  const remaining = getOperatorUpdateGrantRemaining(record)
+  if (remaining <= 0) return null
+  return {
+    remaining,
+    granted_at: record?.operator_update_granted_at ?? null,
+  }
+}
+
+export function hasOperatorUpdateGrant(record: CdkRecord | null | undefined): boolean {
+  return getOperatorUpdateGrantRemaining(record) > 0
+}
+
+export async function consumeOperatorUpdateGrant(record: CdkRecord, operatorCount: number): Promise<CdkRecord> {
+  const consumedAt = new Date().toISOString()
+  const updated: CdkRecord = {
+    ...record,
+    operator_count: operatorCount,
+    operator_update_used_count: (record.operator_update_used_count ?? 0) + 1,
+    operator_update_consumed_at: consumedAt,
+  }
+  const store = await getCdkRecordStore()
+  await store.set(`cdk/${record.code_hash}.json`, updated)
+  return updated
 }
 
 function encryptLicensePayload(payload: string): string {
@@ -287,6 +493,29 @@ export function createSignedLicenseFile({
   const license: LicenseFile = { ...unsigned, sig }
   const licenseFileContent = encryptLicensePayload(canonicalJson(license))
   return { license, licenseFileContent }
+}
+
+export function reissueSignedLicenseFile(
+  license: LicenseFile,
+  permission: PermissionMode,
+  adminSecret: string,
+  overrides: {
+    operators?: LicenseOperator[];
+    operatorUpdateGrant?: OperatorUpdateGrant | null;
+  } = {},
+): { license: LicenseFile; licenseFileContent: string } {
+  const unsigned = {
+    ...license,
+    permission,
+    ...(overrides.operators ? { operators: overrides.operators } : {}),
+    operator_update_grant: overrides.operatorUpdateGrant ?? null,
+    issued_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+  }
+  delete (unsigned as Partial<LicenseFile>).sig
+  const sig = formatSig(hmacSha256(adminSecret, canonicalJson(unsigned)))
+  const nextLicense: LicenseFile = { ...unsigned, sig }
+  const licenseFileContent = encryptLicensePayload(canonicalJson(nextLicense))
+  return { license: nextLicense, licenseFileContent }
 }
 
 export function validateOperators(value: unknown): { ok: true; operators: LicenseOperator[] } | { ok: false; message: string } {
