@@ -2,7 +2,7 @@
 
 [![Quality Checks](https://github.com/ntgmc/goofish-infrast-v1/actions/workflows/quality-checks.yml/badge.svg)](https://github.com/ntgmc/goofish-infrast-v1/actions/workflows/quality-checks.yml)
 
-MAA 基建排班优化器是一个面向《明日方舟》玩家的 Web 工具。用户可以上传授权文件或通过 CDK 兑换生成工作文件，应用会根据干员、基建房间、产物需求和无人机策略计算可导入 MAA 的排班 JSON，并给出精英化升级建议。
+MAA 基建排班优化器是一个面向《明日方舟》玩家的 Web 工具。用户拿到 CDK 后在网站上传干员数据并生成授权文件；已有授权文件或工作文件时可直接上传继续使用。应用会根据干员、基建房间、产物需求和无人机策略计算可导入 MAA 的排班 JSON，并给出精英化升级建议。
 
 ## 在线地址
 
@@ -158,7 +158,7 @@ CDK 管理和兑换相关函数需要以下变量。不要把实际值提交到�
 - `src/`: React 前端应用
 - `src/pages/`: 首页、上传页、优化结果页和管理页
 - `src/components/`: 配置编辑、结果展示和升级建议组件
-- `netlify/functions/`: CDK、授权兑换和排班优化 API
+- `netlify/functions/`: CDK 兑换、授权文件生成和排班优化 API
 - `scripts/`: 数据生成和函数 smoke check 脚本
 - `public/assets/previews/`: 首页展示用预览图
 - `public/webp96/`: 干员与召唤物图标资源

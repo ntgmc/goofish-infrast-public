@@ -48,7 +48,7 @@ export async function parseFileContent(
     ok: false,
     error: {
       code: "INVALID_PREFIX",
-      message: "无法识别这个文件。请上传卖家下发的授权文件，或本工具保存的进度文件。",
+      message: "无法识别这个文件。请上传本站生成的授权文件，或本工具保存的进度文件。",
     },
   };
 }
