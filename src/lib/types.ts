@@ -61,6 +61,13 @@ export interface AppBuildMeta {
   build_context?: string;
 }
 
+export interface Announcement {
+  enabled: boolean;
+  title: string;
+  body: string;
+  updated_at: string | null;
+}
+
 export interface OptimizeRequest {
   license: LicenseFile;
   operators: LicenseOperator[];

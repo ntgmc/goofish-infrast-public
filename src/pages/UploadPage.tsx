@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useCallback } from 'react'
-import type { LicenseConfig, LicenseFile, LicenseOperator } from '../lib/types'
+import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator } from '../lib/types'
+import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import BuildMetaStrip from '../components/BuildMetaStrip'
 
@@ -7,11 +8,12 @@ interface Props {
   onFileLoaded: (content: string) => Promise<void>;
   onLicenseRedeemed: (license: LicenseFile) => void;
   error: string | null;
+  announcement: Announcement | null;
 }
 
 type EntryMode = 'license' | 'cdk'
 
-export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error }: Props) {
+export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, announcement }: Props) {
   const [mode, setMode] = useState<EntryMode>('license')
 
   return (
@@ -31,6 +33,8 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error }: P
           </p>
           <BuildMetaStrip placement="corner" />
         </div>
+
+        <AnnouncementBanner announcement={announcement} className="mb-5" />
 
         <div className="mb-5 flex justify-center">
           <div className="inline-flex rounded-lg bg-surface-1 p-1">
