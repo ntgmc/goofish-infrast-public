@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
-import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator } from '../lib/types'
+import type { Announcement, FreePreviewResult, LicenseConfig, LicenseFile, LicenseOperator } from '../lib/types'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import BuildMetaStrip from '../components/BuildMetaStrip'
@@ -11,7 +11,7 @@ interface Props {
   announcement: Announcement | null;
 }
 
-type EntryMode = 'license' | 'cdk'
+type EntryMode = 'preview' | 'license' | 'cdk'
 
 const FIRST_RUN_TOUR_STORAGE_KEY = 'maa-infrast-upload-tour-seen'
 
@@ -39,7 +39,7 @@ const BASE_TOUR_STEPS: TourStep[] = [
   {
     target: 'entry-mode',
     title: '先选使用方式',
-    body: '第一次使用请选择 CDK，网站会生成授权文件；已有 .maa 文件时选择上传继续使用。',
+    body: '可以先免费预览账号和基建配置；需要完整排班时再使用 CDK 生成授权文件。',
   },
   {
     target: 'cdk-code',
@@ -64,7 +64,7 @@ const BASE_TOUR_STEPS: TourStep[] = [
 ]
 
 export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, announcement }: Props) {
-  const [mode, setMode] = useState<EntryMode>('license')
+  const [mode, setMode] = useState<EntryMode>('preview')
   const [tourOpen, setTourOpen] = useState(false)
   const tourSteps = useMemo(
     () => announcement?.enabled ? [ANNOUNCEMENT_TOUR_STEP, ...BASE_TOUR_STEPS] : BASE_TOUR_STEPS,
@@ -107,7 +107,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
             MAA 基建排班优化器
           </h1>
           <p className="text-base text-ink-secondary">
-            输入 CDK 生成授权文件，或上传已有 .maa 文件
+            免费预览账号方向，完整排班需使用 CDK
           </p>
           <BuildMetaStrip placement="corner" />
         </div>
@@ -118,19 +118,22 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
 
         <div className="mb-5 flex justify-center">
           <div className="inline-flex rounded-lg bg-surface-1 p-1" data-tour="entry-mode">
+            <ModeButton label="免费预览" active={mode === 'preview'} onClick={() => setMode('preview')} />
             <ModeButton label="上传 .maa 文件" active={mode === 'license'} onClick={() => setMode('license')} />
             <ModeButton label="使用 CDK 生成授权文件" active={mode === 'cdk'} onClick={() => setMode('cdk')} />
           </div>
         </div>
 
-        {mode === 'license' ? (
+        {mode === 'preview' ? (
+          <FreePreviewPanel onUseCdk={() => setMode('cdk')} />
+        ) : mode === 'license' ? (
           <LicenseUploadPanel onFileLoaded={onFileLoaded} error={error} />
         ) : (
           <CdkRedeemPanel onLicenseRedeemed={onLicenseRedeemed} />
         )}
 
         <p className="mt-6 text-center text-xs text-ink-muted">
-          CDK 会在本站生成授权文件。授权文件和保存进度文件通常以 .maa 结尾，下次可直接上传继续调整。
+          免费预览不会生成排班表或 MAA JSON。CDK 会在本站生成授权文件，授权文件和保存进度文件通常以 .maa 结尾。
         </p>
         <div className="mt-3 text-center">
           <button
@@ -296,6 +299,198 @@ function LicenseUploadPanel({ onFileLoaded, error }: { onFileLoaded: (content: s
   )
 }
 
+function FreePreviewPanel({ onUseCdk }: { onUseCdk: () => void }) {
+  const [operators, setOperators] = useState<LicenseOperator[] | null>(null)
+  const [operatorsFileName, setOperatorsFileName] = useState<string | null>(null)
+  const [config, setConfig] = useState<LicenseConfig>(() => cloneConfig(CONFIG_PRESETS['243']))
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<FreePreviewResult | null>(null)
+  const operatorsRef = useRef<HTMLInputElement>(null)
+
+  const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
+  const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
+
+  const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
+    const next = normalizeConfig(normalizedConfig)
+    mutate(next)
+    setConfig(next)
+    setPreview(null)
+  }, [normalizedConfig])
+
+  const handleOperatorsFile = async () => {
+    const file = operatorsRef.current?.files?.[0]
+    setOperatorsFileName(file?.name ?? null)
+    setOperators(null)
+    setPreview(null)
+    setError(null)
+    if (!file) return
+    try {
+      setOperators(parseOperatorsText(await file.text()))
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setError(null)
+    setPreview(null)
+    if (!operators) {
+      setError('请先上传 operators.json。')
+      return
+    }
+    if (!configValidation.ok) {
+      setError(configValidation.message)
+      return
+    }
+    setLoading(true)
+    try {
+      const resp = await fetch('/api/free-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operators,
+          config: normalizedConfig,
+        }),
+      })
+      const data = await resp.json() as FreePreviewResult & { error?: string }
+      if (!resp.ok) {
+        throw new Error(data.error || `预览失败: ${resp.status}`)
+      }
+      setPreview(data)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="mx-auto max-w-3xl rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">
+          {error}
+        </div>
+      )}
+
+      <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
+        <div className="grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div>
+            <span className="mb-2 block text-sm font-medium text-ink-secondary">operators.json / .txt</span>
+            <button
+              type="button"
+              onClick={() => operatorsRef.current?.click()}
+              className="w-full rounded-lg bg-surface-2 px-4 py-2 text-left text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
+            >
+              {operatorsFileName ? `已选择：${operatorsFileName}` : '选择干员数据文件'}
+            </button>
+            {operators && (
+              <p className="mt-2 text-xs text-brand-400">已载入 {operators.filter((operator) => operator.own !== false).length} 名干员</p>
+            )}
+            <input
+              ref={operatorsRef}
+              type="file"
+              accept=".json,.txt,application/json,text/plain"
+              onChange={handleOperatorsFile}
+              className="hidden"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !operators || !configValidation.ok}
+            className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+          >
+            {loading ? '生成预览中...' : '生成免费预览'}
+          </button>
+        </div>
+        <OperatorDataGuide />
+      </section>
+
+      <div data-tour="base-config">
+        <ConfigEditor
+          config={normalizedConfig}
+          canEdit
+          changed={false}
+          validation={configValidation}
+          onUpdate={updateConfig}
+          note="免费预览会读取当前基建配置，但不会返回完整排班结果。"
+        />
+      </div>
+
+      {preview && <FreePreviewResultCard preview={preview} onUseCdk={onUseCdk} />}
+    </form>
+  )
+}
+
+function FreePreviewResultCard({ preview, onUseCdk }: { preview: FreePreviewResult; onUseCdk: () => void }) {
+  return (
+    <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-brand-400">免费预览已生成</p>
+          <h2 className="mt-1 text-xl font-semibold text-ink-primary">账号和基建概览</h2>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">
+            这里只展示是否值得继续计算的判断，不包含完整排班表和干员组合。
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onUseCdk}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
+        >
+          使用 CDK 获取完整结果
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <PreviewMetric label="识别干员" value={`${preview.operator_count} 名`} />
+        <PreviewMetric label="布局支持" value={preview.support.label} />
+        <PreviewMetric label="可能提升" value={preview.potential_range.label} />
+      </div>
+
+      <div className="mt-5 rounded-lg bg-surface-2/60 p-4">
+        <p className="text-sm font-semibold text-ink-primary">当前基建布局</p>
+        <p className="mt-1 text-sm leading-6 text-ink-secondary">{preview.support.reason}</p>
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <div>
+          <h3 className="text-sm font-semibold text-ink-primary">预计可优化方向</h3>
+          <ul className="mt-3 space-y-2 text-sm leading-6 text-ink-secondary">
+            {preview.directions.map((direction) => (
+              <li key={direction} className="flex gap-2">
+                <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-400" />
+                <span>{direction}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-lg bg-surface-2/60 p-4">
+          <h3 className="text-sm font-semibold text-ink-primary">提升档位范围</h3>
+          <p className="mt-2 text-2xl font-semibold text-brand-300">{preview.potential_range.label}</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">{preview.potential_range.note}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-2 text-xs leading-5 text-ink-muted">
+        {preview.notices.map((notice) => (
+          <p key={notice}>{notice}</p>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function PreviewMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-surface-2/60 p-4">
+      <p className="text-xs font-medium text-ink-muted">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-ink-primary">{value}</p>
+    </div>
+  )
+}
+
 function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: LicenseFile) => void }) {
   const [code, setCode] = useState('')
   const [operators, setOperators] = useState<LicenseOperator[] | null>(null)
@@ -322,11 +517,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
     setError(null)
     if (!file) return
     try {
-      const data = JSON.parse(await file.text()) as unknown
-      if (!Array.isArray(data)) {
-        throw new Error('operators.json 顶层必须是数组。')
-      }
-      setOperators(data as LicenseOperator[])
+      setOperators(parseOperatorsText(await file.text()))
     } catch (e) {
       setError((e as Error).message)
     }
@@ -678,6 +869,14 @@ function getTourPanelStyle(rect: { top: number; left: number; width: number; hei
     top,
     left,
   }
+}
+
+function parseOperatorsText(text: string): LicenseOperator[] {
+  const data = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
+  if (!Array.isArray(data)) {
+    throw new Error('operators.json 顶层必须是数组。')
+  }
+  return data as LicenseOperator[]
 }
 
 function downloadLicense(content: string, orderHash: string) {

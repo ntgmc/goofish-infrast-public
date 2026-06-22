@@ -2,29 +2,16 @@ import * as esbuild from 'esbuild';
 import { createHmac } from 'node:crypto';
 
 const optimizeEntry = 'netlify/functions/optimize.ts';
+const freePreviewEntry = 'netlify/functions/free-preview.ts';
 const adminSecret = 'check-optimize-secret';
 process.env.MAA_ADMIN_SECRET = adminSecret;
 
-const buildResult = await esbuild.build({
-  entryPoints: [optimizeEntry],
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  write: false,
-  packages: 'external',
-});
-
-const bundledCode = buildResult.outputFiles[0]?.text;
-if (!bundledCode) {
-  throw new Error('Failed to bundle optimize function.');
-}
-
-const functionUrl = `data:text/javascript;base64,${Buffer.from(bundledCode).toString('base64')}`;
-const optimizeModule = await import(functionUrl);
+const optimizeModule = await bundleFunction(optimizeEntry);
+const freePreviewModule = await bundleFunction(freePreviewEntry);
 
 const config = {
-  layout: '',
-  desc: '',
+  layout: '333',
+  desc: '3 贸易站 / 3 制造站',
   trading_stations_count: 3,
   manufacturing_stations_count: 3,
   product_requirements: {
@@ -38,6 +25,31 @@ const config = {
   Fiammetta: { enable: false },
   drones: { enable: false, order: '', targets: [] },
 };
+
+const sampleOperators = [
+  { id: 'char_002_amiya', name: '阿米娅', own: true, elite: 2, rarity: 4 },
+  { id: 'char_010_chen', name: '陈', own: true, elite: 1, rarity: 5 },
+  { id: 'char_4080_lin', name: '林', own: true, elite: 0, rarity: 5 },
+];
+
+async function bundleFunction(entryPoint) {
+  const buildResult = await esbuild.build({
+    entryPoints: [entryPoint],
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    write: false,
+    packages: 'external',
+  });
+
+  const bundledCode = buildResult.outputFiles[0]?.text;
+  if (!bundledCode) {
+    throw new Error(`Failed to bundle ${entryPoint}.`);
+  }
+
+  const functionUrl = `data:text/javascript;base64,${Buffer.from(bundledCode).toString('base64')}`;
+  return await import(functionUrl);
+}
 
 function canonicalJson(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -80,6 +92,20 @@ async function callOptimize(body) {
   return JSON.parse(text);
 }
 
+async function callFreePreview(body) {
+  const request = new Request('http://local/api/free-preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const response = await freePreviewModule.default(request, {});
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`free-preview returned ${response.status}: ${text}`);
+  }
+  return JSON.parse(text);
+}
+
 function assertOptimizeShape(result, label) {
   if (!Array.isArray(result.plans)) {
     throw new Error(`${label}: missing plans array`);
@@ -107,6 +133,20 @@ const current = await callOptimize({
   ignore_elite: false,
 });
 assertOptimizeShape(current, 'current result');
+
+const preview = await callFreePreview({
+  operators: sampleOperators,
+  config,
+});
+if (preview.operator_count !== sampleOperators.length) {
+  throw new Error('free-preview result: invalid operator_count');
+}
+if (preview.plans !== undefined || preview.raw_results !== undefined) {
+  throw new Error('free-preview result: leaked full optimize fields');
+}
+if (!preview.support?.label || !Array.isArray(preview.directions) || !preview.potential_range?.label) {
+  throw new Error('free-preview result: invalid preview shape');
+}
 
 const previousNetlify = process.env.NETLIFY;
 process.env.NETLIFY = 'true';
