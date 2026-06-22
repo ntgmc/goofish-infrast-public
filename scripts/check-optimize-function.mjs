@@ -2,42 +2,58 @@ import * as esbuild from 'esbuild';
 import { createHmac } from 'node:crypto';
 
 const optimizeEntry = 'netlify/functions/optimize.ts';
+const freePreviewEntry = 'netlify/functions/free-preview.ts';
+const redeemCdkEntry = 'netlify/functions/redeem-cdk.ts';
 const adminSecret = 'check-optimize-secret';
 process.env.MAA_ADMIN_SECRET = adminSecret;
+process.env.CDK_HASH_SECRET = 'check-cdk-secret';
 
-const buildResult = await esbuild.build({
-  entryPoints: [optimizeEntry],
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  write: false,
-  packages: 'external',
-});
-
-const bundledCode = buildResult.outputFiles[0]?.text;
-if (!bundledCode) {
-  throw new Error('Failed to bundle optimize function.');
-}
-
-const functionUrl = `data:text/javascript;base64,${Buffer.from(bundledCode).toString('base64')}`;
-const optimizeModule = await import(functionUrl);
+const optimizeModule = await bundleFunction(optimizeEntry);
+const freePreviewModule = await bundleFunction(freePreviewEntry);
+const redeemCdkModule = await bundleFunction(redeemCdkEntry);
+const licenseUtilsModule = await bundleFunction('netlify/functions/license-utils.ts');
 
 const config = {
-  layout: '',
-  desc: '',
+  layout: '3-3-3',
+  desc: '333 搓玉流',
   trading_stations_count: 3,
   manufacturing_stations_count: 3,
   product_requirements: {
-    trading_stations: { LMD: 3, Orundum: 0 },
+    trading_stations: { LMD: 2, Orundum: 1 },
     manufacturing_stations: {
-      'Pure Gold': 3,
-      'Originium Shard': 0,
+      'Pure Gold': 2,
+      'Originium Shard': 1,
       'Battle Record': 0,
     },
   },
-  Fiammetta: { enable: false },
-  drones: { enable: false, order: '', targets: [] },
+  Fiammetta: { enable: true },
+  drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
 };
+
+const sampleOperators = [
+  { id: 'char_002_amiya', name: '阿米娅', own: true, elite: 2, rarity: 4 },
+  { id: 'char_010_chen', name: '陈', own: true, elite: 1, rarity: 5 },
+  { id: 'char_4080_lin', name: '林', own: true, elite: 0, rarity: 5 },
+];
+
+async function bundleFunction(entryPoint) {
+  const buildResult = await esbuild.build({
+    entryPoints: [entryPoint],
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    write: false,
+    packages: 'external',
+  });
+
+  const bundledCode = buildResult.outputFiles[0]?.text;
+  if (!bundledCode) {
+    throw new Error(`Failed to bundle ${entryPoint}.`);
+  }
+
+  const functionUrl = `data:text/javascript;base64,${Buffer.from(bundledCode).toString('base64')}`;
+  return await import(functionUrl);
+}
 
 function canonicalJson(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -52,21 +68,26 @@ function signLicense(unsignedLicense) {
   return `skadi-${digest.slice(0, 8)}-${digest.slice(8, 16)}`;
 }
 
-const unsignedLicense = {
-  version: 1,
-  order_hash: 'legacy-smoke-test',
-  operators: [],
-  config,
-  permission: 'basic',
-  issued_at: '2026-01-01T00:00:00Z',
-};
+function createLicense(permission, orderHash = `${permission}-smoke-test`) {
+  const unsignedLicense = {
+    version: 1,
+    order_hash: orderHash,
+    operators: [],
+    config,
+    permission,
+    issued_at: '2026-01-01T00:00:00Z',
+  };
+  return {
+    ...unsignedLicense,
+    sig: signLicense(unsignedLicense),
+  };
+}
 
-const license = {
-  ...unsignedLicense,
-  sig: signLicense(unsignedLicense),
-};
+const license = createLicense('growth');
+const recommendedLicense = createLicense('recommended');
+const advancedLicense = createLicense('advanced');
 
-async function callOptimize(body) {
+async function callOptimizeRaw(body) {
   const request = new Request('http://local/api/optimize', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -74,10 +95,39 @@ async function callOptimize(body) {
   });
   const response = await optimizeModule.default(request, {});
   const text = await response.text();
+  return { response, text };
+}
+
+async function callOptimize(body) {
+  const { response, text } = await callOptimizeRaw(body);
   if (!response.ok) {
     throw new Error(`optimize returned ${response.status}: ${text}`);
   }
   return JSON.parse(text);
+}
+
+async function callFreePreview(body) {
+  const request = new Request('http://local/api/free-preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const response = await freePreviewModule.default(request, {});
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`free-preview returned ${response.status}: ${text}`);
+  }
+  return JSON.parse(text);
+}
+
+async function callRedeemCdk(body) {
+  const request = new Request('http://local/api/redeem-cdk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const response = await redeemCdkModule.default(request, {});
+  return { response, text: await response.text() };
 }
 
 function assertOptimizeShape(result, label) {
@@ -107,6 +157,85 @@ const current = await callOptimize({
   ignore_elite: false,
 });
 assertOptimizeShape(current, 'current result');
+
+const recommendedCurrent = await callOptimize({
+  license: recommendedLicense,
+  operators: [],
+  config,
+  ignore_elite: false,
+});
+assertOptimizeShape(recommendedCurrent, 'recommended current result');
+if (recommendedCurrent.upgrade_suggestions !== undefined || recommendedCurrent.current_result !== undefined) {
+  throw new Error('recommended current result: leaked upgrade fields');
+}
+
+const recommendedUpgrade = await callOptimizeRaw({
+  license: recommendedLicense,
+  operators: [],
+  config,
+  ignore_elite: true,
+  include_current: true,
+});
+if (recommendedUpgrade.response.status !== 403) {
+  throw new Error(`recommended upgrade guard: expected 403, got ${recommendedUpgrade.response.status}`);
+}
+
+const cdkValidation = await callRedeemCdk({
+  code: 'MAA-TEST-TEST-TEST',
+  validate_only: true,
+});
+if (cdkValidation.response.status !== 404) {
+  throw new Error(`cdk validate_only guard: expected 404, got ${cdkValidation.response.status}: ${cdkValidation.text}`);
+}
+
+const customConfig = {
+  ...config,
+  desc: 'advanced custom smoke config',
+};
+const advancedCustom = await callOptimize({
+  license: advancedLicense,
+  operators: [],
+  config: customConfig,
+  ignore_elite: false,
+});
+assertOptimizeShape(advancedCustom, 'advanced custom result');
+
+const restrictedPreset = licenseUtilsModule.resolveConfigForPermission('growth', config);
+if (!restrictedPreset.ok) {
+  throw new Error(`growth preset config guard: ${restrictedPreset.message}`);
+}
+const customRestrictedConfig = {
+  ...config,
+  layout: '2-4-3',
+  trading_stations_count: 2,
+  manufacturing_stations_count: 4,
+  product_requirements: {
+    trading_stations: { LMD: 2 },
+    manufacturing_stations: { 'Pure Gold': 4 },
+  },
+};
+const restrictedCustom = licenseUtilsModule.resolveConfigForPermission('growth', customRestrictedConfig);
+if (restrictedCustom.ok) {
+  throw new Error('growth custom config guard: expected rejection');
+}
+const advancedCustomConfig = licenseUtilsModule.resolveConfigForPermission('advanced', customRestrictedConfig);
+if (!advancedCustomConfig.ok) {
+  throw new Error(`advanced custom config guard: ${advancedCustomConfig.message}`);
+}
+
+const preview = await callFreePreview({
+  operators: sampleOperators,
+  config,
+});
+if (preview.operator_count !== sampleOperators.length) {
+  throw new Error('free-preview result: invalid operator_count');
+}
+if (preview.plans !== undefined || preview.raw_results !== undefined) {
+  throw new Error('free-preview result: leaked full optimize fields');
+}
+if (!preview.support?.label || !Array.isArray(preview.directions) || !preview.potential_range?.label) {
+  throw new Error('free-preview result: invalid preview shape');
+}
 
 const previousNetlify = process.env.NETLIFY;
 process.env.NETLIFY = 'true';

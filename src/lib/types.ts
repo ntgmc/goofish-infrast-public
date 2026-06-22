@@ -27,14 +27,24 @@ export interface LicenseConfig {
   [key: string]: unknown;
 }
 
-export type PermissionMode = 'basic' | 'premium' | 'admin';
+export type LegacyPermissionMode = 'basic' | 'premium';
+export type ProductPermissionMode = 'recommended' | 'growth' | 'advanced' | 'ultimate';
+export type InternalPermissionMode = 'admin';
+export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | InternalPermissionMode;
+export type PermissionMode = ProductPermissionMode | InternalPermissionMode;
+
+export interface OperatorUpdateGrant {
+  remaining: number;
+  granted_at: string | null;
+}
 
 export interface LicenseFile {
   version: number;
   order_hash: string;
   operators: LicenseOperator[];
   config: LicenseConfig;
-  permission?: PermissionMode;
+  permission?: RawPermissionMode;
+  operator_update_grant?: OperatorUpdateGrant | null;
   issued_at: string;
   sig: string;
 }
@@ -61,6 +71,13 @@ export interface AppBuildMeta {
   build_context?: string;
 }
 
+export interface Announcement {
+  enabled: boolean;
+  title: string;
+  body: string;
+  updated_at: string | null;
+}
+
 export interface OptimizeRequest {
   license: LicenseFile;
   operators: LicenseOperator[];
@@ -69,6 +86,29 @@ export interface OptimizeRequest {
   include_current?: boolean;
   suggestions_only?: boolean;
   upgrade_task_payload?: UpgradeTaskPayload;
+}
+
+export interface FreePreviewRequest {
+  operators: LicenseOperator[];
+  config: LicenseConfig;
+}
+
+export interface FreePreviewResult {
+  operator_count: number;
+  support: {
+    supported: boolean;
+    label: string;
+    reason: string;
+  };
+  directions: string[];
+  potential_range: {
+    min: string;
+    max: string;
+    label: string;
+    note: string;
+  };
+  notices: string[];
+  build_meta: AppBuildMeta;
 }
 
 export interface UpgradeTaskPayload {

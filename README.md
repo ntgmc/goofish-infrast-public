@@ -2,7 +2,7 @@
 
 [![Quality Checks](https://github.com/ntgmc/goofish-infrast-v1/actions/workflows/quality-checks.yml/badge.svg)](https://github.com/ntgmc/goofish-infrast-v1/actions/workflows/quality-checks.yml)
 
-MAA 基建排班优化器是一个面向《明日方舟》玩家的 Web 工具。用户可以上传授权文件或通过 CDK 兑换生成工作文件，应用会根据干员、基建房间、产物需求和无人机策略计算可导入 MAA 的排班 JSON，并给出精英化升级建议。
+MAA 基建排班优化器是一个面向《明日方舟》玩家的 Web 工具。用户拿到 CDK 后在网站上传干员数据并生成授权文件；已有授权文件或工作文件时可直接上传继续使用。应用会根据干员、基建房间、产物需求和无人机策略计算可导入 MAA 的排班 JSON，并给出精英化升级建议。
 
 ## 在线地址
 
@@ -70,6 +70,8 @@ Quality Checks 拆分为两个检查项：
 
 `Web Build` 和 `Functions Smoke Test` 只在 `Deploy Relevance` 判断为需要部署时运行。只修改文档或仓库元数据时，Quality Checks 会保留发布相关性检查，但跳过前端构建和函数 smoke test。
 
+另外，仓库使用 GitHub Actions 在 PR 创建、重新打开、更新 commit 或标记 ready 时，根据 PR 内 commit message 自动更新 PR description。配置文件位于 `.github/workflows/pr-details.yml`。该流程只维护 PR description 中 `<!-- pr-details:start -->` 到 `<!-- pr-details:end -->` 之间的自动生成区块，区块外的人工内容会保留。
+
 Quality Checks 会在执行检查前注入构建元数据：
 
 | Variable | Example | Purpose |
@@ -82,6 +84,8 @@ Quality Checks 会在执行检查前注入构建元数据：
 | `BUILD_CONTEXT` | `pull_request` / `push` | 构建上下文 |
 
 `npm run generate:data` 会根据这些变量生成 `src/lib/build-meta.ts`，并在 `netlify/functions/data.ts` 中写入 `data_version`、`generated_at` 和来源摘要。前端会显示“当前规则数据更新于 YYYY-MM-DD”，优化 API 响应也会带上同一份版本元数据。
+
+版本号 patch bump 规则固定如下：显式 `VERSION_PATCH` 优先，其次使用 `BUILD_NUMBER` / `GITHUB_RUN_NUMBER`；本地未提供构建号时使用当前 Git 提交数。因此每次新增 commit 后生成元数据会自然递增，同一 commit 上重复执行 `npm run generate:data` 或 `npm run build` 不会继续递增版本。
 
 ## Netlify Build & deploy settings
 
@@ -154,7 +158,7 @@ CDK 管理和兑换相关函数需要以下变量。不要把实际值提交到�
 - `src/`: React 前端应用
 - `src/pages/`: 首页、上传页、优化结果页和管理页
 - `src/components/`: 配置编辑、结果展示和升级建议组件
-- `netlify/functions/`: CDK、授权兑换和排班优化 API
+- `netlify/functions/`: CDK 兑换、授权文件生成和排班优化 API
 - `scripts/`: 数据生成和函数 smoke check 脚本
 - `public/assets/previews/`: 首页展示用预览图
 - `public/webp96/`: 干员与召唤物图标资源

@@ -1,0 +1,163 @@
+name: PR Details
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  update-pr-details:
+    name: Update PR Details
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Update PR details from commit messages
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const markerStart = '<!-- pr-details:start -->';
+            const markerEnd = '<!-- pr-details:end -->';
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const pull_number = pr.number;
+
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+
+            const escapeTableCell = (value) =>
+              String(value || '')
+                .replace(/\r?\n/g, ' ')
+                .replace(/\|/g, '\\|')
+                .trim();
+
+            const truncate = (value, maxLength) => {
+              const text = String(value || '').trim();
+              return text.length > maxLength ? `${text.slice(0, maxLength - 1)}...` : text;
+            };
+
+            const parseCommit = ({ sha, commit }) => {
+              const message = commit.message || '';
+              const [rawSubject = '', ...bodyLines] = message.split(/\r?\n/);
+              const subject = rawSubject.trim() || '(no subject)';
+              const conventionalMatch = subject.match(/^([a-zA-Z]+)(?:\([^)]+\))?!?:\s*(.+)$/);
+
+              return {
+                sha: sha.slice(0, 7),
+                type: conventionalMatch ? conventionalMatch[1].toLowerCase() : 'other',
+                subject,
+                body: bodyLines.join('\n').trim(),
+              };
+            };
+
+            const parsedCommits = commits.map(parseCommit);
+            const typeLabels = {
+              feat: 'Features',
+              fix: 'Fixes',
+              perf: 'Performance',
+              refactor: 'Refactors',
+              docs: 'Docs',
+              test: 'Tests',
+              build: 'Build',
+              ci: 'CI',
+              chore: 'Chores',
+              revert: 'Reverts',
+              other: 'Other',
+            };
+
+            const summaryRows = parsedCommits
+              .map((commit) => {
+                const type = typeLabels[commit.type] || commit.type;
+                const subject = truncate(commit.subject, 180);
+                return `| \`${commit.sha}\` | ${escapeTableCell(type)} | ${escapeTableCell(subject)} |`;
+              })
+              .join('\n');
+
+            const grouped = parsedCommits.reduce((acc, commit) => {
+              const label = typeLabels[commit.type] || commit.type;
+              acc[label] = acc[label] || [];
+              acc[label].push(commit.subject);
+              return acc;
+            }, {});
+
+            const groupedSummary = Object.entries(grouped)
+              .map(([label, subjects]) => {
+                const lines = subjects
+                  .map((subject) => `- ${truncate(subject, 140)}`)
+                  .join('\n');
+                return `### ${label}\n${lines}`;
+              })
+              .join('\n\n');
+
+            const commitBodies = parsedCommits
+              .filter((commit) => commit.body.length > 0)
+              .slice(0, 20)
+              .map((commit) => {
+                const body = truncate(commit.body, 1200);
+                return `#### \`${commit.sha}\` ${commit.subject}\n\n${body}`;
+              })
+              .join('\n\n');
+
+            const bodyNote = parsedCommits.some((commit) => commit.body.length > 0)
+              ? `\n\n<details>\n<summary>Commit message bodies</summary>\n\n${commitBodies || 'No commit message bodies.'}\n\n</details>`
+              : '';
+
+            const generatedDetails = [
+              '## PR Details',
+              '',
+              `Generated from ${parsedCommits.length} commit message${parsedCommits.length === 1 ? '' : 's'} in this PR.`,
+              `Head commit: \`${pr.head.sha.slice(0, 7)}\``,
+              '',
+              groupedSummary || 'No commits found.',
+              '',
+              '### Commit List',
+              '| SHA | Type | Subject |',
+              '| --- | --- | --- |',
+              summaryRows || '| - | - | No commits found. |',
+              bodyNote,
+            ].join('\n');
+
+            const generatedBlock = `${markerStart}\n\n${generatedDetails.trim()}\n\n${markerEnd}`;
+            const currentBody = pr.body || '';
+            const startIndex = currentBody.indexOf(markerStart);
+            const endIndex = currentBody.indexOf(markerEnd);
+
+            let nextBody;
+            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+              nextBody =
+                currentBody.slice(0, startIndex) +
+                generatedBlock +
+                currentBody.slice(endIndex + markerEnd.length);
+            } else if (currentBody.trim().length > 0) {
+              nextBody = `${currentBody.trimEnd()}\n\n${generatedBlock}`;
+            } else {
+              nextBody = generatedBlock;
+            }
+
+            if (nextBody === currentBody) {
+              core.info('PR details are already up to date.');
+              return;
+            }
+
+            await github.rest.pulls.update({
+              owner,
+              repo,
+              pull_number,
+              body: nextBody,
+            });
+
+            core.info(`Updated PR #${pull_number} details from commit messages.`);

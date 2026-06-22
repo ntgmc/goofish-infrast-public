@@ -22,8 +22,8 @@ const strengths = [
 const workflow = [
   {
     title: '准备数据',
-    description: '上传授权文件，或用 CDK 加 MAA 导出的干员数据文件生成授权文件。',
-    detail: '按页面提示上传文件，就能进入生成流程。',
+    description: '输入 CDK 并上传 MAA 导出的干员数据，在网站上生成授权文件。',
+    detail: '已有授权文件或保存进度文件时，也可以直接上传继续使用。',
   },
   {
     title: '计算方案',
@@ -45,7 +45,7 @@ const workflow = [
 const screenshotSlots = [
   {
     title: '上传与 CDK 入口',
-    description: '进入工具后可以直接上传授权文件，也可以切换到 CDK 模式生成授权文件，适合首次使用和继续调整两种场景。',
+    description: '首次使用输入 CDK 生成授权文件；已有 .maa 文件时可直接上传，适合继续调整。',
     src: '/assets/previews/upload-entry.png',
   },
   {
@@ -107,7 +107,7 @@ export default function LandingPage({ onStart }: Props) {
                 一键生成可导入 MAA 的基建排班
               </h1>
               <p className="mt-6 max-w-[58ch] text-base leading-8 text-white/66 sm:text-lg">
-                上传授权文件或通过 CDK 生成授权文件，工具会自动计算干员、房间和无人机配置，直接导出可执行的排班 JSON。
+                输入 CDK 生成授权文件，或上传已有 .maa 文件。工具会自动计算干员、房间和无人机配置，直接导出可执行的排班 JSON。
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -230,7 +230,7 @@ export default function LandingPage({ onStart }: Props) {
                 <div>
                   <p className="text-sm font-medium text-cyan-100">准备进入工具</p>
                   <h2 className="mt-3 max-w-2xl text-3xl font-semibold leading-tight tracking-[-0.02em] text-white sm:text-4xl">
-                    已经有授权文件或 CDK 时，可以直接开始
+                    拿到 CDK 或已有 .maa 文件时，可以直接开始
                   </h2>
                 </div>
                 <button
@@ -293,7 +293,7 @@ function HeroPreview() {
         <div className="border-b border-white/10 p-5 lg:border-b-0 lg:border-r">
           <p className="text-sm font-semibold text-white">从数据到排班文件</p>
           <div className="mt-5 space-y-4">
-            <PreviewRow label="输入" value="授权文件 / CDK" tone="cyan" index={0} />
+            <PreviewRow label="输入" value="CDK / .maa 文件" tone="cyan" index={0} />
             <PreviewRow label="计算" value="自动计算最优排班方案" tone="violet" index={1} />
             <PreviewRow label="输出" value="MAA 排班 JSON" tone="emerald" index={2} />
           </div>
