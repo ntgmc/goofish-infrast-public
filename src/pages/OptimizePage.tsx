@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
 import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
-import { canEditConfig, getPermissionMode, mergeOperators } from '../lib/license'
+import { canEditConfig, canReplaceOperators, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
@@ -46,8 +46,9 @@ export default function OptimizePage({
   const optimizeInFlightRef = useRef(false)
 
   const permission = getPermissionMode(license)
-  const userCanReplaceOperators = permission === 'admin'
+  const userCanReplaceOperators = canReplaceOperators(license)
   const userCanEditConfig = canEditConfig(license)
+  const userCanUseUpgradeFeatures = canUseUpgradeFeatures(license)
   const activeConfig = useMemo(
     () => normalizeConfig(configOverride ?? license.config),
     [configOverride, license.config]
@@ -168,13 +169,13 @@ export default function OptimizePage({
     setProgress({ mode: 'generate', startedAt })
     let completed = false
     try {
-      const potential = await runOptimize(true, true)
-      const current = potential.current_result ?? (await runOptimize(false))
+      const potential = userCanUseUpgradeFeatures ? await runOptimize(true, true) : null
+      const current = potential?.current_result ?? (await runOptimize(false))
       setCurrentResult(current)
-      const suggestionResult = potential.upgrade_task_payload
+      const suggestionResult = potential?.upgrade_task_payload
         ? await runUpgradeSuggestions(potential.upgrade_task_payload)
         : potential
-      const serverSuggestions = suggestionResult.upgrade_suggestions
+      const serverSuggestions = suggestionResult?.upgrade_suggestions
       const upgradeList: UpgradeSuggestion[] = serverSuggestions && serverSuggestions.length > 0
         ? serverSuggestions.map((s, idx) => {
           if (s.type === 'single') {
@@ -217,7 +218,7 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [configValidationMessage, hasResult, lastGeneratedSignature, loading, optimizeSignature, runOptimize, runUpgradeSuggestions])
+  }, [configValidationMessage, hasResult, lastGeneratedSignature, loading, optimizeSignature, runOptimize, runUpgradeSuggestions, userCanUseUpgradeFeatures])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
     if (loading || optimizeInFlightRef.current) return
@@ -422,11 +423,15 @@ export default function OptimizePage({
       {phase === 'suggestions' && suggestions.length === 0 && (
         <div className="mt-8">
           <div className="bg-success/10 border border-success/30 rounded-xl p-5 mb-8">
-            <p className="font-semibold text-success">当前练度已是最佳配置</p>
+            <p className="font-semibold text-success">
+              {userCanUseUpgradeFeatures ? '当前练度已是最佳配置' : '当前练度排班已生成'}
+            </p>
             <p className="text-success/80 text-sm mt-1">
-              {currentResultIsRotation
-                ? '无需应用升级建议，请按排班详情在游戏内手动设置。'
-                : '无需应用升级建议，可直接下载优化结果。'}
+              {userCanUseUpgradeFeatures
+                ? currentResultIsRotation
+                  ? '无需应用升级建议，请按排班详情在游戏内手动设置。'
+                  : '无需应用升级建议，可直接下载优化结果。'
+                : '推荐版不包含练度提升建议，可直接下载当前练度优化结果。'}
             </p>
           </div>
           <ResultPanel result={currentResult!} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />

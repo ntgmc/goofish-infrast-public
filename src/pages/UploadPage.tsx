@@ -493,11 +493,13 @@ function PreviewMetric({ label, value }: { label: string; value: string }) {
 
 function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: LicenseFile) => void }) {
   const [code, setCode] = useState('')
+  const [validatedCdk, setValidatedCdk] = useState<{ permission: string; permission_label: string } | null>(null)
   const [operators, setOperators] = useState<LicenseOperator[] | null>(null)
   const [operatorsFileName, setOperatorsFileName] = useState<string | null>(null)
   const [config, setConfig] = useState<LicenseConfig>(() => cloneConfig(CONFIG_PRESETS['243']))
   const [confirmed, setConfirmed] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [validating, setValidating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const operatorsRef = useRef<HTMLInputElement>(null)
 
@@ -523,9 +525,57 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
     }
   }
 
+  const handleCodeChange = (value: string) => {
+    setCode(value)
+    setValidatedCdk(null)
+    setConfirmed(false)
+    setError(null)
+  }
+
+  const handleValidateCdk = async () => {
+    const trimmedCode = code.trim()
+    setError(null)
+    setValidatedCdk(null)
+    if (!trimmedCode) {
+      setError('请先填写 CDK。')
+      return
+    }
+    setValidating(true)
+    try {
+      const resp = await fetch('/api/redeem-cdk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: trimmedCode,
+          validate_only: true,
+        }),
+      })
+      const data = await resp.json() as {
+        error?: string;
+        permission?: string;
+        permission_label?: string;
+      }
+      if (!resp.ok) {
+        throw new Error(data.error || `CDK 校验失败: ${resp.status}`)
+      }
+      if (!data.permission || !data.permission_label) {
+        throw new Error('CDK 校验响应缺少版本信息。')
+      }
+      setValidatedCdk({ permission: data.permission, permission_label: data.permission_label })
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setValidating(false)
+    }
+  }
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
+    if (!validatedCdk) {
+      setError('请先校验 CDK。')
+      return
+    }
     if (!operators) {
       setError('请先上传 operators.json。')
       return
@@ -578,76 +628,124 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
       )}
 
       <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK</span>
             <input
               data-tour="cdk-code"
               type="text"
               value={code}
-              onChange={(event) => setCode(event.currentTarget.value)}
+              onChange={(event) => handleCodeChange(event.currentTarget.value)}
               className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink-primary placeholder:text-ink-muted"
               placeholder="MAA-XXXX-XXXX-XXXX"
               required
             />
           </label>
-          <div>
-            <span className="mb-2 block text-sm font-medium text-ink-secondary">operators.json / .txt</span>
-            <button
-              data-tour="operator-data"
-              type="button"
-              onClick={() => operatorsRef.current?.click()}
-              className="w-full rounded-lg bg-surface-2 px-4 py-2 text-left text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
-            >
-              {operatorsFileName ? `已选择：${operatorsFileName}` : '选择干员数据文件'}
-            </button>
-            {operators && (
-              <p className="mt-2 text-xs text-brand-400">已载入 {operators.length} 名干员</p>
-            )}
-            <input
-              ref={operatorsRef}
-              type="file"
-              accept=".json,.txt,application/json,text/plain"
-              onChange={handleOperatorsFile}
-              className="hidden"
+          <button
+            type="button"
+            onClick={handleValidateCdk}
+            disabled={validating || !code.trim()}
+            className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+          >
+            {validating ? '校验中...' : '校验 CDK'}
+          </button>
+        </div>
+        {validatedCdk && (
+          <p className="mt-3 text-sm text-success">
+            CDK 可用，版本：{validatedCdk.permission_label}
+          </p>
+        )}
+      </section>
+
+      {validatedCdk ? (
+        <>
+          <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
+            <div>
+              <span className="mb-2 block text-sm font-medium text-ink-secondary">operators.json / .txt</span>
+              <button
+                data-tour="operator-data"
+                type="button"
+                onClick={() => operatorsRef.current?.click()}
+                className="w-full rounded-lg bg-surface-2 px-4 py-2 text-left text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
+              >
+                {operatorsFileName ? `已选择：${operatorsFileName}` : '选择干员数据文件'}
+              </button>
+              {operators && (
+                <p className="mt-2 text-xs text-brand-400">已载入 {operators.length} 名干员</p>
+              )}
+              <input
+                ref={operatorsRef}
+                type="file"
+                accept=".json,.txt,application/json,text/plain"
+                onChange={handleOperatorsFile}
+                className="hidden"
+              />
+            </div>
+            <OperatorDataGuide />
+          </section>
+
+          <div data-tour="base-config">
+            <ConfigEditor
+              config={normalizedConfig}
+              canEdit={false}
+              canSelectPreset
+              changed={false}
+              validation={configValidation}
+              onUpdate={updateConfig}
+              note="推荐版和成长版仅支持预设配置；进阶版和尊享版生成授权后可继续自定义配置。"
             />
           </div>
-        </div>
-        <OperatorDataGuide />
-      </section>
 
-      <div data-tour="base-config">
-        <ConfigEditor
-          config={normalizedConfig}
-          canEdit
-          changed={false}
-          validation={configValidation}
-          onUpdate={updateConfig}
-          note="提交前可选择或调整基建配置；提交成功后本次导入的干员和配置不能再次修改。"
-        />
-      </div>
-
-      <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6" data-tour="redeem-action">
-        <label className="flex items-start gap-3 text-sm text-ink-secondary">
-          <input
-            type="checkbox"
-            checked={confirmed}
-            onChange={(event) => setConfirmed(event.currentTarget.checked)}
-            className="mt-1 h-4 w-4 flex-shrink-0 accent-brand-500"
+          <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6" data-tour="redeem-action">
+            <label className="flex items-start gap-3 text-sm text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(event) => setConfirmed(event.currentTarget.checked)}
+                className="mt-1 h-4 w-4 flex-shrink-0 accent-brand-500"
+              />
+              <span>
+                我确认 CDK 仅可使用一次，提交后本次导入的干员和配置不能再次修改。
+              </span>
+            </label>
+            <button
+              type="submit"
+              disabled={loading || !confirmed || !operators || !code.trim() || !configValidation.ok}
+              className="mt-5 w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+            >
+              {loading ? '正在生成授权文件...' : '兑换 CDK 并生成授权文件'}
+            </button>
+          </section>
+        </>
+      ) : (
+        <>
+          <LockedStep
+            tourTarget="operator-data"
+            title="先校验 CDK"
+            body="CDK 可用后再导入干员数据，避免提前处理无效或已使用的兑换码。"
           />
-          <span>
-            我确认 CDK 仅可使用一次，提交后本次导入的干员和配置不能再次修改。
-          </span>
-        </label>
-        <button
-          type="submit"
-          disabled={loading || !confirmed || !operators || !code.trim() || !configValidation.ok}
-          className="mt-5 w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
-        >
-          {loading ? '正在生成授权文件...' : '兑换 CDK 并生成授权文件'}
-        </button>
-      </section>
+          <LockedStep
+            tourTarget="base-config"
+            title="配置选择暂未开放"
+            body="完成 CDK 校验后再选择预设配置。"
+          />
+          <LockedStep
+            tourTarget="redeem-action"
+            title="生成授权文件暂未开放"
+            body="完成 CDK 校验、干员导入和配置选择后再生成授权文件。"
+          />
+        </>
+      )}
     </form>
+  )
+}
+
+function LockedStep({ tourTarget, title, body }: { tourTarget: TourTarget; title: string; body: string }) {
+  return (
+    <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6" data-tour={tourTarget}>
+      <p className="text-sm font-semibold text-ink-primary">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-ink-secondary">{body}</p>
+    </section>
   )
 }
 

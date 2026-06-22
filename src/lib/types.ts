@@ -27,14 +27,18 @@ export interface LicenseConfig {
   [key: string]: unknown;
 }
 
-export type PermissionMode = 'basic' | 'premium' | 'admin';
+export type LegacyPermissionMode = 'basic' | 'premium';
+export type ProductPermissionMode = 'recommended' | 'growth' | 'advanced' | 'ultimate';
+export type InternalPermissionMode = 'admin';
+export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | InternalPermissionMode;
+export type PermissionMode = ProductPermissionMode | InternalPermissionMode;
 
 export interface LicenseFile {
   version: number;
   order_hash: string;
   operators: LicenseOperator[];
   config: LicenseConfig;
-  permission?: PermissionMode;
+  permission?: RawPermissionMode;
   issued_at: string;
   sig: string;
 }
