@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
-import type { LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
+import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
 import { canEditConfig, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
+import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
 import UpgradeSuggestions from '../components/UpgradeSuggestions'
 import ResultPanel from '../components/ResultPanel'
@@ -19,6 +20,7 @@ interface Props {
   configOverride: LicenseConfig | null;
   setConfigOverride: (v: LicenseConfig | null) => void;
   onReset: () => void;
+  announcement: Announcement | null;
 }
 
 export default function OptimizePage({
@@ -29,6 +31,7 @@ export default function OptimizePage({
   configOverride,
   setConfigOverride,
   onReset,
+  announcement,
 }: Props) {
   const [suggestions, setSuggestions] = useState<UpgradeSuggestion[]>([])
   const [currentResult, setCurrentResult] = useState<OptimizeResult | null>(null)
@@ -338,6 +341,8 @@ export default function OptimizePage({
           重新选择文件
         </button>
       </header>
+
+      <AnnouncementBanner announcement={announcement} className="mb-6" />
 
       <CommandBand
         config={activeConfig}

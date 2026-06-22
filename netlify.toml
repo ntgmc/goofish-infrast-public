@@ -12,6 +12,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/announcement"
+  to = "/.netlify/functions/announcement"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/announcement"
+  to = "/.netlify/functions/announcement?admin=1"
+  status = 200
+
+[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200

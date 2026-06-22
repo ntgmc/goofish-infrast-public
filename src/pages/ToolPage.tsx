@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useState } from 'react'
-import type { AppStep, LicenseConfig, LicenseFile } from '../lib/types'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import type { Announcement, AppStep, LicenseConfig, LicenseFile } from '../lib/types'
 import { extractConfigOverride, extractEliteOverrides, extractLicense, parseFileContent } from '../lib/license'
 import UploadPage from './UploadPage'
 
@@ -11,6 +11,37 @@ export default function ToolPage() {
   const [eliteOverrides, setEliteOverrides] = useState<Record<string, number>>({})
   const [configOverride, setConfigOverride] = useState<LicenseConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    fetch('/api/announcement')
+      .then(async (resp) => {
+        if (!resp.ok) return null
+        return await resp.json() as Partial<Announcement>
+      })
+      .then((data) => {
+        if (cancelled) return
+        if (data?.enabled && typeof data.title === 'string' && typeof data.body === 'string') {
+          setAnnouncement({
+            enabled: true,
+            title: data.title,
+            body: data.body,
+            updated_at: typeof data.updated_at === 'string' ? data.updated_at : null,
+          })
+        } else {
+          setAnnouncement(null)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAnnouncement(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleFileLoaded = useCallback(async (content: string) => {
     setError(null)
@@ -48,6 +79,7 @@ export default function ToolPage() {
           onFileLoaded={handleFileLoaded}
           onLicenseRedeemed={handleLicenseRedeemed}
           error={error}
+          announcement={announcement}
         />
       )}
       {step === 'optimize' && license && (
@@ -64,6 +96,7 @@ export default function ToolPage() {
             configOverride={configOverride}
             setConfigOverride={setConfigOverride}
             onReset={handleReset}
+            announcement={announcement}
           />
         </Suspense>
       )}

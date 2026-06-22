@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import type { Announcement } from '../lib/types'
 
 type Permission = 'basic' | 'premium' | 'admin'
 type CdkStatus = 'unused' | 'used' | 'revoked'
@@ -44,6 +45,17 @@ interface RevokeCdkResponse {
   already_revoked?: boolean;
 }
 
+interface AnnouncementResponse extends Partial<Announcement> {
+  error?: string;
+}
+
+const EMPTY_ANNOUNCEMENT: Announcement = {
+  enabled: false,
+  title: '',
+  body: '',
+  updated_at: null,
+}
+
 const permissionLabels: Record<Permission, string> = {
   basic: 'Basic',
   premium: 'Premium',
@@ -77,6 +89,10 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null)
   const [copyStatus, setCopyStatus] = useState<string | null>(null)
   const [result, setResult] = useState<{ code: string; permission: Permission; created_at: string } | null>(null)
+  const [announcement, setAnnouncement] = useState<Announcement>(EMPTY_ANNOUNCEMENT)
+  const [announcementLoading, setAnnouncementLoading] = useState(false)
+  const [announcementSaving, setAnnouncementSaving] = useState(false)
+  const [announcementStatus, setAnnouncementStatus] = useState<string | null>(null)
 
   const summary = useMemo(() => {
     const unused = records.filter((record) => record.status === 'unused').length
@@ -111,6 +127,27 @@ export default function AdminPage() {
     }
   }, [])
 
+  const loadAnnouncement = useCallback(async (password: string) => {
+    setAnnouncementLoading(true)
+    setAnnouncementStatus(null)
+    try {
+      const resp = await fetch('/api/admin/announcement', {
+        headers: {
+          'X-Admin-Password': password,
+        },
+      }).catch(() => {
+        throw new Error('无法连接公告接口。请用 npm.cmd run dev 启动本地 Netlify 函数服务。')
+      })
+      const data = await resp.json() as AnnouncementResponse
+      if (!resp.ok) {
+        throw new Error(data.error || `加载公告失败: ${resp.status}`)
+      }
+      setAnnouncement(normalizeAnnouncementResponse(data))
+    } finally {
+      setAnnouncementLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!authenticated) return
     loadCdkRecords(adminPassword, statusFilter).catch((e) => {
@@ -120,6 +157,16 @@ export default function AdminPage() {
       }
     })
   }, [authenticated, adminPassword, statusFilter, loadCdkRecords])
+
+  useEffect(() => {
+    if (!authenticated) return
+    loadAnnouncement(adminPassword).catch((e) => {
+      setError((e as Error).message)
+      if ((e as Error).message.includes('口令')) {
+        setAuthenticated(false)
+      }
+    })
+  }, [authenticated, adminPassword, loadAnnouncement])
 
   const handleLogin = async (event: FormEvent) => {
     event.preventDefault()
@@ -176,6 +223,35 @@ export default function AdminPage() {
       setCopyStatus('已复制到剪贴板')
     } catch {
       setCopyStatus('复制失败，请手动选择 CDK')
+    }
+  }
+
+  const handleSaveAnnouncement = async (event: FormEvent) => {
+    event.preventDefault()
+    setError(null)
+    setAnnouncementStatus(null)
+    setAnnouncementSaving(true)
+    try {
+      const resp = await fetch('/api/admin/announcement', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_password: adminPassword,
+          enabled: announcement.enabled,
+          title: announcement.title,
+          body: announcement.body,
+        }),
+      })
+      const data = await resp.json() as AnnouncementResponse
+      if (!resp.ok) {
+        throw new Error(data.error || `保存公告失败: ${resp.status}`)
+      }
+      setAnnouncement(normalizeAnnouncementResponse(data))
+      setAnnouncementStatus('公告已保存')
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setAnnouncementSaving(false)
     }
   }
 
@@ -246,6 +322,8 @@ export default function AdminPage() {
     setError(null)
     setCopyStatus(null)
     setRevokingCdkHash(null)
+    setAnnouncement(EMPTY_ANNOUNCEMENT)
+    setAnnouncementStatus(null)
   }
 
   if (!authenticated) {
@@ -416,6 +494,91 @@ export default function AdminPage() {
                 </dl>
               </section>
             )}
+
+            <form onSubmit={handleSaveAnnouncement} className="rounded-xl bg-surface-1 p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-base font-semibold text-ink-primary">公告设置</h2>
+                  <p className="mt-1 text-sm leading-6 text-ink-secondary">
+                    公告会显示在工具页顶部，禁用后前台不展示。
+                  </p>
+                </div>
+                {announcementLoading && (
+                  <span className="shrink-0 text-xs text-ink-muted">加载中...</span>
+                )}
+              </div>
+
+              <label className="mt-5 flex items-center justify-between gap-4 rounded-lg bg-surface-2 px-3 py-2">
+                <span className="text-sm font-medium text-ink-secondary">启用公告</span>
+                <input
+                  type="checkbox"
+                  checked={announcement.enabled}
+                  onChange={(event) => {
+                    const enabled = event.currentTarget.checked
+                    setAnnouncement((current) => ({ ...current, enabled }))
+                  }}
+                  className="h-4 w-4 accent-brand-600"
+                />
+              </label>
+
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">标题</span>
+                <input
+                  type="text"
+                  value={announcement.title}
+                  maxLength={80}
+                  onChange={(event) => {
+                    const title = event.currentTarget.value
+                    setAnnouncement((current) => ({ ...current, title }))
+                  }}
+                  className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted"
+                  placeholder="例如：维护通知"
+                />
+                <span className="mt-1 block text-xs text-ink-muted">{announcement.title.length}/80</span>
+              </label>
+
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">正文</span>
+                <textarea
+                  value={announcement.body}
+                  maxLength={600}
+                  rows={5}
+                  onChange={(event) => {
+                    const body = event.currentTarget.value
+                    setAnnouncement((current) => ({ ...current, body }))
+                  }}
+                  className="w-full resize-y rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-primary placeholder:text-ink-muted"
+                  placeholder="公告内容会按纯文本展示，换行会保留。"
+                />
+                <span className="mt-1 block text-xs text-ink-muted">{announcement.body.length}/600</span>
+              </label>
+
+              <div className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-3">
+                <div className="text-xs font-medium text-ink-muted">预览</div>
+                {announcement.enabled && announcement.title.trim() && announcement.body.trim() ? (
+                  <div className="mt-2">
+                    <div className="text-sm font-semibold text-ink-primary">{announcement.title.trim()}</div>
+                    <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">
+                      {announcement.body.trim()}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-ink-secondary">当前公告不会在前台展示。</p>
+                )}
+              </div>
+
+              {announcementStatus && (
+                <p className="mt-3 text-sm text-success">{announcementStatus}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={announcementSaving}
+                className="mt-5 w-full rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+              >
+                {announcementSaving ? '保存中...' : '保存公告'}
+              </button>
+            </form>
           </aside>
 
           <section className="min-w-0 rounded-xl bg-surface-1">
@@ -548,6 +711,15 @@ function SummaryCell({ label, value }: { label: string; value: number }) {
       <div className="mt-1 text-xs text-ink-muted">{label}</div>
     </div>
   )
+}
+
+function normalizeAnnouncementResponse(data: AnnouncementResponse): Announcement {
+  return {
+    enabled: data.enabled === true,
+    title: typeof data.title === 'string' ? data.title : '',
+    body: typeof data.body === 'string' ? data.body : '',
+    updated_at: typeof data.updated_at === 'string' ? data.updated_at : null,
+  }
 }
 
 function formatDate(value: string | null): string {
