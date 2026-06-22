@@ -28,7 +28,6 @@ jobs:
     outputs:
       deploy_required: ${{ steps.check.outputs.deploy_required }}
       reason: ${{ steps.check.outputs.reason }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,10 +57,11 @@ jobs:
     if: needs.deploy-relevance.outputs.deploy_required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -75,12 +75,14 @@ jobs:
       - name: Configure build metadata
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
+          COMMIT_COUNT="$(git rev-list --count HEAD)"
+          VERSION_PREFIX="$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")"
+          APP_VERSION="${VERSION_PREFIX}.${COMMIT_COUNT}"
           GENERATED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           echo "GIT_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
           echo "GENERATED_AT=${GENERATED_AT}" >> "$GITHUB_ENV"
           echo "BUILD_CONTEXT=${GITHUB_EVENT_NAME}" >> "$GITHUB_ENV"
-          echo "FRONTEND_VERSION=frontend.${GITHUB_RUN_NUMBER}.${SHORT_SHA}" >> "$GITHUB_ENV"
-          echo "BACKEND_VERSION=backend.${GITHUB_RUN_NUMBER}.${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
           echo "DATA_VERSION=data.${GITHUB_RUN_NUMBER}.${SHORT_SHA}" >> "$GITHUB_ENV"
 
       - name: Build web app
@@ -92,10 +94,11 @@ jobs:
     if: needs.deploy-relevance.outputs.deploy_required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -109,16 +112,18 @@ jobs:
       - name: Configure build metadata
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
+          COMMIT_COUNT="$(git rev-list --count HEAD)"
+          VERSION_PREFIX="$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")"
+          APP_VERSION="${VERSION_PREFIX}.${COMMIT_COUNT}"
           GENERATED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           echo "GIT_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
           echo "GENERATED_AT=${GENERATED_AT}" >> "$GITHUB_ENV"
           echo "BUILD_CONTEXT=${GITHUB_EVENT_NAME}" >> "$GITHUB_ENV"
-          echo "FRONTEND_VERSION=frontend.${GITHUB_RUN_NUMBER}.${SHORT_SHA}" >> "$GITHUB_ENV"
-          echo "BACKEND_VERSION=backend.${GITHUB_RUN_NUMBER}.${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
           echo "DATA_VERSION=data.${GITHUB_RUN_NUMBER}.${SHORT_SHA}" >> "$GITHUB_ENV"
 
       - name: Generate data
         run: npm run generate:data
 
-      - name: Smoke test functions
+      - name: Run functions smoke check
         run: npm run check:functions
