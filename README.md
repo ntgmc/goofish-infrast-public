@@ -85,6 +85,8 @@ Quality Checks 会在执行检查前注入构建元数据：
 
 `npm run generate:data` 会根据这些变量生成 `src/lib/build-meta.ts`，并在 `netlify/functions/data.ts` 中写入 `data_version`、`generated_at` 和来源摘要。前端会显示“当前规则数据更新于 YYYY-MM-DD”，优化 API 响应也会带上同一份版本元数据。
 
+版本号 patch bump 规则固定如下：显式 `VERSION_PATCH` 优先，其次使用 `BUILD_NUMBER` / `GITHUB_RUN_NUMBER`；本地未提供构建号时使用当前 Git 提交数。因此每次新增 commit 后生成元数据会自然递增，同一 commit 上重复执行 `npm run generate:data` 或 `npm run build` 不会继续递增版本。
+
 ## Netlify Build & deploy settings
 
 当前仓库已包含 `netlify.toml`，部署配置以该文件为准：
