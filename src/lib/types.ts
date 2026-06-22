@@ -78,6 +78,29 @@ export interface OptimizeRequest {
   upgrade_task_payload?: UpgradeTaskPayload;
 }
 
+export interface FreePreviewRequest {
+  operators: LicenseOperator[];
+  config: LicenseConfig;
+}
+
+export interface FreePreviewResult {
+  operator_count: number;
+  support: {
+    supported: boolean;
+    label: string;
+    reason: string;
+  };
+  directions: string[];
+  potential_range: {
+    min: string;
+    max: string;
+    label: string;
+    note: string;
+  };
+  notices: string[];
+  build_meta: AppBuildMeta;
+}
+
 export interface UpgradeTaskPayload {
   tasks: RawUpgradeTask[];
   baselineScore: number;
