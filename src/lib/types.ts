@@ -33,12 +33,18 @@ export type InternalPermissionMode = 'admin';
 export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | InternalPermissionMode;
 export type PermissionMode = ProductPermissionMode | InternalPermissionMode;
 
+export interface OperatorUpdateGrant {
+  remaining: number;
+  granted_at: string | null;
+}
+
 export interface LicenseFile {
   version: number;
   order_hash: string;
   operators: LicenseOperator[];
   config: LicenseConfig;
   permission?: RawPermissionMode;
+  operator_update_grant?: OperatorUpdateGrant | null;
   issued_at: string;
   sig: string;
 }

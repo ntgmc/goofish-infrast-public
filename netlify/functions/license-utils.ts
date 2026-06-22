@@ -1,7 +1,15 @@
 import { createCipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, ProductPermissionMode, RawPermissionMode } from '../../src/lib/types'
+import type {
+  LicenseConfig,
+  LicenseFile,
+  LicenseOperator,
+  OperatorUpdateGrant,
+  PermissionMode,
+  ProductPermissionMode,
+  RawPermissionMode,
+} from '../../src/lib/types'
 
 const OBFUSCATE_KEY_SEED = 'maa-obfuscate-v1'
 const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const
@@ -76,6 +84,10 @@ export interface CdkRecord {
   operator_count: number | null;
   config_desc: string | null;
   schedule_generate_count?: number;
+  operator_update_grant_count?: number;
+  operator_update_used_count?: number;
+  operator_update_granted_at?: string | null;
+  operator_update_consumed_at?: string | null;
 }
 
 export interface CdkRecordStore {
@@ -410,6 +422,37 @@ export async function incrementCdkScheduleGenerateCount(record: CdkRecord): Prom
   })
 }
 
+export function getOperatorUpdateGrantRemaining(record: CdkRecord | null | undefined): number {
+  if (!record) return 0
+  return Math.max(0, (record.operator_update_grant_count ?? 0) - (record.operator_update_used_count ?? 0))
+}
+
+export function getOperatorUpdateGrant(record: CdkRecord | null | undefined): OperatorUpdateGrant | null {
+  const remaining = getOperatorUpdateGrantRemaining(record)
+  if (remaining <= 0) return null
+  return {
+    remaining,
+    granted_at: record?.operator_update_granted_at ?? null,
+  }
+}
+
+export function hasOperatorUpdateGrant(record: CdkRecord | null | undefined): boolean {
+  return getOperatorUpdateGrantRemaining(record) > 0
+}
+
+export async function consumeOperatorUpdateGrant(record: CdkRecord, operatorCount: number): Promise<CdkRecord> {
+  const consumedAt = new Date().toISOString()
+  const updated: CdkRecord = {
+    ...record,
+    operator_count: operatorCount,
+    operator_update_used_count: (record.operator_update_used_count ?? 0) + 1,
+    operator_update_consumed_at: consumedAt,
+  }
+  const store = await getCdkRecordStore()
+  await store.set(`cdk/${record.code_hash}.json`, updated)
+  return updated
+}
+
 function encryptLicensePayload(payload: string): string {
   const key = createHash('sha256').update(OBFUSCATE_KEY_SEED).digest()
   const iv = randomBytes(12)
@@ -456,10 +499,16 @@ export function reissueSignedLicenseFile(
   license: LicenseFile,
   permission: PermissionMode,
   adminSecret: string,
+  overrides: {
+    operators?: LicenseOperator[];
+    operatorUpdateGrant?: OperatorUpdateGrant | null;
+  } = {},
 ): { license: LicenseFile; licenseFileContent: string } {
   const unsigned = {
     ...license,
     permission,
+    ...(overrides.operators ? { operators: overrides.operators } : {}),
+    operator_update_grant: overrides.operatorUpdateGrant ?? null,
     issued_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
   }
   delete (unsigned as Partial<LicenseFile>).sig

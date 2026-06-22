@@ -185,7 +185,7 @@ export function canEditConfig(license: LicenseFile): boolean {
 }
 
 export function canReplaceOperators(license: LicenseFile): boolean {
-  return getPermissionMode(license) === "admin";
+  return getPermissionMode(license) === "admin" || (license.operator_update_grant?.remaining ?? 0) > 0;
 }
 
 function isRawPermissionMode(value: string): value is RawPermissionMode {

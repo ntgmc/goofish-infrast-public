@@ -26,6 +26,7 @@ interface Props {
 interface LicenseStatusResponse {
   error?: string;
   permission_label?: string;
+  operator_update_available?: boolean;
   license?: LicenseFile | null;
   license_file_content?: string | null;
 }
@@ -162,10 +163,19 @@ export default function OptimizePage({
     }
     try {
       const nextOperators = parseOperatorsFile(await file.text())
-      setLicense({ ...license, operators: nextOperators })
+      const resp = await fetch('/api/license-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license, operators: nextOperators }),
+      })
+      const data = await resp.json() as LicenseStatusResponse
+      if (!resp.ok || !data.license) {
+        throw new Error(data.error || `干员数据更新失败: ${resp.status}`)
+      }
+      setLicense(data.license)
       setEliteOverrides({})
       clearGeneratedResult()
-      setOperatorUploadStatus(`已重新载入 ${nextOperators.length} 名干员。`)
+      setOperatorUploadStatus(`已更新授权内的干员数据，共 ${nextOperators.length} 名。`)
       if (operatorFileRef.current) {
         operatorFileRef.current.value = ''
       }
@@ -678,21 +688,21 @@ function AdminOperatorPanel({
     <details className="mt-6 rounded-xl bg-surface-1">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
         <span className="flex flex-wrap items-center gap-2">
-          Admin 干员数据
+          干员数据
           <span className="rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-medium text-brand-300">
             {operatorCount} 名干员
           </span>
         </span>
-        <span className="text-xs font-medium text-ink-muted">替换 operators.json</span>
+        <span className="text-xs font-medium text-ink-muted">更新 operators.json</span>
       </summary>
       <div className="border-t border-surface-3/60 p-5 sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold text-ink-primary">替换干员数据</h2>
+            <h2 className="text-lg font-semibold text-ink-primary">更新干员数据</h2>
           </div>
           <p className="mt-1 text-sm text-ink-secondary">
-            上传 operators.json 或 .txt 后会清空当前练度调整，下一次生成时使用新的干员数据。
+            上传 operators.json 或 .txt 后会清空当前练度调整，并写入新的授权文件。
           </p>
           {status && (
             <p className="mt-3 text-sm text-brand-300">{status}</p>

@@ -3,6 +3,7 @@ import type { ProductPermissionMode } from '../../src/lib/types'
 import {
   CDK_PRODUCT_PERMISSIONS,
   generateCdk,
+  getOperatorUpdateGrantRemaining,
   getCdkRecordStore,
   hashCdk,
   jsonResponse,
@@ -130,7 +131,7 @@ async function handlePatch(req: Request): Promise<Response> {
     if (admin_password !== adminPassword) {
       return jsonResponse({ error: '管理口令错误。' }, 401)
     }
-    if (action !== 'revoke' && action !== 'upgrade') {
+    if (action !== 'revoke' && action !== 'upgrade' && action !== 'grant_operator_update') {
       return jsonResponse({ error: 'Unsupported action.' }, 400)
     }
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
@@ -170,6 +171,44 @@ async function handlePatch(req: Request): Promise<Response> {
         cdk_id: existing.code_hash.slice(0, 12),
         previous_permission: currentPermission,
         permission: nextPermission,
+      })
+    }
+
+    if (action === 'grant_operator_update') {
+      if (existing.status === 'revoked') {
+        return jsonResponse({ error: '已撤销授权不能发放干员更新权限。' }, 409)
+      }
+      if (existing.status !== 'used') {
+        return jsonResponse({ error: '只能给已使用 CDK 发放干员更新权限。' }, 409)
+      }
+      if (!existing.license_order_hash) {
+        return jsonResponse({ error: '授权记录缺少订单标识，无法发放干员更新权限。' }, 409)
+      }
+
+      const remaining = getOperatorUpdateGrantRemaining(existing)
+      if (remaining > 0) {
+        return jsonResponse({
+          granted: true,
+          already_granted: true,
+          cdk_id: existing.code_hash.slice(0, 12),
+          operator_update_grant_remaining: remaining,
+          operator_update_granted_at: existing.operator_update_granted_at ?? null,
+        })
+      }
+
+      const grantedAt = new Date().toISOString()
+      const updated: CdkRecord = {
+        ...existing,
+        operator_update_grant_count: (existing.operator_update_grant_count ?? 0) + 1,
+        operator_update_granted_at: grantedAt,
+      }
+      await store.set(key, updated)
+      return jsonResponse({
+        granted: true,
+        already_granted: false,
+        cdk_id: existing.code_hash.slice(0, 12),
+        operator_update_grant_remaining: getOperatorUpdateGrantRemaining(updated),
+        operator_update_granted_at: grantedAt,
       })
     }
 
@@ -261,6 +300,11 @@ function toAdminCdkRecord(record: CdkRecord) {
     operator_count: record.operator_count,
     config_desc: record.config_desc,
     schedule_generate_count: record.schedule_generate_count ?? 0,
+    operator_update_grant_count: record.operator_update_grant_count ?? 0,
+    operator_update_used_count: record.operator_update_used_count ?? 0,
+    operator_update_grant_remaining: getOperatorUpdateGrantRemaining(record),
+    operator_update_granted_at: record.operator_update_granted_at ?? null,
+    operator_update_consumed_at: record.operator_update_consumed_at ?? null,
   }
 }
 
