@@ -49,6 +49,23 @@ interface AnnouncementResponse extends Partial<Announcement> {
   error?: string;
 }
 
+interface UsageTotals {
+  unique_visitors: number;
+  visits: number;
+  schedule_generates: number;
+  cdk_redeems: number;
+}
+
+interface UsageDay extends UsageTotals {
+  date: string;
+}
+
+interface UsageStatsResponse {
+  error?: string;
+  totals?: UsageTotals;
+  days?: UsageDay[];
+}
+
 const EMPTY_ANNOUNCEMENT: Announcement = {
   enabled: false,
   title: '',
@@ -93,6 +110,8 @@ export default function AdminPage() {
   const [announcementLoading, setAnnouncementLoading] = useState(false)
   const [announcementSaving, setAnnouncementSaving] = useState(false)
   const [announcementStatus, setAnnouncementStatus] = useState<string | null>(null)
+  const [usageStats, setUsageStats] = useState<{ totals: UsageTotals; days: UsageDay[] } | null>(null)
+  const [usageLoading, setUsageLoading] = useState(false)
 
   const summary = useMemo(() => {
     const unused = records.filter((record) => record.status === 'unused').length
@@ -148,6 +167,26 @@ export default function AdminPage() {
     }
   }, [])
 
+  const loadUsageStats = useCallback(async (password: string) => {
+    setUsageLoading(true)
+    try {
+      const resp = await fetch('/api/admin/usage-stats', {
+        headers: {
+          'X-Admin-Password': password,
+        },
+      }).catch(() => {
+        throw new Error('无法连接统计接口。请用 npm.cmd run dev 启动本地 Netlify 函数服务。')
+      })
+      const data = await resp.json() as UsageStatsResponse
+      if (!resp.ok) {
+        throw new Error(data.error || `加载统计失败: ${resp.status}`)
+      }
+      setUsageStats(normalizeUsageStatsResponse(data))
+    } finally {
+      setUsageLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!authenticated) return
     loadCdkRecords(adminPassword, statusFilter).catch((e) => {
@@ -167,6 +206,16 @@ export default function AdminPage() {
       }
     })
   }, [authenticated, adminPassword, loadAnnouncement])
+
+  useEffect(() => {
+    if (!authenticated) return
+    loadUsageStats(adminPassword).catch((e) => {
+      setError((e as Error).message)
+      if ((e as Error).message.includes('口令')) {
+        setAuthenticated(false)
+      }
+    })
+  }, [authenticated, adminPassword, loadUsageStats])
 
   const handleLogin = async (event: FormEvent) => {
     event.preventDefault()
@@ -255,6 +304,19 @@ export default function AdminPage() {
     }
   }
 
+  const handleRefreshDashboard = async () => {
+    setError(null)
+    const results = await Promise.allSettled([
+      loadCdkRecords(adminPassword, statusFilter),
+      loadAnnouncement(adminPassword),
+      loadUsageStats(adminPassword),
+    ])
+    const rejected = results.find((result) => result.status === 'rejected')
+    if (rejected?.status === 'rejected') {
+      setError((rejected.reason as Error).message)
+    }
+  }
+
   const handleDeleteRecord = async (record: AdminCdkRecord) => {
     if (record.status !== 'unused') return
     const confirmed = window.confirm(`确认删除未使用 CDK ${record.cdk_id}？此操作不可恢复。`)
@@ -324,6 +386,7 @@ export default function AdminPage() {
     setRevokingCdkHash(null)
     setAnnouncement(EMPTY_ANNOUNCEMENT)
     setAnnouncementStatus(null)
+    setUsageStats(null)
   }
 
   if (!authenticated) {
@@ -384,11 +447,11 @@ export default function AdminPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => loadCdkRecords(adminPassword, statusFilter).catch((e) => setError((e as Error).message))}
-              disabled={listLoading}
+              onClick={() => handleRefreshDashboard()}
+              disabled={listLoading || announcementLoading || usageLoading}
               className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:text-ink-muted"
             >
-              {listLoading ? '刷新中...' : '刷新列表'}
+              {listLoading || announcementLoading || usageLoading ? '刷新中...' : '刷新数据'}
             </button>
             <button
               type="button"
@@ -411,6 +474,60 @@ export default function AdminPage() {
             {error}
           </div>
         )}
+
+        <section className="mb-5 rounded-xl bg-surface-1">
+          <div className="flex flex-col gap-4 border-b border-surface-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div>
+              <h2 className="text-base font-semibold text-ink-primary">使用统计</h2>
+              <p className="mt-1 text-sm text-ink-secondary">
+                匿名统计工具页访问、方案生成和 CDK 兑换，近 7 天按 UTC 日期汇总。
+              </p>
+            </div>
+            {usageLoading && (
+              <span className="text-xs text-ink-muted">统计加载中...</span>
+            )}
+          </div>
+
+          <div className="grid gap-px bg-surface-3 text-sm sm:grid-cols-4">
+            <UsageMetric label="累计访问人数" value={usageStats?.totals.unique_visitors ?? 0} />
+            <UsageMetric label="累计访问次数" value={usageStats?.totals.visits ?? 0} />
+            <UsageMetric label="累计生成次数" value={usageStats?.totals.schedule_generates ?? 0} />
+            <UsageMetric label="累计 CDK 兑换" value={usageStats?.totals.cdk_redeems ?? 0} />
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-surface-3 text-left text-sm">
+              <thead className="bg-surface-2 text-xs font-semibold text-ink-secondary">
+                <tr>
+                  <th className="whitespace-nowrap px-4 py-3">日期</th>
+                  <th className="whitespace-nowrap px-4 py-3">访问人数</th>
+                  <th className="whitespace-nowrap px-4 py-3">访问次数</th>
+                  <th className="whitespace-nowrap px-4 py-3">生成次数</th>
+                  <th className="whitespace-nowrap px-4 py-3">CDK 兑换</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-3">
+                {(usageStats?.days ?? []).length > 0 ? (
+                  usageStats!.days.map((day) => (
+                    <tr key={day.date} className="transition-colors duration-150 hover:bg-surface-2/70">
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-ink-primary">{day.date}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{day.unique_visitors}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{day.visits}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{day.schedule_generates}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{day.cdk_redeems}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td className="px-4 py-8 text-center text-sm text-ink-secondary" colSpan={5}>
+                      暂无统计数据。
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         <section className="grid gap-5 lg:grid-cols-[minmax(280px,360px)_1fr]">
           <aside className="space-y-5">
@@ -713,6 +830,15 @@ function SummaryCell({ label, value }: { label: string; value: number }) {
   )
 }
 
+function UsageMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="bg-surface-1 px-5 py-4">
+      <div className="text-xl font-semibold text-ink-primary">{value}</div>
+      <div className="mt-1 text-xs text-ink-muted">{label}</div>
+    </div>
+  )
+}
+
 function normalizeAnnouncementResponse(data: AnnouncementResponse): Announcement {
   return {
     enabled: data.enabled === true,
@@ -720,6 +846,33 @@ function normalizeAnnouncementResponse(data: AnnouncementResponse): Announcement
     body: typeof data.body === 'string' ? data.body : '',
     updated_at: typeof data.updated_at === 'string' ? data.updated_at : null,
   }
+}
+
+function normalizeUsageStatsResponse(data: UsageStatsResponse): { totals: UsageTotals; days: UsageDay[] } {
+  return {
+    totals: normalizeUsageTotals(data.totals),
+    days: Array.isArray(data.days) ? data.days.map(normalizeUsageDay) : [],
+  }
+}
+
+function normalizeUsageDay(day: Partial<UsageDay>): UsageDay {
+  return {
+    date: typeof day.date === 'string' ? day.date : '',
+    ...normalizeUsageTotals(day),
+  }
+}
+
+function normalizeUsageTotals(value: Partial<UsageTotals> | undefined): UsageTotals {
+  return {
+    unique_visitors: normalizeCount(value?.unique_visitors),
+    visits: normalizeCount(value?.visits),
+    schedule_generates: normalizeCount(value?.schedule_generates),
+    cdk_redeems: normalizeCount(value?.cdk_redeems),
+  }
+}
+
+function normalizeCount(value: unknown): number {
+  return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0
 }
 
 function formatDate(value: string | null): string {
