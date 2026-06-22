@@ -375,7 +375,7 @@ function FreePreviewPanel({ onUseCdk }: { onUseCdk: () => void }) {
       )}
 
       <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
-        <div className="grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div className="grid gap-5 sm:grid-cols-[1fr_auto] sm:items-start">
           <div>
             <span className="mb-2 block text-sm font-medium text-ink-secondary">operators.json / .txt</span>
             <button
@@ -399,7 +399,7 @@ function FreePreviewPanel({ onUseCdk }: { onUseCdk: () => void }) {
           <button
             type="submit"
             disabled={loading || !operators || !configValidation.ok}
-            className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+            className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted sm:mt-7"
           >
             {loading ? '生成预览中...' : '生成免费预览'}
           </button>
