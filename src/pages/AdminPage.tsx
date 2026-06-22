@@ -12,6 +12,7 @@ interface AdminCdkRecord {
   created_at: string;
   used_at: string | null;
   revoked_at: string | null;
+  schedule_generate_count?: number;
   order_note: string | null;
   license_order_hash: string | null;
   operator_count: number | null;
@@ -456,19 +457,20 @@ export default function AdminPage() {
                   <tr>
                     <th className="whitespace-nowrap px-4 py-3">CDK 标识</th>
                     <th className="whitespace-nowrap px-4 py-3">权限</th>
-                    <th className="whitespace-nowrap px-4 py-3">状态</th>
-                    <th className="whitespace-nowrap px-4 py-3">生成时间</th>
-                    <th className="whitespace-nowrap px-4 py-3">使用时间</th>
-                    <th className="whitespace-nowrap px-4 py-3">备注</th>
-                    <th className="whitespace-nowrap px-4 py-3">使用信息</th>
-                    <th className="whitespace-nowrap px-4 py-3">操作</th>
+                        <th className="whitespace-nowrap px-4 py-3">状态</th>
+                        <th className="whitespace-nowrap px-4 py-3">生成时间</th>
+                        <th className="whitespace-nowrap px-4 py-3">使用时间</th>
+                        <th className="whitespace-nowrap px-4 py-3">生成次数</th>
+                        <th className="whitespace-nowrap px-4 py-3">备注</th>
+                        <th className="whitespace-nowrap px-4 py-3">使用信息</th>
+                        <th className="whitespace-nowrap px-4 py-3">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-3">
                   {listLoading && records.length === 0 ? (
                     Array.from({ length: 4 }).map((_, index) => (
                       <tr key={index}>
-                        <td className="px-4 py-4" colSpan={8}>
+                          <td className="px-4 py-4" colSpan={9}>
                           <div className="h-5 rounded bg-surface-2" />
                         </td>
                       </tr>
@@ -492,6 +494,7 @@ export default function AdminPage() {
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{formatDate(record.created_at)}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{formatDate(record.used_at)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{record.schedule_generate_count ?? 0}</td>
                         <td className="min-w-[160px] px-4 py-3 text-ink-secondary">{record.order_note || '-'}</td>
                         <td className="min-w-[200px] px-4 py-3 text-ink-secondary">
                           {formatUsage(record)}
@@ -523,7 +526,7 @@ export default function AdminPage() {
                     ))
                   ) : (
                     <tr>
-                      <td className="px-4 py-10 text-center text-sm text-ink-secondary" colSpan={8}>
+                      <td className="px-4 py-10 text-center text-sm text-ink-secondary" colSpan={9}>
                         当前筛选下没有 CDK 记录。
                       </td>
                     </tr>

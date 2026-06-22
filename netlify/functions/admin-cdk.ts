@@ -69,6 +69,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       license_order_hash: null,
       operator_count: null,
       config_desc: null,
+      schedule_generate_count: 0,
     }
     await store.set(key, record)
 
@@ -219,5 +220,6 @@ function toAdminCdkRecord(record: CdkRecord) {
     license_order_hash: record.license_order_hash,
     operator_count: record.operator_count,
     config_desc: record.config_desc,
+    schedule_generate_count: record.schedule_generate_count ?? 0,
   }
 }

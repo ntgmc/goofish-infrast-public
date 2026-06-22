@@ -21,6 +21,7 @@ export interface CdkRecord {
   license_order_hash: string | null;
   operator_count: number | null;
   config_desc: string | null;
+  schedule_generate_count?: number;
 }
 
 export interface CdkRecordStore {
@@ -245,6 +246,14 @@ export async function findCdkRecordByLicenseOrderHash(orderHash: string): Promis
   const store = await getCdkRecordStore()
   const records = await store.list('cdk/')
   return records.find((record) => record.license_order_hash === orderHash) ?? null
+}
+
+export async function incrementCdkScheduleGenerateCount(record: CdkRecord): Promise<void> {
+  const store = await getCdkRecordStore()
+  await store.set(`cdk/${record.code_hash}.json`, {
+    ...record,
+    schedule_generate_count: (record.schedule_generate_count ?? 0) + 1,
+  })
 }
 
 function encryptLicensePayload(payload: string): string {
