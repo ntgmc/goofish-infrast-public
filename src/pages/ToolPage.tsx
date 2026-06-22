@@ -4,6 +4,7 @@ import { extractConfigOverride, extractEliteOverrides, extractLicense, parseFile
 import UploadPage from './UploadPage'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
+const VISITOR_ID_KEY = 'maa_visitor_id'
 
 export default function ToolPage() {
   const [step, setStep] = useState<AppStep>('upload')
@@ -41,6 +42,19 @@ export default function ToolPage() {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  useEffect(() => {
+    const visitorId = getOrCreateVisitorId()
+    if (!visitorId) return
+
+    fetch('/api/usage-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'tool_visit', visitor_id: visitorId }),
+    }).catch(() => {
+      // Usage stats must never block the short tool flow.
+    })
   }, [])
 
   const handleFileLoaded = useCallback(async (content: string) => {
@@ -102,4 +116,22 @@ export default function ToolPage() {
       )}
     </>
   )
+}
+
+function getOrCreateVisitorId(): string | null {
+  try {
+    const existing = window.localStorage.getItem(VISITOR_ID_KEY)
+    if (existing) return existing
+
+    const next = `maa_${createRandomId()}`
+    window.localStorage.setItem(VISITOR_ID_KEY, next)
+    return next
+  } catch {
+    return `maa_${createRandomId()}`
+  }
+}
+
+function createRandomId(): string {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID()
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`
 }

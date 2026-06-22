@@ -10,6 +10,7 @@ import {
   validateOperators,
   type CdkRecord,
 } from './license-utils'
+import { recordUsageEvent } from './usage-stats'
 
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -72,6 +73,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       config_desc: configCheck.config.desc || configCheck.config.layout || null,
     }
     await store.set(key, updated)
+    await recordCdkRedeem()
 
     return jsonResponse({
       license_file_content: licenseFileContent,
@@ -81,5 +83,13 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     console.error('redeem cdk error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
+  }
+}
+
+async function recordCdkRedeem(): Promise<void> {
+  try {
+    await recordUsageEvent('cdk_redeem')
+  } catch (error) {
+    console.warn('usage stats cdk redeem skipped:', error)
   }
 }
