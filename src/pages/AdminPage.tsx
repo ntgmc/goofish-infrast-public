@@ -47,6 +47,13 @@ interface RevokeCdkResponse {
   already_revoked?: boolean;
 }
 
+interface UpgradeCdkResponse {
+  error?: string;
+  upgraded?: boolean;
+  previous_permission?: GeneratedPermission;
+  permission?: GeneratedPermission;
+}
+
 interface AnnouncementResponse extends Partial<Announcement> {
   error?: string;
 }
@@ -85,6 +92,12 @@ const permissionLabels: Record<Permission, string> = {
   admin: 'Admin',
 }
 const cdkProductPermissions: GeneratedPermission[] = ['recommended', 'growth', 'advanced', 'ultimate']
+const cdkProductPermissionRank: Record<GeneratedPermission, number> = {
+  recommended: 0,
+  growth: 1,
+  advanced: 2,
+  ultimate: 3,
+}
 
 const statusLabels: Record<CdkStatus, string> = {
   unused: '未使用',
@@ -116,6 +129,7 @@ export default function AdminPage() {
   const [generateLoading, setGenerateLoading] = useState(false)
   const [deletingCdkHash, setDeletingCdkHash] = useState<string | null>(null)
   const [revokingCdkHash, setRevokingCdkHash] = useState<string | null>(null)
+  const [upgradingCdkHash, setUpgradingCdkHash] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copyStatus, setCopyStatus] = useState<string | null>(null)
   const [result, setResult] = useState<{ code: string; permission: GeneratedPermission; created_at: string } | null>(null)
@@ -390,6 +404,41 @@ export default function AdminPage() {
     }
   }
 
+  const handleUpgradeRecord = async (record: AdminCdkRecord) => {
+    const currentPermission = normalizeProductPermission(record.permission)
+    const nextPermission = getNextProductPermission(record.permission)
+    if (!currentPermission || !nextPermission || record.status === 'revoked') return
+    const confirmed = window.confirm(
+      `确认将授权 ${record.cdk_id} 从 ${permissionLabels[currentPermission]} 升级到 ${permissionLabels[nextPermission]}？`
+    )
+    if (!confirmed) return
+
+    setError(null)
+    setCopyStatus(null)
+    setUpgradingCdkHash(record.code_hash)
+    try {
+      const resp = await fetch('/api/admin/cdk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_password: adminPassword,
+          code_hash: record.code_hash,
+          action: 'upgrade',
+          permission: nextPermission,
+        }),
+      })
+      const data = await resp.json() as UpgradeCdkResponse
+      if (!resp.ok) {
+        throw new Error(data.error || `升级失败: ${resp.status}`)
+      }
+      await loadCdkRecords(adminPassword, statusFilter)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setUpgradingCdkHash(null)
+    }
+  }
+
   const handleLogout = () => {
     setAuthenticated(false)
     setAdminPassword('')
@@ -398,6 +447,7 @@ export default function AdminPage() {
     setError(null)
     setCopyStatus(null)
     setRevokingCdkHash(null)
+    setUpgradingCdkHash(null)
     setAnnouncement(EMPTY_ANNOUNCEMENT)
     setAnnouncementStatus(null)
     setUsageStats(null)
@@ -741,23 +791,47 @@ export default function AdminPage() {
                               </td>
                               <td className="whitespace-nowrap px-4 py-3">
                                 {record.status === 'unused' ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteRecord(record)}
-                                    disabled={deletingCdkHash === record.code_hash}
-                                    className="rounded-lg bg-error/10 px-3 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                                  >
-                                    {deletingCdkHash === record.code_hash ? '删除中...' : '删除'}
-                                  </button>
+                                  <div className="flex flex-wrap gap-2">
+                                    {getNextProductPermission(record.permission) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpgradeRecord(record)}
+                                        disabled={upgradingCdkHash === record.code_hash}
+                                        className="rounded-lg bg-brand-600/15 px-3 py-1.5 text-xs font-semibold text-brand-300 transition-colors duration-150 hover:bg-brand-600/25 disabled:bg-surface-3 disabled:text-ink-muted"
+                                      >
+                                        {upgradingCdkHash === record.code_hash ? '升级中...' : `升到${permissionLabels[getNextProductPermission(record.permission)!]}`}
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteRecord(record)}
+                                      disabled={deletingCdkHash === record.code_hash}
+                                      className="rounded-lg bg-error/10 px-3 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                                    >
+                                      {deletingCdkHash === record.code_hash ? '删除中...' : '删除'}
+                                    </button>
+                                  </div>
                                 ) : record.status === 'used' ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRevokeRecord(record)}
-                                    disabled={revokingCdkHash === record.code_hash}
-                                    className="rounded-lg bg-error/10 px-3 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                                  >
-                                    {revokingCdkHash === record.code_hash ? '撤销中...' : '撤销授权'}
-                                  </button>
+                                  <div className="flex flex-wrap gap-2">
+                                    {getNextProductPermission(record.permission) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpgradeRecord(record)}
+                                        disabled={upgradingCdkHash === record.code_hash}
+                                        className="rounded-lg bg-brand-600/15 px-3 py-1.5 text-xs font-semibold text-brand-300 transition-colors duration-150 hover:bg-brand-600/25 disabled:bg-surface-3 disabled:text-ink-muted"
+                                      >
+                                        {upgradingCdkHash === record.code_hash ? '升级中...' : `升到${permissionLabels[getNextProductPermission(record.permission)!]}`}
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRevokeRecord(record)}
+                                      disabled={revokingCdkHash === record.code_hash}
+                                      className="rounded-lg bg-error/10 px-3 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                                    >
+                                      {revokingCdkHash === record.code_hash ? '撤销中...' : '撤销授权'}
+                                    </button>
+                                  </div>
                                 ) : (
                                   <span className="text-ink-muted">-</span>
                                 )}
@@ -941,4 +1015,18 @@ function formatUsage(record: AdminCdkRecord): string {
     record.status === 'revoked' && record.revoked_at ? `撤销 ${formatDate(record.revoked_at)}` : null,
   ].filter(Boolean)
   return parts.length > 0 ? parts.join(' / ') : '-'
+}
+
+function normalizeProductPermission(permission: Permission): GeneratedPermission | null {
+  if (permission === 'basic') return 'growth'
+  if (permission === 'premium') return 'advanced'
+  if (cdkProductPermissions.includes(permission as GeneratedPermission)) return permission as GeneratedPermission
+  return null
+}
+
+function getNextProductPermission(permission: Permission): GeneratedPermission | null {
+  const current = normalizeProductPermission(permission)
+  if (!current) return null
+  const next = cdkProductPermissions.find((item) => cdkProductPermissionRank[item] === cdkProductPermissionRank[current] + 1)
+  return next ?? null
 }
