@@ -163,6 +163,15 @@ export default function OptimizePage({
     }
     try {
       const nextOperators = parseOperatorsFile(await file.text())
+      const confirmed = window.confirm(
+        `确认替换当前授权内的干员数据？\n\n新文件识别到 ${nextOperators.length} 名干员。继续后会清空当前练度调整，并消耗一次干员数据更新权限。`
+      )
+      if (!confirmed) {
+        if (operatorFileRef.current) {
+          operatorFileRef.current.value = ''
+        }
+        return
+      }
       const resp = await fetch('/api/license-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
