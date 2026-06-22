@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from 'react'
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator } from '../lib/types'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
@@ -13,8 +13,86 @@ interface Props {
 
 type EntryMode = 'license' | 'cdk'
 
+const FIRST_RUN_TOUR_STORAGE_KEY = 'maa-infrast-upload-tour-seen'
+
+type TourTarget =
+  | 'announcement'
+  | 'entry-mode'
+  | 'cdk-code'
+  | 'operator-data'
+  | 'base-config'
+  | 'redeem-action'
+
+interface TourStep {
+  target: TourTarget;
+  title: string;
+  body: string;
+}
+
+const ANNOUNCEMENT_TOUR_STEP: TourStep = {
+  target: 'announcement',
+  title: '先看站内公告',
+  body: '如果这里有公告，请先确认维护通知、使用限制或近期变更，再继续生成授权文件。',
+}
+
+const BASE_TOUR_STEPS: TourStep[] = [
+  {
+    target: 'entry-mode',
+    title: '先选使用方式',
+    body: '第一次使用请选择 CDK，网站会生成授权文件；已有 .maa 文件时选择上传继续使用。',
+  },
+  {
+    target: 'cdk-code',
+    title: '输入你的 CDK',
+    body: '把收到的 CDK 填在这里。CDK 只用于本次生成授权文件，不需要提前准备授权文件。',
+  },
+  {
+    target: 'operator-data',
+    title: '上传干员数据',
+    body: '从 MAA 导出 operators.json 或 txt 文件后上传，工具会按你的账号干员计算排班。',
+  },
+  {
+    target: 'base-config',
+    title: '确认基建配置',
+    body: '这里选择贸易站、制造站、产物和无人机策略。提交前还能调整，提交后本次授权配置会固定。',
+  },
+  {
+    target: 'redeem-action',
+    title: '生成授权文件',
+    body: '勾选确认后兑换 CDK，网站会下载授权文件并进入排班生成流程。',
+  },
+]
+
 export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, announcement }: Props) {
   const [mode, setMode] = useState<EntryMode>('license')
+  const [tourOpen, setTourOpen] = useState(false)
+  const tourSteps = useMemo(
+    () => announcement?.enabled ? [ANNOUNCEMENT_TOUR_STEP, ...BASE_TOUR_STEPS] : BASE_TOUR_STEPS,
+    [announcement?.enabled],
+  )
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(FIRST_RUN_TOUR_STORAGE_KEY) !== 'done') {
+        setTourOpen(true)
+      }
+    } catch {
+      setTourOpen(true)
+    }
+  }, [])
+
+  const handleOpenTour = () => {
+    setTourOpen(true)
+  }
+
+  const handleCloseTour = () => {
+    try {
+      window.localStorage.setItem(FIRST_RUN_TOUR_STORAGE_KEY, 'done')
+    } catch {
+      // Ignore storage failures; closing the tour should still work.
+    }
+    setTourOpen(false)
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
@@ -34,10 +112,12 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
           <BuildMetaStrip placement="corner" />
         </div>
 
-        <AnnouncementBanner announcement={announcement} className="mb-5" />
+        <div data-tour={announcement?.enabled ? 'announcement' : undefined}>
+          <AnnouncementBanner announcement={announcement} className="mb-5" />
+        </div>
 
         <div className="mb-5 flex justify-center">
-          <div className="inline-flex rounded-lg bg-surface-1 p-1">
+          <div className="inline-flex rounded-lg bg-surface-1 p-1" data-tour="entry-mode">
             <ModeButton label="上传 .maa 文件" active={mode === 'license'} onClick={() => setMode('license')} />
             <ModeButton label="使用 CDK 生成授权文件" active={mode === 'cdk'} onClick={() => setMode('cdk')} />
           </div>
@@ -52,7 +132,22 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
         <p className="mt-6 text-center text-xs text-ink-muted">
           CDK 会在本站生成授权文件。授权文件和保存进度文件通常以 .maa 结尾，下次可直接上传继续调整。
         </p>
+        <div className="mt-3 text-center">
+          <button
+            type="button"
+            onClick={handleOpenTour}
+            className="text-xs font-medium text-brand-500 underline-offset-4 transition-colors duration-150 hover:text-brand-400 hover:underline"
+          >
+            查看首次使用导览
+          </button>
+        </div>
       </div>
+      <FirstRunTour
+        open={tourOpen}
+        steps={tourSteps}
+        onClose={handleCloseTour}
+        onModeChange={setMode}
+      />
     </div>
   )
 }
@@ -296,6 +391,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK</span>
             <input
+              data-tour="cdk-code"
               type="text"
               value={code}
               onChange={(event) => setCode(event.currentTarget.value)}
@@ -307,6 +403,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
           <div>
             <span className="mb-2 block text-sm font-medium text-ink-secondary">operators.json / .txt</span>
             <button
+              data-tour="operator-data"
               type="button"
               onClick={() => operatorsRef.current?.click()}
               className="w-full rounded-lg bg-surface-2 px-4 py-2 text-left text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
@@ -328,16 +425,18 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
         <OperatorDataGuide />
       </section>
 
-      <ConfigEditor
-        config={normalizedConfig}
-        canEdit
-        changed={false}
-        validation={configValidation}
-        onUpdate={updateConfig}
-        note="提交前可选择或调整基建配置；提交成功后本次导入的干员和配置不能再次修改。"
-      />
+      <div data-tour="base-config">
+        <ConfigEditor
+          config={normalizedConfig}
+          canEdit
+          changed={false}
+          validation={configValidation}
+          onUpdate={updateConfig}
+          note="提交前可选择或调整基建配置；提交成功后本次导入的干员和配置不能再次修改。"
+        />
+      </div>
 
-      <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
+      <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6" data-tour="redeem-action">
         <label className="flex items-start gap-3 text-sm text-ink-secondary">
           <input
             type="checkbox"
@@ -390,6 +489,195 @@ function OperatorDataGuide() {
       </details>
     </div>
   )
+}
+
+function FirstRunTour({
+  open,
+  steps,
+  onClose,
+  onModeChange,
+}: {
+  open: boolean;
+  steps: TourStep[];
+  onClose: () => void;
+  onModeChange: (mode: EntryMode) => void;
+}) {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
+  const activeStep = steps[activeIndex]
+  const isLastStep = activeIndex === steps.length - 1
+
+  useEffect(() => {
+    if (!open) return
+    setActiveIndex(0)
+  }, [open])
+
+  useEffect(() => {
+    if (activeIndex > steps.length - 1) {
+      setActiveIndex(0)
+    }
+  }, [activeIndex, steps.length])
+
+  useEffect(() => {
+    if (!open || !activeStep) return
+    if (!['announcement', 'entry-mode'].includes(activeStep.target)) onModeChange('cdk')
+
+    let frame = 0
+    let settleTimer = 0
+    const measureTarget = () => {
+      const target = document.querySelector<HTMLElement>(`[data-tour="${activeStep.target}"]`)
+      if (!target) return false
+      setTargetRect(target.getBoundingClientRect())
+      return true
+    }
+    const focusTarget = () => {
+      setTargetRect(null)
+      const target = document.querySelector<HTMLElement>(`[data-tour="${activeStep.target}"]`)
+      if (!target) {
+        frame = window.requestAnimationFrame(focusTarget)
+        return
+      }
+      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+      frame = window.requestAnimationFrame(measureTarget)
+      settleTimer = window.setTimeout(measureTarget, 280)
+    }
+
+    focusTarget()
+    window.addEventListener('resize', measureTarget)
+    window.addEventListener('scroll', measureTarget, true)
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(settleTimer)
+      window.removeEventListener('resize', measureTarget)
+      window.removeEventListener('scroll', measureTarget, true)
+    }
+  }, [activeIndex, activeStep, onModeChange, open])
+
+  if (!open || !activeStep) return null
+
+  const paddedRect = targetRect
+    ? {
+      top: Math.max(12, targetRect.top - 10),
+      left: Math.max(12, targetRect.left - 10),
+      width: Math.min(window.innerWidth - 24, targetRect.width + 20),
+      height: targetRect.height + 20,
+    }
+    : null
+  const panelStyle = getTourPanelStyle(paddedRect)
+
+  const handleNext = () => {
+    if (isLastStep) {
+      onClose()
+      return
+    }
+    setActiveIndex((index) => Math.min(index + 1, steps.length - 1))
+  }
+
+  const handlePrevious = () => {
+    setActiveIndex((index) => Math.max(index - 1, 0))
+  }
+
+  return (
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="first-run-tour-title">
+      {paddedRect ? (
+        <>
+          <div className="fixed inset-x-0 top-0 bg-black/68 backdrop-blur-[1px]" style={{ height: paddedRect.top }} />
+          <div
+            className="fixed left-0 bg-black/68 backdrop-blur-[1px]"
+            style={{ top: paddedRect.top, width: paddedRect.left, height: paddedRect.height }}
+          />
+          <div
+            className="fixed right-0 bg-black/68 backdrop-blur-[1px]"
+            style={{
+              top: paddedRect.top,
+              left: paddedRect.left + paddedRect.width,
+              height: paddedRect.height,
+            }}
+          />
+          <div
+            className="fixed inset-x-0 bottom-0 bg-black/68 backdrop-blur-[1px]"
+            style={{ top: paddedRect.top + paddedRect.height }}
+          />
+          <div
+            className="pointer-events-none fixed rounded-xl border-2 border-brand-300"
+            style={{
+              top: paddedRect.top,
+              left: paddedRect.left,
+              width: paddedRect.width,
+              height: paddedRect.height,
+            }}
+          />
+        </>
+      ) : (
+        <div className="fixed inset-0 bg-black/68 backdrop-blur-[1px]" />
+      )}
+
+      <div
+        className="fixed w-[min(22rem,calc(100vw-2rem))] rounded-xl bg-surface-1 p-5 text-left"
+        style={panelStyle}
+      >
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <p className="text-sm font-medium text-brand-500">
+            {activeIndex + 1} / {steps.length}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-2 py-1 text-sm font-medium text-ink-muted transition-colors duration-150 hover:bg-surface-2 hover:text-ink-primary"
+          >
+            跳过
+          </button>
+        </div>
+        <h2 id="first-run-tour-title" className="text-lg font-semibold text-ink-primary">
+          {activeStep.title}
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">{activeStep.body}</p>
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={handlePrevious}
+            disabled={activeIndex === 0}
+            className="rounded-lg px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-ink-primary disabled:pointer-events-none disabled:text-ink-muted/60"
+          >
+            上一步
+          </button>
+          <button
+            type="button"
+            onClick={handleNext}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
+          >
+            {isLastStep ? '知道了' : '下一步'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function getTourPanelStyle(rect: { top: number; left: number; width: number; height: number } | null) {
+  const margin = 16
+  const panelWidth = Math.min(352, window.innerWidth - margin * 2)
+  const panelHeight = 230
+  if (!rect) {
+    return {
+      top: `calc(50vh - ${panelHeight / 2}px)`,
+      left: `calc(50vw - ${panelWidth / 2}px)`,
+    }
+  }
+
+  const belowTop = rect.top + rect.height + margin
+  const aboveTop = rect.top - panelHeight - margin
+  const top = belowTop + panelHeight <= window.innerHeight - margin
+    ? belowTop
+    : Math.max(margin, aboveTop)
+  const preferredLeft = rect.left + rect.width / 2 - panelWidth / 2
+  const left = Math.min(window.innerWidth - panelWidth - margin, Math.max(margin, preferredLeft))
+
+  return {
+    top,
+    left,
+  }
 }
 
 function downloadLicense(content: string, orderHash: string) {
