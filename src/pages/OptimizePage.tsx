@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
 import { canEditConfig, canReplaceOperators, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
@@ -23,6 +23,13 @@ interface Props {
   announcement: Announcement | null;
 }
 
+interface LicenseStatusResponse {
+  error?: string;
+  permission_label?: string;
+  license?: LicenseFile | null;
+  license_file_content?: string | null;
+}
+
 export default function OptimizePage({
   license,
   setLicense,
@@ -40,10 +47,13 @@ export default function OptimizePage({
   const [progress, setProgress] = useState<ScheduleProgressState | null>(null)
   const [phase, setPhase] = useState<'idle' | 'suggestions' | 'final'>('idle')
   const [operatorUploadStatus, setOperatorUploadStatus] = useState<string | null>(null)
+  const [licenseSyncing, setLicenseSyncing] = useState(true)
+  const [licenseSyncStatus, setLicenseSyncStatus] = useState<string | null>(null)
   const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const operatorFileRef = useRef<HTMLInputElement>(null)
   const optimizeInFlightRef = useRef(false)
+  const pendingLicenseSyncRef = useRef<{ license: LicenseFile; message: string } | null>(null)
 
   const permission = getPermissionMode(license)
   const userCanReplaceOperators = canReplaceOperators(license)
@@ -84,6 +94,64 @@ export default function OptimizePage({
     setInlineError(null)
     setLastGeneratedSignature(null)
   }, [])
+
+  const applySyncedLicense = useCallback((nextLicense: LicenseFile, message: string) => {
+    if (optimizeInFlightRef.current) {
+      pendingLicenseSyncRef.current = { license: nextLicense, message }
+      setLicenseSyncStatus(`${message} 当前计算完成后生效。`)
+      return
+    }
+    setLicense(nextLicense)
+    setLicenseSyncStatus(message)
+    clearGeneratedResult()
+  }, [clearGeneratedResult, setLicense])
+
+  const flushPendingLicenseSync = useCallback(() => {
+    const pending = pendingLicenseSyncRef.current
+    if (!pending) return
+    pendingLicenseSyncRef.current = null
+    setLicense(pending.license)
+    setLicenseSyncStatus(pending.message)
+    clearGeneratedResult()
+  }, [clearGeneratedResult, setLicense])
+
+  useEffect(() => {
+    let cancelled = false
+    setLicenseSyncing(true)
+
+    fetch('/api/license-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ license }),
+    })
+      .then(async (resp) => {
+        const data = await resp.json() as LicenseStatusResponse
+        if (!resp.ok) {
+          throw new Error(data.error || `授权状态同步失败: ${resp.status}`)
+        }
+        return data
+      })
+      .then((data) => {
+        if (cancelled) return
+        if (data.license) {
+          applySyncedLicense(data.license, `授权已同步为${data.permission_label ?? '最新'}权限。`)
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setLicenseSyncStatus((error as Error).message)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLicenseSyncing(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [applySyncedLicense, license])
 
   const handleReplaceOperators = useCallback(async () => {
     if (!userCanReplaceOperators) return
@@ -156,7 +224,7 @@ export default function OptimizePage({
   }, [activeConfig, license, mergedOperators])
 
   const handleGenerate = useCallback(async () => {
-    if (loading || optimizeInFlightRef.current) return
+    if (licenseSyncing || loading || optimizeInFlightRef.current) return
     if (hasResult && lastGeneratedSignature === optimizeSignature) return
     if (configValidationMessage) {
       setInlineError({ scope: 'generate', message: configValidationMessage })
@@ -214,11 +282,12 @@ export default function OptimizePage({
     } finally {
       optimizeInFlightRef.current = false
       setLoading(false)
+      flushPendingLicenseSync()
       if (!completed) {
         setProgress(null)
       }
     }
-  }, [configValidationMessage, hasResult, lastGeneratedSignature, loading, optimizeSignature, runOptimize, runUpgradeSuggestions, userCanUseUpgradeFeatures])
+  }, [configValidationMessage, flushPendingLicenseSync, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, runOptimize, runUpgradeSuggestions, userCanUseUpgradeFeatures])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
     if (loading || optimizeInFlightRef.current) return
@@ -345,6 +414,12 @@ export default function OptimizePage({
 
       <AnnouncementBanner announcement={announcement} className="mb-6" />
 
+      {licenseSyncStatus && (
+        <div className="mb-6 rounded-lg border border-brand-600/30 bg-brand-600/10 px-4 py-3 text-sm text-brand-300">
+          {licenseSyncStatus}
+        </div>
+      )}
+
       <CommandBand
         config={activeConfig}
         configChanged={configChanged}
@@ -352,6 +427,7 @@ export default function OptimizePage({
         fileId={license.order_hash.slice(0, 8)}
         validation={configValidation}
         loading={loading}
+        syncing={licenseSyncing}
         progress={progress?.mode === 'generate' ? progress : null}
         hasResult={hasResult}
         resultIsCurrent={resultIsCurrent}
@@ -462,6 +538,7 @@ function CommandBand({
   fileId,
   validation,
   loading,
+  syncing,
   progress,
   hasResult,
   resultIsCurrent,
@@ -475,6 +552,7 @@ function CommandBand({
   fileId: string;
   validation: { ok: true } | { ok: false; message: string };
   loading: boolean;
+  syncing: boolean;
   progress: ScheduleProgressState | null;
   hasResult: boolean;
   resultIsCurrent: boolean;
@@ -509,16 +587,16 @@ function CommandBand({
           <button
             type="button"
             onClick={onGenerate}
-            disabled={loading || !validation.ok || resultIsCurrent}
+            disabled={loading || syncing || !validation.ok || resultIsCurrent}
             className="rounded-xl bg-surface-2 px-5 py-3 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3 disabled:cursor-not-allowed disabled:text-ink-muted"
           >
-            {loading ? (
+            {loading || syncing ? (
               <span className="inline-flex items-center gap-3">
                 <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                正在计算...
+                {syncing ? '正在同步授权...' : '正在计算...'}
               </span>
             ) : (
               resultIsCurrent ? '方案已是最新' : hasResult ? '重新计算排班' : '生成排班方案'

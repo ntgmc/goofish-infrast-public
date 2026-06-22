@@ -13,6 +13,13 @@ import {
 
 type CdkStatusFilter = CdkStatus | 'all'
 
+const PRODUCT_PERMISSION_RANK: Record<ProductPermissionMode, number> = {
+  recommended: 0,
+  growth: 1,
+  advanced: 2,
+  ultimate: 3,
+}
+
 export default async (req: Request, _context: Context): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return jsonResponse(null, 204)
@@ -112,17 +119,18 @@ async function handleList(req: Request): Promise<Response> {
 
 async function handlePatch(req: Request): Promise<Response> {
   try {
-    const { admin_password, code_hash, action } = await req.json() as {
+    const { admin_password, code_hash, action, permission } = await req.json() as {
       admin_password?: string;
       code_hash?: string;
       action?: string;
+      permission?: string;
     }
     const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
 
     if (admin_password !== adminPassword) {
-      return jsonResponse({ error: 'Invalid admin password.' }, 401)
+      return jsonResponse({ error: '管理口令错误。' }, 401)
     }
-    if (action !== 'revoke') {
+    if (action !== 'revoke' && action !== 'upgrade') {
       return jsonResponse({ error: 'Unsupported action.' }, 400)
     }
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
@@ -136,6 +144,35 @@ async function handlePatch(req: Request): Promise<Response> {
     if (!existing) {
       return jsonResponse({ error: 'CDK not found.' }, 404)
     }
+    if (action === 'upgrade') {
+      if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
+        return jsonResponse({ error: '目标 CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
+      }
+      if (existing.status === 'revoked') {
+        return jsonResponse({ error: '已撤销授权不能升级。' }, 409)
+      }
+      const currentPermission = normalizeProductPermission(existing.permission)
+      if (!currentPermission) {
+        return jsonResponse({ error: '当前授权类型不支持后台升级。' }, 409)
+      }
+      const nextPermission = permission as ProductPermissionMode
+      if (PRODUCT_PERMISSION_RANK[nextPermission] <= PRODUCT_PERMISSION_RANK[currentPermission]) {
+        return jsonResponse({ error: '只能升级到更高等级的授权。' }, 409)
+      }
+
+      const updated: CdkRecord = {
+        ...existing,
+        permission: nextPermission,
+      }
+      await store.set(key, updated)
+      return jsonResponse({
+        upgraded: true,
+        cdk_id: existing.code_hash.slice(0, 12),
+        previous_permission: currentPermission,
+        permission: nextPermission,
+      })
+    }
+
     if (existing.status === 'revoked') {
       return jsonResponse({
         revoked: true,
@@ -225,4 +262,11 @@ function toAdminCdkRecord(record: CdkRecord) {
     config_desc: record.config_desc,
     schedule_generate_count: record.schedule_generate_count ?? 0,
   }
+}
+
+function normalizeProductPermission(permission: CdkRecord['permission']): ProductPermissionMode | null {
+  if (permission === 'basic') return 'growth'
+  if (permission === 'premium') return 'advanced'
+  if ((CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) return permission as ProductPermissionMode
+  return null
 }

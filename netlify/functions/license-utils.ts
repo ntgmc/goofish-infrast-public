@@ -452,6 +452,23 @@ export function createSignedLicenseFile({
   return { license, licenseFileContent }
 }
 
+export function reissueSignedLicenseFile(
+  license: LicenseFile,
+  permission: PermissionMode,
+  adminSecret: string,
+): { license: LicenseFile; licenseFileContent: string } {
+  const unsigned = {
+    ...license,
+    permission,
+    issued_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+  }
+  delete (unsigned as Partial<LicenseFile>).sig
+  const sig = formatSig(hmacSha256(adminSecret, canonicalJson(unsigned)))
+  const nextLicense: LicenseFile = { ...unsigned, sig }
+  const licenseFileContent = encryptLicensePayload(canonicalJson(nextLicense))
+  return { license: nextLicense, licenseFileContent }
+}
+
 export function validateOperators(value: unknown): { ok: true; operators: LicenseOperator[] } | { ok: false; message: string } {
   if (!Array.isArray(value) || value.length === 0) {
     return { ok: false, message: '干员数据不能为空。' }
