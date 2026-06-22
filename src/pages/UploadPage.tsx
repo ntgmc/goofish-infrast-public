@@ -29,7 +29,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
             MAA 基建排班优化器
           </h1>
           <p className="text-base text-ink-secondary">
-            上传授权文件或使用 CDK 生成排班
+            输入 CDK 生成授权文件，或上传已有 .maa 文件
           </p>
           <BuildMetaStrip placement="corner" />
         </div>
@@ -38,7 +38,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
 
         <div className="mb-5 flex justify-center">
           <div className="inline-flex rounded-lg bg-surface-1 p-1">
-            <ModeButton label="上传授权文件" active={mode === 'license'} onClick={() => setMode('license')} />
+            <ModeButton label="上传 .maa 文件" active={mode === 'license'} onClick={() => setMode('license')} />
             <ModeButton label="使用 CDK 生成授权文件" active={mode === 'cdk'} onClick={() => setMode('cdk')} />
           </div>
         </div>
@@ -50,7 +50,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
         )}
 
         <p className="mt-6 text-center text-xs text-ink-muted">
-          授权文件和保存进度文件通常以 .maa 结尾。保存进度文件可在下次直接上传，继续调整练度和配置。
+          CDK 会在本站生成授权文件。授权文件和保存进度文件通常以 .maa 结尾，下次可直接上传继续调整。
         </p>
       </div>
     </div>
@@ -155,7 +155,7 @@ function LicenseUploadPanel({ onFileLoaded, error }: { onFileLoaded: (content: s
                 拖拽授权文件或保存进度文件到此处，或点击选择
               </p>
               <p className="text-xs text-ink-muted">
-                支持卖家下发的授权文件，或本工具保存的进度文件
+                支持本站生成的授权文件，或本工具保存的进度文件
               </p>
               {selectedFileName && (
                 <p className="text-xs font-medium text-brand-400">
@@ -177,7 +177,7 @@ function LicenseUploadPanel({ onFileLoaded, error }: { onFileLoaded: (content: s
             <div className="rounded-lg bg-surface-2/60 p-3">
               <p className="text-sm font-medium text-ink-primary">第一次使用</p>
               <p className="mt-1 text-xs text-ink-secondary">
-                上传卖家给你的授权文件，用于生成排班。
+                切换到 CDK 模式，输入 CDK 并上传干员数据生成授权文件。
               </p>
             </div>
             <div className="rounded-lg bg-surface-2/60 p-3">
@@ -194,7 +194,7 @@ function LicenseUploadPanel({ onFileLoaded, error }: { onFileLoaded: (content: s
           disabled={loading}
           className="w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
         >
-          {loading ? '验证中...' : selectedFileName ? '验证并进入' : '选择授权文件'}
+          {loading ? '验证中...' : selectedFileName ? '验证并进入' : '选择 .maa 文件'}
         </button>
       </div>
     </div>
@@ -354,7 +354,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
           disabled={loading || !confirmed || !operators || !code.trim() || !configValidation.ok}
           className="mt-5 w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
         >
-          {loading ? '正在生成授权文件...' : '兑换并生成授权文件'}
+          {loading ? '正在生成授权文件...' : '兑换 CDK 并生成授权文件'}
         </button>
       </section>
     </form>
