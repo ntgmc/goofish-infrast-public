@@ -70,6 +70,8 @@ Quality Checks 拆分为两个检查项：
 
 `Web Build` 和 `Functions Smoke Test` 只在 `Deploy Relevance` 判断为需要部署时运行。只修改文档或仓库元数据时，Quality Checks 会保留发布相关性检查，但跳过前端构建和函数 smoke test。
 
+另外，仓库使用 GitHub Actions 在 PR 创建、重新打开、更新 commit 或标记 ready 时，根据 PR 内 commit message 自动更新 PR description。配置文件位于 `.github/workflows/pr-details.yml`。该流程只维护 PR description 中 `<!-- pr-details:start -->` 到 `<!-- pr-details:end -->` 之间的自动生成区块，区块外的人工内容会保留。
+
 Quality Checks 会在执行检查前注入构建元数据：
 
 | Variable | Example | Purpose |
