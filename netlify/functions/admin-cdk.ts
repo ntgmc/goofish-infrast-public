@@ -1,5 +1,7 @@
 import type { Context } from '@netlify/functions'
+import type { ProductPermissionMode } from '../../src/lib/types'
 import {
+  CDK_PRODUCT_PERMISSIONS,
   generateCdk,
   getCdkRecordStore,
   hashCdk,
@@ -40,9 +42,10 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     if (admin_password !== adminPassword) {
       return jsonResponse({ error: '管理口令错误。' }, 401)
     }
-    if (permission !== 'basic' && permission !== 'premium' && permission !== 'admin') {
-      return jsonResponse({ error: 'CDK 类型必须是 basic、premium 或 admin。' }, 400)
+    if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
+      return jsonResponse({ error: 'CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
     }
+    const cdkPermission = permission as ProductPermissionMode
 
     const store = await getCdkRecordStore()
     let code = generateCdk()
@@ -60,7 +63,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     const record: CdkRecord = {
       version: 1,
       code_hash: codeHash,
-      permission,
+      permission: cdkPermission,
       status: 'unused',
       created_at: createdAt,
       used_at: null,
@@ -73,7 +76,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     }
     await store.set(key, record)
 
-    return jsonResponse({ code, permission, created_at: createdAt })
+    return jsonResponse({ code, permission: cdkPermission, created_at: createdAt })
   } catch (error) {
     console.error('admin cdk error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'

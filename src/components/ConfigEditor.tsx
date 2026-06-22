@@ -19,8 +19,10 @@ export const SCHEDULE_MODE_LABELS: Record<string, string> = {
 }
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
-  basic: 'Basic',
-  premium: 'Premium',
+  recommended: '推荐版',
+  growth: '成长版',
+  advanced: '进阶版',
+  ultimate: '尊享版',
   admin: 'Admin',
 }
 
@@ -134,6 +136,7 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
 interface ConfigEditorProps {
   config: LicenseConfig;
   canEdit: boolean;
+  canSelectPreset?: boolean;
   changed?: boolean;
   permission?: PermissionMode;
   validation: { ok: true } | { ok: false; message: string };
@@ -147,6 +150,7 @@ interface ConfigEditorProps {
 export default function ConfigEditor({
   config,
   canEdit,
+  canSelectPreset = false,
   changed = false,
   permission,
   validation,
@@ -212,10 +216,10 @@ export default function ConfigEditor({
           <p className="mt-1 text-sm text-ink-secondary">
             {note ?? (canEdit
               ? '修改配置后重新生成，保存进度文件会保留这次配置。'
-              : `当前为 ${permission ? PERMISSION_LABELS[permission] : 'Basic'} 权限，使用授权文件内的固定配置。`)}
+              : `当前为 ${permission ? PERMISSION_LABELS[permission] : '成长版'} 权限，使用授权文件内的固定配置。`)}
           </p>
         </div>
-        {canEdit && (
+          {(canEdit || canSelectPreset) && (
           <div className="flex flex-wrap gap-2">
             <PresetButton label="243 均衡" onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
             <PresetButton label="243 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />

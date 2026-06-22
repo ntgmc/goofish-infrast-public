@@ -1,8 +1,17 @@
-import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, WorkFile } from "./types";
+import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, RawPermissionMode, WorkFile } from "./types";
 import { decryptPayload } from "./crypto";
 
 const LICENSE_PREFIX = "MAA-V1:";
 const WORKFILE_PREFIX = "MAA-W1:";
+const VALID_PERMISSION_MODES: RawPermissionMode[] = [
+  "recommended",
+  "growth",
+  "advanced",
+  "ultimate",
+  "basic",
+  "premium",
+  "admin",
+];
 
 export type ParsedFile =
   | { kind: "license"; data: LicenseFile }
@@ -65,7 +74,7 @@ function validateLicenseStructure(
   if (!Array.isArray(license.operators) || license.operators.length === 0) {
     return { ok: false, error: { code: "INVALID_DATA", message: "授权文件中的干员列表为空。" } };
   }
-  if (license.permission && !["basic", "premium", "admin"].includes(license.permission)) {
+  if (license.permission && !isRawPermissionMode(license.permission)) {
     return { ok: false, error: { code: "INVALID_PERMISSION", message: "授权文件包含未知权限类型。" } };
   }
   const configCheck = validateConfigStructure(license.config);
@@ -151,10 +160,34 @@ export function extractConfigOverride(parsed: ParsedFile): LicenseConfig | null 
 }
 
 export function getPermissionMode(license: LicenseFile): PermissionMode {
-  return license.permission ?? "basic";
+  switch (license.permission) {
+    case "recommended":
+    case "growth":
+    case "advanced":
+    case "ultimate":
+    case "admin":
+      return license.permission;
+    case "premium":
+      return "advanced";
+    case "basic":
+    default:
+      return "growth";
+  }
+}
+
+export function canUseUpgradeFeatures(license: LicenseFile): boolean {
+  return getPermissionMode(license) !== "recommended";
 }
 
 export function canEditConfig(license: LicenseFile): boolean {
   const permission = getPermissionMode(license);
-  return permission === "premium" || permission === "admin";
+  return permission === "advanced" || permission === "ultimate" || permission === "admin";
+}
+
+export function canReplaceOperators(license: LicenseFile): boolean {
+  return getPermissionMode(license) === "admin";
+}
+
+function isRawPermissionMode(value: string): value is RawPermissionMode {
+  return (VALID_PERMISSION_MODES as string[]).includes(value);
 }

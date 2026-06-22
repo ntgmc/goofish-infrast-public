@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import type { Announcement } from '../lib/types'
+import type { Announcement, ProductPermissionMode, RawPermissionMode } from '../lib/types'
 
-type Permission = 'basic' | 'premium' | 'admin'
+type Permission = RawPermissionMode
+type GeneratedPermission = ProductPermissionMode
 type CdkStatus = 'unused' | 'used' | 'revoked'
 type StatusFilter = CdkStatus | 'all'
 type AdminSection = 'overview' | 'cdk' | 'announcement'
@@ -31,7 +32,7 @@ interface CdkListResponse {
 interface GenerateCdkResponse {
   error?: string;
   code?: string;
-  permission?: Permission;
+  permission?: GeneratedPermission;
   created_at?: string;
 }
 
@@ -75,10 +76,15 @@ const EMPTY_ANNOUNCEMENT: Announcement = {
 }
 
 const permissionLabels: Record<Permission, string> = {
-  basic: 'Basic',
-  premium: 'Premium',
+  recommended: '推荐版',
+  growth: '成长版',
+  advanced: '进阶版',
+  ultimate: '尊享版',
+  basic: '成长版',
+  premium: '进阶版',
   admin: 'Admin',
 }
+const cdkProductPermissions: GeneratedPermission[] = ['recommended', 'growth', 'advanced', 'ultimate']
 
 const statusLabels: Record<CdkStatus, string> = {
   unused: '未使用',
@@ -102,7 +108,7 @@ const adminSections: Array<{ id: AdminSection; label: string; description: strin
 export default function AdminPage() {
   const [adminPassword, setAdminPassword] = useState('')
   const [authenticated, setAuthenticated] = useState(false)
-  const [permission, setPermission] = useState<Permission>('basic')
+  const [permission, setPermission] = useState<GeneratedPermission>('growth')
   const [orderNote, setOrderNote] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('unused')
   const [records, setRecords] = useState<AdminCdkRecord[]>([])
@@ -112,7 +118,7 @@ export default function AdminPage() {
   const [revokingCdkHash, setRevokingCdkHash] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copyStatus, setCopyStatus] = useState<string | null>(null)
-  const [result, setResult] = useState<{ code: string; permission: Permission; created_at: string } | null>(null)
+  const [result, setResult] = useState<{ code: string; permission: GeneratedPermission; created_at: string } | null>(null)
   const [announcement, setAnnouncement] = useState<Announcement>(EMPTY_ANNOUNCEMENT)
   const [announcementLoading, setAnnouncementLoading] = useState(false)
   const [announcementSaving, setAnnouncementSaving] = useState(false)
@@ -576,7 +582,7 @@ export default function AdminPage() {
                       <div>
                         <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK 类型</span>
                         <div className="inline-flex rounded-lg bg-surface-2 p-1">
-                          {(['basic', 'premium', 'admin'] as const).map((item) => (
+                          {cdkProductPermissions.map((item) => (
                             <button
                               key={item}
                               type="button"
@@ -592,7 +598,7 @@ export default function AdminPage() {
                           ))}
                         </div>
                         <p className="mt-2 text-xs leading-5 text-ink-muted">
-                          Admin 允许用户重新上传干员数据，并继续修改基建配置。
+                          推荐版只生成当前练度排班；成长版增加练度建议；进阶版和尊享版允许自定义配置。
                         </p>
                       </div>
 
