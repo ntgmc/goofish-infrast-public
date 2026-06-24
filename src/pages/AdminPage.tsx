@@ -34,6 +34,8 @@ interface CdkListResponse {
   cdks?: AdminCdkRecord[];
 }
 
+type CdkBulkAction = 'upgrade' | 'grant_operator_update' | 'revoke' | 'delete'
+
 interface GenerateCdkResponse {
   error?: string;
   code?: string;
@@ -124,6 +126,8 @@ const statusFilterLabels: Record<StatusFilter, string> = {
   all: '全部',
 }
 
+const cdkPageSizeOptions = [10, 20, 50] as const
+
 const adminSections: Array<{ id: AdminSection; label: string; description: string }> = [
   { id: 'overview', label: '概览统计', description: '访问、生成和兑换趋势' },
   { id: 'cdk', label: 'CDK 管理', description: '生成、筛选和处理授权' },
@@ -153,12 +157,51 @@ export default function AdminPage() {
   const [usageStats, setUsageStats] = useState<{ totals: UsageTotals; days: UsageDay[] } | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
   const [activeSection, setActiveSection] = useState<AdminSection>('overview')
+  const [cdkPage, setCdkPage] = useState(1)
+  const [cdkPageSize, setCdkPageSize] = useState<(typeof cdkPageSizeOptions)[number]>(20)
+  const [selectedCdkHashes, setSelectedCdkHashes] = useState<string[]>([])
+  const [bulkAction, setBulkAction] = useState<CdkBulkAction | null>(null)
 
   const summary = useMemo(() => {
     const unused = records.filter((record) => record.status === 'unused').length
     const used = records.filter((record) => record.status === 'used').length
     const revoked = records.filter((record) => record.status === 'revoked').length
     return { unused, used, revoked, total: records.length }
+  }, [records])
+
+  const pageCount = Math.max(1, Math.ceil(records.length / cdkPageSize))
+  const visibleRecords = useMemo(() => {
+    const start = (cdkPage - 1) * cdkPageSize
+    return records.slice(start, start + cdkPageSize)
+  }, [cdkPage, cdkPageSize, records])
+  const selectedRecords = useMemo(() => {
+    const selected = new Set(selectedCdkHashes)
+    return records.filter((record) => selected.has(record.code_hash))
+  }, [records, selectedCdkHashes])
+  const bulkEligibleRecords = useMemo(() => ({
+    upgrade: selectedRecords.filter((record) => record.status !== 'revoked' && Boolean(getNextProductPermission(record.permission))),
+    grant_operator_update: selectedRecords.filter(
+      (record) => record.status === 'used' && (record.operator_update_grant_remaining ?? 0) <= 0
+    ),
+    revoke: selectedRecords.filter((record) => record.status === 'used'),
+    delete: selectedRecords.filter((record) => record.status === 'unused'),
+  }), [selectedRecords])
+  const pageSelected = visibleRecords.length > 0 && visibleRecords.every((record) => selectedCdkHashes.includes(record.code_hash))
+  const paginationStart = records.length === 0 ? 0 : (cdkPage - 1) * cdkPageSize + 1
+  const paginationEnd = Math.min(records.length, cdkPage * cdkPageSize)
+
+  useEffect(() => {
+    setCdkPage(1)
+    setSelectedCdkHashes([])
+  }, [statusFilter])
+
+  useEffect(() => {
+    setCdkPage((current) => Math.min(current, pageCount))
+  }, [pageCount])
+
+  useEffect(() => {
+    const availableHashes = new Set(records.map((record) => record.code_hash))
+    setSelectedCdkHashes((current) => current.filter((hash) => availableHashes.has(hash)))
   }, [records])
 
   const loadCdkRecords = useCallback(async (password: string, filter: StatusFilter) => {
@@ -358,6 +401,86 @@ export default function AdminPage() {
     }
   }
 
+  const toggleCdkSelection = (codeHash: string, checked: boolean) => {
+    setSelectedCdkHashes((current) => {
+      if (checked) {
+        return current.includes(codeHash) ? current : [...current, codeHash]
+      }
+      return current.filter((hash) => hash !== codeHash)
+    })
+  }
+
+  const togglePageSelection = (checked: boolean) => {
+    const pageHashes = visibleRecords.map((record) => record.code_hash)
+    setSelectedCdkHashes((current) => {
+      if (checked) {
+        const next = new Set(current)
+        pageHashes.forEach((hash) => next.add(hash))
+        return Array.from(next)
+      }
+      return current.filter((hash) => !pageHashes.includes(hash))
+    })
+  }
+
+  const handleBulkAction = async (action: CdkBulkAction) => {
+    const targets = bulkEligibleRecords[action]
+    if (targets.length === 0) return
+
+    const actionLabels: Record<CdkBulkAction, string> = {
+      upgrade: '升级',
+      grant_operator_update: '发放干员更新权限给',
+      revoke: '撤销',
+      delete: '删除',
+    }
+    const confirmed = window.confirm(`确认${actionLabels[action]} ${targets.length} 个符合条件的 CDK？`)
+    if (!confirmed) return
+
+    setError(null)
+    setCopyStatus(null)
+    setBulkAction(action)
+    try {
+      for (const record of targets) {
+        if (action === 'delete') {
+          const resp = await fetch('/api/admin/cdk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              admin_password: adminPassword,
+              code_hash: record.code_hash,
+            }),
+          })
+          const data = await resp.json() as { error?: string }
+          if (!resp.ok) {
+            throw new Error(data.error || `删除 ${record.cdk_id} 失败: ${resp.status}`)
+          }
+          continue
+        }
+
+        const nextPermission = action === 'upgrade' ? getNextProductPermission(record.permission) : null
+        const resp = await fetch('/api/admin/cdk', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            admin_password: adminPassword,
+            code_hash: record.code_hash,
+            action,
+            ...(nextPermission ? { permission: nextPermission } : {}),
+          }),
+        })
+        const data = await resp.json() as { error?: string }
+        if (!resp.ok) {
+          throw new Error(data.error || `${actionLabels[action]} ${record.cdk_id} 失败: ${resp.status}`)
+        }
+      }
+      setSelectedCdkHashes([])
+      await loadCdkRecords(adminPassword, statusFilter)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBulkAction(null)
+    }
+  }
+
   const handleDeleteRecord = async (record: AdminCdkRecord) => {
     if (record.status !== 'unused') return
     const confirmed = window.confirm(`确认删除未使用 CDK ${record.cdk_id}？此操作不可恢复。`)
@@ -491,6 +614,9 @@ export default function AdminPage() {
     setCopyStatus(null)
     setRevokingCdkHash(null)
     setUpgradingCdkHash(null)
+    setSelectedCdkHashes([])
+    setBulkAction(null)
+    setCdkPage(1)
     setAnnouncement(EMPTY_ANNOUNCEMENT)
     setAnnouncementStatus(null)
     setUsageStats(null)
@@ -748,7 +874,7 @@ export default function AdminPage() {
                 </section>
 
                 <section className="min-w-0 overflow-hidden rounded-xl bg-surface-1">
-                  <div className="flex flex-col gap-4 border-b border-surface-3 p-5 xl:flex-row xl:items-center xl:justify-between sm:p-6">
+                  <div className="flex flex-col gap-4 border-b border-surface-3 p-5 xl:flex-row xl:items-start xl:justify-between sm:p-6">
                     <div>
                       <h2 className="text-base font-semibold text-ink-primary">CDK 记录</h2>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -758,28 +884,74 @@ export default function AdminPage() {
                         <CdkStat label="当前列表" value={summary.total} />
                       </div>
                     </div>
-                    <div className="inline-flex self-start rounded-lg bg-surface-2 p-1 xl:self-auto">
-                      {(['unused', 'used', 'revoked', 'all'] as const).map((item) => (
+                    <div className="flex flex-col gap-3 xl:items-end">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-ink-muted">已选 {selectedRecords.length}</span>
                         <button
-                          key={item}
                           type="button"
-                          onClick={() => setStatusFilter(item)}
-                          className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${
-                            statusFilter === item
-                              ? 'bg-brand-600 text-white'
-                              : 'text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'
-                          }`}
+                          onClick={() => handleBulkAction('upgrade')}
+                          disabled={bulkAction !== null || bulkEligibleRecords.upgrade.length === 0}
+                          className="rounded-md bg-brand-600/15 px-3 py-2 text-xs font-semibold text-brand-300 transition-colors duration-150 hover:bg-brand-600/25 disabled:bg-surface-3 disabled:text-ink-muted"
                         >
-                          {statusFilterLabels[item]}
+                          {bulkAction === 'upgrade' ? '升级中...' : `批量升级 ${bulkEligibleRecords.upgrade.length}`}
                         </button>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => handleBulkAction('grant_operator_update')}
+                          disabled={bulkAction !== null || bulkEligibleRecords.grant_operator_update.length === 0}
+                          className="rounded-md bg-success/10 px-3 py-2 text-xs font-semibold text-success transition-colors duration-150 hover:bg-success/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                        >
+                          {bulkAction === 'grant_operator_update' ? '发放中...' : `批量发放 ${bulkEligibleRecords.grant_operator_update.length}`}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleBulkAction('revoke')}
+                          disabled={bulkAction !== null || bulkEligibleRecords.revoke.length === 0}
+                          className="rounded-md bg-error/10 px-3 py-2 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                        >
+                          {bulkAction === 'revoke' ? '撤销中...' : `批量撤销 ${bulkEligibleRecords.revoke.length}`}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleBulkAction('delete')}
+                          disabled={bulkAction !== null || bulkEligibleRecords.delete.length === 0}
+                          className="rounded-md bg-error/10 px-3 py-2 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                        >
+                          {bulkAction === 'delete' ? '删除中...' : `批量删除 ${bulkEligibleRecords.delete.length}`}
+                        </button>
+                      </div>
+                      <div className="inline-flex self-start rounded-lg bg-surface-2 p-1 xl:self-auto">
+                        {(['unused', 'used', 'revoked', 'all'] as const).map((item) => (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => setStatusFilter(item)}
+                            className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${
+                              statusFilter === item
+                                ? 'bg-brand-600 text-white'
+                                : 'text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'
+                            }`}
+                          >
+                            {statusFilterLabels[item]}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="min-w-[1120px] divide-y divide-surface-3 text-left text-sm">
+                    <table className="min-w-[1180px] divide-y divide-surface-3 text-left text-sm">
                       <thead className="bg-surface-2 text-xs font-semibold text-ink-secondary">
                         <tr>
+                          <th className="w-10 px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={pageSelected}
+                              onChange={(event) => togglePageSelection(event.currentTarget.checked)}
+                              className="h-4 w-4 rounded border-surface-4 bg-surface-0 accent-brand-600"
+                              aria-label="选择当前页 CDK"
+                            />
+                          </th>
                           <th className="whitespace-nowrap px-4 py-3">CDK</th>
                           <th className="whitespace-nowrap px-4 py-3">操作</th>
                           <th className="whitespace-nowrap px-4 py-3">权限</th>
@@ -793,14 +965,23 @@ export default function AdminPage() {
                         {listLoading && records.length === 0 ? (
                           Array.from({ length: 4 }).map((_, index) => (
                             <tr key={index}>
-                              <td className="px-4 py-4" colSpan={7}>
+                              <td className="px-4 py-4" colSpan={8}>
                                 <div className="h-5 rounded bg-surface-2" />
                               </td>
                             </tr>
                           ))
-                        ) : records.length > 0 ? (
-                          records.map((record) => (
+                        ) : visibleRecords.length > 0 ? (
+                          visibleRecords.map((record) => (
                             <tr key={record.code_hash} className="transition-colors duration-150 hover:bg-surface-2/70">
+                              <td className="px-4 py-4 align-top">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCdkHashes.includes(record.code_hash)}
+                                  onChange={(event) => toggleCdkSelection(record.code_hash, event.currentTarget.checked)}
+                                  className="h-4 w-4 rounded border-surface-4 bg-surface-0 accent-brand-600"
+                                  aria-label={`选择 CDK ${record.cdk_id}`}
+                                />
+                              </td>
                               <td className="whitespace-nowrap px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
                               <td className="w-[260px] px-4 py-3 align-top">
                                 {record.status === 'unused' ? (
@@ -891,13 +1072,57 @@ export default function AdminPage() {
                           ))
                         ) : (
                           <tr>
-                            <td className="px-4 py-10 text-center text-sm text-ink-secondary" colSpan={7}>
+                            <td className="px-4 py-10 text-center text-sm text-ink-secondary" colSpan={8}>
                               当前筛选下没有 CDK 记录。
                             </td>
                           </tr>
                         )}
                       </tbody>
                     </table>
+                  </div>
+
+                  <div className="flex flex-col gap-3 border-t border-surface-3 px-5 py-4 text-sm text-ink-secondary sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <div>
+                      显示 {paginationStart}-{paginationEnd} / {records.length} 条
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-2">
+                        <span className="text-xs text-ink-muted">每页</span>
+                        <select
+                          value={cdkPageSize}
+                          onChange={(event) => {
+                            setCdkPageSize(Number(event.currentTarget.value) as (typeof cdkPageSizeOptions)[number])
+                            setCdkPage(1)
+                          }}
+                          className="rounded-md border border-surface-4 bg-surface-0 px-2 py-1.5 text-sm text-ink-primary"
+                        >
+                          {cdkPageSizeOptions.map((size) => (
+                            <option key={size} value={size}>{size}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setCdkPage((current) => Math.max(1, current - 1))}
+                          disabled={cdkPage <= 1}
+                          className="rounded-md bg-surface-2 px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:text-ink-muted"
+                        >
+                          上一页
+                        </button>
+                        <span className="min-w-16 text-center text-xs text-ink-muted">
+                          {cdkPage} / {pageCount}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCdkPage((current) => Math.min(pageCount, current + 1))}
+                          disabled={cdkPage >= pageCount}
+                          className="rounded-md bg-surface-2 px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:text-ink-muted"
+                        >
+                          下一页
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </section>
               </section>
