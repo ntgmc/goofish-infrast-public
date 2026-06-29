@@ -6,7 +6,7 @@ MAA 基建排班优化器是一个面向《明日方舟》玩家的 Web 工具�
 
 ## 在线地址
 
-- Production: <https://goofish-infrast-v1.netlify.app/>
+- Production: <https://maatool.com/>
 
 ## 技术栈
 
@@ -139,7 +139,7 @@ Netlify 会在构建前执行 `node scripts/netlify-ignore-build.mjs`。该脚�
 4. 等待 GitHub Actions Quality Checks 通过。
 5. 使用 Netlify Deploy Preview 验证 PR 预览环境。
 6. 合并到 `main` 后，由 Netlify 自动触发生产部署。
-7. 部署完成后访问 <https://goofish-infrast-v1.netlify.app/> 做生产冒烟验证。
+7. 部署完成后访问 <https://maatool.com/> 做生产冒烟验证。
 
 ## 环境变量
 
