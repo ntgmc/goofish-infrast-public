@@ -471,20 +471,19 @@ function RotationManualGuide() {
 
 export function MaaImportGuide() {
   return (
-    <div className="mt-6 border-t border-surface-3/60 pt-5">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.25fr)] lg:items-start">
-        <div>
-          <h3 className="text-base font-semibold text-ink-primary">
-            如何在 MAA 中使用排班 JSON
-          </h3>
-          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-ink-secondary">
-            <li>在 MAA 左侧勾选 <span className="font-medium text-ink-primary">基建换班</span></li>
-            <li>点击 <span className="font-medium text-ink-primary">基建换班</span> 右侧 <span className="font-medium text-ink-primary">小齿轮</span></li>
-            <li><span className="font-medium text-ink-primary">基建模式</span> 选择 <span className="font-medium text-ink-primary">自定义基建配置</span></li>
-            <li><span className="font-medium text-ink-primary">内置配置</span> 选择 <span className="font-medium text-ink-primary">自定义</span></li>
-            <li>点击选择，选择本站下载的排班 JSON</li>
-          </ol>
-        </div>
+    <details className="mt-6 overflow-hidden rounded-lg border border-surface-3/70 bg-surface-2/40">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/80">
+        <span>如何在 MAA 中使用排班 JSON</span>
+        <span className="text-xs font-medium text-ink-muted">展开查看</span>
+      </summary>
+      <div className="grid gap-5 border-t border-surface-3/60 p-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.25fr)] lg:items-start">
+        <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-ink-secondary">
+          <li>在 MAA 左侧勾选 <span className="font-medium text-ink-primary">基建换班</span></li>
+          <li>点击 <span className="font-medium text-ink-primary">基建换班</span> 右侧 <span className="font-medium text-ink-primary">小齿轮</span></li>
+          <li><span className="font-medium text-ink-primary">基建模式</span> 选择 <span className="font-medium text-ink-primary">自定义基建配置</span></li>
+          <li><span className="font-medium text-ink-primary">内置配置</span> 选择 <span className="font-medium text-ink-primary">自定义</span></li>
+          <li>点击选择，选择本站下载的排班 JSON</li>
+        </ol>
         <div className="overflow-hidden rounded-lg border border-surface-3 bg-surface-0">
           <img
             src="/assets/maa-import-schedule-json.png"
@@ -494,6 +493,6 @@ export function MaaImportGuide() {
           />
         </div>
       </div>
-    </div>
+    </details>
   )
 }
