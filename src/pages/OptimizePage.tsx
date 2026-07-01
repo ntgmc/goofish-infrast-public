@@ -470,6 +470,8 @@ export default function OptimizePage({
         </div>
       )}
 
+      {licenseSyncing && <LicenseSyncPanel />}
+
       <CommandBand
         config={activeConfig}
         configChanged={configChanged}
@@ -582,6 +584,37 @@ export default function OptimizePage({
           <ResultPanel result={finalResult} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />
         </div>
       )}
+    </div>
+  )
+}
+
+function LicenseSyncPanel() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="mb-6 rounded-xl border border-brand-600/25 bg-surface-1 p-4"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand-500/10 text-brand-400">
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-ink-primary">正在同步授权状态</p>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">
+              请稍候，正在检查 CDK 状态和权限变更，同步完成后即可生成排班。
+            </p>
+          </div>
+        </div>
+        <span className="text-xs font-medium text-ink-muted sm:flex-shrink-0">通常只需几秒</span>
+      </div>
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
+        <div className="schedule-progress-fill h-full w-1/2 rounded-full bg-brand-500" />
+      </div>
     </div>
   )
 }
