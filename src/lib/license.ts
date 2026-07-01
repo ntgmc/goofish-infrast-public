@@ -185,7 +185,7 @@ export function canEditConfig(license: LicenseFile): boolean {
 }
 
 export function isIntermediateAutoConfig(config: LicenseConfig | null | undefined): boolean {
-  return config?.auto_balance_source === "intermediate_inventory";
+  return config?.auto_balance_source === "intermediate_inventory" || config?.auto_balance_source === "limited_config";
 }
 
 export function canUseIntermediateAutoConfig(

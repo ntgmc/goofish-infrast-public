@@ -25,24 +25,8 @@ const SHIFT_PRESETS = [
   { label: '12-12-12', value: [12, 12, 12], note: '12h 固定间隔' },
   { label: '12-6-6', value: [12, 6, 6], note: '24h 非固定间隔' },
 ]
-const INVENTORY_AUTO_BALANCE_DAYS = 7
-const ORUNDUM_SHARD_DAILY_CONSUMPTION = 24
-const SHARD_DAILY_PRODUCTION = 24
-const GOLD_DAILY_PRODUCTION = 20
-const DRONE_ESTIMATED_ACCELERATION_SECONDS_PER_DAY = 240 * 3 * 60
-const LMD_EXPECTED_GOLD_DAILY_CONSUMPTION =
-  (24 * 60 * (2 * 0.3 + 3 * 0.5 + 4 * 0.2)) / (144 * 0.3 + 210 * 0.5 + 276 * 0.2)
 
 type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
-
-interface IntermediateEstimate {
-  stock: number | null;
-  producedPerDay: number;
-  consumedPerDay: number;
-  netPerDay: number;
-  depletionDays: number | null;
-  autoBalance: boolean;
-}
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: '推荐版',
@@ -209,31 +193,6 @@ function normalizeIntermediateInventory(value: unknown): Record<IntermediateProd
   return next
 }
 
-function calculateIntermediateEstimate(config: LicenseConfig, product: IntermediateProduct): IntermediateEstimate {
-  const inventory = normalizeIntermediateInventory(config.intermediate_inventory)
-  const stock = inventory[product]
-  const trading = config.product_requirements.trading_stations
-  const manufacturing = config.product_requirements.manufacturing_stations
-  const producedPerDay = product === 'Originium Shard'
-    ? (manufacturing['Originium Shard'] ?? 0) * SHARD_DAILY_PRODUCTION
-    : (manufacturing['Pure Gold'] ?? 0) * GOLD_DAILY_PRODUCTION
-  const consumedPerDay = product === 'Originium Shard'
-    ? (trading.Orundum ?? 0) * ORUNDUM_SHARD_DAILY_CONSUMPTION
-    : (trading.LMD ?? 0) * LMD_EXPECTED_GOLD_DAILY_CONSUMPTION
-  const netPerDay = producedPerDay - consumedPerDay
-  const depletionDays = netPerDay < 0 ? stock / Math.abs(netPerDay) : null
-  const autoBalance = consumedPerDay > 0 && netPerDay <= 0 && depletionDays !== null && depletionDays <= INVENTORY_AUTO_BALANCE_DAYS
-
-  return {
-    stock,
-    producedPerDay,
-    consumedPerDay,
-    netPerDay,
-    depletionDays,
-    autoBalance,
-  }
-}
-
 function bindAutoDrones(config: LicenseConfig): void {
   config.drones = {
     ...(config.drones ?? { order: 'pre', targets: [] }),
@@ -264,56 +223,8 @@ function setAutoDroneManufacturing(config: LicenseConfig, product: IntermediateP
   }
 }
 
-function estimateDroneProductionPerDay(product: IntermediateProduct): number {
-  const productData = product === 'Originium Shard'
-    ? { craftSeconds: 60 * 60 }
-    : { craftSeconds: 72 * 60 }
-  return DRONE_ESTIMATED_ACCELERATION_SECONDS_PER_DAY / productData.craftSeconds
-}
-
-function shouldRebalanceIntermediateStock(estimate: IntermediateEstimate): boolean {
-  if (estimate.consumedPerDay <= 0 || estimate.netPerDay > 0) return false
-  if (estimate.netPerDay < 0) {
-    return estimate.depletionDays !== null && estimate.depletionDays <= INVENTORY_AUTO_BALANCE_DAYS
-  }
-  return estimate.stock !== null && estimate.stock <= estimate.consumedPerDay * INVENTORY_AUTO_BALANCE_DAYS
-}
-
-function switchOneManufacturingProduct(
-  config: LicenseConfig,
-  targetProduct: IntermediateProduct,
-  donorProducts: string[],
-): void {
-  const manufacturing = { ...config.product_requirements.manufacturing_stations }
-  if ((manufacturing[targetProduct] ?? 0) >= config.manufacturing_stations_count) return
-
-  const donorProduct = donorProducts.find((product) => product !== targetProduct && (manufacturing[product] ?? 0) > 0)
-  if (!donorProduct) return
-
-  manufacturing[donorProduct] = (manufacturing[donorProduct] ?? 0) - 1
-  if (manufacturing[donorProduct] <= 0) delete manufacturing[donorProduct]
-  manufacturing[targetProduct] = (manufacturing[targetProduct] ?? 0) + 1
-  config.product_requirements.manufacturing_stations = manufacturing
-}
-
-function applyIntermediateAutoBalance(config: LicenseConfig, product: IntermediateProduct): void {
+function markIntermediateInventoryForOptimizer(config: LicenseConfig): void {
   config.auto_balance_source = 'intermediate_inventory'
-  const estimate = calculateIntermediateEstimate(config, product)
-  if (estimate.netPerDay < 0) {
-    setAutoDroneManufacturing(config, product)
-  } else {
-    setAutoDroneTradingPriority(config)
-  }
-
-  if (!shouldRebalanceIntermediateStock(estimate)) return
-  if (estimate.netPerDay + estimateDroneProductionPerDay(product) >= 0) return
-
-  if (product === 'Originium Shard') {
-    switchOneManufacturingProduct(config, 'Originium Shard', ['Battle Record', 'Pure Gold'])
-    return
-  }
-
-  switchOneManufacturingProduct(config, 'Pure Gold', ['Battle Record', 'Originium Shard'])
   setAutoDroneTradingPriority(config)
 }
 
@@ -359,8 +270,7 @@ export default function ConfigEditor({
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
   const validationMessage = validation.ok === false ? validation.message : null
-  const shardEstimate = calculateIntermediateEstimate(config, 'Originium Shard')
-  const goldEstimate = calculateIntermediateEstimate(config, 'Pure Gold')
+  const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
 
   const applyPreset = (preset: LicenseConfig) => {
     onUpdate((next) => {
@@ -404,7 +314,7 @@ export default function ConfigEditor({
         ...normalizeIntermediateInventory(next.intermediate_inventory),
         [product]: stock,
       }
-      applyIntermediateAutoBalance(next, product)
+      markIntermediateInventoryForOptimizer(next)
       applyCounts(next)
     })
   }
@@ -465,8 +375,7 @@ export default function ConfigEditor({
             <div className="mt-4">
               <IntermediateInventoryEditor
                 canEdit={canUseIntermediateInventory}
-                shardEstimate={shardEstimate}
-                goldEstimate={goldEstimate}
+                inventory={intermediateInventory}
                 onChange={setIntermediateInventory}
               />
             </div>
@@ -482,7 +391,7 @@ export default function ConfigEditor({
                       disabled={!canUseShiftHours}
                       onClick={() => onUpdate((next) => {
                         next.shift_hours = [...preset.value]
-                        next.auto_balance_source = 'intermediate_inventory'
+                        next.auto_balance_source = 'limited_config'
                         applyCounts(next)
                       })}
                       className={`rounded-lg border px-3 py-2 text-left transition-colors duration-150 disabled:cursor-not-allowed ${
@@ -551,8 +460,7 @@ export default function ConfigEditor({
             />
             <IntermediateInventoryEditor
               canEdit={canEdit}
-              shardEstimate={shardEstimate}
-              goldEstimate={goldEstimate}
+              inventory={intermediateInventory}
               onChange={setIntermediateInventory}
             />
           </div>
@@ -767,26 +675,13 @@ function formatStockValue(value: number | null): string {
   return value === null ? '' : String(value)
 }
 
-function formatDailyAmount(value: number): string {
-  return `${value >= 0 ? '+' : ''}${(Math.round(value * 10) / 10).toLocaleString('zh-CN')}/日`
-}
-
-function formatDepletionDays(estimate: IntermediateEstimate): string {
-  if (estimate.consumedPerDay <= 0) return '暂无消耗'
-  if (estimate.depletionDays === null) return '不会消耗完'
-  if (estimate.depletionDays < 0.1) return '<0.1 日'
-  return `${(Math.round(estimate.depletionDays * 10) / 10).toLocaleString('zh-CN')} 日`
-}
-
 function IntermediateInventoryEditor({
   canEdit,
-  shardEstimate,
-  goldEstimate,
+  inventory,
   onChange,
 }: {
   canEdit: boolean;
-  shardEstimate: IntermediateEstimate;
-  goldEstimate: IntermediateEstimate;
+  inventory: Record<IntermediateProduct, number>;
   onChange: (product: IntermediateProduct, value: number) => void;
 }) {
   return (
@@ -796,14 +691,14 @@ function IntermediateInventoryEditor({
         <IntermediateInventoryField
           label="源石碎片"
           product="Originium Shard"
-          estimate={shardEstimate}
+          value={inventory['Originium Shard']}
           canEdit={canEdit}
           onChange={onChange}
         />
         <IntermediateInventoryField
           label="赤金"
           product="Pure Gold"
-          estimate={goldEstimate}
+          value={inventory['Pure Gold']}
           canEdit={canEdit}
           onChange={onChange}
         />
@@ -815,29 +710,29 @@ function IntermediateInventoryEditor({
 function IntermediateInventoryField({
   label,
   product,
-  estimate,
+  value,
   canEdit,
   onChange,
 }: {
   label: string;
   product: IntermediateProduct;
-  estimate: IntermediateEstimate;
+  value: number;
   canEdit: boolean;
   onChange: (product: IntermediateProduct, value: number) => void;
 }) {
-  const [draftValue, setDraftValue] = useState(() => formatStockValue(estimate.stock))
+  const [draftValue, setDraftValue] = useState(() => formatStockValue(value))
 
   useEffect(() => {
-    setDraftValue(formatStockValue(estimate.stock))
-  }, [estimate.stock])
+    setDraftValue(formatStockValue(value))
+  }, [value])
 
   const commitDraft = () => {
     if (!canEdit) return
-    const value = draftValue.trim() === '' ? 0 : Number(draftValue)
-    if (Number.isFinite(value) && value !== (estimate.stock ?? 0)) {
-      onChange(product, value)
+    const nextValue = draftValue.trim() === '' ? 0 : Number(draftValue)
+    if (Number.isFinite(nextValue) && nextValue !== value) {
+      onChange(product, nextValue)
     } else {
-      setDraftValue(formatStockValue(estimate.stock))
+      setDraftValue(formatStockValue(value))
     }
   }
 
@@ -860,12 +755,6 @@ function IntermediateInventoryField({
           }}
           className="number-input-clean w-24 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary disabled:text-ink-muted"
         />
-      </span>
-      <span className="mt-2 grid grid-cols-2 gap-2 text-xs text-ink-muted">
-        <span>净变动 {formatDailyAmount(estimate.netPerDay)}</span>
-        <span className={estimate.autoBalance ? 'text-warning' : undefined}>
-          消耗完 {formatDepletionDays(estimate)}
-        </span>
       </span>
     </label>
   )
