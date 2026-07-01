@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
-import { canEditConfig, canReplaceOperators, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
+import { canEditConfig, canReplaceOperators, canUseIntermediateAutoConfig, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
@@ -67,6 +67,8 @@ export default function OptimizePage({
   const permission = getPermissionMode(license)
   const userCanReplaceOperators = canReplaceOperators(license)
   const userCanEditConfig = canEditConfig(license)
+  const userCanUseIntermediateAutoConfig = permission === 'recommended' || permission === 'growth'
+  const userCanApplyConfigOverride = userCanEditConfig || userCanUseIntermediateAutoConfig
   const userCanUseUpgradeFeatures = canUseUpgradeFeatures(license)
   const activeConfig = useMemo(
     () => normalizeConfig(configOverride ?? license.config),
@@ -237,7 +239,7 @@ export default function OptimizePage({
   }, [clearGeneratedResult, license, setEliteOverrides, setLicense, userCanReplaceOperators])
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
-    if (!userCanEditConfig) return
+    if (!userCanApplyConfigOverride) return
     const next = normalizeConfig(activeConfig)
     mutate(next)
     next.layout = `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
@@ -249,7 +251,7 @@ export default function OptimizePage({
       showConfigValidationToast(nextValidation.message)
     }
     setInlineError(null)
-  }, [activeConfig, clearConfigValidationToast, setConfigOverride, showConfigValidationToast, userCanEditConfig])
+  }, [activeConfig, clearConfigValidationToast, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
 
   const resetConfig = useCallback(() => {
     setConfigOverride(null)
@@ -428,7 +430,9 @@ export default function OptimizePage({
   }, [finalResult, currentResult])
 
   const handleSaveWorkfile = useCallback(async () => {
-    const savedConfigOverride = userCanEditConfig && configChanged ? activeConfig : undefined
+    const savedConfigOverride = userCanEditConfig || canUseIntermediateAutoConfig(license, activeConfig)
+      ? configChanged ? activeConfig : undefined
+      : undefined
     const derivedKey = await deriveClientKey(license.sig)
     const clientSig = await signClientState(derivedKey, eliteOverrides, savedConfigOverride)
     const clientState: {
@@ -474,7 +478,7 @@ export default function OptimizePage({
             </span>
           </div>
           <p className="text-ink-secondary text-sm">
-            配置: {activeConfig.desc} · ID: {license.order_hash.slice(0, 8)}...
+            配置: {userCanEditConfig ? activeConfig.desc : '预设产物微调'} · ID: {license.order_hash.slice(0, 8)}...
           </p>
           <BuildMetaStrip meta={serverBuildMeta} placement="corner" />
         </div>
@@ -514,6 +518,7 @@ export default function OptimizePage({
       <CommandBand
         config={activeConfig}
         configChanged={configChanged}
+        showConfigDetails={userCanEditConfig}
         operatorCount={license.operators.length}
         fileId={license.order_hash.slice(0, 8)}
         validation={configValidation}
@@ -546,7 +551,9 @@ export default function OptimizePage({
             )}
           </span>
           <span className="text-xs font-medium text-ink-muted">
-            {SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · {activeConfig.layout} · {activeConfig.desc}
+            {userCanEditConfig
+              ? `${SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · ${activeConfig.layout} · ${activeConfig.desc}`
+              : '预设产物微调'}
           </span>
         </summary>
         <div className="border-t border-surface-3/60 p-4 sm:p-5">
@@ -554,6 +561,8 @@ export default function OptimizePage({
             config={activeConfig}
             permission={permission}
             canEdit={userCanEditConfig}
+            canEditIntermediateInventory={userCanUseIntermediateAutoConfig}
+            canEditShiftHours={userCanUseIntermediateAutoConfig}
             changed={configChanged}
             validation={configValidation}
             onUpdate={updateConfig}
@@ -661,6 +670,7 @@ function LicenseSyncPanel() {
 function CommandBand({
   config,
   configChanged,
+  showConfigDetails,
   operatorCount,
   fileId,
   validation,
@@ -675,6 +685,7 @@ function CommandBand({
 }: {
   config: LicenseConfig;
   configChanged: boolean;
+  showConfigDetails: boolean;
   operatorCount: number;
   fileId: string;
   validation: { ok: true } | { ok: false; message: string };
@@ -701,8 +712,14 @@ function CommandBand({
             <span className="rounded-full bg-surface-2 px-2.5 py-1">
               {SCHEDULE_MODE_LABELS[normalizeScheduleMode(config.schedule_mode)]}
             </span>
-            <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.layout}</span>
-            <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.desc}</span>
+            {showConfigDetails ? (
+              <>
+                <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.layout}</span>
+                <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.desc}</span>
+              </>
+            ) : (
+              <span className="rounded-full bg-surface-2 px-2.5 py-1">预设产物微调</span>
+            )}
             {configChanged && (
               <span className="rounded-full bg-warning/10 px-2.5 py-1 text-warning">配置已调整</span>
             )}
