@@ -29,11 +29,11 @@ const SHIFT_PRESETS = [
 type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
-  recommended: '推荐版',
-  growth: '成长版',
-  advanced: '单账号终身版',
-  ultimate: '尊享版',
-  admin: 'Admin',
+  recommended: '单次重置卡',
+  growth: '练度提升卡',
+  advanced: '单账号终身卡',
+  ultimate: 'Admin卡',
+  admin: 'Admin卡',
 }
 
 export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
@@ -335,8 +335,8 @@ export default function ConfigEditor({
             {note ?? (canEdit
               ? '修改配置后重新生成，保存进度文件会保留这次配置。'
               : autoInventoryOnly
-                ? `当前为 ${permission ? PERMISSION_LABELS[permission] : '成长版'} 权限，可通过中间产物库存自动调整推荐配置。`
-                : `当前为 ${permission ? PERMISSION_LABELS[permission] : '成长版'} 权限，使用授权文件内的固定配置。`)}
+? `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，可通过中间产物库存自动调整推荐配置。`
+: `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，使用授权文件内的固定配置。`)}
           </p>
         </div>
       {(canEdit || (canSelectPreset && !autoInventoryOnly)) && (

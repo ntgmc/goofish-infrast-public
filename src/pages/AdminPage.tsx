@@ -53,13 +53,13 @@ interface AdminUserSummary {
 const EMPTY_ANNOUNCEMENT: Announcement = { enabled: false, title: '', body: '', updated_at: null }
 
 const permissionLabels: Record<Permission, string> = {
-  recommended: '推荐版',
-  growth: '成长版',
-  advanced: '单账号终身版',
-  ultimate: '尊享版',
-  basic: '成长版',
-  premium: '单账号终身版',
-  admin: 'Admin',
+recommended: '单次重置卡',
+growth: '练度提升卡',
+advanced: '单账号终身卡',
+ultimate: 'Admin卡',
+basic: '练度提升卡',
+premium: '单账号终身卡',
+admin: 'Admin卡',
 }
 
 const statusLabels: Record<CdkStatus, string> = {
