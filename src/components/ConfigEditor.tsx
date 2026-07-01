@@ -18,6 +18,13 @@ export const SCHEDULE_MODE_LABELS: Record<string, string> = {
   rotation: '游戏内轮换',
 }
 
+const DEFAULT_SHIFT_HOURS = [8, 8, 8]
+const SHIFT_PRESETS = [
+  { label: '8-8-8', value: [8, 8, 8], note: '24h 固定间隔' },
+  { label: '12-12-12', value: [12, 12, 12], note: '12h 固定间隔' },
+  { label: '12-6-6', value: [12, 6, 6], note: '24h 非固定间隔' },
+]
+
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: '推荐版',
   growth: '成长版',
@@ -79,6 +86,35 @@ export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' {
     : 'maa'
 }
 
+function parseShiftHours(value: unknown): number[] | null {
+  const items = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[-,，、\s]+/).filter(Boolean)
+      : null
+  if (!items) return null
+  const hours = items.map((item) => Number(item))
+  if (hours.length === 0 || hours.length > 6) return null
+  if (hours.some((hour) => !Number.isFinite(hour) || hour <= 0)) return null
+  return hours.map((hour) => Math.round(hour * 100) / 100)
+}
+
+function isFixedShiftHours(hours: number[]): boolean {
+  return hours.length > 0 && hours.every((hour) => Math.abs(hour - hours[0]) <= 0.0001)
+}
+
+function isValidShiftHours(hours: number[]): boolean {
+  const total = hours.reduce((sum, hour) => sum + hour, 0)
+  if (Math.abs(total - 24) <= 0.0001) return true
+  return isFixedShiftHours(hours) && (Math.abs(hours[0] - 8) <= 0.0001 || Math.abs(hours[0] - 12) <= 0.0001)
+}
+
+function formatShiftHours(value: unknown): string {
+  if (typeof value === 'string') return value
+  const hours = parseShiftHours(value) ?? DEFAULT_SHIFT_HOURS
+  return hours.map((hour) => String(hour)).join('-')
+}
+
 function sumCounts(counts: Record<string, number> | undefined): number {
   return Object.values(counts ?? {}).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0)
 }
@@ -92,6 +128,7 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.trading_stations_count = Number.isFinite(next.trading_stations_count) ? next.trading_stations_count : 2
   next.manufacturing_stations_count = Number.isFinite(next.manufacturing_stations_count) ? next.manufacturing_stations_count : 4
   next.schedule_mode = normalizeScheduleMode(next.schedule_mode ?? next.mode)
+  next.shift_hours = parseShiftHours(next.shift_hours) ?? [...DEFAULT_SHIFT_HOURS]
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
   next.desc = next.desc || `${next.layout} 基建配置`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
@@ -126,6 +163,10 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
   const manufacturingTotal = sumCounts(config.product_requirements.manufacturing_stations)
   if (manufacturingTotal !== manufacturingCount) {
     return { ok: false, message: `制造产物数量合计为 ${manufacturingTotal}，需要等于 ${manufacturingCount}。` }
+  }
+  const shiftHours = parseShiftHours(config.shift_hours)
+  if (!shiftHours || !isValidShiftHours(shiftHours)) {
+    return { ok: false, message: '换班间隔需填写为 8-8-8、12-12-12，或合计 24 小时的非固定节奏，例如 12-6-6。' }
   }
   if (config.drones?.enable && !config.drones.auto && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
     return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
@@ -163,6 +204,8 @@ export default function ConfigEditor({
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
   const droneTargets = (config.drones?.targets ?? []).join(', ')
+  const shiftHours = parseShiftHours(config.shift_hours) ?? DEFAULT_SHIFT_HOURS
+  const shiftHoursText = formatShiftHours(config.shift_hours ?? shiftHours)
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
   const validationMessage = validation.ok === false ? validation.message : null
@@ -318,12 +361,42 @@ export default function ConfigEditor({
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs leading-5 text-ink-muted">
-                游戏内轮换暂不可用，当前仅支持生成 MAA 排班表。
-              </p>
+            <p className="mt-2 text-xs leading-5 text-ink-muted">
+              游戏内轮换暂不可用，当前仅支持生成 MAA 排班表。
+            </p>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-medium text-ink-muted">换班间隔</p>
+            <div className="grid grid-cols-3 gap-2">
+              {SHIFT_PRESETS.map((preset) => {
+                const active = shiftHoursText === formatShiftHours(preset.value)
+                return (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    disabled={!canEdit}
+                    onClick={() => onUpdate((next) => {
+                      next.shift_hours = [...preset.value]
+                      applyCounts(next)
+                    })}
+                    className={`rounded-lg border px-3 py-2 text-left transition-colors duration-150 disabled:cursor-not-allowed ${
+                      active
+                        ? 'border-brand-500 bg-brand-500/10 text-brand-300'
+                        : 'border-surface-4 bg-surface-1 text-ink-secondary hover:border-surface-5 hover:text-ink-primary disabled:text-ink-muted'
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">{preset.label}</span>
+                    <span className="mt-0.5 block text-xs text-ink-muted">{preset.note}</span>
+                  </button>
+                )
+              })}
             </div>
-            <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-              <span>菲亚梅塔</span>
+              <p className="mt-2 text-xs leading-5 text-ink-muted">
+                非固定间隔按实际班次计算心情与爆仓；12-6-6 时菲亚梅塔只加速第 1、3 班目标。
+              </p>
+          </div>
+          <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
+            <span>菲亚梅塔</span>
               <input
                 type="checkbox"
                 checked={!rotationMode && (config.Fiammetta?.enable ?? false)}
@@ -341,7 +414,7 @@ export default function ConfigEditor({
               </p>
             ) : config.Fiammetta?.enable && (
               <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
-                使用菲亚梅塔需要保证换班时间固定；如果使用 MAA 自带定时换班，请将换班间隔设为 8 小时或 12 小时。
+              菲亚梅塔按换班节奏计算目标；12-6-6 时只加速第 1、3 班。
               </p>
             )}
             <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">

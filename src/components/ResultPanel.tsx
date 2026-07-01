@@ -101,6 +101,10 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
     return { totalEff, plans, productionStats, detailStats }
   }, [result])
 
+  const shiftPattern = result.shift_pattern ?? result.shift_hours?.map((hour) => `${hour}h`).join('-') ?? result.planTimes
+  const totalScheduleHours = result.total_schedule_hours ?? result.daily_production?.hours
+  const fiammettaSlots = result.fiammetta_target_slots ?? []
+
   return (
     <div className="space-y-8">
       <div className="bg-surface-1 rounded-xl p-5 sm:p-6">
@@ -116,9 +120,9 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
                 : '排班 JSON 用于导入或交给 MAA 使用；保存进度文件后，下次可直接上传继续调整。'}
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
-            {!isRotationMode && (
-              <button
+        <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
+          {!isRotationMode && (
+            <button
                 type="button"
                 onClick={onDownload}
                 className="rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
@@ -132,11 +136,33 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
               className="rounded-xl bg-surface-2 px-5 py-3 font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
             >
               保存进度文件
-            </button>
-          </div>
+          </button>
         </div>
-        {isRotationMode ? <RotationManualGuide /> : <MaaImportGuide />}
       </div>
+      <div className="mt-5 grid gap-3 rounded-lg border border-brand-500/30 bg-brand-500/10 p-4 text-sm sm:grid-cols-3">
+        <div>
+          <p className="text-xs font-medium text-ink-muted">换班节奏</p>
+          <p className="mt-1 font-semibold text-ink-primary">{shiftPattern}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-ink-muted">统计周期</p>
+          <p className="mt-1 font-semibold text-ink-primary">
+            {totalScheduleHours ? `${formatCompactNumber(totalScheduleHours)} 小时` : '按班次配置'}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-ink-muted">菲亚梅塔加速</p>
+          <p className="mt-1 font-semibold text-ink-primary">
+            {result.plans.some((plan) => plan.Fiammetta?.enable)
+              ? fiammettaSlots.length > 0
+                ? `第 ${fiammettaSlots.join('、')} 班`
+                : '按可用目标自动安排'
+              : '未启用'}
+          </p>
+        </div>
+      </div>
+      {isRotationMode ? <RotationManualGuide /> : <MaaImportGuide />}
+    </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="预计总效率" value={totalEff.toFixed(2)} suffix="%" highlight />
@@ -171,13 +197,20 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
           {plans.map((plan, i) => (
             <div key={i} className="overflow-hidden rounded-xl bg-surface-1">
               <div className="flex items-center justify-between px-6 py-4 bg-surface-2/50">
+              <div>
                 <span className="font-semibold text-ink-primary">
                   {plan.name || `班次 ${i + 1}`}
                 </span>
-                {plan.Fiammetta?.enable && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning">
-                    菲亚梅塔 → {plan.Fiammetta.target}
+                {plan.shift_hours && (
+                  <span className="ml-2 text-xs font-medium text-ink-muted">
+                    {formatCompactNumber(plan.shift_hours)}h
                   </span>
+                )}
+              </div>
+              {plan.Fiammetta?.enable && plan.Fiammetta.target && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning">
+                  菲亚梅塔 → {plan.Fiammetta.target}
+                </span>
                 )}
               </div>
 
