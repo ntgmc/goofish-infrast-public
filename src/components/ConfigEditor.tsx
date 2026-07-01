@@ -24,6 +24,23 @@ const SHIFT_PRESETS = [
   { label: '12-12-12', value: [12, 12, 12], note: '12h 固定间隔' },
   { label: '12-6-6', value: [12, 6, 6], note: '24h 非固定间隔' },
 ]
+const INVENTORY_AUTO_BALANCE_DAYS = 7
+const ORUNDUM_SHARD_DAILY_CONSUMPTION = 24
+const SHARD_DAILY_PRODUCTION = 24
+const GOLD_DAILY_PRODUCTION = 20
+const LMD_EXPECTED_GOLD_DAILY_CONSUMPTION =
+  (24 * 60 * (2 * 0.3 + 3 * 0.5 + 4 * 0.2)) / (144 * 0.3 + 210 * 0.5 + 276 * 0.2)
+
+type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
+
+interface IntermediateEstimate {
+  stock: number | null;
+  producedPerDay: number;
+  consumedPerDay: number;
+  netPerDay: number;
+  depletionDays: number | null;
+  autoBalance: boolean;
+}
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: '推荐版',
@@ -138,6 +155,7 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
     order: next.drones?.order ?? 'pre',
     targets: Array.isArray(next.drones?.targets) ? next.drones.targets : [],
   }
+  next.intermediate_inventory = normalizeIntermediateInventory(next.intermediate_inventory)
   return next
 }
 
@@ -172,6 +190,98 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
     return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
   }
   return { ok: true }
+}
+
+function normalizeIntermediateInventory(value: unknown): Record<IntermediateProduct, number> {
+  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const next: Record<IntermediateProduct, number> = {
+    'Originium Shard': 0,
+    'Pure Gold': 0,
+  }
+  for (const product of Object.keys(next) as IntermediateProduct[]) {
+    const count = Number(source[product])
+    next[product] = Number.isFinite(count) ? Math.max(0, Math.round(count * 100) / 100) : 0
+  }
+  return next
+}
+
+function calculateIntermediateEstimate(config: LicenseConfig, product: IntermediateProduct): IntermediateEstimate {
+  const inventory = normalizeIntermediateInventory(config.intermediate_inventory)
+  const stock = inventory[product]
+  const trading = config.product_requirements.trading_stations
+  const manufacturing = config.product_requirements.manufacturing_stations
+  const producedPerDay = product === 'Originium Shard'
+    ? (manufacturing['Originium Shard'] ?? 0) * SHARD_DAILY_PRODUCTION
+    : (manufacturing['Pure Gold'] ?? 0) * GOLD_DAILY_PRODUCTION
+  const consumedPerDay = product === 'Originium Shard'
+    ? (trading.Orundum ?? 0) * ORUNDUM_SHARD_DAILY_CONSUMPTION
+    : (trading.LMD ?? 0) * LMD_EXPECTED_GOLD_DAILY_CONSUMPTION
+  const netPerDay = producedPerDay - consumedPerDay
+  const depletionDays = netPerDay < 0 ? stock / Math.abs(netPerDay) : null
+  const autoBalance = consumedPerDay > 0 && netPerDay <= 0 && depletionDays !== null && depletionDays <= INVENTORY_AUTO_BALANCE_DAYS
+
+  return {
+    stock,
+    producedPerDay,
+    consumedPerDay,
+    netPerDay,
+    depletionDays,
+    autoBalance,
+  }
+}
+
+function bindAutoDrones(config: LicenseConfig): void {
+  config.drones = {
+    ...(config.drones ?? { order: 'pre', targets: [] }),
+    enable: true,
+    auto: true,
+    order: config.drones?.order ?? 'pre',
+    targets: Array.isArray(config.drones?.targets) ? config.drones.targets : [],
+  }
+}
+
+function setRoomCounts(config: LicenseConfig, tradingCount: number, manufacturingCount: number): void {
+  config.trading_stations_count = Math.max(1, Math.min(5, tradingCount))
+  config.manufacturing_stations_count = Math.max(1, Math.min(5, manufacturingCount))
+}
+
+function applyIntermediateAutoBalance(config: LicenseConfig, product: IntermediateProduct): void {
+  bindAutoDrones(config)
+
+  if (product === 'Originium Shard') {
+    const currentOrundum = config.product_requirements.trading_stations.Orundum ?? 0
+    const orundumCount = Math.max(1, Math.min(currentOrundum || 1, config.trading_stations_count))
+    const requiredManufacturing = Math.min(5, orundumCount + 1)
+    if (config.manufacturing_stations_count < requiredManufacturing) {
+      setRoomCounts(config, 6 - requiredManufacturing, requiredManufacturing)
+    }
+    const tradingOrundum = Math.min(orundumCount, config.trading_stations_count)
+    const shardCount = Math.min(config.manufacturing_stations_count, tradingOrundum + 1)
+    config.product_requirements.trading_stations = {
+      ...(config.trading_stations_count - tradingOrundum > 0 ? { LMD: config.trading_stations_count - tradingOrundum } : {}),
+      Orundum: tradingOrundum,
+    }
+    config.product_requirements.manufacturing_stations = {
+      ...(config.manufacturing_stations_count - shardCount > 0 ? { 'Pure Gold': config.manufacturing_stations_count - shardCount } : {}),
+      'Originium Shard': shardCount,
+    }
+    return
+  }
+
+  const lmdCount = config.trading_stations_count
+  const requiredManufacturing = Math.min(5, lmdCount + 1)
+  if (config.manufacturing_stations_count < requiredManufacturing) {
+    setRoomCounts(config, 6 - requiredManufacturing, requiredManufacturing)
+  }
+  const finalLmdCount = config.trading_stations_count
+  const goldCount = Math.min(config.manufacturing_stations_count, finalLmdCount + 1)
+  config.product_requirements.trading_stations = { LMD: finalLmdCount }
+  config.product_requirements.manufacturing_stations = {
+    'Pure Gold': goldCount,
+    ...(config.manufacturing_stations_count - goldCount > 0
+      ? { 'Battle Record': config.manufacturing_stations_count - goldCount }
+      : {}),
+  }
 }
 
 interface ConfigEditorProps {
@@ -209,6 +319,8 @@ export default function ConfigEditor({
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
   const validationMessage = validation.ok === false ? validation.message : null
+  const shardEstimate = calculateIntermediateEstimate(config, 'Originium Shard')
+  const goldEstimate = calculateIntermediateEstimate(config, 'Pure Gold')
 
   const applyPreset = (preset: LicenseConfig) => {
     onUpdate((next) => {
@@ -240,6 +352,21 @@ export default function ConfigEditor({
   const setProductCount = (group: ProductGroup, product: string, value: number) => {
     onUpdate((next) => {
       next.product_requirements[group][product] = Math.max(0, Math.min(6, value))
+      applyCounts(next)
+    })
+  }
+
+  const setIntermediateInventory = (product: IntermediateProduct, value: number) => {
+    onUpdate((next) => {
+      const stock = Number.isFinite(value) ? Math.max(0, value) : 0
+      next.intermediate_inventory = {
+        ...normalizeIntermediateInventory(next.intermediate_inventory),
+        [product]: stock,
+      }
+      const estimate = calculateIntermediateEstimate(next, product)
+      if (estimate.autoBalance) {
+        applyIntermediateAutoBalance(next, product)
+      }
       applyCounts(next)
     })
   }
@@ -328,6 +455,12 @@ export default function ConfigEditor({
               counts={config.product_requirements.manufacturing_stations}
               canEdit={canEdit}
               onChange={(product, value) => setProductCount('manufacturing_stations', product, value)}
+            />
+            <IntermediateInventoryEditor
+              canEdit={canEdit}
+              shardEstimate={shardEstimate}
+              goldEstimate={goldEstimate}
+              onChange={setIntermediateInventory}
             />
           </div>
         </div>
@@ -537,6 +670,92 @@ function fitProductCounts(
     next[fallbackProduct] = (next[fallbackProduct] ?? 0) + remaining
   }
   return next
+}
+
+function formatStockValue(value: number | null): string {
+  return value === null ? '' : String(value)
+}
+
+function formatDailyAmount(value: number): string {
+  return `${value >= 0 ? '+' : ''}${(Math.round(value * 10) / 10).toLocaleString('zh-CN')}/日`
+}
+
+function formatDepletionDays(estimate: IntermediateEstimate): string {
+  if (estimate.consumedPerDay <= 0) return '暂无消耗'
+  if (estimate.depletionDays === null) return '不会消耗完'
+  if (estimate.depletionDays < 0.1) return '<0.1 日'
+  return `${(Math.round(estimate.depletionDays * 10) / 10).toLocaleString('zh-CN')} 日`
+}
+
+function IntermediateInventoryEditor({
+  canEdit,
+  shardEstimate,
+  goldEstimate,
+  onChange,
+}: {
+  canEdit: boolean;
+  shardEstimate: IntermediateEstimate;
+  goldEstimate: IntermediateEstimate;
+  onChange: (product: IntermediateProduct, value: number) => void;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium text-ink-muted">中间产物库存</p>
+      <div className="space-y-2">
+        <IntermediateInventoryField
+          label="源石碎片"
+          product="Originium Shard"
+          estimate={shardEstimate}
+          canEdit={canEdit}
+          onChange={onChange}
+        />
+        <IntermediateInventoryField
+          label="赤金"
+          product="Pure Gold"
+          estimate={goldEstimate}
+          canEdit={canEdit}
+          onChange={onChange}
+        />
+      </div>
+    </div>
+  )
+}
+
+function IntermediateInventoryField({
+  label,
+  product,
+  estimate,
+  canEdit,
+  onChange,
+}: {
+  label: string;
+  product: IntermediateProduct;
+  estimate: IntermediateEstimate;
+  canEdit: boolean;
+  onChange: (product: IntermediateProduct, value: number) => void;
+}) {
+  return (
+    <label className="block rounded-lg bg-surface-1 px-3 py-3 text-sm">
+      <span className="flex items-center justify-between gap-3">
+        <span className="text-ink-secondary">{label}</span>
+        <input
+          type="number"
+          min={0}
+          step={1}
+          value={formatStockValue(estimate.stock)}
+          disabled={!canEdit}
+          onChange={(event) => onChange(product, Number(event.currentTarget.value))}
+          className="number-input-clean w-24 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary disabled:text-ink-muted"
+        />
+      </span>
+      <span className="mt-2 grid grid-cols-2 gap-2 text-xs text-ink-muted">
+        <span>净变动 {formatDailyAmount(estimate.netPerDay)}</span>
+        <span className={estimate.autoBalance ? 'text-warning' : undefined}>
+          消耗完 {formatDepletionDays(estimate)}
+        </span>
+      </span>
+    </label>
+  )
 }
 
 function CounterField({
