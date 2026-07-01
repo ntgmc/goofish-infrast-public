@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,14 +23,13 @@ env:
 jobs:
   refresh-build-metadata:
     name: Refresh Build Metadata
+    permissions:
+      contents: write
     if: >-
       github.actor != 'github-actions[bot]' &&
       (
-        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-        (
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        )
+        github.ref == 'refs/heads/main' &&
+        (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 10
