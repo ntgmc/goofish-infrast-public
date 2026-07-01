@@ -107,6 +107,20 @@ export interface FreePreviewResult {
     label: string;
     note: string;
   };
+  limited_schedule: {
+    plan_name: string;
+    plan_count: number;
+    room_limit: number;
+    hidden_room_count: number;
+    rooms: {
+      key: string;
+      label: string;
+      index_label: string;
+      product: string;
+      operators: string[];
+      efficiency: number;
+    }[];
+  };
   notices: string[];
   build_meta: AppBuildMeta;
 }

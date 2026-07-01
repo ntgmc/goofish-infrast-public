@@ -135,7 +135,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
         )}
 
         <p className="mt-6 text-center text-xs text-ink-muted">
-          免费预览不会生成排班表或 MAA JSON。CDK 会在本站生成授权文件，授权文件和保存进度文件通常以 .maa 结尾。
+          免费预览仅展示前 3 个房间，不提供完整排班或 MAA JSON。CDK 会在本站生成授权文件，授权文件和保存进度文件通常以 .maa 结尾。
         </p>
         <div className="mt-3 text-center">
           <button
@@ -416,7 +416,7 @@ function FreePreviewPanel({ onUseCdk }: { onUseCdk: () => void }) {
           changed={false}
           validation={configValidation}
           onUpdate={updateConfig}
-          note="免费预览会读取当前基建配置，但不会返回完整排班结果。"
+          note="免费预览会生成限制级排班，仅展示前 3 个房间。"
         />
       </div>
 
@@ -431,9 +431,9 @@ function FreePreviewResultCard({ preview, onUseCdk }: { preview: FreePreviewResu
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-medium text-brand-400">免费预览已生成</p>
-          <h2 className="mt-1 text-xl font-semibold text-ink-primary">账号和基建概览</h2>
+          <h2 className="mt-1 text-xl font-semibold text-ink-primary">限制级排班预览</h2>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">
-            这里只展示是否值得继续计算的判断，不包含完整排班表和干员组合。
+            已按当前练度生成排班，但免费版只展示前 3 个房间。完整房间、练度建议和 MAA JSON 需使用 CDK。
           </p>
         </div>
         <button
@@ -455,6 +455,8 @@ function FreePreviewResultCard({ preview, onUseCdk }: { preview: FreePreviewResu
         <p className="text-sm font-semibold text-ink-primary">当前基建布局</p>
         <p className="mt-1 text-sm leading-6 text-ink-secondary">{preview.support.reason}</p>
       </div>
+
+      <LimitedSchedulePreview preview={preview} />
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
@@ -482,6 +484,54 @@ function FreePreviewResultCard({ preview, onUseCdk }: { preview: FreePreviewResu
       </div>
     </section>
   )
+}
+
+function LimitedSchedulePreview({ preview }: { preview: FreePreviewResult }) {
+  const schedule = preview.limited_schedule
+  const hiddenRoomCopy = schedule.hidden_room_count > 0
+    ? `另有 ${schedule.hidden_room_count} 个房间和后续班次需使用 CDK 解锁。`
+    : '完整结果可下载 MAA JSON 并保存进度。'
+
+  return (
+    <div className="mt-5 overflow-hidden rounded-lg border border-brand-500/20 bg-brand-500/5">
+      <div className="flex flex-col gap-2 border-b border-brand-500/15 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-ink-primary">免费排班表，前 {schedule.room_limit} 个房间</h3>
+          <p className="mt-1 text-xs leading-5 text-ink-secondary">
+            {schedule.plan_name} · 共 {schedule.plan_count} 个班次。{hiddenRoomCopy}
+          </p>
+        </div>
+        <span className="self-start rounded-full bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning sm:self-auto">
+          限制级预览
+        </span>
+      </div>
+      <div className="divide-y divide-surface-3/60">
+        {schedule.rooms.map((room) => (
+          <div key={room.key} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[minmax(90px,0.65fr)_minmax(80px,0.5fr)_minmax(0,1.8fr)_auto] sm:items-center">
+            <div className="font-medium text-ink-primary">
+              {room.label}
+              {room.index_label && <span className="ml-1 text-ink-muted">{room.index_label}</span>}
+            </div>
+            <div className="text-ink-muted">{room.product}</div>
+            <div className="min-w-0 leading-6 text-ink-secondary">{room.operators.join(', ')}</div>
+            <div className="font-mono text-sm font-semibold text-brand-400 sm:text-right">
+              {formatPreviewEfficiency(room.efficiency)}
+            </div>
+          </div>
+        ))}
+      </div>
+      {schedule.rooms.length === 0 && (
+        <p className="px-4 py-3 text-sm text-ink-secondary">
+          当前配置暂未生成可展示房间，请检查干员数据或基建配置后重试。
+        </p>
+      )}
+    </div>
+  )
+}
+
+function formatPreviewEfficiency(value: number): string {
+  if (!Number.isFinite(value)) return '-'
+  return `${value.toFixed(1)}%`
 }
 
 function PreviewMetric({ label, value }: { label: string; value: string }) {
