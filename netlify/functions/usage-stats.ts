@@ -2,7 +2,8 @@ import type { Context } from '@netlify/functions'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { jsonResponse, requireEnv } from './license-utils'
+import { authenticateAdminRequest } from './admin-auth'
+import { jsonResponse } from './license-utils'
 
 type UsageEventName = 'tool_visit' | 'schedule_generate' | 'cdk_redeem'
 
@@ -86,10 +87,8 @@ async function handlePublicPost(req: Request): Promise<Response> {
 }
 
 async function handleAdminGet(req: Request): Promise<Response> {
-  const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
-  const providedPassword = req.headers.get('X-Admin-Password')
-  if (providedPassword !== adminPassword) {
-    return jsonResponse({ error: '管理口令错误。' }, 401)
+  if (!(await authenticateAdminRequest(req))) {
+    return jsonResponse({ error: '管理账号或密码错误。' }, 401)
   }
 
   const store = await getUsageEventStore()

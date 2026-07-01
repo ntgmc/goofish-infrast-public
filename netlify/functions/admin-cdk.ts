@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions'
 import type { ProductPermissionMode } from '../../src/lib/types'
+import { authenticateAdminRequest } from './admin-auth'
 import {
   CDK_PRODUCT_PERMISSIONS,
   generateCdk,
@@ -40,16 +41,17 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   }
 
   try {
-    const { admin_password, permission, order_note } = await req.json() as {
+    const body = await req.json() as {
       admin_password?: string;
+      admin_user?: string;
       permission?: string;
       order_note?: string;
     }
-    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
+    const { permission, order_note } = body
     const hashSecret = requireEnv('CDK_HASH_SECRET')
 
-    if (admin_password !== adminPassword) {
-      return jsonResponse({ error: '管理口令错误。' }, 401)
+    if (!(await authenticateAdminRequest(req, body))) {
+      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
     }
     if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
       return jsonResponse({ error: 'CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
@@ -95,10 +97,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
 async function handleList(req: Request): Promise<Response> {
   try {
-    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
-    const providedPassword = req.headers.get('X-Admin-Password')
-    if (providedPassword !== adminPassword) {
-      return jsonResponse({ error: '管理口令错误。' }, 401)
+    if (!(await authenticateAdminRequest(req))) {
+      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
     }
 
     const status = normalizeStatusFilter(req.headers.get('X-Cdk-Status'), req.url)
@@ -121,16 +121,17 @@ async function handleList(req: Request): Promise<Response> {
 
 async function handlePatch(req: Request): Promise<Response> {
   try {
-    const { admin_password, code_hash, action, permission } = await req.json() as {
+    const body = await req.json() as {
       admin_password?: string;
+      admin_user?: string;
       code_hash?: string;
       action?: string;
       permission?: string;
     }
-    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
+    const { code_hash, action, permission } = body
 
-    if (admin_password !== adminPassword) {
-      return jsonResponse({ error: '管理口令错误。' }, 401)
+    if (!(await authenticateAdminRequest(req, body))) {
+      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
     }
     if (action !== 'revoke' && action !== 'upgrade' && action !== 'grant_operator_update' && action !== 'unfreeze') {
       return jsonResponse({ error: 'Unsupported action.' }, 400)
@@ -269,14 +270,15 @@ async function handlePatch(req: Request): Promise<Response> {
 
 async function handleDelete(req: Request): Promise<Response> {
   try {
-    const { admin_password, code_hash } = await req.json() as {
+    const body = await req.json() as {
       admin_password?: string;
+      admin_user?: string;
       code_hash?: string;
     }
-    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
+    const { code_hash } = body
 
-    if (admin_password !== adminPassword) {
-      return jsonResponse({ error: 'Invalid admin password.' }, 401)
+    if (!(await authenticateAdminRequest(req, body))) {
+      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
     }
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
       return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
