@@ -25,6 +25,7 @@ export interface LicenseConfig {
     order: string;
     targets: string[];
   };
+  intermediate_inventory?: Record<string, number>;
   [key: string]: unknown;
 }
 
