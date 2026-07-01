@@ -197,7 +197,8 @@ export function canUseIntermediateAutoConfig(
 }
 
 export function canReplaceOperators(license: LicenseFile): boolean {
-  return getPermissionMode(license) === "admin" || (license.operator_update_grant?.remaining ?? 0) > 0;
+  const permission = getPermissionMode(license);
+  return permission === "advanced" || permission === "admin" || (license.operator_update_grant?.remaining ?? 0) > 0;
 }
 
 function isRawPermissionMode(value: string): value is RawPermissionMode {

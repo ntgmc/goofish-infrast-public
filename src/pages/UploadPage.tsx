@@ -6,6 +6,7 @@ import BuildMetaStrip from '../components/BuildMetaStrip'
 import ResultPanel from '../components/ResultPanel'
 import { downloadLicenseFile } from '../lib/download'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
+import { bindPendingActivationToken, getPendingActivationToken } from '../lib/activation-token'
 
 interface Props {
   onFileLoaded: (content: string) => Promise<void>;
@@ -804,7 +805,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
       return
     }
     if (!confirmed) {
-      setError('请先确认 CDK 仅可使用一次。')
+      setError('请先确认 CDK 使用规则。')
       return
     }
     if (!configValidation.ok) {
@@ -820,6 +821,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
           code,
           operators,
           config: normalizedConfig,
+          activation_token: getPendingActivationToken(),
         }),
       })
       const data = await resp.json() as {
@@ -833,6 +835,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
       if (!data.license_file_content || !data.license) {
         throw new Error('兑换响应缺少授权文件。')
       }
+      bindPendingActivationToken(data.license)
       downloadLicenseFile(data.license_file_content, data.license.order_hash)
       onLicenseRedeemed(data.license, data.license_file_content)
     } catch (e) {
@@ -935,8 +938,8 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
                 ? `${validatedCdk.permission_label}可在生成授权文件前调整基建配置。`
                 : cdkCanEditLimitedConfig
                   ? `${validatedCdk.permission_label}可选择预设、填写中间产物库存并修改换班间隔；库存不足时仅微调一个制造站产物。`
-                  : `${validatedCdk.permission_label}仅支持预设配置，进阶版以上可自定义基建配置。`}
-            />
+          : `${validatedCdk.permission_label}仅支持预设配置，单账号终身版以上可自定义基建配置。`}
+      />
           </div>
 
           <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6" data-tour="redeem-action">
@@ -948,8 +951,8 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
                 className="mt-1 h-4 w-4 flex-shrink-0 accent-brand-500"
               />
               <span>
-                我确认 CDK 仅可使用一次，提交后本次导入的干员和配置不能再次修改。
-              </span>
+            我确认 CDK 仅可首次兑换一次；单账号终身版后续可更新干员数据，但受每 7 天 2 次与账号绑定风控限制。
+          </span>
             </label>
             <button
               type="submit"

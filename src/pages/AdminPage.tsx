@@ -3,7 +3,7 @@ import type { Announcement, ProductPermissionMode, RawPermissionMode } from '../
 
 type Permission = RawPermissionMode
 type GeneratedPermission = ProductPermissionMode
-type CdkStatus = 'unused' | 'used' | 'revoked'
+type CdkStatus = 'unused' | 'used' | 'frozen' | 'revoked'
 type StatusFilter = CdkStatus | 'all'
 type AdminSection = 'overview' | 'cdk' | 'announcement'
 
@@ -15,6 +15,8 @@ interface AdminCdkRecord {
   created_at: string;
   used_at: string | null;
   revoked_at: string | null;
+  frozen_at?: string | null;
+  freeze_reason?: string | null;
   schedule_generate_count?: number;
   order_note: string | null;
   license_order_hash: string | null;
@@ -25,6 +27,12 @@ interface AdminCdkRecord {
   operator_update_grant_remaining?: number;
   operator_update_granted_at?: string | null;
   operator_update_consumed_at?: string | null;
+  operator_update_event_count?: number;
+  activation_bound?: boolean;
+  user_agent_count?: number;
+  ip_prefix_count?: number;
+  risk_event_count?: number;
+  latest_risk_event?: { at: string; type: string; reason: string } | null;
 }
 
 interface CdkListResponse {
@@ -52,6 +60,12 @@ interface RevokeCdkResponse {
   error?: string;
   revoked?: boolean;
   already_revoked?: boolean;
+}
+
+interface UnfreezeCdkResponse {
+  error?: string;
+  unfrozen?: boolean;
+  already_unfrozen?: boolean;
 }
 
 interface UpgradeCdkResponse {
@@ -99,10 +113,10 @@ const EMPTY_ANNOUNCEMENT: Announcement = {
 const permissionLabels: Record<Permission, string> = {
   recommended: '推荐版',
   growth: '成长版',
-  advanced: '进阶版',
+  advanced: '单账号终身版',
   ultimate: '尊享版',
   basic: '成长版',
-  premium: '进阶版',
+  premium: '单账号终身版',
   admin: 'Admin',
 }
 const cdkProductPermissions: GeneratedPermission[] = ['recommended', 'growth', 'advanced', 'ultimate']
@@ -116,12 +130,14 @@ const cdkProductPermissionRank: Record<GeneratedPermission, number> = {
 const statusLabels: Record<CdkStatus, string> = {
   unused: '未使用',
   used: '已使用',
+  frozen: '已冻结',
   revoked: '已撤销',
 }
 
 const statusFilterLabels: Record<StatusFilter, string> = {
   unused: '未使用',
   used: '已使用',
+  frozen: '已冻结',
   revoked: '已撤销',
   all: '全部',
 }
@@ -145,6 +161,7 @@ export default function AdminPage() {
   const [generateLoading, setGenerateLoading] = useState(false)
   const [deletingCdkHash, setDeletingCdkHash] = useState<string | null>(null)
   const [revokingCdkHash, setRevokingCdkHash] = useState<string | null>(null)
+  const [unfreezingCdkHash, setUnfreezingCdkHash] = useState<string | null>(null)
   const [upgradingCdkHash, setUpgradingCdkHash] = useState<string | null>(null)
   const [grantingOperatorUpdateHash, setGrantingOperatorUpdateHash] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -165,8 +182,9 @@ export default function AdminPage() {
   const summary = useMemo(() => {
     const unused = records.filter((record) => record.status === 'unused').length
     const used = records.filter((record) => record.status === 'used').length
+    const frozen = records.filter((record) => record.status === 'frozen').length
     const revoked = records.filter((record) => record.status === 'revoked').length
-    return { unused, used, revoked, total: records.length }
+    return { unused, used, frozen, revoked, total: records.length }
   }, [records])
 
   const pageCount = Math.max(1, Math.ceil(records.length / cdkPageSize))
@@ -179,11 +197,11 @@ export default function AdminPage() {
     return records.filter((record) => selected.has(record.code_hash))
   }, [records, selectedCdkHashes])
   const bulkEligibleRecords = useMemo(() => ({
-    upgrade: selectedRecords.filter((record) => record.status !== 'revoked' && Boolean(getNextProductPermission(record.permission))),
+    upgrade: selectedRecords.filter((record) => record.status !== 'revoked' && record.status !== 'frozen' && Boolean(getNextProductPermission(record.permission))),
     grant_operator_update: selectedRecords.filter(
-      (record) => record.status === 'used' && (record.operator_update_grant_remaining ?? 0) <= 0
+      (record) => record.status === 'used' && record.permission !== 'advanced' && record.permission !== 'premium' && (record.operator_update_grant_remaining ?? 0) <= 0
     ),
-    revoke: selectedRecords.filter((record) => record.status === 'used'),
+    revoke: selectedRecords.filter((record) => record.status === 'used' || record.status === 'frozen'),
     delete: selectedRecords.filter((record) => record.status === 'unused'),
   }), [selectedRecords])
   const pageSelected = visibleRecords.length > 0 && visibleRecords.every((record) => selectedCdkHashes.includes(record.code_hash))
@@ -511,7 +529,7 @@ export default function AdminPage() {
   }
 
   const handleRevokeRecord = async (record: AdminCdkRecord) => {
-    if (record.status !== 'used') return
+    if (record.status !== 'used' && record.status !== 'frozen') return
     const confirmed = window.confirm(`确认撤销授权 ${record.cdk_id}？撤销后不可恢复，用户将无法继续生成排班。`)
     if (!confirmed) return
 
@@ -536,7 +554,37 @@ export default function AdminPage() {
     } catch (e) {
       setError((e as Error).message)
     } finally {
-      setRevokingCdkHash(null)
+    setRevokingCdkHash(null)
+  }
+}
+
+  const handleUnfreezeRecord = async (record: AdminCdkRecord) => {
+    if (record.status !== 'frozen') return
+    const confirmed = window.confirm(`确认解冻授权 ${record.cdk_id}？解冻后用户可继续使用，历史风控记录会保留。`)
+    if (!confirmed) return
+
+    setError(null)
+    setCopyStatus(null)
+    setUnfreezingCdkHash(record.code_hash)
+    try {
+      const resp = await fetch('/api/admin/cdk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_password: adminPassword,
+          code_hash: record.code_hash,
+          action: 'unfreeze',
+        }),
+      })
+      const data = await resp.json() as UnfreezeCdkResponse
+      if (!resp.ok) {
+        throw new Error(data.error || `解冻失败: ${resp.status}`)
+      }
+      await loadCdkRecords(adminPassword, statusFilter)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setUnfreezingCdkHash(null)
     }
   }
 
@@ -880,6 +928,7 @@ export default function AdminPage() {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <CdkStat label="未使用" value={summary.unused} />
                         <CdkStat label="已使用" value={summary.used} />
+                        <CdkStat label="已冻结" value={summary.frozen} />
                         <CdkStat label="已撤销" value={summary.revoked} />
                         <CdkStat label="当前列表" value={summary.total} />
                       </div>
@@ -921,7 +970,7 @@ export default function AdminPage() {
                         </button>
                       </div>
                       <div className="inline-flex self-start rounded-lg bg-surface-2 p-1 xl:self-auto">
-                        {(['unused', 'used', 'revoked', 'all'] as const).map((item) => (
+                        {(['unused', 'used', 'frozen', 'revoked', 'all'] as const).map((item) => (
                           <button
                             key={item}
                             type="button"
@@ -1017,18 +1066,20 @@ export default function AdminPage() {
                                         {upgradingCdkHash === record.code_hash ? '升级中' : `升到${permissionLabels[getNextProductPermission(record.permission)!]}`}
                                       </button>
                                     )}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleGrantOperatorUpdate(record)}
-                                      disabled={grantingOperatorUpdateHash === record.code_hash || (record.operator_update_grant_remaining ?? 0) > 0}
-                                      className="rounded-md bg-success/10 px-2.5 py-1.5 text-xs font-semibold text-success transition-colors duration-150 hover:bg-success/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                                    >
-                                      {grantingOperatorUpdateHash === record.code_hash
-                                        ? '发放中'
-                                        : (record.operator_update_grant_remaining ?? 0) > 0
-                                          ? '待使用'
-                                          : '发放更新'}
-                                    </button>
+                                {record.permission !== 'advanced' && record.permission !== 'premium' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleGrantOperatorUpdate(record)}
+                                    disabled={grantingOperatorUpdateHash === record.code_hash || (record.operator_update_grant_remaining ?? 0) > 0}
+                                    className="rounded-md bg-success/10 px-2.5 py-1.5 text-xs font-semibold text-success transition-colors duration-150 hover:bg-success/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                                  >
+                                    {grantingOperatorUpdateHash === record.code_hash
+                                      ? '发放中'
+                                      : (record.operator_update_grant_remaining ?? 0) > 0
+                                        ? '待使用'
+                                        : '发放更新'}
+                                  </button>
+                                )}
                                     <button
                                       type="button"
                                       onClick={() => handleRevokeRecord(record)}
@@ -1037,10 +1088,29 @@ export default function AdminPage() {
                                     >
                                       {revokingCdkHash === record.code_hash ? '撤销中' : '撤销'}
                                     </button>
-                                  </div>
-                                ) : (
-                                  <span className="text-ink-muted">-</span>
-                                )}
+                              </div>
+                            ) : record.status === 'frozen' ? (
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUnfreezeRecord(record)}
+                                  disabled={unfreezingCdkHash === record.code_hash}
+                                  className="rounded-md bg-success/10 px-2.5 py-1.5 text-xs font-semibold text-success transition-colors duration-150 hover:bg-success/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                                >
+                                  {unfreezingCdkHash === record.code_hash ? '解冻中' : '解冻'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRevokeRecord(record)}
+                                  disabled={revokingCdkHash === record.code_hash}
+                                  className="rounded-md bg-error/10 px-2.5 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
+                                >
+                                  {revokingCdkHash === record.code_hash ? '撤销中' : '撤销'}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-ink-muted">-</span>
+                            )}
                               </td>
                               <td className="whitespace-nowrap px-4 py-4 align-top">
                                 <div className="flex flex-col items-start gap-2">
@@ -1048,6 +1118,8 @@ export default function AdminPage() {
                                   <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                                     record.status === 'unused'
                                       ? 'bg-success/10 text-success'
+                                      : record.status === 'frozen'
+                                        ? 'bg-warning/10 text-warning'
                                       : record.status === 'revoked'
                                         ? 'bg-error/10 text-error'
                                         : 'bg-surface-3 text-ink-secondary'
@@ -1265,6 +1337,19 @@ function UsageInfo({ record }: { record: AdminCdkRecord }) {
       ) : grantCount > 0 ? (
         <div className="text-xs text-ink-muted">干员更新已用 {usedCount}/{grantCount}</div>
       ) : null}
+      {(record.operator_update_event_count ?? 0) > 0 && (
+        <div className="text-xs text-ink-muted">终身版更新 {record.operator_update_event_count} 次</div>
+      )}
+      {record.activation_bound && (
+        <div className="text-xs text-ink-muted">
+          已绑定设备 / UA {record.user_agent_count ?? 0} / IP {record.ip_prefix_count ?? 0}
+        </div>
+      )}
+      {record.status === 'frozen' && (
+        <div className="text-xs text-warning">
+          冻结 {formatDate(record.frozen_at ?? null)}：{record.freeze_reason || record.latest_risk_event?.reason || '触发风控'}
+        </div>
+      )}
       {record.status === 'revoked' && record.revoked_at && (
         <div className="text-xs text-error">撤销 {formatDate(record.revoked_at)}</div>
       )}
@@ -1338,6 +1423,9 @@ function formatUsage(record: AdminCdkRecord): string {
       : grantCount > 0
         ? `干员更新已用 ${usedCount}/${grantCount}`
         : null,
+    (record.operator_update_event_count ?? 0) > 0 ? `终身版更新 ${record.operator_update_event_count} 次` : null,
+    record.activation_bound ? `设备绑定 UA ${record.user_agent_count ?? 0} / IP ${record.ip_prefix_count ?? 0}` : null,
+    record.status === 'frozen' ? `冻结 ${record.freeze_reason || record.latest_risk_event?.reason || ''}` : null,
     record.status === 'revoked' && record.revoked_at ? `撤销 ${formatDate(record.revoked_at)}` : null,
   ].filter(Boolean)
   return parts.length > 0 ? parts.join(' / ') : '-'

@@ -31,7 +31,7 @@ type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: '推荐版',
   growth: '成长版',
-  advanced: '进阶版',
+  advanced: '单账号终身版',
   ultimate: '尊享版',
   admin: 'Admin',
 }
