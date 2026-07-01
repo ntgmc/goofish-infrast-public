@@ -5,7 +5,7 @@ type Permission = RawPermissionMode
 type GeneratedPermission = ProductPermissionMode
 type CdkStatus = 'unused' | 'used' | 'frozen' | 'revoked'
 type StatusFilter = CdkStatus | 'all'
-type AdminSection = 'overview' | 'cdk' | 'announcement'
+type AdminSection = 'overview' | 'cdk' | 'risk' | 'announcement'
 
 interface AdminCdkRecord {
   code_hash: string;
@@ -25,65 +25,12 @@ interface AdminCdkRecord {
   operator_update_grant_count?: number;
   operator_update_used_count?: number;
   operator_update_grant_remaining?: number;
-  operator_update_granted_at?: string | null;
-  operator_update_consumed_at?: string | null;
   operator_update_event_count?: number;
   activation_bound?: boolean;
   user_agent_count?: number;
   ip_prefix_count?: number;
   risk_event_count?: number;
   latest_risk_event?: { at: string; type: string; reason: string } | null;
-}
-
-interface CdkListResponse {
-  error?: string;
-  status?: StatusFilter;
-  total?: number;
-  cdks?: AdminCdkRecord[];
-}
-
-type CdkBulkAction = 'upgrade' | 'grant_operator_update' | 'revoke' | 'delete'
-
-interface GenerateCdkResponse {
-  error?: string;
-  code?: string;
-  permission?: GeneratedPermission;
-  created_at?: string;
-}
-
-interface DeleteCdkResponse {
-  error?: string;
-  deleted?: boolean;
-}
-
-interface RevokeCdkResponse {
-  error?: string;
-  revoked?: boolean;
-  already_revoked?: boolean;
-}
-
-interface UnfreezeCdkResponse {
-  error?: string;
-  unfrozen?: boolean;
-  already_unfrozen?: boolean;
-}
-
-interface UpgradeCdkResponse {
-  error?: string;
-  upgraded?: boolean;
-  previous_permission?: GeneratedPermission;
-  permission?: GeneratedPermission;
-}
-
-interface GrantOperatorUpdateResponse {
-  error?: string;
-  granted?: boolean;
-  already_granted?: boolean;
-  operator_update_grant_remaining?: number;
-}
-
-interface AnnouncementResponse extends Partial<Announcement> {
-  error?: string;
 }
 
 interface UsageTotals {
@@ -97,18 +44,13 @@ interface UsageDay extends UsageTotals {
   date: string;
 }
 
-interface UsageStatsResponse {
-  error?: string;
-  totals?: UsageTotals;
-  days?: UsageDay[];
+interface AdminUserSummary {
+  username: string;
+  created_at: string;
+  updated_at: string;
 }
 
-const EMPTY_ANNOUNCEMENT: Announcement = {
-  enabled: false,
-  title: '',
-  body: '',
-  updated_at: null,
-}
+const EMPTY_ANNOUNCEMENT: Announcement = { enabled: false, title: '', body: '', updated_at: null }
 
 const permissionLabels: Record<Permission, string> = {
   recommended: '推荐版',
@@ -119,13 +61,6 @@ const permissionLabels: Record<Permission, string> = {
   premium: '单账号终身版',
   admin: 'Admin',
 }
-const cdkProductPermissions: GeneratedPermission[] = ['recommended', 'growth', 'advanced', 'ultimate']
-const cdkProductPermissionRank: Record<GeneratedPermission, number> = {
-  recommended: 0,
-  growth: 1,
-  advanced: 2,
-  ultimate: 3,
-}
 
 const statusLabels: Record<CdkStatus, string> = {
   unused: '未使用',
@@ -134,1258 +69,574 @@ const statusLabels: Record<CdkStatus, string> = {
   revoked: '已撤销',
 }
 
-const statusFilterLabels: Record<StatusFilter, string> = {
-  unused: '未使用',
-  used: '已使用',
-  frozen: '已冻结',
-  revoked: '已撤销',
-  all: '全部',
+const sectionLabels: Record<AdminSection, string> = {
+  overview: '总览',
+  cdk: 'CDK',
+  risk: '风控',
+  announcement: '公告',
 }
 
-const cdkPageSizeOptions = [10, 20, 50] as const
-
-const adminSections: Array<{ id: AdminSection; label: string; description: string }> = [
-  { id: 'overview', label: '概览统计', description: '访问、生成和兑换趋势' },
-  { id: 'cdk', label: 'CDK 管理', description: '生成、筛选和处理授权' },
-  { id: 'announcement', label: '公告设置', description: '维护工具页顶部公告' },
-]
+const cdkProductPermissions: GeneratedPermission[] = ['recommended', 'growth', 'advanced', 'ultimate']
+const cdkProductPermissionRank: Record<GeneratedPermission, number> = {
+  recommended: 0,
+  growth: 1,
+  advanced: 2,
+  ultimate: 3,
+}
 
 export default function AdminPage() {
-  const [adminPassword, setAdminPassword] = useState('')
-  const [authenticated, setAuthenticated] = useState(false)
+  const [credentials, setCredentials] = useState(() => readStoredCredentials())
+  const [loginUser, setLoginUser] = useState(credentials?.user ?? '')
+  const [loginPassword, setLoginPassword] = useState(credentials?.password ?? '')
+  const [authenticated, setAuthenticated] = useState(Boolean(credentials))
+  const [activeSection, setActiveSection] = useState<AdminSection>('overview')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [records, setRecords] = useState<AdminCdkRecord[]>([])
+  const [users, setUsers] = useState<AdminUserSummary[]>([])
+  const [usageStats, setUsageStats] = useState<{ totals: UsageTotals; days: UsageDay[] } | null>(null)
+  const [announcement, setAnnouncement] = useState<Announcement>(EMPTY_ANNOUNCEMENT)
   const [permission, setPermission] = useState<GeneratedPermission>('growth')
   const [orderNote, setOrderNote] = useState('')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('unused')
-  const [records, setRecords] = useState<AdminCdkRecord[]>([])
-  const [listLoading, setListLoading] = useState(false)
-  const [generateLoading, setGenerateLoading] = useState(false)
-  const [deletingCdkHash, setDeletingCdkHash] = useState<string | null>(null)
-  const [revokingCdkHash, setRevokingCdkHash] = useState<string | null>(null)
-  const [unfreezingCdkHash, setUnfreezingCdkHash] = useState<string | null>(null)
-  const [upgradingCdkHash, setUpgradingCdkHash] = useState<string | null>(null)
-  const [grantingOperatorUpdateHash, setGrantingOperatorUpdateHash] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [copyStatus, setCopyStatus] = useState<string | null>(null)
-  const [result, setResult] = useState<{ code: string; permission: GeneratedPermission; created_at: string } | null>(null)
-  const [announcement, setAnnouncement] = useState<Announcement>(EMPTY_ANNOUNCEMENT)
-  const [announcementLoading, setAnnouncementLoading] = useState(false)
-  const [announcementSaving, setAnnouncementSaving] = useState(false)
-  const [announcementStatus, setAnnouncementStatus] = useState<string | null>(null)
-  const [usageStats, setUsageStats] = useState<{ totals: UsageTotals; days: UsageDay[] } | null>(null)
-  const [usageLoading, setUsageLoading] = useState(false)
-  const [activeSection, setActiveSection] = useState<AdminSection>('overview')
-  const [cdkPage, setCdkPage] = useState(1)
-  const [cdkPageSize, setCdkPageSize] = useState<(typeof cdkPageSizeOptions)[number]>(20)
+  const [generatedCode, setGeneratedCode] = useState<{ code: string; permission: GeneratedPermission; created_at: string } | null>(null)
   const [selectedCdkHashes, setSelectedCdkHashes] = useState<string[]>([])
-  const [bulkAction, setBulkAction] = useState<CdkBulkAction | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [busyAction, setBusyAction] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
-  const summary = useMemo(() => {
-    const unused = records.filter((record) => record.status === 'unused').length
-    const used = records.filter((record) => record.status === 'used').length
-    const frozen = records.filter((record) => record.status === 'frozen').length
-    const revoked = records.filter((record) => record.status === 'revoked').length
-    return { unused, used, frozen, revoked, total: records.length }
-  }, [records])
+  const authHeaders = useMemo<Record<string, string>>(() => {
+    if (!credentials) return {} as Record<string, string>
+    return {
+      'X-Admin-User': credentials.user,
+      'X-Admin-Password': credentials.password,
+    }
+  }, [credentials])
 
-  const pageCount = Math.max(1, Math.ceil(records.length / cdkPageSize))
-  const visibleRecords = useMemo(() => {
-    const start = (cdkPage - 1) * cdkPageSize
-    return records.slice(start, start + cdkPageSize)
-  }, [cdkPage, cdkPageSize, records])
+  const summary = useMemo(() => buildSummary(records, usageStats?.totals, users.length), [records, usageStats, users.length])
+  const visibleRecords = useMemo(
+    () => records.filter((record) => statusFilter === 'all' || record.status === statusFilter),
+    [records, statusFilter],
+  )
+  const riskRecords = useMemo(
+    () => records.filter((record) => record.status === 'frozen' || (record.risk_event_count ?? 0) > 0),
+    [records],
+  )
   const selectedRecords = useMemo(() => {
     const selected = new Set(selectedCdkHashes)
     return records.filter((record) => selected.has(record.code_hash))
   }, [records, selectedCdkHashes])
-  const bulkEligibleRecords = useMemo(() => ({
-    upgrade: selectedRecords.filter((record) => record.status !== 'revoked' && record.status !== 'frozen' && Boolean(getNextProductPermission(record.permission))),
-    grant_operator_update: selectedRecords.filter(
-      (record) => record.status === 'used' && record.permission !== 'advanced' && record.permission !== 'premium' && (record.operator_update_grant_remaining ?? 0) <= 0
-    ),
-    revoke: selectedRecords.filter((record) => record.status === 'used' || record.status === 'frozen'),
-    delete: selectedRecords.filter((record) => record.status === 'unused'),
-  }), [selectedRecords])
-  const pageSelected = visibleRecords.length > 0 && visibleRecords.every((record) => selectedCdkHashes.includes(record.code_hash))
-  const paginationStart = records.length === 0 ? 0 : (cdkPage - 1) * cdkPageSize + 1
-  const paginationEnd = Math.min(records.length, cdkPage * cdkPageSize)
 
-  useEffect(() => {
-    setCdkPage(1)
-    setSelectedCdkHashes([])
-  }, [statusFilter])
-
-  useEffect(() => {
-    setCdkPage((current) => Math.min(current, pageCount))
-  }, [pageCount])
-
-  useEffect(() => {
-    const availableHashes = new Set(records.map((record) => record.code_hash))
-    setSelectedCdkHashes((current) => current.filter((hash) => availableHashes.has(hash)))
-  }, [records])
-
-  const loadCdkRecords = useCallback(async (password: string, filter: StatusFilter) => {
-    setListLoading(true)
+  const loadDashboard = useCallback(async (nextCredentials = credentials) => {
+    if (!nextCredentials) return
+    setLoading(true)
     setError(null)
     try {
-      const resp = await fetch('/api/admin/cdk', {
-        headers: {
-          'X-Admin-Password': password,
-          'X-Cdk-Status': filter,
-        },
-      }).catch(() => {
-        throw new Error('无法连接后台接口。请用 npm.cmd run dev 启动本地 Netlify 函数服务，不要只用 vite preview 或直接打开静态页面。')
-      })
-      const data = await resp.json() as CdkListResponse
-      if (!resp.ok) {
-        throw new Error(data.error || `加载失败: ${resp.status}`)
+      const headers = {
+        'X-Admin-User': nextCredentials.user,
+        'X-Admin-Password': nextCredentials.password,
       }
-      setRecords(data.cdks ?? [])
+      const [cdkResp, usageResp, announcementResp, usersResp] = await Promise.all([
+        fetch('/api/admin/cdk?status=all', { headers }),
+        fetch('/api/admin/usage-stats', { headers }),
+        fetch('/api/admin/announcement', { headers }),
+        fetch('/api/admin/users', { headers }),
+      ])
+      const cdkData = await readJson<{ error?: string; cdks?: AdminCdkRecord[] }>(cdkResp)
+      const usageData = await readJson<{ error?: string; totals?: UsageTotals; days?: UsageDay[] }>(usageResp)
+      const announcementData = await readJson<Partial<Announcement> & { error?: string }>(announcementResp)
+      const usersData = await readJson<{ error?: string; users?: AdminUserSummary[] }>(usersResp)
+      if (!cdkResp.ok) throw new Error(cdkData.error || `加载 CDK 失败: ${cdkResp.status}`)
+      if (!usageResp.ok) throw new Error(usageData.error || `加载统计失败: ${usageResp.status}`)
+      if (!announcementResp.ok) throw new Error(announcementData.error || `加载公告失败: ${announcementResp.status}`)
+      if (!usersResp.ok) throw new Error(usersData.error || `加载账号失败: ${usersResp.status}`)
+      setRecords(cdkData.cdks ?? [])
+      setUsageStats({
+        totals: normalizeUsageTotals(usageData.totals),
+        days: Array.isArray(usageData.days) ? usageData.days.map(normalizeUsageDay) : [],
+      })
+      setAnnouncement(normalizeAnnouncement(announcementData))
+      setUsers(usersData.users ?? [])
       setAuthenticated(true)
-    } catch (e) {
-      setRecords([])
-      throw e
+    } catch (caught) {
+      setError((caught as Error).message)
+      setAuthenticated(false)
+      clearStoredCredentials()
+      setCredentials(null)
     } finally {
-      setListLoading(false)
+      setLoading(false)
     }
-  }, [])
+  }, [credentials])
 
-  const loadAnnouncement = useCallback(async (password: string) => {
-    setAnnouncementLoading(true)
-    setAnnouncementStatus(null)
-    try {
-      const resp = await fetch('/api/admin/announcement', {
-        headers: {
-          'X-Admin-Password': password,
-        },
-      }).catch(() => {
-        throw new Error('无法连接公告接口。请用 npm.cmd run dev 启动本地 Netlify 函数服务。')
-      })
-      const data = await resp.json() as AnnouncementResponse
-      if (!resp.ok) {
-        throw new Error(data.error || `加载公告失败: ${resp.status}`)
-      }
-      setAnnouncement(normalizeAnnouncementResponse(data))
-    } finally {
-      setAnnouncementLoading(false)
-    }
-  }, [])
-
-  const loadUsageStats = useCallback(async (password: string) => {
-    setUsageLoading(true)
-    try {
-      const resp = await fetch('/api/admin/usage-stats', {
-        headers: {
-          'X-Admin-Password': password,
-        },
-      }).catch(() => {
-        throw new Error('无法连接统计接口。请用 npm.cmd run dev 启动本地 Netlify 函数服务。')
-      })
-      const data = await resp.json() as UsageStatsResponse
-      if (!resp.ok) {
-        throw new Error(data.error || `加载统计失败: ${resp.status}`)
-      }
-      setUsageStats(normalizeUsageStatsResponse(data))
-    } finally {
-      setUsageLoading(false)
-    }
+  useEffect(() => {
+    if (credentials) void loadDashboard(credentials)
   }, [])
 
   useEffect(() => {
-    if (!authenticated) return
-    loadCdkRecords(adminPassword, statusFilter).catch((e) => {
-      setError((e as Error).message)
-      if ((e as Error).message.includes('口令')) {
-        setAuthenticated(false)
-      }
-    })
-  }, [authenticated, adminPassword, statusFilter, loadCdkRecords])
-
-  useEffect(() => {
-    if (!authenticated) return
-    loadAnnouncement(adminPassword).catch((e) => {
-      setError((e as Error).message)
-      if ((e as Error).message.includes('口令')) {
-        setAuthenticated(false)
-      }
-    })
-  }, [authenticated, adminPassword, loadAnnouncement])
-
-  useEffect(() => {
-    if (!authenticated) return
-    loadUsageStats(adminPassword).catch((e) => {
-      setError((e as Error).message)
-      if ((e as Error).message.includes('口令')) {
-        setAuthenticated(false)
-      }
-    })
-  }, [authenticated, adminPassword, loadUsageStats])
+    const available = new Set(records.map((record) => record.code_hash))
+    setSelectedCdkHashes((current) => current.filter((hash) => available.has(hash)))
+  }, [records])
 
   const handleLogin = async (event: FormEvent) => {
     event.preventDefault()
-    setError(null)
-    setCopyStatus(null)
-    setResult(null)
-    try {
-      await loadCdkRecords(adminPassword, statusFilter)
-    } catch (e) {
-      setError((e as Error).message)
-      setAuthenticated(false)
-    }
+    const next = { user: loginUser.trim(), password: loginPassword }
+    setCredentials(next)
+    storeCredentials(next)
+    await loadDashboard(next)
   }
 
-  const handleGenerate = async (event: FormEvent) => {
+  const handleLogout = () => {
+    clearStoredCredentials()
+    setCredentials(null)
+    setAuthenticated(false)
+    setRecords([])
+    setUsers([])
+    setUsageStats(null)
+  }
+
+  const handleGenerateCdk = async (event: FormEvent) => {
     event.preventDefault()
+    setBusyAction('generate')
     setError(null)
-    setCopyStatus(null)
-    setResult(null)
-    setGenerateLoading(true)
+    setNotice(null)
     try {
       const resp = await fetch('/api/admin/cdk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          admin_password: adminPassword,
-          permission,
-          order_note: orderNote,
-        }),
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ admin_user: credentials?.user, admin_password: credentials?.password, permission, order_note: orderNote }),
       })
-      const data = await resp.json() as GenerateCdkResponse
-      if (!resp.ok) {
+      const data = await readJson<{ error?: string; code?: string; permission?: GeneratedPermission; created_at?: string }>(resp)
+      if (!resp.ok || !data.code || !data.permission || !data.created_at) {
         throw new Error(data.error || `生成失败: ${resp.status}`)
       }
-      setResult({
-        code: data.code!,
-        permission: data.permission!,
-        created_at: data.created_at!,
-      })
+      setGeneratedCode({ code: data.code, permission: data.permission, created_at: data.created_at })
       setOrderNote('')
-      await loadCdkRecords(adminPassword, statusFilter)
-    } catch (e) {
-      setError((e as Error).message)
+      await loadDashboard()
+    } catch (caught) {
+      setError((caught as Error).message)
     } finally {
-      setGenerateLoading(false)
-    }
-  }
-
-  const handleCopyCode = async () => {
-    if (!result?.code) return
-    setCopyStatus(null)
-    try {
-      await navigator.clipboard.writeText(result.code)
-      setCopyStatus('已复制到剪贴板')
-    } catch {
-      setCopyStatus('复制失败，请手动选择 CDK')
+      setBusyAction(null)
     }
   }
 
   const handleSaveAnnouncement = async (event: FormEvent) => {
     event.preventDefault()
+    setBusyAction('announcement')
     setError(null)
-    setAnnouncementStatus(null)
-    setAnnouncementSaving(true)
+    setNotice(null)
     try {
       const resp = await fetch('/api/admin/announcement', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
-          admin_password: adminPassword,
+          admin_user: credentials?.user,
+          admin_password: credentials?.password,
           enabled: announcement.enabled,
           title: announcement.title,
           body: announcement.body,
         }),
       })
-      const data = await resp.json() as AnnouncementResponse
-      if (!resp.ok) {
-        throw new Error(data.error || `保存公告失败: ${resp.status}`)
-      }
-      setAnnouncement(normalizeAnnouncementResponse(data))
-      setAnnouncementStatus('公告已保存')
-    } catch (e) {
-      setError((e as Error).message)
+      const data = await readJson<Partial<Announcement> & { error?: string }>(resp)
+      if (!resp.ok) throw new Error(data.error || `保存公告失败: ${resp.status}`)
+      setAnnouncement(normalizeAnnouncement(data))
+      setNotice('公告已保存')
+    } catch (caught) {
+      setError((caught as Error).message)
     } finally {
-      setAnnouncementSaving(false)
+      setBusyAction(null)
     }
   }
 
-  const handleRefreshDashboard = async () => {
+  const patchCdk = async (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission) => {
+    setBusyAction(`${action}:${record.code_hash}`)
     setError(null)
-    const results = await Promise.allSettled([
-      loadCdkRecords(adminPassword, statusFilter),
-      loadAnnouncement(adminPassword),
-      loadUsageStats(adminPassword),
-    ])
-    const rejected = results.find((result) => result.status === 'rejected')
-    if (rejected?.status === 'rejected') {
-      setError((rejected.reason as Error).message)
-    }
-  }
-
-  const toggleCdkSelection = (codeHash: string, checked: boolean) => {
-    setSelectedCdkHashes((current) => {
-      if (checked) {
-        return current.includes(codeHash) ? current : [...current, codeHash]
-      }
-      return current.filter((hash) => hash !== codeHash)
-    })
-  }
-
-  const togglePageSelection = (checked: boolean) => {
-    const pageHashes = visibleRecords.map((record) => record.code_hash)
-    setSelectedCdkHashes((current) => {
-      if (checked) {
-        const next = new Set(current)
-        pageHashes.forEach((hash) => next.add(hash))
-        return Array.from(next)
-      }
-      return current.filter((hash) => !pageHashes.includes(hash))
-    })
-  }
-
-  const handleBulkAction = async (action: CdkBulkAction) => {
-    const targets = bulkEligibleRecords[action]
-    if (targets.length === 0) return
-
-    const actionLabels: Record<CdkBulkAction, string> = {
-      upgrade: '升级',
-      grant_operator_update: '发放干员更新权限给',
-      revoke: '撤销',
-      delete: '删除',
-    }
-    const confirmed = window.confirm(`确认${actionLabels[action]} ${targets.length} 个符合条件的 CDK？`)
-    if (!confirmed) return
-
-    setError(null)
-    setCopyStatus(null)
-    setBulkAction(action)
     try {
-      for (const record of targets) {
-        if (action === 'delete') {
-          const resp = await fetch('/api/admin/cdk', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              admin_password: adminPassword,
-              code_hash: record.code_hash,
-            }),
-          })
-          const data = await resp.json() as { error?: string }
-          if (!resp.ok) {
-            throw new Error(data.error || `删除 ${record.cdk_id} 失败: ${resp.status}`)
-          }
-          continue
-        }
-
-        const nextPermission = action === 'upgrade' ? getNextProductPermission(record.permission) : null
-        const resp = await fetch('/api/admin/cdk', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            admin_password: adminPassword,
-            code_hash: record.code_hash,
-            action,
-            ...(nextPermission ? { permission: nextPermission } : {}),
-          }),
-        })
-        const data = await resp.json() as { error?: string }
-        if (!resp.ok) {
-          throw new Error(data.error || `${actionLabels[action]} ${record.cdk_id} 失败: ${resp.status}`)
-        }
-      }
-      setSelectedCdkHashes([])
-      await loadCdkRecords(adminPassword, statusFilter)
-    } catch (e) {
-      setError((e as Error).message)
+      const resp = await fetch('/api/admin/cdk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          admin_user: credentials?.user,
+          admin_password: credentials?.password,
+          code_hash: record.code_hash,
+          action,
+          ...(nextPermission ? { permission: nextPermission } : {}),
+        }),
+      })
+      const data = await readJson<{ error?: string }>(resp)
+      if (!resp.ok) throw new Error(data.error || `操作失败: ${resp.status}`)
+      await loadDashboard()
+    } catch (caught) {
+      setError((caught as Error).message)
     } finally {
-      setBulkAction(null)
+      setBusyAction(null)
     }
   }
 
-  const handleDeleteRecord = async (record: AdminCdkRecord) => {
+  const deleteCdk = async (record: AdminCdkRecord) => {
     if (record.status !== 'unused') return
-    const confirmed = window.confirm(`确认删除未使用 CDK ${record.cdk_id}？此操作不可恢复。`)
-    if (!confirmed) return
-
+    if (!window.confirm(`确认删除未使用 CDK ${record.cdk_id}？`)) return
+    setBusyAction(`delete:${record.code_hash}`)
     setError(null)
-    setCopyStatus(null)
-    setDeletingCdkHash(record.code_hash)
     try {
       const resp = await fetch('/api/admin/cdk', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          admin_password: adminPassword,
-          code_hash: record.code_hash,
-        }),
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ admin_user: credentials?.user, admin_password: credentials?.password, code_hash: record.code_hash }),
       })
-      const data = await resp.json() as DeleteCdkResponse
-      if (!resp.ok) {
-        throw new Error(data.error || `删除失败: ${resp.status}`)
-      }
-      await loadCdkRecords(adminPassword, statusFilter)
-    } catch (e) {
-      setError((e as Error).message)
+      const data = await readJson<{ error?: string }>(resp)
+      if (!resp.ok) throw new Error(data.error || `删除失败: ${resp.status}`)
+      await loadDashboard()
+    } catch (caught) {
+      setError((caught as Error).message)
     } finally {
-      setDeletingCdkHash(null)
+      setBusyAction(null)
     }
   }
 
-  const handleRevokeRecord = async (record: AdminCdkRecord) => {
-    if (record.status !== 'used' && record.status !== 'frozen') return
-    const confirmed = window.confirm(`确认撤销授权 ${record.cdk_id}？撤销后不可恢复，用户将无法继续生成排班。`)
-    if (!confirmed) return
-
-    setError(null)
-    setCopyStatus(null)
-    setRevokingCdkHash(record.code_hash)
-    try {
-      const resp = await fetch('/api/admin/cdk', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          admin_password: adminPassword,
-          code_hash: record.code_hash,
-          action: 'revoke',
-        }),
-      })
-      const data = await resp.json() as RevokeCdkResponse
-      if (!resp.ok) {
-        throw new Error(data.error || `撤销失败: ${resp.status}`)
-      }
-      await loadCdkRecords(adminPassword, statusFilter)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-    setRevokingCdkHash(null)
-  }
-}
-
-  const handleUnfreezeRecord = async (record: AdminCdkRecord) => {
-    if (record.status !== 'frozen') return
-    const confirmed = window.confirm(`确认解冻授权 ${record.cdk_id}？解冻后用户可继续使用，历史风控记录会保留。`)
-    if (!confirmed) return
-
-    setError(null)
-    setCopyStatus(null)
-    setUnfreezingCdkHash(record.code_hash)
-    try {
-      const resp = await fetch('/api/admin/cdk', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          admin_password: adminPassword,
-          code_hash: record.code_hash,
-          action: 'unfreeze',
-        }),
-      })
-      const data = await resp.json() as UnfreezeCdkResponse
-      if (!resp.ok) {
-        throw new Error(data.error || `解冻失败: ${resp.status}`)
-      }
-      await loadCdkRecords(adminPassword, statusFilter)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setUnfreezingCdkHash(null)
-    }
-  }
-
-  const handleUpgradeRecord = async (record: AdminCdkRecord) => {
-    const currentPermission = normalizeProductPermission(record.permission)
-    const nextPermission = getNextProductPermission(record.permission)
-    if (!currentPermission || !nextPermission || record.status === 'revoked') return
-    const confirmed = window.confirm(
-      `确认将授权 ${record.cdk_id} 从 ${permissionLabels[currentPermission]} 升级到 ${permissionLabels[nextPermission]}？`
-    )
-    if (!confirmed) return
-
-    setError(null)
-    setCopyStatus(null)
-    setUpgradingCdkHash(record.code_hash)
-    try {
-      const resp = await fetch('/api/admin/cdk', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          admin_password: adminPassword,
-          code_hash: record.code_hash,
-          action: 'upgrade',
-          permission: nextPermission,
-        }),
-      })
-      const data = await resp.json() as UpgradeCdkResponse
-      if (!resp.ok) {
-        throw new Error(data.error || `升级失败: ${resp.status}`)
-      }
-      await loadCdkRecords(adminPassword, statusFilter)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setUpgradingCdkHash(null)
-    }
-  }
-
-  const handleGrantOperatorUpdate = async (record: AdminCdkRecord) => {
-    if (record.status !== 'used') return
-    const confirmed = window.confirm(`确认给授权 ${record.cdk_id} 发放一次干员数据更新权限？用户同步授权后可替换一次 operators.json。`)
-    if (!confirmed) return
-
-    setError(null)
-    setCopyStatus(null)
-    setGrantingOperatorUpdateHash(record.code_hash)
-    try {
-      const resp = await fetch('/api/admin/cdk', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          admin_password: adminPassword,
-          code_hash: record.code_hash,
-          action: 'grant_operator_update',
-        }),
-      })
-      const data = await resp.json() as GrantOperatorUpdateResponse
-      if (!resp.ok) {
-        throw new Error(data.error || `发放失败: ${resp.status}`)
-      }
-      await loadCdkRecords(adminPassword, statusFilter)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setGrantingOperatorUpdateHash(null)
-    }
-  }
-
-  const handleLogout = () => {
-    setAuthenticated(false)
-    setAdminPassword('')
-    setRecords([])
-    setResult(null)
-    setError(null)
-    setCopyStatus(null)
-    setRevokingCdkHash(null)
-    setUpgradingCdkHash(null)
+  const handleBulkRevoke = async () => {
+    const targets = selectedRecords.filter((record) => record.status === 'used' || record.status === 'frozen')
+    if (targets.length === 0 || !window.confirm(`确认撤销 ${targets.length} 个授权？`)) return
+    for (const record of targets) await patchCdk(record, 'revoke')
     setSelectedCdkHashes([])
-    setBulkAction(null)
-    setCdkPage(1)
-    setAnnouncement(EMPTY_ANNOUNCEMENT)
-    setAnnouncementStatus(null)
-    setUsageStats(null)
   }
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen px-6 py-10">
-        <main className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-md flex-col justify-center">
-          <header className="mb-6">
-            <a
-              href="/"
-              className="mb-6 inline-flex rounded-lg bg-surface-2 px-4 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
-            >
-              返回首页
-            </a>
-            <h1 className="text-2xl font-bold text-ink-primary">CDK 管理后台</h1>
-          </header>
-
-          <form onSubmit={handleLogin} className="rounded-xl bg-surface-1 p-5 sm:p-6">
-            {error && (
-              <div className="mb-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">
-                {error}
-              </div>
-            )}
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-ink-secondary">管理口令</span>
-              <input
-                type="password"
-                value={adminPassword}
-                onChange={(event) => setAdminPassword(event.currentTarget.value)}
-                className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted"
-                placeholder="MAA_ADMIN_PASSWORD"
-                autoComplete="current-password"
-                required
-              />
+      <main className="min-h-screen bg-surface-0 px-6 py-10 text-ink-primary">
+        <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-8 lg:grid-cols-[1fr_380px]">
+          <section>
+            <div className="max-w-2xl">
+              <p className="text-sm font-semibold text-brand-500">MAA Infrast Admin</p>
+              <h1 className="mt-3 text-3xl font-semibold text-ink-primary sm:text-4xl">管理工作台</h1>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-ink-secondary">
+                使用独立管理账号进入后台。Root 口令只用于创建和维护管理账号，日常操作不再需要反复输入。
+              </p>
+            </div>
+          </section>
+          <form onSubmit={handleLogin} className="rounded-xl border border-surface-3 bg-surface-1 p-6">
+            <h2 className="text-lg font-semibold text-ink-primary">账号登录</h2>
+            <label className="mt-5 block">
+              <span className="mb-2 block text-sm font-medium text-ink-secondary">账号</span>
+              <input value={loginUser} onChange={(event) => setLoginUser(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" autoComplete="username" />
             </label>
-            <button
-              type="submit"
-              disabled={listLoading}
-              className="mt-5 w-full rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
-            >
-              {listLoading ? '正在验权...' : '登录后台'}
+            <label className="mt-4 block">
+              <span className="mb-2 block text-sm font-medium text-ink-secondary">密码</span>
+              <input type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" autoComplete="current-password" />
+            </label>
+            {error && <div className="mt-4 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">{error}</div>}
+            <button type="submit" disabled={loading || !loginUser.trim() || !loginPassword} className="mt-5 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+              {loading ? '正在登录...' : '进入后台'}
             </button>
+            <a href="/admin/setup" className="mt-4 block text-center text-sm font-medium text-brand-500 underline-offset-4 hover:underline">添加管理账号</a>
           </form>
-        </main>
-      </div>
+        </div>
+      </main>
     )
   }
 
   return (
-    <div className="min-h-screen px-4 py-6 sm:px-6 sm:py-10">
-      <main className="mx-auto max-w-7xl">
-        <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-ink-primary">管理后台</h1>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">
-              管理 CDK 授权、站内公告和匿名使用统计。
-            </p>
+    <div className="min-h-screen bg-surface-0 text-ink-primary">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-surface-3 bg-surface-1 px-4 py-5 lg:block">
+        <div className="px-2">
+          <p className="text-sm font-semibold text-brand-500">MAA Admin</p>
+          <p className="mt-1 truncate text-xs text-ink-muted">{credentials?.user}</p>
+        </div>
+        <nav className="mt-8 space-y-1">
+          {(Object.keys(sectionLabels) as AdminSection[]).map((section) => (
+            <button key={section} type="button" onClick={() => setActiveSection(section)} className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${activeSection === section ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}>
+              {sectionLabels[section]}
+            </button>
+          ))}
+        </nav>
+        <button type="button" onClick={handleLogout} className="absolute bottom-5 left-4 right-4 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">退出登录</button>
+      </aside>
+
+      <main className="lg:pl-64">
+        <header className="sticky top-0 z-20 border-b border-surface-3 bg-surface-0/95 px-5 py-4 backdrop-blur sm:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-xl font-semibold text-ink-primary">{sectionLabels[activeSection]}</h1>
+              <p className="mt-1 text-sm text-ink-muted">最近同步 {loading ? '进行中' : formatDate(new Date().toISOString())}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => void loadDashboard()} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">刷新数据</button>
+              <a href="/admin/setup" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500">账号设置</a>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => handleRefreshDashboard()}
-              disabled={listLoading || announcementLoading || usageLoading}
-              className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:text-ink-muted"
-            >
-              {listLoading || announcementLoading || usageLoading ? '刷新中...' : '刷新数据'}
-            </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
-            >
-              退出登录
-            </button>
-            <a
-              href="/"
-              className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
-            >
-              返回首页
-            </a>
+          <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
+            {(Object.keys(sectionLabels) as AdminSection[]).map((section) => (
+              <button key={section} type="button" onClick={() => setActiveSection(section)} className={`rounded-lg px-3 py-2 text-sm font-medium ${activeSection === section ? 'bg-brand-600 text-white' : 'bg-surface-1 text-ink-secondary'}`}>
+                {sectionLabels[section]}
+              </button>
+            ))}
           </div>
         </header>
 
-        {error && (
-          <div className="mb-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">
-            {error}
-          </div>
-        )}
+        <div className="px-5 py-6 sm:px-8">
+          {error && <div className="mb-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
+          {notice && <div className="mb-5 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{notice}</div>}
 
-        <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
-          <aside className="rounded-xl border border-surface-3 bg-surface-1 p-2 lg:sticky lg:top-6">
-            <nav className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible" aria-label="后台分类">
-              {adminSections.map((section) => {
-                const active = activeSection === section.id
-                return (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => setActiveSection(section.id)}
-                    aria-current={active ? 'page' : undefined}
-                    className={`min-w-[168px] rounded-lg px-3 py-3 text-left transition-colors duration-150 lg:min-w-0 ${
-                      active
-                        ? 'bg-brand-600 text-white'
-                        : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'
-                    }`}
-                  >
-                    <span className="block text-sm font-semibold">{section.label}</span>
-                    <span className={`mt-1 block text-xs leading-5 ${active ? 'text-white/80' : 'text-ink-muted'}`}>
-                      {section.description}
-                    </span>
-                  </button>
-                )
-              })}
-            </nav>
-          </aside>
-
-          <div className="min-w-0">
-            {activeSection === 'overview' && (
-              <section className="rounded-xl bg-surface-1">
-                <div className="flex flex-col gap-4 border-b border-surface-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-                  <div>
-                    <h2 className="text-base font-semibold text-ink-primary">使用统计</h2>
-                    <p className="mt-1 text-sm text-ink-secondary">
-                      匿名统计工具页访问、方案生成和 CDK 兑换，近 7 天按 UTC 日期汇总。
-                    </p>
+          {activeSection === 'overview' && (
+            <section className="space-y-6">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Metric label="CDK 总量" value={summary.totalCdks} />
+                <Metric label="已兑换" value={summary.usedCdks} />
+                <Metric label="冻结授权" value={summary.frozenCdks} tone={summary.frozenCdks > 0 ? 'warning' : 'default'} />
+                <Metric label="7 日生成" value={summary.scheduleGenerates} />
+              </div>
+              <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+                <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-base font-semibold text-ink-primary">7 日趋势</h2>
+                    <span className="text-xs text-ink-muted">访问 / 生成 / 兑换</span>
                   </div>
-                  {usageLoading && (
-                    <span className="text-xs text-ink-muted">统计加载中...</span>
-                  )}
-                </div>
-
-                <div className="grid gap-px bg-surface-3 text-sm sm:grid-cols-4">
-                  <UsageMetric label="累计访问人数" value={usageStats?.totals.unique_visitors ?? 0} />
-                  <UsageMetric label="累计访问次数" value={usageStats?.totals.visits ?? 0} />
-                  <UsageMetric label="累计生成次数" value={usageStats?.totals.schedule_generates ?? 0} />
-                  <UsageMetric label="累计 CDK 兑换" value={usageStats?.totals.cdk_redeems ?? 0} />
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-surface-3 text-left text-sm">
-                    <thead className="bg-surface-2 text-xs font-semibold text-ink-secondary">
-                      <tr>
-                        <th className="whitespace-nowrap px-4 py-3">日期</th>
-                        <th className="whitespace-nowrap px-4 py-3">访问人数</th>
-                        <th className="whitespace-nowrap px-4 py-3">访问次数</th>
-                        <th className="whitespace-nowrap px-4 py-3">生成次数</th>
-                        <th className="whitespace-nowrap px-4 py-3">CDK 兑换</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-surface-3">
-                      {(usageStats?.days ?? []).length > 0 ? (
-                        usageStats!.days.map((day) => (
-                          <tr key={day.date} className="transition-colors duration-150 hover:bg-surface-2/70">
-                            <td className="whitespace-nowrap px-4 py-3 font-mono text-ink-primary">{day.date}</td>
-                            <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{day.unique_visitors}</td>
-                            <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{day.visits}</td>
-                            <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{day.schedule_generates}</td>
-                            <td className="whitespace-nowrap px-4 py-3 text-ink-secondary">{day.cdk_redeems}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td className="px-4 py-8 text-center text-sm text-ink-secondary" colSpan={5}>
-                            暂无统计数据。
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
-
-            {activeSection === 'cdk' && (
-              <section className="space-y-5">
-                <section className="overflow-hidden rounded-xl bg-surface-1">
-                  <form onSubmit={handleGenerate} className="p-5 sm:p-6">
-                    <div className="flex flex-col gap-5 xl:flex-row xl:items-end">
-                      <div className="min-w-0 flex-1">
-                        <h2 className="text-base font-semibold text-ink-primary">生成 CDK</h2>
-                        <p className="mt-1 text-sm leading-6 text-ink-secondary">
-                          选择授权类型并写入订单备注，生成后立即复制明文 CDK。
-                        </p>
-                        <div className="mt-4 flex flex-col gap-4 lg:flex-row">
-                          <div className="min-w-[280px] flex-1">
-                            <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK 类型</span>
-                            <div className="flex rounded-lg bg-surface-2 p-1">
-                              {cdkProductPermissions.map((item) => (
-                                <button
-                                  key={item}
-                                  type="button"
-                                  onClick={() => setPermission(item)}
-                                  className={`min-w-0 flex-1 whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${
-                                    permission === item
-                                      ? 'bg-brand-600 text-white'
-                                      : 'text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'
-                                  }`}
-                                >
-                                  {permissionLabels[item]}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <label className="min-w-[240px] flex-1">
-                            <span className="mb-2 block text-sm font-medium text-ink-secondary">订单备注 / 订单号</span>
-                            <input
-                              type="text"
-                              value={orderNote}
-                              onChange={(event) => setOrderNote(event.currentTarget.value)}
-                              className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted"
-                              placeholder="可选"
-                            />
-                          </label>
-                        </div>
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={generateLoading}
-                        className="w-full rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted xl:w-40"
-                      >
-                        {generateLoading ? '生成中...' : '生成 CDK'}
-                      </button>
-                    </div>
-                  </form>
-
-                  {result && (
-                    <section className="border-t border-surface-3 bg-warning/10 p-5 sm:p-6">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="min-w-0">
-                          <h2 className="text-sm font-semibold text-warning">请立即复制保存</h2>
-                          <div className="mt-2 break-all font-mono text-base font-semibold tracking-wide text-ink-primary">
-                            {result.code}
-                          </div>
-                          <p className="mt-2 text-sm text-ink-secondary">
-                            {permissionLabels[result.permission]}，{formatDate(result.created_at)}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleCopyCode}
-                          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 lg:flex-shrink-0"
-                        >
-                          复制 CDK
-                        </button>
-                      </div>
-                      {copyStatus && (
-                        <p className="mt-2 text-sm text-ink-secondary">{copyStatus}</p>
-                      )}
-                    </section>
-                  )}
-                </section>
-
-                <section className="min-w-0 overflow-hidden rounded-xl bg-surface-1">
-                  <div className="flex flex-col gap-4 border-b border-surface-3 p-5 xl:flex-row xl:items-start xl:justify-between sm:p-6">
-                    <div>
-                      <h2 className="text-base font-semibold text-ink-primary">CDK 记录</h2>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <CdkStat label="未使用" value={summary.unused} />
-                        <CdkStat label="已使用" value={summary.used} />
-                        <CdkStat label="已冻结" value={summary.frozen} />
-                        <CdkStat label="已撤销" value={summary.revoked} />
-                        <CdkStat label="当前列表" value={summary.total} />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-3 xl:items-end">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-ink-muted">已选 {selectedRecords.length}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleBulkAction('upgrade')}
-                          disabled={bulkAction !== null || bulkEligibleRecords.upgrade.length === 0}
-                          className="rounded-md bg-brand-600/15 px-3 py-2 text-xs font-semibold text-brand-300 transition-colors duration-150 hover:bg-brand-600/25 disabled:bg-surface-3 disabled:text-ink-muted"
-                        >
-                          {bulkAction === 'upgrade' ? '升级中...' : `批量升级 ${bulkEligibleRecords.upgrade.length}`}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleBulkAction('grant_operator_update')}
-                          disabled={bulkAction !== null || bulkEligibleRecords.grant_operator_update.length === 0}
-                          className="rounded-md bg-success/10 px-3 py-2 text-xs font-semibold text-success transition-colors duration-150 hover:bg-success/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                        >
-                          {bulkAction === 'grant_operator_update' ? '发放中...' : `批量发放 ${bulkEligibleRecords.grant_operator_update.length}`}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleBulkAction('revoke')}
-                          disabled={bulkAction !== null || bulkEligibleRecords.revoke.length === 0}
-                          className="rounded-md bg-error/10 px-3 py-2 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                        >
-                          {bulkAction === 'revoke' ? '撤销中...' : `批量撤销 ${bulkEligibleRecords.revoke.length}`}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleBulkAction('delete')}
-                          disabled={bulkAction !== null || bulkEligibleRecords.delete.length === 0}
-                          className="rounded-md bg-error/10 px-3 py-2 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                        >
-                          {bulkAction === 'delete' ? '删除中...' : `批量删除 ${bulkEligibleRecords.delete.length}`}
-                        </button>
-                      </div>
-                      <div className="inline-flex self-start rounded-lg bg-surface-2 p-1 xl:self-auto">
-                        {(['unused', 'used', 'frozen', 'revoked', 'all'] as const).map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => setStatusFilter(item)}
-                            className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${
-                              statusFilter === item
-                                ? 'bg-brand-600 text-white'
-                                : 'text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'
-                            }`}
-                          >
-                            {statusFilterLabels[item]}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="min-w-[1180px] divide-y divide-surface-3 text-left text-sm">
-                      <thead className="bg-surface-2 text-xs font-semibold text-ink-secondary">
-                        <tr>
-                          <th className="w-10 px-4 py-3">
-                            <input
-                              type="checkbox"
-                              checked={pageSelected}
-                              onChange={(event) => togglePageSelection(event.currentTarget.checked)}
-                              className="h-4 w-4 rounded border-surface-4 bg-surface-0 accent-brand-600"
-                              aria-label="选择当前页 CDK"
-                            />
-                          </th>
-                          <th className="whitespace-nowrap px-4 py-3">CDK</th>
-                          <th className="whitespace-nowrap px-4 py-3">操作</th>
-                          <th className="whitespace-nowrap px-4 py-3">权限</th>
-                          <th className="whitespace-nowrap px-4 py-3">时间</th>
-                          <th className="whitespace-nowrap px-4 py-3">生成次数</th>
-                          <th className="whitespace-nowrap px-4 py-3">备注</th>
-                          <th className="whitespace-nowrap px-4 py-3">使用信息</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-surface-3">
-                        {listLoading && records.length === 0 ? (
-                          Array.from({ length: 4 }).map((_, index) => (
-                            <tr key={index}>
-                              <td className="px-4 py-4" colSpan={8}>
-                                <div className="h-5 rounded bg-surface-2" />
-                              </td>
-                            </tr>
-                          ))
-                        ) : visibleRecords.length > 0 ? (
-                          visibleRecords.map((record) => (
-                            <tr key={record.code_hash} className="transition-colors duration-150 hover:bg-surface-2/70">
-                              <td className="px-4 py-4 align-top">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCdkHashes.includes(record.code_hash)}
-                                  onChange={(event) => toggleCdkSelection(record.code_hash, event.currentTarget.checked)}
-                                  className="h-4 w-4 rounded border-surface-4 bg-surface-0 accent-brand-600"
-                                  aria-label={`选择 CDK ${record.cdk_id}`}
-                                />
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
-                              <td className="w-[260px] px-4 py-3 align-top">
-                                {record.status === 'unused' ? (
-                                  <div className="flex flex-wrap gap-2">
-                                    {getNextProductPermission(record.permission) && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleUpgradeRecord(record)}
-                                        disabled={upgradingCdkHash === record.code_hash}
-                                        className="rounded-md bg-brand-600/15 px-2.5 py-1.5 text-xs font-semibold text-brand-300 transition-colors duration-150 hover:bg-brand-600/25 disabled:bg-surface-3 disabled:text-ink-muted"
-                                      >
-                                        {upgradingCdkHash === record.code_hash ? '升级中' : `升到${permissionLabels[getNextProductPermission(record.permission)!]}`}
-                                      </button>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteRecord(record)}
-                                      disabled={deletingCdkHash === record.code_hash}
-                                      className="rounded-md bg-error/10 px-2.5 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                                    >
-                                      {deletingCdkHash === record.code_hash ? '删除中' : '删除'}
-                                    </button>
-                                  </div>
-                                ) : record.status === 'used' ? (
-                                  <div className="flex flex-wrap gap-2">
-                                    {getNextProductPermission(record.permission) && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleUpgradeRecord(record)}
-                                        disabled={upgradingCdkHash === record.code_hash}
-                                        className="rounded-md bg-brand-600/15 px-2.5 py-1.5 text-xs font-semibold text-brand-300 transition-colors duration-150 hover:bg-brand-600/25 disabled:bg-surface-3 disabled:text-ink-muted"
-                                      >
-                                        {upgradingCdkHash === record.code_hash ? '升级中' : `升到${permissionLabels[getNextProductPermission(record.permission)!]}`}
-                                      </button>
-                                    )}
-                                {record.permission !== 'advanced' && record.permission !== 'premium' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleGrantOperatorUpdate(record)}
-                                    disabled={grantingOperatorUpdateHash === record.code_hash || (record.operator_update_grant_remaining ?? 0) > 0}
-                                    className="rounded-md bg-success/10 px-2.5 py-1.5 text-xs font-semibold text-success transition-colors duration-150 hover:bg-success/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                                  >
-                                    {grantingOperatorUpdateHash === record.code_hash
-                                      ? '发放中'
-                                      : (record.operator_update_grant_remaining ?? 0) > 0
-                                        ? '待使用'
-                                        : '发放更新'}
-                                  </button>
-                                )}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRevokeRecord(record)}
-                                      disabled={revokingCdkHash === record.code_hash}
-                                      className="rounded-md bg-error/10 px-2.5 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                                    >
-                                      {revokingCdkHash === record.code_hash ? '撤销中' : '撤销'}
-                                    </button>
-                              </div>
-                            ) : record.status === 'frozen' ? (
-                              <div className="flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleUnfreezeRecord(record)}
-                                  disabled={unfreezingCdkHash === record.code_hash}
-                                  className="rounded-md bg-success/10 px-2.5 py-1.5 text-xs font-semibold text-success transition-colors duration-150 hover:bg-success/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                                >
-                                  {unfreezingCdkHash === record.code_hash ? '解冻中' : '解冻'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRevokeRecord(record)}
-                                  disabled={revokingCdkHash === record.code_hash}
-                                  className="rounded-md bg-error/10 px-2.5 py-1.5 text-xs font-semibold text-error transition-colors duration-150 hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted"
-                                >
-                                  {revokingCdkHash === record.code_hash ? '撤销中' : '撤销'}
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="text-ink-muted">-</span>
-                            )}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-4 align-top">
-                                <div className="flex flex-col items-start gap-2">
-                                  <span className="text-ink-primary">{permissionLabels[record.permission]}</span>
-                                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                    record.status === 'unused'
-                                      ? 'bg-success/10 text-success'
-                                      : record.status === 'frozen'
-                                        ? 'bg-warning/10 text-warning'
-                                      : record.status === 'revoked'
-                                        ? 'bg-error/10 text-error'
-                                        : 'bg-surface-3 text-ink-secondary'
-                                  }`}
-                                  >
-                                    {statusLabels[record.status]}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-4 align-top text-xs text-ink-secondary">
-                                <div>生成 {formatDate(record.created_at)}</div>
-                                <div className="mt-1 text-ink-muted">使用 {formatDate(record.used_at)}</div>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-4 align-top text-ink-secondary">{record.schedule_generate_count ?? 0}</td>
-                              <td className="max-w-[180px] px-4 py-4 align-top text-ink-secondary">
-                                <div className="truncate" title={record.order_note || undefined}>{record.order_note || '-'}</div>
-                              </td>
-                              <td className="w-[320px] px-4 py-4 align-top">
-                                <UsageInfo record={record} />
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td className="px-4 py-10 text-center text-sm text-ink-secondary" colSpan={8}>
-                              当前筛选下没有 CDK 记录。
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="flex flex-col gap-3 border-t border-surface-3 px-5 py-4 text-sm text-ink-secondary sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                    <div>
-                      显示 {paginationStart}-{paginationEnd} / {records.length} 条
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <label className="flex items-center gap-2">
-                        <span className="text-xs text-ink-muted">每页</span>
-                        <select
-                          value={cdkPageSize}
-                          onChange={(event) => {
-                            setCdkPageSize(Number(event.currentTarget.value) as (typeof cdkPageSizeOptions)[number])
-                            setCdkPage(1)
-                          }}
-                          className="rounded-md border border-surface-4 bg-surface-0 px-2 py-1.5 text-sm text-ink-primary"
-                        >
-                          {cdkPageSizeOptions.map((size) => (
-                            <option key={size} value={size}>{size}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setCdkPage((current) => Math.max(1, current - 1))}
-                          disabled={cdkPage <= 1}
-                          className="rounded-md bg-surface-2 px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:text-ink-muted"
-                        >
-                          上一页
-                        </button>
-                        <span className="min-w-16 text-center text-xs text-ink-muted">
-                          {cdkPage} / {pageCount}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setCdkPage((current) => Math.min(pageCount, current + 1))}
-                          disabled={cdkPage >= pageCount}
-                          className="rounded-md bg-surface-2 px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:text-ink-muted"
-                        >
-                          下一页
-                        </button>
-                      </div>
-                    </div>
+                  <div className="mt-5 flex h-52 items-end gap-2">
+                    {(usageStats?.days ?? []).map((day) => <UsageBar key={day.date} day={day} max={summary.maxDailyActivity} />)}
                   </div>
                 </section>
-              </section>
-            )}
+                <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+                  <h2 className="text-base font-semibold text-ink-primary">运营摘要</h2>
+                  <dl className="mt-4 space-y-3 text-sm">
+                    <InfoRow label="独立访客" value={String(summary.uniqueVisitors)} />
+                    <InfoRow label="访问次数" value={String(summary.visits)} />
+                    <InfoRow label="兑换次数" value={String(summary.cdkRedeems)} />
+                    <InfoRow label="管理账号" value={String(summary.adminUsers)} />
+                    <InfoRow label="转化率" value={`${summary.redeemRate}%`} />
+                  </dl>
+                </section>
+              </div>
+            </section>
+          )}
 
-            {activeSection === 'announcement' && (
-              <form onSubmit={handleSaveAnnouncement} className="max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-base font-semibold text-ink-primary">公告设置</h2>
-                    <p className="mt-1 text-sm leading-6 text-ink-secondary">
-                      公告会显示在工具页顶部，禁用后前台不展示。
-                    </p>
-                  </div>
-                  {announcementLoading && (
-                    <span className="shrink-0 text-xs text-ink-muted">加载中...</span>
-                  )}
+          {activeSection === 'cdk' && (
+            <section className="space-y-5">
+              <form onSubmit={handleGenerateCdk} className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+                <div className="grid gap-4 lg:grid-cols-[220px_1fr_auto] lg:items-end">
+                  <label>
+                    <span className="mb-2 block text-sm font-medium text-ink-secondary">授权类型</span>
+                    <select value={permission} onChange={(event) => setPermission(event.currentTarget.value as GeneratedPermission)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary">
+                      {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span className="mb-2 block text-sm font-medium text-ink-secondary">订单备注</span>
+                    <input value={orderNote} maxLength={120} onChange={(event) => setOrderNote(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="闲鱼订单号、用户昵称或售后备注" />
+                  </label>
+                  <button type="submit" disabled={busyAction === 'generate'} className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">{busyAction === 'generate' ? '生成中...' : '生成 CDK'}</button>
                 </div>
-
-                <label className="mt-5 flex items-center justify-between gap-4 rounded-lg bg-surface-2 px-3 py-2">
-                  <span className="text-sm font-medium text-ink-secondary">启用公告</span>
-                  <input
-                    type="checkbox"
-                    checked={announcement.enabled}
-                    onChange={(event) => {
-                      const enabled = event.currentTarget.checked
-                      setAnnouncement((current) => ({ ...current, enabled }))
-                    }}
-                    className="h-4 w-4 accent-brand-600"
-                  />
-                </label>
-
-                <label className="mt-4 block">
-                  <span className="mb-2 block text-sm font-medium text-ink-secondary">标题</span>
-                  <input
-                    type="text"
-                    value={announcement.title}
-                    maxLength={80}
-                    onChange={(event) => {
-                      const title = event.currentTarget.value
-                      setAnnouncement((current) => ({ ...current, title }))
-                    }}
-                    className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted"
-                    placeholder="例如：维护通知"
-                  />
-                  <span className="mt-1 block text-xs text-ink-muted">{announcement.title.length}/80</span>
-                </label>
-
-                <label className="mt-4 block">
-                  <span className="mb-2 block text-sm font-medium text-ink-secondary">正文</span>
-                  <textarea
-                    value={announcement.body}
-                    maxLength={600}
-                    rows={7}
-                    onChange={(event) => {
-                      const body = event.currentTarget.value
-                      setAnnouncement((current) => ({ ...current, body }))
-                    }}
-                    className="w-full resize-y rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-primary placeholder:text-ink-muted"
-                    placeholder="公告内容会按纯文本展示，换行会保留。"
-                  />
-                  <span className="mt-1 block text-xs text-ink-muted">{announcement.body.length}/600</span>
-                </label>
-
-                <div className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-3">
-                  <div className="text-xs font-medium text-ink-muted">预览</div>
-                  {announcement.enabled && announcement.title.trim() && announcement.body.trim() ? (
-                    <div className="mt-2">
-                      <div className="text-sm font-semibold text-ink-primary">{announcement.title.trim()}</div>
-                      <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">
-                        {announcement.body.trim()}
-                      </div>
+                {generatedCode && (
+                  <div className="mt-4 flex flex-col gap-3 rounded-lg bg-surface-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="font-mono text-base font-semibold text-ink-primary">{generatedCode.code}</div>
+                      <div className="mt-1 text-xs text-ink-muted">{permissionLabels[generatedCode.permission]} · {formatDate(generatedCode.created_at)}</div>
                     </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-ink-secondary">当前公告不会在前台展示。</p>
-                  )}
-                </div>
-
-                {announcementStatus && (
-                  <p className="mt-3 text-sm text-success">{announcementStatus}</p>
+                    <button type="button" onClick={() => navigator.clipboard.writeText(generatedCode.code)} className="rounded-lg bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">复制 CDK</button>
+                  </div>
                 )}
-
-                <button
-                  type="submit"
-                  disabled={announcementSaving}
-                  className="mt-5 rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
-                >
-                  {announcementSaving ? '保存中...' : '保存公告'}
-                </button>
               </form>
-            )}
-          </div>
+              <CdkTable
+                records={visibleRecords}
+                selected={selectedCdkHashes}
+                filter={statusFilter}
+                busyAction={busyAction}
+                onFilter={setStatusFilter}
+                onSelect={setSelectedCdkHashes}
+                onBulkRevoke={handleBulkRevoke}
+                onPatch={patchCdk}
+                onDelete={deleteCdk}
+              />
+            </section>
+          )}
+
+          {activeSection === 'risk' && (
+            <section className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Metric label="冻结授权" value={summary.frozenCdks} tone="warning" />
+                <Metric label="风险记录" value={summary.riskEvents} />
+                <Metric label="设备绑定" value={summary.boundDevices} />
+              </div>
+              <RiskTable records={riskRecords} busyAction={busyAction} onPatch={patchCdk} />
+            </section>
+          )}
+
+          {activeSection === 'announcement' && (
+            <form onSubmit={handleSaveAnnouncement} className="max-w-3xl rounded-xl border border-surface-3 bg-surface-1 p-5">
+              <h2 className="text-base font-semibold text-ink-primary">前台公告</h2>
+              <label className="mt-5 flex items-center justify-between gap-4 rounded-lg bg-surface-2 px-3 py-2">
+                <span className="text-sm font-medium text-ink-secondary">启用公告</span>
+                <input type="checkbox" checked={announcement.enabled} onChange={(event) => setAnnouncement((current) => ({ ...current, enabled: event.currentTarget.checked }))} className="h-4 w-4 accent-brand-600" />
+              </label>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">标题</span>
+                <input value={announcement.title} maxLength={80} onChange={(event) => setAnnouncement((current) => ({ ...current, title: event.currentTarget.value }))} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" />
+              </label>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">正文</span>
+                <textarea value={announcement.body} maxLength={600} rows={6} onChange={(event) => setAnnouncement((current) => ({ ...current, body: event.currentTarget.value }))} className="w-full resize-y rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-primary" />
+              </label>
+              <button type="submit" disabled={busyAction === 'announcement'} className="mt-5 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">{busyAction === 'announcement' ? '保存中...' : '保存公告'}</button>
+            </form>
+          )}
         </div>
       </main>
     </div>
   )
 }
 
-function SummaryCell({ label, value }: { label: string; value: number }) {
+function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, onBulkRevoke, onPatch, onDelete }: {
+  records: AdminCdkRecord[];
+  selected: string[];
+  filter: StatusFilter;
+  busyAction: string | null;
+  onFilter: (filter: StatusFilter) => void;
+  onSelect: (hashes: string[]) => void;
+  onBulkRevoke: () => void;
+  onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission) => Promise<void>;
+  onDelete: (record: AdminCdkRecord) => Promise<void>;
+}) {
+  const allSelected = records.length > 0 && records.every((record) => selected.includes(record.code_hash))
   return (
-    <div className="px-5 py-4">
-      <div className="text-lg font-semibold text-ink-primary">{value}</div>
-      <div className="mt-1 text-xs text-ink-muted">{label}</div>
-    </div>
-  )
-}
-
-function CdkStat({ label, value }: { label: string; value: number }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-sm">
-      <span className="font-semibold text-ink-primary">{value}</span>
-      <span className="text-xs text-ink-muted">{label}</span>
-    </span>
-  )
-}
-
-function UsageInfo({ record }: { record: AdminCdkRecord }) {
-  if (record.status === 'unused') {
-    return <span className="text-ink-muted">-</span>
-  }
-
-  const grantCount = record.operator_update_grant_count ?? 0
-  const usedCount = record.operator_update_used_count ?? 0
-  const remaining = record.operator_update_grant_remaining ?? Math.max(0, grantCount - usedCount)
-  const primary = [
-    record.operator_count !== null ? `${record.operator_count} 干员` : null,
-    record.config_desc,
-  ].filter(Boolean).join(' / ')
-
-  return (
-    <div className="space-y-1.5 text-sm">
-      <div className="text-ink-secondary">{primary || '-'}</div>
-      {record.license_order_hash && (
-        <div className="break-all font-mono text-xs text-ink-muted">订单 {record.license_order_hash}</div>
-      )}
-      {remaining > 0 ? (
-        <div className="inline-flex rounded-md bg-success/10 px-2 py-1 text-xs font-semibold text-success">
-          干员更新待使用 {remaining} 次
+    <section className="rounded-xl border border-surface-3 bg-surface-1">
+      <div className="flex flex-col gap-3 border-b border-surface-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {(['all', 'unused', 'used', 'frozen', 'revoked'] as StatusFilter[]).map((item) => (
+            <button key={item} type="button" onClick={() => onFilter(item)} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${filter === item ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3'}`}>
+              {item === 'all' ? '全部' : statusLabels[item]}
+            </button>
+          ))}
         </div>
-      ) : grantCount > 0 ? (
-        <div className="text-xs text-ink-muted">干员更新已用 {usedCount}/{grantCount}</div>
-      ) : null}
-      {(record.operator_update_event_count ?? 0) > 0 && (
-        <div className="text-xs text-ink-muted">终身版更新 {record.operator_update_event_count} 次</div>
-      )}
-      {record.activation_bound && (
-        <div className="text-xs text-ink-muted">
-          已绑定设备 / UA {record.user_agent_count ?? 0} / IP {record.ip_prefix_count ?? 0}
-        </div>
-      )}
-      {record.status === 'frozen' && (
-        <div className="text-xs text-warning">
-          冻结 {formatDate(record.frozen_at ?? null)}：{record.freeze_reason || record.latest_risk_event?.reason || '触发风控'}
-        </div>
-      )}
-      {record.status === 'revoked' && record.revoked_at && (
-        <div className="text-xs text-error">撤销 {formatDate(record.revoked_at)}</div>
-      )}
-    </div>
+        <button type="button" onClick={onBulkRevoke} disabled={selected.length === 0} className="rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error hover:bg-error/20 disabled:bg-surface-2 disabled:text-ink-muted">批量撤销</button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-[980px] divide-y divide-surface-3 text-left text-sm">
+          <thead className="bg-surface-2/70 text-xs font-semibold text-ink-muted">
+            <tr>
+              <th className="px-4 py-3"><input type="checkbox" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></th>
+              <th className="px-4 py-3">CDK</th>
+              <th className="px-4 py-3">状态</th>
+              <th className="px-4 py-3">数据</th>
+              <th className="px-4 py-3">时间</th>
+              <th className="px-4 py-3">备注</th>
+              <th className="px-4 py-3">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-surface-3">
+            {records.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">当前筛选没有记录。</td></tr>
+            ) : records.map((record) => {
+              const nextPermission = getNextProductPermission(record.permission)
+              return (
+                <tr key={record.code_hash} className="hover:bg-surface-2/50">
+                  <td className="px-4 py-4"><input type="checkbox" checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
+                  <td className="px-4 py-4 font-mono text-ink-primary">{record.cdk_id}</td>
+                  <td className="px-4 py-4"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{permissionLabels[record.permission]}</div></td>
+                  <td className="px-4 py-4 text-ink-secondary">
+                    <div>{record.operator_count ?? '-'} 干员 / 生成 {record.schedule_generate_count ?? 0}</div>
+                    <div className="mt-1 text-xs text-ink-muted">终身更新 {record.operator_update_event_count ?? 0} / 风险 {record.risk_event_count ?? 0}</div>
+                  </td>
+                  <td className="px-4 py-4 text-xs text-ink-secondary"><div>创建 {formatDate(record.created_at)}</div><div className="mt-1">使用 {formatDate(record.used_at)}</div></td>
+                  <td className="max-w-[180px] px-4 py-4 text-ink-secondary"><div className="truncate" title={record.order_note || undefined}>{record.order_note || '-'}</div></td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      {nextPermission && record.status !== 'frozen' && record.status !== 'revoked' && <SmallButton onClick={() => onPatch(record, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${record.code_hash}`}>升级</SmallButton>}
+                      {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
+                      {(record.status === 'used' || record.status === 'frozen') && <SmallButton onClick={() => onPatch(record, 'revoke')} loading={busyAction === `revoke:${record.code_hash}`} tone="danger">撤销</SmallButton>}
+                      {record.status === 'unused' && <SmallButton onClick={() => onDelete(record)} loading={busyAction === `delete:${record.code_hash}`} tone="danger">删除</SmallButton>}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 
-function UsageMetric({ label, value }: { label: string; value: number }) {
+function RiskTable({ records, busyAction, onPatch }: { records: AdminCdkRecord[]; busyAction: string | null; onPatch: (record: AdminCdkRecord, action: string) => Promise<void> }) {
   return (
-    <div className="bg-surface-1 px-5 py-4">
-      <div className="text-xl font-semibold text-ink-primary">{value}</div>
-      <div className="mt-1 text-xs text-ink-muted">{label}</div>
-    </div>
+    <section className="rounded-xl border border-surface-3 bg-surface-1">
+      <div className="border-b border-surface-3 p-4">
+        <h2 className="text-base font-semibold text-ink-primary">风险记录</h2>
+      </div>
+      <div className="divide-y divide-surface-3">
+        {records.length === 0 ? <div className="p-8 text-center text-sm text-ink-muted">暂无风险记录。</div> : records.map((record) => (
+          <div key={record.code_hash} className="grid gap-3 p-4 lg:grid-cols-[180px_1fr_auto] lg:items-center">
+            <div><div className="font-mono text-sm text-ink-primary">{record.cdk_id}</div><StatusPill status={record.status} /></div>
+            <div className="text-sm text-ink-secondary">
+              <div>{record.freeze_reason || record.latest_risk_event?.reason || '记录了风控事件'}</div>
+              <div className="mt-1 text-xs text-ink-muted">风险 {record.risk_event_count ?? 0} / UA {record.user_agent_count ?? 0} / IP {record.ip_prefix_count ?? 0} / 冻结 {formatDate(record.frozen_at ?? null)}</div>
+            </div>
+            {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
-function normalizeAnnouncementResponse(data: AnnouncementResponse): Announcement {
-  return {
-    enabled: data.enabled === true,
-    title: typeof data.title === 'string' ? data.title : '',
-    body: typeof data.body === 'string' ? data.body : '',
-    updated_at: typeof data.updated_at === 'string' ? data.updated_at : null,
-  }
+function Metric({ label, value, tone = 'default' }: { label: string; value: number | string; tone?: 'default' | 'warning' }) {
+  return <div className={`rounded-xl border p-4 ${tone === 'warning' ? 'border-warning/30 bg-warning/10' : 'border-surface-3 bg-surface-1'}`}>
+    <div className="text-2xl font-semibold text-ink-primary">{value}</div>
+    <div className="mt-1 text-sm text-ink-muted">{label}</div>
+  </div>
 }
 
-function normalizeUsageStatsResponse(data: UsageStatsResponse): { totals: UsageTotals; days: UsageDay[] } {
-  return {
-    totals: normalizeUsageTotals(data.totals),
-    days: Array.isArray(data.days) ? data.days.map(normalizeUsageDay) : [],
-  }
+function UsageBar({ day, max }: { day: UsageDay; max: number }) {
+  const height = Math.max(8, Math.round(((day.visits + day.schedule_generates + day.cdk_redeems) / Math.max(1, max)) * 100))
+  return <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
+    <div className="flex h-40 w-full items-end rounded-lg bg-surface-2 px-1">
+      <div className="w-full rounded-md bg-brand-500" style={{ height: `${height}%` }} title={`${day.date}: ${day.visits} 访问, ${day.schedule_generates} 生成, ${day.cdk_redeems} 兑换`} />
+    </div>
+    <div className="truncate text-xs text-ink-muted">{day.date.slice(5)}</div>
+  </div>
 }
 
-function normalizeUsageDay(day: Partial<UsageDay>): UsageDay {
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-2 last:border-0"><dt className="text-ink-muted">{label}</dt><dd className="font-medium text-ink-primary">{value}</dd></div>
+}
+
+function StatusPill({ status }: { status: CdkStatus }) {
+  const className = status === 'unused'
+    ? 'bg-success/10 text-success'
+    : status === 'frozen'
+      ? 'bg-warning/10 text-warning'
+      : status === 'revoked'
+        ? 'bg-error/10 text-error'
+        : 'bg-surface-3 text-ink-secondary'
+  return <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${className}`}>{statusLabels[status]}</span>
+}
+
+function SmallButton({ children, onClick, loading, tone = 'default' }: { children: string; onClick: () => void; loading?: boolean; tone?: 'default' | 'success' | 'danger' }) {
+  const className = tone === 'danger'
+    ? 'bg-error/10 text-error hover:bg-error/20'
+    : tone === 'success'
+      ? 'bg-success/10 text-success hover:bg-success/20'
+      : 'bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'
+  return <button type="button" onClick={onClick} disabled={loading} className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150 disabled:bg-surface-3 disabled:text-ink-muted ${className}`}>{loading ? '处理中' : children}</button>
+}
+
+function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0) {
+  const daysActivity = 0
+  const totalCdks = records.length
+  const usedCdks = records.filter((record) => record.status === 'used').length
+  const frozenCdks = records.filter((record) => record.status === 'frozen').length
+  const riskEvents = records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
+  const boundDevices = records.filter((record) => record.activation_bound).length
+  const maxDailyActivity = Math.max(1, ...(usage ? [] : [daysActivity]))
   return {
-    date: typeof day.date === 'string' ? day.date : '',
-    ...normalizeUsageTotals(day),
+    totalCdks,
+    usedCdks,
+    frozenCdks,
+    riskEvents,
+    boundDevices,
+    adminUsers,
+    uniqueVisitors: usage?.unique_visitors ?? 0,
+    visits: usage?.visits ?? 0,
+    scheduleGenerates: usage?.schedule_generates ?? 0,
+    cdkRedeems: usage?.cdk_redeems ?? 0,
+    redeemRate: usage?.visits ? Math.round(((usage?.cdk_redeems ?? 0) / usage.visits) * 1000) / 10 : 0,
+    maxDailyActivity,
   }
 }
 
@@ -1398,8 +649,21 @@ function normalizeUsageTotals(value: Partial<UsageTotals> | undefined): UsageTot
   }
 }
 
+function normalizeUsageDay(day: Partial<UsageDay>): UsageDay {
+  return { date: typeof day.date === 'string' ? day.date : '', ...normalizeUsageTotals(day) }
+}
+
 function normalizeCount(value: unknown): number {
   return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0
+}
+
+function normalizeAnnouncement(value: Partial<Announcement> | null | undefined): Announcement {
+  return {
+    enabled: value?.enabled === true,
+    title: typeof value?.title === 'string' ? value.title : '',
+    body: typeof value?.body === 'string' ? value.body : '',
+    updated_at: typeof value?.updated_at === 'string' ? value.updated_at : null,
+  }
 }
 
 function formatDate(value: string | null): string {
@@ -1409,38 +673,37 @@ function formatDate(value: string | null): string {
   return date.toLocaleString('zh-CN', { hour12: false })
 }
 
-function formatUsage(record: AdminCdkRecord): string {
-  if (record.status === 'unused') return '-'
-  const grantCount = record.operator_update_grant_count ?? 0
-  const usedCount = record.operator_update_used_count ?? 0
-  const remaining = record.operator_update_grant_remaining ?? Math.max(0, grantCount - usedCount)
-  const parts = [
-    record.operator_count !== null ? `${record.operator_count} 干员` : null,
-    record.config_desc,
-    record.license_order_hash ? `订单 ${record.license_order_hash}` : null,
-    remaining > 0
-      ? `干员更新待使用 ${remaining} 次`
-      : grantCount > 0
-        ? `干员更新已用 ${usedCount}/${grantCount}`
-        : null,
-    (record.operator_update_event_count ?? 0) > 0 ? `终身版更新 ${record.operator_update_event_count} 次` : null,
-    record.activation_bound ? `设备绑定 UA ${record.user_agent_count ?? 0} / IP ${record.ip_prefix_count ?? 0}` : null,
-    record.status === 'frozen' ? `冻结 ${record.freeze_reason || record.latest_risk_event?.reason || ''}` : null,
-    record.status === 'revoked' && record.revoked_at ? `撤销 ${formatDate(record.revoked_at)}` : null,
-  ].filter(Boolean)
-  return parts.length > 0 ? parts.join(' / ') : '-'
-}
-
-function normalizeProductPermission(permission: Permission): GeneratedPermission | null {
-  if (permission === 'basic') return 'growth'
-  if (permission === 'premium') return 'advanced'
-  if (cdkProductPermissions.includes(permission as GeneratedPermission)) return permission as GeneratedPermission
-  return null
-}
-
 function getNextProductPermission(permission: Permission): GeneratedPermission | null {
-  const current = normalizeProductPermission(permission)
+  const current = permission === 'basic' ? 'growth' : permission === 'premium' ? 'advanced' : cdkProductPermissions.includes(permission as GeneratedPermission) ? permission as GeneratedPermission : null
   if (!current) return null
-  const next = cdkProductPermissions.find((item) => cdkProductPermissionRank[item] === cdkProductPermissionRank[current] + 1)
-  return next ?? null
+  return cdkProductPermissions.find((item) => cdkProductPermissionRank[item] === cdkProductPermissionRank[current] + 1) ?? null
+}
+
+function readStoredCredentials(): { user: string; password: string } | null {
+  try {
+    const raw = window.sessionStorage.getItem('maa-admin-credentials')
+    return raw ? JSON.parse(raw) as { user: string; password: string } : null
+  } catch {
+    return null
+  }
+}
+
+function storeCredentials(credentials: { user: string; password: string }): void {
+  window.sessionStorage.setItem('maa-admin-credentials', JSON.stringify(credentials))
+}
+
+function clearStoredCredentials(): void {
+  window.sessionStorage.removeItem('maa-admin-credentials')
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  const text = await response.text()
+  if (!text.trim()) {
+    throw new Error(`接口返回为空，请确认后台函数路由已部署: ${response.status}`)
+  }
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(`接口返回格式异常，请确认后台函数路由已部署: ${response.status}`)
+  }
 }
