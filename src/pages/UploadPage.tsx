@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
-import type { Announcement, FreePreviewResult, LicenseConfig, LicenseFile, LicenseOperator, PermissionMode } from '../lib/types'
+import type { AnalyzeScheduleResult, Announcement, FreePreviewResult, LicenseConfig, LicenseFile, LicenseOperator, PermissionMode } from '../lib/types'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import BuildMetaStrip from '../components/BuildMetaStrip'
+import ResultPanel from '../components/ResultPanel'
 import { downloadLicenseFile } from '../lib/download'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 
@@ -13,7 +14,7 @@ interface Props {
   announcement: Announcement | null;
 }
 
-type EntryMode = 'preview' | 'license' | 'cdk'
+type EntryMode = 'preview' | 'analysis' | 'license' | 'cdk'
 
 const FIRST_RUN_TOUR_STORAGE_KEY = 'maa-infrast-upload-tour-seen'
 
@@ -121,6 +122,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
         <div className="mb-5 flex justify-center">
           <div className="inline-flex rounded-lg bg-surface-1 p-1" data-tour="entry-mode">
             <ModeButton label="免费预览" active={mode === 'preview'} onClick={() => setMode('preview')} />
+            <ModeButton label="分析排班表" active={mode === 'analysis'} onClick={() => setMode('analysis')} />
             <ModeButton label="上传 .maa 文件" active={mode === 'license'} onClick={() => setMode('license')} />
             <ModeButton label="使用 CDK 生成授权文件" active={mode === 'cdk'} onClick={() => setMode('cdk')} />
           </div>
@@ -128,6 +130,8 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
 
         {mode === 'preview' ? (
           <FreePreviewPanel onUseCdk={() => setMode('cdk')} />
+        ) : mode === 'analysis' ? (
+          <ScheduleAnalysisPanel />
         ) : mode === 'license' ? (
           <LicenseUploadPanel onFileLoaded={onFileLoaded} error={error} />
         ) : (
@@ -135,7 +139,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
         )}
 
         <p className="mt-6 text-center text-xs text-ink-muted">
-          免费预览仅展示前 3 个房间，不提供完整排班或 MAA JSON。CDK 会在本站生成授权文件，授权文件和保存进度文件通常以 .maa 结尾。
+        排班表分析无需 CDK 和授权；免费预览仅展示前 3 个房间，不提供完整排班或 MAA JSON。CDK 会在本站生成授权文件，授权文件和保存进度文件通常以 .maa 结尾。
         </p>
         <div className="mt-3 text-center">
           <button
@@ -170,6 +174,171 @@ function ModeButton({ label, active, onClick }: { label: string; active: boolean
     >
       {label}
     </button>
+  )
+}
+
+function ScheduleAnalysisPanel() {
+  const [operators, setOperators] = useState<LicenseOperator[] | null>(null)
+  const [schedule, setSchedule] = useState<unknown | null>(null)
+  const [operatorsFileName, setOperatorsFileName] = useState<string | null>(null)
+  const [scheduleFileName, setScheduleFileName] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<AnalyzeScheduleResult | null>(null)
+  const operatorsRef = useRef<HTMLInputElement>(null)
+  const scheduleRef = useRef<HTMLInputElement>(null)
+
+  const handleOperatorsFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+    setError(null)
+    setOperatorsFileName(file.name)
+    try {
+      setOperators(parseOperatorsText(await file.text()))
+    } catch (caught) {
+      setOperators(null)
+      setError((caught as Error).message)
+    }
+  }
+
+  const handleScheduleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+    setError(null)
+    setScheduleFileName(file.name)
+    try {
+      setSchedule(parseScheduleText(await file.text()))
+    } catch (caught) {
+      setSchedule(null)
+      setError((caught as Error).message)
+    }
+  }
+
+  const handleAnalyze = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!operators) {
+      setError('请先上传 operators.json。')
+      return
+    }
+    if (!schedule) {
+      setError('请先上传排班表 JSON。')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const resp = await fetch('/api/analyze-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operators, schedule }),
+      })
+      if (!resp.ok) throw new Error(await readResponseError(resp, `分析失败: ${resp.status}`))
+      setResult(await resp.json() as AnalyzeScheduleResult)
+    } catch (caught) {
+      setResult(null)
+      setError((caught as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleAnalyze} className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-ink-primary">分析导入排班表</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">
+              上传干员数据和已生成的排班 JSON，直接分析红脸风险、日产量和爆仓信息，不需要 CDK 或授权文件。
+            </p>
+          </div>
+          <span className="rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-300">
+            免授权
+          </span>
+        </div>
+
+        {error && (
+          <div className="mt-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <FilePickButton
+            label="干员数据"
+            hint="operators.json / .txt"
+            fileName={operatorsFileName}
+            loadedText={operators ? `已载入 ${operators.filter((operator) => operator.own !== false).length} 名干员` : ''}
+            onClick={() => operatorsRef.current?.click()}
+          />
+          <FilePickButton
+            label="排班表"
+            hint="maa_schedule_optimized.json"
+            fileName={scheduleFileName}
+            loadedText={schedule ? '已载入排班表' : ''}
+            onClick={() => scheduleRef.current?.click()}
+          />
+        </div>
+
+        <input
+          ref={operatorsRef}
+          type="file"
+          accept=".json,.txt,application/json,text/plain"
+          onChange={handleOperatorsFile}
+          className="hidden"
+        />
+        <input
+          ref={scheduleRef}
+          type="file"
+          accept=".json,.txt,application/json,text/plain"
+          onChange={handleScheduleFile}
+          className="hidden"
+        />
+
+        <button
+          type="submit"
+          disabled={loading || !operators || !schedule}
+          className="mt-5 w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+        >
+          {loading ? '分析中...' : '分析排班表'}
+        </button>
+      </form>
+
+      {result && (
+        <div className="mx-auto max-w-5xl">
+          <ResultPanel result={result} variant="analysis" detailDefaultOpen />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FilePickButton({
+  label,
+  hint,
+  fileName,
+  loadedText,
+  onClick,
+}: {
+  label: string;
+  hint: string;
+  fileName: string | null;
+  loadedText: string;
+  onClick: () => void;
+}) {
+  return (
+    <div>
+      <span className="mb-2 block text-sm font-medium text-ink-secondary">{label}</span>
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full rounded-lg bg-surface-2 px-4 py-3 text-left text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
+      >
+        {fileName ? `已选择：${fileName}` : hint}
+      </button>
+      {loadedText && <p className="mt-2 text-xs text-brand-400">{loadedText}</p>}
+    </div>
   )
 }
 
@@ -1044,6 +1213,23 @@ function parseOperatorsText(text: string): LicenseOperator[] {
     throw new Error('operators.json 顶层必须是数组。')
   }
   return data as LicenseOperator[]
+}
+
+function parseScheduleText(text: string): unknown {
+  const data = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
+  if (!Array.isArray(data) && (!data || typeof data !== 'object')) {
+    throw new Error('排班表 JSON 需要是对象或数组。')
+  }
+  return data
+}
+
+async function readResponseError(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = await response.json() as { error?: string }
+    return data.error || fallback
+  } catch {
+    return fallback
+  }
 }
 
 function normalizeCdkPermission(permission: string): PermissionMode {
