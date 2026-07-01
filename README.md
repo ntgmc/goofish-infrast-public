@@ -72,20 +72,23 @@ Quality Checks 拆分为两个检查项：
 
 另外，仓库使用 GitHub Actions 在 PR 创建、重新打开、更新 commit 或标记 ready 时，根据 PR 内 commit message 自动更新 PR description。配置文件位于 `.github/workflows/pr-details.yml`。该流程只维护 PR description 中 `<!-- pr-details:start -->` 到 `<!-- pr-details:end -->` 之间的自动生成区块，区块外的人工内容会保留。
 
-Quality Checks 会在执行检查前注入构建元数据：
+`npm run generate:data` 会自动生成并应用构建元数据。Quality Checks 会在 PR 指向 `main` 或 push 到 `main` 时自动运行该脚本；只有 `main` 分支 push 或手动触发的自动回写任务会把生成后的 `src/lib/build-meta.ts`、`netlify/functions/data.ts` 提交回仓库，PR 阶段不会改写源分支。CI 或 Netlify 可通过以下变量覆盖默认值：
 
 | Variable | Example | Purpose |
 | --- | --- | --- |
-| `FRONTEND_VERSION` | `frontend.123.abcdef1` | 前端版本号 |
-| `BACKEND_VERSION` | `backend.123.abcdef1` | 后端版本号 |
+| `FRONTEND_VERSION` | `1.3.123` | 前端版本号 |
+| `BACKEND_VERSION` | `1.3.123` | 后端版本号 |
+| `APP_VERSION` | `1.3.123` | 同时覆盖前端和后端版本号 |
 | `DATA_VERSION` | `data.123.abcdef1` | 规则数据版本号 |
 | `GENERATED_AT` | `2026-06-21T00:00:00Z` | 规则数据生成时间 |
+| `VERSION_SOURCE_SHA` | commit SHA | 用于生成版本元数据的源提交 |
 | `GIT_SHA` | commit SHA | 版本对应的 Git 提交 |
+| `BUILD_NUMBER` | `123` | 生成版本号时使用的构建序号 |
 | `BUILD_CONTEXT` | `pull_request` / `push` | 构建上下文 |
 
 `npm run generate:data` 会根据这些变量生成 `src/lib/build-meta.ts`，并在 `netlify/functions/data.ts` 中写入 `data_version`、`generated_at` 和来源摘要。前端会显示“当前规则数据更新于 YYYY-MM-DD”，优化 API 响应也会带上同一份版本元数据。
 
-版本号 patch bump 规则固定如下：显式 `VERSION_PATCH` 优先，其次使用 `BUILD_NUMBER` / `GITHUB_RUN_NUMBER`；本地未提供构建号时使用当前 Git 提交数。因此每次新增 commit 后生成元数据会自然递增，同一 commit 上重复执行 `npm run generate:data` 或 `npm run build` 不会继续递增版本。
+未显式提供 `FRONTEND_VERSION`、`BACKEND_VERSION` 或 `APP_VERSION` 时，版本号 patch bump 规则固定如下：显式 `VERSION_PATCH` 优先，其次使用 `BUILD_NUMBER`；本地未提供构建号时使用当前 Git 提交数。Quality Checks 的自动回写任务会把 `github.run_number` 作为 `BUILD_NUMBER` 注入，但只会在 `main` 分支的 push 或手动触发时写回仓库；PR 阶段只生成用于检查的临时产物，不会改写 PR 源分支。机器人提交触发的后续构建不会再次 bump，避免循环提交。未显式提供 `DATA_VERSION` 时，脚本会优先生成 `data.<构建号>.<短 SHA>`，缺少 Git 信息时回退到规则数据内容哈希。
 
 ## Netlify Build & deploy settings
 

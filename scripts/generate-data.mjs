@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,20 +18,30 @@ const sourceHash = createHash('sha256').update(source).digest('hex')
 const baseVersion = String(packageJson.version || '0.0.0')
 const existingFrontendVersion = await readExistingBuildMetaField('frontend_version')
 const existingBackendVersion = await readExistingBuildMetaField('backend_version')
+const existingDataVersion = await readExistingBuildMetaField('data_version')
+const existingGitSha = await readExistingBuildMetaField('git_sha')
+const existingBuildContext = await readExistingBuildMetaField('build_context')
 const defaultBuildVersion = normalizeBaseVersion(baseVersion)
-const dataVersion = process.env.DATA_VERSION || `data.${sourceHash.slice(0, 12)}`
+const gitSha = resolveGitSha(existingGitSha)
+const buildNumber = resolveBuildNumber()
+const generatedBuildVersion = resolveGeneratedBuildVersion(baseVersion, buildNumber)
+const dataVersion = process.env.DATA_VERSION ||
+  (buildNumber ? resolveGeneratedDataVersion(sourceHash, buildNumber, gitSha) : existingDataVersion) ||
+  resolveGeneratedDataVersion(sourceHash, null, gitSha)
 const sourceSummary = buildSourceSummary(data, sourceHash)
 const generatedAt = process.env.GENERATED_AT ||
   await readExistingGeneratedAt(dataVersion, sourceSummary) ||
   new Date().toISOString()
 const appBuildMeta = {
-  frontend_version: process.env.FRONTEND_VERSION || process.env.APP_VERSION || existingFrontendVersion || defaultBuildVersion,
-  backend_version: process.env.BACKEND_VERSION || process.env.APP_VERSION || existingBackendVersion || defaultBuildVersion,
+  frontend_version: process.env.FRONTEND_VERSION || process.env.APP_VERSION || generatedBuildVersion || existingFrontendVersion || defaultBuildVersion,
+  backend_version: process.env.BACKEND_VERSION || process.env.APP_VERSION || generatedBuildVersion || existingBackendVersion || defaultBuildVersion,
   data_version: dataVersion,
   generated_at: generatedAt,
   source_summary: sourceSummary,
-  git_sha: process.env.GIT_SHA || process.env.GITHUB_SHA || process.env.COMMIT_REF || null,
-  build_context: process.env.BUILD_CONTEXT || process.env.GITHUB_EVENT_NAME || process.env.CONTEXT || 'local',
+  git_sha: gitSha,
+  build_context: process.env.BUILD_CONTEXT ||
+    (buildNumber ? process.env.GITHUB_EVENT_NAME || process.env.CONTEXT : existingBuildContext) ||
+    (process.env.CI ? 'ci' : 'local'),
 }
 const dataMetadata = {
   data_version: appBuildMeta.data_version,
@@ -64,6 +75,73 @@ function normalizeBaseVersion(baseVersion) {
 
   const [, major, minor, patch] = match
   return `${major}.${minor}.${patch}`
+}
+
+function resolveGeneratedBuildVersion(baseVersion, buildNumber) {
+  if (!buildNumber) return null
+  const match = baseVersion.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/)
+  if (!match) return `${baseVersion}.${buildNumber}`
+
+  const [, major, minor] = match
+  return `${major}.${minor}.${buildNumber}`
+}
+
+function resolveGeneratedDataVersion(hash, buildNumber, gitSha) {
+  const shortSha = gitSha ? gitSha.slice(0, 7) : null
+  if (buildNumber && shortSha) return `data.${buildNumber}.${shortSha}`
+  if (buildNumber) return `data.${buildNumber}`
+  return `data.${hash.slice(0, 12)}`
+}
+
+function resolveBuildNumber() {
+  for (const key of ['VERSION_PATCH', 'BUILD_NUMBER']) {
+    const value = readPositiveIntegerEnv(key)
+    if (value) return value
+  }
+  if (process.env.CI) return null
+  return readGitCommitCount()
+}
+
+function readPositiveIntegerEnv(key) {
+  const rawValue = process.env[key]
+  if (!rawValue) return null
+  const value = rawValue.trim()
+  if (!/^\d+$/.test(value)) return null
+  return String(Number(value))
+}
+
+function resolveGitSha(existingGitSha) {
+  for (const key of ['VERSION_SOURCE_SHA', 'GIT_SHA', 'COMMIT_REF']) {
+    const sha = normalizeGitSha(process.env[key])
+    if (sha) return sha
+  }
+  if (process.env.CI) return normalizeGitSha(existingGitSha)
+  return readGitSha()
+}
+
+function normalizeGitSha(value) {
+  if (!value) return null
+  const sha = value.trim()
+  return /^[0-9a-f]{7,40}$/i.test(sha) ? sha : null
+}
+
+function readGitSha() {
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+  if (result.status !== 0) return null
+  return result.stdout.trim() || null
+}
+
+function readGitCommitCount() {
+  const result = spawnSync('git', ['rev-list', '--count', 'HEAD'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+  if (result.status !== 0) return null
+  const value = result.stdout.trim()
+  return /^\d+$/.test(value) ? String(Number(value)) : null
 }
 
 async function readExistingGeneratedAt(dataVersion, sourceSummary) {

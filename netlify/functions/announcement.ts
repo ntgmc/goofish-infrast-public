@@ -2,7 +2,8 @@ import type { Context } from '@netlify/functions'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { Announcement } from '../../src/lib/types'
-import { jsonResponse, requireEnv } from './license-utils'
+import { authenticateAdminRequest } from './admin-auth'
+import { jsonResponse } from './license-utils'
 
 const ANNOUNCEMENT_KEY = 'current.json'
 const DEFAULT_ANNOUNCEMENT: Announcement = {
@@ -49,10 +50,8 @@ async function handlePublicGet(): Promise<Response> {
 }
 
 async function handleAdminGet(req: Request): Promise<Response> {
-  const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
-  const providedPassword = req.headers.get('X-Admin-Password')
-  if (providedPassword !== adminPassword) {
-    return jsonResponse({ error: '管理口令错误。' }, 401)
+  if (!(await authenticateAdminRequest(req))) {
+    return jsonResponse({ error: '管理账号或密码错误。' }, 401)
   }
 
   return jsonResponse(await readAnnouncement())
@@ -61,13 +60,13 @@ async function handleAdminGet(req: Request): Promise<Response> {
 async function handleAdminPut(req: Request): Promise<Response> {
   const body = await req.json() as {
     admin_password?: string;
+    admin_user?: string;
     enabled?: unknown;
     title?: unknown;
     body?: unknown;
   }
-  const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
-  if (body.admin_password !== adminPassword) {
-    return jsonResponse({ error: '管理口令错误。' }, 401)
+  if (!(await authenticateAdminRequest(req, body))) {
+    return jsonResponse({ error: '管理账号或密码错误。' }, 401)
   }
 
   const validation = validateAnnouncementInput(body)

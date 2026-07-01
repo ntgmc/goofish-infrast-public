@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
-import { canEditConfig, canReplaceOperators, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
+import { canEditConfig, canReplaceOperators, canUseIntermediateAutoConfig, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
+import { getActivationTokenForLicense } from '../lib/activation-token'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
 import UpgradeSuggestions from '../components/UpgradeSuggestions'
@@ -21,12 +22,17 @@ interface Props {
   setConfigOverride: (v: LicenseConfig | null) => void;
   onReset: () => void;
   announcement: Announcement | null;
+  redeemedNotice: string | null;
+  onRedownloadLicense: (() => void) | null;
 }
 
 interface LicenseStatusResponse {
   error?: string;
   permission_label?: string;
   operator_update_available?: boolean;
+  operator_update_limit?: { window_days: 7; max_updates: 2; used: number; next_available_at?: string };
+  operator_update_next_available_at?: string;
+  risk_status?: 'ok' | 'frozen';
   license?: LicenseFile | null;
   license_file_content?: string | null;
 }
@@ -40,6 +46,8 @@ export default function OptimizePage({
   setConfigOverride,
   onReset,
   announcement,
+  redeemedNotice,
+  onRedownloadLicense,
 }: Props) {
   const [suggestions, setSuggestions] = useState<UpgradeSuggestion[]>([])
   const [currentResult, setCurrentResult] = useState<OptimizeResult | null>(null)
@@ -50,15 +58,21 @@ export default function OptimizePage({
   const [operatorUploadStatus, setOperatorUploadStatus] = useState<string | null>(null)
   const [licenseSyncing, setLicenseSyncing] = useState(true)
   const [licenseSyncStatus, setLicenseSyncStatus] = useState<string | null>(null)
+  const [configPanelOpen, setConfigPanelOpen] = useState(false)
   const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
+  const [configToast, setConfigToast] = useState<{ id: number; message: string } | null>(null)
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const operatorFileRef = useRef<HTMLInputElement>(null)
   const optimizeInFlightRef = useRef(false)
+  const configToastTimerRef = useRef<number | null>(null)
+  const configToastIdRef = useRef(0)
   const pendingLicenseSyncRef = useRef<{ license: LicenseFile; message: string } | null>(null)
 
   const permission = getPermissionMode(license)
   const userCanReplaceOperators = canReplaceOperators(license)
   const userCanEditConfig = canEditConfig(license)
+  const userCanUseIntermediateAutoConfig = permission === 'recommended' || permission === 'growth'
+  const userCanApplyConfigOverride = userCanEditConfig || userCanUseIntermediateAutoConfig
   const userCanUseUpgradeFeatures = canUseUpgradeFeatures(license)
   const activeConfig = useMemo(
     () => normalizeConfig(configOverride ?? license.config),
@@ -71,6 +85,36 @@ export default function OptimizePage({
   )
   const configValidation = useMemo(() => validateConfig(activeConfig), [activeConfig])
   const configValidationMessage = configValidation.ok === false ? configValidation.message : null
+  const configPanelForcedOpen = !configValidation.ok
+  const configPresetLabel = useMemo(() => formatConfigPresetLabel(activeConfig), [activeConfig])
+
+  const clearConfigValidationToast = useCallback(() => {
+    if (configToastTimerRef.current !== null) {
+      window.clearTimeout(configToastTimerRef.current)
+      configToastTimerRef.current = null
+    }
+    setConfigToast(null)
+  }, [])
+
+  const showConfigValidationToast = useCallback((message: string) => {
+    if (configToastTimerRef.current !== null) {
+      window.clearTimeout(configToastTimerRef.current)
+    }
+    configToastIdRef.current += 1
+    setConfigToast({ id: configToastIdRef.current, message })
+    configToastTimerRef.current = window.setTimeout(() => {
+      setConfigToast(null)
+      configToastTimerRef.current = null
+    }, 4200)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (configToastTimerRef.current !== null) {
+        window.clearTimeout(configToastTimerRef.current)
+      }
+    }
+  }, [])
 
   const mergedOperators = useMemo(
     () => mergeOperators(license.operators, eliteOverrides),
@@ -85,6 +129,12 @@ export default function OptimizePage({
   const currentResultIsRotation = normalizeScheduleMode(currentResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
   const finalResultIsRotation = normalizeScheduleMode(finalResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
   const serverBuildMeta = finalResult?.build_meta ?? currentResult?.build_meta
+
+  useEffect(() => {
+    if (configPanelForcedOpen) {
+      setConfigPanelOpen(true)
+    }
+  }, [configPanelForcedOpen])
 
   const clearGeneratedResult = useCallback(() => {
     setSuggestions([])
@@ -123,7 +173,7 @@ export default function OptimizePage({
     fetch('/api/license-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license }),
+      body: JSON.stringify({ license, activation_token: getActivationTokenForLicense(license) }),
     })
       .then(async (resp) => {
         const data = await resp.json() as LicenseStatusResponse
@@ -164,7 +214,7 @@ export default function OptimizePage({
     try {
       const nextOperators = parseOperatorsFile(await file.text())
       const confirmed = window.confirm(
-        `确认替换当前授权内的干员数据？\n\n新文件识别到 ${nextOperators.length} 名干员。继续后会清空当前练度调整，并消耗一次干员数据更新权限。`
+`确认替换当前授权内的干员数据？\n\n新文件识别到 ${nextOperators.length} 名干员。继续后会清空当前练度调整。单账号终身卡每 7 天最多更新 2 次，并会校验账号与设备绑定。`
       )
       if (!confirmed) {
         if (operatorFileRef.current) {
@@ -175,7 +225,11 @@ export default function OptimizePage({
       const resp = await fetch('/api/license-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ license, operators: nextOperators }),
+        body: JSON.stringify({
+          license,
+          operators: nextOperators,
+          activation_token: getActivationTokenForLicense(license),
+        }),
       })
       const data = await resp.json() as LicenseStatusResponse
       if (!resp.ok || !data.license) {
@@ -194,18 +248,25 @@ export default function OptimizePage({
   }, [clearGeneratedResult, license, setEliteOverrides, setLicense, userCanReplaceOperators])
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
-    if (!userCanEditConfig) return
+    if (!userCanApplyConfigOverride) return
     const next = normalizeConfig(activeConfig)
     mutate(next)
     next.layout = `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
     setConfigOverride(next)
-    clearGeneratedResult()
-  }, [activeConfig, clearGeneratedResult, setConfigOverride, userCanEditConfig])
+    const nextValidation = validateConfig(next)
+    if (nextValidation.ok) {
+      clearConfigValidationToast()
+    } else {
+      showConfigValidationToast(nextValidation.message)
+    }
+    setInlineError(null)
+  }, [activeConfig, clearConfigValidationToast, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
 
   const resetConfig = useCallback(() => {
     setConfigOverride(null)
-    clearGeneratedResult()
-  }, [clearGeneratedResult, setConfigOverride])
+    clearConfigValidationToast()
+    setInlineError(null)
+  }, [clearConfigValidationToast, setConfigOverride])
 
   const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false) => {
     const payload: OptimizeRequest = {
@@ -213,6 +274,7 @@ export default function OptimizePage({
       operators: mergedOperators,
       config: activeConfig,
       ignore_elite: ignoreElite,
+      activation_token: getActivationTokenForLicense(license),
       ...(includeCurrent && { include_current: true }),
     }
     const resp = await fetch('/api/optimize', {
@@ -230,6 +292,7 @@ export default function OptimizePage({
       operators: mergedOperators,
       config: activeConfig,
       ignore_elite: true,
+      activation_token: getActivationTokenForLicense(license),
       suggestions_only: true,
       upgrade_task_payload: taskPayload,
     }
@@ -246,7 +309,7 @@ export default function OptimizePage({
     if (licenseSyncing || loading || optimizeInFlightRef.current) return
     if (hasResult && lastGeneratedSignature === optimizeSignature) return
     if (configValidationMessage) {
-      setInlineError({ scope: 'generate', message: configValidationMessage })
+      showConfigValidationToast(configValidationMessage)
       return
     }
     optimizeInFlightRef.current = true
@@ -297,7 +360,7 @@ export default function OptimizePage({
       setPhase('suggestions')
       setLastGeneratedSignature(optimizeSignature)
     } catch (e) {
-      setInlineError({ scope: 'generate', message: '优化失败: ' + (e as Error).message })
+      setInlineError({ scope: 'generate', message: formatOptimizeError((e as Error).message) })
     } finally {
       optimizeInFlightRef.current = false
       setLoading(false)
@@ -306,10 +369,14 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [configValidationMessage, flushPendingLicenseSync, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, runOptimize, runUpgradeSuggestions, userCanUseUpgradeFeatures])
+  }, [configValidationMessage, flushPendingLicenseSync, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, runOptimize, runUpgradeSuggestions, showConfigValidationToast, userCanUseUpgradeFeatures])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
     if (loading || optimizeInFlightRef.current) return
+    if (!resultIsCurrent) {
+      setInlineError({ scope: 'apply', message: '基建配置已修改，请先重新计算排班后再应用练度建议。' })
+      return
+    }
     optimizeInFlightRef.current = true
     setInlineError(null)
     const startedAt = Date.now()
@@ -351,7 +418,7 @@ export default function OptimizePage({
       setPhase('final')
       setLastGeneratedSignature(buildOptimizeSignature(mergeOperators(license.operators, newOverrides), activeConfig))
     } catch (e) {
-      setInlineError({ scope: 'apply', message: '优化失败: ' + (e as Error).message })
+      setInlineError({ scope: 'apply', message: formatOptimizeError((e as Error).message) })
     } finally {
       optimizeInFlightRef.current = false
       setLoading(false)
@@ -359,7 +426,7 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [activeConfig, eliteOverrides, loading, suggestions, license, setEliteOverrides])
+  }, [activeConfig, eliteOverrides, loading, resultIsCurrent, suggestions, license, setEliteOverrides])
 
   const handleDownloadMAA = useCallback(() => {
     const data = finalResult || currentResult
@@ -374,7 +441,9 @@ export default function OptimizePage({
   }, [finalResult, currentResult])
 
   const handleSaveWorkfile = useCallback(async () => {
-    const savedConfigOverride = userCanEditConfig && configChanged ? activeConfig : undefined
+    const savedConfigOverride = userCanEditConfig || canUseIntermediateAutoConfig(license, activeConfig)
+      ? configChanged ? activeConfig : undefined
+      : undefined
     const derivedKey = await deriveClientKey(license.sig)
     const clientSig = await signClientState(derivedKey, eliteOverrides, savedConfigOverride)
     const clientState: {
@@ -408,6 +477,7 @@ export default function OptimizePage({
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
+      {configToast && <ConfigValidationToast key={configToast.id} message={configToast.message} />}
       <header className="flex flex-col gap-5 mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -419,7 +489,7 @@ export default function OptimizePage({
             </span>
           </div>
           <p className="text-ink-secondary text-sm">
-            配置: {activeConfig.desc} · ID: {license.order_hash.slice(0, 8)}...
+            配置: {userCanEditConfig ? activeConfig.desc : configPresetLabel} · ID: {license.order_hash.slice(0, 8)}...
           </p>
           <BuildMetaStrip meta={serverBuildMeta} placement="corner" />
         </div>
@@ -433,15 +503,33 @@ export default function OptimizePage({
 
       <AnnouncementBanner announcement={announcement} className="mb-6" />
 
+      {redeemedNotice && (
+        <div role="status" className="mb-6 flex flex-col gap-3 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning sm:flex-row sm:items-center sm:justify-between">
+          <span>{redeemedNotice}</span>
+          {onRedownloadLicense && (
+            <button
+              type="button"
+              onClick={onRedownloadLicense}
+              className="self-start rounded-lg bg-warning px-3 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-warning/90 sm:self-auto"
+            >
+              重新下载授权文件
+            </button>
+          )}
+        </div>
+      )}
+
       {licenseSyncStatus && (
         <div className="mb-6 rounded-lg border border-brand-600/30 bg-brand-600/10 px-4 py-3 text-sm text-brand-300">
           {licenseSyncStatus}
         </div>
       )}
 
+      {licenseSyncing && <LicenseSyncPanel />}
+
       <CommandBand
         config={activeConfig}
         configChanged={configChanged}
+        showConfigDetails={userCanEditConfig}
         operatorCount={license.operators.length}
         fileId={license.order_hash.slice(0, 8)}
         validation={configValidation}
@@ -457,7 +545,12 @@ export default function OptimizePage({
 
       <details
         className="mt-6 rounded-xl bg-surface-1"
-        open={!configValidation.ok}
+        open={configPanelForcedOpen || configPanelOpen}
+        onToggle={(event) => {
+          if (!configPanelForcedOpen) {
+            setConfigPanelOpen(event.currentTarget.open)
+          }
+        }}
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
           <span className="flex flex-wrap items-center gap-2">
@@ -469,7 +562,9 @@ export default function OptimizePage({
             )}
           </span>
           <span className="text-xs font-medium text-ink-muted">
-            {SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · {activeConfig.layout} · {activeConfig.desc}
+            {userCanEditConfig
+              ? `${SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · ${activeConfig.layout} · ${activeConfig.desc}`
+              : configPresetLabel}
           </span>
         </summary>
         <div className="border-t border-surface-3/60 p-4 sm:p-5">
@@ -477,6 +572,8 @@ export default function OptimizePage({
             config={activeConfig}
             permission={permission}
             canEdit={userCanEditConfig}
+            canEditIntermediateInventory={userCanUseIntermediateAutoConfig}
+            canEditShiftHours={userCanUseIntermediateAutoConfig}
             changed={configChanged}
             validation={configValidation}
             onUpdate={updateConfig}
@@ -526,7 +623,7 @@ export default function OptimizePage({
                 ? currentResultIsRotation
                   ? '无需应用升级建议，请按排班详情在游戏内手动设置。'
                   : '无需应用升级建议，可直接下载优化结果。'
-                : '推荐版不包含练度提升建议，可直接下载当前练度优化结果。'}
+: '单次重置卡不包含练度提升建议，可直接下载当前练度优化结果。'}
             </p>
           </div>
           <ResultPanel result={currentResult!} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />
@@ -550,9 +647,41 @@ export default function OptimizePage({
   )
 }
 
+function LicenseSyncPanel() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="mb-6 rounded-xl border border-brand-600/25 bg-surface-1 p-4"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand-500/10 text-brand-400">
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-ink-primary">正在同步授权状态</p>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">
+              请稍候，正在检查 CDK 状态和权限变更，同步完成后即可生成排班。
+            </p>
+          </div>
+        </div>
+        <span className="text-xs font-medium text-ink-muted sm:flex-shrink-0">通常只需几秒</span>
+      </div>
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
+        <div className="schedule-progress-fill h-full w-1/2 rounded-full bg-brand-500" />
+      </div>
+    </div>
+  )
+}
+
 function CommandBand({
   config,
   configChanged,
+  showConfigDetails,
   operatorCount,
   fileId,
   validation,
@@ -567,6 +696,7 @@ function CommandBand({
 }: {
   config: LicenseConfig;
   configChanged: boolean;
+  showConfigDetails: boolean;
   operatorCount: number;
   fileId: string;
   validation: { ok: true } | { ok: false; message: string };
@@ -579,8 +709,6 @@ function CommandBand({
   onGenerate: () => void;
   onReset: () => void;
 }) {
-  const validationMessage = validation.ok === false ? validation.message : null
-
   return (
     <section className="rounded-xl bg-surface-1 p-5 sm:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -595,8 +723,14 @@ function CommandBand({
             <span className="rounded-full bg-surface-2 px-2.5 py-1">
               {SCHEDULE_MODE_LABELS[normalizeScheduleMode(config.schedule_mode)]}
             </span>
-            <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.layout}</span>
-            <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.desc}</span>
+            {showConfigDetails ? (
+              <>
+                <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.layout}</span>
+                <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.desc}</span>
+              </>
+            ) : (
+              <span className="rounded-full bg-surface-2 px-2.5 py-1">{formatConfigPresetLabel(config)}</span>
+            )}
             {configChanged && (
               <span className="rounded-full bg-warning/10 px-2.5 py-1 text-warning">配置已调整</span>
             )}
@@ -631,10 +765,7 @@ function CommandBand({
       {loading && progress && (
         <ScheduleProgress progress={progress} className="mt-5" />
       )}
-      {validationMessage && (
-        <InlineErrorPanel message={validationMessage} onRetry={onGenerate} onReset={onReset} />
-      )}
-      {error && !validationMessage && (
+      {error && (
         <InlineErrorPanel message={error} onRetry={onGenerate} onReset={onReset} />
       )}
     </section>
@@ -645,8 +776,32 @@ function buildOptimizeSignature(operators: LicenseOperator[], config: LicenseCon
   return canonicalJson({ operators, config })
 }
 
+function formatConfigPresetLabel(config: LicenseConfig): string {
+  const layout = String(config.layout || `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`)
+  const compactLayout = layout.replace(/-/g, '')
+  const presetLayout = compactLayout === '243' || compactLayout === '333' ? compactLayout : layout
+  const trading = config.product_requirements?.trading_stations ?? {}
+  const suffix = (trading.Orundum ?? 0) > 0 ? '搓玉' : '均衡'
+  return `${presetLayout} ${suffix}`
+}
+
 function waitForProgressCompletion(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, SCHEDULE_PROGRESS_COMPLETION_DURATION_MS))
+}
+
+function ConfigValidationToast({ message }: { message: string }) {
+  return (
+    <div
+      className="config-validation-toast pointer-events-none fixed left-4 right-4 top-4 z-50 mx-auto max-w-xl sm:left-auto sm:right-6 sm:top-6 sm:mx-0"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="rounded-lg border border-error/30 bg-surface-1/95 px-4 py-3 shadow-[0_4px_8px_rgba(15,23,42,0.08)] backdrop-blur-sm">
+        <p className="text-sm font-semibold text-error">处理失败</p>
+        <p className="mt-1 text-sm leading-6 text-ink-secondary">{message}</p>
+      </div>
+    </div>
+  )
 }
 
 function InlineErrorPanel({
@@ -744,6 +899,12 @@ async function readResponseError(response: Response, fallback: string): Promise<
   } catch {
     return fallback
   }
+}
+
+function formatOptimizeError(message: string): string {
+  return message.includes('冻结') || message.includes('被冻结') || message.includes('已拦截')
+    ? message
+    : `优化失败: ${message}`
 }
 
 function formatLocalDate(date: Date): string {

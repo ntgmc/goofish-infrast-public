@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions'
 import {
+  createAdvancedRiskBinding,
   createSignedLicenseFile,
   findCdkRecordByCode,
   getCdkRecordStore,
@@ -16,11 +17,11 @@ import {
 import { recordUsageEvent } from './usage-stats'
 
 const PERMISSION_LABELS: Record<string, string> = {
-  recommended: '推荐版',
-  growth: '成长版',
-  advanced: '进阶版',
-  ultimate: '尊享版',
-  admin: 'Admin',
+recommended: '单次重置卡',
+growth: '练度提升卡',
+advanced: '单账号终身卡',
+ultimate: 'Admin卡',
+admin: 'Admin卡',
 }
 
 export default async (req: Request, _context: Context): Promise<Response> => {
@@ -37,6 +38,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       validate_only?: boolean;
       operators?: unknown;
       config?: unknown;
+      activation_token?: unknown;
     }
 
     if (!body.code || typeof body.code !== 'string') {
@@ -64,7 +66,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     if (!existing) {
       return jsonResponse({ error: 'CDK 不存在。' }, 404)
     }
-    if (existing.status === 'used') {
+    if (existing.status === 'used' || existing.status === 'frozen') {
       return jsonResponse({ error: 'CDK 已使用。' }, 409)
     }
     if (existing.status !== 'unused') {
@@ -84,13 +86,21 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       codeHash,
     })
 
-    const updated: CdkRecord = {
+    let updated: CdkRecord = {
       ...existing,
       status: 'used',
       used_at: new Date().toISOString(),
       license_order_hash: license.order_hash,
       operator_count: operatorsCheck.operators.length,
       config_desc: configForPermission.config.desc || configForPermission.config.layout || null,
+    }
+
+    if (permission === 'advanced') {
+      const binding = createAdvancedRiskBinding(updated, operatorsCheck.operators, req, body.activation_token)
+      if (!binding.ok) {
+        return jsonResponse({ error: binding.event.reason }, 400)
+      }
+      updated = binding.record
     }
     await store.set(key, updated)
     await recordCdkRedeem()
@@ -124,7 +134,7 @@ async function validateCdkCode(code: string): Promise<Response> {
     if (!record) {
       return jsonResponse({ error: 'CDK 不存在。' }, 404)
     }
-    if (record.status === 'used') {
+    if (record.status === 'used' || record.status === 'frozen') {
       return jsonResponse({ error: 'CDK 已使用。' }, 409)
     }
     if (record.status !== 'unused') {

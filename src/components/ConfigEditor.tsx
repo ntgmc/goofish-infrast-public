@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { LicenseConfig, PermissionMode } from '../lib/types'
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
@@ -18,12 +19,21 @@ export const SCHEDULE_MODE_LABELS: Record<string, string> = {
   rotation: '游戏内轮换',
 }
 
+const DEFAULT_SHIFT_HOURS = [8, 8, 8]
+const SHIFT_PRESETS = [
+  { label: '8-8-8', value: [8, 8, 8], note: '24h 固定间隔' },
+  { label: '12-12-12', value: [12, 12, 12], note: '12h 固定间隔' },
+  { label: '12-6-6', value: [12, 6, 6], note: '24h 非固定间隔' },
+]
+
+type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
+
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
-  recommended: '推荐版',
-  growth: '成长版',
-  advanced: '进阶版',
-  ultimate: '尊享版',
-  admin: 'Admin',
+  recommended: '单次重置卡',
+  growth: '练度提升卡',
+  advanced: '单账号终身卡',
+  ultimate: 'Admin卡',
+  admin: 'Admin卡',
 }
 
 export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
@@ -79,6 +89,35 @@ export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' {
     : 'maa'
 }
 
+function parseShiftHours(value: unknown): number[] | null {
+  const items = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[-,，、\s]+/).filter(Boolean)
+      : null
+  if (!items) return null
+  const hours = items.map((item) => Number(item))
+  if (hours.length === 0 || hours.length > 6) return null
+  if (hours.some((hour) => !Number.isFinite(hour) || hour <= 0)) return null
+  return hours.map((hour) => Math.round(hour * 100) / 100)
+}
+
+function isFixedShiftHours(hours: number[]): boolean {
+  return hours.length > 0 && hours.every((hour) => Math.abs(hour - hours[0]) <= 0.0001)
+}
+
+function isValidShiftHours(hours: number[]): boolean {
+  const total = hours.reduce((sum, hour) => sum + hour, 0)
+  if (Math.abs(total - 24) <= 0.0001) return true
+  return isFixedShiftHours(hours) && (Math.abs(hours[0] - 8) <= 0.0001 || Math.abs(hours[0] - 12) <= 0.0001)
+}
+
+function formatShiftHours(value: unknown): string {
+  if (typeof value === 'string') return value
+  const hours = parseShiftHours(value) ?? DEFAULT_SHIFT_HOURS
+  return hours.map((hour) => String(hour)).join('-')
+}
+
 function sumCounts(counts: Record<string, number> | undefined): number {
   return Object.values(counts ?? {}).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0)
 }
@@ -92,15 +131,19 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.trading_stations_count = Number.isFinite(next.trading_stations_count) ? next.trading_stations_count : 2
   next.manufacturing_stations_count = Number.isFinite(next.manufacturing_stations_count) ? next.manufacturing_stations_count : 4
   next.schedule_mode = normalizeScheduleMode(next.schedule_mode ?? next.mode)
+  next.shift_hours = parseShiftHours(next.shift_hours) ?? [...DEFAULT_SHIFT_HOURS]
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
   next.desc = next.desc || `${next.layout} 基建配置`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
   next.drones = {
     enable: next.drones?.enable ?? false,
     auto: next.drones?.auto ?? false,
+    auto_strategy: next.drones?.auto_strategy,
+    auto_target_product: next.drones?.auto_target_product,
     order: next.drones?.order ?? 'pre',
     targets: Array.isArray(next.drones?.targets) ? next.drones.targets : [],
   }
+  next.intermediate_inventory = normalizeIntermediateInventory(next.intermediate_inventory)
   return next
 }
 
@@ -127,15 +170,69 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
   if (manufacturingTotal !== manufacturingCount) {
     return { ok: false, message: `制造产物数量合计为 ${manufacturingTotal}，需要等于 ${manufacturingCount}。` }
   }
+  const shiftHours = parseShiftHours(config.shift_hours)
+  if (!shiftHours || !isValidShiftHours(shiftHours)) {
+    return { ok: false, message: '换班间隔需填写为 8-8-8、12-12-12，或合计 24 小时的非固定节奏，例如 12-6-6。' }
+  }
   if (config.drones?.enable && !config.drones.auto && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
     return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
   }
   return { ok: true }
 }
 
+function normalizeIntermediateInventory(value: unknown): Record<IntermediateProduct, number> {
+  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const next: Record<IntermediateProduct, number> = {
+    'Originium Shard': 0,
+    'Pure Gold': 0,
+  }
+  for (const product of Object.keys(next) as IntermediateProduct[]) {
+    const count = Number(source[product])
+    next[product] = Number.isFinite(count) ? Math.max(0, Math.round(count * 100) / 100) : 0
+  }
+  return next
+}
+
+function bindAutoDrones(config: LicenseConfig): void {
+  config.drones = {
+    ...(config.drones ?? { order: 'pre', targets: [] }),
+    enable: true,
+    auto: true,
+    auto_strategy: config.drones?.auto_strategy ?? 'trading_priority',
+    auto_target_product: config.drones?.auto_target_product,
+    order: config.drones?.order ?? 'pre',
+    targets: Array.isArray(config.drones?.targets) ? config.drones.targets : [],
+  }
+}
+
+function setAutoDroneTradingPriority(config: LicenseConfig): void {
+  bindAutoDrones(config)
+  config.drones = {
+    ...config.drones!,
+    auto_strategy: 'trading_priority',
+    auto_target_product: undefined,
+  }
+}
+
+function setAutoDroneManufacturing(config: LicenseConfig, product: IntermediateProduct): void {
+  bindAutoDrones(config)
+  config.drones = {
+    ...config.drones!,
+    auto_strategy: 'manufacture_product',
+    auto_target_product: product,
+  }
+}
+
+function markIntermediateInventoryForOptimizer(config: LicenseConfig): void {
+  config.auto_balance_source = 'intermediate_inventory'
+  setAutoDroneTradingPriority(config)
+}
+
 interface ConfigEditorProps {
   config: LicenseConfig;
   canEdit: boolean;
+  canEditIntermediateInventory?: boolean;
+  canEditShiftHours?: boolean;
   canSelectPreset?: boolean;
   changed?: boolean;
   permission?: PermissionMode;
@@ -150,6 +247,8 @@ interface ConfigEditorProps {
 export default function ConfigEditor({
   config,
   canEdit,
+  canEditIntermediateInventory,
+  canEditShiftHours,
   canSelectPreset = false,
   changed = false,
   permission,
@@ -160,17 +259,24 @@ export default function ConfigEditor({
   note,
   embedded = false,
 }: ConfigEditorProps) {
+  const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
+  const canUseShiftHours = canEdit || Boolean(canEditShiftHours)
+  const autoInventoryOnly = !canEdit && canUseIntermediateInventory
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
   const droneTargets = (config.drones?.targets ?? []).join(', ')
+  const shiftHours = parseShiftHours(config.shift_hours) ?? DEFAULT_SHIFT_HOURS
+  const shiftHoursText = formatShiftHours(config.shift_hours ?? shiftHours)
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
   const validationMessage = validation.ok === false ? validation.message : null
+  const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
 
   const applyPreset = (preset: LicenseConfig) => {
     onUpdate((next) => {
       const copy = normalizeConfig(preset)
       Object.assign(next, copy)
+      delete next.auto_balance_source
     })
   }
 
@@ -201,6 +307,18 @@ export default function ConfigEditor({
     })
   }
 
+  const setIntermediateInventory = (product: IntermediateProduct, value: number) => {
+    onUpdate((next) => {
+      const stock = Number.isFinite(value) ? Math.max(0, value) : 0
+      next.intermediate_inventory = {
+        ...normalizeIntermediateInventory(next.intermediate_inventory),
+        [product]: stock,
+      }
+      markIntermediateInventoryForOptimizer(next)
+      applyCounts(next)
+    })
+  }
+
   return (
     <section className={embedded ? '' : 'bg-surface-1 rounded-xl p-5 sm:p-6'}>
       <div className="flex flex-col gap-4 border-b border-surface-3/60 pb-5 lg:flex-row lg:items-start lg:justify-between">
@@ -216,10 +334,12 @@ export default function ConfigEditor({
           <p className="mt-1 text-sm text-ink-secondary">
             {note ?? (canEdit
               ? '修改配置后重新生成，保存进度文件会保留这次配置。'
-              : `当前为 ${permission ? PERMISSION_LABELS[permission] : '成长版'} 权限，使用授权文件内的固定配置。`)}
+              : autoInventoryOnly
+? `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，可通过中间产物库存自动调整推荐配置。`
+: `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，使用授权文件内的固定配置。`)}
           </p>
         </div>
-          {(canEdit || canSelectPreset) && (
+      {(canEdit || (canSelectPreset && !autoInventoryOnly)) && (
           <div className="flex flex-wrap gap-2">
             <PresetButton label="243 均衡" onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
             <PresetButton label="243 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
@@ -238,6 +358,58 @@ export default function ConfigEditor({
         )}
       </div>
 
+      {autoInventoryOnly ? (
+        <div className="pt-5">
+          <div className="rounded-lg bg-surface-2/60 p-4">
+            <h3 className="font-semibold text-ink-primary">按库存微调产物</h3>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">
+              先选择 243 或 333 预设；库存充足时保留原产物消耗，库存较少时只调整一个制造站产物。
+            </p>
+            {canSelectPreset && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <PresetButton label="243 均衡" onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
+                <PresetButton label="243 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
+                <PresetButton label="333 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
+              </div>
+            )}
+            <div className="mt-4">
+              <IntermediateInventoryEditor
+                canEdit={canUseIntermediateInventory}
+                inventory={intermediateInventory}
+                onChange={setIntermediateInventory}
+              />
+            </div>
+            <div className="mt-5 border-t border-surface-3/60 pt-4">
+              <p className="mb-2 text-xs font-medium text-ink-muted">换班间隔</p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {SHIFT_PRESETS.map((preset) => {
+                  const active = shiftHoursText === formatShiftHours(preset.value)
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      disabled={!canUseShiftHours}
+                      onClick={() => onUpdate((next) => {
+                        next.shift_hours = [...preset.value]
+                        next.auto_balance_source = 'limited_config'
+                        applyCounts(next)
+                      })}
+                      className={`rounded-lg border px-3 py-2 text-left transition-colors duration-150 disabled:cursor-not-allowed ${
+                        active
+                          ? 'border-brand-500 bg-brand-500/10 text-brand-300'
+                          : 'border-surface-4 bg-surface-1 text-ink-secondary hover:border-surface-5 hover:text-ink-primary disabled:text-ink-muted'
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold">{preset.label}</span>
+                      <span className="mt-0.5 block text-xs text-ink-muted">{preset.note}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="grid gap-5 pt-5 lg:grid-cols-[1fr_1fr_0.9fr]">
         <div className="rounded-lg bg-surface-2/60 p-4">
           <div className="mb-4">
@@ -286,6 +458,11 @@ export default function ConfigEditor({
               canEdit={canEdit}
               onChange={(product, value) => setProductCount('manufacturing_stations', product, value)}
             />
+            <IntermediateInventoryEditor
+              canEdit={canEdit}
+              inventory={intermediateInventory}
+              onChange={setIntermediateInventory}
+            />
           </div>
         </div>
 
@@ -318,12 +495,42 @@ export default function ConfigEditor({
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs leading-5 text-ink-muted">
-                游戏内轮换暂不可用，当前仅支持生成 MAA 排班表。
-              </p>
+            <p className="mt-2 text-xs leading-5 text-ink-muted">
+              游戏内轮换暂不可用，当前仅支持生成 MAA 排班表。
+            </p>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-medium text-ink-muted">换班间隔</p>
+            <div className="grid grid-cols-3 gap-2">
+              {SHIFT_PRESETS.map((preset) => {
+                const active = shiftHoursText === formatShiftHours(preset.value)
+                return (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    disabled={!canUseShiftHours}
+                    onClick={() => onUpdate((next) => {
+                      next.shift_hours = [...preset.value]
+                      applyCounts(next)
+                    })}
+                    className={`rounded-lg border px-3 py-2 text-left transition-colors duration-150 disabled:cursor-not-allowed ${
+                      active
+                        ? 'border-brand-500 bg-brand-500/10 text-brand-300'
+                        : 'border-surface-4 bg-surface-1 text-ink-secondary hover:border-surface-5 hover:text-ink-primary disabled:text-ink-muted'
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">{preset.label}</span>
+                    <span className="mt-0.5 block text-xs text-ink-muted">{preset.note}</span>
+                  </button>
+                )
+              })}
             </div>
-            <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-              <span>菲亚梅塔</span>
+              <p className="mt-2 text-xs leading-5 text-ink-muted">
+                非固定间隔按实际班次计算心情与爆仓；12-6-6 时菲亚梅塔只加速第 1、3 班目标。
+              </p>
+          </div>
+          <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
+            <span>菲亚梅塔</span>
               <input
                 type="checkbox"
                 checked={!rotationMode && (config.Fiammetta?.enable ?? false)}
@@ -341,7 +548,7 @@ export default function ConfigEditor({
               </p>
             ) : config.Fiammetta?.enable && (
               <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
-                使用菲亚梅塔需要保证换班时间固定；如果使用 MAA 自带定时换班，请将换班间隔设为 8 小时或 12 小时。
+              菲亚梅塔按换班节奏计算目标；12-6-6 时只加速第 1、3 班。
               </p>
             )}
             <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
@@ -402,25 +609,23 @@ export default function ConfigEditor({
               <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-targets">
                 加速目标
               </label>
-              <input
-                id="drone-targets"
-                type="text"
-                value={droneTargets}
-                disabled={!canEdit || !config.drones?.enable || config.drones?.auto}
-                onChange={(event) => onUpdate((next) => {
-                  next.drones = {
-                    ...(next.drones ?? { enable: true, order: 'pre' }),
-                    targets: event.currentTarget.value.split(',').map((item) => item.trim()).filter(Boolean),
-                  }
-                  applyCounts(next)
-                })}
-                placeholder="LMD, Pure Gold, LMD"
-                className="w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted disabled:text-ink-muted"
-              />
+                <DroneTargetsInput
+                  id="drone-targets"
+                  value={droneTargets}
+                  disabled={!canEdit || !config.drones?.enable || Boolean(config.drones?.auto)}
+                  onChange={(value) => onUpdate((next) => {
+                    next.drones = {
+                      ...(next.drones ?? { enable: true, order: 'pre' }),
+                      targets: value.split(',').map((item) => item.trim()).filter(Boolean),
+                    }
+                    applyCounts(next)
+                  })}
+                />
             </div>
           </div>
         </div>
       </div>
+      )}
 
       {validationMessage && (
         <p className="mt-4 text-sm text-warning">{validationMessage}</p>
@@ -466,6 +671,138 @@ function fitProductCounts(
   return next
 }
 
+function formatStockValue(value: number | null): string {
+  return value === null ? '' : String(value)
+}
+
+function IntermediateInventoryEditor({
+  canEdit,
+  inventory,
+  onChange,
+}: {
+  canEdit: boolean;
+  inventory: Record<IntermediateProduct, number>;
+  onChange: (product: IntermediateProduct, value: number) => void;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium text-ink-muted">中间产物库存</p>
+      <div className="space-y-2">
+        <IntermediateInventoryField
+          label="源石碎片"
+          product="Originium Shard"
+          value={inventory['Originium Shard']}
+          canEdit={canEdit}
+          onChange={onChange}
+        />
+        <IntermediateInventoryField
+          label="赤金"
+          product="Pure Gold"
+          value={inventory['Pure Gold']}
+          canEdit={canEdit}
+          onChange={onChange}
+        />
+      </div>
+    </div>
+  )
+}
+
+function IntermediateInventoryField({
+  label,
+  product,
+  value,
+  canEdit,
+  onChange,
+}: {
+  label: string;
+  product: IntermediateProduct;
+  value: number;
+  canEdit: boolean;
+  onChange: (product: IntermediateProduct, value: number) => void;
+}) {
+  const [draftValue, setDraftValue] = useState(() => formatStockValue(value))
+
+  useEffect(() => {
+    setDraftValue(formatStockValue(value))
+  }, [value])
+
+  const commitDraft = () => {
+    if (!canEdit) return
+    const nextValue = draftValue.trim() === '' ? 0 : Number(draftValue)
+    if (Number.isFinite(nextValue) && nextValue !== value) {
+      onChange(product, nextValue)
+    } else {
+      setDraftValue(formatStockValue(value))
+    }
+  }
+
+  return (
+    <label className="block rounded-lg bg-surface-1 px-3 py-3 text-sm">
+      <span className="flex items-center justify-between gap-3">
+        <span className="text-ink-secondary">{label}</span>
+        <input
+          type="number"
+          min={0}
+          step={1}
+          value={draftValue}
+          disabled={!canEdit}
+          onChange={(event) => setDraftValue(event.currentTarget.value)}
+          onBlur={commitDraft}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur()
+            }
+          }}
+          className="number-input-clean w-24 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary disabled:text-ink-muted"
+        />
+      </span>
+    </label>
+  )
+}
+
+function DroneTargetsInput({
+  id,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [draftValue, setDraftValue] = useState(value)
+
+  useEffect(() => {
+    setDraftValue(value)
+  }, [value])
+
+  const commitDraft = () => {
+    if (disabled) return
+    if (draftValue !== value) {
+      onChange(draftValue)
+    }
+  }
+
+  return (
+    <input
+      id={id}
+      type="text"
+      value={draftValue}
+      disabled={disabled}
+      onChange={(event) => setDraftValue(event.currentTarget.value)}
+      onBlur={commitDraft}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur()
+        }
+      }}
+      placeholder="LMD, Pure Gold, LMD"
+      className="w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted disabled:text-ink-muted"
+    />
+  )
+}
+
 function CounterField({
   label,
   value,
@@ -479,6 +816,26 @@ function CounterField({
   max: number;
   onChange: (value: number) => void;
 }) {
+  const [draftValue, setDraftValue] = useState(() => String(value))
+
+  useEffect(() => {
+    setDraftValue(String(value))
+  }, [value])
+
+  const commitDraft = () => {
+    const nextValue = Number(draftValue)
+    if (!Number.isFinite(nextValue)) {
+      setDraftValue(String(value))
+      return
+    }
+    const boundedValue = Math.max(min, Math.min(max, Math.round(nextValue)))
+    if (boundedValue !== value) {
+      onChange(boundedValue)
+    } else {
+      setDraftValue(String(value))
+    }
+  }
+
   return (
     <label className="block">
       <span className="mb-2 block text-xs font-medium text-ink-muted">{label}</span>
@@ -486,8 +843,14 @@ function CounterField({
         type="number"
         min={min}
         max={max}
-        value={value}
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
+        value={draftValue}
+        onChange={(event) => setDraftValue(event.currentTarget.value)}
+        onBlur={commitDraft}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.currentTarget.blur()
+          }
+        }}
         className="number-input-clean w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary"
       />
     </label>
@@ -521,23 +884,64 @@ function ProductGroupEditor({
       <p className="mb-2 text-xs font-medium text-ink-muted">{label}</p>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
         {products.map((product) => (
-          <label key={product} className="flex items-center justify-between gap-3 rounded-lg bg-surface-1 px-3 py-2 text-sm">
-            <span className="text-ink-secondary">{PRODUCT_LABELS[product] ?? product}</span>
-            {canEdit ? (
-              <input
-                type="number"
-                min={0}
-                max={6}
-                value={counts[product] ?? 0}
-                onChange={(event) => onChange(product, Number(event.currentTarget.value))}
-                className="number-input-clean w-16 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary"
-              />
-            ) : (
-              <span className="font-semibold text-ink-primary">{counts[product] ?? 0}</span>
-            )}
+        <label key={product} className="flex items-center justify-between gap-3 rounded-lg bg-surface-1 px-3 py-2 text-sm">
+          <span className="text-ink-secondary">{PRODUCT_LABELS[product] ?? product}</span>
+          {canEdit ? (
+            <ProductCountInput
+              value={counts[product] ?? 0}
+              onChange={(value) => onChange(product, value)}
+            />
+          ) : (
+            <span className="font-semibold text-ink-primary">{counts[product] ?? 0}</span>
+          )}
           </label>
         ))}
       </div>
     </div>
+  )
+}
+
+function ProductCountInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const [draftValue, setDraftValue] = useState(() => String(value))
+
+  useEffect(() => {
+    setDraftValue(String(value))
+  }, [value])
+
+  const commitDraft = () => {
+    const nextValue = Number(draftValue)
+    if (!Number.isFinite(nextValue)) {
+      setDraftValue(String(value))
+      return
+    }
+    const boundedValue = Math.max(0, Math.min(6, Math.round(nextValue)))
+    if (boundedValue !== value) {
+      onChange(boundedValue)
+    } else {
+      setDraftValue(String(value))
+    }
+  }
+
+  return (
+    <input
+      type="number"
+      min={0}
+      max={6}
+      value={draftValue}
+      onChange={(event) => setDraftValue(event.currentTarget.value)}
+      onBlur={commitDraft}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur()
+        }
+      }}
+      className="number-input-clean w-16 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary"
+    />
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties, type PointerEvent } from 'react'
+import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 
 interface Props {
   onStart: () => void;
@@ -118,6 +119,16 @@ export default function LandingPage({ onStart }: Props) {
                 >
                   一键生成排班
                 </button>
+                {ACTIVE_PURCHASE_CHANNEL?.href && (
+                  <a
+                    href={ACTIVE_PURCHASE_CHANNEL.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-11 items-center justify-center rounded-lg border border-cyan-200/24 px-5 py-3 text-sm font-semibold text-cyan-100 transition duration-150 hover:border-cyan-200/42 hover:bg-cyan-200/[0.08] hover:text-white"
+                  >
+                    {ACTIVE_PURCHASE_CHANNEL.actionLabel}
+                  </a>
+                )}
                 <a
                   href="#preview"
                   className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/12 px-5 py-3 text-sm font-semibold text-white/78 transition duration-150 hover:border-white/24 hover:bg-white/[0.06] hover:text-white"
@@ -233,13 +244,25 @@ export default function LandingPage({ onStart }: Props) {
                     拿到 CDK 或已有 .maa 文件时，可以直接开始
                   </h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={onStart}
-                  className="landing-cta inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#080a0f] transition duration-150 hover:bg-cyan-100 active:scale-[0.98]"
-                >
-                  进入上传页面
-                </button>
+                <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={onStart}
+                    className="landing-cta inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#080a0f] transition duration-150 hover:bg-cyan-100 active:scale-[0.98]"
+                  >
+                    进入上传页面
+                  </button>
+                  {ACTIVE_PURCHASE_CHANNEL?.href && (
+                    <a
+                      href={ACTIVE_PURCHASE_CHANNEL.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-cyan-100/30 px-5 py-3 text-sm font-semibold text-cyan-50 transition duration-150 hover:border-cyan-100/50 hover:bg-white/[0.06]"
+                    >
+                      {ACTIVE_PURCHASE_CHANNEL.actionLabel}
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           </section>

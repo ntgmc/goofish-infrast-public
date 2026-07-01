@@ -3,8 +3,9 @@ import LandingPage from './pages/LandingPage'
 import ToolPage from './pages/ToolPage'
 
 const AdminPage = lazy(() => import('./pages/AdminPage'))
+const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage'))
 
-type Route = 'home' | 'tool' | 'admin'
+type Route = 'home' | 'tool' | 'admin' | 'adminSetup'
 
 function App() {
   const [route, setRoute] = useState<Route>(() => resolveRoute(window.location.pathname) ?? 'home')
@@ -30,7 +31,7 @@ function App() {
     setRoute('tool')
   }, [])
 
-  if (route === 'admin') {
+  if (route === 'admin' || route === 'adminSetup') {
     return (
       <div className="min-h-screen bg-surface-0 text-ink-primary">
         <Suspense fallback={
@@ -38,7 +39,7 @@ function App() {
             正在载入管理后台...
           </div>
         }>
-          <AdminPage />
+          {route === 'admin' ? <AdminPage /> : <AdminSetupPage />}
         </Suspense>
       </div>
     )
@@ -46,12 +47,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">
-      {route === 'home' && (
-        <LandingPage onStart={navigateToTool} />
-      )}
-      {route === 'tool' && (
-        <ToolPage />
-      )}
+      {route === 'home' && <LandingPage onStart={navigateToTool} />}
+      {route === 'tool' && <ToolPage />}
     </div>
   )
 }
@@ -61,6 +58,7 @@ function resolveRoute(pathname: string): Route | null {
   if (path === '/') return 'home'
   if (path === '/tool') return 'tool'
   if (path === '/admin') return 'admin'
+  if (path === '/admin/setup') return 'adminSetup'
   return null
 }
 
