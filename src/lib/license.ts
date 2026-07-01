@@ -112,7 +112,7 @@ function validateWorkFileStructure(
   }
 
   if (workfile.client_state.config_override) {
-    if (!canEditConfig(workfile.license)) {
+    if (!canEditConfig(workfile.license) && !canUseIntermediateAutoConfig(workfile.license, workfile.client_state.config_override)) {
       return { ok: false, error: { code: "PERMISSION_DENIED", message: "当前授权不允许修改基建配置。" } };
     }
     const configCheck = validateConfigStructure(workfile.client_state.config_override);
@@ -182,6 +182,18 @@ export function canUseUpgradeFeatures(license: LicenseFile): boolean {
 export function canEditConfig(license: LicenseFile): boolean {
   const permission = getPermissionMode(license);
   return permission === "advanced" || permission === "ultimate" || permission === "admin";
+}
+
+export function isIntermediateAutoConfig(config: LicenseConfig | null | undefined): boolean {
+  return config?.auto_balance_source === "intermediate_inventory";
+}
+
+export function canUseIntermediateAutoConfig(
+  license: LicenseFile,
+  config: LicenseConfig | null | undefined
+): boolean {
+  const permission = getPermissionMode(license);
+  return (permission === "recommended" || permission === "growth") && isIntermediateAutoConfig(config);
 }
 
 export function canReplaceOperators(license: LicenseFile): boolean {

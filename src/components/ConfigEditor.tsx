@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { LicenseConfig, PermissionMode } from '../lib/types'
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
@@ -28,6 +29,7 @@ const INVENTORY_AUTO_BALANCE_DAYS = 7
 const ORUNDUM_SHARD_DAILY_CONSUMPTION = 24
 const SHARD_DAILY_PRODUCTION = 24
 const GOLD_DAILY_PRODUCTION = 20
+const DRONE_ESTIMATED_ACCELERATION_SECONDS_PER_DAY = 240 * 3 * 60
 const LMD_EXPECTED_GOLD_DAILY_CONSUMPTION =
   (24 * 60 * (2 * 0.3 + 3 * 0.5 + 4 * 0.2)) / (144 * 0.3 + 210 * 0.5 + 276 * 0.2)
 
@@ -152,6 +154,8 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.drones = {
     enable: next.drones?.enable ?? false,
     auto: next.drones?.auto ?? false,
+    auto_strategy: next.drones?.auto_strategy,
+    auto_target_product: next.drones?.auto_target_product,
     order: next.drones?.order ?? 'pre',
     targets: Array.isArray(next.drones?.targets) ? next.drones.targets : [],
   }
@@ -235,58 +239,89 @@ function bindAutoDrones(config: LicenseConfig): void {
     ...(config.drones ?? { order: 'pre', targets: [] }),
     enable: true,
     auto: true,
+    auto_strategy: config.drones?.auto_strategy ?? 'trading_priority',
+    auto_target_product: config.drones?.auto_target_product,
     order: config.drones?.order ?? 'pre',
     targets: Array.isArray(config.drones?.targets) ? config.drones.targets : [],
   }
 }
 
-function setRoomCounts(config: LicenseConfig, tradingCount: number, manufacturingCount: number): void {
-  config.trading_stations_count = Math.max(1, Math.min(5, tradingCount))
-  config.manufacturing_stations_count = Math.max(1, Math.min(5, manufacturingCount))
+function setAutoDroneTradingPriority(config: LicenseConfig): void {
+  bindAutoDrones(config)
+  config.drones = {
+    ...config.drones!,
+    auto_strategy: 'trading_priority',
+    auto_target_product: undefined,
+  }
+}
+
+function setAutoDroneManufacturing(config: LicenseConfig, product: IntermediateProduct): void {
+  bindAutoDrones(config)
+  config.drones = {
+    ...config.drones!,
+    auto_strategy: 'manufacture_product',
+    auto_target_product: product,
+  }
+}
+
+function estimateDroneProductionPerDay(product: IntermediateProduct): number {
+  const productData = product === 'Originium Shard'
+    ? { craftSeconds: 60 * 60 }
+    : { craftSeconds: 72 * 60 }
+  return DRONE_ESTIMATED_ACCELERATION_SECONDS_PER_DAY / productData.craftSeconds
+}
+
+function shouldRebalanceIntermediateStock(estimate: IntermediateEstimate): boolean {
+  if (estimate.consumedPerDay <= 0 || estimate.netPerDay > 0) return false
+  if (estimate.netPerDay < 0) {
+    return estimate.depletionDays !== null && estimate.depletionDays <= INVENTORY_AUTO_BALANCE_DAYS
+  }
+  return estimate.stock !== null && estimate.stock <= estimate.consumedPerDay * INVENTORY_AUTO_BALANCE_DAYS
+}
+
+function switchOneManufacturingProduct(
+  config: LicenseConfig,
+  targetProduct: IntermediateProduct,
+  donorProducts: string[],
+): void {
+  const manufacturing = { ...config.product_requirements.manufacturing_stations }
+  if ((manufacturing[targetProduct] ?? 0) >= config.manufacturing_stations_count) return
+
+  const donorProduct = donorProducts.find((product) => product !== targetProduct && (manufacturing[product] ?? 0) > 0)
+  if (!donorProduct) return
+
+  manufacturing[donorProduct] = (manufacturing[donorProduct] ?? 0) - 1
+  if (manufacturing[donorProduct] <= 0) delete manufacturing[donorProduct]
+  manufacturing[targetProduct] = (manufacturing[targetProduct] ?? 0) + 1
+  config.product_requirements.manufacturing_stations = manufacturing
 }
 
 function applyIntermediateAutoBalance(config: LicenseConfig, product: IntermediateProduct): void {
-  bindAutoDrones(config)
+  config.auto_balance_source = 'intermediate_inventory'
+  const estimate = calculateIntermediateEstimate(config, product)
+  if (estimate.netPerDay < 0) {
+    setAutoDroneManufacturing(config, product)
+  } else {
+    setAutoDroneTradingPriority(config)
+  }
+
+  if (!shouldRebalanceIntermediateStock(estimate)) return
+  if (estimate.netPerDay + estimateDroneProductionPerDay(product) >= 0) return
 
   if (product === 'Originium Shard') {
-    const currentOrundum = config.product_requirements.trading_stations.Orundum ?? 0
-    const orundumCount = Math.max(1, Math.min(currentOrundum || 1, config.trading_stations_count))
-    const requiredManufacturing = Math.min(5, orundumCount + 1)
-    if (config.manufacturing_stations_count < requiredManufacturing) {
-      setRoomCounts(config, 6 - requiredManufacturing, requiredManufacturing)
-    }
-    const tradingOrundum = Math.min(orundumCount, config.trading_stations_count)
-    const shardCount = Math.min(config.manufacturing_stations_count, tradingOrundum + 1)
-    config.product_requirements.trading_stations = {
-      ...(config.trading_stations_count - tradingOrundum > 0 ? { LMD: config.trading_stations_count - tradingOrundum } : {}),
-      Orundum: tradingOrundum,
-    }
-    config.product_requirements.manufacturing_stations = {
-      ...(config.manufacturing_stations_count - shardCount > 0 ? { 'Pure Gold': config.manufacturing_stations_count - shardCount } : {}),
-      'Originium Shard': shardCount,
-    }
+    switchOneManufacturingProduct(config, 'Originium Shard', ['Battle Record', 'Pure Gold'])
     return
   }
 
-  const lmdCount = config.trading_stations_count
-  const requiredManufacturing = Math.min(5, lmdCount + 1)
-  if (config.manufacturing_stations_count < requiredManufacturing) {
-    setRoomCounts(config, 6 - requiredManufacturing, requiredManufacturing)
-  }
-  const finalLmdCount = config.trading_stations_count
-  const goldCount = Math.min(config.manufacturing_stations_count, finalLmdCount + 1)
-  config.product_requirements.trading_stations = { LMD: finalLmdCount }
-  config.product_requirements.manufacturing_stations = {
-    'Pure Gold': goldCount,
-    ...(config.manufacturing_stations_count - goldCount > 0
-      ? { 'Battle Record': config.manufacturing_stations_count - goldCount }
-      : {}),
-  }
+  switchOneManufacturingProduct(config, 'Pure Gold', ['Battle Record', 'Originium Shard'])
+  setAutoDroneTradingPriority(config)
 }
 
 interface ConfigEditorProps {
   config: LicenseConfig;
   canEdit: boolean;
+  canEditIntermediateInventory?: boolean;
+  canEditShiftHours?: boolean;
   canSelectPreset?: boolean;
   changed?: boolean;
   permission?: PermissionMode;
@@ -301,6 +336,8 @@ interface ConfigEditorProps {
 export default function ConfigEditor({
   config,
   canEdit,
+  canEditIntermediateInventory,
+  canEditShiftHours,
   canSelectPreset = false,
   changed = false,
   permission,
@@ -311,6 +348,9 @@ export default function ConfigEditor({
   note,
   embedded = false,
 }: ConfigEditorProps) {
+  const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
+  const canUseShiftHours = canEdit || Boolean(canEditShiftHours)
+  const autoInventoryOnly = !canEdit && canUseIntermediateInventory
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
   const droneTargets = (config.drones?.targets ?? []).join(', ')
@@ -326,6 +366,7 @@ export default function ConfigEditor({
     onUpdate((next) => {
       const copy = normalizeConfig(preset)
       Object.assign(next, copy)
+      delete next.auto_balance_source
     })
   }
 
@@ -363,10 +404,7 @@ export default function ConfigEditor({
         ...normalizeIntermediateInventory(next.intermediate_inventory),
         [product]: stock,
       }
-      const estimate = calculateIntermediateEstimate(next, product)
-      if (estimate.autoBalance) {
-        applyIntermediateAutoBalance(next, product)
-      }
+      applyIntermediateAutoBalance(next, product)
       applyCounts(next)
     })
   }
@@ -386,10 +424,12 @@ export default function ConfigEditor({
           <p className="mt-1 text-sm text-ink-secondary">
             {note ?? (canEdit
               ? '修改配置后重新生成，保存进度文件会保留这次配置。'
-              : `当前为 ${permission ? PERMISSION_LABELS[permission] : '成长版'} 权限，使用授权文件内的固定配置。`)}
+              : autoInventoryOnly
+                ? `当前为 ${permission ? PERMISSION_LABELS[permission] : '成长版'} 权限，可通过中间产物库存自动调整推荐配置。`
+                : `当前为 ${permission ? PERMISSION_LABELS[permission] : '成长版'} 权限，使用授权文件内的固定配置。`)}
           </p>
         </div>
-          {(canEdit || canSelectPreset) && (
+      {(canEdit || (canSelectPreset && !autoInventoryOnly)) && (
           <div className="flex flex-wrap gap-2">
             <PresetButton label="243 均衡" onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
             <PresetButton label="243 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
@@ -408,6 +448,59 @@ export default function ConfigEditor({
         )}
       </div>
 
+      {autoInventoryOnly ? (
+        <div className="pt-5">
+          <div className="rounded-lg bg-surface-2/60 p-4">
+            <h3 className="font-semibold text-ink-primary">按库存微调产物</h3>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">
+              先选择 243 或 333 预设；库存充足时保留原产物消耗，库存较少时只调整一个制造站产物。
+            </p>
+            {canSelectPreset && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <PresetButton label="243 均衡" onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
+                <PresetButton label="243 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
+                <PresetButton label="333 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
+              </div>
+            )}
+            <div className="mt-4">
+              <IntermediateInventoryEditor
+                canEdit={canUseIntermediateInventory}
+                shardEstimate={shardEstimate}
+                goldEstimate={goldEstimate}
+                onChange={setIntermediateInventory}
+              />
+            </div>
+            <div className="mt-5 border-t border-surface-3/60 pt-4">
+              <p className="mb-2 text-xs font-medium text-ink-muted">换班间隔</p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {SHIFT_PRESETS.map((preset) => {
+                  const active = shiftHoursText === formatShiftHours(preset.value)
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      disabled={!canUseShiftHours}
+                      onClick={() => onUpdate((next) => {
+                        next.shift_hours = [...preset.value]
+                        next.auto_balance_source = 'intermediate_inventory'
+                        applyCounts(next)
+                      })}
+                      className={`rounded-lg border px-3 py-2 text-left transition-colors duration-150 disabled:cursor-not-allowed ${
+                        active
+                          ? 'border-brand-500 bg-brand-500/10 text-brand-300'
+                          : 'border-surface-4 bg-surface-1 text-ink-secondary hover:border-surface-5 hover:text-ink-primary disabled:text-ink-muted'
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold">{preset.label}</span>
+                      <span className="mt-0.5 block text-xs text-ink-muted">{preset.note}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="grid gap-5 pt-5 lg:grid-cols-[1fr_1fr_0.9fr]">
         <div className="rounded-lg bg-surface-2/60 p-4">
           <div className="mb-4">
@@ -507,7 +600,7 @@ export default function ConfigEditor({
                   <button
                     key={preset.label}
                     type="button"
-                    disabled={!canEdit}
+                    disabled={!canUseShiftHours}
                     onClick={() => onUpdate((next) => {
                       next.shift_hours = [...preset.value]
                       applyCounts(next)
@@ -608,25 +701,23 @@ export default function ConfigEditor({
               <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-targets">
                 加速目标
               </label>
-              <input
-                id="drone-targets"
-                type="text"
-                value={droneTargets}
-                disabled={!canEdit || !config.drones?.enable || config.drones?.auto}
-                onChange={(event) => onUpdate((next) => {
-                  next.drones = {
-                    ...(next.drones ?? { enable: true, order: 'pre' }),
-                    targets: event.currentTarget.value.split(',').map((item) => item.trim()).filter(Boolean),
-                  }
-                  applyCounts(next)
-                })}
-                placeholder="LMD, Pure Gold, LMD"
-                className="w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted disabled:text-ink-muted"
-              />
+                <DroneTargetsInput
+                  id="drone-targets"
+                  value={droneTargets}
+                  disabled={!canEdit || !config.drones?.enable || Boolean(config.drones?.auto)}
+                  onChange={(value) => onUpdate((next) => {
+                    next.drones = {
+                      ...(next.drones ?? { enable: true, order: 'pre' }),
+                      targets: value.split(',').map((item) => item.trim()).filter(Boolean),
+                    }
+                    applyCounts(next)
+                  })}
+                />
             </div>
           </div>
         </div>
       </div>
+      )}
 
       {validationMessage && (
         <p className="mt-4 text-sm text-warning">{validationMessage}</p>
@@ -734,6 +825,22 @@ function IntermediateInventoryField({
   canEdit: boolean;
   onChange: (product: IntermediateProduct, value: number) => void;
 }) {
+  const [draftValue, setDraftValue] = useState(() => formatStockValue(estimate.stock))
+
+  useEffect(() => {
+    setDraftValue(formatStockValue(estimate.stock))
+  }, [estimate.stock])
+
+  const commitDraft = () => {
+    if (!canEdit) return
+    const value = draftValue.trim() === '' ? 0 : Number(draftValue)
+    if (Number.isFinite(value) && value !== (estimate.stock ?? 0)) {
+      onChange(product, value)
+    } else {
+      setDraftValue(formatStockValue(estimate.stock))
+    }
+  }
+
   return (
     <label className="block rounded-lg bg-surface-1 px-3 py-3 text-sm">
       <span className="flex items-center justify-between gap-3">
@@ -742,9 +849,15 @@ function IntermediateInventoryField({
           type="number"
           min={0}
           step={1}
-          value={formatStockValue(estimate.stock)}
+          value={draftValue}
           disabled={!canEdit}
-          onChange={(event) => onChange(product, Number(event.currentTarget.value))}
+          onChange={(event) => setDraftValue(event.currentTarget.value)}
+          onBlur={commitDraft}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur()
+            }
+          }}
           className="number-input-clean w-24 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary disabled:text-ink-muted"
         />
       </span>
@@ -755,6 +868,49 @@ function IntermediateInventoryField({
         </span>
       </span>
     </label>
+  )
+}
+
+function DroneTargetsInput({
+  id,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [draftValue, setDraftValue] = useState(value)
+
+  useEffect(() => {
+    setDraftValue(value)
+  }, [value])
+
+  const commitDraft = () => {
+    if (disabled) return
+    if (draftValue !== value) {
+      onChange(draftValue)
+    }
+  }
+
+  return (
+    <input
+      id={id}
+      type="text"
+      value={draftValue}
+      disabled={disabled}
+      onChange={(event) => setDraftValue(event.currentTarget.value)}
+      onBlur={commitDraft}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur()
+        }
+      }}
+      placeholder="LMD, Pure Gold, LMD"
+      className="w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted disabled:text-ink-muted"
+    />
   )
 }
 
@@ -771,6 +927,26 @@ function CounterField({
   max: number;
   onChange: (value: number) => void;
 }) {
+  const [draftValue, setDraftValue] = useState(() => String(value))
+
+  useEffect(() => {
+    setDraftValue(String(value))
+  }, [value])
+
+  const commitDraft = () => {
+    const nextValue = Number(draftValue)
+    if (!Number.isFinite(nextValue)) {
+      setDraftValue(String(value))
+      return
+    }
+    const boundedValue = Math.max(min, Math.min(max, Math.round(nextValue)))
+    if (boundedValue !== value) {
+      onChange(boundedValue)
+    } else {
+      setDraftValue(String(value))
+    }
+  }
+
   return (
     <label className="block">
       <span className="mb-2 block text-xs font-medium text-ink-muted">{label}</span>
@@ -778,8 +954,14 @@ function CounterField({
         type="number"
         min={min}
         max={max}
-        value={value}
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
+        value={draftValue}
+        onChange={(event) => setDraftValue(event.currentTarget.value)}
+        onBlur={commitDraft}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.currentTarget.blur()
+          }
+        }}
         className="number-input-clean w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary"
       />
     </label>
@@ -813,23 +995,64 @@ function ProductGroupEditor({
       <p className="mb-2 text-xs font-medium text-ink-muted">{label}</p>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
         {products.map((product) => (
-          <label key={product} className="flex items-center justify-between gap-3 rounded-lg bg-surface-1 px-3 py-2 text-sm">
-            <span className="text-ink-secondary">{PRODUCT_LABELS[product] ?? product}</span>
-            {canEdit ? (
-              <input
-                type="number"
-                min={0}
-                max={6}
-                value={counts[product] ?? 0}
-                onChange={(event) => onChange(product, Number(event.currentTarget.value))}
-                className="number-input-clean w-16 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary"
-              />
-            ) : (
-              <span className="font-semibold text-ink-primary">{counts[product] ?? 0}</span>
-            )}
+        <label key={product} className="flex items-center justify-between gap-3 rounded-lg bg-surface-1 px-3 py-2 text-sm">
+          <span className="text-ink-secondary">{PRODUCT_LABELS[product] ?? product}</span>
+          {canEdit ? (
+            <ProductCountInput
+              value={counts[product] ?? 0}
+              onChange={(value) => onChange(product, value)}
+            />
+          ) : (
+            <span className="font-semibold text-ink-primary">{counts[product] ?? 0}</span>
+          )}
           </label>
         ))}
       </div>
     </div>
+  )
+}
+
+function ProductCountInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const [draftValue, setDraftValue] = useState(() => String(value))
+
+  useEffect(() => {
+    setDraftValue(String(value))
+  }, [value])
+
+  const commitDraft = () => {
+    const nextValue = Number(draftValue)
+    if (!Number.isFinite(nextValue)) {
+      setDraftValue(String(value))
+      return
+    }
+    const boundedValue = Math.max(0, Math.min(6, Math.round(nextValue)))
+    if (boundedValue !== value) {
+      onChange(boundedValue)
+    } else {
+      setDraftValue(String(value))
+    }
+  }
+
+  return (
+    <input
+      type="number"
+      min={0}
+      max={6}
+      value={draftValue}
+      onChange={(event) => setDraftValue(event.currentTarget.value)}
+      onBlur={commitDraft}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur()
+        }
+      }}
+      className="number-input-clean w-16 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary"
+    />
   )
 }

@@ -340,12 +340,27 @@ export function canEditConfigForPermission(permission: PermissionMode): boolean 
   return permission === 'advanced' || permission === 'ultimate' || permission === 'admin'
 }
 
+export function isIntermediateAutoConfig(config: LicenseConfig | null | undefined): boolean {
+  return config?.auto_balance_source === 'intermediate_inventory'
+}
+
+export function canUseIntermediateAutoConfig(
+  license: LicenseFile,
+  config: LicenseConfig | null | undefined,
+): boolean {
+  const permission = getPermissionMode(license)
+  return (permission === 'recommended' || permission === 'growth') && isIntermediateAutoConfig(config)
+}
+
 export function resolveConfigForPermission(
   permission: PermissionMode,
   config: LicenseConfig,
 ): { ok: true; config: LicenseConfig } | { ok: false; message: string } {
   if (canEditConfigForPermission(permission)) {
     return { ok: true, config }
+  }
+  if ((permission === 'recommended' || permission === 'growth') && isIntermediateAutoConfig(config)) {
+    return { ok: true, config: cloneConfig(config) }
   }
   const preset = PRESET_CONFIGS.find((item) => isPresetConfigMatch(config, item))
   if (!preset) {

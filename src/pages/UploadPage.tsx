@@ -727,6 +727,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
   const cdkCanEditConfig = validatedCdk ? canEditCdkConfig(validatedCdk.permission) : false
+  const cdkCanEditLimitedConfig = validatedCdk ? canEditCdkLimitedConfig(validatedCdk.permission) : false
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
     const next = normalizeConfig(normalizedConfig)
@@ -923,6 +924,8 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
             <ConfigEditor
               config={normalizedConfig}
               canEdit={cdkCanEditConfig}
+              canEditIntermediateInventory={cdkCanEditLimitedConfig}
+              canEditShiftHours={cdkCanEditLimitedConfig}
               canSelectPreset
               changed={false}
               permission={validatedCdk.permission}
@@ -930,7 +933,9 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
               onUpdate={updateConfig}
               note={cdkCanEditConfig
                 ? `${validatedCdk.permission_label}可在生成授权文件前调整基建配置。`
-                : `${validatedCdk.permission_label}仅支持预设配置，进阶版以上可自定义基建配置。`}
+                : cdkCanEditLimitedConfig
+                  ? `${validatedCdk.permission_label}可选择预设、填写中间产物库存并修改换班间隔；库存不足时仅微调一个制造站产物。`
+                  : `${validatedCdk.permission_label}仅支持预设配置，进阶版以上可自定义基建配置。`}
             />
           </div>
 
@@ -1242,5 +1247,9 @@ function normalizeCdkPermission(permission: string): PermissionMode {
 
 function canEditCdkConfig(permission: PermissionMode): boolean {
   return permission === 'advanced' || permission === 'ultimate' || permission === 'admin'
+}
+
+function canEditCdkLimitedConfig(permission: PermissionMode): boolean {
+  return permission === 'recommended' || permission === 'growth'
 }
 

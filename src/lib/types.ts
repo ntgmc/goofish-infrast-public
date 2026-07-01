@@ -22,10 +22,13 @@ export interface LicenseConfig {
   drones?: {
     enable: boolean;
     auto?: boolean;
+    auto_strategy?: string;
+    auto_target_product?: string;
     order: string;
     targets: string[];
   };
   intermediate_inventory?: Record<string, number>;
+  auto_balance_source?: string;
   [key: string]: unknown;
 }
 
