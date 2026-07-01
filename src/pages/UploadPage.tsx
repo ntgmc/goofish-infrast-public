@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
-import type { Announcement, FreePreviewResult, LicenseConfig, LicenseFile, LicenseOperator } from '../lib/types'
+import type { Announcement, FreePreviewResult, LicenseConfig, LicenseFile, LicenseOperator, PermissionMode } from '../lib/types'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import BuildMetaStrip from '../components/BuildMetaStrip'
@@ -494,7 +494,7 @@ function PreviewMetric({ label, value }: { label: string; value: string }) {
 
 function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: LicenseFile, licenseFileContent: string) => void }) {
   const [code, setCode] = useState('')
-  const [validatedCdk, setValidatedCdk] = useState<{ permission: string; permission_label: string } | null>(null)
+  const [validatedCdk, setValidatedCdk] = useState<{ permission: PermissionMode; permission_label: string } | null>(null)
   const [operators, setOperators] = useState<LicenseOperator[] | null>(null)
   const [operatorsFileName, setOperatorsFileName] = useState<string | null>(null)
   const [config, setConfig] = useState<LicenseConfig>(() => cloneConfig(CONFIG_PRESETS['243']))
@@ -506,6 +506,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
+  const cdkCanEditConfig = validatedCdk ? canEditCdkConfig(validatedCdk.permission) : false
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
     const next = normalizeConfig(normalizedConfig)
@@ -562,7 +563,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
       if (!data.permission || !data.permission_label) {
         throw new Error('CDK 校验响应缺少版本信息。')
       }
-      setValidatedCdk({ permission: data.permission, permission_label: data.permission_label })
+      setValidatedCdk({ permission: normalizeCdkPermission(data.permission), permission_label: data.permission_label })
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -688,12 +689,15 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
           <div data-tour="base-config">
             <ConfigEditor
               config={normalizedConfig}
-              canEdit={false}
+              canEdit={cdkCanEditConfig}
               canSelectPreset
               changed={false}
+              permission={validatedCdk.permission}
               validation={configValidation}
               onUpdate={updateConfig}
-              note="推荐版和成长版仅支持预设配置；进阶版和尊享版生成授权后可继续自定义配置。"
+              note={cdkCanEditConfig
+                ? `${validatedCdk.permission_label}可在生成授权文件前调整基建配置。`
+                : `${validatedCdk.permission_label}仅支持预设配置，进阶版以上可自定义基建配置。`}
             />
           </div>
 
@@ -976,5 +980,17 @@ function parseOperatorsText(text: string): LicenseOperator[] {
     throw new Error('operators.json 顶层必须是数组。')
   }
   return data as LicenseOperator[]
+}
+
+function normalizeCdkPermission(permission: string): PermissionMode {
+  if (permission === 'recommended' || permission === 'growth' || permission === 'advanced' || permission === 'ultimate' || permission === 'admin') {
+    return permission
+  }
+  if (permission === 'premium') return 'advanced'
+  return 'growth'
+}
+
+function canEditCdkConfig(permission: PermissionMode): boolean {
+  return permission === 'advanced' || permission === 'ultimate' || permission === 'admin'
 }
 
