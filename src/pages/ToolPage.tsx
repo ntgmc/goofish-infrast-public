@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import type { Announcement, AppStep, LicenseConfig, LicenseFile } from '../lib/types'
 import { extractConfigOverride, extractEliteOverrides, extractLicense, parseFileContent } from '../lib/license'
+import { downloadLicenseFile } from '../lib/download'
 import UploadPage from './UploadPage'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
@@ -13,6 +14,8 @@ export default function ToolPage() {
   const [configOverride, setConfigOverride] = useState<LicenseConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
+  const [redeemedNotice, setRedeemedNotice] = useState<string | null>(null)
+  const [redeemedLicenseContent, setRedeemedLicenseContent] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -67,6 +70,8 @@ export default function ToolPage() {
     setLicense(extractLicense(result.data))
     setEliteOverrides(extractEliteOverrides(result.data))
     setConfigOverride(extractConfigOverride(result.data))
+    setRedeemedNotice(null)
+    setRedeemedLicenseContent(null)
     setStep('optimize')
   }, [])
 
@@ -76,15 +81,24 @@ export default function ToolPage() {
     setEliteOverrides({})
     setConfigOverride(null)
     setError(null)
+    setRedeemedNotice(null)
+    setRedeemedLicenseContent(null)
   }, [])
 
-  const handleLicenseRedeemed = useCallback((redeemedLicense: LicenseFile) => {
+  const handleLicenseRedeemed = useCallback((redeemedLicense: LicenseFile, licenseFileContent: string) => {
     setError(null)
     setLicense(redeemedLicense)
     setEliteOverrides({})
     setConfigOverride(null)
+    setRedeemedNotice('CDK 已兑换完成，授权文件已开始下载。请务必保存该授权文件，后续可凭它继续使用或恢复进度。')
+    setRedeemedLicenseContent(licenseFileContent)
     setStep('optimize')
   }, [])
+
+  const handleRedownloadLicense = useCallback(() => {
+    if (!license || !redeemedLicenseContent) return
+    downloadLicenseFile(redeemedLicenseContent, license.order_hash)
+  }, [license, redeemedLicenseContent])
 
   return (
     <>
@@ -111,6 +125,8 @@ export default function ToolPage() {
             setConfigOverride={setConfigOverride}
             onReset={handleReset}
             announcement={announcement}
+            redeemedNotice={redeemedNotice}
+            onRedownloadLicense={redeemedLicenseContent ? handleRedownloadLicense : null}
           />
         </Suspense>
       )}

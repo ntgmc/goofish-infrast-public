@@ -21,6 +21,56 @@ env:
   NODE_VERSION: "20"
 
 jobs:
+  refresh-build-metadata:
+    name: Refresh Build Metadata
+    permissions:
+      contents: write
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      (
+        github.ref == 'refs/heads/main' &&
+        (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout writable branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate build metadata
+        env:
+          VERSION_SOURCE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          BUILD_CONTEXT: ${{ github.event_name }}
+        run: npm run generate:data
+
+      - name: Commit generated metadata
+        env:
+          TARGET_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/build-meta.ts netlify/functions/data.ts
+          if git diff --cached --quiet; then
+            echo "Generated metadata is already up to date."
+            exit 0
+          fi
+          git commit -m "ci: 自动更新构建版本元数据"
+          git push origin "HEAD:${TARGET_BRANCH}"
+
   deploy-relevance:
     name: Deploy Relevance
     runs-on: ubuntu-latest
@@ -72,19 +122,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Configure build metadata
-        run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          COMMIT_COUNT="$(git rev-list --count HEAD)"
-          VERSION_PREFIX="$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")"
-          APP_VERSION="${VERSION_PREFIX}.${COMMIT_COUNT}"
-          GENERATED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          echo "GIT_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
-          echo "GENERATED_AT=${GENERATED_AT}" >> "$GITHUB_ENV"
-          echo "BUILD_CONTEXT=${GITHUB_EVENT_NAME}" >> "$GITHUB_ENV"
-          echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
-          echo "DATA_VERSION=data.${GITHUB_RUN_NUMBER}.${SHORT_SHA}" >> "$GITHUB_ENV"
-
       - name: Build web app
         run: npm run build
 
@@ -108,19 +145,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Configure build metadata
-        run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          COMMIT_COUNT="$(git rev-list --count HEAD)"
-          VERSION_PREFIX="$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")"
-          APP_VERSION="${VERSION_PREFIX}.${COMMIT_COUNT}"
-          GENERATED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          echo "GIT_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
-          echo "GENERATED_AT=${GENERATED_AT}" >> "$GITHUB_ENV"
-          echo "BUILD_CONTEXT=${GITHUB_EVENT_NAME}" >> "$GITHUB_ENV"
-          echo "APP_VERSION=${APP_VERSION}" >> "$GITHUB_ENV"
-          echo "DATA_VERSION=data.${GITHUB_RUN_NUMBER}.${SHORT_SHA}" >> "$GITHUB_ENV"
 
       - name: Generate data
         run: npm run generate:data

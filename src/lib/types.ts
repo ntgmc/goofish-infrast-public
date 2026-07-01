@@ -11,6 +11,7 @@ export interface LicenseConfig {
   layout: string;
   desc: string;
   schedule_mode?: 'maa' | 'rotation' | string;
+  shift_hours?: number[] | string;
   trading_stations_count: number;
   manufacturing_stations_count: number;
   product_requirements: {
@@ -21,9 +22,13 @@ export interface LicenseConfig {
   drones?: {
     enable: boolean;
     auto?: boolean;
+    auto_strategy?: string;
+    auto_target_product?: string;
     order: string;
     targets: string[];
   };
+  intermediate_inventory?: Record<string, number>;
+  auto_balance_source?: string;
   [key: string]: unknown;
 }
 
@@ -83,9 +88,17 @@ export interface OptimizeRequest {
   operators: LicenseOperator[];
   config: LicenseConfig;
   ignore_elite: boolean;
+  activation_token?: string;
   include_current?: boolean;
   suggestions_only?: boolean;
   upgrade_task_payload?: UpgradeTaskPayload;
+}
+
+export interface AnalyzeScheduleRequest {
+  operators: LicenseOperator[];
+  schedule: unknown;
+  config?: Partial<LicenseConfig>;
+  ignore_elite?: boolean;
 }
 
 export interface FreePreviewRequest {
@@ -106,6 +119,20 @@ export interface FreePreviewResult {
     max: string;
     label: string;
     note: string;
+  };
+  limited_schedule: {
+    plan_name: string;
+    plan_count: number;
+    room_limit: number;
+    hidden_room_count: number;
+    rooms: {
+      key: string;
+      label: string;
+      index_label: string;
+      product: string;
+      operators: string[];
+      efficiency: number;
+    }[];
   };
   notices: string[];
   build_meta: AppBuildMeta;
@@ -144,6 +171,10 @@ export interface OptimizeResult {
   description: string;
   schedule_mode?: string;
   schedule_mode_name?: string;
+  shift_hours?: number[];
+  shift_pattern?: string;
+  total_schedule_hours?: number;
+  fiammetta_target_slots?: number[];
   buildingType: number;
   planTimes: string;
   plans: ShiftPlan[];
@@ -153,8 +184,39 @@ export interface OptimizeResult {
   upgrade_suggestions?: RawUpgradeSuggestion[];
   current_result?: OptimizeResult;
   upgrade_task_payload?: UpgradeTaskPayload;
+  analysis_summary?: ScheduleAnalysisSummary;
   build_meta?: AppBuildMeta;
 }
+
+export interface ScheduleAnalysisSummary {
+  source: 'imported_schedule';
+  plan_count: number;
+  room_count: number;
+  mood_valid: boolean;
+  red_face_risk_count: number;
+  red_face_operator_count: number;
+  red_face_operators: string[];
+  risks: {
+    shift: string;
+    operator: string;
+    room_type: string;
+    room_index: number;
+    start?: number;
+    needed?: number;
+    end?: number;
+  }[];
+  overflow: {
+    trading_rooms: number;
+    manufacturing_rooms: number;
+    earliest_trading_full_time?: string;
+    earliest_manufacturing_full_time?: string;
+  };
+  warnings: string[];
+}
+
+export type AnalyzeScheduleResult = OptimizeResult & {
+  analysis_summary: ScheduleAnalysisSummary;
+};
 
 export type RawUpgradeSuggestion =
   | {
@@ -226,6 +288,8 @@ export interface DroneAssignment {
 }
 
 export interface DailyProduction {
+  hours?: number;
+  shift_hours?: number[];
   manufacturing?: Record<string, number>;
   trading?: Record<string, number>;
   consumption?: Record<string, number>;
@@ -238,15 +302,18 @@ export interface ShiftPlan {
   name: string;
   description?: string;
   schedule_mode?: string;
+  shift_hours?: number;
   rooms: Record<string, ShiftRoom[]>;
   Fiammetta?: {
     enable: boolean;
     requested?: boolean;
     available?: boolean;
     target: string;
+    target_slot?: boolean;
     order: string;
     status?: string;
     reason?: string;
+    mood_recovery?: Record<string, unknown>;
   };
   drones?: DroneAssignment;
   mood_valid?: boolean;
@@ -256,6 +323,9 @@ export interface ShiftPlan {
     shift_hours?: number;
     resting_operator_recovers_full?: boolean;
     fiammetta_target_recovers_full?: boolean;
+    dormitory_recovery_calculated?: boolean;
+    dormitory_default_level?: number;
+    dormitory_default_ambience?: number;
   };
 }
 

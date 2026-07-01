@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
-import type { Announcement, FreePreviewResult, LicenseConfig, LicenseFile, LicenseOperator } from '../lib/types'
+import type { AnalyzeScheduleResult, Announcement, FreePreviewResult, LicenseConfig, LicenseFile, LicenseOperator, PermissionMode } from '../lib/types'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import BuildMetaStrip from '../components/BuildMetaStrip'
+import ResultPanel from '../components/ResultPanel'
+import { downloadLicenseFile } from '../lib/download'
+import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
+import { bindPendingActivationToken, getPendingActivationToken } from '../lib/activation-token'
 
 interface Props {
   onFileLoaded: (content: string) => Promise<void>;
-  onLicenseRedeemed: (license: LicenseFile) => void;
+  onLicenseRedeemed: (license: LicenseFile, licenseFileContent: string) => void;
   error: string | null;
   announcement: Announcement | null;
 }
 
-type EntryMode = 'preview' | 'license' | 'cdk'
+type EntryMode = 'preview' | 'analysis' | 'license' | 'cdk'
 
 const FIRST_RUN_TOUR_STORAGE_KEY = 'maa-infrast-upload-tour-seen'
 
@@ -119,6 +123,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
         <div className="mb-5 flex justify-center">
           <div className="inline-flex rounded-lg bg-surface-1 p-1" data-tour="entry-mode">
             <ModeButton label="免费预览" active={mode === 'preview'} onClick={() => setMode('preview')} />
+            <ModeButton label="分析排班表" active={mode === 'analysis'} onClick={() => setMode('analysis')} />
             <ModeButton label="上传 .maa 文件" active={mode === 'license'} onClick={() => setMode('license')} />
             <ModeButton label="使用 CDK 生成授权文件" active={mode === 'cdk'} onClick={() => setMode('cdk')} />
           </div>
@@ -126,6 +131,8 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
 
         {mode === 'preview' ? (
           <FreePreviewPanel onUseCdk={() => setMode('cdk')} />
+        ) : mode === 'analysis' ? (
+          <ScheduleAnalysisPanel />
         ) : mode === 'license' ? (
           <LicenseUploadPanel onFileLoaded={onFileLoaded} error={error} />
         ) : (
@@ -133,7 +140,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
         )}
 
         <p className="mt-6 text-center text-xs text-ink-muted">
-          免费预览不会生成排班表或 MAA JSON。CDK 会在本站生成授权文件，授权文件和保存进度文件通常以 .maa 结尾。
+        排班表分析无需 CDK 和授权；免费预览仅展示前 3 个房间，不提供完整排班或 MAA JSON。CDK 会在本站生成授权文件，授权文件和保存进度文件通常以 .maa 结尾。
         </p>
         <div className="mt-3 text-center">
           <button
@@ -168,6 +175,171 @@ function ModeButton({ label, active, onClick }: { label: string; active: boolean
     >
       {label}
     </button>
+  )
+}
+
+function ScheduleAnalysisPanel() {
+  const [operators, setOperators] = useState<LicenseOperator[] | null>(null)
+  const [schedule, setSchedule] = useState<unknown | null>(null)
+  const [operatorsFileName, setOperatorsFileName] = useState<string | null>(null)
+  const [scheduleFileName, setScheduleFileName] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<AnalyzeScheduleResult | null>(null)
+  const operatorsRef = useRef<HTMLInputElement>(null)
+  const scheduleRef = useRef<HTMLInputElement>(null)
+
+  const handleOperatorsFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+    setError(null)
+    setOperatorsFileName(file.name)
+    try {
+      setOperators(parseOperatorsText(await file.text()))
+    } catch (caught) {
+      setOperators(null)
+      setError((caught as Error).message)
+    }
+  }
+
+  const handleScheduleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    if (!file) return
+    setError(null)
+    setScheduleFileName(file.name)
+    try {
+      setSchedule(parseScheduleText(await file.text()))
+    } catch (caught) {
+      setSchedule(null)
+      setError((caught as Error).message)
+    }
+  }
+
+  const handleAnalyze = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!operators) {
+      setError('请先上传 operators.json。')
+      return
+    }
+    if (!schedule) {
+      setError('请先上传排班表 JSON。')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const resp = await fetch('/api/analyze-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operators, schedule }),
+      })
+      if (!resp.ok) throw new Error(await readResponseError(resp, `分析失败: ${resp.status}`))
+      setResult(await resp.json() as AnalyzeScheduleResult)
+    } catch (caught) {
+      setResult(null)
+      setError((caught as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleAnalyze} className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-ink-primary">分析导入排班表</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">
+              上传干员数据和已生成的排班 JSON，直接分析红脸风险、日产量和爆仓信息，不需要 CDK 或授权文件。
+            </p>
+          </div>
+          <span className="rounded-full bg-brand-500/10 px-3 py-1 text-xs font-semibold text-brand-300">
+            免授权
+          </span>
+        </div>
+
+        {error && (
+          <div className="mt-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <FilePickButton
+            label="干员数据"
+            hint="operators.json / .txt"
+            fileName={operatorsFileName}
+            loadedText={operators ? `已载入 ${operators.filter((operator) => operator.own !== false).length} 名干员` : ''}
+            onClick={() => operatorsRef.current?.click()}
+          />
+          <FilePickButton
+            label="排班表"
+            hint="maa_schedule_optimized.json"
+            fileName={scheduleFileName}
+            loadedText={schedule ? '已载入排班表' : ''}
+            onClick={() => scheduleRef.current?.click()}
+          />
+        </div>
+
+        <input
+          ref={operatorsRef}
+          type="file"
+          accept=".json,.txt,application/json,text/plain"
+          onChange={handleOperatorsFile}
+          className="hidden"
+        />
+        <input
+          ref={scheduleRef}
+          type="file"
+          accept=".json,.txt,application/json,text/plain"
+          onChange={handleScheduleFile}
+          className="hidden"
+        />
+
+        <button
+          type="submit"
+          disabled={loading || !operators || !schedule}
+          className="mt-5 w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+        >
+          {loading ? '分析中...' : '分析排班表'}
+        </button>
+      </form>
+
+      {result && (
+        <div className="mx-auto max-w-5xl">
+          <ResultPanel result={result} variant="analysis" detailDefaultOpen />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FilePickButton({
+  label,
+  hint,
+  fileName,
+  loadedText,
+  onClick,
+}: {
+  label: string;
+  hint: string;
+  fileName: string | null;
+  loadedText: string;
+  onClick: () => void;
+}) {
+  return (
+    <div>
+      <span className="mb-2 block text-sm font-medium text-ink-secondary">{label}</span>
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full rounded-lg bg-surface-2 px-4 py-3 text-left text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
+      >
+        {fileName ? `已选择：${fileName}` : hint}
+      </button>
+      {loadedText && <p className="mt-2 text-xs text-brand-400">{loadedText}</p>}
+    </div>
   )
 }
 
@@ -414,7 +586,7 @@ function FreePreviewPanel({ onUseCdk }: { onUseCdk: () => void }) {
           changed={false}
           validation={configValidation}
           onUpdate={updateConfig}
-          note="免费预览会读取当前基建配置，但不会返回完整排班结果。"
+          note="免费预览会生成限制级排班，仅展示前 3 个房间。"
         />
       </div>
 
@@ -429,9 +601,9 @@ function FreePreviewResultCard({ preview, onUseCdk }: { preview: FreePreviewResu
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-medium text-brand-400">免费预览已生成</p>
-          <h2 className="mt-1 text-xl font-semibold text-ink-primary">账号和基建概览</h2>
+          <h2 className="mt-1 text-xl font-semibold text-ink-primary">限制级排班预览</h2>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">
-            这里只展示是否值得继续计算的判断，不包含完整排班表和干员组合。
+            已按当前练度生成排班，但免费版只展示前 3 个房间。完整房间、练度建议和 MAA JSON 需使用 CDK。
           </p>
         </div>
         <button
@@ -453,6 +625,8 @@ function FreePreviewResultCard({ preview, onUseCdk }: { preview: FreePreviewResu
         <p className="text-sm font-semibold text-ink-primary">当前基建布局</p>
         <p className="mt-1 text-sm leading-6 text-ink-secondary">{preview.support.reason}</p>
       </div>
+
+      <LimitedSchedulePreview preview={preview} />
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
@@ -482,6 +656,54 @@ function FreePreviewResultCard({ preview, onUseCdk }: { preview: FreePreviewResu
   )
 }
 
+function LimitedSchedulePreview({ preview }: { preview: FreePreviewResult }) {
+  const schedule = preview.limited_schedule
+  const hiddenRoomCopy = schedule.hidden_room_count > 0
+    ? `另有 ${schedule.hidden_room_count} 个房间和后续班次需使用 CDK 解锁。`
+    : '完整结果可下载 MAA JSON 并保存进度。'
+
+  return (
+    <div className="mt-5 overflow-hidden rounded-lg border border-brand-500/20 bg-brand-500/5">
+      <div className="flex flex-col gap-2 border-b border-brand-500/15 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-ink-primary">免费排班表，前 {schedule.room_limit} 个房间</h3>
+          <p className="mt-1 text-xs leading-5 text-ink-secondary">
+            {schedule.plan_name} · 共 {schedule.plan_count} 个班次。{hiddenRoomCopy}
+          </p>
+        </div>
+        <span className="self-start rounded-full bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning sm:self-auto">
+          限制级预览
+        </span>
+      </div>
+      <div className="divide-y divide-surface-3/60">
+        {schedule.rooms.map((room) => (
+          <div key={room.key} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[minmax(90px,0.65fr)_minmax(80px,0.5fr)_minmax(0,1.8fr)_auto] sm:items-center">
+            <div className="font-medium text-ink-primary">
+              {room.label}
+              {room.index_label && <span className="ml-1 text-ink-muted">{room.index_label}</span>}
+            </div>
+            <div className="text-ink-muted">{room.product}</div>
+            <div className="min-w-0 leading-6 text-ink-secondary">{room.operators.join(', ')}</div>
+            <div className="font-mono text-sm font-semibold text-brand-400 sm:text-right">
+              {formatPreviewEfficiency(room.efficiency)}
+            </div>
+          </div>
+        ))}
+      </div>
+      {schedule.rooms.length === 0 && (
+        <p className="px-4 py-3 text-sm text-ink-secondary">
+          当前配置暂未生成可展示房间，请检查干员数据或基建配置后重试。
+        </p>
+      )}
+    </div>
+  )
+}
+
+function formatPreviewEfficiency(value: number): string {
+  if (!Number.isFinite(value)) return '-'
+  return `${value.toFixed(1)}%`
+}
+
 function PreviewMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-surface-2/60 p-4">
@@ -491,9 +713,9 @@ function PreviewMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: LicenseFile) => void }) {
+function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: LicenseFile, licenseFileContent: string) => void }) {
   const [code, setCode] = useState('')
-  const [validatedCdk, setValidatedCdk] = useState<{ permission: string; permission_label: string } | null>(null)
+  const [validatedCdk, setValidatedCdk] = useState<{ permission: PermissionMode; permission_label: string } | null>(null)
   const [operators, setOperators] = useState<LicenseOperator[] | null>(null)
   const [operatorsFileName, setOperatorsFileName] = useState<string | null>(null)
   const [config, setConfig] = useState<LicenseConfig>(() => cloneConfig(CONFIG_PRESETS['243']))
@@ -505,6 +727,8 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
+  const cdkCanEditConfig = validatedCdk ? canEditCdkConfig(validatedCdk.permission) : false
+  const cdkCanEditLimitedConfig = validatedCdk ? canEditCdkLimitedConfig(validatedCdk.permission) : false
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
     const next = normalizeConfig(normalizedConfig)
@@ -561,7 +785,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
       if (!data.permission || !data.permission_label) {
         throw new Error('CDK 校验响应缺少版本信息。')
       }
-      setValidatedCdk({ permission: data.permission, permission_label: data.permission_label })
+      setValidatedCdk({ permission: normalizeCdkPermission(data.permission), permission_label: data.permission_label })
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -581,7 +805,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
       return
     }
     if (!confirmed) {
-      setError('请先确认 CDK 仅可使用一次。')
+      setError('请先确认 CDK 使用规则。')
       return
     }
     if (!configValidation.ok) {
@@ -597,6 +821,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
           code,
           operators,
           config: normalizedConfig,
+          activation_token: getPendingActivationToken(),
         }),
       })
       const data = await resp.json() as {
@@ -610,8 +835,9 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
       if (!data.license_file_content || !data.license) {
         throw new Error('兑换响应缺少授权文件。')
       }
-      downloadLicense(data.license_file_content, data.license.order_hash)
-      onLicenseRedeemed(data.license)
+      bindPendingActivationToken(data.license)
+      downloadLicenseFile(data.license_file_content, data.license.order_hash)
+      onLicenseRedeemed(data.license, data.license_file_content)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -655,6 +881,19 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
             CDK 可用，版本：{validatedCdk.permission_label}
           </p>
         )}
+        {ACTIVE_PURCHASE_CHANNEL?.href && (
+          <p className="mt-3 text-sm text-ink-secondary">
+            还没有 CDK？
+            <a
+              href={ACTIVE_PURCHASE_CHANNEL.href}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-1 font-semibold text-brand-500 underline-offset-4 transition-colors duration-150 hover:text-brand-400 hover:underline"
+            >
+              {ACTIVE_PURCHASE_CHANNEL.actionLabel}
+            </a>
+          </p>
+        )}
       </section>
 
       {validatedCdk ? (
@@ -687,13 +926,20 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
           <div data-tour="base-config">
             <ConfigEditor
               config={normalizedConfig}
-              canEdit={false}
+              canEdit={cdkCanEditConfig}
+              canEditIntermediateInventory={cdkCanEditLimitedConfig}
+              canEditShiftHours={cdkCanEditLimitedConfig}
               canSelectPreset
               changed={false}
+              permission={validatedCdk.permission}
               validation={configValidation}
               onUpdate={updateConfig}
-              note="推荐版和成长版仅支持预设配置；进阶版和尊享版生成授权后可继续自定义配置。"
-            />
+              note={cdkCanEditConfig
+                ? `${validatedCdk.permission_label}可在生成授权文件前调整基建配置。`
+                : cdkCanEditLimitedConfig
+                  ? `${validatedCdk.permission_label}可选择预设、填写中间产物库存并修改换班间隔；库存不足时仅微调一个制造站产物。`
+: `${validatedCdk.permission_label}仅支持预设配置，单账号终身卡可自定义基建配置。`}
+      />
           </div>
 
           <section className="mx-auto max-w-3xl rounded-xl bg-surface-1 p-5 sm:p-6" data-tour="redeem-action">
@@ -705,8 +951,8 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
                 className="mt-1 h-4 w-4 flex-shrink-0 accent-brand-500"
               />
               <span>
-                我确认 CDK 仅可使用一次，提交后本次导入的干员和配置不能再次修改。
-              </span>
+我确认 CDK 仅可首次兑换一次；单账号终身卡后续可更新干员数据，但受每 7 天 2 次与账号绑定风控限制。
+          </span>
             </label>
             <button
               type="submit"
@@ -977,12 +1223,36 @@ function parseOperatorsText(text: string): LicenseOperator[] {
   return data as LicenseOperator[]
 }
 
-function downloadLicense(content: string, orderHash: string) {
-  const blob = new Blob([content], { type: 'application/octet-stream' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `maa-license-${orderHash.slice(0, 8)}.maa`
-  a.click()
-  URL.revokeObjectURL(url)
+function parseScheduleText(text: string): unknown {
+  const data = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
+  if (!Array.isArray(data) && (!data || typeof data !== 'object')) {
+    throw new Error('排班表 JSON 需要是对象或数组。')
+  }
+  return data
 }
+
+async function readResponseError(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = await response.json() as { error?: string }
+    return data.error || fallback
+  } catch {
+    return fallback
+  }
+}
+
+function normalizeCdkPermission(permission: string): PermissionMode {
+  if (permission === 'recommended' || permission === 'growth' || permission === 'advanced' || permission === 'ultimate' || permission === 'admin') {
+    return permission
+  }
+  if (permission === 'premium') return 'advanced'
+  return 'growth'
+}
+
+function canEditCdkConfig(permission: PermissionMode): boolean {
+  return permission === 'advanced' || permission === 'ultimate' || permission === 'admin'
+}
+
+function canEditCdkLimitedConfig(permission: PermissionMode): boolean {
+  return permission === 'recommended' || permission === 'growth'
+}
+

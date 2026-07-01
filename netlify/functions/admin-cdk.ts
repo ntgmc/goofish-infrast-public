@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions'
 import type { ProductPermissionMode } from '../../src/lib/types'
+import { authenticateAdminRequest } from './admin-auth'
 import {
   CDK_PRODUCT_PERMISSIONS,
   generateCdk,
@@ -8,6 +9,7 @@ import {
   hashCdk,
   jsonResponse,
   requireEnv,
+  unfreezeCdkRecord,
   type CdkRecord,
   type CdkStatus,
 } from './license-utils'
@@ -39,16 +41,17 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   }
 
   try {
-    const { admin_password, permission, order_note } = await req.json() as {
+    const body = await req.json() as {
       admin_password?: string;
+      admin_user?: string;
       permission?: string;
       order_note?: string;
     }
-    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
+    const { permission, order_note } = body
     const hashSecret = requireEnv('CDK_HASH_SECRET')
 
-    if (admin_password !== adminPassword) {
-      return jsonResponse({ error: '管理口令错误。' }, 401)
+    if (!(await authenticateAdminRequest(req, body))) {
+      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
     }
     if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
       return jsonResponse({ error: 'CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
@@ -94,10 +97,8 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 
 async function handleList(req: Request): Promise<Response> {
   try {
-    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
-    const providedPassword = req.headers.get('X-Admin-Password')
-    if (providedPassword !== adminPassword) {
-      return jsonResponse({ error: '管理口令错误。' }, 401)
+    if (!(await authenticateAdminRequest(req))) {
+      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
     }
 
     const status = normalizeStatusFilter(req.headers.get('X-Cdk-Status'), req.url)
@@ -120,18 +121,19 @@ async function handleList(req: Request): Promise<Response> {
 
 async function handlePatch(req: Request): Promise<Response> {
   try {
-    const { admin_password, code_hash, action, permission } = await req.json() as {
+    const body = await req.json() as {
       admin_password?: string;
+      admin_user?: string;
       code_hash?: string;
       action?: string;
       permission?: string;
     }
-    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
+    const { code_hash, action, permission } = body
 
-    if (admin_password !== adminPassword) {
-      return jsonResponse({ error: '管理口令错误。' }, 401)
+    if (!(await authenticateAdminRequest(req, body))) {
+      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
     }
-    if (action !== 'revoke' && action !== 'upgrade' && action !== 'grant_operator_update') {
+    if (action !== 'revoke' && action !== 'upgrade' && action !== 'grant_operator_update' && action !== 'unfreeze') {
       return jsonResponse({ error: 'Unsupported action.' }, 400)
     }
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
@@ -145,6 +147,28 @@ async function handlePatch(req: Request): Promise<Response> {
     if (!existing) {
       return jsonResponse({ error: 'CDK not found.' }, 404)
     }
+
+    if (action === 'unfreeze') {
+      if (existing.status === 'revoked') {
+        return jsonResponse({ error: '已撤销授权不能解冻。' }, 409)
+      }
+      if (existing.status !== 'frozen') {
+        return jsonResponse({
+          unfrozen: true,
+          already_unfrozen: true,
+          cdk_id: existing.code_hash.slice(0, 12),
+          status: existing.status,
+        })
+      }
+      const updated = await unfreezeCdkRecord(existing)
+      return jsonResponse({
+        unfrozen: true,
+        already_unfrozen: false,
+        cdk_id: existing.code_hash.slice(0, 12),
+        status: updated.status,
+      })
+    }
+
     if (action === 'upgrade') {
       if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
         return jsonResponse({ error: '目标 CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
@@ -220,8 +244,8 @@ async function handlePatch(req: Request): Promise<Response> {
         revoked_at: existing.revoked_at ?? null,
       })
     }
-    if (existing.status !== 'used') {
-      return jsonResponse({ error: 'Only used CDKs can be revoked.' }, 409)
+    if (existing.status !== 'used' && existing.status !== 'frozen') {
+      return jsonResponse({ error: 'Only used or frozen CDKs can be revoked.' }, 409)
     }
 
     const revokedAt = new Date().toISOString()
@@ -246,14 +270,15 @@ async function handlePatch(req: Request): Promise<Response> {
 
 async function handleDelete(req: Request): Promise<Response> {
   try {
-    const { admin_password, code_hash } = await req.json() as {
+    const body = await req.json() as {
       admin_password?: string;
+      admin_user?: string;
       code_hash?: string;
     }
-    const adminPassword = requireEnv('MAA_ADMIN_PASSWORD')
+    const { code_hash } = body
 
-    if (admin_password !== adminPassword) {
-      return jsonResponse({ error: 'Invalid admin password.' }, 401)
+    if (!(await authenticateAdminRequest(req, body))) {
+      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
     }
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
       return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
@@ -280,9 +305,9 @@ async function handleDelete(req: Request): Promise<Response> {
 }
 
 function normalizeStatusFilter(headerValue: string | null, requestUrl: string): CdkStatusFilter {
-  if (headerValue === 'used' || headerValue === 'revoked' || headerValue === 'all') return headerValue
+  if (headerValue === 'used' || headerValue === 'frozen' || headerValue === 'revoked' || headerValue === 'all') return headerValue
   const queryValue = new URL(requestUrl).searchParams.get('status')
-  if (queryValue === 'used' || queryValue === 'revoked' || queryValue === 'all') return queryValue
+  if (queryValue === 'used' || queryValue === 'frozen' || queryValue === 'revoked' || queryValue === 'all') return queryValue
   return 'unused'
 }
 
@@ -295,6 +320,8 @@ function toAdminCdkRecord(record: CdkRecord) {
     created_at: record.created_at,
     used_at: record.used_at,
     revoked_at: record.revoked_at ?? null,
+    frozen_at: record.frozen_at ?? null,
+    freeze_reason: record.freeze_reason ?? null,
     order_note: record.order_note,
     license_order_hash: record.license_order_hash,
     operator_count: record.operator_count,
@@ -305,6 +332,12 @@ function toAdminCdkRecord(record: CdkRecord) {
     operator_update_grant_remaining: getOperatorUpdateGrantRemaining(record),
     operator_update_granted_at: record.operator_update_granted_at ?? null,
     operator_update_consumed_at: record.operator_update_consumed_at ?? null,
+    operator_update_event_count: record.operator_update_events?.length ?? 0,
+    activation_bound: Boolean(record.activation_token_hash),
+    user_agent_count: new Set((record.user_agent_events ?? []).map((event) => event.hash)).size,
+    ip_prefix_count: new Set((record.ip_prefix_events ?? []).map((event) => event.hash)).size,
+    risk_event_count: record.risk_events?.length ?? 0,
+    latest_risk_event: record.risk_events?.at(-1) ?? null,
   }
 }
 
