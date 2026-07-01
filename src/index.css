@@ -638,3 +638,38 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+.config-validation-toast {
+  animation: config-validation-toast 4.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top right;
+}
+
+@keyframes config-validation-toast {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.985);
+  }
+
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  82% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.99);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .config-validation-toast {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}
