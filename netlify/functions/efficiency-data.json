@@ -1942,6 +1942,8 @@
             "槐琥/2"
           ],
           "efficiency": 40,
+          "mood_consumption_clear": "room",
+          "note": "团队精神: 消除当前制造站内所有干员自身心情消耗的影响。",
           "priority": 4000
         },
         {
