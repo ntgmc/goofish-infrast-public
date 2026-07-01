@@ -4,6 +4,7 @@ import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import BuildMetaStrip from '../components/BuildMetaStrip'
 import { downloadLicenseFile } from '../lib/download'
+import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 
 interface Props {
   onFileLoaded: (content: string) => Promise<void>;
@@ -655,6 +656,19 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
         {validatedCdk && (
           <p className="mt-3 text-sm text-success">
             CDK 可用，版本：{validatedCdk.permission_label}
+          </p>
+        )}
+        {ACTIVE_PURCHASE_CHANNEL?.href && (
+          <p className="mt-3 text-sm text-ink-secondary">
+            还没有 CDK？
+            <a
+              href={ACTIVE_PURCHASE_CHANNEL.href}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-1 font-semibold text-brand-500 underline-offset-4 transition-colors duration-150 hover:text-brand-400 hover:underline"
+            >
+              {ACTIVE_PURCHASE_CHANNEL.actionLabel}
+            </a>
           </p>
         )}
       </section>
