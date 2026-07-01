@@ -23,7 +23,38 @@ const VALID_PERMISSION_MODES: RawPermissionMode[] = [
   'admin',
 ]
 export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = ['recommended', 'growth', 'advanced', 'ultimate']
-export type CdkStatus = 'unused' | 'used' | 'revoked'
+export type CdkStatus = 'unused' | 'used' | 'frozen' | 'revoked'
+
+export interface OperatorFingerprint {
+  hash: string;
+  owned_count: number;
+  operators: Record<string, { name: string; own: boolean; elite: number; rarity: number }>;
+}
+
+export interface TimedHashEvent {
+  hash: string;
+  at: string;
+}
+
+export interface OperatorUpdateEvent {
+  at: string;
+  operator_count: number;
+  fingerprint_hash: string;
+}
+
+export interface RiskEvent {
+  at: string;
+  type: string;
+  reason: string;
+  detail?: Record<string, unknown>;
+}
+
+export interface OperatorUpdateLimit {
+  window_days: 7;
+  max_updates: 2;
+  used: number;
+  next_available_at?: string;
+}
 
 const PRESET_CONFIGS: LicenseConfig[] = [
   {
@@ -79,6 +110,8 @@ export interface CdkRecord {
   created_at: string;
   used_at: string | null;
   revoked_at?: string | null;
+  frozen_at?: string | null;
+  freeze_reason?: string | null;
   order_note: string | null;
   license_order_hash: string | null;
   operator_count: number | null;
@@ -88,6 +121,14 @@ export interface CdkRecord {
   operator_update_used_count?: number;
   operator_update_granted_at?: string | null;
   operator_update_consumed_at?: string | null;
+  baseline_operator_fingerprint?: OperatorFingerprint;
+  latest_operator_fingerprint?: OperatorFingerprint;
+  operator_update_events?: OperatorUpdateEvent[];
+  activation_token_hash?: string | null;
+  bound_user_agent_hash?: string | null;
+  user_agent_events?: TimedHashEvent[];
+  ip_prefix_events?: TimedHashEvent[];
+  risk_events?: RiskEvent[];
 }
 
 export interface CdkRecordStore {
@@ -466,6 +507,433 @@ export async function consumeOperatorUpdateGrant(record: CdkRecord, operatorCoun
   const store = await getCdkRecordStore()
   await store.set(`cdk/${record.code_hash}.json`, updated)
   return updated
+}
+
+const ADVANCED_UPDATE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+const ADVANCED_UPDATE_MAX_COUNT = 2
+const CLIENT_SIGNAL_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
+const SOFT_BLOCK_WINDOW_MS = 24 * 60 * 60 * 1000
+const SOFT_BLOCK_FREEZE_COUNT = 3
+
+export function buildOperatorFingerprint(operators: LicenseOperator[]): OperatorFingerprint {
+  const normalized = operators
+    .map((operator) => ({
+      key: String(operator.id || operator.name),
+      name: operator.name,
+      own: Boolean(operator.own),
+      elite: Number(operator.elite) || 0,
+      rarity: Number(operator.rarity) || 0,
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key))
+
+  const snapshot: OperatorFingerprint['operators'] = {}
+  for (const operator of normalized) {
+    snapshot[operator.key] = {
+      name: operator.name,
+      own: operator.own,
+      elite: operator.elite,
+      rarity: operator.rarity,
+    }
+  }
+
+  return {
+    hash: createHash('sha256').update(canonicalJson(normalized)).digest('hex'),
+    owned_count: normalized.filter((operator) => operator.own).length,
+    operators: snapshot,
+  }
+}
+
+export function checkAdvancedOperatorUpdateLimit(
+  record: CdkRecord,
+  now = new Date(),
+): { ok: true; limit: OperatorUpdateLimit } | { ok: false; limit: OperatorUpdateLimit } {
+  const cutoff = now.getTime() - ADVANCED_UPDATE_WINDOW_MS
+  const recentEvents = (record.operator_update_events ?? [])
+    .filter((event) => Date.parse(event.at) > cutoff)
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+  const limit: OperatorUpdateLimit = {
+    window_days: 7,
+    max_updates: ADVANCED_UPDATE_MAX_COUNT,
+    used: recentEvents.length,
+  }
+  if (recentEvents.length < ADVANCED_UPDATE_MAX_COUNT) return { ok: true, limit }
+
+  const oldest = Date.parse(recentEvents[0].at)
+  if (Number.isFinite(oldest)) {
+    limit.next_available_at = new Date(oldest + ADVANCED_UPDATE_WINDOW_MS).toISOString()
+  }
+  return { ok: false, limit }
+}
+
+export function evaluateOperatorRisk(
+  record: CdkRecord,
+  operators: LicenseOperator[],
+): { ok: true; fingerprint: OperatorFingerprint } | { ok: false; fingerprint: OperatorFingerprint; event: RiskEvent } {
+  const fingerprint = buildOperatorFingerprint(operators)
+  const baseline = record.baseline_operator_fingerprint
+  const latest = record.latest_operator_fingerprint ?? baseline
+  if (!baseline) return { ok: true, fingerprint }
+
+  const now = new Date().toISOString()
+  for (const [key, previous] of Object.entries(baseline.operators)) {
+    const next = fingerprint.operators[key]
+    if (previous.own && previous.rarity >= 4 && (!next || !next.own)) {
+      return {
+        ok: false,
+        fingerprint,
+        event: {
+          at: now,
+          type: 'operator_ownership_regression',
+          reason: `高星干员 ${previous.name} 从绑定账号中消失。`,
+          detail: { operator_key: key, operator_name: previous.name },
+        },
+      }
+    }
+  }
+
+  if (latest) {
+    for (const [key, previous] of Object.entries(latest.operators)) {
+      const next = fingerprint.operators[key]
+      if (previous.own && next?.own && next.elite < previous.elite) {
+        return {
+          ok: false,
+          fingerprint,
+          event: {
+            at: now,
+            type: 'operator_elite_regression',
+            reason: `干员 ${previous.name} 练度从精${previous.elite} 回退到精${next.elite}。`,
+            detail: { operator_key: key, operator_name: previous.name, previous_elite: previous.elite, next_elite: next.elite },
+          },
+        }
+      }
+    }
+
+    if (fingerprint.owned_count < latest.owned_count - 2) {
+      return {
+        ok: false,
+        fingerprint,
+        event: {
+          at: now,
+          type: 'operator_count_regression',
+          reason: `拥有干员数从 ${latest.owned_count} 下降到 ${fingerprint.owned_count}。`,
+          detail: { previous_owned_count: latest.owned_count, next_owned_count: fingerprint.owned_count },
+        },
+      }
+    }
+  }
+
+  return { ok: true, fingerprint }
+}
+
+export function formatRiskFreezeMessage(reason: string): string {
+  const trimmed = reason.trim() || '授权触发风控。'
+  if (trimmed.includes('冻结') || trimmed.includes('被冻结')) return trimmed
+  return `授权已被冻结：${trimmed} 请联系卖家人工核验后解冻。`
+}
+
+export function formatOperatorRiskBlockMessage(reason: string): string {
+  return `本次操作已拦截：${reason} 这通常是误选了其他账号或旧版 operators.json，请确认文件后重新上传。`
+}
+
+export function shouldFreezeBindingRisk(event: RiskEvent): boolean {
+  return event.type !== 'device_token_missing'
+}
+
+export function formatBindingBlockMessage(event: RiskEvent): string {
+  if (event.type === 'device_token_missing') {
+    return '本次操作已拦截：缺少设备绑定信息。请回到首次激活授权的浏览器，或重新上传当前授权文件后再试。'
+  }
+  return formatRiskFreezeMessage(event.reason)
+}
+
+export async function recordSoftBlockedRiskEvent(
+  record: CdkRecord,
+  event: RiskEvent,
+  message: string,
+): Promise<{ frozen: false; record: CdkRecord; message: string } | { frozen: true; record: CdkRecord; message: string }> {
+  const now = event.at || new Date().toISOString()
+  const softEvent: RiskEvent = {
+    ...event,
+    at: now,
+    detail: {
+      ...(event.detail ?? {}),
+      soft_block: true,
+    },
+  }
+  const riskEvents = [...(record.risk_events ?? []), softEvent].slice(-20)
+  const cutoff = Date.parse(now) - SOFT_BLOCK_WINDOW_MS
+  const softBlockCount = riskEvents.filter((item) => {
+    const at = Date.parse(item.at)
+    return Number.isFinite(at) && at > cutoff && item.detail?.soft_block === true
+  }).length
+  const updated: CdkRecord = {
+    ...record,
+    risk_events: riskEvents,
+  }
+
+  if (softBlockCount >= SOFT_BLOCK_FREEZE_COUNT) {
+    const thresholdEvent: RiskEvent = {
+      at: now,
+      type: 'soft_block_threshold',
+      reason: `24 小时内第 ${SOFT_BLOCK_FREEZE_COUNT} 次尝试被拦截。最近原因：${event.reason}`,
+      detail: {
+        soft_block_count: softBlockCount,
+        latest_block_type: event.type,
+      },
+    }
+    const frozen = await freezeCdkRecord(updated, thresholdEvent.reason, thresholdEvent)
+    return {
+      frozen: true,
+      record: frozen,
+      message: frozen.freeze_reason || formatRiskFreezeMessage(thresholdEvent.reason),
+    }
+  }
+
+  const store = await getCdkRecordStore()
+  await store.set(`cdk/${record.code_hash}.json`, updated)
+  return {
+    frozen: false,
+    record: updated,
+    message,
+  }
+}
+
+export function evaluateClientBindingRisk(
+  record: CdkRecord,
+  activationToken: unknown,
+  req: Request,
+): { ok: true; record: CdkRecord } | { ok: false; record: CdkRecord; event: RiskEvent } {
+  const now = new Date().toISOString()
+  const tokenHash = hashActivationToken(activationToken)
+  let next: CdkRecord = { ...record }
+
+  if (!next.activation_token_hash) {
+    if (!tokenHash) {
+      return {
+        ok: false,
+        record: next,
+        event: { at: now, type: 'device_token_missing', reason: '缺少设备绑定 Token。' },
+      }
+    }
+    next.activation_token_hash = tokenHash
+  } else if (!tokenHash || tokenHash !== next.activation_token_hash) {
+    return {
+      ok: false,
+      record: next,
+      event: { at: now, type: 'device_token_mismatch', reason: '设备绑定 Token 与首次激活设备不一致。' },
+    }
+  }
+
+  const userAgentHash = hashHeaderValue(req.headers.get('user-agent'))
+  if (userAgentHash) {
+    if (!next.bound_user_agent_hash) next.bound_user_agent_hash = userAgentHash
+    next.user_agent_events = appendTimedHashEvent(next.user_agent_events, userAgentHash, now, CLIENT_SIGNAL_WINDOW_MS)
+    if (countUniqueRecentHashes(next.user_agent_events, now, CLIENT_SIGNAL_WINDOW_MS) > 2) {
+      return {
+        ok: false,
+        record: next,
+        event: { at: now, type: 'user_agent_churn', reason: '同一授权近期使用了过多浏览器环境。' },
+      }
+    }
+  }
+
+  const ipPrefixHash = hashIpPrefix(req)
+  if (ipPrefixHash) {
+    next.ip_prefix_events = appendTimedHashEvent(next.ip_prefix_events, ipPrefixHash, now, CLIENT_SIGNAL_WINDOW_MS)
+    if (countUniqueRecentHashes(next.ip_prefix_events, now, CLIENT_SIGNAL_WINDOW_MS) > 3) {
+      return {
+        ok: false,
+        record: next,
+        event: { at: now, type: 'ip_prefix_churn', reason: '同一授权近期使用了过多网络位置。' },
+      }
+    }
+  }
+
+  return { ok: true, record: next }
+}
+
+export function createAdvancedRiskBinding(
+  record: CdkRecord,
+  operators: LicenseOperator[],
+  req: Request,
+  activationToken: unknown,
+): { ok: true; record: CdkRecord } | { ok: false; event: RiskEvent } {
+  const binding = evaluateClientBindingRisk(record, activationToken, req)
+  if (!binding.ok) return { ok: false, event: binding.event }
+  const fingerprint = buildOperatorFingerprint(operators)
+  return {
+    ok: true,
+    record: {
+      ...binding.record,
+      baseline_operator_fingerprint: binding.record.baseline_operator_fingerprint ?? fingerprint,
+      latest_operator_fingerprint: fingerprint,
+    },
+  }
+}
+
+export async function syncAdvancedCdkBinding(
+  record: CdkRecord,
+  operators: LicenseOperator[],
+  req: Request,
+  activationToken: unknown,
+): Promise<{ ok: true; record: CdkRecord } | { ok: false; status: number; message: string; record: CdkRecord }> {
+  const binding = createAdvancedRiskBinding(record, operators, req, activationToken)
+  if (!binding.ok) {
+    if (!shouldFreezeBindingRisk(binding.event)) {
+      return { ok: false, status: 403, message: formatBindingBlockMessage(binding.event), record }
+    }
+    const frozen = await freezeCdkRecord(record, binding.event.reason, binding.event)
+    return { ok: false, status: 403, message: frozen.freeze_reason || formatRiskFreezeMessage(binding.event.reason), record: frozen }
+  }
+  if (binding.record === record) return { ok: true, record }
+  const store = await getCdkRecordStore()
+  await store.set(`cdk/${record.code_hash}.json`, binding.record)
+  return { ok: true, record: binding.record }
+}
+
+export async function recordAdvancedOperatorUpdate(
+  record: CdkRecord,
+  operators: LicenseOperator[],
+  req: Request,
+  activationToken: unknown,
+): Promise<
+  | { ok: true; record: CdkRecord; limit: OperatorUpdateLimit }
+  | { ok: false; status: 403 | 409 | 429; message: string; record: CdkRecord; limit?: OperatorUpdateLimit }
+> {
+  const binding = evaluateClientBindingRisk(record, activationToken, req)
+  if (!binding.ok) {
+    if (!shouldFreezeBindingRisk(binding.event)) {
+      const blocked = await recordSoftBlockedRiskEvent(binding.record, binding.event, formatBindingBlockMessage(binding.event))
+      return { ok: false, status: 403, message: blocked.message, record: blocked.record }
+    }
+    const frozen = await freezeCdkRecord(binding.record, binding.event.reason, binding.event)
+    return { ok: false, status: 403, message: frozen.freeze_reason || formatRiskFreezeMessage(binding.event.reason), record: frozen }
+  }
+
+  const operatorRisk = evaluateOperatorRisk(binding.record, operators)
+  if (!operatorRisk.ok) {
+    const blocked = await recordSoftBlockedRiskEvent(binding.record, operatorRisk.event, formatOperatorRiskBlockMessage(operatorRisk.event.reason))
+    return { ok: false, status: blocked.frozen ? 403 : 409, message: blocked.message, record: blocked.record }
+  }
+
+  const limitCheck = checkAdvancedOperatorUpdateLimit(binding.record)
+  if (!limitCheck.ok) {
+    return {
+      ok: false,
+      status: 429,
+      message: limitCheck.limit.next_available_at
+        ? `单账号终身版每 7 天最多更新 2 次干员数据，请在 ${limitCheck.limit.next_available_at} 后再试。`
+        : '单账号终身版每 7 天最多更新 2 次干员数据，请稍后再试。',
+      record: binding.record,
+      limit: limitCheck.limit,
+    }
+  }
+
+  const now = new Date().toISOString()
+  const cutoff = Date.now() - ADVANCED_UPDATE_WINDOW_MS
+  const updateEvents = [
+    ...(binding.record.operator_update_events ?? []).filter((event) => Date.parse(event.at) > cutoff),
+    {
+      at: now,
+      operator_count: operators.length,
+      fingerprint_hash: operatorRisk.fingerprint.hash,
+    },
+  ]
+  const updated: CdkRecord = {
+    ...binding.record,
+    operator_count: operators.length,
+    baseline_operator_fingerprint: binding.record.baseline_operator_fingerprint ?? operatorRisk.fingerprint,
+    latest_operator_fingerprint: operatorRisk.fingerprint,
+    operator_update_events: updateEvents,
+  }
+  const store = await getCdkRecordStore()
+  await store.set(`cdk/${record.code_hash}.json`, updated)
+  return { ok: true, record: updated, limit: checkAdvancedOperatorUpdateLimit(updated).limit }
+}
+
+export async function freezeCdkRecord(record: CdkRecord, reason: string, event: RiskEvent): Promise<CdkRecord> {
+  const frozenAt = event.at || new Date().toISOString()
+  const freezeReason = formatRiskFreezeMessage(reason)
+  const updated: CdkRecord = {
+    ...record,
+    status: 'frozen',
+    frozen_at: frozenAt,
+    freeze_reason: freezeReason,
+    risk_events: [...(record.risk_events ?? []), event].slice(-20),
+  }
+  const store = await getCdkRecordStore()
+  await store.set(`cdk/${record.code_hash}.json`, updated)
+  return updated
+}
+
+export async function unfreezeCdkRecord(record: CdkRecord): Promise<CdkRecord> {
+  const updated: CdkRecord = {
+    ...record,
+    status: 'used',
+    frozen_at: null,
+    freeze_reason: null,
+  }
+  const store = await getCdkRecordStore()
+  await store.set(`cdk/${record.code_hash}.json`, updated)
+  return updated
+}
+
+function hashActivationToken(value: unknown): string | null {
+  if (typeof value !== 'string' || value.trim().length < 16) return null
+  return createHash('sha256').update(value.trim()).digest('hex')
+}
+
+function hashHeaderValue(value: string | null): string | null {
+  const normalized = value?.trim()
+  if (!normalized) return null
+  return createHash('sha256').update(normalized).digest('hex')
+}
+
+function appendTimedHashEvent(
+  events: TimedHashEvent[] | undefined,
+  hash: string,
+  at: string,
+  windowMs: number,
+): TimedHashEvent[] {
+  const cutoff = Date.parse(at) - windowMs
+  const recent = (events ?? []).filter((event) => Date.parse(event.at) > cutoff)
+  if (recent[recent.length - 1]?.hash !== hash) recent.push({ hash, at })
+  return recent.slice(-30)
+}
+
+function countUniqueRecentHashes(events: TimedHashEvent[] | undefined, nowIso: string, windowMs: number): number {
+  const cutoff = Date.parse(nowIso) - windowMs
+  return new Set((events ?? []).filter((event) => Date.parse(event.at) > cutoff).map((event) => event.hash)).size
+}
+
+function hashIpPrefix(req: Request): string | null {
+  const rawIp = getClientIp(req)
+  if (!rawIp) return null
+  const prefix = normalizeIpPrefix(rawIp)
+  if (!prefix) return null
+  return createHash('sha256').update(prefix).digest('hex')
+}
+
+function getClientIp(req: Request): string | null {
+  const forwarded = req.headers.get('x-nf-client-connection-ip')
+    || req.headers.get('x-forwarded-for')
+    || req.headers.get('client-ip')
+    || req.headers.get('cf-connecting-ip')
+  const first = forwarded?.split(',')[0]?.trim()
+  return first || null
+}
+
+function normalizeIpPrefix(ip: string): string | null {
+  const withoutPort = ip.replace(/^\[|\]$/g, '').split(':').length === 2 && ip.includes('.')
+    ? ip.split(':')[0]
+    : ip.replace(/^\[|\]$/g, '')
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(withoutPort)) {
+    return withoutPort.split('.').slice(0, 3).join('.') + '.0/24'
+  }
+  if (withoutPort.includes(':')) {
+    return withoutPort.split(':').filter(Boolean).slice(0, 3).join(':') + '::/48'
+  }
+  return null
 }
 
 function encryptLicensePayload(payload: string): string {

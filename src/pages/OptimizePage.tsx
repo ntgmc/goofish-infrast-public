@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
 import { canEditConfig, canReplaceOperators, canUseIntermediateAutoConfig, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
+import { getActivationTokenForLicense } from '../lib/activation-token'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
 import UpgradeSuggestions from '../components/UpgradeSuggestions'
@@ -29,6 +30,9 @@ interface LicenseStatusResponse {
   error?: string;
   permission_label?: string;
   operator_update_available?: boolean;
+  operator_update_limit?: { window_days: 7; max_updates: 2; used: number; next_available_at?: string };
+  operator_update_next_available_at?: string;
+  risk_status?: 'ok' | 'frozen';
   license?: LicenseFile | null;
   license_file_content?: string | null;
 }
@@ -169,7 +173,7 @@ export default function OptimizePage({
     fetch('/api/license-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license }),
+      body: JSON.stringify({ license, activation_token: getActivationTokenForLicense(license) }),
     })
       .then(async (resp) => {
         const data = await resp.json() as LicenseStatusResponse
@@ -210,7 +214,7 @@ export default function OptimizePage({
     try {
       const nextOperators = parseOperatorsFile(await file.text())
       const confirmed = window.confirm(
-        `确认替换当前授权内的干员数据？\n\n新文件识别到 ${nextOperators.length} 名干员。继续后会清空当前练度调整，并消耗一次干员数据更新权限。`
+        `确认替换当前授权内的干员数据？\n\n新文件识别到 ${nextOperators.length} 名干员。继续后会清空当前练度调整。单账号终身版每 7 天最多更新 2 次，并会校验账号与设备绑定。`
       )
       if (!confirmed) {
         if (operatorFileRef.current) {
@@ -221,7 +225,11 @@ export default function OptimizePage({
       const resp = await fetch('/api/license-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ license, operators: nextOperators }),
+        body: JSON.stringify({
+          license,
+          operators: nextOperators,
+          activation_token: getActivationTokenForLicense(license),
+        }),
       })
       const data = await resp.json() as LicenseStatusResponse
       if (!resp.ok || !data.license) {
@@ -266,6 +274,7 @@ export default function OptimizePage({
       operators: mergedOperators,
       config: activeConfig,
       ignore_elite: ignoreElite,
+      activation_token: getActivationTokenForLicense(license),
       ...(includeCurrent && { include_current: true }),
     }
     const resp = await fetch('/api/optimize', {
@@ -283,6 +292,7 @@ export default function OptimizePage({
       operators: mergedOperators,
       config: activeConfig,
       ignore_elite: true,
+      activation_token: getActivationTokenForLicense(license),
       suggestions_only: true,
       upgrade_task_payload: taskPayload,
     }
@@ -350,7 +360,7 @@ export default function OptimizePage({
       setPhase('suggestions')
       setLastGeneratedSignature(optimizeSignature)
     } catch (e) {
-      setInlineError({ scope: 'generate', message: '优化失败: ' + (e as Error).message })
+      setInlineError({ scope: 'generate', message: formatOptimizeError((e as Error).message) })
     } finally {
       optimizeInFlightRef.current = false
       setLoading(false)
@@ -408,7 +418,7 @@ export default function OptimizePage({
       setPhase('final')
       setLastGeneratedSignature(buildOptimizeSignature(mergeOperators(license.operators, newOverrides), activeConfig))
     } catch (e) {
-      setInlineError({ scope: 'apply', message: '优化失败: ' + (e as Error).message })
+      setInlineError({ scope: 'apply', message: formatOptimizeError((e as Error).message) })
     } finally {
       optimizeInFlightRef.current = false
       setLoading(false)
@@ -889,6 +899,12 @@ async function readResponseError(response: Response, fallback: string): Promise<
   } catch {
     return fallback
   }
+}
+
+function formatOptimizeError(message: string): string {
+  return message.includes('冻结') || message.includes('被冻结') || message.includes('已拦截')
+    ? message
+    : `优化失败: ${message}`
 }
 
 function formatLocalDate(date: Date): string {

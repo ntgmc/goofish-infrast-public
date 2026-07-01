@@ -88,6 +88,7 @@ export interface OptimizeRequest {
   operators: LicenseOperator[];
   config: LicenseConfig;
   ignore_elite: boolean;
+  activation_token?: string;
   include_current?: boolean;
   suggestions_only?: boolean;
   upgrade_task_payload?: UpgradeTaskPayload;
