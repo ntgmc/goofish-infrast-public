@@ -214,7 +214,7 @@ export default function OptimizePage({
     try {
       const nextOperators = parseOperatorsFile(await file.text())
       const confirmed = window.confirm(
-        `确认替换当前授权内的干员数据？\n\n新文件识别到 ${nextOperators.length} 名干员。继续后会清空当前练度调整。单账号终身版每 7 天最多更新 2 次，并会校验账号与设备绑定。`
+`确认替换当前授权内的干员数据？\n\n新文件识别到 ${nextOperators.length} 名干员。继续后会清空当前练度调整。单账号终身卡每 7 天最多更新 2 次，并会校验账号与设备绑定。`
       )
       if (!confirmed) {
         if (operatorFileRef.current) {
@@ -623,7 +623,7 @@ export default function OptimizePage({
                 ? currentResultIsRotation
                   ? '无需应用升级建议，请按排班详情在游戏内手动设置。'
                   : '无需应用升级建议，可直接下载优化结果。'
-                : '推荐版不包含练度提升建议，可直接下载当前练度优化结果。'}
+: '单次重置卡不包含练度提升建议，可直接下载当前练度优化结果。'}
             </p>
           </div>
           <ResultPanel result={currentResult!} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />

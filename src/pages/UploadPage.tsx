@@ -938,7 +938,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
                 ? `${validatedCdk.permission_label}可在生成授权文件前调整基建配置。`
                 : cdkCanEditLimitedConfig
                   ? `${validatedCdk.permission_label}可选择预设、填写中间产物库存并修改换班间隔；库存不足时仅微调一个制造站产物。`
-          : `${validatedCdk.permission_label}仅支持预设配置，单账号终身版以上可自定义基建配置。`}
+: `${validatedCdk.permission_label}仅支持预设配置，单账号终身卡可自定义基建配置。`}
       />
           </div>
 
@@ -951,7 +951,7 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
                 className="mt-1 h-4 w-4 flex-shrink-0 accent-brand-500"
               />
               <span>
-            我确认 CDK 仅可首次兑换一次；单账号终身版后续可更新干员数据，但受每 7 天 2 次与账号绑定风控限制。
+我确认 CDK 仅可首次兑换一次；单账号终身卡后续可更新干员数据，但受每 7 天 2 次与账号绑定风控限制。
           </span>
             </label>
             <button

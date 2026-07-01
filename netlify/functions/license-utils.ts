@@ -822,8 +822,8 @@ export async function recordAdvancedOperatorUpdate(
       ok: false,
       status: 429,
       message: limitCheck.limit.next_available_at
-        ? `单账号终身版每 7 天最多更新 2 次干员数据，请在 ${limitCheck.limit.next_available_at} 后再试。`
-        : '单账号终身版每 7 天最多更新 2 次干员数据，请稍后再试。',
+? `单账号终身卡每 7 天最多更新 2 次干员数据，请在 ${limitCheck.limit.next_available_at} 后再试。`
+: '单账号终身卡每 7 天最多更新 2 次干员数据，请稍后再试。',
       record: binding.record,
       limit: limitCheck.limit,
     }

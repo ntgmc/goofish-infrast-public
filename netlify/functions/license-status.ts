@@ -19,11 +19,11 @@ import {
 import type { OperatorUpdateGrant } from '../../src/lib/types'
 
 const PERMISSION_LABELS: Record<string, string> = {
-  recommended: '推荐版',
-  growth: '成长版',
-  advanced: '单账号终身版',
-  ultimate: '尊享版',
-  admin: 'Admin',
+recommended: '单次重置卡',
+growth: '练度提升卡',
+advanced: '单账号终身卡',
+ultimate: 'Admin卡',
+admin: 'Admin卡',
 }
 
 export default async (req: Request, _context: Context): Promise<Response> => {
