@@ -3,10 +3,11 @@ import type { Announcement, FreePreviewResult, LicenseConfig, LicenseFile, Licen
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import BuildMetaStrip from '../components/BuildMetaStrip'
+import { downloadLicenseFile } from '../lib/download'
 
 interface Props {
   onFileLoaded: (content: string) => Promise<void>;
-  onLicenseRedeemed: (license: LicenseFile) => void;
+  onLicenseRedeemed: (license: LicenseFile, licenseFileContent: string) => void;
   error: string | null;
   announcement: Announcement | null;
 }
@@ -491,7 +492,7 @@ function PreviewMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: LicenseFile) => void }) {
+function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: LicenseFile, licenseFileContent: string) => void }) {
   const [code, setCode] = useState('')
   const [validatedCdk, setValidatedCdk] = useState<{ permission: string; permission_label: string } | null>(null)
   const [operators, setOperators] = useState<LicenseOperator[] | null>(null)
@@ -610,8 +611,8 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
       if (!data.license_file_content || !data.license) {
         throw new Error('兑换响应缺少授权文件。')
       }
-      downloadLicense(data.license_file_content, data.license.order_hash)
-      onLicenseRedeemed(data.license)
+      downloadLicenseFile(data.license_file_content, data.license.order_hash)
+      onLicenseRedeemed(data.license, data.license_file_content)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -977,12 +978,3 @@ function parseOperatorsText(text: string): LicenseOperator[] {
   return data as LicenseOperator[]
 }
 
-function downloadLicense(content: string, orderHash: string) {
-  const blob = new Blob([content], { type: 'application/octet-stream' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `maa-license-${orderHash.slice(0, 8)}.maa`
-  a.click()
-  URL.revokeObjectURL(url)
-}

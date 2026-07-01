@@ -21,6 +21,8 @@ interface Props {
   setConfigOverride: (v: LicenseConfig | null) => void;
   onReset: () => void;
   announcement: Announcement | null;
+  redeemedNotice: string | null;
+  onRedownloadLicense: (() => void) | null;
 }
 
 interface LicenseStatusResponse {
@@ -40,6 +42,8 @@ export default function OptimizePage({
   setConfigOverride,
   onReset,
   announcement,
+  redeemedNotice,
+  onRedownloadLicense,
 }: Props) {
   const [suggestions, setSuggestions] = useState<UpgradeSuggestion[]>([])
   const [currentResult, setCurrentResult] = useState<OptimizeResult | null>(null)
@@ -432,6 +436,21 @@ export default function OptimizePage({
       </header>
 
       <AnnouncementBanner announcement={announcement} className="mb-6" />
+
+      {redeemedNotice && (
+        <div role="status" className="mb-6 flex flex-col gap-3 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning sm:flex-row sm:items-center sm:justify-between">
+          <span>{redeemedNotice}</span>
+          {onRedownloadLicense && (
+            <button
+              type="button"
+              onClick={onRedownloadLicense}
+              className="self-start rounded-lg bg-warning px-3 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-warning/90 sm:self-auto"
+            >
+              重新下载授权文件
+            </button>
+          )}
+        </div>
+      )}
 
       {licenseSyncStatus && (
         <div className="mb-6 rounded-lg border border-brand-600/30 bg-brand-600/10 px-4 py-3 text-sm text-brand-300">
