@@ -3,9 +3,10 @@ import type { DailyProduction, DroneAssignment, OptimizeResult, ShiftRoom } from
 
 interface Props {
   result: OptimizeResult;
-  onDownload: () => void;
-  onSaveWorkfile: () => void;
+  onDownload?: () => void;
+  onSaveWorkfile?: () => void;
   detailDefaultOpen?: boolean;
+  variant?: 'optimize' | 'analysis';
 }
 
 const ROOM_LABELS: Record<string, string> = {
@@ -50,8 +51,16 @@ type PreparedPlan = OptimizeResult['plans'][number] & {
   rows: RoomRow[];
 }
 
-export default function ResultPanel({ result, onDownload, onSaveWorkfile, detailDefaultOpen = false }: Props) {
+export default function ResultPanel({
+  result,
+  onDownload,
+  onSaveWorkfile,
+  detailDefaultOpen = false,
+  variant = 'optimize',
+}: Props) {
   const isRotationMode = result.schedule_mode === 'rotation'
+  const isAnalysis = variant === 'analysis' || result.analysis_summary?.source === 'imported_schedule'
+  const analysisSummary = result.analysis_summary
   const { totalEff, plans, productionStats, detailStats } = useMemo(() => {
     const totalEff = result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
     const plans: PreparedPlan[] = result.plans.map((plan) => ({
@@ -109,35 +118,41 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
     <div className="space-y-8">
       <div className="bg-surface-1 rounded-xl p-5 sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-ink-primary">
-              排班方案已就绪
-            </h2>
-            <p className="mt-1 text-sm text-ink-secondary">
-              {result.schedule_mode_name ?? 'MAA排班表'} · {result.planTimes ?? `${detailStats.planCount} 个班次`}。
-              {isRotationMode
-                ? '按下方排班详情在游戏内手动设置；保存进度文件后，下次可直接上传继续调整。'
-                : '排班 JSON 用于导入或交给 MAA 使用；保存进度文件后，下次可直接上传继续调整。'}
-            </p>
-          </div>
-        <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
-          {!isRotationMode && (
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-ink-primary">
+            {isAnalysis ? '排班表分析完成' : '排班方案已就绪'}
+          </h2>
+          <p className="mt-1 text-sm text-ink-secondary">
+            {result.schedule_mode_name ?? 'MAA排班表'} · {result.planTimes ?? `${detailStats.planCount} 个班次`}。
+            {isAnalysis
+              ? '已根据导入排班表计算红脸风险、日产量和爆仓信息。'
+              : isRotationMode
+              ? '按下方排班详情在游戏内手动设置；保存进度文件后，下次可直接上传继续调整。'
+              : '排班 JSON 用于导入或交给 MAA 使用；保存进度文件后，下次可直接上传继续调整。'}
+          </p>
+        </div>
+        {(onDownload || onSaveWorkfile) && (
+          <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
+          {!isAnalysis && !isRotationMode && onDownload && (
             <button
-                type="button"
-                onClick={onDownload}
+              type="button"
+              onClick={onDownload}
                 className="rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
               >
-                下载排班 JSON
-              </button>
-            )}
+              下载排班 JSON
+            </button>
+          )}
+          {!isAnalysis && onSaveWorkfile && (
             <button
               type="button"
               onClick={onSaveWorkfile}
               className="rounded-xl bg-surface-2 px-5 py-3 font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
             >
               保存进度文件
-          </button>
-        </div>
+            </button>
+          )}
+          </div>
+        )}
       </div>
       <div className="mt-5 grid gap-3 rounded-lg border border-brand-500/30 bg-brand-500/10 p-4 text-sm sm:grid-cols-3">
         <div>
@@ -165,7 +180,19 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
     </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="预计总效率" value={totalEff.toFixed(2)} suffix="%" highlight />
+        {isAnalysis ? (
+          <MetricCard
+            label="红脸风险"
+            value={String(analysisSummary?.red_face_risk_count ?? 0)}
+            suffix="处"
+            note={(analysisSummary?.red_face_operator_count ?? 0) > 0
+              ? `${analysisSummary?.red_face_operator_count ?? 0} 名干员：${(analysisSummary?.red_face_operators ?? []).slice(0, 4).join('、')}${(analysisSummary?.red_face_operators?.length ?? 0) > 4 ? '等' : ''}`
+              : '未发现红脸风险'}
+            highlight={(analysisSummary?.red_face_risk_count ?? 0) > 0}
+          />
+        ) : (
+          <MetricCard label="预计总效率" value={totalEff.toFixed(2)} suffix="%" highlight />
+        )}
         <MetricCard
           label="制造站产量"
           value={formatAmount(productionStats.manufacturingTotal)}
@@ -179,12 +206,23 @@ export default function ResultPanel({ result, onDownload, onSaveWorkfile, detail
           note={`赤金净变动 ${formatSigned(productionStats.goldNet)}${productionStats.orundum > 0 ? `，合成玉 ${formatAmount(productionStats.orundum)}` : ''}`}
         />
         <MetricCard
-          label="无人机收益"
-          value={productionStats.droneGain.value}
-          suffix={productionStats.droneGain.suffix}
-          note={productionStats.droneGain.note}
+          label={isAnalysis ? '爆仓概览' : '无人机收益'}
+          value={isAnalysis ? String((analysisSummary?.overflow.trading_rooms ?? 0) + (analysisSummary?.overflow.manufacturing_rooms ?? 0)) : productionStats.droneGain.value}
+          suffix={isAnalysis ? '房间' : productionStats.droneGain.suffix}
+          note={isAnalysis ? formatOverflowSummary(analysisSummary?.overflow) : productionStats.droneGain.note}
         />
       </div>
+
+      {isAnalysis && analysisSummary?.warnings.length ? (
+        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4">
+          <p className="text-sm font-semibold text-warning">分析提示</p>
+          <ul className="mt-2 space-y-1 text-sm leading-6 text-ink-secondary">
+            {analysisSummary.warnings.slice(0, 5).map((warning, index) => (
+              <li key={`${warning}-${index}`}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <details className="overflow-hidden rounded-xl bg-surface-1" open={detailDefaultOpen || isRotationMode}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
@@ -381,6 +419,15 @@ function formatProductionBreakdown(manufacturing: Record<string, number>): strin
     })
     .filter(Boolean)
   return parts.length > 0 ? parts.join('，') : '暂无制造站产出'
+}
+
+function formatOverflowSummary(overflow: NonNullable<OptimizeResult['analysis_summary']>['overflow'] | undefined): string {
+  if (!overflow) return '暂无爆仓信息'
+  const parts = [
+    overflow.earliest_trading_full_time ? `贸易最短 ${overflow.earliest_trading_full_time}` : '',
+    overflow.earliest_manufacturing_full_time ? `制造最短 ${overflow.earliest_manufacturing_full_time}` : '',
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join('，') : '暂无爆仓信息'
 }
 
 type DroneGainSummary = {
