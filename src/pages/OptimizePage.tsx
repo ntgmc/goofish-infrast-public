@@ -54,6 +54,7 @@ export default function OptimizePage({
   const [operatorUploadStatus, setOperatorUploadStatus] = useState<string | null>(null)
   const [licenseSyncing, setLicenseSyncing] = useState(true)
   const [licenseSyncStatus, setLicenseSyncStatus] = useState<string | null>(null)
+  const [configPanelOpen, setConfigPanelOpen] = useState(false)
   const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const operatorFileRef = useRef<HTMLInputElement>(null)
@@ -75,6 +76,7 @@ export default function OptimizePage({
   )
   const configValidation = useMemo(() => validateConfig(activeConfig), [activeConfig])
   const configValidationMessage = configValidation.ok === false ? configValidation.message : null
+  const configPanelForcedOpen = !configValidation.ok
 
   const mergedOperators = useMemo(
     () => mergeOperators(license.operators, eliteOverrides),
@@ -89,6 +91,12 @@ export default function OptimizePage({
   const currentResultIsRotation = normalizeScheduleMode(currentResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
   const finalResultIsRotation = normalizeScheduleMode(finalResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
   const serverBuildMeta = finalResult?.build_meta ?? currentResult?.build_meta
+
+  useEffect(() => {
+    if (configPanelForcedOpen) {
+      setConfigPanelOpen(true)
+    }
+  }, [configPanelForcedOpen])
 
   const clearGeneratedResult = useCallback(() => {
     setSuggestions([])
@@ -203,13 +211,13 @@ export default function OptimizePage({
     mutate(next)
     next.layout = `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
     setConfigOverride(next)
-    clearGeneratedResult()
-  }, [activeConfig, clearGeneratedResult, setConfigOverride, userCanEditConfig])
+    setInlineError(null)
+  }, [activeConfig, setConfigOverride, userCanEditConfig])
 
   const resetConfig = useCallback(() => {
     setConfigOverride(null)
-    clearGeneratedResult()
-  }, [clearGeneratedResult, setConfigOverride])
+    setInlineError(null)
+  }, [setConfigOverride])
 
   const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false) => {
     const payload: OptimizeRequest = {
@@ -314,6 +322,10 @@ export default function OptimizePage({
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
     if (loading || optimizeInFlightRef.current) return
+    if (!resultIsCurrent) {
+      setInlineError({ scope: 'apply', message: '基建配置已修改，请先重新计算排班后再应用练度建议。' })
+      return
+    }
     optimizeInFlightRef.current = true
     setInlineError(null)
     const startedAt = Date.now()
@@ -363,7 +375,7 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [activeConfig, eliteOverrides, loading, suggestions, license, setEliteOverrides])
+  }, [activeConfig, eliteOverrides, loading, resultIsCurrent, suggestions, license, setEliteOverrides])
 
   const handleDownloadMAA = useCallback(() => {
     const data = finalResult || currentResult
@@ -476,7 +488,12 @@ export default function OptimizePage({
 
       <details
         className="mt-6 rounded-xl bg-surface-1"
-        open={!configValidation.ok}
+        open={configPanelForcedOpen || configPanelOpen}
+        onToggle={(event) => {
+          if (!configPanelForcedOpen) {
+            setConfigPanelOpen(event.currentTarget.open)
+          }
+        }}
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
           <span className="flex flex-wrap items-center gap-2">
