@@ -261,6 +261,7 @@ export interface ShiftPlan {
     order: string;
     status?: string;
     reason?: string;
+    mood_recovery?: Record<string, unknown>;
   };
   drones?: DroneAssignment;
   mood_valid?: boolean;
@@ -270,6 +271,9 @@ export interface ShiftPlan {
     shift_hours?: number;
     resting_operator_recovers_full?: boolean;
     fiammetta_target_recovers_full?: boolean;
+    dormitory_recovery_calculated?: boolean;
+    dormitory_default_level?: number;
+    dormitory_default_ambience?: number;
   };
 }
 
