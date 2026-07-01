@@ -82,6 +82,7 @@ export default function OptimizePage({
   const configValidation = useMemo(() => validateConfig(activeConfig), [activeConfig])
   const configValidationMessage = configValidation.ok === false ? configValidation.message : null
   const configPanelForcedOpen = !configValidation.ok
+  const configPresetLabel = useMemo(() => formatConfigPresetLabel(activeConfig), [activeConfig])
 
   const clearConfigValidationToast = useCallback(() => {
     if (configToastTimerRef.current !== null) {
@@ -478,7 +479,7 @@ export default function OptimizePage({
             </span>
           </div>
           <p className="text-ink-secondary text-sm">
-            配置: {userCanEditConfig ? activeConfig.desc : '预设产物微调'} · ID: {license.order_hash.slice(0, 8)}...
+            配置: {userCanEditConfig ? activeConfig.desc : configPresetLabel} · ID: {license.order_hash.slice(0, 8)}...
           </p>
           <BuildMetaStrip meta={serverBuildMeta} placement="corner" />
         </div>
@@ -553,7 +554,7 @@ export default function OptimizePage({
           <span className="text-xs font-medium text-ink-muted">
             {userCanEditConfig
               ? `${SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · ${activeConfig.layout} · ${activeConfig.desc}`
-              : '预设产物微调'}
+              : configPresetLabel}
           </span>
         </summary>
         <div className="border-t border-surface-3/60 p-4 sm:p-5">
@@ -718,7 +719,7 @@ function CommandBand({
                 <span className="rounded-full bg-surface-2 px-2.5 py-1">{config.desc}</span>
               </>
             ) : (
-              <span className="rounded-full bg-surface-2 px-2.5 py-1">预设产物微调</span>
+              <span className="rounded-full bg-surface-2 px-2.5 py-1">{formatConfigPresetLabel(config)}</span>
             )}
             {configChanged && (
               <span className="rounded-full bg-warning/10 px-2.5 py-1 text-warning">配置已调整</span>
@@ -763,6 +764,15 @@ function CommandBand({
 
 function buildOptimizeSignature(operators: LicenseOperator[], config: LicenseConfig): string {
   return canonicalJson({ operators, config })
+}
+
+function formatConfigPresetLabel(config: LicenseConfig): string {
+  const layout = String(config.layout || `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`)
+  const compactLayout = layout.replace(/-/g, '')
+  const presetLayout = compactLayout === '243' || compactLayout === '333' ? compactLayout : layout
+  const trading = config.product_requirements?.trading_stations ?? {}
+  const suffix = (trading.Orundum ?? 0) > 0 ? '搓玉' : '均衡'
+  return `${presetLayout} ${suffix}`
 }
 
 function waitForProgressCompletion(): Promise<void> {
