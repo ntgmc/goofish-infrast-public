@@ -3,9 +3,9 @@
 export const APP_BUILD_META = {
   "frontend_version": "1.0.74",
   "backend_version": "1.0.74",
-  "data_version": "data.0db7627899dd",
-  "generated_at": "2026-06-22T10:51:45.732Z",
-  "source_summary": "source=netlify/functions/efficiency-data.json; sha256=0db7627899dd; workplaces=14; trading_rule_groups=7; manufacturing_rule_groups=9; control_center_rules=13",
+  "data_version": "data.576c1b571c48",
+  "generated_at": "2026-07-01T06:53:41.104Z",
+  "source_summary": "source=netlify/functions/efficiency-data.json; sha256=576c1b571c48; workplaces=14; trading_rule_groups=7; manufacturing_rule_groups=9; control_center_rules=13",
   "git_sha": null,
   "build_context": "local"
 } as const;
