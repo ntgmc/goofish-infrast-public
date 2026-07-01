@@ -112,7 +112,10 @@ export default function AdminPage() {
     }
   }, [credentials])
 
-  const summary = useMemo(() => buildSummary(records, usageStats?.totals, users.length), [records, usageStats, users.length])
+const summary = useMemo(
+() => buildSummary(records, usageStats?.totals, usageStats?.days ?? [], users.length),
+[records, usageStats, users.length],
+)
   const visibleRecords = useMemo(
     () => records.filter((record) => statusFilter === 'all' || record.status === statusFilter),
     [records, statusFilter],
@@ -389,9 +392,11 @@ export default function AdminPage() {
                     <h2 className="text-base font-semibold text-ink-primary">7 日趋势</h2>
                     <span className="text-xs text-ink-muted">访问 / 生成 / 兑换</span>
                   </div>
-                  <div className="mt-5 flex h-52 items-end gap-2">
-                    {(usageStats?.days ?? []).map((day) => <UsageBar key={day.date} day={day} max={summary.maxDailyActivity} />)}
-                  </div>
+<div className="mt-5 flex h-52 items-end gap-2 overflow-hidden">
+{(usageStats?.days ?? []).length > 0
+? (usageStats?.days ?? []).map((day) => <UsageBar key={day.date} day={day} max={summary.maxDailyActivity} />)
+: <div className="flex h-full w-full items-center justify-center rounded-lg bg-surface-2 text-sm text-ink-muted">暂无趋势数据</div>}
+</div>
                 </section>
                 <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
                   <h2 className="text-base font-semibold text-ink-primary">运营摘要</h2>
@@ -583,10 +588,12 @@ function Metric({ label, value, tone = 'default' }: { label: string; value: numb
 }
 
 function UsageBar({ day, max }: { day: UsageDay; max: number }) {
-  const height = Math.max(8, Math.round(((day.visits + day.schedule_generates + day.cdk_redeems) / Math.max(1, max)) * 100))
-  return <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
-    <div className="flex h-40 w-full items-end rounded-lg bg-surface-2 px-1">
-      <div className="w-full rounded-md bg-brand-500" style={{ height: `${height}%` }} title={`${day.date}: ${day.visits} 访问, ${day.schedule_generates} 生成, ${day.cdk_redeems} 兑换`} />
+const activity = day.visits + day.schedule_generates + day.cdk_redeems
+const percentage = Math.round((activity / Math.max(1, max)) * 100)
+const height = Math.min(100, Math.max(activity > 0 ? 8 : 0, percentage))
+return <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
+<div className="flex h-40 w-full items-end rounded-lg bg-surface-2 px-1">
+<div className="w-full rounded-md bg-brand-500" style={{ height: `${height}%` }} title={`${day.date}: ${day.visits} 访问, ${day.schedule_generates} 生成, ${day.cdk_redeems} 兑换`} />
     </div>
     <div className="truncate text-xs text-ink-muted">{day.date.slice(5)}</div>
   </div>
@@ -616,14 +623,13 @@ function SmallButton({ children, onClick, loading, tone = 'default' }: { childre
   return <button type="button" onClick={onClick} disabled={loading} className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150 disabled:bg-surface-3 disabled:text-ink-muted ${className}`}>{loading ? '处理中' : children}</button>
 }
 
-function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0) {
-  const daysActivity = 0
-  const totalCdks = records.length
-  const usedCdks = records.filter((record) => record.status === 'used').length
-  const frozenCdks = records.filter((record) => record.status === 'frozen').length
-  const riskEvents = records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
-  const boundDevices = records.filter((record) => record.activation_bound).length
-  const maxDailyActivity = Math.max(1, ...(usage ? [] : [daysActivity]))
+function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, days: UsageDay[] = [], adminUsers = 0) {
+const totalCdks = records.length
+const usedCdks = records.filter((record) => record.status === 'used').length
+const frozenCdks = records.filter((record) => record.status === 'frozen').length
+const riskEvents = records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
+const boundDevices = records.filter((record) => record.activation_bound).length
+const maxDailyActivity = Math.max(1, ...days.map((day) => day.visits + day.schedule_generates + day.cdk_redeems))
   return {
     totalCdks,
     usedCdks,
