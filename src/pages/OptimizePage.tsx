@@ -56,9 +56,12 @@ export default function OptimizePage({
   const [licenseSyncStatus, setLicenseSyncStatus] = useState<string | null>(null)
   const [configPanelOpen, setConfigPanelOpen] = useState(false)
   const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
+  const [configToast, setConfigToast] = useState<{ id: number; message: string } | null>(null)
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const operatorFileRef = useRef<HTMLInputElement>(null)
   const optimizeInFlightRef = useRef(false)
+  const configToastTimerRef = useRef<number | null>(null)
+  const configToastIdRef = useRef(0)
   const pendingLicenseSyncRef = useRef<{ license: LicenseFile; message: string } | null>(null)
 
   const permission = getPermissionMode(license)
@@ -77,6 +80,34 @@ export default function OptimizePage({
   const configValidation = useMemo(() => validateConfig(activeConfig), [activeConfig])
   const configValidationMessage = configValidation.ok === false ? configValidation.message : null
   const configPanelForcedOpen = !configValidation.ok
+
+  const clearConfigValidationToast = useCallback(() => {
+    if (configToastTimerRef.current !== null) {
+      window.clearTimeout(configToastTimerRef.current)
+      configToastTimerRef.current = null
+    }
+    setConfigToast(null)
+  }, [])
+
+  const showConfigValidationToast = useCallback((message: string) => {
+    if (configToastTimerRef.current !== null) {
+      window.clearTimeout(configToastTimerRef.current)
+    }
+    configToastIdRef.current += 1
+    setConfigToast({ id: configToastIdRef.current, message })
+    configToastTimerRef.current = window.setTimeout(() => {
+      setConfigToast(null)
+      configToastTimerRef.current = null
+    }, 4200)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (configToastTimerRef.current !== null) {
+        window.clearTimeout(configToastTimerRef.current)
+      }
+    }
+  }, [])
 
   const mergedOperators = useMemo(
     () => mergeOperators(license.operators, eliteOverrides),
@@ -211,13 +242,20 @@ export default function OptimizePage({
     mutate(next)
     next.layout = `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
     setConfigOverride(next)
+    const nextValidation = validateConfig(next)
+    if (nextValidation.ok) {
+      clearConfigValidationToast()
+    } else {
+      showConfigValidationToast(nextValidation.message)
+    }
     setInlineError(null)
-  }, [activeConfig, setConfigOverride, userCanEditConfig])
+  }, [activeConfig, clearConfigValidationToast, setConfigOverride, showConfigValidationToast, userCanEditConfig])
 
   const resetConfig = useCallback(() => {
     setConfigOverride(null)
+    clearConfigValidationToast()
     setInlineError(null)
-  }, [setConfigOverride])
+  }, [clearConfigValidationToast, setConfigOverride])
 
   const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false) => {
     const payload: OptimizeRequest = {
@@ -258,7 +296,7 @@ export default function OptimizePage({
     if (licenseSyncing || loading || optimizeInFlightRef.current) return
     if (hasResult && lastGeneratedSignature === optimizeSignature) return
     if (configValidationMessage) {
-      setInlineError({ scope: 'generate', message: configValidationMessage })
+      showConfigValidationToast(configValidationMessage)
       return
     }
     optimizeInFlightRef.current = true
@@ -318,7 +356,7 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [configValidationMessage, flushPendingLicenseSync, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, runOptimize, runUpgradeSuggestions, userCanUseUpgradeFeatures])
+  }, [configValidationMessage, flushPendingLicenseSync, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, runOptimize, runUpgradeSuggestions, showConfigValidationToast, userCanUseUpgradeFeatures])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
     if (loading || optimizeInFlightRef.current) return
@@ -424,6 +462,7 @@ export default function OptimizePage({
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
+      {configToast && <ConfigValidationToast key={configToast.id} message={configToast.message} />}
       <header className="flex flex-col gap-5 mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -648,8 +687,6 @@ function CommandBand({
   onGenerate: () => void;
   onReset: () => void;
 }) {
-  const validationMessage = validation.ok === false ? validation.message : null
-
   return (
     <section className="rounded-xl bg-surface-1 p-5 sm:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -700,10 +737,7 @@ function CommandBand({
       {loading && progress && (
         <ScheduleProgress progress={progress} className="mt-5" />
       )}
-      {validationMessage && (
-        <InlineErrorPanel message={validationMessage} onRetry={onGenerate} onReset={onReset} />
-      )}
-      {error && !validationMessage && (
+      {error && (
         <InlineErrorPanel message={error} onRetry={onGenerate} onReset={onReset} />
       )}
     </section>
@@ -716,6 +750,21 @@ function buildOptimizeSignature(operators: LicenseOperator[], config: LicenseCon
 
 function waitForProgressCompletion(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, SCHEDULE_PROGRESS_COMPLETION_DURATION_MS))
+}
+
+function ConfigValidationToast({ message }: { message: string }) {
+  return (
+    <div
+      className="config-validation-toast pointer-events-none fixed left-4 right-4 top-4 z-50 mx-auto max-w-xl sm:left-auto sm:right-6 sm:top-6 sm:mx-0"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="rounded-lg border border-error/30 bg-surface-1/95 px-4 py-3 shadow-[0_4px_8px_rgba(15,23,42,0.08)] backdrop-blur-sm">
+        <p className="text-sm font-semibold text-error">处理失败</p>
+        <p className="mt-1 text-sm leading-6 text-ink-secondary">{message}</p>
+      </div>
+    </div>
+  )
 }
 
 function InlineErrorPanel({
