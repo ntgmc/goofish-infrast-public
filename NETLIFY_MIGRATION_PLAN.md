@@ -14,7 +14,7 @@
 | API 路由 | `server/routes.ts` 显式注册 `/api/*` 路由 |
 | 主存储 | PostgreSQL |
 | 旧数据来源 | 历史 Netlify Blobs 导出 JSON |
-| 旧 Netlify 配置 | 仅作为遗留回滚配置保留，不参与当前生产链路 |
+| 旧 Netlify 配置 | 当前仅用于把历史 Netlify 域名永久跳转到 `https://maatool.com/`，不参与生产链路 |
 
 ## 当前请求链路
 
@@ -230,4 +230,4 @@ WantedBy=multi-user.target
 - `MAA_ADMIN_SECRET` 和 `CDK_HASH_SECRET` 与历史环境一致。
 - DNS 或反向代理切换路径明确。
 
-除非发生严重生产故障，不建议把 Netlify 重新作为主生产链路。
+除非发生严重生产故障，不建议把 Netlify 重新作为主生产链路。当前 Netlify 站点只应保留 redirect-only 配置，避免旧前端继续暴露给用户。

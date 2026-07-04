@@ -33,7 +33,7 @@ PostgreSQL
   |-- user profiles and workspace data
 ```
 
-`netlify/` 目录目前只是历史兼容目录：部分业务处理器仍放在 `netlify/functions/` 下并由 `server/routes.ts` 复用，但生产请求由 Node 服务器直接处理，不经过 Netlify Functions。`netlify.toml` 仅作为遗留回滚配置保留。
+`netlify/` 目录目前只是历史兼容目录：部分业务处理器仍放在 `netlify/functions/` 下并由 `server/routes.ts` 复用，但生产请求由 Node 服务器直接处理，不经过 Netlify Functions。`netlify.toml` 仅用于把历史 Netlify 域名永久跳转到 `https://maatool.com/`。
 
 ## 技术栈
 
@@ -141,7 +141,7 @@ npm run check:migration
 
 ## 发布流程
 
-当前生产发布以服务器为准，不再使用 Netlify Git-based deploy。
+当前生产发布以服务器为准，不再使用 Netlify Git-based deploy。历史 Netlify 域名 `https://goofish-infrast-v1.netlify.app/` 只保留为永久跳转入口。
 
 推荐流程：
 
