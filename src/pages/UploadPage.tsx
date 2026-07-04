@@ -35,7 +35,7 @@ interface TourStep {
 
 const ANNOUNCEMENT_TOUR_STEP: TourStep = {
   target: 'announcement',
-  title: '先看站内公告',
+  title: '先看站内横幅',
   body: '如果这里有公告，请先确认维护通知、使用限制或近期变更，再继续生成授权文件。',
 }
 
@@ -71,8 +71,8 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
   const [mode, setMode] = useState<EntryMode>('preview')
   const [tourOpen, setTourOpen] = useState(false)
   const tourSteps = useMemo(
-    () => announcement?.enabled ? [ANNOUNCEMENT_TOUR_STEP, ...BASE_TOUR_STEPS] : BASE_TOUR_STEPS,
-    [announcement?.enabled],
+    () => announcement?.active ? [ANNOUNCEMENT_TOUR_STEP, ...BASE_TOUR_STEPS] : BASE_TOUR_STEPS,
+    [announcement?.active],
   )
 
   useEffect(() => {
@@ -116,7 +116,7 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
           <BuildMetaStrip placement="corner" />
         </div>
 
-        <div data-tour={announcement?.enabled ? 'announcement' : undefined}>
+        <div data-tour={announcement?.active ? 'announcement' : undefined}>
           <AnnouncementBanner announcement={announcement} className="mb-5" />
         </div>
 

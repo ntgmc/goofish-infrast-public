@@ -1,21 +1,30 @@
 import type { Context } from '@netlify/functions'
+import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { Announcement } from '../../src/lib/types'
+import type { Announcement, AnnouncementKind } from '../../src/lib/types'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
 
 const ANNOUNCEMENT_KEY = 'current.json'
-const DEFAULT_ANNOUNCEMENT: Announcement = {
-  enabled: false,
-  title: '',
-  body: '',
-  updated_at: null,
+const MAX_TITLE_LENGTH = 80
+const MAX_BODY_LENGTH = 600
+const VALID_KINDS = new Set<AnnouncementKind>(['banner', 'popup'])
+
+interface AnnouncementData {
+  announcements: Announcement[];
+}
+
+interface LegacyAnnouncement {
+  enabled?: unknown;
+  title?: unknown;
+  body?: unknown;
+  updated_at?: unknown;
 }
 
 interface AnnouncementStore {
-  get: () => Promise<Announcement | null>;
-  set: (announcement: Announcement) => Promise<void>;
+  get: () => Promise<unknown>;
+  set: (data: AnnouncementData) => Promise<void>;
 }
 
 export default async (req: Request, _context: Context): Promise<Response> => {
@@ -42,11 +51,18 @@ export default async (req: Request, _context: Context): Promise<Response> => {
 }
 
 async function handlePublicGet(): Promise<Response> {
-  const announcement = await readAnnouncement()
-  if (!announcement.enabled) {
-    return jsonResponse({ enabled: false })
-  }
-  return jsonResponse(announcement)
+  const announcements = (await readAnnouncementData()).announcements
+  const activeAnnouncements = announcements
+    .filter((item) => item.active)
+    .sort(compareNewestFirst)
+  const banner = activeAnnouncements.find((item) => item.kind === 'banner') ?? null
+  const popups = activeAnnouncements.filter((item) => item.kind === 'popup')
+
+  return jsonResponse({
+    banner,
+    popups,
+    announcements: activeAnnouncements,
+  })
 }
 
 async function handleAdminGet(req: Request): Promise<Response> {
@@ -54,64 +70,106 @@ async function handleAdminGet(req: Request): Promise<Response> {
     return jsonResponse({ error: '管理账号或密码错误。' }, 401)
   }
 
-  return jsonResponse(await readAnnouncement())
+  return jsonResponse(await readAnnouncementData())
 }
 
 async function handleAdminPut(req: Request): Promise<Response> {
-  const body = await req.json() as {
-    admin_password?: string;
-    admin_user?: string;
-    enabled?: unknown;
-    title?: unknown;
-    body?: unknown;
-  }
-  if (!(await authenticateAdminRequest(req, body))) {
+  if (!(await authenticateAdminRequest(req))) {
     return jsonResponse({ error: '管理账号或密码错误。' }, 401)
   }
 
-  const validation = validateAnnouncementInput(body)
+  const body = await req.json() as { announcements?: unknown }
+  const current = await readAnnouncementData()
+  const validation = validateAnnouncementList(body.announcements, current.announcements)
   if (!validation.ok) {
     return jsonResponse({ error: validation.message }, 400)
   }
 
-  const announcement: Announcement = {
-    ...validation.announcement,
-    updated_at: new Date().toISOString(),
+  const data: AnnouncementData = {
+    announcements: validation.announcements,
   }
   const store = await getAnnouncementStore()
-  await store.set(announcement)
+  await store.set(data)
 
-  return jsonResponse(announcement)
+  return jsonResponse(data)
 }
 
-function validateAnnouncementInput(value: {
-  enabled?: unknown;
-  title?: unknown;
-  body?: unknown;
-}): { ok: true; announcement: Omit<Announcement, 'updated_at'> } | { ok: false; message: string } {
-  if (typeof value.enabled !== 'boolean') {
-    return { ok: false, message: '公告启用状态必须是布尔值。' }
+function validateAnnouncementList(
+  value: unknown,
+  current: Announcement[],
+): { ok: true; announcements: Announcement[] } | { ok: false; message: string } {
+  if (!Array.isArray(value)) {
+    return { ok: false, message: '公告列表格式不正确。' }
   }
 
-  const title = typeof value.title === 'string' ? value.title.trim() : ''
-  const body = typeof value.body === 'string' ? value.body.trim() : ''
-  if (title.length > 80) {
-    return { ok: false, message: '公告标题不能超过 80 字。' }
-  }
-  if (body.length > 600) {
-    return { ok: false, message: '公告正文不能超过 600 字。' }
-  }
-  if (value.enabled && (!title || !body)) {
-    return { ok: false, message: '启用公告时必须填写标题和正文。' }
+  const now = new Date().toISOString()
+  const currentById = new Map(current.map((item) => [item.id, item]))
+  const usedIds = new Set<string>()
+  const announcements: Announcement[] = []
+
+  for (const [index, raw] of value.entries()) {
+    if (!raw || typeof raw !== 'object') {
+      return { ok: false, message: `第 ${index + 1} 条公告格式不正确。` }
+    }
+
+    const item = raw as Record<string, unknown>
+    const kind = item.kind
+    if (kind !== 'banner' && kind !== 'popup') {
+      return { ok: false, message: `第 ${index + 1} 条公告类型不正确。` }
+    }
+
+    const title = typeof item.title === 'string' ? item.title.trim() : ''
+    const body = typeof item.body === 'string' ? item.body.trim() : ''
+    const active = item.active === true
+
+    if (title.length > MAX_TITLE_LENGTH) {
+      return { ok: false, message: `第 ${index + 1} 条公告标题不能超过 ${MAX_TITLE_LENGTH} 字。` }
+    }
+    if (body.length > MAX_BODY_LENGTH) {
+      return { ok: false, message: `第 ${index + 1} 条公告正文不能超过 ${MAX_BODY_LENGTH} 字。` }
+    }
+    if (active && (!title || !body)) {
+      return { ok: false, message: `第 ${index + 1} 条公告启用时必须填写标题和正文。` }
+    }
+
+    let id = typeof item.id === 'string' && item.id.trim() ? item.id.trim() : createAnnouncementId()
+    while (usedIds.has(id)) id = createAnnouncementId()
+    usedIds.add(id)
+
+    const previous = currentById.get(id)
+    const createdAt = normalizeIsoString(item.created_at) ?? previous?.created_at ?? now
+    const updatedAt = hasAnnouncementChanged(previous, { kind, active, title, body })
+      ? now
+      : normalizeIsoString(item.updated_at) ?? previous?.updated_at ?? now
+
+    announcements.push({
+      id,
+      kind,
+      active,
+      title,
+      body,
+      created_at: createdAt,
+      updated_at: updatedAt,
+    })
   }
 
-  return { ok: true, announcement: { enabled: value.enabled, title, body } }
+  return { ok: true, announcements }
 }
 
-async function readAnnouncement(): Promise<Announcement> {
+function hasAnnouncementChanged(
+  previous: Announcement | undefined,
+  next: Pick<Announcement, 'kind' | 'active' | 'title' | 'body'>,
+): boolean {
+  if (!previous) return true
+  return previous.kind !== next.kind
+    || previous.active !== next.active
+    || previous.title !== next.title
+    || previous.body !== next.body
+}
+
+async function readAnnouncementData(): Promise<AnnouncementData> {
   const store = await getAnnouncementStore()
-  const announcement = await store.get()
-  return normalizeAnnouncement(announcement)
+  return normalizeAnnouncementData(await store.get())
 }
 
 async function getAnnouncementStore(): Promise<AnnouncementStore> {
@@ -119,27 +177,96 @@ async function getAnnouncementStore(): Promise<AnnouncementStore> {
     const { getStore } = await import('@netlify/blobs')
     const store = getStore('maa-announcements')
     return {
-      get: async () => await store.get(ANNOUNCEMENT_KEY, { type: 'json' }) as Announcement | null,
-      set: async (announcement) => {
-        await store.setJSON(ANNOUNCEMENT_KEY, announcement)
+      get: async () => await store.get(ANNOUNCEMENT_KEY, { type: 'json' }),
+      set: async (data) => {
+        await store.setJSON(ANNOUNCEMENT_KEY, data)
       },
     }
   }
 
   return {
-    get: async () => readLocalAnnouncement(),
-    set: async (announcement) => writeLocalAnnouncement(announcement),
+    get: async () => readLocalAnnouncementData(),
+    set: async (data) => writeLocalAnnouncementData(data),
   }
 }
 
-function normalizeAnnouncement(value: Announcement | null): Announcement {
-  if (!value || typeof value !== 'object') return DEFAULT_ANNOUNCEMENT
-  return {
-    enabled: value.enabled === true,
-    title: typeof value.title === 'string' ? value.title : '',
-    body: typeof value.body === 'string' ? value.body : '',
-    updated_at: typeof value.updated_at === 'string' ? value.updated_at : null,
+function normalizeAnnouncementData(value: unknown): AnnouncementData {
+  if (isRecord(value) && Array.isArray(value.announcements)) {
+    return {
+      announcements: value.announcements
+        .map(normalizeAnnouncementItem)
+        .filter((item): item is Announcement => Boolean(item)),
+    }
   }
+
+  const legacy = normalizeLegacyAnnouncement(value)
+  return { announcements: legacy ? [legacy] : [] }
+}
+
+function normalizeAnnouncementItem(value: unknown): Announcement | null {
+  if (!isRecord(value)) return null
+  const id = typeof value.id === 'string' && value.id.trim() ? value.id.trim() : createAnnouncementId()
+  const kind = normalizeKind(value.kind)
+  if (!kind) return null
+  const title = typeof value.title === 'string' ? value.title.trim() : ''
+  const body = typeof value.body === 'string' ? value.body.trim() : ''
+  const now = new Date().toISOString()
+
+  return {
+    id,
+    kind,
+    active: value.active === true,
+    title,
+    body,
+    created_at: normalizeIsoString(value.created_at) ?? normalizeIsoString(value.updated_at) ?? now,
+    updated_at: normalizeIsoString(value.updated_at) ?? now,
+  }
+}
+
+function normalizeLegacyAnnouncement(value: unknown): Announcement | null {
+  if (!isRecord(value)) return null
+  const legacy = value as LegacyAnnouncement
+  const title = typeof legacy.title === 'string' ? legacy.title.trim() : ''
+  const body = typeof legacy.body === 'string' ? legacy.body.trim() : ''
+  const updatedAt = normalizeIsoString(legacy.updated_at) ?? new Date().toISOString()
+
+  if (!title && !body && legacy.enabled !== true) return null
+
+  return {
+    id: 'legacy-banner',
+    kind: 'banner',
+    active: legacy.enabled === true,
+    title,
+    body,
+    created_at: updatedAt,
+    updated_at: updatedAt,
+  }
+}
+
+function normalizeKind(value: unknown): AnnouncementKind | null {
+  return typeof value === 'string' && VALID_KINDS.has(value as AnnouncementKind)
+    ? value as AnnouncementKind
+    : null
+}
+
+function normalizeIsoString(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return value
+}
+
+function compareNewestFirst(a: Announcement, b: Announcement): number {
+  return Date.parse(b.updated_at) - Date.parse(a.updated_at)
+}
+
+function createAnnouncementId(): string {
+  if (typeof randomUUID === 'function') return `ann_${randomUUID()}`
+  return `ann_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
 function hasNetlifyBlobsContext(): boolean {
@@ -173,14 +300,14 @@ function localAnnouncementPath(): string {
   return join(process.cwd(), '.netlify', 'local-announcements', ANNOUNCEMENT_KEY)
 }
 
-function readLocalAnnouncement(): Announcement | null {
+function readLocalAnnouncementData(): unknown {
   const path = localAnnouncementPath()
   if (!existsSync(path)) return null
-  return JSON.parse(readFileSync(path, 'utf8')) as Announcement
+  return JSON.parse(readFileSync(path, 'utf8')) as unknown
 }
 
-function writeLocalAnnouncement(announcement: Announcement): void {
+function writeLocalAnnouncementData(data: AnnouncementData): void {
   const path = localAnnouncementPath()
   mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, JSON.stringify(announcement, null, 2), 'utf8')
+  writeFileSync(path, JSON.stringify(data, null, 2), 'utf8')
 }
