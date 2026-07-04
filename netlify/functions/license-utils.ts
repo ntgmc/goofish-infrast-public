@@ -1,6 +1,6 @@
 import { createCipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type {
   LicenseConfig,
   LicenseFile,
@@ -10,6 +10,7 @@ import type {
   ProductPermissionMode,
   RawPermissionMode,
 } from '../../src/lib/types'
+import { createPostgresCdkRecordStore } from '../../server/storage/cdk-store'
 
 const OBFUSCATE_KEY_SEED = 'maa-obfuscate-v1'
 const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const
@@ -170,91 +171,22 @@ export function jsonResponse(body: unknown, status = 200): Response {
 }
 
 export async function getCdkRecordStore(): Promise<CdkRecordStore> {
-  if (hasNetlifyBlobsContext()) {
-    const { getStore } = await import('@netlify/blobs')
-    const store = getStore('maa-cdks')
-    return {
-      get: async (key) => await store.get(key, { type: 'json' }) as CdkRecord | null,
-      set: async (key, record) => {
-        await store.setJSON(key, record)
-      },
-      delete: async (key) => {
-        await store.delete(key)
-      },
-      list: async (prefix) => {
-        const { blobs } = await store.list({ prefix })
-        const records = await Promise.all(
-          blobs.map(async ({ key }) => await store.get(key, { type: 'json' }) as CdkRecord | null),
-        )
-        return records.filter((record): record is CdkRecord => record !== null)
-      },
-    }
-  }
-
-  return {
-    get: async (key) => readLocalCdkRecord(key),
-    set: async (key, record) => writeLocalCdkRecord(key, record),
-    delete: async (key) => deleteLocalCdkRecord(key),
-    list: async (prefix) => readLocalCdkRecords(prefix),
-  }
+  const testingStore = getTestingCdkRecordStore()
+  if (testingStore) return testingStore
+  return createPostgresCdkRecordStore()
 }
 
-function hasNetlifyBlobsContext(): boolean {
-  if (process.env.NETLIFY_DEV || process.env.NODE_ENV === 'development') {
-    return false
-  }
-
-  const globalContext = (globalThis as unknown as { netlifyBlobsContext?: unknown }).netlifyBlobsContext
-  if (hasUsableBlobsContext(globalContext)) return true
-
-  const encodedContext = process.env.NETLIFY_BLOBS_CONTEXT
-  if (!encodedContext) return false
-  try {
-    const decoded = JSON.parse(Buffer.from(encodedContext, 'base64').toString('utf8')) as unknown
-    return hasUsableBlobsContext(decoded)
-  } catch {
-    return false
-  }
+export function setCdkRecordStoreForTesting(store: CdkRecordStore | null): void {
+  ;(globalThis as unknown as { __maaCdkRecordStoreForTesting?: CdkRecordStore }).__maaCdkRecordStoreForTesting =
+    store ?? undefined
 }
 
-function hasUsableBlobsContext(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return false
-  const context = value as Record<string, unknown>
-  return typeof context.siteID === 'string' &&
-    context.siteID.length > 0 &&
-    typeof context.token === 'string' &&
-    context.token.length > 0
-}
-
-function localCdkPath(key: string): string {
-  const safeParts = key.split('/').filter((part) => part && part !== '.' && part !== '..')
-  return join(process.cwd(), '.netlify', 'local-cdks', ...safeParts)
-}
-
-function readLocalCdkRecord(key: string): CdkRecord | null {
-  const path = localCdkPath(key)
-  if (!existsSync(path)) return null
-  return JSON.parse(readFileSync(path, 'utf8')) as CdkRecord
-}
-
-function writeLocalCdkRecord(key: string, record: CdkRecord): void {
-  const path = localCdkPath(key)
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, JSON.stringify(record, null, 2), 'utf8')
-}
-
-function deleteLocalCdkRecord(key: string): void {
-  const path = localCdkPath(key)
-  if (existsSync(path)) unlinkSync(path)
-}
-
-function readLocalCdkRecords(prefix: string): CdkRecord[] {
-  const dir = localCdkPath(prefix)
-  if (!existsSync(dir)) return []
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
-    .map((entry) => readLocalCdkRecord(`${prefix}${entry.name}`))
-    .filter((record): record is CdkRecord => record !== null)
+function getTestingCdkRecordStore(): CdkRecordStore | null {
+  if (process.env.NODE_ENV === 'production') return null
+  return (
+    (globalThis as unknown as { __maaCdkRecordStoreForTesting?: CdkRecordStore })
+      .__maaCdkRecordStoreForTesting ?? null
+  )
 }
 
 export function requireEnv(name: string): string {
@@ -803,6 +735,9 @@ export async function recordAdvancedOperatorUpdate(
   const binding = evaluateClientBindingRisk(record, activationToken, req)
   if (!binding.ok) {
     if (!shouldFreezeBindingRisk(binding.event)) {
+      if (binding.event.type === 'device_token_missing') {
+        return { ok: false, status: 403, message: formatBindingBlockMessage(binding.event), record: binding.record }
+      }
       const blocked = await recordSoftBlockedRiskEvent(binding.record, binding.event, formatBindingBlockMessage(binding.event))
       return { ok: false, status: 403, message: blocked.message, record: blocked.record }
     }
@@ -879,8 +814,15 @@ export async function unfreezeCdkRecord(record: CdkRecord): Promise<CdkRecord> {
 }
 
 function hashActivationToken(value: unknown): string | null {
-  if (typeof value !== 'string' || value.trim().length < 16) return null
-  return createHash('sha256').update(value.trim()).digest('hex')
+  const token = normalizeLicenseActivationToken(value)
+  if (!token) return null
+  return createHash('sha256').update(token).digest('hex')
+}
+
+function normalizeLicenseActivationToken(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const token = value.trim()
+  return token.length >= 16 ? token : null
 }
 
 function hashHeaderValue(value: string | null): string | null {
@@ -951,12 +893,14 @@ export function createSignedLicenseFile({
   config,
   permission,
   codeHash,
+  activationToken,
 }: {
   adminSecret: string;
   operators: LicenseOperator[];
   config: LicenseConfig;
   permission: PermissionMode;
   codeHash: string;
+  activationToken?: unknown;
 }): { license: LicenseFile; licenseFileContent: string } {
   const issuedAt = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
   const orderHash = createHash('sha256')
@@ -970,6 +914,7 @@ export function createSignedLicenseFile({
     operators,
     config,
     permission,
+    activation_token: normalizeLicenseActivationToken(activationToken),
     issued_at: issuedAt,
   }
   const sig = formatSig(hmacSha256(adminSecret, canonicalJson(unsigned)))
@@ -985,12 +930,15 @@ export function reissueSignedLicenseFile(
   overrides: {
     operators?: LicenseOperator[];
     operatorUpdateGrant?: OperatorUpdateGrant | null;
+    activationToken?: unknown;
   } = {},
 ): { license: LicenseFile; licenseFileContent: string } {
+  const activationToken = normalizeLicenseActivationToken(overrides.activationToken)
   const unsigned = {
     ...license,
     permission,
     ...(overrides.operators ? { operators: overrides.operators } : {}),
+    ...(activationToken ? { activation_token: activationToken } : {}),
     operator_update_grant: overrides.operatorUpdateGrant ?? null,
     issued_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
   }

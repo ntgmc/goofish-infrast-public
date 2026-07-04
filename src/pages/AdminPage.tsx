@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import type { Announcement, ProductPermissionMode, RawPermissionMode } from '../lib/types'
+import type { Announcement, AnnouncementAdminResponse, AnnouncementKind, ProductPermissionMode, RawPermissionMode } from '../lib/types'
 
 type Permission = RawPermissionMode
 type GeneratedPermission = ProductPermissionMode
@@ -50,7 +50,7 @@ interface AdminUserSummary {
   updated_at: string;
 }
 
-const EMPTY_ANNOUNCEMENT: Announcement = { enabled: false, title: '', body: '', updated_at: null }
+const EMPTY_ANNOUNCEMENTS: Announcement[] = []
 
 const permissionLabels: Record<Permission, string> = {
 recommended: '单次重置卡',
@@ -73,7 +73,7 @@ const sectionLabels: Record<AdminSection, string> = {
   overview: '总览',
   cdk: 'CDK',
   risk: '风控',
-  announcement: '公告',
+  announcement: '公告管理',
 }
 
 const cdkProductPermissions: GeneratedPermission[] = ['recommended', 'growth', 'advanced', 'ultimate']
@@ -94,7 +94,7 @@ export default function AdminPage() {
   const [records, setRecords] = useState<AdminCdkRecord[]>([])
   const [users, setUsers] = useState<AdminUserSummary[]>([])
   const [usageStats, setUsageStats] = useState<{ totals: UsageTotals; days: UsageDay[] } | null>(null)
-  const [announcement, setAnnouncement] = useState<Announcement>(EMPTY_ANNOUNCEMENT)
+  const [announcements, setAnnouncements] = useState<Announcement[]>(EMPTY_ANNOUNCEMENTS)
   const [permission, setPermission] = useState<GeneratedPermission>('growth')
   const [orderNote, setOrderNote] = useState('')
   const [generatedCode, setGeneratedCode] = useState<{ code: string; permission: GeneratedPermission; created_at: string } | null>(null)
@@ -146,7 +146,7 @@ const summary = useMemo(
       ])
       const cdkData = await readJson<{ error?: string; cdks?: AdminCdkRecord[] }>(cdkResp)
       const usageData = await readJson<{ error?: string; totals?: UsageTotals; days?: UsageDay[] }>(usageResp)
-      const announcementData = await readJson<Partial<Announcement> & { error?: string }>(announcementResp)
+      const announcementData = await readJson<Partial<AnnouncementAdminResponse> & { error?: string }>(announcementResp)
       const usersData = await readJson<{ error?: string; users?: AdminUserSummary[] }>(usersResp)
       if (!cdkResp.ok) throw new Error(cdkData.error || `加载 CDK 失败: ${cdkResp.status}`)
       if (!usageResp.ok) throw new Error(usageData.error || `加载统计失败: ${usageResp.status}`)
@@ -157,7 +157,7 @@ const summary = useMemo(
         totals: normalizeUsageTotals(usageData.totals),
         days: Array.isArray(usageData.days) ? usageData.days.map(normalizeUsageDay) : [],
       })
-      setAnnouncement(normalizeAnnouncement(announcementData))
+      setAnnouncements(normalizeAnnouncementList(announcementData.announcements))
       setUsers(usersData.users ?? [])
       setAuthenticated(true)
     } catch (caught) {
@@ -233,20 +233,30 @@ const summary = useMemo(
         body: JSON.stringify({
           admin_user: credentials?.user,
           admin_password: credentials?.password,
-          enabled: announcement.enabled,
-          title: announcement.title,
-          body: announcement.body,
+          announcements,
         }),
       })
-      const data = await readJson<Partial<Announcement> & { error?: string }>(resp)
+      const data = await readJson<Partial<AnnouncementAdminResponse> & { error?: string }>(resp)
       if (!resp.ok) throw new Error(data.error || `保存公告失败: ${resp.status}`)
-      setAnnouncement(normalizeAnnouncement(data))
+      setAnnouncements(normalizeAnnouncementList(data.announcements))
       setNotice('公告已保存')
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
       setBusyAction(null)
     }
+  }
+
+  const addAnnouncement = (kind: AnnouncementKind) => {
+    setAnnouncements((current) => [createDraftAnnouncement(kind), ...current])
+  }
+
+  const updateAnnouncement = (id: string, patch: Partial<Pick<Announcement, 'kind' | 'active' | 'title' | 'body'>>) => {
+    setAnnouncements((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item))
+  }
+
+  const deleteAnnouncement = (id: string) => {
+    setAnnouncements((current) => current.filter((item) => item.id !== id))
   }
 
   const patchCdk = async (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission) => {
@@ -463,24 +473,83 @@ const summary = useMemo(
             </section>
           )}
 
-          {activeSection === 'announcement' && (
-            <form onSubmit={handleSaveAnnouncement} className="max-w-3xl rounded-xl border border-surface-3 bg-surface-1 p-5">
-              <h2 className="text-base font-semibold text-ink-primary">前台公告</h2>
-              <label className="mt-5 flex items-center justify-between gap-4 rounded-lg bg-surface-2 px-3 py-2">
-                <span className="text-sm font-medium text-ink-secondary">启用公告</span>
-                <input type="checkbox" checked={announcement.enabled} onChange={(event) => setAnnouncement((current) => ({ ...current, enabled: event.currentTarget.checked }))} className="h-4 w-4 accent-brand-600" />
-              </label>
-              <label className="mt-4 block">
-                <span className="mb-2 block text-sm font-medium text-ink-secondary">标题</span>
-                <input value={announcement.title} maxLength={80} onChange={(event) => setAnnouncement((current) => ({ ...current, title: event.currentTarget.value }))} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" />
-              </label>
-              <label className="mt-4 block">
-                <span className="mb-2 block text-sm font-medium text-ink-secondary">正文</span>
-                <textarea value={announcement.body} maxLength={600} rows={6} onChange={(event) => setAnnouncement((current) => ({ ...current, body: event.currentTarget.value }))} className="w-full resize-y rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-primary" />
-              </label>
-              <button type="submit" disabled={busyAction === 'announcement'} className="mt-5 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">{busyAction === 'announcement' ? '保存中...' : '保存公告'}</button>
-            </form>
-          )}
+        {activeSection === 'announcement' && (
+          <form onSubmit={handleSaveAnnouncement} className="space-y-5">
+            <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-ink-primary">横幅和弹出式公告</h2>
+                  <p className="mt-1 text-sm text-ink-secondary">横幅显示在工具页内，弹出式公告会在用户首次未读时弹出。</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => addAnnouncement('banner')} className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">新增横幅</button>
+                  <button type="button" onClick={() => addAnnouncement('popup')} className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">新增弹出式公告</button>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                {announcements.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-surface-4 bg-surface-0 px-4 py-6 text-sm text-ink-muted">
+                    还没有公告。新增横幅或弹出式公告后保存即可生效。
+                  </div>
+                )}
+                {announcements.map((item) => (
+                  <article key={item.id} className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={item.kind}
+                          onChange={(event) => updateAnnouncement(item.id, { kind: event.currentTarget.value as AnnouncementKind })}
+                          className="rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary"
+                        >
+                          <option value="banner">横幅</option>
+                          <option value="popup">弹出式公告</option>
+                        </select>
+                        <label className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm font-medium text-ink-secondary">
+                          <input
+                            type="checkbox"
+                            checked={item.active}
+                            onChange={(event) => updateAnnouncement(item.id, { active: event.currentTarget.checked })}
+                            className="h-4 w-4 accent-brand-600"
+                          />
+                          启用
+                        </label>
+                      </div>
+                      <button type="button" onClick={() => deleteAnnouncement(item.id)} className="rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error hover:bg-error/20">
+                        删除
+                      </button>
+                    </div>
+
+                    <label className="mt-4 block">
+                      <span className="mb-2 block text-sm font-medium text-ink-secondary">标题</span>
+                      <input
+                        value={item.title}
+                        maxLength={80}
+                        onChange={(event) => updateAnnouncement(item.id, { title: event.currentTarget.value })}
+                        className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary"
+                      />
+                    </label>
+                    <label className="mt-4 block">
+                      <span className="mb-2 block text-sm font-medium text-ink-secondary">正文</span>
+                      <textarea
+                        value={item.body}
+                        maxLength={600}
+                        rows={5}
+                        onChange={(event) => updateAnnouncement(item.id, { body: event.currentTarget.value })}
+                        className="w-full resize-y rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-primary"
+                      />
+                    </label>
+                    <p className="mt-3 text-xs text-ink-muted">更新时间：{formatDate(item.updated_at)}</p>
+                  </article>
+                ))}
+              </div>
+
+              <button type="submit" disabled={busyAction === 'announcement'} className="mt-5 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+                {busyAction === 'announcement' ? '保存中...' : '保存公告'}
+              </button>
+            </section>
+          </form>
+        )}
         </div>
       </main>
     </div>
@@ -663,13 +732,37 @@ function normalizeCount(value: unknown): number {
   return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0
 }
 
-function normalizeAnnouncement(value: Partial<Announcement> | null | undefined): Announcement {
+function normalizeAnnouncementList(value: Announcement[] | null | undefined): Announcement[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is Announcement => Boolean(item) && typeof item === 'object')
+    .map((item) => ({
+      id: typeof item.id === 'string' && item.id ? item.id : createDraftId(),
+      kind: item.kind === 'banner' || item.kind === 'popup' ? item.kind : 'popup',
+      active: item.active === true,
+      title: typeof item.title === 'string' ? item.title : '',
+      body: typeof item.body === 'string' ? item.body : '',
+      created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
+      updated_at: typeof item.updated_at === 'string' ? item.updated_at : new Date().toISOString(),
+    }))
+}
+
+function createDraftAnnouncement(kind: AnnouncementKind): Announcement {
+  const now = new Date().toISOString()
   return {
-    enabled: value?.enabled === true,
-    title: typeof value?.title === 'string' ? value.title : '',
-    body: typeof value?.body === 'string' ? value.body : '',
-    updated_at: typeof value?.updated_at === 'string' ? value.updated_at : null,
+    id: createDraftId(),
+    kind,
+    active: false,
+    title: '',
+    body: '',
+    created_at: now,
+    updated_at: now,
   }
+}
+
+function createDraftId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return `draft_${crypto.randomUUID()}`
+  return `draft_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
 
 function formatDate(value: string | null): string {

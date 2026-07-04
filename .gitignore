@@ -1,5 +1,7 @@
 node_modules/
 dist/
+server/dist/
+.cache/
 .idea/
 *.pyc
 __pycache__/
@@ -9,6 +11,8 @@ _tmp.py
 .env.*
 .agents
 .vite-dev.*
+
+.codex
 
 # Local Netlify folder
 .netlify

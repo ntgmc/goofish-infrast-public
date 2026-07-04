@@ -1,9 +1,8 @@
 import type { Context } from '@netlify/functions'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
+import { createPostgresUsageEventStore } from '../../server/storage/usage-store'
 
 type UsageEventName = 'tool_visit' | 'schedule_generate' | 'cdk_redeem'
 
@@ -164,27 +163,22 @@ function getLastSevenDates(): string[] {
 }
 
 async function getUsageEventStore(): Promise<UsageEventStore> {
-  if (hasNetlifyBlobsContext()) {
-    const { getStore } = await import('@netlify/blobs')
-    const store = getStore('maa-usage-events')
-    return {
-      set: async (key, record) => {
-        await store.setJSON(key, record)
-      },
-      list: async (prefix) => {
-        const { blobs } = await store.list({ prefix })
-        const records = await Promise.all(
-          blobs.map(async ({ key }) => await store.get(key, { type: 'json' }) as UsageEventRecord | null),
-        )
-        return records.filter((record): record is UsageEventRecord => record !== null)
-      },
-    }
-  }
+  const testingStore = getTestingUsageEventStore()
+  if (testingStore) return testingStore
+  return createPostgresUsageEventStore()
+}
 
-  return {
-    set: async (key, record) => writeLocalUsageEvent(key, record),
-    list: async (prefix) => readLocalUsageEvents(prefix),
-  }
+export function setUsageEventStoreForTesting(store: UsageEventStore | null): void {
+  ;(globalThis as unknown as { __maaUsageEventStoreForTesting?: UsageEventStore }).__maaUsageEventStoreForTesting =
+    store ?? undefined
+}
+
+function getTestingUsageEventStore(): UsageEventStore | null {
+  if (process.env.NODE_ENV === 'production') return null
+  return (
+    (globalThis as unknown as { __maaUsageEventStoreForTesting?: UsageEventStore })
+      .__maaUsageEventStoreForTesting ?? null
+  )
 }
 
 function isUsageEventRecord(value: unknown): value is UsageEventRecord {
@@ -196,57 +190,4 @@ function isUsageEventRecord(value: unknown): value is UsageEventRecord {
     typeof record.date === 'string' &&
     (record.visitor_id === null || typeof record.visitor_id === 'string')
   )
-}
-
-function hasNetlifyBlobsContext(): boolean {
-  if (process.env.NETLIFY_DEV || process.env.NODE_ENV === 'development') {
-    return false
-  }
-
-  const globalContext = (globalThis as unknown as { netlifyBlobsContext?: unknown }).netlifyBlobsContext
-  if (hasUsableBlobsContext(globalContext)) return true
-
-  const encodedContext = process.env.NETLIFY_BLOBS_CONTEXT
-  if (!encodedContext) return false
-  try {
-    const decoded = JSON.parse(Buffer.from(encodedContext, 'base64').toString('utf8')) as unknown
-    return hasUsableBlobsContext(decoded)
-  } catch {
-    return false
-  }
-}
-
-function hasUsableBlobsContext(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return false
-  const context = value as Record<string, unknown>
-  return typeof context.siteID === 'string' &&
-    context.siteID.length > 0 &&
-    typeof context.token === 'string' &&
-    context.token.length > 0
-}
-
-function localUsagePath(key: string): string {
-  const safeParts = key.split('/').filter((part) => part && part !== '.' && part !== '..')
-  return join(process.cwd(), '.netlify', 'local-usage-events', ...safeParts)
-}
-
-function writeLocalUsageEvent(key: string, record: UsageEventRecord): void {
-  const path = localUsagePath(key)
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, JSON.stringify(record, null, 2), 'utf8')
-}
-
-function readLocalUsageEvents(prefix: string): UsageEventRecord[] {
-  const dir = localUsagePath(prefix)
-  if (!existsSync(dir)) return []
-  return readJsonFilesRecursively(dir)
-}
-
-function readJsonFilesRecursively(dir: string): UsageEventRecord[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(dir, entry.name)
-    if (entry.isDirectory()) return readJsonFilesRecursively(path)
-    if (!entry.isFile() || !entry.name.endsWith('.json')) return []
-    return JSON.parse(readFileSync(path, 'utf8')) as UsageEventRecord
-  })
 }

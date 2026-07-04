@@ -81,7 +81,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
         return jsonResponse({ error: '当前授权没有可用的干员数据更新权限。' }, 403)
       }
 
-      let nextOperatorUpdateGrant = null
+      let nextOperatorUpdateGrant: OperatorUpdateGrant | null = null
       let nextUpdateLimit = advancedUpdateLimit
       if (effectivePermission === 'advanced' && effectiveCdkRecord) {
         const updateCheck = await recordAdvancedOperatorUpdate(effectiveCdkRecord, operatorsCheck.operators, req, body.activation_token)
@@ -103,6 +103,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       const reissued = reissueSignedLicenseFile(licenseCheck.license, effectivePermission, adminSecret, {
         operators: operatorsCheck.operators,
         operatorUpdateGrant: nextOperatorUpdateGrant,
+        activationToken: body.activation_token,
       })
 
       return jsonResponse({
@@ -118,13 +119,15 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       })
     }
 
-    const shouldReissue = effectivePermission !== filePermission
-      || !isSameOperatorUpdateGrant(licenseCheck.license.operator_update_grant, operatorUpdateGrant)
-    const reissued = shouldReissue
-      ? reissueSignedLicenseFile(licenseCheck.license, effectivePermission, adminSecret, {
+  const shouldReissue = effectivePermission !== filePermission
+    || !isSameOperatorUpdateGrant(licenseCheck.license.operator_update_grant, operatorUpdateGrant)
+    || hasDifferentActivationToken(licenseCheck.license.activation_token, body.activation_token)
+  const reissued = shouldReissue
+    ? reissueSignedLicenseFile(licenseCheck.license, effectivePermission, adminSecret, {
         operatorUpdateGrant,
+        activationToken: body.activation_token,
       })
-      : null
+    : null
 
     return jsonResponse({
       permission: effectivePermission,
@@ -151,4 +154,16 @@ function isSameOperatorUpdateGrant(
   if (!current && !next) return true
   if (!current || !next) return false
   return current.remaining === next.remaining && current.granted_at === next.granted_at
+}
+
+function hasDifferentActivationToken(current: unknown, next: unknown): boolean {
+  const nextToken = normalizeActivationToken(next)
+  if (!nextToken) return false
+  return normalizeActivationToken(current) !== nextToken
+}
+
+function normalizeActivationToken(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const token = value.trim()
+  return token.length >= 16 ? token : null
 }

@@ -49,6 +49,7 @@ export interface LicenseFile {
   operators: LicenseOperator[];
   config: LicenseConfig;
   permission?: RawPermissionMode;
+  activation_token?: string | null;
   operator_update_grant?: OperatorUpdateGrant | null;
   issued_at: string;
   sig: string;
@@ -76,11 +77,26 @@ export interface AppBuildMeta {
   build_context?: string;
 }
 
+export type AnnouncementKind = 'banner' | 'popup';
+
 export interface Announcement {
-  enabled: boolean;
+  id: string;
+  kind: AnnouncementKind;
+  active: boolean;
   title: string;
   body: string;
-  updated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnnouncementPublicResponse {
+  banner: Announcement | null;
+  popups: Announcement[];
+  announcements: Announcement[];
+}
+
+export interface AnnouncementAdminResponse {
+  announcements: Announcement[];
 }
 
 export interface OptimizeRequest {

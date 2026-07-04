@@ -23,14 +23,14 @@ env:
 jobs:
   refresh-build-metadata:
     name: Refresh Build Metadata
+    needs: deploy-relevance
     permissions:
       contents: write
     if: >-
       github.actor != 'github-actions[bot]' &&
-      (
-        github.ref == 'refs/heads/main' &&
-        (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      )
+      github.ref == 'refs/heads/main' &&
+      needs.deploy-relevance.outputs.deploy_required == 'true' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

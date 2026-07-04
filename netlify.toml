@@ -1,6 +1,8 @@
+# Legacy Netlify rollback configuration only. The primary production backend now runs
+# as a standalone Node service behind Nginx and uses PostgreSQL via DATABASE_URL.
 [build]
-  command = "npm run build"
-  ignore = "node scripts/netlify-ignore-build.mjs"
+command = "npm run build"
+ignore = "node scripts/netlify-ignore-build.mjs"
   publish = "dist"
 
 [build.environment]
