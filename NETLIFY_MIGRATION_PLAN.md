@@ -1,16 +1,16 @@
 # Netlify 迁出最终迁移计划
 
-> 状态：基于当前本地代码校准后的最终推荐方案。你需要最后确认本文顶部 3 个决策项；如果没有反对意见，就按默认值执行。
+> 状态：基于当前本地代码校准后的最终推荐方案。本文已按最终决策更新：存储使用 PostgreSQL，部署形态和上线切换使用默认推荐方案。
 
-## 需要你拍板的 3 个决策
+## 已确定的 3 个决策
 
 | 决策 | 默认推荐 | 备选 | 影响 |
 | --- | --- | --- | --- |
-| 部署形态 | 单机 Node 20 + systemd + Nginx | Docker Compose + Caddy/Nginx；云托管 Node 平台 | 单机方案改动最小，适合当前 Vite 静态站 + 小型 API；Docker 便于后续扩展和迁移。 |
-| 主存储 | SQLite | PostgreSQL；本地 JSON 文件 | SQLite 适合单机低并发，备份简单；PostgreSQL 更适合多实例；本地 JSON 只适合作临时过渡。 |
-| 上线切换 | 维护窗口切换 | 并行灰度；直接切换 | 维护窗口期间暂停写入，导出 Netlify Blobs 后导入新库，再切 DNS，数据一致性风险最低。 |
+| 部署形态 | 单机 Node 20 + PostgreSQL + systemd + Nginx | Docker Compose + Caddy/Nginx；云托管 Node 平台 | 单机方案改动最小，适合当前 Vite 静态站 + 小型 API；PostgreSQL 作为独立服务运行，后续迁移到托管数据库或多实例也更顺。 |
+| 主存储 | PostgreSQL | SQLite；本地 JSON 文件 | PostgreSQL 是正式生产存储，支持更稳妥的并发、备份、索引和后续扩容；SQLite 只保留为低并发单机备选；本地 JSON 只适合作临时过渡。 |
+| 上线切换 | 维护窗口切换 | 并行灰度；直接切换 | 维护窗口期间暂停写入，导出 Netlify Blobs 后导入 PostgreSQL，再切 DNS，数据一致性风险最低。 |
 
-默认落地结论：使用 **Node 20 + Hono/Node HTTP 适配层 + SQLite + Nginx + systemd + certbot**。前端继续 `npm run build` 输出 `dist`，Nginx 托管静态文件并把 `/api/*` 反代到本机 Node 后端。
+默认落地结论：使用 **Node 20 + Hono/Node HTTP 适配层 + PostgreSQL + Nginx + systemd + certbot**。前端继续 `npm run build` 输出 `dist`，Nginx 托管静态文件并把 `/api/*` 反代到本机 Node 后端，Node 后端通过 `DATABASE_URL` 访问 PostgreSQL。
 
 ## 本地代码校准结论
 
@@ -36,9 +36,9 @@ Nginx / Caddy
 Node 20 后端
   |-- 路由兼容现有 /api/*
   |-- 调用或迁移 netlify/functions 中的业务逻辑
-  |-- 通过 Repository/Store 访问 SQLite
+|-- 通过 Repository/Store 访问 PostgreSQL
 
-SQLite
+PostgreSQL
   |-- cdk_records
   |-- announcements
   |-- usage_events
@@ -49,7 +49,7 @@ SQLite
 
 - 保留 `/api` URL 兼容性。
 - 尽量复用现有 `netlify/functions/*.ts` 的业务逻辑。
-- 把 `@netlify/blobs` 存储替换为可自主管理的 SQLite。
+- 把 `@netlify/blobs` 存储替换为可自主管理的 PostgreSQL。
 - 保持旧授权文件可校验，避免已有用户授权失效。
 
 ## 必须保留的 API 路由
@@ -79,7 +79,7 @@ SQLite
 
 ### 推荐新表
 
-| Netlify Blobs store | 当前用途 | SQLite 表 |
+| Netlify Blobs store | 当前用途 | PostgreSQL 表 |
 | --- | --- | --- |
 | `maa-cdks` | CDK、授权状态、风控、升级/撤销、使用次数、订单 hash | `cdk_records` |
 | `maa-announcements` | 当前公告配置，包含 banner/popup 数据 | `announcements` |
@@ -95,9 +95,9 @@ CREATE TABLE cdk_records (
   status TEXT NOT NULL,
   permission TEXT NOT NULL,
   license_order_hash TEXT,
-  record_json TEXT NOT NULL,
-  created_at TEXT,
-  updated_at TEXT
+  record_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_cdk_records_status ON cdk_records(status);
@@ -105,17 +105,17 @@ CREATE INDEX idx_cdk_records_license_order_hash ON cdk_records(license_order_has
 
 CREATE TABLE announcements (
   key TEXT PRIMARY KEY,
-  data_json TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  data_json JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE usage_events (
   key TEXT PRIMARY KEY,
   event TEXT NOT NULL,
   visitor_id TEXT,
-  date TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  record_json TEXT NOT NULL
+  date DATE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  record_json JSONB NOT NULL
 );
 
 CREATE INDEX idx_usage_events_date ON usage_events(date);
@@ -126,15 +126,15 @@ CREATE TABLE admin_users (
   password_hash TEXT NOT NULL,
   salt TEXT NOT NULL,
   iterations INTEGER NOT NULL,
-  record_json TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  record_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
 );
 ```
 
 说明：
 
-- 第一阶段建议保留完整 JSON 字段，降低业务改动。
+- 第一阶段建议保留完整 JSONB 字段，降低业务改动。
 - 对查询频繁的字段建立索引，特别是 `status`、`license_order_hash`、`date`。
 - 不建议正式生产长期使用 `.netlify/local-*` 文件 fallback。它们只适合本地开发或紧急临时过渡。
 
@@ -144,6 +144,7 @@ CREATE TABLE admin_users (
 
 ```text
 NODE_ENV=production
+DATABASE_URL=postgresql://goofish_app:...@127.0.0.1:5432/goofish_infrast_v1
 MAA_ADMIN_PASSWORD=...
 MAA_ADMIN_SECRET=...
 CDK_HASH_SECRET=...
@@ -155,7 +156,6 @@ CDK_HASH_SECRET=...
 BACKEND_VERSION=...
 APP_VERSION=...
 PORT=3000
-DATABASE_URL=file:/var/lib/goofish-infrast-v1/app.sqlite
 ```
 
 迁移后不应再依赖：
@@ -221,7 +221,7 @@ netlify/functions/admin-auth.ts
 建议新增：
 
 ```text
-server/storage/sqlite.ts
+server/storage/postgres.ts
 server/storage/cdk-store.ts
 server/storage/announcement-store.ts
 server/storage/usage-store.ts
@@ -232,7 +232,7 @@ server/storage/admin-user-store.ts
 
 - 不在业务函数里继续直接判断 Netlify Blobs context。
 - 保留现有 store 接口能力：`get`、`set`、`delete`、`list`。
-- 让业务层不用知道数据来自 Netlify Blobs、SQLite 还是本地文件。
+- 让业务层不用知道数据来自 Netlify Blobs、PostgreSQL 还是本地文件。
 - 迁移完成后，`@netlify/blobs` 仅作为导出脚本依赖保留，或完全移除。
 
 ### 第 3 步：新增数据导出导入脚本
@@ -241,7 +241,7 @@ server/storage/admin-user-store.ts
 
 ```text
 scripts/export-netlify-blobs.mjs
-scripts/import-sqlite.mjs
+scripts/import-postgres.mjs
 scripts/verify-migrated-data.mjs
 ```
 
@@ -293,9 +293,16 @@ npm run check:local
 ```text
 /opt/goofish-infrast-v1              # 代码或构建产物
 /var/www/goofish-infrast-v1/dist     # Vite 静态文件
-/var/lib/goofish-infrast-v1          # SQLite、导出数据、备份
+/var/lib/goofish-infrast-v1          # 导出数据、迁移中间文件、PostgreSQL 备份
 /var/log/goofish-infrast-v1          # 后端日志
 ```
+
+### PostgreSQL 基线
+
+- PostgreSQL 作为同机独立服务运行，Node 后端只通过 `DATABASE_URL` 连接，不直接读写数据库数据目录。
+- 创建独立数据库和最小权限应用用户，例如数据库 `goofish_infrast_v1`、用户 `goofish_app`；真实密码只放在服务器环境变量或 `EnvironmentFile` 中。
+- 迁移前先跑建表 SQL，再导入 Netlify Blobs 导出的 JSON；导入完成后执行数量、索引、旧授权文件校验。
+- 切换前使用 `pg_dump` 保存 PostgreSQL 备份，并保留原始 Blobs 导出 JSON 作为二次恢复来源。
 
 ### Nginx 概念配置
 
@@ -329,7 +336,8 @@ server {
 ```ini
 [Unit]
 Description=goofish-infrast-v1 backend
-After=network.target
+After=network.target postgresql.service
+Wants=postgresql.service
 
 [Service]
 WorkingDirectory=/opt/goofish-infrast-v1
@@ -338,7 +346,7 @@ Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
 Environment=PORT=3000
-Environment=DATABASE_URL=file:/var/lib/goofish-infrast-v1/app.sqlite
+Environment=DATABASE_URL=postgresql://goofish_app:...@127.0.0.1:5432/goofish_infrast_v1
 Environment=MAA_ADMIN_PASSWORD=...
 Environment=MAA_ADMIN_SECRET=...
 Environment=CDK_HASH_SECRET=...
@@ -351,12 +359,12 @@ WantedBy=multi-user.target
 
 ## 上线切换流程
 
-1. 在新服务器部署代码、Node 20、Nginx、systemd、SQLite 目录。
+1. 在新服务器部署代码、Node 20、PostgreSQL、Nginx、systemd 和必要目录。
 2. 配置生产环境变量，确保 `MAA_ADMIN_SECRET` 和 `CDK_HASH_SECRET` 与 Netlify 生产一致。
 3. 构建前端和后端。
 4. 在 Netlify 侧进入维护窗口：暂停会产生写入的后台操作和兑换操作。
 5. 从 Netlify Blobs 导出 `maa-cdks`、`maa-announcements`、`maa-usage-events`、`maa-admin-users`。
-6. 导入 SQLite。
+6. 导入 PostgreSQL。
 7. 启动新 Node 后端，只用临时域名或 hosts 访问验证。
 8. 跑完整验证清单。
 9. 切 DNS 或反代入口。
@@ -408,9 +416,9 @@ WantedBy=multi-user.target
 ## 回滚方案
 
 - 切换前保留 Netlify 旧站点和 Blobs 数据不删除。
-- 切 DNS 前保存 SQLite 数据库备份和导出 JSON。
+- 切 DNS 前保存 PostgreSQL 备份和导出 JSON。
 - 如果新站核心接口异常，立即把 DNS 或入口反代切回 Netlify。
-- 若切换期间新站已经产生写入，回滚前必须导出 SQLite 中新增写入并决定是否补回旧系统，避免数据分叉。
+- 若切换期间新站已经产生写入，回滚前必须导出 PostgreSQL 中新增写入并决定是否补回旧系统，避免数据分叉。
 
 ## 风险点
 
@@ -420,14 +428,14 @@ WantedBy=multi-user.target
 - 遗漏 `/api/admin/announcement` 和 `/api/admin/usage-stats` 的 admin 语义会导致后台读写异常。
 - 没有传递真实客户端 IP 头会影响 advanced 授权的风控判断。
 - 直接使用本地 JSON 文件长期生产会有并发写入和备份风险。
-- 没有维护窗口直接切换，可能出现 Netlify Blobs 与 SQLite 双边写入的数据分叉。
+- 没有维护窗口直接切换，可能出现 Netlify Blobs 与 PostgreSQL 双边写入的数据分叉。
 
 ## 最终推荐执行顺序
 
-1. 你确认顶部 3 个决策项，默认是单机 systemd、SQLite、维护窗口切换。
+1. 按已确定决策执行：单机 Node 20 + PostgreSQL + systemd + Nginx，维护窗口切换。
 2. 新增 Node 后端入口和 `/api` 路由适配。
-3. 新增 SQLite store，替换 Netlify Blobs 访问。
-4. 新增 Blobs 导出、SQLite 导入和迁移校验脚本。
+3. 新增 PostgreSQL store，替换 Netlify Blobs 访问。
+4. 新增 Blobs 导出、PostgreSQL 导入和迁移校验脚本。
 5. 保留并扩展本地检查：`npm run build`、`npm run check:functions`、核心 API smoke test。
 6. 在新服务器部署并通过临时域名验证。
 7. 开维护窗口，导出、导入、验证、切 DNS。
