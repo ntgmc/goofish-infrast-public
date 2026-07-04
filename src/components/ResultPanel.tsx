@@ -127,8 +127,8 @@ export default function ResultPanel({
             {isAnalysis
               ? '已根据导入排班表计算红脸风险、日产量和爆仓信息。'
               : isRotationMode
-              ? '按下方排班详情在游戏内手动设置；保存进度文件后，下次可直接上传继续调整。'
-              : '排班 JSON 用于导入或交给 MAA 使用；保存进度文件后，下次可直接上传继续调整。'}
+          ? '按下方排班详情在游戏内手动设置；账号空间接入后会自动保存当前练度和配置。'
+          : '排班 JSON 用于导入或交给 MAA 使用；账号空间接入后会自动保存当前练度和配置。'}
           </p>
         </div>
         {(onDownload || onSaveWorkfile) && (
@@ -148,7 +148,7 @@ export default function ResultPanel({
               onClick={onSaveWorkfile}
               className="rounded-xl bg-surface-2 px-5 py-3 font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
             >
-              保存进度文件
+            导出本地备份
             </button>
           )}
           </div>

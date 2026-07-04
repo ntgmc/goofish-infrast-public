@@ -4,7 +4,7 @@ import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import BuildMetaStrip from '../components/BuildMetaStrip'
 import ResultPanel from '../components/ResultPanel'
-import { downloadLicenseFile } from '../lib/download'
+import DeferredFeatureMenu from '../components/DeferredFeatureMenu'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 import { bindPendingActivationToken, getPendingActivationToken } from '../lib/activation-token'
 
@@ -35,7 +35,7 @@ interface TourStep {
 
 const ANNOUNCEMENT_TOUR_STEP: TourStep = {
   target: 'announcement',
-  title: '先看站内公告',
+  title: '先看站内横幅',
   body: '如果这里有公告，请先确认维护通知、使用限制或近期变更，再继续生成授权文件。',
 }
 
@@ -62,8 +62,8 @@ const BASE_TOUR_STEPS: TourStep[] = [
   },
   {
     target: 'redeem-action',
-    title: '生成授权文件',
-    body: '勾选确认后兑换 CDK，网站会下载授权文件并进入排班生成流程。',
+    title: '写入账号空间',
+    body: '勾选确认后兑换 CDK，当前会进入排班生成流程；账号系统接入后会直接保存到云端空间。',
   },
 ]
 
@@ -71,17 +71,15 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
   const [mode, setMode] = useState<EntryMode>('preview')
   const [tourOpen, setTourOpen] = useState(false)
   const tourSteps = useMemo(
-    () => announcement?.enabled ? [ANNOUNCEMENT_TOUR_STEP, ...BASE_TOUR_STEPS] : BASE_TOUR_STEPS,
-    [announcement?.enabled],
+    () => announcement?.active ? [ANNOUNCEMENT_TOUR_STEP, ...BASE_TOUR_STEPS] : BASE_TOUR_STEPS,
+    [announcement?.active],
   )
 
   useEffect(() => {
     try {
-      if (window.localStorage.getItem(FIRST_RUN_TOUR_STORAGE_KEY) !== 'done') {
-        setTourOpen(true)
-      }
+      window.localStorage.setItem(FIRST_RUN_TOUR_STORAGE_KEY, 'done')
     } catch {
-      setTourOpen(true)
+      // Ignore storage failures; the manual tour button remains available.
     }
   }, [])
 
@@ -99,78 +97,117 @@ export default function UploadPage({ onFileLoaded, onLicenseRedeemed, error, ann
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-5xl">
-        <div className="mb-8 text-center">
-          <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2">
-            <svg className="h-8 w-8 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+<div className="min-h-screen bg-surface-0 lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
+      <DashboardSidebar activeMode={mode} onModeChange={setMode} onOpenTour={handleOpenTour} />
+      <main className="min-w-0 px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
+        <div className="mb-5 rounded-xl border border-surface-3 bg-surface-1 p-5">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-brand-500/10">
+              <svg className="h-8 w-8 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <DeferredFeatureMenu />
           </div>
-          <h1 className="mb-3 text-3xl font-bold text-ink-primary">
-            MAA 基建排班优化器
+          <h1 className="mb-3 text-3xl font-bold tracking-[-0.02em] text-ink-primary">
+            MAA 基建排班工作台
           </h1>
-          <p className="text-base text-ink-secondary">
-            免费预览账号方向，完整排班需使用 CDK
+          <p className="max-w-3xl text-sm leading-6 text-ink-secondary">
+            上传干员数据、预览账号状态，或使用 CDK 生成可继续排班的工作文件。当前页面只保留完成基建排班需要的主路径。
           </p>
           <BuildMetaStrip placement="corner" />
         </div>
 
-        <div data-tour={announcement?.enabled ? 'announcement' : undefined}>
+        <div data-tour={announcement?.active ? 'announcement' : undefined}>
           <AnnouncementBanner announcement={announcement} className="mb-5" />
         </div>
 
-        <div className="mb-5 flex justify-center">
-          <div className="inline-flex rounded-lg bg-surface-1 p-1" data-tour="entry-mode">
-            <ModeButton label="免费预览" active={mode === 'preview'} onClick={() => setMode('preview')} />
-            <ModeButton label="分析排班表" active={mode === 'analysis'} onClick={() => setMode('analysis')} />
-            <ModeButton label="上传 .maa 文件" active={mode === 'license'} onClick={() => setMode('license')} />
-            <ModeButton label="使用 CDK 生成授权文件" active={mode === 'cdk'} onClick={() => setMode('cdk')} />
-          </div>
+        <div className="grid gap-5">
+          <section className="min-w-0">
+            {mode === 'preview' ? (
+              <FreePreviewPanel onUseCdk={() => setMode('cdk')} />
+            ) : mode === 'analysis' ? (
+              <ScheduleAnalysisPanel />
+            ) : mode === 'license' ? (
+              <LicenseUploadPanel onFileLoaded={onFileLoaded} error={error} />
+            ) : (
+              <CdkRedeemPanel onLicenseRedeemed={onLicenseRedeemed} />
+            )}
+          </section>
         </div>
-
-        {mode === 'preview' ? (
-          <FreePreviewPanel onUseCdk={() => setMode('cdk')} />
-        ) : mode === 'analysis' ? (
-          <ScheduleAnalysisPanel />
-        ) : mode === 'license' ? (
-          <LicenseUploadPanel onFileLoaded={onFileLoaded} error={error} />
-        ) : (
-          <CdkRedeemPanel onLicenseRedeemed={onLicenseRedeemed} />
-        )}
-
-        <p className="mt-6 text-center text-xs text-ink-muted">
-        排班表分析无需 CDK 和授权；免费预览仅展示前 3 个房间，不提供完整排班或 MAA JSON。CDK 会在本站生成授权文件，授权文件和保存进度文件通常以 .maa 结尾。
-        </p>
-        <div className="mt-3 text-center">
-          <button
-            type="button"
-            onClick={handleOpenTour}
-            className="text-xs font-medium text-brand-500 underline-offset-4 transition-colors duration-150 hover:text-brand-400 hover:underline"
-          >
-            查看首次使用导览
-          </button>
         </div>
+        <FirstRunTour
+          open={tourOpen}
+          steps={tourSteps}
+          onClose={handleCloseTour}
+          onModeChange={setMode}
+        />
+        </main>
       </div>
-      <FirstRunTour
-        open={tourOpen}
-        steps={tourSteps}
-        onClose={handleCloseTour}
-        onModeChange={setMode}
-      />
-    </div>
   )
 }
 
-function ModeButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function DashboardSidebar({
+  activeMode,
+  onModeChange,
+  onOpenTour,
+}: {
+  activeMode: EntryMode;
+  onModeChange: (mode: EntryMode) => void;
+  onOpenTour: () => void;
+}) {
+  return (
+<aside className="flex max-w-full flex-col border-b border-surface-3 bg-surface-1 p-4 lg:sticky lg:top-0 lg:h-screen lg:self-start lg:overflow-y-auto lg:border-b-0 lg:border-r">
+      <div className="mb-6 flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-600 text-white">
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M7 3h7l4 4v14H7V3Zm7 0v5h4M9.5 13h5M9.5 16h3" />
+          </svg>
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-ink-primary">MAA SaaS</p>
+          <p className="text-xs text-ink-muted">排班与玩家工具</p>
+        </div>
+      </div>
+      <nav className="space-y-2" aria-label="工作台导航" data-tour="entry-mode">
+        <SidebarButton label="兑换 CDK" active={activeMode === 'cdk'} onClick={() => onModeChange('cdk')} />
+        <SidebarButton label="导入旧 .maa" active={activeMode === 'license'} onClick={() => onModeChange('license')} />
+        <SidebarButton label="免费预览" active={activeMode === 'preview'} onClick={() => onModeChange('preview')} />
+        <SidebarButton label="排班表分析" active={activeMode === 'analysis'} onClick={() => onModeChange('analysis')} />
+      </nav>
+      <div className="mt-6 border-t border-surface-3 pt-4">
+        <a
+          href="/announcements"
+          className="flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-ink-primary"
+        >
+          公告
+        </a>
+      </div>
+      <div className="mt-6 border-t border-surface-3 pt-4">
+        <p className="text-xs font-semibold text-ink-muted">说明</p>
+        <p className="mt-2 text-xs leading-5 text-ink-secondary">
+          排班表分析无需 CDK 和授权；免费预览仅展示前 3 个房间，不提供完整排班或 MAA JSON。
+        </p>
+        <button
+          type="button"
+          onClick={onOpenTour}
+          className="mt-3 text-xs font-medium text-brand-500 underline-offset-4 transition-colors duration-150 hover:text-brand-400 hover:underline"
+        >
+          查看首次使用导览
+        </button>
+      </div>
+    </aside>
+  )
+}
+
+function SidebarButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors duration-150 ${
-        active
-          ? 'bg-brand-600 text-white'
-          : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'
+      className={`flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm font-semibold transition-colors duration-150 ${
+        active ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'
       }`}
     >
       {label}
@@ -836,7 +873,6 @@ function CdkRedeemPanel({ onLicenseRedeemed }: { onLicenseRedeemed: (license: Li
         throw new Error('兑换响应缺少授权文件。')
       }
       bindPendingActivationToken(data.license)
-      downloadLicenseFile(data.license_file_content, data.license.order_hash)
       onLicenseRedeemed(data.license, data.license_file_content)
     } catch (e) {
       setError((e as Error).message)
@@ -1255,4 +1291,3 @@ function canEditCdkConfig(permission: PermissionMode): boolean {
 function canEditCdkLimitedConfig(permission: PermissionMode): boolean {
   return permission === 'recommended' || permission === 'growth'
 }
-

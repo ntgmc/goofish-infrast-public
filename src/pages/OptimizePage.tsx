@@ -8,6 +8,7 @@ import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHED
 import UpgradeSuggestions from '../components/UpgradeSuggestions'
 import ResultPanel from '../components/ResultPanel'
 import BuildMetaStrip from '../components/BuildMetaStrip'
+import DeferredFeatureMenu from '../components/DeferredFeatureMenu'
 import ScheduleProgress, {
   SCHEDULE_PROGRESS_COMPLETION_DURATION_MS,
   type ScheduleProgressState,
@@ -476,30 +477,35 @@ export default function OptimizePage({
   }, [activeConfig, configChanged, eliteOverrides, license, userCanEditConfig])
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
       {configToast && <ConfigValidationToast key={configToast.id} message={configToast.message} />}
-      <header className="flex flex-col gap-5 mb-8 sm:flex-row sm:items-center sm:justify-between">
+      <header className="mb-6 rounded-xl border border-surface-3 bg-surface-1 p-5">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold text-ink-primary">
-              智能排班生成器
+            <h1 className="text-2xl font-bold tracking-[-0.02em] text-ink-primary">
+              排班结果工作台
             </h1>
             <span className="rounded-full bg-surface-2 px-3 py-1 text-xs font-semibold text-brand-300">
               {PERMISSION_LABELS[permission]}
             </span>
           </div>
-          <p className="text-ink-secondary text-sm">
-            配置: {userCanEditConfig ? activeConfig.desc : configPresetLabel} · ID: {license.order_hash.slice(0, 8)}...
+          <p className="max-w-3xl text-sm leading-6 text-ink-secondary">
+            配置: {userCanEditConfig ? activeConfig.desc : configPresetLabel} · ID: {license.order_hash.slice(0, 8)}。在这里生成、检查并下载当前账号的基建排班方案。
           </p>
           <BuildMetaStrip meta={serverBuildMeta} placement="corner" />
         </div>
-        <button
-          onClick={onReset}
-          className="self-start text-ink-secondary hover:text-ink-primary text-sm px-4 py-2 rounded-lg hover:bg-surface-2 transition-colors duration-150 sm:self-auto"
-        >
-          重新选择文件
-        </button>
-      </header>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <DeferredFeatureMenu />
+          <button
+            onClick={onReset}
+            className="rounded-lg px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-ink-primary"
+          >
+            返回数据空间
+          </button>
+        </div>
+      </div>
+    </header>
 
       <AnnouncementBanner announcement={announcement} className="mb-6" />
 
@@ -525,6 +531,13 @@ export default function OptimizePage({
       )}
 
       {licenseSyncing && <LicenseSyncPanel />}
+
+      <ResultDashboardCards
+        orderId={license.order_hash.slice(0, 8)}
+        operatorCount={license.operators.length}
+        resultReady={hasResult}
+        configChanged={configChanged}
+      />
 
       <CommandBand
         config={activeConfig}
@@ -674,6 +687,50 @@ function LicenseSyncPanel() {
       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
         <div className="schedule-progress-fill h-full w-1/2 rounded-full bg-brand-500" />
       </div>
+    </div>
+  )
+}
+
+function ResultDashboardCards({
+  orderId,
+  operatorCount,
+  resultReady,
+  configChanged,
+}: {
+  orderId: string;
+  operatorCount: number;
+  resultReady: boolean;
+  configChanged: boolean;
+}) {
+  return (
+    <section className="mb-6">
+      <div className="rounded-xl border border-brand-600/25 bg-brand-600/10 p-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-ink-primary">账号数据空间</h2>
+            <p className="mt-2 text-sm leading-6 text-ink-secondary">
+              当前授权 ID {orderId}，数据已载入，可直接生成或重新计算基建排班。
+            </p>
+          </div>
+          <span className="rounded-full bg-surface-0 px-3 py-1 text-xs font-semibold text-brand-300">
+            {resultReady ? '已有结果' : '待生成'}
+          </span>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <DashboardMiniStat label="干员数据" value={`${operatorCount} 名`} />
+          <DashboardMiniStat label="配置状态" value={configChanged ? '已调整' : '未改动'} />
+          <DashboardMiniStat label="排班状态" value={resultReady ? '可查看' : '待生成'} />
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function DashboardMiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-surface-2 px-3 py-2">
+      <p className="text-xs text-ink-muted">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-ink-primary">{value}</p>
     </div>
   )
 }
