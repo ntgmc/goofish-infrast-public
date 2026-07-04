@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import BuildMetaStrip from './components/BuildMetaStrip'
 import LandingPage from './pages/LandingPage'
 import ToolPage from './pages/ToolPage'
 
@@ -42,6 +43,7 @@ function App() {
         }>
           {route === 'admin' ? <AdminPage /> : <AdminSetupPage />}
         </Suspense>
+        <BuildMetaStrip placement="corner" />
       </div>
     )
   }
@@ -59,6 +61,7 @@ function App() {
           <AnnouncementsPage />
         </Suspense>
       )}
+      <BuildMetaStrip placement="corner" />
     </div>
   )
 }
