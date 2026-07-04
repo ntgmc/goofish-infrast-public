@@ -72,7 +72,7 @@ Quality Checks 拆分为两个检查项：
 
 另外，仓库使用 GitHub Actions 在 PR 创建、重新打开、更新 commit 或标记 ready 时，根据 PR 内 commit message 自动更新 PR description。配置文件位于 `.github/workflows/pr-details.yml`。该流程只维护 PR description 中 `<!-- pr-details:start -->` 到 `<!-- pr-details:end -->` 之间的自动生成区块，区块外的人工内容会保留。
 
-`npm run generate:data` 会自动生成并应用构建元数据。Quality Checks 会在 PR 指向 `main` 或 push 到 `main` 时自动运行该脚本；只有 `main` 分支 push 或手动触发的自动回写任务会把生成后的 `src/lib/build-meta.ts`、`netlify/functions/data.ts` 提交回仓库，PR 阶段不会改写源分支。CI 或 Netlify 可通过以下变量覆盖默认值：
+`npm run generate:data` 默认使用稳定模式生成数据和构建元数据：如果规则数据和已提交元数据没有变化，重复运行不会改写 `src/lib/build-meta.ts` 或 `netlify/functions/data.ts`。Quality Checks 的普通构建和函数 smoke test 都使用稳定模式；只有 `main` 分支 push 或手动触发的自动回写任务会运行 `npm run generate:data -- --refresh-metadata`，并把刷新后的版本元数据提交回仓库。CI 或 Netlify 可通过以下变量覆盖默认值：
 
 | Variable | Example | Purpose |
 | --- | --- | --- |
@@ -85,10 +85,11 @@ Quality Checks 拆分为两个检查项：
 | `GIT_SHA` | commit SHA | 版本对应的 Git 提交 |
 | `BUILD_NUMBER` | `123` | 生成版本号时使用的构建序号 |
 | `BUILD_CONTEXT` | `pull_request` / `push` | 构建上下文 |
+| `REFRESH_BUILD_METADATA` | `1` | 启用版本元数据刷新模式，等同于传入 `--refresh-metadata` |
 
 `npm run generate:data` 会根据这些变量生成 `src/lib/build-meta.ts`，并在 `netlify/functions/data.ts` 中写入 `data_version`、`generated_at` 和来源摘要。前端会显示“当前规则数据更新于 YYYY-MM-DD”，优化 API 响应也会带上同一份版本元数据。
 
-未显式提供 `FRONTEND_VERSION`、`BACKEND_VERSION` 或 `APP_VERSION` 时，版本号 patch bump 规则固定如下：显式 `VERSION_PATCH` 优先，其次使用 `BUILD_NUMBER`；本地未提供构建号时使用当前 Git 提交数。Quality Checks 的自动回写任务会把 `github.run_number` 作为 `BUILD_NUMBER` 注入，但只会在 `main` 分支的 push 或手动触发时写回仓库；PR 阶段只生成用于检查的临时产物，不会改写 PR 源分支。机器人提交触发的后续构建不会再次 bump，避免循环提交。未显式提供 `DATA_VERSION` 时，脚本会优先生成 `data.<构建号>.<短 SHA>`，缺少 Git 信息时回退到规则数据内容哈希。
+未显式提供 `FRONTEND_VERSION`、`BACKEND_VERSION` 或 `APP_VERSION` 时，版本号 patch bump 只在刷新模式中启用：显式 `VERSION_PATCH` 优先，其次使用 `BUILD_NUMBER`；本地刷新且未提供构建号时使用当前 Git 提交数。Quality Checks 的自动回写任务会把 `github.run_number` 作为 `BUILD_NUMBER` 注入，并通过 `--refresh-metadata` 写回仓库；PR 阶段和普通构建只生成用于检查的稳定临时产物，不会改写 PR 源分支。机器人提交触发的后续构建不会再次 bump，避免循环提交。未显式提供 `DATA_VERSION` 时，刷新模式会优先生成 `data.<构建号>.<短 SHA>`，缺少 Git 信息时回退到规则数据内容哈希。
 
 ## Netlify Build & deploy settings
 
