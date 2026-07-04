@@ -55,7 +55,7 @@ jobs:
           VERSION_SOURCE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           BUILD_NUMBER: ${{ github.run_number }}
           BUILD_CONTEXT: ${{ github.event_name }}
-        run: npm run generate:data
+        run: npm run generate:data -- --refresh-metadata
 
       - name: Commit generated metadata
         env:
