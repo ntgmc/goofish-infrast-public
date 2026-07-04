@@ -78,6 +78,15 @@ export interface AnnouncementReadRecord {
   read_at: string
 }
 
+export interface PasswordResetTokenRecord {
+  id: string
+  user_id: string
+  token_hash: string
+  expires_at: string
+  used_at: string | null
+  created_at: string
+}
+
 export async function getUserByEmail(email: string): Promise<UserAccountRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: UserAccountRecord }>(
@@ -212,6 +221,53 @@ export async function deleteSessionsForUser(userId: string, keepTokenHash?: stri
     return
   }
   await query('delete from user_sessions where user_id = $1', [userId])
+}
+
+export async function savePasswordResetToken(token: PasswordResetTokenRecord): Promise<void> {
+  await ensureSchema()
+  await query(
+    `insert into password_reset_tokens
+      (id, user_id, token_hash, expires_at, used_at, created_at)
+      values ($1, $2, $3, $4, $5, $6)
+      on conflict (id) do update set
+        token_hash = excluded.token_hash,
+        expires_at = excluded.expires_at,
+        used_at = excluded.used_at,
+        created_at = excluded.created_at`,
+    [token.id, token.user_id, token.token_hash, token.expires_at, token.used_at, token.created_at],
+  )
+}
+
+export async function getPasswordResetTokenByHash(tokenHash: string): Promise<PasswordResetTokenRecord | null> {
+  await ensureSchema()
+  const result = await query<PasswordResetTokenRecord>(
+    `select id, user_id, token_hash, expires_at, used_at, created_at
+      from password_reset_tokens
+      where token_hash = $1`,
+    [tokenHash],
+  )
+  return result.rows[0] ?? null
+}
+
+export async function getRecentPasswordResetTokenForUser(
+  userId: string,
+  since: string,
+): Promise<PasswordResetTokenRecord | null> {
+  await ensureSchema()
+  const result = await query<PasswordResetTokenRecord>(
+    `select id, user_id, token_hash, expires_at, used_at, created_at
+      from password_reset_tokens
+      where user_id = $1 and created_at >= $2
+      order by created_at desc
+      limit 1`,
+    [userId, since],
+  )
+  return result.rows[0] ?? null
+}
+
+export async function markPasswordResetTokenUsed(tokenId: string, usedAt = new Date().toISOString()): Promise<void> {
+  await ensureSchema()
+  await query('update password_reset_tokens set used_at = $2 where id = $1 and used_at is null', [tokenId, usedAt])
 }
 
 export async function listProfilesForUser(userId: string): Promise<UserGameAccountRecord[]> {

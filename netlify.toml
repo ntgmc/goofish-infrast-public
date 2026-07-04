@@ -54,6 +54,16 @@ to = "/.netlify/functions/auth"
 status = 200
 
 [[redirects]]
+from = "/api/auth/forgot-password"
+to = "/.netlify/functions/auth"
+status = 200
+
+[[redirects]]
+from = "/api/auth/reset-password"
+to = "/.netlify/functions/auth"
+status = 200
+
+[[redirects]]
 from = "/api/auth/change-password"
 to = "/.netlify/functions/auth"
 status = 200

@@ -1,13 +1,14 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import BuildMetaStrip from './components/BuildMetaStrip'
 import LandingPage from './pages/LandingPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import ToolPage from './pages/ToolPage'
 
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage'))
 
-type Route = 'home' | 'tool' | 'announcements' | 'admin' | 'adminSetup'
+type Route = 'home' | 'tool' | 'resetPassword' | 'announcements' | 'admin' | 'adminSetup'
 
 function App() {
   const [route, setRoute] = useState<Route>(() => resolveRoute(window.location.pathname) ?? 'home')
@@ -52,6 +53,7 @@ function App() {
     <div className="min-h-screen bg-surface-0 text-ink-primary">
       {route === 'home' && <LandingPage onStart={navigateToTool} />}
       {route === 'tool' && <ToolPage />}
+      {route === 'resetPassword' && <ResetPasswordPage />}
       {route === 'announcements' && (
         <Suspense fallback={
           <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
@@ -70,6 +72,7 @@ function resolveRoute(pathname: string): Route | null {
   const path = pathname.replace(/\/+$/, '') || '/'
   if (path === '/') return 'home'
   if (path === '/tool') return 'tool'
+  if (path === '/reset-password') return 'resetPassword'
   if (path === '/announcements') return 'announcements'
   if (path === '/admin') return 'admin'
   if (path === '/admin/setup') return 'adminSetup'

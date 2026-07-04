@@ -6,8 +6,10 @@ import {
   jsonResponse,
   loginUser,
   logoutRequest,
+  requestPasswordReset,
   registerUser,
   requireUserSession,
+  resetPasswordWithToken,
 } from './user-auth'
 
 export default async (req: Request, _context: Context): Promise<Response> => {
@@ -36,6 +38,20 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       await logoutRequest(req)
       return jsonResponse({ ok: true }, 200, { 'Set-Cookie': clearSessionCookie() })
+    }
+
+    if (pathname.endsWith('/forgot-password')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      const body = await req.json() as { email?: unknown }
+      return jsonResponse(await requestPasswordReset(body.email))
+    }
+
+    if (pathname.endsWith('/reset-password')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      const body = await req.json() as { token?: unknown; new_password?: unknown }
+      const reset = await resetPasswordWithToken(body.token, body.new_password)
+      if (!reset.ok) return jsonResponse({ error: reset.message }, reset.status)
+      return jsonResponse({ ok: true })
     }
 
     if (pathname.endsWith('/change-password')) {

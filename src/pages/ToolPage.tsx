@@ -20,7 +20,7 @@ import { canonicalJson } from '../lib/crypto'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
 
-type AuthMode = 'login' | 'register'
+type AuthMode = 'login' | 'register' | 'forgot'
 type DashboardSection = 'profiles' | 'redeem' | 'announcements' | 'settings'
 type WorkspaceSetupSection = 'operators' | 'config'
 type WorkspaceMode = 'dashboard' | 'setup' | 'optimize'
@@ -204,20 +204,33 @@ function AuthPage({
   const [cdk, setCdk] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     const nextErrors: FieldErrors = {}
     const emailError = validateEmailInput(email)
-    const passwordError = validatePasswordInput(password)
+    const passwordError = mode === 'forgot' ? null : validatePasswordInput(password)
     if (emailError) nextErrors.email = emailError
     if (passwordError) nextErrors.password = passwordError
     setFieldErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
     setLoading(true)
     setError(null)
+    setNotice(null)
     try {
+      if (mode === 'forgot') {
+        const resp = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        })
+        const data = await resp.json() as { error?: string; message?: string }
+        if (!resp.ok) throw new Error(data.error || `发送重置邮件失败: ${resp.status}`)
+        setNotice(data.message || '如果该邮箱已注册，我们会发送重置密码邮件。')
+        return
+      }
       const resp = await fetch(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -262,12 +275,14 @@ function AuthPage({
         </section>
 
         <form onSubmit={handleSubmit} noValidate className="rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8">
-          <div className="mb-6 grid grid-cols-2 rounded-lg bg-surface-2 p-1">
-            <button type="button" onClick={() => setMode('login')} className={`rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>登录</button>
-            <button type="button" onClick={() => setMode('register')} className={`rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>注册</button>
-          </div>
-          {error && <div className="mb-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
-          <label className="block">
+            <div className="mb-6 grid grid-cols-2 rounded-lg bg-surface-2 p-1">
+              <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null) }} className={`rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>登录</button>
+              <button type="button" onClick={() => { setMode('register'); setError(null); setNotice(null) }} className={`rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>注册</button>
+            </div>
+            {error && <div className="mb-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
+            {notice && <div className="mb-5 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{notice}</div>}
+            {mode === 'forgot' && <h2 className="mb-5 text-lg font-semibold text-ink-primary">重置密码</h2>}
+            <label className="block">
             <span className="mb-2 block text-sm font-medium text-ink-secondary">邮箱</span>
             <input
               id="auth-email"
@@ -284,33 +299,44 @@ function AuthPage({
             />
             {fieldErrors.email && <p id="auth-email-error" className="mt-1.5 text-sm text-error">{fieldErrors.email}</p>}
           </label>
-          <label className="mt-4 block">
-            <span className="mb-2 block text-sm font-medium text-ink-secondary">密码</span>
-            <input
-              id="auth-password"
-              type="password"
-              value={password}
-              onChange={(event) => {
-                setPassword(event.currentTarget.value)
-                clearFieldError('password')
-              }}
-              onFocus={() => clearFieldError('password')}
-              className={inputClassName(Boolean(fieldErrors.password))}
-              aria-invalid={Boolean(fieldErrors.password)}
-              aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
-            />
-            {fieldErrors.password && <p id="auth-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.password}</p>}
-          </label>
-          {mode === 'register' && (
-            <label className="mt-4 block">
-              <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK（可选）</span>
-              <input type="text" value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink-primary" placeholder="可注册后再兑换" />
-            </label>
-          )}
-          <p className="mt-4 text-xs leading-5 text-ink-muted">忘记密码请联系管理员重置。重置后使用管理员提供的新密码登录。</p>
-          <button type="submit" disabled={loading} className="mt-6 w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
-            {loading ? '处理中...' : mode === 'login' ? '登录' : '创建账号'}
-          </button>
+            {mode !== 'forgot' && (
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">密码</span>
+                <input
+                  id="auth-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.currentTarget.value)
+                    clearFieldError('password')
+                  }}
+                  onFocus={() => clearFieldError('password')}
+                  className={inputClassName(Boolean(fieldErrors.password))}
+                  aria-invalid={Boolean(fieldErrors.password)}
+                  aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
+                />
+                {fieldErrors.password && <p id="auth-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.password}</p>}
+              </label>
+            )}
+            {mode === 'register' && (
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK（可选）</span>
+                <input type="text" value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink-primary" placeholder="可注册后再兑换" />
+              </label>
+            )}
+            {mode === 'login' && (
+              <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}) }} className="mt-4 text-sm font-medium text-brand-500 underline-offset-4 hover:underline">
+                忘记密码？
+              </button>
+            )}
+            {mode === 'forgot' && (
+              <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null); setFieldErrors({}) }} className="mt-4 text-sm font-medium text-brand-500 underline-offset-4 hover:underline">
+                返回登录
+              </button>
+            )}
+            <button type="submit" disabled={loading} className="mt-6 w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+              {loading ? '处理中...' : mode === 'login' ? '登录' : mode === 'register' ? '创建账号' : '发送重置邮件'}
+            </button>
         </form>
       </div>
     </main>
