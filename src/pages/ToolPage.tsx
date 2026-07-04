@@ -13,7 +13,7 @@ import type {
 import AnnouncementPopup from '../components/AnnouncementPopup'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import BuildMetaStrip from '../components/BuildMetaStrip'
-import ConfigEditor, { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
+import ConfigEditor, { CONFIG_PRESETS, PERMISSION_LABELS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import DeferredFeatureMenu from '../components/DeferredFeatureMenu'
 import { canonicalJson } from '../lib/crypto'
 
@@ -21,6 +21,7 @@ const OptimizePage = lazy(() => import('./OptimizePage'))
 
 type AuthMode = 'login' | 'register'
 type WorkspaceMode = 'setup' | 'optimize'
+type WorkspaceSetupSection = 'operators' | 'config'
 
 export default function ToolPage() {
   const [authLoading, setAuthLoading] = useState(true)
@@ -274,6 +275,7 @@ function WorkspaceSetupPage({
   const [operators, setOperators] = useState<LicenseOperator[] | null>(workspace?.operators ?? null)
   const [operatorFileName, setOperatorFileName] = useState<string | null>(null)
   const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(workspace?.config ?? cloneConfig(CONFIG_PRESETS['243'])))
+  const [activeSection, setActiveSection] = useState<WorkspaceSetupSection>('operators')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -281,6 +283,12 @@ function WorkspaceSetupPage({
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
   const canEditConfig = user.permission === 'advanced' || user.permission === 'ultimate' || user.permission === 'admin'
   const canEditLimitedConfig = user.permission === 'recommended' || user.permission === 'growth'
+  const ownedOperatorCount = useMemo(() => operators?.filter((operator) => operator.own !== false).length ?? 0, [operators])
+  const configChanged = workspace?.config ? canonicalJson(normalizedConfig) !== canonicalJson(workspace.config) : true
+  const setupSections: Array<{ id: WorkspaceSetupSection; label: string; ready: boolean }> = [
+    { id: 'operators', label: '干员数据', ready: Boolean(operators) },
+    { id: 'config', label: '基建配置', ready: configValidation.ok },
+  ]
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
     const next = normalizeConfig(normalizedConfig)
@@ -334,60 +342,136 @@ function WorkspaceSetupPage({
   }
 
   return (
-    <main className="min-h-screen bg-surface-0 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-5 rounded-xl border border-surface-3 bg-surface-1 p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="min-h-screen bg-surface-0 text-ink-primary">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-surface-3 bg-surface-1 px-4 py-5 lg:block">
+        <div className="px-2">
+          <p className="text-sm font-semibold text-brand-500">MAA Workspace</p>
+          <p className="mt-1 truncate text-xs text-ink-muted">{user.email}</p>
+        </div>
+        <nav className="mt-8 space-y-1">
+          {setupSections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => setActiveSection(section.id)}
+              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${
+                activeSection === section.id
+                  ? 'bg-brand-600 text-white'
+                  : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'
+              }`}
+            >
+              <span>{section.label}</span>
+              <span className={`h-2 w-2 rounded-full ${section.ready ? 'bg-success' : 'bg-surface-4'}`} />
+            </button>
+          ))}
+        </nav>
+        <button type="button" onClick={onLogout} className="absolute bottom-5 left-4 right-4 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">
+          退出登录
+        </button>
+      </aside>
+
+      <main className="lg:pl-64">
+        <header className="sticky top-0 z-20 border-b border-surface-3 bg-surface-0/95 px-5 py-4 backdrop-blur sm:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium text-brand-400">{user.email}</p>
-              <h1 className="mt-2 text-3xl font-bold tracking-[-0.02em] text-ink-primary">准备账号工作区</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-ink-secondary">
-                上传干员数据并确认基建配置。保存后这些内容会进入后端工作区，下次登录会自动恢复。
-              </p>
+              <h1 className="mt-1 text-xl font-semibold text-ink-primary">准备账号工作区</h1>
+              <p className="mt-1 text-sm text-ink-muted">授权与工作状态会保存到后端账号工作区。</p>
             </div>
-            <button type="button" onClick={onLogout} className="self-start rounded-lg border border-surface-4 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-ink-primary">
+            <button type="button" onClick={onLogout} className="self-start rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary lg:hidden">
               退出登录
             </button>
           </div>
-          {announcement?.active && <AnnouncementBanner announcement={announcement} className="mt-5" />}
+          <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
+            {setupSections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSection(section.id)}
+                className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${
+                  activeSection === section.id ? 'bg-brand-600 text-white' : 'bg-surface-1 text-ink-secondary'
+                }`}
+              >
+                {section.label}
+              </button>
+            ))}
+          </div>
+          {announcement?.active && <AnnouncementBanner announcement={announcement} className="mt-4" />}
         </header>
 
-        <form onSubmit={handleSave} className="space-y-5">
-          {error && <div className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
+        <form onSubmit={handleSave} className="px-5 py-6 sm:px-8">
+          <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
+            <div className="space-y-5">
+              {error && <div className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
 
-          <section className="rounded-xl bg-surface-1 p-5 sm:p-6">
-            <h2 className="text-lg font-semibold text-ink-primary">干员数据</h2>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">
-              从 MAA 干员识别导出的 JSON/TXT 会保存到后端账号工作区。
-            </p>
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <label className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-2 px-4 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">
-                {operatorFileName ? `已选择：${operatorFileName}` : operators ? `已载入 ${operators.length} 名干员` : '选择干员数据文件'}
-                <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} className="hidden" />
-              </label>
-              {operators && <span className="text-sm text-brand-400">已载入 {operators.filter((operator) => operator.own !== false).length} 名拥有干员</span>}
+              {activeSection === 'operators' && (
+                <section className="rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-ink-primary">干员数据</h2>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">
+                        从 MAA 干员识别导出的 JSON/TXT 会保存到后端账号工作区，下次登录会自动恢复。
+                      </p>
+                    </div>
+                    {operators && <span className="rounded-md bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">已就绪</span>}
+                  </div>
+                  <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <label className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-2 px-4 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">
+                      {operatorFileName ? `已选择：${operatorFileName}` : operators ? `已载入 ${operators.length} 名干员` : '选择干员数据文件'}
+                      <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} className="hidden" />
+                    </label>
+                    {operators && <span className="text-sm text-brand-400">拥有干员 {ownedOperatorCount} 名</span>}
+                  </div>
+                </section>
+              )}
+
+              {activeSection === 'config' && (
+                <ConfigEditor
+                  config={normalizedConfig}
+                  canEdit={canEditConfig}
+                  canEditIntermediateInventory={canEditLimitedConfig}
+                  canEditShiftHours={canEditLimitedConfig}
+                  canSelectPreset
+                  changed={configChanged}
+                  permission={user.permission}
+                  validation={configValidation}
+                  onUpdate={updateConfig}
+                  note="配置会保存到后端账号工作区，不再生成本地授权文件。"
+                />
+              )}
             </div>
-          </section>
 
-          <ConfigEditor
-            config={normalizedConfig}
-            canEdit={canEditConfig}
-            canEditIntermediateInventory={canEditLimitedConfig}
-            canEditShiftHours={canEditLimitedConfig}
-            canSelectPreset
-            changed={workspace?.config ? canonicalJson(normalizedConfig) !== canonicalJson(workspace.config) : true}
-            permission={user.permission}
-            validation={configValidation}
-            onUpdate={updateConfig}
-            note="配置会保存到后端账号工作区，不再生成本地授权文件。"
-          />
+            <aside className="space-y-5">
+              <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+                <h2 className="text-base font-semibold text-ink-primary">工作区状态</h2>
+                <dl className="mt-4 space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-3">
+                    <dt className="text-ink-muted">权限</dt>
+                    <dd className="font-medium text-ink-primary">{PERMISSION_LABELS[user.permission]}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-3">
+                    <dt className="text-ink-muted">干员</dt>
+                    <dd className="font-medium text-ink-primary">{operators ? `${operators.length} 名` : '未上传'}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-3">
+                    <dt className="text-ink-muted">拥有</dt>
+                    <dd className="font-medium text-ink-primary">{operators ? `${ownedOperatorCount} 名` : '-'}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-ink-muted">配置</dt>
+                    <dd className={`font-medium ${configValidation.ok ? 'text-success' : 'text-error'}`}>{configValidation.ok ? (configChanged ? '已调整' : '已同步') : '需修正'}</dd>
+                  </div>
+                </dl>
+              </section>
 
-          <button type="submit" disabled={saving || !operators || !configValidation.ok} className="w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
-            {saving ? '正在保存...' : '保存工作区并开始排班'}
-          </button>
+              <button type="submit" disabled={saving || !operators || !configValidation.ok} className="w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+                {saving ? '正在保存...' : '保存工作区并开始排班'}
+              </button>
+            </aside>
+          </div>
         </form>
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }
 
