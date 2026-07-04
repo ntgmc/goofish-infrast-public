@@ -339,7 +339,7 @@ export function resolveConfigForPermission(
   if (!preset) {
     return { ok: false, message: '当前 CDK 版本仅支持 243 均衡、243 搓玉或 333 搓玉预设配置。' }
   }
-  return { ok: true, config: cloneConfig(preset) }
+  return { ok: true, config: resolvePresetMode(config, preset) }
 }
 
 function isRawPermissionMode(value: string): value is RawPermissionMode {
@@ -350,15 +350,28 @@ function cloneConfig(config: LicenseConfig): LicenseConfig {
   return JSON.parse(JSON.stringify(config)) as LicenseConfig
 }
 
+function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
+  const resolved = cloneConfig(preset)
+  if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
+    resolved.schedule_mode = 'rotation'
+    resolved.Fiammetta = { ...(resolved.Fiammetta ?? {}), enable: false }
+    resolved.drones = { ...(resolved.drones ?? { order: 'pre', targets: [] }), enable: false }
+  }
+  return resolved
+}
+
 function isPresetConfigMatch(config: LicenseConfig, preset: LicenseConfig): boolean {
+  const scheduleMode = normalizeScheduleMode(config.schedule_mode)
+  const presetMode = normalizeScheduleMode(preset.schedule_mode)
+  const scheduleMatches = scheduleMode === presetMode || (scheduleMode === 'rotation' && presetMode === 'maa')
   return config.layout === preset.layout
-    && normalizeScheduleMode(config.schedule_mode) === normalizeScheduleMode(preset.schedule_mode)
+    && scheduleMatches
     && config.trading_stations_count === preset.trading_stations_count
     && config.manufacturing_stations_count === preset.manufacturing_stations_count
     && countsMatch(config.product_requirements?.trading_stations, preset.product_requirements.trading_stations, TRADING_PRODUCTS)
     && countsMatch(config.product_requirements?.manufacturing_stations, preset.product_requirements.manufacturing_stations, MANUFACTURING_PRODUCTS)
-    && Boolean(config.Fiammetta?.enable) === Boolean(preset.Fiammetta?.enable)
-    && dronesMatch(config.drones, preset.drones)
+    && (scheduleMode === 'rotation' || Boolean(config.Fiammetta?.enable) === Boolean(preset.Fiammetta?.enable))
+    && (scheduleMode === 'rotation' || dronesMatch(config.drones, preset.drones))
 }
 
 function normalizeScheduleMode(mode: unknown): string {

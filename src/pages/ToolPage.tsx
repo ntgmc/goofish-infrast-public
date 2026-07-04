@@ -40,6 +40,8 @@ export default function ToolPage() {
   const [banner, setBanner] = useState<Announcement | null>(null)
   const [popups, setPopups] = useState<Announcement[]>([])
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0)
+  const [openingProfileId, setOpeningProfileId] = useState<string | null>(null)
+  const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -93,10 +95,20 @@ export default function ToolPage() {
   }, [])
 
   const refreshProfileWorkspace = useCallback(async (profile: UserGameAccount, mode: WorkspaceMode) => {
-    const resp = await fetch(`/api/user/workspace?profile_id=${encodeURIComponent(profile.id)}`)
-    const data = await resp.json() as AuthSuccessResponse & { error?: string }
-    if (!resp.ok) throw new Error(data.error || `加载账号资料失败: ${resp.status}`)
-    applyAuthPayload(data, mode)
+    setOpeningProfileId(profile.id)
+    setWorkspaceLoadError(null)
+    try {
+      const resp = await fetch(`/api/user/workspace?profile_id=${encodeURIComponent(profile.id)}`)
+      const data = await resp.json() as AuthSuccessResponse & { error?: string }
+      if (!resp.ok) throw new Error(data.error || `加载账号资料失败: ${resp.status}`)
+      applyAuthPayload(data, mode)
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : '加载账号资料失败，请稍后重试。'
+      setWorkspaceLoadError(message)
+      throw caught
+    } finally {
+      setOpeningProfileId(null)
+    }
   }, [applyAuthPayload])
 
   const persistWorkspacePatch = useCallback(async (patch: Partial<UserWorkspace>) => {
@@ -141,10 +153,12 @@ export default function ToolPage() {
         <AccountDashboard
           user={user}
           profiles={profiles}
-          activeProfile={activeProfile}
-          announcementUnreadCount={announcementUnreadCount}
-          onLogout={handleLogout}
-          onPayload={(payload) => applyAuthPayload(payload, 'dashboard')}
+        activeProfile={activeProfile}
+        announcementUnreadCount={announcementUnreadCount}
+        openingProfileId={openingProfileId}
+        workspaceLoadError={workspaceLoadError}
+        onLogout={handleLogout}
+        onPayload={(payload) => applyAuthPayload(payload, 'dashboard')}
           onOpenProfile={(profile) => {
             void refreshProfileWorkspace(profile, 'setup').catch(console.error)
           }}
@@ -179,10 +193,12 @@ export default function ToolPage() {
         <AccountDashboard
           user={user}
           profiles={profiles}
-          activeProfile={activeProfile}
-          announcementUnreadCount={announcementUnreadCount}
-          onLogout={handleLogout}
-          onPayload={(payload) => applyAuthPayload(payload, 'dashboard')}
+        activeProfile={activeProfile}
+        announcementUnreadCount={announcementUnreadCount}
+        openingProfileId={openingProfileId}
+        workspaceLoadError={workspaceLoadError}
+        onLogout={handleLogout}
+        onPayload={(payload) => applyAuthPayload(payload, 'dashboard')}
           onOpenProfile={(profile) => {
             void refreshProfileWorkspace(profile, 'setup').catch(console.error)
           }}
@@ -349,6 +365,8 @@ function AccountDashboard({
   profiles,
   activeProfile,
   announcementUnreadCount,
+  openingProfileId,
+  workspaceLoadError,
   onLogout,
   onPayload,
   onOpenProfile,
@@ -357,6 +375,8 @@ function AccountDashboard({
   profiles: UserGameAccount[]
   activeProfile: UserGameAccount | null
   announcementUnreadCount: number
+  openingProfileId: string | null
+  workspaceLoadError: string | null
   onLogout: () => void
   onPayload: (payload: AuthSuccessResponse) => void
   onOpenProfile: (profile: UserGameAccount) => void
@@ -402,7 +422,12 @@ function AccountDashboard({
           </div>
         </header>
         <div className="px-5 py-6 sm:px-8">
-          {section === 'profiles' && <ProfileList profiles={profiles} onOpen={onOpenProfile} onEdit={onPayload} />}
+        {workspaceLoadError && (
+          <div className="mb-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">
+            {workspaceLoadError}
+          </div>
+        )}
+        {section === 'profiles' && <ProfileList profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} />}
           {section === 'tools' && <DashboardTools />}
           {section === 'redeem' && <RedeemPanel onRedeemed={(payload) => { onPayload(payload); setSection('profiles') }} />}
           {section === 'announcements' && <AnnouncementCenter />}
@@ -439,10 +464,12 @@ function DashboardTools() {
 
 function ProfileList({
   profiles,
+  openingProfileId,
   onOpen,
   onEdit,
 }: {
   profiles: UserGameAccount[]
+  openingProfileId: string | null
   onOpen: (profile: UserGameAccount) => void
   onEdit: (payload: AuthSuccessResponse) => void
 }) {
@@ -457,7 +484,14 @@ function ProfileList({
   return (
     <section className="grid gap-4 xl:grid-cols-2">
       {profiles.map((profile, index) => (
-        <ProfileCard key={profile.id} profile={profile} fallbackName={`账号 ${index + 1}`} onOpen={() => onOpen(profile)} onSaved={onEdit} />
+        <ProfileCard
+          key={profile.id}
+          profile={profile}
+          fallbackName={`账号 ${index + 1}`}
+          opening={openingProfileId === profile.id}
+          onOpen={() => onOpen(profile)}
+          onSaved={onEdit}
+        />
       ))}
     </section>
   )
@@ -466,11 +500,13 @@ function ProfileList({
 function ProfileCard({
   profile,
   fallbackName,
+  opening,
   onOpen,
   onSaved,
 }: {
   profile: UserGameAccount
   fallbackName: string
+  opening: boolean
   onOpen: () => void
   onSaved: (payload: AuthSuccessResponse) => void
 }) {
@@ -506,7 +542,14 @@ function ProfileCard({
           <p className="mt-2 text-sm leading-6 text-ink-secondary">{profile.note || '暂无备注'}</p>
           <p className="mt-3 text-xs text-ink-muted">{profile.operator_count} 名干员 · 更新 {formatDate(profile.updated_at)}</p>
         </div>
-        <button type="button" onClick={onOpen} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500">准备这个账号</button>
+        <button
+          type="button"
+          onClick={onOpen}
+          disabled={opening}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:cursor-wait disabled:bg-surface-3 disabled:text-ink-muted"
+        >
+          {opening ? '正在准备...' : '准备这个账号'}
+        </button>
       </div>
       <button type="button" onClick={() => setEditing((value) => !value)} className="mt-4 text-sm font-semibold text-brand-400 hover:text-brand-300">修改名称和备注</button>
       {editing && (

@@ -154,6 +154,7 @@ function applyCounts(config: LicenseConfig): LicenseConfig {
 }
 
 export function validateConfig(config: LicenseConfig): { ok: true } | { ok: false; message: string } {
+  const rotationMode = normalizeScheduleMode(config.schedule_mode) === 'rotation'
   const tradingCount = config.trading_stations_count
   const manufacturingCount = config.manufacturing_stations_count
   if (!Number.isInteger(tradingCount) || !Number.isInteger(manufacturingCount)) {
@@ -171,10 +172,10 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
     return { ok: false, message: `制造产物数量合计为 ${manufacturingTotal}，需要等于 ${manufacturingCount}。` }
   }
   const shiftHours = parseShiftHours(config.shift_hours)
-  if (!shiftHours || !isValidShiftHours(shiftHours)) {
+  if (!rotationMode && (!shiftHours || !isValidShiftHours(shiftHours))) {
     return { ok: false, message: '换班间隔需填写为 8-8-8、12-12-12，或合计 24 小时的非固定节奏，例如 12-6-6。' }
   }
-  if (config.drones?.enable && !config.drones.auto && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
+  if (!rotationMode && config.drones?.enable && !config.drones.auto && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
     return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
   }
   return { ok: true }
@@ -260,7 +261,6 @@ export default function ConfigEditor({
   embedded = false,
 }: ConfigEditorProps) {
   const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
-  const canUseShiftHours = canEdit || Boolean(canEditShiftHours)
   const autoInventoryOnly = !canEdit && canUseIntermediateInventory
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
@@ -269,6 +269,7 @@ export default function ConfigEditor({
   const shiftHoursText = formatShiftHours(config.shift_hours ?? shiftHours)
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
+  const canUseShiftHours = !rotationMode && (canEdit || Boolean(canEditShiftHours))
   const validationMessage = validation.ok === false ? validation.message : null
   const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
 
@@ -473,15 +474,14 @@ export default function ConfigEditor({
               <p className="mb-2 text-xs font-medium text-ink-muted">排班模式</p>
               <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
                 {(['maa', 'rotation'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    disabled={!canEdit || mode === 'rotation'}
-                    title={mode === 'rotation' ? '游戏内轮换暂不可用' : undefined}
-                    onClick={() => onUpdate((next) => {
-                      next.schedule_mode = mode
-                      if (mode === 'rotation') {
-                        next.Fiammetta = { ...(next.Fiammetta ?? {}), enable: false }
+              <button
+                key={mode}
+                type="button"
+                disabled={!canEdit}
+                onClick={() => onUpdate((next) => {
+                  next.schedule_mode = mode
+                  if (mode === 'rotation') {
+                    next.Fiammetta = { ...(next.Fiammetta ?? {}), enable: false }
                       }
                       applyCounts(next)
                     })}
@@ -494,9 +494,9 @@ export default function ConfigEditor({
                     {SCHEDULE_MODE_LABELS[mode]}
                   </button>
                 ))}
-              </div>
+            </div>
             <p className="mt-2 text-xs leading-5 text-ink-muted">
-              游戏内轮换暂不可用，当前仅支持生成 MAA 排班表。
+              游戏内轮换会生成两个设施预设队列，按游戏内“队列轮换/快速切换”使用；不会生成 MAA 排班 JSON。
             </p>
           </div>
           <div>
@@ -555,8 +555,8 @@ export default function ConfigEditor({
               <span>无人机</span>
               <input
                 type="checkbox"
-                checked={config.drones?.enable ?? false}
-                disabled={!canEdit}
+                  checked={!rotationMode && (config.drones?.enable ?? false)}
+                  disabled={!canEdit || rotationMode}
                 onChange={(event) => onUpdate((next) => {
                   next.drones = {
                     ...(next.drones ?? { order: 'pre', targets: [] }),
@@ -572,8 +572,8 @@ export default function ConfigEditor({
               <span>无人机 Auto</span>
               <input
                 type="checkbox"
-                checked={config.drones?.auto ?? false}
-                disabled={!canEdit || !config.drones?.enable}
+                  checked={!rotationMode && (config.drones?.auto ?? false)}
+                  disabled={!canEdit || rotationMode || !config.drones?.enable}
                 onChange={(event) => onUpdate((next) => {
                   next.drones = {
                     ...(next.drones ?? { enable: true, order: 'pre', targets: [] }),
@@ -591,7 +591,7 @@ export default function ConfigEditor({
               <select
                 id="drone-order"
                 value={config.drones?.order ?? 'pre'}
-                disabled={!canEdit || !config.drones?.enable}
+                disabled={!canEdit || rotationMode || !config.drones?.enable}
                 onChange={(event) => onUpdate((next) => {
                   next.drones = {
                     ...(next.drones ?? { enable: true, targets: [] }),
@@ -612,7 +612,7 @@ export default function ConfigEditor({
                 <DroneTargetsInput
                   id="drone-targets"
                   value={droneTargets}
-                  disabled={!canEdit || !config.drones?.enable || Boolean(config.drones?.auto)}
+                disabled={!canEdit || rotationMode || !config.drones?.enable || Boolean(config.drones?.auto)}
                   onChange={(value) => onUpdate((next) => {
                     next.drones = {
                       ...(next.drones ?? { enable: true, order: 'pre' }),
