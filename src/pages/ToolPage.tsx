@@ -16,12 +16,13 @@ import AnnouncementPopup from '../components/AnnouncementPopup'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { CONFIG_PRESETS, PERMISSION_LABELS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import DeferredFeatureMenu from '../components/DeferredFeatureMenu'
+import ScheduleAnalysisTool from '../components/ScheduleAnalysisTool'
 import { canonicalJson } from '../lib/crypto'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
 
 type AuthMode = 'login' | 'register' | 'forgot'
-type DashboardSection = 'profiles' | 'redeem' | 'announcements' | 'settings'
+type DashboardSection = 'profiles' | 'tools' | 'redeem' | 'announcements' | 'settings'
 type WorkspaceSetupSection = 'operators' | 'config'
 type WorkspaceMode = 'dashboard' | 'setup' | 'optimize'
 type FieldErrors = Record<string, string>
@@ -363,6 +364,7 @@ function AccountDashboard({
   const [section, setSection] = useState<DashboardSection>('profiles')
   const labels: Record<DashboardSection, string> = {
     profiles: '游戏账号',
+    tools: '工具',
     redeem: '兑换 CDK',
     announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCount})` : ''}`,
     settings: '账号设置',
@@ -401,11 +403,36 @@ function AccountDashboard({
         </header>
         <div className="px-5 py-6 sm:px-8">
           {section === 'profiles' && <ProfileList profiles={profiles} onOpen={onOpenProfile} onEdit={onPayload} />}
+          {section === 'tools' && <DashboardTools />}
           {section === 'redeem' && <RedeemPanel onRedeemed={(payload) => { onPayload(payload); setSection('profiles') }} />}
           {section === 'announcements' && <AnnouncementCenter />}
           {section === 'settings' && <SettingsPanel />}
         </div>
       </main>
+    </div>
+  )
+}
+
+function DashboardTools() {
+  return (
+    <div className="space-y-6">
+      <section className="rounded-lg border border-surface-3 bg-surface-1 p-5 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-ink-primary">排班表分析</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">
+              这里和公开工具页使用同一套分析能力；不会读取或覆盖当前账号保存的干员数据。
+            </p>
+          </div>
+          <a
+            href="/tools/schedule-analysis"
+            className="inline-flex w-fit items-center justify-center rounded-lg border border-surface-3 bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary"
+          >
+            打开独立页面
+          </a>
+        </div>
+      </section>
+      <ScheduleAnalysisTool compact />
     </div>
   )
 }
