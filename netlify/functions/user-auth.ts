@@ -1,19 +1,30 @@
 import { createHash, pbkdf2Sync, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import type { AuthUser, PermissionMode } from '../../src/lib/types'
+import type { Announcement, AuthSuccessResponse, AuthUser, PermissionMode, UserGameAccount } from '../../src/lib/types'
 import {
   deleteSessionByTokenHash,
+  deleteSessionsForUser,
+  deleteUserAccount,
   emptyWorkspace,
+  getAnnouncementReads,
+  getProfileWorkspace,
   getSessionByTokenHash,
   getUserByEmail,
   getUserById,
-  getWorkspace,
+  listProfilesForUser,
+  markAnnouncementRead,
+  migrateLegacyUserIfNeeded,
+  saveProfileWorkspace,
   saveUserAccount,
+  saveUserProfile,
   saveUserSession,
-  saveWorkspace,
+  toPublicProfile,
   toPublicWorkspace,
   touchSession,
   type UserAccountRecord,
+  type UserGameAccountRecord,
+  type UserSessionRecord,
 } from '../../server/storage/user-store'
+import { createPostgresAnnouncementStore } from '../../server/storage/announcement-store'
 import {
   getCdkRecordStore,
   hashCdk,
@@ -27,9 +38,14 @@ const SESSION_COOKIE = 'maa_session'
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
 const PASSWORD_ITERATIONS = 120_000
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const ANNOUNCEMENT_KEY = 'current.json'
 
 export interface AuthContext {
   user: UserAccountRecord
+  session: UserSessionRecord
+  tokenHash: string
+  profiles: UserGameAccountRecord[]
+  activeProfile: UserGameAccountRecord | null
   cdkRecord: CdkRecord | null
 }
 
@@ -59,83 +75,76 @@ export function validatePassword(value: unknown): { ok: true; password: string }
   return { ok: true, password: value }
 }
 
-export async function registerUser(emailValue: unknown, passwordValue: unknown, cdkValue: unknown): Promise<
+export async function registerUser(
+  emailValue: unknown,
+  passwordValue: unknown,
+  cdkValue?: unknown,
+): Promise<
   | { ok: true; user: UserAccountRecord; cookie: string }
   | { ok: false; status: number; message: string }
 > {
   const email = normalizeEmail(emailValue)
   if (!email) return { ok: false, status: 400, message: '邮箱格式不正确。' }
-
   const passwordCheck = validatePassword(passwordValue)
   if (!passwordCheck.ok) return { ok: false, status: 400, message: passwordCheck.message }
-
-  if (typeof cdkValue !== 'string' || !cdkValue.trim()) {
-    return { ok: false, status: 400, message: '请填写 CDK。' }
-  }
-
-  if (await getUserByEmail(email)) {
-    return { ok: false, status: 409, message: '该邮箱已经注册，请直接登录。' }
-  }
-
-  const hashSecret = requireEnv('CDK_HASH_SECRET')
-  const codeHash = hashCdk(normalizeCode(cdkValue), hashSecret)
-  const cdkKey = `cdk/${codeHash}.json`
-  const cdkStore = await getCdkRecordStore()
-  const cdkRecord = await cdkStore.get(cdkKey)
-
-  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK 不存在。' }
-  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已冻结，请联系卖家。' }
-  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已撤销，请联系卖家。' }
-  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
+  const existing = await getUserByEmail(email)
+  if (existing) return { ok: false, status: 409, message: '该邮箱已注册。' }
 
   const now = new Date().toISOString()
-  const userId = randomUUID()
-  const permission = normalizePermissionMode(cdkRecord.permission)
-  const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, userId)
   const passwordHash = hashPassword(passwordCheck.password)
   const user: UserAccountRecord = {
     version: 1,
-    id: userId,
+    id: randomUUID(),
     email,
     password_hash: passwordHash.hash,
     salt: passwordHash.salt,
     iterations: PASSWORD_ITERATIONS,
-    permission,
+    permission: 'growth',
     status: 'active',
-    cdk_key: cdkKey,
-    cdk_code_hash: codeHash,
-    cdk_order_hash: cdkOrderHash,
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
     created_at: now,
     updated_at: now,
   }
-
   await saveUserAccount(user)
-  await cdkStore.set(cdkKey, {
-    ...cdkRecord,
-    status: 'used',
-    used_at: now,
-    license_order_hash: cdkOrderHash,
-    operator_count: cdkRecord.operator_count ?? null,
-    config_desc: cdkRecord.config_desc ?? null,
-    account_id: userId,
-    account_email_hash: createHash('sha256').update(email).digest('hex'),
-    bound_at: now,
-  } as CdkRecord)
-  await saveWorkspace(emptyWorkspace(userId))
 
-  const session = await createSession(userId)
+  if (typeof cdkValue === 'string' && cdkValue.trim()) {
+    const redeemed = await redeemProfileCdk(user, cdkValue, '账号 1', '')
+    if (!redeemed.ok) {
+      await deleteUserAccount(user.id)
+      return redeemed
+    }
+    const primary = {
+      ...user,
+      permission: redeemed.profile.permission,
+      cdk_key: redeemed.profile.cdk_key,
+      cdk_code_hash: redeemed.profile.cdk_code_hash,
+      cdk_order_hash: redeemed.profile.cdk_order_hash,
+      updated_at: new Date().toISOString(),
+    }
+    await saveUserAccount(primary)
+    user.permission = primary.permission
+    user.cdk_key = primary.cdk_key
+    user.cdk_code_hash = primary.cdk_code_hash
+    user.cdk_order_hash = primary.cdk_order_hash
+    user.updated_at = primary.updated_at
+  }
+
+  const session = await createSession(user.id)
   return { ok: true, user, cookie: session.cookie }
 }
 
-export async function loginUser(emailValue: unknown, passwordValue: unknown): Promise<
+export async function loginUser(
+  emailValue: unknown,
+  passwordValue: unknown,
+): Promise<
   | { ok: true; user: UserAccountRecord; cookie: string }
   | { ok: false; status: number; message: string }
 > {
   const email = normalizeEmail(emailValue)
   if (!email) return { ok: false, status: 400, message: '邮箱格式不正确。' }
-  if (typeof passwordValue !== 'string' || !passwordValue) {
-    return { ok: false, status: 400, message: '请填写密码。' }
-  }
+  if (typeof passwordValue !== 'string') return { ok: false, status: 400, message: '请填写密码。' }
 
   const user = await getUserByEmail(email)
   if (!user || !verifyPassword(passwordValue, user)) {
@@ -145,8 +154,98 @@ export async function loginUser(emailValue: unknown, passwordValue: unknown): Pr
     return { ok: false, status: 403, message: '账号状态不可用，请联系卖家。' }
   }
 
+  await migrateLegacyUserIfNeeded(user)
   const session = await createSession(user.id)
   return { ok: true, user, cookie: session.cookie }
+}
+
+export async function changeUserPassword(
+  user: UserAccountRecord,
+  oldPasswordValue: unknown,
+  newPasswordValue: unknown,
+  keepTokenHash: string,
+): Promise<{ ok: true; user: UserAccountRecord } | { ok: false; status: number; message: string }> {
+  if (typeof oldPasswordValue !== 'string' || !verifyPassword(oldPasswordValue, user)) {
+    return { ok: false, status: 401, message: '当前密码不正确。' }
+  }
+  const nextPassword = validatePassword(newPasswordValue)
+  if (!nextPassword.ok) return { ok: false, status: 400, message: nextPassword.message }
+  const updated = await setUserPassword(user, nextPassword.password)
+  await deleteSessionsForUser(user.id, keepTokenHash)
+  return { ok: true, user: updated }
+}
+
+export async function resetUserPasswordByAdmin(
+  user: UserAccountRecord,
+  newPasswordValue: unknown,
+): Promise<{ ok: true; user: UserAccountRecord } | { ok: false; message: string }> {
+  const nextPassword = validatePassword(newPasswordValue)
+  if (!nextPassword.ok) return { ok: false, message: nextPassword.message }
+  const updated = await setUserPassword(user, nextPassword.password)
+  await deleteSessionsForUser(user.id)
+  return { ok: true, user: updated }
+}
+
+export async function redeemProfileCdk(
+  user: UserAccountRecord,
+  codeValue: unknown,
+  displayNameValue?: unknown,
+  noteValue?: unknown,
+): Promise<
+  | { ok: true; profile: UserGameAccountRecord }
+  | { ok: false; status: number; message: string }
+> {
+  if (typeof codeValue !== 'string' || !codeValue.trim()) {
+    return { ok: false, status: 400, message: '请填写 CDK。' }
+  }
+
+  const normalizedCode = normalizeCode(codeValue)
+  const codeHash = hashCdk(normalizedCode, requireEnv('CDK_HASH_SECRET'))
+  const cdkKey = `cdk/${codeHash}.json`
+  const cdkStore = await getCdkRecordStore()
+  const cdkRecord = await cdkStore.get(cdkKey)
+  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK 不存在。' }
+  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已冻结，请联系卖家。' }
+  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已撤销，请联系卖家。' }
+  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
+
+  const now = new Date().toISOString()
+  const profileId = randomUUID()
+  const permission = normalizePermissionMode(cdkRecord.permission)
+  const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profileId)
+  const displayName = normalizeProfileDisplayName(displayNameValue) || await nextDefaultProfileName(user.id)
+  const note = normalizeProfileNote(noteValue)
+  const profile: UserGameAccountRecord = {
+    version: 1,
+    id: profileId,
+    user_id: user.id,
+    cdk_key: cdkKey,
+    cdk_code_hash: codeHash,
+    cdk_order_hash: cdkOrderHash,
+    permission,
+    status: 'active',
+    display_name: displayName,
+    note,
+    created_at: now,
+    updated_at: now,
+  }
+
+  await saveUserProfile(profile)
+  await saveProfileWorkspace(emptyWorkspace(profile.id))
+  await cdkStore.set(cdkKey, {
+    ...cdkRecord,
+    status: 'used',
+    used_at: now,
+    license_order_hash: cdkOrderHash,
+    operator_count: cdkRecord.operator_count ?? null,
+    config_desc: cdkRecord.config_desc ?? null,
+    account_id: user.id,
+    profile_id: profile.id,
+    account_email_hash: createHash('sha256').update(user.email).digest('hex'),
+    bound_at: now,
+  } as CdkRecord)
+
+  return { ok: true, profile }
 }
 
 export async function requireUserSession(req: Request): Promise<AuthContext | null> {
@@ -154,24 +253,45 @@ export async function requireUserSession(req: Request): Promise<AuthContext | nu
   if (!token) return null
   const tokenHash = hashSessionToken(token)
   const session = await getSessionByTokenHash(tokenHash)
-  if (!session || Date.parse(session.expires_at) <= Date.now()) return null
+  if (!session) return null
+  if (Date.parse(session.expires_at) <= Date.now()) {
+    await deleteSessionByTokenHash(tokenHash)
+    return null
+  }
   const user = await getUserById(session.user_id)
-  if (!user || user.status !== 'active') return null
+  if (!user) {
+    await deleteSessionByTokenHash(tokenHash)
+    return null
+  }
+  const profiles = await migrateLegacyUserIfNeeded(user)
+  const activeProfile = profiles[0] ?? null
+  const cdkRecord = activeProfile ? await getCdkRecordForProfile(activeProfile) : null
   await touchSession(session)
-  const cdkRecord = await (await getCdkRecordStore()).get(user.cdk_key)
-  return { user, cdkRecord }
+  return { user, session, tokenHash, profiles, activeProfile, cdkRecord }
 }
 
 export async function logoutRequest(req: Request): Promise<void> {
   const token = getSessionToken(req)
-  if (token) await deleteSessionByTokenHash(hashSessionToken(token))
+  if (!token) return
+  await deleteSessionByTokenHash(hashSessionToken(token))
 }
 
-export async function buildAuthPayload(user: UserAccountRecord) {
-  const workspace = await getWorkspace(user.id)
+export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?: string | null): Promise<AuthSuccessResponse> {
+  const records = await migrateLegacyUserIfNeeded(user)
+  const publicProfiles: UserGameAccount[] = []
+  for (const profile of records) {
+    publicProfiles.push(toPublicProfile(profile, await getProfileWorkspace(profile.id)))
+  }
+  const activeProfileRecord = activeProfileId
+    ? records.find((profile) => profile.id === activeProfileId) ?? records[0] ?? null
+    : records[0] ?? null
+  const activeWorkspace = activeProfileRecord ? await getProfileWorkspace(activeProfileRecord.id) : null
   return {
     user: toPublicUser(user),
-    workspace: toPublicWorkspace(workspace),
+    profiles: publicProfiles,
+    active_profile: activeProfileRecord ? toPublicProfile(activeProfileRecord, activeWorkspace) : null,
+    workspace: activeProfileRecord ? toPublicWorkspace(activeWorkspace) : null,
+    announcement_unread_count: await getAnnouncementUnreadCount(user.id),
   }
 }
 
@@ -181,14 +301,48 @@ export function toPublicUser(user: UserAccountRecord): AuthUser {
     email: user.email,
     permission: user.permission,
     status: user.status,
-    cdk_status: user.status === 'active' ? 'used' : user.status,
+    cdk_status: user.cdk_key ? (user.status === 'active' ? 'used' : user.status) : 'none',
     cdk_order_hash: user.cdk_order_hash,
     created_at: user.created_at,
   }
 }
 
+export async function getAnnouncementUnreadCount(userId: string): Promise<number> {
+  const announcements = await getActiveAnnouncements()
+  const readIds = new Set((await getAnnouncementReads(userId)).map((read) => read.announcement_id))
+  return announcements.filter((announcement) => !readIds.has(announcement.id)).length
+}
+
+export async function markAnnouncementsRead(userId: string, announcementIds: string[]): Promise<void> {
+  for (const announcementId of announcementIds) {
+    await markAnnouncementRead(userId, announcementId)
+  }
+}
+
+export async function getActiveAnnouncements(): Promise<Announcement[]> {
+  const store = createPostgresAnnouncementStore(ANNOUNCEMENT_KEY)
+  const value = await store.get()
+  if (!value || typeof value !== 'object' || !Array.isArray((value as { announcements?: unknown }).announcements)) return []
+  return ((value as { announcements: unknown[] }).announcements)
+    .filter((item): item is Announcement => isAnnouncement(item) && item.active)
+    .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
+}
+
 export function clearSessionCookie(): string {
   return `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secureCookieSuffix()}`
+}
+
+async function setUserPassword(user: UserAccountRecord, password: string): Promise<UserAccountRecord> {
+  const passwordHash = hashPassword(password)
+  const updated: UserAccountRecord = {
+    ...user,
+    password_hash: passwordHash.hash,
+    salt: passwordHash.salt,
+    iterations: PASSWORD_ITERATIONS,
+    updated_at: new Date().toISOString(),
+  }
+  await saveUserAccount(updated)
+  return updated
 }
 
 function hashPassword(password: string): { hash: string; salt: string } {
@@ -224,19 +378,48 @@ async function createSession(userId: string): Promise<{ cookie: string }> {
 }
 
 function getSessionToken(req: Request): string | null {
-  const cookie = req.headers.get('Cookie') || req.headers.get('cookie') || ''
-  const match = cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${SESSION_COOKIE}=`))
-  return match ? decodeURIComponent(match.slice(SESSION_COOKIE.length + 1)) : null
+  const cookie = req.headers.get('cookie') ?? ''
+  const match = cookie.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))
+  return match?.[1] ? decodeURIComponent(match[1]) : null
 }
 
 function hashSessionToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
-function createAccountOrderHash(codeHash: string, userId: string): string {
-  return createHash('sha256').update(`${codeHash}:${userId}`).digest('hex').slice(0, 16)
-}
-
 function secureCookieSuffix(): string {
   return process.env.NODE_ENV === 'production' ? '; Secure' : ''
+}
+
+function createAccountOrderHash(codeHash: string, profileId: string): string {
+  return createHash('sha256').update(`${codeHash}:${profileId}`).digest('hex').slice(0, 32)
+}
+
+async function nextDefaultProfileName(userId: string): Promise<string> {
+  const profiles = await listProfilesForUser(userId)
+  return `账号 ${profiles.length + 1}`
+}
+
+function normalizeProfileDisplayName(value: unknown): string {
+  return typeof value === 'string' ? value.trim().slice(0, 40) : ''
+}
+
+function normalizeProfileNote(value: unknown): string {
+  return typeof value === 'string' ? value.trim().slice(0, 500) : ''
+}
+
+async function getCdkRecordForProfile(profile: UserGameAccountRecord): Promise<CdkRecord | null> {
+  const store = await getCdkRecordStore()
+  return store.get(profile.cdk_key)
+}
+
+function isAnnouncement(value: unknown): value is Announcement {
+  if (!value || typeof value !== 'object') return false
+  const item = value as Record<string, unknown>
+  return typeof item.id === 'string'
+    && (item.kind === 'banner' || item.kind === 'popup')
+    && typeof item.title === 'string'
+    && typeof item.body === 'string'
+    && typeof item.created_at === 'string'
+    && typeof item.updated_at === 'string'
 }

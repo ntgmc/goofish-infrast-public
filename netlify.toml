@@ -49,18 +49,38 @@ ignore = "node scripts/netlify-ignore-build.mjs"
   status = 200
 
 [[redirects]]
-  from = "/api/auth/logout"
-  to = "/.netlify/functions/auth"
-  status = 200
+from = "/api/auth/logout"
+to = "/.netlify/functions/auth"
+status = 200
 
 [[redirects]]
-  from = "/api/auth/me"
-  to = "/.netlify/functions/auth"
-  status = 200
+from = "/api/auth/change-password"
+to = "/.netlify/functions/auth"
+status = 200
 
 [[redirects]]
-  from = "/api/user/status"
-  to = "/.netlify/functions/user-status"
+from = "/api/auth/me"
+to = "/.netlify/functions/auth"
+status = 200
+
+[[redirects]]
+from = "/api/user/announcements"
+to = "/.netlify/functions/user-announcements"
+status = 200
+
+[[redirects]]
+from = "/api/user/profiles"
+to = "/.netlify/functions/user-profiles"
+status = 200
+
+[[redirects]]
+from = "/api/user/profiles/redeem"
+to = "/.netlify/functions/user-profiles"
+status = 200
+
+[[redirects]]
+from = "/api/user/status"
+to = "/.netlify/functions/user-status"
   status = 200
 
 [[redirects]]

@@ -1,6 +1,13 @@
 import { query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
-import type { LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode, UserWorkspace } from '../../src/lib/types'
+import type {
+  LicenseConfig,
+  LicenseOperator,
+  OptimizeResult,
+  PermissionMode,
+  UserGameAccount,
+  UserWorkspace,
+} from '../../src/lib/types'
 
 let schemaReady: Promise<void> | null = null
 
@@ -13,9 +20,24 @@ export interface UserAccountRecord {
   iterations: number
   permission: PermissionMode
   status: 'active' | 'frozen' | 'revoked'
+  cdk_key: string | null
+  cdk_code_hash: string | null
+  cdk_order_hash: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface UserGameAccountRecord {
+  version: 1
+  id: string
+  user_id: string
   cdk_key: string
   cdk_code_hash: string
   cdk_order_hash: string | null
+  permission: PermissionMode
+  status: 'active' | 'frozen' | 'revoked'
+  display_name: string
+  note: string
   created_at: string
   updated_at: string
 }
@@ -32,12 +54,28 @@ export interface UserSessionRecord {
 
 export interface UserWorkspaceRecord {
   version: 1
+  profile_id: string
+  operators: LicenseOperator[] | null
+  config: LicenseConfig | null
+  elite_overrides: Record<string, number>
+  last_result: OptimizeResult | null
+  updated_at: string
+}
+
+interface LegacyUserWorkspaceRecord {
+  version: 1
   user_id: string
   operators: LicenseOperator[] | null
   config: LicenseConfig | null
   elite_overrides: Record<string, number>
   last_result: OptimizeResult | null
   updated_at: string
+}
+
+export interface AnnouncementReadRecord {
+  user_id: string
+  announcement_id: string
+  read_at: string
 }
 
 export async function getUserByEmail(email: string): Promise<UserAccountRecord | null> {
@@ -56,6 +94,14 @@ export async function getUserById(id: string): Promise<UserAccountRecord | null>
     [id],
   )
   return result.rows[0]?.record_json ?? null
+}
+
+export async function listUserAccounts(): Promise<UserAccountRecord[]> {
+  await ensureSchema()
+  const result = await query<{ record_json: UserAccountRecord }>(
+    'select record_json from user_accounts order by created_at desc',
+  )
+  return result.rows.map((row) => row.record_json)
 }
 
 export async function saveUserAccount(user: UserAccountRecord): Promise<void> {
@@ -92,6 +138,11 @@ export async function saveUserAccount(user: UserAccountRecord): Promise<void> {
       user.updated_at,
     ],
   )
+}
+
+export async function deleteUserAccount(userId: string): Promise<void> {
+  await ensureSchema()
+  await query('delete from user_accounts where id = $1', [userId])
 }
 
 export async function saveUserSession(session: UserSessionRecord): Promise<void> {
@@ -136,9 +187,88 @@ export async function deleteSessionByTokenHash(tokenHash: string): Promise<void>
   await query('delete from user_sessions where token_hash = $1', [tokenHash])
 }
 
-export async function getWorkspace(userId: string): Promise<UserWorkspaceRecord | null> {
+export async function deleteSessionsForUser(userId: string, keepTokenHash?: string): Promise<void> {
+  await ensureSchema()
+  if (keepTokenHash) {
+    await query('delete from user_sessions where user_id = $1 and token_hash <> $2', [userId, keepTokenHash])
+    return
+  }
+  await query('delete from user_sessions where user_id = $1', [userId])
+}
+
+export async function listProfilesForUser(userId: string): Promise<UserGameAccountRecord[]> {
+  await ensureSchema()
+  const result = await query<{ record_json: UserGameAccountRecord }>(
+    'select record_json from user_game_accounts where user_id = $1 order by created_at asc',
+    [userId],
+  )
+  return result.rows.map((row) => row.record_json)
+}
+
+export async function getProfileById(profileId: string): Promise<UserGameAccountRecord | null> {
+  await ensureSchema()
+  const result = await query<{ record_json: UserGameAccountRecord }>(
+    'select record_json from user_game_accounts where id = $1',
+    [profileId],
+  )
+  return result.rows[0]?.record_json ?? null
+}
+
+export async function getProfileForUser(userId: string, profileId: string): Promise<UserGameAccountRecord | null> {
+  await ensureSchema()
+  const result = await query<{ record_json: UserGameAccountRecord }>(
+    'select record_json from user_game_accounts where id = $1 and user_id = $2',
+    [profileId, userId],
+  )
+  return result.rows[0]?.record_json ?? null
+}
+
+export async function saveUserProfile(profile: UserGameAccountRecord): Promise<void> {
+  await ensureSchema()
+  await query(
+    `insert into user_game_accounts
+      (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note, record_json, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12)
+     on conflict (id) do update set
+      permission = excluded.permission,
+      status = excluded.status,
+      display_name = excluded.display_name,
+      note = excluded.note,
+      record_json = excluded.record_json,
+      updated_at = excluded.updated_at`,
+    [
+      profile.id,
+      profile.user_id,
+      profile.cdk_key,
+      profile.cdk_code_hash,
+      profile.cdk_order_hash,
+      profile.permission,
+      profile.status,
+      profile.display_name,
+      profile.note,
+      JSON.stringify(profile),
+      profile.created_at,
+      profile.updated_at,
+    ],
+  )
+}
+
+export async function getWorkspace(profileId: string): Promise<UserWorkspaceRecord | null> {
+  return getProfileWorkspace(profileId)
+}
+
+export async function getProfileWorkspace(profileId: string): Promise<UserWorkspaceRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: UserWorkspaceRecord }>(
+    'select record_json from user_profile_workspaces where profile_id = $1',
+    [profileId],
+  )
+  return result.rows[0]?.record_json ?? null
+}
+
+export async function getLegacyWorkspace(userId: string): Promise<LegacyUserWorkspaceRecord | null> {
+  await ensureSchema()
+  const result = await query<{ record_json: LegacyUserWorkspaceRecord }>(
     'select record_json from user_workspaces where user_id = $1',
     [userId],
   )
@@ -146,12 +276,16 @@ export async function getWorkspace(userId: string): Promise<UserWorkspaceRecord 
 }
 
 export async function saveWorkspace(workspace: UserWorkspaceRecord): Promise<void> {
+  return saveProfileWorkspace(workspace)
+}
+
+export async function saveProfileWorkspace(workspace: UserWorkspaceRecord): Promise<void> {
   await ensureSchema()
   await query(
-    `insert into user_workspaces
-      (user_id, operators_json, config_json, elite_overrides_json, last_result_json, record_json, updated_at)
+    `insert into user_profile_workspaces
+      (profile_id, operators_json, config_json, elite_overrides_json, last_result_json, record_json, updated_at)
      values ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7)
-     on conflict (user_id) do update set
+     on conflict (profile_id) do update set
       operators_json = excluded.operators_json,
       config_json = excluded.config_json,
       elite_overrides_json = excluded.elite_overrides_json,
@@ -159,7 +293,7 @@ export async function saveWorkspace(workspace: UserWorkspaceRecord): Promise<voi
       record_json = excluded.record_json,
       updated_at = excluded.updated_at`,
     [
-      workspace.user_id,
+      workspace.profile_id,
       JSON.stringify(workspace.operators),
       JSON.stringify(workspace.config),
       JSON.stringify(workspace.elite_overrides),
@@ -170,10 +304,67 @@ export async function saveWorkspace(workspace: UserWorkspaceRecord): Promise<voi
   )
 }
 
-export function emptyWorkspace(userId: string): UserWorkspaceRecord {
+export async function migrateLegacyUserIfNeeded(user: UserAccountRecord): Promise<UserGameAccountRecord[]> {
+  const existingProfiles = await listProfilesForUser(user.id)
+  if (existingProfiles.length > 0 || !user.cdk_key || !user.cdk_code_hash) return existingProfiles
+
+  const now = new Date().toISOString()
+  const profile: UserGameAccountRecord = {
+    version: 1,
+    id: user.id,
+    user_id: user.id,
+    cdk_key: user.cdk_key,
+    cdk_code_hash: user.cdk_code_hash,
+    cdk_order_hash: user.cdk_order_hash,
+    permission: user.permission,
+    status: user.status,
+    display_name: '账号 1',
+    note: '',
+    created_at: user.created_at,
+    updated_at: now,
+  }
+  await saveUserProfile(profile)
+
+  const legacyWorkspace = await getLegacyWorkspace(user.id)
+  await saveProfileWorkspace(
+    legacyWorkspace
+      ? {
+          version: 1,
+          profile_id: profile.id,
+          operators: legacyWorkspace.operators,
+          config: legacyWorkspace.config,
+          elite_overrides: legacyWorkspace.elite_overrides ?? {},
+          last_result: legacyWorkspace.last_result ?? null,
+          updated_at: legacyWorkspace.updated_at ?? now,
+        }
+      : emptyWorkspace(profile.id),
+  )
+  return [profile]
+}
+
+export async function getAnnouncementReads(userId: string): Promise<AnnouncementReadRecord[]> {
+  await ensureSchema()
+  const result = await query<AnnouncementReadRecord>(
+    'select user_id, announcement_id, read_at from user_announcement_reads where user_id = $1',
+    [userId],
+  )
+  return result.rows
+}
+
+export async function markAnnouncementRead(userId: string, announcementId: string, readAt = new Date().toISOString()): Promise<void> {
+  await ensureSchema()
+  await query(
+    `insert into user_announcement_reads (user_id, announcement_id, read_at)
+     values ($1, $2, $3)
+     on conflict (user_id, announcement_id) do update set read_at = excluded.read_at`,
+    [userId, announcementId, readAt],
+  )
+}
+
+export function emptyWorkspace(profileId: string): UserWorkspaceRecord {
   return {
     version: 1,
-    user_id: userId,
+    profile_id: profileId,
     operators: null,
     config: null,
     elite_overrides: {},
@@ -184,11 +375,27 @@ export function emptyWorkspace(userId: string): UserWorkspaceRecord {
 
 export function toPublicWorkspace(workspace: UserWorkspaceRecord | null): UserWorkspace {
   return {
+    profile_id: workspace?.profile_id ?? null,
     operators: workspace?.operators ?? null,
     config: workspace?.config ?? null,
     elite_overrides: workspace?.elite_overrides ?? {},
     last_result: workspace?.last_result ?? null,
     updated_at: workspace?.updated_at ?? null,
+  }
+}
+
+export function toPublicProfile(profile: UserGameAccountRecord, workspace?: UserWorkspaceRecord | null): UserGameAccount {
+  return {
+    id: profile.id,
+    user_id: profile.user_id,
+    permission: profile.permission,
+    status: profile.status,
+    cdk_order_hash: profile.cdk_order_hash,
+    display_name: profile.display_name,
+    note: profile.note,
+    operator_count: workspace?.operators?.length ?? 0,
+    updated_at: workspace?.updated_at ?? profile.updated_at,
+    created_at: profile.created_at,
   }
 }
 

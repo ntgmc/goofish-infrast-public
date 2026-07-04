@@ -1,4 +1,6 @@
 import type { Context } from '@netlify/functions'
+import { getProfileForUser } from '../../server/storage/user-store'
+import { getCdkRecordStore } from './license-utils'
 import { jsonResponse, requireUserSession, toPublicUser } from './user-auth'
 
 export default async (req: Request, _context: Context): Promise<Response> => {
@@ -8,17 +10,21 @@ export default async (req: Request, _context: Context): Promise<Response> => {
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
-    if (auth.cdkRecord?.status === 'frozen') {
-      return jsonResponse({ error: auth.cdkRecord.freeze_reason || '账号授权已冻结，请联系卖家。' }, 403)
+    const profileId = new URL(req.url).searchParams.get('profile_id')
+    const profile = profileId ? await getProfileForUser(auth.user.id, profileId) : auth.activeProfile
+    if (!profile) return jsonResponse({ error: '请先兑换或选择 CDK 档案。' }, 404)
+    const cdkRecord = await (await getCdkRecordStore()).get(profile.cdk_key)
+    if (profile.status === 'frozen' || cdkRecord?.status === 'frozen') {
+      return jsonResponse({ error: cdkRecord?.freeze_reason || '账号授权已冻结，请联系卖家。' }, 403)
     }
-    if (auth.cdkRecord?.status === 'revoked') {
+    if (profile.status === 'revoked' || cdkRecord?.status === 'revoked') {
       return jsonResponse({ error: '账号授权已撤销，请联系卖家。' }, 403)
     }
     return jsonResponse({
       user: toPublicUser(auth.user),
-      permission: auth.user.permission,
-      permission_label: auth.user.permission,
-      status: auth.cdkRecord?.status ?? auth.user.status,
+      permission: profile.permission,
+      permission_label: profile.permission,
+      status: cdkRecord?.status ?? profile.status,
       risk_status: 'ok',
     })
   } catch (error) {

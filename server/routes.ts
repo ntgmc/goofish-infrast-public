@@ -8,6 +8,8 @@ import freePreviewHandler from '../netlify/functions/free-preview'
 import licenseStatusHandler from '../netlify/functions/license-status'
 import optimizeHandler from '../netlify/functions/optimize'
 import redeemCdkHandler from '../netlify/functions/redeem-cdk'
+import userAnnouncementsHandler from '../netlify/functions/user-announcements'
+import userProfilesHandler from '../netlify/functions/user-profiles'
 import userStatusHandler from '../netlify/functions/user-status'
 import userWorkspaceHandler from '../netlify/functions/user-workspace'
 import usageStatsHandler from '../netlify/functions/usage-stats'
@@ -27,6 +29,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/auth/register', authHandler as unknown as ApiHandler],
   ['/api/auth/login', authHandler as unknown as ApiHandler],
   ['/api/auth/logout', authHandler as unknown as ApiHandler],
+  ['/api/auth/change-password', authHandler as unknown as ApiHandler],
   ['/api/auth/me', authHandler as unknown as ApiHandler],
   ['/api/announcement', announcementHandler as unknown as ApiHandler],
   ['/api/admin/announcement', announcementHandler as unknown as ApiHandler],
@@ -36,6 +39,9 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/free-preview', freePreviewHandler as unknown as ApiHandler],
   ['/api/redeem-cdk', redeemCdkHandler as unknown as ApiHandler],
   ['/api/license-status', licenseStatusHandler as unknown as ApiHandler],
+  ['/api/user/announcements', userAnnouncementsHandler as unknown as ApiHandler],
+  ['/api/user/profiles', userProfilesHandler as unknown as ApiHandler],
+  ['/api/user/profiles/redeem', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/optimize', optimizeHandler as unknown as ApiHandler],
