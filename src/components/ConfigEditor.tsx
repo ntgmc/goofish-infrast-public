@@ -336,7 +336,7 @@ export default function ConfigEditor({
               ? '修改配置后重新生成，保存进度文件会保留这次配置。'
               : autoInventoryOnly
 ? `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，可通过中间产物库存自动调整推荐配置。`
-: `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，使用授权文件内的固定配置。`)}
+                : `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，使用当前套餐提供的固定配置。`)}
           </p>
         </div>
       {(canEdit || (canSelectPreset && !autoInventoryOnly)) && (

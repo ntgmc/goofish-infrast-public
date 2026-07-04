@@ -37,7 +37,7 @@ export default function AnnouncementsPage() {
         <div className="flex flex-col gap-3 border-b border-surface-3 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">公告</h1>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">查看当前启用中的横幅和弹出式公告。</p>
+            <p className="mt-2 text-sm leading-6 text-ink-secondary">这里会集中展示近期通知，方便你随时回看。</p>
           </div>
           <a
             href="/tool"
@@ -51,7 +51,7 @@ export default function AnnouncementsPage() {
         {error && <div className="mt-6 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
         {!loading && !error && announcements.length === 0 && (
           <div className="mt-6 rounded-lg border border-surface-3 bg-surface-1 px-4 py-5 text-sm text-ink-secondary">
-            当前没有启用中的公告。
+            暂时没有新的公告。
           </div>
         )}
 

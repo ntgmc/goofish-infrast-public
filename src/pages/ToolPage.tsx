@@ -25,6 +25,7 @@ type AuthMode = 'login' | 'register'
 type DashboardSection = 'profiles' | 'redeem' | 'announcements' | 'settings'
 type WorkspaceSetupSection = 'operators' | 'config'
 type WorkspaceMode = 'dashboard' | 'setup' | 'optimize'
+type FieldErrors = Record<string, string>
 
 export default function ToolPage() {
   const [authLoading, setAuthLoading] = useState(true)
@@ -94,12 +95,12 @@ export default function ToolPage() {
   const refreshProfileWorkspace = useCallback(async (profile: UserGameAccount, mode: WorkspaceMode) => {
     const resp = await fetch(`/api/user/workspace?profile_id=${encodeURIComponent(profile.id)}`)
     const data = await resp.json() as AuthSuccessResponse & { error?: string }
-    if (!resp.ok) throw new Error(data.error || `加载工作区失败: ${resp.status}`)
+    if (!resp.ok) throw new Error(data.error || `加载账号资料失败: ${resp.status}`)
     applyAuthPayload(data, mode)
   }, [applyAuthPayload])
 
   const persistWorkspacePatch = useCallback(async (patch: Partial<UserWorkspace>) => {
-    if (!activeProfile) throw new Error('请先选择账号档案。')
+    if (!activeProfile) throw new Error('请先选择游戏账号。')
     const resp = await fetch('/api/user/workspace', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -128,7 +129,7 @@ export default function ToolPage() {
   }, [applyAuthPayload])
 
   if (authLoading) {
-    return <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">正在检查登录状态...</div>
+    return <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">正在确认登录信息...</div>
   }
 
   return (
@@ -204,9 +205,17 @@ function AuthPage({
   const [cdk, setCdk] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    const nextErrors: FieldErrors = {}
+    const emailError = validateEmailInput(email)
+    const passwordError = validatePasswordInput(password)
+    if (emailError) nextErrors.email = emailError
+    if (passwordError) nextErrors.password = passwordError
+    setFieldErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
     setLoading(true)
     setError(null)
     try {
@@ -225,6 +234,15 @@ function AuthPage({
     }
   }
 
+  const clearFieldError = (field: string) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
+  }
+
   return (
     <main className="min-h-screen bg-surface-0 px-4 py-8 sm:px-6">
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
@@ -239,13 +257,13 @@ function AuthPage({
           </div>
           <h1 className="text-3xl font-bold tracking-[-0.02em] text-ink-primary">MAA 基建排班工作台</h1>
           <p className="mt-3 text-sm leading-6 text-ink-secondary">
-            使用邮箱和密码登录。注册时 CDK 可选；也可以先创建账号，进入工作区后再兑换多条 CDK 档案。
+            使用邮箱和密码登录。注册时 CDK 可选；也可以先创建账号，登录后再添加多个游戏账号。
           </p>
           <BuildMetaStrip className="mt-6" />
           {announcement?.active && <AnnouncementBanner announcement={announcement} className="mt-6" />}
         </section>
 
-        <form onSubmit={handleSubmit} className="rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8">
+        <form onSubmit={handleSubmit} noValidate className="rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8">
           <div className="mb-6 grid grid-cols-2 rounded-lg bg-surface-2 p-1">
             <button type="button" onClick={() => setMode('login')} className={`rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>登录</button>
             <button type="button" onClick={() => setMode('register')} className={`rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>注册</button>
@@ -253,11 +271,37 @@ function AuthPage({
           {error && <div className="mb-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-ink-secondary">邮箱</span>
-            <input type="email" value={email} onChange={(event) => setEmail(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" required />
+            <input
+              id="auth-email"
+              type="email"
+              value={email}
+              onChange={(event) => {
+                setEmail(event.currentTarget.value)
+                clearFieldError('email')
+              }}
+              onFocus={() => clearFieldError('email')}
+              className={inputClassName(Boolean(fieldErrors.email))}
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
+            />
+            {fieldErrors.email && <p id="auth-email-error" className="mt-1.5 text-sm text-error">{fieldErrors.email}</p>}
           </label>
           <label className="mt-4 block">
             <span className="mb-2 block text-sm font-medium text-ink-secondary">密码</span>
-            <input type="password" value={password} onChange={(event) => setPassword(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" minLength={8} required />
+            <input
+              id="auth-password"
+              type="password"
+              value={password}
+              onChange={(event) => {
+                setPassword(event.currentTarget.value)
+                clearFieldError('password')
+              }}
+              onFocus={() => clearFieldError('password')}
+              className={inputClassName(Boolean(fieldErrors.password))}
+              aria-invalid={Boolean(fieldErrors.password)}
+              aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
+            />
+            {fieldErrors.password && <p id="auth-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.password}</p>}
           </label>
           {mode === 'register' && (
             <label className="mt-4 block">
@@ -294,7 +338,7 @@ function AccountDashboard({
 }) {
   const [section, setSection] = useState<DashboardSection>('profiles')
   const labels: Record<DashboardSection, string> = {
-    profiles: '账号档案',
+    profiles: '游戏账号',
     redeem: '兑换 CDK',
     announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCount})` : ''}`,
     settings: '账号设置',
@@ -321,7 +365,7 @@ function AccountDashboard({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-xl font-semibold text-ink-primary">{labels[section]}</h1>
-              <p className="mt-1 text-sm text-ink-muted">{activeProfile ? `当前: ${activeProfile.display_name}` : '一个登录账号可以维护多个 CDK 档案。'}</p>
+        <p className="mt-1 text-sm text-ink-muted">{activeProfile ? `正在查看：${activeProfile.display_name}` : '一个登录账号可以添加多个游戏账号。'}</p>
             </div>
             <button type="button" onClick={onLogout} className="self-start rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary lg:hidden">退出登录</button>
           </div>
@@ -354,8 +398,8 @@ function ProfileList({
   if (profiles.length === 0) {
     return (
       <section className="rounded-xl border border-surface-3 bg-surface-1 p-6">
-        <h2 className="text-lg font-semibold text-ink-primary">还没有 CDK 档案</h2>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">请先进入“兑换 CDK”，创建第一个游戏账号档案。</p>
+        <h2 className="text-lg font-semibold text-ink-primary">还没有添加游戏账号</h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">请先进入“兑换 CDK”，添加第一个游戏账号。</p>
       </section>
     )
   }
@@ -411,14 +455,14 @@ function ProfileCard({
           <p className="mt-2 text-sm leading-6 text-ink-secondary">{profile.note || '暂无备注'}</p>
           <p className="mt-3 text-xs text-ink-muted">{profile.operator_count} 名干员 · 更新 {formatDate(profile.updated_at)}</p>
         </div>
-        <button type="button" onClick={onOpen} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500">进入工作区</button>
+        <button type="button" onClick={onOpen} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500">准备这个账号</button>
       </div>
-      <button type="button" onClick={() => setEditing((value) => !value)} className="mt-4 text-sm font-semibold text-brand-400 hover:text-brand-300">编辑名称和备注</button>
+      <button type="button" onClick={() => setEditing((value) => !value)} className="mt-4 text-sm font-semibold text-brand-400 hover:text-brand-300">修改名称和备注</button>
       {editing && (
         <div className="mt-4 space-y-3 rounded-lg bg-surface-2 p-4">
           {error && <div className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">{error}</div>}
           <input value={displayName} maxLength={40} onChange={(event) => setDisplayName(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" />
-          <textarea value={note} maxLength={500} rows={3} onChange={(event) => setNote(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="账号备注" />
+          <textarea value={note} maxLength={500} rows={3} onChange={(event) => setNote(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="给这个账号写点备注" />
           <button type="button" onClick={() => void save()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white">保存</button>
         </div>
       )}
@@ -458,20 +502,20 @@ function RedeemPanel({ onRedeemed }: { onRedeemed: (payload: AuthSuccessResponse
 
   return (
     <form onSubmit={submit} className="max-w-2xl rounded-xl border border-surface-3 bg-surface-1 p-6">
-      <h2 className="text-lg font-semibold text-ink-primary">兑换新的 CDK 档案</h2>
-      <p className="mt-2 text-sm leading-6 text-ink-secondary">只能兑换未使用的 CDK。每条 CDK 会创建一个独立账号工作区。</p>
+      <h2 className="text-lg font-semibold text-ink-primary">添加新的游戏账号</h2>
+      <p className="mt-2 text-sm leading-6 text-ink-secondary">输入未使用的 CDK。添加后，这个游戏账号会单独保存干员数据和排班设置。</p>
       {error && <div className="mt-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
       <label className="mt-5 block">
         <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK</span>
         <input value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink-primary" required />
       </label>
       <label className="mt-4 block">
-        <span className="mb-2 block text-sm font-medium text-ink-secondary">档案名称</span>
+        <span className="mb-2 block text-sm font-medium text-ink-secondary">账号名称</span>
         <input value={displayName} onChange={(event) => setDisplayName(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="例如：主号" />
       </label>
       <label className="mt-4 block">
         <span className="mb-2 block text-sm font-medium text-ink-secondary">备注</span>
-        <textarea value={note} onChange={(event) => setNote(event.currentTarget.value)} rows={4} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="只建议填写账号说明，不要保存密码。" />
+        <textarea value={note} onChange={(event) => setNote(event.currentTarget.value)} rows={4} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="可以写区服、用途等说明。请不要填写游戏密码。" />
       </label>
       <button type="submit" disabled={loading} className="mt-5 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">{loading ? '兑换中...' : '兑换 CDK'}</button>
     </form>
@@ -512,12 +556,12 @@ function AnnouncementCenter() {
   return (
     <section className="max-w-4xl space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-ink-secondary">查看当前启用公告，并维护已读状态。</p>
-        <button type="button" onClick={() => void markRead()} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">全部已读</button>
+        <p className="text-sm text-ink-secondary">这里会显示近期通知，读过的内容会自动留在公告列表中方便回看。</p>
+        <button type="button" onClick={() => void markRead()} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">全部设为已读</button>
       </div>
       {loading && <p className="text-sm text-ink-secondary">正在加载公告...</p>}
       {error && <div className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
-      {!loading && items.length === 0 && <div className="rounded-xl border border-surface-3 bg-surface-1 p-6 text-sm text-ink-secondary">暂无启用公告。</div>}
+      {!loading && items.length === 0 && <div className="rounded-xl border border-surface-3 bg-surface-1 p-6 text-sm text-ink-secondary">暂时没有新的公告。</div>}
       {items.map(({ announcement, read_at }) => (
         <article key={announcement.id} className={`rounded-xl border p-5 ${read_at ? 'border-surface-3 bg-surface-1' : 'border-brand-500/50 bg-brand-500/10'}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -529,7 +573,7 @@ function AnnouncementCenter() {
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{announcement.body}</p>
               <p className="mt-3 text-xs text-ink-muted">更新 {formatDate(announcement.updated_at)}</p>
             </div>
-            {!read_at && <button type="button" onClick={() => void markRead(announcement.id)} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white">标记已读</button>}
+            {!read_at && <button type="button" onClick={() => void markRead(announcement.id)} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white">我知道了</button>}
           </div>
         </article>
       ))}
@@ -543,10 +587,20 @@ function SettingsPanel() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [loading, setLoading] = useState(false)
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
+    const nextErrors: FieldErrors = {}
+    const oldPasswordError = validatePasswordInput(oldPassword)
+    const newPasswordError = validatePasswordInput(newPassword)
+    if (oldPasswordError) nextErrors.oldPassword = oldPasswordError
+    if (newPasswordError) nextErrors.newPassword = newPasswordError
+    if (!confirmPassword) nextErrors.confirmPassword = '请再次输入新密码'
+    else if (newPassword && newPassword !== confirmPassword) nextErrors.confirmPassword = '两次输入的新密码不一致'
+    setFieldErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
     if (newPassword !== confirmPassword) {
       setError('两次输入的新密码不一致。')
       return
@@ -573,22 +627,71 @@ function SettingsPanel() {
     }
   }
 
+  const clearFieldError = (field: string) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
+  }
+
   return (
-    <form onSubmit={submit} className="max-w-xl rounded-xl border border-surface-3 bg-surface-1 p-6">
+    <form onSubmit={submit} noValidate className="max-w-xl rounded-xl border border-surface-3 bg-surface-1 p-6">
       <h2 className="text-lg font-semibold text-ink-primary">修改登录密码</h2>
       {error && <div className="mt-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
       {status && <div className="mt-5 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{status}</div>}
       <label className="mt-5 block">
         <span className="mb-2 block text-sm font-medium text-ink-secondary">当前密码</span>
-        <input type="password" value={oldPassword} onChange={(event) => setOldPassword(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" required />
+        <input
+          id="settings-old-password"
+          type="password"
+          value={oldPassword}
+          onChange={(event) => {
+            setOldPassword(event.currentTarget.value)
+            clearFieldError('oldPassword')
+          }}
+          onFocus={() => clearFieldError('oldPassword')}
+          className={inputClassName(Boolean(fieldErrors.oldPassword))}
+          aria-invalid={Boolean(fieldErrors.oldPassword)}
+          aria-describedby={fieldErrors.oldPassword ? 'settings-old-password-error' : undefined}
+        />
+        {fieldErrors.oldPassword && <p id="settings-old-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.oldPassword}</p>}
       </label>
       <label className="mt-4 block">
         <span className="mb-2 block text-sm font-medium text-ink-secondary">新密码</span>
-        <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" minLength={8} required />
+        <input
+          id="settings-new-password"
+          type="password"
+          value={newPassword}
+          onChange={(event) => {
+            setNewPassword(event.currentTarget.value)
+            clearFieldError('newPassword')
+            clearFieldError('confirmPassword')
+          }}
+          onFocus={() => clearFieldError('newPassword')}
+          className={inputClassName(Boolean(fieldErrors.newPassword))}
+          aria-invalid={Boolean(fieldErrors.newPassword)}
+          aria-describedby={fieldErrors.newPassword ? 'settings-new-password-error' : undefined}
+        />
+        {fieldErrors.newPassword && <p id="settings-new-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.newPassword}</p>}
       </label>
       <label className="mt-4 block">
         <span className="mb-2 block text-sm font-medium text-ink-secondary">确认新密码</span>
-        <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" minLength={8} required />
+        <input
+          id="settings-confirm-password"
+          type="password"
+          value={confirmPassword}
+          onChange={(event) => {
+            setConfirmPassword(event.currentTarget.value)
+            clearFieldError('confirmPassword')
+          }}
+          onFocus={() => clearFieldError('confirmPassword')}
+          className={inputClassName(Boolean(fieldErrors.confirmPassword))}
+          aria-invalid={Boolean(fieldErrors.confirmPassword)}
+          aria-describedby={fieldErrors.confirmPassword ? 'settings-confirm-password-error' : undefined}
+        />
+        {fieldErrors.confirmPassword && <p id="settings-confirm-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.confirmPassword}</p>}
       </label>
       <button type="submit" disabled={loading} className="mt-5 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">{loading ? '保存中...' : '修改密码'}</button>
     </form>
@@ -629,7 +732,7 @@ function WorkspaceSetupPage({
   const filteredOperators = useMemo(() => {
     const keyword = operatorSearch.trim().toLowerCase()
     const source = operators ?? []
-    return keyword ? source.filter((operator) => operator.name.toLowerCase().includes(keyword) || operator.id.toLowerCase().includes(keyword)) : source
+    return keyword ? source.filter((operator) => operator.name.toLowerCase().includes(keyword)) : source
   }, [operatorSearch, operators])
   const setupSections: Array<{ id: WorkspaceSetupSection; label: string; ready: boolean }> = [
     { id: 'operators', label: '干员数据', ready: Boolean(operators) },
@@ -658,7 +761,7 @@ function WorkspaceSetupPage({
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!operators) {
-      setError('请先上传 operators.json。')
+      setError('请先上传干员识别文件。')
       return
     }
     if (!configValidation.ok) {
@@ -704,7 +807,7 @@ function WorkspaceSetupPage({
             </button>
           ))}
         </nav>
-        <button type="button" onClick={onBack} className="absolute bottom-16 left-4 right-4 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">返回档案</button>
+        <button type="button" onClick={onBack} className="absolute bottom-16 left-4 right-4 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">返回账号列表</button>
         <button type="button" onClick={onLogout} className="absolute bottom-5 left-4 right-4 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">退出登录</button>
       </aside>
 
@@ -714,10 +817,10 @@ function WorkspaceSetupPage({
             <div>
               <p className="text-sm font-medium text-brand-400">{profile.display_name}</p>
               <h1 className="mt-1 text-xl font-semibold text-ink-primary">准备账号工作区</h1>
-              <p className="mt-1 text-sm text-ink-muted">上传干员数据并确认基建配置，保存后进入排班优化。</p>
+              <p className="mt-1 text-sm text-ink-muted">上传干员识别文件并确认基建配置，保存后进入排班优化。</p>
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={onBack} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">返回档案</button>
+              <button type="button" onClick={onBack} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">返回账号列表</button>
               <button type="button" onClick={onLogout} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3 lg:hidden">退出登录</button>
             </div>
           </div>
@@ -738,20 +841,20 @@ function WorkspaceSetupPage({
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <h2 className="text-lg font-semibold text-ink-primary">干员数据</h2>
-                      <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">上传 MAA 干员识别导出的 JSON/TXT，并在保存前预览头像、精英化和等级。</p>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">上传 MAA 导出的干员识别文件，并在保存前预览头像、精英化和等级。</p>
                     </div>
                     {operators && <span className="rounded-md bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">已就绪</span>}
                   </div>
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                     <label className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-2 px-4 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">
-                      {operatorFileName ? `已选择：${operatorFileName}` : operators ? `已载入 ${operators.length} 名干员` : '选择干员数据文件'}
+                      {operatorFileName ? `已选择：${operatorFileName}` : operators ? `已载入 ${operators.length} 名干员` : '选择干员识别文件'}
                       <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} className="hidden" />
                     </label>
                     {operators && <span className="text-sm text-brand-400">拥有干员 {ownedOperatorCount} 名</span>}
                   </div>
                   {operators && (
                     <div className="mt-5">
-                      <input value={operatorSearch} onChange={(event) => setOperatorSearch(event.currentTarget.value)} className="mb-4 w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="搜索干员名称或 ID" />
+                      <input value={operatorSearch} onChange={(event) => setOperatorSearch(event.currentTarget.value)} className="mb-4 w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="搜索干员名称" />
                       <div className="grid max-h-[560px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
                         {filteredOperators.map((operator) => <OperatorPreviewCard key={operator.id} operator={operator} />)}
                       </div>
@@ -771,21 +874,21 @@ function WorkspaceSetupPage({
                   permission={profile.permission}
                   validation={configValidation}
                   onUpdate={updateConfig}
-                  note="配置会保存到当前 CDK 档案，不再生成本地授权文件。"
+                  note="保存后，下次打开这个账号会自动带上这套配置。"
                 />
               )}
             </div>
 
             <aside className="space-y-5">
               <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
-                <h2 className="text-base font-semibold text-ink-primary">工作区状态</h2>
+                <h2 className="text-base font-semibold text-ink-primary">准备情况</h2>
                 <dl className="mt-4 space-y-3 text-sm">
-                  <InfoRow label="权限" value={PERMISSION_LABELS[profile.permission]} />
-                  <InfoRow label="干员" value={operators ? `${operators.length} 名` : '未上传'} />
-                  <InfoRow label="拥有" value={operators ? `${ownedOperatorCount} 名` : '-'} />
+                  <InfoRow label="套餐" value={PERMISSION_LABELS[profile.permission]} />
+                  <InfoRow label="干员" value={operators ? `${operators.length} 名` : '还未上传'} />
+                  <InfoRow label="已拥有" value={operators ? `${ownedOperatorCount} 名` : '-'} />
                   <div className="flex items-center justify-between gap-4">
-                    <dt className="text-ink-muted">配置</dt>
-                    <dd className={`font-medium ${configValidation.ok ? 'text-success' : 'text-error'}`}>{configValidation.ok ? (configChanged ? '已调整' : '已同步') : '需修正'}</dd>
+                    <dt className="text-ink-muted">基建配置</dt>
+                    <dd className={`font-medium ${configValidation.ok ? 'text-success' : 'text-error'}`}>{configValidation.ok ? (configChanged ? '已修改' : '已保存') : '请检查'}</dd>
                   </div>
                 </dl>
               </section>
@@ -893,6 +996,27 @@ function parseOperatorsText(text: string): LicenseOperator[] {
     }
   })
   return data as LicenseOperator[]
+}
+
+function validateEmailInput(value: string): string | null {
+  const email = value.trim()
+  if (!email) return '请输入邮箱'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return '请输入正确的邮箱地址'
+  return null
+}
+
+function validatePasswordInput(value: string): string | null {
+  if (!value) return '请输入密码'
+  if (value.length < 8) return '密码至少需要 8 位'
+  return null
+}
+
+function inputClassName(hasError: boolean, extra = ''): string {
+  const base = 'w-full rounded-lg border px-3 py-2 text-sm text-ink-primary outline-none transition-colors duration-150 focus:ring-2'
+  const state = hasError
+    ? 'border-error/70 bg-error/10 focus:border-error focus:ring-error/20'
+    : 'border-surface-4 bg-surface-0 focus:border-brand-500 focus:ring-brand-500/20'
+  return `${base} ${state} ${extra}`.trim()
 }
 
 function formatDate(value: string | null | undefined): string {
