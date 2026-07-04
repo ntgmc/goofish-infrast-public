@@ -101,12 +101,6 @@ export default function ToolPage() {
   return (
     <>
       <AnnouncementPopup announcements={popups} />
-      <a
-        href="/announcements"
-        className="fixed bottom-4 right-4 z-30 rounded-lg border border-surface-3 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-secondary shadow-sm transition-colors duration-150 hover:bg-surface-1 hover:text-ink-primary"
-      >
-        公告
-      </a>
       {step === 'upload' && (
         <UploadPage
           onFileLoaded={handleFileLoaded}
