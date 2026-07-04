@@ -136,7 +136,7 @@ export default function AdminPage() {
   }, [credentials])
 
 const summary = useMemo(
-() => buildSummary(records, usageStats?.totals, usageStats?.days ?? [], users.length),
+() => buildSummary(records, usageStats?.totals, users.length),
 [records, usageStats, users.length],
 )
   const visibleRecords = useMemo(
@@ -548,11 +548,7 @@ const summary = useMemo(
                     <h2 className="text-base font-semibold text-ink-primary">7 日趋势</h2>
                     <span className="text-xs text-ink-muted">访问 / 生成 / 兑换</span>
                   </div>
-<div className="mt-5 flex h-52 items-end gap-2 overflow-hidden">
-{(usageStats?.days ?? []).length > 0
-? (usageStats?.days ?? []).map((day) => <UsageBar key={day.date} day={day} max={summary.maxDailyActivity} />)
-: <div className="flex h-full w-full items-center justify-center rounded-lg bg-surface-2 text-sm text-ink-muted">暂无趋势数据</div>}
-</div>
+                  <UsageTrendChart days={usageStats?.days ?? []} />
                 </section>
                 <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
                   <h2 className="text-base font-semibold text-ink-primary">运营摘要</h2>
@@ -882,26 +878,194 @@ function RiskTable({ records, busyAction, onPatch }: { records: AdminCdkRecord[]
 }
 
 function Metric({ label, value, tone = 'default' }: { label: string; value: number | string; tone?: 'default' | 'warning' }) {
-  return <div className={`rounded-xl border p-4 ${tone === 'warning' ? 'border-warning/30 bg-warning/10' : 'border-surface-3 bg-surface-1'}`}>
-    <div className="text-2xl font-semibold text-ink-primary">{value}</div>
-    <div className="mt-1 text-sm text-ink-muted">{label}</div>
-  </div>
+return <div className={`rounded-xl border p-4 ${tone === 'warning' ? 'border-warning/30 bg-warning/10' : 'border-surface-3 bg-surface-1'}`}>
+<div className="text-2xl font-semibold text-ink-primary">{value}</div>
+<div className="mt-1 text-sm text-ink-muted">{label}</div>
+</div>
 }
 
-function UsageBar({ day, max }: { day: UsageDay; max: number }) {
-const activity = day.visits + day.schedule_generates + day.cdk_redeems
-const percentage = Math.round((activity / Math.max(1, max)) * 100)
-const height = Math.min(100, Math.max(activity > 0 ? 8 : 0, percentage))
-return <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
-<div className="flex h-40 w-full items-end rounded-lg bg-surface-2 px-1">
-<div className="w-full rounded-md bg-brand-500" style={{ height: `${height}%` }} title={`${day.date}: ${day.visits} 访问, ${day.schedule_generates} 生成, ${day.cdk_redeems} 兑换`} />
+type TrendMetricKey = 'visits' | 'schedule_generates' | 'cdk_redeems'
+
+const trendMetrics: Array<{ key: TrendMetricKey; label: string; stroke: string; dasharray?: string }> = [
+  { key: 'visits', label: '访问', stroke: 'var(--color-brand-500)' },
+  { key: 'schedule_generates', label: '生成', stroke: 'var(--color-warning)', dasharray: '8 5' },
+  { key: 'cdk_redeems', label: '兑换', stroke: 'var(--color-success)', dasharray: '2 5' },
+]
+
+const trendChart = {
+  width: 640,
+  height: 260,
+  left: 44,
+  right: 18,
+  top: 20,
+  bottom: 38,
+}
+
+function UsageTrendChart({ days }: { days: UsageDay[] }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+
+  if (days.length === 0) {
+    return (
+      <div className="mt-5 flex h-64 w-full items-center justify-center rounded-lg bg-surface-2 text-sm text-ink-muted">
+        暂无趋势数据
+      </div>
+    )
+  }
+
+  const plotWidth = trendChart.width - trendChart.left - trendChart.right
+  const plotHeight = trendChart.height - trendChart.top - trendChart.bottom
+  const maxValue = Math.max(0, ...days.flatMap((day) => trendMetrics.map((metric) => Number(day[metric.key]) || 0)))
+  const yMax = Math.max(1, maxValue)
+  const yTicks = buildTrendTicks(yMax)
+  const yFor = (value: number) => trendChart.top + plotHeight - (value / yMax) * plotHeight
+  const xFor = (index: number) => trendChart.left + (days.length === 1 ? plotWidth / 2 : (plotWidth * index) / (days.length - 1))
+  const points = days.map((day, index) => ({
+    day,
+    x: xFor(index),
+    values: trendMetrics.map((metric) => ({
+      ...metric,
+      value: Number(day[metric.key]) || 0,
+      y: yFor(Number(day[metric.key]) || 0),
+    })),
+  }))
+  const activePoint = activeIndex === null ? null : points[activeIndex]
+  const tooltipLeft = activePoint ? Math.min(82, Math.max(18, (activePoint.x / trendChart.width) * 100)) : 50
+  const tooltipTop = activePoint
+    ? Math.min(72, Math.max(12, (Math.min(...activePoint.values.map((value) => value.y)) / trendChart.height) * 100))
+    : 50
+
+  return (
+    <div className="relative mt-5 h-64 overflow-hidden rounded-lg bg-surface-2/80 p-3 sm:h-72">
+      <div className="absolute right-3 top-3 z-10 flex flex-wrap justify-end gap-2 text-xs text-ink-secondary">
+        {trendMetrics.map((metric) => (
+          <span key={metric.key} className="inline-flex items-center gap-1.5 rounded-md bg-surface-1/90 px-2 py-1">
+            <span
+              aria-hidden="true"
+              className="h-0.5 w-5 rounded-full"
+              style={{
+                backgroundColor: metric.stroke,
+                backgroundImage: metric.dasharray ? `repeating-linear-gradient(90deg, ${metric.stroke} 0 6px, transparent 6px 10px)` : undefined,
+              }}
+            />
+            {metric.label}
+          </span>
+        ))}
+      </div>
+      <svg
+        className="h-full w-full"
+        viewBox={`0 0 ${trendChart.width} ${trendChart.height}`}
+        role="img"
+        aria-labelledby="usage-trend-title usage-trend-desc"
+        onMouseLeave={() => setActiveIndex(null)}
+      >
+        <title id="usage-trend-title">7 日趋势</title>
+        <desc id="usage-trend-desc">最近 7 日访问、生成、兑换三项指标的趋势折线图。</desc>
+        {yTicks.map((tick) => {
+          const y = yFor(tick)
+          return (
+            <g key={tick}>
+              <line x1={trendChart.left} x2={trendChart.width - trendChart.right} y1={y} y2={y} stroke="var(--color-surface-3)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+              <text x={trendChart.left - 10} y={y + 4} textAnchor="end" fontSize="11" fill="var(--color-ink-muted)">
+                {tick}
+              </text>
+            </g>
+          )
+        })}
+        <line x1={trendChart.left} x2={trendChart.left} y1={trendChart.top} y2={trendChart.top + plotHeight} stroke="var(--color-surface-4)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        <line x1={trendChart.left} x2={trendChart.width - trendChart.right} y1={trendChart.top + plotHeight} y2={trendChart.top + plotHeight} stroke="var(--color-surface-4)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        {trendMetrics.map((metric) => (
+          <path
+            key={metric.key}
+            d={buildTrendPath(points.map((point) => ({ x: point.x, y: point.values.find((value) => value.key === metric.key)?.y ?? yFor(0) })))}
+            fill="none"
+            stroke={metric.stroke}
+            strokeWidth="2.5"
+            strokeDasharray={metric.dasharray}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+        {points.map((point) => (
+          <g key={point.day.date}>
+            {point.values.map((value) => (
+              <circle key={value.key} cx={point.x} cy={value.y} r={activePoint?.day.date === point.day.date ? 4 : 3} fill="var(--color-surface-1)" stroke={value.stroke} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+            ))}
+            <text x={point.x} y={trendChart.height - 12} textAnchor="middle" fontSize="11" fill="var(--color-ink-muted)">
+              {point.day.date.slice(5)}
+            </text>
+          </g>
+        ))}
+        {points.map((point, index) => {
+          const previousX = index === 0 ? trendChart.left : (points[index - 1].x + point.x) / 2
+          const nextX = index === points.length - 1 ? trendChart.width - trendChart.right : (point.x + points[index + 1].x) / 2
+          return (
+            <rect
+              key={`${point.day.date}-hit`}
+              x={previousX}
+              y={trendChart.top}
+              width={Math.max(16, nextX - previousX)}
+              height={plotHeight}
+              fill="transparent"
+              tabIndex={0}
+              aria-label={`${point.day.date}，访问 ${point.day.visits}，生成 ${point.day.schedule_generates}，兑换 ${point.day.cdk_redeems}`}
+              onFocus={() => setActiveIndex(index)}
+              onBlur={() => setActiveIndex(null)}
+              onMouseEnter={() => setActiveIndex(index)}
+            />
+          )
+        })}
+      </svg>
+      {activePoint && (
+        <div
+          className="pointer-events-none absolute z-20 min-w-36 -translate-x-1/2 rounded-lg border border-surface-3 bg-surface-1 px-3 py-2 text-xs shadow-lg"
+          style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }}
+        >
+          <div className="mb-1 font-semibold text-ink-primary">{activePoint.day.date}</div>
+          <div className="space-y-1 text-ink-secondary">
+            {activePoint.values.map((value) => (
+              <div key={value.key} className="flex items-center justify-between gap-4">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: value.stroke }} />
+                  {value.label}
+                </span>
+                <span className="font-medium text-ink-primary">{value.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <dl className="sr-only">
+        {days.map((day) => (
+          <div key={day.date}>
+            <dt>{day.date}</dt>
+            <dd>
+              访问 {day.visits}，生成 {day.schedule_generates}，兑换 {day.cdk_redeems}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
-    <div className="truncate text-xs text-ink-muted">{day.date.slice(5)}</div>
-  </div>
+  )
+}
+
+function buildTrendTicks(maxValue: number) {
+  if (maxValue <= 3) {
+    return Array.from({ length: maxValue + 1 }, (_, index) => maxValue - index)
+  }
+  return Array.from(new Set([maxValue, Math.round(maxValue * 0.66), Math.round(maxValue * 0.33), 0]))
+}
+
+function buildTrendPath(points: Array<{ x: number; y: number }>) {
+  if (points.length === 1) {
+    const [point] = points
+    return `M ${point.x - 12} ${point.y} L ${point.x + 12} ${point.y}`
+  }
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-2 last:border-0"><dt className="text-ink-muted">{label}</dt><dd className="font-medium text-ink-primary">{value}</dd></div>
+return <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-2 last:border-0"><dt className="text-ink-muted">{label}</dt><dd className="font-medium text-ink-primary">{value}</dd></div>
 }
 
 function StatusPill({ status }: { status: CdkStatus }) {
@@ -933,13 +1097,12 @@ function SmallButton({ children, onClick, loading, tone = 'default' }: { childre
   return <button type="button" onClick={onClick} disabled={loading} className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150 disabled:bg-surface-3 disabled:text-ink-muted ${className}`}>{loading ? '处理中' : children}</button>
 }
 
-function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, days: UsageDay[] = [], adminUsers = 0) {
+function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0) {
 const totalCdks = records.length
 const usedCdks = records.filter((record) => record.status === 'used').length
 const frozenCdks = records.filter((record) => record.status === 'frozen').length
 const riskEvents = records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
 const boundDevices = records.filter((record) => record.activation_bound).length
-const maxDailyActivity = Math.max(1, ...days.map((day) => day.visits + day.schedule_generates + day.cdk_redeems))
   return {
     totalCdks,
     usedCdks,
@@ -952,7 +1115,6 @@ const maxDailyActivity = Math.max(1, ...days.map((day) => day.visits + day.sched
     scheduleGenerates: usage?.schedule_generates ?? 0,
     cdkRedeems: usage?.cdk_redeems ?? 0,
     redeemRate: usage?.visits ? Math.round(((usage?.cdk_redeems ?? 0) / usage.visits) * 1000) / 10 : 0,
-    maxDailyActivity,
   }
 }
 
