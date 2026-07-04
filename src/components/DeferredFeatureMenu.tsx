@@ -1,7 +1,7 @@
 const deferredFeatures = [
   {
-    title: '云端档案',
-    description: '登录后保存干员数据、授权状态和排班记录。',
+    title: '账号同步',
+    description: '登录后自动保存干员数据和排班记录。',
     status: '规划中',
   },
   {

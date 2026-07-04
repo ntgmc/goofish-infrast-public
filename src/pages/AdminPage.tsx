@@ -6,6 +6,7 @@ type GeneratedPermission = ProductPermissionMode
 type CdkStatus = 'unused' | 'used' | 'frozen' | 'revoked'
 type StatusFilter = CdkStatus | 'all'
 type AdminSection = 'overview' | 'cdk' | 'risk' | 'announcement' | 'users'
+type FieldErrors = Record<string, string>
 
 interface AdminCdkRecord {
   code_hash: string;
@@ -112,6 +113,8 @@ export default function AdminPage() {
   const [selectedCdkHashes, setSelectedCdkHashes] = useState<string[]>([])
   const [resetUserEmail, setResetUserEmail] = useState('')
   const [resetPassword, setResetPassword] = useState('')
+  const [loginFieldErrors, setLoginFieldErrors] = useState<FieldErrors>({})
+  const [resetFieldErrors, setResetFieldErrors] = useState<FieldErrors>({})
   const [loading, setLoading] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -195,6 +198,11 @@ const summary = useMemo(
 
   const handleLogin = async (event: FormEvent) => {
     event.preventDefault()
+    const nextErrors: FieldErrors = {}
+    if (!loginUser.trim()) nextErrors.loginUser = '请输入账号'
+    if (!loginPassword) nextErrors.loginPassword = '请输入密码'
+    setLoginFieldErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
     const next = { user: loginUser.trim(), password: loginPassword }
     setCredentials(next)
     storeCredentials(next)
@@ -328,6 +336,13 @@ const summary = useMemo(
 
   const handleResetUserPassword = async (event: FormEvent) => {
     event.preventDefault()
+    const nextErrors: FieldErrors = {}
+    const emailError = validateEmailInput(resetUserEmail)
+    const passwordError = validatePasswordInput(resetPassword)
+    if (emailError) nextErrors.resetUserEmail = emailError
+    if (passwordError) nextErrors.resetPassword = passwordError
+    setResetFieldErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
     setBusyAction('reset-password')
     setError(null)
     setNotice(null)
@@ -369,18 +384,45 @@ const summary = useMemo(
               </p>
             </div>
           </section>
-          <form onSubmit={handleLogin} className="rounded-xl border border-surface-3 bg-surface-1 p-6">
-            <h2 className="text-lg font-semibold text-ink-primary">账号登录</h2>
-            <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-medium text-ink-secondary">账号</span>
-              <input value={loginUser} onChange={(event) => setLoginUser(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" autoComplete="username" />
-            </label>
-            <label className="mt-4 block">
-              <span className="mb-2 block text-sm font-medium text-ink-secondary">密码</span>
-              <input type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" autoComplete="current-password" />
-            </label>
+        <form onSubmit={handleLogin} noValidate className="rounded-xl border border-surface-3 bg-surface-1 p-6">
+          <h2 className="text-lg font-semibold text-ink-primary">账号登录</h2>
+          <label className="mt-5 block">
+            <span className="mb-2 block text-sm font-medium text-ink-secondary">账号</span>
+            <input
+              id="admin-login-user"
+              value={loginUser}
+              onChange={(event) => {
+                setLoginUser(event.currentTarget.value)
+                setLoginFieldErrors((current) => omitFieldError(current, 'loginUser'))
+              }}
+              onFocus={() => setLoginFieldErrors((current) => omitFieldError(current, 'loginUser'))}
+              className={inputClassName(Boolean(loginFieldErrors.loginUser))}
+              autoComplete="username"
+              aria-invalid={Boolean(loginFieldErrors.loginUser)}
+              aria-describedby={loginFieldErrors.loginUser ? 'admin-login-user-error' : undefined}
+            />
+            {loginFieldErrors.loginUser && <p id="admin-login-user-error" className="mt-1.5 text-sm text-error">{loginFieldErrors.loginUser}</p>}
+          </label>
+          <label className="mt-4 block">
+            <span className="mb-2 block text-sm font-medium text-ink-secondary">密码</span>
+            <input
+              id="admin-login-password"
+              type="password"
+              value={loginPassword}
+              onChange={(event) => {
+                setLoginPassword(event.currentTarget.value)
+                setLoginFieldErrors((current) => omitFieldError(current, 'loginPassword'))
+              }}
+              onFocus={() => setLoginFieldErrors((current) => omitFieldError(current, 'loginPassword'))}
+              className={inputClassName(Boolean(loginFieldErrors.loginPassword))}
+              autoComplete="current-password"
+              aria-invalid={Boolean(loginFieldErrors.loginPassword)}
+              aria-describedby={loginFieldErrors.loginPassword ? 'admin-login-password-error' : undefined}
+            />
+            {loginFieldErrors.loginPassword && <p id="admin-login-password-error" className="mt-1.5 text-sm text-error">{loginFieldErrors.loginPassword}</p>}
+          </label>
             {error && <div className="mt-4 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">{error}</div>}
-            <button type="submit" disabled={loading || !loginUser.trim() || !loginPassword} className="mt-5 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+          <button type="submit" disabled={loading} className="mt-5 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
               {loading ? '正在登录...' : '进入后台'}
             </button>
             <a href="/admin/setup" className="mt-4 block text-center text-sm font-medium text-brand-500 underline-offset-4 hover:underline">添加管理账号</a>
@@ -597,19 +639,45 @@ const summary = useMemo(
 
           {activeSection === 'users' && (
             <section className="space-y-5">
-              <form onSubmit={handleResetUserPassword} className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+            <form onSubmit={handleResetUserPassword} noValidate className="rounded-xl border border-surface-3 bg-surface-1 p-5">
                 <h2 className="text-lg font-semibold text-ink-primary">重置用户密码</h2>
                 <p className="mt-2 text-sm leading-6 text-ink-secondary">输入用户邮箱和新临时密码。保存后该用户现有登录会话会失效。</p>
                 <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_240px_auto] lg:items-end">
-                  <label>
-                    <span className="mb-2 block text-sm font-medium text-ink-secondary">用户邮箱</span>
-                    <input value={resetUserEmail} onChange={(event) => setResetUserEmail(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="user@example.com" />
-                  </label>
-                  <label>
-                    <span className="mb-2 block text-sm font-medium text-ink-secondary">新密码</span>
-                    <input type="password" value={resetPassword} onChange={(event) => setResetPassword(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" minLength={8} />
-                  </label>
-                  <button type="submit" disabled={busyAction === 'reset-password' || !resetUserEmail.trim() || resetPassword.length < 8} className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+                <label>
+                  <span className="mb-2 block text-sm font-medium text-ink-secondary">用户邮箱</span>
+                  <input
+                    id="admin-reset-email"
+                    value={resetUserEmail}
+                    onChange={(event) => {
+                      setResetUserEmail(event.currentTarget.value)
+                      setResetFieldErrors((current) => omitFieldError(current, 'resetUserEmail'))
+                    }}
+                    onFocus={() => setResetFieldErrors((current) => omitFieldError(current, 'resetUserEmail'))}
+                    className={inputClassName(Boolean(resetFieldErrors.resetUserEmail))}
+                    placeholder="user@example.com"
+                    aria-invalid={Boolean(resetFieldErrors.resetUserEmail)}
+                    aria-describedby={resetFieldErrors.resetUserEmail ? 'admin-reset-email-error' : undefined}
+                  />
+                  {resetFieldErrors.resetUserEmail && <p id="admin-reset-email-error" className="mt-1.5 text-sm text-error">{resetFieldErrors.resetUserEmail}</p>}
+                </label>
+                <label>
+                  <span className="mb-2 block text-sm font-medium text-ink-secondary">新密码</span>
+                  <input
+                    id="admin-reset-password"
+                    type="password"
+                    value={resetPassword}
+                    onChange={(event) => {
+                      setResetPassword(event.currentTarget.value)
+                      setResetFieldErrors((current) => omitFieldError(current, 'resetPassword'))
+                    }}
+                    onFocus={() => setResetFieldErrors((current) => omitFieldError(current, 'resetPassword'))}
+                    className={inputClassName(Boolean(resetFieldErrors.resetPassword))}
+                    aria-invalid={Boolean(resetFieldErrors.resetPassword)}
+                    aria-describedby={resetFieldErrors.resetPassword ? 'admin-reset-password-error' : undefined}
+                  />
+                  {resetFieldErrors.resetPassword && <p id="admin-reset-password-error" className="mt-1.5 text-sm text-error">{resetFieldErrors.resetPassword}</p>}
+                </label>
+                <button type="submit" disabled={busyAction === 'reset-password'} className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
                     {busyAction === 'reset-password' ? '重置中...' : '重置密码'}
                   </button>
                 </div>
@@ -866,6 +934,34 @@ function formatDate(value: string | null): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function validateEmailInput(value: string): string | null {
+  const email = value.trim()
+  if (!email) return '请输入邮箱'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return '请输入正确的邮箱地址'
+  return null
+}
+
+function validatePasswordInput(value: string): string | null {
+  if (!value) return '请输入密码'
+  if (value.length < 8) return '密码至少需要 8 位'
+  return null
+}
+
+function omitFieldError(errors: FieldErrors, field: string): FieldErrors {
+  if (!errors[field]) return errors
+  const next = { ...errors }
+  delete next[field]
+  return next
+}
+
+function inputClassName(hasError: boolean): string {
+  const base = 'w-full rounded-lg border px-3 py-2 text-sm text-ink-primary outline-none transition-colors duration-150 focus:ring-2'
+  const state = hasError
+    ? 'border-error/70 bg-error/10 focus:border-error focus:ring-error/20'
+    : 'border-surface-4 bg-surface-0 focus:border-brand-500 focus:ring-brand-500/20'
+  return `${base} ${state}`
 }
 
 function getNextProductPermission(permission: Permission): GeneratedPermission | null {
