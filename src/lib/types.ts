@@ -356,4 +356,32 @@ export interface UpgradeSuggestion {
   desc?: string;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  permission: PermissionMode;
+  status: 'active' | 'frozen' | 'revoked';
+  cdk_status: string;
+  cdk_order_hash: string | null;
+  created_at: string;
+}
+
+export interface UserWorkspace {
+  operators: LicenseOperator[] | null;
+  config: LicenseConfig | null;
+  elite_overrides: Record<string, number>;
+  last_result: OptimizeResult | null;
+  updated_at: string | null;
+}
+
+export interface AuthMeResponse {
+  user: AuthUser | null;
+  workspace: UserWorkspace | null;
+}
+
+export interface AuthSuccessResponse {
+  user: AuthUser;
+  workspace: UserWorkspace;
+}
+
 export type AppStep = 'upload' | 'optimize';
