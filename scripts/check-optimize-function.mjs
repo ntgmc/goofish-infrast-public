@@ -318,11 +318,24 @@ for (const plan of rotationResult.plans) {
   if (plan.Fiammetta?.enable || plan.Fiammetta?.target) {
     throw new Error('rotation result: Fiammetta should be disabled');
   }
+  if (plan.mood_valid === false || plan.mood_errors !== undefined) {
+    throw new Error('rotation result: should not report fixed-shift mood errors');
+  }
   if (plan.drones !== undefined) {
     throw new Error('rotation result: plan.drones should be omitted');
   }
   if (Array.isArray(plan.rooms?.dormitory) && plan.rooms.dormitory.length > 0) {
     throw new Error('rotation result: dormitory rooms should be omitted');
+  }
+  for (const rooms of Object.values(plan.rooms ?? {})) {
+    if (!Array.isArray(rooms)) continue;
+    for (const room of rooms) {
+      for (const mood of Object.values(room.mood ?? {})) {
+        if (mood?.red_face) {
+          throw new Error('rotation result: should not mark red-face risk from preset queues');
+        }
+      }
+    }
   }
 }
 

@@ -73,7 +73,7 @@ export default function ResultPanel({
           if (!Array.isArray(ops) || ops.length === 0) return []
           const efficiency = getDisplayEfficiency(room)
           const speedEfficiency = getEffectiveEfficiency(roomType, room)
-          const detail = [isRotationMode ? '' : getEfficiencyDetail(roomType, room), getMoodDetail(room)]
+          const detail = [isRotationMode ? '' : getEfficiencyDetail(roomType, room), getMoodDetail(room, isRotationMode)]
             .filter(Boolean)
             .join(' · ')
           return {
@@ -237,17 +237,6 @@ export default function ResultPanel({
         </div>
       ) : null}
 
-      {isRotationMode && plans.some((plan) => plan.mood_valid === false) ? (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4">
-          <p className="text-sm font-semibold text-warning">队列轮换需要调整</p>
-          <ul className="mt-2 space-y-1 text-sm leading-6 text-ink-secondary">
-            {plans.flatMap((plan) => (plan.mood_errors ?? []).slice(0, 3).map((error, index) => (
-              <li key={`${plan.name}-${index}`}>{String(error['message'] ?? error['operator'] ?? '心情同步校验未通过')}</li>
-            )))}
-          </ul>
-        </div>
-      ) : null}
-
       <details className="overflow-hidden rounded-xl bg-surface-1" open={detailDefaultOpen || isRotationMode}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
           <span>{isRotationMode ? '预设队列' : '排班详情'}</span>
@@ -388,7 +377,14 @@ function getEfficiencyDetail(roomType: string, room: ShiftRoom): string {
   return ''
 }
 
-function getMoodDetail(room: ShiftRoom): string {
+function getMoodDetail(room: ShiftRoom, isRotationMode = false): string {
+  if (isRotationMode) {
+    const workHoursToZero = room.rotation?.work_hours_to_zero
+    return workHoursToZero !== undefined && workHoursToZero !== null
+      ? `预计 ${formatCompactNumber(workHoursToZero)}h 后整设施切换`
+      : ''
+  }
+
   const mood = room.mood ?? {}
   const entries = Object.values(mood)
   if (entries.length === 0) return ''
@@ -399,10 +395,7 @@ function getMoodDetail(room: ShiftRoom): string {
     .map(([name]) => name)
   const parts = [`心情≥${formatCompactNumber(minEnd)}`, `最高消耗/时 ${formatCompactNumber(maxCost)}`]
   if (room.rotation?.work_hours_to_zero !== undefined && room.rotation.work_hours_to_zero !== null) {
-    const triggers = room.rotation.trigger_operators?.length
-      ? ` (${room.rotation.trigger_operators.join(', ')})`
-      : ''
-    parts.push(`最快耗心 ${formatCompactNumber(room.rotation.work_hours_to_zero)}h 触发整设施切换${triggers}`)
+    parts.push(`最快耗心 ${formatCompactNumber(room.rotation.work_hours_to_zero)}h 触发整设施切换`)
   }
   if (redOps.length > 0) parts.push(`红脸风险 ${redOps.join(', ')}`)
   return parts.join('，')
