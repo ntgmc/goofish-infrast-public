@@ -104,6 +104,7 @@ export interface OptimizeRequest {
   operators: LicenseOperator[];
   config: LicenseConfig;
   ignore_elite: boolean;
+  profile_id?: string;
   activation_token?: string;
   include_current?: boolean;
   suggestions_only?: boolean;
@@ -187,6 +188,12 @@ export interface OptimizeResult {
   description: string;
   schedule_mode?: string;
   schedule_mode_name?: string;
+  rotation_mode?: {
+    queue_count: number;
+    quick_switch: true;
+    training_policy: 'assume_not_training';
+    suppress_total_efficiency: true;
+  };
   shift_hours?: number[];
   shift_pattern?: string;
   total_schedule_hours?: number;
@@ -284,8 +291,12 @@ export interface ShiftRoom {
     red_face?: boolean;
   }>;
   rotation?: {
+    queue_index?: number;
     trigger_operators?: string[];
     work_hours_to_zero?: number | null;
+    sync_valid?: boolean;
+    sync_group?: string;
+    training_policy?: 'assume_not_training';
   };
   autofill?: boolean;
 }
@@ -334,12 +345,15 @@ export interface ShiftPlan {
   drones?: DroneAssignment;
   mood_valid?: boolean;
   mood_errors?: Record<string, unknown>[];
-  mood_assumptions?: {
-    max_mood?: number;
-    shift_hours?: number;
-    resting_operator_recovers_full?: boolean;
-    fiammetta_target_recovers_full?: boolean;
-    dormitory_recovery_calculated?: boolean;
+    mood_assumptions?: {
+      max_mood?: number;
+      shift_hours?: number;
+      resting_operator_recovers_full?: boolean;
+      cyclic_mood_simulation?: boolean;
+      cyclic_mood_simulation_iterations?: number;
+      cyclic_mood_simulation_delta?: number;
+      fiammetta_target_recovers_full?: boolean;
+      dormitory_recovery_calculated?: boolean;
     dormitory_default_level?: number;
     dormitory_default_ambience?: number;
   };
@@ -354,6 +368,59 @@ export interface UpgradeSuggestion {
   current_elite?: number;
   target_elite?: number;
   desc?: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  permission: PermissionMode;
+  status: 'active' | 'frozen' | 'revoked';
+  cdk_status: string;
+  cdk_order_hash: string | null;
+  created_at: string;
+}
+
+export interface UserGameAccount {
+  id: string;
+  user_id: string;
+  permission: PermissionMode;
+  status: 'active' | 'frozen' | 'revoked';
+  cdk_order_hash: string | null;
+  display_name: string;
+  note: string;
+  operator_count: number;
+  updated_at: string | null;
+  created_at: string;
+}
+
+export interface UserWorkspace {
+  profile_id: string | null;
+  operators: LicenseOperator[] | null;
+  config: LicenseConfig | null;
+  elite_overrides: Record<string, number>;
+  last_result: OptimizeResult | null;
+  updated_at: string | null;
+}
+
+export interface UserAnnouncementRead {
+  announcement: Announcement;
+  read_at: string | null;
+}
+
+export interface AuthMeResponse {
+  user: AuthUser | null;
+  profiles?: UserGameAccount[];
+  active_profile?: UserGameAccount | null;
+  workspace: UserWorkspace | null;
+  announcement_unread_count?: number;
+}
+
+export interface AuthSuccessResponse {
+  user: AuthUser;
+  profiles: UserGameAccount[];
+  active_profile: UserGameAccount | null;
+  workspace: UserWorkspace | null;
+  announcement_unread_count?: number;
 }
 
 export type AppStep = 'upload' | 'optimize';

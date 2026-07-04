@@ -38,6 +38,12 @@ const config = {
   drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
 };
 
+const rotationConfig = {
+  ...config,
+  desc: '333 游戏内轮换烟测',
+  schedule_mode: 'rotation',
+};
+
 const sampleOperators = [
   { id: 'char_002_amiya', name: '阿米娅', own: true, elite: 2, rarity: 4 },
   { id: 'char_010_chen', name: '陈', own: true, elite: 1, rarity: 5 },
@@ -205,6 +211,23 @@ function assertOptimizeShape(result, label) {
   }
 }
 
+function assertNoFiammettaInRooms(result, label, { includeDormitories = true } = {}) {
+  const blockedRoomTypes = includeDormitories
+    ? null
+    : new Set(['trading', 'manufacturing', 'power', 'control', 'meeting', 'hire']);
+  for (const plan of result.plans ?? []) {
+    for (const [roomType, rooms] of Object.entries(plan.rooms ?? {})) {
+      if (!Array.isArray(rooms)) continue;
+      if (blockedRoomTypes && !blockedRoomTypes.has(roomType)) continue;
+      for (const [index, room] of rooms.entries()) {
+        if (Array.isArray(room?.operators) && room.operators.includes('菲亚梅塔')) {
+          throw new Error(`${label}: unexpected Fiammetta in ${roomType} ${index + 1}`);
+        }
+      }
+    }
+  }
+}
+
 const current = await callOptimize({
   license,
   operators: [],
@@ -212,6 +235,7 @@ const current = await callOptimize({
   ignore_elite: false,
 });
 assertOptimizeShape(current, 'current result');
+assertNoFiammettaInRooms(current, 'current result', { includeDormitories: false });
 
 const recommendedCurrent = await callOptimize({
   license: recommendedLicense,
@@ -255,9 +279,76 @@ const advancedCustom = await callOptimize({
 });
 assertOptimizeShape(advancedCustom, 'advanced custom result');
 
+const fiammettaDisabledResult = await callOptimize({
+  license: advancedLicense,
+  operators: [],
+  config: {
+    ...config,
+    Fiammetta: { enable: false },
+  },
+  ignore_elite: false,
+});
+assertOptimizeShape(fiammettaDisabledResult, 'Fiammetta disabled result');
+assertNoFiammettaInRooms(fiammettaDisabledResult, 'Fiammetta disabled result');
+
+const rotationResult = await callOptimize({
+  license: advancedLicense,
+  operators: [],
+  config: rotationConfig,
+  ignore_elite: false,
+});
+assertOptimizeShape(rotationResult, 'rotation result');
+assertNoFiammettaInRooms(rotationResult, 'rotation result');
+if (rotationResult.schedule_mode !== 'rotation') {
+  throw new Error(`rotation result: expected schedule_mode rotation, got ${rotationResult.schedule_mode}`);
+}
+if (!rotationResult.rotation_mode?.quick_switch || rotationResult.rotation_mode.queue_count !== 2) {
+  throw new Error('rotation result: missing quick switch queue metadata');
+}
+if (!Array.isArray(rotationResult.plans) || rotationResult.plans.length !== 2) {
+  throw new Error(`rotation result: expected 2 preset queues, got ${rotationResult.plans?.length}`);
+}
+if (rotationResult.shift_hours !== undefined || rotationResult.total_schedule_hours !== undefined) {
+  throw new Error('rotation result: leaked fixed shift timing fields');
+}
+if (rotationResult.daily_production !== undefined || rotationResult.total_efficiency !== undefined) {
+  throw new Error('rotation result: leaked production or total efficiency fields');
+}
+for (const plan of rotationResult.plans) {
+  if (plan.Fiammetta?.enable || plan.Fiammetta?.target) {
+    throw new Error('rotation result: Fiammetta should be disabled');
+  }
+  if (plan.mood_valid === false || plan.mood_errors !== undefined) {
+    throw new Error('rotation result: should not report fixed-shift mood errors');
+  }
+  if (plan.drones !== undefined) {
+    throw new Error('rotation result: plan.drones should be omitted');
+  }
+  if (Array.isArray(plan.rooms?.dormitory) && plan.rooms.dormitory.length > 0) {
+    throw new Error('rotation result: dormitory rooms should be omitted');
+  }
+  for (const rooms of Object.values(plan.rooms ?? {})) {
+    if (!Array.isArray(rooms)) continue;
+    for (const room of rooms) {
+      for (const mood of Object.values(room.mood ?? {})) {
+        if (mood?.red_face) {
+          throw new Error('rotation result: should not mark red-face risk from preset queues');
+        }
+      }
+    }
+  }
+}
+
 const restrictedPreset = licenseUtilsModule.resolveConfigForPermission('growth', config);
 if (!restrictedPreset.ok) {
   throw new Error(`growth preset config guard: ${restrictedPreset.message}`);
+}
+const restrictedRotationPreset = licenseUtilsModule.resolveConfigForPermission('growth', rotationConfig);
+if (!restrictedRotationPreset.ok) {
+  throw new Error(`growth rotation preset config guard: ${restrictedRotationPreset.message}`);
+}
+if (restrictedRotationPreset.config.schedule_mode !== 'rotation') {
+  throw new Error('growth rotation preset config guard: expected rotation mode to be preserved');
 }
 const customRestrictedConfig = {
   ...config,
