@@ -7,7 +7,16 @@ import {
   requireRootAdminPassword,
 } from './admin-auth'
 import { jsonResponse } from './license-utils'
-import { getUserByEmail, getUserById, listProfilesForUser, listUserAccounts } from '../../server/storage/user-store'
+import {
+  deleteSessionsForUser,
+  deleteUserAccount,
+  getUserByEmail,
+  getUserById,
+  listProfilesForUser,
+  listUserAccounts,
+  saveUserAccount,
+  type UserAccountRecord,
+} from '../../server/storage/user-store'
 import { resetUserPasswordByAdmin } from './user-auth'
 
 export default async (req: Request, _context: Context): Promise<Response> => {
@@ -52,21 +61,48 @@ export default async (req: Request, _context: Context): Promise<Response> => {
         action?: unknown
         user_id?: unknown
         email?: unknown
+        confirm_email?: unknown
         new_password?: unknown
       }
       if (!(await authenticateAdminRequest(req, body))) {
         return jsonResponse({ error: '管理账号或密码错误。' }, 401)
       }
-      if (body.action !== 'reset_password') return jsonResponse({ error: '未知操作。' }, 400)
-      const target = typeof body.user_id === 'string' && body.user_id
-        ? await getUserById(body.user_id)
-        : typeof body.email === 'string' && body.email
-          ? await getUserByEmail(body.email.trim().toLowerCase())
-          : null
+      if (
+        body.action !== 'reset_password'
+        && body.action !== 'freeze_account'
+        && body.action !== 'unfreeze_account'
+        && body.action !== 'delete_account'
+      ) {
+        return jsonResponse({ error: '未知操作。' }, 400)
+      }
+      const target = await findTargetUser(body)
       if (!target) return jsonResponse({ error: '用户不存在。' }, 404)
-      const reset = await resetUserPasswordByAdmin(target, body.new_password)
-      if (!reset.ok) return jsonResponse({ error: reset.message }, 400)
-      return jsonResponse({ ok: true, user: { id: reset.user.id, email: reset.user.email, updated_at: reset.user.updated_at } })
+
+      if (body.action === 'reset_password') {
+        const reset = await resetUserPasswordByAdmin(target, body.new_password)
+        if (!reset.ok) return jsonResponse({ error: reset.message }, 400)
+        return jsonResponse({ ok: true, user: toAdminAppUser(reset.user) })
+      }
+
+      if (body.action === 'freeze_account' || body.action === 'unfreeze_account') {
+        const status = body.action === 'freeze_account' ? 'frozen' : 'active'
+        const updated = await setUserStatus(target, status)
+        if (status !== 'active') await deleteSessionsForUser(target.id)
+        return jsonResponse({ ok: true, user: toAdminAppUser(updated) })
+      }
+
+      if (body.action === 'delete_account') {
+        const confirmedEmail = typeof body.confirm_email === 'string'
+          ? body.confirm_email.trim().toLowerCase()
+          : ''
+        if (confirmedEmail !== target.email) {
+          return jsonResponse({ error: '确认邮箱不匹配。' }, 400)
+        }
+        await deleteUserAccount(target.id)
+        return jsonResponse({ ok: true, deleted: true, user: { id: target.id, email: target.email } })
+      }
+
+      return jsonResponse({ error: '未知操作。' }, 400)
     }
 
     if (req.method === 'DELETE') {
@@ -84,5 +120,35 @@ export default async (req: Request, _context: Context): Promise<Response> => {
     console.error('admin users error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
+  }
+}
+
+async function findTargetUser(body: { user_id?: unknown; email?: unknown }): Promise<UserAccountRecord | null> {
+  if (typeof body.user_id === 'string' && body.user_id) return getUserById(body.user_id)
+  if (typeof body.email === 'string' && body.email.trim()) {
+    return getUserByEmail(body.email.trim().toLowerCase())
+  }
+  return null
+}
+
+async function setUserStatus(
+  user: UserAccountRecord,
+  status: UserAccountRecord['status'],
+): Promise<UserAccountRecord> {
+  const updated: UserAccountRecord = {
+    ...user,
+    status,
+    updated_at: new Date().toISOString(),
+  }
+  await saveUserAccount(updated)
+  return updated
+}
+
+function toAdminAppUser(user: UserAccountRecord) {
+  return {
+    id: user.id,
+    email: user.email,
+    status: user.status,
+    updated_at: user.updated_at,
   }
 }

@@ -263,6 +263,10 @@ export async function requireUserSession(req: Request): Promise<AuthContext | nu
     await deleteSessionByTokenHash(tokenHash)
     return null
   }
+  if (user.status !== 'active') {
+    await deleteSessionByTokenHash(tokenHash)
+    return null
+  }
   const profiles = await migrateLegacyUserIfNeeded(user)
   const activeProfile = profiles[0] ?? null
   const cdkRecord = activeProfile ? await getCdkRecordForProfile(activeProfile) : null
