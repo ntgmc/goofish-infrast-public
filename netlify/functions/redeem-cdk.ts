@@ -84,6 +84,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       config: configForPermission.config,
       permission,
       codeHash,
+      activationToken: body.activation_token,
     })
 
     let updated: CdkRecord = {

@@ -86,6 +86,24 @@ function createLicense(permission, orderHash = `${permission}-smoke-test`) {
 const license = createLicense('growth');
 const recommendedLicense = createLicense('recommended');
 const advancedLicense = createLicense('advanced');
+const activationToken = '0123456789abcdef0123456789abcdef';
+const issuedWithToken = licenseUtilsModule.createSignedLicenseFile({
+  adminSecret,
+  operators: sampleOperators,
+  config,
+  permission: 'advanced',
+  codeHash: 'activation-token-smoke',
+  activationToken,
+});
+if (issuedWithToken.license.activation_token !== activationToken) {
+  throw new Error('license signing: missing activation_token');
+}
+const reissuedWithToken = licenseUtilsModule.reissueSignedLicenseFile(advancedLicense, 'advanced', adminSecret, {
+  activationToken,
+});
+if (reissuedWithToken.license.activation_token !== activationToken) {
+  throw new Error('license reissue: missing activation_token');
+}
 
 async function callOptimizeRaw(body) {
   const request = new Request('http://local/api/optimize', {

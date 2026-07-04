@@ -49,6 +49,7 @@ export interface LicenseFile {
   operators: LicenseOperator[];
   config: LicenseConfig;
   permission?: RawPermissionMode;
+  activation_token?: string | null;
   operator_update_grant?: OperatorUpdateGrant | null;
   issued_at: string;
   sig: string;
