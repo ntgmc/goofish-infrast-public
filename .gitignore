@@ -10,5 +10,7 @@ _tmp.py
 .agents
 .vite-dev.*
 
+.codex
+
 # Local Netlify folder
 .netlify
