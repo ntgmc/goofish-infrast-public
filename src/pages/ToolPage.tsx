@@ -14,7 +14,6 @@ import type {
 } from '../lib/types'
 import AnnouncementPopup from '../components/AnnouncementPopup'
 import AnnouncementBanner from '../components/AnnouncementBanner'
-import BuildMetaStrip from '../components/BuildMetaStrip'
 import ConfigEditor, { CONFIG_PRESETS, PERMISSION_LABELS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import DeferredFeatureMenu from '../components/DeferredFeatureMenu'
 import { canonicalJson } from '../lib/crypto'
@@ -259,7 +258,6 @@ function AuthPage({
           <p className="mt-3 text-sm leading-6 text-ink-secondary">
             使用邮箱和密码登录。注册时 CDK 可选；也可以先创建账号，登录后再添加多个游戏账号。
           </p>
-          <BuildMetaStrip className="mt-6" />
           {announcement?.active && <AnnouncementBanner announcement={announcement} className="mt-6" />}
         </section>
 

@@ -7,7 +7,6 @@ import AnnouncementBanner from '../components/AnnouncementBanner'
 import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
 import UpgradeSuggestions from '../components/UpgradeSuggestions'
 import ResultPanel from '../components/ResultPanel'
-import BuildMetaStrip from '../components/BuildMetaStrip'
 import DeferredFeatureMenu from '../components/DeferredFeatureMenu'
 import ScheduleProgress, {
   SCHEDULE_PROGRESS_COMPLETION_DURATION_MS,
@@ -131,7 +130,6 @@ export default function OptimizePage({
   const resultIsCurrent = hasResult && lastGeneratedSignature === optimizeSignature
   const currentResultIsRotation = normalizeScheduleMode(currentResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
   const finalResultIsRotation = normalizeScheduleMode(finalResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
-  const serverBuildMeta = finalResult?.build_meta ?? currentResult?.build_meta
 
   useEffect(() => {
     if (configPanelForcedOpen) {
@@ -493,7 +491,6 @@ export default function OptimizePage({
           <p className="max-w-3xl text-sm leading-6 text-ink-secondary">
             配置: {userCanEditConfig ? activeConfig.desc : configPresetLabel} · ID: {license.order_hash.slice(0, 8)}。在这里生成、检查并下载当前账号的基建排班方案。
           </p>
-          <BuildMetaStrip meta={serverBuildMeta} placement="corner" />
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <DeferredFeatureMenu />
