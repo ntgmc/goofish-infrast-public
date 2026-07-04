@@ -4,7 +4,7 @@
 # stale frontend that cannot reach the production backend.
 
 [build]
-command = "node -e \"require('fs').mkdirSync('dist',{recursive:true})\""
+command = "node -e \"const fs=require('fs');fs.mkdirSync('dist',{recursive:true});fs.writeFileSync('dist/_redirects','/* https://maatool.com/:splat 301!\\n')\""
 publish = "dist"
 
 [[redirects]]
