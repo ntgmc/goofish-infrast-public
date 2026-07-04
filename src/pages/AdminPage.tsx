@@ -812,37 +812,37 @@ function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, o
         </div>
         <button type="button" onClick={onBulkRevoke} disabled={selected.length === 0} className="rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error hover:bg-error/20 disabled:bg-surface-2 disabled:text-ink-muted">批量撤销</button>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-[980px] divide-y divide-surface-3 text-left text-sm">
-          <thead className="bg-surface-2/70 text-xs font-semibold text-ink-muted">
-            <tr>
-              <th className="px-4 py-3"><input type="checkbox" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></th>
-              <th className="px-4 py-3">CDK</th>
-              <th className="px-4 py-3">状态</th>
-              <th className="px-4 py-3">数据</th>
-              <th className="px-4 py-3">时间</th>
-              <th className="px-4 py-3">备注</th>
-              <th className="px-4 py-3">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-surface-3">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
+            <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
+              <tr>
+                <th className="w-12 px-4 py-3"><input type="checkbox" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></th>
+                <th className="w-36 px-4 py-3">CDK</th>
+                <th className="w-32 px-4 py-3">状态</th>
+                <th className="w-56 px-4 py-3">数据</th>
+                <th className="w-44 px-4 py-3">时间</th>
+                <th className="w-48 px-4 py-3">备注</th>
+                <th className="w-64 px-4 py-3">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-3">
             {records.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">当前筛选没有记录。</td></tr>
             ) : records.map((record) => {
               const nextPermission = getNextProductPermission(record.permission)
               return (
                 <tr key={record.code_hash} className="hover:bg-surface-2/50">
-                  <td className="px-4 py-4"><input type="checkbox" checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
-                  <td className="px-4 py-4 font-mono text-ink-primary">{record.cdk_id}</td>
-                  <td className="px-4 py-4"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{permissionLabels[record.permission]}</div></td>
-                  <td className="px-4 py-4 text-ink-secondary">
-                    <div>{record.operator_count ?? '-'} 干员 / 生成 {record.schedule_generate_count ?? 0}</div>
-                    <div className="mt-1 text-xs text-ink-muted">终身更新 {record.operator_update_event_count ?? 0} / 风险 {record.risk_event_count ?? 0}</div>
-                  </td>
-                  <td className="px-4 py-4 text-xs text-ink-secondary"><div>创建 {formatDate(record.created_at)}</div><div className="mt-1">使用 {formatDate(record.used_at)}</div></td>
-                  <td className="max-w-[180px] px-4 py-4 text-ink-secondary"><div className="truncate" title={record.order_note || undefined}>{record.order_note || '-'}</div></td>
-                  <td className="px-4 py-4">
-                    <div className="flex flex-wrap gap-2">
+                    <td className="px-4 py-4 align-top"><input type="checkbox" checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
+                    <td className="px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
+                    <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{permissionLabels[record.permission]}</div></td>
+                    <td className="px-4 py-4 align-top text-ink-secondary">
+                      <div>{record.operator_count ?? '-'} 干员 / 生成 {record.schedule_generate_count ?? 0}</div>
+                      <div className="mt-1 text-xs text-ink-muted">终身更新 {record.operator_update_event_count ?? 0} / 风险 {record.risk_event_count ?? 0}</div>
+                    </td>
+                    <td className="px-4 py-4 align-top text-xs text-ink-secondary"><div>创建 {formatDate(record.created_at)}</div><div className="mt-1">使用 {formatDate(record.used_at)}</div></td>
+                    <td className="px-4 py-4 align-top text-ink-secondary"><div className="truncate" title={record.order_note || undefined}>{record.order_note || '-'}</div></td>
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex min-w-0 flex-wrap gap-2">
                       {nextPermission && record.status !== 'frozen' && record.status !== 'revoked' && <SmallButton onClick={() => onPatch(record, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${record.code_hash}`}>升级</SmallButton>}
                       {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
                       {(record.status === 'used' || record.status === 'frozen') && <SmallButton onClick={() => onPatch(record, 'revoke')} loading={busyAction === `revoke:${record.code_hash}`} tone="danger">撤销</SmallButton>}
