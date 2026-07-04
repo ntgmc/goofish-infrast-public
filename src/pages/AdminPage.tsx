@@ -5,7 +5,7 @@ type Permission = RawPermissionMode
 type GeneratedPermission = ProductPermissionMode
 type CdkStatus = 'unused' | 'used' | 'frozen' | 'revoked'
 type StatusFilter = CdkStatus | 'all'
-type AdminSection = 'overview' | 'cdk' | 'risk' | 'announcement'
+type AdminSection = 'overview' | 'cdk' | 'risk' | 'announcement' | 'users'
 
 interface AdminCdkRecord {
   code_hash: string;
@@ -50,6 +50,15 @@ interface AdminUserSummary {
   updated_at: string;
 }
 
+interface AppUserSummary {
+  id: string;
+  email: string;
+  status: string;
+  profile_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 const EMPTY_ANNOUNCEMENTS: Announcement[] = []
 
 const permissionLabels: Record<Permission, string> = {
@@ -74,6 +83,7 @@ const sectionLabels: Record<AdminSection, string> = {
   cdk: 'CDK',
   risk: '风控',
   announcement: '公告管理',
+  users: '用户维护',
 }
 
 const cdkProductPermissions: GeneratedPermission[] = ['recommended', 'growth', 'advanced', 'ultimate']
@@ -93,12 +103,15 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [records, setRecords] = useState<AdminCdkRecord[]>([])
   const [users, setUsers] = useState<AdminUserSummary[]>([])
+  const [appUsers, setAppUsers] = useState<AppUserSummary[]>([])
   const [usageStats, setUsageStats] = useState<{ totals: UsageTotals; days: UsageDay[] } | null>(null)
   const [announcements, setAnnouncements] = useState<Announcement[]>(EMPTY_ANNOUNCEMENTS)
   const [permission, setPermission] = useState<GeneratedPermission>('growth')
   const [orderNote, setOrderNote] = useState('')
   const [generatedCode, setGeneratedCode] = useState<{ code: string; permission: GeneratedPermission; created_at: string } | null>(null)
   const [selectedCdkHashes, setSelectedCdkHashes] = useState<string[]>([])
+  const [resetUserEmail, setResetUserEmail] = useState('')
+  const [resetPassword, setResetPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -147,7 +160,7 @@ const summary = useMemo(
       const cdkData = await readJson<{ error?: string; cdks?: AdminCdkRecord[] }>(cdkResp)
       const usageData = await readJson<{ error?: string; totals?: UsageTotals; days?: UsageDay[] }>(usageResp)
       const announcementData = await readJson<Partial<AnnouncementAdminResponse> & { error?: string }>(announcementResp)
-      const usersData = await readJson<{ error?: string; users?: AdminUserSummary[] }>(usersResp)
+      const usersData = await readJson<{ error?: string; users?: AdminUserSummary[]; app_users?: AppUserSummary[] }>(usersResp)
       if (!cdkResp.ok) throw new Error(cdkData.error || `加载 CDK 失败: ${cdkResp.status}`)
       if (!usageResp.ok) throw new Error(usageData.error || `加载统计失败: ${usageResp.status}`)
       if (!announcementResp.ok) throw new Error(announcementData.error || `加载公告失败: ${announcementResp.status}`)
@@ -159,6 +172,7 @@ const summary = useMemo(
       })
       setAnnouncements(normalizeAnnouncementList(announcementData.announcements))
       setUsers(usersData.users ?? [])
+      setAppUsers(usersData.app_users ?? [])
       setAuthenticated(true)
     } catch (caught) {
       setError((caught as Error).message)
@@ -310,6 +324,36 @@ const summary = useMemo(
     if (targets.length === 0 || !window.confirm(`确认撤销 ${targets.length} 个授权？`)) return
     for (const record of targets) await patchCdk(record, 'revoke')
     setSelectedCdkHashes([])
+  }
+
+  const handleResetUserPassword = async (event: FormEvent) => {
+    event.preventDefault()
+    setBusyAction('reset-password')
+    setError(null)
+    setNotice(null)
+    try {
+      const resp = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          admin_user: credentials?.user,
+          admin_password: credentials?.password,
+          action: 'reset_password',
+          email: resetUserEmail,
+          new_password: resetPassword,
+        }),
+      })
+      const data = await readJson<{ error?: string; user?: { email: string } }>(resp)
+      if (!resp.ok) throw new Error(data.error || `重置密码失败: ${resp.status}`)
+      setNotice(`已重置 ${data.user?.email ?? resetUserEmail} 的密码`)
+      setResetUserEmail('')
+      setResetPassword('')
+      await loadDashboard()
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setBusyAction(null)
+    }
   }
 
   if (!authenticated) {
@@ -548,8 +592,60 @@ const summary = useMemo(
                 {busyAction === 'announcement' ? '保存中...' : '保存公告'}
               </button>
             </section>
-          </form>
-        )}
+            </form>
+          )}
+
+          {activeSection === 'users' && (
+            <section className="space-y-5">
+              <form onSubmit={handleResetUserPassword} className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+                <h2 className="text-lg font-semibold text-ink-primary">重置用户密码</h2>
+                <p className="mt-2 text-sm leading-6 text-ink-secondary">输入用户邮箱和新临时密码。保存后该用户现有登录会话会失效。</p>
+                <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_240px_auto] lg:items-end">
+                  <label>
+                    <span className="mb-2 block text-sm font-medium text-ink-secondary">用户邮箱</span>
+                    <input value={resetUserEmail} onChange={(event) => setResetUserEmail(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="user@example.com" />
+                  </label>
+                  <label>
+                    <span className="mb-2 block text-sm font-medium text-ink-secondary">新密码</span>
+                    <input type="password" value={resetPassword} onChange={(event) => setResetPassword(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" minLength={8} />
+                  </label>
+                  <button type="submit" disabled={busyAction === 'reset-password' || !resetUserEmail.trim() || resetPassword.length < 8} className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+                    {busyAction === 'reset-password' ? '重置中...' : '重置密码'}
+                  </button>
+                </div>
+              </form>
+
+              <section className="rounded-xl border border-surface-3 bg-surface-1">
+                <div className="border-b border-surface-3 p-4">
+                  <h2 className="text-lg font-semibold text-ink-primary">注册用户</h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
+                      <tr>
+                        <th className="px-4 py-3">邮箱</th>
+                        <th className="px-4 py-3">状态</th>
+                        <th className="px-4 py-3">档案</th>
+                        <th className="px-4 py-3">时间</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-3">
+                      {appUsers.length === 0 ? (
+                        <tr><td colSpan={4} className="px-4 py-10 text-center text-ink-muted">暂无注册用户。</td></tr>
+                      ) : appUsers.map((item) => (
+                        <tr key={item.id} className="hover:bg-surface-2/50">
+                          <td className="px-4 py-4 font-medium text-ink-primary">{item.email}</td>
+                          <td className="px-4 py-4 text-ink-secondary">{item.status}</td>
+                          <td className="px-4 py-4 text-ink-secondary">{item.profile_count}</td>
+                          <td className="px-4 py-4 text-xs text-ink-muted">{formatDate(item.updated_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </section>
+          )}
         </div>
       </main>
     </div>

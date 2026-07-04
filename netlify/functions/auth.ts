@@ -1,6 +1,7 @@
 import type { Context } from '@netlify/functions'
 import {
   buildAuthPayload,
+  changeUserPassword,
   clearSessionCookie,
   jsonResponse,
   loginUser,
@@ -37,10 +38,20 @@ export default async (req: Request, _context: Context): Promise<Response> => {
       return jsonResponse({ ok: true }, 200, { 'Set-Cookie': clearSessionCookie() })
     }
 
+    if (pathname.endsWith('/change-password')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      const auth = await requireUserSession(req)
+      if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
+      const body = await req.json() as { old_password?: unknown; new_password?: unknown }
+      const changed = await changeUserPassword(auth.user, body.old_password, body.new_password, auth.tokenHash)
+      if (!changed.ok) return jsonResponse({ error: changed.message }, changed.status)
+      return jsonResponse(await buildAuthPayload(changed.user))
+    }
+
     if (pathname.endsWith('/me')) {
       if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
       const auth = await requireUserSession(req)
-      if (!auth) return jsonResponse({ user: null, workspace: null })
+      if (!auth) return jsonResponse({ user: null, profiles: [], active_profile: null, workspace: null, announcement_unread_count: 0 })
       return jsonResponse(await buildAuthPayload(auth.user))
     }
 

@@ -104,6 +104,7 @@ export interface OptimizeRequest {
   operators: LicenseOperator[];
   config: LicenseConfig;
   ignore_elite: boolean;
+  profile_id?: string;
   activation_token?: string;
   include_current?: boolean;
   suggestions_only?: boolean;
@@ -366,7 +367,21 @@ export interface AuthUser {
   created_at: string;
 }
 
+export interface UserGameAccount {
+  id: string;
+  user_id: string;
+  permission: PermissionMode;
+  status: 'active' | 'frozen' | 'revoked';
+  cdk_order_hash: string | null;
+  display_name: string;
+  note: string;
+  operator_count: number;
+  updated_at: string | null;
+  created_at: string;
+}
+
 export interface UserWorkspace {
+  profile_id: string | null;
   operators: LicenseOperator[] | null;
   config: LicenseConfig | null;
   elite_overrides: Record<string, number>;
@@ -374,14 +389,25 @@ export interface UserWorkspace {
   updated_at: string | null;
 }
 
+export interface UserAnnouncementRead {
+  announcement: Announcement;
+  read_at: string | null;
+}
+
 export interface AuthMeResponse {
   user: AuthUser | null;
+  profiles?: UserGameAccount[];
+  active_profile?: UserGameAccount | null;
   workspace: UserWorkspace | null;
+  announcement_unread_count?: number;
 }
 
 export interface AuthSuccessResponse {
   user: AuthUser;
-  workspace: UserWorkspace;
+  profiles: UserGameAccount[];
+  active_profile: UserGameAccount | null;
+  workspace: UserWorkspace | null;
+  announcement_unread_count?: number;
 }
 
 export type AppStep = 'upload' | 'optimize';

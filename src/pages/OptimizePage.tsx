@@ -15,6 +15,7 @@ import ScheduleProgress, {
 } from '../components/ScheduleProgress'
 
 interface Props {
+  profileId: string;
   license: LicenseFile;
   setLicense: (v: LicenseFile) => void;
   eliteOverrides: Record<string, number>;
@@ -39,6 +40,7 @@ interface LicenseStatusResponse {
 }
 
 export default function OptimizePage({
+  profileId,
   license,
   setLicense,
   eliteOverrides,
@@ -171,7 +173,7 @@ export default function OptimizePage({
     let cancelled = false
     setLicenseSyncing(true)
 
-    fetch('/api/user/status')
+    fetch(`/api/user/status?profile_id=${encodeURIComponent(profileId)}`)
       .then(async (resp) => {
         const data = await resp.json() as LicenseStatusResponse
         if (!resp.ok) {
@@ -198,7 +200,7 @@ export default function OptimizePage({
     return () => {
       cancelled = true
     }
-  }, [license.order_hash])
+  }, [license.order_hash, profileId])
 
   const handleReplaceOperators = useCallback(async () => {
     if (!userCanReplaceOperators) return
@@ -222,6 +224,7 @@ export default function OptimizePage({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          profile_id: profileId,
           license,
           operators: nextOperators,
           activation_token: getActivationTokenForLicense(license),
@@ -266,6 +269,7 @@ export default function OptimizePage({
 
   const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false) => {
     const payload: OptimizeRequest = {
+      profile_id: profileId,
       license,
       operators: mergedOperators,
       config: activeConfig,
@@ -280,10 +284,11 @@ export default function OptimizePage({
     })
     if (!resp.ok) throw new Error(await readResponseError(resp, `优化请求失败: ${resp.status}`))
     return resp.json() as Promise<OptimizeResult>
-  }, [activeConfig, license, mergedOperators])
+  }, [activeConfig, license, mergedOperators, profileId])
 
   const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
     const payload: OptimizeRequest = {
+      profile_id: profileId,
       license,
       operators: mergedOperators,
       config: activeConfig,
@@ -299,7 +304,7 @@ export default function OptimizePage({
     })
     if (!resp.ok) throw new Error(await readResponseError(resp, `upgrade suggestions request failed: ${resp.status}`))
     return resp.json() as Promise<OptimizeResult>
-  }, [activeConfig, license, mergedOperators])
+  }, [activeConfig, license, mergedOperators, profileId])
 
   const handleGenerate = useCallback(async () => {
     if (licenseSyncing || loading || optimizeInFlightRef.current) return
@@ -422,7 +427,7 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [activeConfig, eliteOverrides, loading, resultIsCurrent, suggestions, license, setEliteOverrides])
+  }, [activeConfig, eliteOverrides, loading, resultIsCurrent, suggestions, license, profileId, setEliteOverrides])
 
   const handleDownloadMAA = useCallback(() => {
     const data = finalResult || currentResult
