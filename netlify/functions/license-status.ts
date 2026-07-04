@@ -81,7 +81,7 @@ export default async (req: Request, _context: Context): Promise<Response> => {
         return jsonResponse({ error: '当前授权没有可用的干员数据更新权限。' }, 403)
       }
 
-      let nextOperatorUpdateGrant = null
+      let nextOperatorUpdateGrant: OperatorUpdateGrant | null = null
       let nextUpdateLimit = advancedUpdateLimit
       if (effectivePermission === 'advanced' && effectiveCdkRecord) {
         const updateCheck = await recordAdvancedOperatorUpdate(effectiveCdkRecord, operatorsCheck.operators, req, body.activation_token)
