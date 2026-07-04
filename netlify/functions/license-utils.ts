@@ -803,6 +803,9 @@ export async function recordAdvancedOperatorUpdate(
   const binding = evaluateClientBindingRisk(record, activationToken, req)
   if (!binding.ok) {
     if (!shouldFreezeBindingRisk(binding.event)) {
+      if (binding.event.type === 'device_token_missing') {
+        return { ok: false, status: 403, message: formatBindingBlockMessage(binding.event), record: binding.record }
+      }
       const blocked = await recordSoftBlockedRiskEvent(binding.record, binding.event, formatBindingBlockMessage(binding.event))
       return { ok: false, status: 403, message: blocked.message, record: blocked.record }
     }
@@ -879,8 +882,15 @@ export async function unfreezeCdkRecord(record: CdkRecord): Promise<CdkRecord> {
 }
 
 function hashActivationToken(value: unknown): string | null {
-  if (typeof value !== 'string' || value.trim().length < 16) return null
-  return createHash('sha256').update(value.trim()).digest('hex')
+  const token = normalizeLicenseActivationToken(value)
+  if (!token) return null
+  return createHash('sha256').update(token).digest('hex')
+}
+
+function normalizeLicenseActivationToken(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const token = value.trim()
+  return token.length >= 16 ? token : null
 }
 
 function hashHeaderValue(value: string | null): string | null {
@@ -951,12 +961,14 @@ export function createSignedLicenseFile({
   config,
   permission,
   codeHash,
+  activationToken,
 }: {
   adminSecret: string;
   operators: LicenseOperator[];
   config: LicenseConfig;
   permission: PermissionMode;
   codeHash: string;
+  activationToken?: unknown;
 }): { license: LicenseFile; licenseFileContent: string } {
   const issuedAt = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
   const orderHash = createHash('sha256')
@@ -970,6 +982,7 @@ export function createSignedLicenseFile({
     operators,
     config,
     permission,
+    activation_token: normalizeLicenseActivationToken(activationToken),
     issued_at: issuedAt,
   }
   const sig = formatSig(hmacSha256(adminSecret, canonicalJson(unsigned)))
@@ -985,12 +998,15 @@ export function reissueSignedLicenseFile(
   overrides: {
     operators?: LicenseOperator[];
     operatorUpdateGrant?: OperatorUpdateGrant | null;
+    activationToken?: unknown;
   } = {},
 ): { license: LicenseFile; licenseFileContent: string } {
+  const activationToken = normalizeLicenseActivationToken(overrides.activationToken)
   const unsigned = {
     ...license,
     permission,
     ...(overrides.operators ? { operators: overrides.operators } : {}),
+    ...(activationToken ? { activation_token: activationToken } : {}),
     operator_update_grant: overrides.operatorUpdateGrant ?? null,
     issued_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
   }

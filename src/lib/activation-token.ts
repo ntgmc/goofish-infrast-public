@@ -4,7 +4,7 @@ const TOKEN_PREFIX = 'maa-infrast-activation-token:'
 const PENDING_TOKEN_KEY = `${TOKEN_PREFIX}pending`
 
 export function getActivationTokenForLicense(license: LicenseFile): string {
-  return getOrCreateToken(`${TOKEN_PREFIX}${license.order_hash}`)
+  return getOrImportToken(`${TOKEN_PREFIX}${license.order_hash}`, license.activation_token)
 }
 
 export function getPendingActivationToken(): string {
@@ -13,6 +13,14 @@ export function getPendingActivationToken(): string {
 
 export function bindPendingActivationToken(license: LicenseFile): void {
   if (!canUseLocalStorage()) return
+
+  const imported = normalizeToken(license.activation_token)
+  if (imported) {
+    window.localStorage.setItem(`${TOKEN_PREFIX}${license.order_hash}`, imported)
+    window.localStorage.removeItem(PENDING_TOKEN_KEY)
+    return
+  }
+
   const pending = window.localStorage.getItem(PENDING_TOKEN_KEY)
   if (!pending) return
   const key = `${TOKEN_PREFIX}${license.order_hash}`
@@ -20,6 +28,16 @@ export function bindPendingActivationToken(license: LicenseFile): void {
     window.localStorage.setItem(key, pending)
   }
   window.localStorage.removeItem(PENDING_TOKEN_KEY)
+}
+
+function getOrImportToken(key: string, token: unknown): string {
+  const imported = normalizeToken(token)
+  if (!canUseLocalStorage()) return imported ?? createToken()
+  if (imported) {
+    window.localStorage.setItem(key, imported)
+    return imported
+  }
+  return getOrCreateToken(key)
 }
 
 function getOrCreateToken(key: string): string {
@@ -41,6 +59,12 @@ function createToken(): string {
     }
   }
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function normalizeToken(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const token = value.trim()
+  return token.length >= 16 ? token : null
 }
 
 function canUseLocalStorage(): boolean {
