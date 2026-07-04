@@ -7,6 +7,8 @@ const expectedRoutes = [
   '/api/announcement',
   '/api/auth/login',
   '/api/auth/logout',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
   '/api/auth/change-password',
   '/api/auth/me',
   '/api/auth/register',

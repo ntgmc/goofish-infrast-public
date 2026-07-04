@@ -6,13 +6,17 @@ import {
   deleteUserAccount,
   emptyWorkspace,
   getAnnouncementReads,
+  getPasswordResetTokenByHash,
   getProfileWorkspace,
+  getRecentPasswordResetTokenForUser,
   getSessionByTokenHash,
   getUserByEmail,
   getUserById,
   listProfilesForUser,
+  markPasswordResetTokenUsed,
   markAnnouncementRead,
   migrateLegacyUserIfNeeded,
+  savePasswordResetToken,
   saveProfileWorkspace,
   saveUserAccount,
   saveUserProfile,
@@ -25,6 +29,7 @@ import {
   type UserSessionRecord,
 } from '../../server/storage/user-store'
 import { createPostgresAnnouncementStore } from '../../server/storage/announcement-store'
+import { sendPasswordResetEmail } from './email'
 import {
   getCdkRecordStore,
   hashCdk,
@@ -39,6 +44,10 @@ const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
 const PASSWORD_ITERATIONS = 120_000
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ANNOUNCEMENT_KEY = 'current.json'
+const PASSWORD_RESET_DEFAULT_TTL_MINUTES = 30
+const PASSWORD_RESET_RESEND_WINDOW_MS = 1000 * 60 * 5
+export const PASSWORD_RESET_REQUEST_MESSAGE = '如果该邮箱已注册，我们会发送重置密码邮件。'
+const PASSWORD_RESET_INVALID_MESSAGE = '重置链接无效或已过期。'
 
 export interface AuthContext {
   user: UserAccountRecord
@@ -184,6 +193,70 @@ export async function resetUserPasswordByAdmin(
   const updated = await setUserPassword(user, nextPassword.password)
   await deleteSessionsForUser(user.id)
   return { ok: true, user: updated }
+}
+
+export async function requestPasswordReset(emailValue: unknown): Promise<{ ok: true; message: string }> {
+  const email = normalizeEmail(emailValue)
+  if (!email) return { ok: true, message: PASSWORD_RESET_REQUEST_MESSAGE }
+
+  try {
+    const user = await getUserByEmail(email)
+    if (!user || user.status !== 'active') return { ok: true, message: PASSWORD_RESET_REQUEST_MESSAGE }
+
+    const resendSince = new Date(Date.now() - PASSWORD_RESET_RESEND_WINDOW_MS).toISOString()
+    const recent = await getRecentPasswordResetTokenForUser(user.id, resendSince)
+    if (recent) return { ok: true, message: PASSWORD_RESET_REQUEST_MESSAGE }
+
+    const token = randomBytes(32).toString('base64url')
+    const now = new Date()
+    const expiresMinutes = getPasswordResetTtlMinutes()
+    const expiresAt = new Date(now.getTime() + expiresMinutes * 60 * 1000).toISOString()
+    await savePasswordResetToken({
+      id: randomUUID(),
+      user_id: user.id,
+      token_hash: hashPasswordResetToken(token),
+      expires_at: expiresAt,
+      used_at: null,
+      created_at: now.toISOString(),
+    })
+
+    await sendPasswordResetEmail({
+      email: user.email,
+      resetUrl: buildPasswordResetUrl(token),
+      expiresMinutes,
+    })
+  } catch (error) {
+    console.error('password reset request error:', error)
+  }
+
+  return { ok: true, message: PASSWORD_RESET_REQUEST_MESSAGE }
+}
+
+export async function resetPasswordWithToken(
+  tokenValue: unknown,
+  newPasswordValue: unknown,
+): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
+  if (typeof tokenValue !== 'string' || !tokenValue.trim()) {
+    return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
+  }
+
+  const resetToken = await getPasswordResetTokenByHash(hashPasswordResetToken(tokenValue.trim()))
+  if (!resetToken || resetToken.used_at || Date.parse(resetToken.expires_at) <= Date.now()) {
+    return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
+  }
+
+  const user = await getUserById(resetToken.user_id)
+  if (!user || user.status !== 'active') {
+    return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
+  }
+
+  const nextPassword = validatePassword(newPasswordValue)
+  if (!nextPassword.ok) return { ok: false, status: 400, message: nextPassword.message }
+
+  await setUserPassword(user, nextPassword.password)
+  await markPasswordResetTokenUsed(resetToken.id)
+  await deleteSessionsForUser(user.id)
+  return { ok: true }
 }
 
 export async function redeemProfileCdk(
@@ -389,6 +462,23 @@ function getSessionToken(req: Request): string | null {
 
 function hashSessionToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
+}
+
+function hashPasswordResetToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+function buildPasswordResetUrl(token: string): string {
+  const baseUrl = process.env.PUBLIC_APP_URL?.trim()
+  if (!baseUrl) throw new Error('PUBLIC_APP_URL not configured')
+  const url = new URL('/reset-password', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`)
+  url.searchParams.set('token', token)
+  return url.toString()
+}
+
+function getPasswordResetTtlMinutes(): number {
+  const raw = Number(process.env.PASSWORD_RESET_TTL_MINUTES)
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : PASSWORD_RESET_DEFAULT_TTL_MINUTES
 }
 
 function secureCookieSuffix(): string {
