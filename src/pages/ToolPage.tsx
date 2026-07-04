@@ -1,7 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import type { Announcement, AppStep, LicenseConfig, LicenseFile } from '../lib/types'
+import type { Announcement, AnnouncementPublicResponse, AppStep, LicenseConfig, LicenseFile } from '../lib/types'
 import { extractConfigOverride, extractEliteOverrides, extractLicense, parseFileContent } from '../lib/license'
 import { downloadLicenseFile } from '../lib/download'
+import AnnouncementPopup from '../components/AnnouncementPopup'
 import UploadPage from './UploadPage'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
@@ -13,7 +14,8 @@ export default function ToolPage() {
   const [eliteOverrides, setEliteOverrides] = useState<Record<string, number>>({})
   const [configOverride, setConfigOverride] = useState<LicenseConfig | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [announcement, setAnnouncement] = useState<Announcement | null>(null)
+  const [banner, setBanner] = useState<Announcement | null>(null)
+  const [popups, setPopups] = useState<Announcement[]>([])
   const [redeemedNotice, setRedeemedNotice] = useState<string | null>(null)
   const [redeemedLicenseContent, setRedeemedLicenseContent] = useState<string | null>(null)
 
@@ -23,23 +25,18 @@ export default function ToolPage() {
     fetch('/api/announcement')
       .then(async (resp) => {
         if (!resp.ok) return null
-        return await resp.json() as Partial<Announcement>
+        return await resp.json() as AnnouncementPublicResponse
       })
       .then((data) => {
         if (cancelled) return
-        if (data?.enabled && typeof data.title === 'string' && typeof data.body === 'string') {
-          setAnnouncement({
-            enabled: true,
-            title: data.title,
-            body: data.body,
-            updated_at: typeof data.updated_at === 'string' ? data.updated_at : null,
-          })
-        } else {
-          setAnnouncement(null)
-        }
+        setBanner(data?.banner ?? null)
+        setPopups(Array.isArray(data?.popups) ? data.popups : [])
       })
       .catch(() => {
-        if (!cancelled) setAnnouncement(null)
+        if (!cancelled) {
+          setBanner(null)
+          setPopups([])
+        }
       })
 
     return () => {
@@ -67,6 +64,7 @@ export default function ToolPage() {
       setError(result.error.message)
       return
     }
+
     setLicense(extractLicense(result.data))
     setEliteOverrides(extractEliteOverrides(result.data))
     setConfigOverride(extractConfigOverride(result.data))
@@ -102,12 +100,19 @@ export default function ToolPage() {
 
   return (
     <>
+      <AnnouncementPopup announcements={popups} />
+      <a
+        href="/announcements"
+        className="fixed bottom-4 right-4 z-30 rounded-lg border border-surface-3 bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-secondary shadow-sm transition-colors duration-150 hover:bg-surface-1 hover:text-ink-primary"
+      >
+        公告
+      </a>
       {step === 'upload' && (
         <UploadPage
           onFileLoaded={handleFileLoaded}
           onLicenseRedeemed={handleLicenseRedeemed}
           error={error}
-          announcement={announcement}
+          announcement={banner}
         />
       )}
       {step === 'optimize' && license && (
@@ -124,7 +129,7 @@ export default function ToolPage() {
             configOverride={configOverride}
             setConfigOverride={setConfigOverride}
             onReset={handleReset}
-            announcement={announcement}
+            announcement={banner}
             redeemedNotice={redeemedNotice}
             onRedownloadLicense={redeemedLicenseContent ? handleRedownloadLicense : null}
           />
