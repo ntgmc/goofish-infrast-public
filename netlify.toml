@@ -39,6 +39,36 @@ ignore = "node scripts/netlify-ignore-build.mjs"
   status = 200
 
 [[redirects]]
+  from = "/api/auth/register"
+  to = "/.netlify/functions/auth"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/login"
+  to = "/.netlify/functions/auth"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/logout"
+  to = "/.netlify/functions/auth"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/me"
+  to = "/.netlify/functions/auth"
+  status = 200
+
+[[redirects]]
+  from = "/api/user/status"
+  to = "/.netlify/functions/user-status"
+  status = 200
+
+[[redirects]]
+  from = "/api/user/workspace"
+  to = "/.netlify/functions/user-workspace"
+  status = 200
+
+[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200

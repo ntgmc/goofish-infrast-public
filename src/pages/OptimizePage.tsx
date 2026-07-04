@@ -70,7 +70,7 @@ export default function OptimizePage({
   const pendingLicenseSyncRef = useRef<{ license: LicenseFile; message: string } | null>(null)
 
   const permission = getPermissionMode(license)
-  const userCanReplaceOperators = canReplaceOperators(license)
+  const userCanReplaceOperators = false
   const userCanEditConfig = canEditConfig(license)
   const userCanUseIntermediateAutoConfig = permission === 'recommended' || permission === 'growth'
   const userCanApplyConfigOverride = userCanEditConfig || userCanUseIntermediateAutoConfig
@@ -171,22 +171,17 @@ export default function OptimizePage({
     let cancelled = false
     setLicenseSyncing(true)
 
-    fetch('/api/license-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ license, activation_token: getActivationTokenForLicense(license) }),
-    })
+    fetch('/api/user/status')
       .then(async (resp) => {
         const data = await resp.json() as LicenseStatusResponse
         if (!resp.ok) {
-          throw new Error(data.error || `授权状态同步失败: ${resp.status}`)
+          throw new Error(data.error || `账号授权状态同步失败: ${resp.status}`)
         }
         return data
       })
       .then((data) => {
-        if (cancelled) return
-        if (data.license) {
-          applySyncedLicense(data.license, `授权已同步为${data.permission_label ?? '最新'}权限。`)
+        if (!cancelled) {
+          setLicenseSyncStatus(`账号授权已同步为${data.permission_label ?? '当前'}权限。`)
         }
       })
       .catch((error) => {
@@ -203,7 +198,7 @@ export default function OptimizePage({
     return () => {
       cancelled = true
     }
-  }, [applySyncedLicense, license])
+  }, [license.order_hash])
 
   const handleReplaceOperators = useCallback(async () => {
     if (!userCanReplaceOperators) return
@@ -509,20 +504,11 @@ export default function OptimizePage({
 
       <AnnouncementBanner announcement={announcement} className="mb-6" />
 
-      {redeemedNotice && (
-        <div role="status" className="mb-6 flex flex-col gap-3 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning sm:flex-row sm:items-center sm:justify-between">
-          <span>{redeemedNotice}</span>
-          {onRedownloadLicense && (
-            <button
-              type="button"
-              onClick={onRedownloadLicense}
-              className="self-start rounded-lg bg-warning px-3 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-warning/90 sm:self-auto"
-            >
-              重新下载授权文件
-            </button>
-          )}
-        </div>
-      )}
+        {redeemedNotice && (
+          <div role="status" className="mb-6 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning">
+            {redeemedNotice}
+          </div>
+        )}
 
       {licenseSyncStatus && (
         <div className="mb-6 rounded-lg border border-brand-600/30 bg-brand-600/10 px-4 py-3 text-sm text-brand-300">
@@ -611,7 +597,6 @@ export default function OptimizePage({
             <ResultPanel
               result={currentResult}
               onDownload={handleDownloadMAA}
-              onSaveWorkfile={handleSaveWorkfile}
             />
           )}
           <UpgradeSuggestions
@@ -639,7 +624,7 @@ export default function OptimizePage({
 : '单次重置卡不包含练度提升建议，可直接下载当前练度优化结果。'}
             </p>
           </div>
-          <ResultPanel result={currentResult!} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />
+          <ResultPanel result={currentResult!} onDownload={handleDownloadMAA} />
         </div>
       )}
 
@@ -653,7 +638,7 @@ export default function OptimizePage({
                 : '已应用练度修改。'}
             </p>
           </div>
-          <ResultPanel result={finalResult} onDownload={handleDownloadMAA} onSaveWorkfile={handleSaveWorkfile} />
+          <ResultPanel result={finalResult} onDownload={handleDownloadMAA} />
         </div>
       )}
     </div>
@@ -923,7 +908,7 @@ function AdminOperatorPanel({
             <h2 className="text-lg font-semibold text-ink-primary">更新干员数据</h2>
           </div>
           <p className="mt-1 text-sm text-ink-secondary">
-            上传 operators.json 或 .txt 后会清空当前练度调整，并写入新的授权文件。
+            上传 operators.json 或 .txt 后会清空当前练度调整，并写入后端账号工作区。
           </p>
           {status && (
             <p className="mt-3 text-sm text-brand-300">{status}</p>

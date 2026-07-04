@@ -5,12 +5,18 @@ const expectedRoutes = [
   '/api/admin/usage-stats',
   '/api/analyze-schedule',
   '/api/announcement',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/me',
+  '/api/auth/register',
   '/api/data',
   '/api/free-preview',
   '/api/health',
   '/api/license-status',
   '/api/optimize',
   '/api/redeem-cdk',
+  '/api/user/status',
+  '/api/user/workspace',
   '/api/usage-stats',
 ]
 
