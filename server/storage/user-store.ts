@@ -1,4 +1,4 @@
-import { query } from './postgres'
+import { getPool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import type {
   LicenseConfig,
@@ -142,7 +142,25 @@ export async function saveUserAccount(user: UserAccountRecord): Promise<void> {
 
 export async function deleteUserAccount(userId: string): Promise<void> {
   await ensureSchema()
-  await query('delete from user_accounts where id = $1', [userId])
+  const client = await getPool().connect()
+  try {
+    await client.query('begin')
+    await client.query(
+      'delete from user_profile_workspaces where profile_id in (select id from user_game_accounts where user_id = $1)',
+      [userId],
+    )
+    await client.query('delete from user_workspaces where user_id = $1', [userId])
+    await client.query('delete from user_announcement_reads where user_id = $1', [userId])
+    await client.query('delete from user_sessions where user_id = $1', [userId])
+    await client.query('delete from user_game_accounts where user_id = $1', [userId])
+    await client.query('delete from user_accounts where id = $1', [userId])
+    await client.query('commit')
+  } catch (error) {
+    await client.query('rollback')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 export async function saveUserSession(session: UserSessionRecord): Promise<void> {

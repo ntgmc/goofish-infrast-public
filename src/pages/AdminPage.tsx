@@ -4,6 +4,7 @@ import type { Announcement, AnnouncementAdminResponse, AnnouncementKind, Product
 type Permission = RawPermissionMode
 type GeneratedPermission = ProductPermissionMode
 type CdkStatus = 'unused' | 'used' | 'frozen' | 'revoked'
+type AppUserStatus = 'active' | 'frozen' | 'revoked'
 type StatusFilter = CdkStatus | 'all'
 type AdminSection = 'overview' | 'cdk' | 'risk' | 'announcement' | 'users'
 type FieldErrors = Record<string, string>
@@ -54,7 +55,7 @@ interface AdminUserSummary {
 interface AppUserSummary {
   id: string;
   email: string;
-  status: string;
+  status: AppUserStatus;
   profile_count: number;
   created_at: string;
   updated_at: string;
@@ -75,6 +76,12 @@ admin: 'Admin卡',
 const statusLabels: Record<CdkStatus, string> = {
   unused: '未使用',
   used: '已使用',
+  frozen: '已冻结',
+  revoked: '已撤销',
+}
+
+const appUserStatusLabels: Record<AppUserStatus, string> = {
+  active: '正常',
   frozen: '已冻结',
   revoked: '已撤销',
 }
@@ -369,6 +376,59 @@ const summary = useMemo(
     } finally {
       setBusyAction(null)
     }
+  }
+
+  const patchAppUser = async (
+    user: AppUserSummary,
+    action: 'freeze_account' | 'unfreeze_account' | 'delete_account',
+    successMessage: string,
+    extraBody: Record<string, unknown> = {},
+  ) => {
+    const busyKey = `app-user:${action}:${user.id}`
+    setBusyAction(busyKey)
+    setError(null)
+    setNotice(null)
+    try {
+      const resp = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          admin_user: credentials?.user,
+          admin_password: credentials?.password,
+          action,
+          user_id: user.id,
+          ...extraBody,
+        }),
+      })
+      const data = await readJson<{ error?: string }>(resp)
+      if (!resp.ok) throw new Error(data.error || `${successMessage}失败: ${resp.status}`)
+      setNotice(`${successMessage}：${user.email}`)
+      await loadDashboard()
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleFreezeAppUser = async (user: AppUserSummary) => {
+    if (!window.confirm(`确认冻结账号 ${user.email}？`)) return
+    await patchAppUser(user, 'freeze_account', '已冻结账号')
+  }
+
+  const handleUnfreezeAppUser = async (user: AppUserSummary) => {
+    await patchAppUser(user, 'unfreeze_account', '已解冻账号')
+  }
+
+  const handleDeleteAppUser = async (user: AppUserSummary) => {
+    const confirmedEmail = window.prompt(`删除账号会清空 ${user.email} 的用户数据。请输入该邮箱确认删除。`)
+    if (confirmedEmail === null) return
+    if (confirmedEmail.trim().toLowerCase() !== user.email.toLowerCase()) {
+      setNotice(null)
+      setError('确认邮箱不匹配，已取消删除。')
+      return
+    }
+    await patchAppUser(user, 'delete_account', '已删除账号', { confirm_email: confirmedEmail.trim() })
   }
 
   if (!authenticated) {
@@ -695,17 +755,25 @@ const summary = useMemo(
                         <th className="px-4 py-3">状态</th>
                         <th className="px-4 py-3">档案</th>
                         <th className="px-4 py-3">时间</th>
+                        <th className="px-4 py-3">操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-3">
                       {appUsers.length === 0 ? (
-                        <tr><td colSpan={4} className="px-4 py-10 text-center text-ink-muted">暂无注册用户。</td></tr>
+                        <tr><td colSpan={5} className="px-4 py-10 text-center text-ink-muted">暂无注册用户。</td></tr>
                       ) : appUsers.map((item) => (
                         <tr key={item.id} className="hover:bg-surface-2/50">
                           <td className="px-4 py-4 font-medium text-ink-primary">{item.email}</td>
-                          <td className="px-4 py-4 text-ink-secondary">{item.status}</td>
+                          <td className="px-4 py-4"><UserStatusPill status={item.status} /></td>
                           <td className="px-4 py-4 text-ink-secondary">{item.profile_count}</td>
                           <td className="px-4 py-4 text-xs text-ink-muted">{formatDate(item.updated_at)}</td>
+                          <td className="px-4 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              {item.status === 'active' && <SmallButton onClick={() => void handleFreezeAppUser(item)} loading={busyAction === `app-user:freeze_account:${item.id}`}>冻结</SmallButton>}
+                              {item.status === 'frozen' && <SmallButton onClick={() => void handleUnfreezeAppUser(item)} loading={busyAction === `app-user:unfreeze_account:${item.id}`} tone="success">解冻</SmallButton>}
+                              <SmallButton onClick={() => void handleDeleteAppUser(item)} loading={busyAction === `app-user:delete_account:${item.id}`} tone="danger">删除</SmallButton>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -845,6 +913,15 @@ function StatusPill({ status }: { status: CdkStatus }) {
         ? 'bg-error/10 text-error'
         : 'bg-surface-3 text-ink-secondary'
   return <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${className}`}>{statusLabels[status]}</span>
+}
+
+function UserStatusPill({ status }: { status: AppUserStatus }) {
+  const className = status === 'active'
+    ? 'bg-success/10 text-success'
+    : status === 'frozen'
+      ? 'bg-warning/10 text-warning'
+      : 'bg-error/10 text-error'
+  return <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${className}`}>{appUserStatusLabels[status]}</span>
 }
 
 function SmallButton({ children, onClick, loading, tone = 'default' }: { children: string; onClick: () => void; loading?: boolean; tone?: 'default' | 'success' | 'danger' }) {
