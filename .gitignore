@@ -13,6 +13,7 @@ _tmp.py
 .vite-dev.*
 
 .codex
+graphify-out
 
 # Local Netlify folder
 .netlify
