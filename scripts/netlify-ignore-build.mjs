@@ -53,6 +53,10 @@ if (changedFiles.length === 0) {
   skipDeploy('no changed files since last deploy')
 }
 
+if (!CHECK_ONLY && process.env.CONTEXT === 'deploy-preview') {
+  continueDeploy(`deploy preview builds are always enabled: ${changedFiles.join(', ')}`)
+}
+
 if (!CHECK_ONLY) {
   const currentCommitFiles = readCurrentCommitFiles(headRef)
 
