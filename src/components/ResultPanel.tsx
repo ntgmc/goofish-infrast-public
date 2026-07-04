@@ -65,14 +65,15 @@ export default function ResultPanel({
     const totalEff = result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
     const plans: PreparedPlan[] = result.plans.map((plan) => ({
       ...plan,
-      rows: Object.entries(plan.rooms ?? {}).flatMap(([roomType, rooms]) => {
-        if (!Array.isArray(rooms)) return []
-        return rooms.flatMap((room, index) => {
+          rows: Object.entries(plan.rooms ?? {}).flatMap(([roomType, rooms]) => {
+            if (!Array.isArray(rooms)) return []
+            if (isRotationMode && roomType === 'dormitory') return []
+            return rooms.flatMap((room, index) => {
           const ops = room.operators
           if (!Array.isArray(ops) || ops.length === 0) return []
           const efficiency = getDisplayEfficiency(room)
           const speedEfficiency = getEffectiveEfficiency(roomType, room)
-          const detail = [getEfficiencyDetail(roomType, room), getMoodDetail(room)]
+          const detail = [isRotationMode ? '' : getEfficiencyDetail(roomType, room), getMoodDetail(room, isRotationMode)]
             .filter(Boolean)
             .join(' · ')
           return {
@@ -108,7 +109,7 @@ export default function ResultPanel({
     }
 
     return { totalEff, plans, productionStats, detailStats }
-  }, [result])
+  }, [result, isRotationMode])
 
   const shiftPattern = result.shift_pattern ?? result.shift_hours?.map((hour) => `${hour}h`).join('-') ?? result.planTimes
   const totalScheduleHours = result.total_schedule_hours ?? result.daily_production?.hours
@@ -127,7 +128,7 @@ export default function ResultPanel({
             {isAnalysis
               ? '已根据导入排班表计算红脸风险、日产量和爆仓信息。'
               : isRotationMode
-          ? '按下方排班详情在游戏内手动设置；账号空间接入后会自动保存当前练度和配置。'
+                ? '按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。'
           : '排班 JSON 用于导入或交给 MAA 使用；账号空间接入后会自动保存当前练度和配置。'}
           </p>
         </div>
@@ -156,24 +157,30 @@ export default function ResultPanel({
       </div>
       <div className="mt-5 grid gap-3 rounded-lg border border-brand-500/30 bg-brand-500/10 p-4 text-sm sm:grid-cols-3">
         <div>
-          <p className="text-xs font-medium text-ink-muted">换班节奏</p>
-          <p className="mt-1 font-semibold text-ink-primary">{shiftPattern}</p>
+            <p className="text-xs font-medium text-ink-muted">{isRotationMode ? '队列数量' : '换班节奏'}</p>
+            <p className="mt-1 font-semibold text-ink-primary">{isRotationMode ? result.planTimes : shiftPattern}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-ink-muted">{isRotationMode ? '统计方式' : '统计周期'}</p>
+            <p className="mt-1 font-semibold text-ink-primary">
+              {isRotationMode
+                ? '不计算固定时间'
+                : totalScheduleHours
+                  ? `${formatCompactNumber(totalScheduleHours)} 小时`
+                  : '按班次配置'}
+            </p>
         </div>
         <div>
-          <p className="text-xs font-medium text-ink-muted">统计周期</p>
-          <p className="mt-1 font-semibold text-ink-primary">
-            {totalScheduleHours ? `${formatCompactNumber(totalScheduleHours)} 小时` : '按班次配置'}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs font-medium text-ink-muted">菲亚梅塔加速</p>
-          <p className="mt-1 font-semibold text-ink-primary">
-            {result.plans.some((plan) => plan.Fiammetta?.enable)
-              ? fiammettaSlots.length > 0
-                ? `第 ${fiammettaSlots.join('、')} 班`
-                : '按可用目标自动安排'
-              : '未启用'}
-          </p>
+            <p className="text-xs font-medium text-ink-muted">{isRotationMode ? '快速切换' : '菲亚梅塔加速'}</p>
+            <p className="mt-1 font-semibold text-ink-primary">
+              {isRotationMode
+                ? '游戏内按钮'
+                : result.plans.some((plan) => plan.Fiammetta?.enable)
+                  ? fiammettaSlots.length > 0
+                    ? `第 ${fiammettaSlots.join('、')} 班`
+                    : '按可用目标自动安排'
+                  : '未启用'}
+            </p>
         </div>
       </div>
       {isRotationMode ? <RotationManualGuide /> : <MaaImportGuide />}
@@ -190,27 +197,33 @@ export default function ResultPanel({
               : '未发现红脸风险'}
             highlight={(analysisSummary?.red_face_risk_count ?? 0) > 0}
           />
+        ) : isRotationMode ? (
+          <MetricCard label="预设队列" value={String(detailStats.planCount)} suffix="组" highlight />
         ) : (
           <MetricCard label="预计总效率" value={totalEff.toFixed(2)} suffix="%" highlight />
         )}
         <MetricCard
-          label="制造站产量"
-          value={formatAmount(productionStats.manufacturingTotal)}
-          suffix="件/日"
-          note={formatProductionBreakdown(productionStats.manufacturing)}
+          label={isRotationMode ? '房间预设' : '制造站产量'}
+          value={isRotationMode ? String(detailStats.roomCount) : formatAmount(productionStats.manufacturingTotal)}
+          suffix={isRotationMode ? '间' : '件/日'}
+          note={isRotationMode ? '按每个设施分别录入队列 1 / 队列 2' : formatProductionBreakdown(productionStats.manufacturing)}
         />
-        <MetricCard
-          label="预计日产出"
-          value={formatAmount(productionStats.lmd)}
-          suffix="龙门币"
-          note={`赤金净变动 ${formatSigned(productionStats.goldNet)}${productionStats.orundum > 0 ? `，合成玉 ${formatAmount(productionStats.orundum)}` : ''}`}
-        />
-        <MetricCard
-          label={isAnalysis ? '爆仓概览' : '无人机收益'}
-          value={isAnalysis ? String((analysisSummary?.overflow.trading_rooms ?? 0) + (analysisSummary?.overflow.manufacturing_rooms ?? 0)) : productionStats.droneGain.value}
-          suffix={isAnalysis ? '房间' : productionStats.droneGain.suffix}
-          note={isAnalysis ? formatOverflowSummary(analysisSummary?.overflow) : productionStats.droneGain.note}
-        />
+        {!isRotationMode && (
+          <>
+            <MetricCard
+              label="预计日产出"
+              value={formatAmount(productionStats.lmd)}
+              suffix="龙门币"
+              note={`赤金净变动 ${formatSigned(productionStats.goldNet)}${productionStats.orundum > 0 ? `，合成玉 ${formatAmount(productionStats.orundum)}` : ''}`}
+            />
+            <MetricCard
+              label={isAnalysis ? '爆仓概览' : '无人机收益'}
+              value={isAnalysis ? String((analysisSummary?.overflow.trading_rooms ?? 0) + (analysisSummary?.overflow.manufacturing_rooms ?? 0)) : productionStats.droneGain.value}
+              suffix={isAnalysis ? '房间' : productionStats.droneGain.suffix}
+              note={isAnalysis ? formatOverflowSummary(analysisSummary?.overflow) : productionStats.droneGain.note}
+            />
+          </>
+        )}
       </div>
 
       {isAnalysis && analysisSummary?.warnings.length ? (
@@ -226,7 +239,7 @@ export default function ResultPanel({
 
       <details className="overflow-hidden rounded-xl bg-surface-1" open={detailDefaultOpen || isRotationMode}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
-          <span>排班详情</span>
+          <span>{isRotationMode ? '预设队列' : '排班详情'}</span>
           <span className="text-xs font-medium text-ink-muted">
             {result.planTimes ?? `${detailStats.planCount} 个班次`}，{detailStats.roomCount} 个房间
           </span>
@@ -245,7 +258,7 @@ export default function ResultPanel({
                   </span>
                 )}
               </div>
-              {plan.Fiammetta?.enable && plan.Fiammetta.target && (
+              {!isRotationMode && plan.Fiammetta?.enable && plan.Fiammetta.target && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning">
                   菲亚梅塔 → {plan.Fiammetta.target}
                 </span>
@@ -257,7 +270,7 @@ export default function ResultPanel({
                   <span>房间</span>
                   <span>产物</span>
                   <span>干员</span>
-                  <span className="text-right">效率</span>
+                <span className="text-right">{isRotationMode ? '轮换' : '效率'}</span>
                 </div>
                 {plan.rows.map((row) => (
                   <div
@@ -281,9 +294,9 @@ export default function ResultPanel({
                     </div>
                     <div className="mt-2 md:mt-0 md:text-right">
                       <div className="text-sm font-semibold text-brand-400 md:font-mono">
-                        {row.efficiency}
+                        {isRotationMode ? '快速切换' : row.efficiency}
                       </div>
-                      {row.hasAdjustedSpeed && (
+                      {!isRotationMode && row.hasAdjustedSpeed && (
                         <div className="mt-0.5 text-xs text-ink-muted">
                           速度 {row.speedEfficiency}
                         </div>
@@ -297,7 +310,7 @@ export default function ResultPanel({
                   </div>
                 ))}
 
-                {plan.drones?.enable && <DroneSummary drones={plan.drones} />}
+                {!isRotationMode && plan.drones?.enable && <DroneSummary drones={plan.drones} />}
               </div>
             </div>
           ))}
@@ -364,7 +377,14 @@ function getEfficiencyDetail(roomType: string, room: ShiftRoom): string {
   return ''
 }
 
-function getMoodDetail(room: ShiftRoom): string {
+function getMoodDetail(room: ShiftRoom, isRotationMode = false): string {
+  if (isRotationMode) {
+    const workHoursToZero = room.rotation?.work_hours_to_zero
+    return workHoursToZero !== undefined && workHoursToZero !== null
+      ? `预计 ${formatCompactNumber(workHoursToZero)}h 后整设施切换`
+      : ''
+  }
+
   const mood = room.mood ?? {}
   const entries = Object.values(mood)
   if (entries.length === 0) return ''
@@ -375,10 +395,7 @@ function getMoodDetail(room: ShiftRoom): string {
     .map(([name]) => name)
   const parts = [`心情≥${formatCompactNumber(minEnd)}`, `最高消耗/时 ${formatCompactNumber(maxCost)}`]
   if (room.rotation?.work_hours_to_zero !== undefined && room.rotation.work_hours_to_zero !== null) {
-    const triggers = room.rotation.trigger_operators?.length
-      ? ` (${room.rotation.trigger_operators.join(', ')})`
-      : ''
-    parts.push(`轮换到零 ${formatCompactNumber(room.rotation.work_hours_to_zero)}h${triggers}`)
+    parts.push(`最快耗心 ${formatCompactNumber(room.rotation.work_hours_to_zero)}h 触发整设施切换`)
   }
   if (redOps.length > 0) parts.push(`红脸风险 ${redOps.join(', ')}`)
   return parts.join('，')
@@ -539,10 +556,10 @@ function RotationManualGuide() {
     <div className="mt-6 border-t border-surface-3/60 pt-5">
       <div className="rounded-lg bg-surface-2/60 px-4 py-4">
         <h3 className="text-base font-semibold text-ink-primary">
-          游戏内手动设置
+          游戏内快速切换设置
         </h3>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">
-          游戏内轮换不生成排班 JSON。按下方排班详情中的两个班次，逐个房间设置产物和干员；无人机加速按班次底部的无人机摘要手动处理。
+          游戏内轮换不生成排班 JSON。按下方预设队列逐个设施设置队列 1 / 队列 2，平时使用游戏内“队列轮换/快速切换”；同一设施由心情消耗最快的干员触发切换，触发时会切换该设施内所有干员。
         </p>
       </div>
     </div>

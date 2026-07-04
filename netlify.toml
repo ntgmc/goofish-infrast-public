@@ -1,53 +1,14 @@
-# Legacy Netlify rollback configuration only. The primary production backend now runs
-# as a standalone Node service behind Nginx and uses PostgreSQL via DATABASE_URL.
+# Historical Netlify site only.
+# The production site runs on the self-hosted server at https://maatool.com/.
+# Keep this deploy as a permanent redirect so old Netlify links do not expose a
+# stale frontend that cannot reach the production backend.
+
 [build]
-command = "npm run build"
-ignore = "node scripts/netlify-ignore-build.mjs"
-  publish = "dist"
-
-[build.environment]
-  NODE_VERSION = "20"
+command = "node -e \"require('fs').mkdirSync('dist',{recursive:true})\""
+publish = "dist"
 
 [[redirects]]
-  from = "/api/admin/cdk"
-  to = "/.netlify/functions/admin-cdk"
-  status = 200
-
-[[redirects]]
-  from = "/api/announcement"
-  to = "/.netlify/functions/announcement"
-  status = 200
-
-[[redirects]]
-  from = "/api/admin/announcement"
-  to = "/.netlify/functions/announcement?admin=1"
-  status = 200
-
-[[redirects]]
-  from = "/api/usage-stats"
-  to = "/.netlify/functions/usage-stats"
-  status = 200
-
-[[redirects]]
-  from = "/api/admin/usage-stats"
-  to = "/.netlify/functions/usage-stats?admin=1"
-  status = 200
-
-[[redirects]]
-  from = "/api/admin/users"
-  to = "/.netlify/functions/admin-users"
-  status = 200
-
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
+from = "/*"
+to = "https://maatool.com/:splat"
+status = 301
+force = true

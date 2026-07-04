@@ -35,7 +35,7 @@ export default function BuildMetaStrip({ meta = APP_BUILD_META, className = '', 
               <dd className="mt-0.5 break-all font-mono text-[11px] text-ink-muted">{meta.frontend_version}</dd>
             </div>
             <div>
-              <dt className="font-medium text-ink-secondary">后端</dt>
+              <dt className="font-medium text-ink-secondary">服务</dt>
               <dd className="mt-0.5 break-all font-mono text-[11px] text-ink-muted">{meta.backend_version}</dd>
             </div>
             <div>
