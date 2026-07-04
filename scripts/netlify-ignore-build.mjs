@@ -10,6 +10,7 @@ const deployRelevantFiles = new Set([
   'netlify.toml',
   'package.json',
   'package-lock.json',
+  'tsconfig.server.json',
   'tsconfig.json',
   'vite.config.ts',
 ])
@@ -18,10 +19,16 @@ const deployRelevantPrefixes = [
   'src/',
   'public/',
   'netlify/',
+  'server/',
 ]
 
 const deployRelevantScripts = new Set([
+  'scripts/build-server.mjs',
+  'scripts/check-server-routes.mjs',
+  'scripts/export-netlify-blobs.mjs',
   'scripts/generate-data.mjs',
+  'scripts/import-postgres.mjs',
+  'scripts/verify-migrated-data.mjs',
 ])
 
 const generatedMetadataFiles = new Set([

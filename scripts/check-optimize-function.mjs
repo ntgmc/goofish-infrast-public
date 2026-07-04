@@ -1,17 +1,25 @@
 import * as esbuild from 'esbuild';
 import { createHmac } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const optimizeEntry = 'netlify/functions/optimize.ts';
 const freePreviewEntry = 'netlify/functions/free-preview.ts';
 const redeemCdkEntry = 'netlify/functions/redeem-cdk.ts';
 const adminSecret = 'check-optimize-secret';
+const bundleDir = resolve('.cache/check-functions');
 process.env.MAA_ADMIN_SECRET = adminSecret;
 process.env.CDK_HASH_SECRET = 'check-cdk-secret';
+process.env.NODE_ENV = 'test';
+await mkdir(bundleDir, { recursive: true });
 
 const optimizeModule = await bundleFunction(optimizeEntry);
 const freePreviewModule = await bundleFunction(freePreviewEntry);
 const redeemCdkModule = await bundleFunction(redeemCdkEntry);
 const licenseUtilsModule = await bundleFunction('netlify/functions/license-utils.ts');
+globalThis.__maaCdkRecordStoreForTesting = createMemoryCdkRecordStore();
+globalThis.__maaUsageEventStoreForTesting = createMemoryUsageEventStore();
 
 const config = {
   layout: '3-3-3',
@@ -37,13 +45,13 @@ const sampleOperators = [
 ];
 
 async function bundleFunction(entryPoint) {
+  const outputPath = resolve(bundleDir, `${entryPoint.replace(/[\\/.:]/g, '-')}.cjs`);
   const buildResult = await esbuild.build({
     entryPoints: [entryPoint],
     bundle: true,
     platform: 'node',
-    format: 'esm',
+    format: 'cjs',
     write: false,
-    packages: 'external',
   });
 
   const bundledCode = buildResult.outputFiles[0]?.text;
@@ -51,8 +59,37 @@ async function bundleFunction(entryPoint) {
     throw new Error(`Failed to bundle ${entryPoint}.`);
   }
 
-  const functionUrl = `data:text/javascript;base64,${Buffer.from(bundledCode).toString('base64')}`;
-  return await import(functionUrl);
+  await writeFile(outputPath, bundledCode, 'utf8');
+  const imported = await import(`${pathToFileURL(outputPath).href}?t=${Date.now()}`);
+  return imported.default ?? imported;
+}
+
+function createMemoryCdkRecordStore() {
+  const records = new Map();
+  return {
+    get: async (key) => records.get(key) ?? null,
+    set: async (key, record) => {
+      records.set(key, record);
+    },
+    delete: async (key) => {
+      records.delete(key);
+    },
+    list: async (prefix) => [...records.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([, record]) => record),
+  };
+}
+
+function createMemoryUsageEventStore() {
+  const records = new Map();
+  return {
+    set: async (key, record) => {
+      records.set(key, record);
+    },
+    list: async (prefix) => [...records.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([, record]) => record),
+  };
 }
 
 function canonicalJson(value) {

@@ -1,7 +1,6 @@
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { requireEnv } from './license-utils'
+import { createPostgresAdminUserStore } from '../../server/storage/admin-user-store'
 
 export interface AdminUserRecord {
   version: 1;
@@ -102,73 +101,5 @@ function normalizeUsername(value: unknown): string | null {
 }
 
 async function getAdminUserStore(): Promise<AdminUserStore> {
-  if (hasNetlifyBlobsContext()) {
-    const { getStore } = await import('@netlify/blobs')
-    const store = getStore('maa-admin-users')
-    return {
-      get: async (username) => await store.get(`users/${username}.json`, { type: 'json' }) as AdminUserRecord | null,
-      set: async (username, user) => { await store.setJSON(`users/${username}.json`, user) },
-      delete: async (username) => { await store.delete(`users/${username}.json`) },
-      list: async () => {
-        const { blobs } = await store.list({ prefix: 'users/' })
-        const users = await Promise.all(blobs.map(({ key }) => store.get(key, { type: 'json' }) as Promise<AdminUserRecord | null>))
-        return users.filter((user): user is AdminUserRecord => user !== null)
-      },
-    }
-  }
-  return {
-    get: async (username) => readLocalAdminUser(username),
-    set: async (username, user) => writeLocalAdminUser(username, user),
-    delete: async (username) => deleteLocalAdminUser(username),
-    list: async () => readLocalAdminUsers(),
-  }
-}
-
-function hasNetlifyBlobsContext(): boolean {
-  if (process.env.NETLIFY_DEV || process.env.NODE_ENV === 'development') return false
-  const globalContext = (globalThis as unknown as { netlifyBlobsContext?: unknown }).netlifyBlobsContext
-  if (hasUsableBlobsContext(globalContext)) return true
-  const encodedContext = process.env.NETLIFY_BLOBS_CONTEXT
-  if (!encodedContext) return false
-  try {
-    return hasUsableBlobsContext(JSON.parse(Buffer.from(encodedContext, 'base64').toString('utf8')) as unknown)
-  } catch {
-    return false
-  }
-}
-
-function hasUsableBlobsContext(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return false
-  const context = value as Record<string, unknown>
-  return typeof context.siteID === 'string' && context.siteID.length > 0 && typeof context.token === 'string' && context.token.length > 0
-}
-
-function localAdminUserPath(username: string): string {
-  return join(process.cwd(), '.netlify', 'local-admin-users', `${username}.json`)
-}
-
-function readLocalAdminUser(username: string): AdminUserRecord | null {
-  const path = localAdminUserPath(username)
-  if (!existsSync(path)) return null
-  return JSON.parse(readFileSync(path, 'utf8')) as AdminUserRecord
-}
-
-function writeLocalAdminUser(username: string, user: AdminUserRecord): void {
-  const path = localAdminUserPath(username)
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, JSON.stringify(user, null, 2), 'utf8')
-}
-
-function deleteLocalAdminUser(username: string): void {
-  const path = localAdminUserPath(username)
-  if (existsSync(path)) unlinkSync(path)
-}
-
-function readLocalAdminUsers(): AdminUserRecord[] {
-  const dir = join(process.cwd(), '.netlify', 'local-admin-users')
-  if (!existsSync(dir)) return []
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
-    .map((entry) => readLocalAdminUser(entry.name.replace(/\.json$/, '')))
-    .filter((user): user is AdminUserRecord => user !== null)
+  return createPostgresAdminUserStore()
 }

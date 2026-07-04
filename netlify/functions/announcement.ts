@@ -1,10 +1,9 @@
 import type { Context } from '@netlify/functions'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import type { Announcement, AnnouncementKind } from '../../src/lib/types'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
+import { createPostgresAnnouncementStore } from '../../server/storage/announcement-store'
 
 const ANNOUNCEMENT_KEY = 'current.json'
 const MAX_TITLE_LENGTH = 80
@@ -173,21 +172,7 @@ async function readAnnouncementData(): Promise<AnnouncementData> {
 }
 
 async function getAnnouncementStore(): Promise<AnnouncementStore> {
-  if (hasNetlifyBlobsContext()) {
-    const { getStore } = await import('@netlify/blobs')
-    const store = getStore('maa-announcements')
-    return {
-      get: async () => await store.get(ANNOUNCEMENT_KEY, { type: 'json' }),
-      set: async (data) => {
-        await store.setJSON(ANNOUNCEMENT_KEY, data)
-      },
-    }
-  }
-
-  return {
-    get: async () => readLocalAnnouncementData(),
-    set: async (data) => writeLocalAnnouncementData(data),
-  }
+  return createPostgresAnnouncementStore(ANNOUNCEMENT_KEY)
 }
 
 function normalizeAnnouncementData(value: unknown): AnnouncementData {
@@ -267,47 +252,4 @@ function createAnnouncementId(): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-}
-
-function hasNetlifyBlobsContext(): boolean {
-  if (process.env.NETLIFY_DEV || process.env.NODE_ENV === 'development') {
-    return false
-  }
-
-  const globalContext = (globalThis as unknown as { netlifyBlobsContext?: unknown }).netlifyBlobsContext
-  if (hasUsableBlobsContext(globalContext)) return true
-
-  const encodedContext = process.env.NETLIFY_BLOBS_CONTEXT
-  if (!encodedContext) return false
-  try {
-    const decoded = JSON.parse(Buffer.from(encodedContext, 'base64').toString('utf8')) as unknown
-    return hasUsableBlobsContext(decoded)
-  } catch {
-    return false
-  }
-}
-
-function hasUsableBlobsContext(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return false
-  const context = value as Record<string, unknown>
-  return typeof context.siteID === 'string' &&
-    context.siteID.length > 0 &&
-    typeof context.token === 'string' &&
-    context.token.length > 0
-}
-
-function localAnnouncementPath(): string {
-  return join(process.cwd(), '.netlify', 'local-announcements', ANNOUNCEMENT_KEY)
-}
-
-function readLocalAnnouncementData(): unknown {
-  const path = localAnnouncementPath()
-  if (!existsSync(path)) return null
-  return JSON.parse(readFileSync(path, 'utf8')) as unknown
-}
-
-function writeLocalAnnouncementData(data: AnnouncementData): void {
-  const path = localAnnouncementPath()
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, JSON.stringify(data, null, 2), 'utf8')
 }
