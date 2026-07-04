@@ -24,6 +24,11 @@ const deployRelevantScripts = new Set([
   'scripts/generate-data.mjs',
 ])
 
+const generatedMetadataFiles = new Set([
+  'src/lib/build-meta.ts',
+  'netlify/functions/data.ts',
+])
+
 const baseRef = process.env.CACHED_COMMIT_REF
 const headRef = process.env.COMMIT_REF || process.env.HEAD
 
@@ -48,6 +53,16 @@ if (changedFiles.length === 0) {
   skipDeploy('no changed files since last deploy')
 }
 
+if (!CHECK_ONLY) {
+  const currentCommitFiles = readCurrentCommitFiles(headRef)
+
+  if (currentCommitFiles && isGeneratedMetadataCommit(currentCommitFiles)) {
+    continueDeploy(`generated build metadata changed: ${currentCommitFiles.join(', ')}`)
+  }
+
+  skipDeploy(`waiting for CI generated metadata commit: ${(currentCommitFiles || changedFiles).join(', ')}`)
+}
+
 const deployRelevant = changedFiles.filter(isDeployRelevant)
 
 if (deployRelevant.length === 0) {
@@ -60,6 +75,23 @@ function isDeployRelevant(file) {
   if (deployRelevantFiles.has(file)) return true
   if (deployRelevantScripts.has(file)) return true
   return deployRelevantPrefixes.some((prefix) => file.startsWith(prefix))
+}
+
+function isGeneratedMetadataCommit(files) {
+  return files.length > 0 && files.every((file) => generatedMetadataFiles.has(file))
+}
+
+function readCurrentCommitFiles(headRef) {
+  const diff = spawnSync('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', `${headRef}^`, headRef, '--'], {
+    encoding: 'utf8',
+  })
+
+  if (diff.status !== 0) return null
+
+  return diff.stdout
+    .split(/\r?\n/)
+    .map((file) => file.trim().replace(/\\/g, '/'))
+    .filter(Boolean)
 }
 
 function skipDeploy(reason) {
