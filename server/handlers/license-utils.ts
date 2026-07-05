@@ -62,6 +62,7 @@ const PRESET_CONFIGS: LicenseConfig[] = [
     layout: '2-4-3',
     desc: '243 均衡流 (2赤金/2经验)',
     schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
     trading_stations_count: 2,
     manufacturing_stations_count: 4,
     product_requirements: {
@@ -75,6 +76,7 @@ const PRESET_CONFIGS: LicenseConfig[] = [
     layout: '2-4-3',
     desc: '243 搓玉 (2赤金/2源石)',
     schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
     trading_stations_count: 2,
     manufacturing_stations_count: 4,
     product_requirements: {
@@ -88,6 +90,7 @@ const PRESET_CONFIGS: LicenseConfig[] = [
     layout: '3-3-3',
     desc: '333 搓玉流',
     schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
     trading_stations_count: 3,
     manufacturing_stations_count: 3,
     product_requirements: {
@@ -990,6 +993,7 @@ export function validateConfig(value: unknown): { ok: true; config: LicenseConfi
     return { ok: false, message: '基建配置不能为空。' }
   }
   const config = value as LicenseConfig
+  config.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
   if (!config.layout || !config.product_requirements) {
     return { ok: false, message: '基建配置缺少 layout 或 product_requirements。' }
   }
@@ -1031,4 +1035,11 @@ function isCountRecord(value: unknown): value is Record<string, number> {
 
 function sumCounts(counts: Record<string, number>): number {
   return Object.values(counts).reduce((sum, value) => sum + value, 0)
+}
+
+function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' {
+  const ruleText = String(rule ?? 'fixed').trim().toLowerCase()
+  return ['maa_autofill', 'maa-autofill', 'autofill', 'auto', 'maa自动填满', '自动填满'].includes(ruleText)
+    ? 'maa_autofill'
+    : 'fixed'
 }
