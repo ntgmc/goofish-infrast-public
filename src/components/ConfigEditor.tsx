@@ -19,6 +19,11 @@ export const SCHEDULE_MODE_LABELS: Record<string, string> = {
   rotation: '游戏内轮换',
 }
 
+export const DORMITORY_RULE_LABELS: Record<string, string> = {
+  fixed: '排班表写死',
+  maa_autofill: 'MAA 自动填满',
+}
+
 const DEFAULT_SHIFT_HOURS = [8, 8, 8]
 const SHIFT_PRESETS = [
   { label: '8-8-8', value: [8, 8, 8], note: '24h 固定间隔' },
@@ -41,6 +46,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
     layout: '2-4-3',
     desc: '243 均衡流 (2赤金/2经验)',
     schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
     trading_stations_count: 2,
     manufacturing_stations_count: 4,
     product_requirements: {
@@ -54,6 +60,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
     layout: '2-4-3',
     desc: '243 搓玉 (2赤金/2源石)',
     schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
     trading_stations_count: 2,
     manufacturing_stations_count: 4,
     product_requirements: {
@@ -67,6 +74,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
     layout: '3-3-3',
     desc: '333 搓玉流',
     schedule_mode: 'maa',
+    dormitory_rule: 'fixed',
     trading_stations_count: 3,
     manufacturing_stations_count: 3,
     product_requirements: {
@@ -87,6 +95,13 @@ export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' {
   return ['rotation', 'rotate', 'game_rotation', 'in_game_rotation', '轮换', '轮换模式', '游戏内轮换'].includes(modeText)
     ? 'rotation'
     : 'maa'
+}
+
+export function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' {
+  const ruleText = String(rule ?? 'fixed').trim().toLowerCase()
+  return ['maa_autofill', 'maa-autofill', 'autofill', 'auto', 'maa自动填满', '自动填满'].includes(ruleText)
+    ? 'maa_autofill'
+    : 'fixed'
 }
 
 function parseShiftHours(value: unknown): number[] | null {
@@ -131,6 +146,7 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.trading_stations_count = Number.isFinite(next.trading_stations_count) ? next.trading_stations_count : 2
   next.manufacturing_stations_count = Number.isFinite(next.manufacturing_stations_count) ? next.manufacturing_stations_count : 4
   next.schedule_mode = normalizeScheduleMode(next.schedule_mode ?? next.mode)
+  next.dormitory_rule = normalizeDormitoryRule(next.dormitory_rule)
   next.shift_hours = parseShiftHours(next.shift_hours) ?? [...DEFAULT_SHIFT_HOURS]
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
   next.desc = next.desc || `${next.layout} 基建配置`
@@ -501,12 +517,42 @@ export default function ConfigEditor({
                   </button>
                 ))}
             </div>
-            <p className="mt-2 text-xs leading-5 text-ink-muted">
-              游戏内轮换会生成两个设施预设队列，按游戏内“队列轮换/快速切换”使用；不会生成 MAA 排班 JSON。
-            </p>
-          </div>
-          <div>
-            <p className="mb-2 text-xs font-medium text-ink-muted">换班间隔</p>
+              <p className="mt-2 text-xs leading-5 text-ink-muted">
+                游戏内轮换会生成两个设施预设队列，按游戏内“队列轮换/快速切换”使用；不会生成 MAA 排班 JSON。
+              </p>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium text-ink-muted">宿舍规则</p>
+              <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
+                {(['fixed', 'maa_autofill'] as const).map((rule) => (
+                  <button
+                    key={rule}
+                    type="button"
+                    disabled={!canEdit || rotationMode}
+                    onClick={() => onUpdate((next) => {
+                      next.dormitory_rule = rule
+                      applyCounts(next)
+                    })}
+                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed ${
+                      normalizeDormitoryRule(config.dormitory_rule) === rule
+                        ? 'bg-brand-600 text-white'
+                        : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
+                    }`}
+                  >
+                    {DORMITORY_RULE_LABELS[rule]}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs leading-5 text-ink-muted">
+                {rotationMode
+                  ? '游戏内轮换不生成 MAA 排班 JSON，宿舍规则不参与导出。'
+                  : normalizeDormitoryRule(config.dormitory_rule) === 'maa_autofill'
+                    ? '导出的 MAA JSON 不写死宿舍干员，宿舍由 MAA 自动填满；心情仍按自动填满估算。'
+                    : '导出的 MAA JSON 会固定宿舍干员，和当前行为一致。'}
+              </p>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium text-ink-muted">换班间隔</p>
             <div className="grid grid-cols-3 gap-2">
               {SHIFT_PRESETS.map((preset) => {
                 const active = shiftHoursText === formatShiftHours(preset.value)
