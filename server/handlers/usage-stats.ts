@@ -1,8 +1,7 @@
-import type { Context } from '@netlify/functions'
 import { randomUUID } from 'node:crypto'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
-import { createPostgresUsageEventStore } from '../../server/storage/usage-store'
+import { createPostgresUsageEventStore } from '../storage/usage-store'
 
 type UsageEventName = 'tool_visit' | 'schedule_generate' | 'cdk_redeem'
 
@@ -30,7 +29,7 @@ interface UsageDayStats {
 const EVENT_PREFIX = 'events/'
 const VALID_VISITOR_ID = /^[A-Za-z0-9_-]{8,128}$/
 
-export default async (req: Request, _context: Context): Promise<Response> => {
+export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return jsonResponse(null, 204)
   }

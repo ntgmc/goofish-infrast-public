@@ -20,7 +20,6 @@
   },
   "include": [
     "server/**/*.ts",
-    "netlify/functions/**/*.ts",
     "src/lib/**/*.ts"
   ],
   "exclude": [

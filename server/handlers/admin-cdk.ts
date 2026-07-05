@@ -1,4 +1,3 @@
-import type { Context } from '@netlify/functions'
 import type { ProductPermissionMode } from '../../src/lib/types'
 import { authenticateAdminRequest } from './admin-auth'
 import {
@@ -23,7 +22,7 @@ const PRODUCT_PERMISSION_RANK: Record<ProductPermissionMode, number> = {
   ultimate: 3,
 }
 
-export default async (req: Request, _context: Context): Promise<Response> => {
+export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return jsonResponse(null, 204)
   }
