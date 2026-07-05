@@ -134,6 +134,7 @@ export interface CdkRecord {
 
 export interface CdkRecordStore {
   get: (key: string) => Promise<CdkRecord | null>;
+  getByLicenseOrderHash: (orderHash: string) => Promise<CdkRecord | null>;
   set: (key: string, record: CdkRecord) => Promise<void>;
   delete: (key: string) => Promise<void>;
   list: (prefix: string) => Promise<CdkRecord[]>;
@@ -405,8 +406,7 @@ function dronesMatch(actual: LicenseConfig['drones'], expected: LicenseConfig['d
 
 export async function findCdkRecordByLicenseOrderHash(orderHash: string): Promise<CdkRecord | null> {
   const store = await getCdkRecordStore()
-  const records = await store.list('cdk/')
-  return records.find((record) => record.license_order_hash === orderHash) ?? null
+  return store.getByLicenseOrderHash(orderHash)
 }
 
 export async function findCdkRecordByCode(code: string, hashSecret: string): Promise<CdkRecord | null> {
