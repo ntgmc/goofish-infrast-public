@@ -117,6 +117,12 @@ npm run check:migration
 
 另外，仓库使用 GitHub Actions 在 PR 创建、重新打开、更新 commit 或标记 ready 时，根据 PR 内 commit message 自动更新 PR description。配置文件位于 `.github/workflows/pr-details.yml`。该流程只维护 PR description 中 `<!-- pr-details:start -->` `<!-- pr-details:end -->` 之间的自动生成区块，区块外的人工内容会保留。
 
+## 自动部署
+
+生产部署由 `.github/workflows/deploy-production.yml` 触发，并在自托管服务器上执行 `scripts/deploy-production.sh`。`main` 的 Quality Checks 通过后会自动 SSH 到服务器，完成拉取代码、安装依赖、生产构建、重启 systemd 服务和 `/api/health` 健康检查。
+
+服务器准备步骤、GitHub Secrets/Variables 和故障处理见 [Production Deploy Workflow](docs/production-deploy.md)。
+
 ## 服务器 API
 
 `server/routes.ts` 显式注册所有 `/api` 路由，并把请求分发到对应处理器。当前核心路由包括：
