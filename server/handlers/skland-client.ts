@@ -143,11 +143,12 @@ export function convertSklandCharactersToOperators(gamePlayerInfo: unknown): Lic
     })
   }
 
-  if (operators.length === 0) {
+  const uniqueOperators = dedupeSklandOperators(operators)
+  if (uniqueOperators.length === 0) {
     logSklandImportDebug('no convertible operators', gamePlayerInfo)
     throw new Error('森空岛干员数据无法转换为当前系统格式，请稍后重试。')
   }
-  return operators.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'))
+  return uniqueOperators.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'))
 }
 
 export function encryptSklandCredential(cred: string): string {
@@ -314,6 +315,23 @@ function numberValue(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null
   }
   return null
+}
+
+function dedupeSklandOperators(operators: LicenseOperator[]): LicenseOperator[] {
+  const byKey = new Map<string, LicenseOperator>()
+  for (const operator of operators) {
+    const key = sklandOperatorDedupKey(operator)
+    if (!byKey.has(key)) {
+      byKey.set(key, operator)
+    }
+  }
+  return [...byKey.values()]
+}
+
+function sklandOperatorDedupKey(operator: LicenseOperator): string {
+  const normalizedName = operator.name.replace(/\s+/g, '').toLowerCase()
+  if (normalizedName.includes('阿米娅') || operator.id.includes('amiya')) return 'skland:amiya'
+  return operator.id
 }
 
 function getNestedArray(value: unknown, path: string[]): unknown[] | null {

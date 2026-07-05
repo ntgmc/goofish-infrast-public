@@ -30,11 +30,15 @@ const operators = skland.convertSklandCharactersToOperators({
   data: {
     chars: [
       { charId: 'char_002_amiya', evolvePhase: 2, level: 80, potentialRank: 5 },
+      { charId: 'char_1001_amiya2', evolvePhase: 1, level: 70, potentialRank: 3 },
+      { charId: 'char_1037_amiya3', evolvePhase: 0, level: 50, potentialRank: 1 },
       { charId: 'token_10002_kalts_mon3tr', name: 'Mon3tr', evolvePhase: 0, rarity: 5 },
       { charId: 'char_010_chen', name: '陈', evolvePhase: '1', level: '70', potentialRank: '2', rarity: '5' },
     ],
     charInfoMap: {
       char_002_amiya: { name: '阿米娅', rarity: 4 },
+      char_1001_amiya2: { name: '阿米娅', rarity: 4 },
+      char_1037_amiya3: { name: '阿米娅', rarity: 4 },
     },
   },
 })
@@ -43,6 +47,9 @@ if (operators.length !== 2) {
 }
 if (!operators.every((operator) => operator.id.startsWith('char_') && operator.own === true)) {
   throw new Error('converted operators have invalid ids or ownership')
+}
+if (operators.filter((operator) => operator.name === '阿米娅').length !== 1) {
+  throw new Error('converted operators should dedupe Amiya variants')
 }
 
 const calls = []

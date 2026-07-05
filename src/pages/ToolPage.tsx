@@ -1110,11 +1110,11 @@ const [sklandLogin, setSklandLogin] = useState<SklandLoginState>({
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
   const canEditConfig = profile.permission === 'advanced' || profile.permission === 'ultimate' || profile.permission === 'admin'
   const canEditLimitedConfig = profile.permission === 'recommended' || profile.permission === 'growth'
-  const ownedOperatorCount = useMemo(() => operators?.filter((operator) => operator.own !== false).length ?? 0, [operators])
+  const ownedOperatorCount = useMemo(() => countOwnedOperators(operators), [operators])
   const configChanged = workspace?.config ? canonicalJson(normalizedConfig) !== canonicalJson(workspace.config) : true
   const filteredOperators = useMemo(() => {
     const keyword = operatorSearch.trim().toLowerCase()
-    const source = operators ?? []
+    const source = sortOperatorsForPreview((operators ?? []).filter((operator) => operator.own !== false))
     return keyword ? source.filter((operator) => operator.name.toLowerCase().includes(keyword)) : source
   }, [operatorSearch, operators])
   const setupSections: Array<{ id: WorkspaceSetupSection; label: string; ready: boolean }> = [
@@ -1385,7 +1385,7 @@ const [sklandLogin, setSklandLogin] = useState<SklandLoginState>({
                   </div>
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                     <label className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-2 px-4 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">
-                      {operatorFileName ? `已选择：${operatorFileName}` : operators ? `已载入 ${operators.length} 名干员` : '选择干员识别文件'}
+                    {operatorFileName ? `已选择：${operatorFileName}` : operators ? `已载入 ${ownedOperatorCount} 名拥有干员` : '选择干员识别文件'}
                       <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} className="hidden" />
                     </label>
                     {operators && <span className="text-sm text-brand-400">拥有干员 {ownedOperatorCount} 名</span>}
@@ -1446,7 +1446,7 @@ const [sklandLogin, setSklandLogin] = useState<SklandLoginState>({
                 <h2 className="text-base font-semibold text-ink-primary">准备情况</h2>
                 <dl className="mt-4 space-y-3 text-sm">
                   <InfoRow label="套餐" value={PERMISSION_LABELS[profile.permission]} />
-                  <InfoRow label="干员" value={operators ? `${operators.length} 名` : '还未上传'} />
+              <InfoRow label="干员" value={operators ? `${ownedOperatorCount} 名` : '还未上传'} />
                   <InfoRow label="已拥有" value={operators ? `${ownedOperatorCount} 名` : '-'} />
                   <div className="flex items-center justify-between gap-4">
                     <dt className="text-ink-muted">基建配置</dt>
@@ -1584,6 +1584,28 @@ function createAccountLicense(profile: UserGameAccount, operators: LicenseOperat
     issued_at: profile.created_at,
     sig: `account-${profile.id}`,
   }
+}
+
+function countOwnedOperators(operators: LicenseOperator[] | null | undefined): number {
+  return operators?.filter((operator) => operator.own !== false).length ?? 0
+}
+
+function sortOperatorsForPreview(operators: LicenseOperator[]): LicenseOperator[] {
+  return [...operators].sort((left, right) => (
+    numberValue(right.elite) - numberValue(left.elite)
+    || numberValue(right.level) - numberValue(left.level)
+    || left.name.localeCompare(right.name, 'zh-CN')
+    || left.id.localeCompare(right.id)
+  ))
+}
+
+function numberValue(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
 }
 
 function normalizePermission(permission: PermissionMode): PermissionMode {
