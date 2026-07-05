@@ -10,7 +10,7 @@ import type {
   ProductPermissionMode,
   RawPermissionMode,
 } from '../../src/lib/types'
-import { createPostgresCdkRecordStore } from '../../server/storage/cdk-store'
+import { createPostgresCdkRecordStore } from '../storage/cdk-store'
 
 const OBFUSCATE_KEY_SEED = 'maa-obfuscate-v1'
 const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const

@@ -5,11 +5,11 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const sourcePath = resolve(root, 'netlify/functions/efficiency-data.json')
-const targetPath = resolve(root, 'netlify/functions/data.ts')
+const sourcePath = resolve(root, 'server/handlers/efficiency-data.json')
+const targetPath = resolve(root, 'server/handlers/data.ts')
 const buildMetaPath = resolve(root, 'src/lib/build-meta.ts')
 const packagePath = resolve(root, 'package.json')
-const LINE_ENDING = '\r\n'
+const LINE_ENDING = '\n'
 
 const source = await readFile(sourcePath, 'utf8')
 const data = JSON.parse(source.replace(/^\uFEFF/, ''))
@@ -195,7 +195,7 @@ function buildSourceSummary(rawData, hash) {
   }, 0)
 
   return [
-    'source=netlify/functions/efficiency-data.json',
+    'source=server/handlers/efficiency-data.json',
     `sha256=${hash.slice(0, 12)}`,
     `workplaces=${workplaceCount}`,
     `trading_rule_groups=${Object.keys(tradingRules).length}`,

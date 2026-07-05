@@ -1,4 +1,3 @@
-import type { Context } from '@netlify/functions'
 import {
   buildAuthPayload,
   changeUserPassword,
@@ -12,7 +11,7 @@ import {
   resetPasswordWithToken,
 } from './user-auth'
 
-export default async (req: Request, _context: Context): Promise<Response> => {
+export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   const pathname = new URL(req.url).pathname

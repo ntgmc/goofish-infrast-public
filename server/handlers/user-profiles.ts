@@ -1,4 +1,3 @@
-import type { Context } from '@netlify/functions'
 import {
   emptyWorkspace,
   getProfileForUser,
@@ -7,10 +6,10 @@ import {
   saveProfileWorkspace,
   saveUserProfile,
   toPublicProfile,
-} from '../../server/storage/user-store'
+} from '../storage/user-store'
 import { buildAuthPayload, jsonResponse, redeemProfileCdk, requireUserSession, toPublicUser } from './user-auth'
 
-export default async (req: Request, _context: Context): Promise<Response> => {
+export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   try {
