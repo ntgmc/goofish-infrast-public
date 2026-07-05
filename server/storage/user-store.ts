@@ -486,10 +486,14 @@ export function toPublicProfile(profile: UserGameAccountRecord, workspace?: User
           last_imported_at: profile.skland_binding.last_imported_at,
         }
       : null,
-    operator_count: workspace?.operators?.length ?? 0,
+    operator_count: countOwnedOperators(workspace?.operators),
     updated_at: workspace?.updated_at ?? profile.updated_at,
     created_at: profile.created_at,
   }
+}
+
+function countOwnedOperators(operators: LicenseOperator[] | null | undefined): number {
+  return operators?.filter((operator) => operator.own !== false).length ?? 0
 }
 
 function ensureSchema(): Promise<void> {
