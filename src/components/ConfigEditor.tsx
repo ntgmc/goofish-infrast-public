@@ -243,6 +243,8 @@ interface ConfigEditorProps {
   resetLabel?: string;
   note?: string;
   embedded?: boolean;
+  hideHeader?: boolean;
+  hidePresetActions?: boolean;
 }
 
 export default function ConfigEditor({
@@ -259,6 +261,8 @@ export default function ConfigEditor({
   resetLabel = '恢复授权配置',
   note,
   embedded = false,
+  hideHeader = false,
+  hidePresetActions = false,
 }: ConfigEditorProps) {
   const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
   const autoInventoryOnly = !canEdit && canUseIntermediateInventory
@@ -322,6 +326,7 @@ export default function ConfigEditor({
 
   return (
     <section className={embedded ? '' : 'bg-surface-1 rounded-xl p-5 sm:p-6'}>
+      {!hideHeader && (
       <div className="flex flex-col gap-4 border-b border-surface-3/60 pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -340,7 +345,7 @@ export default function ConfigEditor({
                 : `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，使用当前套餐提供的固定配置。`)}
           </p>
         </div>
-      {(canEdit || (canSelectPreset && !autoInventoryOnly)) && (
+          {!hidePresetActions && (canEdit || (canSelectPreset && !autoInventoryOnly)) && (
           <div className="flex flex-wrap gap-2">
             <PresetButton label="243 均衡" onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
             <PresetButton label="243 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
@@ -358,6 +363,7 @@ export default function ConfigEditor({
           </div>
         )}
       </div>
+      )}
 
       {autoInventoryOnly ? (
         <div className="pt-5">
@@ -366,7 +372,7 @@ export default function ConfigEditor({
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
               先选择 243 或 333 预设；库存充足时保留原产物消耗，库存较少时只调整一个制造站产物。
             </p>
-            {canSelectPreset && (
+            {!hidePresetActions && canSelectPreset && (
               <div className="mt-4 flex flex-wrap gap-2">
                 <PresetButton label="243 均衡" onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
                 <PresetButton label="243 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
@@ -626,7 +632,6 @@ export default function ConfigEditor({
         </div>
       </div>
       )}
-
       {validationMessage && (
         <p className="mt-4 text-sm text-warning">{validationMessage}</p>
       )}
