@@ -28,6 +28,30 @@ type DashboardSection = 'profiles' | 'preview' | 'tools' | 'redeem' | 'announcem
 type WorkspaceSetupSection = 'operators' | 'config'
 type WorkspaceMode = 'dashboard' | 'setup' | 'optimize'
 type FieldErrors = Record<string, string>
+type SklandLoginState = {
+  open: boolean
+  scanId: string | null
+  qrDataUrl: string | null
+  expiresAt: string | null
+  status: 'idle' | 'starting' | 'waiting' | 'importing' | 'imported' | 'error'
+  message: string | null
+}
+
+type SklandPayload = AuthSuccessResponse & {
+  skland_import?: {
+    status: 'imported'
+    uid: string
+    nickname: string
+    channel_name: string
+    operator_count: number
+    imported_at: string
+  }
+  error?: string
+  status?: string
+}
+
+const SKLAND_SCAN_POLL_DELAY_MS = 5000
+const SKLAND_SCAN_MAX_POLLS = 18
 
 export default function ToolPage() {
   const [authLoading, setAuthLoading] = useState(true)
@@ -172,6 +196,7 @@ export default function ToolPage() {
           workspace={workspace}
           announcement={banner}
           onSaved={(payload) => applyAuthPayload(payload, 'optimize')}
+          onSynced={(payload) => applyAuthPayload(payload, 'setup')}
           onBack={() => setWorkspaceMode('dashboard')}
           onLogout={handleLogout}
         />
@@ -1050,6 +1075,7 @@ function WorkspaceSetupPage({
   workspace,
   announcement,
   onSaved,
+  onSynced,
   onBack,
   onLogout,
 }: {
@@ -1058,6 +1084,7 @@ function WorkspaceSetupPage({
   workspace: UserWorkspace | null
   announcement: Announcement | null
   onSaved: (payload: AuthSuccessResponse) => void
+  onSynced: (payload: AuthSuccessResponse) => void
   onBack: () => void
   onLogout: () => void
 }) {
@@ -1068,6 +1095,16 @@ function WorkspaceSetupPage({
 const [activeSection, setActiveSection] = useState<WorkspaceSetupSection>('operators')
 const [error, setError] = useState<string | null>(null)
 const [saving, setSaving] = useState(false)
+const [sklandLogin, setSklandLogin] = useState<SklandLoginState>({
+  open: false,
+  scanId: null,
+  qrDataUrl: null,
+  expiresAt: null,
+  status: 'idle',
+  message: null,
+  })
+  const [sklandBusy, setSklandBusy] = useState(false)
+  const sklandPollCountRef = useRef(0)
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
@@ -1103,6 +1140,161 @@ const [saving, setSaving] = useState(false)
       setError((caught as Error).message)
     }
   }
+
+  const applySklandPayload = useCallback((data: SklandPayload) => {
+    if (!data.user) return
+    const nextOperators = data.workspace?.operators ?? null
+    setOperators(nextOperators)
+    setOperatorFileName(null)
+    setError(null)
+    onSynced(data)
+  }, [onSynced])
+
+  const completeSklandLogin = useCallback(async (scanId: string) => {
+    if (sklandBusy) return
+    setSklandBusy(true)
+    setSklandLogin((current) => ({
+      ...current,
+      status: 'waiting',
+      message: '正在检查扫码状态，请在森空岛 App 中确认扫码...',
+    }))
+    try {
+      const resp = await fetch('/api/user/skland/login/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profile.id, scan_id: scanId }),
+      })
+      const data = await resp.json() as SklandPayload
+      if (resp.status === 202 || data.status === 'pending') {
+        setSklandLogin((current) => ({ ...current, status: 'waiting', message: '等待森空岛 App 确认扫码...' }))
+        return
+      }
+      if (!resp.ok || !data.user) throw new Error(data.error || `森空岛导入失败: ${resp.status}`)
+      setSklandLogin((current) => ({
+        ...current,
+        status: 'importing',
+        message: '扫码已确认，正在导入森空岛干员数据...',
+      }))
+      applySklandPayload(data)
+      setSklandLogin((current) => ({
+        ...current,
+        status: 'imported',
+        message: data.skland_import
+          ? `已导入 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}`
+          : '森空岛干员数据已导入。',
+      }))
+    } catch (caught) {
+      setSklandLogin((current) => ({ ...current, status: 'error', message: (caught as Error).message }))
+    } finally {
+      setSklandBusy(false)
+    }
+  }, [applySklandPayload, profile.id, sklandBusy])
+
+  const handleStartSklandLogin = useCallback(async () => {
+    setSklandBusy(true)
+    setError(null)
+    setSklandLogin({
+      open: true,
+      scanId: null,
+      qrDataUrl: null,
+      expiresAt: null,
+      status: 'starting',
+      message: '正在生成鹰角扫码登录二维码...',
+    })
+    try {
+      const resp = await fetch('/api/user/skland/login/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profile.id }),
+      })
+      const data = await resp.json() as { scan_id?: string; qr_data_url?: string; expires_at?: string; error?: string }
+      if (!resp.ok || !data.scan_id || !data.qr_data_url) throw new Error(data.error || `生成森空岛二维码失败: ${resp.status}`)
+      setSklandLogin({
+        open: true,
+        scanId: data.scan_id,
+        qrDataUrl: data.qr_data_url,
+        expiresAt: data.expires_at ?? null,
+        status: 'waiting',
+        message: '请使用森空岛 App 扫码确认，二维码约 2 分钟内有效。',
+      })
+      sklandPollCountRef.current = 0
+    } catch (caught) {
+      setSklandLogin((current) => ({ ...current, status: 'error', message: (caught as Error).message }))
+    } finally {
+      setSklandBusy(false)
+    }
+  }, [profile.id])
+
+  const handleRefreshSkland = useCallback(async () => {
+    setSklandBusy(true)
+    setError(null)
+    try {
+      const resp = await fetch('/api/user/skland/import/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profile.id }),
+      })
+      const data = await resp.json() as SklandPayload
+      if (!resp.ok || !data.user) throw new Error(data.error || `森空岛刷新失败: ${resp.status}`)
+      applySklandPayload(data)
+      setSklandLogin({
+        open: true,
+        scanId: null,
+        qrDataUrl: null,
+        expiresAt: null,
+        status: 'imported',
+        message: data.skland_import
+          ? `已刷新 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}`
+          : '森空岛干员数据已刷新。',
+      })
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setSklandBusy(false)
+    }
+  }, [applySklandPayload, profile.id])
+
+  const handleUnbindSkland = useCallback(async () => {
+    if (!window.confirm('确认解绑森空岛？已导入的干员数据会保留，但之后需要重新扫码才能刷新。')) return
+    setSklandBusy(true)
+    setError(null)
+    try {
+      const resp = await fetch('/api/user/skland/binding', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profile.id }),
+      })
+      const data = await resp.json() as AuthSuccessResponse & { error?: string }
+      if (!resp.ok || !data.user) throw new Error(data.error || `森空岛解绑失败: ${resp.status}`)
+      onSynced(data)
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setSklandBusy(false)
+    }
+  }, [onSynced, profile.id])
+
+  useEffect(() => {
+    if (!sklandLogin.open || !sklandLogin.scanId || sklandLogin.status !== 'waiting') return
+    if (sklandLogin.expiresAt && Date.now() > Date.parse(sklandLogin.expiresAt)) {
+      setSklandLogin((current) => ({ ...current, status: 'error', message: '二维码已过期，请重新生成。' }))
+      return
+    }
+    if (sklandPollCountRef.current >= SKLAND_SCAN_MAX_POLLS) {
+      setSklandLogin((current) => ({
+        ...current,
+        status: 'error',
+        message: '扫码等待超时，请重新生成二维码后再试。',
+      }))
+      return
+    }
+    const timer = window.setTimeout(() => {
+      if (!sklandLogin.scanId) return
+      sklandPollCountRef.current += 1
+      void completeSklandLogin(sklandLogin.scanId)
+    }, SKLAND_SCAN_POLL_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [completeSklandLogin, sklandLogin.expiresAt, sklandLogin.open, sklandLogin.scanId, sklandLogin.status])
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -1198,6 +1390,31 @@ const [saving, setSaving] = useState(false)
                     </label>
                     {operators && <span className="text-sm text-brand-400">拥有干员 {ownedOperatorCount} 名</span>}
                   </div>
+                  <div className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-ink-primary">森空岛扫码导入</p>
+                        <p className="mt-1 text-sm leading-6 text-ink-secondary">
+                          {profile.skland_binding
+                            ? `已绑定 ${profile.skland_binding.nickname} (${profile.skland_binding.uid})，最近导入 ${formatDate(profile.skland_binding.last_imported_at)}。`
+                            : '使用森空岛 App 扫码后自动导入当前账号干员练度，并保存加密凭据用于后续刷新。'}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={handleStartSklandLogin} disabled={sklandBusy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+                          森空岛扫码导入
+                        </button>
+                        <button type="button" onClick={handleRefreshSkland} disabled={sklandBusy || !profile.skland_binding} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:bg-surface-2 disabled:text-ink-muted">
+                          刷新森空岛数据
+                        </button>
+                        {profile.skland_binding && (
+                          <button type="button" onClick={handleUnbindSkland} disabled={sklandBusy} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:text-ink-muted">
+                            解绑
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                   {operators && (
                     <div className="mt-5">
                       <input value={operatorSearch} onChange={(event) => setOperatorSearch(event.currentTarget.value)} className="mb-4 w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="搜索干员名称" />
@@ -1244,6 +1461,50 @@ const [saving, setSaving] = useState(false)
           </div>
         </form>
       </main>
+      {sklandLogin.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6">
+          <section className="w-full max-w-md rounded-xl border border-surface-3 bg-surface-1 p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-ink-primary">森空岛扫码导入</h2>
+                <p className="mt-1 text-sm leading-6 text-ink-secondary">使用森空岛 App 扫码确认后，干员数据会自动保存到当前云端工作区。</p>
+              </div>
+              <button type="button" onClick={() => setSklandLogin((current) => ({ ...current, open: false }))} className="rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
+                关闭
+              </button>
+            </div>
+            <div className="mt-5 flex min-h-[300px] items-center justify-center rounded-lg border border-surface-3 bg-surface-0 p-4">
+              {sklandLogin.qrDataUrl && sklandLogin.status !== 'imported' ? (
+                <img src={sklandLogin.qrDataUrl} alt="森空岛扫码登录二维码" className="h-[260px] w-[260px] rounded-lg bg-white p-2" />
+              ) : sklandLogin.status === 'imported' ? (
+                <div className="text-center">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-2xl font-bold text-success">✓</div>
+                  <p className="mt-4 text-sm font-semibold text-ink-primary">导入完成</p>
+                </div>
+              ) : (
+                <div className="text-sm text-ink-secondary">正在准备二维码...</div>
+              )}
+            </div>
+            {sklandLogin.message && (
+              <div className={`mt-4 rounded-lg px-4 py-3 text-sm ${sklandLogin.status === 'error' ? 'border border-error/30 bg-error/10 text-error' : sklandLogin.status === 'imported' ? 'border border-success/30 bg-success/10 text-success' : 'border border-surface-3 bg-surface-0 text-ink-secondary'}`}>
+                {sklandLogin.message}
+              </div>
+            )}
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              {sklandLogin.status === 'error' && (
+                <button type="button" onClick={handleStartSklandLogin} disabled={sklandBusy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+                  重新生成
+                </button>
+              )}
+              {sklandLogin.status === 'waiting' && sklandLogin.scanId && (
+                <button type="button" onClick={() => void completeSklandLogin(sklandLogin.scanId!)} disabled={sklandBusy} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3 disabled:text-ink-muted">
+                  立即检查
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

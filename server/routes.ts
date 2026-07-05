@@ -10,6 +10,7 @@ import optimizeHandler from './handlers/optimize'
 import redeemCdkHandler from './handlers/redeem-cdk'
 import userAnnouncementsHandler from './handlers/user-announcements'
 import userProfilesHandler from './handlers/user-profiles'
+import userSklandHandler from './handlers/user-skland'
 import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
 import usageStatsHandler from './handlers/usage-stats'
@@ -44,6 +45,10 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/announcements', userAnnouncementsHandler as unknown as ApiHandler],
   ['/api/user/profiles', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/redeem', userProfilesHandler as unknown as ApiHandler],
+  ['/api/user/skland/login/start', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/login/complete', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/import/refresh', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/binding', userSklandHandler as unknown as ApiHandler],
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/optimize', optimizeHandler as unknown as ApiHandler],

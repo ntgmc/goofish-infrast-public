@@ -38,8 +38,18 @@ export interface UserGameAccountRecord {
   status: 'active' | 'frozen' | 'revoked'
   display_name: string
   note: string
+  skland_binding?: SklandBindingRecord | null
   created_at: string
   updated_at: string
+}
+
+export interface SklandBindingRecord {
+  uid: string
+  nickname: string
+  channel_name: string
+  bound_at: string
+  last_imported_at: string | null
+  encrypted_cred: string
 }
 
 export interface UserSessionRecord {
@@ -467,6 +477,15 @@ export function toPublicProfile(profile: UserGameAccountRecord, workspace?: User
     cdk_order_hash: profile.cdk_order_hash,
     display_name: profile.display_name,
     note: profile.note,
+    skland_binding: profile.skland_binding
+      ? {
+          uid: profile.skland_binding.uid,
+          nickname: profile.skland_binding.nickname,
+          channel_name: profile.skland_binding.channel_name,
+          bound_at: profile.skland_binding.bound_at,
+          last_imported_at: profile.skland_binding.last_imported_at,
+        }
+      : null,
     operator_count: workspace?.operators?.length ?? 0,
     updated_at: workspace?.updated_at ?? profile.updated_at,
     created_at: profile.created_at,
