@@ -14,6 +14,18 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
       )
       return result.rows[0]?.record_json ?? null
     },
+    getByLicenseOrderHash: async (orderHash) => {
+      await ensureSchema()
+      const result = await query<{ record_json: CdkRecord }>(
+        `select record_json
+         from cdk_records
+         where key like 'cdk/%' and license_order_hash = $1
+         order by created_at desc nulls last, key asc
+         limit 1`,
+        [orderHash],
+      )
+      return result.rows[0]?.record_json ?? null
+    },
     set: async (key, record) => {
       await ensureSchema()
       await query(
