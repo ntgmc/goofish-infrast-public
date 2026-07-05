@@ -133,6 +133,8 @@ export interface CdkRecord {
   user_agent_events?: TimedHashEvent[];
   ip_prefix_events?: TimedHashEvent[];
   risk_events?: RiskEvent[];
+  account_id?: string | null;
+  profile_id?: string | null;
 }
 
 export interface CdkRecordStore {
@@ -631,11 +633,16 @@ export async function recordSoftBlockedRiskEvent(
         latest_block_type: event.type,
       },
     }
-    const frozen = await freezeCdkRecord(updated, thresholdEvent.reason, thresholdEvent)
+    const thresholdUpdated: CdkRecord = {
+      ...updated,
+      risk_events: [...(updated.risk_events ?? []), thresholdEvent].slice(-20),
+    }
+    const store = await getCdkRecordStore()
+    await store.set(`cdk/${record.code_hash}.json`, thresholdUpdated)
     return {
       frozen: true,
-      record: frozen,
-      message: frozen.freeze_reason || formatRiskFreezeMessage(thresholdEvent.reason),
+      record: thresholdUpdated,
+      message: formatRiskFreezeMessage(thresholdEvent.reason),
     }
   }
 
@@ -748,7 +755,7 @@ export async function recordAdvancedOperatorUpdate(
   activationToken: unknown,
 ): Promise<
   | { ok: true; record: CdkRecord; limit: OperatorUpdateLimit }
-  | { ok: false; status: 403 | 409 | 429; message: string; record: CdkRecord; limit?: OperatorUpdateLimit }
+  | { ok: false; status: 403 | 409 | 429; message: string; record: CdkRecord; limit?: OperatorUpdateLimit; profile_freeze_required?: boolean }
 > {
   const binding = evaluateClientBindingRisk(record, activationToken, req)
   if (!binding.ok) {
@@ -766,7 +773,13 @@ export async function recordAdvancedOperatorUpdate(
   const operatorRisk = evaluateOperatorRisk(binding.record, operators)
   if (!operatorRisk.ok) {
     const blocked = await recordSoftBlockedRiskEvent(binding.record, operatorRisk.event, formatOperatorRiskBlockMessage(operatorRisk.event.reason))
-    return { ok: false, status: blocked.frozen ? 403 : 409, message: blocked.message, record: blocked.record }
+    return {
+      ok: false,
+      status: blocked.frozen ? 403 : 409,
+      message: blocked.message,
+      record: blocked.record,
+      profile_freeze_required: blocked.frozen,
+    }
   }
 
   const limitCheck = checkAdvancedOperatorUpdateLimit(binding.record)
