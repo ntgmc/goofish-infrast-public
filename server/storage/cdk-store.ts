@@ -1,6 +1,6 @@
 import { query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
-import type { CdkRecord, CdkRecordStore } from '../../netlify/functions/license-utils'
+import type { CdkRecord, CdkRecordStore } from '../handlers/license-utils'
 
 let schemaReady: Promise<void> | null = null
 

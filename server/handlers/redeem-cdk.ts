@@ -1,4 +1,3 @@
-import type { Context } from '@netlify/functions'
 import {
   createAdvancedRiskBinding,
   createSignedLicenseFile,
@@ -24,7 +23,7 @@ ultimate: 'Admin卡',
 admin: 'Admin卡',
 }
 
-export default async (req: Request, _context: Context): Promise<Response> => {
+export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return jsonResponse(null, 204)
   }

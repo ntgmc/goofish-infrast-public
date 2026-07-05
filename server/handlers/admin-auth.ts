@@ -1,6 +1,6 @@
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto'
 import { requireEnv } from './license-utils'
-import { createPostgresAdminUserStore } from '../../server/storage/admin-user-store'
+import { createPostgresAdminUserStore } from '../storage/admin-user-store'
 
 export interface AdminUserRecord {
   version: 1;
