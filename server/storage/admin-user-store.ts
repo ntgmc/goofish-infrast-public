@@ -1,5 +1,5 @@
 import { query } from './postgres'
-import type { AdminUserRecord } from '../../netlify/functions/admin-auth'
+import type { AdminUserRecord } from '../handlers/admin-auth'
 
 export interface AdminUserStore {
   get: (username: string) => Promise<AdminUserRecord | null>

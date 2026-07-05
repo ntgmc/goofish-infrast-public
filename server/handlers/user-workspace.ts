@@ -1,4 +1,3 @@
-import type { Context } from '@netlify/functions'
 import type { OptimizeResult } from '../../src/lib/types'
 import {
   emptyWorkspace,
@@ -7,11 +6,11 @@ import {
   saveProfileWorkspace,
   toPublicWorkspace,
   type UserWorkspaceRecord,
-} from '../../server/storage/user-store'
+} from '../storage/user-store'
 import { resolveConfigForPermission, validateConfig, validateOperators } from './license-utils'
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 
-export default async (req: Request, _context: Context): Promise<Response> => {
+export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   try {

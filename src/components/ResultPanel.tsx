@@ -59,6 +59,7 @@ export default function ResultPanel({
   variant = 'optimize',
 }: Props) {
   const isRotationMode = result.schedule_mode === 'rotation'
+  const isMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_autofill'
   const isAnalysis = variant === 'analysis' || result.analysis_summary?.source === 'imported_schedule'
   const analysisSummary = result.analysis_summary
   const { totalEff, plans, productionStats, detailStats } = useMemo(() => {
@@ -66,9 +67,23 @@ export default function ResultPanel({
     const plans: PreparedPlan[] = result.plans.map((plan) => ({
       ...plan,
           rows: Object.entries(plan.rooms ?? {}).flatMap(([roomType, rooms]) => {
-            if (!Array.isArray(rooms)) return []
-            if (isRotationMode && roomType === 'dormitory') return []
-            return rooms.flatMap((room, index) => {
+        if (!Array.isArray(rooms)) return []
+        if (isRotationMode && roomType === 'dormitory') return []
+        return rooms.flatMap((room, index) => {
+          if (roomType === 'dormitory' && isMaaDormitoryAutofill) {
+            if (index > 0) return []
+            return [{
+              key: `${roomType}-maa-autofill`,
+              label: ROOM_LABELS[roomType] || roomType,
+              indexLabel: '',
+              product: '-',
+              operators: '宿舍由 MAA 自动填满',
+              efficiency: '-',
+              speedEfficiency: '-',
+              detail: '导出的 MAA JSON 不写死宿舍干员',
+              hasAdjustedSpeed: false,
+            }]
+          }
           const ops = room.operators
           if (!Array.isArray(ops) || ops.length === 0) return []
           const efficiency = getDisplayEfficiency(room)
@@ -109,7 +124,7 @@ export default function ResultPanel({
     }
 
     return { totalEff, plans, productionStats, detailStats }
-  }, [result, isRotationMode])
+  }, [result, isRotationMode, isMaaDormitoryAutofill])
 
   const shiftPattern = result.shift_pattern ?? result.shift_hours?.map((hour) => `${hour}h`).join('-') ?? result.planTimes
   const totalScheduleHours = result.total_schedule_hours ?? result.daily_production?.hours
@@ -129,8 +144,11 @@ export default function ResultPanel({
               ? '已根据导入排班表计算红脸风险、日产量和爆仓信息。'
               : isRotationMode
                 ? '按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。'
-          : '排班 JSON 用于导入或交给 MAA 使用；账号空间接入后会自动保存当前练度和配置。'}
+                : '排班 JSON 用于导入或交给 MAA 使用；账号空间接入后会自动保存当前练度和配置。'}
           </p>
+          {!isAnalysis && !isRotationMode && result.dormitory_rule_name && (
+            <p className="mt-1 text-sm text-ink-muted">宿舍规则：{result.dormitory_rule_name}</p>
+          )}
         </div>
         {(onDownload || onSaveWorkfile) && (
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">

@@ -5,7 +5,7 @@ import pg from 'pg'
 const { Pool } = pg
 const inputPath = process.argv[2]
 if (!inputPath) {
-  console.error('Usage: node scripts/import-postgres.mjs <netlify-blobs-export.json>')
+  console.error('Usage: node scripts/import-postgres.mjs <migration-export.json>')
   process.exit(1)
 }
 
