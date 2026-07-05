@@ -11,6 +11,7 @@ export interface LicenseConfig {
   layout: string;
   desc: string;
   schedule_mode?: 'maa' | 'rotation' | string;
+  dormitory_rule?: 'fixed' | 'maa_autofill' | string;
   shift_hours?: number[] | string;
   trading_stations_count: number;
   manufacturing_stations_count: number;
@@ -188,6 +189,8 @@ export interface OptimizeResult {
   description: string;
   schedule_mode?: string;
   schedule_mode_name?: string;
+  dormitory_rule?: 'fixed' | 'maa_autofill' | string;
+  dormitory_rule_name?: string;
   rotation_mode?: {
     queue_count: number;
     quick_switch: true;
