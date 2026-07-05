@@ -1,9 +1,8 @@
-import type { Context } from '@netlify/functions'
-import { getProfileForUser } from '../../server/storage/user-store'
+import { getProfileForUser } from '../storage/user-store'
 import { getCdkRecordStore } from './license-utils'
 import { jsonResponse, requireUserSession, toPublicUser } from './user-auth'
 
-export default async (req: Request, _context: Context): Promise<Response> => {
+export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
 

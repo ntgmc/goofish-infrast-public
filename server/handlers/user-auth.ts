@@ -27,8 +27,8 @@ import {
   type UserAccountRecord,
   type UserGameAccountRecord,
   type UserSessionRecord,
-} from '../../server/storage/user-store'
-import { createPostgresAnnouncementStore } from '../../server/storage/announcement-store'
+} from '../storage/user-store'
+import { createPostgresAnnouncementStore } from '../storage/announcement-store'
 import { sendPasswordResetEmail } from './email'
 import {
   getCdkRecordStore,

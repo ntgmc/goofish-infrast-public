@@ -10,7 +10,7 @@ MAA 基建排班优化器是一个面向《明日方舟》玩家的 Web 工具�
 
 ## 当前架构
 
-生产环境已经完全切换为自托管服务器，不再使用 Netlify 承载站点、函数或数据存储。
+生产环境完全基于自托管服务器运行，前端由 Nginx 提供静态文件，后端由 Node.js 服务处理 API，数据存储使用 PostgreSQL。
 
 ```text
 Internet
@@ -33,7 +33,7 @@ PostgreSQL
   |-- user profiles and workspace data
 ```
 
-`netlify/` 目录目前只是历史兼容目录：部分业务处理器仍放在 `netlify/functions/` 下并由 `server/routes.ts` 复用，但生产请求由 Node 服务器直接处理，不经过 Netlify Functions。`netlify.toml` 仅用于把历史 Netlify 域名永久跳转到 `https://maatool.com/`。
+`server/handlers/` 存放标准 Web API 处理器，`server/routes.ts` 负责注册和分发 `/api/*` 请求。
 
 ## 技术栈
 
@@ -109,13 +109,19 @@ npm run check:migration
 
 | Job | Command | Purpose |
 | --- | --- | --- |
-| `Deploy Relevance` | `npm run check:deploy-relevance` | 判断本次变更是否需要继续运行构建检查。脚本名沿用历史命名，不代表当前使用 Netlify 部署。 |
+| `Build Relevance` | `npm run check:build-relevance` | 判断本次变更是否需要继续运行构建检查。 |
 | `Web Build` | `npm run build` | 生成效率数据、执行 TypeScript 检查、构建 Vite 前端并打包 Node 后端。 |
-| `Functions Smoke Test` | `npm run generate:data` + `npm run check:functions` | 验证仍被服务器复用的历史处理器可以被打包和调用。 |
+| `API Smoke Test` | `npm run generate:data` + `npm run check:api` | 验证服务器 API 处理器可以被打包和调用。 |
 
-`Web Build` 和 `Functions Smoke Test` 只在 `Deploy Relevance` 判断为需要部署相关检查时运行。只修改文档或仓库元数据时，Quality Checks 会保留发布相关性检查，但跳过构建和 smoke test。
+`Web Build` 和 `API Smoke Test` 只在 `Build Relevance` 判断为需要构建相关检查时运行。只修改文档或仓库元数据时，Quality Checks 会保留构建相关性检查，但跳过构建和 smoke test。
 
 另外，仓库使用 GitHub Actions 在 PR 创建、重新打开、更新 commit 或标记 ready 时，根据 PR 内 commit message 自动更新 PR description。配置文件位于 `.github/workflows/pr-details.yml`。该流程只维护 PR description 中 `<!-- pr-details:start -->` `<!-- pr-details:end -->` 之间的自动生成区块，区块外的人工内容会保留。
+
+## 自动部署
+
+生产部署由 `.github/workflows/deploy-production.yml` 触发，并在自托管服务器上执行 `scripts/deploy-production.sh`。`main` 的 Quality Checks 通过后会自动 SSH 到服务器，完成拉取代码、安装依赖、生产构建、重启 systemd 服务和 `/api/health` 健康检查。
+
+服务器准备步骤、GitHub Secrets/Variables 和故障处理见 [Production Deploy Workflow](docs/production-deploy.md)。
 
 ## 服务器 API
 
@@ -141,7 +147,7 @@ npm run check:migration
 
 ## 发布流程
 
-当前生产发布以服务器为准，不再使用 Netlify Git-based deploy。历史 Netlify 域名 `https://goofish-infrast-v1.netlify.app/` 只保留为永久跳转入口。
+当前生产发布以服务器为准。
 
 推荐流程：
 
@@ -196,15 +202,14 @@ location / {
 | `BUILD_CONTEXT` | No | 构建上下文 |
 | `REFRESH_BUILD_METADATA` | No | 启用版本元数据刷新模式，等同于传入 `--refresh-metadata` |
 
-`npm run generate:data` 会根据版本变量生成 `src/lib/build-meta.ts`，并在 `netlify/functions/data.ts` 中写入 `data_version`、`generated_at` 和来源摘要。该输出文件路径仍沿用历史目录名，但数据会被 Node 服务器通过 `/api/data` 提供。
+`npm run generate:data` 会根据版本变量生成 `src/lib/build-meta.ts`，并在 `server/handlers/data.ts` 中写入 `data_version`、`generated_at` 和来源摘要。数据会被 Node 服务器通过 `/api/data` 提供。
 
 ## 数据迁移与运维脚本
 
-从 Netlify Blobs 到 PostgreSQL 的迁移已经完成。相关脚本保留用于审计、重放或灾备：
+PostgreSQL 迁移和验证脚本保留用于审计、重放或灾备：
 
 | Script | Purpose |
 | --- | --- |
-| `scripts/export-netlify-blobs.mjs` | 从旧 Netlify Blobs 导出历史数据。 |
 | `scripts/import-postgres.mjs` | 将导出 JSON 导入 PostgreSQL。 |
 | `scripts/verify-migrated-data.mjs` | 校验 PostgreSQL 中的迁移数据。 |
 | `scripts/check-server-routes.mjs` | 校验 Node 服务器 API 路由注册完整性。 |
@@ -214,7 +219,7 @@ location / {
 
 - `src/`: React 前端页面、组件和客户端逻辑
 - `server/`: Node HTTP 入口、API 路由和 PostgreSQL 存储层
-- `netlify/functions/`: 历史处理器兼容目录，当前由 Node 服务器直接复用
+- `server/handlers/`: API 处理器、优化器和规则数据
 - `scripts/`: 数据生成、服务器构建、迁移导入导出和检查脚本
 - `public/`: 静态资源
 - `.github/workflows/`: GitHub Actions 工作流

@@ -1,21 +1,21 @@
-import adminCdkHandler from '../netlify/functions/admin-cdk'
-import adminUsersHandler from '../netlify/functions/admin-users'
-import analyzeScheduleHandler from '../netlify/functions/analyze-schedule'
-import announcementHandler from '../netlify/functions/announcement'
-import authHandler from '../netlify/functions/auth'
-import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from '../netlify/functions/data'
-import freePreviewHandler from '../netlify/functions/free-preview'
-import licenseStatusHandler from '../netlify/functions/license-status'
-import optimizeHandler from '../netlify/functions/optimize'
-import redeemCdkHandler from '../netlify/functions/redeem-cdk'
-import userAnnouncementsHandler from '../netlify/functions/user-announcements'
-import userProfilesHandler from '../netlify/functions/user-profiles'
-import userStatusHandler from '../netlify/functions/user-status'
-import userWorkspaceHandler from '../netlify/functions/user-workspace'
-import usageStatsHandler from '../netlify/functions/usage-stats'
+import adminCdkHandler from './handlers/admin-cdk'
+import adminUsersHandler from './handlers/admin-users'
+import analyzeScheduleHandler from './handlers/analyze-schedule'
+import announcementHandler from './handlers/announcement'
+import authHandler from './handlers/auth'
+import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
+import freePreviewHandler from './handlers/free-preview'
+import licenseStatusHandler from './handlers/license-status'
+import optimizeHandler from './handlers/optimize'
+import redeemCdkHandler from './handlers/redeem-cdk'
+import userAnnouncementsHandler from './handlers/user-announcements'
+import userProfilesHandler from './handlers/user-profiles'
+import userStatusHandler from './handlers/user-status'
+import userWorkspaceHandler from './handlers/user-workspace'
+import usageStatsHandler from './handlers/usage-stats'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 
-type ApiHandler = (req: Request, context: unknown) => Promise<Response>
+type ApiHandler = (req: Request) => Promise<Response>
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -64,7 +64,7 @@ export async function routeRequest(req: Request): Promise<Response> {
     return jsonResponse({ error: 'API route not found' }, 404)
   }
 
-  return handler(req, {})
+  return handler(req)
 }
 
 export function getRegisteredApiRoutes(): string[] {
