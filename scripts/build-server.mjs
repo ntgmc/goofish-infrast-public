@@ -11,6 +11,6 @@ await build({
   target: 'node20',
   format: 'esm',
   sourcemap: true,
-  external: ['pg'],
+  external: ['pg', 'qrcode'],
   logLevel: 'info',
 })

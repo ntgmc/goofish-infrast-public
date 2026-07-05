@@ -383,6 +383,14 @@ export interface AuthUser {
   created_at: string;
 }
 
+export interface SklandPublicBinding {
+  uid: string;
+  nickname: string;
+  channel_name: string;
+  bound_at: string;
+  last_imported_at: string | null;
+}
+
 export interface UserGameAccount {
   id: string;
   user_id: string;
@@ -391,6 +399,7 @@ export interface UserGameAccount {
   cdk_order_hash: string | null;
   display_name: string;
   note: string;
+  skland_binding?: SklandPublicBinding | null;
   operator_count: number;
   updated_at: string | null;
   created_at: string;
