@@ -9,9 +9,10 @@ interface Props {
   progress?: ScheduleProgressState | null;
   error?: string | null;
   onReset: () => void;
+  embedded?: boolean;
 }
 
-export default function UpgradeSuggestions({ suggestions, onApply, loading, progress, error, onReset }: Props) {
+export default function UpgradeSuggestions({ suggestions, onApply, loading, progress, error, onReset, embedded = false }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const selectedIds = useMemo(() => Array.from(selected), [selected])
@@ -32,12 +33,14 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
   }
 
   return (
-    <div className="space-y-8">
+    <div className={embedded ? 'space-y-4' : 'space-y-8'}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-ink-primary mb-2">
-            练度优化建议
-          </h2>
+          {!embedded && (
+            <h2 className="text-xl font-semibold text-ink-primary mb-2">
+              练度优化建议
+            </h2>
+          )}
           <p className="text-ink-secondary text-sm">
             可选路径：先下载当前方案离开，或勾选建议后重新计算。
           </p>
@@ -98,11 +101,12 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
             <label
               key={id}
               className={`
-                flex items-center gap-5 p-5 rounded-xl cursor-pointer
+                flex items-center rounded-xl cursor-pointer
                 transition-colors duration-150
-                ${selected.has(id) 
-                  ? 'bg-brand-500/10 border border-brand-500/30' 
-                  : 'bg-surface-1 border border-transparent hover:border-surface-4'
+                ${embedded ? 'gap-4 p-4' : 'gap-5 p-5'}
+                ${selected.has(id)
+                  ? 'bg-brand-500/10 border border-brand-500/30'
+                  : `${embedded ? 'bg-surface-2/60' : 'bg-surface-1'} border border-transparent hover:border-surface-4`
                 }
               `}
             >
@@ -167,7 +171,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
         })}
       </div>
 
-      <div className="rounded-lg bg-surface-1 p-4 text-sm text-ink-secondary">
+      <div className={`${embedded ? 'bg-surface-2/60' : 'bg-surface-1'} rounded-lg p-4 text-sm text-ink-secondary`}>
         已选 {selected.size} 项。建议先下载当前方案留底；应用建议后，系统会重新计算并生成一份新方案，不会覆盖现在这份结果。
       </div>
     </div>

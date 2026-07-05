@@ -336,9 +336,6 @@ export function resolveConfigForPermission(
   if (canEditConfigForPermission(permission)) {
     return { ok: true, config }
   }
-  if ((permission === 'recommended' || permission === 'growth') && isIntermediateAutoConfig(config)) {
-    return { ok: true, config: cloneConfig(config) }
-  }
   const preset = PRESET_CONFIGS.find((item) => isPresetConfigMatch(config, item))
   if (!preset) {
     return { ok: false, message: '当前 CDK 版本仅支持 243 均衡、243 搓玉或 333 搓玉预设配置。' }
@@ -356,10 +353,15 @@ function cloneConfig(config: LicenseConfig): LicenseConfig {
 
 function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
   const resolved = cloneConfig(preset)
+  resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
     resolved.schedule_mode = 'rotation'
     resolved.Fiammetta = { ...(resolved.Fiammetta ?? {}), enable: false }
     resolved.drones = { ...(resolved.drones ?? { order: 'pre', targets: [] }), enable: false }
+  } else if (isIntermediateAutoConfig(config)) {
+    resolved.intermediate_inventory = config.intermediate_inventory
+    resolved.auto_balance_source = config.auto_balance_source
+    resolved.drones = cloneConfig(config).drones
   }
   return resolved
 }

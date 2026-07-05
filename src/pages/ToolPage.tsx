@@ -502,7 +502,6 @@ return (
                   config={normalizedConfig}
                   canEdit
                   canEditIntermediateInventory
-                  canEditShiftHours
                   validation={configValidation}
                   onUpdate={updateConfig}
                   embedded
@@ -1215,7 +1214,6 @@ const [saving, setSaving] = useState(false)
                   config={normalizedConfig}
                   canEdit={canEditConfig}
                   canEditIntermediateInventory={canEditLimitedConfig}
-                  canEditShiftHours={canEditLimitedConfig}
                   canSelectPreset
                   changed={configChanged}
                   permission={profile.permission}

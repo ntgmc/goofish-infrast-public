@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
-import { canEditConfig, canReplaceOperators, canUseIntermediateAutoConfig, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
+import { canEditConfig, canReplaceOperators, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
 import { getActivationTokenForLicense } from '../lib/activation-token'
 import AnnouncementBanner from '../components/AnnouncementBanner'
-import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../components/ConfigEditor'
+import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode, normalizeDormitoryRule } from '../components/ConfigEditor'
 import UpgradeSuggestions from '../components/UpgradeSuggestions'
 import ResultPanel from '../components/ResultPanel'
 import DeferredFeatureMenu from '../components/DeferredFeatureMenu'
@@ -60,7 +60,6 @@ export default function OptimizePage({
   const [operatorUploadStatus, setOperatorUploadStatus] = useState<string | null>(null)
   const [licenseSyncing, setLicenseSyncing] = useState(true)
   const [licenseSyncStatus, setLicenseSyncStatus] = useState<string | null>(null)
-  const [configPanelOpen, setConfigPanelOpen] = useState(false)
   const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
   const [configToast, setConfigToast] = useState<{ id: number; message: string } | null>(null)
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
@@ -74,7 +73,7 @@ export default function OptimizePage({
   const userCanReplaceOperators = false
   const userCanEditConfig = canEditConfig(license)
   const userCanUseIntermediateAutoConfig = permission === 'recommended' || permission === 'growth'
-  const userCanApplyConfigOverride = userCanEditConfig || userCanUseIntermediateAutoConfig
+  const userCanApplyConfigOverride = true
   const userCanUseUpgradeFeatures = canUseUpgradeFeatures(license)
   const activeConfig = useMemo(
     () => normalizeConfig(configOverride ?? license.config),
@@ -87,8 +86,26 @@ export default function OptimizePage({
   )
   const configValidation = useMemo(() => validateConfig(activeConfig), [activeConfig])
   const configValidationMessage = configValidation.ok === false ? configValidation.message : null
-  const configPanelForcedOpen = !configValidation.ok
   const configPresetLabel = useMemo(() => formatConfigPresetLabel(activeConfig), [activeConfig])
+
+  const normalizeAllowedConfigOverride = useCallback((nextConfig: LicenseConfig): LicenseConfig => {
+    const next = normalizeConfig(nextConfig)
+    if (userCanEditConfig) return next
+
+    const limited = normalizeConfig(baseConfig)
+    limited.schedule_mode = normalizeScheduleMode(next.schedule_mode)
+    limited.dormitory_rule = normalizeDormitoryRule(next.dormitory_rule)
+    if (limited.schedule_mode === 'rotation') {
+      limited.Fiammetta = { ...(limited.Fiammetta ?? {}), enable: false }
+      limited.drones = { ...(limited.drones ?? { order: 'pre', targets: [] }), enable: false }
+    } else if (userCanUseIntermediateAutoConfig && (next.auto_balance_source === 'intermediate_inventory' || next.auto_balance_source === 'limited_config')) {
+      limited.intermediate_inventory = next.intermediate_inventory
+      limited.auto_balance_source = next.auto_balance_source
+      limited.drones = next.drones
+    }
+
+    return limited
+  }, [baseConfig, userCanEditConfig, userCanUseIntermediateAutoConfig])
 
   const clearConfigValidationToast = useCallback(() => {
     if (configToastTimerRef.current !== null) {
@@ -128,15 +145,6 @@ export default function OptimizePage({
   )
   const hasResult = Boolean(finalResult || currentResult)
   const resultIsCurrent = hasResult && lastGeneratedSignature === optimizeSignature
-  const currentResultIsRotation = normalizeScheduleMode(currentResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
-  const finalResultIsRotation = normalizeScheduleMode(finalResult?.schedule_mode ?? activeConfig.schedule_mode) === 'rotation'
-
-  useEffect(() => {
-    if (configPanelForcedOpen) {
-      setConfigPanelOpen(true)
-    }
-  }, [configPanelForcedOpen])
-
   const clearGeneratedResult = useCallback(() => {
     setSuggestions([])
     setCurrentResult(null)
@@ -179,9 +187,9 @@ export default function OptimizePage({
         }
         return data
       })
-      .then((data) => {
+      .then(() => {
         if (!cancelled) {
-          setLicenseSyncStatus(`账号授权已同步为${data.permission_label ?? '当前'}权限。`)
+          setLicenseSyncStatus(null)
         }
       })
       .catch((error) => {
@@ -246,9 +254,10 @@ export default function OptimizePage({
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
     if (!userCanApplyConfigOverride) return
-    const next = normalizeConfig(activeConfig)
-    mutate(next)
-    next.layout = `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
+    const draft = normalizeConfig(activeConfig)
+    mutate(draft)
+    draft.layout = `${draft.trading_stations_count}-${draft.manufacturing_stations_count}-3`
+    const next = normalizeAllowedConfigOverride(draft)
     setConfigOverride(next)
     const nextValidation = validateConfig(next)
     if (nextValidation.ok) {
@@ -257,7 +266,7 @@ export default function OptimizePage({
       showConfigValidationToast(nextValidation.message)
     }
     setInlineError(null)
-  }, [activeConfig, clearConfigValidationToast, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
+  }, [activeConfig, clearConfigValidationToast, normalizeAllowedConfigOverride, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
 
   const resetConfig = useCallback(() => {
     setConfigOverride(null)
@@ -440,9 +449,7 @@ export default function OptimizePage({
   }, [finalResult, currentResult])
 
   const handleSaveWorkfile = useCallback(async () => {
-    const savedConfigOverride = userCanEditConfig || canUseIntermediateAutoConfig(license, activeConfig)
-      ? configChanged ? activeConfig : undefined
-      : undefined
+    const savedConfigOverride = configChanged ? activeConfig : undefined
     const derivedKey = await deriveClientKey(license.sig)
     const clientSig = await signClientState(derivedKey, eliteOverrides, savedConfigOverride)
     const clientState: {
@@ -472,177 +479,162 @@ export default function OptimizePage({
     a.download = `maa-workfile-${formatLocalDate(new Date())}.maa`
     a.click()
     URL.revokeObjectURL(url)
-  }, [activeConfig, configChanged, eliteOverrides, license, userCanEditConfig])
+  }, [activeConfig, configChanged, eliteOverrides, license])
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+    <div className="min-h-screen w-full bg-surface-0">
       {configToast && <ConfigValidationToast key={configToast.id} message={configToast.message} />}
-      <header className="mb-6 rounded-xl border border-surface-3 bg-surface-1 p-5">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-[-0.02em] text-ink-primary">
-              排班结果工作台
-            </h1>
-            <span className="rounded-full bg-surface-2 px-3 py-1 text-xs font-semibold text-brand-300">
-              {PERMISSION_LABELS[permission]}
-            </span>
-          </div>
-          <p className="max-w-3xl text-sm leading-6 text-ink-secondary">
-            配置: {userCanEditConfig ? activeConfig.desc : configPresetLabel} · ID: {license.order_hash.slice(0, 8)}。在这里生成、检查并下载当前账号的基建排班方案。
+      <header className="border-b border-surface-3 bg-surface-1">
+        <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold text-ink-primary">
+                排班结果工作台
+              </h1>
+              <span className="inline-flex w-max shrink-0 whitespace-nowrap rounded-full bg-surface-2 px-3 py-1 text-xs font-semibold text-brand-300">
+                {PERMISSION_LABELS[permission]}
+              </span>
+            </div>
+          <p className="text-sm leading-6 text-ink-secondary">
+            生成、检查并下载当前账号的基建排班方案。
           </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 lg:flex-shrink-0">
+            <DeferredFeatureMenu />
+            <button
+              onClick={onReset}
+              className="rounded-lg px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-ink-primary"
+            >
+              返回数据空间
+            </button>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <DeferredFeatureMenu />
-          <button
-            onClick={onReset}
-            className="rounded-lg px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-ink-primary"
-          >
-            返回数据空间
-          </button>
-        </div>
-      </div>
-    </header>
+      </header>
 
-      <AnnouncementBanner announcement={announcement} className="mb-6" />
+      <main className="w-full space-y-4 px-4 py-4 sm:px-6 lg:px-8">
+        {(licenseSyncing || licenseSyncStatus || announcement || redeemedNotice) && (
+          <div className="space-y-3">
+            {licenseSyncing && <LicenseSyncPanel />}
 
-        {redeemedNotice && (
-          <div role="status" className="mb-6 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning">
-            {redeemedNotice}
+            {licenseSyncStatus && (
+              <div className="rounded-lg border border-brand-600/30 bg-brand-600/10 px-4 py-3 text-sm leading-6 text-brand-300">
+                {licenseSyncStatus}
+              </div>
+            )}
+
+            <AnnouncementBanner announcement={announcement} />
+
+            {redeemedNotice && (
+              <div role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning">
+                {redeemedNotice}
+              </div>
+            )}
           </div>
         )}
 
-      {licenseSyncStatus && (
-        <div className="mb-6 rounded-lg border border-brand-600/30 bg-brand-600/10 px-4 py-3 text-sm text-brand-300">
-          {licenseSyncStatus}
-        </div>
-      )}
-
-      {licenseSyncing && <LicenseSyncPanel />}
-
-      <ResultDashboardCards
-        orderId={license.order_hash.slice(0, 8)}
-        operatorCount={license.operators.length}
-        resultReady={hasResult}
-        configChanged={configChanged}
-      />
-
-      <CommandBand
-        config={activeConfig}
-        configChanged={configChanged}
-        showConfigDetails={userCanEditConfig}
-        operatorCount={license.operators.length}
-        fileId={license.order_hash.slice(0, 8)}
-        validation={configValidation}
-        loading={loading}
-        syncing={licenseSyncing}
-        progress={progress?.mode === 'generate' ? progress : null}
-        hasResult={hasResult}
-        resultIsCurrent={resultIsCurrent}
-        error={inlineError?.scope === 'generate' ? inlineError.message : null}
-        onGenerate={handleGenerate}
-        onReset={onReset}
-      />
-
-      <details
-        className="mt-6 rounded-xl bg-surface-1"
-        open={configPanelForcedOpen || configPanelOpen}
-        onToggle={(event) => {
-          if (!configPanelForcedOpen) {
-            setConfigPanelOpen(event.currentTarget.open)
-          }
-        }}
-      >
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
-          <span className="flex flex-wrap items-center gap-2">
-            调整基建配置
-            {configChanged && (
-              <span className="rounded-full bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning">
-                已修改
-              </span>
-            )}
-          </span>
-          <span className="text-xs font-medium text-ink-muted">
-            {userCanEditConfig
-              ? `${SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · ${activeConfig.layout} · ${activeConfig.desc}`
-              : configPresetLabel}
-          </span>
-        </summary>
-        <div className="border-t border-surface-3/60 p-4 sm:p-5">
-          <ConfigEditor
+          <GenerateControlBar
             config={activeConfig}
-            permission={permission}
-            canEdit={userCanEditConfig}
-            canEditIntermediateInventory={userCanUseIntermediateAutoConfig}
-            canEditShiftHours={userCanUseIntermediateAutoConfig}
-            changed={configChanged}
+            configChanged={configChanged}
+            showConfigDetails={userCanEditConfig}
+            operatorCount={license.operators.length}
+            configPresetLabel={configPresetLabel}
             validation={configValidation}
-            onUpdate={updateConfig}
-            onReset={resetConfig}
-            embedded
-          />
-        </div>
-      </details>
-
-      {userCanReplaceOperators && (
-        <AdminOperatorPanel
-          operatorCount={license.operators.length}
-          status={operatorUploadStatus}
-          fileRef={operatorFileRef}
-          onReplace={handleReplaceOperators}
-        />
-      )}
-
-      {phase === 'suggestions' && suggestions.length > 0 && (
-        <div className="mt-8 space-y-8">
-          {currentResult && (
-            <ResultPanel
-              result={currentResult}
-              onDownload={handleDownloadMAA}
-            />
-          )}
-          <UpgradeSuggestions
-            suggestions={suggestions}
-            onApply={handleApplySuggestions}
             loading={loading}
-            progress={progress?.mode === 'apply' ? progress : null}
-            error={inlineError?.scope === 'apply' ? inlineError.message : null}
+            syncing={licenseSyncing}
+            progress={progress?.mode === 'generate' ? progress : null}
+            hasResult={hasResult}
+            resultIsCurrent={resultIsCurrent}
+            error={inlineError?.scope === 'generate' ? inlineError.message : null}
+            onGenerate={handleGenerate}
             onReset={onReset}
           />
-        </div>
-      )}
 
-      {phase === 'suggestions' && suggestions.length === 0 && (
-        <div className="mt-8">
-          <div className="bg-success/10 border border-success/30 rounded-xl p-5 mb-8">
-            <p className="font-semibold text-success">
-              {userCanUseUpgradeFeatures ? '当前练度已是最佳配置' : '当前练度排班已生成'}
-            </p>
-            <p className="text-success/80 text-sm mt-1">
-              {userCanUseUpgradeFeatures
-                ? currentResultIsRotation
-                  ? '无需应用升级建议，请按排班详情在游戏内手动设置。'
-                  : '无需应用升级建议，可直接下载优化结果。'
-: '单次重置卡不包含练度提升建议，可直接下载当前练度优化结果。'}
-            </p>
-          </div>
-          <ResultPanel result={currentResult!} onDownload={handleDownloadMAA} />
-        </div>
-      )}
+        <div className="min-w-0 space-y-4">
+          <details
+            className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1"
+            open={!configValidation.ok}
+          >
+            <summary className="flex cursor-pointer list-none flex-col gap-3 px-5 py-4 transition-colors duration-150 hover:bg-surface-2/50 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base font-semibold text-ink-primary">基建配置</h2>
+                  {configChanged && (
+                    <span className="inline-flex w-max shrink-0 whitespace-nowrap rounded-full bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning">
+                      已修改
+                    </span>
+                  )}
+                  {!configValidation.ok && (
+                    <span className="inline-flex w-max shrink-0 whitespace-nowrap rounded-full bg-error/10 px-2.5 py-1 text-xs font-medium text-error">
+                      需处理
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm leading-6 text-ink-secondary">
+                  {SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · {userCanEditConfig ? `${activeConfig.layout} · ${activeConfig.desc}` : configPresetLabel}
+                </p>
+              </div>
+              <span className="inline-flex w-max shrink-0 whitespace-nowrap rounded-full bg-surface-2 px-3 py-1 text-xs font-semibold text-brand-300">
+                展开调整
+              </span>
+            </summary>
+            <div className="border-t border-surface-3/60 p-4 sm:p-5">
+              <ConfigEditor
+                config={activeConfig}
+                permission={permission}
+                canEdit={userCanEditConfig}
+                canEditIntermediateInventory={userCanUseIntermediateAutoConfig}
+                changed={configChanged}
+                validation={configValidation}
+                onUpdate={updateConfig}
+                onReset={resetConfig}
+                embedded
+              />
+            </div>
+          </details>
 
-      {phase === 'final' && finalResult && (
-        <div className="mt-8">
-          <div className="bg-success/10 border border-success/30 rounded-xl p-5 mb-8">
-            <p className="font-semibold text-success">排班方案已生成</p>
-            <p className="text-success/80 text-sm mt-1">
-              {finalResultIsRotation
-                ? '已应用练度修改，请按排班详情在游戏内手动设置。'
-                : '已应用练度修改。'}
-            </p>
-          </div>
-          <ResultPanel result={finalResult} onDownload={handleDownloadMAA} />
+          {userCanReplaceOperators && (
+            <AdminOperatorPanel
+              operatorCount={license.operators.length}
+              status={operatorUploadStatus}
+              fileRef={operatorFileRef}
+              onReplace={handleReplaceOperators}
+            />
+          )}
+
+          <section className="min-w-0">
+            {phase === 'idle' && (
+              <div className="rounded-xl border border-dashed border-surface-3 bg-surface-1/70 px-5 py-10 text-center">
+                <p className="text-base font-semibold text-ink-primary">生成后将在这里显示排班结果</p>
+                <p className="mt-2 text-sm leading-6 text-ink-secondary">
+                  确认上方状态并点击生成，结果会按数据、详情、导入和建议分区展示。
+                </p>
+              </div>
+            )}
+
+            {phase === 'suggestions' && currentResult && (
+              <ResultPanel
+                result={currentResult}
+                onDownload={handleDownloadMAA}
+                suggestionsSlot={suggestions.length > 0 ? (
+                  <UpgradeSuggestions
+                    suggestions={suggestions}
+                    onApply={handleApplySuggestions}
+                    loading={loading}
+                    progress={progress?.mode === 'apply' ? progress : null}
+                    error={inlineError?.scope === 'apply' ? inlineError.message : null}
+                    onReset={onReset}
+                    embedded
+                  />
+                ) : null}
+              />
+            )}
+
+            {phase === 'final' && finalResult && (
+              <ResultPanel result={finalResult} onDownload={handleDownloadMAA} />
+            )}
+          </section>
         </div>
-      )}
+      </main>
     </div>
   )
 }
@@ -652,7 +644,7 @@ function LicenseSyncPanel() {
     <div
       role="status"
       aria-live="polite"
-      className="mb-6 rounded-xl border border-brand-600/25 bg-surface-1 p-4"
+      className="rounded-xl border border-brand-600/25 bg-surface-1 p-4"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
@@ -678,13 +670,215 @@ function LicenseSyncPanel() {
   )
 }
 
+function GenerateControlBar({
+  config,
+  configChanged,
+  showConfigDetails,
+  operatorCount,
+  configPresetLabel,
+  validation,
+  loading,
+  syncing,
+  progress,
+  hasResult,
+  resultIsCurrent,
+  error,
+  onGenerate,
+  onReset,
+}: {
+  config: LicenseConfig;
+  configChanged: boolean;
+  showConfigDetails: boolean;
+  operatorCount: number;
+  configPresetLabel: string;
+  validation: { ok: true } | { ok: false; message: string };
+  loading: boolean;
+  syncing: boolean;
+  progress: ScheduleProgressState | null;
+  hasResult: boolean;
+  resultIsCurrent: boolean;
+  error: string | null;
+  onGenerate: () => void;
+  onReset: () => void;
+}) {
+  const scheduleMode = normalizeScheduleMode(config.schedule_mode)
+  const readyLabel = resultIsCurrent ? '方案已是最新' : hasResult ? '已有结果' : '待生成'
+  const configLabel = showConfigDetails
+    ? `${SCHEDULE_MODE_LABELS[scheduleMode]} · ${config.layout} · ${config.desc}`
+    : `${SCHEDULE_MODE_LABELS[scheduleMode]} · ${configPresetLabel}`
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
+      <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-brand-400">生成控制</span>
+            <span className={`inline-flex w-max shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
+              resultIsCurrent
+                ? 'bg-brand-600/15 text-brand-300'
+                : hasResult
+                  ? 'bg-warning/10 text-warning'
+                  : 'bg-surface-2 text-ink-secondary'
+            }`}>
+              {readyLabel}
+            </span>
+            {configChanged && (
+              <span className="inline-flex w-max shrink-0 whitespace-nowrap rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
+                配置已调整
+              </span>
+            )}
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-[minmax(120px,0.4fr)_minmax(0,1fr)] xl:grid-cols-[minmax(120px,0.24fr)_minmax(0,1fr)_minmax(120px,0.24fr)]">
+            <DashboardMiniStat label="干员数据" value={`${operatorCount} 名`} />
+            <DashboardMiniStat label="当前配置" value={configLabel} />
+            <DashboardMiniStat label="配置状态" value={configChanged ? '已调整' : '未改动'} />
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-2 lg:w-64">
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={loading || syncing || !validation.ok || resultIsCurrent}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted"
+          >
+            {loading || syncing ? (
+              <span className="inline-flex w-max shrink-0 items-center gap-3 whitespace-nowrap">
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                {syncing ? '正在同步授权...' : '正在计算...'}
+              </span>
+            ) : resultIsCurrent ? '方案已是最新' : hasResult ? '重新计算排班' : '生成排班方案'}
+          </button>
+          {resultIsCurrent && (
+            <p className="text-xs leading-5 text-ink-muted">修改配置或干员数据后才需要重新计算。</p>
+          )}
+          {!validation.ok && (
+            <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">{validation.message}</p>
+          )}
+        </div>
+      </div>
+      {loading && progress && (
+        <div className="border-t border-surface-3/60 px-4 py-4 sm:px-5">
+          <ScheduleProgress progress={progress} />
+        </div>
+      )}
+      {error && (
+        <div className="border-t border-surface-3/60 px-4 py-4 sm:px-5">
+          <InlineErrorPanel message={error} onRetry={onGenerate} onReset={onReset} />
+        </div>
+      )}
+    </section>
+  )
+}
+
+function WorkbenchPanel({
+  config,
+  configChanged,
+  showConfigDetails,
+  operatorCount,
+  configPresetLabel,
+  validation,
+  loading,
+  syncing,
+  progress,
+  hasResult,
+  resultIsCurrent,
+  error,
+  onGenerate,
+  onReset,
+}: {
+  config: LicenseConfig;
+  configChanged: boolean;
+  showConfigDetails: boolean;
+  operatorCount: number;
+  configPresetLabel: string;
+  validation: { ok: true } | { ok: false; message: string };
+  loading: boolean;
+  syncing: boolean;
+  progress: ScheduleProgressState | null;
+  hasResult: boolean;
+  resultIsCurrent: boolean;
+  error: string | null;
+  onGenerate: () => void;
+  onReset: () => void;
+}) {
+  const scheduleMode = normalizeScheduleMode(config.schedule_mode)
+  const readyLabel = resultIsCurrent ? '方案已是最新' : hasResult ? '已有结果' : '待生成'
+  const configLabel = showConfigDetails
+    ? `${SCHEDULE_MODE_LABELS[scheduleMode]} · ${config.layout} · ${config.desc}`
+    : `${SCHEDULE_MODE_LABELS[scheduleMode]} · ${configPresetLabel}`
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
+      <div className="grid gap-0">
+        <div className="p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-brand-400">操作区</p>
+              <h2 className="mt-1 text-lg font-semibold text-ink-primary">生成排班</h2>
+              <p className="mt-2 text-sm leading-6 text-ink-secondary">
+                数据已载入，确认右侧配置后即可生成。
+              </p>
+            </div>
+            <span className={`inline-flex w-max shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
+              resultIsCurrent
+                ? 'bg-brand-600/15 text-brand-300'
+                : hasResult
+                ? 'bg-warning/10 text-warning'
+                : 'bg-surface-2 text-ink-secondary'
+            }`}>
+              {readyLabel}
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-3">
+            <DashboardMiniStat label="干员数据" value={`${operatorCount} 名`} />
+            <DashboardMiniStat label="当前配置" value={configLabel} />
+            <DashboardMiniStat label="配置状态" value={configChanged ? '已调整' : '未改动'} />
+          </div>
+        </div>
+
+        <div className="border-t border-surface-3 bg-surface-2/40 p-5">
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={onGenerate}
+              disabled={loading || syncing || !validation.ok || resultIsCurrent}
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted"
+            >
+              {loading || syncing ? (
+                <span className="inline-flex w-max shrink-0 items-center gap-3 whitespace-nowrap">
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {syncing ? '正在同步授权...' : '正在计算...'}
+                </span>
+              ) : resultIsCurrent ? '方案已是最新' : hasResult ? '重新计算排班' : '生成排班方案'}
+            </button>
+            {resultIsCurrent && (
+              <p className="text-xs leading-5 text-ink-muted">修改基建配置或干员数据后才需要重新计算。</p>
+            )}
+            {!validation.ok && (
+              <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">{validation.message}</p>
+            )}
+          </div>
+          {loading && progress && <ScheduleProgress progress={progress} className="mt-5" />}
+          {error && <InlineErrorPanel message={error} onRetry={onGenerate} onReset={onReset} />}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function ResultDashboardCards({
-  orderId,
   operatorCount,
   resultReady,
   configChanged,
 }: {
-  orderId: string;
   operatorCount: number;
   resultReady: boolean;
   configChanged: boolean;
@@ -696,7 +890,7 @@ function ResultDashboardCards({
           <div>
             <h2 className="text-sm font-semibold text-ink-primary">账号数据空间</h2>
             <p className="mt-2 text-sm leading-6 text-ink-secondary">
-              当前授权 ID {orderId}，数据已载入，可直接生成或重新计算基建排班。
+              数据已载入，可直接生成或重新计算基建排班。
             </p>
           </div>
           <span className="rounded-full bg-surface-0 px-3 py-1 text-xs font-semibold text-brand-300">
@@ -715,9 +909,9 @@ function ResultDashboardCards({
 
 function DashboardMiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-surface-2 px-3 py-2">
+    <div className="min-w-0 rounded-lg bg-surface-2 px-3 py-2">
       <p className="text-xs text-ink-muted">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-ink-primary">{value}</p>
+      <p className="mt-1 truncate text-sm font-semibold text-ink-primary" title={value}>{value}</p>
     </div>
   )
 }
@@ -727,7 +921,6 @@ function CommandBand({
   configChanged,
   showConfigDetails,
   operatorCount,
-  fileId,
   validation,
   loading,
   syncing,
@@ -742,7 +935,6 @@ function CommandBand({
   configChanged: boolean;
   showConfigDetails: boolean;
   operatorCount: number;
-  fileId: string;
   validation: { ok: true } | { ok: false; message: string };
   loading: boolean;
   syncing: boolean;
@@ -762,8 +954,7 @@ function CommandBand({
             排班方案
           </h2>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink-secondary">
-            <span className="rounded-full bg-surface-2 px-2.5 py-1">ID {fileId}</span>
-            <span className="rounded-full bg-surface-2 px-2.5 py-1">{operatorCount} 名干员</span>
+              <span className="rounded-full bg-surface-2 px-2.5 py-1">{operatorCount} 名干员</span>
             <span className="rounded-full bg-surface-2 px-2.5 py-1">
               {SCHEDULE_MODE_LABELS[normalizeScheduleMode(config.schedule_mode)]}
             </span>

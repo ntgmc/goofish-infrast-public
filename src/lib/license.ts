@@ -112,7 +112,7 @@ function validateWorkFileStructure(
   }
 
   if (workfile.client_state.config_override) {
-    if (!canEditConfig(workfile.license) && !canUseIntermediateAutoConfig(workfile.license, workfile.client_state.config_override)) {
+    if (!canEditConfig(workfile.license) && !canUseLimitedConfigOverride(workfile.license, workfile.client_state.config_override)) {
       return { ok: false, error: { code: "PERMISSION_DENIED", message: "当前授权不允许修改基建配置。" } };
     }
     const configCheck = validateConfigStructure(workfile.client_state.config_override);
@@ -194,6 +194,37 @@ export function canUseIntermediateAutoConfig(
 ): boolean {
   const permission = getPermissionMode(license);
   return (permission === "recommended" || permission === "growth") && isIntermediateAutoConfig(config);
+}
+
+function canUseLimitedConfigOverride(
+  license: LicenseFile,
+  config: LicenseConfig | null | undefined
+): boolean {
+  if (!config) return false;
+  const permission = getPermissionMode(license);
+  if (permission !== "recommended" && permission !== "growth") return false;
+  return hasSameStationPlan(license.config, config);
+}
+
+function hasSameStationPlan(base: LicenseConfig, override: LicenseConfig): boolean {
+  return base.layout === override.layout
+    && base.trading_stations_count === override.trading_stations_count
+    && base.manufacturing_stations_count === override.manufacturing_stations_count
+    && countRecordsEqual(base.product_requirements?.trading_stations, override.product_requirements?.trading_stations)
+    && countRecordsEqual(base.product_requirements?.manufacturing_stations, override.product_requirements?.manufacturing_stations);
+}
+
+function countRecordsEqual(
+  a: Record<string, number> | null | undefined,
+  b: Record<string, number> | null | undefined
+): boolean {
+  const left = a ?? {};
+  const right = b ?? {};
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    if ((left[key] ?? 0) !== (right[key] ?? 0)) return false;
+  }
+  return true;
 }
 
 export function canReplaceOperators(license: LicenseFile): boolean {
