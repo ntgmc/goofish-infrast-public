@@ -1,9 +1,8 @@
-import type { Context } from '@netlify/functions'
 import { randomUUID } from 'node:crypto'
 import type { Announcement, AnnouncementKind } from '../../src/lib/types'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
-import { createPostgresAnnouncementStore } from '../../server/storage/announcement-store'
+import { createPostgresAnnouncementStore } from '../storage/announcement-store'
 
 const ANNOUNCEMENT_KEY = 'current.json'
 const MAX_TITLE_LENGTH = 80
@@ -26,7 +25,7 @@ interface AnnouncementStore {
   set: (data: AnnouncementData) => Promise<void>;
 }
 
-export default async (req: Request, _context: Context): Promise<Response> => {
+export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return jsonResponse(null, 204)
   }

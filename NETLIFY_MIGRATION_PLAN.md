@@ -29,7 +29,7 @@ Nginx
 Node 20 backend
   |-- server/index.ts
   |-- server/routes.ts
-  |-- reuses historical handlers from netlify/functions/
+  |-- reuses historical handlers from server/handlers/
   |-- reads and writes PostgreSQL through server/storage/
 
 PostgreSQL
@@ -40,7 +40,7 @@ PostgreSQL
   |-- user-related tables
 ```
 
-`netlify/functions/` 仍是部分业务处理器的源码位置，这是历史目录名，不表示当前请求会进入 Netlify Functions。当前生产请求由 Node 服务器直接调用这些处理器。
+`server/handlers/` 仍是部分业务处理器的源码位置，这是历史目录名，不表示当前请求会进入 Netlify Functions。当前生产请求由 Node 服务器直接调用这些处理器。
 
 ## 已完成事项
 
@@ -219,7 +219,7 @@ WantedBy=multi-user.target
 | `scripts/export-netlify-blobs.mjs` | 从旧 Netlify Blobs 导出历史数据，主要用于审计或灾备重放。 |
 | `scripts/import-postgres.mjs` | 将导出 JSON 导入 PostgreSQL。 |
 | `scripts/verify-migrated-data.mjs` | 校验 PostgreSQL 迁移数据。 |
-| `scripts/netlify-ignore-build.mjs` | 历史命名的发布相关性判断脚本，当前仅用于 GitHub Actions 跳过无关构建。 |
+| `scripts/check-build-relevance.mjs` | 历史命名的发布相关性判断脚本，当前仅用于 GitHub Actions 跳过无关构建。 |
 
 ## 回滚说明
 
