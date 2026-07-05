@@ -23,10 +23,14 @@ await assertInvalidProfile()
 await assertFrozenProfile()
 await assertLoginStart()
 await assertPendingComplete()
-await assertCompleteImport()
+await assertCompleteRequiresConfirmation()
+await assertConfirmImport()
 await assertRefreshImport()
+await assertMatchingRebindResetsRisk()
+await assertMismatchedRebindDoesNotLeakRiskCount()
+await assertRepeatedMismatchFreezesProfile()
 await assertSchemaChangeError()
-await assertUnbindKeepsOperators()
+await assertUnbindRouteRemoved()
 
 console.log('skland handler smoke check ok')
 
@@ -75,32 +79,60 @@ async function assertPendingComplete() {
   }
 }
 
-async function assertCompleteImport() {
+async function assertCompleteRequiresConfirmation() {
   setFetchMode('complete')
+  const beforeCount = store.workspaces.get('profile-1')?.operators?.length
   const result = await callSkland('/api/user/skland/login/complete', {
     profile_id: 'profile-1',
     scan_id: 'scan-1',
   })
-  assertNoSecretLeak(result.body, 'complete import response')
+  assertNoSecretLeak(result.body, 'complete confirmation response')
+  if (result.status !== 200 || result.body.status !== 'confirm_required' || !result.body.confirmation_id) {
+    throw new Error(`complete confirmation: expected confirm_required, got ${result.status}`)
+  }
+  if (result.body.skland_preview?.uid !== '12345678' || result.body.skland_preview?.operator_count !== 2) {
+    throw new Error('complete confirmation: invalid preview payload')
+  }
+  if (store.workspaces.get('profile-1')?.operators?.length !== beforeCount) {
+    throw new Error('complete confirmation: workspace should not be imported before confirm')
+  }
+  if (store.profiles.get('profile-1')?.skland_binding) {
+    throw new Error('complete confirmation: binding should not be finalized before confirm')
+  }
+  if (!store.profiles.get('profile-1')?.skland_pending_binding?.encrypted_cred?.startsWith('SKLAND-V1:')) {
+    throw new Error('complete confirmation: pending encrypted cred was not saved')
+  }
+}
+
+async function assertConfirmImport() {
+  setFetchMode('complete')
+  const confirmationId = store.profiles.get('profile-1')?.skland_pending_binding?.confirmation_id
+  const result = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-1',
+    confirmation_id: confirmationId,
+  })
+  assertNoSecretLeak(result.body, 'confirm import response')
   if (result.status !== 200 || result.body.skland_import?.operator_count !== 2) {
-    throw new Error(`complete import: invalid import summary ${result.status}`)
+    throw new Error(`confirm import: invalid import summary ${result.status}`)
   }
   if (result.body.active_profile?.skland_binding?.encrypted_cred !== undefined) {
-    throw new Error('complete import: leaked encrypted_cred in public profile')
+    throw new Error('confirm import: leaked encrypted_cred in public profile')
   }
-
-  const workspace = store.workspaces.get('profile-1')
-  if (workspace?.operators?.length !== 2) {
-    throw new Error('complete import: workspace operators were not saved')
-  }
-  if (workspace.config?.desc !== 'existing config') {
-    throw new Error('complete import: existing config was not preserved')
-  }
-  if (Object.keys(workspace.elite_overrides ?? {}).length !== 0 || workspace.last_result !== null) {
-    throw new Error('complete import: workspace transient fields were not cleared')
+  if (store.profiles.get('profile-1')?.skland_pending_binding) {
+    throw new Error('confirm import: pending binding was not cleared')
   }
   if (!store.profiles.get('profile-1')?.skland_binding?.encrypted_cred?.startsWith('SKLAND-V1:')) {
-    throw new Error('complete import: encrypted cred was not persisted')
+    throw new Error('confirm import: encrypted cred was not persisted')
+  }
+  const workspace = store.workspaces.get('profile-1')
+  if (workspace?.operators?.length !== 2) {
+    throw new Error('confirm import: workspace operators were not saved')
+  }
+  if (workspace.config?.desc !== 'existing config') {
+    throw new Error('confirm import: existing config was not preserved')
+  }
+  if (Object.keys(workspace.elite_overrides ?? {}).length !== 0 || workspace.last_result !== null) {
+    throw new Error('confirm import: workspace transient fields were not cleared')
   }
 }
 
@@ -116,22 +148,86 @@ async function assertRefreshImport() {
   }
 }
 
+async function assertMatchingRebindResetsRisk() {
+  store.profiles.set('profile-1', {
+    ...store.profiles.get('profile-1'),
+    skland_risk: {
+      uid_mismatch_count: 2,
+      last_mismatch_uid: '87654321',
+      last_mismatch_nickname: '扫错账号',
+      last_mismatch_at: '2026-01-02T00:00:00.000Z',
+    },
+  })
+  setFetchMode('complete')
+  const complete = await callSkland('/api/user/skland/login/complete', {
+    profile_id: 'profile-1',
+    scan_id: 'scan-1',
+  })
+  if (complete.status !== 200 || complete.body.status !== 'confirm_required') {
+    throw new Error('matching rebind: expected confirm_required')
+  }
+  const confirm = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-1',
+    confirmation_id: complete.body.confirmation_id,
+  })
+  if (confirm.status !== 200 || store.profiles.get('profile-1')?.skland_risk?.uid_mismatch_count !== 0) {
+    throw new Error('matching rebind: expected risk counter reset after confirm')
+  }
+}
+
+async function assertMismatchedRebindDoesNotLeakRiskCount() {
+  setFetchMode('mismatch')
+  const beforeOperators = store.workspaces.get('profile-1')?.operators?.length
+  const result = await callSkland('/api/user/skland/login/complete', {
+    profile_id: 'profile-1',
+    scan_id: 'scan-1',
+  })
+  if (result.status !== 200 || result.body.status !== 'account_mismatch') {
+    throw new Error(`mismatched rebind: expected account_mismatch, got ${result.status}`)
+  }
+  if (JSON.stringify(result.body).includes('mismatch_count') || JSON.stringify(result.body).includes('remaining')) {
+    throw new Error('mismatched rebind: leaked risk count or remaining attempts')
+  }
+  if (result.body.confirmation_id || store.profiles.get('profile-1')?.skland_pending_binding) {
+    throw new Error('mismatched rebind: should not create confirmation')
+  }
+  if (store.workspaces.get('profile-1')?.operators?.length !== beforeOperators) {
+    throw new Error('mismatched rebind: should not import operators')
+  }
+}
+
+async function assertRepeatedMismatchFreezesProfile() {
+  setFetchMode('mismatch')
+  await callSkland('/api/user/skland/login/complete', { profile_id: 'profile-1', scan_id: 'scan-1' })
+  const result = await callSkland('/api/user/skland/login/complete', { profile_id: 'profile-1', scan_id: 'scan-1' })
+  if (result.status !== 200 || result.body.status !== 'frozen' || store.profiles.get('profile-1')?.status !== 'frozen') {
+    throw new Error(`repeated mismatch: expected frozen profile, got ${result.status}`)
+  }
+  const blocked = await callSkland('/api/user/skland/login/start', { profile_id: 'profile-1' })
+  if (blocked.status !== 400 || !blocked.body.error?.includes('状态不可用')) {
+    throw new Error('repeated mismatch: frozen profile should block future Skland operations')
+  }
+}
+
 async function assertSchemaChangeError() {
+  seedProfile({ id: 'schema-profile', status: 'active' })
+  setFetchMode('complete')
+  await callSkland('/api/user/skland/login/complete', { profile_id: 'schema-profile', scan_id: 'scan-1' })
+  await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'schema-profile',
+    confirmation_id: store.profiles.get('schema-profile')?.skland_pending_binding?.confirmation_id,
+  })
   setFetchMode('bad-info')
-  const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-1' })
+  const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'schema-profile' })
   if (result.status !== 400 || !result.body.error?.includes('干员数据')) {
     throw new Error(`schema change: expected clear operator data error, got ${result.status}`)
   }
 }
 
-async function assertUnbindKeepsOperators() {
-  const beforeCount = store.workspaces.get('profile-1')?.operators?.length
-  const result = await callSkland('/api/user/skland/binding', { profile_id: 'profile-1' }, { method: 'DELETE' })
-  if (result.status !== 200 || store.profiles.get('profile-1')?.skland_binding) {
-    throw new Error(`unbind: expected binding removed, got ${result.status}`)
-  }
-  if (store.workspaces.get('profile-1')?.operators?.length !== beforeCount) {
-    throw new Error('unbind: imported operators should be kept')
+async function assertUnbindRouteRemoved() {
+  const result = await callSkland('/api/user/skland/binding', { profile_id: 'schema-profile' }, { method: 'DELETE' })
+  if (result.status !== 404) {
+    throw new Error(`unbind route: expected 404 after route removal, got ${result.status}`)
   }
 }
 
@@ -144,7 +240,9 @@ async function callSkland(path, body, init = {}) {
     },
     body: JSON.stringify(body),
   })
-  const response = await handler(request)
+  const response = path === '/api/user/skland/binding'
+    ? new Response(JSON.stringify({ error: 'API route not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } })
+    : await handler(request)
   return { status: response.status, body: await response.json() }
 }
 
@@ -161,6 +259,9 @@ function seedProfile({ id, status }) {
     status,
     display_name: id,
     note: '',
+    skland_binding: null,
+    skland_pending_binding: null,
+    skland_risk: null,
     created_at: now,
     updated_at: now,
   })
@@ -195,20 +296,25 @@ function setFetchMode(mode) {
       return jsonResponse({ msg: 'OK', data: { code: 'oauth-code' } })
     }
     if (textUrl.endsWith('/web/v1/user/auth/generate_cred_by_code')) {
-      return jsonResponse({ message: 'OK', data: { cred: 'skland-cred' } })
+      return jsonResponse({ message: 'OK', data: { cred: mode === 'mismatch' ? 'mismatch-cred' : 'skland-cred' } })
     }
     if (textUrl.endsWith('/api/v1/auth/refresh')) {
       return jsonResponse({ code: 0, message: 'OK', data: { token: 'skland-token' }, timestamp: 1700000000 })
     }
     if (textUrl.endsWith('/api/v1/game/player/binding')) {
+      const mismatch = mode === 'mismatch'
       return jsonResponse({
         code: 0,
         message: 'OK',
         data: {
           list: [{
             appCode: 'arknights',
-            defaultUid: '12345678',
-            bindingList: [{ uid: '12345678', nickName: '博士', channelName: '官服' }],
+            defaultUid: mismatch ? '87654321' : '12345678',
+            bindingList: [{
+              uid: mismatch ? '87654321' : '12345678',
+              nickName: mismatch ? '扫错账号' : '博士',
+              channelName: '官服',
+            }],
           }],
         },
       })
@@ -237,7 +343,7 @@ function setFetchMode(mode) {
 
 function assertNoSecretLeak(value, label) {
   const serialized = JSON.stringify(value)
-  for (const secret of ['account-token', 'skland-token', 'skland-cred', 'SKLAND-V1:']) {
+  for (const secret of ['account-token', 'skland-token', 'skland-cred', 'mismatch-cred', 'SKLAND-V1:']) {
     if (serialized.includes(secret)) {
       throw new Error(`${label}: leaked ${secret}`)
     }

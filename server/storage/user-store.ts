@@ -39,6 +39,8 @@ export interface UserGameAccountRecord {
   display_name: string
   note: string
   skland_binding?: SklandBindingRecord | null
+  skland_pending_binding?: SklandPendingBindingRecord | null
+  skland_risk?: SklandRiskRecord | null
   created_at: string
   updated_at: string
 }
@@ -50,6 +52,24 @@ export interface SklandBindingRecord {
   bound_at: string
   last_imported_at: string | null
   encrypted_cred: string
+}
+
+export interface SklandPendingBindingRecord {
+  confirmation_id: string
+  uid: string
+  nickname: string
+  channel_name: string
+  encrypted_cred: string
+  operator_count: number
+  created_at: string
+  expires_at: string
+}
+
+export interface SklandRiskRecord {
+  uid_mismatch_count: number
+  last_mismatch_uid: string | null
+  last_mismatch_nickname: string | null
+  last_mismatch_at: string | null
 }
 
 export interface UserSessionRecord {
