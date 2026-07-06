@@ -21,6 +21,7 @@ const expectedRoutes = [
   '/api/redeem-cdk',
   '/api/user/announcements',
   '/api/user/profiles',
+  '/api/user/profiles/depot-value',
   '/api/user/profiles/redeem',
   '/api/user/status',
   '/api/user/workspace',

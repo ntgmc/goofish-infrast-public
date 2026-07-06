@@ -3,6 +3,7 @@ import {
   emptyWorkspace,
   getProfileForUser,
   getProfileWorkspace,
+  isDepotValueProfile,
   saveProfileWorkspace,
   toPublicWorkspace,
   type UserWorkspaceRecord,
@@ -22,6 +23,7 @@ export default async (req: Request): Promise<Response> => {
       if (!profileId) return jsonResponse({ error: '缺少 profile_id。' }, 400)
       const profile = await getProfileForUser(auth.user.id, profileId)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
+      if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班工作区。' }, 403)
       const workspace = await getProfileWorkspace(profile.id)
       return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(workspace) })
     }
@@ -42,6 +44,7 @@ export default async (req: Request): Promise<Response> => {
     }
     const profile = await getProfileForUser(auth.user.id, body.profile_id)
     if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
+    if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案不能保存排班工作区。' }, 403)
     if (profile.status !== 'active') return jsonResponse({ error: '账号档案状态不可用。' }, 403)
 
     const existing = await getProfileWorkspace(profile.id)

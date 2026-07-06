@@ -1,15 +1,35 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
+import AuthForm from '../components/AuthForm'
 import BrandLogo from '../components/BrandLogo'
-import type { AuthMeResponse, DepotValueRequest, DepotValueResponse, UserGameAccount } from '../lib/types'
+import SklandBindingDialog, { type SklandPayload } from '../components/SklandBindingDialog'
+import { getCurrentSiteUrl } from '../lib/site-url'
+import type { AuthMeResponse, DepotValueItem, DepotValueProfileResponse, DepotValueRequest, DepotValueResponse, UserGameAccount } from '../lib/types'
+
+const LMD_ITEM_ID = '4001'
 
 export default function DepotValuePage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [depotText, setDepotText] = useState('')
   const [auth, setAuth] = useState<AuthMeResponse | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [depotProfile, setDepotProfile] = useState<UserGameAccount | null>(null)
   const [selectedProfileId, setSelectedProfileId] = useState('')
   const [result, setResult] = useState<DepotValueResponse | null>(null)
   const [loading, setLoading] = useState<DepotValueRequest['source'] | null>(null)
+  const [profilePreparing, setProfilePreparing] = useState(false)
+  const [sklandDialogOpen, setSklandDialogOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const applyAuthData = useCallback((data: AuthMeResponse | null) => {
+    setAuth(data)
+    const profiles = data?.profiles ?? []
+    const firstSklandProfile = profiles.find((profile) => profile.skland_binding)
+    setDepotProfile(profiles.find((profile) => profile.kind === 'depot_value') ?? null)
+    setSelectedProfileId((current) => {
+      if (current && profiles.some((profile) => profile.id === current && profile.skland_binding)) return current
+      return firstSklandProfile?.id ?? ''
+    })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -17,17 +37,18 @@ export default function DepotValuePage() {
       .then(async (resp) => (resp.ok ? await resp.json() as AuthMeResponse : null))
       .then((data) => {
         if (cancelled || !data) return
-        setAuth(data)
-        const firstSklandProfile = data.profiles?.find((profile) => profile.skland_binding)
-        if (firstSklandProfile) setSelectedProfileId(firstSklandProfile.id)
+        applyAuthData(data)
       })
       .catch(() => {
-        if (!cancelled) setAuth(null)
+        if (!cancelled) applyAuthData(null)
+      })
+      .finally(() => {
+        if (!cancelled) setAuthLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [applyAuthData])
 
   useEffect(() => {
     if (result) drawShareCard(canvasRef.current, result)
@@ -37,6 +58,58 @@ export default function DepotValuePage() {
     () => auth?.profiles?.filter((profile) => profile.skland_binding) ?? [],
     [auth],
   )
+
+  const analyze = useCallback(async (payload: DepotValueRequest) => {
+    setLoading(payload.source)
+    setError(null)
+    try {
+      const resp = await fetch('/api/depot-value', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await resp.json() as DepotValueResponse & { error?: string }
+      if (!resp.ok) throw new Error(data.error || `仓库分析失败: ${resp.status}`)
+      setResult(data)
+      window.setTimeout(() => document.getElementById('depot-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+    } catch (caught) {
+      setResult(null)
+      setError((caught as Error).message)
+    } finally {
+      setLoading(null)
+    }
+  }, [])
+
+  const ensureDepotProfile = useCallback(async (): Promise<UserGameAccount> => {
+    setProfilePreparing(true)
+    setError(null)
+    try {
+      const resp = await fetch('/api/user/profiles/depot-value', { method: 'POST' })
+      const data = await resp.json() as DepotValueProfileResponse & { error?: string }
+      if (!resp.ok || !data.user || !data.depot_profile) {
+        throw new Error(data.error || `创建仓库分析档案失败: ${resp.status}`)
+      }
+      applyAuthData(data)
+      setDepotProfile(data.depot_profile)
+      setSelectedProfileId(data.depot_profile.id)
+      return data.depot_profile
+    } finally {
+      setProfilePreparing(false)
+    }
+  }, [applyAuthData])
+
+  const openSklandBinding = useCallback(async () => {
+    setResult(null)
+    setError(null)
+    try {
+      const profile = depotProfile ?? await ensureDepotProfile()
+      setDepotProfile(profile)
+      setSelectedProfileId(profile.id)
+      setSklandDialogOpen(true)
+    } catch (caught) {
+      setError((caught as Error).message)
+    }
+  }, [depotProfile, ensureDepotProfile])
 
   const readClipboard = async () => {
     setResult(null)
@@ -66,32 +139,42 @@ export default function DepotValuePage() {
   }
 
   const analyzeSkland = async () => {
-    if (!selectedProfileId) {
-      setError('当前登录账号没有可用的森空岛绑定档案。')
+    const profileId = selectedProfileId || sklandProfiles[0]?.id
+    if (profileId) {
+      setSelectedProfileId(profileId)
+      await analyze({ source: 'skland', profile_id: profileId })
       return
     }
-    await analyze({ source: 'skland', profile_id: selectedProfileId })
+    if (!auth?.user) {
+      setError('请先登录或注册，再使用森空岛库存。')
+      return
+    }
+    await openSklandBinding()
   }
 
-  const analyze = async (payload: DepotValueRequest) => {
-    setLoading(payload.source)
-    setError(null)
-    try {
-      const resp = await fetch('/api/depot-value', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = await resp.json() as DepotValueResponse & { error?: string }
-      if (!resp.ok) throw new Error(data.error || `仓库分析失败: ${resp.status}`)
-      setResult(data)
-      window.setTimeout(() => document.getElementById('depot-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
-    } catch (caught) {
-      setResult(null)
-      setError((caught as Error).message)
-    } finally {
-      setLoading(null)
+  const handleAuthenticated = (payload: AuthMeResponse) => {
+    applyAuthData(payload)
+    void openSklandBinding()
+  }
+
+  const handleSklandPayload = (payload: SklandPayload) => {
+    applyAuthData(payload)
+    const profile = payload.active_profile ?? payload.profiles?.find((item) => item.kind === 'depot_value') ?? null
+    if (profile?.kind === 'depot_value') setDepotProfile(profile)
+  }
+
+  const handleSklandCompleted = (payload: SklandPayload) => {
+    handleSklandPayload(payload)
+    const completedProfile = payload.active_profile?.skland_binding
+      ? payload.active_profile
+      : payload.profiles?.find((profile) => profile.kind === 'depot_value' && profile.skland_binding)
+    if (!completedProfile?.skland_binding) {
+      setError('森空岛绑定已完成，但未找到可分析的绑定档案，请刷新后重试。')
+      return
     }
+    setSklandDialogOpen(false)
+    setSelectedProfileId(completedProfile.id)
+    void analyze({ source: 'skland', profile_id: completedProfile.id })
   }
 
   const downloadShareImage = () => {
@@ -200,37 +283,65 @@ export default function DepotValuePage() {
                 <div>
                   <h3 className="text-sm font-semibold text-ink-primary">森空岛快捷导入</h3>
                   <p className="mt-1 text-sm leading-6 text-ink-secondary">
-                    已登录并绑定森空岛的账号可直接读取养成库存；不会覆盖工作区数据。
+                    使用森空岛导入会读取养成库存做本次估值，并匿名贡献聚合统计，用于改进击败百分比。
                   </p>
                 </div>
-                <a href="/tool" className="text-sm font-semibold text-brand-500 hover:text-brand-400">
-                  去绑定
-                </a>
+                {auth?.user && (
+                  <span className="rounded-md bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+                    已登录
+                  </span>
+                )}
               </div>
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                <select
-                  value={selectedProfileId}
-                  onChange={(event) => setSelectedProfileId(event.currentTarget.value)}
-                  className="min-h-11 flex-1 rounded-lg border border-surface-4 bg-surface-0 px-3 text-sm text-ink-primary outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                >
-                  <option value="">{sklandProfiles.length > 0 ? '选择森空岛档案' : '暂无已绑定森空岛档案'}</option>
-                  {sklandProfiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {formatProfileLabel(profile)}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => void analyzeSkland()}
-                  disabled={loading !== null || !selectedProfileId}
-                  className="rounded-lg border border-surface-3 bg-surface-0 px-5 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary disabled:bg-surface-2 disabled:text-ink-muted"
-                >
-                  {loading === 'skland' ? '正在读取...' : '使用森空岛库存'}
-                </button>
-              </div>
+              {authLoading ? (
+                <p className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-3 text-sm text-ink-secondary">正在确认登录状态...</p>
+              ) : !auth?.user ? (
+                <div className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-4">
+                  <AuthForm
+                    compact
+                    allowCdk={false}
+                    intro="登录或注册后会自动创建一个仅用于仓库分析的免费档案，然后继续绑定森空岛。"
+                    onAuthenticated={handleAuthenticated}
+                  />
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {sklandProfiles.length > 0 && (
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <select
+                        value={selectedProfileId}
+                        onChange={(event) => setSelectedProfileId(event.currentTarget.value)}
+                        className="min-h-11 flex-1 rounded-lg border border-surface-4 bg-surface-0 px-3 text-sm text-ink-primary outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                      >
+                        {sklandProfiles.map((profile) => (
+                          <option key={profile.id} value={profile.id}>
+                            {formatProfileLabel(profile)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => void analyzeSkland()}
+                        disabled={loading !== null || profilePreparing}
+                        className="rounded-lg border border-surface-3 bg-surface-0 px-5 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary disabled:bg-surface-2 disabled:text-ink-muted"
+                      >
+                        {loading === 'skland' ? '正在读取...' : '使用森空岛库存'}
+                      </button>
+                    </div>
+                  )}
+                  {sklandProfiles.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void openSklandBinding()}
+                      disabled={loading !== null || profilePreparing}
+                      className="w-full rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+                    >
+                      {profilePreparing ? '正在准备账号...' : '绑定森空岛并分析仓库'}
+                    </button>
+                  )}
+                </div>
+              )}
               <p className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-3 text-sm leading-6 text-ink-secondary">
-                使用森空岛库存会默认匿名贡献本次统计结果，用于改进击败百分比；不包含仓库明细、干员明细、昵称、UID 明文或凭据。
+                使用森空岛导入会默认匿名贡献本次统计结果；样本不包含仓库明细、干员明细、昵称、UID 明文或凭据。
               </p>
             </div>
           </section>
@@ -240,7 +351,7 @@ export default function DepotValuePage() {
             <div className="mt-4 space-y-4 text-sm leading-6 text-ink-secondary">
               <p>作战记录会先换算成经验，再折成大致理智；龙门币和材料也会尽量换算成同一个理智数。</p>
               <p>材料价格优先参考一图流/企鹅物流的物品价值。模组数据块、数据增补仪、数据增补条、家具零件不会参与计算。</p>
-              <p>使用森空岛库存时会默认贡献匿名统计样本，样本越多，“击败 X% 博士”会越接近真实分布；样本不足时仍会参考估算曲线。</p>
+              <p>使用森空岛库存时会默认贡献匿名统计样本，样本越多，“击败 X% 博士”会越接近真实分布。</p>
             </div>
           </section>
         </div>
@@ -251,6 +362,15 @@ export default function DepotValuePage() {
             <SharePanel result={result} canvasRef={canvasRef} onDownload={downloadShareImage} />
           </section>
         )}
+        <SklandBindingDialog
+          open={sklandDialogOpen}
+          profile={depotProfile}
+          context="depot"
+          autoStart
+          onOpenChange={setSklandDialogOpen}
+          onPayload={handleSklandPayload}
+          onCompleted={handleSklandCompleted}
+        />
       </div>
     </main>
   )
@@ -292,7 +412,7 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
               </span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>
-                <p className="mt-1 text-xs text-ink-muted">数量 {formatNumber(item.count)} · 单件 {formatNumber(item.unit_sanity)} 理智</p>
+                <p className="mt-1 text-xs text-ink-muted">数量 {formatNumber(item.count)} · {formatUnitSanityLabel(item)}</p>
               </div>
               <p className="text-sm font-semibold text-ink-primary">{formatNumber(item.equivalent_sanity)}</p>
             </div>
@@ -436,7 +556,7 @@ function drawShareCard(canvas: HTMLCanvasElement | null, result: DepotValueRespo
   ctx.fillText('免费生成你的仓库资产分享图', 112, 1446)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.62)'
   ctx.font = '400 22px "Noto Sans SC", "Microsoft YaHei", sans-serif'
-  ctx.fillText('MAA 基建排班优化器 · https://maatool.com/', 112, 1484)
+  ctx.fillText(`MAA 基建排班优化器 · ${getCurrentSiteUrl()}`, 112, 1484)
 }
 
 function drawRoundedRect(
@@ -494,6 +614,11 @@ function formatRankingNote(result: DepotValueResponse): string {
     return `样本积累中，当前结果仍以估算曲线为主。`
   }
   return `样本积累中，当前结果仍以估算曲线为主。`
+}
+
+function formatUnitSanityLabel(item: DepotValueItem): string {
+  if (item.id === LMD_ITEM_ID) return `万件 ${formatNumber(item.unit_sanity * 10000)} 理智`
+  return `单件 ${formatNumber(item.unit_sanity)} 理智`
 }
 
 function formatNumber(value: number): string {

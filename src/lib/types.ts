@@ -38,6 +38,7 @@ export type ProductPermissionMode = 'recommended' | 'growth' | 'advanced' | 'ult
 export type InternalPermissionMode = 'admin';
 export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | InternalPermissionMode;
 export type PermissionMode = ProductPermissionMode | InternalPermissionMode;
+export type UserGameAccountKind = 'cdk' | 'depot_value';
 
 export interface OperatorUpdateGrant {
   remaining: number;
@@ -508,6 +509,7 @@ export interface SklandPublicBinding {
 export interface UserGameAccount {
   id: string;
   user_id: string;
+  kind: UserGameAccountKind;
   permission: PermissionMode;
   status: 'active' | 'frozen' | 'revoked';
   cdk_order_hash: string | null;
@@ -548,5 +550,9 @@ export interface AuthSuccessResponse {
   workspace: UserWorkspace | null;
   announcement_unread_count?: number;
 }
+
+export type DepotValueProfileResponse = AuthSuccessResponse & {
+  depot_profile: UserGameAccount;
+};
 
 export type AppStep = 'upload' | 'optimize';

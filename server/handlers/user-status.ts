@@ -1,4 +1,4 @@
-import { getProfileForUser } from '../storage/user-store'
+import { getProfileForUser, isDepotValueProfile } from '../storage/user-store'
 import { getCdkRecordStore } from './license-utils'
 import { jsonResponse, requireUserSession, toPublicUser } from './user-auth'
 
@@ -12,6 +12,7 @@ export default async (req: Request): Promise<Response> => {
     const profileId = new URL(req.url).searchParams.get('profile_id')
     const profile = profileId ? await getProfileForUser(auth.user.id, profileId) : auth.activeProfile
     if (!profile) return jsonResponse({ error: '请先兑换或选择 CDK 档案。' }, 404)
+    if (isDepotValueProfile(profile) || !profile.cdk_key) return jsonResponse({ error: '仓库分析档案没有 CDK 授权状态。' }, 403)
     const cdkRecord = await (await getCdkRecordStore()).get(profile.cdk_key)
     if (profile.status === 'frozen' || cdkRecord?.status === 'frozen') {
       return jsonResponse({ error: cdkRecord?.freeze_reason || '账号授权已冻结，请联系卖家。' }, 403)
