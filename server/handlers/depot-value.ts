@@ -20,7 +20,7 @@ const MAX_BODY_BYTES = 1024 * 1024
 const TOP_ITEM_LIMIT = 8
 const UNPRICED_ITEM_LIMIT = 12
 const LMD_ITEM_ID = '4001'
-const UNPRICED_BY_POLICY = new Set(['mod_unlock_token', 'mod_update_token_1', 'mod_update_token_2'])
+const UNPRICED_BY_POLICY = new Set(['3401', 'mod_unlock_token', 'mod_update_token_1', 'mod_update_token_2'])
 
 type DepotInventoryItem = {
   id: string
@@ -38,6 +38,7 @@ const ITEM_NAMES: Record<string, string> = {
   '2003': '中级作战记录',
   '2004': '高级作战记录',
   '3003': '赤金',
+  '3401': '家具零件',
   '4001': '龙门币',
   '30011': '源岩',
   '30012': '固源岩',

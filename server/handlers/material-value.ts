@@ -1,5 +1,10 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+
 const YITULIU_ITEM_VALUE_URL = 'https://backend.yituliu.cn/item/v7/value'
-const YITULIU_CACHE_TTL_MS = 15 * 60 * 1000
+const YITULIU_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const YITULIU_RETRY_AFTER_FAILURE_MS = 15 * 60 * 1000
+const YITULIU_CACHE_FILE_VERSION = 1
 const PURE_GOLD_ITEM_ID = '3003'
 const TRADE_PURE_GOLD_PER_LMD = 2 / 1000
 
@@ -34,7 +39,42 @@ export type PricingState = {
 let yituliuCache: { expiresAt: number; state: PricingState } | null = null
 
 export async function getYituliuPricing(): Promise<PricingState> {
-  if (yituliuCache && Date.now() < yituliuCache.expiresAt) return yituliuCache.state
+  const now = Date.now()
+  if (yituliuCache && now < yituliuCache.expiresAt) return yituliuCache.state
+
+  const diskCache = await readYituliuDiskCache()
+  if (diskCache && now < diskCache.expiresAt) {
+    yituliuCache = { expiresAt: diskCache.expiresAt, state: diskCache.state }
+    return diskCache.state
+  }
+
+  const remoteCache = await fetchYituliuPricing()
+  if (remoteCache) {
+    yituliuCache = { expiresAt: remoteCache.expiresAt, state: remoteCache.state }
+    await writeYituliuDiskCache(remoteCache)
+    return remoteCache.state
+  }
+
+  if (diskCache) {
+    logYituliuDebug({
+      event: 'using_stale_disk_cache',
+      cache_fetched_at: new Date(diskCache.fetchedAt).toISOString(),
+      price_count: diskCache.state.prices.size,
+    })
+    yituliuCache = { expiresAt: Date.now() + YITULIU_RETRY_AFTER_FAILURE_MS, state: diskCache.state }
+    return diskCache.state
+  }
+
+  const state = { status: 'unavailable' as const, prices: new Map<string, number>() }
+  yituliuCache = { expiresAt: Date.now() + YITULIU_RETRY_AFTER_FAILURE_MS, state }
+  return state
+}
+
+export function resetYituliuPricingMemoryCacheForTest(): void {
+  yituliuCache = null
+}
+
+async function fetchYituliuPricing(): Promise<{ fetchedAt: number; expiresAt: number; state: PricingState } | null> {
   const startedAt = Date.now()
   let loggedFailure = false
   try {
@@ -70,10 +110,11 @@ export async function getYituliuPricing(): Promise<PricingState> {
         ...responseMeta,
         ...summarizeYituliuPayload(data, prices.size),
       })
+      return null
     }
+    const fetchedAt = Date.now()
     const state = { status: 'ok' as const, prices }
-    yituliuCache = { expiresAt: Date.now() + YITULIU_CACHE_TTL_MS, state }
-    return state
+    return { fetchedAt, expiresAt: fetchedAt + YITULIU_CACHE_TTL_MS, state }
   } catch (error) {
     if (!loggedFailure) {
       logYituliuDebug({
@@ -84,10 +125,69 @@ export async function getYituliuPricing(): Promise<PricingState> {
         error_message: error instanceof Error ? error.message : String(error),
       })
     }
-    const state = { status: 'unavailable' as const, prices: new Map<string, number>() }
-    yituliuCache = { expiresAt: Date.now() + YITULIU_CACHE_TTL_MS, state }
-    return state
+    return null
   }
+}
+
+async function readYituliuDiskCache(): Promise<{ fetchedAt: number; expiresAt: number; state: PricingState } | null> {
+  try {
+    const raw = await readFile(getYituliuCachePath(), 'utf8')
+    const payload = JSON.parse(raw) as unknown
+    if (!isRecord(payload) || payload.version !== YITULIU_CACHE_FILE_VERSION) return null
+    const fetchedAtText = stringValue(payload.fetched_at)
+    const fetchedAt = Date.parse(fetchedAtText)
+    if (!Number.isFinite(fetchedAt)) return null
+    const prices = readSerializedPrices(payload.prices)
+    if (prices.size === 0) return null
+    const state = { status: 'ok' as const, prices }
+    return { fetchedAt, expiresAt: fetchedAt + YITULIU_CACHE_TTL_MS, state }
+  } catch (error) {
+    if (errorCode(error) !== 'ENOENT') {
+      logYituliuDebug({
+        event: 'disk_cache_read_failed',
+        cache_path: getYituliuCachePath(),
+        error_name: error instanceof Error ? error.name : typeof error,
+        error_message: error instanceof Error ? error.message : String(error),
+      })
+    }
+    return null
+  }
+}
+
+async function writeYituliuDiskCache(cache: { fetchedAt: number; state: PricingState }): Promise<void> {
+  try {
+    const cachePath = getYituliuCachePath()
+    await mkdir(dirname(cachePath), { recursive: true })
+    await writeFile(cachePath, `${JSON.stringify({
+      version: YITULIU_CACHE_FILE_VERSION,
+      fetched_at: new Date(cache.fetchedAt).toISOString(),
+      prices: [...cache.state.prices.entries()].sort(([left], [right]) => left.localeCompare(right)),
+    })}\n`, 'utf8')
+  } catch (error) {
+    logYituliuDebug({
+      event: 'disk_cache_write_failed',
+      cache_path: getYituliuCachePath(),
+      error_name: error instanceof Error ? error.name : typeof error,
+      error_message: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
+function readSerializedPrices(value: unknown): Map<string, number> {
+  const prices = new Map<string, number>()
+  if (!Array.isArray(value)) return prices
+  for (const row of value) {
+    if (!Array.isArray(row) || row.length < 2) continue
+    const itemId = stringValue(row[0])
+    const price = numberValue(row[1])
+    if (itemId && price && price > 0) prices.set(itemId, price)
+  }
+  return prices
+}
+
+function getYituliuCachePath(): string {
+  const configured = process.env.MAA_MATERIAL_VALUE_CACHE_PATH?.trim()
+  return configured || join(process.cwd(), '.cache', 'material-value', 'yituliu-item-value-v1.json')
 }
 
 export function buildYituliuPriceMap(data: unknown): Map<string, number> {
@@ -250,4 +350,8 @@ function numberValue(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null
   }
   return null
+}
+
+function errorCode(value: unknown): string {
+  return isRecord(value) && typeof value.code === 'string' ? value.code : ''
 }
