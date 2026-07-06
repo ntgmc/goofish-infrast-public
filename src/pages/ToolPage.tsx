@@ -1123,6 +1123,7 @@ const [saving, setSaving] = useState(false)
   })
   const [sklandBusy, setSklandBusy] = useState(false)
   const sklandPollCountRef = useRef(0)
+  const sklandStartRequestRef = useRef(0)
   const sklandCredentialInputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
@@ -1245,6 +1246,8 @@ const [saving, setSaving] = useState(false)
   }, [applySklandPayload, onSynced, profile.id, sklandBusy])
 
   const handleStartSklandLogin = useCallback(async () => {
+    const requestId = sklandStartRequestRef.current + 1
+    sklandStartRequestRef.current = requestId
     setSklandBusy(true)
     setError(null)
     setSklandLogin({
@@ -1266,6 +1269,7 @@ const [saving, setSaving] = useState(false)
       })
       const data = await resp.json() as { scan_id?: string; qr_data_url?: string; expires_at?: string; error?: string }
       if (!resp.ok || !data.scan_id || !data.qr_data_url) throw new Error(data.error || `生成森空岛二维码失败: ${resp.status}`)
+      if (sklandStartRequestRef.current !== requestId) return
       setSklandLogin({
         open: true,
         mode: 'scan',
@@ -1279,9 +1283,10 @@ const [saving, setSaving] = useState(false)
       })
       sklandPollCountRef.current = 0
     } catch (caught) {
+      if (sklandStartRequestRef.current !== requestId) return
       setSklandLogin((current) => ({ ...current, status: 'error', message: (caught as Error).message }))
     } finally {
-      setSklandBusy(false)
+      if (sklandStartRequestRef.current === requestId) setSklandBusy(false)
     }
   }, [profile.id])
 
@@ -1402,8 +1407,40 @@ const [saving, setSaving] = useState(false)
     }
   }, [applySklandPayload, profile.id, sklandLogin.confirmationId])
 
+  const handleCloseSklandLogin = useCallback(() => {
+    sklandStartRequestRef.current += 1
+    setSklandBusy(false)
+    setSklandLogin((current) => ({ ...current, open: false }))
+  }, [])
+
+  const handleSelectSklandLoginMode = useCallback((mode: SklandLoginState['mode']) => {
+    if (mode === 'password') return
+    sklandStartRequestRef.current += 1
+    setSklandBusy(false)
+    setSklandLogin((current) => {
+      const keepWaitingScan = mode === 'scan' && current.status === 'waiting' && Boolean(current.scanId && current.qrDataUrl)
+      return {
+        ...current,
+        mode,
+        scanId: keepWaitingScan ? current.scanId : null,
+        qrDataUrl: keepWaitingScan ? current.qrDataUrl : null,
+        expiresAt: keepWaitingScan ? current.expiresAt : null,
+        confirmationId: null,
+        preview: null,
+        status: keepWaitingScan ? 'waiting' : 'idle',
+        message: mode === 'scan'
+          ? keepWaitingScan
+            ? current.message
+            : '点击生成二维码后，使用森空岛 App 扫码确认。'
+          : mode === 'manual'
+            ? '粘贴森空岛凭据后读取账号信息。'
+            : '复制书签脚本，在森空岛网页点击后回到这里粘贴。',
+      }
+    })
+  }, [])
+
   useEffect(() => {
-    if (!sklandLogin.open || !sklandLogin.scanId || sklandLogin.status !== 'waiting') return
+    if (!sklandLogin.open || sklandLogin.mode !== 'scan' || !sklandLogin.scanId || sklandLogin.status !== 'waiting') return
     if (sklandLogin.expiresAt && Date.now() > Date.parse(sklandLogin.expiresAt)) {
       setSklandLogin((current) => ({ ...current, status: 'error', message: '二维码已过期，请重新生成。' }))
       return
@@ -1422,7 +1459,7 @@ const [saving, setSaving] = useState(false)
       void completeSklandLogin(sklandLogin.scanId)
     }, SKLAND_SCAN_POLL_DELAY_MS)
     return () => window.clearTimeout(timer)
-  }, [completeSklandLogin, sklandLogin.expiresAt, sklandLogin.open, sklandLogin.scanId, sklandLogin.status])
+  }, [completeSklandLogin, sklandLogin.expiresAt, sklandLogin.mode, sklandLogin.open, sklandLogin.scanId, sklandLogin.status])
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -1592,29 +1629,16 @@ const [saving, setSaving] = useState(false)
  <h2 className="text-lg font-semibold text-ink-primary">森空岛导入</h2>
  <p className="mt-1 text-sm leading-6 text-ink-secondary">先展示游戏昵称和 UID，确认无误后才会导入。</p>
  </div>
- <button type="button" onClick={() => setSklandLogin((current) => ({ ...current, open: false }))} className="rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
- 关闭
- </button>
+              <button type="button" onClick={handleCloseSklandLogin} className="rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
+                关闭
+              </button>
  </div>
  <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
  {(['scan', 'manual', 'bookmarklet', 'password'] as const).map((mode) => (
  <button
  key={mode}
  type="button"
- onClick={() => {
- if (mode === 'password') return
- setSklandLogin((current) => ({
- ...current,
- mode,
- scanId: mode === 'scan' ? current.scanId : null,
- qrDataUrl: mode === 'scan' ? current.qrDataUrl : null,
- expiresAt: mode === 'scan' ? current.expiresAt : null,
- confirmationId: null,
- preview: null,
- status: mode === 'scan' ? current.status : 'idle',
- message: mode === 'manual' ? '粘贴森空岛凭据后读取账号信息。' : mode === 'bookmarklet' ? '复制书签脚本，在森空岛网页点击后回到这里粘贴。' : current.message,
- }))
- }}
+                    onClick={() => handleSelectSklandLoginMode(mode)}
  disabled={mode === 'password'}
  className={'rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ' + (sklandLogin.mode === mode ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3')}
  >
