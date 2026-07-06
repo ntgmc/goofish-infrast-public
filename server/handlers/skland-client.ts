@@ -118,7 +118,6 @@ export function convertSklandCharactersToOperators(gamePlayerInfo: unknown): Lic
   const chars = getNestedArray(gamePlayerInfo, ['data', 'chars'])
   const charInfoMap = getNestedRecord(gamePlayerInfo, ['data', 'charInfoMap'])
   if (!chars || chars.length === 0) {
-    logSklandImportDebug('missing data.chars', gamePlayerInfo)
     throw new Error('森空岛返回的干员数据为空，请确认账号已绑定明日方舟角色。')
   }
 
@@ -130,7 +129,7 @@ export function convertSklandCharactersToOperators(gamePlayerInfo: unknown): Lic
     const meta = charInfoMap && isRecord(charInfoMap[id]) ? charInfoMap[id] : null
     const name = stringValue(raw.name ?? meta?.name)
     const elite = numberValue(raw.evolvePhase)
-    const rarity = numberValue(raw.rarity ?? meta?.rarity)
+    const rarity = numberValue(meta?.rarity)
     if (!name || elite === null || rarity === null) continue
     operators.push({
       id,
@@ -145,7 +144,6 @@ export function convertSklandCharactersToOperators(gamePlayerInfo: unknown): Lic
 
   const uniqueOperators = dedupeSklandOperators(operators)
   if (uniqueOperators.length === 0) {
-    logSklandImportDebug('no convertible operators', gamePlayerInfo)
     throw new Error('森空岛干员数据无法转换为当前系统格式，请稍后重试。')
   }
   return uniqueOperators.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'))
@@ -192,7 +190,7 @@ export function generateSklandSign(token: string, path: string, queryOrBody: str
   return createHash('md5').update(hmac, 'utf8').digest('hex')
 }
 
-class SklandClient {
+export class SklandClient {
   private token = ''
   private timestamp = ''
 
@@ -223,6 +221,23 @@ class SklandClient {
       throw new Error('读取森空岛干员数据失败，请稍后重试。')
     }
     return data
+  }
+
+  async getCultivateInfo(): Promise<unknown> {
+    const data = await this.getSigned<ApiEnvelope>('/api/v1/game/cultivate/info')
+    return getEnvelopeData(data, '读取森空岛养成通用数据失败，请稍后重试。')
+  }
+
+  async getCultivatePlayer(uid: string): Promise<unknown> {
+    const query = `uid=${encodeURIComponent(uid)}`
+    const data = await this.getSigned<ApiEnvelope>('/api/v1/game/cultivate/player', query)
+    return getEnvelopeData(data, '读取森空岛养成库存失败，请稍后重试。')
+  }
+
+  async getCultivateCharacter(characterId: string): Promise<unknown> {
+    const query = `characterId=${encodeURIComponent(characterId)}`
+    const data = await this.getSigned<ApiEnvelope>('/api/v1/game/cultivate/character', query)
+    return getEnvelopeData(data, '读取森空岛干员养成材料失败，请稍后重试。')
   }
 
   private async refreshToken(): Promise<void> {
@@ -302,6 +317,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
+function getEnvelopeData(envelope: ApiEnvelope, message: string): unknown {
+  if (envelope.code !== 0 || envelope.message !== 'OK' || envelope.data === undefined || envelope.data === null) {
+    throw new Error(message)
+  }
+  return envelope.data
+}
+
 function stringValue(value: unknown): string {
   if (typeof value === 'string') return value.trim()
   if (typeof value === 'number' && Number.isFinite(value)) return String(value)
@@ -350,41 +372,4 @@ function getNestedRecord(value: unknown, path: string[]): Record<string, unknown
     current = current[key]
   }
   return isRecord(current) ? current : null
-}
-
-function logSklandImportDebug(reason: string, gamePlayerInfo: unknown): void {
-  if (process.env.SKLAND_DEBUG_IMPORT !== '1') return
-  const data = isRecord(gamePlayerInfo) && isRecord(gamePlayerInfo.data) ? gamePlayerInfo.data : null
-  const chars = data && Array.isArray(data.chars) ? data.chars : null
-  const charInfoMap = data && isRecord(data.charInfoMap) ? data.charInfoMap : null
-  const summary = {
-    reason,
-    root_keys: isRecord(gamePlayerInfo) ? Object.keys(gamePlayerInfo).slice(0, 30) : [],
-    data_keys: data ? Object.keys(data).slice(0, 50) : [],
-    chars_length: chars?.length ?? null,
-    char_info_map_size: charInfoMap ? Object.keys(charInfoMap).length : null,
-    chars_sample: chars?.slice(0, 5).map(summarizeSklandCharacter) ?? null,
-    char_info_sample: charInfoMap
-      ? Object.entries(charInfoMap).slice(0, 5).map(([id, value]) => ({ id, ...summarizeSklandCharacter(value) }))
-      : null,
-  }
-  console.warn('[skland import debug]', safeJson(summary))
-}
-
-function summarizeSklandCharacter(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) return { type: typeof value }
-  return {
-    keys: Object.keys(value).slice(0, 30),
-    charId: stringValue(value.charId ?? value.id) || undefined,
-    name: stringValue(value.name) || undefined,
-    evolvePhase: numberValue(value.evolvePhase),
-    level: numberValue(value.level),
-    potentialRank: numberValue(value.potentialRank),
-    rarity: numberValue(value.rarity),
-  }
-}
-
-function safeJson(value: unknown): string {
-  const text = JSON.stringify(value)
-  return text.length > 8000 ? `${text.slice(0, 8000)}...[truncated]` : text
 }

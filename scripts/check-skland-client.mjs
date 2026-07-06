@@ -33,12 +33,14 @@ const operators = skland.convertSklandCharactersToOperators({
       { charId: 'char_1001_amiya2', evolvePhase: 1, level: 70, potentialRank: 3 },
       { charId: 'char_1037_amiya3', evolvePhase: 0, level: 50, potentialRank: 1 },
       { charId: 'token_10002_kalts_mon3tr', name: 'Mon3tr', evolvePhase: 0, rarity: 5 },
-      { charId: 'char_010_chen', name: '陈', evolvePhase: '1', level: '70', potentialRank: '2', rarity: '5' },
+      { charId: 'char_010_chen', name: '陈', evolvePhase: '1', level: '70', potentialRank: '2', rarity: 0 },
+      { charId: 'char_rawonly', name: '仅原始稀有度', evolvePhase: 0, level: 1, potentialRank: 0, rarity: 5 },
     ],
     charInfoMap: {
       char_002_amiya: { name: '阿米娅', rarity: 4 },
       char_1001_amiya2: { name: '阿米娅', rarity: 4 },
       char_1037_amiya3: { name: '阿米娅', rarity: 4 },
+      char_010_chen: { name: '陈', rarity: 5 },
     },
   },
 })
@@ -50,6 +52,13 @@ if (!operators.every((operator) => operator.id.startsWith('char_') && operator.o
 }
 if (operators.filter((operator) => operator.name === '阿米娅').length !== 1) {
   throw new Error('converted operators should dedupe Amiya variants')
+}
+const chen = operators.find((operator) => operator.id === 'char_010_chen')
+if (chen?.rarity !== 5) {
+  throw new Error(`converted operators should use charInfoMap rarity, got ${chen?.rarity}`)
+}
+if (operators.some((operator) => operator.id === 'char_rawonly')) {
+  throw new Error('converted operators should require charInfoMap rarity')
 }
 
 const calls = []
@@ -90,8 +99,20 @@ globalThis.fetch = async (url, init) => {
     return jsonResponse({
       code: 0,
       message: 'OK',
-      data: { chars: [{ charId: 'char_002_amiya', name: '阿米娅', evolvePhase: 2, level: 80, potentialRank: 5, rarity: 4 }] },
+      data: {
+        chars: [{ charId: 'char_002_amiya', name: '阿米娅', evolvePhase: 2, level: 80, potentialRank: 5, rarity: 0 }],
+        charInfoMap: { char_002_amiya: { name: '阿米娅', rarity: 4 } },
+      },
     })
+  }
+  if (String(url).endsWith('/api/v1/game/cultivate/info')) {
+    return jsonResponse({ code: 0, message: 'OK', data: { characters: [], items: {} } })
+  }
+  if (String(url).includes('/api/v1/game/cultivate/player')) {
+    return jsonResponse({ code: 0, message: 'OK', data: { items: [], characters: [] } })
+  }
+  if (String(url).includes('/api/v1/game/cultivate/character')) {
+    return jsonResponse({ code: 0, message: 'OK', data: { evolvePhaseCost: [] } })
   }
   throw new Error(`unexpected fetch ${url}`)
 }
@@ -109,6 +130,20 @@ if (cred !== 'skland-cred') throw new Error('cred exchange failed')
 const imported = await skland.importSklandOperatorsByCred(cred)
 if (imported.binding.uid !== '12345678' || imported.operators.length !== 1) {
   throw new Error('skland import flow failed')
+}
+const refreshCallsBeforeCultivate = calls.filter((call) => String(call.url).endsWith('/api/v1/auth/refresh')).length
+const cultivateClient = new skland.SklandClient('cultivate-cred')
+await cultivateClient.getCultivateInfo()
+await cultivateClient.getCultivatePlayer('12345678')
+await cultivateClient.getCultivateCharacter('char_002_amiya')
+const refreshCallsAfterCultivate = calls.filter((call) => String(call.url).endsWith('/api/v1/auth/refresh')).length
+if (refreshCallsAfterCultivate !== refreshCallsBeforeCultivate + 1) {
+  throw new Error('cultivate requests should reuse one refreshed Skland token')
+}
+for (const path of ['/api/v1/game/cultivate/info', '/api/v1/game/cultivate/player?uid=12345678', '/api/v1/game/cultivate/character?characterId=char_002_amiya']) {
+  if (!calls.some((call) => String(call.url).endsWith(path))) {
+    throw new Error(`missing cultivate request ${path}`)
+  }
 }
 if (calls.some((call) => JSON.stringify(call).includes('cred-secret'))) {
   throw new Error('mock calls should not include credential plaintext from encryption test')

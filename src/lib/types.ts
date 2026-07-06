@@ -244,7 +244,56 @@ export type AnalyzeScheduleResult = OptimizeResult & {
   analysis_summary: ScheduleAnalysisSummary;
 };
 
-export type RawUpgradeSuggestion =
+export interface UpgradeTrainingMaterial {
+  id: string;
+  name: string;
+  count: number;
+  rarity?: number;
+  sortId?: number;
+  equivalent_sanity?: number | null;
+}
+
+export interface UpgradeTrainingCostBucket {
+  cash: number;
+  exp: number;
+  materials: UpgradeTrainingMaterial[];
+  equivalent_sanity: number | null;
+}
+
+export interface UpgradeTrainingOperatorCost {
+  id: string;
+  name: string;
+  current_elite: number;
+  target_elite: number;
+  current_level: number;
+  target_level: number;
+  totals: UpgradeTrainingCostBucket;
+  missing: UpgradeTrainingCostBucket;
+  warnings: string[];
+}
+
+export interface UpgradeTrainingCost {
+  status: 'available' | 'partial' | 'unavailable';
+  target?: {
+    id: string;
+    name: string;
+    current_elite: number;
+    target_elite: number;
+  };
+  totals: UpgradeTrainingCostBucket;
+  missing: UpgradeTrainingCostBucket;
+  equivalent_sanity: number | null;
+  unpriced_items: UpgradeTrainingMaterial[];
+  sources: {
+    skland: 'ok' | 'unavailable';
+    yituliu: 'ok' | 'unavailable';
+    lmd_exp: 'fixed_36_per_10000';
+  };
+  warnings: string[];
+  operators: UpgradeTrainingOperatorCost[];
+}
+
+export type RawUpgradeSuggestion = (
   | {
       type: 'single';
       id?: string;
@@ -261,7 +310,10 @@ export type RawUpgradeSuggestion =
       gain: number;
       rooms?: string;
       specialType?: string;
-    };
+    }
+) & {
+  training_cost?: UpgradeTrainingCost;
+};
 
 export interface RoomOverflow {
   equivalent?: {
@@ -366,11 +418,14 @@ export interface UpgradeSuggestion {
   type: 'single' | 'bundle';
   id?: string;
   name?: string;
-  ops?: { id: string; name: string; current_elite: number; target_elite: number }[];
+  ops?: { id?: string; name: string; current?: number; target?: number; current_elite?: number; target_elite?: number }[];
   gain: number;
   current_elite?: number;
   target_elite?: number;
+  current?: number;
+  target?: number;
   desc?: string;
+  training_cost?: UpgradeTrainingCost;
 }
 
 export interface AuthUser {

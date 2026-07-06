@@ -335,31 +335,33 @@ export default function OptimizePage({
         : potential
       const serverSuggestions = suggestionResult?.upgrade_suggestions
       const upgradeList: UpgradeSuggestion[] = serverSuggestions && serverSuggestions.length > 0
-        ? serverSuggestions.map((s, idx) => {
-          if (s.type === 'single') {
-            return {
-              type: 'single' as const,
-              id: s.id || s.name || '',
-              name: s.name,
-              current_elite: s.current,
-              target_elite: s.target,
-              gain: Math.round(s.gain),
-              desc: `${s.name}: 精${s.current} → 精${s.target}`,
-            }
-          }
-          return {
-            type: 'bundle' as const,
-            id: `bundle-${idx}`,
-            gain: Math.round(s.gain),
-            desc: s.ops?.map(o => `${o.name}: 精${o.current}→精${o.target}`).join(', ') || '',
-            ops: s.ops?.map(o => ({
-              id: o.id || o.name,
-              name: o.name,
-              current_elite: o.current,
-              target_elite: o.target,
-            })),
-          }
-        })
+            ? serverSuggestions.map((s, idx) => {
+              if (s.type === 'single') {
+                return {
+                  type: 'single' as const,
+                  id: s.id || s.name || '',
+                  name: s.name,
+                  current_elite: s.current,
+                  target_elite: s.target,
+                  gain: Math.round(s.gain),
+                  desc: `${s.name}: 精${s.current} → 精${s.target}`,
+                  training_cost: s.training_cost,
+                }
+              }
+              return {
+                type: 'bundle' as const,
+                id: `bundle-${idx}`,
+                gain: Math.round(s.gain),
+                desc: s.ops?.map(o => `${o.name}: 精${o.current}→精${o.target}`).join(', ') || '',
+                ops: s.ops?.map(o => ({
+                  id: o.id || o.name,
+                  name: o.name,
+                  current_elite: o.current,
+                  target_elite: o.target,
+                })),
+                training_cost: s.training_cost,
+              }
+            })
         : []
       completed = true
       setProgress({ mode: 'generate', startedAt, completedAt: Date.now() })
