@@ -79,7 +79,7 @@ export default function AuthForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8'}>
+    <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'space-y-5 rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8'}>
       <div className="grid grid-cols-2 rounded-lg bg-surface-2 p-1">
         <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null) }} className={`rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>登录</button>
         <button type="button" onClick={() => { setMode('register'); setError(null); setNotice(null) }} className={`rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>注册</button>
