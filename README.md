@@ -134,6 +134,7 @@ npm run check:migration
 - `POST /api/usage-stats`
 - `GET /api/admin/usage-stats`
 - `GET`/`POST`/`PATCH`/`DELETE /api/admin/cdk`
+- `GET`/`PUT /api/admin/risk-settings`
 - `GET`/`POST`/`DELETE /api/admin/users`
 - `POST /api/analyze-schedule`
 - `POST /api/free-preview`

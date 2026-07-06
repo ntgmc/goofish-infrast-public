@@ -100,6 +100,17 @@ async function handleList(req: Request): Promise<Response> {
       return jsonResponse({ error: '管理账号或密码错误。' }, 401)
     }
 
+    const detailCodeHash = new URL(req.url).searchParams.get('code_hash')
+    if (detailCodeHash) {
+      if (!/^[a-f0-9]{64}$/i.test(detailCodeHash)) {
+        return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
+      }
+      const store = await getCdkRecordStore()
+      const record = await store.get(`cdk/${detailCodeHash}.json`)
+      if (!record) return jsonResponse({ error: 'CDK not found.' }, 404)
+      return jsonResponse({ cdk: toAdminCdkDetail(record) })
+    }
+
     const status = normalizeStatusFilter(req.headers.get('X-Cdk-Status'), req.url)
     const store = await getCdkRecordStore()
     const records = (await store.list('cdk/'))
@@ -126,13 +137,21 @@ async function handlePatch(req: Request): Promise<Response> {
       code_hash?: string;
       action?: string;
       permission?: string;
+      order_note?: string;
     }
-    const { code_hash, action, permission } = body
+    const { code_hash, action, permission, order_note } = body
 
     if (!(await authenticateAdminRequest(req, body))) {
       return jsonResponse({ error: '管理账号或密码错误。' }, 401)
     }
-    if (action !== 'revoke' && action !== 'upgrade' && action !== 'grant_operator_update' && action !== 'unfreeze') {
+    if (
+      action !== 'revoke'
+      && action !== 'upgrade'
+      && action !== 'grant_operator_update'
+      && action !== 'unfreeze'
+      && action !== 'update_note'
+      && action !== 'set_permission'
+    ) {
       return jsonResponse({ error: 'Unsupported action.' }, 400)
     }
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
@@ -145,6 +164,35 @@ async function handlePatch(req: Request): Promise<Response> {
 
     if (!existing) {
       return jsonResponse({ error: 'CDK not found.' }, 404)
+    }
+
+    if (action === 'update_note') {
+      const updated: CdkRecord = {
+        ...existing,
+        order_note: typeof order_note === 'string' && order_note.trim() ? order_note.trim().slice(0, 500) : null,
+      }
+      await store.set(key, updated)
+      return jsonResponse({ updated: true, cdk: toAdminCdkDetail(updated) })
+    }
+
+    if (action === 'set_permission') {
+      if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
+        return jsonResponse({ error: '目标 CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
+      }
+      if (existing.status === 'revoked') {
+        return jsonResponse({ error: '已撤销授权不能调整权限。' }, 409)
+      }
+      const updated: CdkRecord = {
+        ...existing,
+        permission: permission as ProductPermissionMode,
+      }
+      await store.set(key, updated)
+      return jsonResponse({
+        updated: true,
+        cdk_id: existing.code_hash.slice(0, 12),
+        permission: updated.permission,
+        cdk: toAdminCdkDetail(updated),
+      })
     }
 
     if (action === 'unfreeze') {
@@ -336,8 +384,64 @@ function toAdminCdkRecord(record: CdkRecord) {
     user_agent_count: new Set((record.user_agent_events ?? []).map((event) => event.hash)).size,
     ip_prefix_count: new Set((record.ip_prefix_events ?? []).map((event) => event.hash)).size,
     risk_event_count: record.risk_events?.length ?? 0,
-    latest_risk_event: record.risk_events?.at(-1) ?? null,
+    latest_risk_event: summarizeRiskEvent(record.risk_events?.at(-1)),
   }
+}
+
+function summarizeRiskEvent(event: NonNullable<CdkRecord['risk_events']>[number] | undefined) {
+  if (!event) return null
+  return {
+    at: event.at,
+    type: event.type,
+    reason: event.reason,
+  }
+}
+
+function toAdminCdkDetail(record: CdkRecord) {
+  return {
+    ...toAdminCdkRecord(record),
+    revoked_at: record.revoked_at ?? null,
+    operator_update_granted_at: record.operator_update_granted_at ?? null,
+    operator_update_consumed_at: record.operator_update_consumed_at ?? null,
+    baseline_operator_count: record.baseline_operator_fingerprint?.owned_count ?? null,
+    latest_operator_count: record.latest_operator_fingerprint?.owned_count ?? null,
+    risk_events: (record.risk_events ?? []).map((event) => ({
+      at: event.at,
+      type: event.type,
+      reason: event.reason,
+      detail: sanitizeRiskDetail(event.detail),
+    })),
+    operator_update_events: (record.operator_update_events ?? []).map((event) => ({
+      at: event.at,
+      operator_count: event.operator_count,
+    })),
+    device_signals: {
+      activation_bound: Boolean(record.activation_token_hash),
+      user_agent_count: new Set((record.user_agent_events ?? []).map((event) => event.hash)).size,
+      ip_prefix_count: new Set((record.ip_prefix_events ?? []).map((event) => event.hash)).size,
+    },
+    linked_account: record.account_id && record.profile_id
+      ? { account_id: record.account_id, profile_id: record.profile_id }
+      : null,
+  }
+}
+
+function sanitizeRiskDetail(detail: Record<string, unknown> | undefined): Record<string, unknown> | null {
+  if (!detail) return null
+  const sanitized: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(detail)) {
+    if (isSensitiveRiskDetailKey(key)) continue
+    if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      sanitized[key] = value
+    } else if (Array.isArray(value)) {
+      sanitized[key] = { count: value.length }
+    }
+  }
+  return Object.keys(sanitized).length > 0 ? sanitized : null
+}
+
+function isSensitiveRiskDetailKey(key: string): boolean {
+  return /(hash|token|secret|credential|encrypted|salt|password)/i.test(key)
 }
 
 function normalizeProductPermission(permission: CdkRecord['permission']): ProductPermissionMode | null {

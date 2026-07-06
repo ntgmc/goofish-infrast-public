@@ -248,6 +248,7 @@ function memoryLicenseUtilsModule() {
     export async function freezeCdkRecord(record) { return record }
     export function getPermissionMode(license) { return license?.permission ?? 'growth' }
     export async function getCdkRecordStore() { return { get: async () => null, set: async () => undefined } }
+    export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, device_risk_enabled: false, updated_at: null } }
     export async function findCdkRecordByLicenseOrderHash() { return null }
     export async function incrementCdkScheduleGenerateCount() {}
     export function normalizePermissionMode(permission) { return permission ?? 'growth' }
