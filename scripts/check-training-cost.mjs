@@ -18,6 +18,15 @@ await esbuild.build({
 })
 
 const training = await import(`${pathToFileURL(modulePath).href}?t=${Date.now()}`)
+const sanityDebugLogs = []
+const originalConsoleInfo = console.info
+console.info = (...args) => {
+  if (args[0] === '[training-cost sanity debug]') {
+    sanityDebugLogs.push(args)
+    return
+  }
+  originalConsoleInfo(...args)
+}
 
 const operators = [
   { id: 'char_test_a', name: '测试干员A', own: true, elite: 0, level: 1, rarity: 2 },
@@ -86,6 +95,19 @@ if (partial.equivalent_sanity !== partial.totals.equivalent_sanity) {
 }
 if (partial.equivalent_sanity === partial.missing.equivalent_sanity) {
   throw new Error('top-level equivalent sanity should not use inventory gap')
+}
+const oldGrossSanity =
+  (partial.totals.cash + partial.totals.exp) * (36 / 10000) +
+  partial.totals.materials.reduce((sum, item) => sum + (item.equivalent_sanity ?? 0), 0)
+if (partial.equivalent_sanity >= oldGrossSanity) {
+  throw new Error('LMD equivalent sanity should deduct pure gold consumed by trading post')
+}
+const firstSanityDebug = JSON.parse(sanityDebugLogs[0]?.[1] ?? '{}')
+if (!String(firstSanityDebug.formula ?? '').includes(' * ') || !String(firstSanityDebug.formula ?? '').includes('龙门币')) {
+  throw new Error('sanity debug log should include a readable multiplication formula')
+}
+if (!String(firstSanityDebug.lmd?.unit_formula ?? '').includes('0.002')) {
+  throw new Error('sanity debug log should show pure gold deduction in LMD unit formula')
 }
 
 const enough = training.calculateEliteTrainingCostForTest({
@@ -181,4 +203,5 @@ if (priceMap.get('3001') !== 19 || priceMap.get('3002') !== 31 || priceMap.get('
   throw new Error('Yituliu price map should read itemValueAp and prefer the lowest positive apExpect')
 }
 
+console.info = originalConsoleInfo
 console.log('training cost smoke check ok')
