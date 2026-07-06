@@ -87,8 +87,8 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_created_at ON password_rese
 CREATE TABLE IF NOT EXISTS user_game_accounts (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
-  cdk_key TEXT NOT NULL,
-  cdk_code_hash TEXT NOT NULL,
+  cdk_key TEXT,
+  cdk_code_hash TEXT,
   cdk_order_hash TEXT,
   permission TEXT NOT NULL,
   status TEXT NOT NULL,
@@ -152,6 +152,9 @@ CREATE INDEX IF NOT EXISTS idx_depot_value_samples_operator_power ON depot_value
 ALTER TABLE user_accounts ALTER COLUMN cdk_key DROP NOT NULL;
 ALTER TABLE user_accounts ALTER COLUMN cdk_code_hash DROP NOT NULL;
 ALTER TABLE user_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
+ALTER TABLE user_game_accounts ALTER COLUMN cdk_key DROP NOT NULL;
+ALTER TABLE user_game_accounts ALTER COLUMN cdk_code_hash DROP NOT NULL;
+ALTER TABLE user_game_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
 `
 
 export async function ensureDatabaseSchema(): Promise<void> {

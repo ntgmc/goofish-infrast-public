@@ -31,6 +31,7 @@ await assertEncodedCredentialPreview()
 await assertInvalidCredentialPreview()
 await assertOversizedCredentialPreview()
 await assertConfirmImport()
+await assertDepotValueConfirmDoesNotWriteWorkspace()
 await assertRefreshImport()
 await assertMatchingRebindResetsRisk()
 await assertMismatchedRebindDoesNotLeakRiskCount()
@@ -237,6 +238,49 @@ async function assertConfirmImport() {
   }
 }
 
+async function assertDepotValueConfirmDoesNotWriteWorkspace() {
+  seedProfile({ id: 'depot-profile', status: 'active' })
+  store.profiles.set('depot-profile', {
+    ...store.profiles.get('depot-profile'),
+    kind: 'depot_value',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    permission: 'growth',
+  })
+  store.workspaces.delete('depot-profile')
+  setFetchMode('complete')
+  const preview = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'depot-profile',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  if (preview.status !== 200 || preview.body.status !== 'confirm_required') {
+    throw new Error(`depot confirm: expected confirm_required preview, got ${preview.status}`)
+  }
+  const result = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'depot-profile',
+    confirmation_id: preview.body.confirmation_id,
+  })
+  assertNoSecretLeak(result.body, 'depot confirm response')
+  if (result.status !== 200 || !result.body.active_profile?.skland_binding) {
+    throw new Error(`depot confirm: expected public binding in auth payload, got ${result.status}`)
+  }
+  if (result.body.skland_import) {
+    throw new Error('depot confirm: should not return workspace import summary')
+  }
+  if (store.workspaces.has('depot-profile')) {
+    throw new Error('depot confirm: should not create or write workspace')
+  }
+  if (store.profiles.get('depot-profile')?.skland_pending_binding) {
+    throw new Error('depot confirm: pending binding was not cleared')
+  }
+  const refresh = await callSkland('/api/user/skland/import/refresh', { profile_id: 'depot-profile' })
+  if (refresh.status !== 403) {
+    throw new Error(`depot refresh: expected 403, got ${refresh.status}`)
+  }
+}
+
 async function assertRefreshImport() {
   setFetchMode('refresh')
   const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-1' })
@@ -357,6 +401,7 @@ function seedProfile({ id, status }) {
     cdk_code_hash: `hash-${id}`,
     cdk_order_hash: null,
     permission: 'advanced',
+    kind: 'cdk',
     status,
     display_name: id,
     note: '',
@@ -544,6 +589,9 @@ function memoryUserStoreModule() {
     export async function saveUserProfile(profile) {
       store.profiles.set(profile.id, profile)
     }
+    export function isDepotValueProfile(profile) {
+      return profile?.kind === 'depot_value'
+    }
   `
 }
 
@@ -579,6 +627,7 @@ function memoryUserAuthModule() {
       return {
         id: profile.id,
         user_id: profile.user_id,
+        kind: profile.kind === 'depot_value' ? 'depot_value' : 'cdk',
         permission: profile.permission,
         status: profile.status,
         cdk_order_hash: profile.cdk_order_hash,

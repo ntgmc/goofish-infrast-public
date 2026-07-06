@@ -1,7 +1,9 @@
 import {
   emptyWorkspace,
+  getOrCreateDepotValueProfile,
   getProfileForUser,
   getProfileWorkspace,
+  isDepotValueProfile,
   listProfilesForUser,
   saveProfileWorkspace,
   saveUserProfile,
@@ -17,6 +19,15 @@ export default async (req: Request): Promise<Response> => {
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
 
     const pathname = new URL(req.url).pathname
+
+    if (pathname.endsWith('/depot-value')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      const profile = await getOrCreateDepotValueProfile(auth.user)
+      return jsonResponse({
+        ...(await buildAuthPayload(auth.user, profile.id)),
+        depot_profile: toPublicProfile(profile, null),
+      })
+    }
 
     if (req.method === 'GET') {
       const profiles = await listProfilesForUser(auth.user.id)
@@ -50,7 +61,7 @@ export default async (req: Request): Promise<Response> => {
         updated_at: new Date().toISOString(),
       }
       await saveUserProfile(updated)
-      if (!(await getProfileWorkspace(updated.id))) {
+      if (!isDepotValueProfile(updated) && !(await getProfileWorkspace(updated.id))) {
         await saveProfileWorkspace(emptyWorkspace(updated.id))
       }
       return jsonResponse(await buildAuthPayload(auth.user, updated.id))

@@ -5,6 +5,7 @@ import {
   emptyWorkspace,
   getProfileForUser,
   getProfileWorkspace,
+  isDepotValueProfile,
   saveProfileWorkspace,
   saveUserProfile,
   type SklandBindingRecord,
@@ -115,6 +116,10 @@ export default async (req: Request): Promise<Response> => {
         return jsonResponse({ error: '森空岛账号与当前绑定账号不一致，请重新登录森空岛。' }, 409)
       }
 
+      if (isDepotValueProfile(profile)) {
+        return jsonResponse(await saveDepotValueSklandBinding(auth.user, profile))
+      }
+
       const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(pending.encrypted_cred))
       return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
     }
@@ -124,6 +129,9 @@ export default async (req: Request): Promise<Response> => {
       ensureSklandCredentialSecret()
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
+      if (isDepotValueProfile(profile)) {
+        return jsonResponse({ error: '仓库分析档案不会刷新干员工作区，请在仓库价值分析页重新分析。' }, 403)
+      }
       const encryptedCred = profile.skland_binding?.encrypted_cred
       if (!encryptedCred) return jsonResponse({ error: '当前账号尚未绑定森空岛，请先登录导入。' }, 404)
       const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(encryptedCred))
@@ -137,6 +145,31 @@ export default async (req: Request): Promise<Response> => {
     const status = message.includes('SKLAND_CREDENTIAL_SECRET') ? 500 : 400
     return jsonResponse({ error: message }, status)
   }
+}
+
+async function saveDepotValueSklandBinding(
+  user: AuthPayloadUser,
+  profile: UserGameAccountRecord,
+): Promise<AuthSuccessResponse> {
+  const pending = profile.skland_pending_binding
+  if (!pending) throw new Error('森空岛绑定确认已失效，请重新登录森空岛。')
+  const now = new Date().toISOString()
+  const existingBinding = profile.skland_binding
+  await saveUserProfile({
+    ...profile,
+    skland_binding: {
+      uid: pending.uid,
+      nickname: pending.nickname,
+      channel_name: pending.channel_name,
+      bound_at: existingBinding?.bound_at ?? now,
+      last_imported_at: null,
+      encrypted_cred: pending.encrypted_cred,
+    },
+    skland_pending_binding: null,
+    skland_risk: { uid_mismatch_count: 0, last_mismatch_uid: null, last_mismatch_nickname: null, last_mismatch_at: null },
+    updated_at: now,
+  })
+  return buildAuthPayload(user, profile.id)
 }
 
 async function createPendingSklandBindingFromCred(

@@ -46,6 +46,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/license-status', licenseStatusHandler as unknown as ApiHandler],
   ['/api/user/announcements', userAnnouncementsHandler as unknown as ApiHandler],
   ['/api/user/profiles', userProfilesHandler as unknown as ApiHandler],
+  ['/api/user/profiles/depot-value', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/redeem', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/skland/login/start', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/login/complete', userSklandHandler as unknown as ApiHandler],

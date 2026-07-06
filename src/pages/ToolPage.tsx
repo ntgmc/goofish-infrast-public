@@ -16,10 +16,12 @@ import type {
 } from '../lib/types'
 import AnnouncementPopup from '../components/AnnouncementPopup'
 import AnnouncementBanner from '../components/AnnouncementBanner'
+import AuthForm from '../components/AuthForm'
 import BrandLogo from '../components/BrandLogo'
 import ConfigEditor, { CONFIG_PRESETS, PERMISSION_LABELS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import DeferredFeatureMenu from '../components/DeferredFeatureMenu'
 import ScheduleAnalysisTool from '../components/ScheduleAnalysisTool'
+import SklandBindingDialog from '../components/SklandBindingDialog'
 import { canonicalJson } from '../lib/crypto'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
@@ -182,6 +184,9 @@ export default function ToolPage() {
     applyAuthPayload(null)
   }, [applyAuthPayload])
 
+  const cdkProfiles = useMemo(() => profiles.filter(isCdkProfile), [profiles])
+  const activeCdkProfile = activeProfile && isCdkProfile(activeProfile) ? activeProfile : cdkProfiles[0] ?? null
+
   if (authLoading) {
     return <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">正在确认登录信息...</div>
   }
@@ -194,8 +199,8 @@ export default function ToolPage() {
       ) : workspaceMode === 'dashboard' ? (
         <AccountDashboard
           user={user}
-          profiles={profiles}
-        activeProfile={activeProfile}
+          profiles={cdkProfiles}
+        activeProfile={activeCdkProfile}
         announcementUnreadCount={announcementUnreadCount}
         openingProfileId={openingProfileId}
         workspaceLoadError={workspaceLoadError}
@@ -205,7 +210,7 @@ export default function ToolPage() {
             void refreshProfileWorkspace(profile, 'setup').catch(console.error)
           }}
         />
-      ) : activeProfile && (workspaceMode === 'setup' || !license) ? (
+      ) : activeProfile && isCdkProfile(activeProfile) && (workspaceMode === 'setup' || !license) ? (
         <WorkspaceSetupPage
           user={user}
           profile={activeProfile}
@@ -216,7 +221,7 @@ export default function ToolPage() {
           onBack={() => setWorkspaceMode('dashboard')}
           onLogout={handleLogout}
         />
-      ) : activeProfile && license ? (
+      ) : activeProfile && isCdkProfile(activeProfile) && license ? (
         <Suspense fallback={<div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">正在载入排班工具...</div>}>
           <OptimizePage
             profileId={activeProfile.id}
@@ -235,8 +240,8 @@ export default function ToolPage() {
       ) : (
         <AccountDashboard
           user={user}
-          profiles={profiles}
-        activeProfile={activeProfile}
+          profiles={cdkProfiles}
+        activeProfile={activeCdkProfile}
         announcementUnreadCount={announcementUnreadCount}
         openingProfileId={openingProfileId}
         workspaceLoadError={workspaceLoadError}
@@ -258,63 +263,6 @@ function AuthPage({
   announcement: Announcement | null
   onAuthenticated: (payload: AuthSuccessResponse) => void
 }) {
-  const [mode, setMode] = useState<AuthMode>('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [cdk, setCdk] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    const nextErrors: FieldErrors = {}
-    const emailError = validateEmailInput(email)
-    const passwordError = mode === 'forgot' ? null : validatePasswordInput(password)
-    if (emailError) nextErrors.email = emailError
-    if (passwordError) nextErrors.password = passwordError
-    setFieldErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) return
-    setLoading(true)
-    setError(null)
-    setNotice(null)
-    try {
-      if (mode === 'forgot') {
-        const resp = await fetch('/api/auth/forgot-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-        })
-        const data = await resp.json() as { error?: string; message?: string }
-        if (!resp.ok) throw new Error(data.error || `发送重置邮件失败: ${resp.status}`)
-        setNotice(data.message || '如果该邮箱已注册，我们会发送重置密码邮件。')
-        return
-      }
-      const resp = await fetch(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mode === 'login' ? { email, password } : { email, password, cdk: cdk.trim() || undefined }),
-      })
-      const data = await resp.json() as AuthSuccessResponse & { error?: string }
-      if (!resp.ok || !data.user) throw new Error(data.error || `${mode === 'login' ? '登录' : '注册'}失败: ${resp.status}`)
-      onAuthenticated(data)
-    } catch (caught) {
-      setError((caught as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const clearFieldError = (field: string) => {
-    setFieldErrors((current) => {
-      if (!current[field]) return current
-      const next = { ...current }
-      delete next[field]
-      return next
-    })
-  }
-
   return (
     <main className="min-h-screen bg-surface-0 px-4 py-8 sm:px-6">
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
@@ -329,71 +277,7 @@ function AuthPage({
           </p>
           {announcement?.active && <AnnouncementBanner announcement={announcement} className="mt-6" />}
         </section>
-
-        <form onSubmit={handleSubmit} noValidate className="rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8">
-            <div className="mb-6 grid grid-cols-2 rounded-lg bg-surface-2 p-1">
-              <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null) }} className={`rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>登录</button>
-              <button type="button" onClick={() => { setMode('register'); setError(null); setNotice(null) }} className={`rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>注册</button>
-            </div>
-            {error && <div className="mb-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
-            {notice && <div className="mb-5 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{notice}</div>}
-            {mode === 'forgot' && <h2 className="mb-5 text-lg font-semibold text-ink-primary">重置密码</h2>}
-            <label className="block">
-            <span className="mb-2 block text-sm font-medium text-ink-secondary">邮箱</span>
-            <input
-              id="auth-email"
-              type="email"
-              value={email}
-              onChange={(event) => {
-                setEmail(event.currentTarget.value)
-                clearFieldError('email')
-              }}
-              onFocus={() => clearFieldError('email')}
-              className={inputClassName(Boolean(fieldErrors.email))}
-              aria-invalid={Boolean(fieldErrors.email)}
-              aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
-            />
-            {fieldErrors.email && <p id="auth-email-error" className="mt-1.5 text-sm text-error">{fieldErrors.email}</p>}
-          </label>
-            {mode !== 'forgot' && (
-              <label className="mt-4 block">
-                <span className="mb-2 block text-sm font-medium text-ink-secondary">密码</span>
-                <input
-                  id="auth-password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => {
-                    setPassword(event.currentTarget.value)
-                    clearFieldError('password')
-                  }}
-                  onFocus={() => clearFieldError('password')}
-                  className={inputClassName(Boolean(fieldErrors.password))}
-                  aria-invalid={Boolean(fieldErrors.password)}
-                  aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
-                />
-                {fieldErrors.password && <p id="auth-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.password}</p>}
-              </label>
-            )}
-            {mode === 'register' && (
-              <label className="mt-4 block">
-                <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK（可选）</span>
-                <input type="text" value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink-primary" placeholder="可注册后再兑换" />
-              </label>
-            )}
-            {mode === 'login' && (
-              <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}) }} className="mt-4 text-sm font-medium text-brand-500 underline-offset-4 hover:underline">
-                忘记密码？
-              </button>
-            )}
-            {mode === 'forgot' && (
-              <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null); setFieldErrors({}) }} className="mt-4 text-sm font-medium text-brand-500 underline-offset-4 hover:underline">
-                返回登录
-              </button>
-            )}
-      <button type="submit" disabled={loading} className="mt-6 w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
-        {loading ? '处理中...' : mode === 'login' ? '登录' : mode === 'register' ? '创建账号' : '发送重置邮件'}
-      </button>
-    </form>
+        <AuthForm onAuthenticated={onAuthenticated} allowCdk />
   </div>
 </main>
 )
@@ -1129,6 +1013,7 @@ function WorkspaceSetupPage({
 const [activeSection, setActiveSection] = useState<WorkspaceSetupSection>('operators')
 const [error, setError] = useState<string | null>(null)
 const [saving, setSaving] = useState(false)
+  const [sklandDialogOpen, setSklandDialogOpen] = useState(false)
   const [sklandLogin, setSklandLogin] = useState<SklandLoginState>({
     open: false,
     mode: 'scan',
@@ -1591,10 +1476,10 @@ const [saving, setSaving] = useState(false)
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={handleStartSklandLogin} disabled={sklandBusy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+                        <button type="button" onClick={() => setSklandDialogOpen(true)} disabled={sklandBusy || sklandDialogOpen} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
                           森空岛扫码导入
                         </button>
-                        <button type="button" onClick={handleRefreshSkland} disabled={sklandBusy || !profile.skland_binding} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:bg-surface-2 disabled:text-ink-muted">
+                        <button type="button" onClick={handleRefreshSkland} disabled={sklandBusy || sklandDialogOpen || !profile.skland_binding} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:bg-surface-2 disabled:text-ink-muted">
                           刷新森空岛数据
                         </button>
                       </div>
@@ -1646,6 +1531,13 @@ const [saving, setSaving] = useState(false)
           </div>
         </form>
       </main>
+      <SklandBindingDialog
+        open={sklandDialogOpen}
+        profile={profile}
+        context="workspace"
+        onOpenChange={setSklandDialogOpen}
+        onPayload={applySklandPayload}
+      />
  {sklandLogin.open && (
  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6">
  <section className="w-full max-w-2xl rounded-xl border border-surface-3 bg-surface-1 p-5 shadow-2xl">
@@ -1906,6 +1798,10 @@ function createAccountLicense(profile: UserGameAccount, operators: LicenseOperat
 
 function countOwnedOperators(operators: LicenseOperator[] | null | undefined): number {
   return operators?.filter((operator) => operator.own !== false).length ?? 0
+}
+
+function isCdkProfile(profile: UserGameAccount): boolean {
+  return profile.kind !== 'depot_value'
 }
 
 function sortOperatorsForPreview(operators: LicenseOperator[]): LicenseOperator[] {
