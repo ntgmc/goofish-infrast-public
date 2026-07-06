@@ -81,6 +81,12 @@ if (partial.missing.materials.find((item) => item.id === '3001')?.count !== 2) {
 if (partial.equivalent_sanity === null || partial.equivalent_sanity <= 0) {
   throw new Error('priced missing materials should produce equivalent sanity')
 }
+if (partial.equivalent_sanity !== partial.totals.equivalent_sanity) {
+  throw new Error('top-level equivalent sanity should use total demand')
+}
+if (partial.equivalent_sanity === partial.missing.equivalent_sanity) {
+  throw new Error('top-level equivalent sanity should not use inventory gap')
+}
 
 const enough = training.calculateEliteTrainingCostForTest({
   target: { id: 'char_test_a', name: '测试干员A', currentElite: 0, targetElite: 1 },
@@ -101,6 +107,12 @@ const enough = training.calculateEliteTrainingCostForTest({
 
 if (enough.missing.cash !== 0 || enough.missing.exp !== 0 || enough.missing.materials.length !== 0) {
   throw new Error('fully stocked inventory should have no missing resources')
+}
+if (enough.equivalent_sanity === null || enough.equivalent_sanity <= 0 || enough.totals.equivalent_sanity !== enough.equivalent_sanity) {
+  throw new Error('fully stocked inventory should still keep total-demand equivalent sanity')
+}
+if (enough.missing.equivalent_sanity !== 0) {
+  throw new Error('fully stocked inventory should keep missing equivalent sanity at zero')
 }
 
 const secondPromotion = training.calculateEliteTrainingCostForTest({
@@ -151,6 +163,11 @@ if (nested.totals.materials.find((item) => item.id === '3001')?.count !== 3) {
 }
 
 const priceMap = training.buildYituliuPriceMap({
+  code: 200,
+  msg: '操作成功',
+  data: [
+    { itemId: '3003', itemName: '糖', itemValue: 8, itemValueAp: 12 },
+  ],
   recommendedStageList: [
     { itemId: '3001', stageResultList: [{ apExpect: 21 }, { apExpect: 19 }] },
   ],
@@ -160,8 +177,8 @@ const priceMap = training.buildYituliuPriceMap({
   ],
 })
 
-if (priceMap.get('3001') !== 19 || priceMap.get('3002') !== 31) {
-  throw new Error('Yituliu price map should prefer the lowest positive apExpect')
+if (priceMap.get('3001') !== 19 || priceMap.get('3002') !== 31 || priceMap.get('3003') !== 12) {
+  throw new Error('Yituliu price map should read itemValueAp and prefer the lowest positive apExpect')
 }
 
 console.log('training cost smoke check ok')

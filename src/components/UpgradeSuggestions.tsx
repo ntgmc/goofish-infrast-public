@@ -192,28 +192,29 @@ function TrainingCostSummary({ cost }: { cost: UpgradeTrainingCost }) {
   const missingMaterialCount = cost.missing.materials.reduce((sum, item) => sum + item.count, 0)
   const totalMaterialCount = cost.totals.materials.reduce((sum, item) => sum + item.count, 0)
   const topMaterials = cost.missing.materials.slice(0, 4)
-  const sanityLabel = cost.equivalent_sanity === null
+  const totalSanity = cost.totals.equivalent_sanity
+  const sanityLabel = totalSanity === null
     ? '未估价'
-    : `${formatCostNumber(cost.equivalent_sanity)} 理智`
+    : `${formatCostNumber(totalSanity)} 理智`
 
   return (
     <div className="mt-3 rounded-lg border border-surface-3 bg-surface-0/60 px-3 py-2">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-        <span className="font-semibold text-ink-secondary">库存缺口</span>
+        <span className="font-semibold text-ink-secondary">总需求</span>
         <span className="text-ink-muted">等效理智</span>
         <span className="font-semibold text-brand-300">{sanityLabel}</span>
         <span className="text-ink-muted">龙门币</span>
-        <span className="font-mono text-ink-primary">{formatCostNumber(cost.missing.cash)}</span>
+        <span className="font-mono text-ink-primary">{formatCostNumber(cost.totals.cash)}</span>
         <span className="text-ink-muted">经验</span>
-        <span className="font-mono text-ink-primary">{formatCostNumber(cost.missing.exp)}</span>
+        <span className="font-mono text-ink-primary">{formatCostNumber(cost.totals.exp)}</span>
         <span className="text-ink-muted">材料</span>
-        <span className="font-mono text-ink-primary">{formatCostNumber(missingMaterialCount)}</span>
+        <span className="font-mono text-ink-primary">{formatCostNumber(totalMaterialCount)}</span>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
-        <span>总需求</span>
-        <span>龙门币 <span className="font-mono text-ink-secondary">{formatCostNumber(cost.totals.cash)}</span></span>
-        <span>经验 <span className="font-mono text-ink-secondary">{formatCostNumber(cost.totals.exp)}</span></span>
-        <span>材料 <span className="font-mono text-ink-secondary">{formatCostNumber(totalMaterialCount)}</span></span>
+        <span>库存缺口</span>
+        <span>龙门币 <span className="font-mono text-ink-secondary">{formatCostNumber(cost.missing.cash)}</span></span>
+        <span>经验 <span className="font-mono text-ink-secondary">{formatCostNumber(cost.missing.exp)}</span></span>
+        <span>材料 <span className="font-mono text-ink-secondary">{formatCostNumber(missingMaterialCount)}</span></span>
       </div>
       {topMaterials.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
