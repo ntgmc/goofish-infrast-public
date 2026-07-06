@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { DailyProduction, DroneAssignment, OptimizeResult, ShiftRoom } from '../lib/types'
 
 interface Props {
@@ -7,6 +7,7 @@ interface Props {
   onSaveWorkfile?: () => void;
   detailDefaultOpen?: boolean;
   variant?: 'optimize' | 'analysis';
+  suggestionsSlot?: ReactNode;
 }
 
 const ROOM_LABELS: Record<string, string> = {
@@ -27,6 +28,14 @@ const PRODUCT_LABELS: Record<string, string> = {
   'Battle Record': '作战记录',
   'Originium Shard': '源石碎片',
 }
+
+const SANITY_PER_LMD = 36 / 10000
+const SANITY_PER_EXP = 36 / 10000
+const SANITY_PER_BATTLE_RECORD = SANITY_PER_EXP * 1000
+const SANITY_PER_PURE_GOLD = SANITY_PER_EXP * (145 / 229) * (50 / 3) * 24
+const SANITY_PER_ORUNDUM = 3 / 4
+const SANITY_PER_PURCHASE_CERTIFICATE = 30 * (1 - SANITY_PER_LMD * 12) / 21
+const SANITY_PER_ORIGINIUM_SHARD = SANITY_PER_PURCHASE_CERTIFICATE * 90
 
 const DRONE_REASON_LABELS: Record<string, string> = {
   'manual target': '按配置目标匹配',
@@ -57,12 +66,13 @@ export default function ResultPanel({
   onSaveWorkfile,
   detailDefaultOpen = false,
   variant = 'optimize',
+  suggestionsSlot,
 }: Props) {
   const isRotationMode = result.schedule_mode === 'rotation'
   const isMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_autofill'
   const isAnalysis = variant === 'analysis' || result.analysis_summary?.source === 'imported_schedule'
   const analysisSummary = result.analysis_summary
-  const { totalEff, plans, productionStats, detailStats } = useMemo(() => {
+  const { totalEff, plans, productionStats, productionSanity, detailStats } = useMemo(() => {
     const totalEff = result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
     const plans: PreparedPlan[] = result.plans.map((plan) => ({
       ...plan,
@@ -117,38 +127,59 @@ export default function ResultPanel({
       goldNet: daily.net?.['Pure Gold'] ?? 0,
       droneGain,
     }
+    const productionSanity = calculateProductionSanity(daily)
 
     const detailStats = {
       planCount: plans.length,
       roomCount: plans.reduce((sum, plan) => sum + plan.rows.length, 0),
     }
 
-    return { totalEff, plans, productionStats, detailStats }
+    return { totalEff, plans, productionStats, productionSanity, detailStats }
   }, [result, isRotationMode, isMaaDormitoryAutofill])
 
   const shiftPattern = result.shift_pattern ?? result.shift_hours?.map((hour) => `${hour}h`).join('-') ?? result.planTimes
   const totalScheduleHours = result.total_schedule_hours ?? result.daily_production?.hours
   const fiammettaSlots = result.fiammetta_target_slots ?? []
+  const contextItems = [
+    { label: '排班模式', value: result.schedule_mode_name ?? (isRotationMode ? '游戏内轮换' : 'MAA排班表') },
+    { label: isRotationMode ? '队列数量' : '换班节奏', value: isRotationMode ? result.planTimes ?? `${detailStats.planCount} 组` : shiftPattern },
+    {
+      label: isRotationMode ? '统计方式' : '统计周期',
+      value: isRotationMode
+        ? '不计算固定时间'
+        : totalScheduleHours
+        ? `${formatCompactNumber(totalScheduleHours)} 小时`
+        : '按班次配置',
+    },
+    {
+      label: '宿舍规则',
+      value: isRotationMode ? '轮换模式不导出宿舍' : result.dormitory_rule_name ?? (isMaaDormitoryAutofill ? 'MAA 自动填满' : '排班表写死'),
+    },
+  ]
+  const tabs = [
+    { id: 'data', label: '数据' },
+    { id: 'detail', label: isRotationMode ? '预设队列' : '详情' },
+    { id: 'import', label: isRotationMode ? '设置' : '导入' },
+    ...(suggestionsSlot ? [{ id: 'suggestions', label: '建议' }] : []),
+  ] as const
+  const [activeTab, setActiveTab] = useState<string>('data')
+  const selectedTab = activeTab === 'suggestions' && !suggestionsSlot ? 'data' : activeTab
 
   return (
     <div className="space-y-8">
-      <div className="bg-surface-1 rounded-xl p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="overflow-hidden rounded-xl bg-surface-1">
+        <div className="flex flex-col gap-5 border-b border-surface-3/60 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold text-ink-primary">
             {isAnalysis ? '排班表分析完成' : '排班方案已就绪'}
           </h2>
           <p className="mt-1 text-sm text-ink-secondary">
-            {result.schedule_mode_name ?? 'MAA排班表'} · {result.planTimes ?? `${detailStats.planCount} 个班次`}。
-            {isAnalysis
+              {isAnalysis
               ? '已根据导入排班表计算红脸风险、日产量和爆仓信息。'
               : isRotationMode
                 ? '按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。'
                 : '排班 JSON 用于导入或交给 MAA 使用；账号空间接入后会自动保存当前练度和配置。'}
           </p>
-          {!isAnalysis && !isRotationMode && result.dormitory_rule_name && (
-            <p className="mt-1 text-sm text-ink-muted">宿舍规则：{result.dormitory_rule_name}</p>
-          )}
         </div>
         {(onDownload || onSaveWorkfile) && (
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
@@ -173,96 +204,120 @@ export default function ResultPanel({
           </div>
         )}
       </div>
-      <div className="mt-5 grid gap-3 rounded-lg border border-brand-500/30 bg-brand-500/10 p-4 text-sm sm:grid-cols-3">
-        <div>
-            <p className="text-xs font-medium text-ink-muted">{isRotationMode ? '队列数量' : '换班节奏'}</p>
-            <p className="mt-1 font-semibold text-ink-primary">{isRotationMode ? result.planTimes : shiftPattern}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-ink-muted">{isRotationMode ? '统计方式' : '统计周期'}</p>
-            <p className="mt-1 font-semibold text-ink-primary">
-              {isRotationMode
-                ? '不计算固定时间'
-                : totalScheduleHours
-                  ? `${formatCompactNumber(totalScheduleHours)} 小时`
-                  : '按班次配置'}
-            </p>
-        </div>
-        <div>
-            <p className="text-xs font-medium text-ink-muted">{isRotationMode ? '快速切换' : '菲亚梅塔加速'}</p>
-            <p className="mt-1 font-semibold text-ink-primary">
-              {isRotationMode
-                ? '游戏内按钮'
-                : result.plans.some((plan) => plan.Fiammetta?.enable)
-                  ? fiammettaSlots.length > 0
-                    ? `第 ${fiammettaSlots.join('、')} 班`
-                    : '按可用目标自动安排'
-                  : '未启用'}
-            </p>
-        </div>
-      </div>
-      {isRotationMode ? <RotationManualGuide /> : <MaaImportGuide />}
-    </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {isAnalysis ? (
-          <MetricCard
-            label="红脸风险"
-            value={String(analysisSummary?.red_face_risk_count ?? 0)}
-            suffix="处"
-            note={(analysisSummary?.red_face_operator_count ?? 0) > 0
-              ? `${analysisSummary?.red_face_operator_count ?? 0} 名干员：${(analysisSummary?.red_face_operators ?? []).slice(0, 4).join('、')}${(analysisSummary?.red_face_operators?.length ?? 0) > 4 ? '等' : ''}`
-              : '未发现红脸风险'}
-            highlight={(analysisSummary?.red_face_risk_count ?? 0) > 0}
-          />
-        ) : isRotationMode ? (
-          <MetricCard label="预设队列" value={String(detailStats.planCount)} suffix="组" highlight />
-        ) : (
-          <MetricCard label="预计总效率" value={totalEff.toFixed(2)} suffix="%" highlight />
-        )}
-        <MetricCard
-          label={isRotationMode ? '房间预设' : '制造站产量'}
-          value={isRotationMode ? String(detailStats.roomCount) : formatAmount(productionStats.manufacturingTotal)}
-          suffix={isRotationMode ? '间' : '件/日'}
-          note={isRotationMode ? '按每个设施分别录入队列 1 / 队列 2' : formatProductionBreakdown(productionStats.manufacturing)}
-        />
-        {!isRotationMode && (
-          <>
-            <MetricCard
-              label="预计日产出"
-              value={formatAmount(productionStats.lmd)}
-              suffix="龙门币"
-              note={`赤金净变动 ${formatSigned(productionStats.goldNet)}${productionStats.orundum > 0 ? `，合成玉 ${formatAmount(productionStats.orundum)}` : ''}`}
-            />
-            <MetricCard
-              label={isAnalysis ? '爆仓概览' : '无人机收益'}
-              value={isAnalysis ? String((analysisSummary?.overflow.trading_rooms ?? 0) + (analysisSummary?.overflow.manufacturing_rooms ?? 0)) : productionStats.droneGain.value}
-              suffix={isAnalysis ? '房间' : productionStats.droneGain.suffix}
-              note={isAnalysis ? formatOverflowSummary(analysisSummary?.overflow) : productionStats.droneGain.note}
-            />
-          </>
-        )}
-      </div>
-
-      {isAnalysis && analysisSummary?.warnings.length ? (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4">
-          <p className="text-sm font-semibold text-warning">分析提示</p>
-          <ul className="mt-2 space-y-1 text-sm leading-6 text-ink-secondary">
-            {analysisSummary.warnings.slice(0, 5).map((warning, index) => (
-              <li key={`${warning}-${index}`}>{warning}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      <details className="overflow-hidden rounded-xl bg-surface-1" open={detailDefaultOpen || isRotationMode}>
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
-          <span>{isRotationMode ? '预设队列' : '排班详情'}</span>
-          <span className="text-xs font-medium text-ink-muted">
-            {result.planTimes ?? `${detailStats.planCount} 个班次`}，{detailStats.roomCount} 个房间
+      <div className="border-b border-surface-3/60 px-5 py-3 sm:px-6">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-muted">
+          {contextItems.map((item) => (
+            <span key={item.label} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <span>{item.label}</span>
+              <span className="font-semibold text-ink-primary">{item.value}</span>
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <span>菲亚梅塔</span>
+            <span className="font-semibold text-ink-primary">
+              {fiammettaSlots.length > 0 ? fiammettaSlots.join('、') : '未启用'}
+            </span>
           </span>
-        </summary>
-        <div className="space-y-5 border-t border-surface-3/60 p-4 sm:p-5">
+        </div>
+      </div>
+
+      <div className="border-b border-surface-3/60 px-5 pt-3 sm:px-6">
+        <div className="flex gap-2 overflow-x-auto" role="tablist" aria-label="排班结果视图">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={selectedTab === tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`inline-flex w-max shrink-0 whitespace-nowrap rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors duration-150 ${
+                selectedTab === tab.id
+                  ? 'bg-surface-2 text-brand-300'
+                  : 'text-ink-muted hover:bg-surface-2/60 hover:text-ink-primary'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      </div>
+
+      {selectedTab === 'data' && (
+        <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
+        <div className="border-b border-surface-3/60 px-5 py-4 sm:px-6">
+          <h3 className="text-base font-semibold text-ink-primary">数据</h3>
+        </div>
+        {isAnalysis && analysisSummary?.warnings.length ? (
+          <div className="mx-5 mt-5 rounded-xl border border-warning/30 bg-warning/10 p-4 sm:mx-6">
+            <p className="text-sm font-semibold text-warning">分析提示</p>
+            <ul className="mt-2 space-y-1 text-sm leading-6 text-ink-secondary">
+              {analysisSummary.warnings.slice(0, 5).map((warning, index) => (
+                <li key={`${warning}-${index}`}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
+          {isAnalysis ? (
+            <MetricCard
+              label="红脸风险"
+              value={String(analysisSummary?.red_face_risk_count ?? 0)}
+              suffix="处"
+              note={(analysisSummary?.red_face_operator_count ?? 0) > 0
+                ? `${analysisSummary?.red_face_operator_count ?? 0} 名干员：${(analysisSummary?.red_face_operators ?? []).slice(0, 4).join('、')}${(analysisSummary?.red_face_operators?.length ?? 0) > 4 ? '等' : ''}`
+                : '未发现红脸风险'}
+              highlight={(analysisSummary?.red_face_risk_count ?? 0) > 0}
+            />
+          ) : isRotationMode ? (
+            <MetricCard label="预设队列" value={String(detailStats.planCount)} suffix="组" highlight />
+          ) : (
+            <MetricCard label="预计总效率" value={totalEff.toFixed(2)} suffix="%" highlight />
+          )}
+          <MetricCard
+            label={isRotationMode ? '房间预设' : '制造站产量'}
+            value={isRotationMode ? String(detailStats.roomCount) : formatAmount(productionStats.manufacturingTotal)}
+            suffix={isRotationMode ? '间' : '件/日'}
+            note={isRotationMode ? '按每个设施分别录入队列 1 / 队列 2' : formatProductionBreakdown(productionStats.manufacturing)}
+          />
+          {!isRotationMode && (
+            <>
+              <MetricCard
+                label="预计日产出"
+                value={formatAmount(productionStats.lmd)}
+                suffix="龙门币"
+                note={`赤金净变动 ${formatSigned(productionStats.goldNet)}${productionStats.orundum > 0 ? `，合成玉 ${formatAmount(productionStats.orundum)}` : ''}`}
+              />
+              {isAnalysis ? (
+                <MetricCard
+                  label="爆仓概览"
+                  value={String((analysisSummary?.overflow.trading_rooms ?? 0) + (analysisSummary?.overflow.manufacturing_rooms ?? 0))}
+                  suffix="房间"
+                  note={formatOverflowSummary(analysisSummary?.overflow)}
+                />
+              ) : (
+                <MetricCard
+                  label="等效理智"
+                  value={formatAmount(productionSanity.value)}
+                  suffix="理智"
+                  note={productionSanity.note}
+                />
+              )}
+            </>
+          )}
+        </div>
+        </section>
+      )}
+
+      {selectedTab === 'detail' && (
+        <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
+          <div className="flex items-center justify-between gap-4 border-b border-surface-3/60 px-5 py-4 text-sm font-semibold text-ink-primary sm:px-6">
+            <span>{isRotationMode ? '预设队列' : '排班详情'}</span>
+            <span className="text-xs font-medium text-ink-muted">
+              {result.planTimes ?? `${detailStats.planCount} 个班次`}，{detailStats.roomCount} 个房间
+            </span>
+          </div>
+          <div className="space-y-5 p-4 sm:p-5">
           {plans.map((plan, i) => (
             <div key={i} className="overflow-hidden rounded-xl bg-surface-1">
               <div className="flex items-center justify-between px-6 py-4 bg-surface-2/50">
@@ -332,8 +387,21 @@ export default function ResultPanel({
               </div>
             </div>
           ))}
-        </div>
-      </details>
+          </div>
+        </section>
+      )}
+
+      {selectedTab === 'import' && (
+        <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
+          {isRotationMode ? <RotationManualGuide compact /> : <MaaImportGuide compact />}
+        </section>
+      )}
+
+      {selectedTab === 'suggestions' && suggestionsSlot && (
+        <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
+          {suggestionsSlot}
+        </section>
+      )}
     </div>
   )
 }
@@ -352,7 +420,7 @@ function MetricCard({
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-xl bg-surface-1 p-5">
+    <div className="rounded-xl border border-surface-3/60 bg-surface-2/60 p-5">
       <p className="mb-2 text-sm font-medium text-ink-muted">{label}</p>
       <p className={`text-3xl font-bold ${highlight ? 'text-brand-400' : 'text-ink-primary'}`}>
         {value}
@@ -454,6 +522,34 @@ function formatProductionBreakdown(manufacturing: Record<string, number>): strin
     })
     .filter(Boolean)
   return parts.length > 0 ? parts.join('，') : '暂无制造站产出'
+}
+
+function calculateProductionSanity(daily: Partial<DailyProduction>): { value: number; note: string } {
+  const manufacturing = daily.manufacturing ?? {}
+  const trading = daily.trading ?? {}
+  const consumption = daily.consumption ?? {}
+
+  const manufacturingSanity =
+    getResourceAmount(manufacturing, 'Pure Gold') * SANITY_PER_PURE_GOLD +
+    getResourceAmount(manufacturing, 'Battle Record') * SANITY_PER_BATTLE_RECORD +
+    getResourceAmount(manufacturing, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
+  const tradingSanity =
+    getResourceAmount(trading, 'LMD') * SANITY_PER_LMD +
+    getResourceAmount(trading, 'Orundum') * SANITY_PER_ORUNDUM
+  const consumptionSanity =
+    getResourceAmount(consumption, 'Pure Gold') * SANITY_PER_PURE_GOLD +
+    getResourceAmount(consumption, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
+  const value = manufacturingSanity + tradingSanity - consumptionSanity
+
+  return {
+    value,
+    note: `制造 ${formatAmount(manufacturingSanity)} + 贸易 ${formatAmount(tradingSanity)} - 消耗 ${formatAmount(consumptionSanity)}`,
+  }
+}
+
+function getResourceAmount(values: Record<string, number>, key: string): number {
+  const value = values[key] ?? 0
+  return Number.isFinite(value) ? value : 0
 }
 
 function formatOverflowSummary(overflow: NonNullable<OptimizeResult['analysis_summary']>['overflow'] | undefined): string {
@@ -569,10 +665,10 @@ function DroneSummary({ drones }: { drones: DroneAssignment }) {
   )
 }
 
-function RotationManualGuide() {
+function RotationManualGuide({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="mt-6 border-t border-surface-3/60 pt-5">
-      <div className="rounded-lg bg-surface-2/60 px-4 py-4">
+    <div className={compact ? '' : 'mt-6 border-t border-surface-3/60 pt-5'}>
+      <div className={compact ? '' : 'rounded-lg bg-surface-2/60 px-4 py-4'}>
         <h3 className="text-base font-semibold text-ink-primary">
           游戏内快速切换设置
         </h3>
@@ -584,9 +680,9 @@ function RotationManualGuide() {
   )
 }
 
-export function MaaImportGuide() {
+export function MaaImportGuide({ compact = false }: { compact?: boolean }) {
   return (
-    <details className="mt-6 overflow-hidden rounded-lg border border-surface-3/70 bg-surface-2/40">
+    <details className={`${compact ? '' : 'mt-6 '}overflow-hidden rounded-lg border border-surface-3/70 bg-surface-2/40`}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/80">
         <span>如何在 MAA 中使用排班 JSON</span>
         <span className="text-xs font-medium text-ink-muted">展开查看</span>

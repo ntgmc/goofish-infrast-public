@@ -14,8 +14,10 @@ import {
   validateLicenseForRequest,
   validateOperators,
   verifyLicenseSignature,
+  type CdkRecord,
 } from './license-utils'
 import type { OperatorUpdateGrant } from '../../src/lib/types'
+import { getProfileForUser, saveUserProfile, type UserGameAccountRecord } from '../storage/user-store'
 
 const PERMISSION_LABELS: Record<string, string> = {
 recommended: '单次重置卡',
@@ -52,6 +54,10 @@ export default async (req: Request): Promise<Response> => {
     if (cdkRecord?.status === 'frozen') {
       return jsonResponse({ error: formatRiskFreezeMessage(cdkRecord.freeze_reason || '授权已触发风控冻结，请联系卖家人工核验。'), risk_status: 'frozen' }, 403)
     }
+    const boundProfile = cdkRecord ? await getCdkBoundProfile(cdkRecord) : null
+    if (boundProfile?.status === 'frozen') {
+      return jsonResponse({ error: '当前账号档案已触发干员数据风控冻结，请联系卖家人工核验。', risk_status: 'frozen' }, 403)
+    }
 
     const filePermission = normalizePermissionMode(licenseCheck.license.permission)
     const effectivePermission = normalizePermissionMode(cdkRecord?.permission ?? licenseCheck.license.permission)
@@ -83,15 +89,16 @@ export default async (req: Request): Promise<Response> => {
       let nextOperatorUpdateGrant: OperatorUpdateGrant | null = null
       let nextUpdateLimit = advancedUpdateLimit
       if (effectivePermission === 'advanced' && effectiveCdkRecord) {
-        const updateCheck = await recordAdvancedOperatorUpdate(effectiveCdkRecord, operatorsCheck.operators, req, body.activation_token)
-        if (!updateCheck.ok) {
-          return jsonResponse({
-            error: updateCheck.message,
-            risk_status: updateCheck.record.status === 'frozen' ? 'frozen' : 'ok',
-            operator_update_limit: updateCheck.limit,
-            operator_update_next_available_at: updateCheck.limit?.next_available_at,
-          }, updateCheck.status)
-        }
+      const updateCheck = await recordAdvancedOperatorUpdate(effectiveCdkRecord, operatorsCheck.operators, req, body.activation_token)
+      if (!updateCheck.ok) {
+        const profileFrozen = updateCheck.profile_freeze_required ? await freezeCdkBoundProfile(updateCheck.record) : false
+        return jsonResponse({
+          error: updateCheck.message,
+          risk_status: updateCheck.record.status === 'frozen' || profileFrozen ? 'frozen' : 'ok',
+          operator_update_limit: updateCheck.limit,
+          operator_update_next_available_at: updateCheck.limit?.next_available_at,
+        }, updateCheck.status)
+      }
         effectiveCdkRecord = updateCheck.record
         nextUpdateLimit = updateCheck.limit
       } else if (effectiveCdkRecord && effectivePermission !== 'admin') {
@@ -144,6 +151,23 @@ export default async (req: Request): Promise<Response> => {
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
   }
+}
+
+async function getCdkBoundProfile(record: CdkRecord): Promise<UserGameAccountRecord | null> {
+  if (!record.account_id || !record.profile_id) return null
+  return getProfileForUser(record.account_id, record.profile_id)
+}
+
+async function freezeCdkBoundProfile(record: CdkRecord): Promise<boolean> {
+  const profile = await getCdkBoundProfile(record)
+  if (!profile) return false
+  if (profile.status === 'frozen') return true
+  await saveUserProfile({
+    ...profile,
+    status: 'frozen',
+    updated_at: new Date().toISOString(),
+  })
+  return true
 }
 
 function isSameOperatorUpdateGrant(

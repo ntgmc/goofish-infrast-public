@@ -1,3 +1,4 @@
+import BrandLogo from '../components/BrandLogo'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 
 interface Props {
@@ -13,23 +14,23 @@ const resultMetrics = [
 
 const workflow = [
   {
-    title: '上传授权文件',
-    description: '支持商家下发的授权文件，也支持本工具保存的工作文件。',
+    title: '登录并添加游戏账号',
+    description: '用邮箱进入工作台，注册时可填写 CDK，也可以登录后在“兑换 CDK”里添加多个游戏账号。',
   },
   {
-    title: '核对基建目标',
-    description: '读取干员、房间和产物策略，保留可继续调整的配置。',
+    title: '上传干员并确认配置',
+    description: '上传 MAA 导出的干员识别文件，选择 243、333 等预设或按套餐权限调整基建参数。',
   },
   {
-    title: '下载排班 JSON',
-    description: '生成可导入 MAA 的排班文件，并同步给出精英化建议。',
+    title: '生成并下载排班',
+    description: '保存工作区后生成排班 JSON，同时查看效率指标和精英化提升建议。',
   },
 ]
 
 const assurances = [
-  '授权文件和工作文件使用 .maa 结尾',
-  '文件内容加密，页面不会明文展示敏感数据',
-  '结果页保留下载、保存和继续调整入口',
+  '邮箱账号用于管理多个游戏账号',
+  'CDK 用于添加正式游戏账号',
+  '干员数据来自 MAA 导出的识别文件',
 ]
 
 const fitPoints = [
@@ -38,8 +39,8 @@ const fitPoints = [
     body: '不用手动拆技能组合，工具会根据当前干员池和基建房间重新计算。',
   },
   {
-    title: '适合只想拿结果的流程',
-    body: '页面围绕上传、计算、下载三件事组织，不把用户留在复杂控制台里。',
+    title: '适合想集中管理账号的流程',
+    body: '工作台围绕账号、干员数据、基建配置和排班结果组织，后续更新不用重新梳理入口。',
   },
   {
     title: '适合 MAA 的后续导入',
@@ -56,12 +57,10 @@ export default function LandingPage({ onStart }: Props) {
         <div className="relative z-10 min-w-0">
           <nav className="mb-12 flex items-center justify-between gap-4">
             <a href="/" className="flex min-h-11 items-center gap-3 rounded-lg pr-3 text-left">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-300 text-brand-950">
-                <FileIcon />
-              </span>
+          <BrandLogo size="md" />
               <span>
                 <span className="block text-sm font-semibold text-white">MAA 基建排班优化器</span>
-                <span className="block text-xs text-brand-100/64">上传，计算，带走排班文件</span>
+              <span className="block text-xs text-brand-100/64">账号，CDK，生成排班</span>
               </span>
             </a>
             <a
@@ -78,19 +77,25 @@ export default function LandingPage({ onStart }: Props) {
               为明日方舟玩家准备的短时结果型工具
             </p>
             <h1 className="max-w-2xl text-3xl font-semibold leading-[1.08] tracking-[-0.03em] text-white sm:text-5xl lg:text-6xl">
-              把基建排班从反复试错，压缩到一次上传。
+              登录账号，按当前干员池生成 MAA 基建排班
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-brand-50/74">
-              读取干员数据、房间配置和产物目标，生成可导入 MAA 的排班 JSON。已有工作文件时，也能直接继续上次调整。
+              在工作台里添加 CDK 游戏账号，上传 MAA 导出的干员识别文件，确认基建配置后即可生成可导入 MAA 的排班 JSON，并查看练度提升建议。
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <a
+                href="/tools/depot-value"
+                className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-5 py-3 text-sm font-semibold text-brand-950 transition duration-150 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-surface-0"
+              >
+                免费仓库估值
+              </a>
               <button
                 type="button"
                 onClick={onStart}
                 className="landing-cta inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg bg-brand-300 px-5 py-3 text-sm font-semibold text-brand-950 transition duration-150 hover:bg-brand-200 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:ring-offset-2 focus:ring-offset-surface-0 active:scale-[0.99]"
               >
-                进入上传页面
+                进入工作台
               </button>
               {purchaseHref && (
                 <a
@@ -105,9 +110,9 @@ export default function LandingPage({ onStart }: Props) {
             </div>
 
             <dl className="mt-10 grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
-              <HeroFact value="3 步" label="从上传到下载" />
-              <HeroFact value=".maa" label="工作文件格式" />
-              <HeroFact value="MAA" label="导入目标" />
+              <HeroFact value="账号工作台" label="统一管理入口" />
+              <HeroFact value="CDK" label="添加游戏账号" />
+              <HeroFact value="MAA JSON" label="导入目标" />
             </dl>
           </div>
         </div>
@@ -125,7 +130,7 @@ export default function LandingPage({ onStart }: Props) {
               页面只保留完成任务需要的路径。
             </h2>
             <p className="mt-4 max-w-lg text-base leading-7 text-brand-50/68">
-              新用户拿 CDK 生成工作文件，老用户上传工作文件继续调整。两条路径最终都回到可导入 MAA 的结果。
+              登录后添加 CDK 游戏账号，上传干员识别文件并保存工作区，最终回到可导入 MAA 的排班结果。
             </p>
           </div>
 
@@ -144,7 +149,7 @@ export default function LandingPage({ onStart }: Props) {
               <source srcSet="/assets/previews/optimize-result-dark.png" media="(prefers-color-scheme: dark)" />
               <img
                 src="/assets/previews/optimize-result-light.png"
-                alt="排班方案结果页，展示下载排班 JSON、保存工作文件、效率指标和精英化建议"
+                alt="排班方案结果页，展示下载排班 JSON、效率指标和精英化建议"
                 className="block aspect-[16/10] w-full object-cover object-top"
                 loading="lazy"
               />
@@ -156,7 +161,7 @@ export default function LandingPage({ onStart }: Props) {
               生成结果不只是一份 JSON，还包括可判断的收益指标。
             </h2>
             <p className="mt-4 max-w-xl text-base leading-7 text-brand-50/68">
-              结果页直接给出排班文件、工作文件和关键效率数据。需要再调策略时，可以保存工作文件，下次从当前状态继续。
+              结果页直接给出可导入 MAA 的排班 JSON、关键效率数据和练度建议。需要更新干员或调整策略时，回到同一个游戏账号工作区继续处理。
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -183,7 +188,7 @@ export default function LandingPage({ onStart }: Props) {
         <div className="mx-auto grid max-w-7xl gap-8 rounded-xl border border-brand-200/18 bg-brand-200/[0.08] p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.02em] text-white sm:text-3xl">
-              准备好授权文件或 CDK 后，直接开始。
+              有账号或 CDK 后，进入工作台开始。
             </h2>
             <ul className="mt-5 grid gap-3 text-sm leading-6 text-brand-50/72 sm:grid-cols-3">
               {assurances.map((item) => (
@@ -199,7 +204,7 @@ export default function LandingPage({ onStart }: Props) {
             onClick={onStart}
             className="landing-cta inline-flex min-h-12 cursor-pointer items-center justify-center rounded-lg bg-white px-5 py-3 text-sm font-semibold text-brand-950 transition duration-150 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#0b2428] active:scale-[0.99]"
           >
-            打开上传入口
+            打开工作台
           </button>
         </div>
       </section>
@@ -227,7 +232,7 @@ function ProductPreview({ onStart }: { onStart: () => void }) {
               <source srcSet="/assets/previews/upload-entry-dark.png" media="(prefers-color-scheme: dark)" />
               <img
                 src="/assets/previews/upload-entry-light.png"
-                alt="上传入口页面，包含授权文件上传、CDK 生成工作文件和选择授权文件按钮"
+              alt="工作台页面，包含登录注册、CDK 兑换、干员数据上传和基建配置入口"
                 className="block aspect-[16/9] w-full object-cover object-top"
               />
             </picture>
@@ -240,9 +245,9 @@ function ProductPreview({ onStart }: { onStart: () => void }) {
                 <span className="text-xs font-medium text-success">可下载</span>
             </div>
             <div className="mt-4 space-y-3">
-              <ProgressLine label="解析干员数据" width="100%" />
-              <ProgressLine label="匹配房间策略" width="88%" />
-              <ProgressLine label="写入排班 JSON" width="76%" />
+                  <ProgressLine label="读取干员识别文件" width="100%" />
+                  <ProgressLine label="校验基建配置" width="88%" />
+                  <ProgressLine label="生成排班 JSON" width="76%" />
             </div>
           </div>
 
@@ -256,7 +261,7 @@ function ProductPreview({ onStart }: { onStart: () => void }) {
               onClick={onStart}
               className="mt-4 inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg bg-surface-0 px-4 text-sm font-semibold text-white transition duration-150 hover:bg-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-950 focus:ring-offset-2 focus:ring-offset-warning"
             >
-              上传文件
+              进入工作台
             </button>
           </div>
         </div>
@@ -319,27 +324,6 @@ function CheckIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.8"
-      />
-    </svg>
-  )
-}
-
-function FileIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M7 3.75h6.15L18 8.6v11.65H7V3.75Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M13 4v5h5M9.5 13h5M9.5 16h3.25"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
       />
     </svg>
   )

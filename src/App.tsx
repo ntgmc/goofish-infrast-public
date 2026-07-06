@@ -7,9 +7,10 @@ import ToolPage from './pages/ToolPage'
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage'))
+const DepotValuePage = lazy(() => import('./pages/DepotValuePage'))
 const ScheduleAnalysisPage = lazy(() => import('./pages/ScheduleAnalysisPage'))
 
-type Route = 'home' | 'tool' | 'resetPassword' | 'announcements' | 'admin' | 'adminSetup' | 'scheduleAnalysis'
+type Route = 'home' | 'tool' | 'resetPassword' | 'announcements' | 'admin' | 'adminSetup' | 'scheduleAnalysis' | 'depotValue'
 
 function App() {
   const [route, setRoute] = useState<Route>(() => resolveRoute(window.location.pathname) ?? 'home')
@@ -73,6 +74,15 @@ function App() {
           <ScheduleAnalysisPage />
         </Suspense>
       )}
+      {route === 'depotValue' && (
+        <Suspense fallback={
+          <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
+            正在载入仓库价值分析器...
+          </div>
+        }>
+          <DepotValuePage />
+        </Suspense>
+      )}
       <BuildMetaStrip placement="corner" />
     </div>
   )
@@ -83,6 +93,7 @@ function resolveRoute(pathname: string): Route | null {
   if (path === '/') return 'home'
   if (path === '/tool') return 'tool'
   if (path === '/tools/schedule-analysis') return 'scheduleAnalysis'
+  if (path === '/tools/depot-value') return 'depotValue'
   if (path === '/reset-password') return 'resetPassword'
   if (path === '/announcements') return 'announcements'
   if (path === '/admin') return 'admin'

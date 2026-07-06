@@ -292,6 +292,7 @@ export async function redeemProfileCdk(
     version: 1,
     id: profileId,
     user_id: user.id,
+    kind: 'cdk',
     cdk_key: cdkKey,
     cdk_code_hash: codeHash,
     cdk_order_hash: cdkOrderHash,
@@ -341,7 +342,7 @@ export async function requireUserSession(req: Request): Promise<AuthContext | nu
     return null
   }
   const profiles = await migrateLegacyUserIfNeeded(user)
-  const activeProfile = profiles[0] ?? null
+  const activeProfile = profiles.find((profile) => profile.kind !== 'depot_value') ?? profiles[0] ?? null
   const cdkRecord = activeProfile ? await getCdkRecordForProfile(activeProfile) : null
   await touchSession(session)
   return { user, session, tokenHash, profiles, activeProfile, cdkRecord }
@@ -359,9 +360,10 @@ export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?
   for (const profile of records) {
     publicProfiles.push(toPublicProfile(profile, await getProfileWorkspace(profile.id)))
   }
+  const defaultActiveProfile = records.find((profile) => profile.kind !== 'depot_value') ?? records[0] ?? null
   const activeProfileRecord = activeProfileId
-    ? records.find((profile) => profile.id === activeProfileId) ?? records[0] ?? null
-    : records[0] ?? null
+    ? records.find((profile) => profile.id === activeProfileId) ?? defaultActiveProfile
+    : defaultActiveProfile
   const activeWorkspace = activeProfileRecord ? await getProfileWorkspace(activeProfileRecord.id) : null
   return {
     user: toPublicUser(user),
@@ -503,6 +505,7 @@ function normalizeProfileNote(value: unknown): string {
 }
 
 async function getCdkRecordForProfile(profile: UserGameAccountRecord): Promise<CdkRecord | null> {
+  if (!profile.cdk_key) return null
   const store = await getCdkRecordStore()
   return store.get(profile.cdk_key)
 }

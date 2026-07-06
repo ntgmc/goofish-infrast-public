@@ -25,11 +25,6 @@ export const DORMITORY_RULE_LABELS: Record<string, string> = {
 }
 
 const DEFAULT_SHIFT_HOURS = [8, 8, 8]
-const SHIFT_PRESETS = [
-  { label: '8-8-8', value: [8, 8, 8], note: '24h 固定间隔' },
-  { label: '12-12-12', value: [12, 12, 12], note: '12h 固定间隔' },
-  { label: '12-6-6', value: [12, 6, 6], note: '24h 非固定间隔' },
-]
 
 type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 
@@ -127,12 +122,6 @@ function isValidShiftHours(hours: number[]): boolean {
   return isFixedShiftHours(hours) && (Math.abs(hours[0] - 8) <= 0.0001 || Math.abs(hours[0] - 12) <= 0.0001)
 }
 
-function formatShiftHours(value: unknown): string {
-  if (typeof value === 'string') return value
-  const hours = parseShiftHours(value) ?? DEFAULT_SHIFT_HOURS
-  return hours.map((hour) => String(hour)).join('-')
-}
-
 function sumCounts(counts: Record<string, number> | undefined): number {
   return Object.values(counts ?? {}).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0)
 }
@@ -147,7 +136,7 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.manufacturing_stations_count = Number.isFinite(next.manufacturing_stations_count) ? next.manufacturing_stations_count : 4
   next.schedule_mode = normalizeScheduleMode(next.schedule_mode ?? next.mode)
   next.dormitory_rule = normalizeDormitoryRule(next.dormitory_rule)
-  next.shift_hours = parseShiftHours(next.shift_hours) ?? [...DEFAULT_SHIFT_HOURS]
+  next.shift_hours = [...DEFAULT_SHIFT_HOURS]
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
   next.desc = next.desc || `${next.layout} 基建配置`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
@@ -189,7 +178,7 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
   }
   const shiftHours = parseShiftHours(config.shift_hours)
   if (!rotationMode && (!shiftHours || !isValidShiftHours(shiftHours))) {
-    return { ok: false, message: '换班间隔需填写为 8-8-8、12-12-12，或合计 24 小时的非固定节奏，例如 12-6-6。' }
+    return { ok: false, message: '换班间隔已固定为 8-8-8，请重新载入配置后再试。' }
   }
   if (!rotationMode && config.drones?.enable && !config.drones.auto && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
     return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
@@ -249,7 +238,6 @@ interface ConfigEditorProps {
   config: LicenseConfig;
   canEdit: boolean;
   canEditIntermediateInventory?: boolean;
-  canEditShiftHours?: boolean;
   canSelectPreset?: boolean;
   changed?: boolean;
   permission?: PermissionMode;
@@ -267,7 +255,6 @@ export default function ConfigEditor({
   config,
   canEdit,
   canEditIntermediateInventory,
-  canEditShiftHours,
   canSelectPreset = false,
   changed = false,
   permission,
@@ -285,11 +272,8 @@ export default function ConfigEditor({
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
   const droneTargets = (config.drones?.targets ?? []).join(', ')
-  const shiftHours = parseShiftHours(config.shift_hours) ?? DEFAULT_SHIFT_HOURS
-  const shiftHoursText = formatShiftHours(config.shift_hours ?? shiftHours)
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
-  const canUseShiftHours = !rotationMode && (canEdit || Boolean(canEditShiftHours))
   const validationMessage = validation.ok === false ? validation.message : null
   const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
 
@@ -357,8 +341,8 @@ export default function ConfigEditor({
             {note ?? (canEdit
               ? '修改配置后重新生成，保存进度文件会保留这次配置。'
               : autoInventoryOnly
-? `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，可通过中间产物库存自动调整推荐配置。`
-                : `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，使用当前套餐提供的固定配置。`)}
+                ? `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，可通过中间产物库存自动调整推荐配置，并可修改排班模式与宿舍规则。`
+                : `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，可修改排班模式与宿舍规则；其他配置按当前套餐固定。`)}
           </p>
         </div>
           {!hidePresetActions && (canEdit || (canSelectPreset && !autoInventoryOnly)) && (
@@ -401,34 +385,6 @@ export default function ConfigEditor({
                 inventory={intermediateInventory}
                 onChange={setIntermediateInventory}
               />
-            </div>
-            <div className="mt-5 border-t border-surface-3/60 pt-4">
-              <p className="mb-2 text-xs font-medium text-ink-muted">换班间隔</p>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {SHIFT_PRESETS.map((preset) => {
-                  const active = shiftHoursText === formatShiftHours(preset.value)
-                  return (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      disabled={!canUseShiftHours}
-                      onClick={() => onUpdate((next) => {
-                        next.shift_hours = [...preset.value]
-                        next.auto_balance_source = 'limited_config'
-                        applyCounts(next)
-                      })}
-                      className={`rounded-lg border px-3 py-2 text-left transition-colors duration-150 disabled:cursor-not-allowed ${
-                        active
-                          ? 'border-brand-500 bg-brand-500/10 text-brand-300'
-                          : 'border-surface-4 bg-surface-1 text-ink-secondary hover:border-surface-5 hover:text-ink-primary disabled:text-ink-muted'
-                      }`}
-                    >
-                      <span className="block text-sm font-semibold">{preset.label}</span>
-                      <span className="mt-0.5 block text-xs text-ink-muted">{preset.note}</span>
-                    </button>
-                  )
-                })}
-              </div>
             </div>
           </div>
         </div>
@@ -499,7 +455,7 @@ export default function ConfigEditor({
               <button
                 key={mode}
                 type="button"
-                disabled={!canEdit}
+                  disabled={false}
                 onClick={() => onUpdate((next) => {
                   next.schedule_mode = mode
                   if (mode === 'rotation') {
@@ -507,10 +463,10 @@ export default function ConfigEditor({
                       }
                       applyCounts(next)
                     })}
-                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed ${
+                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 ${
                       scheduleMode === mode
                         ? 'bg-brand-600 text-white'
-                        : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
+                        : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'
                     }`}
                   >
                     {SCHEDULE_MODE_LABELS[mode]}
@@ -528,7 +484,7 @@ export default function ConfigEditor({
                   <button
                     key={rule}
                     type="button"
-                    disabled={!canEdit || rotationMode}
+                    disabled={rotationMode}
                     onClick={() => onUpdate((next) => {
                       next.dormitory_rule = rule
                       applyCounts(next)
@@ -551,36 +507,6 @@ export default function ConfigEditor({
                     : '导出的 MAA JSON 会固定宿舍干员，和当前行为一致。'}
               </p>
             </div>
-            <div>
-              <p className="mb-2 text-xs font-medium text-ink-muted">换班间隔</p>
-            <div className="grid grid-cols-3 gap-2">
-              {SHIFT_PRESETS.map((preset) => {
-                const active = shiftHoursText === formatShiftHours(preset.value)
-                return (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    disabled={!canUseShiftHours}
-                    onClick={() => onUpdate((next) => {
-                      next.shift_hours = [...preset.value]
-                      applyCounts(next)
-                    })}
-                    className={`rounded-lg border px-3 py-2 text-left transition-colors duration-150 disabled:cursor-not-allowed ${
-                      active
-                        ? 'border-brand-500 bg-brand-500/10 text-brand-300'
-                        : 'border-surface-4 bg-surface-1 text-ink-secondary hover:border-surface-5 hover:text-ink-primary disabled:text-ink-muted'
-                    }`}
-                  >
-                    <span className="block text-sm font-semibold">{preset.label}</span>
-                    <span className="mt-0.5 block text-xs text-ink-muted">{preset.note}</span>
-                  </button>
-                )
-              })}
-            </div>
-              <p className="mt-2 text-xs leading-5 text-ink-muted">
-                非固定间隔按实际班次计算心情与爆仓；12-6-6 时菲亚梅塔只加速第 1、3 班目标。
-              </p>
-          </div>
           <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
             <span>菲亚梅塔</span>
               <input
@@ -600,7 +526,7 @@ export default function ConfigEditor({
               </p>
             ) : config.Fiammetta?.enable && (
               <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
-              菲亚梅塔按换班节奏计算目标；12-6-6 时只加速第 1、3 班。
+                菲亚梅塔按固定 8-8-8 换班节奏计算目标。
               </p>
             )}
             <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
