@@ -7,11 +7,20 @@ const bundleDir = resolve('.cache/check-depot-value')
 const priceCachePath = resolve(bundleDir, 'yituliu-cache.json')
 await mkdir(bundleDir, { recursive: true })
 await rm(priceCachePath, { force: true })
+process.env.NODE_ENV = 'test'
 process.env.MAA_MATERIAL_VALUE_CACHE_PATH = priceCachePath
+process.env.DEPOT_SAMPLE_HASH_SECRET = 'check-depot-sample-secret'
+const sampleStore = createMemoryDepotValueSampleStore()
+globalThis.__maaDepotValueSampleStoreForTesting = sampleStore
 const originalConsoleError = console.error
+const originalConsoleWarn = console.warn
 console.error = (...args) => {
   if (String(args[0] ?? '').startsWith('depot value error:')) return
   originalConsoleError(...args)
+}
+console.warn = (...args) => {
+  if (String(args[0] ?? '').startsWith('depot value skland sample fetch failed:')) return
+  originalConsoleWarn(...args)
 }
 
 const handlerPath = await bundleHandler()
@@ -148,6 +157,12 @@ async function assertUploadFormats() {
   if (flat.body.percentile < 1 || flat.body.percentile > 99) {
     throw new Error('upload formats: percentile should be clamped to 1-99')
   }
+  if (flat.body.ranking.contribution_status !== 'not_applicable') {
+    throw new Error(`upload formats: expected not_applicable contribution, got ${flat.body.ranking.contribution_status}`)
+  }
+  if (sampleStore.records.size !== 0) {
+    throw new Error('upload formats: upload input should not write sample records')
+  }
 
   const duplicate = await callDepot({
     source: 'upload',
@@ -226,8 +241,17 @@ async function assertSklandFlow() {
 
   const imported = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
   assertNoSecretLeak(imported.body, 'skland import response')
+  if (imported.body.ranking.contribution_status !== 'saved') {
+    throw new Error(`skland import: expected default saved contribution, got ${imported.body.ranking.contribution_status}`)
+  }
   if (imported.status !== 200 || imported.body.source !== 'skland') {
     throw new Error(`skland import: expected 200 skland result, got ${imported.status}`)
+  }
+  if (imported.body.sources.ranking !== 'sample_adjusted_curve_v1' || imported.body.ranking.sample_count !== 1) {
+    throw new Error('skland import: expected default sample-adjusted ranking with one sample')
+  }
+  if (sampleStore.records.size !== 1) {
+    throw new Error(`skland import: expected one default sample record, got ${sampleStore.records.size}`)
   }
   if (globalThis.__depotSklandUid !== '12345678' || globalThis.__depotClientCred !== 'decrypted-skland-cred') {
     throw new Error('skland import: did not read expected bound account')
@@ -238,6 +262,23 @@ async function assertSklandFlow() {
   const gel = imported.body.top_items.find((item) => item.id === '31013')
   if (gel?.count !== 58 || gel.equivalent_sanity !== 232) {
     throw new Error('skland import: should accept numeric string counts from cultivate inventory')
+  }
+  const record = [...sampleStore.records.values()][0]
+  if (record.account_level !== 120 || record.operator_count !== 3 || record.six_star_count !== 2 || record.elite2_count !== 2) {
+    throw new Error('skland import: invalid aggregate operator/account stats')
+  }
+  assertNoRawSampleLeak(record, 'skland import sample record')
+
+  const repeated = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
+  if (repeated.status !== 200 || sampleStore.records.size !== 1) {
+    throw new Error('skland import: repeated same uid should update one sample record')
+  }
+
+  globalThis.__depotGameInfoFails = true
+  const unavailable = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
+  globalThis.__depotGameInfoFails = false
+  if (unavailable.status !== 200 || unavailable.body.ranking.contribution_status !== 'unavailable') {
+    throw new Error(`skland import: game info failure should not block analysis, got ${unavailable.status}/${unavailable.body.ranking.contribution_status}`)
   }
 }
 
@@ -279,9 +320,18 @@ async function expectRawStatus(body, status, label) {
 
 function assertNoSecretLeak(value, label) {
   const serialized = JSON.stringify(value)
-  for (const secret of ['bound-secret', 'decrypted-skland-cred', 'SKLAND-V1:']) {
+  for (const secret of ['bound-secret', 'decrypted-skland-cred', 'SKLAND-V1:', '12345678', '博士']) {
     if (serialized.includes(secret)) {
       throw new Error(`${label}: leaked ${secret}`)
+    }
+  }
+}
+
+function assertNoRawSampleLeak(value, label) {
+  const serialized = JSON.stringify(value)
+  for (const secret of ['bound-secret', 'decrypted-skland-cred', 'SKLAND-V1:', '12345678', '博士', 'char_002_amiya', '阿米娅', '源岩']) {
+    if (serialized.includes(secret)) {
+      throw new Error(`${label}: leaked raw value ${secret}`)
     }
   }
 }
@@ -317,8 +367,16 @@ function memorySklandPlugin() {
         path: 'memory-skland-client',
         namespace: 'depot-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])depot-value-sample-store(\.ts)?$/ }, () => ({
+        path: 'memory-depot-value-sample-store',
+        namespace: 'depot-smoke',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'depot-smoke' }, (args) => ({
-        contents: args.path === 'memory-user-auth' ? memoryUserAuthModule() : memorySklandClientModule(),
+        contents: args.path === 'memory-user-auth'
+          ? memoryUserAuthModule()
+          : args.path === 'memory-depot-value-sample-store'
+            ? memoryDepotValueSampleStoreModule()
+            : memorySklandClientModule(),
         loader: 'js',
       }))
     },
@@ -334,8 +392,31 @@ function memoryUserAuthModule() {
   `
 }
 
+function memoryDepotValueSampleStoreModule() {
+  return `
+    export function getDepotValueSampleStore() {
+      return globalThis.__maaDepotValueSampleStoreForTesting ?? null
+    }
+  `
+}
+
 function memorySklandClientModule() {
   return `
+    export function convertSklandCharactersToOperators(gamePlayerInfo) {
+      const chars = gamePlayerInfo?.data?.chars ?? []
+      const charInfoMap = gamePlayerInfo?.data?.charInfoMap ?? {}
+      return chars
+        .filter((item) => item?.charId?.startsWith('char_'))
+        .map((item) => ({
+          id: item.charId,
+          name: item.name ?? charInfoMap[item.charId]?.name,
+          own: true,
+          elite: Number(item.evolvePhase) || 0,
+          level: Number(item.level) || 0,
+          potential: Number(item.potentialRank) || 0,
+          rarity: Number(charInfoMap[item.charId]?.rarity) || 0,
+        }))
+    }
     export function decryptSklandCredential(encrypted) {
       if (encrypted !== 'bound-secret') throw new Error('unexpected encrypted credential')
       return 'decrypted-skland-cred'
@@ -369,8 +450,46 @@ function memorySklandClientModule() {
           },
         }
       }
+      async getGamePlayerInfo(uid) {
+        globalThis.__depotGameInfoUid = uid
+        if (globalThis.__depotGameInfoFails) throw new Error('game player info down')
+        return {
+          data: {
+            status: { level: 120 },
+            chars: [
+              { charId: 'char_002_amiya', name: '阿米娅', evolvePhase: 2, level: 90, potentialRank: 5 },
+              { charId: 'char_010_chen', name: '陈', evolvePhase: 2, level: 80, potentialRank: 2 },
+              { charId: 'char_4080_lin', name: '林', evolvePhase: 1, level: 70, potentialRank: 1 },
+              { charId: 'token_10002_kalts_mon3tr', name: 'Mon3tr', evolvePhase: 0, level: 1 },
+            ],
+            charInfoMap: {
+              char_002_amiya: { name: '阿米娅', rarity: 4 },
+              char_010_chen: { name: '陈', rarity: 5 },
+              char_4080_lin: { name: '林', rarity: 5 },
+            },
+          },
+        }
+      }
     }
   `
+}
+
+function createMemoryDepotValueSampleStore() {
+  const records = new Map()
+  return {
+    records,
+    save: async (record) => {
+      records.set(record.uid_hash, record)
+    },
+    getDistribution: async (totalEquivalentSanity) => {
+      const values = [...records.values()]
+      return {
+        sample_count: values.length,
+        less_count: values.filter((record) => record.total_equivalent_sanity < totalEquivalentSanity).length,
+        equal_count: values.filter((record) => record.total_equivalent_sanity === totalEquivalentSanity).length,
+      }
+    },
+  }
 }
 
 function jsonResponse(body) {

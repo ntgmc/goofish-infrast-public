@@ -1,13 +1,16 @@
+import { createHmac } from 'node:crypto'
 import type {
   DepotValueItem,
-  DepotValueRequest,
+  DepotValueRanking,
+  DepotValueSampleContributionStatus,
   DepotValueResponse,
   DepotValueSource,
   DepotValueUnpricedItem,
+  LicenseOperator,
 } from '../../src/lib/types'
 import { APP_BUILD_META } from '../../src/lib/build-meta'
 import { requireUserSession } from './user-auth'
-import { decryptSklandCredential, SklandClient } from './skland-client'
+import { convertSklandCharactersToOperators, decryptSklandCredential, SklandClient } from './skland-client'
 import {
   getExpItemSanity,
   getNetLmdSanity,
@@ -15,10 +18,16 @@ import {
   round,
   type PricingState,
 } from './material-value'
+import {
+  getDepotValueSampleStore,
+  type DepotValueSampleRecord,
+  type DepotValueSampleStore,
+} from '../storage/depot-value-sample-store'
 
 const MAX_BODY_BYTES = 1024 * 1024
 const TOP_ITEM_LIMIT = 8
 const UNPRICED_ITEM_LIMIT = 12
+const SAMPLE_WEIGHT_PRIOR_COUNT = 200
 const LMD_ITEM_ID = '4001'
 const UNPRICED_BY_POLICY = new Set(['3401', 'mod_unlock_token', 'mod_update_token_1', 'mod_update_token_2'])
 
@@ -30,6 +39,30 @@ type DepotInventoryItem = {
 
 type HandlerError = Error & {
   status?: number
+}
+
+type SklandDepotRead = {
+  inventory: DepotInventoryItem[]
+  sample: SklandSampleData | null
+}
+
+type SklandSampleData = {
+  uid: string
+  accountLevel: number | null
+  operatorStats: DepotOperatorStats
+}
+
+type DepotOperatorStats = {
+  operator_count: number
+  elite2_count: number
+  six_star_count: number
+  six_star_e2_count: number
+  e2_90_count: number
+  operator_power_score: number
+}
+
+type DepotValueBuildOptions = {
+  sample?: SklandSampleData | null
 }
 
 const ITEM_NAMES: Record<string, string> = {
@@ -129,13 +162,16 @@ export default async (req: Request): Promise<Response> => {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
 
   try {
-    const body = await readLimitedJsonBody(req) as Partial<DepotValueRequest>
+    const body = await readLimitedJsonBody(req)
+    if (!isRecord(body)) return jsonResponse({ error: '请求体必须是对象。' }, 400)
     if (body.source === 'upload') {
       return jsonResponse(await buildDepotValueResponse(normalizeDepotInventory(body.inventory), 'upload'))
     }
     if (body.source === 'skland') {
-      const inventory = await readSklandInventory(req, body.profile_id)
-      return jsonResponse(await buildDepotValueResponse(inventory, 'skland'))
+      const skland = await readSklandInventory(req, body.profile_id, true)
+      return jsonResponse(await buildDepotValueResponse(skland.inventory, 'skland', undefined, {
+        sample: skland.sample,
+      }))
     }
     return jsonResponse({ error: '请指定 source 为 upload 或 skland。' }, 400)
   } catch (error) {
@@ -156,6 +192,7 @@ export async function buildDepotValueResponse(
   items: DepotInventoryItem[],
   source: DepotValueSource,
   pricingState?: PricingState,
+  options: DepotValueBuildOptions = {},
 ): Promise<DepotValueResponse> {
   const pricing = pricingState ?? await getYituliuPricing()
   const pricedItems: DepotValueItem[] = []
@@ -184,6 +221,18 @@ export async function buildDepotValueResponse(
   if (unpricedItems.length > 0) {
     warnings.push(`有 ${unpricedItems.length} 类物品暂无可靠理智估价，未计入总值。`)
   }
+  const sampleStore = getDepotValueSampleStore()
+  const contributionStatus = await saveDepotSampleIfRequested({
+    source,
+    total,
+    itemCount: items.length,
+    pricedCount: pricedItems.length,
+    unpricedCount: unpricedItems.length,
+    sample: options.sample ?? null,
+    sampleStore,
+    warnings,
+  })
+  const rankingResult = await buildDepotRanking(total, sampleStore, contributionStatus, warnings)
 
   return {
     source,
@@ -191,7 +240,8 @@ export async function buildDepotValueResponse(
     priced_count: pricedItems.length,
     unpriced_count: unpricedItems.length,
     total_equivalent_sanity: total,
-    percentile: estimateDepotPercentile(total),
+    percentile: rankingResult.percentile,
+    ranking: rankingResult.ranking,
     top_items: pricedItems
       .sort((left, right) => right.equivalent_sanity - left.equivalent_sanity || left.id.localeCompare(right.id))
       .slice(0, TOP_ITEM_LIMIT),
@@ -201,10 +251,123 @@ export async function buildDepotValueResponse(
       inventory: source,
       yituliu: pricing.status,
       lmd_exp: 'fixed_lmd_exp_36_per_10000',
-      ranking: 'entertainment_curve_v1',
+      ranking: rankingResult.ranking.mode === 'sample_adjusted' ? 'sample_adjusted_curve_v1' : 'entertainment_curve_v1',
     },
     generated_at: new Date().toISOString(),
     build_meta: APP_BUILD_META,
+  }
+}
+
+async function saveDepotSampleIfRequested({
+  source,
+  total,
+  itemCount,
+  pricedCount,
+  unpricedCount,
+  sample,
+  sampleStore,
+  warnings,
+}: {
+  source: DepotValueSource
+  total: number
+  itemCount: number
+  pricedCount: number
+  unpricedCount: number
+  sample: SklandSampleData | null
+  sampleStore: DepotValueSampleStore | null
+  warnings: string[]
+}): Promise<DepotValueSampleContributionStatus> {
+  if (source !== 'skland') return 'not_applicable'
+  if (!sampleStore || !sample) return 'unavailable'
+
+  const uidHash = hashSklandUid(sample.uid)
+  if (!uidHash) return 'unavailable'
+
+  const now = new Date().toISOString()
+  const record: DepotValueSampleRecord = {
+    version: 1,
+    uid_hash: uidHash,
+    total_equivalent_sanity: total,
+    account_level: sample.accountLevel,
+    operator_power_score: sample.operatorStats.operator_power_score,
+    operator_count: sample.operatorStats.operator_count,
+    elite2_count: sample.operatorStats.elite2_count,
+    six_star_count: sample.operatorStats.six_star_count,
+    six_star_e2_count: sample.operatorStats.six_star_e2_count,
+    e2_90_count: sample.operatorStats.e2_90_count,
+    inventory_item_count: itemCount,
+    priced_count: pricedCount,
+    unpriced_count: unpricedCount,
+    sample_json: {
+      version: 1,
+      source: 'skland',
+      total_equivalent_sanity: total,
+      account_level: sample.accountLevel,
+      operator_power_score: sample.operatorStats.operator_power_score,
+      operator_count: sample.operatorStats.operator_count,
+      elite2_count: sample.operatorStats.elite2_count,
+      six_star_count: sample.operatorStats.six_star_count,
+      six_star_e2_count: sample.operatorStats.six_star_e2_count,
+      e2_90_count: sample.operatorStats.e2_90_count,
+      inventory_item_count: itemCount,
+      priced_count: pricedCount,
+      unpriced_count: unpricedCount,
+      sampled_at: now,
+    },
+    sampled_at: now,
+    updated_at: now,
+  }
+
+  try {
+    await sampleStore.save(record)
+    return 'saved'
+  } catch (error) {
+    console.warn('depot value sample save failed:', error instanceof Error ? error.message : error)
+    warnings.push('匿名样本暂未保存，本次分析结果不受影响。')
+    return 'unavailable'
+  }
+}
+
+async function buildDepotRanking(
+  totalSanity: number,
+  sampleStore: DepotValueSampleStore | null,
+  contributionStatus: DepotValueSampleContributionStatus,
+  warnings: string[],
+): Promise<{ percentile: number; ranking: DepotValueRanking }> {
+  const curvePercentile = estimateDepotCurvePercentile(totalSanity)
+  const curveRanking: DepotValueRanking = {
+    mode: 'curve',
+    sample_count: 0,
+    sample_weight: 0,
+    curve_percentile: curvePercentile,
+    sample_percentile: null,
+    contribution_status: contributionStatus,
+  }
+  if (!sampleStore) return { percentile: curvePercentile, ranking: curveRanking }
+
+  try {
+    const distribution = await sampleStore.getDistribution(totalSanity)
+    if (distribution.sample_count <= 0) return { percentile: curvePercentile, ranking: curveRanking }
+    const samplePercentile = ((distribution.less_count + distribution.equal_count * 0.5) / distribution.sample_count) * 100
+    const sampleWeight = distribution.sample_count / (distribution.sample_count + SAMPLE_WEIGHT_PRIOR_COUNT)
+    const percentile = clampPercentile(Math.round(
+      curvePercentile * (1 - sampleWeight) + samplePercentile * sampleWeight,
+    ))
+    return {
+      percentile,
+      ranking: {
+        mode: 'sample_adjusted',
+        sample_count: distribution.sample_count,
+        sample_weight: round(sampleWeight, 4),
+        curve_percentile: curvePercentile,
+        sample_percentile: round(samplePercentile, 2),
+        contribution_status: contributionStatus,
+      },
+    }
+  } catch (error) {
+    console.warn('depot value sample ranking failed:', error instanceof Error ? error.message : error)
+    warnings.push('真实样本库暂不可用，本次使用估算曲线。')
+    return { percentile: curvePercentile, ranking: curveRanking }
   }
 }
 
@@ -251,7 +414,11 @@ function mergeDepotItems(items: DepotInventoryItem[]): DepotInventoryItem[] {
   return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id))
 }
 
-async function readSklandInventory(req: Request, profileId: unknown): Promise<DepotInventoryItem[]> {
+async function readSklandInventory(
+  req: Request,
+  profileId: unknown,
+  includeSample: boolean,
+): Promise<SklandDepotRead> {
   const auth = await requireUserSession(req)
   if (!auth) throw createError('请先登录。', 401)
   if (typeof profileId !== 'string' || !profileId.trim()) throw createError('缺少 profile_id。', 400)
@@ -262,11 +429,28 @@ async function readSklandInventory(req: Request, profileId: unknown): Promise<De
   if (!binding?.encrypted_cred) throw createError('当前账号尚未绑定森空岛。', 404)
 
   const client = new SklandClient(decryptSklandCredential(binding.encrypted_cred))
+  const playerInfoPromise = includeSample
+    ? client.getGamePlayerInfo(binding.uid)
+      .then((value) => ({ ok: true as const, value }))
+      .catch((error) => ({ ok: false as const, error }))
+    : Promise.resolve(null)
   const [calInfo, calPlayer] = await Promise.all([
     client.getCultivateInfo(),
     client.getCultivatePlayer(binding.uid),
   ])
-  return mergeDepotItems(readSklandPlayerItems(calInfo, calPlayer))
+  const playerInfo = await playerInfoPromise
+  const inventory = mergeDepotItems(readSklandPlayerItems(calInfo, calPlayer))
+  let sample: SklandSampleData | null = null
+  if (playerInfo?.ok) {
+    try {
+      sample = buildSklandSampleData(binding.uid, playerInfo.value)
+    } catch (error) {
+      console.warn('depot value skland sample parse failed:', error instanceof Error ? error.message : error)
+    }
+  } else if (playerInfo && !playerInfo.ok) {
+    console.warn('depot value skland sample fetch failed:', playerInfo.error instanceof Error ? playerInfo.error.message : playerInfo.error)
+  }
+  return { inventory, sample }
 }
 
 function readSklandPlayerItems(calInfo: unknown, calPlayer: unknown): DepotInventoryItem[] {
@@ -282,6 +466,69 @@ function readSklandPlayerItems(calInfo: unknown, calPlayer: unknown): DepotInven
     const meta = isRecord(itemMeta[id]) ? itemMeta[id] : {}
     return [{ id, name: stringValue(meta.name ?? raw.name) || getItemName(id), count }]
   })
+}
+
+function buildSklandSampleData(uid: string, gamePlayerInfo: unknown): SklandSampleData {
+  return {
+    uid,
+    accountLevel: readAccountLevel(gamePlayerInfo),
+    operatorStats: summarizeOperators(convertSklandCharactersToOperators(gamePlayerInfo)),
+  }
+}
+
+function summarizeOperators(operators: LicenseOperator[]): DepotOperatorStats {
+  const owned = operators.filter((operator) => operator.own !== false)
+  let operatorPowerScore = 0
+  let elite2Count = 0
+  let sixStarCount = 0
+  let sixStarE2Count = 0
+  let e2MaxLevelCount = 0
+
+  for (const operator of owned) {
+    const rarity = numberValue(operator.rarity) ?? 0
+    const elite = numberValue(operator.elite) ?? 0
+    const level = Math.max(0, Math.min(90, numberValue(operator.level) ?? 0))
+    const isElite2 = elite >= 2
+    const isSixStar = rarity >= 5
+    operatorPowerScore += (rarity + 1) * (elite * 100 + level)
+    if (isElite2) elite2Count += 1
+    if (isSixStar) sixStarCount += 1
+    if (isSixStar && isElite2) sixStarE2Count += 1
+    if (isElite2 && level >= 90) e2MaxLevelCount += 1
+  }
+
+  return {
+    operator_count: owned.length,
+    elite2_count: elite2Count,
+    six_star_count: sixStarCount,
+    six_star_e2_count: sixStarE2Count,
+    e2_90_count: e2MaxLevelCount,
+    operator_power_score: round(operatorPowerScore, 2),
+  }
+}
+
+function readAccountLevel(value: unknown): number | null {
+  const paths = [
+    ['data', 'status', 'level'],
+    ['data', 'player', 'level'],
+    ['data', 'level'],
+    ['data', 'user', 'level'],
+    ['status', 'level'],
+    ['player', 'level'],
+    ['level'],
+    ['user', 'level'],
+  ]
+  for (const path of paths) {
+    const level = numberValue(readPath(value, path))
+    if (level !== null && level >= 0) return Math.floor(level)
+  }
+  return null
+}
+
+function hashSklandUid(uid: string): string | null {
+  const secret = process.env.DEPOT_SAMPLE_HASH_SECRET?.trim() || process.env.CDK_HASH_SECRET?.trim()
+  if (!secret) return null
+  return createHmac('sha256', secret).update(`skland:${uid}`).digest('hex')
 }
 
 function getDepotUnitSanity(id: string, pricing: PricingState): number | null {
@@ -301,7 +548,7 @@ function sortUnpricedItems(items: DepotValueUnpricedItem[]): DepotValueUnpricedI
   ))
 }
 
-function estimateDepotPercentile(totalSanity: number): number {
+function estimateDepotCurvePercentile(totalSanity: number): number {
   const points = [
     { sanity: 0, percentile: 1 },
     { sanity: 500, percentile: 45 },
@@ -412,4 +659,22 @@ function stringValue(value: unknown): string {
   if (typeof value === 'string') return value.trim()
   if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   return ''
+}
+
+function numberValue(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+function readPath(value: unknown, path: string[]): unknown {
+  let current = value
+  for (const key of path) {
+    if (!isRecord(current)) return undefined
+    current = current[key]
+  }
+  return current
 }
