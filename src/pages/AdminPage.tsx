@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { Announcement, AnnouncementAdminResponse, AnnouncementKind, ProductPermissionMode, RawPermissionMode } from '../lib/types'
+import { apiJson, apiVoid } from '../lib/api-client'
 
 type Permission = RawPermissionMode
 type GeneratedPermission = ProductPermissionMode
@@ -266,23 +267,13 @@ const summary = useMemo(
         'X-Admin-User': nextCredentials.user,
         'X-Admin-Password': nextCredentials.password,
       }
-      const [cdkResp, usageResp, announcementResp, usersResp, riskSettingsResp] = await Promise.all([
-        fetch('/api/admin/cdk?status=all', { headers }),
-        fetch('/api/admin/usage-stats', { headers }),
-        fetch('/api/admin/announcement', { headers }),
-        fetch('/api/admin/users', { headers }),
-        fetch('/api/admin/risk-settings', { headers }),
+      const [cdkData, usageData, announcementData, usersData, riskSettingsData] = await Promise.all([
+        apiJson<{ cdks?: AdminCdkRecord[] }>('/api/admin/cdk?status=all', { headers, fallbackMessage: '加载 CDK 失败' }),
+        apiJson<{ totals?: UsageTotals; days?: UsageDay[] }>('/api/admin/usage-stats', { headers, fallbackMessage: '加载统计失败' }),
+        apiJson<Partial<AnnouncementAdminResponse>>('/api/admin/announcement', { headers, fallbackMessage: '加载公告失败' }),
+        apiJson<{ users?: AdminUserSummary[]; app_users?: AppUserSummary[] }>('/api/admin/users', { headers, fallbackMessage: '加载账号失败' }),
+        apiJson<{ settings?: Partial<RiskControlSettings> }>('/api/admin/risk-settings', { headers, fallbackMessage: '加载风控设置失败' }),
       ])
-      const cdkData = await readJson<{ error?: string; cdks?: AdminCdkRecord[] }>(cdkResp)
-      const usageData = await readJson<{ error?: string; totals?: UsageTotals; days?: UsageDay[] }>(usageResp)
-      const announcementData = await readJson<Partial<AnnouncementAdminResponse> & { error?: string }>(announcementResp)
-      const usersData = await readJson<{ error?: string; users?: AdminUserSummary[]; app_users?: AppUserSummary[] }>(usersResp)
-      const riskSettingsData = await readJson<{ error?: string; settings?: Partial<RiskControlSettings> }>(riskSettingsResp)
-      if (!cdkResp.ok) throw new Error(cdkData.error || `加载 CDK 失败: ${cdkResp.status}`)
-      if (!usageResp.ok) throw new Error(usageData.error || `加载统计失败: ${usageResp.status}`)
-      if (!announcementResp.ok) throw new Error(announcementData.error || `加载公告失败: ${announcementResp.status}`)
-      if (!usersResp.ok) throw new Error(usersData.error || `加载账号失败: ${usersResp.status}`)
-      if (!riskSettingsResp.ok) throw new Error(riskSettingsData.error || `加载风控设置失败: ${riskSettingsResp.status}`)
       setRecords(cdkData.cdks ?? [])
       setUsageStats({
         totals: normalizeUsageTotals(usageData.totals),
@@ -345,14 +336,14 @@ const summary = useMemo(
     setError(null)
     setNotice(null)
     try {
-      const resp = await fetch('/api/admin/cdk', {
+      const data = await apiJson<{ code?: string; permission?: GeneratedPermission; created_at?: string }>('/api/admin/cdk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ admin_user: credentials?.user, admin_password: credentials?.password, permission, order_note: orderNote }),
+        headers: authHeaders,
+        json: { admin_user: credentials?.user, admin_password: credentials?.password, permission, order_note: orderNote },
+        fallbackMessage: '生成失败',
       })
-      const data = await readJson<{ error?: string; code?: string; permission?: GeneratedPermission; created_at?: string }>(resp)
-      if (!resp.ok || !data.code || !data.permission || !data.created_at) {
-        throw new Error(data.error || `生成失败: ${resp.status}`)
+      if (!data.code || !data.permission || !data.created_at) {
+        throw new Error('生成失败')
       }
       setGeneratedCode({ code: data.code, permission: data.permission, created_at: data.created_at })
       setOrderNote('')
@@ -370,17 +361,16 @@ const summary = useMemo(
     setError(null)
     setNotice(null)
     try {
-      const resp = await fetch('/api/admin/announcement', {
+      const data = await apiJson<Partial<AnnouncementAdminResponse>>('/api/admin/announcement', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
+        headers: authHeaders,
+        json: {
           admin_user: credentials?.user,
           admin_password: credentials?.password,
           announcements,
-        }),
+        },
+        fallbackMessage: '保存公告失败',
       })
-      const data = await readJson<Partial<AnnouncementAdminResponse> & { error?: string }>(resp)
-      if (!resp.ok) throw new Error(data.error || `保存公告失败: ${resp.status}`)
       setAnnouncements(normalizeAnnouncementList(data.announcements))
       setNotice('公告已保存')
     } catch (caught) {
@@ -395,17 +385,16 @@ const summary = useMemo(
     setError(null)
     setNotice(null)
     try {
-      const resp = await fetch('/api/admin/risk-settings', {
+      const data = await apiJson<{ settings?: Partial<RiskControlSettings> }>('/api/admin/risk-settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
+        headers: authHeaders,
+        json: {
           admin_user: credentials?.user,
           admin_password: credentials?.password,
           ...patch,
-        }),
+        },
+        fallbackMessage: '保存风控设置失败',
       })
-      const data = await readJson<{ error?: string; settings?: Partial<RiskControlSettings> }>(resp)
-      if (!resp.ok) throw new Error(data.error || `保存风控设置失败: ${resp.status}`)
       setRiskSettings(normalizeRiskSettings(data.settings))
       setNotice('风控设置已保存')
     } catch (caught) {
@@ -436,26 +425,27 @@ const summary = useMemo(
     setBusyAction(`${action}:${record.code_hash}`)
     setError(null)
     try {
-      const resp = await fetch('/api/admin/cdk', {
+      const data = await apiJson<{ cdk?: AdminCdkDetail }>('/api/admin/cdk', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
+        headers: authHeaders,
+        json: {
           admin_user: credentials?.user,
           admin_password: credentials?.password,
           code_hash: record.code_hash,
           action,
           ...(nextPermission ? { permission: nextPermission } : {}),
           ...extraBody,
-        }),
+        },
+        fallbackMessage: '操作失败',
       })
-      const data = await readJson<{ error?: string; cdk?: AdminCdkDetail }>(resp)
-      if (!resp.ok) throw new Error(data.error || `操作失败: ${resp.status}`)
       if (data.cdk) {
         setSelectedCdkDetail(data.cdk)
       } else if (selectedCdkDetail?.code_hash === record.code_hash) {
-        const detailResp = await fetch(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}`, { headers: authHeaders })
-        const detailData = await readJson<{ error?: string; cdk?: AdminCdkDetail }>(detailResp)
-        if (detailResp.ok && detailData.cdk) setSelectedCdkDetail(detailData.cdk)
+        const detailData = await apiJson<{ cdk?: AdminCdkDetail }>(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}`, {
+          headers: authHeaders,
+          fallbackMessage: '加载 CDK 详情失败',
+        })
+        if (detailData.cdk) setSelectedCdkDetail(detailData.cdk)
       }
       await loadDashboard()
     } catch (caught) {
@@ -471,13 +461,12 @@ const summary = useMemo(
     setBusyAction(`delete:${record.code_hash}`)
     setError(null)
     try {
-      const resp = await fetch('/api/admin/cdk', {
+      await apiVoid('/api/admin/cdk', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ admin_user: credentials?.user, admin_password: credentials?.password, code_hash: record.code_hash }),
+        headers: authHeaders,
+        json: { admin_user: credentials?.user, admin_password: credentials?.password, code_hash: record.code_hash },
+        fallbackMessage: '删除失败',
       })
-      const data = await readJson<{ error?: string }>(resp)
-      if (!resp.ok) throw new Error(data.error || `删除失败: ${resp.status}`)
       if (selectedCdkDetail?.code_hash === record.code_hash) setSelectedCdkDetail(null)
       await loadDashboard()
     } catch (caught) {
@@ -491,9 +480,11 @@ const summary = useMemo(
     setBusyAction(`cdk-detail:${record.code_hash}`)
     setError(null)
     try {
-      const resp = await fetch(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}`, { headers: authHeaders })
-      const data = await readJson<{ error?: string; cdk?: AdminCdkDetail }>(resp)
-      if (!resp.ok || !data.cdk) throw new Error(data.error || `加载 CDK 详情失败: ${resp.status}`)
+      const data = await apiJson<{ cdk?: AdminCdkDetail }>(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}`, {
+        headers: authHeaders,
+        fallbackMessage: '加载 CDK 详情失败',
+      })
+      if (!data.cdk) throw new Error('加载 CDK 详情失败')
       setSelectedCdkDetail(data.cdk)
     } catch (caught) {
       setError((caught as Error).message)
@@ -534,9 +525,11 @@ const summary = useMemo(
     setBusyAction(`user-detail:${user.id}`)
     setError(null)
     try {
-      const resp = await fetch(`/api/admin/users?user_id=${encodeURIComponent(user.id)}`, { headers: authHeaders })
-      const data = await readJson<{ error?: string; detail?: AdminUserDetail }>(resp)
-      if (!resp.ok || !data.detail) throw new Error(data.error || `加载用户详情失败: ${resp.status}`)
+      const data = await apiJson<{ detail?: AdminUserDetail }>(`/api/admin/users?user_id=${encodeURIComponent(user.id)}`, {
+        headers: authHeaders,
+        fallbackMessage: '加载用户详情失败',
+      })
+      if (!data.detail) throw new Error('加载用户详情失败')
       setSelectedUserDetail(data.detail)
     } catch (caught) {
       setError((caught as Error).message)
@@ -556,20 +549,20 @@ const summary = useMemo(
     setError(null)
     setNotice(null)
     try {
-      const resp = await fetch('/api/admin/users', {
+      const data = await apiJson<{ detail?: AdminUserDetail }>('/api/admin/users', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
+        headers: authHeaders,
+        json: {
           admin_user: credentials?.user,
           admin_password: credentials?.password,
           action,
           user_id: selectedUserDetail.user.id,
           profile_id: profile.id,
           ...extraBody,
-        }),
+        },
+        fallbackMessage: '档案操作失败',
       })
-      const data = await readJson<{ error?: string; detail?: AdminUserDetail }>(resp)
-      if (!resp.ok || !data.detail) throw new Error(data.error || `档案操作失败: ${resp.status}`)
+      if (!data.detail) throw new Error('档案操作失败')
       setSelectedUserDetail(data.detail)
       setNotice('档案已更新')
       await loadDashboard()
@@ -637,19 +630,18 @@ const summary = useMemo(
     setError(null)
     setNotice(null)
     try {
-      const resp = await fetch('/api/admin/users', {
+      const data = await apiJson<{ user?: { email: string } }>('/api/admin/users', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
+        headers: authHeaders,
+        json: {
           admin_user: credentials?.user,
           admin_password: credentials?.password,
           action: 'reset_password',
           email: resetUserEmail,
           new_password: resetPassword,
-        }),
+        },
+        fallbackMessage: '重置密码失败',
       })
-      const data = await readJson<{ error?: string; user?: { email: string } }>(resp)
-      if (!resp.ok) throw new Error(data.error || `重置密码失败: ${resp.status}`)
       setNotice(`已重置 ${data.user?.email ?? resetUserEmail} 的密码`)
       setResetUserEmail('')
       setResetPassword('')
@@ -672,19 +664,18 @@ const summary = useMemo(
     setError(null)
     setNotice(null)
     try {
-      const resp = await fetch('/api/admin/users', {
+      const data = await apiJson<{ detail?: AdminUserDetail; deleted?: boolean }>('/api/admin/users', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
+        headers: authHeaders,
+        json: {
           admin_user: credentials?.user,
           admin_password: credentials?.password,
           action,
           user_id: user.id,
           ...extraBody,
-        }),
+        },
+        fallbackMessage: `${successMessage}失败`,
       })
-      const data = await readJson<{ error?: string; detail?: AdminUserDetail; deleted?: boolean }>(resp)
-      if (!resp.ok) throw new Error(data.error || `${successMessage}失败: ${resp.status}`)
       if (data.detail) setSelectedUserDetail(data.detail)
       if (data.deleted && selectedUserDetail?.user.id === user.id) setSelectedUserDetail(null)
       setNotice(`${successMessage}：${user.email}`)
@@ -1934,14 +1925,3 @@ function clearStoredCredentials(): void {
   window.sessionStorage.removeItem('maa-admin-credentials')
 }
 
-async function readJson<T>(response: Response): Promise<T> {
-  const text = await response.text()
-  if (!text.trim()) {
-    throw new Error(`接口返回为空，请确认后台函数路由已部署: ${response.status}`)
-  }
-  try {
-    return JSON.parse(text) as T
-  } catch {
-    throw new Error(`接口返回格式异常，请确认后台函数路由已部署: ${response.status}`)
-  }
-}

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { AuthSuccessResponse } from '../lib/types'
+import { apiJson } from '../lib/api-client'
 
 type AuthMode = 'login' | 'register' | 'forgot'
 type FieldErrors = Record<string, string>
@@ -43,24 +44,21 @@ export default function AuthForm({
     setNotice(null)
     try {
       if (mode === 'forgot') {
-        const resp = await fetch('/api/auth/forgot-password', {
+        const data = await apiJson<{ message?: string }>('/api/auth/forgot-password', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          json: { email },
+          fallbackMessage: '发送重置邮件失败',
         })
-        const data = await resp.json() as { error?: string; message?: string }
-        if (!resp.ok) throw new Error(data.error || `发送重置邮件失败: ${resp.status}`)
         setNotice(data.message || '如果该邮箱已注册，我们会发送重置密码邮件。')
         return
       }
 
-      const resp = await fetch(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
+      const data = await apiJson<AuthSuccessResponse>(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mode === 'login' ? { email, password } : { email, password, cdk: allowCdk ? cdk.trim() || undefined : undefined }),
+        json: mode === 'login' ? { email, password } : { email, password, cdk: allowCdk ? cdk.trim() || undefined : undefined },
+        fallbackMessage: mode === 'login' ? '登录失败' : '注册失败',
       })
-      const data = await resp.json() as AuthSuccessResponse & { error?: string }
-      if (!resp.ok || !data.user) throw new Error(data.error || `${mode === 'login' ? '登录' : '注册'}失败: ${resp.status}`)
+      if (!data.user) throw new Error(mode === 'login' ? '登录失败' : '注册失败')
       onAuthenticated(data)
     } catch (caught) {
       setError((caught as Error).message)
