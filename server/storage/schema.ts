@@ -20,6 +20,12 @@ CREATE TABLE IF NOT EXISTS announcements (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS risk_settings (
+  key TEXT PRIMARY KEY,
+  record_json JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS usage_events (
   key TEXT PRIMARY KEY,
   event TEXT NOT NULL,

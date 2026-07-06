@@ -96,7 +96,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (permission === 'advanced') {
-      const binding = createAdvancedRiskBinding(updated, operatorsCheck.operators, req, body.activation_token)
+      const binding = await createAdvancedRiskBinding(updated, operatorsCheck.operators, req, body.activation_token)
       if (!binding.ok) {
         return jsonResponse({ error: binding.event.reason }, 400)
       }

@@ -11,6 +11,14 @@ import type {
   RawPermissionMode,
 } from '../../src/lib/types'
 import { createPostgresCdkRecordStore } from '../storage/cdk-store'
+import {
+  createPostgresRiskControlSettingsStore,
+  DEFAULT_RISK_CONTROL_SETTINGS,
+  normalizeRiskControlSettings,
+  type RiskControlSettings,
+  type RiskControlSettingsPatch,
+  type RiskControlSettingsStore,
+} from '../storage/risk-settings-store'
 
 const OBFUSCATE_KEY_SEED = 'maa-obfuscate-v1'
 const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const
@@ -171,7 +179,7 @@ export function jsonResponse(body: unknown, status = 200): Response {
       ...(status === 204 ? {} : { 'Content-Type': 'application/json' }),
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Password, X-Cdk-Status',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Password, X-Admin-User, X-Cdk-Status',
     },
   })
 }
@@ -182,8 +190,30 @@ export async function getCdkRecordStore(): Promise<CdkRecordStore> {
   return createPostgresCdkRecordStore()
 }
 
+export async function getRiskControlSettings(): Promise<RiskControlSettings> {
+  try {
+    const store = getRiskControlSettingsStore()
+    return normalizeRiskControlSettings(await store.get())
+  } catch (error) {
+    console.warn('risk settings unavailable, using defaults:', error)
+    return { ...DEFAULT_RISK_CONTROL_SETTINGS }
+  }
+}
+
+export async function saveRiskControlSettings(patch: RiskControlSettingsPatch): Promise<RiskControlSettings> {
+  const store = getRiskControlSettingsStore()
+  const current = normalizeRiskControlSettings(await store.get())
+  const next = normalizeRiskControlSettings({ ...current, ...patch })
+  return store.set(next)
+}
+
 export function setCdkRecordStoreForTesting(store: CdkRecordStore | null): void {
   ;(globalThis as unknown as { __maaCdkRecordStoreForTesting?: CdkRecordStore }).__maaCdkRecordStoreForTesting =
+    store ?? undefined
+}
+
+export function setRiskControlSettingsStoreForTesting(store: RiskControlSettingsStore | null): void {
+  ;(globalThis as unknown as { __maaRiskControlSettingsStoreForTesting?: RiskControlSettingsStore }).__maaRiskControlSettingsStoreForTesting =
     store ?? undefined
 }
 
@@ -192,6 +222,20 @@ function getTestingCdkRecordStore(): CdkRecordStore | null {
   return (
     (globalThis as unknown as { __maaCdkRecordStoreForTesting?: CdkRecordStore })
       .__maaCdkRecordStoreForTesting ?? null
+  )
+}
+
+function getRiskControlSettingsStore(): RiskControlSettingsStore {
+  const testingStore = getTestingRiskControlSettingsStore()
+  if (testingStore) return testingStore
+  return createPostgresRiskControlSettingsStore()
+}
+
+function getTestingRiskControlSettingsStore(): RiskControlSettingsStore | null {
+  if (process.env.NODE_ENV === 'production') return null
+  return (
+    (globalThis as unknown as { __maaRiskControlSettingsStoreForTesting?: RiskControlSettingsStore })
+      .__maaRiskControlSettingsStoreForTesting ?? null
   )
 }
 
@@ -709,13 +753,16 @@ export function evaluateClientBindingRisk(
   return { ok: true, record: next }
 }
 
-export function createAdvancedRiskBinding(
+export async function createAdvancedRiskBinding(
   record: CdkRecord,
   operators: LicenseOperator[],
   req: Request,
   activationToken: unknown,
-): { ok: true; record: CdkRecord } | { ok: false; event: RiskEvent } {
-  const binding = evaluateClientBindingRisk(record, activationToken, req)
+): Promise<{ ok: true; record: CdkRecord } | { ok: false; event: RiskEvent }> {
+  const settings = await getRiskControlSettings()
+  const binding: { ok: true; record: CdkRecord } | { ok: false; record: CdkRecord; event: RiskEvent } = settings.device_risk_enabled
+    ? evaluateClientBindingRisk(record, activationToken, req)
+    : { ok: true, record }
   if (!binding.ok) return { ok: false, event: binding.event }
   const fingerprint = buildOperatorFingerprint(operators)
   return {
@@ -734,7 +781,7 @@ export async function syncAdvancedCdkBinding(
   req: Request,
   activationToken: unknown,
 ): Promise<{ ok: true; record: CdkRecord } | { ok: false; status: number; message: string; record: CdkRecord }> {
-  const binding = createAdvancedRiskBinding(record, operators, req, activationToken)
+  const binding = await createAdvancedRiskBinding(record, operators, req, activationToken)
   if (!binding.ok) {
     if (!shouldFreezeBindingRisk(binding.event)) {
       return { ok: false, status: 403, message: formatBindingBlockMessage(binding.event), record }
@@ -757,22 +804,30 @@ export async function recordAdvancedOperatorUpdate(
   | { ok: true; record: CdkRecord; limit: OperatorUpdateLimit }
   | { ok: false; status: 403 | 409 | 429; message: string; record: CdkRecord; limit?: OperatorUpdateLimit; profile_freeze_required?: boolean }
 > {
-  const binding = evaluateClientBindingRisk(record, activationToken, req)
-  if (!binding.ok) {
-    if (!shouldFreezeBindingRisk(binding.event)) {
-      if (binding.event.type === 'device_token_missing') {
-        return { ok: false, status: 403, message: formatBindingBlockMessage(binding.event), record: binding.record }
+  const settings = await getRiskControlSettings()
+  let bindingRecord = record
+
+  if (settings.device_risk_enabled) {
+    const binding = evaluateClientBindingRisk(record, activationToken, req)
+    if (!binding.ok) {
+      if (!shouldFreezeBindingRisk(binding.event)) {
+        if (binding.event.type === 'device_token_missing') {
+          return { ok: false, status: 403, message: formatBindingBlockMessage(binding.event), record: binding.record }
+        }
+        const blocked = await recordSoftBlockedRiskEvent(binding.record, binding.event, formatBindingBlockMessage(binding.event))
+        return { ok: false, status: 403, message: blocked.message, record: blocked.record }
       }
-      const blocked = await recordSoftBlockedRiskEvent(binding.record, binding.event, formatBindingBlockMessage(binding.event))
-      return { ok: false, status: 403, message: blocked.message, record: blocked.record }
+      const frozen = await freezeCdkRecord(binding.record, binding.event.reason, binding.event)
+      return { ok: false, status: 403, message: frozen.freeze_reason || formatRiskFreezeMessage(binding.event.reason), record: frozen }
     }
-    const frozen = await freezeCdkRecord(binding.record, binding.event.reason, binding.event)
-    return { ok: false, status: 403, message: frozen.freeze_reason || formatRiskFreezeMessage(binding.event.reason), record: frozen }
+    bindingRecord = binding.record
   }
 
-  const operatorRisk = evaluateOperatorRisk(binding.record, operators)
+  const operatorRisk = settings.operator_data_risk_enabled
+    ? evaluateOperatorRisk(bindingRecord, operators)
+    : { ok: true as const, fingerprint: buildOperatorFingerprint(operators) }
   if (!operatorRisk.ok) {
-    const blocked = await recordSoftBlockedRiskEvent(binding.record, operatorRisk.event, formatOperatorRiskBlockMessage(operatorRisk.event.reason))
+    const blocked = await recordSoftBlockedRiskEvent(bindingRecord, operatorRisk.event, formatOperatorRiskBlockMessage(operatorRisk.event.reason))
     return {
       ok: false,
       status: blocked.frozen ? 403 : 409,
@@ -782,7 +837,7 @@ export async function recordAdvancedOperatorUpdate(
     }
   }
 
-  const limitCheck = checkAdvancedOperatorUpdateLimit(binding.record)
+  const limitCheck = checkAdvancedOperatorUpdateLimit(bindingRecord)
   if (!limitCheck.ok) {
     return {
       ok: false,
@@ -790,7 +845,7 @@ export async function recordAdvancedOperatorUpdate(
       message: limitCheck.limit.next_available_at
 ? `单账号终身卡每 7 天最多更新 2 次干员数据，请在 ${limitCheck.limit.next_available_at} 后再试。`
 : '单账号终身卡每 7 天最多更新 2 次干员数据，请稍后再试。',
-      record: binding.record,
+      record: bindingRecord,
       limit: limitCheck.limit,
     }
   }
@@ -798,7 +853,7 @@ export async function recordAdvancedOperatorUpdate(
   const now = new Date().toISOString()
   const cutoff = Date.now() - ADVANCED_UPDATE_WINDOW_MS
   const updateEvents = [
-    ...(binding.record.operator_update_events ?? []).filter((event) => Date.parse(event.at) > cutoff),
+    ...(bindingRecord.operator_update_events ?? []).filter((event) => Date.parse(event.at) > cutoff),
     {
       at: now,
       operator_count: operators.length,
@@ -806,9 +861,9 @@ export async function recordAdvancedOperatorUpdate(
     },
   ]
   const updated: CdkRecord = {
-    ...binding.record,
+    ...bindingRecord,
     operator_count: operators.length,
-    baseline_operator_fingerprint: binding.record.baseline_operator_fingerprint ?? operatorRisk.fingerprint,
+    baseline_operator_fingerprint: bindingRecord.baseline_operator_fingerprint ?? operatorRisk.fingerprint,
     latest_operator_fingerprint: operatorRisk.fingerprint,
     operator_update_events: updateEvents,
   }

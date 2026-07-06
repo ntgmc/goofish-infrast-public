@@ -46,6 +46,14 @@ interface UsageDay extends UsageTotals {
   date: string;
 }
 
+interface RiskControlSettings {
+  operator_data_risk_enabled: boolean;
+  device_risk_enabled: boolean;
+  updated_at: string | null;
+}
+
+type RiskControlSettingsPatch = Partial<Pick<RiskControlSettings, 'operator_data_risk_enabled' | 'device_risk_enabled'>>
+
 interface AdminUserSummary {
   username: string;
   created_at: string;
@@ -62,6 +70,11 @@ interface AppUserSummary {
 }
 
 const EMPTY_ANNOUNCEMENTS: Announcement[] = []
+const DEFAULT_RISK_SETTINGS: RiskControlSettings = {
+  operator_data_risk_enabled: true,
+  device_risk_enabled: false,
+  updated_at: null,
+}
 
 const permissionLabels: Record<Permission, string> = {
 recommended: '单次重置卡',
@@ -114,6 +127,7 @@ export default function AdminPage() {
   const [appUsers, setAppUsers] = useState<AppUserSummary[]>([])
   const [usageStats, setUsageStats] = useState<{ totals: UsageTotals; days: UsageDay[] } | null>(null)
   const [announcements, setAnnouncements] = useState<Announcement[]>(EMPTY_ANNOUNCEMENTS)
+  const [riskSettings, setRiskSettings] = useState<RiskControlSettings>(DEFAULT_RISK_SETTINGS)
   const [permission, setPermission] = useState<GeneratedPermission>('growth')
   const [orderNote, setOrderNote] = useState('')
   const [generatedCode, setGeneratedCode] = useState<{ code: string; permission: GeneratedPermission; created_at: string } | null>(null)
@@ -161,26 +175,30 @@ const summary = useMemo(
         'X-Admin-User': nextCredentials.user,
         'X-Admin-Password': nextCredentials.password,
       }
-      const [cdkResp, usageResp, announcementResp, usersResp] = await Promise.all([
+      const [cdkResp, usageResp, announcementResp, usersResp, riskSettingsResp] = await Promise.all([
         fetch('/api/admin/cdk?status=all', { headers }),
         fetch('/api/admin/usage-stats', { headers }),
         fetch('/api/admin/announcement', { headers }),
         fetch('/api/admin/users', { headers }),
+        fetch('/api/admin/risk-settings', { headers }),
       ])
       const cdkData = await readJson<{ error?: string; cdks?: AdminCdkRecord[] }>(cdkResp)
       const usageData = await readJson<{ error?: string; totals?: UsageTotals; days?: UsageDay[] }>(usageResp)
       const announcementData = await readJson<Partial<AnnouncementAdminResponse> & { error?: string }>(announcementResp)
       const usersData = await readJson<{ error?: string; users?: AdminUserSummary[]; app_users?: AppUserSummary[] }>(usersResp)
+      const riskSettingsData = await readJson<{ error?: string; settings?: Partial<RiskControlSettings> }>(riskSettingsResp)
       if (!cdkResp.ok) throw new Error(cdkData.error || `加载 CDK 失败: ${cdkResp.status}`)
       if (!usageResp.ok) throw new Error(usageData.error || `加载统计失败: ${usageResp.status}`)
       if (!announcementResp.ok) throw new Error(announcementData.error || `加载公告失败: ${announcementResp.status}`)
       if (!usersResp.ok) throw new Error(usersData.error || `加载账号失败: ${usersResp.status}`)
+      if (!riskSettingsResp.ok) throw new Error(riskSettingsData.error || `加载风控设置失败: ${riskSettingsResp.status}`)
       setRecords(cdkData.cdks ?? [])
       setUsageStats({
         totals: normalizeUsageTotals(usageData.totals),
         days: Array.isArray(usageData.days) ? usageData.days.map(normalizeUsageDay) : [],
       })
       setAnnouncements(normalizeAnnouncementList(announcementData.announcements))
+      setRiskSettings(normalizeRiskSettings(riskSettingsData.settings))
       setUsers(usersData.users ?? [])
       setAppUsers(usersData.app_users ?? [])
       setAuthenticated(true)
@@ -223,6 +241,7 @@ const summary = useMemo(
     setRecords([])
     setUsers([])
     setUsageStats(null)
+    setRiskSettings(DEFAULT_RISK_SETTINGS)
   }
 
   const handleGenerateCdk = async (event: FormEvent) => {
@@ -269,6 +288,31 @@ const summary = useMemo(
       if (!resp.ok) throw new Error(data.error || `保存公告失败: ${resp.status}`)
       setAnnouncements(normalizeAnnouncementList(data.announcements))
       setNotice('公告已保存')
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleSaveRiskSettings = async (patch: RiskControlSettingsPatch) => {
+    setBusyAction('risk-settings')
+    setError(null)
+    setNotice(null)
+    try {
+      const resp = await fetch('/api/admin/risk-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          admin_user: credentials?.user,
+          admin_password: credentials?.password,
+          ...patch,
+        }),
+      })
+      const data = await readJson<{ error?: string; settings?: Partial<RiskControlSettings> }>(resp)
+      if (!resp.ok) throw new Error(data.error || `保存风控设置失败: ${resp.status}`)
+      setRiskSettings(normalizeRiskSettings(data.settings))
+      setNotice('风控设置已保存')
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -606,6 +650,11 @@ const summary = useMemo(
 
           {activeSection === 'risk' && (
             <section className="space-y-5">
+              <RiskSettingsPanel
+                settings={riskSettings}
+                saving={busyAction === 'risk-settings'}
+                onChange={handleSaveRiskSettings}
+              />
               <div className="grid gap-3 sm:grid-cols-3">
                 <Metric label="冻结授权" value={summary.frozenCdks} tone="warning" />
                 <Metric label="风险记录" value={summary.riskEvents} />
@@ -852,6 +901,78 @@ function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, o
         </table>
       </div>
     </section>
+  )
+}
+
+function RiskSettingsPanel({
+  settings,
+  saving,
+  onChange,
+}: {
+  settings: RiskControlSettings;
+  saving: boolean;
+  onChange: (patch: RiskControlSettingsPatch) => Promise<void>;
+}) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-3 p-4">
+        <div>
+          <h2 className="text-base font-semibold text-ink-primary">风控开关</h2>
+          <p className="mt-1 text-sm text-ink-muted">设备风控默认关闭，避免浏览器或网络变化造成误触发。</p>
+        </div>
+        <span className="text-xs text-ink-muted">{saving ? '保存中...' : `更新 ${formatDate(settings.updated_at)}`}</span>
+      </div>
+      <div className="grid gap-3 p-4 md:grid-cols-2">
+        <RiskToggle
+          label="干员数据风控"
+          description="校验干员消失、练度回退和拥有数异常下降。"
+          checked={settings.operator_data_risk_enabled}
+          disabled={saving}
+          onChange={(checked) => onChange({ operator_data_risk_enabled: checked })}
+        />
+        <RiskToggle
+          label="设备风控"
+          description="校验设备 Token、浏览器环境和网络位置。"
+          checked={settings.device_risk_enabled}
+          disabled={saving}
+          onChange={(checked) => onChange({ device_risk_enabled: checked })}
+        />
+      </div>
+    </section>
+  )
+}
+
+function RiskToggle({
+  label,
+  description,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => Promise<void>;
+}) {
+  return (
+    <label className={`flex min-h-28 items-start justify-between gap-4 rounded-lg border p-4 transition-colors duration-150 ${checked ? 'border-brand-500/50 bg-brand-500/10' : 'border-surface-3 bg-surface-2/40'} ${disabled ? 'opacity-70' : 'cursor-pointer hover:border-brand-400/60'}`}>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-ink-primary">{label}</span>
+        <span className="mt-2 block text-sm leading-6 text-ink-secondary">{description}</span>
+        <span className={`mt-3 inline-flex rounded-md px-2 py-1 text-xs font-semibold ${checked ? 'bg-success/10 text-success' : 'bg-surface-3 text-ink-muted'}`}>{checked ? '已启用' : '已关闭'}</span>
+      </span>
+      <span className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full p-0.5 transition-colors duration-150 ${checked ? 'bg-brand-600' : 'bg-surface-4'}`}>
+        <input
+          type="checkbox"
+          className="sr-only"
+          checked={checked}
+          disabled={disabled}
+          onChange={(event) => void onChange(event.currentTarget.checked)}
+        />
+        <span className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-150 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      </span>
+    </label>
   )
 }
 
@@ -1129,6 +1250,14 @@ function normalizeUsageTotals(value: Partial<UsageTotals> | undefined): UsageTot
 
 function normalizeUsageDay(day: Partial<UsageDay>): UsageDay {
   return { date: typeof day.date === 'string' ? day.date : '', ...normalizeUsageTotals(day) }
+}
+
+function normalizeRiskSettings(value: Partial<RiskControlSettings> | null | undefined): RiskControlSettings {
+  return {
+    operator_data_risk_enabled: value?.operator_data_risk_enabled !== false,
+    device_risk_enabled: value?.device_risk_enabled === true,
+    updated_at: typeof value?.updated_at === 'string' ? value.updated_at : null,
+  }
 }
 
 function normalizeCount(value: unknown): number {

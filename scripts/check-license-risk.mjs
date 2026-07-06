@@ -7,7 +7,9 @@ const bundleDir = resolve('.cache/check-license-risk')
 await mkdir(bundleDir, { recursive: true })
 
 const store = createMemoryCdkRecordStore()
+const riskSettingsStore = createMemoryRiskControlSettingsStore()
 globalThis.__maaCdkRecordStoreForTesting = store
+globalThis.__maaRiskControlSettingsStoreForTesting = riskSettingsStore
 
 const modulePath = await bundleModule('server/handlers/license-utils.ts')
 const licenseUtils = await import(`${pathToFileURL(modulePath).href}?t=${Date.now()}`)
@@ -45,18 +47,47 @@ for (let index = 0; index < 3; index += 1) {
   operatorRiskRecord = result.record
 }
 
-let userAgentRiskRecord = createRecord('user-agent-risk')
+let defaultDeviceRiskRecord = createRecord('device-risk-default-off')
 for (const userAgent of ['agent-a', 'agent-b', 'agent-c']) {
   const result = await licenseUtils.recordAdvancedOperatorUpdate(
-    userAgentRiskRecord,
+    defaultDeviceRiskRecord,
     baselineOperators,
     requestWithUserAgent(userAgent),
-    'activation-token-user-agent-risk',
+    'activation-token-device-risk-default-off',
   )
-  userAgentRiskRecord = result.record
+  defaultDeviceRiskRecord = result.record
 }
-if (userAgentRiskRecord.status !== 'frozen') {
-  throw new Error('user-agent churn risk should still freeze cdk record')
+if (defaultDeviceRiskRecord.status === 'frozen') {
+  throw new Error('device risk should be disabled by default')
+}
+
+await riskSettingsStore.set({ operator_data_risk_enabled: false, device_risk_enabled: false, updated_at: null })
+let disabledOperatorRiskRecord = createRecord('operator-risk-disabled')
+disabledOperatorRiskRecord.baseline_operator_fingerprint = licenseUtils.buildOperatorFingerprint(baselineOperators)
+disabledOperatorRiskRecord.latest_operator_fingerprint = disabledOperatorRiskRecord.baseline_operator_fingerprint
+const disabledOperatorResult = await licenseUtils.recordAdvancedOperatorUpdate(
+  disabledOperatorRiskRecord,
+  regressedOperators,
+  requestWithUserAgent('operator-risk-disabled-agent'),
+  'activation-token-operator-risk-disabled',
+)
+if (!disabledOperatorResult.ok || disabledOperatorResult.profile_freeze_required || disabledOperatorResult.record.status === 'frozen') {
+  throw new Error('disabled operator risk should allow regressed operator data')
+}
+
+await riskSettingsStore.set({ operator_data_risk_enabled: true, device_risk_enabled: true, updated_at: null })
+let enabledDeviceRiskRecord = createRecord('device-risk-enabled')
+for (const userAgent of ['agent-a', 'agent-b', 'agent-c']) {
+  const result = await licenseUtils.recordAdvancedOperatorUpdate(
+    enabledDeviceRiskRecord,
+    baselineOperators,
+    requestWithUserAgent(userAgent),
+    'activation-token-device-risk-enabled',
+  )
+  enabledDeviceRiskRecord = result.record
+}
+if (enabledDeviceRiskRecord.status !== 'frozen') {
+  throw new Error('enabled user-agent churn risk should freeze cdk record')
 }
 
 console.log('license risk smoke check ok')
@@ -99,6 +130,21 @@ function createMemoryCdkRecordStore() {
     list: async (prefix) => [...records.entries()]
       .filter(([key]) => key.startsWith(prefix))
       .map(([, record]) => record),
+  }
+}
+
+function createMemoryRiskControlSettingsStore() {
+  let settings = null
+  return {
+    get: async () => settings,
+    set: async (next) => {
+      settings = {
+        operator_data_risk_enabled: next.operator_data_risk_enabled !== false,
+        device_risk_enabled: next.device_risk_enabled === true,
+        updated_at: new Date().toISOString(),
+      }
+      return settings
+    },
   }
 }
 
