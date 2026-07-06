@@ -54,6 +54,12 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active goofish-infrast-v1
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-infrast-v1
 ```
 
+Verify the rule as the deploy user before running the workflow:
+
+```bash
+sudo -n systemctl is-active goofish-infrast-v1
+```
+
 Keep production secrets such as `DATABASE_URL`, `MAA_ADMIN_PASSWORD`,
 `MAA_ADMIN_SECRET`, and `CDK_HASH_SECRET` in the systemd `EnvironmentFile`; do
 not store them in GitHub Actions secrets unless the workflow truly needs them.
