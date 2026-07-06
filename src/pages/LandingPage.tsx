@@ -1,3 +1,4 @@
+import BrandLogo from '../components/BrandLogo'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 
 interface Props {
@@ -56,9 +57,7 @@ export default function LandingPage({ onStart }: Props) {
         <div className="relative z-10 min-w-0">
           <nav className="mb-12 flex items-center justify-between gap-4">
             <a href="/" className="flex min-h-11 items-center gap-3 rounded-lg pr-3 text-left">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-300 text-brand-950">
-                <FileIcon />
-              </span>
+          <BrandLogo size="md" />
               <span>
                 <span className="block text-sm font-semibold text-white">MAA 基建排班优化器</span>
               <span className="block text-xs text-brand-100/64">账号，CDK，生成排班</span>
@@ -319,27 +318,6 @@ function CheckIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.8"
-      />
-    </svg>
-  )
-}
-
-function FileIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M7 3.75h6.15L18 8.6v11.65H7V3.75Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M13 4v5h5M9.5 13h5M9.5 16h3.25"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
       />
     </svg>
   )
