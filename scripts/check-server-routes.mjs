@@ -1,5 +1,6 @@
 const expectedRoutes = [
   '/api/admin/cdk',
+  '/api/admin/risk-settings',
   '/api/admin/users',
   '/api/admin/announcement',
   '/api/admin/usage-stats',
