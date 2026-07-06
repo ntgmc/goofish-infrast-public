@@ -13,6 +13,7 @@ const expectedRoutes = [
   '/api/auth/me',
   '/api/auth/register',
   '/api/data',
+  '/api/depot-value',
   '/api/free-preview',
   '/api/health',
   '/api/license-status',

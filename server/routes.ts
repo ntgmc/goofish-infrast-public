@@ -4,6 +4,7 @@ import analyzeScheduleHandler from './handlers/analyze-schedule'
 import announcementHandler from './handlers/announcement'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
+import depotValueHandler from './handlers/depot-value'
 import freePreviewHandler from './handlers/free-preview'
 import licenseStatusHandler from './handlers/license-status'
 import optimizeHandler from './handlers/optimize'
@@ -39,6 +40,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/analyze-schedule', analyzeScheduleHandler as unknown as ApiHandler],
+  ['/api/depot-value', depotValueHandler as unknown as ApiHandler],
   ['/api/free-preview', freePreviewHandler as unknown as ApiHandler],
   ['/api/redeem-cdk', redeemCdkHandler as unknown as ApiHandler],
   ['/api/license-status', licenseStatusHandler as unknown as ApiHandler],

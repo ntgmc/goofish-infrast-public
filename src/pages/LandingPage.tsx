@@ -84,6 +84,12 @@ export default function LandingPage({ onStart }: Props) {
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <a
+                href="/tools/depot-value"
+                className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-5 py-3 text-sm font-semibold text-brand-950 transition duration-150 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-surface-0"
+              >
+                免费仓库估值
+              </a>
               <button
                 type="button"
                 onClick={onStart}
