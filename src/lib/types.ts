@@ -287,7 +287,7 @@ export interface UpgradeTrainingCost {
   sources: {
     skland: 'ok' | 'unavailable';
     yituliu: 'ok' | 'unavailable';
-    lmd_exp: 'fixed_36_per_10000';
+    lmd_exp: 'fixed_lmd_trade_gold_net_exp_36_per_10000';
   };
   warnings: string[];
   operators: UpgradeTrainingOperatorCost[];

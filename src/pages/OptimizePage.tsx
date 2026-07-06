@@ -614,10 +614,10 @@ export default function OptimizePage({
             )}
 
             {phase === 'suggestions' && currentResult && (
-              <ResultPanel
-                result={currentResult}
-                onDownload={handleDownloadMAA}
-                suggestionsSlot={suggestions.length > 0 ? (
+                <ResultPanel
+                  result={currentResult}
+                  onDownload={handleDownloadMAA}
+                  suggestionsSlot={suggestions.length > 0 ? (
                   <UpgradeSuggestions
                     suggestions={suggestions}
                     onApply={handleApplySuggestions}
@@ -632,7 +632,10 @@ export default function OptimizePage({
             )}
 
             {phase === 'final' && finalResult && (
-              <ResultPanel result={finalResult} onDownload={handleDownloadMAA} />
+          <ResultPanel
+            result={finalResult}
+            onDownload={handleDownloadMAA}
+          />
             )}
           </section>
         </div>

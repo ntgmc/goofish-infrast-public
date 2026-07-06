@@ -29,6 +29,14 @@ const PRODUCT_LABELS: Record<string, string> = {
   'Originium Shard': '源石碎片',
 }
 
+const SANITY_PER_LMD = 36 / 10000
+const SANITY_PER_EXP = 36 / 10000
+const SANITY_PER_BATTLE_RECORD = SANITY_PER_EXP * 1000
+const SANITY_PER_PURE_GOLD = SANITY_PER_EXP * (145 / 229) * (50 / 3) * 24
+const SANITY_PER_ORUNDUM = 3 / 4
+const SANITY_PER_PURCHASE_CERTIFICATE = 30 * (1 - SANITY_PER_LMD * 12) / 21
+const SANITY_PER_ORIGINIUM_SHARD = SANITY_PER_PURCHASE_CERTIFICATE * 90
+
 const DRONE_REASON_LABELS: Record<string, string> = {
   'manual target': '按配置目标匹配',
   'tequila priority': '优先加速龙舌兰订单',
@@ -64,7 +72,7 @@ export default function ResultPanel({
   const isMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_autofill'
   const isAnalysis = variant === 'analysis' || result.analysis_summary?.source === 'imported_schedule'
   const analysisSummary = result.analysis_summary
-  const { totalEff, plans, productionStats, detailStats } = useMemo(() => {
+  const { totalEff, plans, productionStats, productionSanity, detailStats } = useMemo(() => {
     const totalEff = result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
     const plans: PreparedPlan[] = result.plans.map((plan) => ({
       ...plan,
@@ -119,13 +127,14 @@ export default function ResultPanel({
       goldNet: daily.net?.['Pure Gold'] ?? 0,
       droneGain,
     }
+    const productionSanity = calculateProductionSanity(daily)
 
     const detailStats = {
       planCount: plans.length,
       roomCount: plans.reduce((sum, plan) => sum + plan.rows.length, 0),
     }
 
-    return { totalEff, plans, productionStats, detailStats }
+    return { totalEff, plans, productionStats, productionSanity, detailStats }
   }, [result, isRotationMode, isMaaDormitoryAutofill])
 
   const shiftPattern = result.shift_pattern ?? result.shift_hours?.map((hour) => `${hour}h`).join('-') ?? result.planTimes
@@ -279,12 +288,21 @@ export default function ResultPanel({
                 suffix="龙门币"
                 note={`赤金净变动 ${formatSigned(productionStats.goldNet)}${productionStats.orundum > 0 ? `，合成玉 ${formatAmount(productionStats.orundum)}` : ''}`}
               />
-              <MetricCard
-                label={isAnalysis ? '爆仓概览' : '无人机收益'}
-                value={isAnalysis ? String((analysisSummary?.overflow.trading_rooms ?? 0) + (analysisSummary?.overflow.manufacturing_rooms ?? 0)) : productionStats.droneGain.value}
-                suffix={isAnalysis ? '房间' : productionStats.droneGain.suffix}
-                note={isAnalysis ? formatOverflowSummary(analysisSummary?.overflow) : productionStats.droneGain.note}
-              />
+              {isAnalysis ? (
+                <MetricCard
+                  label="爆仓概览"
+                  value={String((analysisSummary?.overflow.trading_rooms ?? 0) + (analysisSummary?.overflow.manufacturing_rooms ?? 0))}
+                  suffix="房间"
+                  note={formatOverflowSummary(analysisSummary?.overflow)}
+                />
+              ) : (
+                <MetricCard
+                  label="等效理智"
+                  value={formatAmount(productionSanity.value)}
+                  suffix="理智"
+                  note={productionSanity.note}
+                />
+              )}
             </>
           )}
         </div>
@@ -504,6 +522,34 @@ function formatProductionBreakdown(manufacturing: Record<string, number>): strin
     })
     .filter(Boolean)
   return parts.length > 0 ? parts.join('，') : '暂无制造站产出'
+}
+
+function calculateProductionSanity(daily: Partial<DailyProduction>): { value: number; note: string } {
+  const manufacturing = daily.manufacturing ?? {}
+  const trading = daily.trading ?? {}
+  const consumption = daily.consumption ?? {}
+
+  const manufacturingSanity =
+    getResourceAmount(manufacturing, 'Pure Gold') * SANITY_PER_PURE_GOLD +
+    getResourceAmount(manufacturing, 'Battle Record') * SANITY_PER_BATTLE_RECORD +
+    getResourceAmount(manufacturing, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
+  const tradingSanity =
+    getResourceAmount(trading, 'LMD') * SANITY_PER_LMD +
+    getResourceAmount(trading, 'Orundum') * SANITY_PER_ORUNDUM
+  const consumptionSanity =
+    getResourceAmount(consumption, 'Pure Gold') * SANITY_PER_PURE_GOLD +
+    getResourceAmount(consumption, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
+  const value = manufacturingSanity + tradingSanity - consumptionSanity
+
+  return {
+    value,
+    note: `制造 ${formatAmount(manufacturingSanity)} + 贸易 ${formatAmount(tradingSanity)} - 消耗 ${formatAmount(consumptionSanity)}`,
+  }
+}
+
+function getResourceAmount(values: Record<string, number>, key: string): number {
+  const value = values[key] ?? 0
+  return Number.isFinite(value) ? value : 0
 }
 
 function formatOverflowSummary(overflow: NonNullable<OptimizeResult['analysis_summary']>['overflow'] | undefined): string {
