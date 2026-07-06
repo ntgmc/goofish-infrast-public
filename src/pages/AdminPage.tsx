@@ -27,12 +27,27 @@ interface AdminCdkRecord {
   operator_update_grant_count?: number;
   operator_update_used_count?: number;
   operator_update_grant_remaining?: number;
+  operator_update_granted_at?: string | null;
+  operator_update_consumed_at?: string | null;
   operator_update_event_count?: number;
   activation_bound?: boolean;
   user_agent_count?: number;
   ip_prefix_count?: number;
   risk_event_count?: number;
   latest_risk_event?: { at: string; type: string; reason: string } | null;
+}
+
+interface AdminCdkDetail extends AdminCdkRecord {
+  baseline_operator_count?: number | null;
+  latest_operator_count?: number | null;
+  risk_events?: Array<{ at: string; type: string; reason: string; detail?: Record<string, unknown> | null }>;
+  operator_update_events?: Array<{ at: string; operator_count: number }>;
+  device_signals?: {
+    activation_bound: boolean;
+    user_agent_count: number;
+    ip_prefix_count: number;
+  };
+  linked_account?: { account_id: string; profile_id: string } | null;
 }
 
 interface UsageTotals {
@@ -63,10 +78,84 @@ interface AdminUserSummary {
 interface AppUserSummary {
   id: string;
   email: string;
+  permission?: Permission;
   status: AppUserStatus;
+  cdk_order_hash?: string | null;
   profile_count: number;
   created_at: string;
   updated_at: string;
+}
+
+interface AdminWorkspaceSummary {
+  exists: boolean;
+  operator_count: number;
+  has_operators: boolean;
+  has_config: boolean;
+  config_desc: string | null;
+  layout: string | null;
+  schedule_mode: string;
+  dormitory_rule: string | null;
+  trading_stations_count: number | null;
+  manufacturing_stations_count: number | null;
+  has_last_result: boolean;
+  last_result_title: string | null;
+  updated_at: string | null;
+}
+
+interface AdminLinkedCdkSummary {
+  cdk_id: string;
+  permission: Permission;
+  status: CdkStatus;
+  license_order_hash: string | null;
+  order_note: string | null;
+  operator_count: number | null;
+  used_at: string | null;
+  frozen_at: string | null;
+  freeze_reason: string | null;
+  risk_event_count: number;
+  operator_update_event_count: number;
+}
+
+interface AdminProfileSummary {
+  id: string;
+  user_id: string;
+  kind?: string;
+  display_name: string;
+  note: string;
+  permission: Permission;
+  status: AppUserStatus;
+  cdk_order_hash?: string | null;
+  skland_binding: {
+    uid: string;
+    nickname: string;
+    channel_name: string;
+    bound_at: string;
+    last_imported_at: string | null;
+  } | null;
+  skland_pending_binding: {
+    uid: string;
+    nickname: string;
+    channel_name: string;
+    operator_count: number;
+    created_at: string;
+    expires_at: string;
+  } | null;
+  skland_risk: {
+    uid_mismatch_count: number;
+    last_mismatch_uid: string | null;
+    last_mismatch_nickname: string | null;
+    last_mismatch_at: string | null;
+  } | null;
+  operator_count: number;
+  created_at: string;
+  updated_at: string;
+  workspace: AdminWorkspaceSummary;
+  cdk: AdminLinkedCdkSummary | null;
+}
+
+interface AdminUserDetail {
+  user: AppUserSummary;
+  profiles: AdminProfileSummary[];
 }
 
 const EMPTY_ANNOUNCEMENTS: Announcement[] = []
@@ -132,6 +221,8 @@ export default function AdminPage() {
   const [orderNote, setOrderNote] = useState('')
   const [generatedCode, setGeneratedCode] = useState<{ code: string; permission: GeneratedPermission; created_at: string } | null>(null)
   const [selectedCdkHashes, setSelectedCdkHashes] = useState<string[]>([])
+  const [selectedCdkDetail, setSelectedCdkDetail] = useState<AdminCdkDetail | null>(null)
+  const [selectedUserDetail, setSelectedUserDetail] = useState<AdminUserDetail | null>(null)
   const [resetUserEmail, setResetUserEmail] = useState('')
   const [resetPassword, setResetPassword] = useState('')
   const [loginFieldErrors, setLoginFieldErrors] = useState<FieldErrors>({})
@@ -240,8 +331,12 @@ const summary = useMemo(
     setAuthenticated(false)
     setRecords([])
     setUsers([])
+    setAppUsers([])
     setUsageStats(null)
     setRiskSettings(DEFAULT_RISK_SETTINGS)
+    setSelectedCdkHashes([])
+    setSelectedCdkDetail(null)
+    setSelectedUserDetail(null)
   }
 
   const handleGenerateCdk = async (event: FormEvent) => {
@@ -332,7 +427,12 @@ const summary = useMemo(
     setAnnouncements((current) => current.filter((item) => item.id !== id))
   }
 
-  const patchCdk = async (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission) => {
+  const patchCdk = async (
+    record: AdminCdkRecord,
+    action: string,
+    nextPermission?: GeneratedPermission,
+    extraBody: Record<string, unknown> = {},
+  ) => {
     setBusyAction(`${action}:${record.code_hash}`)
     setError(null)
     try {
@@ -345,10 +445,18 @@ const summary = useMemo(
           code_hash: record.code_hash,
           action,
           ...(nextPermission ? { permission: nextPermission } : {}),
+          ...extraBody,
         }),
       })
-      const data = await readJson<{ error?: string }>(resp)
+      const data = await readJson<{ error?: string; cdk?: AdminCdkDetail }>(resp)
       if (!resp.ok) throw new Error(data.error || `操作失败: ${resp.status}`)
+      if (data.cdk) {
+        setSelectedCdkDetail(data.cdk)
+      } else if (selectedCdkDetail?.code_hash === record.code_hash) {
+        const detailResp = await fetch(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}`, { headers: authHeaders })
+        const detailData = await readJson<{ error?: string; cdk?: AdminCdkDetail }>(detailResp)
+        if (detailResp.ok && detailData.cdk) setSelectedCdkDetail(detailData.cdk)
+      }
       await loadDashboard()
     } catch (caught) {
       setError((caught as Error).message)
@@ -370,6 +478,7 @@ const summary = useMemo(
       })
       const data = await readJson<{ error?: string }>(resp)
       if (!resp.ok) throw new Error(data.error || `删除失败: ${resp.status}`)
+      if (selectedCdkDetail?.code_hash === record.code_hash) setSelectedCdkDetail(null)
       await loadDashboard()
     } catch (caught) {
       setError((caught as Error).message)
@@ -378,11 +487,141 @@ const summary = useMemo(
     }
   }
 
+  const loadCdkDetail = async (record: AdminCdkRecord) => {
+    setBusyAction(`cdk-detail:${record.code_hash}`)
+    setError(null)
+    try {
+      const resp = await fetch(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}`, { headers: authHeaders })
+      const data = await readJson<{ error?: string; cdk?: AdminCdkDetail }>(resp)
+      if (!resp.ok || !data.cdk) throw new Error(data.error || `加载 CDK 详情失败: ${resp.status}`)
+      setSelectedCdkDetail(data.cdk)
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleUpdateCdkNote = async (record: AdminCdkDetail) => {
+    const nextNote = window.prompt('请输入新的订单备注，留空可清除备注。', record.order_note ?? '')
+    if (nextNote === null) return
+    await patchCdk(record, 'update_note', undefined, { order_note: nextNote.trim() })
+  }
+
+  const handleSetCdkPermission = async (record: AdminCdkDetail) => {
+    const nextPermission = window.prompt(
+      `请输入授权类型：${cdkProductPermissions.join(' / ')}`,
+      normalizeProductPermission(record.permission) ?? 'growth',
+    )
+    if (nextPermission === null) return
+    const permissionValue = normalizeProductPermission(nextPermission.trim())
+    if (!permissionValue) {
+      setNotice(null)
+      setError('授权类型必须是 recommended、growth、advanced 或 ultimate。')
+      return
+    }
+    await patchCdk(record, 'set_permission', permissionValue)
+  }
+
   const handleBulkRevoke = async () => {
     const targets = selectedRecords.filter((record) => record.status === 'used' || record.status === 'frozen')
     if (targets.length === 0 || !window.confirm(`确认撤销 ${targets.length} 个授权？`)) return
     for (const record of targets) await patchCdk(record, 'revoke')
     setSelectedCdkHashes([])
+  }
+
+  const loadUserDetail = async (user: AppUserSummary) => {
+    setBusyAction(`user-detail:${user.id}`)
+    setError(null)
+    try {
+      const resp = await fetch(`/api/admin/users?user_id=${encodeURIComponent(user.id)}`, { headers: authHeaders })
+      const data = await readJson<{ error?: string; detail?: AdminUserDetail }>(resp)
+      if (!resp.ok || !data.detail) throw new Error(data.error || `加载用户详情失败: ${resp.status}`)
+      setSelectedUserDetail(data.detail)
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const patchUserProfile = async (
+    profile: AdminProfileSummary,
+    action: 'update_profile' | 'set_profile_status' | 'set_profile_permission' | 'clear_profile_skland_binding' | 'clear_profile_workspace',
+    extraBody: Record<string, unknown> = {},
+  ) => {
+    if (!selectedUserDetail) return
+    const busyKey = `profile:${action}:${profile.id}`
+    setBusyAction(busyKey)
+    setError(null)
+    setNotice(null)
+    try {
+      const resp = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          admin_user: credentials?.user,
+          admin_password: credentials?.password,
+          action,
+          user_id: selectedUserDetail.user.id,
+          profile_id: profile.id,
+          ...extraBody,
+        }),
+      })
+      const data = await readJson<{ error?: string; detail?: AdminUserDetail }>(resp)
+      if (!resp.ok || !data.detail) throw new Error(data.error || `档案操作失败: ${resp.status}`)
+      setSelectedUserDetail(data.detail)
+      setNotice('档案已更新')
+      await loadDashboard()
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleUpdateProfile = async (profile: AdminProfileSummary) => {
+    const displayName = window.prompt('请输入档案名称。', profile.display_name)
+    if (displayName === null) return
+    const note = window.prompt('请输入档案备注，留空可清除备注。', profile.note ?? '')
+    if (note === null) return
+    await patchUserProfile(profile, 'update_profile', { display_name: displayName.trim(), note: note.trim() })
+  }
+
+  const handleSetProfileStatus = async (profile: AdminProfileSummary) => {
+    const status = window.prompt('请输入档案状态：active / frozen / revoked', profile.status)
+    if (status === null) return
+    if (!isAppUserStatus(status.trim())) {
+      setNotice(null)
+      setError('档案状态必须是 active、frozen 或 revoked。')
+      return
+    }
+    await patchUserProfile(profile, 'set_profile_status', { status: status.trim() })
+  }
+
+  const handleSetProfilePermission = async (profile: AdminProfileSummary) => {
+    const nextPermission = window.prompt(
+      `请输入档案权限：${cdkProductPermissions.join(' / ')}`,
+      normalizeProductPermission(profile.permission) ?? 'growth',
+    )
+    if (nextPermission === null) return
+    const permissionValue = normalizeProductPermission(nextPermission.trim())
+    if (!permissionValue) {
+      setNotice(null)
+      setError('档案权限必须是 recommended、growth、advanced 或 ultimate。')
+      return
+    }
+    await patchUserProfile(profile, 'set_profile_permission', { permission: permissionValue })
+  }
+
+  const handleClearProfileSklandBinding = async (profile: AdminProfileSummary) => {
+    if (!window.confirm(`确认清空档案「${profile.display_name}」的森空岛绑定和风控计数？`)) return
+    await patchUserProfile(profile, 'clear_profile_skland_binding')
+  }
+
+  const handleClearProfileWorkspace = async (profile: AdminProfileSummary) => {
+    if (!window.confirm(`确认清空档案「${profile.display_name}」的工作区？干员、配置和最近结果都会重置为空摘要。`)) return
+    await patchUserProfile(profile, 'clear_profile_workspace')
   }
 
   const handleResetUserPassword = async (event: FormEvent) => {
@@ -444,8 +683,10 @@ const summary = useMemo(
           ...extraBody,
         }),
       })
-      const data = await readJson<{ error?: string }>(resp)
+      const data = await readJson<{ error?: string; detail?: AdminUserDetail; deleted?: boolean }>(resp)
       if (!resp.ok) throw new Error(data.error || `${successMessage}失败: ${resp.status}`)
+      if (data.detail) setSelectedUserDetail(data.detail)
+      if (data.deleted && selectedUserDetail?.user.id === user.id) setSelectedUserDetail(null)
       setNotice(`${successMessage}：${user.email}`)
       await loadDashboard()
     } catch (caught) {
@@ -643,8 +884,19 @@ const summary = useMemo(
                 onSelect={setSelectedCdkHashes}
                 onBulkRevoke={handleBulkRevoke}
                 onPatch={patchCdk}
+                onOpenDetail={loadCdkDetail}
                 onDelete={deleteCdk}
               />
+              {selectedCdkDetail && (
+                <CdkDetailPanel
+                  detail={selectedCdkDetail}
+                  busyAction={busyAction}
+                  onClose={() => setSelectedCdkDetail(null)}
+                  onPatch={patchCdk}
+                  onUpdateNote={handleUpdateCdkNote}
+                  onSetPermission={handleSetCdkPermission}
+                />
+              )}
             </section>
           )}
 
@@ -798,6 +1050,7 @@ const summary = useMemo(
                       <tr>
                         <th className="px-4 py-3">邮箱</th>
                         <th className="px-4 py-3">状态</th>
+                        <th className="px-4 py-3">权限</th>
                         <th className="px-4 py-3">档案</th>
                         <th className="px-4 py-3">时间</th>
                         <th className="px-4 py-3">操作</th>
@@ -805,15 +1058,17 @@ const summary = useMemo(
                     </thead>
                     <tbody className="divide-y divide-surface-3">
                       {appUsers.length === 0 ? (
-                        <tr><td colSpan={5} className="px-4 py-10 text-center text-ink-muted">暂无注册用户。</td></tr>
+                        <tr><td colSpan={6} className="px-4 py-10 text-center text-ink-muted">暂无注册用户。</td></tr>
                       ) : appUsers.map((item) => (
                         <tr key={item.id} className="hover:bg-surface-2/50">
                           <td className="px-4 py-4 font-medium text-ink-primary">{item.email}</td>
                           <td className="px-4 py-4"><UserStatusPill status={item.status} /></td>
+                          <td className="px-4 py-4 text-ink-secondary">{item.permission ? permissionLabels[item.permission] : '-'}</td>
                           <td className="px-4 py-4 text-ink-secondary">{item.profile_count}</td>
                           <td className="px-4 py-4 text-xs text-ink-muted">{formatDate(item.updated_at)}</td>
                           <td className="px-4 py-4">
                             <div className="flex flex-wrap gap-2">
+                              <SmallButton onClick={() => void loadUserDetail(item)} loading={busyAction === `user-detail:${item.id}`}>详情</SmallButton>
                               {item.status === 'active' && <SmallButton onClick={() => void handleFreezeAppUser(item)} loading={busyAction === `app-user:freeze_account:${item.id}`}>冻结</SmallButton>}
                               {item.status === 'frozen' && <SmallButton onClick={() => void handleUnfreezeAppUser(item)} loading={busyAction === `app-user:unfreeze_account:${item.id}`} tone="success">解冻</SmallButton>}
                               <SmallButton onClick={() => void handleDeleteAppUser(item)} loading={busyAction === `app-user:delete_account:${item.id}`} tone="danger">删除</SmallButton>
@@ -825,6 +1080,21 @@ const summary = useMemo(
                   </table>
                 </div>
               </section>
+              {selectedUserDetail && (
+                <UserDetailPanel
+                  detail={selectedUserDetail}
+                  busyAction={busyAction}
+                  onClose={() => setSelectedUserDetail(null)}
+                  onUpdateProfile={handleUpdateProfile}
+                  onSetProfileStatus={handleSetProfileStatus}
+                  onSetProfilePermission={handleSetProfilePermission}
+                  onClearSklandBinding={handleClearProfileSklandBinding}
+                  onClearWorkspace={handleClearProfileWorkspace}
+                  onFreezeUser={handleFreezeAppUser}
+                  onUnfreezeUser={handleUnfreezeAppUser}
+                  onDeleteUser={handleDeleteAppUser}
+                />
+              )}
             </section>
           )}
         </div>
@@ -833,7 +1103,159 @@ const summary = useMemo(
   )
 }
 
-function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, onBulkRevoke, onPatch, onDelete }: {
+function UserDetailPanel({
+  detail,
+  busyAction,
+  onClose,
+  onUpdateProfile,
+  onSetProfileStatus,
+  onSetProfilePermission,
+  onClearSklandBinding,
+  onClearWorkspace,
+  onFreezeUser,
+  onUnfreezeUser,
+  onDeleteUser,
+}: {
+  detail: AdminUserDetail;
+  busyAction: string | null;
+  onClose: () => void;
+  onUpdateProfile: (profile: AdminProfileSummary) => Promise<void>;
+  onSetProfileStatus: (profile: AdminProfileSummary) => Promise<void>;
+  onSetProfilePermission: (profile: AdminProfileSummary) => Promise<void>;
+  onClearSklandBinding: (profile: AdminProfileSummary) => Promise<void>;
+  onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
+  onFreezeUser: (user: AppUserSummary) => Promise<void>;
+  onUnfreezeUser: (user: AppUserSummary) => Promise<void>;
+  onDeleteUser: (user: AppUserSummary) => Promise<void>;
+}) {
+  const user = detail.user
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1">
+      <div className="flex flex-col gap-3 border-b border-surface-3 p-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="break-all text-lg font-semibold text-ink-primary">{user.email}</h2>
+            <UserStatusPill status={user.status} />
+            {user.permission && <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{permissionLabels[user.permission]}</span>}
+          </div>
+          <p className="mt-2 break-all text-sm text-ink-muted">用户 ID：{user.id}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {user.status === 'active' && <SmallButton onClick={() => void onFreezeUser(user)} loading={busyAction === `app-user:freeze_account:${user.id}`}>冻结用户</SmallButton>}
+          {user.status === 'frozen' && <SmallButton onClick={() => void onUnfreezeUser(user)} loading={busyAction === `app-user:unfreeze_account:${user.id}`} tone="success">解冻用户</SmallButton>}
+          <SmallButton onClick={() => void onDeleteUser(user)} loading={busyAction === `app-user:delete_account:${user.id}`} tone="danger">删除用户</SmallButton>
+          <SmallButton onClick={onClose}>关闭</SmallButton>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <dl className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <DetailItem label="账号状态" value={appUserStatusLabels[user.status]} />
+          <DetailItem label="档案数量" value={String(detail.profiles.length)} />
+          <DetailItem label="CDK 订单标识" value={user.cdk_order_hash || '-'} />
+          <DetailItem label="创建时间" value={formatDate(user.created_at)} />
+          <DetailItem label="更新时间" value={formatDate(user.updated_at)} />
+        </dl>
+
+        <div className="mt-5 space-y-4">
+          {detail.profiles.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-surface-4 bg-surface-0 px-4 py-8 text-center text-sm text-ink-muted">该用户暂无档案。</div>
+          ) : detail.profiles.map((profile) => (
+            <ProfileDetailCard
+              key={profile.id}
+              profile={profile}
+              busyAction={busyAction}
+              onUpdateProfile={onUpdateProfile}
+              onSetProfileStatus={onSetProfileStatus}
+              onSetProfilePermission={onSetProfilePermission}
+              onClearSklandBinding={onClearSklandBinding}
+              onClearWorkspace={onClearWorkspace}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ProfileDetailCard({
+  profile,
+  busyAction,
+  onUpdateProfile,
+  onSetProfileStatus,
+  onSetProfilePermission,
+  onClearSklandBinding,
+  onClearWorkspace,
+}: {
+  profile: AdminProfileSummary;
+  busyAction: string | null;
+  onUpdateProfile: (profile: AdminProfileSummary) => Promise<void>;
+  onSetProfileStatus: (profile: AdminProfileSummary) => Promise<void>;
+  onSetProfilePermission: (profile: AdminProfileSummary) => Promise<void>;
+  onClearSklandBinding: (profile: AdminProfileSummary) => Promise<void>;
+  onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
+}) {
+  const sklandSummary = profile.skland_binding
+    ? `${profile.skland_binding.nickname || '-'} / ${profile.skland_binding.uid} / ${profile.skland_binding.channel_name || '-'}`
+    : profile.skland_pending_binding
+      ? `待确认：${profile.skland_pending_binding.nickname || '-'} / ${profile.skland_pending_binding.uid}`
+      : '-'
+  const riskCount = profile.skland_risk?.uid_mismatch_count ?? 0
+  return (
+    <article className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold text-ink-primary">{profile.display_name || '账号档案'}</h3>
+            <UserStatusPill status={profile.status} />
+            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{permissionLabels[profile.permission]}</span>
+          </div>
+          <p className="mt-2 break-all text-xs text-ink-muted">档案 ID：{profile.id}</p>
+          {profile.note && <p className="mt-2 text-sm text-ink-secondary">{profile.note}</p>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <SmallButton onClick={() => void onUpdateProfile(profile)} loading={busyAction === `profile:update_profile:${profile.id}`}>改名称</SmallButton>
+          <SmallButton onClick={() => void onSetProfileStatus(profile)} loading={busyAction === `profile:set_profile_status:${profile.id}`}>改状态</SmallButton>
+          <SmallButton onClick={() => void onSetProfilePermission(profile)} loading={busyAction === `profile:set_profile_permission:${profile.id}`}>改权限</SmallButton>
+          <SmallButton onClick={() => void onClearSklandBinding(profile)} loading={busyAction === `profile:clear_profile_skland_binding:${profile.id}`} tone="danger">清绑定</SmallButton>
+          <SmallButton onClick={() => void onClearWorkspace(profile)} loading={busyAction === `profile:clear_profile_workspace:${profile.id}`} tone="danger">清工作区</SmallButton>
+        </div>
+      </div>
+
+      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+        <DetailItem label="档案类型" value={profile.kind || '-'} />
+        <DetailItem label="CDK 订单标识" value={profile.cdk_order_hash || profile.cdk?.license_order_hash || '-'} />
+        <DetailItem label="森空岛绑定" value={sklandSummary} />
+        <DetailItem label="绑定时间" value={formatDate(profile.skland_binding?.bound_at ?? null)} />
+        <DetailItem label="最近导入" value={formatDate(profile.skland_binding?.last_imported_at ?? null)} />
+        <DetailItem label="风险计数" value={String(riskCount)} />
+        <DetailItem label="工作区存在" value={profile.workspace.exists ? '是' : '否'} />
+        <DetailItem label="工作区干员" value={String(profile.workspace.operator_count)} />
+        <DetailItem label="拥有干员" value={String(profile.operator_count)} />
+        <DetailItem label="配置摘要" value={profile.workspace.config_desc || '-'} />
+        <DetailItem label="最近结果" value={profile.workspace.has_last_result ? (profile.workspace.last_result_title || '有结果') : '无结果'} />
+        <DetailItem label="结果更新时间" value={formatDate(profile.workspace.updated_at)} />
+      </dl>
+
+      {profile.cdk && (
+        <div className="mt-4 rounded-lg bg-surface-2 p-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono font-medium text-ink-primary">{profile.cdk.cdk_id}</span>
+            <StatusPill status={profile.cdk.status} />
+            <span className="text-ink-secondary">{permissionLabels[profile.cdk.permission]}</span>
+          </div>
+          <div className="mt-2 grid gap-2 text-xs text-ink-muted sm:grid-cols-3">
+            <span>备注：{profile.cdk.order_note || '-'}</span>
+            <span>风险：{profile.cdk.risk_event_count}</span>
+            <span>更新：{profile.cdk.operator_update_event_count}</span>
+          </div>
+        </div>
+      )}
+    </article>
+  )
+}
+
+function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
   records: AdminCdkRecord[];
   selected: string[];
   filter: StatusFilter;
@@ -841,7 +1263,8 @@ function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, o
   onFilter: (filter: StatusFilter) => void;
   onSelect: (hashes: string[]) => void;
   onBulkRevoke: () => void;
-  onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission) => Promise<void>;
+  onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
+  onOpenDetail: (record: AdminCdkRecord) => Promise<void>;
   onDelete: (record: AdminCdkRecord) => Promise<void>;
 }) {
   const allSelected = records.length > 0 && records.every((record) => selected.includes(record.code_hash))
@@ -888,6 +1311,7 @@ function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, o
                     <td className="px-4 py-4 align-top text-ink-secondary"><div className="truncate" title={record.order_note || undefined}>{record.order_note || '-'}</div></td>
                     <td className="px-4 py-4 align-top">
                       <div className="flex min-w-0 flex-wrap gap-2">
+                      <SmallButton onClick={() => void onOpenDetail(record)} loading={busyAction === `cdk-detail:${record.code_hash}`}>详情</SmallButton>
                       {nextPermission && record.status !== 'frozen' && record.status !== 'revoked' && <SmallButton onClick={() => onPatch(record, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${record.code_hash}`}>升级</SmallButton>}
                       {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
                       {(record.status === 'used' || record.status === 'frozen') && <SmallButton onClick={() => onPatch(record, 'revoke')} loading={busyAction === `revoke:${record.code_hash}`} tone="danger">撤销</SmallButton>}
@@ -899,6 +1323,123 @@ function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, o
             })}
           </tbody>
         </table>
+      </div>
+    </section>
+  )
+}
+
+function CdkDetailPanel({
+  detail,
+  busyAction,
+  onClose,
+  onPatch,
+  onUpdateNote,
+  onSetPermission,
+}: {
+  detail: AdminCdkDetail;
+  busyAction: string | null;
+  onClose: () => void;
+  onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
+  onUpdateNote: (record: AdminCdkDetail) => Promise<void>;
+  onSetPermission: (record: AdminCdkDetail) => Promise<void>;
+}) {
+  const nextPermission = getNextProductPermission(detail.permission)
+  const canGrantOperatorUpdate = detail.status === 'used' && Boolean(detail.license_order_hash)
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1">
+      <div className="flex flex-col gap-3 border-b border-surface-3 p-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-mono text-base font-semibold text-ink-primary">{detail.cdk_id}</h2>
+            <StatusPill status={detail.status} />
+            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{permissionLabels[detail.permission]}</span>
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">订单备注：{detail.order_note || '-'}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <SmallButton onClick={() => void onUpdateNote(detail)} loading={busyAction === `update_note:${detail.code_hash}`}>改备注</SmallButton>
+          {detail.status !== 'revoked' && <SmallButton onClick={() => void onSetPermission(detail)} loading={busyAction === `set_permission:${detail.code_hash}`}>改授权</SmallButton>}
+          {nextPermission && detail.status !== 'frozen' && detail.status !== 'revoked' && <SmallButton onClick={() => void onPatch(detail, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${detail.code_hash}`}>升级</SmallButton>}
+          {canGrantOperatorUpdate && <SmallButton onClick={() => void onPatch(detail, 'grant_operator_update')} loading={busyAction === `grant_operator_update:${detail.code_hash}`}>发放更新</SmallButton>}
+          {detail.status === 'frozen' && <SmallButton onClick={() => void onPatch(detail, 'unfreeze')} loading={busyAction === `unfreeze:${detail.code_hash}`} tone="success">解冻</SmallButton>}
+          {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => void onPatch(detail, 'revoke')} loading={busyAction === `revoke:${detail.code_hash}`} tone="danger">撤销</SmallButton>}
+          <SmallButton onClick={onClose}>关闭</SmallButton>
+        </div>
+      </div>
+
+      <div className="grid gap-5 p-4 xl:grid-cols-[1fr_1fr]">
+        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+          <h3 className="text-sm font-semibold text-ink-primary">授权摘要</h3>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <DetailItem label="订单标识" value={detail.license_order_hash || '-'} />
+            <DetailItem label="工作区干员" value={formatNullableNumber(detail.operator_count)} />
+            <DetailItem label="初始干员数" value={formatNullableNumber(detail.baseline_operator_count)} />
+            <DetailItem label="最近干员数" value={formatNullableNumber(detail.latest_operator_count)} />
+            <DetailItem label="排班生成" value={String(detail.schedule_generate_count ?? 0)} />
+            <DetailItem label="配置摘要" value={detail.config_desc || '-'} />
+            <DetailItem label="创建时间" value={formatDate(detail.created_at)} />
+            <DetailItem label="使用时间" value={formatDate(detail.used_at)} />
+            <DetailItem label="冻结时间" value={formatDate(detail.frozen_at ?? null)} />
+            <DetailItem label="撤销时间" value={formatDate(detail.revoked_at)} />
+          </dl>
+        </section>
+
+        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+          <h3 className="text-sm font-semibold text-ink-primary">设备和更新</h3>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <DetailItem label="设备绑定" value={(detail.device_signals?.activation_bound ?? detail.activation_bound) ? '已绑定' : '未绑定'} />
+            <DetailItem label="UA 摘要数" value={String(detail.device_signals?.user_agent_count ?? detail.user_agent_count ?? 0)} />
+            <DetailItem label="IP 段摘要数" value={String(detail.device_signals?.ip_prefix_count ?? detail.ip_prefix_count ?? 0)} />
+            <DetailItem label="更新权限剩余" value={String(detail.operator_update_grant_remaining ?? 0)} />
+            <DetailItem label="更新权限发放" value={String(detail.operator_update_grant_count ?? 0)} />
+            <DetailItem label="更新权限使用" value={String(detail.operator_update_used_count ?? 0)} />
+            <DetailItem label="发放时间" value={formatDate(detail.operator_update_granted_at ?? null)} />
+            <DetailItem label="使用时间" value={formatDate(detail.operator_update_consumed_at ?? null)} />
+          </dl>
+          {detail.linked_account && (
+            <p className="mt-4 break-all rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-secondary">
+              关联用户：{detail.linked_account.account_id} / 档案 {detail.linked_account.profile_id}
+            </p>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-ink-primary">风控事件</h3>
+            <span className="text-xs text-ink-muted">{detail.risk_events?.length ?? 0} 条</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {(detail.risk_events ?? []).length === 0 ? (
+              <p className="text-sm text-ink-muted">暂无风控事件。</p>
+            ) : (detail.risk_events ?? []).slice().reverse().slice(0, 8).map((event, index) => (
+              <article key={`${event.at}-${index}`} className="rounded-lg bg-surface-2 px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-ink-primary">{event.type}</span>
+                  <span className="text-xs text-ink-muted">{formatDate(event.at)}</span>
+                </div>
+                <p className="mt-1 text-ink-secondary">{event.reason}</p>
+                {event.detail && <p className="mt-1 break-all text-xs text-ink-muted">{formatRiskDetail(event.detail)}</p>}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-ink-primary">干员更新事件</h3>
+            <span className="text-xs text-ink-muted">{detail.operator_update_events?.length ?? 0} 条</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {(detail.operator_update_events ?? []).length === 0 ? (
+              <p className="text-sm text-ink-muted">暂无干员更新事件。</p>
+            ) : (detail.operator_update_events ?? []).slice().reverse().slice(0, 8).map((event, index) => (
+              <article key={`${event.at}-${index}`} className="rounded-lg bg-surface-2 px-3 py-2 text-sm">
+                <div className="font-medium text-ink-primary">{event.operator_count} 名干员</div>
+                <div className="mt-1 text-xs text-ink-muted">{formatDate(event.at)}</div>
+              </article>
+            ))}
+          </div>
+        </section>
       </div>
     </section>
   )
@@ -1189,6 +1730,15 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 return <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-2 last:border-0"><dt className="text-ink-muted">{label}</dt><dd className="font-medium text-ink-primary">{value}</dd></div>
 }
 
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg bg-surface-2 px-3 py-2">
+      <dt className="text-xs font-medium text-ink-muted">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-medium text-ink-primary">{value}</dd>
+    </div>
+  )
+}
+
 function StatusPill({ status }: { status: CdkStatus }) {
   const className = status === 'unused'
     ? 'bg-success/10 text-success'
@@ -1336,6 +1886,35 @@ function getNextProductPermission(permission: Permission): GeneratedPermission |
   const current = permission === 'basic' ? 'growth' : permission === 'premium' ? 'advanced' : cdkProductPermissions.includes(permission as GeneratedPermission) ? permission as GeneratedPermission : null
   if (!current) return null
   return cdkProductPermissions.find((item) => cdkProductPermissionRank[item] === cdkProductPermissionRank[current] + 1) ?? null
+}
+
+function normalizeProductPermission(permission: string): GeneratedPermission | null {
+  if (permission === 'basic') return 'growth'
+  if (permission === 'premium') return 'advanced'
+  return cdkProductPermissions.includes(permission as GeneratedPermission) ? permission as GeneratedPermission : null
+}
+
+function isAppUserStatus(status: string): status is AppUserStatus {
+  return status === 'active' || status === 'frozen' || status === 'revoked'
+}
+
+function formatNullableNumber(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : '-'
+}
+
+function formatRiskDetail(detail: Record<string, unknown>): string {
+  const visible = Object.entries(detail)
+    .filter(([key]) => !/(hash|token|secret|credential|encrypted|salt|password)/i.test(key))
+    .slice(0, 6)
+    .map(([key, value]) => `${key}: ${formatRiskValue(value)}`)
+  return visible.length > 0 ? visible.join(' / ') : '已隐藏敏感详情'
+}
+
+function formatRiskValue(value: unknown): string {
+  if (value === null || value === undefined) return '-'
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) return `${value.length} 项`
+  return '对象摘要'
 }
 
 function readStoredCredentials(): { user: string; password: string } | null {
