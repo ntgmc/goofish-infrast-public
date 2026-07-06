@@ -1,18 +1,21 @@
 import * as esbuild from 'esbuild'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const bundleDir = resolve('.cache/check-depot-value')
+const priceCachePath = resolve(bundleDir, 'yituliu-cache.json')
 await mkdir(bundleDir, { recursive: true })
+await rm(priceCachePath, { force: true })
+process.env.MAA_MATERIAL_VALUE_CACHE_PATH = priceCachePath
 const originalConsoleError = console.error
 console.error = (...args) => {
   if (String(args[0] ?? '').startsWith('depot value error:')) return
   originalConsoleError(...args)
 }
 
-const handlerModule = await import(`${pathToFileURL(await bundleHandler()).href}?t=${Date.now()}`)
-const handler = handlerModule.default ?? handlerModule
+const handlerPath = await bundleHandler()
+let handler = await loadHandler(handlerPath)
 
 const FLAT_SAMPLE = {
   '2001': 16000,
@@ -114,6 +117,7 @@ globalThis.fetch = async (url) => {
 }
 
 await assertUploadFormats()
+await assertPriceCacheFallback()
 await assertUploadErrors()
 await assertSklandFlow()
 
@@ -137,6 +141,10 @@ async function assertUploadFormats() {
   if (!flat.body.unpriced_items.some((item) => item.id === 'mod_unlock_token' && item.name === '模组数据块')) {
     throw new Error('upload formats: mod token should be unpriced by policy')
   }
+  const furniture = await callDepot({ source: 'upload', inventory: { '3401': 100 } })
+  if (!furniture.body.unpriced_items.some((item) => item.id === '3401' && item.name === '家具零件')) {
+    throw new Error('upload formats: furniture parts should be unpriced by policy')
+  }
   if (flat.body.percentile < 1 || flat.body.percentile > 99) {
     throw new Error('upload formats: percentile should be clamped to 1-99')
   }
@@ -154,6 +162,28 @@ async function assertUploadFormats() {
   const sourceRock = duplicate.body.top_items.find((item) => item.id === '30011')
   if (duplicate.status !== 200 || sourceRock?.count !== 3 || sourceRock.equivalent_sanity !== 6) {
     throw new Error('upload formats: duplicate ids should be merged')
+  }
+}
+
+async function assertPriceCacheFallback() {
+  globalThis.fetch = async () => {
+    throw new Error('remote price source down')
+  }
+  handler = await loadHandler(handlerPath)
+  const fallback = await callDepot({ source: 'upload', inventory: { '30011': 2, '31013': 3 } })
+  if (fallback.status !== 200) {
+    throw new Error(`price cache fallback: expected 200, got ${fallback.status}`)
+  }
+  if (fallback.body.sources.yituliu !== 'ok') {
+    throw new Error(`price cache fallback: expected cached yituliu ok, got ${fallback.body.sources.yituliu}`)
+  }
+  if (fallback.body.warnings.some((warning) => warning.includes('材料价值源暂不可用'))) {
+    throw new Error('price cache fallback: should not downgrade to fixed-only warning when disk cache exists')
+  }
+  const sourceRock = fallback.body.top_items.find((item) => item.id === '30011')
+  const gel = fallback.body.top_items.find((item) => item.id === '31013')
+  if (sourceRock?.equivalent_sanity !== 4 || gel?.equivalent_sanity !== 12) {
+    throw new Error('price cache fallback: should price materials from persisted cache when remote fails')
   }
 }
 
@@ -268,6 +298,11 @@ async function bundleHandler() {
   })
   await writeFile(outputPath, result.outputFiles[0].text, 'utf8')
   return outputPath
+}
+
+async function loadHandler(outputPath) {
+  const handlerModule = await import(`${pathToFileURL(outputPath).href}?t=${Date.now()}-${Math.random()}`)
+  return handlerModule.default ?? handlerModule
 }
 
 function memorySklandPlugin() {
