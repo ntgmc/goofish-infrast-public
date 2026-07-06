@@ -28,8 +28,12 @@ import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 
 const PENDING_BINDING_TTL_MS = 10 * 60 * 1000
 const UID_MISMATCH_FREEZE_THRESHOLD = 3
+const MAX_CREDENTIAL_TEXT_LENGTH = 16 * 1024
+const MAX_CREDENTIAL_JSON_DEPTH = 8
 
 type HandlerResponse = AuthSuccessResponse & { skland_import?: SklandImportSummary }
+type AuthPayloadUser = Parameters<typeof buildAuthPayload>[0]
+type CredentialSource = 'manual' | 'bookmarklet'
 
 interface SklandPreview {
   uid: string
@@ -57,7 +61,11 @@ export default async (req: Request): Promise<Response> => {
         margin: 2,
         errorCorrectionLevel: 'M',
       })
-      return jsonResponse({ scan_id: scan.scanId, qr_data_url: qrDataUrl, expires_at: scan.expiresAt })
+      return jsonResponse({
+        scan_id: scan.scanId,
+        qr_data_url: qrDataUrl,
+        expires_at: scan.expiresAt,
+      })
     }
 
     if (pathname.endsWith('/login/complete')) {
@@ -73,38 +81,18 @@ export default async (req: Request): Promise<Response> => {
 
       const accountToken = await getHypergryphTokenByScanCode(scanCode)
       const cred = await getCredByHypergryphToken(accountToken)
-      const imported = await importSklandOperatorsByCred(cred)
-      const operatorsCheck = validateOperators(imported.operators)
-      if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
-      const preview = toSklandPreview(imported.binding, operatorsCheck.operators.length)
+      return createPendingSklandBindingFromCred(auth.user, profile, cred)
+    }
 
-      if (profile.skland_binding?.uid && profile.skland_binding.uid !== imported.binding.uid) {
-        return handleAccountMismatch(auth.user, profile, preview)
-      }
-
-      const now = new Date()
-      const confirmationId = randomUUID()
-      await saveUserProfile({
-        ...profile,
-        skland_pending_binding: {
-          confirmation_id: confirmationId,
-          uid: imported.binding.uid,
-          nickname: imported.binding.nickname,
-          channel_name: imported.binding.channel_name,
-          encrypted_cred: encryptSklandCredential(cred),
-          operator_count: operatorsCheck.operators.length,
-          created_at: now.toISOString(),
-          expires_at: new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString(),
-        },
-        updated_at: now.toISOString(),
-      })
-
-      return jsonResponse({
-        status: 'confirm_required',
-        confirmation_id: confirmationId,
-        skland_preview: preview,
-        warning: '绑定后不可解绑，请确认这是当前账号对应的森空岛角色。',
-      })
+    if (pathname.endsWith('/credential/preview')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const body = await readJsonBody(req)
+      const profile = await requireActiveProfile(auth.user.id, body.profile_id)
+      const source = normalizeCredentialSource(body.source)
+      const cred = extractSklandCredential(body.credential_text)
+      if (!cred) return jsonResponse({ error: '未识别到森空岛凭据，请检查复制内容。' }, 400)
+      return createPendingSklandBindingFromCred(auth.user, profile, cred, source)
     }
 
     if (pathname.endsWith('/login/confirm')) {
@@ -117,14 +105,14 @@ export default async (req: Request): Promise<Response> => {
       }
       const pending = profile.skland_pending_binding
       if (!pending || pending.confirmation_id !== body.confirmation_id.trim()) {
-        return jsonResponse({ error: '森空岛绑定确认已失效，请重新扫码。' }, 400)
+        return jsonResponse({ error: '森空岛绑定确认已失效，请重新登录森空岛。' }, 400)
       }
       if (Date.now() > Date.parse(pending.expires_at)) {
         await saveUserProfile({ ...profile, skland_pending_binding: null, updated_at: new Date().toISOString() })
-        return jsonResponse({ error: '森空岛绑定确认已过期，请重新扫码。' }, 400)
+        return jsonResponse({ error: '森空岛绑定确认已过期，请重新登录森空岛。' }, 400)
       }
       if (profile.skland_binding?.uid && profile.skland_binding.uid !== pending.uid) {
-        return jsonResponse({ error: '森空岛账号与当前绑定账号不一致，请重新扫码。' }, 409)
+        return jsonResponse({ error: '森空岛账号与当前绑定账号不一致，请重新登录森空岛。' }, 409)
       }
 
       const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(pending.encrypted_cred))
@@ -137,7 +125,7 @@ export default async (req: Request): Promise<Response> => {
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       const encryptedCred = profile.skland_binding?.encrypted_cred
-      if (!encryptedCred) return jsonResponse({ error: '当前账号尚未绑定森空岛，请先扫码导入。' }, 404)
+      if (!encryptedCred) return jsonResponse({ error: '当前账号尚未绑定森空岛，请先登录导入。' }, 404)
       const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(encryptedCred))
       return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
     }
@@ -151,13 +139,56 @@ export default async (req: Request): Promise<Response> => {
   }
 }
 
+async function createPendingSklandBindingFromCred(
+  user: AuthPayloadUser,
+  profile: UserGameAccountRecord,
+  cred: string,
+  source?: CredentialSource,
+): Promise<Response> {
+  const imported = await importSklandOperatorsByCred(cred)
+  const operatorsCheck = validateOperators(imported.operators)
+  if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
+  const preview = toSklandPreview(imported.binding, operatorsCheck.operators.length)
+
+  if (profile.skland_binding?.uid && profile.skland_binding.uid !== imported.binding.uid) {
+    return handleAccountMismatch(user, profile, preview)
+  }
+
+  const now = new Date()
+  const confirmationId = randomUUID()
+  await saveUserProfile({
+    ...profile,
+    skland_pending_binding: {
+      confirmation_id: confirmationId,
+      uid: imported.binding.uid,
+      nickname: imported.binding.nickname,
+      channel_name: imported.binding.channel_name,
+      encrypted_cred: encryptSklandCredential(cred),
+      operator_count: operatorsCheck.operators.length,
+      created_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString(),
+    },
+    updated_at: now.toISOString(),
+  })
+
+  return jsonResponse({
+    status: 'confirm_required',
+    confirmation_id: confirmationId,
+    skland_preview: preview,
+    warning: source === 'bookmarklet'
+      ? '书签脚本已读取森空岛凭据。绑定后不可解绑，请确认这是当前账号对应的森空岛角色。'
+      : '绑定后不可解绑，请确认这是当前账号对应的森空岛角色。',
+  })
+}
+
 async function handleAccountMismatch(
-  user: Parameters<typeof buildAuthPayload>[0],
+  user: AuthPayloadUser,
   profile: UserGameAccountRecord,
   preview: SklandPreview,
 ): Promise<Response> {
   const now = new Date().toISOString()
-  const mismatchCount = (profile.skland_risk?.uid_mismatch_count ?? 0) + 1
+  const previousRisk = profile.skland_risk
+  const mismatchCount = (previousRisk?.uid_mismatch_count ?? 0) + 1
   const nextProfile: UserGameAccountRecord = {
     ...profile,
     status: mismatchCount >= UID_MISMATCH_FREEZE_THRESHOLD ? 'frozen' : profile.status,
@@ -176,14 +207,14 @@ async function handleAccountMismatch(
     return jsonResponse({
       ...(await buildAuthPayload(user, profile.id)),
       status: 'frozen',
-      warning: '森空岛扫码账号多次与当前绑定账号不一致，当前游戏账号档案已冻结。',
+      warning: '森空岛账号多次与当前绑定账号不一致，当前游戏账号档案已冻结。',
     })
   }
 
   return jsonResponse({
     status: 'account_mismatch',
     skland_preview: preview,
-    warning: '该账号与当前绑定账号不一致，请确认是否扫错账号。',
+    warning: '该账号与当前绑定账号不一致，请确认是否登录错账号。',
   })
 }
 
@@ -233,7 +264,7 @@ async function saveSklandImport(
 }
 
 async function buildPayloadWithImport(
-  user: Parameters<typeof buildAuthPayload>[0],
+  user: AuthPayloadUser,
   profileId: string,
   imported: SklandImportSummary,
 ): Promise<HandlerResponse> {
@@ -271,6 +302,82 @@ function toSklandPreview(binding: SklandBindingSummary, operatorCount: number): 
     nickname: binding.nickname,
     channel_name: binding.channel_name,
     operator_count: operatorCount,
+  }
+}
+
+function normalizeCredentialSource(value: unknown): CredentialSource {
+  return value === 'bookmarklet' ? 'bookmarklet' : 'manual'
+}
+
+export function extractSklandCredential(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const input = value.trim()
+  if (!input) return null
+  if (input.length > MAX_CREDENTIAL_TEXT_LENGTH) return null
+
+  const parsed = parseCredentialJson(input)
+  if (parsed) return parsed
+
+  const keyValue = extractCredentialFromKeyValueText(input)
+  if (keyValue) return keyValue
+
+  const firstCommaValue = normalizeCredentialCandidate(input.split(',')[0])
+  if (firstCommaValue) return firstCommaValue
+
+  return normalizeCredentialCandidate(input)
+}
+
+function parseCredentialJson(input: string): string | null {
+  try {
+    return findCredentialInObject(JSON.parse(input))
+  } catch {
+    return null
+  }
+}
+
+function findCredentialInObject(value: unknown, depth = 0): string | null {
+  if (depth > MAX_CREDENTIAL_JSON_DEPTH) return null
+  if (!value || typeof value !== 'object') return null
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findCredentialInObject(item, depth + 1)
+      if (found) return found
+    }
+    return null
+  }
+
+  const record = value as Record<string, unknown>
+  for (const key of ['SK_OAUTH_CRED_KEY', 'sk_oauth_cred_key', 'cred', 'credential']) {
+    const found = normalizeCredentialCandidate(record[key])
+    if (found) return found
+  }
+  for (const item of Object.values(record)) {
+    const found = findCredentialInObject(item, depth + 1)
+    if (found) return found
+  }
+  return null
+}
+
+function extractCredentialFromKeyValueText(input: string): string | null {
+  const match = input.match(/(?:^|[;,\s{，；])["']?(?:SK_OAUTH_CRED_KEY|sk_oauth_cred_key|cred|credential)["']?\s*[:=]\s*["']?([^"',;\s}，；]+)/)
+  return normalizeCredentialCandidate(match?.[1])
+}
+
+function normalizeCredentialCandidate(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const rawCandidate = value.trim().replace(/^["']|["']$/g, '')
+  const candidate = decodeCredentialCandidate(rawCandidate)
+  if (!candidate || candidate.includes('=') || candidate.includes(';')) return null
+  if (candidate.length < 12) return null
+  return candidate
+}
+
+function decodeCredentialCandidate(value: string): string {
+  if (!value.includes('%')) return value
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
   }
 }
 

@@ -37,6 +37,7 @@ type SklandPreview = {
 
 type SklandLoginState = {
   open: boolean
+  mode: 'scan' | 'manual' | 'bookmarklet' | 'password'
   scanId: string | null
   qrDataUrl: string | null
   expiresAt: string | null
@@ -64,6 +65,8 @@ type SklandPayload = AuthSuccessResponse & {
 
 const SKLAND_SCAN_POLL_DELAY_MS = 5000
 const SKLAND_SCAN_MAX_POLLS = 18
+const SKLAND_CONSOLE_CODE = `(()=>{const raw=localStorage.getItem('SK_OAUTH_CRED_KEY');let cred=raw;try{const data=JSON.parse(raw||'null');cred=data?.cred||data?.value||raw;}catch{}copy('SK_OAUTH_CRED_KEY='+encodeURIComponent(cred||''));console.log(cred?'已复制到粘贴板':'未找到 SK_OAUTH_CRED_KEY');})()`
+const SKLAND_BOOKMARKLET = `javascript:(()=>{const raw=localStorage.getItem("SK_OAUTH_CRED_KEY");if(!raw){alert("未找到 SK_OAUTH_CRED_KEY，请先登录森空岛网页。");return;}let cred=raw;try{const data=JSON.parse(raw);cred=data.cred||data.value||raw;}catch{}const text="SK_OAUTH_CRED_KEY="+encodeURIComponent(cred);const done=()=>alert("森空岛凭据已复制，请回到排班工作台粘贴。");navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(text).then(done).catch(()=>prompt("复制下面的森空岛凭据",text)):prompt("复制下面的森空岛凭据",text);})()`
 
 export default function ToolPage() {
   const [authLoading, setAuthLoading] = useState(true)
@@ -1109,6 +1112,7 @@ const [error, setError] = useState<string | null>(null)
 const [saving, setSaving] = useState(false)
   const [sklandLogin, setSklandLogin] = useState<SklandLoginState>({
     open: false,
+    mode: 'scan',
     scanId: null,
     qrDataUrl: null,
     expiresAt: null,
@@ -1119,6 +1123,7 @@ const [saving, setSaving] = useState(false)
   })
   const [sklandBusy, setSklandBusy] = useState(false)
   const sklandPollCountRef = useRef(0)
+  const sklandCredentialInputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
@@ -1244,6 +1249,7 @@ const [saving, setSaving] = useState(false)
     setError(null)
     setSklandLogin({
       open: true,
+      mode: 'scan',
       scanId: null,
       qrDataUrl: null,
       expiresAt: null,
@@ -1262,14 +1268,15 @@ const [saving, setSaving] = useState(false)
       if (!resp.ok || !data.scan_id || !data.qr_data_url) throw new Error(data.error || `生成森空岛二维码失败: ${resp.status}`)
       setSklandLogin({
         open: true,
-      scanId: data.scan_id,
-      qrDataUrl: data.qr_data_url,
-      expiresAt: data.expires_at ?? null,
-      confirmationId: null,
-      preview: null,
-      status: 'waiting',
-      message: '请使用森空岛 App 扫码确认，二维码约 2 分钟内有效。',
-    })
+        mode: 'scan',
+        scanId: data.scan_id,
+        qrDataUrl: data.qr_data_url,
+        expiresAt: data.expires_at ?? null,
+        confirmationId: null,
+        preview: null,
+        status: 'waiting',
+        message: '请使用森空岛 App 扫码确认，二维码约 2 分钟内有效。',
+      })
       sklandPollCountRef.current = 0
     } catch (caught) {
       setSklandLogin((current) => ({ ...current, status: 'error', message: (caught as Error).message }))
@@ -1277,6 +1284,62 @@ const [saving, setSaving] = useState(false)
       setSklandBusy(false)
     }
   }, [profile.id])
+
+  const handlePreviewSklandCredential = useCallback(async (source: 'manual' | 'bookmarklet') => {
+    const credentialText = sklandCredentialInputRef.current?.value.trim() ?? ''
+    if (!credentialText) {
+      setSklandLogin((current) => ({ ...current, status: 'error', message: '请先粘贴森空岛凭据。' }))
+      return
+    }
+    setSklandBusy(true)
+    setError(null)
+    setSklandLogin((current) => ({ ...current, status: 'starting', message: '正在读取森空岛账号信息...' }))
+    try {
+      const resp = await fetch('/api/user/skland/credential/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profile.id, credential_text: credentialText, source }),
+      })
+      const data = await resp.json() as SklandPayload
+      if (!resp.ok) throw new Error(data.error || `森空岛凭据读取失败: ${resp.status}`)
+      if (sklandCredentialInputRef.current) sklandCredentialInputRef.current.value = ''
+      if (data.status === 'account_mismatch') {
+        setSklandLogin((current) => ({
+          ...current,
+          confirmationId: null,
+          preview: data.skland_preview ?? null,
+          status: 'account_mismatch',
+          message: data.warning || '该账号与当前绑定账号不一致，请确认是否登录错账号。',
+        }))
+        return
+      }
+      if (data.status === 'frozen') {
+        if (data.user) onSynced(data)
+        setSklandLogin((current) => ({
+          ...current,
+          confirmationId: null,
+          preview: data.skland_preview ?? null,
+          status: 'frozen',
+          message: data.warning || '当前游戏账号档案已冻结。',
+        }))
+        return
+      }
+      if (data.status !== 'confirm_required' || !data.confirmation_id || !data.skland_preview) {
+        throw new Error(data.error || '森空岛凭据已读取，但未返回可确认账号。')
+      }
+      setSklandLogin((current) => ({
+        ...current,
+        confirmationId: data.confirmation_id ?? null,
+        preview: data.skland_preview ?? null,
+        status: 'confirm_required',
+        message: data.warning || '请确认森空岛账号信息，确认后将导入干员数据。',
+      }))
+    } catch (caught) {
+      setSklandLogin((current) => ({ ...current, status: 'error', message: (caught as Error).message }))
+    } finally {
+      setSklandBusy(false)
+    }
+  }, [onSynced, profile.id])
 
   const handleRefreshSkland = useCallback(async () => {
     setSklandBusy(true)
@@ -1292,12 +1355,13 @@ const [saving, setSaving] = useState(false)
       applySklandPayload(data)
       setSklandLogin({
         open: true,
-      scanId: null,
-      qrDataUrl: null,
-      expiresAt: null,
-      confirmationId: null,
-      preview: null,
-      status: 'imported',
+        mode: 'scan',
+        scanId: null,
+        qrDataUrl: null,
+        expiresAt: null,
+        confirmationId: null,
+        preview: null,
+        status: 'imported',
         message: data.skland_import
           ? `已刷新 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}`
           : '森空岛干员数据已刷新。',
@@ -1520,68 +1584,152 @@ const [saving, setSaving] = useState(false)
           </div>
         </form>
       </main>
-      {sklandLogin.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6">
-          <section className="w-full max-w-md rounded-xl border border-surface-3 bg-surface-1 p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-ink-primary">森空岛扫码导入</h2>
-                <p className="mt-1 text-sm leading-6 text-ink-secondary">扫码后会先展示游戏昵称和 UID，确认无误后才会导入。</p>
-              </div>
-              <button type="button" onClick={() => setSklandLogin((current) => ({ ...current, open: false }))} className="rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
-                关闭
-              </button>
-            </div>
-              <div className="mt-5 flex min-h-[300px] items-center justify-center rounded-lg border border-surface-3 bg-surface-0 p-4">
-                {sklandLogin.qrDataUrl && sklandLogin.status === 'waiting' ? (
-                  <img src={sklandLogin.qrDataUrl} alt="森空岛扫码登录二维码" className="h-[260px] w-[260px] rounded-lg bg-white p-2" />
-                ) : (sklandLogin.status === 'confirm_required' || sklandLogin.status === 'account_mismatch') && sklandLogin.preview ? (
-                  <div className="w-full space-y-3 text-sm">
-                    <div className="rounded-lg border border-surface-3 bg-surface-1 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">扫码账号</p>
-                      <p className="mt-2 text-base font-semibold text-ink-primary">{sklandLogin.preview.nickname}</p>
-                      <p className="mt-1 text-ink-secondary">UID：{sklandLogin.preview.uid}</p>
-                      <p className="mt-1 text-ink-secondary">服务器：{sklandLogin.preview.channel_name}</p>
-                      <p className="mt-1 text-ink-secondary">拥有干员：{sklandLogin.preview.operator_count} 名</p>
-                    </div>
-                    {sklandLogin.status === 'confirm_required' && (
-                      <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-warning">
-                        绑定后不可解绑，请确认这是当前账号对应的森空岛角色。
-                      </div>
-                    )}
-                  </div>
-                ) : sklandLogin.status === 'imported' ? (
-                  <div className="text-center">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-2xl font-bold text-success">✓</div>
-                    <p className="mt-4 text-sm font-semibold text-ink-primary">导入完成</p>
-                  </div>
-                ) : sklandLogin.status === 'frozen' ? (
-                  <div className="text-center text-sm text-error">当前游戏账号档案已冻结。</div>
-                ) : (
-                  <div className="text-sm text-ink-secondary">正在准备二维码...</div>
-                )}
-              </div>
-            {sklandLogin.message && (
-              <div className={`mt-4 rounded-lg px-4 py-3 text-sm ${sklandLogin.status === 'error' ? 'border border-error/30 bg-error/10 text-error' : sklandLogin.status === 'imported' ? 'border border-success/30 bg-success/10 text-success' : 'border border-surface-3 bg-surface-0 text-ink-secondary'}`}>
-                {sklandLogin.message}
-              </div>
-            )}
-              <div className="mt-4 flex flex-wrap justify-end gap-2">
-                {(sklandLogin.status === 'error' || sklandLogin.status === 'account_mismatch') && (
-                  <button type="button" onClick={handleStartSklandLogin} disabled={sklandBusy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
-                    重新生成
-                  </button>
-                )}
-                {sklandLogin.status === 'confirm_required' && (
-                  <button type="button" onClick={handleConfirmSklandLogin} disabled={sklandBusy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
-                    确认绑定并导入
-                  </button>
-                )}
-                {sklandLogin.status === 'waiting' && sklandLogin.scanId && (
-                <button type="button" onClick={() => void completeSklandLogin(sklandLogin.scanId!)} disabled={sklandBusy} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3 disabled:text-ink-muted">
-                  立即检查
-                </button>
-              )}
+ {sklandLogin.open && (
+ <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6">
+ <section className="w-full max-w-2xl rounded-xl border border-surface-3 bg-surface-1 p-5 shadow-2xl">
+ <div className="flex items-start justify-between gap-4">
+ <div>
+ <h2 className="text-lg font-semibold text-ink-primary">森空岛导入</h2>
+ <p className="mt-1 text-sm leading-6 text-ink-secondary">先展示游戏昵称和 UID，确认无误后才会导入。</p>
+ </div>
+ <button type="button" onClick={() => setSklandLogin((current) => ({ ...current, open: false }))} className="rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
+ 关闭
+ </button>
+ </div>
+ <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+ {(['scan', 'manual', 'bookmarklet', 'password'] as const).map((mode) => (
+ <button
+ key={mode}
+ type="button"
+ onClick={() => {
+ if (mode === 'password') return
+ setSklandLogin((current) => ({
+ ...current,
+ mode,
+ scanId: mode === 'scan' ? current.scanId : null,
+ qrDataUrl: mode === 'scan' ? current.qrDataUrl : null,
+ expiresAt: mode === 'scan' ? current.expiresAt : null,
+ confirmationId: null,
+ preview: null,
+ status: mode === 'scan' ? current.status : 'idle',
+ message: mode === 'manual' ? '粘贴森空岛凭据后读取账号信息。' : mode === 'bookmarklet' ? '复制书签脚本，在森空岛网页点击后回到这里粘贴。' : current.message,
+ }))
+ }}
+ disabled={mode === 'password'}
+ className={'rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ' + (sklandLogin.mode === mode ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3')}
+ >
+ {mode === 'scan' ? '扫码登录' : mode === 'manual' ? '手动凭据' : mode === 'bookmarklet' ? '书签脚本' : '模拟登录'}
+ </button>
+ ))}
+ </div>
+<p className="mt-2 text-xs text-ink-muted">推荐使用扫码登录，无法扫码时可更换其他方式。</p>
+ {sklandLogin.mode === 'manual' && (
+ <div className="mt-5 space-y-3 rounded-lg border border-surface-3 bg-surface-0 p-4">
+ <ol className="space-y-3 text-sm leading-6 text-ink-secondary">
+ <li><span className="font-semibold text-ink-primary">1. 登录森空岛网页：</span>点击下方按钮打开森空岛官网，在网页中完成登录。</li>
+ <li><span className="font-semibold text-ink-primary">2. 复制凭据：</span>登录后按 F12 打开开发者工具，切到 Console/控制台，执行下方一图流命令。</li>
+ <li><span className="font-semibold text-ink-primary">3. 粘贴导入：</span>把剪贴板中的凭据粘贴到输入框，读取账号信息后再确认导入。</li>
+ </ol>
+ <div className="flex flex-wrap gap-2">
+ <button type="button" onClick={() => window.open('https://www.skland.com/index', '_blank', 'noopener,noreferrer')} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
+ 打开森空岛官网
+ </button>
+ <button type="button" onClick={() => void navigator.clipboard?.writeText(SKLAND_CONSOLE_CODE)} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
+ 复制一图流命令
+ </button>
+ </div>
+ <textarea
+ readOnly
+ value={SKLAND_CONSOLE_CODE}
+ rows={3}
+ className="w-full resize-y rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 font-mono text-xs text-ink-secondary outline-none"
+ />
+ <textarea
+ ref={sklandCredentialInputRef}
+ rows={4}
+ className="w-full resize-y rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 font-mono text-sm text-ink-primary outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+ placeholder="粘贴森空岛凭据"
+ />
+ <button type="button" onClick={() => void handlePreviewSklandCredential('manual')} disabled={sklandBusy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+ 读取账号信息
+ </button>
+ </div>
+ )}
+ {sklandLogin.mode === 'bookmarklet' && (
+ <div className="mt-5 space-y-3 rounded-lg border border-surface-3 bg-surface-0 p-4">
+ <p className="text-sm leading-6 text-ink-secondary">复制书签脚本保存为浏览器书签，在森空岛登录后点击书签，脚本会把经过编码的 SK_OAUTH_CRED_KEY 复制到剪贴板。</p>
+ <textarea readOnly value={SKLAND_BOOKMARKLET} rows={4} className="w-full resize-y rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 font-mono text-xs text-ink-secondary outline-none" />
+ <div className="flex flex-wrap gap-2">
+ <button type="button" onClick={() => void navigator.clipboard?.writeText(SKLAND_BOOKMARKLET)} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
+ 复制书签脚本
+ </button>
+ <button type="button" onClick={() => window.open('https://www.skland.com/index', '_blank', 'noopener,noreferrer')} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
+ 打开森空岛
+ </button>
+ </div>
+ <textarea
+ ref={sklandCredentialInputRef}
+ rows={4}
+ className="w-full resize-y rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 font-mono text-sm text-ink-primary outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+ placeholder="粘贴书签脚本复制出的凭据"
+ />
+ <button type="button" onClick={() => void handlePreviewSklandCredential('bookmarklet')} disabled={sklandBusy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+ 读取账号信息
+ </button>
+ </div>
+ )}
+ {sklandLogin.mode === 'password' && (
+ <div className="mt-5 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning">
+推荐使用扫码登录，无法扫码时可更换其他方式。
+ </div>
+ )}
+ <div className="mt-5 flex min-h-[260px] items-center justify-center rounded-lg border border-surface-3 bg-surface-0 p-4">
+ {sklandLogin.mode === 'scan' && sklandLogin.qrDataUrl && sklandLogin.status === 'waiting' ? (
+ <img src={sklandLogin.qrDataUrl} alt="森空岛扫码登录二维码" className="h-[240px] w-[240px] rounded-lg bg-white p-2" />
+ ) : (sklandLogin.status === 'confirm_required' || sklandLogin.status === 'account_mismatch') && sklandLogin.preview ? (
+ <div className="w-full space-y-3 text-sm">
+ <div className="rounded-lg border border-surface-3 bg-surface-1 p-4">
+ <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">待确认账号</p>
+ <p className="mt-2 text-lg font-semibold text-ink-primary">{sklandLogin.preview.nickname}</p>
+ <p className="mt-1 text-ink-secondary">UID {sklandLogin.preview.uid} · {sklandLogin.preview.channel_name}</p>
+ <p className="mt-1 text-ink-secondary">可导入 {sklandLogin.preview.operator_count} 名干员</p>
+ </div>
+ {sklandLogin.status === 'confirm_required' ? (
+ <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-warning">绑定后不可解绑，请确认账号无误。</p>
+ ) : (
+ <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-error">该账号与当前绑定账号不一致，请重新选择正确账号。</p>
+ )}
+ </div>
+ ) : (
+ <div className="space-y-3 text-center text-sm text-ink-secondary">
+ <p>{sklandLogin.message || '请选择一种森空岛登录方式。'}</p>
+ {sklandLogin.mode === 'scan' && sklandLogin.status !== 'waiting' && (
+ <button type="button" onClick={handleStartSklandLogin} disabled={sklandBusy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+ 生成扫码二维码
+ </button>
+ )}
+ </div>
+ )}
+ </div>
+ {sklandLogin.message && sklandLogin.status !== 'confirm_required' && (
+ <p className={'mt-3 text-sm ' + (sklandLogin.status === 'error' || sklandLogin.status === 'account_mismatch' || sklandLogin.status === 'frozen' ? 'text-error' : 'text-ink-secondary')}>{sklandLogin.message}</p>
+ )}
+ <div className="mt-5 flex flex-wrap justify-end gap-2">
+ {(sklandLogin.status === 'error' || sklandLogin.status === 'account_mismatch') && sklandLogin.mode === 'scan' && (
+ <button type="button" onClick={handleStartSklandLogin} disabled={sklandBusy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+ 重新生成
+ </button>
+ )}
+ {sklandLogin.status === 'confirm_required' && (
+ <button type="button" onClick={handleConfirmSklandLogin} disabled={sklandBusy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+ 确认绑定并导入
+ </button>
+ )}
+ {sklandLogin.status === 'waiting' && sklandLogin.scanId && (
+ <button type="button" onClick={() => void completeSklandLogin(sklandLogin.scanId!)} disabled={sklandBusy} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3 disabled:text-ink-muted">
+ 立即检查
+ </button>
+ )}
             </div>
           </section>
         </div>
