@@ -128,6 +128,27 @@ CREATE TABLE IF NOT EXISTS user_announcement_reads (
   PRIMARY KEY (user_id, announcement_id)
 );
 
+CREATE TABLE IF NOT EXISTS depot_value_samples (
+  uid_hash TEXT PRIMARY KEY,
+  total_equivalent_sanity NUMERIC NOT NULL,
+  account_level INTEGER,
+  operator_power_score NUMERIC NOT NULL,
+  operator_count INTEGER NOT NULL,
+  elite2_count INTEGER NOT NULL,
+  six_star_count INTEGER NOT NULL,
+  six_star_e2_count INTEGER NOT NULL,
+  e2_90_count INTEGER NOT NULL,
+  inventory_item_count INTEGER NOT NULL,
+  priced_count INTEGER NOT NULL,
+  unpriced_count INTEGER NOT NULL,
+  sample_json JSONB NOT NULL,
+  sampled_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_depot_value_samples_total_sanity ON depot_value_samples(total_equivalent_sanity);
+CREATE INDEX IF NOT EXISTS idx_depot_value_samples_account_level ON depot_value_samples(account_level);
+CREATE INDEX IF NOT EXISTS idx_depot_value_samples_operator_power ON depot_value_samples(operator_power_score);
+
 ALTER TABLE user_accounts ALTER COLUMN cdk_key DROP NOT NULL;
 ALTER TABLE user_accounts ALTER COLUMN cdk_code_hash DROP NOT NULL;
 ALTER TABLE user_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;

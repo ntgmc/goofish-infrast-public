@@ -157,6 +157,7 @@ export default function DepotValuePage() {
                     <h3 className="text-sm font-semibold text-ink-primary">粘贴仓库 JSON</h3>
                     <p className="mt-1 text-sm leading-6 text-ink-secondary">
                       从 MAA 选择“企鹅物流刷图规划”或“明日方舟工具箱”导出，复制内容后粘贴到这里。
+                      粘贴 JSON 只用于本次分析，不会进入样本池。
                     </p>
                   </div>
                   <button
@@ -228,6 +229,9 @@ export default function DepotValuePage() {
                   {loading === 'skland' ? '正在读取...' : '使用森空岛库存'}
                 </button>
               </div>
+              <p className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-3 text-sm leading-6 text-ink-secondary">
+                使用森空岛库存会默认匿名贡献本次统计结果，用于改进击败百分比；不包含仓库明细、干员明细、昵称、UID 明文或凭据。
+              </p>
             </div>
           </section>
 
@@ -236,7 +240,7 @@ export default function DepotValuePage() {
             <div className="mt-4 space-y-4 text-sm leading-6 text-ink-secondary">
               <p>作战记录会先换算成经验，再折成大致理智；龙门币和材料也会尽量换算成同一个理智数。</p>
               <p>材料价格优先参考一图流/企鹅物流的物品价值。模组数据块、数据增补仪、数据增补条、家具零件不会参与计算。</p>
-              <p>“击败 X% 博士”是为了方便分享的娱乐估算，不是真实全服排名。</p>
+              <p>使用森空岛库存时会默认贡献匿名统计样本，样本越多，“击败 X% 博士”会越接近真实分布；样本不足时仍会参考估算曲线。</p>
             </div>
           </section>
         </div>
@@ -259,6 +263,9 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
       <h2 className="mt-2 text-2xl font-semibold text-ink-primary">
         你的仓库资产击败了 {result.percentile}% 博士
       </h2>
+      <p className="mt-3 rounded-lg border border-surface-3 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-secondary">
+        {formatRankingNote(result)}
+      </p>
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <Metric label="等价理智" value={formatNumber(result.total_equivalent_sanity)} />
         <Metric label="已估价物品" value={`${result.priced_count} 类`} />
@@ -382,7 +389,9 @@ function drawShareCard(canvas: HTMLCanvasElement | null, result: DepotValueRespo
   ctx.fillText('MAA 仓库价值分析器', 72, 96)
   ctx.font = '400 24px "Noto Sans SC", "Microsoft YaHei", sans-serif'
   ctx.fillStyle = 'rgba(255, 255, 255, 0.62)'
-  ctx.fillText('娱乐估算，不代表真实全服排行', 72, 136)
+  ctx.fillText(result.ranking.mode === 'sample_adjusted'
+    ? `参考 ${formatNumber(result.ranking.sample_count)} 位森空岛样本修正`
+    : '样本积累中，当前结果以估算曲线为主', 72, 136)
 
   ctx.fillStyle = '#ffffff'
   ctx.font = '700 60px "Noto Sans SC", "Microsoft YaHei", sans-serif'
@@ -472,8 +481,19 @@ function parseDepotText(text: string): unknown {
   try {
     return JSON.parse(trimmed) as unknown
   } catch {
-    throw new Error('JSON 格式不正确。请在 MAA 导出方式中选择“企鹅物流刷图规划”或“明日方舟工具箱”，不要选择 Markdown 或 CSV。')
+    throw new Error('JSON 格式不正确。请在 MAA 导出方式中选择“企鹅物流刷图规划”或“明日方舟工具箱”。')
   }
+}
+
+function formatRankingNote(result: DepotValueResponse): string {
+  if (result.ranking.mode === 'sample_adjusted') {
+    const weightText = `${Math.round(result.ranking.sample_weight * 100)}%`
+    return `已参考 ${formatNumber(result.ranking.sample_count)} 位森空岛样本修正百分比，当前样本权重约 ${weightText}。`
+  }
+  if (result.ranking.sample_count > 0) {
+    return `样本积累中，当前结果仍以估算曲线为主。`
+  }
+  return `样本积累中，当前结果仍以估算曲线为主。`
 }
 
 function formatNumber(value: number): string {

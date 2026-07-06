@@ -66,8 +66,8 @@ type SklandPayload = AuthSuccessResponse & {
 
 const SKLAND_SCAN_POLL_DELAY_MS = 5000
 const SKLAND_SCAN_MAX_POLLS = 18
-const SKLAND_CONSOLE_CODE = `(()=>{const raw=localStorage.getItem('SK_OAUTH_CRED_KEY');let cred=raw;try{const data=JSON.parse(raw||'null');cred=data?.cred||data?.value||raw;}catch{}copy('SK_OAUTH_CRED_KEY='+encodeURIComponent(cred||''));console.log(cred?'已复制到粘贴板':'未找到 SK_OAUTH_CRED_KEY');})()`
-const SKLAND_BOOKMARKLET = `javascript:(()=>{const raw=localStorage.getItem("SK_OAUTH_CRED_KEY");if(!raw){alert("未找到 SK_OAUTH_CRED_KEY，请先登录森空岛网页。");return;}let cred=raw;try{const data=JSON.parse(raw);cred=data.cred||data.value||raw;}catch{}const text="SK_OAUTH_CRED_KEY="+encodeURIComponent(cred);const done=()=>alert("森空岛凭据已复制，请回到排班工作台粘贴。");navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(text).then(done).catch(()=>prompt("复制下面的森空岛凭据",text)):prompt("复制下面的森空岛凭据",text);})()`
+const SKLAND_CONSOLE_CODE = `(()=>{const raw=localStorage.getItem('SK_OAUTH_CRED_KEY');let cred=raw;try{const data=JSON.parse(raw||'null');cred=data?.cred||data?.value||raw;}catch{}copy(encodeURIComponent(cred||''));console.log(cred?'已复制到粘贴板':'未找到森空岛凭据');})()`
+const SKLAND_BOOKMARKLET = `javascript:(()=>{const raw=localStorage.getItem("SK_OAUTH_CRED_KEY");if(!raw){alert("未找到森空岛凭据，请先登录森空岛网页。");return;}let cred=raw;try{const data=JSON.parse(raw);cred=data.cred||data.value||raw;}catch{}const text=encodeURIComponent(cred);const done=()=>alert("森空岛凭据已复制，请回到排班工作台粘贴。");navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(text).then(done).catch(()=>prompt("复制下面的森空岛凭据",text)):prompt("复制下面的森空岛凭据",text);})()`
 
 export default function ToolPage() {
   const [authLoading, setAuthLoading] = useState(true)
@@ -1704,13 +1704,53 @@ const [saving, setSaving] = useState(false)
  </button>
  </div>
  )}
- {sklandLogin.mode === 'bookmarklet' && (
- <div className="mt-5 space-y-3 rounded-lg border border-surface-3 bg-surface-0 p-4">
- <p className="text-sm leading-6 text-ink-secondary">复制书签脚本保存为浏览器书签，在森空岛登录后点击书签，脚本会把经过编码的 SK_OAUTH_CRED_KEY 复制到剪贴板。</p>
- <textarea readOnly value={SKLAND_BOOKMARKLET} rows={4} className="w-full resize-y rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 font-mono text-xs text-ink-secondary outline-none" />
- <div className="flex flex-wrap gap-2">
- <button type="button" onClick={() => void navigator.clipboard?.writeText(SKLAND_BOOKMARKLET)} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
- 复制书签脚本
+{sklandLogin.mode === 'bookmarklet' && (
+<div className="mt-5 space-y-3 rounded-lg border border-surface-3 bg-surface-0 p-4">
+<div className="space-y-2 text-sm leading-6 text-ink-secondary">
+<p>按住下面的书签按钮拖到浏览器书签栏。在森空岛登录后点击该书签，它会复制凭据，回到这里粘贴即可。</p>
+<div className="grid gap-2 sm:grid-cols-3">
+<div className="rounded-lg border border-surface-3 bg-surface-1 px-3 py-2">
+<span className="block text-xs font-semibold uppercase tracking-wide text-ink-muted">1</span>
+<span>显示浏览器书签栏</span>
+</div>
+<div className="rounded-lg border border-surface-3 bg-surface-1 px-3 py-2">
+<span className="block text-xs font-semibold uppercase tracking-wide text-ink-muted">2</span>
+<span>拖动按钮到书签栏</span>
+</div>
+<div className="rounded-lg border border-surface-3 bg-surface-1 px-3 py-2">
+<span className="block text-xs font-semibold uppercase tracking-wide text-ink-muted">3</span>
+<span>在森空岛页面点击书签</span>
+</div>
+</div>
+</div>
+<div className="rounded-lg border border-brand-500/30 bg-brand-500/10 px-4 py-5 text-center">
+<a
+href={SKLAND_BOOKMARKLET}
+draggable
+title="森空岛凭据助手"
+onClick={(event) => {
+event.preventDefault()
+setSklandLogin((current) => ({
+...current,
+message: '不要直接点击。请按住这个按钮，拖到浏览器顶部的书签栏后松开。',
+}))
+}}
+onDragStart={() => {
+setSklandLogin((current) => ({
+...current,
+message: '拖到浏览器书签栏后松开即可安装。',
+}))
+}}
+className="inline-flex min-h-12 items-center justify-center rounded-full bg-brand-600 px-6 text-base font-bold text-white shadow-sm hover:bg-brand-500"
+>
+森空岛凭据助手
+</a>
+<p className="mt-3 text-xs text-ink-muted">如果浏览器禁止拖拽书签，可复制下面脚本手动新建书签。</p>
+</div>
+<textarea readOnly value={SKLAND_BOOKMARKLET} rows={4} className="w-full resize-y rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 font-mono text-xs text-ink-secondary outline-none" />
+<div className="flex flex-wrap gap-2">
+<button type="button" onClick={() => void navigator.clipboard?.writeText(SKLAND_BOOKMARKLET)} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
+复制书签脚本
  </button>
  <button type="button" onClick={() => window.open('https://www.skland.com/index', '_blank', 'noopener,noreferrer')} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">
  打开森空岛

@@ -182,6 +182,18 @@ export interface DepotValueUnpricedItem {
   count: number;
 }
 
+export type DepotValueRankingMode = 'curve' | 'sample_adjusted';
+export type DepotValueSampleContributionStatus = 'saved' | 'not_applicable' | 'unavailable';
+
+export interface DepotValueRanking {
+  mode: DepotValueRankingMode;
+  sample_count: number;
+  sample_weight: number;
+  curve_percentile: number;
+  sample_percentile: number | null;
+  contribution_status: DepotValueSampleContributionStatus;
+}
+
 export interface DepotValueResponse {
   source: DepotValueSource;
   item_count: number;
@@ -189,6 +201,7 @@ export interface DepotValueResponse {
   unpriced_count: number;
   total_equivalent_sanity: number;
   percentile: number;
+  ranking: DepotValueRanking;
   top_items: DepotValueItem[];
   unpriced_items: DepotValueUnpricedItem[];
   warnings: string[];
@@ -196,7 +209,7 @@ export interface DepotValueResponse {
     inventory: DepotValueSource;
     yituliu: 'ok' | 'unavailable';
     lmd_exp: 'fixed_lmd_exp_36_per_10000';
-    ranking: 'entertainment_curve_v1';
+    ranking: 'entertainment_curve_v1' | 'sample_adjusted_curve_v1';
   };
   generated_at: string;
   build_meta: AppBuildMeta;
