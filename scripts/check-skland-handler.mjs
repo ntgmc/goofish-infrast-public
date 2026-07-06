@@ -24,6 +24,12 @@ await assertFrozenProfile()
 await assertLoginStart()
 await assertPendingComplete()
 await assertCompleteRequiresConfirmation()
+await assertManualCredentialPreview()
+await assertManualCredentialConfirm()
+await assertCookieCredentialPreview()
+await assertEncodedCredentialPreview()
+await assertInvalidCredentialPreview()
+await assertOversizedCredentialPreview()
 await assertConfirmImport()
 await assertRefreshImport()
 await assertMatchingRebindResetsRisk()
@@ -101,6 +107,101 @@ async function assertCompleteRequiresConfirmation() {
   }
   if (!store.profiles.get('profile-1')?.skland_pending_binding?.encrypted_cred?.startsWith('SKLAND-V1:')) {
     throw new Error('complete confirmation: pending encrypted cred was not saved')
+  }
+}
+
+async function assertManualCredentialPreview() {
+  seedProfile({ id: 'profile-manual', status: 'active' })
+  setFetchMode('complete')
+  const beforeCount = store.workspaces.get('profile-manual')?.operators?.length
+  const result = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-manual',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  assertNoSecretLeak(result.body, 'manual credential preview response')
+  if (result.status !== 200 || result.body.status !== 'confirm_required' || !result.body.confirmation_id) {
+    throw new Error(`manual credential preview: expected confirm_required, got ${result.status}`)
+  }
+  if (store.workspaces.get('profile-manual')?.operators?.length !== beforeCount) {
+    throw new Error('manual credential preview: workspace should not be imported before confirm')
+  }
+  if (!store.profiles.get('profile-manual')?.skland_pending_binding?.encrypted_cred?.startsWith('SKLAND-V1:')) {
+    throw new Error('manual credential preview: pending encrypted cred was not saved')
+  }
+}
+
+async function assertManualCredentialConfirm() {
+  const pending = store.profiles.get('profile-manual')?.skland_pending_binding
+  if (!pending) throw new Error('manual credential confirm: missing pending binding')
+  setFetchMode('complete')
+  const result = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-manual',
+    confirmation_id: pending.confirmation_id,
+  })
+  assertNoSecretLeak(result.body, 'manual credential confirm response')
+  if (result.status !== 200 || result.body.skland_import?.operator_count !== 2) {
+    throw new Error(`manual credential confirm: invalid import summary ${result.status}`)
+  }
+  if (store.profiles.get('profile-manual')?.skland_pending_binding) {
+    throw new Error('manual credential confirm: pending binding was not cleared')
+  }
+}
+
+async function assertCookieCredentialPreview() {
+  seedProfile({ id: 'profile-cookie', status: 'active' })
+  setFetchMode('complete')
+  const result = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-cookie',
+    credential_text: 'foo=bar; SK_OAUTH_CRED_KEY=manual-skland-cred; SK_TOKEN_CACHE_KEY=ignored-token',
+    source: 'bookmarklet',
+  })
+  assertNoSecretLeak(result.body, 'cookie credential preview response')
+  if (result.status !== 200 || result.body.status !== 'confirm_required' || !result.body.confirmation_id) {
+    throw new Error(`cookie credential preview: expected confirm_required, got ${result.status}`)
+  }
+}
+
+async function assertEncodedCredentialPreview() {
+  seedProfile({ id: 'profile-encoded', status: 'active' })
+  setFetchMode('complete')
+  const result = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-encoded',
+    credential_text: `SK_OAUTH_CRED_KEY=${encodeURIComponent('manual-skland-cred')}`,
+    source: 'bookmarklet',
+  })
+  assertNoSecretLeak(result.body, 'encoded credential preview response')
+  if (result.status !== 200 || result.body.status !== 'confirm_required' || !result.body.confirmation_id) {
+    throw new Error(`encoded credential preview: expected confirm_required, got ${result.status}`)
+  }
+}
+
+async function assertInvalidCredentialPreview() {
+  seedProfile({ id: 'profile-invalid-credential', status: 'active' })
+  setFetchMode('complete')
+  const result = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-invalid-credential',
+    credential_text: 'bad',
+    source: 'manual',
+  })
+  if (result.status !== 400 || !result.body.error?.includes('未识别到森空岛凭据')) {
+    throw new Error(`invalid credential preview: expected 400 parse error, got ${result.status}`)
+  }
+  if (JSON.stringify(result.body).includes('bad')) {
+    throw new Error('invalid credential preview: leaked raw credential text')
+  }
+}
+
+async function assertOversizedCredentialPreview() {
+  seedProfile({ id: 'profile-oversized-credential', status: 'active' })
+  setFetchMode('complete')
+  const result = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-oversized-credential',
+    credential_text: 'x'.repeat(17 * 1024),
+    source: 'manual',
+  })
+  if (result.status !== 400 || !result.body.error?.includes('未识别到森空岛凭据')) {
+    throw new Error(`oversized credential preview: expected 400 parse error, got ${result.status}`)
   }
 }
 
@@ -343,7 +444,7 @@ function setFetchMode(mode) {
 
 function assertNoSecretLeak(value, label) {
   const serialized = JSON.stringify(value)
-  for (const secret of ['account-token', 'skland-token', 'skland-cred', 'mismatch-cred', 'SKLAND-V1:']) {
+  for (const secret of ['account-token', 'skland-token', 'skland-cred', 'manual-skland-cred', 'mismatch-cred', 'ignored-token', 'SKLAND-V1:']) {
     if (serialized.includes(secret)) {
       throw new Error(`${label}: leaked ${secret}`)
     }
