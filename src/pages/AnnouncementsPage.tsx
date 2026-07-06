@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Announcement, AnnouncementPublicResponse } from '../lib/types'
+import { apiJson } from '../lib/api-client'
 
 export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -9,11 +10,7 @@ export default function AnnouncementsPage() {
   useEffect(() => {
     let cancelled = false
 
-    fetch('/api/announcement')
-      .then(async (resp) => {
-        if (!resp.ok) throw new Error(`加载公告失败: ${resp.status}`)
-        return await resp.json() as AnnouncementPublicResponse
-      })
+    apiJson<AnnouncementPublicResponse>('/api/announcement', { fallbackMessage: '加载公告失败' })
       .then((data) => {
         if (cancelled) return
         setAnnouncements(Array.isArray(data.announcements) ? data.announcements : [])

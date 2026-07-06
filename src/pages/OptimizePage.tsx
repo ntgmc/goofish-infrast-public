@@ -1,17 +1,20 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
 import { canEditConfig, canReplaceOperators, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
 import { getActivationTokenForLicense } from '../lib/activation-token'
 import AnnouncementBanner from '../components/AnnouncementBanner'
-import ConfigEditor, { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode, normalizeDormitoryRule } from '../components/ConfigEditor'
-import UpgradeSuggestions from '../components/UpgradeSuggestions'
-import ResultPanel from '../components/ResultPanel'
+import { apiJson } from '../lib/api-client'
+import { normalizeConfig, validateConfig, PERMISSION_LABELS, SCHEDULE_MODE_LABELS, normalizeScheduleMode, normalizeDormitoryRule } from '../lib/config'
 import DeferredFeatureMenu from '../components/DeferredFeatureMenu'
 import ScheduleProgress, {
   SCHEDULE_PROGRESS_COMPLETION_DURATION_MS,
   type ScheduleProgressState,
 } from '../components/ScheduleProgress'
+
+const ConfigEditor = lazy(() => import('../components/ConfigEditor'))
+const ResultPanel = lazy(() => import('../components/ResultPanel'))
+const UpgradeSuggestions = lazy(() => import('../components/UpgradeSuggestions'))
 
 interface Props {
   profileId: string;
@@ -179,14 +182,9 @@ export default function OptimizePage({
     let cancelled = false
     setLicenseSyncing(true)
 
-    fetch(`/api/user/status?profile_id=${encodeURIComponent(profileId)}`)
-      .then(async (resp) => {
-        const data = await resp.json() as LicenseStatusResponse
-        if (!resp.ok) {
-          throw new Error(data.error || `账号授权状态同步失败: ${resp.status}`)
-        }
-        return data
-      })
+    apiJson<LicenseStatusResponse>(`/api/user/status?profile_id=${encodeURIComponent(profileId)}`, {
+      fallbackMessage: '账号授权状态同步失败',
+    })
       .then(() => {
         if (!cancelled) {
           setLicenseSyncStatus(null)
@@ -226,19 +224,18 @@ export default function OptimizePage({
         }
         return
       }
-      const resp = await fetch('/api/license-status', {
+      const data = await apiJson<LicenseStatusResponse>('/api/license-status', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           profile_id: profileId,
           license,
           operators: nextOperators,
           activation_token: getActivationTokenForLicense(license),
-        }),
+        },
+        fallbackMessage: '干员数据更新失败',
       })
-      const data = await resp.json() as LicenseStatusResponse
-      if (!resp.ok || !data.license) {
-        throw new Error(data.error || `干员数据更新失败: ${resp.status}`)
+      if (!data.license) {
+        throw new Error('干员数据更新失败')
       }
       setLicense(data.license)
       setEliteOverrides({})
@@ -284,13 +281,11 @@ export default function OptimizePage({
       activation_token: getActivationTokenForLicense(license),
       ...(includeCurrent && { include_current: true }),
     }
-    const resp = await fetch('/api/optimize', {
+    return await apiJson<OptimizeResult>('/api/optimize', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      json: payload,
+      fallbackMessage: '优化请求失败',
     })
-    if (!resp.ok) throw new Error(await readResponseError(resp, `优化请求失败: ${resp.status}`))
-    return resp.json() as Promise<OptimizeResult>
   }, [activeConfig, license, mergedOperators, profileId])
 
   const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
@@ -304,13 +299,11 @@ export default function OptimizePage({
       suggestions_only: true,
       upgrade_task_payload: taskPayload,
     }
-    const resp = await fetch('/api/optimize', {
+    return await apiJson<OptimizeResult>('/api/optimize', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      json: payload,
+      fallbackMessage: 'upgrade suggestions request failed',
     })
-    if (!resp.ok) throw new Error(await readResponseError(resp, `upgrade suggestions request failed: ${resp.status}`))
-    return resp.json() as Promise<OptimizeResult>
   }, [activeConfig, license, mergedOperators, profileId])
 
   const handleGenerate = useCallback(async () => {
@@ -409,18 +402,16 @@ export default function OptimizePage({
     setEliteOverrides(newOverrides)
     setLoading(true)
     try {
-      const result = await fetch('/api/optimize', {
+      const data = await apiJson<OptimizeResult>('/api/optimize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        json: {
           license,
           operators: mergeOperators(license.operators, newOverrides),
           config: activeConfig,
           ignore_elite: false,
-        }),
+        },
+        fallbackMessage: '优化失败',
       })
-      if (!result.ok) throw new Error(await readResponseError(result, '优化失败'))
-      const data = await result.json() as OptimizeResult
       completed = true
       setProgress({ mode: 'apply', startedAt, completedAt: Date.now() })
       await waitForProgressCompletion()
@@ -580,17 +571,19 @@ export default function OptimizePage({
               </span>
             </summary>
             <div className="border-t border-surface-3/60 p-4 sm:p-5">
-              <ConfigEditor
-                config={activeConfig}
-                permission={permission}
-                canEdit={userCanEditConfig}
-                canEditIntermediateInventory={userCanUseIntermediateAutoConfig}
-                changed={configChanged}
-                validation={configValidation}
-                onUpdate={updateConfig}
-                onReset={resetConfig}
-                embedded
-              />
+              <Suspense fallback={<ResultFallback />}>
+                <ConfigEditor
+                  config={activeConfig}
+                  permission={permission}
+                  canEdit={userCanEditConfig}
+                  canEditIntermediateInventory={userCanUseIntermediateAutoConfig}
+                  changed={configChanged}
+                  validation={configValidation}
+                  onUpdate={updateConfig}
+                  onReset={resetConfig}
+                  embedded
+                />
+              </Suspense>
             </div>
           </details>
 
@@ -614,28 +607,34 @@ export default function OptimizePage({
             )}
 
             {phase === 'suggestions' && currentResult && (
+              <Suspense fallback={<ResultFallback />}>
                 <ResultPanel
                   result={currentResult}
                   onDownload={handleDownloadMAA}
                   suggestionsSlot={suggestions.length > 0 ? (
-                  <UpgradeSuggestions
-                    suggestions={suggestions}
-                    onApply={handleApplySuggestions}
-                    loading={loading}
-                    progress={progress?.mode === 'apply' ? progress : null}
-                    error={inlineError?.scope === 'apply' ? inlineError.message : null}
-                    onReset={onReset}
-                    embedded
-                  />
-                ) : null}
-              />
+                    <Suspense fallback={<ResultFallback />}>
+                      <UpgradeSuggestions
+                        suggestions={suggestions}
+                        onApply={handleApplySuggestions}
+                        loading={loading}
+                        progress={progress?.mode === 'apply' ? progress : null}
+                        error={inlineError?.scope === 'apply' ? inlineError.message : null}
+                        onReset={onReset}
+                        embedded
+                      />
+                    </Suspense>
+                  ) : null}
+                />
+              </Suspense>
             )}
 
             {phase === 'final' && finalResult && (
-          <ResultPanel
-            result={finalResult}
-            onDownload={handleDownloadMAA}
-          />
+              <Suspense fallback={<ResultFallback />}>
+                <ResultPanel
+                  result={finalResult}
+                  onDownload={handleDownloadMAA}
+                />
+              </Suspense>
             )}
           </section>
         </div>
@@ -1029,6 +1028,10 @@ function waitForProgressCompletion(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, SCHEDULE_PROGRESS_COMPLETION_DURATION_MS))
 }
 
+function ResultFallback() {
+  return <div className="rounded-xl border border-surface-3 bg-surface-1 p-5 text-sm text-ink-secondary">正在载入...</div>
+}
+
 function ConfigValidationToast({ message }: { message: string }) {
   return (
     <div
@@ -1130,15 +1133,6 @@ function AdminOperatorPanel({
       </div>
     </details>
   )
-}
-
-async function readResponseError(response: Response, fallback: string): Promise<string> {
-  try {
-    const data = await response.json() as { error?: string }
-    return data.error || fallback
-  } catch {
-    return fallback
-  }
 }
 
 function formatOptimizeError(message: string): string {

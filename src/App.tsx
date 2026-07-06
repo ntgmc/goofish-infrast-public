@@ -2,8 +2,8 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import BuildMetaStrip from './components/BuildMetaStrip'
 import LandingPage from './pages/LandingPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
-import ToolPage from './pages/ToolPage'
 
+const ToolPage = lazy(() => import('./pages/ToolPage'))
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage'))
@@ -54,7 +54,15 @@ function App() {
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">
       {route === 'home' && <LandingPage onStart={navigateToTool} />}
-      {route === 'tool' && <ToolPage />}
+      {route === 'tool' && (
+        <Suspense fallback={
+          <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
+            正在载入工作台...
+          </div>
+        }>
+          <ToolPage />
+        </Suspense>
+      )}
       {route === 'resetPassword' && <ResetPasswordPage />}
       {route === 'announcements' && (
         <Suspense fallback={

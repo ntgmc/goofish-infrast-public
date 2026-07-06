@@ -3,6 +3,7 @@ import AuthForm from '../components/AuthForm'
 import BrandLogo from '../components/BrandLogo'
 import SklandBindingDialog, { type SklandPayload } from '../components/SklandBindingDialog'
 import { getCurrentSiteUrl } from '../lib/site-url'
+import { apiJson, apiJsonOrNull } from '../lib/api-client'
 import type { AuthMeResponse, DepotValueItem, DepotValueProfileResponse, DepotValueRequest, DepotValueResponse, UserGameAccount } from '../lib/types'
 
 const LMD_ITEM_ID = '4001'
@@ -33,8 +34,7 @@ export default function DepotValuePage() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/auth/me')
-      .then(async (resp) => (resp.ok ? await resp.json() as AuthMeResponse : null))
+    apiJsonOrNull<AuthMeResponse>('/api/auth/me')
       .then((data) => {
         if (cancelled || !data) return
         applyAuthData(data)
@@ -63,13 +63,11 @@ export default function DepotValuePage() {
     setLoading(payload.source)
     setError(null)
     try {
-      const resp = await fetch('/api/depot-value', {
+      const data = await apiJson<DepotValueResponse>('/api/depot-value', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        json: payload,
+        fallbackMessage: '仓库分析失败',
       })
-      const data = await resp.json() as DepotValueResponse & { error?: string }
-      if (!resp.ok) throw new Error(data.error || `仓库分析失败: ${resp.status}`)
       setResult(data)
       window.setTimeout(() => document.getElementById('depot-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
     } catch (caught) {
@@ -84,10 +82,12 @@ export default function DepotValuePage() {
     setProfilePreparing(true)
     setError(null)
     try {
-      const resp = await fetch('/api/user/profiles/depot-value', { method: 'POST' })
-      const data = await resp.json() as DepotValueProfileResponse & { error?: string }
-      if (!resp.ok || !data.user || !data.depot_profile) {
-        throw new Error(data.error || `创建仓库分析档案失败: ${resp.status}`)
+      const data = await apiJson<DepotValueProfileResponse>('/api/user/profiles/depot-value', {
+        method: 'POST',
+        fallbackMessage: '创建仓库分析档案失败',
+      })
+      if (!data.user || !data.depot_profile) {
+        throw new Error('创建仓库分析档案失败')
       }
       applyAuthData(data)
       setDepotProfile(data.depot_profile)
