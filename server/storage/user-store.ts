@@ -5,6 +5,7 @@ import type {
   LicenseOperator,
   OptimizeResult,
   PermissionMode,
+  UserGameAccountKind,
   UserGameAccount,
   UserWorkspace,
 } from '../../src/lib/types'
@@ -31,15 +32,46 @@ export interface UserGameAccountRecord {
   version: 1
   id: string
   user_id: string
-  cdk_key: string
-  cdk_code_hash: string
+  kind?: UserGameAccountKind
+  cdk_key: string | null
+  cdk_code_hash: string | null
   cdk_order_hash: string | null
   permission: PermissionMode
   status: 'active' | 'frozen' | 'revoked'
   display_name: string
   note: string
+  skland_binding?: SklandBindingRecord | null
+  skland_pending_binding?: SklandPendingBindingRecord | null
+  skland_risk?: SklandRiskRecord | null
   created_at: string
   updated_at: string
+}
+
+export interface SklandBindingRecord {
+  uid: string
+  nickname: string
+  channel_name: string
+  bound_at: string
+  last_imported_at: string | null
+  encrypted_cred: string
+}
+
+export interface SklandPendingBindingRecord {
+  confirmation_id: string
+  uid: string
+  nickname: string
+  channel_name: string
+  encrypted_cred: string
+  operator_count: number
+  created_at: string
+  expires_at: string
+}
+
+export interface SklandRiskRecord {
+  uid_mismatch_count: number
+  last_mismatch_uid: string | null
+  last_mismatch_nickname: string | null
+  last_mismatch_at: string | null
 }
 
 export interface UserSessionRecord {
@@ -327,6 +359,34 @@ export async function saveUserProfile(profile: UserGameAccountRecord): Promise<v
   )
 }
 
+export async function getOrCreateDepotValueProfile(user: UserAccountRecord): Promise<UserGameAccountRecord> {
+  await ensureSchema()
+  const existing = (await listProfilesForUser(user.id)).find((profile) => normalizeProfileKind(profile) === 'depot_value')
+  if (existing) return existing
+
+  const now = new Date().toISOString()
+  const profile: UserGameAccountRecord = {
+    version: 1,
+    id: `depot-${user.id}`,
+    user_id: user.id,
+    kind: 'depot_value',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    permission: 'growth',
+    status: 'active',
+    display_name: '仓库分析',
+    note: '用于森空岛仓库价值分析，不解锁排班工作台。',
+    skland_binding: null,
+    skland_pending_binding: null,
+    skland_risk: null,
+    created_at: now,
+    updated_at: now,
+  }
+  await saveUserProfile(profile)
+  return profile
+}
+
 export async function getWorkspace(profileId: string): Promise<UserWorkspaceRecord | null> {
   return getProfileWorkspace(profileId)
 }
@@ -387,6 +447,7 @@ export async function migrateLegacyUserIfNeeded(user: UserAccountRecord): Promis
     version: 1,
     id: user.id,
     user_id: user.id,
+    kind: 'cdk',
     cdk_key: user.cdk_key,
     cdk_code_hash: user.cdk_code_hash,
     cdk_order_hash: user.cdk_order_hash,
@@ -462,15 +523,37 @@ export function toPublicProfile(profile: UserGameAccountRecord, workspace?: User
   return {
     id: profile.id,
     user_id: profile.user_id,
+    kind: normalizeProfileKind(profile),
     permission: profile.permission,
     status: profile.status,
     cdk_order_hash: profile.cdk_order_hash,
     display_name: profile.display_name,
     note: profile.note,
-    operator_count: workspace?.operators?.length ?? 0,
+    skland_binding: profile.skland_binding
+      ? {
+          uid: profile.skland_binding.uid,
+          nickname: profile.skland_binding.nickname,
+          channel_name: profile.skland_binding.channel_name,
+          bound_at: profile.skland_binding.bound_at,
+          last_imported_at: profile.skland_binding.last_imported_at,
+        }
+      : null,
+    operator_count: countOwnedOperators(workspace?.operators),
     updated_at: workspace?.updated_at ?? profile.updated_at,
     created_at: profile.created_at,
   }
+}
+
+export function normalizeProfileKind(profile: Pick<UserGameAccountRecord, 'kind'>): UserGameAccountKind {
+  return profile.kind === 'depot_value' ? 'depot_value' : 'cdk'
+}
+
+export function isDepotValueProfile(profile: Pick<UserGameAccountRecord, 'kind'>): boolean {
+  return normalizeProfileKind(profile) === 'depot_value'
+}
+
+function countOwnedOperators(operators: LicenseOperator[] | null | undefined): number {
+  return operators?.filter((operator) => operator.own !== false).length ?? 0
 }
 
 function ensureSchema(): Promise<void> {

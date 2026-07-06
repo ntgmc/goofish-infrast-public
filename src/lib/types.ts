@@ -38,6 +38,7 @@ export type ProductPermissionMode = 'recommended' | 'growth' | 'advanced' | 'ult
 export type InternalPermissionMode = 'admin';
 export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | InternalPermissionMode;
 export type PermissionMode = ProductPermissionMode | InternalPermissionMode;
+export type UserGameAccountKind = 'cdk' | 'depot_value';
 
 export interface OperatorUpdateGrant {
   remaining: number;
@@ -156,6 +157,65 @@ export interface FreePreviewResult {
   build_meta: AppBuildMeta;
 }
 
+export type DepotValueSource = 'upload' | 'skland';
+
+export type DepotValueRequest =
+  | {
+      source: 'upload';
+      inventory: unknown;
+    }
+  | {
+      source: 'skland';
+      profile_id: string;
+    };
+
+export interface DepotValueItem {
+  id: string;
+  name: string;
+  count: number;
+  unit_sanity: number;
+  equivalent_sanity: number;
+}
+
+export interface DepotValueUnpricedItem {
+  id: string;
+  name: string;
+  count: number;
+}
+
+export type DepotValueRankingMode = 'curve' | 'sample_adjusted';
+export type DepotValueSampleContributionStatus = 'saved' | 'not_applicable' | 'unavailable';
+
+export interface DepotValueRanking {
+  mode: DepotValueRankingMode;
+  sample_count: number;
+  sample_weight: number;
+  curve_percentile: number;
+  sample_percentile: number | null;
+  contribution_status: DepotValueSampleContributionStatus;
+}
+
+export interface DepotValueResponse {
+  source: DepotValueSource;
+  item_count: number;
+  priced_count: number;
+  unpriced_count: number;
+  total_equivalent_sanity: number;
+  percentile: number;
+  ranking: DepotValueRanking;
+  top_items: DepotValueItem[];
+  unpriced_items: DepotValueUnpricedItem[];
+  warnings: string[];
+  sources: {
+    inventory: DepotValueSource;
+    yituliu: 'ok' | 'unavailable';
+    lmd_exp: 'fixed_lmd_exp_36_per_10000';
+    ranking: 'entertainment_curve_v1' | 'sample_adjusted_curve_v1';
+  };
+  generated_at: string;
+  build_meta: AppBuildMeta;
+}
+
 export interface UpgradeTaskPayload {
   tasks: RawUpgradeTask[];
   baselineScore: number;
@@ -244,7 +304,56 @@ export type AnalyzeScheduleResult = OptimizeResult & {
   analysis_summary: ScheduleAnalysisSummary;
 };
 
-export type RawUpgradeSuggestion =
+export interface UpgradeTrainingMaterial {
+  id: string;
+  name: string;
+  count: number;
+  rarity?: number;
+  sortId?: number;
+  equivalent_sanity?: number | null;
+}
+
+export interface UpgradeTrainingCostBucket {
+  cash: number;
+  exp: number;
+  materials: UpgradeTrainingMaterial[];
+  equivalent_sanity: number | null;
+}
+
+export interface UpgradeTrainingOperatorCost {
+  id: string;
+  name: string;
+  current_elite: number;
+  target_elite: number;
+  current_level: number;
+  target_level: number;
+  totals: UpgradeTrainingCostBucket;
+  missing: UpgradeTrainingCostBucket;
+  warnings: string[];
+}
+
+export interface UpgradeTrainingCost {
+  status: 'available' | 'partial' | 'unavailable';
+  target?: {
+    id: string;
+    name: string;
+    current_elite: number;
+    target_elite: number;
+  };
+  totals: UpgradeTrainingCostBucket;
+  missing: UpgradeTrainingCostBucket;
+  equivalent_sanity: number | null;
+  unpriced_items: UpgradeTrainingMaterial[];
+  sources: {
+    skland: 'ok' | 'unavailable';
+    yituliu: 'ok' | 'unavailable';
+    lmd_exp: 'fixed_lmd_trade_gold_net_exp_36_per_10000';
+  };
+  warnings: string[];
+  operators: UpgradeTrainingOperatorCost[];
+}
+
+export type RawUpgradeSuggestion = (
   | {
       type: 'single';
       id?: string;
@@ -261,7 +370,10 @@ export type RawUpgradeSuggestion =
       gain: number;
       rooms?: string;
       specialType?: string;
-    };
+    }
+) & {
+  training_cost?: UpgradeTrainingCost;
+};
 
 export interface RoomOverflow {
   equivalent?: {
@@ -366,11 +478,14 @@ export interface UpgradeSuggestion {
   type: 'single' | 'bundle';
   id?: string;
   name?: string;
-  ops?: { id: string; name: string; current_elite: number; target_elite: number }[];
+  ops?: { id?: string; name: string; current?: number; target?: number; current_elite?: number; target_elite?: number }[];
   gain: number;
   current_elite?: number;
   target_elite?: number;
+  current?: number;
+  target?: number;
   desc?: string;
+  training_cost?: UpgradeTrainingCost;
 }
 
 export interface AuthUser {
@@ -383,14 +498,24 @@ export interface AuthUser {
   created_at: string;
 }
 
+export interface SklandPublicBinding {
+  uid: string;
+  nickname: string;
+  channel_name: string;
+  bound_at: string;
+  last_imported_at: string | null;
+}
+
 export interface UserGameAccount {
   id: string;
   user_id: string;
+  kind: UserGameAccountKind;
   permission: PermissionMode;
   status: 'active' | 'frozen' | 'revoked';
   cdk_order_hash: string | null;
   display_name: string;
   note: string;
+  skland_binding?: SklandPublicBinding | null;
   operator_count: number;
   updated_at: string | null;
   created_at: string;
@@ -425,5 +550,9 @@ export interface AuthSuccessResponse {
   workspace: UserWorkspace | null;
   announcement_unread_count?: number;
 }
+
+export type DepotValueProfileResponse = AuthSuccessResponse & {
+  depot_profile: UserGameAccount;
+};
 
 export type AppStep = 'upload' | 'optimize';
