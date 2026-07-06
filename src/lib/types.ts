@@ -156,6 +156,52 @@ export interface FreePreviewResult {
   build_meta: AppBuildMeta;
 }
 
+export type DepotValueSource = 'upload' | 'skland';
+
+export type DepotValueRequest =
+  | {
+      source: 'upload';
+      inventory: unknown;
+    }
+  | {
+      source: 'skland';
+      profile_id: string;
+    };
+
+export interface DepotValueItem {
+  id: string;
+  name: string;
+  count: number;
+  unit_sanity: number;
+  equivalent_sanity: number;
+}
+
+export interface DepotValueUnpricedItem {
+  id: string;
+  name: string;
+  count: number;
+}
+
+export interface DepotValueResponse {
+  source: DepotValueSource;
+  item_count: number;
+  priced_count: number;
+  unpriced_count: number;
+  total_equivalent_sanity: number;
+  percentile: number;
+  top_items: DepotValueItem[];
+  unpriced_items: DepotValueUnpricedItem[];
+  warnings: string[];
+  sources: {
+    inventory: DepotValueSource;
+    yituliu: 'ok' | 'unavailable';
+    lmd_exp: 'fixed_lmd_exp_36_per_10000';
+    ranking: 'entertainment_curve_v1';
+  };
+  generated_at: string;
+  build_meta: AppBuildMeta;
+}
+
 export interface UpgradeTaskPayload {
   tasks: RawUpgradeTask[];
   baselineScore: number;

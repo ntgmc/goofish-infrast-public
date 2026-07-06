@@ -7,6 +7,12 @@ interface DeferredFeature {
 
 const deferredFeatures: DeferredFeature[] = [
   {
+    title: '仓库价值分析器',
+    description: '上传 MAA 仓库 JSON，生成“击败 X% 博士”的免费分享图。',
+    status: '已开放',
+    href: '/tools/depot-value',
+  },
+  {
     title: '排班表分析',
     description: '上传干员数据和已有排班 JSON，查看红脸风险、日产量和爆仓信息。',
     status: '已开放',
