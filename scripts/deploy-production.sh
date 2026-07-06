@@ -37,6 +37,19 @@ run_systemctl() {
   fi
 }
 
+check_systemctl_access() {
+  if [[ "$(id -u)" == "0" ]]; then
+    return 0
+  fi
+
+  if sudo -n systemctl is-active --quiet "$SERVICE_NAME" ||
+    [[ "$?" == "3" ]]; then
+    return 0
+  fi
+
+  fail "deploy user cannot run systemctl without a password. Configure sudoers with NOPASSWD for: systemctl restart/is-active/status $SERVICE_NAME"
+}
+
 check_worktree_clean() {
   git diff --quiet || fail "working tree has unstaged changes"
   git diff --cached --quiet || fail "working tree has staged changes"
@@ -72,6 +85,8 @@ require_command systemctl
 if [[ "$(id -u)" != "0" ]]; then
   require_command sudo
 fi
+
+check_systemctl_access
 
 mkdir -p "$(dirname "$LOCK_FILE")"
 exec 9>"$LOCK_FILE"
