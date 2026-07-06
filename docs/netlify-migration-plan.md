@@ -2,7 +2,7 @@
 
 状态：已完成。生产站点现在完全基于自托管服务器运行，不再使用 Netlify 承载站点、Functions 或 Blobs。
 
-本文保留原迁移目标、最终落地架构和回溯检查项，用于后续运维、审计和故障恢复。当前生产说明以 [README.md](D:/GITHOME/goofish-infrast-v1/README.md) 为准。
+本文保留原迁移目标、最终落地架构和回溯检查项，用于后续运维、审计和故障恢复。当前生产说明以 [README.md](../README.md) 为准。
 
 ## 最终落地结论
 
@@ -195,6 +195,7 @@ WantedBy=multi-user.target
 后台 API：
 
 - `GET`/`POST`/`PATCH`/`DELETE /api/admin/cdk`
+- `GET`/`PUT /api/admin/risk-settings`
 - `GET`/`POST`/`DELETE /api/admin/users`
 - `GET`/`PUT /api/admin/announcement`
 - `GET /api/admin/usage-stats`
