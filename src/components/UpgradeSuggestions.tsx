@@ -1,5 +1,5 @@
 ﻿import { useCallback, useMemo, useState } from 'react'
-import type { UpgradeSuggestion } from '../lib/types'
+import type { UpgradeSuggestion, UpgradeTrainingCost } from '../lib/types'
 import ScheduleProgress, { type ScheduleProgressState } from './ScheduleProgress'
 
 interface Props {
@@ -159,6 +159,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
                 <div className="text-ink-secondary text-sm mt-1">
                   {s.desc}
                 </div>
+                {s.training_cost && <TrainingCostSummary cost={s.training_cost} />}
               </div>
 
               {/* Badge */}
@@ -176,4 +177,74 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
       </div>
     </div>
   )
+}
+
+function TrainingCostSummary({ cost }: { cost: UpgradeTrainingCost }) {
+  const warning = cost.warnings[0]
+  if (cost.status === 'unavailable') {
+    return (
+      <div className="mt-3 rounded-lg border border-surface-3 bg-surface-0/60 px-3 py-2 text-xs leading-5 text-ink-muted">
+        {warning || '材料成本暂不可用'}
+      </div>
+    )
+  }
+
+  const missingMaterialCount = cost.missing.materials.reduce((sum, item) => sum + item.count, 0)
+  const totalMaterialCount = cost.totals.materials.reduce((sum, item) => sum + item.count, 0)
+  const topMaterials = cost.missing.materials.slice(0, 4)
+  const sanityLabel = cost.equivalent_sanity === null
+    ? '未估价'
+    : `${formatCostNumber(cost.equivalent_sanity)} 理智`
+
+  return (
+    <div className="mt-3 rounded-lg border border-surface-3 bg-surface-0/60 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+        <span className="font-semibold text-ink-secondary">库存缺口</span>
+        <span className="text-ink-muted">等效理智</span>
+        <span className="font-semibold text-brand-300">{sanityLabel}</span>
+        <span className="text-ink-muted">龙门币</span>
+        <span className="font-mono text-ink-primary">{formatCostNumber(cost.missing.cash)}</span>
+        <span className="text-ink-muted">经验</span>
+        <span className="font-mono text-ink-primary">{formatCostNumber(cost.missing.exp)}</span>
+        <span className="text-ink-muted">材料</span>
+        <span className="font-mono text-ink-primary">{formatCostNumber(missingMaterialCount)}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
+        <span>总需求</span>
+        <span>龙门币 <span className="font-mono text-ink-secondary">{formatCostNumber(cost.totals.cash)}</span></span>
+        <span>经验 <span className="font-mono text-ink-secondary">{formatCostNumber(cost.totals.exp)}</span></span>
+        <span>材料 <span className="font-mono text-ink-secondary">{formatCostNumber(totalMaterialCount)}</span></span>
+      </div>
+      {topMaterials.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {topMaterials.map((item) => (
+            <span key={item.id} className="rounded-md bg-surface-2 px-2 py-1 text-xs text-ink-secondary">
+              {item.name} x{formatCostNumber(item.count)}
+            </span>
+          ))}
+          {cost.missing.materials.length > topMaterials.length && (
+            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs text-ink-muted">
+              +{cost.missing.materials.length - topMaterials.length} 种
+            </span>
+          )}
+        </div>
+      )}
+      {cost.unpriced_items.length > 0 && (
+        <div className="mt-2 text-xs text-warning">
+          {cost.sources.yituliu === 'unavailable' ? '一图流估价暂不可用' : `${cost.unpriced_items.length} 种材料未估价`}
+        </div>
+      )}
+      {warning && (
+        <div className="mt-2 text-xs text-warning">
+          {warning}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function formatCostNumber(value: number): string {
+  if (!Number.isFinite(value)) return '-'
+  if (Math.abs(value) >= 1000) return Math.round(value).toLocaleString('zh-CN')
+  return value % 1 === 0 ? String(value) : value.toFixed(1)
 }

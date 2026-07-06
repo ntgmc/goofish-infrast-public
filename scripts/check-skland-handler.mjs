@@ -427,16 +427,20 @@ function setFetchMode(mode) {
       return jsonResponse({
         code: 0,
         message: 'OK',
-        data: {
-          chars: mode === 'refresh'
-            ? [{ charId: 'char_002_amiya', name: '阿米娅', evolvePhase: 2, level: 80, potentialRank: 5, rarity: 4 }]
-            : [
-                { charId: 'char_002_amiya', name: '阿米娅', evolvePhase: 2, level: 80, potentialRank: 5, rarity: 4 },
-                { charId: 'char_010_chen', name: '陈', evolvePhase: 1, level: 70, potentialRank: 2, rarity: 5 },
-                { charId: 'token_10002_kalts_mon3tr', name: 'Mon3tr', evolvePhase: 0, rarity: 5 },
-              ],
+      data: {
+        chars: mode === 'refresh'
+          ? [{ charId: 'char_002_amiya', name: '阿米娅', evolvePhase: 2, level: 80, potentialRank: 5, rarity: 0 }]
+          : [
+            { charId: 'char_002_amiya', name: '阿米娅', evolvePhase: 2, level: 80, potentialRank: 5, rarity: 0 },
+            { charId: 'char_010_chen', name: '陈', evolvePhase: 1, level: 70, potentialRank: 2, rarity: 0 },
+            { charId: 'token_10002_kalts_mon3tr', name: 'Mon3tr', evolvePhase: 0, rarity: 5 },
+          ],
+        charInfoMap: {
+          char_002_amiya: { name: '阿米娅', rarity: 4 },
+          char_010_chen: { name: '陈', rarity: 5 },
         },
-      })
+      },
+    })
     }
     throw new Error(`unexpected fetch ${textUrl}`)
   }
