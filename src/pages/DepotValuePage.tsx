@@ -287,7 +287,7 @@ export default function DepotValuePage() {
                   </p>
                 </div>
                 {auth?.user && (
-                  <span className="rounded-md bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+                  <span className="inline-flex whitespace-nowrap rounded-md bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
                     已登录
                   </span>
                 )}
