@@ -16,6 +16,7 @@ import type {
 } from '../lib/types'
 import AnnouncementPopup from '../components/AnnouncementPopup'
 import AnnouncementBanner from '../components/AnnouncementBanner'
+import BrandLogo from '../components/BrandLogo'
 import ConfigEditor, { CONFIG_PRESETS, PERMISSION_LABELS, cloneConfig, normalizeConfig, validateConfig } from '../components/ConfigEditor'
 import DeferredFeatureMenu from '../components/DeferredFeatureMenu'
 import ScheduleAnalysisTool from '../components/ScheduleAnalysisTool'
@@ -319,11 +320,7 @@ function AuthPage({
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
         <section className="rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8">
           <div className="mb-5 flex items-start justify-between gap-4">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-brand-500/10">
-              <svg className="h-8 w-8 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 5.25a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 1115 0" />
-              </svg>
-            </div>
+        <BrandLogo size="lg" />
             <DeferredFeatureMenu />
           </div>
           <h1 className="text-3xl font-bold tracking-[-0.02em] text-ink-primary">MAA 基建排班工作台</h1>
@@ -684,9 +681,12 @@ announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCou
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-surface-3 bg-surface-1 px-4 py-5 lg:block">
-        <div className="px-2">
-          <p className="text-sm font-semibold text-brand-500">MAA Workspace</p>
-          <p className="mt-1 truncate text-xs text-ink-muted">{user.email}</p>
+        <div className="flex items-center gap-3 px-2">
+          <BrandLogo size="sm" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-brand-500">MAA Workspace</p>
+            <p className="mt-1 truncate text-xs text-ink-muted">{user.email}</p>
+          </div>
         </div>
         <nav className="mt-8 space-y-1">
           {(Object.keys(labels) as DashboardSection[]).map((key) => (
@@ -700,10 +700,13 @@ announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCou
       <main className="lg:pl-64">
         <header className="sticky top-0 z-20 border-b border-surface-3 bg-surface-0/95 px-5 py-4 backdrop-blur sm:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold text-ink-primary">{labels[section]}</h1>
-        <p className="mt-1 text-sm text-ink-muted">{activeProfile ? `正在查看：${activeProfile.display_name}` : '一个登录账号可以添加多个游戏账号。'}</p>
+          <div className="flex min-w-0 items-start gap-3">
+            <BrandLogo size="sm" className="lg:hidden" />
+            <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-ink-primary">{labels[section]}</h1>
+            <p className="mt-1 text-sm text-ink-muted">{activeProfile ? `正在查看：${activeProfile.display_name}` : '一个登录账号可以添加多个游戏账号。'}</p>
             </div>
+          </div>
             <button type="button" onClick={onLogout} className="self-start rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary lg:hidden">退出登录</button>
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
@@ -1497,10 +1500,13 @@ const [saving, setSaving] = useState(false)
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-surface-3 bg-surface-1 px-4 py-5 lg:block">
-        <div className="px-2">
-          <p className="text-sm font-semibold text-brand-500">MAA Workspace</p>
-          <p className="mt-1 truncate text-xs text-ink-muted">{user.email}</p>
-          <p className="mt-3 truncate text-sm font-medium text-ink-primary">{profile.display_name}</p>
+        <div className="flex items-start gap-3 px-2">
+          <BrandLogo size="sm" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-brand-500">MAA Workspace</p>
+            <p className="mt-1 truncate text-xs text-ink-muted">{user.email}</p>
+            <p className="mt-3 truncate text-sm font-medium text-ink-primary">{profile.display_name}</p>
+          </div>
         </div>
         <nav className="mt-8 space-y-1">
           {setupSections.map((section) => (
@@ -1517,11 +1523,14 @@ const [saving, setSaving] = useState(false)
       <main className="lg:pl-64">
         <header className="sticky top-0 z-20 border-b border-surface-3 bg-surface-0/95 px-5 py-4 backdrop-blur sm:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-brand-400">{profile.display_name}</p>
-              <h1 className="mt-1 text-xl font-semibold text-ink-primary">准备账号工作区</h1>
-              <p className="mt-1 text-sm text-ink-muted">上传干员识别文件并确认基建配置，保存后进入排班优化。</p>
+          <div className="flex min-w-0 items-start gap-3">
+            <BrandLogo size="sm" className="lg:hidden" />
+            <div className="min-w-0">
+            <p className="text-sm font-medium text-brand-400">{profile.display_name}</p>
+            <h1 className="mt-1 text-xl font-semibold text-ink-primary">准备账号工作区</h1>
+            <p className="mt-1 text-sm text-ink-muted">上传干员识别文件并确认基建配置，保存后进入排班优化。</p>
             </div>
+          </div>
             <div className="flex gap-2">
               <button type="button" onClick={onBack} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">返回账号列表</button>
               <button type="button" onClick={onLogout} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3 lg:hidden">退出登录</button>
