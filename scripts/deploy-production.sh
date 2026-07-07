@@ -15,6 +15,7 @@ BUILD_COMMAND="${BUILD_COMMAND:-npm run build}"
 SKIP_INSTALL="${SKIP_INSTALL:-false}"
 FORCE_DEPLOY="${FORCE_DEPLOY:-false}"
 EXPECT_STORAGE_TYPE="${EXPECT_STORAGE_TYPE:-postgres}"
+GENERATED_DEPLOY_DIRTY_FILES="${GENERATED_DEPLOY_DIRTY_FILES:-src/lib/build-meta.ts server/handlers/data.ts}"
 
 log() {
   printf '[deploy] %s\n' "$*"
@@ -53,6 +54,50 @@ check_systemctl_access() {
 check_worktree_clean() {
   git diff --quiet || fail "working tree has unstaged changes"
   git diff --cached --quiet || fail "working tree has staged changes"
+}
+
+is_generated_deploy_dirty_file() {
+  local changed_file allowed_file
+
+  changed_file="$1"
+  for allowed_file in $GENERATED_DEPLOY_DIRTY_FILES; do
+    if [[ "$changed_file" == "$allowed_file" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+restore_generated_deploy_changes() {
+  local changed_files staged_files changed_file has_generated_changes=false
+
+  changed_files="$(git diff --name-only)"
+  staged_files="$(git diff --cached --name-only)"
+  if [[ -z "$changed_files" && -z "$staged_files" ]]; then
+    return 0
+  fi
+
+  while IFS= read -r changed_file; do
+    [[ -z "$changed_file" ]] && continue
+    if ! is_generated_deploy_dirty_file "$changed_file"; then
+      return 0
+    fi
+    has_generated_changes=true
+  done <<<"$changed_files"
+
+  while IFS= read -r changed_file; do
+    [[ -z "$changed_file" ]] && continue
+    if ! is_generated_deploy_dirty_file "$changed_file"; then
+      return 0
+    fi
+    has_generated_changes=true
+  done <<<"$staged_files"
+
+  if [[ "$has_generated_changes" == "true" ]]; then
+    log "discarding generated deploy changes: $GENERATED_DEPLOY_DIRTY_FILES"
+    git restore --staged --worktree -- $GENERATED_DEPLOY_DIRTY_FILES
+  fi
 }
 
 check_health() {
@@ -101,6 +146,7 @@ fi
 cd "$APP_DIR"
 
 log "deploying $REMOTE/$BRANCH from $APP_DIR"
+restore_generated_deploy_changes
 check_worktree_clean
 
 git fetch --prune "$REMOTE" "+refs/heads/$BRANCH:refs/remotes/$REMOTE/$BRANCH"
@@ -111,6 +157,7 @@ else
   git switch --track -c "$BRANCH" "$REMOTE/$BRANCH"
 fi
 
+restore_generated_deploy_changes
 check_worktree_clean
 
 before_sha="$(git rev-parse HEAD)"
@@ -135,6 +182,7 @@ fi
 
 log "building production artifacts: $BUILD_COMMAND"
 bash -lc "$BUILD_COMMAND"
+restore_generated_deploy_changes
 
 [[ -f "$APP_DIR/dist/index.html" ]] || fail "missing frontend artifact: dist/index.html"
 [[ -f "$APP_DIR/server/dist/index.js" ]] || fail "missing backend artifact: server/dist/index.js"
