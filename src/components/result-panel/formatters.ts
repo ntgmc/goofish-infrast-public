@@ -24,6 +24,19 @@ export type PreparedResult = {
     droneGain: DroneGainSummary;
   };
   productionSanity: { value: number; note: string };
+  maaDefaultComparison?: {
+    sanityDelta: number;
+    sanityDeltaNote: string;
+    baselineSanity: number;
+    totalEfficiencyDelta: number;
+    rawTotalEfficiencyDelta: number;
+    lmdDelta: number;
+    goldNetDelta: number;
+    baselineTotalEfficiency: number;
+    baselineLmd: number;
+    baselineGoldNet: number;
+    warnings: string[];
+  };
   detailStats: { planCount: number; roomCount: number };
 }
 
@@ -110,13 +123,40 @@ export function prepareResult(
     droneGain,
   }
   const productionSanity = calculateProductionSanity(daily)
+  const maaDefaultComparison = !isRotationMode && result.maa_default_comparison
+    ? (() => {
+        const comparison = result.maa_default_comparison
+        const deltaDaily: Partial<DailyProduction> = {
+          manufacturing: comparison.delta.manufacturing,
+          trading: comparison.delta.trading,
+          consumption: comparison.delta.consumption,
+          net: comparison.delta.net,
+          drones: comparison.delta.drones,
+        }
+        const baselineSanity = calculateProductionSanity(comparison.baseline.daily_production ?? {})
+        const sanityDelta = calculateProductionSanity(deltaDaily)
+        return {
+          sanityDelta: sanityDelta.value,
+          sanityDeltaNote: `相对 MAA 默认 ${formatSigned(sanityDelta.value)} 理智/日（${sanityDelta.note}）`,
+          baselineSanity: baselineSanity.value,
+          totalEfficiencyDelta: comparison.delta.total_efficiency,
+          rawTotalEfficiencyDelta: comparison.delta.raw_total_efficiency,
+          lmdDelta: comparison.delta.trading.LMD ?? 0,
+          goldNetDelta: comparison.delta.net['Pure Gold'] ?? 0,
+          baselineTotalEfficiency: comparison.baseline.total_efficiency,
+          baselineLmd: comparison.baseline.daily_production?.trading?.LMD ?? 0,
+          baselineGoldNet: comparison.baseline.daily_production?.net?.['Pure Gold'] ?? 0,
+          warnings: comparison.warnings,
+        }
+      })()
+    : undefined
 
   const detailStats = {
     planCount: plans.length,
     roomCount: plans.reduce((sum, plan) => sum + plan.rows.length, 0),
   }
 
-  return { totalEff, rawTotalEff, plans, productionStats, productionSanity, detailStats }
+  return { totalEff, rawTotalEff, plans, productionStats, productionSanity, maaDefaultComparison, detailStats }
 }
 
 function buildOperatorLookup(operators: LicenseOperator[]): Map<string, LicenseOperator> {

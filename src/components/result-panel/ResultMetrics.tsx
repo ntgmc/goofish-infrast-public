@@ -19,7 +19,11 @@ export default function ResultMetrics({
   analysisSummary: OptimizeResult['analysis_summary'];
   prepared: PreparedResult;
 }) {
-  const { totalEff, rawTotalEff, productionStats, productionSanity, detailStats } = prepared
+  const { totalEff, rawTotalEff, productionStats, productionSanity, maaDefaultComparison, detailStats } = prepared
+  const showMaaDefaultComparison = Boolean(maaDefaultComparison) && !isAnalysis && !isRotationMode
+  const productionSanityNote = showMaaDefaultComparison && maaDefaultComparison
+    ? maaDefaultComparison.sanityDeltaNote
+    : productionSanity.note
 
   return (
     <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
@@ -84,12 +88,20 @@ export default function ResultMetrics({
                 label="等效理智"
                 value={formatAmount(productionSanity.value)}
                 suffix="理智"
-                note={productionSanity.note}
+                note={productionSanityNote}
               />
             )}
           </>
         )}
       </div>
+      {showMaaDefaultComparison && maaDefaultComparison ? (
+        <div className="border-t border-surface-3/60 px-5 pb-5 pt-3 text-xs leading-5 text-ink-secondary sm:px-6">
+          MAA 默认基准：总效率 {formatAmount(maaDefaultComparison.baselineTotalEfficiency)}%，龙门币 {formatAmount(maaDefaultComparison.baselineLmd)}/日，赤金净变动 {formatSigned(maaDefaultComparison.baselineGoldNet)}/日
+          {maaDefaultComparison.warnings.length > 0
+            ? `；模拟提示 ${maaDefaultComparison.warnings.slice(0, 3).join('、')}`
+            : ''}
+        </div>
+      ) : null}
     </section>
   )
 }
