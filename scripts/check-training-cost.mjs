@@ -78,6 +78,12 @@ if (partial.totals.materials[0]?.id !== '3001' || partial.totals.materials[0].co
 if (partial.missing.materials.find((item) => item.id === '3001')?.count !== 2) {
   throw new Error('material inventory should be deducted from missing count')
 }
+if (!partial.available || partial.available.cash !== partial.totals.cash - partial.missing.cash || partial.available.exp !== partial.totals.exp - partial.missing.exp) {
+  throw new Error('available bucket should reflect stocked cash and exp')
+}
+if (partial.available.materials.find((item) => item.id === '3001')?.count !== 1) {
+  throw new Error('available bucket should keep stocked material counts')
+}
 if (partial.equivalent_sanity === null || partial.equivalent_sanity <= 0) {
   throw new Error('priced missing materials should produce equivalent sanity')
 }
@@ -113,6 +119,12 @@ const enough = training.calculateEliteTrainingCostForTest({
 
 if (enough.missing.cash !== 0 || enough.missing.exp !== 0 || enough.missing.materials.length !== 0) {
   throw new Error('fully stocked inventory should have no missing resources')
+}
+if (!enough.available || enough.available.cash !== enough.totals.cash || enough.available.exp !== enough.totals.exp) {
+  throw new Error('fully stocked inventory should expose available cash and exp equal to totals')
+}
+if (enough.available.materials.find((item) => item.id === '3001')?.count !== enough.totals.materials.find((item) => item.id === '3001')?.count) {
+  throw new Error('fully stocked inventory should expose available materials equal to totals')
 }
 if (enough.equivalent_sanity === null || enough.equivalent_sanity <= 0 || enough.totals.equivalent_sanity !== enough.equivalent_sanity) {
   throw new Error('fully stocked inventory should still keep total-demand equivalent sanity')
