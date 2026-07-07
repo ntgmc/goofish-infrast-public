@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import type {
+  LicenseOperator,
   OptimizeResult,
   UpgradeSuggestion,
   WorkspaceResultHistoryItem,
@@ -17,6 +18,7 @@ export default function ResultSection({
   historyItem,
   currentResult,
   finalResult,
+  operators,
   suggestions,
   loading,
   progress,
@@ -29,6 +31,7 @@ export default function ResultSection({
   historyItem: WorkspaceResultHistoryItem | null;
   currentResult: OptimizeResult | null;
   finalResult: OptimizeResult | null;
+  operators: LicenseOperator[];
   suggestions: UpgradeSuggestion[];
   loading: boolean;
   progress: ScheduleProgressState | null;
@@ -52,6 +55,7 @@ export default function ResultSection({
         <Suspense fallback={<ResultFallback />}>
           <ResultPanel
             result={historyItem.result}
+            operators={operators}
             onDownload={isMaaJsonDownloadable(historyItem.result) ? onDownloadMAA : undefined}
           />
         </Suspense>
@@ -61,6 +65,7 @@ export default function ResultSection({
         <Suspense fallback={<ResultFallback />}>
           <ResultPanel
             result={currentResult}
+            operators={operators}
             onDownload={onDownloadMAA}
             suggestionsSlot={suggestions.length > 0 ? (
               <Suspense fallback={<ResultFallback />}>
@@ -83,6 +88,7 @@ export default function ResultSection({
         <Suspense fallback={<ResultFallback />}>
           <ResultPanel
             result={finalResult}
+            operators={operators}
             onDownload={onDownloadMAA}
           />
         </Suspense>

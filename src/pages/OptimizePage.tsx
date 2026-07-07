@@ -758,6 +758,7 @@ export default function OptimizePage({
             historyItem={historyItem}
             currentResult={currentResult}
             finalResult={finalResult}
+            operators={mergedOperators}
             suggestions={suggestions}
             loading={loading}
             progress={progress}

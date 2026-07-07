@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import { formatCompactNumber, prepareResult } from './formatters'
 import { MaaImportGuide, RotationManualGuide } from './Guides'
+import ResultBoard from './ResultBoard'
 import ResultDetail from './ResultDetail'
 import ResultMetrics from './ResultMetrics'
 import type { ResultPanelProps, ResultTabId } from './types'
 
 export default function ResultPanel({
   result,
+  operators = [],
   onDownload,
   onSaveWorkfile,
   detailDefaultOpen = false,
@@ -18,8 +20,8 @@ export default function ResultPanel({
   const isAnalysis = variant === 'analysis' || result.analysis_summary?.source === 'imported_schedule'
   const analysisSummary = result.analysis_summary
   const prepared = useMemo(
-    () => prepareResult(result, isRotationMode, isMaaDormitoryAutofill),
-    [result, isRotationMode, isMaaDormitoryAutofill],
+    () => prepareResult(result, isRotationMode, isMaaDormitoryAutofill, operators),
+    [result, isRotationMode, isMaaDormitoryAutofill, operators],
   )
   const { detailStats } = prepared
 
@@ -44,11 +46,14 @@ export default function ResultPanel({
   ]
   const tabs: Array<{ id: ResultTabId; label: string }> = [
     { id: 'data', label: '数据' },
+    { id: 'board', label: '总览图' },
     { id: 'detail', label: isRotationMode ? '预设队列' : '详情' },
     { id: 'import', label: isRotationMode ? '设置' : '导入' },
     ...(suggestionsSlot ? [{ id: 'suggestions' as const, label: '建议' }] : []),
   ] as const
-  const [activeTab, setActiveTab] = useState<ResultTabId>(detailDefaultOpen ? 'detail' : 'data')
+  const [activeTab, setActiveTab] = useState<ResultTabId>(
+    detailDefaultOpen ? 'detail' : isAnalysis ? 'data' : 'board',
+  )
   const selectedTab = activeTab === 'suggestions' && !suggestionsSlot ? 'data' : activeTab
 
   return (
@@ -128,6 +133,14 @@ export default function ResultPanel({
           </div>
         </div>
       </div>
+
+      {selectedTab === 'board' && (
+        <ResultBoard
+          isRotationMode={isRotationMode}
+          prepared={prepared}
+          planTimes={result.planTimes}
+        />
+      )}
 
       {selectedTab === 'data' && (
         <ResultMetrics

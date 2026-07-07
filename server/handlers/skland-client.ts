@@ -220,10 +220,14 @@ export class SklandClient {
     }
     for (const item of data.data.list) {
       if (!isRecord(item) || item.appCode !== 'arknights' || !Array.isArray(item.bindingList)) continue
-      const first = item.bindingList.find(isRecord)
-      const uid = stringValue(item.defaultUid ?? first?.uid)
-      const nickname = stringValue(first?.nickName ?? first?.nickname ?? uid)
-      const channel = stringValue(first?.channelName ?? first?.channel ?? '官方')
+      const bindings = item.bindingList.filter(isRecord)
+      const defaultUid = stringValue(item.defaultUid)
+      const binding = defaultUid
+        ? bindings.find((candidate) => stringValue(candidate.uid) === defaultUid) ?? bindings[0]
+        : bindings.find((candidate) => stringValue(candidate.uid))
+      const uid = defaultUid || stringValue(binding?.uid)
+      const nickname = stringValue(binding?.nickName ?? binding?.nickname ?? uid)
+      const channel = stringValue(binding?.channelName ?? binding?.channel ?? '官方')
       if (uid && nickname) {
         return { uid, nickname, channel_name: channel || '官方' }
       }
