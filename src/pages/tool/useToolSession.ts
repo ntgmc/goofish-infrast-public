@@ -11,7 +11,7 @@ import type {
   WorkspaceSavedConfigAction,
 } from '../../lib/types'
 import { apiJson, apiJsonOrNull, apiVoid } from '../../lib/api-client'
-import { createAccountLicense, isCdkProfile } from './tool-utils'
+import { createAccountLicense, isSchedulableProfile } from './tool-utils'
 
 export type WorkspaceMode = 'dashboard' | 'setup' | 'optimize'
 export type WorkspacePatch = Partial<UserWorkspace> & { saved_config_action?: WorkspaceSavedConfigAction }
@@ -126,8 +126,8 @@ export function useToolSession() {
     applyAuthPayload(null)
   }, [applyAuthPayload])
 
-  const cdkProfiles = useMemo(() => profiles.filter(isCdkProfile), [profiles])
-  const activeCdkProfile = activeProfile && isCdkProfile(activeProfile) ? activeProfile : cdkProfiles[0] ?? null
+  const cdkProfiles = useMemo(() => profiles.filter(isSchedulableProfile), [profiles])
+  const activeCdkProfile = activeProfile && isSchedulableProfile(activeProfile) ? activeProfile : cdkProfiles[0] ?? null
 
   return {
     authLoading,

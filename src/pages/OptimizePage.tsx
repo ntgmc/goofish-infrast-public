@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react'
 import type {
   Announcement,
   AuthSuccessResponse,
@@ -9,6 +9,7 @@ import type {
   OptimizeResult,
   UpgradeSuggestion,
   UpgradeTaskPayload,
+  UserGameAccount,
   UserWorkspace,
   WorkspaceResultHistoryItem,
   WorkspaceSavedConfig,
@@ -19,7 +20,7 @@ import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from 
 import { getActivationTokenForLicense } from '../lib/activation-token'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import { apiJson } from '../lib/api-client'
-import { normalizeConfig, validateConfig, PERMISSION_LABELS, normalizeScheduleMode, normalizeDormitoryRule } from '../lib/config'
+import { normalizeConfig, validateConfig, normalizeScheduleMode, normalizeDormitoryRule } from '../lib/config'
 import {
   SCHEDULE_PROGRESS_COMPLETION_DURATION_MS,
   type ScheduleProgressState,
@@ -37,9 +38,11 @@ import OverviewSection from './tool/optimize/OverviewSection'
 import PlansSection from './tool/optimize/PlansSection'
 import ResultSection from './tool/optimize/ResultSection'
 import type { OptimizePhase, OptimizeSection } from './tool/optimize/types'
+import { getProfileAccessLabel, isFreePreviewProfile } from './tool/tool-utils'
 
 interface Props {
   profileId: string;
+  profile: UserGameAccount;
   license: LicenseFile;
   workspace: UserWorkspace | null;
   setLicense: (v: LicenseFile) => void;
@@ -52,6 +55,7 @@ interface Props {
   announcement: Announcement | null;
   redeemedNotice: string | null;
   onRedownloadLicense: (() => void) | null;
+  onProfileUpgraded: (payload: AuthSuccessResponse) => void;
 }
 
 type WorkspacePatch = Partial<UserWorkspace> & { saved_config_action?: WorkspaceSavedConfigAction }
@@ -69,6 +73,7 @@ interface LicenseStatusResponse {
 
 export default function OptimizePage({
   profileId,
+  profile,
   license,
   workspace,
   setLicense,
@@ -81,6 +86,7 @@ export default function OptimizePage({
   announcement,
   redeemedNotice,
   onRedownloadLicense,
+  onProfileUpgraded,
 }: Props) {
   const initialHistoryItem = workspace?.result_history?.[0] ?? null
   const [suggestions, setSuggestions] = useState<UpgradeSuggestion[]>([])
@@ -99,6 +105,9 @@ export default function OptimizePage({
   const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const [workspaceBusyAction, setWorkspaceBusyAction] = useState<string | null>(null)
+  const [upgradeCdk, setUpgradeCdk] = useState('')
+  const [upgradeLoading, setUpgradeLoading] = useState(false)
+  const [upgradeError, setUpgradeError] = useState<string | null>(null)
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const operatorFileRef = useRef<HTMLInputElement>(null)
   const optimizeInFlightRef = useRef(false)
@@ -106,12 +115,13 @@ export default function OptimizePage({
   const configToastIdRef = useRef(0)
   const pendingLicenseSyncRef = useRef<{ license: LicenseFile; message: string } | null>(null)
 
+  const isPreviewProfile = isFreePreviewProfile(profile)
   const permission = getPermissionMode(license)
   const userCanReplaceOperators = false
-  const userCanEditConfig = canEditConfig(license)
-  const userCanUseIntermediateAutoConfig = permission === 'recommended' || permission === 'growth'
+  const userCanEditConfig = isPreviewProfile || canEditConfig(license)
+  const userCanUseIntermediateAutoConfig = isPreviewProfile || permission === 'recommended' || permission === 'growth'
   const userCanApplyConfigOverride = true
-  const userCanUseUpgradeFeatures = canUseUpgradeFeatures(license)
+  const userCanUseUpgradeFeatures = !isPreviewProfile && canUseUpgradeFeatures(license)
   const activeConfig = useMemo(
     () => normalizeConfig(configOverride ?? license.config),
     [configOverride, license.config]
@@ -190,6 +200,8 @@ export default function OptimizePage({
     setSection('overview')
     setInlineError(null)
     setLastGeneratedSignature(null)
+    setUpgradeCdk('')
+    setUpgradeError(null)
   }, [profileId, workspace?.profile_id])
 
   const mergedOperators = useMemo(
@@ -611,6 +623,26 @@ export default function OptimizePage({
     downloadOptimizeResult(data, 'maa_schedule_optimized')
   }, [finalResult, currentResult, historyItem])
 
+  const handleUpgradePreviewProfile = useCallback(async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isPreviewProfile || upgradeLoading) return
+    setUpgradeLoading(true)
+    setUpgradeError(null)
+    try {
+      const data = await apiJson<AuthSuccessResponse>('/api/user/profiles/redeem', {
+        method: 'POST',
+        json: { profile_id: profileId, cdk: upgradeCdk },
+        fallbackMessage: '解锁失败',
+      })
+      setUpgradeCdk('')
+      onProfileUpgraded(data)
+    } catch (error) {
+      setUpgradeError((error as Error).message)
+    } finally {
+      setUpgradeLoading(false)
+    }
+  }, [isPreviewProfile, onProfileUpgraded, profileId, upgradeCdk, upgradeLoading])
+
   const handleSaveWorkfile = useCallback(async () => {
     const savedConfigOverride = configChanged ? activeConfig : undefined
     const derivedKey = await deriveClientKey(license.sig)
@@ -647,7 +679,7 @@ export default function OptimizePage({
   return (
     <OptimizeShell
       section={section}
-      permissionLabel={PERMISSION_LABELS[permission]}
+      permissionLabel={getProfileAccessLabel(profile)}
       badges={{
         plans: `${savedConfigs.length}/${resultHistory.length}`,
         result: hasResult ? '有结果' : undefined,
@@ -763,7 +795,13 @@ export default function OptimizePage({
             loading={loading}
             progress={progress}
             inlineError={inlineError}
-            onDownloadMAA={handleDownloadMAA}
+            previewProfile={isPreviewProfile}
+            upgradeCdk={upgradeCdk}
+            upgradeLoading={upgradeLoading}
+            upgradeError={upgradeError}
+            onUpgradeCdkChange={setUpgradeCdk}
+            onUpgradePreviewProfile={handleUpgradePreviewProfile}
+            onDownloadMAA={isPreviewProfile ? undefined : handleDownloadMAA}
             onApplySuggestions={handleApplySuggestions}
             onReset={onReset}
           />

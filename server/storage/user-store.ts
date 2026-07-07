@@ -349,6 +349,9 @@ export async function saveUserProfile(profile: UserGameAccountRecord): Promise<v
       (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note, record_json, created_at, updated_at)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12)
      on conflict (id) do update set
+      cdk_key = excluded.cdk_key,
+      cdk_code_hash = excluded.cdk_code_hash,
+      cdk_order_hash = excluded.cdk_order_hash,
       permission = excluded.permission,
       status = excluded.status,
       display_name = excluded.display_name,
@@ -656,11 +659,20 @@ function normalizeSklandCredentialInvalidReason(value: unknown): SklandCredentia
 }
 
 export function normalizeProfileKind(profile: Pick<UserGameAccountRecord, 'kind'>): UserGameAccountKind {
+  if (profile.kind === 'free_preview') return 'free_preview'
   return profile.kind === 'depot_value' ? 'depot_value' : 'cdk'
 }
 
 export function isDepotValueProfile(profile: Pick<UserGameAccountRecord, 'kind'>): boolean {
   return normalizeProfileKind(profile) === 'depot_value'
+}
+
+export function isFreePreviewProfile(profile: Pick<UserGameAccountRecord, 'kind'>): boolean {
+  return normalizeProfileKind(profile) === 'free_preview'
+}
+
+export function isSchedulableProfile(profile: Pick<UserGameAccountRecord, 'kind'>): boolean {
+  return normalizeProfileKind(profile) !== 'depot_value'
 }
 
 function countOwnedOperators(operators: LicenseOperator[] | null | undefined): number {

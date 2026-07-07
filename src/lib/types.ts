@@ -46,7 +46,7 @@ export type ProductPermissionMode = 'recommended' | 'growth' | 'advanced' | 'ult
 export type InternalPermissionMode = 'admin';
 export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | InternalPermissionMode;
 export type PermissionMode = ProductPermissionMode | InternalPermissionMode;
-export type UserGameAccountKind = 'cdk' | 'depot_value';
+export type UserGameAccountKind = 'cdk' | 'free_preview' | 'depot_value';
 
 export interface OperatorUpdateGrant {
   remaining: number;
@@ -137,43 +137,6 @@ export interface AnalyzeScheduleRequest {
   schedule: unknown;
   config?: Partial<LicenseConfig>;
   ignore_elite?: boolean;
-}
-
-export interface FreePreviewRequest {
-  operators: LicenseOperator[];
-  config: LicenseConfig;
-}
-
-export interface FreePreviewResult {
-  operator_count: number;
-  support: {
-    supported: boolean;
-    label: string;
-    reason: string;
-  };
-  directions: string[];
-  potential_range: {
-    min: string;
-    max: string;
-    label: string;
-    note: string;
-  };
-  limited_schedule: {
-    plan_name: string;
-    plan_count: number;
-    room_limit: number;
-    hidden_room_count: number;
-    rooms: {
-      key: string;
-      label: string;
-      index_label: string;
-      product: string;
-      operators: string[];
-      efficiency: number;
-    }[];
-  };
-  notices: string[];
-  build_meta: AppBuildMeta;
 }
 
 export type DepotValueSource = 'upload' | 'skland';
@@ -294,6 +257,11 @@ export interface OptimizeResult {
   current_result?: OptimizeResult;
   upgrade_task_payload?: UpgradeTaskPayload;
   analysis_summary?: ScheduleAnalysisSummary;
+  preview_limit?: {
+    room_limit: number;
+    hidden_room_count: number;
+    notice: string;
+  };
   build_meta?: AppBuildMeta;
 }
 

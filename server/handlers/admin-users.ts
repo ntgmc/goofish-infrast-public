@@ -325,7 +325,7 @@ async function buildAdminProfileOperatorData(user: UserAccountRecord, profile: U
     profile: {
       id: profile.id,
       display_name: profile.display_name,
-      kind: profile.kind === 'depot_value' ? 'depot_value' : 'cdk',
+      kind: profile.kind,
       status: profile.status,
       permission: profile.permission,
       skland_binding: profile.skland_binding
