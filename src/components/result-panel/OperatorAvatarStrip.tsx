@@ -6,11 +6,13 @@ export default function OperatorAvatarStrip({
   fallbackText,
   compact = false,
   micro = false,
+  showFullNames = false,
 }: {
   operators: RoomOperator[];
   fallbackText: string;
   compact?: boolean;
   micro?: boolean;
+  showFullNames?: boolean;
 }) {
   if (operators.length === 0) {
     return <p className="text-sm leading-6 text-ink-secondary">{fallbackText}</p>
@@ -26,6 +28,7 @@ export default function OperatorAvatarStrip({
           operator={operator}
           compact={compact}
           micro={micro}
+          showFullNames={showFullNames}
         />
       ))}
     </div>
@@ -36,15 +39,22 @@ function OperatorAvatarTile({
   operator,
   compact = false,
   micro = false,
+  showFullNames = false,
 }: {
   operator: RoomOperator;
   compact?: boolean;
   micro?: boolean;
+  showFullNames?: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false)
   const canLoadImage = Boolean(operator.id && !imageFailed)
   const avatarSize = micro ? 'h-8 w-8' : compact ? 'h-10 w-10' : 'h-11 w-11'
-  const tileWidth = micro ? 'w-9' : compact ? 'w-12' : 'w-[3.25rem]'
+  const tileWidth = micro ? showFullNames ? 'w-14' : 'w-9' : compact ? 'w-12' : 'w-[3.25rem]'
+  const labelClassName = [
+    micro ? 'mt-0.5 text-[10px] leading-3' : 'mt-1 text-[11px] leading-4',
+    showFullNames ? 'whitespace-normal break-words' : 'truncate',
+    'block font-medium text-ink-secondary',
+  ].join(' ')
   const initial = operator.name.trim().slice(0, 1) || '?'
 
   return (
@@ -67,7 +77,7 @@ function OperatorAvatarTile({
           </div>
         )}
       </div>
-      <span className={`${micro ? 'mt-0.5 text-[10px] leading-3' : 'mt-1 text-[11px] leading-4'} block truncate font-medium text-ink-secondary`}>
+      <span className={labelClassName}>
         {operator.name}
       </span>
     </div>

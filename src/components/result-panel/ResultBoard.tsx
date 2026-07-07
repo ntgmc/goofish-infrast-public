@@ -89,7 +89,7 @@ export default function ResultBoard({
                         slot.row.isAutofill ? (
                           <p className="rounded-md bg-surface-0/80 px-2 py-1.5 text-xs leading-5 text-ink-secondary">{slot.row.operatorText}</p>
                         ) : (
-                          <OperatorAvatarStrip operators={slot.row.operators} fallbackText={slot.row.operatorText} micro />
+                          <OperatorAvatarStrip operators={slot.row.operators} fallbackText={slot.row.operatorText} micro showFullNames />
                         )
                       ) : (
                         <p className="rounded-md border border-dashed border-surface-3/70 bg-surface-0/55 px-2 py-1.5 text-xs leading-5 text-ink-muted">
