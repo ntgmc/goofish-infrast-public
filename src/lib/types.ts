@@ -268,7 +268,8 @@ export interface OptimizeResult {
   upgrade_task_payload?: UpgradeTaskPayload;
   analysis_summary?: ScheduleAnalysisSummary;
   preview_limit?: {
-    room_limit: number;
+    mode?: 'room_limited' | 'full_rotation_without_export';
+    room_limit?: number;
     hidden_room_count: number;
     notice: string;
   };

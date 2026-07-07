@@ -68,11 +68,11 @@ export default function ResultPanel({
         <div className="flex flex-col gap-5 border-b border-surface-3/60 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-ink-primary">
-              {isPreview ? '限制级排班预览已就绪' : isAnalysis ? '排班表分析完成' : '排班方案已就绪'}
+              {isPreview ? '免费个人排班已就绪' : isAnalysis ? '排班表分析完成' : '排班方案已就绪'}
             </h2>
             <p className="mt-1 text-sm text-ink-secondary">
               {isPreview
-                ? '这是按正常流程生成的免费预览结果，只展示部分房间。'
+                ? '这是按正常流程生成的免费个人排班结果，可照着设置完整游戏内轮换，但不包含导出和高级分析。'
                 : isAnalysis
                 ? '已根据导入排班表计算红脸风险、日产量和爆仓信息。'
                 : isRotationMode

@@ -83,6 +83,30 @@ export interface SklandRiskRecord {
   last_mismatch_at: string | null
 }
 
+export interface FreePreviewClaimRecord {
+  uid_hash: string
+  user_id: string
+  profile_id: string
+  claimed_at: string
+  uid?: string
+  nickname?: string
+  channel_name?: string
+}
+
+export interface FreePreviewPendingClaimRecord {
+  confirmation_id: string
+  user_id: string
+  uid: string
+  nickname: string
+  channel_name: string
+  encrypted_cred: string
+  operator_count: number
+  display_name: string
+  note: string
+  created_at: string
+  expires_at: string
+}
+
 export interface UserSessionRecord {
   version: 1
   id: string
@@ -373,6 +397,85 @@ export async function saveUserProfile(profile: UserGameAccountRecord): Promise<v
       profile.updated_at,
     ],
   )
+}
+
+export async function getFreePreviewClaim(uidHash: string): Promise<FreePreviewClaimRecord | null> {
+  await ensureSchema()
+  const result = await query<{ record_json: FreePreviewClaimRecord }>(
+    'select record_json from free_preview_claims where uid_hash = $1',
+    [uidHash],
+  )
+  return result.rows[0]?.record_json ?? null
+}
+
+export async function claimFreePreviewUid(
+  claim: FreePreviewClaimRecord,
+): Promise<{ ok: true; claim: FreePreviewClaimRecord } | { ok: false; claim: FreePreviewClaimRecord | null }> {
+  await ensureSchema()
+  const result = await query<{ record_json: FreePreviewClaimRecord }>(
+    `insert into free_preview_claims
+      (uid_hash, user_id, profile_id, claimed_at, record_json)
+     values ($1, $2, $3, $4, $5::jsonb)
+     on conflict (uid_hash) do nothing
+     returning record_json`,
+    [
+      claim.uid_hash,
+      claim.user_id,
+      claim.profile_id,
+      claim.claimed_at,
+      JSON.stringify(claim),
+    ],
+  )
+  const inserted = result.rows[0]?.record_json
+  if (inserted) return { ok: true, claim: inserted }
+  return { ok: false, claim: await getFreePreviewClaim(claim.uid_hash) }
+}
+
+export async function deleteFreePreviewClaim(uidHash: string, profileId?: string): Promise<void> {
+  await ensureSchema()
+  if (profileId) {
+    await query('delete from free_preview_claims where uid_hash = $1 and profile_id = $2', [uidHash, profileId])
+    return
+  }
+  await query('delete from free_preview_claims where uid_hash = $1', [uidHash])
+}
+
+export async function saveFreePreviewPendingClaim(claim: FreePreviewPendingClaimRecord): Promise<void> {
+  await ensureSchema()
+  await query(
+    `insert into free_preview_pending_claims
+      (confirmation_id, user_id, expires_at, record_json, created_at)
+     values ($1, $2, $3, $4::jsonb, $5)
+     on conflict (confirmation_id) do update set
+      user_id = excluded.user_id,
+      expires_at = excluded.expires_at,
+      record_json = excluded.record_json,
+      created_at = excluded.created_at`,
+    [
+      claim.confirmation_id,
+      claim.user_id,
+      claim.expires_at,
+      JSON.stringify(claim),
+      claim.created_at,
+    ],
+  )
+}
+
+export async function getFreePreviewPendingClaim(
+  userId: string,
+  confirmationId: string,
+): Promise<FreePreviewPendingClaimRecord | null> {
+  await ensureSchema()
+  const result = await query<{ record_json: FreePreviewPendingClaimRecord }>(
+    'select record_json from free_preview_pending_claims where user_id = $1 and confirmation_id = $2',
+    [userId, confirmationId],
+  )
+  return result.rows[0]?.record_json ?? null
+}
+
+export async function deleteFreePreviewPendingClaim(userId: string, confirmationId: string): Promise<void> {
+  await ensureSchema()
+  await query('delete from free_preview_pending_claims where user_id = $1 and confirmation_id = $2', [userId, confirmationId])
 }
 
 export async function getOrCreateDepotValueProfile(user: UserAccountRecord): Promise<UserGameAccountRecord> {

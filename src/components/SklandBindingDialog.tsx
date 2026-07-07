@@ -7,7 +7,11 @@ export type { SklandPayload } from '../hooks/useSklandBinding'
 type SklandBindingDialogProps = {
   open: boolean
   profile: UserGameAccount | null
-  context?: 'workspace' | 'depot'
+  context?: 'workspace' | 'depot' | 'free_preview_claim'
+  claimProfileMeta?: {
+    displayName?: string
+    note?: string
+  }
   autoStart?: boolean
   onOpenChange: (open: boolean) => void
   onPayload: (payload: SklandPayload) => void
@@ -27,12 +31,15 @@ export default function SklandBindingDialog({
   open,
   profile,
   context = 'workspace',
+  claimProfileMeta,
   autoStart = false,
   onOpenChange,
   onPayload,
   onCompleted,
 }: SklandBindingDialogProps) {
   const isDepot = context === 'depot'
+  const isFreePreviewClaim = context === 'free_preview_claim'
+  const canStartWithoutProfile = isFreePreviewClaim
   const {
     sklandLogin,
     busy,
@@ -44,23 +51,27 @@ export default function SklandBindingDialog({
     close,
     selectMode,
     setMessage,
-  } = useSklandBinding({ open, profile, context, autoStart, onOpenChange, onPayload, onCompleted })
+  } = useSklandBinding({ open, profile, context, claimProfileMeta, autoStart, onOpenChange, onPayload, onCompleted })
 
   if (!open) return null
 
   const currentStep = stepForStatus(sklandLogin.status)
   const hasError = sklandLogin.status === 'error' || sklandLogin.status === 'account_mismatch' || sklandLogin.status === 'frozen'
   const confirmDisabled = busy || sklandLogin.status !== 'confirm_required' || !sklandLogin.confirmationId
+  const title = isFreePreviewClaim ? '领取免费个人排班' : '森空岛导入'
+  const description = isDepot
+    ? '先预览游戏昵称和 UID，确认后才会保存绑定并分析仓库。'
+    : isFreePreviewClaim
+      ? '先确认游戏 UID，确认后才会创建免费档案并导入干员。'
+      : '先预览游戏昵称和 UID，确认后才会保存绑定并导入干员。'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6">
       <section className="max-h-[calc(100vh-3rem)] w-full max-w-2xl overflow-y-auto rounded-xl border border-surface-3 bg-surface-1 p-5 shadow-2xl" aria-labelledby="skland-binding-title">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="skland-binding-title" className="text-lg font-semibold text-ink-primary">森空岛导入</h2>
-            <p className="mt-1 text-sm leading-6 text-ink-secondary">
-              {isDepot ? '先预览游戏昵称和 UID，确认后才会保存绑定并分析仓库。' : '先预览游戏昵称和 UID，确认后才会保存绑定并导入干员。'}
-            </p>
+            <h2 id="skland-binding-title" className="text-lg font-semibold text-ink-primary">{title}</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">{description}</p>
           </div>
           <button type="button" onClick={close} className="rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3">
             关闭
@@ -94,6 +105,7 @@ export default function SklandBindingDialog({
             <ScanModePanel
               busy={busy}
               profile={profile}
+              canStartWithoutProfile={canStartWithoutProfile}
               state={sklandLogin}
               onStart={startSklandLogin}
               onCheck={() => {
@@ -137,7 +149,7 @@ export default function SklandBindingDialog({
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           {hasError && sklandLogin.mode === 'scan' && (
-            <button type="button" onClick={startSklandLogin} disabled={busy || !profile} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+            <button type="button" onClick={startSklandLogin} disabled={busy || (!profile && !canStartWithoutProfile)} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
               重新生成二维码
             </button>
           )}
@@ -165,12 +177,14 @@ export default function SklandBindingDialog({
 function ScanModePanel({
   busy,
   profile,
+  canStartWithoutProfile,
   state,
   onStart,
   onCheck,
 }: {
   busy: boolean
   profile: UserGameAccount | null
+  canStartWithoutProfile: boolean
   state: SklandLoginState
   onStart: () => void
   onCheck: () => void
@@ -181,9 +195,9 @@ function ScanModePanel({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold text-ink-primary">扫码授权</h3>
-          <p className="mt-1 text-sm leading-6 text-ink-secondary">使用森空岛 App 扫码授权。授权后只会进入账号预览，需要你再次确认才保存。</p>
+          <p className="mt-1 text-sm leading-6 text-ink-secondary">使用森空岛 App 扫码授权。授权后只会进入账号预览，需要再次确认才保存。</p>
         </div>
-        <button type="button" onClick={onStart} disabled={busy || !profile} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+        <button type="button" onClick={onStart} disabled={busy || (!profile && !canStartWithoutProfile)} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
           {waiting ? '重新生成二维码' : '生成扫码二维码'}
         </button>
       </div>
