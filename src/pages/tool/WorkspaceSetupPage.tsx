@@ -4,9 +4,9 @@ import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import { ApiError, apiJson } from '../../lib/api-client'
-import { CONFIG_PRESETS, PERMISSION_LABELS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
+import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
 import { canonicalJson } from '../../lib/crypto'
-import { countOwnedOperators, formatDate, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
+import { countOwnedOperators, formatDate, getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
 
@@ -50,8 +50,9 @@ export default function WorkspaceSetupPage({
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
-  const canEditConfig = profile.permission === 'advanced' || profile.permission === 'ultimate' || profile.permission === 'admin'
-  const canEditLimitedConfig = profile.permission === 'recommended' || profile.permission === 'growth'
+  const isPreviewProfile = isFreePreviewProfile(profile)
+  const canEditConfig = isPreviewProfile || profile.permission === 'advanced' || profile.permission === 'ultimate' || profile.permission === 'admin'
+  const canEditLimitedConfig = isPreviewProfile || profile.permission === 'recommended' || profile.permission === 'growth'
   const ownedOperatorCount = useMemo(() => countOwnedOperators(operators), [operators])
   const configChanged = workspace?.config ? canonicalJson(normalizedConfig) !== canonicalJson(workspace.config) : true
   const filteredOperators = useMemo(() => {
@@ -272,7 +273,7 @@ export default function WorkspaceSetupPage({
               <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
                 <h2 className="text-base font-semibold text-ink-primary">准备情况</h2>
                 <dl className="mt-4 space-y-3 text-sm">
-                  <InfoRow label="套餐" value={PERMISSION_LABELS[profile.permission]} />
+                  <InfoRow label="套餐" value={getProfileAccessLabel(profile)} />
                   <InfoRow label="干员" value={operators ? `${ownedOperatorCount} 名` : '还未上传'} />
                   <InfoRow label="已拥有" value={operators ? `${ownedOperatorCount} 名` : '-'} />
                   <div className="flex items-center justify-between gap-4">

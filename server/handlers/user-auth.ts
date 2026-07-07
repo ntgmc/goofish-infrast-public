@@ -7,6 +7,7 @@ import {
   emptyWorkspace,
   getAnnouncementReads,
   getPasswordResetTokenByHash,
+  getProfileForUser,
   getProfileWorkspace,
   getRecentPasswordResetTokenForUser,
   getSessionByTokenHash,
@@ -21,6 +22,7 @@ import {
   saveUserAccount,
   saveUserProfile,
   saveUserSession,
+  isFreePreviewProfile,
   toPublicProfile,
   toPublicWorkspace,
   touchSession,
@@ -320,6 +322,119 @@ export async function redeemProfileCdk(
   } as CdkRecord)
 
   return { ok: true, profile }
+}
+
+export async function createOrReusePreviewProfile(
+  user: UserAccountRecord,
+  displayNameValue?: unknown,
+  noteValue?: unknown,
+): Promise<{ ok: true; profile: UserGameAccountRecord }> {
+  const profiles = await listProfilesForUser(user.id)
+  const existing = profiles.find((profile) => isFreePreviewProfile(profile))
+  const displayName = normalizeProfileDisplayName(displayNameValue)
+  const note = normalizeProfileNote(noteValue)
+
+  if (existing) {
+    if (!displayName && !note) return { ok: true, profile: existing }
+    const updated: UserGameAccountRecord = {
+      ...existing,
+      display_name: displayName || existing.display_name,
+      note: note || existing.note,
+      updated_at: new Date().toISOString(),
+    }
+    await saveUserProfile(updated)
+    return { ok: true, profile: updated }
+  }
+
+  const now = new Date().toISOString()
+  const profile: UserGameAccountRecord = {
+    version: 1,
+    id: randomUUID(),
+    user_id: user.id,
+    kind: 'free_preview',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    permission: 'growth',
+    status: 'active',
+    display_name: displayName || '免费预览',
+    note: note || '免费预览档案，输入 CDK 后可解锁完整结果。',
+    created_at: now,
+    updated_at: now,
+  }
+  await saveUserProfile(profile)
+  await saveProfileWorkspace(emptyWorkspace(profile.id))
+  return { ok: true, profile }
+}
+
+export async function upgradePreviewProfileWithCdk(
+  user: UserAccountRecord,
+  profileIdValue: unknown,
+  codeValue: unknown,
+  displayNameValue?: unknown,
+  noteValue?: unknown,
+): Promise<
+  | { ok: true; profile: UserGameAccountRecord }
+  | { ok: false; status: number; message: string }
+> {
+  if (typeof profileIdValue !== 'string' || !profileIdValue.trim()) {
+    return { ok: false, status: 400, message: '缺少免费预览档案。' }
+  }
+  const profile = await getProfileForUser(user.id, profileIdValue.trim())
+  if (!profile) return { ok: false, status: 404, message: '账号档案不存在。' }
+  if (!isFreePreviewProfile(profile)) {
+    return { ok: false, status: 400, message: '只有免费预览档案可以原地解锁。' }
+  }
+  if (profile.status !== 'active') return { ok: false, status: 403, message: '账号档案状态不可用。' }
+  if (typeof codeValue !== 'string' || !codeValue.trim()) {
+    return { ok: false, status: 400, message: '请填写 CDK。' }
+  }
+
+  const normalizedCode = normalizeCode(codeValue)
+  const codeHash = hashCdk(normalizedCode, requireEnv('CDK_HASH_SECRET'))
+  const cdkKey = `cdk/${codeHash}.json`
+  const cdkStore = await getCdkRecordStore()
+  const cdkRecord = await cdkStore.get(cdkKey)
+  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK 不存在。' }
+  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已冻结，请联系卖家。' }
+  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已撤销，请联系卖家。' }
+  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
+
+  const now = new Date().toISOString()
+  const permission = normalizePermissionMode(cdkRecord.permission)
+  const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profile.id)
+  const displayName = normalizeProfileDisplayName(displayNameValue)
+  const note = normalizeProfileNote(noteValue)
+  const upgraded: UserGameAccountRecord = {
+    ...profile,
+    kind: 'cdk',
+    cdk_key: cdkKey,
+    cdk_code_hash: codeHash,
+    cdk_order_hash: cdkOrderHash,
+    permission,
+    display_name: displayName || profile.display_name || '账号',
+    note: note || profile.note,
+    updated_at: now,
+  }
+
+  await saveUserProfile(upgraded)
+  if (!(await getProfileWorkspace(upgraded.id))) {
+    await saveProfileWorkspace(emptyWorkspace(upgraded.id))
+  }
+  await cdkStore.set(cdkKey, {
+    ...cdkRecord,
+    status: 'used',
+    used_at: now,
+    license_order_hash: cdkOrderHash,
+    operator_count: cdkRecord.operator_count ?? null,
+    config_desc: cdkRecord.config_desc ?? null,
+    account_id: user.id,
+    profile_id: upgraded.id,
+    account_email_hash: createHash('sha256').update(user.email).digest('hex'),
+    bound_at: now,
+  } as CdkRecord)
+
+  return { ok: true, profile: upgraded }
 }
 
 export async function requireUserSession(req: Request): Promise<AuthContext | null> {

@@ -184,6 +184,9 @@ function memoryUserStoreModule() {
     export function isDepotValueProfile(profile) {
       return profile?.kind === 'depot_value'
     }
+    export function isFreePreviewProfile(profile) {
+      return profile?.kind === 'free_preview'
+    }
     export async function listProfilesForUser(userId) {
       return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
     }
@@ -200,7 +203,7 @@ function memoryUserStoreModule() {
       return {
         id: profile.id,
         user_id: profile.user_id,
-        kind: profile.kind === 'depot_value' ? 'depot_value' : 'cdk',
+        kind: profile.kind || 'cdk',
         permission: profile.permission,
         status: profile.status,
         cdk_order_hash: profile.cdk_order_hash,
@@ -301,6 +304,12 @@ function memoryUserAuthModule() {
     export async function redeemProfileCdk() {
       return { ok: false, status: 400, message: 'not implemented in smoke test' }
     }
+    export async function createOrReusePreviewProfile() {
+      return { ok: false, status: 400, message: 'not implemented in smoke test' }
+    }
+    export async function upgradePreviewProfileWithCdk() {
+      return { ok: false, status: 400, message: 'not implemented in smoke test' }
+    }
     export function toPublicUser(user) {
       return {
         id: user.id,
@@ -316,7 +325,7 @@ function memoryUserAuthModule() {
       return {
         id: profile.id,
         user_id: profile.user_id,
-        kind: profile.kind === 'depot_value' ? 'depot_value' : 'cdk',
+        kind: profile.kind || 'cdk',
         permission: profile.permission,
         status: profile.status,
         cdk_order_hash: profile.cdk_order_hash,

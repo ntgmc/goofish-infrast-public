@@ -761,7 +761,7 @@ function memoryUserAuthModule() {
       return {
         id: profile.id,
         user_id: profile.user_id,
-        kind: profile.kind === 'depot_value' ? 'depot_value' : 'cdk',
+        kind: profile.kind || 'cdk',
         permission: profile.permission,
         status: profile.status,
         cdk_order_hash: profile.cdk_order_hash,

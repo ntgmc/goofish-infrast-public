@@ -11,6 +11,7 @@ globalThis.__workspaceHistorySmokeStore = store
 
 const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts')
 const optimizeHandler = await bundleHandler('server/handlers/optimize.ts')
+const profilesHandler = await bundleHandler('server/handlers/user-profiles.ts')
 
 const sampleConfig = {
   layout: '3-3-3',
@@ -33,9 +34,11 @@ const sampleOperators = [
 ]
 
 await assertRequiresLogin()
+await assertPreviewProfileLifecycle()
 await assertSavedConfigActions()
 await assertSavedConfigLimitAndPermission()
 await assertOptimizeHistory()
+await assertPreviewWorkspaceAndOptimizeLimits()
 await assertOperatorsPatchKeepsHistory()
 
 console.log('workspace history smoke check ok')
@@ -44,6 +47,68 @@ async function assertRequiresLogin() {
   const result = await call(workspaceHandler, '/api/user/workspace?profile_id=profile-1', undefined, { method: 'GET', auth: false })
   if (result.status !== 401) {
     throw new Error(`workspace auth: expected 401, got ${result.status}`)
+  }
+}
+
+async function assertPreviewProfileLifecycle() {
+  const unauthenticated = await call(profilesHandler, '/api/user/profiles/preview', {}, { method: 'POST', auth: false })
+  if (unauthenticated.status !== 401) {
+    throw new Error(`preview profile auth: expected 401, got ${unauthenticated.status}`)
+  }
+
+  const created = await call(profilesHandler, '/api/user/profiles/preview', {
+    display_name: ' 体验号 ',
+    note: ' 预览备注 ',
+  })
+  const preview = created.body?.active_profile
+  if (created.status !== 200 || preview?.kind !== 'free_preview') {
+    throw new Error(`preview profile create: expected free_preview, got ${created.status}`)
+  }
+  const storedPreview = store.profiles.get(preview.id)
+  if (!storedPreview || storedPreview.cdk_key !== null || storedPreview.cdk_code_hash !== null || storedPreview.cdk_order_hash !== null) {
+    throw new Error('preview profile create: CDK fields should stay null')
+  }
+  if (!store.workspaces.has(preview.id)) {
+    throw new Error('preview profile create: workspace should be initialized')
+  }
+
+  const reused = await call(profilesHandler, '/api/user/profiles/preview', {
+    display_name: ' 二次进入 ',
+  })
+  if (reused.status !== 200 || reused.body?.active_profile?.id !== preview.id) {
+    throw new Error('preview profile reuse: expected existing preview profile')
+  }
+
+  store.workspaces.set(preview.id, {
+    ...emptyWorkspace(preview.id),
+    operators: sampleOperators,
+    config: sampleConfig,
+  })
+  store.cdks.set('UPGRADE-CDK', {
+    status: 'unused',
+    permission: 'advanced',
+    license_order_hash: 'order-upgrade',
+  })
+
+  const upgraded = await call(profilesHandler, '/api/user/profiles/redeem', {
+    profile_id: preview.id,
+    cdk: 'UPGRADE-CDK',
+  })
+  const activeProfile = upgraded.body?.active_profile
+  if (upgraded.status !== 200 || activeProfile?.id !== preview.id || activeProfile.kind !== 'cdk' || activeProfile.permission !== 'advanced') {
+    throw new Error(`preview profile upgrade: expected same profile converted to cdk, got ${upgraded.status}`)
+  }
+  const upgradedStored = store.profiles.get(preview.id)
+  if (!upgradedStored || upgradedStored.kind !== 'cdk' || !upgradedStored.cdk_key || !upgradedStored.cdk_code_hash || upgradedStored.cdk_order_hash !== 'order-upgrade') {
+    throw new Error('preview profile upgrade: stored profile was not converted')
+  }
+  const usedCdk = store.cdks.get('UPGRADE-CDK')
+  if (usedCdk?.status !== 'used' || usedCdk.profile_id !== preview.id || usedCdk.account_id !== store.user.id) {
+    throw new Error('preview profile upgrade: CDK was not consumed and bound')
+  }
+  const keptWorkspace = store.workspaces.get(preview.id)
+  if (keptWorkspace?.operators?.length !== sampleOperators.length || keptWorkspace.config?.desc !== sampleConfig.desc) {
+    throw new Error('preview profile upgrade: workspace data should be preserved')
   }
 }
 
@@ -183,6 +248,71 @@ async function assertOptimizeHistory() {
   }
 }
 
+async function assertPreviewWorkspaceAndOptimizeLimits() {
+  const created = await call(profilesHandler, '/api/user/profiles/preview', {
+    display_name: '限制预览',
+  })
+  const preview = created.body?.active_profile
+  if (created.status !== 200 || preview?.kind !== 'free_preview') {
+    throw new Error(`preview optimize setup: expected new preview profile, got ${created.status}`)
+  }
+
+  const restrictedConfig = { ...sampleConfig, desc: '预览自定义配置', permission_blocked: true }
+  const saved = await call(workspaceHandler, '/api/user/workspace', {
+    profile_id: preview.id,
+    operators: sampleOperators,
+    config: restrictedConfig,
+    saved_config_action: { type: 'save', name: '预览配置', config: restrictedConfig },
+  }, { method: 'PATCH' })
+  if (saved.status !== 200 || saved.body?.workspace?.config?.permission_blocked !== true || saved.body.workspace.saved_configs.length !== 1) {
+    throw new Error(`preview workspace save: expected unrestricted workspace save, got ${saved.status}`)
+  }
+
+  const beforeHistoryCount = store.workspaces.get(preview.id)?.result_history.length ?? 0
+  const suggestionsOnly = await call(optimizeHandler, '/api/optimize', {
+    profile_id: preview.id,
+    license: null,
+    operators: sampleOperators,
+    config: restrictedConfig,
+    ignore_elite: true,
+    suggestions_only: true,
+    upgrade_task_payload: {
+      tasks: [],
+      baselineScore: 0,
+    },
+  })
+  if (suggestionsOnly.status !== 403 || store.workspaces.get(preview.id)?.result_history.length !== beforeHistoryCount) {
+    throw new Error(`preview suggestions_only: expected 403 without history append, got ${suggestionsOnly.status}`)
+  }
+
+  const generated = await call(optimizeHandler, '/api/optimize', {
+    profile_id: preview.id,
+    license: null,
+    operators: sampleOperators,
+    config: restrictedConfig,
+    ignore_elite: false,
+  })
+  if (generated.status !== 200) {
+    throw new Error(`preview optimize: expected 200, got ${generated.status}`)
+  }
+  assertPreviewResultIsLimited(generated.body, 'preview optimize response')
+
+  const workspace = store.workspaces.get(preview.id)
+  if (!workspace?.last_result || workspace.result_history.length !== beforeHistoryCount + 1) {
+    throw new Error('preview optimize: expected limited result stored in history')
+  }
+  assertPreviewResultIsLimited(workspace.last_result, 'preview stored last_result')
+  assertPreviewResultIsLimited(workspace.result_history[0].result, 'preview stored history')
+
+  const previewEvents = store.usageEvents.filter((event) => event.profile_id === preview.id)
+  if (!previewEvents.some((event) => event.event === 'schedule_generate' && event.status === 'success')) {
+    throw new Error('preview optimize: missing schedule_generate usage event')
+  }
+  if (!previewEvents.some((event) => event.event === 'free_preview' && event.status === 'success')) {
+    throw new Error('preview optimize: missing free_preview usage event')
+  }
+}
+
 async function assertOperatorsPatchKeepsHistory() {
   const before = store.workspaces.get('profile-1')
   if (!before?.last_result || before.result_history.length !== 1 || before.saved_configs.length !== 1) {
@@ -199,6 +329,38 @@ async function assertOperatorsPatchKeepsHistory() {
   if (workspace.result_history.length !== 1 || workspace.saved_configs.length !== 1) {
     throw new Error('operators patch: history and saved configs should be kept')
   }
+}
+
+function assertPreviewResultIsLimited(result, label) {
+  if (!result || typeof result !== 'object') {
+    throw new Error(`${label}: missing result`)
+  }
+  if (result.preview_limit?.room_limit !== 3 || result.preview_limit.hidden_room_count < 1) {
+    throw new Error(`${label}: missing preview_limit metadata`)
+  }
+  if (countVisibleRooms(result.plans) > 3) {
+    throw new Error(`${label}: leaked more than three visible rooms`)
+  }
+  if (!Array.isArray(result.raw_results) || result.raw_results.length !== 0) {
+    throw new Error(`${label}: raw_results should be empty`)
+  }
+  for (const key of ['daily_production', 'maa_default_comparison', 'upgrade_suggestions', 'current_result', 'upgrade_task_payload', 'raw_total_efficiency', 'total_efficiency']) {
+    if (key in result) {
+      throw new Error(`${label}: leaked ${key}`)
+    }
+  }
+}
+
+function countVisibleRooms(plans) {
+  if (!Array.isArray(plans)) return 0
+  let count = 0
+  for (const plan of plans) {
+    for (const rooms of Object.values(plan?.rooms ?? {})) {
+      if (!Array.isArray(rooms)) continue
+      count += rooms.filter((room) => Array.isArray(room?.operators) && room.operators.length > 0).length
+    }
+  }
+  return count
 }
 
 async function call(handler, path, body = {}, init = {}) {
@@ -277,7 +439,7 @@ function memoryModule(path) {
   if (path === 'memory-user-store') return memoryUserStoreModule()
   if (path === 'memory-user-auth') return memoryUserAuthModule()
   if (path === 'memory-license-utils') return memoryLicenseUtilsModule()
-  if (path === 'memory-usage-stats') return 'export async function recordUsageEvent() {}'
+  if (path === 'memory-usage-stats') return 'export async function recordUsageEvent(event, payload = {}) { globalThis.__workspaceHistorySmokeStore.usageEvents.push({ event, ...payload }) }'
   if (path === 'memory-training-cost') return 'export async function attachTrainingCostsToUpgradeSuggestions({ suggestions }) { return suggestions }'
   if (path === 'memory-optimizer') return memoryOptimizerModule()
   return 'export const APP_BUILD_META = { frontend_version: "test", backend_version: "test", data_version: "test", generated_at: "test", source_summary: "test" }'
@@ -289,9 +451,23 @@ function memoryUserStoreModule() {
     export function emptyWorkspace(profileId) {
       return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
     }
+    export async function listProfilesForUser(userId) {
+      return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
+    }
     export async function getProfileForUser(userId, profileId) {
       const profile = store.profiles.get(profileId)
       return profile?.user_id === userId ? profile : null
+    }
+    export async function saveUserProfile(profile) {
+      store.profiles.set(profile.id, profile)
+    }
+    export async function getOrCreateDepotValueProfile(user) {
+      const existing = [...store.profiles.values()].find((profile) => profile.user_id === user.id && profile.kind === 'depot_value')
+      if (existing) return existing
+      const now = new Date().toISOString()
+      const profile = { version: 1, id: 'depot-' + user.id, user_id: user.id, kind: 'depot_value', cdk_key: null, cdk_code_hash: null, cdk_order_hash: null, permission: 'growth', status: 'active', display_name: '仓库分析', note: '', created_at: now, updated_at: now }
+      store.profiles.set(profile.id, profile)
+      return profile
     }
     export async function getProfileWorkspace(profileId) {
       return store.workspaces.get(profileId) ?? null
@@ -301,6 +477,9 @@ function memoryUserStoreModule() {
     }
     export function isDepotValueProfile(profile) {
       return profile?.kind === 'depot_value'
+    }
+    export function isFreePreviewProfile(profile) {
+      return profile?.kind === 'free_preview'
     }
     export async function saveProfileWorkspace(workspace) {
       store.workspaces.set(workspace.profile_id, normalizeWorkspace(workspace))
@@ -341,15 +520,70 @@ function memoryUserAuthModule() {
       const activeProfile = store.profiles.get('profile-1') ?? null
       return { user: store.user, session: {}, tokenHash: 'test', profiles: [...store.profiles.values()], activeProfile, cdkRecord: null }
     }
+    export async function createOrReusePreviewProfile(user, displayNameValue, noteValue) {
+      const existing = [...store.profiles.values()].find((profile) => profile.user_id === user.id && profile.kind === 'free_preview')
+      const displayName = normalizeDisplayName(displayNameValue)
+      const note = normalizeNote(noteValue)
+      if (existing) {
+        const updated = { ...existing, display_name: displayName || existing.display_name, note: note || existing.note, updated_at: new Date().toISOString() }
+        store.profiles.set(updated.id, updated)
+        return { ok: true, profile: updated }
+      }
+      const now = new Date().toISOString()
+      const id = 'preview-' + (++store.previewCounter)
+      const profile = { version: 1, id, user_id: user.id, kind: 'free_preview', cdk_key: null, cdk_code_hash: null, cdk_order_hash: null, permission: 'growth', status: 'active', display_name: displayName || '免费预览', note: note || '', created_at: now, updated_at: now }
+      store.profiles.set(id, profile)
+      store.workspaces.set(id, emptyWorkspace(id))
+      return { ok: true, profile }
+    }
+    export async function upgradePreviewProfileWithCdk(user, profileIdValue, cdkValue, displayNameValue, noteValue) {
+      const profileId = typeof profileIdValue === 'string' ? profileIdValue.trim() : ''
+      const profile = store.profiles.get(profileId)
+      if (!profile || profile.user_id !== user.id) return { ok: false, status: 404, message: '账号档案不存在。' }
+      if (profile.kind !== 'free_preview') return { ok: false, status: 400, message: '只有免费预览档案可以原地解锁。' }
+      const cdk = typeof cdkValue === 'string' ? cdkValue.trim() : ''
+      if (!cdk) return { ok: false, status: 400, message: '请填写 CDK。' }
+      const record = store.cdks.get(cdk)
+      if (!record) return { ok: false, status: 404, message: 'CDK 不存在。' }
+      if (record.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
+      const now = new Date().toISOString()
+      const displayName = normalizeDisplayName(displayNameValue)
+      const note = normalizeNote(noteValue)
+      const upgraded = { ...profile, kind: 'cdk', cdk_key: 'cdk/' + cdk + '.json', cdk_code_hash: 'hash-' + cdk, cdk_order_hash: record.license_order_hash || 'order-' + profile.id, permission: record.permission || 'growth', display_name: displayName || profile.display_name, note: note || profile.note, updated_at: now }
+      store.profiles.set(upgraded.id, upgraded)
+      if (!store.workspaces.has(upgraded.id)) store.workspaces.set(upgraded.id, emptyWorkspace(upgraded.id))
+      store.cdks.set(cdk, { ...record, status: 'used', used_at: now, account_id: user.id, profile_id: upgraded.id, license_order_hash: upgraded.cdk_order_hash })
+      return { ok: true, profile: upgraded }
+    }
+    export async function redeemProfileCdk(user, cdkValue, displayNameValue, noteValue) {
+      const cdk = typeof cdkValue === 'string' ? cdkValue.trim() : ''
+      if (!cdk) return { ok: false, status: 400, message: '请填写 CDK。' }
+      const record = store.cdks.get(cdk) || { status: 'unused', permission: 'growth', license_order_hash: 'order-' + cdk }
+      if (record.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
+      const now = new Date().toISOString()
+      const id = 'cdk-profile-' + (++store.profileCounter)
+      const profile = { version: 1, id, user_id: user.id, kind: 'cdk', cdk_key: 'cdk/' + cdk + '.json', cdk_code_hash: 'hash-' + cdk, cdk_order_hash: record.license_order_hash, permission: record.permission, status: 'active', display_name: normalizeDisplayName(displayNameValue) || '账号', note: normalizeNote(noteValue), created_at: now, updated_at: now }
+      store.profiles.set(id, profile)
+      store.workspaces.set(id, emptyWorkspace(id))
+      store.cdks.set(cdk, { ...record, status: 'used', used_at: now, account_id: user.id, profile_id: id })
+      return { ok: true, profile }
+    }
     export async function buildAuthPayload(user, activeProfileId) {
       const active = store.profiles.get(activeProfileId) ?? store.profiles.get('profile-1') ?? null
       return {
-        user: { id: user.id, email: user.email, permission: user.permission, status: user.status, cdk_status: 'used', cdk_order_hash: null, created_at: user.created_at },
-        profiles: [...store.profiles.values()].map((profile) => ({ id: profile.id, user_id: profile.user_id, kind: profile.kind, permission: profile.permission, status: profile.status, cdk_order_hash: profile.cdk_order_hash, display_name: profile.display_name, note: profile.note, operator_count: store.workspaces.get(profile.id)?.operators?.length ?? 0, updated_at: profile.updated_at, created_at: profile.created_at })),
-        active_profile: active ? { id: active.id, user_id: active.user_id, kind: active.kind, permission: active.permission, status: active.status, cdk_order_hash: active.cdk_order_hash, display_name: active.display_name, note: active.note, operator_count: store.workspaces.get(active.id)?.operators?.length ?? 0, updated_at: active.updated_at, created_at: active.created_at } : null,
+        user: toPublicUser(user),
+        profiles: [...store.profiles.values()].map(toPublicProfile),
+        active_profile: active ? toPublicProfile(active) : null,
         workspace: active ? toPublicWorkspace(store.workspaces.get(active.id) ?? null) : null,
         announcement_unread_count: 0,
       }
+    }
+    export function toPublicUser(user) {
+      return { id: user.id, email: user.email, permission: user.permission, status: user.status, cdk_status: user.cdk_key ? 'used' : 'none', cdk_order_hash: user.cdk_order_hash ?? null, created_at: user.created_at }
+    }
+    function toPublicProfile(profile) {
+      const workspace = store.workspaces.get(profile.id) ?? null
+      return { id: profile.id, user_id: profile.user_id, kind: profile.kind, permission: profile.permission, status: profile.status, cdk_order_hash: profile.cdk_order_hash, display_name: profile.display_name, note: profile.note, operator_count: workspace?.operators?.length ?? 0, updated_at: workspace?.updated_at ?? profile.updated_at, created_at: profile.created_at }
     }
     function toPublicWorkspace(workspace) {
       return {
@@ -362,6 +596,15 @@ function memoryUserAuthModule() {
         result_history: workspace?.result_history ?? [],
         updated_at: workspace?.updated_at ?? null,
       }
+    }
+    function emptyWorkspace(profileId) {
+      return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
+    }
+    function normalizeDisplayName(value) {
+      return typeof value === 'string' ? value.trim().slice(0, 40) : ''
+    }
+    function normalizeNote(value) {
+      return typeof value === 'string' ? value.trim().slice(0, 500) : ''
     }
   `
 }
@@ -399,6 +642,25 @@ function memoryLicenseUtilsModule() {
 
 function memoryOptimizerModule() {
   return `
+    const previewRooms = {
+      trading: [
+        room('trade-1', '贸易站 1', 'LMD'),
+        room('trade-2', '贸易站 2', 'LMD'),
+      ],
+      manufacture: [
+        room('mfg-1', '制造站 1', 'Pure Gold'),
+        room('mfg-2', '制造站 2', 'Originium Shard'),
+      ],
+      power: [
+        room('power-1', '发电站 1', ''),
+      ],
+      dormitory: [
+        { id: 'dorm-1', name: '宿舍 1', operators: [] },
+      ],
+    }
+    function room(id, name, product) {
+      return { id, name, product, operators: [{ id: 'char_002_amiya', name: '阿米娅' }], final_efficiency: 1.23, efficiency: 1.23 }
+    }
     export class WorkplaceOptimizer {
       constructor(operators, config) {
         this.operators = operators
@@ -412,9 +674,30 @@ function memoryOptimizerModule() {
           schedule_mode: this.config.schedule_mode ?? 'maa',
           buildingType: 243,
           planTimes: '3班',
-          plans: [{ name: 'A', rooms: {} }],
-          raw_results: [{ total_efficiency: ignoreElite ? 200 : 100, assignment_detail: [] }],
+          plans: [{ name: 'A', rooms: previewRooms }],
+          raw_results: [{ totalEfficiency: ignoreElite ? 200 : 100, assignmentDetail: [] }],
+          daily_production: {
+            manufacturing: { 'Pure Gold': 1 },
+            trading: { LMD: 1 },
+            consumption: {},
+            net: {},
+            drones: {},
+          },
           total_efficiency: ignoreElite ? 200 : 100,
+        }
+      }
+      simulateMaaDefaultAssignments() {
+        return {
+          plans: [{ name: 'Default', rooms: previewRooms }],
+          raw_results: [{ totalEfficiency: 50, assignmentDetail: [] }],
+          daily_production: {
+            manufacturing: { 'Pure Gold': 0.5 },
+            trading: { LMD: 0.5 },
+            consumption: {},
+            net: {},
+            drones: {},
+          },
+          shift_hours: [8, 16, 24],
         }
       }
       calculateUpgradeTargetSuggestions() { return [] }
@@ -446,6 +729,10 @@ function createMemoryStore() {
       updated_at: now,
     }]]),
     workspaces: new Map(),
+    cdks: new Map(),
+    usageEvents: [],
+    previewCounter: 0,
+    profileCounter: 0,
   }
 }
 

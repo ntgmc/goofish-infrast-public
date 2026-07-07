@@ -3,7 +3,7 @@ import AnnouncementPopup from '../components/AnnouncementPopup'
 import AccountDashboard from './tool/AccountDashboard'
 import AuthPage from './tool/AuthPage'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
-import { isCdkProfile } from './tool/tool-utils'
+import { isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
@@ -58,7 +58,7 @@ export default function ToolPage() {
             void refreshProfileWorkspace(profile, 'setup').catch(console.error)
           }}
         />
-      ) : activeProfile && isCdkProfile(activeProfile) && (workspaceMode === 'setup' || !license) ? (
+      ) : activeProfile && isSchedulableProfile(activeProfile) && (workspaceMode === 'setup' || !license) ? (
         <WorkspaceSetupPage
           user={user}
           profile={activeProfile}
@@ -69,10 +69,11 @@ export default function ToolPage() {
           onBack={() => setWorkspaceMode('dashboard')}
           onLogout={handleLogout}
         />
-      ) : activeProfile && isCdkProfile(activeProfile) && license ? (
+      ) : activeProfile && isSchedulableProfile(activeProfile) && license ? (
         <Suspense fallback={<div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">正在载入排班工具...</div>}>
           <OptimizePage
             profileId={activeProfile.id}
+            profile={activeProfile}
             license={license}
             workspace={workspace}
             setLicense={(next) => setLicense(next)}
@@ -85,6 +86,7 @@ export default function ToolPage() {
             announcement={banner}
             redeemedNotice={null}
             onRedownloadLicense={null}
+            onProfileUpgraded={(payload) => applyAuthPayload(payload, 'optimize')}
           />
         </Suspense>
       ) : (
