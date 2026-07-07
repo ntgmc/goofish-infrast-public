@@ -41,6 +41,15 @@ export interface LicenseConfig {
   [key: string]: unknown;
 }
 
+export type IntermediateProduct = 'Originium Shard' | 'Pure Gold';
+
+export interface IntermediateDepletion {
+  product: IntermediateProduct;
+  stock: number;
+  net_per_day: number;
+  days_remaining: number | null;
+}
+
 export type LegacyPermissionMode = 'basic' | 'premium';
 export type ProductPermissionMode = 'recommended' | 'growth' | 'advanced' | 'ultimate';
 export type InternalPermissionMode = 'admin';
@@ -253,6 +262,7 @@ export interface OptimizeResult {
   total_efficiency?: number;
   raw_total_efficiency?: number;
   maa_default_comparison?: MaaDefaultComparison;
+  intermediate_depletion?: IntermediateDepletion[];
   upgrade_suggestions?: RawUpgradeSuggestion[];
   current_result?: OptimizeResult;
   upgrade_task_payload?: UpgradeTaskPayload;

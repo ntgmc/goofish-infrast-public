@@ -1,18 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import QRCode from 'qrcode'
-import type { AuthSuccessResponse, SklandCredentialInvalidReason } from '../../src/lib/types'
+import type { AuthSuccessResponse, LicenseConfig, SklandCredentialInvalidReason } from '../../src/lib/types'
 import {
   emptyWorkspace,
   getProfileForUser,
   getProfileWorkspace,
   isDepotValueProfile,
+  isFreePreviewProfile,
   saveProfileWorkspace,
   saveUserProfile,
   type SklandBindingRecord,
   type UserGameAccountRecord,
   type UserWorkspaceRecord,
 } from '../storage/user-store'
-import { validateOperators } from './license-utils'
+import { resolveConfigForPermission, validateConfig, validateOperators } from './license-utils'
 import {
   createHypergryphScan,
   decryptSklandCredential,
@@ -23,6 +24,7 @@ import {
   getScanCode,
   importSklandOperatorsByCred,
   SklandClientError,
+  type IntermediateInventory,
   type SklandBindingSummary,
   type SklandImportSummary,
 } from './skland-client'
@@ -34,6 +36,21 @@ const PENDING_BINDING_TTL_MS = 10 * 60 * 1000
 const UID_MISMATCH_FREEZE_THRESHOLD = 3
 const MAX_CREDENTIAL_TEXT_LENGTH = 16 * 1024
 const MAX_CREDENTIAL_JSON_DEPTH = 8
+
+const DEFAULT_SKLAND_CONFIG: LicenseConfig = {
+  layout: '2-4-3',
+  desc: '243 均衡流 (2赤金/2经验)',
+  schedule_mode: 'maa',
+  dormitory_rule: 'fixed',
+  trading_stations_count: 2,
+  manufacturing_stations_count: 4,
+  product_requirements: {
+    trading_stations: { LMD: 2 },
+    manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 2 },
+  },
+  Fiammetta: { enable: true },
+  drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+}
 
 type HandlerResponse = AuthSuccessResponse & { skland_import?: SklandImportSummary }
 type AuthPayloadUser = Parameters<typeof buildAuthPayload>[0]
@@ -319,14 +336,16 @@ async function saveSklandImport(
   profile: UserGameAccountRecord,
   cred: string,
 ): Promise<SklandImportSummary> {
-  const imported = await importSklandOperatorsByCred(cred)
+  const imported = await importSklandOperatorsByCred(cred, { includeInventory: true })
   const operatorsCheck = validateOperators(imported.operators)
   if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
 
   const existingWorkspace = await getProfileWorkspace(profile.id)
+  const configResult = resolveSklandImportConfig(profile, existingWorkspace?.config ?? null, imported.intermediateInventory)
   const nextWorkspace: UserWorkspaceRecord = {
     ...(existingWorkspace ?? emptyWorkspace(profile.id)),
     operators: operatorsCheck.operators,
+    config: configResult.config ?? existingWorkspace?.config ?? null,
     elite_overrides: {},
     last_result: null,
     updated_at: imported.importedAt,
@@ -359,7 +378,74 @@ async function saveSklandImport(
     ...imported.binding,
     operator_count: operatorsCheck.operators.length,
     imported_at: imported.importedAt,
+    ...(imported.intermediateInventory && { intermediate_inventory: imported.intermediateInventory }),
+    inventory_synced: Boolean(imported.intermediateInventory && configResult.config),
+    config_saved: Boolean(configResult.config),
+    ...(configResult.warning || imported.inventoryWarning
+      ? { inventory_warning: [imported.inventoryWarning, configResult.warning].filter(Boolean).join(' ') }
+      : {}),
   }
+}
+
+function resolveSklandImportConfig(
+  profile: UserGameAccountRecord,
+  existingConfig: LicenseConfig | null,
+  inventory: IntermediateInventory | undefined,
+): { config: LicenseConfig | null; warning?: string } {
+  if (!inventory) return { config: null }
+
+  const candidates = [
+    ...(existingConfig ? [existingConfig] : []),
+    DEFAULT_SKLAND_CONFIG,
+  ]
+  let lastMessage = ''
+  for (const candidate of candidates) {
+    const next = applyIntermediateInventoryToConfig(cloneConfig(candidate), inventory)
+    const configCheck = validateConfig(next)
+    if (!configCheck.ok) {
+      lastMessage = configCheck.message
+      continue
+    }
+    const permissionCheck = isFreePreviewProfile(profile)
+      ? { ok: true as const, config: configCheck.config }
+      : resolveConfigForPermission(profile.permission, configCheck.config)
+    if (permissionCheck.ok) return { config: permissionCheck.config }
+    lastMessage = permissionCheck.message
+  }
+
+  return {
+    config: null,
+    warning: lastMessage
+      ? `森空岛库存已读取，但基建配置未自动保存：${lastMessage}`
+      : '森空岛库存已读取，但基建配置未自动保存。',
+  }
+}
+
+function applyIntermediateInventoryToConfig(config: LicenseConfig, inventory: IntermediateInventory): LicenseConfig {
+  config.intermediate_inventory = {
+    'Originium Shard': normalizeInventoryCount(inventory['Originium Shard']),
+    'Pure Gold': normalizeInventoryCount(inventory['Pure Gold']),
+  }
+  config.auto_balance_source = 'intermediate_inventory'
+  config.drones = {
+    ...(config.drones ?? { order: 'pre', targets: [] }),
+    enable: true,
+    auto: true,
+    auto_strategy: 'trading_priority',
+    auto_target_product: undefined,
+    order: config.drones?.order ?? 'pre',
+    targets: Array.isArray(config.drones?.targets) ? config.drones.targets : [],
+  }
+  return config
+}
+
+function cloneConfig(config: LicenseConfig): LicenseConfig {
+  return JSON.parse(JSON.stringify(config)) as LicenseConfig
+}
+
+function normalizeInventoryCount(value: unknown): number {
+  const count = Number(value)
+  return Number.isFinite(count) ? Math.max(0, Math.round(count * 100) / 100) : 0
 }
 
 async function buildPayloadWithImport(

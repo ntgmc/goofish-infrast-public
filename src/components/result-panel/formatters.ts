@@ -11,6 +11,14 @@ export type DroneGainSummary = {
   note: string;
 }
 
+export type PreparedIntermediateDepletion = {
+  product: string;
+  label: string;
+  stock: number;
+  netPerDay: number;
+  daysRemaining: number | null;
+}
+
 export type PreparedResult = {
   totalEff: number;
   rawTotalEff: number;
@@ -24,6 +32,7 @@ export type PreparedResult = {
     droneGain: DroneGainSummary;
   };
   productionSanity: { value: number; note: string };
+  intermediateDepletion: PreparedIntermediateDepletion[];
   maaDefaultComparison?: {
     sanityDelta: number;
     sanityDeltaNote: string;
@@ -123,6 +132,13 @@ export function prepareResult(
     droneGain,
   }
   const productionSanity = calculateProductionSanity(daily)
+  const intermediateDepletion = (result.intermediate_depletion ?? []).map((item) => ({
+    product: item.product,
+    label: formatProduct(item.product),
+    stock: item.stock,
+    netPerDay: item.net_per_day,
+    daysRemaining: item.days_remaining,
+  }))
   const maaDefaultComparison = !isRotationMode && result.maa_default_comparison
     ? (() => {
         const comparison = result.maa_default_comparison
@@ -156,7 +172,7 @@ export function prepareResult(
     roomCount: plans.reduce((sum, plan) => sum + plan.rows.length, 0),
   }
 
-  return { totalEff, rawTotalEff, plans, productionStats, productionSanity, maaDefaultComparison, detailStats }
+  return { totalEff, rawTotalEff, plans, productionStats, productionSanity, intermediateDepletion, maaDefaultComparison, detailStats }
 }
 
 function buildOperatorLookup(operators: LicenseOperator[]): Map<string, LicenseOperator> {
@@ -200,6 +216,21 @@ export function formatCompactNumber(value: number): string {
 export function formatSigned(value: number): string {
   const sign = value > 0 ? '+' : ''
   return `${sign}${formatAmount(value)}`
+}
+
+export function formatIntermediateDepletionSummary(items: PreparedIntermediateDepletion[]): string {
+  if (items.length === 0) return ''
+  const consuming = items.filter((item) => item.daysRemaining !== null)
+  if (consuming.length === 0) return '当前排班不会耗尽赤金/源石碎片'
+  return consuming
+    .map((item) => `${item.label}${formatDaysRemaining(item.daysRemaining ?? 0)}`)
+    .join('，')
+}
+
+function formatDaysRemaining(days: number): string {
+  if (!Number.isFinite(days) || days <= 0) return '不足 1 天后耗完'
+  if (days < 1) return '不足 1 天后耗完'
+  return `约 ${formatAmount(days)} 天后耗完`
 }
 
 export function formatProductionBreakdown(manufacturing: Record<string, number>): string {

@@ -1,6 +1,7 @@
 import type { OptimizeResult } from '../../lib/types'
 import {
   formatAmount,
+  formatIntermediateDepletionSummary,
   formatOverflowSummary,
   formatProductionBreakdown,
   formatSigned,
@@ -19,11 +20,14 @@ export default function ResultMetrics({
   analysisSummary: OptimizeResult['analysis_summary'];
   prepared: PreparedResult;
 }) {
-  const { totalEff, rawTotalEff, productionStats, productionSanity, maaDefaultComparison, detailStats } = prepared
+  const { totalEff, rawTotalEff, productionStats, productionSanity, intermediateDepletion, maaDefaultComparison, detailStats } = prepared
   const showMaaDefaultComparison = Boolean(maaDefaultComparison) && !isAnalysis && !isRotationMode
   const productionSanityNote = showMaaDefaultComparison && maaDefaultComparison
     ? maaDefaultComparison.sanityDeltaNote
     : productionSanity.note
+  const intermediateDepletionSummary = !isAnalysis && !isRotationMode
+    ? formatIntermediateDepletionSummary(intermediateDepletion)
+    : ''
 
   return (
     <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
@@ -94,6 +98,11 @@ export default function ResultMetrics({
           </>
         )}
       </div>
+      {intermediateDepletionSummary && (
+        <div className="border-t border-surface-3/60 px-5 py-3 text-xs leading-5 text-ink-secondary sm:px-6">
+          <span className="font-medium text-ink-primary">中间产物库存：</span>{intermediateDepletionSummary}
+        </div>
+      )}
       {showMaaDefaultComparison && maaDefaultComparison ? (
         <div className="border-t border-surface-3/60 px-5 pb-5 pt-3 text-xs leading-5 text-ink-secondary sm:px-6">
           MAA 默认基准：总效率 {formatAmount(maaDefaultComparison.baselineTotalEfficiency)}%，龙门币 {formatAmount(maaDefaultComparison.baselineLmd)}/日，赤金净变动 {formatSigned(maaDefaultComparison.baselineGoldNet)}/日
