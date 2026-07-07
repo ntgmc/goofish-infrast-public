@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import type { Announcement, AnnouncementAdminResponse, AnnouncementKind, ProductPermissionMode, RawPermissionMode } from '../lib/types'
+import type { Announcement, AnnouncementAdminResponse, AnnouncementKind, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../lib/types'
 import { apiJson, apiVoid } from '../lib/api-client'
 
 type Permission = RawPermissionMode
@@ -159,6 +159,32 @@ interface AdminUserDetail {
   profiles: AdminProfileSummary[];
 }
 
+interface AdminProfileOperatorData {
+  user: {
+    id: string;
+    email: string;
+  };
+  profile: {
+    id: string;
+    display_name: string;
+    kind: UserGameAccountKind;
+    status: AppUserStatus;
+    permission: Permission;
+    skland_binding: {
+      uid: string;
+      nickname: string;
+      channel_name: string;
+      bound_at: string;
+      last_imported_at: string | null;
+    } | null;
+    workspace_updated_at: string | null;
+  };
+  operators: LicenseOperator[];
+  total_operator_records: number;
+  owned_operator_count: number;
+  generated_at: string;
+}
+
 const EMPTY_ANNOUNCEMENTS: Announcement[] = []
 const DEFAULT_RISK_SETTINGS: RiskControlSettings = {
   operator_data_risk_enabled: true,
@@ -224,6 +250,8 @@ export default function AdminPage() {
   const [selectedCdkHashes, setSelectedCdkHashes] = useState<string[]>([])
   const [selectedCdkDetail, setSelectedCdkDetail] = useState<AdminCdkDetail | null>(null)
   const [selectedUserDetail, setSelectedUserDetail] = useState<AdminUserDetail | null>(null)
+  const [operatorDataByProfileId, setOperatorDataByProfileId] = useState<Record<string, AdminProfileOperatorData>>({})
+  const [expandedOperatorProfileId, setExpandedOperatorProfileId] = useState<string | null>(null)
   const [resetUserEmail, setResetUserEmail] = useState('')
   const [resetPassword, setResetPassword] = useState('')
   const [loginFieldErrors, setLoginFieldErrors] = useState<FieldErrors>({})
@@ -328,6 +356,8 @@ const summary = useMemo(
     setSelectedCdkHashes([])
     setSelectedCdkDetail(null)
     setSelectedUserDetail(null)
+    setOperatorDataByProfileId({})
+    setExpandedOperatorProfileId(null)
   }
 
   const handleGenerateCdk = async (event: FormEvent) => {
@@ -531,11 +561,65 @@ const summary = useMemo(
       })
       if (!data.detail) throw new Error('加载用户详情失败')
       setSelectedUserDetail(data.detail)
+      setOperatorDataByProfileId({})
+      setExpandedOperatorProfileId(null)
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
       setBusyAction(null)
     }
+  }
+
+  const loadProfileOperatorData = async (
+    profile: AdminProfileSummary,
+    options: { expand?: boolean; busyKey?: string } = {},
+  ): Promise<AdminProfileOperatorData | null> => {
+    if (!selectedUserDetail) return null
+    const busyKey = options.busyKey ?? `profile-operators:${profile.id}`
+    setBusyAction(busyKey)
+    setError(null)
+    setNotice(null)
+    try {
+      const data = await apiJson<{ operator_data?: AdminProfileOperatorData }>(
+        `/api/admin/users?user_id=${encodeURIComponent(selectedUserDetail.user.id)}&profile_id=${encodeURIComponent(profile.id)}&include=operators`,
+        {
+          headers: authHeaders,
+          fallbackMessage: '加载干员数据失败',
+        },
+      )
+      if (!data.operator_data) throw new Error('加载干员数据失败')
+      setOperatorDataByProfileId((current) => ({
+        ...current,
+        [profile.id]: data.operator_data as AdminProfileOperatorData,
+      }))
+      if (options.expand !== false) setExpandedOperatorProfileId(profile.id)
+      return data.operator_data
+    } catch (caught) {
+      setError((caught as Error).message)
+      return null
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const handleViewProfileOperators = async (profile: AdminProfileSummary) => {
+    if (expandedOperatorProfileId === profile.id) {
+      setExpandedOperatorProfileId(null)
+      return
+    }
+    if (operatorDataByProfileId[profile.id]) {
+      setExpandedOperatorProfileId(profile.id)
+      return
+    }
+    await loadProfileOperatorData(profile)
+  }
+
+  const handleDownloadProfileOperators = async (profile: AdminProfileSummary) => {
+    const data = operatorDataByProfileId[profile.id]
+      ?? await loadProfileOperatorData(profile, { expand: false, busyKey: `profile-operators-download:${profile.id}` })
+    if (!data) return
+    downloadOperatorsJson(data)
+    setNotice(`已开始下载 ${profile.display_name || '账号档案'} 的干员 JSON`)
   }
 
   const patchUserProfile = async (
@@ -564,6 +648,8 @@ const summary = useMemo(
       })
       if (!data.detail) throw new Error('档案操作失败')
       setSelectedUserDetail(data.detail)
+      setOperatorDataByProfileId((current) => omitProfileOperatorData(current, profile.id))
+      if (expandedOperatorProfileId === profile.id) setExpandedOperatorProfileId(null)
       setNotice('档案已更新')
       await loadDashboard()
     } catch (caught) {
@@ -677,7 +763,11 @@ const summary = useMemo(
         fallbackMessage: `${successMessage}失败`,
       })
       if (data.detail) setSelectedUserDetail(data.detail)
-      if (data.deleted && selectedUserDetail?.user.id === user.id) setSelectedUserDetail(null)
+      if (data.deleted && selectedUserDetail?.user.id === user.id) {
+        setSelectedUserDetail(null)
+        setOperatorDataByProfileId({})
+        setExpandedOperatorProfileId(null)
+      }
       setNotice(`${successMessage}：${user.email}`)
       await loadDashboard()
     } catch (caught) {
@@ -1075,12 +1165,20 @@ const summary = useMemo(
                 <UserDetailPanel
                   detail={selectedUserDetail}
                   busyAction={busyAction}
-                  onClose={() => setSelectedUserDetail(null)}
+                  operatorDataByProfileId={operatorDataByProfileId}
+                  expandedOperatorProfileId={expandedOperatorProfileId}
+                  onClose={() => {
+                    setSelectedUserDetail(null)
+                    setOperatorDataByProfileId({})
+                    setExpandedOperatorProfileId(null)
+                  }}
                   onUpdateProfile={handleUpdateProfile}
                   onSetProfileStatus={handleSetProfileStatus}
                   onSetProfilePermission={handleSetProfilePermission}
                   onClearSklandBinding={handleClearProfileSklandBinding}
                   onClearWorkspace={handleClearProfileWorkspace}
+                  onViewOperators={handleViewProfileOperators}
+                  onDownloadOperators={handleDownloadProfileOperators}
                   onFreezeUser={handleFreezeAppUser}
                   onUnfreezeUser={handleUnfreezeAppUser}
                   onDeleteUser={handleDeleteAppUser}
@@ -1097,24 +1195,32 @@ const summary = useMemo(
 function UserDetailPanel({
   detail,
   busyAction,
+  operatorDataByProfileId,
+  expandedOperatorProfileId,
   onClose,
   onUpdateProfile,
   onSetProfileStatus,
   onSetProfilePermission,
   onClearSklandBinding,
   onClearWorkspace,
+  onViewOperators,
+  onDownloadOperators,
   onFreezeUser,
   onUnfreezeUser,
   onDeleteUser,
 }: {
   detail: AdminUserDetail;
   busyAction: string | null;
+  operatorDataByProfileId: Record<string, AdminProfileOperatorData>;
+  expandedOperatorProfileId: string | null;
   onClose: () => void;
   onUpdateProfile: (profile: AdminProfileSummary) => Promise<void>;
   onSetProfileStatus: (profile: AdminProfileSummary) => Promise<void>;
   onSetProfilePermission: (profile: AdminProfileSummary) => Promise<void>;
   onClearSklandBinding: (profile: AdminProfileSummary) => Promise<void>;
   onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
+  onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
+  onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
   onFreezeUser: (user: AppUserSummary) => Promise<void>;
   onUnfreezeUser: (user: AppUserSummary) => Promise<void>;
   onDeleteUser: (user: AppUserSummary) => Promise<void>;
@@ -1156,11 +1262,15 @@ function UserDetailPanel({
               key={profile.id}
               profile={profile}
               busyAction={busyAction}
+              operatorData={operatorDataByProfileId[profile.id] ?? null}
+              operatorsExpanded={expandedOperatorProfileId === profile.id}
               onUpdateProfile={onUpdateProfile}
               onSetProfileStatus={onSetProfileStatus}
               onSetProfilePermission={onSetProfilePermission}
               onClearSklandBinding={onClearSklandBinding}
               onClearWorkspace={onClearWorkspace}
+              onViewOperators={onViewOperators}
+              onDownloadOperators={onDownloadOperators}
             />
           ))}
         </div>
@@ -1172,19 +1282,27 @@ function UserDetailPanel({
 function ProfileDetailCard({
   profile,
   busyAction,
+  operatorData,
+  operatorsExpanded,
   onUpdateProfile,
   onSetProfileStatus,
   onSetProfilePermission,
   onClearSklandBinding,
   onClearWorkspace,
+  onViewOperators,
+  onDownloadOperators,
 }: {
   profile: AdminProfileSummary;
   busyAction: string | null;
+  operatorData: AdminProfileOperatorData | null;
+  operatorsExpanded: boolean;
   onUpdateProfile: (profile: AdminProfileSummary) => Promise<void>;
   onSetProfileStatus: (profile: AdminProfileSummary) => Promise<void>;
   onSetProfilePermission: (profile: AdminProfileSummary) => Promise<void>;
   onClearSklandBinding: (profile: AdminProfileSummary) => Promise<void>;
   onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
+  onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
+  onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
 }) {
   const sklandSummary = profile.skland_binding
     ? `${profile.skland_binding.nickname || '-'} / ${profile.skland_binding.uid} / ${profile.skland_binding.channel_name || '-'}`
@@ -1208,6 +1326,8 @@ function ProfileDetailCard({
           <SmallButton onClick={() => void onUpdateProfile(profile)} loading={busyAction === `profile:update_profile:${profile.id}`}>改名称</SmallButton>
           <SmallButton onClick={() => void onSetProfileStatus(profile)} loading={busyAction === `profile:set_profile_status:${profile.id}`}>改状态</SmallButton>
           <SmallButton onClick={() => void onSetProfilePermission(profile)} loading={busyAction === `profile:set_profile_permission:${profile.id}`}>改权限</SmallButton>
+          <SmallButton onClick={() => void onViewOperators(profile)} loading={busyAction === `profile-operators:${profile.id}`}>{operatorsExpanded ? '收起干员' : '查看干员'}</SmallButton>
+          <SmallButton onClick={() => void onDownloadOperators(profile)} loading={busyAction === `profile-operators-download:${profile.id}`}>下载 JSON</SmallButton>
           <SmallButton onClick={() => void onClearSklandBinding(profile)} loading={busyAction === `profile:clear_profile_skland_binding:${profile.id}`} tone="danger">清绑定</SmallButton>
           <SmallButton onClick={() => void onClearWorkspace(profile)} loading={busyAction === `profile:clear_profile_workspace:${profile.id}`} tone="danger">清工作区</SmallButton>
         </div>
@@ -1242,7 +1362,63 @@ function ProfileDetailCard({
           </div>
         </div>
       )}
+      {operatorsExpanded && operatorData && <ProfileOperatorsPanel data={operatorData} />}
     </article>
+  )
+}
+
+function ProfileOperatorsPanel({ data }: { data: AdminProfileOperatorData }) {
+  const operators = data.operators
+  const sklandSummary = data.profile.skland_binding
+    ? `${data.profile.skland_binding.nickname || '-'} / ${data.profile.skland_binding.uid} / ${data.profile.skland_binding.channel_name || '-'}`
+    : '-'
+  return (
+    <div className="mt-4 border-t border-surface-3 pt-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h4 className="text-sm font-semibold text-ink-primary">森空岛干员数据</h4>
+          <p className="mt-1 text-xs text-ink-muted">生成时间：{formatDate(data.generated_at)}</p>
+        </div>
+        <div className="grid gap-2 text-xs text-ink-secondary sm:grid-cols-3 lg:min-w-[420px]">
+          <span className="rounded-md bg-surface-2 px-2 py-1">总记录 {data.total_operator_records}</span>
+          <span className="rounded-md bg-surface-2 px-2 py-1">拥有 {data.owned_operator_count}</span>
+          <span className="rounded-md bg-surface-2 px-2 py-1">更新 {formatDate(data.profile.workspace_updated_at)}</span>
+        </div>
+      </div>
+      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+        <DetailItem label="档案" value={data.profile.display_name || data.profile.id} />
+        <DetailItem label="档案状态" value={appUserStatusLabels[data.profile.status]} />
+        <DetailItem label="森空岛绑定" value={sklandSummary} />
+      </dl>
+      <div className="mt-3 overflow-x-auto rounded-lg border border-surface-3">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
+            <tr>
+              <th className="px-3 py-2">干员</th>
+              <th className="px-3 py-2">ID</th>
+              <th className="px-3 py-2">拥有</th>
+              <th className="px-3 py-2">精英化</th>
+              <th className="px-3 py-2">等级</th>
+              <th className="px-3 py-2">稀有度</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-surface-3">
+            {operators.length === 0 ? (
+              <tr><td colSpan={6} className="px-3 py-8 text-center text-ink-muted">该档案暂无干员数据。</td></tr>
+            ) : operators.map((operator, index) => (
+              <tr key={`${operator.id}-${index}`} className="hover:bg-surface-2/50">
+                <td className="px-3 py-2 font-medium text-ink-primary">{operator.name || '-'}</td>
+                <td className="px-3 py-2 font-mono text-xs text-ink-muted">{operator.id || '-'}</td>
+                <td className="px-3 py-2 text-ink-secondary">{operator.own === false ? '否' : '是'}</td>
+                <td className="px-3 py-2 text-ink-secondary">{formatOperatorValue(operator.elite)}</td>
+                <td className="px-3 py-2 text-ink-secondary">{formatOperatorValue(operator.level)}</td>
+                <td className="px-3 py-2 text-ink-secondary">{formatOperatorValue(operator.rarity)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
@@ -1891,6 +2067,45 @@ function isAppUserStatus(status: string): status is AppUserStatus {
 
 function formatNullableNumber(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) ? String(value) : '-'
+}
+
+function downloadOperatorsJson(data: AdminProfileOperatorData): void {
+  const blob = new Blob([JSON.stringify(data.operators, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `skland-operators-${formatFileSegment(data.profile.id)}-${formatDownloadTimestamp()}.json`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function formatFileSegment(value: string): string {
+  return value.slice(0, 8).replace(/[^A-Za-z0-9_-]/g, '') || 'profile'
+}
+
+function formatDownloadTimestamp(date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join('') + `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+}
+
+function formatOperatorValue(value: unknown): string {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  if (typeof value === 'string' && value.trim()) return value
+  return '-'
+}
+
+function omitProfileOperatorData(
+  current: Record<string, AdminProfileOperatorData>,
+  profileId: string,
+): Record<string, AdminProfileOperatorData> {
+  if (!(profileId in current)) return current
+  const next = { ...current }
+  delete next[profileId]
+  return next
 }
 
 function formatRiskDetail(detail: Record<string, unknown>): string {

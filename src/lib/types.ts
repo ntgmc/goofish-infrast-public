@@ -20,6 +20,14 @@ export interface LicenseConfig {
     manufacturing_stations: Record<string, number>;
   };
   Fiammetta?: { enable: boolean; candidate_mode?: string };
+  optimizer_search?: {
+    beam?: boolean;
+    candidate_limit?: number;
+    beam_width?: number;
+    trace_search?: boolean;
+    trace_dynamic_rules?: boolean;
+    trace_candidates?: boolean;
+  };
   drones?: {
     enable: boolean;
     auto?: boolean;
@@ -220,6 +228,7 @@ export interface DepotValueResponse {
 export interface UpgradeTaskPayload {
   tasks: RawUpgradeTask[];
   baselineScore: number;
+  baselineDailySanity?: number;
   currentFiammettaTargets?: string[];
   potentialFiammettaTargets?: string[];
 }
@@ -229,6 +238,7 @@ export interface RawUpgradeTask {
   rule: unknown | null;
   roomName: string;
   estimatedGain: number;
+  impact_sources?: UpgradeImpactRoom[];
 }
 
 export interface AssignmentResult {
@@ -343,6 +353,7 @@ export interface UpgradeTrainingCost {
     target_elite: number;
   };
   totals: UpgradeTrainingCostBucket;
+  available?: UpgradeTrainingCostBucket;
   missing: UpgradeTrainingCostBucket;
   equivalent_sanity: number | null;
   unpriced_items: UpgradeTrainingMaterial[];
@@ -353,6 +364,38 @@ export interface UpgradeTrainingCost {
   };
   warnings: string[];
   operators: UpgradeTrainingOperatorCost[];
+}
+
+export interface UpgradeImpactRoom {
+  room_name: string;
+  room_type: string;
+  product: string;
+  rule_description: string;
+  operators: string[];
+  missing_operators: string[];
+  estimated_gain: number;
+}
+
+export interface UpgradeImpact {
+  rooms: UpgradeImpactRoom[];
+  summary?: string;
+}
+
+export interface UpgradeSuggestionRoi {
+  efficiency_gain: number;
+  daily_sanity_gain: number | null;
+  payback_days: number | null;
+  payback_basis: 'missing_sanity';
+  unavailable_reason?: string;
+}
+
+export interface UpgradePartialOutcome {
+  missing_operator: { id?: string; name: string; current?: number; target?: number };
+  remaining_ops: { id?: string; name: string; current?: number; target?: number }[];
+  efficiency_gain: number;
+  daily_sanity_gain: number | null;
+  has_benefit: boolean;
+  rooms: string;
 }
 
 export type RawUpgradeSuggestion = (
@@ -375,6 +418,11 @@ export type RawUpgradeSuggestion = (
     }
 ) & {
   training_cost?: UpgradeTrainingCost;
+  roi?: UpgradeSuggestionRoi;
+  impact?: UpgradeImpact;
+  partial_outcomes?: UpgradePartialOutcome[];
+  partial_outcomes_truncated?: boolean;
+  partial_outcomes_unavailable_reason?: string;
 };
 
 export interface RoomOverflow {
@@ -482,12 +530,19 @@ export interface UpgradeSuggestion {
   name?: string;
   ops?: { id?: string; name: string; current?: number; target?: number; current_elite?: number; target_elite?: number }[];
   gain: number;
+  rooms?: string;
+  specialType?: string;
   current_elite?: number;
   target_elite?: number;
   current?: number;
   target?: number;
   desc?: string;
   training_cost?: UpgradeTrainingCost;
+  roi?: UpgradeSuggestionRoi;
+  impact?: UpgradeImpact;
+  partial_outcomes?: UpgradePartialOutcome[];
+  partial_outcomes_truncated?: boolean;
+  partial_outcomes_unavailable_reason?: string;
 }
 
 export interface AuthUser {

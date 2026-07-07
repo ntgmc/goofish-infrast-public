@@ -494,6 +494,13 @@ export default function OptimizePage({
                   gain: Math.round(s.gain),
                   desc: `${s.name}: 精${s.current} → 精${s.target}`,
                   training_cost: s.training_cost,
+                  rooms: s.rooms,
+                  specialType: s.specialType,
+                  roi: s.roi,
+                  impact: s.impact,
+                  partial_outcomes: s.partial_outcomes,
+                  partial_outcomes_truncated: s.partial_outcomes_truncated,
+                  partial_outcomes_unavailable_reason: s.partial_outcomes_unavailable_reason,
                 }
               }
               return {
@@ -504,10 +511,19 @@ export default function OptimizePage({
                 ops: s.ops?.map(o => ({
                   id: o.id || o.name,
                   name: o.name,
+                  current: o.current,
+                  target: o.target,
                   current_elite: o.current,
                   target_elite: o.target,
                 })),
                 training_cost: s.training_cost,
+                rooms: s.rooms,
+                specialType: s.specialType,
+                roi: s.roi,
+                impact: s.impact,
+                partial_outcomes: s.partial_outcomes,
+                partial_outcomes_truncated: s.partial_outcomes_truncated,
+                partial_outcomes_unavailable_reason: s.partial_outcomes_unavailable_reason,
               }
             })
         : []

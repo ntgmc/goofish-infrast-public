@@ -127,6 +127,113 @@
       }
     ]
   },
+  "operator_groups": {
+    "abyssal_hunters": {
+      "name": "深海猎人",
+      "operators": [
+        "斯卡蒂",
+        "浊心斯卡蒂",
+        "幽灵鲨",
+        "归溟幽灵鲨",
+        "歌蕾蒂娅",
+        "安哲拉",
+        "乌尔比安",
+        "深巡",
+        "海沫"
+      ]
+    },
+    "durin": {
+      "name": "杜林族",
+      "operators": [
+        "杜林",
+        "桃金娘",
+        "褐果",
+        "至简"
+      ]
+    },
+    "sui": {
+      "name": "岁",
+      "operators": [
+        "年",
+        "夕",
+        "令",
+        "重岳",
+        "黍"
+      ]
+    },
+    "elite_operators": {
+      "name": "精英干员",
+      "operators": [
+        "阿米娅",
+        "凯尔希",
+        "煌",
+        "迷迭香",
+        "W",
+        "逻各斯",
+        "Stormeye",
+        "Mechanist",
+        "Sharp",
+        "Touch",
+        "Pith",
+        "Misery",
+        "Outcast",
+        "Ace",
+        "Scout"
+      ]
+    },
+    "laterano": {
+      "name": "拉特兰",
+      "operators": [
+        "能天使",
+        "蕾缪安",
+        "莫斯提马",
+        "菲亚梅塔",
+        "空弦",
+        "安德切尔",
+        "送葬人",
+        "圣约送葬人",
+        "铅踝",
+        "见行者",
+        "隐现",
+        "奥伦"
+      ]
+    },
+    "glasgow": {
+      "name": "格拉斯哥帮",
+      "operators": [
+        "推进之王",
+        "维娜·维多利亚",
+        "因陀罗",
+        "摩根",
+        "达格达"
+      ]
+    },
+    "rhine_lab": {
+      "name": "莱茵生命",
+      "operators": [
+        "塞雷娅",
+        "伊芙利特",
+        "赫默",
+        "淬羽赫默",
+        "白面鸮",
+        "梅尔",
+        "麦哲伦",
+        "多萝西",
+        "缪尔赛思",
+        "星源"
+      ]
+    },
+    "pinus_sylvestris": {
+      "name": "红松骑士团",
+      "operators": [
+        "焰尾",
+        "灰毫",
+        "远牙",
+        "野鬃",
+        "蚀清"
+      ]
+    }
+  },
   "combination_rules": {
     "trading_station": {
       "巫恋组": {
@@ -402,16 +509,46 @@
             "apply_each": true,
             "priority": 2500
           },
-          {
-            "combo": [
-              "深巡/2",
-              "赫德雷/2"
+        {
+          "combo": [
+            "深巡/2"
+          ],
+          "efficiency": 40,
+          "note": "旧静态40%；动态=30%+乌尔比安在基建内10%",
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 30,
+            "per_operator": 10,
+            "operators": [
+              "乌尔比安"
             ],
-            "efficiency": 40,
-            "apply_each": true,
-            "note": "30%-40%",
-            "priority": 2500
+            "dependency_scope": "facility",
+            "scope": "trading_station",
+            "detail": "old_static=40; dynamic=30+10 if Ulpianus is assigned in facility"
           },
+          "priority": 2500
+        },
+        {
+          "combo": [
+            "赫德雷/2"
+          ],
+          "efficiency": 40,
+          "note": "旧静态40%；动态=30%+伊内丝/W在工作场所各5%",
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 30,
+            "per_operator": 5,
+            "operators": [
+              "伊内丝",
+              "W"
+            ],
+            "dependency_scope": "workplace",
+            "cap": 2,
+            "scope": "trading_station",
+            "detail": "old_static=40; dynamic=30+5 for each of Ines/W assigned in workplace"
+          },
+          "priority": 2500
+        },
           {
             "combo": [
               "月见夜",
@@ -477,13 +614,21 @@
             "apply_each": true,
             "priority": 2250
           },
-          {
-            "combo": [
-              "石英/1"
-            ],
-            "efficiency": 34,
-            "priority": 2200
+        {
+          "combo": [
+            "石英/1"
+          ],
+          "efficiency": 34,
+          "note": "旧静态34%；动态=30%+2%*制造配方种类数",
+          "dynamic_effects": {
+            "type": "manufacturing_recipe_kinds",
+            "base": 30,
+            "per_recipe_kind": 2,
+            "scope": "trading_station",
+            "detail": "old_static=34; dynamic=30+2*manufacturingRecipeKinds"
           },
+          "priority": 2200
+        },
           {
             "combo": [
               "贝洛内/2"
@@ -682,15 +827,6 @@
           },
           {
             "combo": [
-              "鸿雪/2",
-              "图耶/2"
-            ],
-            "efficiency": -185,
-            "note": "2赤金线，暂不实现",
-            "priority": -1
-          },
-          {
-            "combo": [
               "黑键/2",
               "伺夜/2"
             ],
@@ -717,15 +853,6 @@
             ],
             "efficiency": -200,
             "note": "黑键满挂件（迷迭香）暂不考虑",
-            "priority": -1
-          },
-          {
-            "combo": [
-              "（需要研究）鸿雪/2",
-              "图耶/2"
-            ],
-            "efficiency": -301,
-            "note": "（较麻烦需要研究）绮良跨站, 4赤金4杜林",
             "priority": -1
           }
         ]
@@ -1051,9 +1178,26 @@
             "鸿雪/2",
             "图耶/2"
           ],
-          "efficiency": -80,
-          "note": "2赤金线，暂不实现",
-          "priority": -1
+          "efficiency": 20,
+          "note": "动态：图耶β按实际+虚拟赤金线计算；鸿雪提供杜林族虚拟赤金线。",
+          "dynamic_line_contributions": [
+            {
+              "type": "durin_facility_count",
+              "group": "durin",
+              "cap": 4,
+              "detail": "Pozemka E2: each Durin in facility contributes one virtual Pure Gold line, capped at 4"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "pure_gold_line_step",
+            "base": 5,
+            "per_step": 15,
+            "step_size": 2,
+            "include_virtual": true,
+            "scope": "trading_station",
+            "detail": "old_placeholder=-80; dynamic=Tuye E2 5+15*floor((actualPureGoldLines+virtualLines)/2)"
+          },
+          "priority": 2600
         },
         {
           "combo": [
@@ -1061,19 +1205,33 @@
             "鸿雪/2",
             "图耶/2"
           ],
-          "efficiency": -110,
-          "note": "2赤金线4杜林,权重低，暂不实现",
-          "priority": -1
-        },
-        {
-          "combo": [
-            "绮良/2",
-            "鸿雪/2",
-            "图耶/2"
+          "efficiency": 40,
+          "note": "动态：鸿雪/绮良提供虚拟赤金线，图耶β按实际+虚拟赤金线计算。",
+          "dynamic_line_contributions": [
+            {
+              "type": "durin_facility_count",
+              "group": "durin",
+              "cap": 4,
+              "detail": "Pozemka E2: each Durin in facility contributes one virtual Pure Gold line, capped at 4"
+            },
+            {
+              "type": "pure_gold_line_step",
+              "step_size": 2,
+              "per_step": 2,
+              "include_virtual": true,
+              "detail": "Kirara E2: every 2 Pure Gold lines contributes 2 virtual Pure Gold lines"
+            }
           ],
-          "efficiency": -160,
-          "note": "4赤金线4杜林，暂不实现",
-          "priority": -1
+          "dynamic_effects": {
+            "type": "pure_gold_line_step",
+            "base": 10,
+            "per_step": 15,
+            "step_size": 2,
+            "include_virtual": true,
+            "scope": "trading_station",
+            "detail": "old_placeholders=-110/-160; dynamic=Kirara base 5 + Tuye E2 5+15*floor((actualPureGoldLines+virtualLines)/2)"
+          },
+          "priority": 2600
         }
       ],
       "通用单人": [
@@ -1115,12 +1273,42 @@
         },
         {
           "combo": [
-            "深巡/2",
+            "深巡/2"
+          ],
+          "efficiency": 40,
+          "note": "旧静态40%；动态=30%+乌尔比安在基建内10%",
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 30,
+            "per_operator": 10,
+            "operators": [
+              "乌尔比安"
+            ],
+            "dependency_scope": "facility",
+            "scope": "trading_station",
+            "detail": "old_static=40; dynamic=30+10 if Ulpianus is assigned in facility"
+          },
+          "priority": 4000
+        },
+        {
+          "combo": [
             "赫德雷/2"
           ],
           "efficiency": 40,
-          "apply_each": true,
-          "note": "30%-40%",
+          "note": "旧静态40%；动态=30%+伊内丝/W在工作场所各5%",
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 30,
+            "per_operator": 5,
+            "operators": [
+              "伊内丝",
+              "W"
+            ],
+            "dependency_scope": "workplace",
+            "cap": 2,
+            "scope": "trading_station",
+            "detail": "old_static=40; dynamic=30+5 for each of Ines/W assigned in workplace"
+          },
           "priority": 4000
         },
         {
@@ -1165,7 +1353,93 @@
             "石英/1"
           ],
           "efficiency": 34,
+          "note": "旧静态34%；动态=30%+2%*制造配方种类数",
+          "dynamic_effects": {
+            "type": "manufacturing_recipe_kinds",
+            "base": 30,
+            "per_recipe_kind": 2,
+            "scope": "trading_station",
+            "detail": "old_static=34; dynamic=30+2*manufacturingRecipeKinds"
+          },
           "priority": 3400
+        },
+        {
+          "combo": [
+            "鸿雪"
+          ],
+          "efficiency": 10,
+          "note": "动态：每条赤金生产线+5%。",
+          "dynamic_effects": {
+            "type": "pure_gold_line_count",
+            "base": 0,
+            "per_pure_gold_line": 5,
+            "include_virtual": true,
+            "scope": "trading_station",
+            "detail": "dynamic=5*(actualPureGoldLineCount+virtualPureGoldLineContribution)"
+          },
+          "priority": 1700
+        },
+        {
+          "combo": [
+            "图耶"
+          ],
+          "efficiency": 5,
+          "note": "动态：物流规划α，基础5%，每4条赤金线额外15%。",
+          "dynamic_effects": {
+            "type": "pure_gold_line_step",
+            "base": 5,
+            "per_step": 15,
+            "step_size": 4,
+            "include_virtual": true,
+            "scope": "trading_station",
+            "detail": "dynamic=5+15*floor((actualPureGoldLineCount+virtualPureGoldLineContribution)/4)"
+          },
+          "priority": 1600
+        },
+        {
+          "combo": [
+            "图耶/2"
+          ],
+          "efficiency": 20,
+          "note": "动态：物流规划β，基础5%，每2条赤金线额外15%。",
+          "dynamic_effects": {
+            "type": "pure_gold_line_step",
+            "base": 5,
+            "per_step": 15,
+            "step_size": 2,
+            "include_virtual": true,
+            "scope": "trading_station",
+            "detail": "dynamic=5+15*floor((actualPureGoldLineCount+virtualPureGoldLineContribution)/2)"
+          },
+          "priority": 2300
+        },
+        {
+          "combo": [
+            "绮良"
+          ],
+          "efficiency": 5,
+          "note": "动态：订单流可视化α，基础5%，每4条赤金线提供2条虚拟赤金线。",
+          "dynamic_line_contributions": {
+            "type": "pure_gold_line_step",
+            "step_size": 4,
+            "per_step": 2,
+            "detail": "Kirara E0: every 4 actual Pure Gold lines contributes 2 virtual Pure Gold lines"
+          },
+          "priority": 1500
+        },
+        {
+          "combo": [
+            "绮良/2"
+          ],
+          "efficiency": 5,
+          "note": "动态：订单流可视化β，基础5%，每2条赤金线提供2条虚拟赤金线。",
+          "dynamic_line_contributions": {
+            "type": "pure_gold_line_step",
+            "step_size": 2,
+            "per_step": 2,
+            "detail": "Kirara E2: every 2 actual Pure Gold lines contributes 2 virtual Pure Gold lines"
+          },
+          "priority": 1500
         },
         {
           "combo": [
@@ -1923,7 +2197,15 @@
           "product": [
             "Pure Gold"
           ],
-          "note": "20%*N,N=贸易站数",
+          "note": "旧静态40%；动态=20%*贸易站数",
+          "dynamic_effects": {
+            "type": "trading_station_count",
+            "base": 0,
+            "per_trading_station": 20,
+            "product": "Pure Gold",
+            "scope": "manufacturing_station",
+            "detail": "old_static=40; dynamic=20*tradingStationsCount"
+          },
           "priority": 4080
         },
         {
@@ -1962,7 +2244,15 @@
           "product": [
             "Pure Gold"
           ],
-          "note": "33%-39%",
+          "note": "旧静态39%；动态=30%+3%*贸易站数",
+          "dynamic_effects": {
+            "type": "trading_station_count",
+            "base": 30,
+            "per_trading_station": 3,
+            "product": "Pure Gold",
+            "scope": "manufacturing_station",
+            "detail": "old_static=39; dynamic=30+3*tradingStationsCount"
+          },
           "priority": 3980
         },
         {
