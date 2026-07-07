@@ -72,8 +72,10 @@ export default function ResultPanel({
   const isMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_autofill'
   const isAnalysis = variant === 'analysis' || result.analysis_summary?.source === 'imported_schedule'
   const analysisSummary = result.analysis_summary
-  const { totalEff, plans, productionStats, productionSanity, detailStats } = useMemo(() => {
-    const totalEff = result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
+  const { totalEff, rawTotalEff, plans, productionStats, productionSanity, detailStats } = useMemo(() => {
+    const rawTotalEff = result.raw_total_efficiency ??
+      result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
+    const totalEff = result.total_efficiency ?? rawTotalEff
     const plans: PreparedPlan[] = result.plans.map((plan) => ({
       ...plan,
           rows: Object.entries(plan.rooms ?? {}).flatMap(([roomType, rooms]) => {
@@ -134,7 +136,7 @@ export default function ResultPanel({
       roomCount: plans.reduce((sum, plan) => sum + plan.rows.length, 0),
     }
 
-    return { totalEff, plans, productionStats, productionSanity, detailStats }
+    return { totalEff, rawTotalEff, plans, productionStats, productionSanity, detailStats }
   }, [result, isRotationMode, isMaaDormitoryAutofill])
 
   const shiftPattern = result.shift_pattern ?? result.shift_hours?.map((hour) => `${hour}h`).join('-') ?? result.planTimes
@@ -272,7 +274,13 @@ export default function ResultPanel({
           ) : isRotationMode ? (
             <MetricCard label="预设队列" value={String(detailStats.planCount)} suffix="组" highlight />
           ) : (
-            <MetricCard label="预计总效率" value={totalEff.toFixed(2)} suffix="%" highlight />
+            <MetricCard
+              label="预计总效率"
+              value={totalEff.toFixed(2)}
+              suffix="%"
+              note={Math.abs(totalEff - rawTotalEff) >= 0.05 ? `原始房间和 ${rawTotalEff.toFixed(2)}%` : undefined}
+              highlight
+            />
           )}
           <MetricCard
             label={isRotationMode ? '房间预设' : '制造站产量'}
