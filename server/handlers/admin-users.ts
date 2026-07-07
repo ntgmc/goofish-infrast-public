@@ -56,7 +56,16 @@ export default async (req: Request): Promise<Response> => {
       if (!(await authenticateAdminRequest(req))) {
         return jsonResponse({ error: '管理账号或密码错误。' }, 401)
       }
-      const userId = new URL(req.url).searchParams.get('user_id')
+      const url = new URL(req.url)
+      const userId = url.searchParams.get('user_id')
+      const profileId = url.searchParams.get('profile_id')
+      if (url.searchParams.get('include') === 'operators') {
+        const user = await findTargetUser({ user_id: userId })
+        if (!user) return jsonResponse({ error: '用户不存在。' }, 404)
+        const profile = await findTargetProfile({ profile_id: profileId }, user)
+        if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
+        return jsonResponse({ operator_data: await buildAdminProfileOperatorData(user, profile) })
+      }
       if (userId) {
         const user = await getUserById(userId)
         if (!user) return jsonResponse({ error: '用户不存在。' }, 404)
@@ -302,6 +311,38 @@ async function buildAdminProfileSummary(profile: UserGameAccountRecord) {
       : null,
     workspace: summarizeWorkspace(workspace),
     cdk: summarizeCdkForProfile(cdk),
+  }
+}
+
+async function buildAdminProfileOperatorData(user: UserAccountRecord, profile: UserGameAccountRecord) {
+  const workspace = await getProfileWorkspace(profile.id)
+  const operators = Array.isArray(workspace?.operators) ? workspace.operators : []
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+    },
+    profile: {
+      id: profile.id,
+      display_name: profile.display_name,
+      kind: profile.kind === 'depot_value' ? 'depot_value' : 'cdk',
+      status: profile.status,
+      permission: profile.permission,
+      skland_binding: profile.skland_binding
+        ? {
+            uid: profile.skland_binding.uid,
+            nickname: profile.skland_binding.nickname,
+            channel_name: profile.skland_binding.channel_name,
+            bound_at: profile.skland_binding.bound_at,
+            last_imported_at: profile.skland_binding.last_imported_at,
+          }
+        : null,
+      workspace_updated_at: workspace?.updated_at ?? null,
+    },
+    operators,
+    total_operator_records: operators.length,
+    owned_operator_count: countOwnedOperators(operators),
+    generated_at: new Date().toISOString(),
   }
 }
 
