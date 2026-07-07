@@ -1,7 +1,7 @@
-import type { DailyProduction, OptimizeResult, ShiftRoom } from '../../lib/types'
+import type { DailyProduction, LicenseOperator, OptimizeResult, ShiftRoom } from '../../lib/types'
 import { calculateProductionSanity } from '../../lib/production-sanity'
 import { PRODUCT_LABELS, ROOM_LABELS } from './labels'
-import type { PreparedPlan } from './types'
+import type { PreparedPlan, RoomOperator } from './types'
 
 const MAX_MOOD_FALLBACK = 24
 
@@ -24,50 +24,88 @@ export type PreparedResult = {
     droneGain: DroneGainSummary;
   };
   productionSanity: { value: number; note: string };
+  maaDefaultComparison?: {
+    sanityDelta: number;
+    sanityDeltaNote: string;
+    baselineSanity: number;
+    totalEfficiencyDelta: number;
+    rawTotalEfficiencyDelta: number;
+    lmdDelta: number;
+    goldNetDelta: number;
+    baselineTotalEfficiency: number;
+    baselineLmd: number;
+    baselineGoldNet: number;
+    warnings: string[];
+  };
   detailStats: { planCount: number; roomCount: number };
 }
 
-export function prepareResult(result: OptimizeResult, isRotationMode: boolean, isMaaDormitoryAutofill: boolean): PreparedResult {
+export function prepareResult(
+  result: OptimizeResult,
+  isRotationMode: boolean,
+  isMaaDormitoryAutofill: boolean,
+  operators: LicenseOperator[] = [],
+): PreparedResult {
+  const operatorLookup = buildOperatorLookup(operators)
   const rawTotalEff = result.raw_total_efficiency ??
     result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
   const totalEff = result.total_efficiency ?? rawTotalEff
-  const plans: PreparedPlan[] = result.plans.map((plan) => ({
+  const plans: PreparedPlan[] = result.plans.map((plan, planIndex) => ({
     ...plan,
     rows: Object.entries(plan.rooms ?? {}).flatMap(([roomType, rooms]) => {
       if (!Array.isArray(rooms)) return []
       if (isRotationMode && roomType === 'dormitory') return []
       return rooms.flatMap((room, index) => {
+        const queueLabel = isRotationMode ? plan.name || `队列 ${planIndex + 1}` : plan.name || `班次 ${planIndex + 1}`
         if (roomType === 'dormitory' && isMaaDormitoryAutofill) {
           if (index > 0) return []
           return [{
-            key: `${roomType}-maa-autofill`,
+            key: `${planIndex}-${roomType}-maa-autofill`,
             label: ROOM_LABELS[roomType] || roomType,
             indexLabel: '',
+            roomType,
+            roomIndex: index,
+            queueLabel,
             product: '-',
-            operators: '宿舍由 MAA 自动填满',
+            operators: [],
+            operatorText: '宿舍由 MAA 自动填满',
             efficiency: '-',
             speedEfficiency: '-',
             detail: '导出的 MAA JSON 不写死宿舍干员',
+            detailItems: ['导出的 MAA JSON 不写死宿舍干员'],
             hasAdjustedSpeed: false,
+            isAutofill: true,
           }]
         }
         const ops = room.operators
         if (!Array.isArray(ops) || ops.length === 0) return []
         const efficiency = getDisplayEfficiency(room)
         const speedEfficiency = getEffectiveEfficiency(roomType, room)
-        const detail = [isRotationMode ? '' : getEfficiencyDetail(roomType, room), getMoodDetail(room, isRotationMode)]
+        const hasAdjustedSpeed = Math.abs(speedEfficiency - efficiency) >= 0.05
+        const detailItems = [
+          `${isRotationMode ? '房间效率' : '显示效率'} ${formatPercent(efficiency)}`,
+          `速度效率 ${formatPercent(speedEfficiency)}`,
+          getEfficiencyDetail(roomType, room),
+          getMoodDetail(room, isRotationMode),
+        ].filter(Boolean)
+        const detail = detailItems
           .filter(Boolean)
           .join(' · ')
         return {
-          key: `${roomType}-${index}`,
+          key: `${planIndex}-${roomType}-${index}`,
           label: ROOM_LABELS[roomType] || roomType,
           indexLabel: rooms.length > 1 ? String(index + 1) : '',
+          roomType,
+          roomIndex: index,
+          queueLabel,
           product: formatProduct(room.product),
-          operators: ops.join(', '),
+          operators: resolveRoomOperators(ops, operatorLookup),
+          operatorText: ops.join('、'),
           efficiency: formatPercent(efficiency),
           speedEfficiency: formatPercent(speedEfficiency),
           detail,
-          hasAdjustedSpeed: Math.abs(speedEfficiency - efficiency) >= 0.05,
+          detailItems,
+          hasAdjustedSpeed,
         }
       })
     }),
@@ -85,13 +123,58 @@ export function prepareResult(result: OptimizeResult, isRotationMode: boolean, i
     droneGain,
   }
   const productionSanity = calculateProductionSanity(daily)
+  const maaDefaultComparison = !isRotationMode && result.maa_default_comparison
+    ? (() => {
+        const comparison = result.maa_default_comparison
+        const deltaDaily: Partial<DailyProduction> = {
+          manufacturing: comparison.delta.manufacturing,
+          trading: comparison.delta.trading,
+          consumption: comparison.delta.consumption,
+          net: comparison.delta.net,
+          drones: comparison.delta.drones,
+        }
+        const baselineSanity = calculateProductionSanity(comparison.baseline.daily_production ?? {})
+        const sanityDelta = calculateProductionSanity(deltaDaily)
+        return {
+          sanityDelta: sanityDelta.value,
+          sanityDeltaNote: `相对 MAA 默认 ${formatSigned(sanityDelta.value)} 理智/日（${sanityDelta.note}）`,
+          baselineSanity: baselineSanity.value,
+          totalEfficiencyDelta: comparison.delta.total_efficiency,
+          rawTotalEfficiencyDelta: comparison.delta.raw_total_efficiency,
+          lmdDelta: comparison.delta.trading.LMD ?? 0,
+          goldNetDelta: comparison.delta.net['Pure Gold'] ?? 0,
+          baselineTotalEfficiency: comparison.baseline.total_efficiency,
+          baselineLmd: comparison.baseline.daily_production?.trading?.LMD ?? 0,
+          baselineGoldNet: comparison.baseline.daily_production?.net?.['Pure Gold'] ?? 0,
+          warnings: comparison.warnings,
+        }
+      })()
+    : undefined
 
   const detailStats = {
     planCount: plans.length,
     roomCount: plans.reduce((sum, plan) => sum + plan.rows.length, 0),
   }
 
-  return { totalEff, rawTotalEff, plans, productionStats, productionSanity, detailStats }
+  return { totalEff, rawTotalEff, plans, productionStats, productionSanity, maaDefaultComparison, detailStats }
+}
+
+function buildOperatorLookup(operators: LicenseOperator[]): Map<string, LicenseOperator> {
+  const lookup = new Map<string, LicenseOperator>()
+  for (const operator of operators) {
+    if (!operator?.name) continue
+    lookup.set(operator.name, operator)
+    lookup.set(operator.name.trim(), operator)
+  }
+  return lookup
+}
+
+function resolveRoomOperators(names: string[], lookup: Map<string, LicenseOperator>): RoomOperator[] {
+  return names.map((name) => {
+    const operator = lookup.get(name) ?? lookup.get(name.trim())
+    const id = typeof operator?.id === 'string' && operator.id ? operator.id : undefined
+    return { name, id }
+  })
 }
 
 export function formatProduct(product?: string): string {

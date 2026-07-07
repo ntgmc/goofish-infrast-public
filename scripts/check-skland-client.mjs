@@ -83,6 +83,32 @@ globalThis.fetch = async (url, init) => {
     return jsonResponse({ code: 0, message: 'OK', data: { token: 'skland-token' }, timestamp: 1700000000 })
   }
   if (String(url).endsWith('/api/v1/game/player/binding')) {
+    if (init?.headers?.cred === 'blank-default-uid-cred') {
+      return jsonResponse({
+        code: 0,
+        message: 'OK',
+        data: {
+          list: [{
+            appCode: 'arknights',
+            defaultUid: '',
+            bindingList: [{
+              uid: '130761348',
+              nickName: 'Blank Default Doctor',
+              channelName: '官服',
+            }],
+          }, {
+            appCode: 'endfield',
+            bindingList: [{
+              uid: '434207645',
+              nickName: '',
+              channelName: '官服',
+              roles: [{ roleId: '1384481039', nickname: 'Endfield Doctor' }],
+              defaultRole: { roleId: '1384481039', nickname: 'Endfield Doctor' },
+            }],
+          }],
+        },
+      })
+    }
     return jsonResponse({
       code: 0,
       message: 'OK',
@@ -130,6 +156,21 @@ if (cred !== 'skland-cred') throw new Error('cred exchange failed')
 const imported = await skland.importSklandOperatorsByCred(cred)
 if (imported.binding.uid !== '12345678' || imported.operators.length !== 1) {
   throw new Error('skland import flow failed')
+}
+const blankDefaultUidImported = await skland.importSklandOperatorsByCred('blank-default-uid-cred')
+if (
+  blankDefaultUidImported.binding.uid !== '130761348'
+  || blankDefaultUidImported.binding.nickname !== 'Blank Default Doctor'
+  || blankDefaultUidImported.binding.channel_name !== '官服'
+  || blankDefaultUidImported.operators.length !== 1
+) {
+  throw new Error(`blank defaultUid import flow failed: ${JSON.stringify(blankDefaultUidImported.binding)}`)
+}
+if (!calls.some((call) => String(call.url).endsWith('/api/v1/game/player/info?uid=130761348'))) {
+  throw new Error('blank defaultUid import should read Arknights player info by bindingList uid')
+}
+if (calls.some((call) => String(call.url).endsWith('/api/v1/game/player/info?uid=434207645'))) {
+  throw new Error('blank defaultUid import should ignore Endfield uid')
 }
 const refreshCallsBeforeCultivate = calls.filter((call) => String(call.url).endsWith('/api/v1/auth/refresh')).length
 const cultivateClient = new skland.SklandClient('cultivate-cred')

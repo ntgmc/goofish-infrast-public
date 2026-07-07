@@ -279,6 +279,7 @@ export interface OptimizeResult {
   daily_production?: DailyProduction;
   total_efficiency?: number;
   raw_total_efficiency?: number;
+  maa_default_comparison?: MaaDefaultComparison;
   upgrade_suggestions?: RawUpgradeSuggestion[];
   current_result?: OptimizeResult;
   upgrade_task_payload?: UpgradeTaskPayload;
@@ -448,6 +449,8 @@ export interface ShiftRoom {
   efficiency?: number;
   final_efficiency?: number;
   overflow?: RoomOverflow;
+  dynamic_resources?: Record<string, number>;
+  dynamic_resource_details?: Record<string, unknown>[];
   mood?: Record<string, {
     start?: number;
     cost_per_hour?: number;
@@ -487,7 +490,38 @@ export interface DailyProduction {
   consumption?: Record<string, number>;
   net?: Record<string, number>;
   drones?: Record<string, number>;
+  dynamic_resources?: Record<string, number>;
+  dynamic_resource_details?: Record<string, unknown>[];
   details?: Record<string, unknown>[];
+}
+
+export interface DailyProductionDelta {
+  total_efficiency: number;
+  raw_total_efficiency: number;
+  manufacturing: Record<string, number>;
+  trading: Record<string, number>;
+  consumption: Record<string, number>;
+  net: Record<string, number>;
+  drones: Record<string, number>;
+}
+
+export interface MaaDefaultComparison {
+  source: 'maa_default_simulation_v1';
+  simulation: {
+    algorithm: 'maa_default_room_local_greedy_v1' | string;
+    facility_order: string[];
+    drones: 'Money' | string;
+    shift_hours: number[];
+  };
+  baseline: {
+    daily_production: DailyProduction;
+    total_efficiency: number;
+    raw_total_efficiency: number;
+    plan_count: number;
+    room_count: number;
+  };
+  delta: DailyProductionDelta;
+  warnings: string[];
 }
 
 export interface ShiftPlan {
@@ -508,6 +542,8 @@ export interface ShiftPlan {
     mood_recovery?: Record<string, unknown>;
   };
   drones?: DroneAssignment;
+  dynamic_resources?: Record<string, number>;
+  dynamic_resource_details?: Record<string, unknown>[];
   mood_valid?: boolean;
   mood_errors?: Record<string, unknown>[];
     mood_assumptions?: {

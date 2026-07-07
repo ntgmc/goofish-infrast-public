@@ -1,0 +1,68 @@
+name: Sync Operator Avatars
+
+on:
+  schedule:
+    - cron: "10 20 * * *"
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch to update with synced operator avatars
+        required: true
+        default: dev
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: operator-avatar-sync-${{ github.event.inputs.target_branch || 'dev' }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "20"
+  TARGET_BRANCH: ${{ github.event.inputs.target_branch || 'dev' }}
+
+jobs:
+  sync:
+    name: Sync operator avatars
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Sync operator avatars
+        env:
+          GITHUB_TOKEN: ${{ secrets.OPERATOR_AVATAR_SOURCE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: npm run sync:operator-avatars
+
+      - name: Commit synced avatars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$(git status --porcelain -- public/webp96)" ]]; then
+            echo "Operator avatars are already up to date."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A public/webp96
+
+          if git diff --cached --quiet; then
+            echo "No staged operator avatar changes."
+            exit 0
+          fi
+
+          git commit -m "ci: 同步干员头像资源"
+          git pull --rebase origin "$TARGET_BRANCH"
+          git push origin "HEAD:$TARGET_BRANCH"

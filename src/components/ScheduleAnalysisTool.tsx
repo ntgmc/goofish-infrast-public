@@ -142,7 +142,14 @@ export default function ScheduleAnalysisTool({ compact = false }: ScheduleAnalys
         </button>
       </form>
 
-      {result && <ResultPanel result={result} variant="analysis" detailDefaultOpen={false} />}
+      {result && (
+        <ResultPanel
+          result={result}
+          operators={operators ?? undefined}
+          variant="analysis"
+          detailDefaultOpen={false}
+        />
+      )}
     </div>
   )
 }
