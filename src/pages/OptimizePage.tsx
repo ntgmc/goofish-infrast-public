@@ -1,5 +1,19 @@
 import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import type { Announcement, LicenseConfig, LicenseFile, LicenseOperator, OptimizeRequest, OptimizeResult, UpgradeSuggestion, UpgradeTaskPayload } from '../lib/types'
+import type {
+  Announcement,
+  AuthSuccessResponse,
+  LicenseConfig,
+  LicenseFile,
+  LicenseOperator,
+  OptimizeRequest,
+  OptimizeResult,
+  UpgradeSuggestion,
+  UpgradeTaskPayload,
+  UserWorkspace,
+  WorkspaceResultHistoryItem,
+  WorkspaceSavedConfig,
+  WorkspaceSavedConfigAction,
+} from '../lib/types'
 import { canEditConfig, canReplaceOperators, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../lib/license'
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
 import { getActivationTokenForLicense } from '../lib/activation-token'
@@ -11,6 +25,15 @@ import ScheduleProgress, {
   SCHEDULE_PROGRESS_COMPLETION_DURATION_MS,
   type ScheduleProgressState,
 } from '../components/ScheduleProgress'
+import {
+  describeConfigDiff,
+  downloadOptimizeResult,
+  formatPlanName,
+  formatResultSummary,
+  formatWorkspaceDate,
+  isMaaJsonDownloadable,
+  type ConfigDiffItem,
+} from '../lib/workspace-history'
 
 const ConfigEditor = lazy(() => import('../components/ConfigEditor'))
 const ResultPanel = lazy(() => import('../components/ResultPanel'))
@@ -19,16 +42,21 @@ const UpgradeSuggestions = lazy(() => import('../components/UpgradeSuggestions')
 interface Props {
   profileId: string;
   license: LicenseFile;
+  workspace: UserWorkspace | null;
   setLicense: (v: LicenseFile) => void;
   eliteOverrides: Record<string, number>;
   setEliteOverrides: (v: Record<string, number>) => void;
   configOverride: LicenseConfig | null;
   setConfigOverride: (v: LicenseConfig | null) => void;
+  onWorkspacePatch: (patch: WorkspacePatch) => Promise<AuthSuccessResponse | void>;
   onReset: () => void;
   announcement: Announcement | null;
   redeemedNotice: string | null;
   onRedownloadLicense: (() => void) | null;
 }
+
+type WorkspacePatch = Partial<UserWorkspace> & { saved_config_action?: WorkspaceSavedConfigAction }
+type OptimizePhase = 'idle' | 'history' | 'suggestions' | 'final'
 
 interface LicenseStatusResponse {
   error?: string;
@@ -44,27 +72,34 @@ interface LicenseStatusResponse {
 export default function OptimizePage({
   profileId,
   license,
+  workspace,
   setLicense,
   eliteOverrides,
   setEliteOverrides,
   configOverride,
   setConfigOverride,
+  onWorkspacePatch,
   onReset,
   announcement,
   redeemedNotice,
   onRedownloadLicense,
 }: Props) {
+  const initialHistoryItem = workspace?.result_history?.[0] ?? null
   const [suggestions, setSuggestions] = useState<UpgradeSuggestion[]>([])
   const [currentResult, setCurrentResult] = useState<OptimizeResult | null>(null)
   const [finalResult, setFinalResult] = useState<OptimizeResult | null>(null)
+  const [historyItem, setHistoryItem] = useState<WorkspaceResultHistoryItem | null>(initialHistoryItem)
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState<ScheduleProgressState | null>(null)
-  const [phase, setPhase] = useState<'idle' | 'suggestions' | 'final'>('idle')
+  const [phase, setPhase] = useState<OptimizePhase>(initialHistoryItem ? 'history' : 'idle')
   const [operatorUploadStatus, setOperatorUploadStatus] = useState<string | null>(null)
   const [licenseSyncing, setLicenseSyncing] = useState(true)
   const [licenseSyncStatus, setLicenseSyncStatus] = useState<string | null>(null)
   const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
   const [configToast, setConfigToast] = useState<{ id: number; message: string } | null>(null)
+  const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null)
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null)
+  const [workspaceBusyAction, setWorkspaceBusyAction] = useState<string | null>(null)
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const operatorFileRef = useRef<HTMLInputElement>(null)
   const optimizeInFlightRef = useRef(false)
@@ -90,6 +125,13 @@ export default function OptimizePage({
   const configValidation = useMemo(() => validateConfig(activeConfig), [activeConfig])
   const configValidationMessage = configValidation.ok === false ? configValidation.message : null
   const configPresetLabel = useMemo(() => formatConfigPresetLabel(activeConfig), [activeConfig])
+  const savedConfigs = workspace?.saved_configs ?? []
+  const resultHistory = workspace?.result_history ?? []
+  const latestWorkspaceResult = resultHistory[0] ?? null
+  const configDiffRows = useMemo(
+    () => describeConfigDiff(activeConfig, latestWorkspaceResult?.config ?? null),
+    [activeConfig, latestWorkspaceResult]
+  )
 
   const normalizeAllowedConfigOverride = useCallback((nextConfig: LicenseConfig): LicenseConfig => {
     const next = normalizeConfig(nextConfig)
@@ -138,6 +180,18 @@ export default function OptimizePage({
     }
   }, [])
 
+  useEffect(() => {
+    const nextHistoryItem = workspace?.result_history?.[0] ?? null
+    setSuggestions([])
+    setCurrentResult(null)
+    setFinalResult(null)
+    setHistoryItem(nextHistoryItem)
+    setProgress(null)
+    setPhase(nextHistoryItem ? 'history' : 'idle')
+    setInlineError(null)
+    setLastGeneratedSignature(null)
+  }, [profileId, workspace?.profile_id])
+
   const mergedOperators = useMemo(
     () => mergeOperators(license.operators, eliteOverrides),
     [license.operators, eliteOverrides]
@@ -146,12 +200,13 @@ export default function OptimizePage({
     () => buildOptimizeSignature(mergedOperators, activeConfig),
     [activeConfig, mergedOperators]
   )
-  const hasResult = Boolean(finalResult || currentResult)
+  const hasResult = Boolean(finalResult || currentResult || historyItem)
   const resultIsCurrent = hasResult && lastGeneratedSignature === optimizeSignature
   const clearGeneratedResult = useCallback(() => {
     setSuggestions([])
     setCurrentResult(null)
     setFinalResult(null)
+    setHistoryItem(null)
     setProgress(null)
     setPhase('idle')
     setInlineError(null)
@@ -271,6 +326,101 @@ export default function OptimizePage({
     setInlineError(null)
   }, [clearConfigValidationToast, setConfigOverride])
 
+  const runSavedConfigAction = useCallback(async (
+    busyKey: string,
+    action: WorkspaceSavedConfigAction,
+    successMessage: string,
+  ) => {
+    setWorkspaceBusyAction(busyKey)
+    setWorkspaceError(null)
+    try {
+      await onWorkspacePatch({ saved_config_action: action })
+      setWorkspaceNotice(successMessage)
+    } catch (error) {
+      setWorkspaceError((error as Error).message)
+    } finally {
+      setWorkspaceBusyAction(null)
+    }
+  }, [onWorkspacePatch])
+
+  const handleSaveCurrentConfig = useCallback(async (name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      setWorkspaceError('请填写方案名称。')
+      return
+    }
+    await runSavedConfigAction('save-current', {
+      type: 'save',
+      name: trimmed,
+      config: activeConfig,
+    }, `已保存方案“${trimmed}”。`)
+  }, [activeConfig, runSavedConfigAction])
+
+  const handleRenameSavedConfig = useCallback(async (config: WorkspaceSavedConfig) => {
+    const nextName = window.prompt('新的方案名称', config.name)
+    if (nextName === null) return
+    const trimmed = nextName.trim()
+    if (!trimmed || trimmed === config.name) return
+    await runSavedConfigAction(`rename:${config.id}`, {
+      type: 'rename',
+      id: config.id,
+      name: trimmed,
+    }, `已重命名为“${trimmed}”。`)
+  }, [runSavedConfigAction])
+
+  const handleDeleteSavedConfig = useCallback(async (config: WorkspaceSavedConfig) => {
+    if (!window.confirm(`删除方案“${config.name}”？`)) return
+    await runSavedConfigAction(`delete:${config.id}`, {
+      type: 'delete',
+      id: config.id,
+    }, `已删除方案“${config.name}”。`)
+  }, [runSavedConfigAction])
+
+  const handleUseSavedConfig = useCallback((config: WorkspaceSavedConfig) => {
+    const nextConfig = normalizeAllowedConfigOverride(config.config)
+    setConfigOverride(nextConfig)
+    setCurrentResult(null)
+    setFinalResult(null)
+    setHistoryItem(null)
+    setSuggestions([])
+    setPhase('idle')
+    setLastGeneratedSignature(null)
+    setInlineError(null)
+    setWorkspaceNotice(`已载入方案“${config.name}”，可以继续调整或重新生成。`)
+    void runSavedConfigAction(`touch:${config.id}`, {
+      type: 'touch',
+      id: config.id,
+    }, `已载入方案“${config.name}”。`)
+  }, [normalizeAllowedConfigOverride, runSavedConfigAction, setConfigOverride])
+
+  const handleViewHistory = useCallback((item: WorkspaceResultHistoryItem) => {
+    setCurrentResult(null)
+    setFinalResult(null)
+    setSuggestions([])
+    setHistoryItem(item)
+    setPhase('history')
+    setLastGeneratedSignature(null)
+    setInlineError(null)
+  }, [])
+
+  const handleUseHistoryConfig = useCallback((item: WorkspaceResultHistoryItem) => {
+    handleViewHistory(item)
+    if (!item.config) {
+      setWorkspaceError('这条旧结果没有保存配置快照，只能查看或下载。')
+      return
+    }
+    setConfigOverride(normalizeAllowedConfigOverride(item.config))
+    setWorkspaceNotice(`已载入历史配置“${item.name}”，可继续调整后重新生成。`)
+  }, [handleViewHistory, normalizeAllowedConfigOverride, setConfigOverride])
+
+  const handleDownloadHistory = useCallback((item: WorkspaceResultHistoryItem) => {
+    if (!isMaaJsonDownloadable(item.result)) {
+      setWorkspaceError('游戏内轮换模式不生成 MAA JSON。')
+      return
+    }
+    downloadOptimizeResult(item.result, `maa-schedule-${item.id.slice(0, 8) || 'history'}`)
+  }, [])
+
   const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false) => {
     const payload: OptimizeRequest = {
       profile_id: profileId,
@@ -315,6 +465,8 @@ export default function OptimizePage({
     }
     optimizeInFlightRef.current = true
     setInlineError(null)
+    setHistoryItem(null)
+    setPhase('idle')
     setLoading(true)
     const startedAt = Date.now()
     setProgress({ mode: 'generate', startedAt })
@@ -405,10 +557,13 @@ export default function OptimizePage({
       const data = await apiJson<OptimizeResult>('/api/optimize', {
         method: 'POST',
         json: {
+          profile_id: profileId,
           license,
           operators: mergeOperators(license.operators, newOverrides),
           config: activeConfig,
           ignore_elite: false,
+          activation_token: getActivationTokenForLicense(license),
+          history_source: 'applied_suggestions',
         },
         fallbackMessage: '优化失败',
       })
@@ -430,16 +585,10 @@ export default function OptimizePage({
   }, [activeConfig, eliteOverrides, loading, resultIsCurrent, suggestions, license, profileId, setEliteOverrides])
 
   const handleDownloadMAA = useCallback(() => {
-    const data = finalResult || currentResult
+    const data = finalResult || currentResult || historyItem?.result
     if (!data) return
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'maa_schedule_optimized.json'
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [finalResult, currentResult])
+    downloadOptimizeResult(data, 'maa_schedule_optimized')
+  }, [finalResult, currentResult, historyItem])
 
   const handleSaveWorkfile = useCallback(async () => {
     const savedConfigOverride = configChanged ? activeConfig : undefined
@@ -542,6 +691,25 @@ export default function OptimizePage({
             onReset={onReset}
           />
 
+          <WorkspacePlansPanel
+            activeConfig={activeConfig}
+            savedConfigs={savedConfigs}
+            resultHistory={resultHistory}
+            latestResult={latestWorkspaceResult}
+            selectedHistoryId={historyItem?.id ?? null}
+            diffRows={configDiffRows}
+            busyAction={workspaceBusyAction}
+            notice={workspaceNotice}
+            error={workspaceError}
+            onSaveCurrent={handleSaveCurrentConfig}
+            onUseSavedConfig={handleUseSavedConfig}
+            onRenameSavedConfig={handleRenameSavedConfig}
+            onDeleteSavedConfig={handleDeleteSavedConfig}
+            onViewHistory={handleViewHistory}
+            onUseHistoryConfig={handleUseHistoryConfig}
+            onDownloadHistory={handleDownloadHistory}
+          />
+
         <div className="min-w-0 space-y-4">
           <details
             className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1"
@@ -606,6 +774,15 @@ export default function OptimizePage({
               </div>
             )}
 
+            {phase === 'history' && historyItem && (
+              <Suspense fallback={<ResultFallback />}>
+                <ResultPanel
+                  result={historyItem.result}
+                  onDownload={isMaaJsonDownloadable(historyItem.result) ? handleDownloadMAA : undefined}
+                />
+              </Suspense>
+            )}
+
             {phase === 'suggestions' && currentResult && (
               <Suspense fallback={<ResultFallback />}>
                 <ResultPanel
@@ -640,6 +817,229 @@ export default function OptimizePage({
         </div>
       </main>
     </div>
+  )
+}
+
+function WorkspacePlansPanel({
+  activeConfig,
+  savedConfigs,
+  resultHistory,
+  latestResult,
+  selectedHistoryId,
+  diffRows,
+  busyAction,
+  notice,
+  error,
+  onSaveCurrent,
+  onUseSavedConfig,
+  onRenameSavedConfig,
+  onDeleteSavedConfig,
+  onViewHistory,
+  onUseHistoryConfig,
+  onDownloadHistory,
+}: {
+  activeConfig: LicenseConfig;
+  savedConfigs: WorkspaceSavedConfig[];
+  resultHistory: WorkspaceResultHistoryItem[];
+  latestResult: WorkspaceResultHistoryItem | null;
+  selectedHistoryId: string | null;
+  diffRows: ConfigDiffItem[];
+  busyAction: string | null;
+  notice: string | null;
+  error: string | null;
+  onSaveCurrent: (name: string) => Promise<void>;
+  onUseSavedConfig: (config: WorkspaceSavedConfig) => void;
+  onRenameSavedConfig: (config: WorkspaceSavedConfig) => Promise<void>;
+  onDeleteSavedConfig: (config: WorkspaceSavedConfig) => Promise<void>;
+  onViewHistory: (item: WorkspaceResultHistoryItem) => void;
+  onUseHistoryConfig: (item: WorkspaceResultHistoryItem) => void;
+  onDownloadHistory: (item: WorkspaceResultHistoryItem) => void;
+}) {
+  const [draftName, setDraftName] = useState(formatPlanName(activeConfig))
+
+  useEffect(() => {
+    setDraftName(formatPlanName(activeConfig))
+  }, [activeConfig.desc, activeConfig.layout])
+
+  const saving = busyAction === 'save-current'
+
+  const submitSave = (event: React.FormEvent) => {
+    event.preventDefault()
+    void onSaveCurrent(draftName)
+  }
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
+      <div className="border-b border-surface-3/60 px-5 py-4 sm:px-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-brand-400">我的方案</p>
+            <h2 className="mt-1 text-lg font-semibold text-ink-primary">方案库与历史结果</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">
+              保存常用配置，回看最近生成结果；离开页面后也能重新下载上次 MAA JSON。
+            </p>
+          </div>
+          <form onSubmit={submitSave} className="flex w-full min-w-0 flex-col gap-2 sm:flex-row lg:w-auto">
+            <label className="min-w-0 flex-1 lg:w-56">
+              <span className="sr-only">方案名称</span>
+              <input
+                value={draftName}
+                onChange={(event) => setDraftName(event.currentTarget.value)}
+                maxLength={40}
+                className="min-h-11 w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary"
+                placeholder="例如：243 刷钱"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:cursor-wait disabled:bg-surface-3 disabled:text-ink-muted"
+            >
+              {saving ? '保存中...' : '保存当前配置'}
+            </button>
+          </form>
+        </div>
+        {(notice || error) && (
+          <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${error ? 'border-error/30 bg-error/10 text-error' : 'border-success/30 bg-success/10 text-success'}`}>
+            {error ?? notice}
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-0 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <div className="border-b border-surface-3/60 p-5 sm:p-6 lg:border-b-0 lg:border-r">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-base font-semibold text-ink-primary">上次结果</h3>
+              <p className="mt-1 text-sm leading-6 text-ink-secondary">
+                {latestResult ? `${latestResult.name} · ${formatWorkspaceDate(latestResult.created_at)}` : '还没有生成过排班结果。'}
+              </p>
+            </div>
+            {latestResult && (
+              <span className="rounded-md bg-surface-2 px-2.5 py-1 text-xs font-semibold text-brand-300">
+                {latestResult.source === 'applied_suggestions' ? '建议后' : latestResult.source === 'legacy' ? '旧结果' : '生成'}
+              </span>
+            )}
+          </div>
+          {latestResult ? (
+            <>
+              <p className="mt-3 text-sm text-ink-secondary">{formatResultSummary(latestResult.result)}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <SmallActionButton onClick={() => onViewHistory(latestResult)}>查看</SmallActionButton>
+                <SmallActionButton onClick={() => onDownloadHistory(latestResult)} disabled={!isMaaJsonDownloadable(latestResult.result)}>下载 JSON</SmallActionButton>
+                <SmallActionButton onClick={() => onUseHistoryConfig(latestResult)} disabled={!latestResult.config}>继续调配置</SmallActionButton>
+              </div>
+            </>
+          ) : (
+            <p className="mt-4 rounded-lg bg-surface-2 px-3 py-3 text-sm text-ink-muted">生成一次排班后，这里会保留可回看的上次结果。</p>
+          )}
+        </div>
+
+        <div className="p-5 sm:p-6">
+          <h3 className="text-base font-semibold text-ink-primary">当前方案 vs 上次方案</h3>
+          {latestResult ? (
+            diffRows.length > 0 ? (
+              <div className="mt-4 grid gap-2">
+                {diffRows.map((row) => (
+                  <div key={row.label} className="grid gap-2 rounded-lg bg-surface-2 px-3 py-3 text-sm md:grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)]">
+                    <span className="font-medium text-ink-primary">{row.label}</span>
+                    <span className="min-w-0 text-ink-muted">上次：{row.before}</span>
+                    <span className="min-w-0 text-brand-300">当前：{row.after}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 rounded-lg bg-success/10 px-3 py-3 text-sm text-success">当前配置与上次生成配置一致。</p>
+            )
+          ) : (
+            <p className="mt-4 rounded-lg bg-surface-2 px-3 py-3 text-sm text-ink-muted">暂无上次方案可对比。</p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid border-t border-surface-3/60 lg:grid-cols-2">
+        <div className="border-b border-surface-3/60 p-5 sm:p-6 lg:border-b-0 lg:border-r">
+          <div className="flex items-center justify-between gap-4">
+            <h3 className="text-base font-semibold text-ink-primary">已保存配置</h3>
+            <span className="text-xs text-ink-muted">{savedConfigs.length}/20</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {savedConfigs.length === 0 && <p className="rounded-lg bg-surface-2 px-3 py-3 text-sm text-ink-muted">还没有保存配置。</p>}
+            {savedConfigs.map((item) => (
+              <div key={item.id} className="rounded-lg border border-surface-3 bg-surface-0 px-3 py-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      {formatPlanName(item.config)} · 更新 {formatWorkspaceDate(item.updated_at)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
+                    <SmallActionButton onClick={() => onUseSavedConfig(item)} disabled={busyAction === `touch:${item.id}`}>载入</SmallActionButton>
+                    <SmallActionButton onClick={() => void onRenameSavedConfig(item)} disabled={busyAction === `rename:${item.id}`}>改名</SmallActionButton>
+                    <SmallActionButton onClick={() => void onDeleteSavedConfig(item)} disabled={busyAction === `delete:${item.id}`} tone="danger">删除</SmallActionButton>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-4">
+            <h3 className="text-base font-semibold text-ink-primary">历史结果</h3>
+            <span className="text-xs text-ink-muted">{resultHistory.length}/10</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {resultHistory.length === 0 && <p className="rounded-lg bg-surface-2 px-3 py-3 text-sm text-ink-muted">暂无历史结果。</p>}
+            {resultHistory.map((item) => (
+              <div key={item.id} className={`rounded-lg border px-3 py-3 ${selectedHistoryId === item.id ? 'border-brand-500/60 bg-brand-600/10' : 'border-surface-3 bg-surface-0'}`}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      {formatWorkspaceDate(item.created_at)} · {formatResultSummary(item.result)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
+                    <SmallActionButton onClick={() => onViewHistory(item)}>查看</SmallActionButton>
+                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={!isMaaJsonDownloadable(item.result)}>下载</SmallActionButton>
+                    <SmallActionButton onClick={() => onUseHistoryConfig(item)} disabled={!item.config}>继续调</SmallActionButton>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function SmallActionButton({
+  children,
+  onClick,
+  disabled = false,
+  tone = 'default',
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: 'default' | 'danger';
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex min-h-9 items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-muted ${
+        tone === 'danger'
+          ? 'bg-error/10 text-error hover:bg-error/15'
+          : 'bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
 

@@ -8,11 +8,13 @@ import type {
   LicenseFile,
   UserGameAccount,
   UserWorkspace,
+  WorkspaceSavedConfigAction,
 } from '../../lib/types'
 import { apiJson, apiJsonOrNull, apiVoid } from '../../lib/api-client'
 import { createAccountLicense, isCdkProfile } from './tool-utils'
 
 export type WorkspaceMode = 'dashboard' | 'setup' | 'optimize'
+export type WorkspacePatch = Partial<UserWorkspace> & { saved_config_action?: WorkspaceSavedConfigAction }
 
 export function useToolSession() {
   const [authLoading, setAuthLoading] = useState(true)
@@ -97,7 +99,7 @@ export function useToolSession() {
     }
   }, [applyAuthPayload])
 
-  const persistWorkspacePatch = useCallback(async (patch: Partial<UserWorkspace>) => {
+  const persistWorkspacePatch = useCallback(async (patch: WorkspacePatch) => {
     if (!activeProfile) throw new Error('请先选择游戏账号。')
     const data = await apiJson<AuthSuccessResponse>('/api/user/workspace', {
       method: 'PATCH',
@@ -150,6 +152,7 @@ export function useToolSession() {
     workspaceLoadError,
     applyAuthPayload,
     refreshProfileWorkspace,
+    persistWorkspacePatch,
     handleLogout,
   }
 }

@@ -144,7 +144,7 @@ async function assertManualCredentialConfirm() {
   })
   assertNoSecretLeak(result.body, 'manual credential confirm response')
   if (result.status !== 200 || result.body.skland_import?.operator_count !== 2) {
-    throw new Error(`manual credential confirm: invalid import summary ${result.status}`)
+    throw new Error(`manual credential confirm: invalid import summary ${result.status}: ${JSON.stringify(result.body)}`)
   }
   if (store.profiles.get('profile-manual')?.skland_pending_binding) {
     throw new Error('manual credential confirm: pending binding was not cleared')
@@ -474,6 +474,8 @@ function seedProfile({ id, status }) {
     config: { desc: 'existing config' },
     elite_overrides: { char_old: 2 },
     last_result: { stale: true },
+    saved_configs: [],
+    result_history: [],
     updated_at: now,
   })
 }
@@ -636,23 +638,27 @@ function memoryUserStoreModule() {
   return `
     const store = globalThis.__sklandHandlerSmokeStore
     export function emptyWorkspace(profileId) {
-      return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, updated_at: new Date().toISOString() }
+      return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
     }
     export async function getProfileForUser(userId, profileId) {
       const profile = store.profiles.get(profileId)
       return profile?.user_id === userId ? profile : null
     }
     export async function getProfileWorkspace(profileId) {
-      return store.workspaces.get(profileId) ?? null
+      const workspace = store.workspaces.get(profileId) ?? null
+      return workspace ? normalizeWorkspace(workspace) : null
     }
     export async function saveProfileWorkspace(workspace) {
-      store.workspaces.set(workspace.profile_id, workspace)
+      store.workspaces.set(workspace.profile_id, normalizeWorkspace(workspace))
     }
     export async function saveUserProfile(profile) {
       store.profiles.set(profile.id, profile)
     }
     export function isDepotValueProfile(profile) {
       return profile?.kind === 'depot_value'
+    }
+    function normalizeWorkspace(workspace) {
+      return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }
     }
   `
 }
@@ -720,8 +726,13 @@ function memoryUserAuthModule() {
         config: workspace?.config ?? null,
         elite_overrides: workspace?.elite_overrides ?? {},
         last_result: workspace?.last_result ?? null,
+        saved_configs: workspace?.saved_configs ?? [],
+        result_history: workspace?.result_history ?? [],
         updated_at: workspace?.updated_at ?? null,
       }
+    }
+    function normalizeWorkspace(workspace) {
+      return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }
     }
   `
 }

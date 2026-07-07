@@ -31,6 +31,7 @@ export default function ToolPage() {
     workspaceLoadError,
     applyAuthPayload,
     refreshProfileWorkspace,
+    persistWorkspacePatch,
     handleLogout,
   } = useToolSession()
 
@@ -73,11 +74,13 @@ export default function ToolPage() {
           <OptimizePage
             profileId={activeProfile.id}
             license={license}
+            workspace={workspace}
             setLicense={(next) => setLicense(next)}
             eliteOverrides={eliteOverrides}
             setEliteOverrides={setEliteOverrides}
             configOverride={configOverride}
             setConfigOverride={setConfigOverride}
+            onWorkspacePatch={persistWorkspacePatch}
             onReset={() => setWorkspaceMode('setup')}
             announcement={banner}
             redeemedNotice={null}
