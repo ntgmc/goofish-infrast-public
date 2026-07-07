@@ -1,19 +1,27 @@
-import { randomUUID } from 'node:crypto'
+import { createHmac, randomUUID } from 'node:crypto'
 import QRCode from 'qrcode'
 import type { AuthSuccessResponse, LicenseConfig, SklandCredentialInvalidReason } from '../../src/lib/types'
 import {
   emptyWorkspace,
+  claimFreePreviewUid,
+  deleteFreePreviewClaim,
+  deleteFreePreviewPendingClaim,
+  getFreePreviewClaim,
+  getFreePreviewPendingClaim,
   getProfileForUser,
   getProfileWorkspace,
   isDepotValueProfile,
   isFreePreviewProfile,
+  listProfilesForUser,
   saveProfileWorkspace,
+  saveFreePreviewPendingClaim,
   saveUserProfile,
+  type FreePreviewClaimRecord,
   type SklandBindingRecord,
   type UserGameAccountRecord,
   type UserWorkspaceRecord,
 } from '../storage/user-store'
-import { resolveConfigForPermission, validateConfig, validateOperators } from './license-utils'
+import { requireEnv, resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
 import {
   createHypergryphScan,
   decryptSklandCredential,
@@ -72,6 +80,57 @@ export default async (req: Request): Promise<Response> => {
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
 
     const pathname = new URL(req.url).pathname
+    if (pathname.endsWith('/free-preview/login/start')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const scan = await createHypergryphScan()
+      const qrDataUrl = await QRCode.toDataURL(scan.scanUrl, {
+        width: 300,
+        margin: 2,
+        errorCorrectionLevel: 'M',
+      })
+      return jsonResponse({
+        scan_id: scan.scanId,
+        qr_data_url: qrDataUrl,
+        expires_at: scan.expiresAt,
+      })
+    }
+
+    if (pathname.endsWith('/free-preview/login/complete')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const body = await readJsonBody(req)
+      if (typeof body.scan_id !== 'string' || !body.scan_id.trim()) {
+        return jsonResponse({ error: 'Missing scan_id.' }, 400)
+      }
+      const scanCode = await getScanCode(body.scan_id.trim())
+      if (!scanCode) return jsonResponse({ status: 'pending' }, 202)
+
+      const accountToken = await getHypergryphTokenByScanCode(scanCode)
+      const cred = await getCredByHypergryphToken(accountToken)
+      return createPendingFreePreviewClaimFromCred(auth.user, cred, body.display_name, body.note)
+    }
+
+    if (pathname.endsWith('/free-preview/credential/preview')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const body = await readJsonBody(req)
+      const source = normalizeCredentialSource(body.source)
+      const cred = extractSklandCredential(body.credential_text)
+      if (!cred) return jsonResponse({ error: 'Missing Skland credential.' }, 400)
+      return createPendingFreePreviewClaimFromCred(auth.user, cred, body.display_name, body.note, source)
+    }
+
+    if (pathname.endsWith('/free-preview/login/confirm')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const body = await readJsonBody(req)
+      if (typeof body.confirmation_id !== 'string' || !body.confirmation_id.trim()) {
+        return jsonResponse({ error: 'Missing confirmation_id.' }, 400)
+      }
+      return confirmFreePreviewClaim(auth.user, body.confirmation_id.trim())
+    }
+
     if (pathname.endsWith('/login/start')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       ensureSklandCredentialSecret()
@@ -96,7 +155,7 @@ export default async (req: Request): Promise<Response> => {
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       if (typeof body.scan_id !== 'string' || !body.scan_id.trim()) {
-        return jsonResponse({ error: '缺少 scan_id。' }, 400)
+        return jsonResponse({ error: 'Missing scan_id.' }, 400)
       }
       const scanCode = await getScanCode(body.scan_id.trim())
       if (!scanCode) return jsonResponse({ status: 'pending' }, 202)
@@ -113,7 +172,7 @@ export default async (req: Request): Promise<Response> => {
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       const source = normalizeCredentialSource(body.source)
       const cred = extractSklandCredential(body.credential_text)
-      if (!cred) return jsonResponse({ error: '未识别到森空岛凭据，请检查复制内容。' }, 400)
+      if (!cred) return jsonResponse({ error: 'Missing Skland credential.' }, 400)
       return createPendingSklandBindingFromCred(auth.user, profile, cred, source)
     }
 
@@ -144,7 +203,21 @@ export default async (req: Request): Promise<Response> => {
         return jsonResponse(await saveDepotValueSklandBinding(auth.user, profile))
       }
 
-      const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(pending.encrypted_cred))
+      if (isFreePreviewProfile(profile)) {
+        const claim = await claimFreePreviewProfileUid(auth.user.id, profile, pending, new Date().toISOString())
+        if (!claim.ok) {
+          await recordSklandImport('failure', 'permission_denied', startedAt, profile.id, 'login_confirm')
+          return jsonResponse({ error: claim.message, code: 'free_preview_uid_claimed' }, 409)
+        }
+      }
+
+      let imported: SklandImportSummary
+      try {
+        imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(pending.encrypted_cred))
+      } catch (error) {
+        if (isFreePreviewProfile(profile)) await deleteFreePreviewClaim(hashFreePreviewUid(pending.uid), profile.id)
+        throw error
+      }
       await recordSklandImport('success', 'ok', startedAt, profile.id, 'login_confirm')
       return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
     }
@@ -224,6 +297,145 @@ async function recordSklandImport(
   }
 }
 
+async function createPendingFreePreviewClaimFromCred(
+  user: AuthPayloadUser,
+  cred: string,
+  displayNameValue?: unknown,
+  noteValue?: unknown,
+  source?: CredentialSource,
+): Promise<Response> {
+  const imported = await importSklandOperatorsByCred(cred)
+  const operatorsCheck = validateOperators(imported.operators)
+  if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
+  const preview = toSklandPreview(imported.binding, operatorsCheck.operators.length)
+  const existingPreview = (await listProfilesForUser(user.id)).find((profile) => isFreePreviewProfile(profile))
+  if (existingPreview?.skland_binding) {
+    return jsonResponse({ error: 'This account already has a claimed free preview profile.', code: 'free_preview_already_claimed' }, 409)
+  }
+  if (existingPreview && existingPreview.status !== 'active') {
+    return jsonResponse({ error: 'Free preview profile is not active.' }, 403)
+  }
+
+  const uidHash = hashFreePreviewUid(imported.binding.uid)
+  const existingClaim = await getFreePreviewClaim(uidHash)
+  if (existingClaim && existingClaim.profile_id !== existingPreview?.id) {
+    return jsonResponse({ error: 'This Skland UID has already claimed a free preview profile.', code: 'free_preview_uid_claimed' }, 409)
+  }
+
+  const now = new Date()
+  const confirmationId = randomUUID()
+  await saveFreePreviewPendingClaim({
+    confirmation_id: confirmationId,
+    user_id: user.id,
+    uid: imported.binding.uid,
+    nickname: imported.binding.nickname,
+    channel_name: imported.binding.channel_name,
+    encrypted_cred: encryptSklandCredential(cred),
+    operator_count: operatorsCheck.operators.length,
+    display_name: normalizeProfileDisplayName(displayNameValue),
+    note: normalizeProfileNote(noteValue),
+    created_at: now.toISOString(),
+    expires_at: new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString(),
+  })
+
+  return jsonResponse({
+    status: 'confirm_required',
+    confirmation_id: confirmationId,
+    skland_preview: preview,
+    warning: source === 'bookmarklet'
+      ? 'Bookmarklet credential was read. Confirm the nickname and UID before creating the free preview profile.'
+      : 'Confirm the nickname and UID before creating the free preview profile.',
+  })
+}
+
+async function confirmFreePreviewClaim(user: AuthPayloadUser, confirmationId: string): Promise<Response> {
+  const pending = await getFreePreviewPendingClaim(user.id, confirmationId)
+  if (!pending) {
+    return jsonResponse({ error: 'Free preview confirmation has expired. Please log in to Skland again.' }, 400)
+  }
+  if (Date.now() > Date.parse(pending.expires_at)) {
+    await deleteFreePreviewPendingClaim(user.id, confirmationId)
+    return jsonResponse({ error: 'Free preview confirmation has expired. Please log in to Skland again.' }, 400)
+  }
+
+  const profiles = await listProfilesForUser(user.id)
+  const existingPreview = profiles.find((profile) => isFreePreviewProfile(profile))
+  if (existingPreview?.skland_binding) {
+    await deleteFreePreviewPendingClaim(user.id, confirmationId)
+    return jsonResponse({ error: 'This account already has a claimed free preview profile.', code: 'free_preview_already_claimed' }, 409)
+  }
+  if (existingPreview && existingPreview.status !== 'active') {
+    return jsonResponse({ error: 'Free preview profile is not active.' }, 403)
+  }
+
+  const now = new Date().toISOString()
+  const profile: UserGameAccountRecord = existingPreview ?? {
+    version: 1,
+    id: randomUUID(),
+    user_id: user.id,
+    kind: 'free_preview',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    permission: 'growth',
+    status: 'active',
+    display_name: pending.display_name || 'Free preview',
+    note: pending.note || 'Skland-bound free personal schedule profile.',
+    skland_binding: null,
+    skland_pending_binding: null,
+    skland_risk: null,
+    created_at: now,
+    updated_at: now,
+  }
+  const uidHash = hashFreePreviewUid(pending.uid)
+  const claim = await claimFreePreviewUid(buildFreePreviewClaim(uidHash, user.id, profile.id, pending, now))
+  if (!claim.ok && claim.claim?.profile_id !== profile.id) {
+    return jsonResponse({ error: 'This Skland UID has already claimed a free preview profile.', code: 'free_preview_uid_claimed' }, 409)
+  }
+
+  try {
+    if (!existingPreview) await saveUserProfile(profile)
+    const imported = await saveSklandImport(user.id, profile, decryptSklandCredential(pending.encrypted_cred))
+    await deleteFreePreviewPendingClaim(user.id, confirmationId)
+    return jsonResponse(await buildPayloadWithImport(user, profile.id, imported))
+  } catch (error) {
+    if (!existingPreview) await deleteFreePreviewClaim(uidHash, profile.id)
+    throw error
+  }
+}
+
+async function claimFreePreviewProfileUid(
+  userId: string,
+  profile: UserGameAccountRecord,
+  binding: Pick<SklandBindingSummary, 'uid' | 'nickname' | 'channel_name'>,
+  claimedAt: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const uidHash = hashFreePreviewUid(binding.uid)
+  const claim = await claimFreePreviewUid(buildFreePreviewClaim(uidHash, userId, profile.id, binding, claimedAt))
+  if (!claim.ok && claim.claim?.profile_id !== profile.id) {
+    return { ok: false, message: 'This Skland UID has already claimed a free preview profile.' }
+  }
+  return { ok: true }
+}
+
+function buildFreePreviewClaim(
+  uidHash: string,
+  userId: string,
+  profileId: string,
+  binding: Pick<SklandBindingSummary, 'uid' | 'nickname' | 'channel_name'>,
+  claimedAt: string,
+): FreePreviewClaimRecord {
+  return {
+    uid_hash: uidHash,
+    user_id: userId,
+    profile_id: profileId,
+    claimed_at: claimedAt,
+    uid: binding.uid,
+    nickname: binding.nickname,
+    channel_name: binding.channel_name,
+  }
+}
+
 async function saveDepotValueSklandBinding(
   user: AuthPayloadUser,
   profile: UserGameAccountRecord,
@@ -265,6 +477,12 @@ async function createPendingSklandBindingFromCred(
 
   if (profile.skland_binding?.uid && profile.skland_binding.uid !== imported.binding.uid) {
     return handleAccountMismatch(user, profile, preview)
+  }
+  if (isFreePreviewProfile(profile)) {
+    const existingClaim = await getFreePreviewClaim(hashFreePreviewUid(imported.binding.uid))
+    if (existingClaim && existingClaim.profile_id !== profile.id) {
+      return jsonResponse({ error: 'This Skland UID has already claimed a free preview profile.', code: 'free_preview_uid_claimed' }, 409)
+    }
   }
 
   const now = new Date()
@@ -339,6 +557,13 @@ async function saveSklandImport(
   const imported = await importSklandOperatorsByCred(cred, { includeInventory: true })
   const operatorsCheck = validateOperators(imported.operators)
   if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
+  if (profile.skland_binding?.uid && profile.skland_binding.uid !== imported.binding.uid) {
+    throw new Error('Skland account does not match the bound profile UID.')
+  }
+  if (isFreePreviewProfile(profile)) {
+    const claim = await claimFreePreviewProfileUid(userId, profile, imported.binding, imported.importedAt)
+    if (!claim.ok) throw new Error(claim.message)
+  }
 
   const existingWorkspace = await getProfileWorkspace(profile.id)
   const configResult = resolveSklandImportConfig(profile, existingWorkspace?.config ?? null, imported.intermediateInventory)
@@ -407,7 +632,7 @@ function resolveSklandImportConfig(
       continue
     }
     const permissionCheck = isFreePreviewProfile(profile)
-      ? { ok: true as const, config: configCheck.config }
+      ? resolveFreePreviewConfig(configCheck.config)
       : resolveConfigForPermission(profile.permission, configCheck.config)
     if (permissionCheck.ok) return { config: permissionCheck.config }
     lastMessage = permissionCheck.message
@@ -519,6 +744,21 @@ function toSklandPreview(binding: SklandBindingSummary, operatorCount: number): 
     channel_name: binding.channel_name,
     operator_count: operatorCount,
   }
+}
+
+function hashFreePreviewUid(uid: string): string {
+  const secret = process.env.FREE_PREVIEW_UID_HASH_SECRET || requireEnv('CDK_HASH_SECRET')
+  return createHmac('sha256', secret)
+    .update(`skland:${uid.trim()}`)
+    .digest('hex')
+}
+
+function normalizeProfileDisplayName(value: unknown): string {
+  return typeof value === 'string' ? value.trim().slice(0, 40) : ''
+}
+
+function normalizeProfileNote(value: unknown): string {
+  return typeof value === 'string' ? value.trim().slice(0, 500) : ''
 }
 
 function normalizeCredentialSource(value: unknown): CredentialSource {

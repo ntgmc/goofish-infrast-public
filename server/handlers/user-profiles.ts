@@ -41,6 +41,7 @@ export default async (req: Request): Promise<Response> => {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       const body = await req.json() as { display_name?: unknown; note?: unknown }
       const preview = await createOrReusePreviewProfile(auth.user, body.display_name, body.note)
+      if (!preview.ok) return jsonResponse({ error: preview.message }, preview.status)
       return jsonResponse(await buildAuthPayload(auth.user, preview.profile.id))
     }
 

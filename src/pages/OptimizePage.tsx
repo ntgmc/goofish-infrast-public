@@ -118,7 +118,7 @@ export default function OptimizePage({
   const isPreviewProfile = isFreePreviewProfile(profile)
   const permission = getPermissionMode(license)
   const userCanReplaceOperators = false
-  const userCanEditConfig = isPreviewProfile || canEditConfig(license)
+  const userCanEditConfig = canEditConfig(license)
   const userCanUseIntermediateAutoConfig = isPreviewProfile || permission === 'recommended' || permission === 'growth'
   const userCanApplyConfigOverride = true
   const userCanUseUpgradeFeatures = !isPreviewProfile && canUseUpgradeFeatures(license)

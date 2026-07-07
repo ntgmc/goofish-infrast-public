@@ -82,7 +82,7 @@ function ProfileCard({
             <h2 className="truncate text-lg font-semibold text-ink-primary">{profile.display_name || fallbackName}</h2>
             <span className={`rounded-md px-2 py-1 text-xs font-semibold ${isFreePreviewProfile(profile) ? 'bg-warning/10 text-warning' : 'bg-surface-2 text-brand-300'}`}>{getProfileAccessLabel(profile)}</span>
           </div>
-          <p className="mt-2 text-sm leading-6 text-ink-secondary">{profile.note || (isFreePreviewProfile(profile) ? '免费预览只展示部分结果，输入 CDK 后解锁完整排班。' : '暂无备注')}</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">{profile.note || (isFreePreviewProfile(profile) ? '免费个人排班可查看完整游戏内轮换，但不提供导出和高级分析。' : '暂无备注')}</p>
           <p className="mt-3 text-xs text-ink-muted">{profile.operator_count} 名干员 · 更新 {formatDate(profile.updated_at)}</p>
         </div>
         <button

@@ -52,8 +52,10 @@ export default function WorkspaceSetupPage({
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
   const isPreviewProfile = isFreePreviewProfile(profile)
-  const canEditConfig = isPreviewProfile || profile.permission === 'advanced' || profile.permission === 'ultimate' || profile.permission === 'admin'
+  const canEditConfig = profile.permission === 'advanced' || profile.permission === 'ultimate' || profile.permission === 'admin'
   const canEditLimitedConfig = isPreviewProfile || profile.permission === 'recommended' || profile.permission === 'growth'
+  const freePreviewNeedsBinding = isPreviewProfile && !profile.skland_binding
+  const canManualEditOperators = !isPreviewProfile
   const ownedOperatorCount = useMemo(() => countOwnedOperators(operators), [operators])
   const configChanged = workspace?.config ? canonicalJson(normalizedConfig) !== canonicalJson(workspace.config) : true
   const filteredOperators = useMemo(() => {
@@ -78,6 +80,12 @@ export default function WorkspaceSetupPage({
     setError(null)
     setStatus(null)
     setSklandRefreshNotice(null)
+    if (isPreviewProfile) {
+      setOperatorFileName(null)
+      setError('Free preview operator data can only be imported from Skland.')
+      event.currentTarget.value = ''
+      return
+    }
     if (!file) return
     try {
       setOperators(parseOperatorsText(await file.text()))
@@ -136,6 +144,10 @@ export default function WorkspaceSetupPage({
       setError('请先上传干员识别文件。')
       return
     }
+    if (freePreviewNeedsBinding) {
+      setError('Free preview profiles must be bound to Skland before saving workspace data.')
+      return
+    }
     if (!configValidation.ok) {
       setError(configValidation.message)
       return
@@ -149,7 +161,7 @@ export default function WorkspaceSetupPage({
         method: 'PATCH',
         json: {
           profile_id: profile.id,
-          operators,
+          ...(isPreviewProfile ? {} : { operators }),
           config: normalizedConfig,
           elite_overrides: workspace?.elite_overrides ?? {},
         },
@@ -230,7 +242,7 @@ export default function WorkspaceSetupPage({
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                     <label className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-2 px-4 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">
                       {operatorFileName ? `已选择：${operatorFileName}` : operators ? `已载入 ${ownedOperatorCount} 名拥有干员` : '选择干员识别文件'}
-                      <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} className="hidden" />
+                      <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} disabled={!canManualEditOperators} className="hidden" />
                     </label>
                     {operators && <span className="text-sm text-brand-400">拥有干员 {ownedOperatorCount} 名</span>}
                   </div>
@@ -284,7 +296,7 @@ export default function WorkspaceSetupPage({
                   </div>
                 </dl>
               </section>
-              <button type="submit" disabled={saving || !operators || !configValidation.ok} className="w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+              <button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} className="w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
                 {saving ? '正在保存...' : '保存工作区并开始排班'}
               </button>
             </aside>

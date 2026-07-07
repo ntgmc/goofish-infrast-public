@@ -379,6 +379,57 @@ export default function ConfigEditor({
                 <PresetButton label="333 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
               </div>
             )}
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="mb-2 text-xs font-medium text-ink-muted">Schedule mode</p>
+                <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
+                  {(['maa', 'rotation'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => onUpdate((next) => {
+                        next.schedule_mode = mode
+                        if (mode === 'rotation') {
+                          next.Fiammetta = { ...(next.Fiammetta ?? {}), enable: false }
+                          next.drones = { ...(next.drones ?? { order: 'pre', targets: [] }), enable: false }
+                        }
+                        applyCounts(next)
+                      })}
+                      className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+                        scheduleMode === mode
+                          ? 'bg-brand-600 text-white'
+                          : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'
+                      }`}
+                    >
+                      {SCHEDULE_MODE_LABELS[mode]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-medium text-ink-muted">Dormitory rule</p>
+                <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
+                  {(['fixed', 'maa_autofill'] as const).map((rule) => (
+                    <button
+                      key={rule}
+                      type="button"
+                      disabled={rotationMode}
+                      onClick={() => onUpdate((next) => {
+                        next.dormitory_rule = rule
+                        applyCounts(next)
+                      })}
+                      className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed ${
+                        normalizeDormitoryRule(config.dormitory_rule) === rule
+                          ? 'bg-brand-600 text-white'
+                          : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
+                      }`}
+                    >
+                      {DORMITORY_RULE_LABELS[rule]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
             <div className="mt-4">
               <IntermediateInventoryEditor
                 canEdit={canUseIntermediateInventory}
