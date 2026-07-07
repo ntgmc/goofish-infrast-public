@@ -10,18 +10,24 @@ import {
   requireUserSession,
   resetPasswordWithToken,
 } from './user-auth'
+import { recordUsageEvent } from './usage-stats'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   const pathname = new URL(req.url).pathname
+  const startedAt = Date.now()
 
   try {
     if (pathname.endsWith('/register')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       const body = await req.json() as { email?: unknown; password?: unknown; cdk?: unknown }
       const registered = await registerUser(body.email, body.password, body.cdk)
-      if (!registered.ok) return jsonResponse({ error: registered.message }, registered.status)
+      if (!registered.ok) {
+        await recordRegister('failure', startedAt)
+        return jsonResponse({ error: registered.message }, registered.status)
+      }
+      await recordRegister('success', startedAt)
       return jsonResponse(await buildAuthPayload(registered.user), 200, { 'Set-Cookie': registered.cookie })
     }
 
@@ -73,7 +79,21 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'API route not found' }, 404)
   } catch (error) {
     console.error('auth error:', error)
+    if (pathname.endsWith('/register')) await recordRegister('failure', startedAt)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
+  }
+}
+
+async function recordRegister(status: 'success' | 'failure', startedAt: number): Promise<void> {
+  try {
+    await recordUsageEvent('register', {
+      status,
+      reason_code: status === 'success' ? 'ok' : 'registration_failed',
+      duration_ms: Date.now() - startedAt,
+      source: 'auth_register',
+    })
+  } catch (error) {
+    console.warn('usage stats register skipped:', error)
   }
 }

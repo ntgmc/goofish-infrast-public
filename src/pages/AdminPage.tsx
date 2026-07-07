@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import type { Announcement, AnnouncementAdminResponse, AnnouncementKind, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../lib/types'
+import type { Announcement, AnnouncementAdminResponse, AnnouncementKind, AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../lib/types'
 import { apiJson, apiVoid } from '../lib/api-client'
 
 type Permission = RawPermissionMode
@@ -7,8 +7,18 @@ type GeneratedPermission = ProductPermissionMode
 type CdkStatus = 'unused' | 'used' | 'frozen' | 'revoked'
 type AppUserStatus = 'active' | 'frozen' | 'revoked'
 type StatusFilter = CdkStatus | 'all'
+type PermissionFilter = GeneratedPermission | 'all'
+type BinaryFilter = 'all' | 'yes' | 'no'
 type AdminSection = 'overview' | 'cdk' | 'risk' | 'announcement' | 'users'
 type FieldErrors = Record<string, string>
+
+interface CdkTableFilters {
+  status: StatusFilter;
+  permission: PermissionFilter;
+  bound: BinaryFilter;
+  risk: BinaryFilter;
+  generated: BinaryFilter;
+}
 
 interface AdminCdkRecord {
   code_hash: string;
@@ -35,7 +45,8 @@ interface AdminCdkRecord {
   user_agent_count?: number;
   ip_prefix_count?: number;
   risk_event_count?: number;
-  latest_risk_event?: { at: string; type: string; reason: string } | null;
+  risk_events?: Array<{ at: string; type: string; reason: string; soft_block?: boolean; escalation?: boolean }>;
+  latest_risk_event?: { at: string; type: string; reason: string; soft_block?: boolean; escalation?: boolean } | null;
 }
 
 interface AdminCdkDetail extends AdminCdkRecord {
@@ -54,12 +65,152 @@ interface AdminCdkDetail extends AdminCdkRecord {
 interface UsageTotals {
   unique_visitors: number;
   visits: number;
+  free_previews: number;
+  registers: number;
   schedule_generates: number;
   cdk_redeems: number;
+  failures: number;
+  schedule_failures: number;
+  cdk_redeem_failures: number;
+  skland_imports: number;
+  skland_import_failures: number;
+  announcement_impressions: number;
+  announcement_reads: number;
 }
 
 interface UsageDay extends UsageTotals {
   date: string;
+}
+
+type UsageRangeKey = '7d' | '14d' | '30d'
+type UsageRangeMode = UsageRangeKey | 'custom'
+type AnnouncementSortKey = 'updated_desc' | 'updated_asc' | 'kind' | 'active'
+
+interface UsageRange {
+  from: string;
+  to: string;
+  days: number;
+}
+
+interface UsageFunnelStep {
+  key: string;
+  label: string;
+  count: number;
+  conversion_rate: number;
+  dropoff: number;
+}
+
+interface UsageFailureReason {
+  reason_code: string;
+  count: number;
+  percentage: number;
+  last_seen_at: string | null;
+  events?: Record<string, number>;
+}
+
+interface UsageFailureSample {
+  created_at: string;
+  event: string;
+  reason_code: string;
+  duration_ms: number | null;
+  permission: string | null;
+  cdk_status: string | null;
+  source: string | null;
+  has_profile: boolean;
+}
+
+interface UsageLatencyStats {
+  average_ms: number;
+  p50_ms: number;
+  p95_ms: number;
+  max_ms: number;
+  sample_count: number;
+  days: Array<{ date: string; average_ms: number; p95_ms: number; sample_count: number }>;
+}
+
+interface UsageSklandStats {
+  attempts: number;
+  success: number;
+  failed: number;
+  success_rate: number;
+  credential_invalid: number;
+  refresh_forbidden: number;
+  not_bound: number;
+  request_failed: number;
+  days: Array<{ date: string; attempts: number; success: number; failed: number; success_rate: number }>;
+}
+
+interface UsageAnnouncementStats {
+  impressions: number;
+  reads: number;
+  unread: number;
+  read_rate: number;
+}
+
+interface UsageCdkDistributionItem {
+  permission: string;
+  total: number;
+  success: number;
+  failure: number;
+  statuses: Record<string, number>;
+}
+
+interface UsageStatsResponse {
+  totals: UsageTotals;
+  days: UsageDay[];
+  range: UsageRange;
+  funnel: UsageFunnelStep[];
+  failure_reasons: UsageFailureReason[];
+  recent_failures: UsageFailureSample[];
+  latency: {
+    schedule_generate: UsageLatencyStats;
+  };
+  skland: UsageSklandStats;
+  announcement: UsageAnnouncementStats;
+  cdk_distribution: UsageCdkDistributionItem[];
+}
+
+interface CdkPermissionDistribution {
+  permission: Permission;
+  total: number;
+  unused: number;
+  used: number;
+  frozen: number;
+  revoked: number;
+}
+
+interface CdkStatusDistribution {
+  status: CdkStatus;
+  total: number;
+}
+
+interface RiskReasonStats {
+  reason: string;
+  type: string;
+  count: number;
+  last_seen_at: string | null;
+  latest_record: AdminCdkRecord | null;
+}
+
+interface RiskTrendDay {
+  date: string;
+  soft_blocks: number;
+  freezes: number;
+  escalations: number;
+  total: number;
+}
+
+interface CdkOpsSummary {
+  permission_distribution: CdkPermissionDistribution[];
+  status_distribution: CdkStatusDistribution[];
+  risk_reasons: RiskReasonStats[];
+  risk_trend: RiskTrendDay[];
+  soft_blocks: number;
+  freezes: number;
+  escalations: number;
+  risk_records: number;
+  generated_records: number;
+  bound_records: number;
 }
 
 interface RiskControlSettings {
@@ -186,6 +337,14 @@ interface AdminProfileOperatorData {
 }
 
 const EMPTY_ANNOUNCEMENTS: Announcement[] = []
+const EMPTY_ANNOUNCEMENT_REACH_STATS: AnnouncementReachStats = {
+  impressions: 0,
+  reads: 0,
+  server_reads: 0,
+  local_reads: 0,
+  unread: 0,
+  read_rate: 0,
+}
 const DEFAULT_RISK_SETTINGS: RiskControlSettings = {
   operator_data_risk_enabled: true,
   device_risk_enabled: false,
@@ -223,6 +382,18 @@ const sectionLabels: Record<AdminSection, string> = {
   users: '用户维护',
 }
 
+const announcementKindLabels: Record<AnnouncementKind, string> = {
+  banner: '横幅',
+  popup: '弹出式公告',
+}
+
+const announcementSortLabels: Record<AnnouncementSortKey, string> = {
+  updated_desc: '更新时间新到旧',
+  updated_asc: '更新时间旧到新',
+  kind: '公告类型',
+  active: '启用状态',
+}
+
 const cdkProductPermissions: GeneratedPermission[] = ['recommended', 'growth', 'advanced', 'ultimate']
 const cdkProductPermissionRank: Record<GeneratedPermission, number> = {
   recommended: 0,
@@ -238,11 +409,20 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(Boolean(credentials))
   const [activeSection, setActiveSection] = useState<AdminSection>('overview')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [permissionFilter, setPermissionFilter] = useState<PermissionFilter>('all')
+  const [boundFilter, setBoundFilter] = useState<BinaryFilter>('all')
+  const [riskFilter, setRiskFilter] = useState<BinaryFilter>('all')
+  const [generatedFilter, setGeneratedFilter] = useState<BinaryFilter>('all')
   const [records, setRecords] = useState<AdminCdkRecord[]>([])
   const [users, setUsers] = useState<AdminUserSummary[]>([])
   const [appUsers, setAppUsers] = useState<AppUserSummary[]>([])
-  const [usageStats, setUsageStats] = useState<{ totals: UsageTotals; days: UsageDay[] } | null>(null)
+  const [usageRange, setUsageRange] = useState<UsageRangeMode>('7d')
+  const [usageRangeFrom, setUsageRangeFrom] = useState(() => getDateOffsetString(6))
+  const [usageRangeTo, setUsageRangeTo] = useState(() => getDateOffsetString(0))
+  const [usageStats, setUsageStats] = useState<UsageStatsResponse | null>(null)
   const [announcements, setAnnouncements] = useState<Announcement[]>(EMPTY_ANNOUNCEMENTS)
+  const [announcementStats, setAnnouncementStats] = useState<Record<string, AnnouncementReachStats>>({})
+  const [announcementSort, setAnnouncementSort] = useState<AnnouncementSortKey>('updated_desc')
   const [riskSettings, setRiskSettings] = useState<RiskControlSettings>(DEFAULT_RISK_SETTINGS)
   const [permission, setPermission] = useState<GeneratedPermission>('growth')
   const [orderNote, setOrderNote] = useState('')
@@ -268,14 +448,30 @@ export default function AdminPage() {
       'X-Admin-Password': credentials.password,
     }
   }, [credentials])
+  const usageStatsQuery = useMemo(
+    () => buildUsageStatsQuery(usageRange, usageRangeFrom, usageRangeTo),
+    [usageRange, usageRangeFrom, usageRangeTo],
+  )
 
 const summary = useMemo(
 () => buildSummary(records, usageStats?.totals, users.length),
 [records, usageStats, users.length],
 )
+  const cdkOpsSummary = useMemo(() => buildCdkOpsSummary(records), [records])
+  const cdkFilters = useMemo<CdkTableFilters>(() => ({
+    status: statusFilter,
+    permission: permissionFilter,
+    bound: boundFilter,
+    risk: riskFilter,
+    generated: generatedFilter,
+  }), [statusFilter, permissionFilter, boundFilter, riskFilter, generatedFilter])
   const visibleRecords = useMemo(
-    () => records.filter((record) => statusFilter === 'all' || record.status === statusFilter),
-    [records, statusFilter],
+    () => records.filter((record) => recordMatchesCdkFilters(record, cdkFilters)),
+    [records, cdkFilters],
+  )
+  const sortedAnnouncements = useMemo(
+    () => sortAnnouncements(announcements, announcementSort),
+    [announcements, announcementSort],
   )
   const riskRecords = useMemo(
     () => records.filter((record) => record.status === 'frozen' || (record.risk_event_count ?? 0) > 0),
@@ -288,6 +484,10 @@ const summary = useMemo(
 
   const loadDashboard = useCallback(async (nextCredentials = credentials) => {
     if (!nextCredentials) return
+    if (!usageStatsQuery) {
+      setError('自定义时间范围无效，请选择开始和结束日期')
+      return
+    }
     setLoading(true)
     setError(null)
     try {
@@ -297,17 +497,16 @@ const summary = useMemo(
       }
       const [cdkData, usageData, announcementData, usersData, riskSettingsData] = await Promise.all([
         apiJson<{ cdks?: AdminCdkRecord[] }>('/api/admin/cdk?status=all', { headers, fallbackMessage: '加载 CDK 失败' }),
-        apiJson<{ totals?: UsageTotals; days?: UsageDay[] }>('/api/admin/usage-stats', { headers, fallbackMessage: '加载统计失败' }),
+        apiJson<Partial<UsageStatsResponse>>(`/api/admin/usage-stats?${usageStatsQuery}`, { headers, fallbackMessage: '加载统计失败' }),
         apiJson<Partial<AnnouncementAdminResponse>>('/api/admin/announcement', { headers, fallbackMessage: '加载公告失败' }),
         apiJson<{ users?: AdminUserSummary[]; app_users?: AppUserSummary[] }>('/api/admin/users', { headers, fallbackMessage: '加载账号失败' }),
         apiJson<{ settings?: Partial<RiskControlSettings> }>('/api/admin/risk-settings', { headers, fallbackMessage: '加载风控设置失败' }),
       ])
+      const nextAnnouncements = normalizeAnnouncementList(announcementData.announcements)
       setRecords(cdkData.cdks ?? [])
-      setUsageStats({
-        totals: normalizeUsageTotals(usageData.totals),
-        days: Array.isArray(usageData.days) ? usageData.days.map(normalizeUsageDay) : [],
-      })
-      setAnnouncements(normalizeAnnouncementList(announcementData.announcements))
+      setUsageStats(normalizeUsageStats(usageData))
+      setAnnouncements(nextAnnouncements)
+      setAnnouncementStats(normalizeAnnouncementStatsMap(announcementData.stats, nextAnnouncements))
       setRiskSettings(normalizeRiskSettings(riskSettingsData.settings))
       setUsers(usersData.users ?? [])
       setAppUsers(usersData.app_users ?? [])
@@ -320,11 +519,11 @@ const summary = useMemo(
     } finally {
       setLoading(false)
     }
-  }, [credentials])
+  }, [credentials, usageStatsQuery])
 
   useEffect(() => {
     if (credentials) void loadDashboard(credentials)
-  }, [])
+  }, [usageStatsQuery])
 
   useEffect(() => {
     const available = new Set(records.map((record) => record.code_hash))
@@ -352,12 +551,39 @@ const summary = useMemo(
     setUsers([])
     setAppUsers([])
     setUsageStats(null)
+    setAnnouncements([])
+    setAnnouncementStats({})
     setRiskSettings(DEFAULT_RISK_SETTINGS)
     setSelectedCdkHashes([])
     setSelectedCdkDetail(null)
     setSelectedUserDetail(null)
     setOperatorDataByProfileId({})
     setExpandedOperatorProfileId(null)
+  }
+
+  const handleExportUsageReport = async (format: 'csv' | 'json') => {
+    if (!credentials) return
+    if (!usageStats) {
+      setError('统计数据尚未加载完成')
+      return
+    }
+    setBusyAction(`report:${format}`)
+    setError(null)
+    setNotice(null)
+    try {
+      const range = usageStats?.range
+      const filenameRange = range?.from && range?.to ? `${range.from}_${range.to}` : usageRange
+      const report = buildCurrentOpsReport(usageStats, cdkOpsSummary, announcements, announcementStats)
+      const blob = format === 'json'
+        ? new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' })
+        : new Blob([`\uFEFF${buildCurrentOpsReportCsv(report)}`], { type: 'text/csv;charset=utf-8' })
+      downloadBlob(blob, `admin-ops-report-${filenameRange}.${format}`)
+      setNotice(format === 'csv' ? 'CSV 报表已导出' : 'JSON 报表已导出')
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setBusyAction(null)
+    }
   }
 
   const handleGenerateCdk = async (event: FormEvent) => {
@@ -401,7 +627,9 @@ const summary = useMemo(
         },
         fallbackMessage: '保存公告失败',
       })
-      setAnnouncements(normalizeAnnouncementList(data.announcements))
+      const nextAnnouncements = normalizeAnnouncementList(data.announcements)
+      setAnnouncements(nextAnnouncements)
+      setAnnouncementStats(normalizeAnnouncementStatsMap(data.stats, nextAnnouncements))
       setNotice('公告已保存')
     } catch (caught) {
       setError((caught as Error).message)
@@ -902,31 +1130,90 @@ const summary = useMemo(
 
           {activeSection === 'overview' && (
             <section className="space-y-6">
+              <div className="flex flex-col gap-3 rounded-xl border border-surface-3 bg-surface-1 p-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-ink-primary">运营概览</h2>
+                  <p className="mt-1 text-sm text-ink-muted">
+                    {usageStats?.range.from && usageStats?.range.to ? `${usageStats.range.from} 至 ${usageStats.range.to}` : '选择统计范围'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(['7d', '14d', '30d'] as UsageRangeKey[]).map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      onClick={() => setUsageRange(range)}
+                      className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-150 ${usageRange === range ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'}`}
+                    >
+                      {range === '7d' ? '7 天' : range === '14d' ? '14 天' : '30 天'}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setUsageRange('custom')}
+                    className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors duration-150 ${usageRange === 'custom' ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'}`}
+                  >
+                    自定义
+                  </button>
+                  {usageRange === 'custom' && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-2 py-1.5">
+                      <input
+                        type="date"
+                        value={usageRangeFrom}
+                        max={usageRangeTo}
+                        onChange={(event) => setUsageRangeFrom(event.currentTarget.value)}
+                        className="rounded-md border border-surface-4 bg-surface-0 px-2 py-1.5 text-sm text-ink-primary"
+                        aria-label="统计开始日期"
+                      />
+                      <span className="text-xs text-ink-muted">至</span>
+                      <input
+                        type="date"
+                        value={usageRangeTo}
+                        min={usageRangeFrom}
+                        onChange={(event) => setUsageRangeTo(event.currentTarget.value)}
+                        className="rounded-md border border-surface-4 bg-surface-0 px-2 py-1.5 text-sm text-ink-primary"
+                        aria-label="统计结束日期"
+                      />
+                    </div>
+                  )}
+                  <button type="button" onClick={() => void handleExportUsageReport('csv')} disabled={busyAction === 'report:csv'} className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3 disabled:bg-surface-3 disabled:text-ink-muted">
+                    {busyAction === 'report:csv' ? '导出中...' : '导出 CSV'}
+                  </button>
+                  <button type="button" onClick={() => void handleExportUsageReport('json')} disabled={busyAction === 'report:json'} className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3 disabled:bg-surface-3 disabled:text-ink-muted">
+                    {busyAction === 'report:json' ? '导出中...' : '导出 JSON'}
+                  </button>
+                </div>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <Metric label="CDK 总量" value={summary.totalCdks} />
-                <Metric label="已兑换" value={summary.usedCdks} />
-                <Metric label="冻结授权" value={summary.frozenCdks} tone={summary.frozenCdks > 0 ? 'warning' : 'default'} />
-                <Metric label="7 日生成" value={summary.scheduleGenerates} />
+                <Metric label="免费预览" value={summary.freePreviews} />
+                <Metric label="注册数" value={summary.registers} />
+                <Metric label="CDK 兑换" value={summary.cdkRedeems} />
+                <Metric label="排班生成" value={summary.scheduleGenerates} />
+                <Metric label="生成成功率" value={`${summary.scheduleSuccessRate}%`} tone={summary.scheduleSuccessRate < 80 && summary.scheduleAttempts > 0 ? 'warning' : 'default'} />
+                <Metric label="平均耗时" value={formatDuration(usageStats?.latency.schedule_generate.average_ms ?? 0)} />
+                <Metric label="P95 耗时" value={formatDuration(usageStats?.latency.schedule_generate.p95_ms ?? 0)} tone={(usageStats?.latency.schedule_generate.p95_ms ?? 0) > 10000 ? 'warning' : 'default'} />
+                <Metric label="冻结/软拦截" value={summary.frozenCdks + summary.riskEvents} tone={summary.frozenCdks + summary.riskEvents > 0 ? 'warning' : 'default'} />
               </div>
               <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
                 <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-base font-semibold text-ink-primary">7 日趋势</h2>
+                    <h2 className="text-base font-semibold text-ink-primary">趋势</h2>
                     <span className="text-xs text-ink-muted">访问 / 生成 / 兑换</span>
                   </div>
                   <UsageTrendChart days={usageStats?.days ?? []} />
                 </section>
-                <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
-                  <h2 className="text-base font-semibold text-ink-primary">运营摘要</h2>
-                  <dl className="mt-4 space-y-3 text-sm">
-                    <InfoRow label="独立访客" value={String(summary.uniqueVisitors)} />
-                    <InfoRow label="访问次数" value={String(summary.visits)} />
-                    <InfoRow label="兑换次数" value={String(summary.cdkRedeems)} />
-                    <InfoRow label="管理账号" value={String(summary.adminUsers)} />
-                    <InfoRow label="转化率" value={`${summary.redeemRate}%`} />
-                  </dl>
-                </section>
+                <FunnelPanel steps={usageStats?.funnel ?? []} />
               </div>
+              <div className="grid gap-5 xl:grid-cols-2">
+                <FailureReasonPanel reasons={usageStats?.failure_reasons ?? []} samples={usageStats?.recent_failures ?? []} />
+                <LatencyPanel stats={usageStats?.latency.schedule_generate ?? EMPTY_LATENCY_STATS} />
+              </div>
+              <div className="grid gap-5 xl:grid-cols-3">
+                <OpsSummaryPanel summary={summary} />
+                <SklandPanel stats={usageStats?.skland ?? EMPTY_SKLAND_STATS} />
+                <AnnouncementStatsPanel stats={usageStats?.announcement ?? EMPTY_ANNOUNCEMENT_STATS} />
+              </div>
+              <CdkDistributionPanel items={usageStats?.cdk_distribution ?? []} />
             </section>
           )}
 
@@ -956,12 +1243,19 @@ const summary = useMemo(
                   </div>
                 )}
               </form>
+              <CdkRecordDistributionPanel summary={cdkOpsSummary} />
               <CdkTable
                 records={visibleRecords}
                 selected={selectedCdkHashes}
-                filter={statusFilter}
+                filters={cdkFilters}
                 busyAction={busyAction}
-                onFilter={setStatusFilter}
+                onFilterChange={(patch) => {
+                  if (patch.status) setStatusFilter(patch.status)
+                  if (patch.permission) setPermissionFilter(patch.permission)
+                  if (patch.bound) setBoundFilter(patch.bound)
+                  if (patch.risk) setRiskFilter(patch.risk)
+                  if (patch.generated) setGeneratedFilter(patch.generated)
+                }}
                 onSelect={setSelectedCdkHashes}
                 onBulkRevoke={handleBulkRevoke}
                 onPatch={patchCdk}
@@ -988,12 +1282,12 @@ const summary = useMemo(
                 saving={busyAction === 'risk-settings'}
                 onChange={handleSaveRiskSettings}
               />
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Metric label="冻结授权" value={summary.frozenCdks} tone="warning" />
-                <Metric label="风险记录" value={summary.riskEvents} />
-                <Metric label="设备绑定" value={summary.boundDevices} />
+              <RiskConsoleSummary summary={cdkOpsSummary} />
+              <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+                <RiskTrendPanel days={cdkOpsSummary.risk_trend} />
+                <RiskReasonPanel reasons={cdkOpsSummary.risk_reasons} onOpenDetail={loadCdkDetail} />
               </div>
-              <RiskTable records={riskRecords} busyAction={busyAction} onPatch={patchCdk} />
+              <RiskTable records={riskRecords} busyAction={busyAction} onPatch={patchCdk} onOpenDetail={loadCdkDetail} />
             </section>
           )}
 
@@ -1005,7 +1299,19 @@ const summary = useMemo(
                   <h2 className="text-base font-semibold text-ink-primary">横幅和弹出式公告</h2>
                   <p className="mt-1 text-sm text-ink-secondary">横幅显示在工具页内，弹出式公告会在用户首次未读时弹出。</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary">
+                    <span>排序</span>
+                    <select
+                      value={announcementSort}
+                      onChange={(event) => setAnnouncementSort(event.currentTarget.value as AnnouncementSortKey)}
+                      className="bg-transparent text-sm font-semibold text-ink-primary outline-none"
+                    >
+                      {Object.entries(announcementSortLabels).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </label>
                   <button type="button" onClick={() => addAnnouncement('banner')} className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">新增横幅</button>
                   <button type="button" onClick={() => addAnnouncement('popup')} className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">新增弹出式公告</button>
                 </div>
@@ -1017,55 +1323,61 @@ const summary = useMemo(
                     还没有公告。新增横幅或弹出式公告后保存即可生效。
                   </div>
                 )}
-                {announcements.map((item) => (
-                  <article key={item.id} className="rounded-lg border border-surface-3 bg-surface-0 p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <select
-                          value={item.kind}
-                          onChange={(event) => updateAnnouncement(item.id, { kind: event.currentTarget.value as AnnouncementKind })}
-                          className="rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary"
-                        >
-                          <option value="banner">横幅</option>
-                          <option value="popup">弹出式公告</option>
-                        </select>
-                        <label className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm font-medium text-ink-secondary">
-                          <input
-                            type="checkbox"
-                            checked={item.active}
-                            onChange={(event) => updateAnnouncement(item.id, { active: event.currentTarget.checked })}
-                            className="h-4 w-4 accent-brand-600"
-                          />
-                          启用
-                        </label>
+                {sortedAnnouncements.map((item) => {
+                  const stats = announcementStats[item.id] ?? EMPTY_ANNOUNCEMENT_REACH_STATS
+                  return (
+                    <article key={item.id} className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select
+                            value={item.kind}
+                            onChange={(event) => updateAnnouncement(item.id, { kind: event.currentTarget.value as AnnouncementKind })}
+                            className="rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary"
+                          >
+                            {Object.entries(announcementKindLabels).map(([kind, label]) => (
+                              <option key={kind} value={kind}>{label}</option>
+                            ))}
+                          </select>
+                          <label className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm font-medium text-ink-secondary">
+                            <input
+                              type="checkbox"
+                              checked={item.active}
+                              onChange={(event) => updateAnnouncement(item.id, { active: event.currentTarget.checked })}
+                              className="h-4 w-4 accent-brand-600"
+                            />
+                            启用
+                          </label>
+                        </div>
+                        <button type="button" onClick={() => deleteAnnouncement(item.id)} className="rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error hover:bg-error/20">
+                          删除
+                        </button>
                       </div>
-                      <button type="button" onClick={() => deleteAnnouncement(item.id)} className="rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error hover:bg-error/20">
-                        删除
-                      </button>
-                    </div>
 
-                    <label className="mt-4 block">
-                      <span className="mb-2 block text-sm font-medium text-ink-secondary">标题</span>
-                      <input
-                        value={item.title}
-                        maxLength={80}
-                        onChange={(event) => updateAnnouncement(item.id, { title: event.currentTarget.value })}
-                        className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary"
-                      />
-                    </label>
-                    <label className="mt-4 block">
-                      <span className="mb-2 block text-sm font-medium text-ink-secondary">正文</span>
-                      <textarea
-                        value={item.body}
-                        maxLength={600}
-                        rows={5}
-                        onChange={(event) => updateAnnouncement(item.id, { body: event.currentTarget.value })}
-                        className="w-full resize-y rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-primary"
-                      />
-                    </label>
-                    <p className="mt-3 text-xs text-ink-muted">更新时间：{formatDate(item.updated_at)}</p>
-                  </article>
-                ))}
+                      <AnnouncementReachMetrics stats={stats} />
+
+                      <label className="mt-4 block">
+                        <span className="mb-2 block text-sm font-medium text-ink-secondary">标题</span>
+                        <input
+                          value={item.title}
+                          maxLength={80}
+                          onChange={(event) => updateAnnouncement(item.id, { title: event.currentTarget.value })}
+                          className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary"
+                        />
+                      </label>
+                      <label className="mt-4 block">
+                        <span className="mb-2 block text-sm font-medium text-ink-secondary">正文</span>
+                        <textarea
+                          value={item.body}
+                          maxLength={600}
+                          rows={5}
+                          onChange={(event) => updateAnnouncement(item.id, { body: event.currentTarget.value })}
+                          className="w-full resize-y rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-primary"
+                        />
+                      </label>
+                      <p className="mt-3 text-xs text-ink-muted">更新时间：{formatDate(item.updated_at)}</p>
+                    </article>
+                  )
+                })}
               </div>
 
               <button type="submit" disabled={busyAction === 'announcement'} className="mt-5 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
@@ -1422,12 +1734,12 @@ function ProfileOperatorsPanel({ data }: { data: AdminProfileOperatorData }) {
   )
 }
 
-function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
+function CdkTable({ records, selected, filters, busyAction, onFilterChange, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
   records: AdminCdkRecord[];
   selected: string[];
-  filter: StatusFilter;
+  filters: CdkTableFilters;
   busyAction: string | null;
-  onFilter: (filter: StatusFilter) => void;
+  onFilterChange: (patch: Partial<CdkTableFilters>) => void;
   onSelect: (hashes: string[]) => void;
   onBulkRevoke: () => void;
   onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
@@ -1440,12 +1752,24 @@ function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, o
       <div className="flex flex-col gap-3 border-b border-surface-3 p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-2">
           {(['all', 'unused', 'used', 'frozen', 'revoked'] as StatusFilter[]).map((item) => (
-            <button key={item} type="button" onClick={() => onFilter(item)} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${filter === item ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3'}`}>
+            <button key={item} type="button" onClick={() => onFilterChange({ status: item })} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${filters.status === item ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3'}`}>
               {item === 'all' ? '全部' : statusLabels[item]}
             </button>
           ))}
         </div>
         <button type="button" onClick={onBulkRevoke} disabled={selected.length === 0} className="rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error hover:bg-error/20 disabled:bg-surface-2 disabled:text-ink-muted">批量撤销</button>
+      </div>
+      <div className="grid gap-3 border-b border-surface-3 p-4 md:grid-cols-4">
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-medium text-ink-muted">权限</span>
+          <select value={filters.permission} onChange={(event) => onFilterChange({ permission: event.currentTarget.value as PermissionFilter })} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary">
+            <option value="all">全部权限</option>
+            {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
+          </select>
+        </label>
+        <BinaryFilterSelect label="设备绑定" value={filters.bound} onChange={(value) => onFilterChange({ bound: value })} />
+        <BinaryFilterSelect label="风险事件" value={filters.risk} onChange={(value) => onFilterChange({ risk: value })} />
+        <BinaryFilterSelect label="生成过排班" value={filters.generated} onChange={(value) => onFilterChange({ generated: value })} />
       </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
@@ -1492,6 +1816,19 @@ function CdkTable({ records, selected, filter, busyAction, onFilter, onSelect, o
         </table>
       </div>
     </section>
+  )
+}
+
+function BinaryFilterSelect({ label, value, onChange }: { label: string; value: BinaryFilter; onChange: (value: BinaryFilter) => void }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-medium text-ink-muted">{label}</span>
+      <select value={value} onChange={(event) => onChange(event.currentTarget.value as BinaryFilter)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary">
+        <option value="all">全部</option>
+        <option value="yes">是</option>
+        <option value="no">否</option>
+      </select>
+    </label>
   )
 }
 
@@ -1684,7 +2021,7 @@ function RiskToggle({
   )
 }
 
-function RiskTable({ records, busyAction, onPatch }: { records: AdminCdkRecord[]; busyAction: string | null; onPatch: (record: AdminCdkRecord, action: string) => Promise<void> }) {
+function RiskTable({ records, busyAction, onPatch, onOpenDetail }: { records: AdminCdkRecord[]; busyAction: string | null; onPatch: (record: AdminCdkRecord, action: string) => Promise<void>; onOpenDetail: (record: AdminCdkRecord) => Promise<void> }) {
   return (
     <section className="rounded-xl border border-surface-3 bg-surface-1">
       <div className="border-b border-surface-3 p-4">
@@ -1698,7 +2035,10 @@ function RiskTable({ records, busyAction, onPatch }: { records: AdminCdkRecord[]
               <div>{record.freeze_reason || record.latest_risk_event?.reason || '记录了风控事件'}</div>
               <div className="mt-1 text-xs text-ink-muted">风险 {record.risk_event_count ?? 0} / UA {record.user_agent_count ?? 0} / IP {record.ip_prefix_count ?? 0} / 冻结 {formatDate(record.frozen_at ?? null)}</div>
             </div>
-            {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
+            <div className="flex flex-wrap gap-2">
+              <SmallButton onClick={() => void onOpenDetail(record)} loading={busyAction === `cdk-detail:${record.code_hash}`}>详情</SmallButton>
+              {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
+            </div>
           </div>
         ))}
       </div>
@@ -1711,6 +2051,341 @@ return <div className={`rounded-xl border p-4 ${tone === 'warning' ? 'border-war
 <div className="text-2xl font-semibold text-ink-primary">{value}</div>
 <div className="mt-1 text-sm text-ink-muted">{label}</div>
 </div>
+}
+
+const EMPTY_LATENCY_STATS: UsageLatencyStats = {
+  average_ms: 0,
+  p50_ms: 0,
+  p95_ms: 0,
+  max_ms: 0,
+  sample_count: 0,
+  days: [],
+}
+
+const EMPTY_SKLAND_STATS: UsageSklandStats = {
+  attempts: 0,
+  success: 0,
+  failed: 0,
+  success_rate: 0,
+  credential_invalid: 0,
+  refresh_forbidden: 0,
+  not_bound: 0,
+  request_failed: 0,
+  days: [],
+}
+
+const EMPTY_ANNOUNCEMENT_STATS: UsageAnnouncementStats = {
+  impressions: 0,
+  reads: 0,
+  unread: 0,
+  read_rate: 0,
+}
+
+function FunnelPanel({ steps }: { steps: UsageFunnelStep[] }) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+      <h2 className="text-base font-semibold text-ink-primary">运营漏斗</h2>
+      <div className="mt-4 space-y-3">
+        {steps.length === 0 && <div className="rounded-lg bg-surface-2 px-4 py-6 text-center text-sm text-ink-muted">暂无漏斗数据</div>}
+        {steps.map((step) => (
+          <div key={step.key} className="rounded-lg bg-surface-2 p-3">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-ink-primary">{step.label}</span>
+              <span className="font-semibold text-ink-primary">{step.count}</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3">
+              <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min(100, Math.max(0, step.conversion_rate))}%` }} />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs text-ink-muted">
+              <span>转化 {step.conversion_rate}%</span>
+              <span>掉失 {step.dropoff}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function FailureReasonPanel({ reasons, samples }: { reasons: UsageFailureReason[]; samples: UsageFailureSample[] }) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-ink-primary">失败原因 Top</h2>
+        <span className="text-xs text-ink-muted">稳定 reason_code</span>
+      </div>
+      <div className="mt-4 space-y-3">
+        {reasons.length === 0 && <div className="rounded-lg bg-surface-2 px-4 py-6 text-center text-sm text-ink-muted">暂无失败事件</div>}
+        {reasons.slice(0, 5).map((item) => (
+          <div key={item.reason_code} className="rounded-lg bg-surface-2 p-3">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-mono text-xs font-semibold text-ink-primary">{item.reason_code}</span>
+              <span className="font-semibold text-ink-primary">{item.count}</span>
+            </div>
+            <div className="mt-2 text-xs text-ink-muted">{item.percentage}% · 最近 {formatDate(item.last_seen_at)}</div>
+          </div>
+        ))}
+      </div>
+      {samples.length > 0 && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full text-left text-xs">
+            <thead className="text-ink-muted">
+              <tr>
+                <th className="pb-2 pr-3 font-medium">时间</th>
+                <th className="pb-2 pr-3 font-medium">事件</th>
+                <th className="pb-2 pr-3 font-medium">原因</th>
+                <th className="pb-2 font-medium">耗时</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-3">
+              {samples.slice(0, 5).map((sample) => (
+                <tr key={`${sample.created_at}-${sample.event}-${sample.reason_code}`}>
+                  <td className="py-2 pr-3 text-ink-secondary">{formatDate(sample.created_at)}</td>
+                  <td className="py-2 pr-3 text-ink-secondary">{sample.event}</td>
+                  <td className="py-2 pr-3 font-mono text-ink-primary">{sample.reason_code}</td>
+                  <td className="py-2 text-ink-secondary">{sample.duration_ms === null ? '-' : formatDuration(sample.duration_ms)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function LatencyPanel({ stats }: { stats: UsageLatencyStats }) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+      <h2 className="text-base font-semibold text-ink-primary">优化耗时</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <DetailItem label="平均" value={formatDuration(stats.average_ms)} />
+        <DetailItem label="P50" value={formatDuration(stats.p50_ms)} />
+        <DetailItem label="P95" value={formatDuration(stats.p95_ms)} />
+        <DetailItem label="样本" value={String(stats.sample_count)} />
+      </div>
+      <div className="mt-4 space-y-2">
+        {stats.days.slice(-7).map((day) => (
+          <div key={day.date} className="grid grid-cols-[72px_1fr_64px] items-center gap-3 text-xs">
+            <span className="text-ink-muted">{day.date.slice(5)}</span>
+            <div className="h-2 overflow-hidden rounded-full bg-surface-3">
+              <div className="h-full rounded-full bg-warning" style={{ width: `${Math.min(100, day.p95_ms / 200)}%` }} />
+            </div>
+            <span className="text-right text-ink-secondary">{formatDuration(day.p95_ms)}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function OpsSummaryPanel({ summary }: { summary: ReturnType<typeof buildSummary> }) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+      <h2 className="text-base font-semibold text-ink-primary">运营摘要</h2>
+      <dl className="mt-4 space-y-3 text-sm">
+        <InfoRow label="独立访客" value={String(summary.uniqueVisitors)} />
+        <InfoRow label="访问次数" value={String(summary.visits)} />
+        <InfoRow label="管理账号" value={String(summary.adminUsers)} />
+        <InfoRow label="CDK 转化" value={`${summary.redeemRate}%`} />
+      </dl>
+    </section>
+  )
+}
+
+function SklandPanel({ stats }: { stats: UsageSklandStats }) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+      <h2 className="text-base font-semibold text-ink-primary">Skland 导入</h2>
+      <dl className="mt-4 space-y-3 text-sm">
+        <InfoRow label="尝试" value={String(stats.attempts)} />
+        <InfoRow label="成功" value={String(stats.success)} />
+        <InfoRow label="失败" value={String(stats.failed)} />
+        <InfoRow label="成功率" value={`${stats.success_rate}%`} />
+        <InfoRow label="凭据失效" value={String(stats.credential_invalid)} />
+      </dl>
+    </section>
+  )
+}
+
+function AnnouncementStatsPanel({ stats }: { stats: UsageAnnouncementStats }) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+      <h2 className="text-base font-semibold text-ink-primary">公告触达</h2>
+      <dl className="mt-4 space-y-3 text-sm">
+        <InfoRow label="触达" value={String(stats.impressions)} />
+        <InfoRow label="已读" value={String(stats.reads)} />
+        <InfoRow label="未读估算" value={String(stats.unread)} />
+        <InfoRow label="阅读率" value={`${stats.read_rate}%`} />
+      </dl>
+    </section>
+  )
+}
+
+function AnnouncementReachMetrics({ stats }: { stats: AnnouncementReachStats }) {
+  return (
+    <dl className="mt-4 grid gap-y-3 border-y border-surface-3 py-3 text-sm sm:grid-cols-4 sm:divide-x sm:divide-surface-3">
+      <div className="sm:px-3 first:sm:pl-0">
+        <dt className="text-xs text-ink-muted">触达</dt>
+        <dd className="mt-1 font-semibold text-ink-primary">{stats.impressions}</dd>
+      </div>
+      <div className="sm:px-3">
+        <dt className="text-xs text-ink-muted">已读</dt>
+        <dd className="mt-1 font-semibold text-ink-primary">{stats.reads}</dd>
+        <dd className="mt-0.5 text-xs text-ink-muted">账号 {stats.server_reads} / 本地 {stats.local_reads}</dd>
+      </div>
+      <div className="sm:px-3">
+        <dt className="text-xs text-ink-muted">未读估算</dt>
+        <dd className="mt-1 font-semibold text-ink-primary">{stats.unread}</dd>
+      </div>
+      <div className="sm:px-3">
+        <dt className="text-xs text-ink-muted">阅读率</dt>
+        <dd className="mt-1 font-semibold text-ink-primary">{stats.read_rate}%</dd>
+      </div>
+    </dl>
+  )
+}
+
+function CdkDistributionPanel({ items }: { items: UsageCdkDistributionItem[] }) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+      <h2 className="text-base font-semibold text-ink-primary">CDK 兑换事件分布</h2>
+      <div className="mt-4 overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead className="text-xs text-ink-muted">
+            <tr>
+              <th className="pb-2 pr-4 font-medium">权限</th>
+              <th className="pb-2 pr-4 font-medium">总量</th>
+              <th className="pb-2 pr-4 font-medium">成功</th>
+              <th className="pb-2 font-medium">失败</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-surface-3">
+            {items.length === 0 && (
+              <tr><td colSpan={4} className="py-5 text-center text-sm text-ink-muted">暂无 CDK 兑换事件</td></tr>
+            )}
+            {items.map((item) => (
+              <tr key={item.permission}>
+                <td className="py-3 pr-4 font-medium text-ink-primary">{permissionLabels[item.permission as Permission] ?? item.permission}</td>
+                <td className="py-3 pr-4 text-ink-secondary">{item.total}</td>
+                <td className="py-3 pr-4 text-success">{item.success}</td>
+                <td className="py-3 text-error">{item.failure}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function CdkRecordDistributionPanel({ summary }: { summary: CdkOpsSummary }) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-base font-semibold text-ink-primary">CDK 权限与状态分布</h2>
+        <span className="text-xs text-ink-muted">基于当前 CDK 记录</span>
+      </div>
+      <div className="mt-4 grid gap-5 xl:grid-cols-[1fr_0.75fr]">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="text-xs text-ink-muted">
+              <tr>
+                <th className="pb-2 pr-4 font-medium">权限</th>
+                <th className="pb-2 pr-4 font-medium">总量</th>
+                <th className="pb-2 pr-4 font-medium">未用</th>
+                <th className="pb-2 pr-4 font-medium">已用</th>
+                <th className="pb-2 pr-4 font-medium">冻结</th>
+                <th className="pb-2 font-medium">撤销</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-3">
+              {summary.permission_distribution.map((item) => (
+                <tr key={item.permission}>
+                  <td className="py-3 pr-4 font-medium text-ink-primary">{permissionLabels[item.permission] ?? item.permission}</td>
+                  <td className="py-3 pr-4 text-ink-secondary">{item.total}</td>
+                  <td className="py-3 pr-4 text-ink-secondary">{item.unused}</td>
+                  <td className="py-3 pr-4 text-ink-secondary">{item.used}</td>
+                  <td className="py-3 pr-4 text-warning">{item.frozen}</td>
+                  <td className="py-3 text-error">{item.revoked}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          {summary.status_distribution.map((item) => (
+            <div key={item.status} className="rounded-lg bg-surface-2 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <StatusPill status={item.status} />
+                <span className="text-lg font-semibold text-ink-primary">{item.total}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function RiskConsoleSummary({ summary }: { summary: CdkOpsSummary }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <Metric label="风险 CDK" value={summary.risk_records} tone={summary.risk_records > 0 ? 'warning' : 'default'} />
+      <Metric label="软拦截" value={summary.soft_blocks} tone={summary.soft_blocks > 0 ? 'warning' : 'default'} />
+      <Metric label="冻结事件" value={summary.freezes} tone={summary.freezes > 0 ? 'warning' : 'default'} />
+      <Metric label="升级冻结" value={summary.escalations} tone={summary.escalations > 0 ? 'warning' : 'default'} />
+      <Metric label="设备绑定" value={summary.bound_records} />
+    </div>
+  )
+}
+
+function RiskTrendPanel({ days }: { days: RiskTrendDay[] }) {
+  const maxValue = Math.max(1, ...days.map((day) => day.total))
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+      <h2 className="text-base font-semibold text-ink-primary">风控趋势</h2>
+      <div className="mt-4 space-y-2">
+        {days.length === 0 && <div className="rounded-lg bg-surface-2 px-4 py-6 text-center text-sm text-ink-muted">暂无风控趋势数据</div>}
+        {days.map((day) => (
+          <div key={day.date} className="grid grid-cols-[72px_1fr_116px] items-center gap-3 text-xs">
+            <span className="text-ink-muted">{day.date.slice(5)}</span>
+            <div className="flex h-2 overflow-hidden rounded-full bg-surface-3">
+              <div className="bg-warning" style={{ width: `${(day.soft_blocks / maxValue) * 100}%` }} />
+              <div className="bg-error" style={{ width: `${(day.freezes / maxValue) * 100}%` }} />
+            </div>
+            <span className="text-right text-ink-secondary">软 {day.soft_blocks} / 冻 {day.freezes}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function RiskReasonPanel({ reasons, onOpenDetail }: { reasons: RiskReasonStats[]; onOpenDetail: (record: AdminCdkRecord) => Promise<void> }) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+      <h2 className="text-base font-semibold text-ink-primary">风险原因分布</h2>
+      <div className="mt-4 space-y-3">
+        {reasons.length === 0 && <div className="rounded-lg bg-surface-2 px-4 py-6 text-center text-sm text-ink-muted">暂无风险原因</div>}
+        {reasons.slice(0, 6).map((item) => (
+          <div key={`${item.type}:${item.reason}`} className="rounded-lg bg-surface-2 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="font-medium text-ink-primary">{item.type}</div>
+                <div className="mt-1 line-clamp-2 text-sm text-ink-secondary">{item.reason}</div>
+                <div className="mt-1 text-xs text-ink-muted">最近 {formatDate(item.last_seen_at)}</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="rounded-md bg-surface-1 px-2 py-1 text-sm font-semibold text-ink-primary">{item.count}</span>
+                {item.latest_record && <SmallButton onClick={() => void onOpenDetail(item.latest_record!)}>详情</SmallButton>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 type TrendMetricKey = 'visits' | 'schedule_generates' | 'cdk_redeems'
@@ -1941,6 +2616,9 @@ const usedCdks = records.filter((record) => record.status === 'used').length
 const frozenCdks = records.filter((record) => record.status === 'frozen').length
 const riskEvents = records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
 const boundDevices = records.filter((record) => record.activation_bound).length
+const scheduleGenerates = usage?.schedule_generates ?? 0
+const scheduleFailures = usage?.schedule_failures ?? 0
+const scheduleAttempts = scheduleGenerates + scheduleFailures
   return {
     totalCdks,
     usedCdks,
@@ -1950,23 +2628,265 @@ const boundDevices = records.filter((record) => record.activation_bound).length
     adminUsers,
     uniqueVisitors: usage?.unique_visitors ?? 0,
     visits: usage?.visits ?? 0,
-    scheduleGenerates: usage?.schedule_generates ?? 0,
+    freePreviews: usage?.free_previews ?? 0,
+    registers: usage?.registers ?? 0,
+    scheduleGenerates,
+    scheduleFailures,
+    scheduleAttempts,
+    scheduleSuccessRate: scheduleAttempts ? Math.round((scheduleGenerates / scheduleAttempts) * 1000) / 10 : 0,
     cdkRedeems: usage?.cdk_redeems ?? 0,
     redeemRate: usage?.visits ? Math.round(((usage?.cdk_redeems ?? 0) / usage.visits) * 1000) / 10 : 0,
   }
+}
+
+function recordMatchesCdkFilters(record: AdminCdkRecord, filters: CdkTableFilters): boolean {
+  if (filters.status !== 'all' && record.status !== filters.status) return false
+  if (filters.permission !== 'all' && normalizeProductPermission(record.permission) !== filters.permission) return false
+  if (filters.bound !== 'all' && Boolean(record.activation_bound) !== (filters.bound === 'yes')) return false
+  if (filters.risk !== 'all' && ((record.risk_event_count ?? 0) > 0) !== (filters.risk === 'yes')) return false
+  if (filters.generated !== 'all' && ((record.schedule_generate_count ?? 0) > 0) !== (filters.generated === 'yes')) return false
+  return true
+}
+
+function buildCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummary {
+  const permissionMap = new Map<Permission, CdkPermissionDistribution>()
+  for (const permission of cdkProductPermissions) {
+    permissionMap.set(permission, { permission, total: 0, unused: 0, used: 0, frozen: 0, revoked: 0 })
+  }
+  const statusMap = new Map<CdkStatus, CdkStatusDistribution>(
+    (['unused', 'used', 'frozen', 'revoked'] as CdkStatus[]).map((status) => [status, { status, total: 0 }]),
+  )
+  const reasonMap = new Map<string, RiskReasonStats>()
+  const trendMap = new Map<string, RiskTrendDay>()
+  let softBlocks = 0
+  let escalations = 0
+
+  for (const record of records) {
+    const permission = normalizeProductPermission(record.permission) ?? record.permission
+    const distribution = permissionMap.get(permission) ?? { permission, total: 0, unused: 0, used: 0, frozen: 0, revoked: 0 }
+    distribution.total += 1
+    distribution[record.status] += 1
+    permissionMap.set(permission, distribution)
+
+    const statusDistribution = statusMap.get(record.status)
+    if (statusDistribution) statusDistribution.total += 1
+
+    for (const event of record.risk_events ?? []) {
+      const date = event.at.slice(0, 10)
+      const trend = trendMap.get(date) ?? { date, soft_blocks: 0, freezes: 0, escalations: 0, total: 0 }
+      trend.total += 1
+      if (event.soft_block) {
+        trend.soft_blocks += 1
+        softBlocks += 1
+      }
+      if (event.escalation) {
+        trend.escalations += 1
+        escalations += 1
+      }
+      if (record.status === 'frozen' && record.latest_risk_event?.at === event.at) {
+        trend.freezes += 1
+      }
+      trendMap.set(date, trend)
+
+      const key = `${event.type}:${event.reason}`
+      const current = reasonMap.get(key) ?? {
+        type: event.type,
+        reason: event.reason,
+        count: 0,
+        last_seen_at: null,
+        latest_record: null,
+      }
+      current.count += 1
+      if (!current.last_seen_at || Date.parse(event.at) > Date.parse(current.last_seen_at)) {
+        current.last_seen_at = event.at
+        current.latest_record = record
+      }
+      reasonMap.set(key, current)
+    }
+  }
+
+  return {
+    permission_distribution: [...permissionMap.values()].filter((item) => item.total > 0),
+    status_distribution: [...statusMap.values()],
+    risk_reasons: [...reasonMap.values()].sort((left, right) => {
+      if (left.count !== right.count) return right.count - left.count
+      return (Date.parse(right.last_seen_at ?? '') || 0) - (Date.parse(left.last_seen_at ?? '') || 0)
+    }),
+    risk_trend: buildRiskTrendDays(trendMap),
+    soft_blocks: softBlocks,
+    freezes: records.filter((record) => record.status === 'frozen').length,
+    escalations,
+    risk_records: records.filter((record) => (record.risk_event_count ?? 0) > 0 || record.status === 'frozen').length,
+    generated_records: records.filter((record) => (record.schedule_generate_count ?? 0) > 0).length,
+    bound_records: records.filter((record) => record.activation_bound).length,
+  }
+}
+
+function buildRiskTrendDays(trendMap: Map<string, RiskTrendDay>): RiskTrendDay[] {
+  const dates: string[] = []
+  const now = new Date()
+  for (let offset = 13; offset >= 0; offset -= 1) {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - offset)).toISOString().slice(0, 10)
+    dates.push(date)
+  }
+  return dates.map((date) => trendMap.get(date) ?? { date, soft_blocks: 0, freezes: 0, escalations: 0, total: 0 })
+}
+
+function buildUsageStatsQuery(range: UsageRangeMode, from: string, to: string): string | null {
+  if (range !== 'custom') return `range=${range}`
+  if (!isDateInputString(from) || !isDateInputString(to) || from > to) return null
+  return `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+}
+
+function getDateOffsetString(offset: number): string {
+  const now = new Date()
+  const date = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() - offset))
+  return date.toISOString().slice(0, 10)
+}
+
+function isDateInputString(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
 function normalizeUsageTotals(value: Partial<UsageTotals> | undefined): UsageTotals {
   return {
     unique_visitors: normalizeCount(value?.unique_visitors),
     visits: normalizeCount(value?.visits),
+    free_previews: normalizeCount(value?.free_previews),
+    registers: normalizeCount(value?.registers),
     schedule_generates: normalizeCount(value?.schedule_generates),
     cdk_redeems: normalizeCount(value?.cdk_redeems),
+    failures: normalizeCount(value?.failures),
+    schedule_failures: normalizeCount(value?.schedule_failures),
+    cdk_redeem_failures: normalizeCount(value?.cdk_redeem_failures),
+    skland_imports: normalizeCount(value?.skland_imports),
+    skland_import_failures: normalizeCount(value?.skland_import_failures),
+    announcement_impressions: normalizeCount(value?.announcement_impressions),
+    announcement_reads: normalizeCount(value?.announcement_reads),
   }
 }
 
 function normalizeUsageDay(day: Partial<UsageDay>): UsageDay {
   return { date: typeof day.date === 'string' ? day.date : '', ...normalizeUsageTotals(day) }
+}
+
+function normalizeUsageStats(value: Partial<UsageStatsResponse>): UsageStatsResponse {
+  const totals = normalizeUsageTotals(value.totals)
+  const days = Array.isArray(value.days) ? value.days.map(normalizeUsageDay) : []
+  return {
+    totals,
+    days,
+    range: normalizeUsageRange(value.range, days),
+    funnel: Array.isArray(value.funnel) ? value.funnel.map(normalizeFunnelStep) : [],
+    failure_reasons: Array.isArray(value.failure_reasons) ? value.failure_reasons.map(normalizeFailureReason) : [],
+    recent_failures: Array.isArray(value.recent_failures) ? value.recent_failures.map(normalizeFailureSample) : [],
+    latency: {
+      schedule_generate: normalizeLatencyStats(value.latency?.schedule_generate),
+    },
+    skland: normalizeSklandStats(value.skland),
+    announcement: normalizeAnnouncementStats(value.announcement),
+    cdk_distribution: Array.isArray(value.cdk_distribution) ? value.cdk_distribution.map(normalizeCdkDistributionItem) : [],
+  }
+}
+
+function normalizeUsageRange(value: Partial<UsageRange> | undefined, days: UsageDay[]): UsageRange {
+  return {
+    from: typeof value?.from === 'string' ? value.from : days[0]?.date ?? '',
+    to: typeof value?.to === 'string' ? value.to : days[days.length - 1]?.date ?? '',
+    days: normalizeCount(value?.days) || days.length,
+  }
+}
+
+function normalizeFunnelStep(value: Partial<UsageFunnelStep>): UsageFunnelStep {
+  return {
+    key: typeof value.key === 'string' ? value.key : '',
+    label: typeof value.label === 'string' ? value.label : '',
+    count: normalizeCount(value.count),
+    conversion_rate: normalizeNumber(value.conversion_rate),
+    dropoff: normalizeCount(value.dropoff),
+  }
+}
+
+function normalizeFailureReason(value: Partial<UsageFailureReason>): UsageFailureReason {
+  return {
+    reason_code: typeof value.reason_code === 'string' ? value.reason_code : 'unknown_failure',
+    count: normalizeCount(value.count),
+    percentage: normalizeNumber(value.percentage),
+    last_seen_at: typeof value.last_seen_at === 'string' ? value.last_seen_at : null,
+    events: value.events && typeof value.events === 'object' ? value.events : {},
+  }
+}
+
+function normalizeFailureSample(value: Partial<UsageFailureSample>): UsageFailureSample {
+  return {
+    created_at: typeof value.created_at === 'string' ? value.created_at : '',
+    event: typeof value.event === 'string' ? value.event : '',
+    reason_code: typeof value.reason_code === 'string' ? value.reason_code : 'unknown_failure',
+    duration_ms: typeof value.duration_ms === 'number' && Number.isFinite(value.duration_ms) ? value.duration_ms : null,
+    permission: typeof value.permission === 'string' ? value.permission : null,
+    cdk_status: typeof value.cdk_status === 'string' ? value.cdk_status : null,
+    source: typeof value.source === 'string' ? value.source : null,
+    has_profile: value.has_profile === true,
+  }
+}
+
+function normalizeLatencyStats(value: Partial<UsageLatencyStats> | undefined): UsageLatencyStats {
+  return {
+    average_ms: normalizeCount(value?.average_ms),
+    p50_ms: normalizeCount(value?.p50_ms),
+    p95_ms: normalizeCount(value?.p95_ms),
+    max_ms: normalizeCount(value?.max_ms),
+    sample_count: normalizeCount(value?.sample_count),
+    days: Array.isArray(value?.days)
+      ? value.days.map((day) => ({
+        date: typeof day.date === 'string' ? day.date : '',
+        average_ms: normalizeCount(day.average_ms),
+        p95_ms: normalizeCount(day.p95_ms),
+        sample_count: normalizeCount(day.sample_count),
+      }))
+      : [],
+  }
+}
+
+function normalizeSklandStats(value: Partial<UsageSklandStats> | undefined): UsageSklandStats {
+  return {
+    attempts: normalizeCount(value?.attempts),
+    success: normalizeCount(value?.success),
+    failed: normalizeCount(value?.failed),
+    success_rate: normalizeNumber(value?.success_rate),
+    credential_invalid: normalizeCount(value?.credential_invalid),
+    refresh_forbidden: normalizeCount(value?.refresh_forbidden),
+    not_bound: normalizeCount(value?.not_bound),
+    request_failed: normalizeCount(value?.request_failed),
+    days: Array.isArray(value?.days)
+      ? value.days.map((day) => ({
+        date: typeof day.date === 'string' ? day.date : '',
+        attempts: normalizeCount(day.attempts),
+        success: normalizeCount(day.success),
+        failed: normalizeCount(day.failed),
+        success_rate: normalizeNumber(day.success_rate),
+      }))
+      : [],
+  }
+}
+
+function normalizeAnnouncementStats(value: Partial<UsageAnnouncementStats> | undefined): UsageAnnouncementStats {
+  return {
+    impressions: normalizeCount(value?.impressions),
+    reads: normalizeCount(value?.reads),
+    unread: normalizeCount(value?.unread),
+    read_rate: normalizeNumber(value?.read_rate),
+  }
+}
+
+function normalizeCdkDistributionItem(value: Partial<UsageCdkDistributionItem>): UsageCdkDistributionItem {
+  return {
+    permission: typeof value.permission === 'string' ? value.permission : 'unknown',
+    total: normalizeCount(value.total),
+    success: normalizeCount(value.success),
+    failure: normalizeCount(value.failure),
+    statuses: value.statuses && typeof value.statuses === 'object' ? value.statuses : {},
+  }
 }
 
 function normalizeRiskSettings(value: Partial<RiskControlSettings> | null | undefined): RiskControlSettings {
@@ -1979,6 +2899,10 @@ function normalizeRiskSettings(value: Partial<RiskControlSettings> | null | unde
 
 function normalizeCount(value: unknown): number {
   return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0
+}
+
+function normalizeNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value * 10) / 10 : 0
 }
 
 function normalizeAnnouncementList(value: Announcement[] | null | undefined): Announcement[] {
@@ -1994,6 +2918,55 @@ function normalizeAnnouncementList(value: Announcement[] | null | undefined): An
       created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
       updated_at: typeof item.updated_at === 'string' ? item.updated_at : new Date().toISOString(),
     }))
+}
+
+function normalizeAnnouncementStatsMap(
+  value: Partial<Record<string, Partial<AnnouncementReachStats>>> | null | undefined,
+  announcements: Announcement[],
+): Record<string, AnnouncementReachStats> {
+  const source = value && typeof value === 'object' ? value : {}
+  return Object.fromEntries(
+    announcements.map((announcement) => [announcement.id, normalizeAnnouncementReachStats(source[announcement.id])]),
+  )
+}
+
+function normalizeAnnouncementReachStats(value: Partial<AnnouncementReachStats> | undefined): AnnouncementReachStats {
+  return {
+    impressions: normalizeCount(value?.impressions),
+    reads: normalizeCount(value?.reads),
+    server_reads: normalizeCount(value?.server_reads),
+    local_reads: normalizeCount(value?.local_reads),
+    unread: normalizeCount(value?.unread),
+    read_rate: normalizeNumber(value?.read_rate),
+  }
+}
+
+function sortAnnouncements(items: Announcement[], sort: AnnouncementSortKey): Announcement[] {
+  const next = [...items]
+  return next.sort((left, right) => {
+    if (sort === 'updated_asc') return compareAnnouncementUpdatedAt(left, right)
+    if (sort === 'kind') {
+      const kindCompare = announcementKindRank(left.kind) - announcementKindRank(right.kind)
+      return kindCompare || compareAnnouncementUpdatedAtDesc(left, right)
+    }
+    if (sort === 'active') {
+      const activeCompare = Number(right.active) - Number(left.active)
+      return activeCompare || compareAnnouncementUpdatedAtDesc(left, right)
+    }
+    return compareAnnouncementUpdatedAtDesc(left, right)
+  })
+}
+
+function compareAnnouncementUpdatedAt(left: Announcement, right: Announcement): number {
+  return (Date.parse(left.updated_at) || 0) - (Date.parse(right.updated_at) || 0)
+}
+
+function compareAnnouncementUpdatedAtDesc(left: Announcement, right: Announcement): number {
+  return compareAnnouncementUpdatedAt(right, left)
+}
+
+function announcementKindRank(kind: AnnouncementKind): number {
+  return kind === 'banner' ? 0 : 1
 }
 
 function createDraftAnnouncement(kind: AnnouncementKind): Announcement {
@@ -2019,6 +2992,12 @@ function formatDate(value: string | null): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function formatDuration(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '-'
+  if (value < 1000) return `${Math.round(value)}ms`
+  return `${Math.round(value / 100) / 10}s`
 }
 
 function validateEmailInput(value: string): string | null {
@@ -2069,14 +3048,110 @@ function formatNullableNumber(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) ? String(value) : '-'
 }
 
-function downloadOperatorsJson(data: AdminProfileOperatorData): void {
-  const blob = new Blob([JSON.stringify(data.operators, null, 2)], { type: 'application/json' })
+function buildCurrentOpsReport(
+  usage: UsageStatsResponse,
+  cdk: CdkOpsSummary,
+  announcements: Announcement[],
+  announcementStats: Record<string, AnnouncementReachStats>,
+) {
+  return {
+    generated_at: new Date().toISOString(),
+    range: usage.range,
+    totals: usage.totals,
+    days: usage.days,
+    funnel: usage.funnel,
+    failure_reasons: usage.failure_reasons,
+    latency: usage.latency,
+    skland: usage.skland,
+    announcement: usage.announcement,
+    announcement_items: announcements.map((announcement) => ({
+      id: announcement.id,
+      kind: announcement.kind,
+      title: announcement.title,
+      active: announcement.active,
+      updated_at: announcement.updated_at,
+      stats: announcementStats[announcement.id] ?? EMPTY_ANNOUNCEMENT_REACH_STATS,
+    })),
+    cdk_permission_distribution: cdk.permission_distribution,
+    cdk_status_distribution: cdk.status_distribution,
+    risk_trend: cdk.risk_trend,
+    risk_reasons: cdk.risk_reasons.map((item) => ({
+      type: item.type,
+      reason: item.reason,
+      count: item.count,
+      last_seen_at: item.last_seen_at,
+      latest_cdk_id: item.latest_record?.cdk_id ?? null,
+    })),
+  }
+}
+
+function buildCurrentOpsReportCsv(report: ReturnType<typeof buildCurrentOpsReport>): string {
+  const rows: string[][] = [
+    ['section', 'key', 'label', 'date', 'value', 'extra'],
+    ['range', 'from', 'From', '', report.range.from, ''],
+    ['range', 'to', 'To', '', report.range.to, ''],
+    ['range', 'days', 'Days', '', String(report.range.days), ''],
+  ]
+  for (const [key, value] of Object.entries(report.totals)) {
+    rows.push(['totals', key, key, '', String(value), ''])
+  }
+  for (const day of report.days) {
+    for (const [key, value] of Object.entries(day)) {
+      if (key === 'date') continue
+      rows.push(['days', key, key, day.date, String(value), ''])
+    }
+  }
+  for (const item of report.funnel) {
+    rows.push(['funnel', item.key, item.label, '', String(item.count), `conversion=${item.conversion_rate};dropoff=${item.dropoff}`])
+  }
+  for (const item of report.failure_reasons) {
+    rows.push(['failure_reasons', item.reason_code, item.reason_code, item.last_seen_at ?? '', String(item.count), `percentage=${item.percentage}`])
+  }
+  for (const item of report.cdk_permission_distribution) {
+    rows.push(['cdk_permission_distribution', String(item.permission), permissionLabels[item.permission] ?? String(item.permission), '', String(item.total), `unused=${item.unused};used=${item.used};frozen=${item.frozen};revoked=${item.revoked}`])
+  }
+  for (const item of report.cdk_status_distribution) {
+    rows.push(['cdk_status_distribution', item.status, statusLabels[item.status], '', String(item.total), ''])
+  }
+  for (const day of report.risk_trend) {
+    rows.push(['risk_trend', 'risk_events', 'Risk events', day.date, String(day.total), `soft=${day.soft_blocks};freeze=${day.freezes};escalation=${day.escalations}`])
+  }
+  for (const item of report.risk_reasons) {
+    rows.push(['risk_reasons', item.type, item.reason, item.last_seen_at ?? '', String(item.count), `latest_cdk=${item.latest_cdk_id ?? ''}`])
+  }
+  const latency = report.latency.schedule_generate
+  rows.push(['latency', 'average_ms', 'Average', '', String(latency.average_ms), ''])
+  rows.push(['latency', 'p50_ms', 'P50', '', String(latency.p50_ms), ''])
+  rows.push(['latency', 'p95_ms', 'P95', '', String(latency.p95_ms), ''])
+  rows.push(['latency', 'max_ms', 'Max', '', String(latency.max_ms), ''])
+  rows.push(['skland', 'success_rate', 'Success rate', '', String(report.skland.success_rate), `attempts=${report.skland.attempts};failed=${report.skland.failed}`])
+  rows.push(['announcement', 'read_rate', 'Read rate', '', String(report.announcement.read_rate), `impressions=${report.announcement.impressions};reads=${report.announcement.reads}`])
+  for (const item of report.announcement_items) {
+    const extra = `id=${item.id};kind=${item.kind};active=${item.active};server_reads=${item.stats.server_reads};local_reads=${item.stats.local_reads}`
+    rows.push(['announcement_item', 'impressions', item.title, item.updated_at, String(item.stats.impressions), extra])
+    rows.push(['announcement_item', 'reads', item.title, item.updated_at, String(item.stats.reads), extra])
+    rows.push(['announcement_item', 'read_rate', item.title, item.updated_at, String(item.stats.read_rate), extra])
+  }
+  return rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
+}
+
+function csvCell(value: string): string {
+  if (!/[",\r\n]/.test(value)) return value
+  return `"${value.replace(/"/g, '""')}"`
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `skland-operators-${formatFileSegment(data.profile.id)}-${formatDownloadTimestamp()}.json`
+  anchor.download = filename
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+function downloadOperatorsJson(data: AdminProfileOperatorData): void {
+  const blob = new Blob([JSON.stringify(data.operators, null, 2)], { type: 'application/json' })
+  downloadBlob(blob, `skland-operators-${formatFileSegment(data.profile.id)}-${formatDownloadTimestamp()}.json`)
 }
 
 function formatFileSegment(value: string): string {

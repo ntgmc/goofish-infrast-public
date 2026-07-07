@@ -105,8 +105,18 @@ export interface AnnouncementPublicResponse {
   announcements: Announcement[];
 }
 
+export interface AnnouncementStats {
+  impressions: number;
+  reads: number;
+  server_reads: number;
+  local_reads: number;
+  unread: number;
+  read_rate: number;
+}
+
 export interface AnnouncementAdminResponse {
   announcements: Announcement[];
+  stats?: Record<string, AnnouncementStats>;
 }
 
 export interface OptimizeRequest {

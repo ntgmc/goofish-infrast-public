@@ -4,8 +4,8 @@ export const APP_BUILD_META = {
   "frontend_version": "1.3.136",
   "backend_version": "1.3.136",
   "data_version": "data.136.bfcc3b3",
-  "generated_at": "2026-07-07T11:28:31.577Z",
-  "source_summary": "source=server/handlers/efficiency-data.json; sha256=c8188a9c44c2; workplaces=14; trading_rule_groups=7; manufacturing_rule_groups=9; control_center_rules=13",
+  "generated_at": "2026-07-07T14:44:56.611Z",
+  "source_summary": "source=server/handlers/efficiency-data.json; sha256=8dcf68d2777f; workplaces=14; trading_rule_groups=7; manufacturing_rule_groups=9; control_center_rules=22",
   "git_sha": "bfcc3b3cd2dacba0b54870db077e95e3956e98d7",
   "build_context": "local"
 } as const;

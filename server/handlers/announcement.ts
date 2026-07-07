@@ -3,6 +3,9 @@ import type { Announcement, AnnouncementKind } from '../../src/lib/types'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
+import { getAnnouncementReadCounts } from '../storage/user-store'
+import { listUsageEvents, recordUsageEvent } from './usage-stats'
+import type { AnnouncementStats } from '../../src/lib/types'
 
 const ANNOUNCEMENT_KEY = 'current.json'
 const MAX_TITLE_LENGTH = 80
@@ -55,6 +58,9 @@ async function handlePublicGet(): Promise<Response> {
     .sort(compareNewestFirst)
   const banner = activeAnnouncements.find((item) => item.kind === 'banner') ?? null
   const popups = activeAnnouncements.filter((item) => item.kind === 'popup')
+  if (activeAnnouncements.length > 0) {
+    await Promise.all(activeAnnouncements.map((item) => recordAnnouncementEvent('announcement_impression', 'public_get', item)))
+  }
 
   return jsonResponse({
     banner,
@@ -63,12 +69,34 @@ async function handlePublicGet(): Promise<Response> {
   })
 }
 
+async function recordAnnouncementEvent(
+  event: 'announcement_impression' | 'announcement_read',
+  source: string,
+  announcement: Pick<Announcement, 'id' | 'kind'>,
+): Promise<void> {
+  try {
+    await recordUsageEvent(event, {
+      status: 'success',
+      reason_code: 'ok',
+      source,
+      announcement_id: announcement.id,
+      announcement_kind: announcement.kind,
+    })
+  } catch (error) {
+    console.warn('usage stats announcement skipped:', error)
+  }
+}
+
 async function handleAdminGet(req: Request): Promise<Response> {
   if (!(await authenticateAdminRequest(req))) {
     return jsonResponse({ error: '管理账号或密码错误。' }, 401)
   }
 
-  return jsonResponse(await readAnnouncementData())
+  const data = await readAnnouncementData()
+  return jsonResponse({
+    ...data,
+    stats: await buildAnnouncementStats(data.announcements),
+  })
 }
 
 async function handleAdminPut(req: Request): Promise<Response> {
@@ -89,7 +117,43 @@ async function handleAdminPut(req: Request): Promise<Response> {
   const store = await getAnnouncementStore()
   await store.set(data)
 
-  return jsonResponse(data)
+  return jsonResponse({
+    ...data,
+    stats: await buildAnnouncementStats(data.announcements),
+  })
+}
+
+async function buildAnnouncementStats(announcements: Announcement[]): Promise<Record<string, AnnouncementStats>> {
+  const [events, serverReadCounts] = await Promise.all([
+    listUsageEvents(),
+    getAnnouncementReadCounts(),
+  ])
+  const stats = new Map<string, { impressions: number; local_reads: number }>()
+  const activeIds = new Set(announcements.map((announcement) => announcement.id))
+
+  for (const event of events) {
+    if (!event.announcement_id || !activeIds.has(event.announcement_id) || event.status === 'failure') continue
+    const current = stats.get(event.announcement_id) ?? { impressions: 0, local_reads: 0 }
+    if (event.event === 'announcement_impression') current.impressions += 1
+    if (event.event === 'announcement_read' && event.source !== 'user_announcements') current.local_reads += 1
+    stats.set(event.announcement_id, current)
+  }
+
+  return Object.fromEntries(announcements.map((announcement) => {
+    const eventStats = stats.get(announcement.id)
+    const serverReads = serverReadCounts[announcement.id] ?? 0
+    const localReads = eventStats?.local_reads ?? 0
+    const reads = serverReads + localReads
+    const impressions = Math.max(eventStats?.impressions ?? 0, reads)
+    return [announcement.id, {
+      impressions,
+      reads,
+      server_reads: serverReads,
+      local_reads: localReads,
+      unread: Math.max(0, impressions - reads),
+      read_rate: rate(reads, impressions),
+    }]
+  }))
 }
 
 function validateAnnouncementList(
@@ -242,6 +306,10 @@ function normalizeIsoString(value: unknown): string | null {
 
 function compareNewestFirst(a: Announcement, b: Announcement): number {
   return Date.parse(b.updated_at) - Date.parse(a.updated_at)
+}
+
+function rate(count: number, total: number): number {
+  return total > 0 ? Math.round((count / total) * 1000) / 10 : 0
 }
 
 function createAnnouncementId(): string {
