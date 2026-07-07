@@ -25,6 +25,7 @@ await assertLoginStart()
 await assertPendingComplete()
 await assertCompleteRequiresConfirmation()
 await assertManualCredentialPreview()
+await assertBlankDefaultUidCredentialPreview()
 await assertManualCredentialConfirm()
 await assertCookieCredentialPreview()
 await assertEncodedCredentialPreview()
@@ -131,6 +132,33 @@ async function assertManualCredentialPreview() {
   }
   if (!store.profiles.get('profile-manual')?.skland_pending_binding?.encrypted_cred?.startsWith('SKLAND-V1:')) {
     throw new Error('manual credential preview: pending encrypted cred was not saved')
+  }
+}
+
+async function assertBlankDefaultUidCredentialPreview() {
+  seedProfile({ id: 'profile-blank-default-uid', status: 'active' })
+  setFetchMode('blank-default-uid')
+  const result = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-blank-default-uid',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  assertNoSecretLeak(result.body, 'blank defaultUid credential preview response')
+  if (result.status !== 200 || result.body.status !== 'confirm_required' || !result.body.confirmation_id) {
+    throw new Error(`blank defaultUid preview: expected confirm_required, got ${result.status}`)
+  }
+  if (
+    result.body.skland_preview?.uid !== '130761348'
+    || result.body.skland_preview?.nickname !== 'Blank Default Doctor'
+    || result.body.skland_preview?.channel_name !== '官服'
+  ) {
+    throw new Error(`blank defaultUid preview: invalid preview ${JSON.stringify(result.body.skland_preview)}`)
+  }
+  if (!store.fetchCalls.some((url) => url.includes('/api/v1/game/player/info?uid=130761348'))) {
+    throw new Error('blank defaultUid preview: should read Arknights player info by bindingList uid')
+  }
+  if (store.fetchCalls.some((url) => url.includes('/api/v1/game/player/info?uid=434207645'))) {
+    throw new Error('blank defaultUid preview: should ignore Endfield uid')
   }
 }
 
@@ -510,6 +538,32 @@ function setFetchMode(mode) {
     }
     if (textUrl.endsWith('/api/v1/game/player/binding')) {
       const mismatch = mode === 'mismatch'
+      if (mode === 'blank-default-uid') {
+        return jsonResponse({
+          code: 0,
+          message: 'OK',
+          data: {
+            list: [{
+              appCode: 'arknights',
+              defaultUid: '',
+              bindingList: [{
+                uid: '130761348',
+                nickName: 'Blank Default Doctor',
+                channelName: '官服',
+              }],
+            }, {
+              appCode: 'endfield',
+              bindingList: [{
+                uid: '434207645',
+                nickName: '',
+                channelName: '官服',
+                roles: [{ roleId: '1384481039', nickname: 'Endfield Doctor' }],
+                defaultRole: { roleId: '1384481039', nickname: 'Endfield Doctor' },
+              }],
+            }],
+          },
+        })
+      }
       return jsonResponse({
         code: 0,
         message: 'OK',
