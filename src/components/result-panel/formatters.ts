@@ -1,0 +1,287 @@
+import type { DailyProduction, OptimizeResult, ShiftRoom } from '../../lib/types'
+import { PRODUCT_LABELS, ROOM_LABELS } from './labels'
+import type { PreparedPlan } from './types'
+
+const SANITY_PER_LMD = 36 / 10000
+const SANITY_PER_EXP = 36 / 10000
+const SANITY_PER_BATTLE_RECORD = SANITY_PER_EXP * 1000
+const SANITY_PER_PURE_GOLD = SANITY_PER_EXP * (145 / 229) * (50 / 3) * 24
+const SANITY_PER_ORUNDUM = 3 / 4
+const SANITY_PER_PURCHASE_CERTIFICATE = 30 * (1 - SANITY_PER_LMD * 12) / 21
+const SANITY_PER_ORIGINIUM_SHARD = SANITY_PER_PURCHASE_CERTIFICATE * 90
+const MAX_MOOD_FALLBACK = 24
+
+export type DroneGainSummary = {
+  value: string;
+  suffix: string;
+  note: string;
+}
+
+export type PreparedResult = {
+  totalEff: number;
+  rawTotalEff: number;
+  plans: PreparedPlan[];
+  productionStats: {
+    manufacturing: Record<string, number>;
+    manufacturingTotal: number;
+    lmd: number;
+    orundum: number;
+    goldNet: number;
+    droneGain: DroneGainSummary;
+  };
+  productionSanity: { value: number; note: string };
+  detailStats: { planCount: number; roomCount: number };
+}
+
+export function prepareResult(result: OptimizeResult, isRotationMode: boolean, isMaaDormitoryAutofill: boolean): PreparedResult {
+  const rawTotalEff = result.raw_total_efficiency ??
+    result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
+  const totalEff = result.total_efficiency ?? rawTotalEff
+  const plans: PreparedPlan[] = result.plans.map((plan) => ({
+    ...plan,
+    rows: Object.entries(plan.rooms ?? {}).flatMap(([roomType, rooms]) => {
+      if (!Array.isArray(rooms)) return []
+      if (isRotationMode && roomType === 'dormitory') return []
+      return rooms.flatMap((room, index) => {
+        if (roomType === 'dormitory' && isMaaDormitoryAutofill) {
+          if (index > 0) return []
+          return [{
+            key: `${roomType}-maa-autofill`,
+            label: ROOM_LABELS[roomType] || roomType,
+            indexLabel: '',
+            product: '-',
+            operators: '宿舍由 MAA 自动填满',
+            efficiency: '-',
+            speedEfficiency: '-',
+            detail: '导出的 MAA JSON 不写死宿舍干员',
+            hasAdjustedSpeed: false,
+          }]
+        }
+        const ops = room.operators
+        if (!Array.isArray(ops) || ops.length === 0) return []
+        const efficiency = getDisplayEfficiency(room)
+        const speedEfficiency = getEffectiveEfficiency(roomType, room)
+        const detail = [isRotationMode ? '' : getEfficiencyDetail(roomType, room), getMoodDetail(room, isRotationMode)]
+          .filter(Boolean)
+          .join(' · ')
+        return {
+          key: `${roomType}-${index}`,
+          label: ROOM_LABELS[roomType] || roomType,
+          indexLabel: rooms.length > 1 ? String(index + 1) : '',
+          product: formatProduct(room.product),
+          operators: ops.join(', '),
+          efficiency: formatPercent(efficiency),
+          speedEfficiency: formatPercent(speedEfficiency),
+          detail,
+          hasAdjustedSpeed: Math.abs(speedEfficiency - efficiency) >= 0.05,
+        }
+      })
+    }),
+  }))
+
+  const daily = result.daily_production ?? {}
+  const manufacturing = daily.manufacturing ?? {}
+  const droneGain = summarizeDroneGains(daily.details ?? [])
+  const productionStats = {
+    manufacturing,
+    manufacturingTotal: Object.values(manufacturing).reduce((sum, value) => sum + value, 0),
+    lmd: daily.trading?.LMD ?? 0,
+    orundum: daily.trading?.Orundum ?? 0,
+    goldNet: daily.net?.['Pure Gold'] ?? 0,
+    droneGain,
+  }
+  const productionSanity = calculateProductionSanity(daily)
+
+  const detailStats = {
+    planCount: plans.length,
+    roomCount: plans.reduce((sum, plan) => sum + plan.rows.length, 0),
+  }
+
+  return { totalEff, rawTotalEff, plans, productionStats, productionSanity, detailStats }
+}
+
+export function formatProduct(product?: string): string {
+  if (!product) return '-'
+  return PRODUCT_LABELS[product] ?? product
+}
+
+export function formatPercent(value: number): string {
+  return `${Number.isFinite(value) ? value.toFixed(1) : '0.0'}%`
+}
+
+export function formatAmount(value: number): string {
+  if (!Number.isFinite(value)) return '0'
+  if (Math.abs(value) >= 1000) return Math.round(value).toLocaleString('zh-CN')
+  return value.toFixed(value % 1 === 0 ? 0 : 1)
+}
+
+export function formatCompactNumber(value: number): string {
+  if (!Number.isFinite(value)) return '0'
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '')
+}
+
+export function formatSigned(value: number): string {
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${formatAmount(value)}`
+}
+
+export function formatProductionBreakdown(manufacturing: Record<string, number>): string {
+  const parts = ['Pure Gold', 'Battle Record', 'Originium Shard']
+    .map((product) => {
+      const amount = manufacturing[product] ?? 0
+      return amount > 0 ? `${formatProduct(product)} ${formatAmount(amount)}` : ''
+    })
+    .filter(Boolean)
+  return parts.length > 0 ? parts.join('，') : '暂无制造站产出'
+}
+
+export function formatOverflowSummary(overflow: NonNullable<OptimizeResult['analysis_summary']>['overflow'] | undefined): string {
+  if (!overflow) return '暂无爆仓信息'
+  const parts = [
+    overflow.earliest_trading_full_time ? `贸易最短 ${overflow.earliest_trading_full_time}` : '',
+    overflow.earliest_manufacturing_full_time ? `制造最短 ${overflow.earliest_manufacturing_full_time}` : '',
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join('，') : '暂无爆仓信息'
+}
+
+function getDisplayEfficiency(room: ShiftRoom): number {
+  return Number(
+    room.overflow?.equivalent?.equivalent_efficiency ??
+    room.overflow?.final_efficiency ??
+    room.final_efficiency ??
+    room.efficiency ??
+    0,
+  )
+}
+
+function getEffectiveEfficiency(roomType: string, room: ShiftRoom): number {
+  if (roomType === 'trading') {
+    return Number(room.overflow?.speed_efficiency ?? room.overflow?.final_efficiency ?? room.final_efficiency ?? room.efficiency ?? 0)
+  }
+  return Number(room.overflow?.final_efficiency ?? room.final_efficiency ?? room.efficiency ?? 0)
+}
+
+function getEfficiencyDetail(roomType: string, room: ShiftRoom): string {
+  const overflow = room.overflow
+  if (!overflow) return ''
+  if (roomType === 'trading' && typeof overflow.time === 'string') {
+    return `满单 ${overflow.time}`
+  }
+  if (roomType === 'trading' && typeof overflow.expected_order_time === 'string') {
+    return `单均 ${overflow.expected_order_time}`
+  }
+  if (roomType === 'manufacture' && typeof overflow.time === 'string') {
+    return `满仓 ${overflow.time}`
+  }
+  return ''
+}
+
+function getMoodDetail(room: ShiftRoom, isRotationMode = false): string {
+  if (isRotationMode) {
+    const workHoursToZero = room.rotation?.work_hours_to_zero
+    return workHoursToZero !== undefined && workHoursToZero !== null
+      ? `预计 ${formatCompactNumber(workHoursToZero)}h 后整设施切换`
+      : ''
+  }
+
+  const mood = room.mood ?? {}
+  const entries = Object.values(mood)
+  if (entries.length === 0) return ''
+  const minEnd = Math.min(...entries.map((item) => Number(item.end ?? MAX_MOOD_FALLBACK)))
+  const maxCost = Math.max(...entries.map((item) => Number(item.cost_per_hour ?? 0)))
+  const redOps = Object.entries(mood)
+    .filter(([, item]) => item.red_face)
+    .map(([name]) => name)
+  const parts = [`心情≥${formatCompactNumber(minEnd)}`, `最高消耗/时 ${formatCompactNumber(maxCost)}`]
+  if (room.rotation?.work_hours_to_zero !== undefined && room.rotation.work_hours_to_zero !== null) {
+    parts.push(`最快耗心 ${formatCompactNumber(room.rotation.work_hours_to_zero)}h 触发整设施切换`)
+  }
+  if (redOps.length > 0) parts.push(`红脸风险 ${redOps.join(', ')}`)
+  return parts.join('，')
+}
+
+function calculateProductionSanity(daily: Partial<DailyProduction>): { value: number; note: string } {
+  const manufacturing = daily.manufacturing ?? {}
+  const trading = daily.trading ?? {}
+  const consumption = daily.consumption ?? {}
+
+  const manufacturingSanity =
+    getResourceAmount(manufacturing, 'Pure Gold') * SANITY_PER_PURE_GOLD +
+    getResourceAmount(manufacturing, 'Battle Record') * SANITY_PER_BATTLE_RECORD +
+    getResourceAmount(manufacturing, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
+  const tradingSanity =
+    getResourceAmount(trading, 'LMD') * SANITY_PER_LMD +
+    getResourceAmount(trading, 'Orundum') * SANITY_PER_ORUNDUM
+  const consumptionSanity =
+    getResourceAmount(consumption, 'Pure Gold') * SANITY_PER_PURE_GOLD +
+    getResourceAmount(consumption, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
+  const value = manufacturingSanity + tradingSanity - consumptionSanity
+
+  return {
+    value,
+    note: `制造 ${formatAmount(manufacturingSanity)} + 贸易 ${formatAmount(tradingSanity)} - 消耗 ${formatAmount(consumptionSanity)}`,
+  }
+}
+
+function summarizeDroneGains(details: NonNullable<DailyProduction['details']>): DroneGainSummary {
+  const produced: Record<string, number> = {}
+  const consumed: Record<string, number> = {}
+
+  for (const detail of details) {
+    if (detail.source !== 'drones') continue
+    const product = typeof detail.product === 'string' ? detail.product : ''
+    const amount = typeof detail.amount === 'number' ? detail.amount : 0
+    if (product && amount > 0) {
+      produced[product] = (produced[product] ?? 0) + amount
+    }
+    if (isRecord(detail.consume)) {
+      for (const [productName, rawAmount] of Object.entries(detail.consume)) {
+        if (typeof rawAmount === 'number' && rawAmount > 0) {
+          consumed[productName] = (consumed[productName] ?? 0) + rawAmount
+        }
+      }
+    }
+  }
+
+  const productOrder = ['LMD', 'Pure Gold', 'Battle Record', 'Orundum', 'Originium Shard']
+  const producedParts = formatResourceParts(produced, productOrder)
+  const consumedParts = formatResourceParts(consumed, productOrder)
+  const primaryProduct = productOrder.find((product) => (produced[product] ?? 0) > 0) ??
+    Object.keys(produced).find((product) => produced[product] > 0)
+
+  if (!primaryProduct) {
+    return {
+      value: '0',
+      suffix: '收益',
+      note: '未产生无人机加速收益',
+    }
+  }
+
+  return {
+    value: `+${formatAmount(produced[primaryProduct])}`,
+    suffix: formatProduct(primaryProduct),
+    note: [
+      producedParts.length > 0 ? `额外产出 ${producedParts.join('，')}` : '',
+      consumedParts.length > 0 ? `消耗 ${consumedParts.join('，')}` : '',
+    ].filter(Boolean).join('；'),
+  }
+}
+
+function getResourceAmount(values: Record<string, number>, key: string): number {
+  const value = values[key] ?? 0
+  return Number.isFinite(value) ? value : 0
+}
+
+function formatResourceParts(values: Record<string, number>, preferredOrder: string[]): string[] {
+  const orderedProducts = [
+    ...preferredOrder,
+    ...Object.keys(values).filter((product) => !preferredOrder.includes(product)).sort(),
+  ]
+  return orderedProducts
+    .filter((product) => (values[product] ?? 0) > 0)
+    .map((product) => `${formatProduct(product)} ${formatAmount(values[product])}`)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
