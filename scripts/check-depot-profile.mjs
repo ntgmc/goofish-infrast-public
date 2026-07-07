@@ -243,6 +243,11 @@ function memoryUsageStatsModule() {
 function memoryLicenseUtilsModule() {
   return `
     export function canUseUpgradeFeatures() { return true }
+    export function canonicalJson(obj) {
+      if (obj === null || typeof obj !== 'object') return JSON.stringify(obj)
+      if (Array.isArray(obj)) return '[' + obj.map(canonicalJson).join(',') + ']'
+      return '{' + Object.keys(obj).sort().map((key) => JSON.stringify(key) + ':' + canonicalJson(obj[key])).join(',') + '}'
+    }
     export function evaluateClientBindingRisk() { return { ok: true } }
     export function evaluateOperatorRisk() { return { ok: true } }
     export function formatBindingBlockMessage() { return 'blocked' }

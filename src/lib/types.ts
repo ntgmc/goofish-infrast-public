@@ -108,6 +108,7 @@ export interface OptimizeRequest {
   ignore_elite: boolean;
   profile_id?: string;
   activation_token?: string;
+  history_source?: 'generated' | 'applied_suggestions';
   include_current?: boolean;
   suggestions_only?: boolean;
   upgrade_task_payload?: UpgradeTaskPayload;
@@ -534,8 +535,37 @@ export interface UserWorkspace {
   config: LicenseConfig | null;
   elite_overrides: Record<string, number>;
   last_result: OptimizeResult | null;
+  saved_configs: WorkspaceSavedConfig[];
+  result_history: WorkspaceResultHistoryItem[];
   updated_at: string | null;
 }
+
+export interface WorkspaceSavedConfig {
+  id: string;
+  name: string;
+  config: LicenseConfig;
+  created_at: string;
+  updated_at: string;
+  last_used_at: string | null;
+}
+
+export type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legacy';
+
+export interface WorkspaceResultHistoryItem {
+  id: string;
+  name: string;
+  created_at: string;
+  config: LicenseConfig | null;
+  result: OptimizeResult;
+  operator_count: number;
+  source: WorkspaceResultHistorySource;
+}
+
+export type WorkspaceSavedConfigAction =
+  | { type: 'save'; id?: string; name: string; config: LicenseConfig }
+  | { type: 'rename'; id: string; name: string }
+  | { type: 'delete'; id: string }
+  | { type: 'touch'; id: string };
 
 export interface UserAnnouncementRead {
   announcement: Announcement;
