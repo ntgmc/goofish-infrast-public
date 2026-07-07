@@ -267,6 +267,7 @@ export interface OptimizeResult {
   raw_results: AssignmentResult[];
   daily_production?: DailyProduction;
   total_efficiency?: number;
+  raw_total_efficiency?: number;
   upgrade_suggestions?: RawUpgradeSuggestion[];
   current_result?: OptimizeResult;
   upgrade_task_payload?: UpgradeTaskPayload;
