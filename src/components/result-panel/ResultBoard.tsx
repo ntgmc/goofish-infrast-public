@@ -11,6 +11,12 @@ type BoardRoomGroup = {
   rows: RoomRow[];
 }
 
+type BoardSlot = {
+  key: string;
+  label: string;
+  row?: RoomRow;
+}
+
 const ROOM_TONE: Record<string, string> = {
   trading: 'border-brand-500/35 bg-brand-500/10',
   manufacture: 'border-warning/35 bg-warning/10',
@@ -74,16 +80,24 @@ export default function ResultBoard({
                   )}
                 </div>
                 <div className="space-y-2 px-3 py-2.5">
-                  {group.rows.map((row) => (
-                    <div key={row.key} className="grid grid-cols-[3.4rem_minmax(0,1fr)_auto] items-start gap-2">
-                      <span className="pt-1 text-xs font-semibold text-ink-secondary">{shortQueueLabel(row.queueLabel)}</span>
-                      {row.isAutofill ? (
-                        <p className="rounded-md bg-surface-0/80 px-2 py-1.5 text-xs leading-5 text-ink-secondary">{row.operatorText}</p>
+                  {buildBoardSlots(group.rows, prepared.detailStats.planCount, isRotationMode).map((slot) => (
+                    <div key={slot.key} className="grid min-h-[3.35rem] grid-cols-[3.4rem_minmax(0,1fr)_auto] items-start gap-2">
+                      <span className={`pt-1 text-xs font-semibold ${slot.row ? 'text-ink-secondary' : 'text-ink-muted'}`}>
+                        {slot.label}
+                      </span>
+                      {slot.row ? (
+                        slot.row.isAutofill ? (
+                          <p className="rounded-md bg-surface-0/80 px-2 py-1.5 text-xs leading-5 text-ink-secondary">{slot.row.operatorText}</p>
+                        ) : (
+                          <OperatorAvatarStrip operators={slot.row.operators} fallbackText={slot.row.operatorText} micro />
+                        )
                       ) : (
-                        <OperatorAvatarStrip operators={row.operators} fallbackText={row.operatorText} micro />
+                        <p className="rounded-md border border-dashed border-surface-3/70 bg-surface-0/55 px-2 py-1.5 text-xs leading-5 text-ink-muted">
+                          未安排
+                        </p>
                       )}
-                      {!row.isAutofill && (
-                        <span className="pt-1 text-[11px] font-semibold text-brand-400">{row.efficiency}</span>
+                      {slot.row && !slot.row.isAutofill && (
+                        <span className="pt-1 text-[11px] font-semibold text-brand-400">{slot.row.efficiency}</span>
                       )}
                     </div>
                   ))}
@@ -125,12 +139,67 @@ function buildBoardRoomGroups(plans: PreparedPlan[], isRotationMode: boolean): B
   return [...groups.values()]
 }
 
-function shortQueueLabel(label: string): string {
+function buildBoardSlots(rows: RoomRow[], minimumSlotCount: number, isRotationMode: boolean): BoardSlot[] {
+  const occupied = new Map<number, RoomRow>()
+  const overflowRows: RoomRow[] = []
+  let nextSequentialSlot = 1
+  let maxSlot = Math.max(0, minimumSlotCount)
+
+  for (const row of rows) {
+    const parsedSlot = getQueueSlotNumber(row.queueLabel) ?? getSlotNumberFromRowKey(row.key)
+    let slot = parsedSlot
+    if (!slot) {
+      while (occupied.has(nextSequentialSlot)) nextSequentialSlot += 1
+      slot = nextSequentialSlot
+    }
+
+    if (occupied.has(slot)) {
+      overflowRows.push(row)
+      continue
+    }
+
+    occupied.set(slot, row)
+    maxSlot = Math.max(maxSlot, slot)
+  }
+
+  for (const row of overflowRows) {
+    maxSlot += 1
+    occupied.set(maxSlot, row)
+  }
+
+  return Array.from({ length: maxSlot }, (_, index) => {
+    const slotNumber = index + 1
+    const row = occupied.get(slotNumber)
+    return {
+      key: row?.key ?? `empty-${slotNumber}`,
+      label: row ? shortQueueLabel(row.queueLabel) : formatSlotLabel(slotNumber, isRotationMode),
+      row,
+    }
+  })
+}
+
+function getQueueSlotNumber(label: string): number | undefined {
   const queueMatch = label.match(/队列\s*(\d+)/)
-  if (queueMatch?.[1]) return `队列${queueMatch[1]}`
+  if (queueMatch?.[1]) return Number(queueMatch[1])
   const shiftMatch = label.match(/(?:第)?\s*(\d+)\s*班|班次\s*(\d+)/)
   const shiftNumber = shiftMatch?.[1] ?? shiftMatch?.[2]
-  if (shiftNumber) return `班${shiftNumber}`
+  if (shiftNumber) return Number(shiftNumber)
+  return undefined
+}
+
+function getSlotNumberFromRowKey(key: string): number | undefined {
+  const planIndexMatch = key.match(/^(\d+)-/)
+  if (!planIndexMatch?.[1]) return undefined
+  return Number(planIndexMatch[1]) + 1
+}
+
+function formatSlotLabel(slotNumber: number, isRotationMode: boolean): string {
+  return isRotationMode ? `队列${slotNumber}` : `班${slotNumber}`
+}
+
+function shortQueueLabel(label: string): string {
+  const slotNumber = getQueueSlotNumber(label)
+  if (slotNumber) return label.includes('队列') ? `队列${slotNumber}` : `班${slotNumber}`
   return label.replace(/\s+/g, '')
 }
 
