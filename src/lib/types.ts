@@ -20,6 +20,14 @@ export interface LicenseConfig {
     manufacturing_stations: Record<string, number>;
   };
   Fiammetta?: { enable: boolean; candidate_mode?: string };
+  optimizer_search?: {
+    beam?: boolean;
+    candidate_limit?: number;
+    beam_width?: number;
+    trace_search?: boolean;
+    trace_dynamic_rules?: boolean;
+    trace_candidates?: boolean;
+  };
   drones?: {
     enable: boolean;
     auto?: boolean;
