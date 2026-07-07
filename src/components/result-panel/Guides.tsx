@@ -29,12 +29,15 @@ export function MaaImportGuide({ compact = false }: { compact?: boolean }) {
           <li>点击选择，选择本站下载的排班 JSON</li>
         </ol>
         <div className="overflow-hidden rounded-lg border border-surface-3 bg-surface-0">
-          <img
-            src="/assets/maa-import-schedule-json.png"
-            alt="MAA 自定义基建配置中选择排班 JSON 的位置示意图"
-            className="block h-auto w-full"
-            loading="lazy"
-          />
+          <picture>
+            <source srcSet="/assets/maa-import-schedule-json-dark.png" media="(prefers-color-scheme: dark)" />
+            <img
+              src="/assets/maa-import-schedule-json-bright.png"
+              alt="MAA 自定义基建配置中选择排班 JSON 的位置示意图"
+              className="block h-auto w-full"
+              loading="lazy"
+            />
+          </picture>
         </div>
       </div>
     </details>
