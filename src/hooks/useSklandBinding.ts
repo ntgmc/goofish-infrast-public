@@ -9,6 +9,8 @@ export type SklandPreview = {
   operator_count: number
 }
 
+export type SklandRecoveryAction = 'rebind' | 'retry' | 'bind_first' | 'use_depot_analysis'
+
 export type SklandPayload = AuthSuccessResponse & {
   skland_import?: {
     status: 'imported'
@@ -19,20 +21,25 @@ export type SklandPayload = AuthSuccessResponse & {
     imported_at: string
   }
   error?: string
+  code?: 'skland_credential_invalid' | 'skland_refresh_failed' | 'skland_not_bound' | 'skland_depot_refresh_forbidden'
+  recovery_action?: SklandRecoveryAction
   confirmation_id?: string
   skland_preview?: SklandPreview
   warning?: string
   status?: string
 }
 
+export type SklandImportMode = 'scan' | 'manual' | 'bookmarklet'
+export type SklandLoginStatus = 'idle' | 'starting' | 'waiting' | 'confirm_required' | 'account_mismatch' | 'importing' | 'imported' | 'frozen' | 'error'
+
 export type SklandLoginState = {
-  mode: 'scan' | 'manual' | 'bookmarklet' | 'password'
+  mode: SklandImportMode
   scanId: string | null
   qrDataUrl: string | null
   expiresAt: string | null
   confirmationId: string | null
   preview: SklandPreview | null
-  status: 'idle' | 'starting' | 'waiting' | 'confirm_required' | 'account_mismatch' | 'importing' | 'imported' | 'frozen' | 'error'
+  status: SklandLoginStatus
   message: string | null
 }
 
@@ -62,7 +69,7 @@ export function useSklandBinding({
   const [busy, setBusy] = useState(false)
   const pollCountRef = useRef(0)
   const startRequestRef = useRef(0)
-  const credentialInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const credentialInputRef = useRef<HTMLTextAreaElement>(null)
   const startedForProfileRef = useRef<string | null>(null)
   const isDepot = context === 'depot'
 
@@ -71,13 +78,51 @@ export function useSklandBinding({
     onCompleted?.(data)
   }, [onCompleted, onPayload])
 
+  const showPayloadState = useCallback((data: SklandPayload, fallback: string): boolean => {
+    if (data.status === 'confirm_required' && data.confirmation_id && data.skland_preview) {
+      setSklandLogin((current) => ({
+        ...current,
+        qrDataUrl: null,
+        confirmationId: data.confirmation_id ?? null,
+        preview: data.skland_preview ?? null,
+        status: 'confirm_required',
+        message: data.warning || fallback,
+      }))
+      return true
+    }
+    if (data.status === 'account_mismatch' && data.skland_preview) {
+      setSklandLogin((current) => ({
+        ...current,
+        qrDataUrl: null,
+        confirmationId: null,
+        preview: data.skland_preview ?? null,
+        status: 'account_mismatch',
+        message: data.warning || '该账号与当前绑定账号不一致。请重新登录正确的森空岛账号。',
+      }))
+      return true
+    }
+    if (data.status === 'frozen') {
+      if (data.user) onPayload(data)
+      setSklandLogin((current) => ({
+        ...current,
+        qrDataUrl: null,
+        confirmationId: null,
+        preview: data.skland_preview ?? null,
+        status: 'frozen',
+        message: data.warning || '当前游戏账号档案已冻结，请联系管理员处理。',
+      }))
+      return true
+    }
+    return false
+  }, [onPayload])
+
   const completeSklandLogin = useCallback(async (scanId: string) => {
     if (!profile || busy) return
     setBusy(true)
     setSklandLogin((current) => ({
       ...current,
       status: 'waiting',
-      message: '正在检查扫码状态，请在森空岛 App 中确认扫码...',
+      message: '正在检查扫码状态，请在森空岛 App 中确认授权。',
     }))
     try {
       const data = await apiJson<SklandPayload>('/api/user/skland/login/complete', {
@@ -86,43 +131,10 @@ export function useSklandBinding({
         fallbackMessage: '森空岛导入失败',
       })
       if (data.status === 'pending') {
-        setSklandLogin((current) => ({ ...current, status: 'waiting', message: '等待森空岛 App 确认扫码...' }))
+        setSklandLogin((current) => ({ ...current, status: 'waiting', message: '等待森空岛 App 确认授权。' }))
         return
       }
-      if (data.status === 'confirm_required' && data.confirmation_id && data.skland_preview) {
-        setSklandLogin((current) => ({
-          ...current,
-          qrDataUrl: null,
-          confirmationId: data.confirmation_id ?? null,
-          preview: data.skland_preview ?? null,
-          status: 'confirm_required',
-          message: data.warning || (isDepot ? '请确认森空岛账号信息，确认后将用于仓库价值分析。' : '请确认森空岛账号信息，确认后将导入干员数据。'),
-        }))
-        return
-      }
-      if (data.status === 'account_mismatch' && data.skland_preview) {
-        setSklandLogin((current) => ({
-          ...current,
-          qrDataUrl: null,
-          confirmationId: null,
-          preview: data.skland_preview ?? null,
-          status: 'account_mismatch',
-          message: data.warning || '该账号与当前绑定账号不一致，请确认是否扫错账号。',
-        }))
-        return
-      }
-      if (data.status === 'frozen') {
-        if (data.user) onPayload(data)
-        setSklandLogin((current) => ({
-          ...current,
-          qrDataUrl: null,
-          confirmationId: null,
-          preview: null,
-          status: 'frozen',
-          message: data.warning || '当前游戏账号档案已冻结。',
-        }))
-        return
-      }
+      if (showPayloadState(data, previewFallbackMessage(isDepot))) return
       if (!data.user) throw new Error(data.error || '森空岛导入失败')
       applyCompletedPayload(data)
       setSklandLogin((current) => ({
@@ -131,15 +143,15 @@ export function useSklandBinding({
         message: formatImportedMessage(data, isDepot),
       }))
     } catch (caught) {
-      setSklandLogin((current) => ({ ...current, status: 'error', message: (caught as Error).message }))
+      setSklandLogin((current) => ({ ...current, status: 'error', message: errorWithRecovery(caught, '扫码失败，请重新生成二维码，或改用粘贴凭据。') }))
     } finally {
       setBusy(false)
     }
-  }, [applyCompletedPayload, busy, isDepot, onPayload, profile])
+  }, [applyCompletedPayload, busy, isDepot, profile, showPayloadState])
 
   const startSklandLogin = useCallback(async () => {
     if (!profile) {
-      setSklandLogin((current) => ({ ...current, status: 'error', message: '请先创建或选择账号档案。' }))
+      setSklandLogin((current) => ({ ...current, status: 'error', message: '请先创建或选择账号档案，然后再绑定森空岛。' }))
       return
     }
     const requestId = startRequestRef.current + 1
@@ -153,7 +165,7 @@ export function useSklandBinding({
       confirmationId: null,
       preview: null,
       status: 'starting',
-      message: '正在生成森空岛扫码登录二维码...',
+      message: '正在生成森空岛扫码授权二维码。',
     })
     try {
       const data = await apiJson<{ scan_id?: string; qr_data_url?: string; expires_at?: string }>('/api/user/skland/login/start', {
@@ -171,75 +183,51 @@ export function useSklandBinding({
         confirmationId: null,
         preview: null,
         status: 'waiting',
-        message: '请使用森空岛 App 扫码确认，二维码约 2 分钟内有效。',
+        message: '请使用森空岛 App 扫码确认。确认后会先展示昵称和 UID，不会立即保存。',
       })
       pollCountRef.current = 0
     } catch (caught) {
       if (startRequestRef.current !== requestId) return
-      setSklandLogin((current) => ({ ...current, status: 'error', message: (caught as Error).message }))
+      setSklandLogin((current) => ({ ...current, status: 'error', message: errorWithRecovery(caught, '二维码生成失败，请稍后重试，或改用粘贴凭据。') }))
     } finally {
       if (startRequestRef.current === requestId) setBusy(false)
     }
   }, [profile])
 
   const previewCredential = useCallback(async (source: 'manual' | 'bookmarklet') => {
-    if (!profile) return
+    if (!profile) {
+      setSklandLogin((current) => ({ ...current, status: 'error', message: '请先创建或选择账号档案，然后再绑定森空岛。' }))
+      return
+    }
     const credentialText = credentialInputRef.current?.value.trim() ?? ''
     if (!credentialText) {
-      setSklandLogin((current) => ({ ...current, status: 'error', message: '请先粘贴森空岛凭据。' }))
+      setSklandLogin((current) => ({ ...current, status: 'error', message: '请先粘贴森空岛凭据，再读取账号预览。' }))
+      credentialInputRef.current?.focus()
       return
     }
     setBusy(true)
-    setSklandLogin((current) => ({ ...current, status: 'starting', message: '正在读取森空岛账号信息...' }))
+    setSklandLogin((current) => ({ ...current, status: 'starting', message: '正在读取森空岛账号信息。' }))
     try {
       const data = await apiJson<SklandPayload>('/api/user/skland/credential/preview', {
         method: 'POST',
         json: { profile_id: profile.id, credential_text: credentialText, source },
         fallbackMessage: '森空岛凭据读取失败',
       })
-      if (credentialInputRef.current) credentialInputRef.current.value = ''
-      if (data.status === 'account_mismatch') {
-        setSklandLogin((current) => ({
-          ...current,
-          confirmationId: null,
-          preview: data.skland_preview ?? null,
-          status: 'account_mismatch',
-          message: data.warning || '该账号与当前绑定账号不一致，请确认是否登录错账号。',
-        }))
-        return
-      }
-      if (data.status === 'frozen') {
-        if (data.user) onPayload(data)
-        setSklandLogin((current) => ({
-          ...current,
-          confirmationId: null,
-          preview: data.skland_preview ?? null,
-          status: 'frozen',
-          message: data.warning || '当前游戏账号档案已冻结。',
-        }))
-        return
-      }
-      if (data.status !== 'confirm_required' || !data.confirmation_id || !data.skland_preview) {
+      if (!showPayloadState(data, previewFallbackMessage(isDepot))) {
         throw new Error(data.error || '森空岛凭据已读取，但未返回可确认账号。')
       }
-      setSklandLogin((current) => ({
-        ...current,
-        confirmationId: data.confirmation_id ?? null,
-        preview: data.skland_preview ?? null,
-        status: 'confirm_required',
-        message: data.warning || (isDepot ? '请确认森空岛账号信息，确认后将用于仓库价值分析。' : '请确认森空岛账号信息，确认后将导入干员数据。'),
-      }))
+      if (credentialInputRef.current) credentialInputRef.current.value = ''
     } catch (caught) {
-      setSklandLogin((current) => ({ ...current, status: 'error', message: (caught as Error).message }))
+      setSklandLogin((current) => ({ ...current, status: 'error', message: errorWithRecovery(caught, '请重新获取凭据，或改用扫码授权。') }))
     } finally {
       setBusy(false)
     }
-  }, [isDepot, onPayload, profile])
+  }, [isDepot, profile, showPayloadState])
 
   const confirmSklandLogin = useCallback(async () => {
     if (!profile || !sklandLogin.confirmationId) return
     setBusy(true)
-    setSklandLogin((current) => ({ ...current, status: 'importing', message: isDepot ? '正在保存森空岛绑定...' : '正在导入森空岛干员数据...' }))
+    setSklandLogin((current) => ({ ...current, status: 'importing', message: isDepot ? '正在保存森空岛绑定并准备分析仓库。' : '正在保存森空岛绑定并导入干员数据。' }))
     try {
       const data = await apiJson<SklandPayload>('/api/user/skland/login/confirm', {
         method: 'POST',
@@ -256,7 +244,7 @@ export function useSklandBinding({
         message: formatImportedMessage(data, isDepot),
       }))
     } catch (caught) {
-      setSklandLogin((current) => ({ ...current, status: 'error', message: (caught as Error).message }))
+      setSklandLogin((current) => ({ ...current, status: 'error', message: errorWithRecovery(caught, isDepot ? '请重新预览后再保存仓库绑定。' : '请重新预览后再导入。') }))
     } finally {
       setBusy(false)
     }
@@ -268,14 +256,12 @@ export function useSklandBinding({
     onOpenChange(false)
   }, [onOpenChange])
 
-  const selectMode = useCallback((mode: SklandLoginState['mode']) => {
-    if (mode === 'password') return
+  const selectMode = useCallback((mode: SklandImportMode) => {
     startRequestRef.current += 1
     setBusy(false)
     setSklandLogin((current) => {
       const keepWaitingScan = mode === 'scan' && current.status === 'waiting' && Boolean(current.scanId && current.qrDataUrl)
       return {
-        ...current,
         mode,
         scanId: keepWaitingScan ? current.scanId : null,
         qrDataUrl: keepWaitingScan ? current.qrDataUrl : null,
@@ -283,15 +269,10 @@ export function useSklandBinding({
         confirmationId: null,
         preview: null,
         status: keepWaitingScan ? 'waiting' : 'idle',
-        message: mode === 'scan'
-          ? keepWaitingScan
-            ? current.message
-            : '点击生成二维码后，使用森空岛 App 扫码确认。'
-          : mode === 'manual'
-            ? '粘贴森空岛凭据后读取账号信息。'
-            : '复制书签脚本，在森空岛网页点击后回到这里粘贴。',
+        message: keepWaitingScan ? current.message : modeIntro(mode),
       }
     })
+    window.setTimeout(() => credentialInputRef.current?.focus(), 0)
   }, [])
 
   const setMessage = useCallback((message: string) => {
@@ -313,14 +294,14 @@ export function useSklandBinding({
   useEffect(() => {
     if (!open || sklandLogin.mode !== 'scan' || !sklandLogin.scanId || sklandLogin.status !== 'waiting') return
     if (sklandLogin.expiresAt && Date.now() > Date.parse(sklandLogin.expiresAt)) {
-      setSklandLogin((current) => ({ ...current, status: 'error', message: '二维码已过期，请重新生成。' }))
+      setSklandLogin((current) => ({ ...current, status: 'error', message: '二维码已过期。请重新生成二维码，或改用粘贴凭据。' }))
       return
     }
     if (pollCountRef.current >= SKLAND_SCAN_MAX_POLLS) {
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: '扫码等待超时，请重新生成二维码后再试。',
+        message: '扫码等待超时。请重新生成二维码，或改用粘贴凭据。',
       }))
       return
     }
@@ -359,8 +340,23 @@ function createInitialState(): SklandLoginState {
   }
 }
 
+function modeIntro(mode: SklandImportMode): string {
+  if (mode === 'scan') return '生成二维码后，使用森空岛 App 授权。授权后会先预览昵称和 UID。'
+  if (mode === 'manual') return '粘贴森空岛凭据后读取账号预览，确认前不会保存。'
+  return '安装书签脚本后复制凭据，粘贴后读取账号预览。'
+}
+
+function previewFallbackMessage(isDepot: boolean): string {
+  return isDepot ? '请确认森空岛账号信息，确认后将保存绑定并分析仓库。' : '请确认森空岛账号信息，确认后将保存绑定并导入干员数据。'
+}
+
+function errorWithRecovery(caught: unknown, fallback: string): string {
+  const message = caught instanceof Error ? caught.message : ''
+  return message ? `${message} ${fallback}` : fallback
+}
+
 function formatImportedMessage(data: SklandPayload, isDepot: boolean): string {
-  if (isDepot) return '森空岛已绑定，正在读取仓库库存...'
+  if (isDepot) return '森空岛已保存，正在读取仓库库存。'
   return data.skland_import
     ? `已导入 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}`
     : '森空岛干员数据已导入。'

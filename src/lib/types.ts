@@ -499,12 +499,18 @@ export interface AuthUser {
   created_at: string;
 }
 
+export type SklandCredentialStatus = 'available' | 'invalid';
+export type SklandCredentialInvalidReason = 'expired_or_revoked' | 'credential_format_invalid';
+
 export interface SklandPublicBinding {
   uid: string;
   nickname: string;
   channel_name: string;
   bound_at: string;
   last_imported_at: string | null;
+  credential_status: SklandCredentialStatus;
+  credential_invalid_at: string | null;
+  credential_invalid_reason: SklandCredentialInvalidReason | null;
 }
 
 export interface UserGameAccount {
