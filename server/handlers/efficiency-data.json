@@ -158,7 +158,91 @@
         "夕",
         "令",
         "重岳",
-        "黍"
+        "黍",
+        "余",
+        "望"
+      ]
+    },
+    "human_fireworks_flat_providers": {
+      "name": "人间烟火固定来源",
+      "operators": [
+        "夕",
+        "令",
+        "重岳",
+        "乌有",
+        "桑葚"
+      ]
+    },
+    "monster_cuisine_providers": {
+      "name": "魔物料理来源",
+      "operators": [
+        "森西"
+      ]
+    },
+    "perception_control_providers": {
+      "name": "感知信息控制中枢来源",
+      "operators": [
+        "夕",
+        "令"
+      ]
+    },
+    "perception_hire_providers": {
+      "name": "感知信息办公室来源",
+      "operators": [
+        "絮雨"
+      ]
+    },
+    "perception_dream_providers": {
+      "name": "梦境来源",
+      "operators": [
+        "爱丽丝"
+      ]
+    },
+    "perception_melody_providers": {
+      "name": "小节来源",
+      "operators": [
+        "车尔尼"
+      ]
+    },
+    "rainbow_team": {
+      "name": "彩虹小队",
+      "operators": [
+        "灰烬",
+        "战车",
+        "闪击",
+        "霜华",
+        "艾拉",
+        "医生",
+        "双月",
+        "导火索"
+      ]
+    },
+    "ursus_student_self_governing_group": {
+      "name": "乌萨斯学生自治团",
+      "operators": [
+        "早露",
+        "凛冬",
+        "真理",
+        "古米",
+        "烈夏",
+        "苦艾"
+      ]
+    },
+    "monster_hunter_team": {
+      "name": "怪物猎人小队",
+      "operators": [
+        "火龙S黑角",
+        "麒麟R夜刀",
+        "泰拉大陆调查团"
+      ]
+    },
+    "mygo_passion_providers": {
+      "name": "热情值来源",
+      "operators": [
+        "八幡海铃",
+        "三角初华",
+        "祐天寺若麦",
+        "若叶睦"
       ]
     },
     "elite_operators": {
@@ -166,6 +250,7 @@
       "operators": [
         "阿米娅",
         "凯尔希",
+        "凯尔希·思衡托",
         "煌",
         "迷迭香",
         "W",
@@ -593,17 +678,33 @@
             }
           },
           {
-            "combo": [
-              "齐尔查克/2"
-            ],
-            "dormitory": [
-              "森西/2"
-            ],
-            "efficiency": 35,
-            "note": "31%-35%，需宿舍有森西",
-            "priority": 2280,
-            "order_limit_delta": 1
+          "combo": [
+            "齐尔查克/2"
+          ],
+          "dormitory": [
+            "森西/2"
+          ],
+          "efficiency": 30,
+          "dynamic_resource_contributions": {
+            "resource": "monster_cuisine",
+            "per_group_operator": 5,
+            "group": "monster_cuisine_providers",
+            "scope": "facility",
+            "cap": 5,
+            "key": "monster_cuisine_senshi_dorm",
+            "detail": "森西大食堂：宿舍森西按默认5级宿舍提供5点魔物料理。"
           },
+          "dynamic_resource_effects": {
+            "resource": "monster_cuisine",
+            "type": "efficiency_per_resource",
+            "per_resource": 1,
+            "scope": "trading_station",
+            "detail": "齐尔查克：每1点魔物料理+1%订单获取效率。"
+          },
+          "note": "动态：迷宫谈判术，基础30%，每1点魔物料理+1%，需宿舍有森西。",
+          "priority": 2280,
+          "order_limit_delta": 1
+        },
           {
             "combo": [
               "海蒂/2",
@@ -825,36 +926,337 @@
             "note": "黑键乌有混用满挂件（迷迭香）",
             "priority": 2260
           },
-          {
-            "combo": [
-              "黑键/2",
-              "伺夜/2"
-            ],
-            "efficiency": -195,
-            "note": "黑键满挂件（迷迭香）暂不考虑",
-            "priority": -1
-          },
-          {
-            "combo": [
-              "黑键/2",
-              "空弦/2"
-            ],
-            "efficiency": -195,
-            "note": "黑键满挂件（迷迭香）暂不考虑",
-            "priority": -1
-          },
-          {
-            "combo": [
-              "黑键/2",
-              "伺夜/2"
-            ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": -200,
-            "note": "黑键满挂件（迷迭香）暂不考虑",
-            "priority": -1
-          }
+        {
+          "combo": [
+            "黑键/2",
+            "伺夜/2"
+          ],
+          "control_center": [
+            "夕",
+            "令/2"
+          ],
+          "hire": [
+            "絮雨/2"
+          ],
+          "dormitory": [
+            "车尔尼/2",
+            "爱丽丝/2"
+          ],
+          "efficiency": 40,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "perception_information",
+              "amount": 20,
+              "key": "logos_dorm_full_occupancy",
+              "detail": "黑键：默认4宿舍满员提供20点感知信息。"
+            },
+            {
+              "resource": "perception_information",
+              "per_group_operator": 10,
+              "group": "perception_control_providers",
+              "scope": "control_center",
+              "cap": 20,
+              "key": "perception_control_dusk_ling",
+              "detail": "夕/令在控制中枢时各提供10点感知信息。"
+            },
+            {
+              "resource": "memory_fragment",
+              "per_group_operator": 30,
+              "group": "perception_hire_providers",
+              "scope": "hire",
+              "cap": 30,
+              "key": "perception_hire_whisperain",
+              "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
+            },
+            {
+              "resource": "dream",
+              "per_group_operator": 5,
+              "group": "perception_dream_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_dream_alice",
+              "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
+            },
+            {
+              "resource": "melody",
+              "per_group_operator": 5,
+              "group": "perception_melody_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_melody_czerny",
+              "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
+            }
+          ],
+          "dynamic_resource_effects": [
+            {
+              "resource": "memory_fragment",
+              "type": "resource_conversion",
+              "key": "memory_fragment_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "dream",
+              "type": "resource_conversion",
+              "key": "dream_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "melody",
+              "type": "resource_conversion",
+              "key": "melody_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "perception_information",
+              "type": "resource_conversion",
+              "key": "perception_information_to_silent_resonance",
+              "step_size": 1,
+              "output_resource": "silent_resonance",
+              "output_per_step": 1,
+              "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "silent_resonance",
+              "type": "efficiency_per_step",
+              "step_size": 2,
+              "per_step": 1,
+              "scope": "trading_station",
+              "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
+            }
+          ],
+          "note": "动态：但书+黑键+伺夜，伺夜按40%，黑键按无声共鸣链读取挂件。",
+          "priority": 2420
+        },
+        {
+          "combo": [
+            "黑键/2",
+            "空弦/2"
+          ],
+          "control_center": [
+            "夕",
+            "令/2"
+          ],
+          "hire": [
+            "絮雨/2"
+          ],
+          "dormitory": [
+            "车尔尼/2",
+            "爱丽丝/2"
+          ],
+          "efficiency": 45,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "perception_information",
+              "amount": 20,
+              "key": "logos_dorm_full_occupancy",
+              "detail": "黑键：默认4宿舍满员提供20点感知信息。"
+            },
+            {
+              "resource": "perception_information",
+              "per_group_operator": 10,
+              "group": "perception_control_providers",
+              "scope": "control_center",
+              "cap": 20,
+              "key": "perception_control_dusk_ling",
+              "detail": "夕/令在控制中枢时各提供10点感知信息。"
+            },
+            {
+              "resource": "memory_fragment",
+              "per_group_operator": 30,
+              "group": "perception_hire_providers",
+              "scope": "hire",
+              "cap": 30,
+              "key": "perception_hire_whisperain",
+              "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
+            },
+            {
+              "resource": "dream",
+              "per_group_operator": 5,
+              "group": "perception_dream_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_dream_alice",
+              "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
+            },
+            {
+              "resource": "melody",
+              "per_group_operator": 5,
+              "group": "perception_melody_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_melody_czerny",
+              "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
+            }
+          ],
+          "dynamic_resource_effects": [
+            {
+              "resource": "memory_fragment",
+              "type": "resource_conversion",
+              "key": "memory_fragment_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "dream",
+              "type": "resource_conversion",
+              "key": "dream_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "melody",
+              "type": "resource_conversion",
+              "key": "melody_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "perception_information",
+              "type": "resource_conversion",
+              "key": "perception_information_to_silent_resonance",
+              "step_size": 1,
+              "output_resource": "silent_resonance",
+              "output_per_step": 1,
+              "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "silent_resonance",
+              "type": "efficiency_per_step",
+              "step_size": 2,
+              "per_step": 1,
+              "scope": "trading_station",
+              "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
+            }
+          ],
+          "note": "动态：但书+黑键+空弦，空弦按45%，黑键按无声共鸣链读取挂件。",
+          "priority": 2640
+        },
+        {
+          "combo": [
+            "黑键/2",
+            "伺夜/2"
+          ],
+          "control_center": [
+            "八幡海铃/2",
+            "夕",
+            "令/2"
+          ],
+          "hire": [
+            "絮雨/2"
+          ],
+          "dormitory": [
+            "车尔尼/2",
+            "爱丽丝/2"
+          ],
+          "efficiency": 45,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "perception_information",
+              "amount": 20,
+              "key": "logos_dorm_full_occupancy",
+              "detail": "黑键：默认4宿舍满员提供20点感知信息。"
+            },
+            {
+              "resource": "perception_information",
+              "per_group_operator": 10,
+              "group": "perception_control_providers",
+              "scope": "control_center",
+              "cap": 20,
+              "key": "perception_control_dusk_ling",
+              "detail": "夕/令在控制中枢时各提供10点感知信息。"
+            },
+            {
+              "resource": "memory_fragment",
+              "per_group_operator": 30,
+              "group": "perception_hire_providers",
+              "scope": "hire",
+              "cap": 30,
+              "key": "perception_hire_whisperain",
+              "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
+            },
+            {
+              "resource": "dream",
+              "per_group_operator": 5,
+              "group": "perception_dream_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_dream_alice",
+              "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
+            },
+            {
+              "resource": "melody",
+              "per_group_operator": 5,
+              "group": "perception_melody_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_melody_czerny",
+              "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
+            }
+          ],
+          "dynamic_resource_effects": [
+            {
+              "resource": "memory_fragment",
+              "type": "resource_conversion",
+              "key": "memory_fragment_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "dream",
+              "type": "resource_conversion",
+              "key": "dream_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "melody",
+              "type": "resource_conversion",
+              "key": "melody_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "perception_information",
+              "type": "resource_conversion",
+              "key": "perception_information_to_silent_resonance",
+              "step_size": 1,
+              "output_resource": "silent_resonance",
+              "output_per_step": 1,
+              "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "silent_resonance",
+              "type": "efficiency_per_step",
+              "step_size": 2,
+              "per_step": 1,
+              "scope": "trading_station",
+              "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
+            }
+          ],
+          "note": "动态：但书+黑键+伺夜+八幡海铃，伺夜按45%，黑键按无声共鸣链读取挂件。",
+          "priority": 2760
+        }
         ]
       },
       "孑12体系": {
@@ -1237,10 +1639,44 @@
       "通用单人": [
         {
           "combo": [
-            "（需要研究）乌有/2"
+            "乌有/2"
           ],
-          "efficiency": 95,
-          "note": "20%-95%",
+          "efficiency": 0,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "human_fireworks",
+              "amount": 20,
+              "key": "uyou_dorm_full_occupancy",
+              "detail": "愿者上钩：默认4间宿舍满员提供20点人间烟火。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 5,
+              "group": "sui",
+              "scope": "facility",
+              "cap": 25,
+              "key": "human_fireworks_sui_facility",
+              "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 15,
+              "group": "human_fireworks_flat_providers",
+              "scope": "facility",
+              "cap": 15,
+              "key": "human_fireworks_flat_provider",
+              "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+            }
+          ],
+          "dynamic_resource_effects": {
+            "resource": "human_fireworks",
+            "type": "efficiency_per_resource",
+            "per_resource": 1,
+            "cap": 95,
+            "scope": "trading_station",
+            "detail": "愿者上钩：每1点人间烟火+1%订单获取效率，当前模型沿用95%上限口径。"
+          },
+          "note": "动态：愿者上钩，宿舍满员默认20点人间烟火，每1点人间烟火+1%订单获取效率，最高按95%折算。",
           "priority": 6000
         },
         {
@@ -1332,8 +1768,24 @@
           "dormitory": [
             "森西/2"
           ],
-          "efficiency": 35,
-          "note": "31%-35%，需宿舍有森西",
+          "efficiency": 30,
+          "dynamic_resource_contributions": {
+            "resource": "monster_cuisine",
+            "per_group_operator": 5,
+            "group": "monster_cuisine_providers",
+            "scope": "facility",
+            "cap": 5,
+            "key": "monster_cuisine_senshi_dorm",
+            "detail": "森西大食堂：宿舍森西按默认5级宿舍提供5点魔物料理。"
+          },
+          "dynamic_resource_effects": {
+            "resource": "monster_cuisine",
+            "type": "efficiency_per_resource",
+            "per_resource": 1,
+            "scope": "trading_station",
+            "detail": "齐尔查克：每1点魔物料理+1%订单获取效率。"
+          },
+          "note": "动态：迷宫谈判术，基础30%，每1点魔物料理+1%，需宿舍有森西。",
           "priority": 3530,
           "order_limit_delta": 1
         },
@@ -1550,6 +2002,15 @@
         },
         {
           "combo": [
+            "涤火杰西卡"
+          ],
+          "efficiency": 10,
+          "priority": 1420,
+          "order_limit_delta": 4,
+          "note": "订单管理·β: 进驻贸易站时，订单获取效率+10%，且订单上限+4"
+        },
+        {
+          "combo": [
             "翎羽/1",
             "四月"
           ],
@@ -1561,10 +2022,120 @@
         },
         {
           "combo": [
-            "（需要研究）黑键/2"
+            "黑角"
           ],
-          "efficiency": 47,
-          "note": "32%-47%",
+          "efficiency": 10,
+          "priority": 1410,
+          "order_limit_delta": 2,
+          "note": "订单管理·α: 进驻贸易站时，订单获取效率+10%，且订单上限+2"
+        },
+        {
+          "combo": [
+            "贝娜/2"
+          ],
+          "efficiency": 0,
+          "priority": 120,
+          "mood_consumption_delta": {
+            "贝娜": -0.25
+          },
+          "note": "裁缝·α: 小幅提升当前贸易站高品质贵金属订单出现概率；概率倾向暂不折算为效率，仅计入心情消耗降低。"
+        },
+        {
+          "combo": [
+            "黑键/2"
+          ],
+          "efficiency": 0,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "perception_information",
+              "amount": 20,
+              "key": "logos_dorm_full_occupancy",
+              "detail": "黑键：默认4宿舍满员提供20点感知信息。"
+            },
+            {
+              "resource": "perception_information",
+              "per_group_operator": 10,
+              "group": "perception_control_providers",
+              "scope": "control_center",
+              "cap": 20,
+              "key": "perception_control_dusk_ling",
+              "detail": "夕/令在控制中枢时各提供10点感知信息。"
+            },
+            {
+              "resource": "memory_fragment",
+              "per_group_operator": 30,
+              "group": "perception_hire_providers",
+              "scope": "hire",
+              "cap": 30,
+              "key": "perception_hire_whisperain",
+              "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
+            },
+            {
+              "resource": "dream",
+              "per_group_operator": 5,
+              "group": "perception_dream_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_dream_alice",
+              "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
+            },
+            {
+              "resource": "melody",
+              "per_group_operator": 5,
+              "group": "perception_melody_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_melody_czerny",
+              "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
+            }
+          ],
+          "dynamic_resource_effects": [
+            {
+              "resource": "memory_fragment",
+              "type": "resource_conversion",
+              "key": "memory_fragment_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "dream",
+              "type": "resource_conversion",
+              "key": "dream_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "melody",
+              "type": "resource_conversion",
+              "key": "melody_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "perception_information",
+              "type": "resource_conversion",
+              "key": "perception_information_to_silent_resonance",
+              "step_size": 1,
+              "output_resource": "silent_resonance",
+              "output_per_step": 1,
+              "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "silent_resonance",
+              "type": "efficiency_per_step",
+              "step_size": 2,
+              "per_step": 1,
+              "scope": "trading_station",
+              "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
+            }
+          ],
+          "note": "动态：无声共鸣；基础感知信息按4宿舍满员20点计算，额外挂件按已入驻辅助房间读取。",
           "priority": 1200
         },
         {
@@ -1590,6 +2161,21 @@
         },
         {
           "combo": [
+            "史都华德",
+            "暗索/1"
+          ],
+          "efficiency": 0,
+          "apply_each": true,
+          "priority": 530,
+          "order_limit_delta": 5,
+          "mood_consumption_delta": {
+            "史都华德": -0.25,
+            "暗索": -0.25
+          },
+          "note": "谈判: 进驻贸易站时，订单上限+5，心情每小时消耗-0.25"
+        },
+        {
+          "combo": [
             "铎铃/2"
           ],
           "efficiency": 0,
@@ -1597,7 +2183,36 @@
           "mood_consumption_delta": {
             "铎铃": -0.1
           },
-          "note": "万里传书: 进驻贸易站时，贸易站内全体干员每小时心情消耗-0.1，每有10点人间烟火，则额外-0.02；暂未计入：人间烟火额外心情消耗降低。"
+          "dynamic_resource_contributions": [
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 5,
+              "group": "sui",
+              "scope": "facility",
+              "cap": 25,
+              "key": "human_fireworks_sui_facility",
+              "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 15,
+              "group": "human_fireworks_flat_providers",
+              "scope": "facility",
+              "cap": 15,
+              "key": "human_fireworks_flat_provider",
+              "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+            }
+          ],
+          "dynamic_resource_effects": {
+            "resource": "human_fireworks",
+            "type": "mood_delta_per_step",
+            "step_size": 10,
+            "per_step": -0.02,
+            "target": "room",
+            "scope": "trading_station",
+            "detail": "万里传书：每10点人间烟火额外降低房间全员心情消耗0.02。"
+          },
+          "note": "万里传书: 进驻贸易站时，贸易站内全体干员每小时心情消耗-0.1，每有10点人间烟火，则额外-0.02。"
         },
         {
           "combo": [
@@ -1608,7 +2223,36 @@
           "mood_consumption_delta": {
             "铎铃": -0.1
           },
-          "note": "跋山涉水: 进驻贸易站时，贸易站内全体干员每小时心情消耗-0.1，每有10点人间烟火，则额外-0.01；暂未计入：人间烟火额外心情消耗降低。"
+          "dynamic_resource_contributions": [
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 5,
+              "group": "sui",
+              "scope": "facility",
+              "cap": 25,
+              "key": "human_fireworks_sui_facility",
+              "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 15,
+              "group": "human_fireworks_flat_providers",
+              "scope": "facility",
+              "cap": 15,
+              "key": "human_fireworks_flat_provider",
+              "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+            }
+          ],
+          "dynamic_resource_effects": {
+            "resource": "human_fireworks",
+            "type": "mood_delta_per_step",
+            "step_size": 10,
+            "per_step": -0.01,
+            "target": "room",
+            "scope": "trading_station",
+            "detail": "跋山涉水：每10点人间烟火额外降低房间全员心情消耗0.01。"
+          },
+          "note": "跋山涉水: 进驻贸易站时，贸易站内全体干员每小时心情消耗-0.1，每有10点人间烟火，则额外-0.01。"
         },
         {
           "combo": [
@@ -1623,36 +2267,63 @@
         },
         {
           "combo": [
-            "泰拉大陆调查团（需要研究）"
+            "泰拉大陆调查团"
           ],
-          "efficiency": 41,
-          "note": "较麻烦，不考虑",
-          "priority": -1
+          "efficiency": 5,
+          "order_limit_delta": 2,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "catnip",
+              "per_group_operator": 2,
+              "group": "monster_hunter_team",
+              "required_operators": "火龙S黑角",
+              "scope": "control_center",
+              "key": "catnip_higashi_teamwork",
+              "detail": "火龙S黑角：控制中枢内每1名怪物猎人小队干员提供2个木天蓼。"
+            },
+            {
+              "resource": "catnip",
+              "amount": 8,
+              "required_operators": "麒麟R夜刀",
+              "scope": "control_center",
+              "key": "catnip_yato_stamina_recovery",
+              "detail": "麒麟R夜刀：进驻控制中枢时提供8个木天蓼。"
+            }
+          ],
+          "dynamic_resource_effects": {
+            "resource": "catnip",
+            "type": "efficiency_per_resource",
+            "per_resource": 3,
+            "scope": "trading_station",
+            "detail": "可爱的艾露猫：每1个木天蓼+3%订单获取效率。"
+          },
+          "note": "动态：可爱的艾露猫，基础订单效率+5%、订单上限+2，每1个木天蓼+3%。",
+          "priority": 2900
         },
         {
           "combo": [
             "U-Official"
           ],
-          "efficiency": -1,
-          "priority": -1,
-          "note": "TODO: 固定2赤金订单收益暂未适配。天真的谈判者: 进驻贸易站时，订单获取效率+10%，当前贸易站赤金订单的赤金交付数必定为2（不视作违约订单）"
+          "efficiency": 10,
+          "priority": 1020,
+          "note": "天真的谈判者: 进驻贸易站时，订单获取效率+10%；固定2赤金订单属于订单价值模型，当前不折入通用效率分数。"
         },
         {
           "combo": [
             "佩佩/2"
           ],
-          "efficiency": -1,
-          "priority": -1,
-          "note": "TODO: 特别独占订单暂未适配。慧眼独到: 进驻贸易站时，固定获取特别独占订单（不视作违约订单），且该类订单不受任何订单获取效率的影响"
+          "efficiency": 0,
+          "priority": 550,
+          "note": "慧眼独到: 固定获取特别独占订单（不视作违约订单），且该类订单不受订单获取效率影响；该订单价值不折入通用效率分数。"
         }
       ]
     },
     "manufacturing_station": {
       "迷迭香": [
-        {
-          "combo": [
-            "迷迭香/2"
-          ],
+      {
+        "combo": [
+          "迷迭香/2"
+        ],
           "control_center": [
             "重岳",
             "令/2",
@@ -1666,13 +2337,102 @@
             "车尔尼/2",
             "爱丽丝/2"
           ],
-          "process": [
-            "年"
-          ],
-          "efficiency": 219,
-          "note": "黑键乌有混用满挂件（迷迭香）",
-          "priority": 21360
-        }
+        "process": [
+          "年"
+        ],
+        "efficiency": 0,
+        "dynamic_resource_contributions": [
+          {
+            "resource": "perception_information",
+            "amount": 20,
+            "key": "rosmontis_dorm_full_occupancy",
+            "detail": "迷迭香：默认4宿舍满员提供20点感知信息。"
+          },
+          {
+            "resource": "perception_information",
+            "per_group_operator": 10,
+            "group": "perception_control_providers",
+            "scope": "control_center",
+            "cap": 20,
+            "key": "perception_control_dusk_ling",
+            "detail": "夕/令在控制中枢时各提供10点感知信息。"
+          },
+          {
+            "resource": "memory_fragment",
+            "per_group_operator": 30,
+            "group": "perception_hire_providers",
+            "scope": "hire",
+            "cap": 30,
+            "key": "perception_hire_whisperain",
+            "detail": "絮雨：默认满级办公室4招募位，额外3个招募位提供30点记忆碎片。"
+          },
+          {
+            "resource": "dream",
+            "per_group_operator": 5,
+            "group": "perception_dream_providers",
+            "scope": "dormitory",
+            "cap": 5,
+            "key": "perception_dream_alice",
+            "detail": "爱丽丝：默认5级宿舍提供5层梦境。"
+          },
+          {
+            "resource": "melody",
+            "per_group_operator": 5,
+            "group": "perception_melody_providers",
+            "scope": "dormitory",
+            "cap": 5,
+            "key": "perception_melody_czerny",
+            "detail": "车尔尼：默认5级宿舍提供5个小节。"
+          }
+        ],
+        "dynamic_resource_effects": [
+          {
+            "resource": "memory_fragment",
+            "type": "resource_conversion",
+            "key": "memory_fragment_to_perception_information",
+            "step_size": 1,
+            "output_resource": "perception_information",
+            "output_per_step": 1,
+            "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+          },
+          {
+            "resource": "dream",
+            "type": "resource_conversion",
+            "key": "dream_to_perception_information",
+            "step_size": 1,
+            "output_resource": "perception_information",
+            "output_per_step": 1,
+            "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+          },
+          {
+            "resource": "melody",
+            "type": "resource_conversion",
+            "key": "melody_to_perception_information",
+            "step_size": 1,
+            "output_resource": "perception_information",
+            "output_per_step": 1,
+            "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+          },
+          {
+            "resource": "perception_information",
+            "type": "resource_conversion",
+            "key": "perception_information_to_thinking_chain",
+            "step_size": 1,
+            "output_resource": "thinking_chain",
+            "output_per_step": 1,
+            "detail": "每1点感知信息转化为1点思维链环；该转化不影响原本中间产物数目。"
+          },
+          {
+            "resource": "thinking_chain",
+            "type": "efficiency_per_resource",
+            "per_resource": 1,
+            "scope": "manufacturing_station",
+            "detail": "迷迭香精二：每1点思维链环+1%生产力。"
+          }
+        ],
+        "note": "动态：思维链环完整挂件，默认按4宿舍满员、5级宿舍、4招募位办公室计算。",
+        "priority": 21360
+      }
       ],
       "莱茵生命": {
         "base_combo": [
@@ -2059,9 +2819,18 @@
           "combo": [
             "冬时/1"
           ],
-          "efficiency": 30,
+          "efficiency": 0,
+          "dynamic_effects": {
+            "type": "room_operator_count",
+            "base": 0,
+            "per_operator": 10,
+            "cap": 3,
+            "fill_room": true,
+            "detail": "流程优化：同房其他干员生产力归零，每个当前制造站内干员为当前制造站+10%生产力。"
+          },
           "priority": 3060,
-          "storage_capacity_delta": 5
+          "storage_capacity_delta": 5,
+          "note": "动态：流程优化按当前制造站内干员数量+10%/人，最多3人；填入的同房干员只用于人数计数。"
         },
         {
           "combo": [
@@ -2232,9 +3001,82 @@
           "combo": [
             "至简/2"
           ],
-          "efficiency": 40,
-          "note": "3发电站",
+          "efficiency": 0,
+          "dynamic_resource_contributions": {
+            "resource": "engineering_robot",
+            "amount": 64,
+            "key": "minimalist_max_facility_levels",
+            "detail": "至简精二：基建内设施等级总和（不包含活动室）按满级243布局上限64点工程机器人建模。"
+          },
+          "dynamic_resource_effects": {
+            "resource": "engineering_robot",
+            "type": "efficiency_per_step",
+            "step_size": 8,
+            "per_step": 5,
+            "scope": "manufacturing_station",
+            "detail": "至简精二：每8点工程机器人+5%生产力。"
+          },
+          "note": "动态：工程机器人，上限64点时等价原静态40%。",
           "priority": 4000
+        },
+        {
+          "combo": [
+            "泰拉大陆调查团"
+          ],
+          "efficiency": 5,
+          "storage_capacity_delta": 8,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "catnip",
+              "per_group_operator": 2,
+              "group": "monster_hunter_team",
+              "required_operators": "火龙S黑角",
+              "scope": "control_center",
+              "key": "catnip_higashi_teamwork",
+              "detail": "火龙S黑角：控制中枢内每1名怪物猎人小队干员提供2个木天蓼。"
+            },
+            {
+              "resource": "catnip",
+              "amount": 8,
+              "required_operators": "麒麟R夜刀",
+              "scope": "control_center",
+              "key": "catnip_yato_stamina_recovery",
+              "detail": "麒麟R夜刀：进驻控制中枢时提供8个木天蓼。"
+            }
+          ],
+          "dynamic_resource_effects": {
+            "resource": "catnip",
+            "type": "efficiency_per_resource",
+            "per_resource": 1,
+            "scope": "manufacturing_station",
+            "detail": "可靠的随从们：每1个木天蓼+1%生产力。"
+          },
+          "note": "动态：可靠的随从们，基础仓库容量+8、生产力+5%，每1个木天蓼+1%。",
+          "priority": 3650
+        },
+        {
+          "combo": [
+            "战车/2"
+          ],
+          "efficiency": 20,
+          "dynamic_resource_contributions": {
+            "resource": "ursus_drink",
+            "per_group_operator": 1,
+            "group": "ursus_student_self_governing_group",
+            "required_operators": "战车",
+            "scope": "control_center",
+            "key": "ursus_drink_tachanka_control",
+            "detail": "战车精二：进驻控制中枢时，控制中枢内每1名乌萨斯学生自治团干员提供1瓶乌萨斯特饮。"
+          },
+          "dynamic_resource_effects": {
+            "resource": "ursus_drink",
+            "type": "storage_capacity_delta_per_resource",
+            "per_resource": 2,
+            "scope": "manufacturing_station",
+            "detail": "实干的寡言者：每1瓶乌萨斯特饮使仓库容量上限+2。"
+          },
+          "note": "动态：实干的寡言者，基础生产力+20%，每1瓶乌萨斯特饮仓库容量+2。",
+          "priority": 2100
         },
         {
           "combo": [
@@ -2281,6 +3123,21 @@
           "mood_consumption_delta": {
             "酒神": -0.25
           }
+        },
+        {
+          "combo": [
+            "导火索/2"
+          ],
+          "efficiency": 20,
+          "dynamic_resource_effects": {
+            "resource": "ursus_drink",
+            "type": "storage_capacity_delta_per_resource",
+            "per_resource": 2,
+            "scope": "manufacturing_station",
+            "detail": "实干的寡言者：每1瓶乌萨斯特饮使仓库容量上限+2。"
+          },
+          "note": "动态：实干的寡言者，基础生产力+20%，每1瓶乌萨斯特饮仓库容量+2。",
+          "priority": 3620
         },
         {
           "combo": [
@@ -2339,8 +3196,24 @@
           "dormitory": [
             "森西/2"
           ],
-          "efficiency": 35,
-          "note": "31%-35%",
+          "efficiency": 30,
+          "dynamic_resource_contributions": {
+            "resource": "monster_cuisine",
+            "per_group_operator": 5,
+            "group": "monster_cuisine_providers",
+            "scope": "facility",
+            "cap": 5,
+            "key": "monster_cuisine_senshi_dorm",
+            "detail": "森西大食堂：宿舍森西按默认5级宿舍提供5点魔物料理。"
+          },
+          "dynamic_resource_effects": {
+            "resource": "monster_cuisine",
+            "type": "efficiency_per_resource",
+            "per_resource": 1,
+            "scope": "manufacturing_station",
+            "detail": "玛露西尔：每1点魔物料理+1%生产力。"
+          },
+          "note": "动态：意想不到的美味，基础30%，每1点魔物料理+1%，需宿舍有森西。",
           "priority": 3475
         },
         {
@@ -2630,6 +3503,18 @@
         },
         {
           "combo": [
+            "清道夫/1"
+          ],
+          "efficiency": 0,
+          "storage_capacity_delta": 8,
+          "priority": 580,
+          "mood_consumption_delta": {
+            "清道夫": -0.25
+          },
+          "note": "拾荒者: 进驻制造站时，仓库容量上限+8，心情每小时消耗-0.25。当前生产效率为0%，仅作为容量/心情规则建模。"
+        },
+        {
+          "combo": [
             "灰毫",
             "远牙",
             "野鬃",
@@ -2698,45 +3583,182 @@
           "product": [
             "Battle Record"
           ],
-          "efficiency": -1,
-          "priority": -1,
-          "note": "TODO: 古米在贸易站的跨房间依赖暂未适配。患难拍档: 进驻制造站时，若古米在贸易站，则作战记录类配方的生产力+35%"
+          "efficiency": 0,
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 0,
+            "per_operator": 35,
+            "operators": [
+              "古米"
+            ],
+            "dependency_scope": "trading_station",
+            "cap": 1,
+            "product": "Battle Record",
+            "scope": "manufacturing_station",
+            "detail": "患难拍档：古米在贸易站时作战记录类配方生产力+35%。"
+          },
+          "priority": 3150,
+          "note": "动态：患难拍档，进驻制造站时，若古米在贸易站，则作战记录类配方的生产力+35%。"
         },
         {
           "combo": [
             "黍/2"
           ],
-          "efficiency": -1,
-          "priority": -1,
-          "note": "TODO: 人间烟火中间产物暂未适配。稻禾厚，顺秋收: 进驻制造站时，每3点人间烟火+1%生产力"
+          "efficiency": 0,
+          "priority": 1500,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 5,
+              "group": "sui",
+              "scope": "facility",
+              "cap": 25,
+              "key": "human_fireworks_sui_facility",
+              "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 15,
+              "group": "human_fireworks_flat_providers",
+              "scope": "facility",
+              "cap": 15,
+              "key": "human_fireworks_flat_provider",
+              "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+            }
+          ],
+          "dynamic_resource_effects": {
+            "resource": "human_fireworks",
+            "type": "efficiency_per_step",
+            "step_size": 3,
+            "per_step": 1,
+            "scope": "manufacturing_station",
+            "detail": "稻禾厚，顺秋收：每3点人间烟火+1%生产力。"
+          },
+          "note": "稻禾厚，顺秋收: 进驻制造站时，每3点人间烟火+1%生产力。"
         },
         {
           "combo": [
             "截云"
           ],
-          "efficiency": -1,
-          "priority": -1,
-          "note": "TODO: 巫术结晶中间产物暂未适配。古老巫术: 进驻制造站时，每5点人间烟火转化为1点巫术结晶 / 逐水草: 进驻制造站时，每1点巫术结晶+1%生产力"
+          "efficiency": 0,
+          "priority": 1500,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 5,
+              "group": "sui",
+              "scope": "facility",
+              "cap": 25,
+              "key": "human_fireworks_sui_facility",
+              "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 15,
+              "group": "human_fireworks_flat_providers",
+              "scope": "facility",
+              "cap": 15,
+              "key": "human_fireworks_flat_provider",
+              "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+            }
+          ],
+          "dynamic_resource_effects": [
+            {
+              "resource": "human_fireworks",
+              "type": "resource_conversion",
+              "step_size": 5,
+              "output_resource": "witchcraft_crystal",
+              "output_per_step": 1,
+              "scope": "manufacturing_station",
+              "detail": "古老巫术：每5点人间烟火转化为1点巫术结晶；中间产物转化不消耗原资源。"
+            },
+            {
+              "resource": "witchcraft_crystal",
+              "type": "efficiency_per_resource",
+              "per_resource": 1,
+              "scope": "manufacturing_station",
+              "detail": "逐水草：每1点巫术结晶+1%生产力。"
+            }
+          ],
+          "note": "古老巫术: 进驻制造站时，每5点人间烟火转化为1点巫术结晶 / 逐水草: 进驻制造站时，每1点巫术结晶+1%生产力。"
         },
         {
           "combo": [
             "截云/2"
           ],
-          "efficiency": -1,
-          "priority": -1,
-          "note": "TODO: 巫术结晶中间产物暂未适配。问枯荣: 进驻制造站时，每1点巫术结晶+2%生产力"
+          "efficiency": 0,
+          "priority": 1600,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 5,
+              "group": "sui",
+              "scope": "facility",
+              "cap": 25,
+              "key": "human_fireworks_sui_facility",
+              "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 15,
+              "group": "human_fireworks_flat_providers",
+              "scope": "facility",
+              "cap": 15,
+              "key": "human_fireworks_flat_provider",
+              "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+            }
+          ],
+          "dynamic_resource_effects": [
+            {
+              "resource": "human_fireworks",
+              "type": "resource_conversion",
+              "step_size": 5,
+              "output_resource": "witchcraft_crystal",
+              "output_per_step": 1,
+              "scope": "manufacturing_station",
+              "detail": "古老巫术：每5点人间烟火转化为1点巫术结晶；中间产物转化不消耗原资源。"
+            },
+            {
+              "resource": "witchcraft_crystal",
+              "type": "efficiency_per_resource",
+              "per_resource": 2,
+              "scope": "manufacturing_station",
+              "detail": "问枯荣：每1点巫术结晶+2%生产力。"
+            }
+          ],
+          "note": "问枯荣: 进驻制造站时，每1点巫术结晶+2%生产力。"
         },
         {
           "combo": [
-            "（需要研究）温米/2",
+            "温米/2",
             "阿兰娜/2"
           ],
-          "efficiency": -75,
+          "efficiency": 45,
           "product": [
             "Pure Gold"
           ],
-          "note": "+3小车，亏损15%发电（暂不实现）",
-          "priority": -1
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 45,
+            "per_operator": 10,
+            "operators": [
+              "Lancet-2",
+              "Castle-3",
+              "THRM-EX",
+              "正义骑士号",
+              "Friston-3",
+              "PhonoR-0",
+              "CONFESS-47",
+              "GALLUS²"
+            ],
+            "dependency_scope": "power",
+            "cap": 3,
+            "product": "Pure Gold",
+            "scope": "manufacturing_station",
+            "detail": "平台协作：阿兰娜进驻赤金制造站时基础+45%，每个发电站内平台相关小车额外+10%，最多3个。"
+          },
+          "priority": 4280,
+          "note": "动态：温米/阿兰娜赤金制造组合，基础45%，每个发电站平台相关小车+10%，最多3个；发电站机会成本由发电站排班结果体现。"
         }
       ]
     },
@@ -2837,11 +3859,22 @@
         },
         {
           "combo": [
-            "缪尔赛思+5莱茵挂件，暂不实现/2"
+            "缪尔赛思/2"
           ],
-          "efficiency": 25,
-          "note": "+5莱茵挂件，暂不实现",
-          "priority": -1
+          "efficiency": 10,
+          "dynamic_effects": {
+            "type": "operator_group_presence_count",
+            "base": 10,
+            "per_operator": 3,
+            "group": "rhine_lab",
+            "dependency_scope": "facility",
+            "exclude_assigned_operators": true,
+            "cap": 5,
+            "scope": "power_station",
+            "detail": "生态科主任：基础无人机恢复速度+10%，基建内每名除自身以外的莱茵生命干员额外+3%，最多计5名。"
+          },
+          "note": "动态：生态科主任，发电站基础+10%，基建内每名除自身以外的莱茵生命干员+3%，最多5名。",
+          "priority": 1960
         }
       ]
     },
@@ -2873,8 +3906,18 @@
             "伊内丝/2"
           ],
           "efficiency": 51,
+          "dynamic_effects": {
+            "type": "linear_warmup_cap",
+            "base": 51,
+            "per_hour": 2,
+            "assumed_hours": 5,
+            "max_extra": 10,
+            "cap": 61,
+            "scope": "meeting_room",
+            "detail": "聚影：沿用本库既有会客室51%基线，工作后每小时+2%，按5小时额外+10%封顶折算。"
+          },
           "priority": 7750,
-          "note": "PRTS:聚影;动态额外加成未计入"
+          "note": "动态：聚影，沿用本库既有会客室51%基线，长班暖机额外+10%封顶。"
         },
         {
           "combo": [
@@ -2892,6 +3935,22 @@
           "efficiency": 0,
           "priority": 0,
           "note": "双面间谍: 进驻会客室时，如果会客室内只有自身处于工作状态时，线索搜集速度提升50%，心情每小时消耗+2；两人会客室排班场景按0%计入。"
+        },
+        {
+          "combo": [
+            "U-Official",
+            "极境",
+            "极境/2",
+            "夏栎",
+            "夏栎/2",
+            "苦艾",
+            "苦艾/2",
+            "山/2"
+          ],
+          "efficiency": 0,
+          "apply_each": true,
+          "priority": 120,
+          "note": "会客室线索倾向/保底概率类技能：当前评分模型只折算线索搜集速度，不将特定阵营线索出现概率转换为效率。"
         },
         {
           "combo": [
@@ -2940,9 +3999,52 @@
           "combo": [
             "赤刃明霄陈/2"
           ],
-          "efficiency": 41,
+          "efficiency": 20,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 5,
+              "group": "sui",
+              "scope": "facility",
+              "cap": 25,
+              "key": "human_fireworks_sui_facility",
+              "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 15,
+              "group": "human_fireworks_flat_providers",
+              "scope": "facility",
+              "cap": 15,
+              "key": "human_fireworks_flat_provider",
+              "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+            }
+          ],
+          "dynamic_resource_effects": {
+            "resource": "human_fireworks",
+            "type": "efficiency_per_step",
+            "step_size": 10,
+            "per_step": 1,
+            "scope": "meeting_room",
+            "detail": "扶危行侠：基础线索搜集速度+20%，每10点人间烟火额外+1%。"
+          },
           "priority": 6750,
-          "note": "PRTS:扶危行侠;动态额外加成未计入"
+          "note": "动态：扶危行侠，基础线索搜集速度+20%，每10点人间烟火额外+1%。"
+        },
+        {
+          "combo": [
+            "双月/2"
+          ],
+          "efficiency": 5,
+          "dynamic_resource_effects": {
+            "resource": "intelligence_reserve",
+            "type": "efficiency_per_resource",
+            "per_resource": 5,
+            "scope": "meeting_room",
+            "detail": "情报分析：每1点情报储备+5%线索搜集速度。"
+          },
+          "priority": 6725,
+          "note": "动态：基础线索搜集速度+5%，每1点情报储备额外+5%。"
         },
         {
           "combo": [
@@ -3029,14 +4131,6 @@
           ],
           "efficiency": 22,
           "priority": 5300
-        },
-        {
-          "combo": [
-            "双月/2"
-          ],
-          "efficiency": 25,
-          "priority": 5150,
-          "note": "PRTS:情报专家;动态额外加成未计入"
         },
         {
           "combo": [
@@ -3136,6 +4230,23 @@
       "单人": [
         {
           "combo": [
+            "凯尔希·思衡托/2"
+          ],
+          "efficiency": 30,
+          "dynamic_effects": {
+            "type": "operator_group_room_count",
+            "base": 30,
+            "per_operator": 4,
+            "group": "elite_operators",
+            "cap": 5,
+            "scope": "hire",
+            "detail": "“泰拉的方舟”：基础人脉资源联络速度+30%，基建内每有一间进驻精英干员的设施额外+4%，最多5间。"
+          },
+          "priority": 4785,
+          "note": "动态：“泰拉的方舟”，办公室基础+30%，按进驻精英干员的设施数+4%，最多5间。"
+        },
+        {
+          "combo": [
             "斥罪"
           ],
           "efficiency": 50,
@@ -3158,7 +4269,15 @@
           ],
           "efficiency": 35,
           "priority": 4540,
-          "note": "街头法则: 进驻人力办公室时，人脉资源的联络速度+35%，同时每个招募位（不包含初始招募位）额外+5%会客室线索搜集速度；暂未计入：会客室招募位加成。"
+          "note": "街头法则: 进驻人力办公室时，人脉资源的联络速度+35%；每个额外招募位+5%会客室线索搜集速度属于会客室房间级全局加成，不折入单个办公室效率分数。"
+        },
+        {
+          "combo": [
+            "乌有"
+          ],
+          "efficiency": 35,
+          "priority": 4540,
+          "note": "好事之徒: 进驻人力办公室时，人脉资源的联络速度+35%；每个额外招募位+5%会客室线索搜集速度属于会客室房间级全局加成，不折入单个办公室效率分数。"
         },
         {
           "combo": [
@@ -3168,7 +4287,7 @@
           "efficiency": 30,
           "apply_each": true,
           "priority": 4330,
-          "note": "“号外！”: 进驻人力办公室时，人脉资源的联络速度+30%，同时每个招募位（不包含初始招募位）额外+5%会客室线索搜集速度 / 交游广阔: 进驻人力办公室时，人脉资源的联络速度+30%，同时每个招募位（不包含初始招募位）额外+5%会客室线索搜集速度；暂未计入：会客室招募位加成。"
+          "note": "“号外！” / 交游广阔: 进驻人力办公室时，人脉资源的联络速度+30%；每个额外招募位+5%会客室线索搜集速度属于会客室房间级全局加成，不折入单个办公室效率分数。"
         },
         {
           "combo": [
@@ -3209,6 +4328,30 @@
         },
         {
           "combo": [
+            "闪击/2"
+          ],
+          "efficiency": 20,
+          "dynamic_resource_effects": [
+            {
+              "resource": "intelligence_reserve",
+              "type": "efficiency_per_resource",
+              "per_resource": 5,
+              "scope": "hire",
+              "detail": "语言沟通：每1点情报储备+5%人脉资源联络速度。"
+            },
+            {
+              "resource": "ursus_drink",
+              "type": "efficiency_per_resource",
+              "per_resource": 5,
+              "scope": "hire",
+              "detail": "语言沟通：每1瓶乌萨斯特饮+5%人脉资源联络速度。"
+            }
+          ],
+          "priority": 3985,
+          "note": "动态：基础人脉资源联络速度+20%，每1点情报储备和每1瓶乌萨斯特饮额外+5%；办公室作为辅助房间由其他规则需求带入。"
+        },
+        {
+          "combo": [
             "锡人"
           ],
           "efficiency": 25,
@@ -3232,7 +4375,7 @@
           "efficiency": 20,
           "apply_each": true,
           "priority": 3210,
-          "note": "内幕: 进驻人力办公室时，人脉资源的联络速度+20%，每产生1次联络次数，增加黑钢国际线索的概率（工作时长和招募位影响概率） / 人望: 进驻人力办公室时，人脉资源的联络速度+20%，每产生1次联络次数，增加乌萨斯学生自治团线索的概率（工作时长和招募位影响概率） / 旧识新交: 进驻人力办公室时，人脉资源的联络速度+20%，每产生1次联络次数，增加格拉斯哥帮线索的概率（工作时长和招募位影响概率） / 巡游: 进驻人力办公室时，人脉资源的联络速度+20%，同时每个招募位（不包含初始招募位）+10点记忆碎片；暂未计入：线索倾向或中间产物额外效果。"
+          "note": "内幕 / 人望 / 旧识新交: 线索倾向概率不折入效率分数；巡游: 絮雨的记忆碎片已在黑键/迷迭香感知信息链中通过办公室作用域读取。"
         },
         {
           "combo": [
@@ -3283,6 +4426,52 @@
             "桑葚": -0.25,
             "深律": -0.25
           }
+        }
+      ]
+    },
+    "processing": {
+      "单人": [
+        {
+          "combo": [
+            "凯尔希·思衡托/2"
+          ],
+          "efficiency": 80,
+          "priority": 8000,
+          "note": "理论革新: 进驻加工站加工任意类材料时，副产品的产出概率提升80%。"
+        },
+        {
+          "combo": [
+            "凯尔希·思衡托"
+          ],
+          "efficiency": 70,
+          "priority": 7000,
+          "note": "技术阐明: 进驻加工站加工任意类材料时，副产品的产出概率提升70%。"
+        },
+        {
+          "combo": [
+            "霜华/2"
+          ],
+          "efficiency": 50,
+          "dynamic_resource_effects": [
+            {
+              "resource": "intelligence_reserve",
+              "type": "efficiency_per_resource",
+              "per_resource": 5,
+              "scope": "processing",
+              "detail": "全神贯注：每1点情报储备额外提升5%加工站副产品产出概率。"
+            },
+            {
+              "resource": "ursus_drink",
+              "type": "efficiency_per_step",
+              "step_size": 4,
+              "per_step": 15,
+              "cap": 15,
+              "scope": "processing",
+              "detail": "全神贯注：乌萨斯特饮达到4瓶时，额外提升15%加工站副产品产出概率。"
+            }
+          ],
+          "priority": 5000,
+          "note": "动态：基础副产品产出概率+50%，每1点情报储备额外+5%，乌萨斯特饮达到4瓶额外+15%；加工站作为辅助房间由其他规则需求带入。"
         }
       ]
     }
@@ -3336,12 +4525,184 @@
       "operator": "八幡海铃",
       "description": "进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高）",
       "priority": 1120,
+      "dynamic_resource_contributions": {
+        "resource": "passion",
+        "amount": 10,
+        "scope": "control_center",
+        "required_operators": "八幡海铃",
+        "key": "passion_hachimanka_reliable_partner",
+        "detail": "可靠伙伴：八幡海铃进驻控制中枢时热情值+10。"
+      },
       "effects": [
         {
           "target": "hire",
           "efficiency": 10,
           "exclusive": true,
           "group": "hire_global_buff"
+        }
+      ]
+    },
+    {
+      "operator": "琴柳/2",
+      "description": "进驻控制中枢时，人力办公室联络速度小于30%时额外+20%；当前模型按办公室全局联络速度加成记录，且不进入日效率分数。",
+      "priority": 1115,
+      "effects": [
+        {
+          "target": "hire",
+          "efficiency": 20,
+          "exclusive": true,
+          "group": "hire_global_buff"
+        }
+      ]
+    },
+    {
+      "operator": "祐天寺若麦",
+      "description": "进驻控制中枢时，热情值+10；会客室线索搜集速度+5%（同种效果取最高）",
+      "priority": 1110,
+      "dynamic_resource_contributions": {
+        "resource": "passion",
+        "amount": 10,
+        "scope": "control_center",
+        "required_operators": "祐天寺若麦",
+        "key": "passion_nyamuchi_study",
+        "detail": "勤学苦练：祐天寺若麦进驻控制中枢时热情值+10。"
+      },
+      "effects": [
+        {
+          "target": "passion_resource",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "passion_resource_selector"
+        },
+        {
+          "target": "meeting",
+          "efficiency": 5,
+          "exclusive": true,
+          "group": "meeting_global_buff"
+        }
+      ]
+    },
+    {
+      "operator": "老鲤/2",
+      "description": "进驻控制中枢时，会客室线索搜集速度+25%（同种效果取最高）",
+      "priority": 1130,
+      "effects": [
+        {
+          "target": "meeting",
+          "efficiency": 25,
+          "exclusive": true,
+          "group": "meeting_global_buff"
+        }
+      ]
+    },
+    {
+      "operator": "魔王/2",
+      "description": "进驻控制中枢时，会客室线索搜集速度+15%（同种效果取最高）",
+      "priority": 1125,
+      "effects": [
+        {
+          "target": "meeting",
+          "efficiency": 15,
+          "exclusive": true,
+          "group": "meeting_global_buff"
+        }
+      ]
+    },
+    {
+      "operator": "三角初华",
+      "description": "进驻控制中枢时，宿舍内每有1名干员，热情值+1；默认4宿舍满员按20点计。",
+      "priority": 1100,
+      "dynamic_resource_contributions": {
+        "resource": "passion",
+        "amount": 20,
+        "scope": "control_center",
+        "required_operators": "三角初华",
+        "key": "passion_uika_dorm_full_occupancy",
+        "detail": "偶像光环：默认4宿舍满员20名干员，热情值+20。"
+      },
+      "effects": [
+        {
+          "target": "passion_resource",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "passion_resource_selector"
+        }
+      ]
+    },
+    {
+      "operator": "若叶睦",
+      "description": "进驻控制中枢时，热情值+20；每8点热情值所有贸易站订单效率+1%（同种效果取最高）。",
+      "priority": 700,
+      "dynamic_resource_contributions": {
+        "resource": "passion",
+        "amount": 20,
+        "scope": "control_center",
+        "required_operators": "若叶睦",
+        "key": "passion_mutsumi_actor",
+        "detail": "演技的怪物：若叶睦进驻控制中枢时热情值+20。"
+      },
+      "dynamic_resource_effects": {
+        "resource": "passion",
+        "type": "efficiency_per_step",
+        "step_size": 8,
+        "per_step": 1,
+        "target": "trading",
+        "group": "trading_global_buff",
+        "exclusive": true,
+        "detail": "演技的怪物：每8点热情值，所有贸易站订单效率+1%。"
+      },
+      "effects": [
+        {
+          "target": "trading",
+          "efficiency": 2,
+          "exclusive": true,
+          "group": "trading_global_buff"
+        }
+      ]
+    },
+    {
+      "operator": "丰川祥子/2",
+      "description": "进驻控制中枢时，所有生产贵金属类配方的制造站生产力+1%，每20点热情值额外+1%。",
+      "priority": 250,
+      "dynamic_resource_effects": {
+        "resource": "passion",
+        "type": "efficiency_per_step",
+        "step_size": 20,
+        "per_step": 1,
+        "target": "manufacturing_pure_gold",
+        "group": "manufacturing_pure_gold_passion_buff",
+        "exclusive": true,
+        "detail": "丰富工作经验精二：每20点热情值，所有生产贵金属类配方的制造站生产力+1%。"
+      },
+      "effects": [
+        {
+          "target": "manufacturing_pure_gold",
+          "efficiency": 1,
+          "exclusive": true,
+          "group": "manufacturing_pure_gold_base_buff"
+        }
+      ]
+    },
+    {
+      "operator": "丰川祥子",
+      "description": "进驻控制中枢时，所有生产贵金属类配方的制造站生产力+0.5%，每20点热情值额外+0.5%。",
+      "priority": 240,
+      "dynamic_resource_effects": {
+        "resource": "passion",
+        "type": "efficiency_per_step",
+        "step_size": 20,
+        "per_step": 0.5,
+        "target": "manufacturing_pure_gold",
+        "group": "manufacturing_pure_gold_passion_buff",
+        "exclusive": true,
+        "detail": "丰富工作经验精英0：每20点热情值，所有生产贵金属类配方的制造站生产力+0.5%。"
+      },
+      "effects": [
+        {
+          "target": "manufacturing_pure_gold",
+          "efficiency": 0.5,
+          "exclusive": true,
+          "group": "manufacturing_pure_gold_base_buff"
         }
       ]
     },
@@ -3446,6 +4807,26 @@
           "exclusive": false,
           "group": "control_mood_recovery_r6_skill"
         }
+      ],
+      "dynamic_resource_contributions": [
+        {
+          "resource": "intelligence_reserve",
+          "per_group_operator": 1,
+          "group": "rainbow_team",
+          "required_operators": "灰烬",
+          "scope": "control_center",
+          "key": "intelligence_reserve_ash_rainbow_control",
+          "detail": "灰烬精二：进驻控制中枢时，控制中枢内每1名彩虹小队干员提供1点情报储备。"
+        },
+        {
+          "resource": "ursus_drink",
+          "per_group_operator": 1,
+          "group": "ursus_student_self_governing_group",
+          "required_operators": "战车",
+          "scope": "control_center",
+          "key": "ursus_drink_tachanka_control",
+          "detail": "战车精二：进驻控制中枢时，控制中枢内每1名乌萨斯学生自治团干员提供1瓶乌萨斯特饮。"
+        }
       ]
     },
     {
@@ -3465,7 +4846,11 @@
         "杜宾",
         "清道夫",
         "红",
-        "坚雷/1"
+        "坚雷/1",
+        "歌蕾蒂娅",
+        "歌蕾蒂娅/2",
+        "可露希尔",
+        "夕"
       ],
       "apply_each": true,
       "description": "心情恢复+0.05",
@@ -3477,6 +4862,40 @@
           "efficiency": 5,
           "exclusive": false,
           "group": "control_mood_recovery_base"
+        }
+      ]
+    },
+    {
+      "operator": [
+        "布丁/1",
+        "森蚺/2",
+        "摆渡人",
+        "摆渡人/1",
+        "妮芙/2",
+        "戴菲恩/2",
+        "灵知/2",
+        "吽/2",
+        "灵知",
+        "陈",
+        "早露",
+        "重岳",
+        "重岳/2",
+        "令",
+        "令/2",
+        "海蒂/2",
+        "阿",
+        "惊蛰",
+        "惊蛰/2"
+      ],
+      "apply_each": true,
+      "description": "控制中枢条件/概率/派系心情类技能占位：依赖发电站作业平台、会客室线索倾向、指定派系人数或心情阈值等当前评分模型不折算的状态，按0效率显式记录。",
+      "priority": 20,
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_unscored_skill_placeholder"
         }
       ]
     },
@@ -3576,6 +4995,22 @@
       "target_bonuses": [],
       "ignored_dynamic_rules": [],
       "description": "进驻宿舍时，自身心情每小时恢复+2，同时无法获得其他来源提供的心情恢复效果"
+    },
+    {
+      "holder": "摩根",
+      "elite": 0,
+      "skill": "头号陪练",
+      "all_recovery": null,
+      "others_recovery": null,
+      "single_recovery": null,
+      "self_recovery": null,
+      "power_station_bonus_per_room": 0,
+      "dormitory_level_bonus_per_level": 0,
+      "target_bonuses": [],
+      "ignored_dynamic_rules": [
+        "进驻宿舍时，推进之王对该宿舍中格拉斯哥帮干员恢复效果额外+0.3"
+      ],
+      "description": "进驻宿舍时，推进之王对该宿舍中格拉斯哥帮干员恢复效果额外+0.3；当前宿舍恢复模型不支持修饰另一名干员的恢复技能，按占位记录。"
     },
     {
       "holder": "杜林",
@@ -4100,9 +5535,16 @@
       "power_station_bonus_per_room": 0,
       "dormitory_level_bonus_per_level": 0,
       "target_bonuses": [],
-      "ignored_dynamic_rules": [
-        "进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2，每有5点无声共鸣，该宿舍内所有干员的心情每小时恢复额外+0.01（同种效果取最高）"
-      ],
+      "ignored_dynamic_rules": [],
+      "dynamic_resource_effects": {
+        "resource": "silent_resonance",
+        "type": "recovery_per_step",
+        "step_size": 5,
+        "per_step": 0.01,
+        "target": "all",
+        "scope": "dormitory",
+        "detail": "无词颂歌：每5点无声共鸣使该宿舍内所有干员心情每小时恢复额外+0.01。"
+      },
       "description": "进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.2，每有5点无声共鸣，该宿舍内所有干员的心情每小时恢复额外+0.01（同种效果取最高）"
     },
     {
