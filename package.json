@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "generate:data": "node scripts/generate-data.mjs",
+    "sync:operator-avatars": "node scripts/sync-operator-avatars.mjs",
     "predev": "npm run generate:data",
     "dev": "vite",
     "build:web": "tsc && vite build",
