@@ -28,6 +28,7 @@ const MAX_BODY_BYTES = 1024 * 1024
 const TOP_ITEM_LIMIT = 8
 const UNPRICED_ITEM_LIMIT = 12
 const SAMPLE_WEIGHT_PRIOR_COUNT = 200
+const DEPOT_CURVE_SANITY_SCALE = 30
 const LMD_ITEM_ID = '4001'
 const UNPRICED_BY_POLICY = new Set(['3401', 'mod_unlock_token', 'mod_update_token_1', 'mod_update_token_2'])
 
@@ -557,7 +558,10 @@ function estimateDepotCurvePercentile(totalSanity: number): number {
     { sanity: 4000, percentile: 88 },
     { sanity: 8000, percentile: 95 },
     { sanity: 15000, percentile: 99 },
-  ]
+  ].map((point) => ({
+    ...point,
+    sanity: point.sanity * DEPOT_CURVE_SANITY_SCALE,
+  }))
   if (!Number.isFinite(totalSanity) || totalSanity <= 0) return 1
   for (let index = 1; index < points.length; index += 1) {
     const left = points[index - 1]

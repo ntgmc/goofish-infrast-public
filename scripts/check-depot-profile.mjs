@@ -212,6 +212,9 @@ function memoryUserStoreModule() {
           channel_name: profile.skland_binding.channel_name,
           bound_at: profile.skland_binding.bound_at,
           last_imported_at: profile.skland_binding.last_imported_at,
+          credential_status: profile.skland_binding.credential_status === 'invalid' ? 'invalid' : 'available',
+          credential_invalid_at: profile.skland_binding.credential_invalid_at ?? null,
+          credential_invalid_reason: profile.skland_binding.credential_invalid_reason === 'expired_or_revoked' || profile.skland_binding.credential_invalid_reason === 'credential_format_invalid' ? profile.skland_binding.credential_invalid_reason : null,
         } : null,
         operator_count: workspace?.operators?.filter((operator) => operator.own !== false).length ?? 0,
         updated_at: workspace?.updated_at ?? profile.updated_at,
@@ -240,6 +243,11 @@ function memoryUsageStatsModule() {
 function memoryLicenseUtilsModule() {
   return `
     export function canUseUpgradeFeatures() { return true }
+    export function canonicalJson(obj) {
+      if (obj === null || typeof obj !== 'object') return JSON.stringify(obj)
+      if (Array.isArray(obj)) return '[' + obj.map(canonicalJson).join(',') + ']'
+      return '{' + Object.keys(obj).sort().map((key) => JSON.stringify(key) + ':' + canonicalJson(obj[key])).join(',') + '}'
+    }
     export function evaluateClientBindingRisk() { return { ok: true } }
     export function evaluateOperatorRisk() { return { ok: true } }
     export function formatBindingBlockMessage() { return 'blocked' }
@@ -320,6 +328,9 @@ function memoryUserAuthModule() {
           channel_name: profile.skland_binding.channel_name,
           bound_at: profile.skland_binding.bound_at,
           last_imported_at: profile.skland_binding.last_imported_at,
+          credential_status: profile.skland_binding.credential_status === 'invalid' ? 'invalid' : 'available',
+          credential_invalid_at: profile.skland_binding.credential_invalid_at ?? null,
+          credential_invalid_reason: profile.skland_binding.credential_invalid_reason === 'expired_or_revoked' || profile.skland_binding.credential_invalid_reason === 'credential_format_invalid' ? profile.skland_binding.credential_invalid_reason : null,
         } : null,
         operator_count: workspace?.operators?.filter((operator) => operator.own !== false).length ?? 0,
         updated_at: workspace?.updated_at ?? profile.updated_at,

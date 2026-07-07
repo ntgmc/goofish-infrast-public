@@ -11,7 +11,7 @@
     "build:server": "node scripts/build-server.mjs",
     "build": "npm run generate:data && npm run build:web && npm run build:server",
     "check:build-relevance": "node scripts/check-build-relevance.mjs --check",
-    "check:api": "node scripts/check-api-handlers.mjs && node scripts/check-skland-client.mjs && node scripts/check-skland-handler.mjs && node scripts/check-training-cost.mjs && node scripts/check-depot-profile.mjs && node scripts/check-depot-value.mjs && node scripts/check-license-risk.mjs",
+    "check:api": "node scripts/check-api-handlers.mjs && node scripts/check-skland-client.mjs && node scripts/check-skland-handler.mjs && node scripts/check-training-cost.mjs && node scripts/check-depot-profile.mjs && node scripts/check-workspace-history.mjs && node scripts/check-depot-value.mjs && node scripts/check-license-risk.mjs",
     "check:migration": "npm run build && node scripts/check-server-routes.mjs && node scripts/verify-migrated-data.mjs",
     "check:local": "npm run build && npm run check:api && node scripts/check-server-routes.mjs",
     "start:server": "node server/dist/index.js",

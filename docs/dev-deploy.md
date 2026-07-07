@@ -59,9 +59,14 @@ systemd commands:
 
 ```sudoers
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart goofish-infrast-v1-dev
-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active goofish-infrast-v1-dev
-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-infrast-v1-dev
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-infrast-v1-dev
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-infrast-v1-dev --no-pager --lines=50
 ```
+
+The deploy script keeps the server checkout clean. It still rejects unexpected
+local changes, but it automatically discards local changes to
+`src/lib/build-meta.ts` and `server/handlers/data.ts` because `npm run build`
+can regenerate those tracked files during deployment.
 
 ## PostgreSQL
 

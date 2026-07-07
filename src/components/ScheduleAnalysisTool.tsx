@@ -1,6 +1,8 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useRef, useState, type FormEvent } from 'react'
 import type { AnalyzeScheduleResult, LicenseOperator } from '../lib/types'
-import ResultPanel from './ResultPanel'
+import { apiJson } from '../lib/api-client'
+
+const ResultPanel = lazy(() => import('./ResultPanel'))
 
 const ACCEPTED_FILE_TYPES = '.json,.txt,application/json,text/plain'
 
@@ -64,13 +66,11 @@ export default function ScheduleAnalysisTool({ compact = false }: ScheduleAnalys
 
     setLoading(true)
     try {
-      const resp = await fetch('/api/analyze-schedule', {
+      const data = await apiJson<AnalyzeScheduleResult>('/api/analyze-schedule', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operators, schedule }),
+        json: { operators, schedule },
+        fallbackMessage: '分析失败',
       })
-      const data = await resp.json() as AnalyzeScheduleResult & { error?: string }
-      if (!resp.ok) throw new Error(data.error || `分析失败: ${resp.status}`)
       setResult(data)
     } catch (caught) {
       setResult(null)
