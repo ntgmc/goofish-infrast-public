@@ -502,6 +502,18 @@ export async function getAnnouncementReads(userId: string): Promise<Announcement
   return result.rows
 }
 
+export async function getAnnouncementReadCounts(): Promise<Record<string, number>> {
+  await ensureSchema()
+  const result = await query<{ announcement_id: string; read_count: number }>(
+    `select announcement_id, count(*)::int as read_count
+     from user_announcement_reads
+     group by announcement_id`,
+  )
+  return Object.fromEntries(
+    result.rows.map((row) => [row.announcement_id, Number.isFinite(Number(row.read_count)) ? Number(row.read_count) : 0]),
+  )
+}
+
 export async function markAnnouncementRead(userId: string, announcementId: string, readAt = new Date().toISOString()): Promise<void> {
   await ensureSchema()
   await query(

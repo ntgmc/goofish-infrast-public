@@ -676,16 +676,28 @@ function memoryStorePlugin() {
         path: 'memory-license-utils',
         namespace: 'skland-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])usage-stats(\.ts)?$/ }, () => ({
+        path: 'memory-usage-stats',
+        namespace: 'skland-smoke',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'skland-smoke' }, (args) => ({
         contents: args.path === 'memory-user-store'
           ? memoryUserStoreModule()
           : args.path === 'memory-user-auth'
             ? memoryUserAuthModule()
-            : memoryLicenseUtilsModule(),
+            : args.path === 'memory-usage-stats'
+              ? memoryUsageStatsModule()
+              : memoryLicenseUtilsModule(),
         loader: 'js',
       }))
     },
   }
+}
+
+function memoryUsageStatsModule() {
+  return `
+    export async function recordUsageEvent() {}
+  `
 }
 
 function memoryUserStoreModule() {

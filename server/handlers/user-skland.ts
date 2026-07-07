@@ -27,6 +27,8 @@ import {
   type SklandImportSummary,
 } from './skland-client'
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
+import { recordUsageEvent } from './usage-stats'
+import type { UsageReasonCode } from '../storage/usage-store'
 
 const PENDING_BINDING_TTL_MS = 10 * 60 * 1000
 const UID_MISMATCH_FREEZE_THRESHOLD = 3
@@ -47,6 +49,7 @@ interface SklandPreview {
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
+  const startedAt = Date.now()
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
@@ -107,13 +110,16 @@ export default async (req: Request): Promise<Response> => {
       }
       const pending = profile.skland_pending_binding
       if (!pending || pending.confirmation_id !== body.confirmation_id.trim()) {
+        await recordSklandImport('failure', 'skland_confirm_invalid', startedAt, profile.id, 'login_confirm')
         return jsonResponse({ error: '森空岛绑定确认已失效，请重新登录森空岛。' }, 400)
       }
       if (Date.now() > Date.parse(pending.expires_at)) {
         await saveUserProfile({ ...profile, skland_pending_binding: null, updated_at: new Date().toISOString() })
+        await recordSklandImport('failure', 'skland_pending_expired', startedAt, profile.id, 'login_confirm')
         return jsonResponse({ error: '森空岛绑定确认已过期，请重新登录森空岛。' }, 400)
       }
       if (profile.skland_binding?.uid && profile.skland_binding.uid !== pending.uid) {
+        await recordSklandImport('failure', 'skland_account_mismatch', startedAt, profile.id, 'login_confirm')
         return jsonResponse({ error: '森空岛账号与当前绑定账号不一致，请重新登录森空岛。' }, 409)
       }
 
@@ -122,6 +128,7 @@ export default async (req: Request): Promise<Response> => {
       }
 
       const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(pending.encrypted_cred))
+      await recordSklandImport('success', 'ok', startedAt, profile.id, 'login_confirm')
       return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
     }
 
@@ -131,6 +138,7 @@ export default async (req: Request): Promise<Response> => {
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       if (isDepotValueProfile(profile)) {
+        await recordSklandImport('failure', 'skland_refresh_forbidden', startedAt, profile.id, 'refresh')
         return jsonResponse({
           error: '仓库分析档案不会刷新干员工作区，请在仓库价值分析页重新分析。',
           code: 'skland_depot_refresh_forbidden',
@@ -139,6 +147,7 @@ export default async (req: Request): Promise<Response> => {
       }
       const encryptedCred = profile.skland_binding?.encrypted_cred
       if (!encryptedCred) {
+        await recordSklandImport('failure', 'skland_not_bound', startedAt, profile.id, 'refresh')
         return jsonResponse({
           error: '当前账号尚未绑定森空岛，请先登录导入。',
           code: 'skland_not_bound',
@@ -147,10 +156,12 @@ export default async (req: Request): Promise<Response> => {
       }
       try {
         const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(encryptedCred))
+        await recordSklandImport('success', 'ok', startedAt, profile.id, 'refresh')
         return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
       } catch (caught) {
         if (isSklandCredentialInvalid(caught)) {
           const nextProfile = await markSklandCredentialInvalid(profile, credentialInvalidReason(caught))
+          await recordSklandImport('failure', 'skland_credential_invalid', startedAt, profile.id, 'refresh')
           return jsonResponse({
             ...(await buildAuthPayload(auth.user, nextProfile.id)),
             error: (caught as Error).message || '森空岛凭据已失效，请重新绑定。',
@@ -158,6 +169,7 @@ export default async (req: Request): Promise<Response> => {
             recovery_action: 'rebind',
           }, 400)
         }
+        await recordSklandImport('failure', 'skland_refresh_failed', startedAt, profile.id, 'refresh')
         return jsonResponse({
           error: (caught as Error).message || '森空岛刷新失败，请稍后重试。',
           code: 'skland_refresh_failed',
@@ -172,6 +184,26 @@ export default async (req: Request): Promise<Response> => {
     const message = error instanceof Error ? error.message : 'Internal server error'
     const status = message.includes('SKLAND_CREDENTIAL_SECRET') ? 500 : 400
     return jsonResponse({ error: message }, status)
+  }
+}
+
+async function recordSklandImport(
+  status: 'success' | 'failure',
+  reasonCode: UsageReasonCode,
+  startedAt: number,
+  profileId: string,
+  source: string,
+): Promise<void> {
+  try {
+    await recordUsageEvent('skland_import', {
+      status,
+      reason_code: reasonCode,
+      duration_ms: Date.now() - startedAt,
+      profile_id: profileId,
+      source,
+    })
+  } catch (error) {
+    console.warn('usage stats skland import skipped:', error)
   }
 }
 

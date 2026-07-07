@@ -384,6 +384,7 @@ function toAdminCdkRecord(record: CdkRecord) {
     user_agent_count: new Set((record.user_agent_events ?? []).map((event) => event.hash)).size,
     ip_prefix_count: new Set((record.ip_prefix_events ?? []).map((event) => event.hash)).size,
     risk_event_count: record.risk_events?.length ?? 0,
+    risk_events: (record.risk_events ?? []).map(summarizeRiskEvent).filter((event): event is NonNullable<ReturnType<typeof summarizeRiskEvent>> => Boolean(event)),
     latest_risk_event: summarizeRiskEvent(record.risk_events?.at(-1)),
   }
 }
@@ -394,6 +395,8 @@ function summarizeRiskEvent(event: NonNullable<CdkRecord['risk_events']>[number]
     at: event.at,
     type: event.type,
     reason: event.reason,
+    soft_block: event.detail?.soft_block === true,
+    escalation: event.type === 'soft_block_threshold',
   }
 }
 
