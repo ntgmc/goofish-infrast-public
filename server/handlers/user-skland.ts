@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import QRCode from 'qrcode'
-import type { AuthSuccessResponse } from '../../src/lib/types'
+import type { AuthSuccessResponse, SklandCredentialInvalidReason } from '../../src/lib/types'
 import {
   emptyWorkspace,
   getProfileForUser,
@@ -22,6 +22,7 @@ import {
   getHypergryphTokenByScanCode,
   getScanCode,
   importSklandOperatorsByCred,
+  SklandClientError,
   type SklandBindingSummary,
   type SklandImportSummary,
 } from './skland-client'
@@ -130,12 +131,39 @@ export default async (req: Request): Promise<Response> => {
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       if (isDepotValueProfile(profile)) {
-        return jsonResponse({ error: '仓库分析档案不会刷新干员工作区，请在仓库价值分析页重新分析。' }, 403)
+        return jsonResponse({
+          error: '仓库分析档案不会刷新干员工作区，请在仓库价值分析页重新分析。',
+          code: 'skland_depot_refresh_forbidden',
+          recovery_action: 'use_depot_analysis',
+        }, 403)
       }
       const encryptedCred = profile.skland_binding?.encrypted_cred
-      if (!encryptedCred) return jsonResponse({ error: '当前账号尚未绑定森空岛，请先登录导入。' }, 404)
-      const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(encryptedCred))
-      return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
+      if (!encryptedCred) {
+        return jsonResponse({
+          error: '当前账号尚未绑定森空岛，请先登录导入。',
+          code: 'skland_not_bound',
+          recovery_action: 'bind_first',
+        }, 404)
+      }
+      try {
+        const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(encryptedCred))
+        return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
+      } catch (caught) {
+        if (isSklandCredentialInvalid(caught)) {
+          const nextProfile = await markSklandCredentialInvalid(profile, credentialInvalidReason(caught))
+          return jsonResponse({
+            ...(await buildAuthPayload(auth.user, nextProfile.id)),
+            error: (caught as Error).message || '森空岛凭据已失效，请重新绑定。',
+            code: 'skland_credential_invalid',
+            recovery_action: 'rebind',
+          }, 400)
+        }
+        return jsonResponse({
+          error: (caught as Error).message || '森空岛刷新失败，请稍后重试。',
+          code: 'skland_refresh_failed',
+          recovery_action: 'retry',
+        }, 400)
+      }
     }
 
     return jsonResponse({ error: 'API route not found' }, 404)
@@ -164,6 +192,9 @@ async function saveDepotValueSklandBinding(
       bound_at: existingBinding?.bound_at ?? now,
       last_imported_at: null,
       encrypted_cred: pending.encrypted_cred,
+      credential_status: 'available',
+      credential_invalid_at: null,
+      credential_invalid_reason: null,
     },
     skland_pending_binding: null,
     skland_risk: { uid_mismatch_count: 0, last_mismatch_uid: null, last_mismatch_nickname: null, last_mismatch_at: null },
@@ -282,6 +313,9 @@ async function saveSklandImport(
       encrypted_cred: shouldReuseEncryptedCred(existingBinding, cred)
         ? existingBinding.encrypted_cred
         : encryptSklandCredential(cred),
+      credential_status: 'available',
+      credential_invalid_at: null,
+      credential_invalid_reason: null,
     },
     skland_pending_binding: null,
     skland_risk: { uid_mismatch_count: 0, last_mismatch_uid: null, last_mismatch_nickname: null, last_mismatch_at: null },
@@ -305,6 +339,37 @@ async function buildPayloadWithImport(
     ...(await buildAuthPayload(user, profileId)),
     skland_import: imported,
   }
+}
+
+async function markSklandCredentialInvalid(
+  profile: UserGameAccountRecord,
+  reason: SklandCredentialInvalidReason,
+): Promise<UserGameAccountRecord> {
+  if (!profile.skland_binding) return profile
+  const now = new Date().toISOString()
+  const nextProfile: UserGameAccountRecord = {
+    ...profile,
+    skland_binding: {
+      ...profile.skland_binding,
+      credential_status: 'invalid',
+      credential_invalid_at: now,
+      credential_invalid_reason: reason,
+    },
+    updated_at: now,
+  }
+  await saveUserProfile(nextProfile)
+  return nextProfile
+}
+
+function isSklandCredentialInvalid(error: unknown): boolean {
+  return error instanceof SklandClientError
+    && (error.code === 'credential_invalid' || error.code === 'credential_format_invalid')
+}
+
+function credentialInvalidReason(error: unknown): SklandCredentialInvalidReason {
+  return error instanceof SklandClientError && error.code === 'credential_format_invalid'
+    ? 'credential_format_invalid'
+    : 'expired_or_revoked'
 }
 
 async function requireActiveProfile(userId: string, profileId: unknown): Promise<UserGameAccountRecord> {

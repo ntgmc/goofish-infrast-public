@@ -3,7 +3,7 @@ import type { Announcement, AuthSuccessResponse, AuthUser, LicenseConfig, Licens
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
-import { apiJson } from '../../lib/api-client'
+import { ApiError, apiJson } from '../../lib/api-client'
 import { CONFIG_PRESETS, PERMISSION_LABELS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
 import { canonicalJson } from '../../lib/crypto'
 import { countOwnedOperators, formatDate, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
@@ -11,6 +11,11 @@ import { countOwnedOperators, formatDate, parseOperatorsText, sortOperatorsForPr
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
 
 type WorkspaceSetupSection = 'operators' | 'config'
+type SklandRefreshNotice = {
+  kind: 'success' | 'error'
+  message: string
+  recovery_action?: SklandPayload['recovery_action']
+}
 
 export default function WorkspaceSetupPage({
   user,
@@ -41,6 +46,7 @@ export default function WorkspaceSetupPage({
   const [saving, setSaving] = useState(false)
   const [sklandDialogOpen, setSklandDialogOpen] = useState(false)
   const [sklandRefreshing, setSklandRefreshing] = useState(false)
+  const [sklandRefreshNotice, setSklandRefreshNotice] = useState<SklandRefreshNotice | null>(null)
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
@@ -69,6 +75,7 @@ export default function WorkspaceSetupPage({
     setOperatorFileName(file?.name ?? null)
     setError(null)
     setStatus(null)
+    setSklandRefreshNotice(null)
     if (!file) return
     try {
       setOperators(parseOperatorsText(await file.text()))
@@ -84,6 +91,7 @@ export default function WorkspaceSetupPage({
     setOperatorFileName(null)
     setError(null)
     setStatus(null)
+    setSklandRefreshNotice(null)
     onSynced(data)
   }, [onSynced])
 
@@ -91,6 +99,7 @@ export default function WorkspaceSetupPage({
     setSklandRefreshing(true)
     setError(null)
     setStatus(null)
+    setSklandRefreshNotice(null)
     try {
       const data = await apiJson<SklandPayload>('/api/user/skland/import/refresh', {
         method: 'POST',
@@ -99,15 +108,24 @@ export default function WorkspaceSetupPage({
       })
       if (!data.user) throw new Error('森空岛刷新失败')
       applySklandPayload(data)
-      setStatus(data.skland_import
-        ? `已刷新 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}`
-        : '森空岛干员数据已刷新。')
+      setSklandRefreshNotice({
+        kind: 'success',
+        message: data.skland_import
+          ? `已刷新 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}`
+          : '森空岛干员数据已刷新。',
+      })
     } catch (caught) {
-      setError((caught as Error).message)
+      const payload = sklandPayloadFromError(caught)
+      if (payload?.user) onSynced(payload as SklandPayload)
+      setSklandRefreshNotice({
+        kind: 'error',
+        message: formatSklandRefreshError(payload, caught instanceof ApiError ? caught.status : 500),
+        recovery_action: payload?.recovery_action,
+      })
     } finally {
       setSklandRefreshing(false)
     }
-  }, [applySklandPayload, profile.id])
+  }, [applySklandPayload, onSynced, profile.id])
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -122,6 +140,7 @@ export default function WorkspaceSetupPage({
     setSaving(true)
     setError(null)
     setStatus(null)
+    setSklandRefreshNotice(null)
     try {
       const data = await apiJson<AuthSuccessResponse>('/api/user/workspace', {
         method: 'PATCH',
@@ -213,26 +232,14 @@ export default function WorkspaceSetupPage({
                     {operators && <span className="text-sm text-brand-400">拥有干员 {ownedOperatorCount} 名</span>}
                   </div>
 
-                  <div className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-ink-primary">森空岛扫码导入</p>
-                        <p className="mt-1 text-sm leading-6 text-ink-secondary">
-                          {profile.skland_binding
-                            ? `已绑定 ${profile.skland_binding.nickname} (${profile.skland_binding.uid})，最近导入 ${formatDate(profile.skland_binding.last_imported_at)}。`
-                            : '使用森空岛 App 扫码后先确认游戏昵称和 UID，确认绑定后不可解绑。'}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => setSklandDialogOpen(true)} disabled={sklandRefreshing || sklandDialogOpen} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
-                          森空岛扫码导入
-                        </button>
-                        <button type="button" onClick={handleRefreshSkland} disabled={sklandRefreshing || sklandDialogOpen || !profile.skland_binding} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:bg-surface-2 disabled:text-ink-muted">
-                          刷新森空岛数据
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <SklandStatusCard
+                    profile={profile}
+                    busy={sklandRefreshing}
+                    dialogOpen={sklandDialogOpen}
+                    notice={sklandRefreshNotice}
+                    onOpen={() => setSklandDialogOpen(true)}
+                    onRefresh={handleRefreshSkland}
+                  />
 
                   {operators && (
                     <div className="mt-5">
@@ -289,6 +296,90 @@ export default function WorkspaceSetupPage({
         onOpenChange={setSklandDialogOpen}
         onPayload={applySklandPayload}
       />
+    </div>
+  )
+}
+
+function SklandStatusCard({
+  profile,
+  busy,
+  dialogOpen,
+  notice,
+  onOpen,
+  onRefresh,
+}: {
+  profile: UserGameAccount
+  busy: boolean
+  dialogOpen: boolean
+  notice: SklandRefreshNotice | null
+  onOpen: () => void
+  onRefresh: () => void
+}) {
+  const binding = profile.skland_binding
+  const invalid = binding?.credential_status === 'invalid'
+  const canRefresh = Boolean(binding && !invalid)
+  return (
+    <div className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-ink-primary">森空岛导入</p>
+            {binding ? (
+              <span className={'rounded-md px-2.5 py-1 text-xs font-semibold ' + (invalid ? 'bg-error/10 text-error' : 'bg-success/10 text-success')}>
+                {invalid ? '凭据已失效' : '已绑定'}
+              </span>
+            ) : (
+              <span className="rounded-md bg-surface-2 px-2.5 py-1 text-xs font-semibold text-ink-muted">未绑定</span>
+            )}
+          </div>
+          {binding ? (
+            <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+              <StatusInfo label="昵称" value={binding.nickname} />
+              <StatusInfo label="UID" value={binding.uid} />
+              <StatusInfo label="服务器" value={binding.channel_name} />
+              <StatusInfo label="绑定时间" value={formatDate(binding.bound_at)} />
+              <StatusInfo label="最近刷新" value={formatDate(binding.last_imported_at)} />
+              <StatusInfo label="凭据状态" value={invalid ? sklandCredentialInvalidLabel(binding.credential_invalid_reason) : '可用'} danger={invalid} />
+            </dl>
+          ) : (
+            <p className="mt-2 text-sm leading-6 text-ink-secondary">扫码、粘贴凭据或书签脚本都会先预览昵称和 UID，确认后才保存绑定并导入。</p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onOpen} disabled={busy || dialogOpen} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+            {binding ? '重新绑定森空岛' : '绑定森空岛'}
+          </button>
+          <button type="button" onClick={onRefresh} disabled={busy || dialogOpen || !canRefresh} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:bg-surface-2 disabled:text-ink-muted">
+            {busy ? '正在刷新...' : '刷新森空岛数据'}
+          </button>
+        </div>
+      </div>
+      {notice && (
+        <div className={'mt-3 rounded-lg border px-3 py-2 text-sm leading-6 ' + (notice.kind === 'error' ? 'border-error/30 bg-error/10 text-error' : 'border-success/30 bg-success/10 text-success')} role={notice.kind === 'error' ? 'alert' : 'status'}>
+          <p>{notice.message}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(notice.recovery_action === 'rebind' || notice.recovery_action === 'bind_first') && (
+              <button type="button" onClick={onOpen} disabled={busy || dialogOpen} className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+                重新绑定森空岛
+              </button>
+            )}
+            {notice.recovery_action === 'retry' && (
+              <button type="button" onClick={onRefresh} disabled={busy || dialogOpen || !binding} className="rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:text-ink-muted">
+                再次刷新
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StatusInfo({ label, value, danger = false }: { label: string; value: string; danger?: boolean }) {
+  return (
+    <div className="min-w-0 rounded-lg border border-surface-3 bg-surface-1 px-3 py-2">
+      <dt className="text-xs font-semibold text-ink-muted">{label}</dt>
+      <dd className={'mt-1 break-words font-medium ' + (danger ? 'text-error' : 'text-ink-primary')}>{value}</dd>
     </div>
   )
 }
@@ -360,4 +451,28 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function SectionFallback() {
   return <div className="rounded-xl border border-surface-3 bg-surface-1 p-6 text-sm text-ink-secondary">正在载入配置...</div>
+}
+
+function sklandPayloadFromError(caught: unknown): Partial<SklandPayload> | null {
+  if (!(caught instanceof ApiError) || !caught.data || typeof caught.data !== 'object') return null
+  return caught.data as Partial<SklandPayload>
+}
+
+function formatSklandRefreshError(data: Partial<SklandPayload> | null, status: number): string {
+  if (data?.code === 'skland_credential_invalid') {
+    return data.error || '森空岛凭据已失效。请重新绑定森空岛后再刷新。'
+  }
+  if (data?.code === 'skland_not_bound') {
+    return data.error || '当前账号尚未绑定森空岛。请先完成绑定。'
+  }
+  if (data?.code === 'skland_depot_refresh_forbidden') {
+    return data.error || '仓库分析档案不能刷新工作区，请到仓库价值分析页重新分析。'
+  }
+  return data?.error || `森空岛刷新失败: ${status}。请稍后重试。`
+}
+
+function sklandCredentialInvalidLabel(reason: string | null | undefined): string {
+  if (reason === 'credential_format_invalid') return '凭据格式无效，请重新绑定'
+  if (reason === 'expired_or_revoked') return '凭据已失效，请重新绑定'
+  return '凭据不可用，请重新绑定'
 }

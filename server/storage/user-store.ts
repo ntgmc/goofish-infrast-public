@@ -5,6 +5,8 @@ import type {
   LicenseOperator,
   OptimizeResult,
   PermissionMode,
+  SklandCredentialInvalidReason,
+  SklandCredentialStatus,
   UserGameAccountKind,
   UserGameAccount,
   UserWorkspace,
@@ -54,6 +56,9 @@ export interface SklandBindingRecord {
   bound_at: string
   last_imported_at: string | null
   encrypted_cred: string
+  credential_status?: SklandCredentialStatus
+  credential_invalid_at?: string | null
+  credential_invalid_reason?: SklandCredentialInvalidReason | null
 }
 
 export interface SklandPendingBindingRecord {
@@ -536,12 +541,19 @@ export function toPublicProfile(profile: UserGameAccountRecord, workspace?: User
           channel_name: profile.skland_binding.channel_name,
           bound_at: profile.skland_binding.bound_at,
           last_imported_at: profile.skland_binding.last_imported_at,
+          credential_status: profile.skland_binding.credential_status === 'invalid' ? 'invalid' : 'available',
+          credential_invalid_at: profile.skland_binding.credential_invalid_at ?? null,
+          credential_invalid_reason: normalizeSklandCredentialInvalidReason(profile.skland_binding.credential_invalid_reason),
         }
       : null,
     operator_count: countOwnedOperators(workspace?.operators),
     updated_at: workspace?.updated_at ?? profile.updated_at,
     created_at: profile.created_at,
   }
+}
+
+function normalizeSklandCredentialInvalidReason(value: unknown): SklandCredentialInvalidReason | null {
+  return value === 'expired_or_revoked' || value === 'credential_format_invalid' ? value : null
 }
 
 export function normalizeProfileKind(profile: Pick<UserGameAccountRecord, 'kind'>): UserGameAccountKind {

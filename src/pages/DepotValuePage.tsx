@@ -58,6 +58,10 @@ export default function DepotValuePage() {
     () => auth?.profiles?.filter((profile) => profile.skland_binding) ?? [],
     [auth],
   )
+  const selectedSklandProfile = useMemo(
+    () => sklandProfiles.find((profile) => profile.id === selectedProfileId) ?? sklandProfiles[0] ?? null,
+    [selectedProfileId, sklandProfiles],
+  )
 
   const analyze = useCallback(async (payload: DepotValueRequest) => {
     setLoading(payload.source)
@@ -139,9 +143,13 @@ export default function DepotValuePage() {
   }
 
   const analyzeSkland = async () => {
-    const profileId = selectedProfileId || sklandProfiles[0]?.id
+    const profileId = selectedSklandProfile?.id
     if (profileId) {
       setSelectedProfileId(profileId)
+      if (selectedSklandProfile?.skland_binding?.credential_status === 'invalid') {
+        await openSklandBinding()
+        return
+      }
       await analyze({ source: 'skland', profile_id: profileId })
       return
     }
@@ -306,26 +314,37 @@ export default function DepotValuePage() {
               ) : (
                 <div className="mt-4 space-y-3">
                   {sklandProfiles.length > 0 && (
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                      <select
-                        value={selectedProfileId}
-                        onChange={(event) => setSelectedProfileId(event.currentTarget.value)}
-                        className="min-h-11 flex-1 rounded-lg border border-surface-4 bg-surface-0 px-3 text-sm text-ink-primary outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                      >
-                        {sklandProfiles.map((profile) => (
-                          <option key={profile.id} value={profile.id}>
-                            {formatProfileLabel(profile)}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => void analyzeSkland()}
-                        disabled={loading !== null || profilePreparing}
-                        className="rounded-lg border border-surface-3 bg-surface-0 px-5 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary disabled:bg-surface-2 disabled:text-ink-muted"
-                      >
-                        {loading === 'skland' ? '正在读取...' : '使用森空岛库存'}
-                      </button>
+                    <div className="space-y-2">
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <select
+                          value={selectedSklandProfile?.id ?? selectedProfileId}
+                          onChange={(event) => setSelectedProfileId(event.currentTarget.value)}
+                          className="min-h-11 flex-1 rounded-lg border border-surface-4 bg-surface-0 px-3 text-sm text-ink-primary outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                        >
+                          {sklandProfiles.map((profile) => (
+                            <option key={profile.id} value={profile.id}>
+                              {formatProfileLabel(profile)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => void analyzeSkland()}
+                          disabled={loading !== null || profilePreparing}
+                          className="rounded-lg border border-surface-3 bg-surface-0 px-5 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary disabled:bg-surface-2 disabled:text-ink-muted"
+                        >
+                          {loading === 'skland'
+                            ? '正在读取...'
+                            : selectedSklandProfile?.skland_binding?.credential_status === 'invalid'
+                              ? '重新绑定并分析'
+                              : '使用森空岛库存'}
+                        </button>
+                      </div>
+                      {selectedSklandProfile?.skland_binding?.credential_status === 'invalid' && (
+                        <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm leading-6 text-error" role="alert">
+                          当前选择的森空岛凭据已失效。请重新绑定后再读取仓库库存。
+                        </p>
+                      )}
                     </div>
                   )}
                   {sklandProfiles.length === 0 && (
@@ -592,7 +611,9 @@ function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: num
 
 function formatProfileLabel(profile: UserGameAccount): string {
   const binding = profile.skland_binding
-  return binding ? `${profile.display_name} · ${binding.nickname} (${binding.uid})` : profile.display_name
+  return binding
+    ? `${profile.display_name} · ${binding.nickname} (${binding.uid})${binding.credential_status === 'invalid' ? ' · 凭据失效' : ''}`
+    : profile.display_name
 }
 
 function parseDepotText(text: string): unknown {
