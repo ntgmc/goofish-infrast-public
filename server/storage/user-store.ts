@@ -5,12 +5,18 @@ import type {
   LicenseOperator,
   OptimizeResult,
   PermissionMode,
+  SklandCredentialInvalidReason,
+  SklandCredentialStatus,
   UserGameAccountKind,
   UserGameAccount,
   UserWorkspace,
+  WorkspaceResultHistoryItem,
+  WorkspaceSavedConfig,
 } from '../../src/lib/types'
 
 let schemaReady: Promise<void> | null = null
+const WORKSPACE_SAVED_CONFIG_LIMIT = 20
+const WORKSPACE_RESULT_HISTORY_LIMIT = 10
 
 export interface UserAccountRecord {
   version: 1
@@ -54,6 +60,9 @@ export interface SklandBindingRecord {
   bound_at: string
   last_imported_at: string | null
   encrypted_cred: string
+  credential_status?: SklandCredentialStatus
+  credential_invalid_at?: string | null
+  credential_invalid_reason?: SklandCredentialInvalidReason | null
 }
 
 export interface SklandPendingBindingRecord {
@@ -91,6 +100,8 @@ export interface UserWorkspaceRecord {
   config: LicenseConfig | null
   elite_overrides: Record<string, number>
   last_result: OptimizeResult | null
+  saved_configs: WorkspaceSavedConfig[]
+  result_history: WorkspaceResultHistoryItem[]
   updated_at: string
 }
 
@@ -101,6 +112,8 @@ interface LegacyUserWorkspaceRecord {
   config: LicenseConfig | null
   elite_overrides: Record<string, number>
   last_result: OptimizeResult | null
+  saved_configs?: WorkspaceSavedConfig[]
+  result_history?: WorkspaceResultHistoryItem[]
   updated_at: string
 }
 
@@ -397,7 +410,7 @@ export async function getProfileWorkspace(profileId: string): Promise<UserWorksp
     'select record_json from user_profile_workspaces where profile_id = $1',
     [profileId],
   )
-  return result.rows[0]?.record_json ?? null
+  return normalizeWorkspaceRecord(result.rows[0]?.record_json ?? null)
 }
 
 export async function getLegacyWorkspace(userId: string): Promise<LegacyUserWorkspaceRecord | null> {
@@ -415,6 +428,7 @@ export async function saveWorkspace(workspace: UserWorkspaceRecord): Promise<voi
 
 export async function saveProfileWorkspace(workspace: UserWorkspaceRecord): Promise<void> {
   await ensureSchema()
+  const normalized = normalizeWorkspaceRecord(workspace) ?? workspace
   await query(
     `insert into user_profile_workspaces
       (profile_id, operators_json, config_json, elite_overrides_json, last_result_json, record_json, updated_at)
@@ -427,13 +441,13 @@ export async function saveProfileWorkspace(workspace: UserWorkspaceRecord): Prom
       record_json = excluded.record_json,
       updated_at = excluded.updated_at`,
     [
-      workspace.profile_id,
-      JSON.stringify(workspace.operators),
-      JSON.stringify(workspace.config),
-      JSON.stringify(workspace.elite_overrides),
-      JSON.stringify(workspace.last_result),
-      JSON.stringify(workspace),
-      workspace.updated_at,
+      normalized.profile_id,
+      JSON.stringify(normalized.operators),
+      JSON.stringify(normalized.config),
+      JSON.stringify(normalized.elite_overrides),
+      JSON.stringify(normalized.last_result),
+      JSON.stringify(normalized),
+      normalized.updated_at,
     ],
   )
 }
@@ -470,6 +484,8 @@ export async function migrateLegacyUserIfNeeded(user: UserAccountRecord): Promis
           config: legacyWorkspace.config,
           elite_overrides: legacyWorkspace.elite_overrides ?? {},
           last_result: legacyWorkspace.last_result ?? null,
+          saved_configs: normalizeSavedConfigs(legacyWorkspace.saved_configs),
+          result_history: normalizeResultHistory(legacyWorkspace.result_history),
           updated_at: legacyWorkspace.updated_at ?? now,
         }
       : emptyWorkspace(profile.id),
@@ -504,18 +520,24 @@ export function emptyWorkspace(profileId: string): UserWorkspaceRecord {
     config: null,
     elite_overrides: {},
     last_result: null,
+    saved_configs: [],
+    result_history: [],
     updated_at: new Date().toISOString(),
   }
 }
 
 export function toPublicWorkspace(workspace: UserWorkspaceRecord | null): UserWorkspace {
+  const normalized = normalizeWorkspaceRecord(workspace)
+  const resultHistory = normalized ? getPublicResultHistory(normalized) : []
   return {
-    profile_id: workspace?.profile_id ?? null,
-    operators: workspace?.operators ?? null,
-    config: workspace?.config ?? null,
-    elite_overrides: workspace?.elite_overrides ?? {},
-    last_result: workspace?.last_result ?? null,
-    updated_at: workspace?.updated_at ?? null,
+    profile_id: normalized?.profile_id ?? null,
+    operators: normalized?.operators ?? null,
+    config: normalized?.config ?? null,
+    elite_overrides: normalized?.elite_overrides ?? {},
+    last_result: normalized?.last_result ?? null,
+    saved_configs: normalized?.saved_configs ?? [],
+    result_history: resultHistory,
+    updated_at: normalized?.updated_at ?? null,
   }
 }
 
@@ -536,12 +558,89 @@ export function toPublicProfile(profile: UserGameAccountRecord, workspace?: User
           channel_name: profile.skland_binding.channel_name,
           bound_at: profile.skland_binding.bound_at,
           last_imported_at: profile.skland_binding.last_imported_at,
+          credential_status: profile.skland_binding.credential_status === 'invalid' ? 'invalid' : 'available',
+          credential_invalid_at: profile.skland_binding.credential_invalid_at ?? null,
+          credential_invalid_reason: normalizeSklandCredentialInvalidReason(profile.skland_binding.credential_invalid_reason),
         }
       : null,
     operator_count: countOwnedOperators(workspace?.operators),
     updated_at: workspace?.updated_at ?? profile.updated_at,
     created_at: profile.created_at,
   }
+}
+
+export function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null | undefined): UserWorkspaceRecord | null {
+  if (!workspace) return null
+  return {
+    version: 1,
+    profile_id: workspace.profile_id,
+    operators: Array.isArray(workspace.operators) ? workspace.operators : null,
+    config: isRecord(workspace.config) ? workspace.config as LicenseConfig : null,
+    elite_overrides: isRecord(workspace.elite_overrides) ? workspace.elite_overrides as Record<string, number> : {},
+    last_result: isRecord(workspace.last_result) ? workspace.last_result as OptimizeResult : null,
+    saved_configs: normalizeSavedConfigs((workspace as { saved_configs?: unknown }).saved_configs),
+    result_history: normalizeResultHistory((workspace as { result_history?: unknown }).result_history),
+    updated_at: typeof workspace.updated_at === 'string' ? workspace.updated_at : new Date().toISOString(),
+  }
+}
+
+function normalizeSavedConfigs(value: unknown): WorkspaceSavedConfig[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((raw) => {
+    if (!isRecord(raw) || !isRecord(raw.config)) return []
+    const id = typeof raw.id === 'string' ? raw.id : ''
+    const name = typeof raw.name === 'string' ? raw.name : ''
+    const createdAt = typeof raw.created_at === 'string' ? raw.created_at : ''
+    const updatedAt = typeof raw.updated_at === 'string' ? raw.updated_at : createdAt
+    if (!id || !name || !createdAt || !updatedAt) return []
+    return [{
+      id,
+      name,
+      config: raw.config as LicenseConfig,
+      created_at: createdAt,
+      updated_at: updatedAt,
+      last_used_at: typeof raw.last_used_at === 'string' ? raw.last_used_at : null,
+    }]
+  }).slice(0, WORKSPACE_SAVED_CONFIG_LIMIT)
+}
+
+function normalizeResultHistory(value: unknown): WorkspaceResultHistoryItem[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((raw) => {
+    if (!isRecord(raw) || !isRecord(raw.result)) return []
+    const id = typeof raw.id === 'string' ? raw.id : ''
+    const name = typeof raw.name === 'string' ? raw.name : ''
+    const createdAt = typeof raw.created_at === 'string' ? raw.created_at : ''
+    if (!id || !name || !createdAt) return []
+    const source = raw.source === 'applied_suggestions' || raw.source === 'legacy' ? raw.source : 'generated'
+    return [{
+      id,
+      name,
+      created_at: createdAt,
+      config: isRecord(raw.config) ? raw.config as LicenseConfig : null,
+      result: raw.result as OptimizeResult,
+      operator_count: typeof raw.operator_count === 'number' && Number.isFinite(raw.operator_count) ? raw.operator_count : 0,
+      source,
+    }]
+  }).slice(0, WORKSPACE_RESULT_HISTORY_LIMIT)
+}
+
+function getPublicResultHistory(workspace: UserWorkspaceRecord): WorkspaceResultHistoryItem[] {
+  if (workspace.result_history.length > 0) return workspace.result_history
+  if (!workspace.last_result) return []
+  return [{
+    id: 'legacy-last-result',
+    name: '上次排班结果',
+    created_at: workspace.updated_at,
+    config: workspace.config,
+    result: workspace.last_result,
+    operator_count: countOwnedOperators(workspace.operators),
+    source: 'legacy',
+  }]
+}
+
+function normalizeSklandCredentialInvalidReason(value: unknown): SklandCredentialInvalidReason | null {
+  return value === 'expired_or_revoked' || value === 'credential_format_invalid' ? value : null
 }
 
 export function normalizeProfileKind(profile: Pick<UserGameAccountRecord, 'kind'>): UserGameAccountKind {
@@ -554,6 +653,10 @@ export function isDepotValueProfile(profile: Pick<UserGameAccountRecord, 'kind'>
 
 function countOwnedOperators(operators: LicenseOperator[] | null | undefined): number {
   return operators?.filter((operator) => operator.own !== false).length ?? 0
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
 function ensureSchema(): Promise<void> {

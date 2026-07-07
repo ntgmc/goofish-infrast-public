@@ -50,14 +50,14 @@ systemd commands. Adjust the service name and `systemctl` path for your server:
 
 ```sudoers
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart goofish-infrast-v1
-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active goofish-infrast-v1
-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-infrast-v1
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-infrast-v1
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-infrast-v1 --no-pager --lines=50
 ```
 
 Verify the rule as the deploy user before running the workflow:
 
 ```bash
-sudo -n systemctl is-active goofish-infrast-v1
+sudo -n systemctl is-active --quiet goofish-infrast-v1
 ```
 
 Keep production secrets such as `DATABASE_URL`, `MAA_ADMIN_PASSWORD`,
@@ -98,6 +98,9 @@ ssh-keyscan -H your-server.example.com
 The deploy script is intentionally conservative:
 
 - It refuses to deploy if the server checkout has local changes.
+- It automatically discards local changes to generated build metadata files
+  (`src/lib/build-meta.ts` and `server/handlers/data.ts`) before clean checks
+  and after building, because `npm run build` can regenerate them on the server.
 - It uses `git pull --ff-only`, so divergent history fails instead of being
   merged on the server.
 - It keeps a deployment lock with `flock` when available.

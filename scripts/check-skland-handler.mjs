@@ -33,6 +33,8 @@ await assertOversizedCredentialPreview()
 await assertConfirmImport()
 await assertDepotValueConfirmDoesNotWriteWorkspace()
 await assertRefreshImport()
+await assertRefreshTransientFailurePreservesBinding()
+await assertRefreshCredentialInvalid()
 await assertMatchingRebindResetsRisk()
 await assertMismatchedRebindDoesNotLeakRiskCount()
 await assertRepeatedMismatchFreezesProfile()
@@ -142,7 +144,7 @@ async function assertManualCredentialConfirm() {
   })
   assertNoSecretLeak(result.body, 'manual credential confirm response')
   if (result.status !== 200 || result.body.skland_import?.operator_count !== 2) {
-    throw new Error(`manual credential confirm: invalid import summary ${result.status}`)
+    throw new Error(`manual credential confirm: invalid import summary ${result.status}: ${JSON.stringify(result.body)}`)
   }
   if (store.profiles.get('profile-manual')?.skland_pending_binding) {
     throw new Error('manual credential confirm: pending binding was not cleared')
@@ -220,6 +222,12 @@ async function assertConfirmImport() {
   if (result.body.active_profile?.skland_binding?.encrypted_cred !== undefined) {
     throw new Error('confirm import: leaked encrypted_cred in public profile')
   }
+  if (result.body.active_profile?.skland_binding?.credential_status !== 'available') {
+    throw new Error('confirm import: public binding should report available credential')
+  }
+  if (result.body.active_profile?.skland_binding?.credential_invalid_at !== null) {
+    throw new Error('confirm import: public binding should not have invalid timestamp')
+  }
   if (store.profiles.get('profile-1')?.skland_pending_binding) {
     throw new Error('confirm import: pending binding was not cleared')
   }
@@ -266,6 +274,9 @@ async function assertDepotValueConfirmDoesNotWriteWorkspace() {
   if (result.status !== 200 || !result.body.active_profile?.skland_binding) {
     throw new Error(`depot confirm: expected public binding in auth payload, got ${result.status}`)
   }
+  if (result.body.active_profile.skland_binding.credential_status !== 'available') {
+    throw new Error('depot confirm: public binding should report available credential')
+  }
   if (result.body.skland_import) {
     throw new Error('depot confirm: should not return workspace import summary')
   }
@@ -288,8 +299,50 @@ async function assertRefreshImport() {
   if (result.status !== 200 || result.body.skland_import?.operator_count !== 1) {
     throw new Error(`refresh import: invalid response ${result.status}`)
   }
+  if (result.body.active_profile?.skland_binding?.credential_status !== 'available') {
+    throw new Error('refresh import: public binding should report available credential')
+  }
+  if (result.body.active_profile?.skland_binding?.last_imported_at !== result.body.skland_import?.imported_at) {
+    throw new Error('refresh import: public binding should expose latest imported timestamp')
+  }
+  if (store.profiles.get('profile-1')?.skland_binding?.credential_status !== 'available') {
+    throw new Error('refresh import: stored binding should reset credential status to available')
+  }
   if (store.fetchCalls.some((url) => url.includes('hypergryph.com'))) {
     throw new Error('refresh import: should not call Hypergryph APIs')
+  }
+}
+
+async function assertRefreshTransientFailurePreservesBinding() {
+  setFetchMode('temporary-fail')
+  const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-1' })
+  assertNoSecretLeak(result.body, 'refresh transient failure response')
+  if (result.status !== 400 || result.body.code !== 'skland_refresh_failed' || result.body.recovery_action !== 'retry') {
+    throw new Error(`refresh transient failure: expected retry error, got ${result.status}`)
+  }
+  const binding = store.profiles.get('profile-1')?.skland_binding
+  if (binding?.credential_status !== 'available' || binding.credential_invalid_at !== null || binding.credential_invalid_reason !== null) {
+    throw new Error('refresh transient failure: should preserve available credential status')
+  }
+}
+
+async function assertRefreshCredentialInvalid() {
+  setFetchMode('expired')
+  const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-1' })
+  assertNoSecretLeak(result.body, 'refresh invalid credential response')
+  if (result.status !== 400 || result.body.code !== 'skland_credential_invalid' || result.body.recovery_action !== 'rebind') {
+    throw new Error(`refresh invalid credential: expected rebind error, got ${result.status}`)
+  }
+  const publicBinding = result.body.active_profile?.skland_binding
+  if (publicBinding?.credential_status !== 'invalid' || publicBinding.credential_invalid_reason !== 'expired_or_revoked') {
+    throw new Error('refresh invalid credential: public binding should report invalid credential')
+  }
+  if (!publicBinding.credential_invalid_at) {
+    throw new Error('refresh invalid credential: public binding should include invalid timestamp')
+  }
+  const storedBinding = store.profiles.get('profile-1')?.skland_binding
+  if (storedBinding?.credential_status !== 'invalid' || storedBinding.credential_invalid_reason !== 'expired_or_revoked') {
+    throw new Error('refresh invalid credential: stored binding should be marked invalid')
   }
 }
 
@@ -317,6 +370,9 @@ async function assertMatchingRebindResetsRisk() {
   })
   if (confirm.status !== 200 || store.profiles.get('profile-1')?.skland_risk?.uid_mismatch_count !== 0) {
     throw new Error('matching rebind: expected risk counter reset after confirm')
+  }
+  if (store.profiles.get('profile-1')?.skland_binding?.credential_status !== 'available') {
+    throw new Error('matching rebind: expected credential status reset after confirm')
   }
 }
 
@@ -418,6 +474,8 @@ function seedProfile({ id, status }) {
     config: { desc: 'existing config' },
     elite_overrides: { char_old: 2 },
     last_result: { stale: true },
+    saved_configs: [],
+    result_history: [],
     updated_at: now,
   })
 }
@@ -445,6 +503,9 @@ function setFetchMode(mode) {
       return jsonResponse({ message: 'OK', data: { cred: mode === 'mismatch' ? 'mismatch-cred' : 'skland-cred' } })
     }
     if (textUrl.endsWith('/api/v1/auth/refresh')) {
+      if (mode === 'expired') {
+        return jsonResponse({ code: 10001, message: 'CREDENTIAL_EXPIRED', data: null })
+      }
       return jsonResponse({ code: 0, message: 'OK', data: { token: 'skland-token' }, timestamp: 1700000000 })
     }
     if (textUrl.endsWith('/api/v1/game/player/binding')) {
@@ -466,6 +527,9 @@ function setFetchMode(mode) {
       })
     }
     if (textUrl.includes('/api/v1/game/player/info')) {
+      if (mode === 'temporary-fail') {
+        return jsonResponse({ code: 1, message: 'TEMPORARY_UNAVAILABLE', data: null })
+      }
       if (mode === 'bad-info') {
         return jsonResponse({ code: 0, message: 'OK', data: { chars: [{ charId: 'token_1', name: '召唤物' }] } })
       }
@@ -574,23 +638,27 @@ function memoryUserStoreModule() {
   return `
     const store = globalThis.__sklandHandlerSmokeStore
     export function emptyWorkspace(profileId) {
-      return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, updated_at: new Date().toISOString() }
+      return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
     }
     export async function getProfileForUser(userId, profileId) {
       const profile = store.profiles.get(profileId)
       return profile?.user_id === userId ? profile : null
     }
     export async function getProfileWorkspace(profileId) {
-      return store.workspaces.get(profileId) ?? null
+      const workspace = store.workspaces.get(profileId) ?? null
+      return workspace ? normalizeWorkspace(workspace) : null
     }
     export async function saveProfileWorkspace(workspace) {
-      store.workspaces.set(workspace.profile_id, workspace)
+      store.workspaces.set(workspace.profile_id, normalizeWorkspace(workspace))
     }
     export async function saveUserProfile(profile) {
       store.profiles.set(profile.id, profile)
     }
     export function isDepotValueProfile(profile) {
       return profile?.kind === 'depot_value'
+    }
+    function normalizeWorkspace(workspace) {
+      return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }
     }
   `
 }
@@ -639,6 +707,9 @@ function memoryUserAuthModule() {
           channel_name: profile.skland_binding.channel_name,
           bound_at: profile.skland_binding.bound_at,
           last_imported_at: profile.skland_binding.last_imported_at,
+          credential_status: profile.skland_binding.credential_status === 'invalid' ? 'invalid' : 'available',
+          credential_invalid_at: profile.skland_binding.credential_invalid_at ?? null,
+          credential_invalid_reason: profile.skland_binding.credential_invalid_reason === 'expired_or_revoked' || profile.skland_binding.credential_invalid_reason === 'credential_format_invalid' ? profile.skland_binding.credential_invalid_reason : null,
         } : null,
         operator_count: countOwnedOperators(workspace?.operators),
         updated_at: workspace?.updated_at ?? profile.updated_at,
@@ -655,8 +726,13 @@ function memoryUserAuthModule() {
         config: workspace?.config ?? null,
         elite_overrides: workspace?.elite_overrides ?? {},
         last_result: workspace?.last_result ?? null,
+        saved_configs: workspace?.saved_configs ?? [],
+        result_history: workspace?.result_history ?? [],
         updated_at: workspace?.updated_at ?? null,
       }
+    }
+    function normalizeWorkspace(workspace) {
+      return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }
     }
   `
 }

@@ -7,6 +7,19 @@ const SKLAND_BASE = 'https://zonai.skland.com'
 const REQUEST_TIMEOUT_MS = 25000
 const SKLAND_USER_AGENT = 'Skland/1.21.0 (com.hypergryph.skland; build:102100065; iOS 17.6.0; ) Alamofire/5.7.1'
 
+export type SklandClientErrorCode = 'credential_invalid' | 'credential_format_invalid' | 'request_failed'
+
+export class SklandClientError extends Error {
+  constructor(
+    readonly code: SklandClientErrorCode,
+    message: string,
+    readonly httpStatus?: number,
+  ) {
+    super(message)
+    this.name = 'SklandClientError'
+  }
+}
+
 export interface SklandBindingSummary {
   uid: string
   nickname: string
@@ -162,16 +175,20 @@ export function encryptSklandCredential(cred: string): string {
 export function decryptSklandCredential(encrypted: string): string {
   const secret = getCredentialSecret()
   const payload = encrypted.startsWith('SKLAND-V1:') ? encrypted.slice('SKLAND-V1:'.length) : ''
-  if (!payload) throw new Error('森空岛绑定凭据格式无效，请重新扫码绑定。')
+  if (!payload) throw new SklandClientError('credential_format_invalid', '森空岛绑定凭据格式无效，请重新扫码绑定。')
   const raw = Buffer.from(payload, 'base64')
-  if (raw.length <= 28) throw new Error('森空岛绑定凭据格式无效，请重新扫码绑定。')
-  const iv = raw.subarray(0, 12)
-  const tag = raw.subarray(12, 28)
-  const encryptedBody = raw.subarray(28)
-  const key = createHash('sha256').update(secret).digest()
-  const decipher = createDecipheriv('aes-256-gcm', key, iv)
-  decipher.setAuthTag(tag)
-  return Buffer.concat([decipher.update(encryptedBody), decipher.final()]).toString('utf8')
+  if (raw.length <= 28) throw new SklandClientError('credential_format_invalid', '森空岛绑定凭据格式无效，请重新扫码绑定。')
+  try {
+    const iv = raw.subarray(0, 12)
+    const tag = raw.subarray(12, 28)
+    const encryptedBody = raw.subarray(28)
+    const key = createHash('sha256').update(secret).digest()
+    const decipher = createDecipheriv('aes-256-gcm', key, iv)
+    decipher.setAuthTag(tag)
+    return Buffer.concat([decipher.update(encryptedBody), decipher.final()]).toString('utf8')
+  } catch {
+    throw new SklandClientError('credential_format_invalid', '森空岛绑定凭据格式无效，请重新扫码绑定。')
+  }
 }
 
 export function ensureSklandCredentialSecret(): void {
@@ -243,15 +260,9 @@ export class SklandClient {
   private async refreshToken(): Promise<void> {
     const timestamp = `${Math.floor(Date.now() / 1000)}`
     const sign = generateSklandSign('', '/api/v1/auth/refresh', '', timestamp)
-    const data = await fetchJson<ApiEnvelope>(`${SKLAND_BASE}/api/v1/auth/refresh`, {
-      method: 'GET',
-      headers: {
-        ...this.baseHeaders(timestamp, sign),
-        cred: this.cred,
-      },
-    })
+    const data = await fetchSklandRefreshToken(timestamp, sign, this.cred, this.baseHeaders(timestamp, sign))
     if (data.code !== 0 || data.message !== 'OK' || !isRecord(data.data) || typeof data.data.token !== 'string') {
-      throw new Error('森空岛凭据已失效，请重新扫码绑定。')
+      throw new SklandClientError('credential_invalid', '森空岛凭据已失效，请重新扫码绑定。')
     }
     this.token = data.data.token
     this.timestamp = stringValue(data.timestamp) || timestamp
@@ -288,6 +299,30 @@ export class SklandClient {
   }
 }
 
+async function fetchSklandRefreshToken(
+  timestamp: string,
+  sign: string,
+  cred: string,
+  baseHeaders: Record<string, string>,
+): Promise<ApiEnvelope> {
+  try {
+    return await fetchJson<ApiEnvelope>(`${SKLAND_BASE}/api/v1/auth/refresh`, {
+      method: 'GET',
+      headers: {
+        ...baseHeaders,
+        cred,
+        sign,
+        timestamp,
+      },
+    })
+  } catch (error) {
+    if (error instanceof SklandClientError && (error.httpStatus === 401 || error.httpStatus === 403)) {
+      throw new SklandClientError('credential_invalid', '森空岛凭据已失效，请重新扫码绑定。')
+    }
+    throw error
+  }
+}
+
 async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
@@ -300,7 +335,7 @@ async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
     data = null
   }
   if (!response.ok) {
-    throw new Error(`鹰角或森空岛接口请求失败: HTTP ${response.status}`)
+    throw new SklandClientError('request_failed', `鹰角或森空岛接口请求失败: HTTP ${response.status}`, response.status)
   }
   return data as T
 }

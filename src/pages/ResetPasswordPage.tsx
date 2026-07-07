@@ -1,4 +1,5 @@
 import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
+import { apiVoid } from '../lib/api-client'
 
 type FieldErrors = Record<string, string>
 
@@ -29,13 +30,11 @@ export default function ResetPasswordPage() {
     setError(null)
     setNotice(null)
     try {
-      const resp = await fetch('/api/auth/reset-password', {
+      await apiVoid('/api/auth/reset-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, new_password: password }),
+        json: { token, new_password: password },
+        fallbackMessage: '重置密码失败',
       })
-      const data = await resp.json() as { error?: string }
-      if (!resp.ok) throw new Error(data.error || `重置密码失败: ${resp.status}`)
       setPassword('')
       setConfirmPassword('')
       setNotice('密码已重置，请使用新密码登录。')

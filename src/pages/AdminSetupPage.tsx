@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { apiJson, apiVoid, getApiErrorMessage } from '../lib/api-client'
 
 interface AdminUserSummary {
   username: string;
@@ -18,15 +19,14 @@ export default function AdminSetupPage() {
   useEffect(() => {
     const credentials = readStoredCredentials()
     if (!credentials) return
-    fetch('/api/admin/users', {
+    apiJson<{ users?: AdminUserSummary[] }>('/api/admin/users', {
       headers: {
         'X-Admin-User': credentials.user,
         'X-Admin-Password': credentials.password,
       },
     })
-      .then(async (response) => {
-        const data = await readJson<{ users?: AdminUserSummary[] }>(response)
-        if (response.ok) setUsers(data.users ?? [])
+      .then((data) => {
+        setUsers(data.users ?? [])
       })
       .catch(() => undefined)
   }, [])
@@ -37,13 +37,12 @@ export default function AdminSetupPage() {
     setError(null)
     setNotice(null)
     try {
-      const resp = await fetch('/api/admin/users', {
+      const data = await apiJson<{ user?: AdminUserSummary }>('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ root_password: rootPassword, username, password }),
+        json: { root_password: rootPassword, username, password },
+        fallbackMessage: '创建失败',
       })
-      const data = await readJson<{ error?: string; user?: AdminUserSummary }>(resp)
-      if (!resp.ok || !data.user) throw new Error(data.error || `创建失败: ${resp.status}`)
+      if (!data.user) throw new Error('创建失败')
       setUsers((current) => [data.user!, ...current.filter((item) => item.username !== data.user!.username)])
       setUsername('')
       setPassword('')
@@ -61,17 +60,15 @@ export default function AdminSetupPage() {
     setError(null)
     setNotice(null)
     try {
-      const resp = await fetch('/api/admin/users', {
+      await apiVoid('/api/admin/users', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ root_password: rootPassword, username: target }),
+        json: { root_password: rootPassword, username: target },
+        fallbackMessage: '删除失败',
       })
-      const data = await readJson<{ error?: string }>(resp)
-      if (!resp.ok) throw new Error(data.error || `删除失败: ${resp.status}`)
       setUsers((current) => current.filter((item) => item.username !== target))
       setNotice(`已删除管理账号 ${target}`)
     } catch (caught) {
-      setError((caught as Error).message)
+      setError(getApiErrorMessage(caught, '删除失败'))
     } finally {
       setLoading(false)
     }
@@ -152,16 +149,4 @@ function formatDate(value: string | null): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('zh-CN', { hour12: false })
-}
-
-async function readJson<T>(response: Response): Promise<T> {
-  const text = await response.text()
-  if (!text.trim()) {
-    throw new Error(`接口返回为空，请确认后台函数路由已部署: ${response.status}`)
-  }
-  try {
-    return JSON.parse(text) as T
-  } catch {
-    throw new Error(`接口返回格式异常，请确认后台函数路由已部署: ${response.status}`)
-  }
 }
