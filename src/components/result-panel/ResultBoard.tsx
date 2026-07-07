@@ -1,0 +1,142 @@
+import type { PreparedResult } from './formatters'
+import OperatorAvatarStrip from './OperatorAvatarStrip'
+import type { PreparedPlan, RoomRow } from './types'
+
+type BoardRoomGroup = {
+  key: string;
+  label: string;
+  indexLabel: string;
+  roomType: string;
+  product: string;
+  rows: RoomRow[];
+}
+
+const ROOM_TONE: Record<string, string> = {
+  trading: 'border-brand-500/35 bg-brand-500/10',
+  manufacture: 'border-warning/35 bg-warning/10',
+  power: 'border-success/35 bg-success/10',
+  control: 'border-brand-300/25 bg-surface-2/45',
+  meeting: 'border-surface-4/70 bg-surface-2/35',
+  hire: 'border-surface-4/70 bg-surface-2/35',
+  processing: 'border-surface-4/70 bg-surface-2/35',
+  dormitory: 'border-success/25 bg-success/10',
+}
+
+export default function ResultBoard({
+  prepared,
+  isRotationMode,
+  planTimes,
+}: {
+  prepared: PreparedResult;
+  isRotationMode: boolean;
+  planTimes?: string;
+}) {
+  const groups = buildBoardRoomGroups(prepared.plans, isRotationMode)
+  const modeLabel = isRotationMode ? '游戏内轮换参考图' : 'MAA 排班参考图'
+  const queueLabel = planTimes ?? `${prepared.detailStats.planCount} 个${isRotationMode ? '队列' : '班次'}`
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
+      <div className="border-b border-surface-3/60 bg-surface-2/35 px-4 py-3 sm:px-5">
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-ink-primary">{modeLabel}</h2>
+            <p className="mt-1 text-xs leading-5 text-ink-muted">
+              按房间聚合展示，头像为主、名称辅助；详细效率数据请在详情页展开查看。
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full bg-surface-0 px-2.5 py-1 font-semibold text-ink-secondary">{queueLabel}</span>
+            <span className="rounded-full bg-surface-0 px-2.5 py-1 font-semibold text-ink-secondary">{groups.length} 个房间</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-3 sm:p-4">
+        {groups.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-surface-3 bg-surface-0 px-4 py-8 text-center text-sm text-ink-muted">
+            暂无可展示的排班总览。
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {groups.map((group) => (
+              <article
+                key={group.key}
+                className={`overflow-hidden rounded-lg border border-dashed ${ROOM_TONE[group.roomType] ?? 'border-surface-3 bg-surface-2/35'}`}
+              >
+                <div className="border-b border-surface-3/50 px-3 py-2 text-center">
+                  <h3 className="truncate text-sm font-semibold text-ink-primary">
+                    {group.label}
+                    {group.indexLabel && <span className="ml-1 text-ink-muted">{group.indexLabel}</span>}
+                  </h3>
+                  {group.product !== '-' && (
+                    <p className="mt-0.5 truncate text-[11px] font-medium text-ink-muted">{group.product}</p>
+                  )}
+                </div>
+                <div className="space-y-2 px-3 py-2.5">
+                  {group.rows.map((row) => (
+                    <div key={row.key} className="grid grid-cols-[3.4rem_minmax(0,1fr)_auto] items-start gap-2">
+                      <span className="pt-1 text-xs font-semibold text-ink-secondary">{shortQueueLabel(row.queueLabel)}</span>
+                      {row.isAutofill ? (
+                        <p className="rounded-md bg-surface-0/80 px-2 py-1.5 text-xs leading-5 text-ink-secondary">{row.operatorText}</p>
+                      ) : (
+                        <OperatorAvatarStrip operators={row.operators} fallbackText={row.operatorText} micro />
+                      )}
+                      {!row.isAutofill && (
+                        <span className="pt-1 text-[11px] font-semibold text-brand-400">{row.efficiency}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function buildBoardRoomGroups(plans: PreparedPlan[], isRotationMode: boolean): BoardRoomGroup[] {
+  const groups = new Map<string, BoardRoomGroup>()
+
+  for (const plan of plans) {
+    for (const row of plan.rows) {
+      if (isRotationMode && row.roomType === 'dormitory') continue
+      const key = `${row.roomType}-${row.roomIndex}`
+      const existing = groups.get(key)
+      if (existing) {
+        existing.rows.push(row)
+        existing.product = formatGroupProduct(existing.rows)
+        continue
+      }
+
+      groups.set(key, {
+        key,
+        label: row.label,
+        indexLabel: row.indexLabel,
+        roomType: row.roomType,
+        product: row.product,
+        rows: [row],
+      })
+    }
+  }
+
+  return [...groups.values()]
+}
+
+function shortQueueLabel(label: string): string {
+  const queueMatch = label.match(/队列\s*(\d+)/)
+  if (queueMatch?.[1]) return `队列${queueMatch[1]}`
+  const shiftMatch = label.match(/(?:第)?\s*(\d+)\s*班|班次\s*(\d+)/)
+  const shiftNumber = shiftMatch?.[1] ?? shiftMatch?.[2]
+  if (shiftNumber) return `班${shiftNumber}`
+  return label.replace(/\s+/g, '')
+}
+
+function formatGroupProduct(rows: RoomRow[]): string {
+  const products = Array.from(new Set(rows.map((row) => row.product).filter((product) => product && product !== '-')))
+  if (products.length === 0) return '-'
+  if (products.length <= 2) return products.join(' / ')
+  return '多产物'
+}
