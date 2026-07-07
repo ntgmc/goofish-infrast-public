@@ -330,10 +330,10 @@ function aggregateOperatorCosts(operatorCosts: OperatorCost[], pricing: PricingS
   totals.equivalent_sanity = totalSanity.value
   const missingSanity = calculateBucketSanity(missing, pricing)
   missing.equivalent_sanity = missingSanity.value
+  const available = calculateAvailableBucket(totals, missing, pricing)
 
   const unpricedItems = totalSanity.unpricedItems
   const status: UpgradeTrainingCost['status'] = unpricedItems.length > 0 ? 'partial' : 'available'
-  logTrainingCostSanityDebug(operatorCosts, totals, pricing, totalSanity)
   return {
     status,
     target: operatorCosts.length === 1
@@ -345,6 +345,7 @@ function aggregateOperatorCosts(operatorCosts: OperatorCost[], pricing: PricingS
       }
       : undefined,
     totals,
+    available,
     missing,
     equivalent_sanity: totals.equivalent_sanity,
     unpriced_items: unpricedItems,
@@ -356,6 +357,21 @@ function aggregateOperatorCosts(operatorCosts: OperatorCost[], pricing: PricingS
     warnings,
     operators: operatorCosts,
   }
+}
+
+function calculateAvailableBucket(totals: CostBucket, missing: CostBucket, pricing: PricingState): CostBucket {
+  const available = emptyBucket()
+  available.cash = Math.max(0, totals.cash - missing.cash)
+  available.exp = Math.max(0, totals.exp - missing.exp)
+  for (const totalMaterial of totals.materials) {
+    const missingMaterial = missing.materials.find((item) => item.id === totalMaterial.id)
+    const count = Math.max(0, totalMaterial.count - (missingMaterial?.count ?? 0))
+    if (count > 0) {
+      available.materials.push({ ...totalMaterial, count })
+    }
+  }
+  available.equivalent_sanity = calculateBucketSanity(available, pricing).value
+  return available
 }
 
 function calculateMissingBucket(totals: CostBucket, inventory: InventoryItem[], pricing: PricingState): CostBucket {
@@ -397,95 +413,8 @@ function getNetLmdSanity(pricing: PricingState): number {
   return Math.max(0, FIXED_SANITY_PER_LMD_GROSS - pureGoldSanity * TRADE_PURE_GOLD_PER_LMD)
 }
 
-function getPureGoldSanitySource(pricing: PricingState): 'yituliu' | 'fixed_exp_drone_fallback' {
-  return pricing.prices.has(PURE_GOLD_ITEM_ID) ? 'yituliu' : 'fixed_exp_drone_fallback'
-}
-
 function getFixedPureGoldSanity(): number {
   return FIXED_SANITY_PER_EXP * YITULIU_ITEM_VALUE_CONFIG.expCoefficient * (50 / 3) * 24
-}
-
-function logTrainingCostSanityDebug(
-  operatorCosts: OperatorCost[],
-  totals: CostBucket,
-  pricing: PricingState,
-  totalSanity: BucketSanityResult,
-): void {
-  const breakdown = createBucketSanityBreakdown(totals, pricing, totalSanity)
-  const targets = operatorCosts.map((cost) => ({
-    id: cost.id,
-    name: cost.name,
-    current_elite: cost.current_elite,
-    target_elite: cost.target_elite,
-  }))
-  console.info('[training-cost sanity debug]', JSON.stringify({
-    scope: 'total_demand',
-    target: targets.length === 1 ? targets[0] : undefined,
-    targets: targets.length > 1 ? targets : undefined,
-    yituliu: pricing.status,
-    ...breakdown,
-  }))
-}
-
-function createBucketSanityBreakdown(
-  bucket: CostBucket,
-  pricing: PricingState,
-  result: BucketSanityResult,
-): Record<string, unknown> {
-  const pureGoldSanity = pricing.prices.get(PURE_GOLD_ITEM_ID) ?? getFixedPureGoldSanity()
-  const lmdUnitSanity = getNetLmdSanity(pricing)
-  const lmdSanity = round(bucket.cash * lmdUnitSanity, 2)
-  const expSanity = round(bucket.exp * FIXED_SANITY_PER_EXP, 2)
-  const materialLines = bucket.materials.map((material) => {
-    const unitSanity = pricing.prices.get(material.id) ?? null
-    const lineSanity = unitSanity === null ? null : round(material.count * unitSanity, 2)
-    return {
-      id: material.id,
-      name: material.name,
-      count: material.count,
-      unit_sanity: unitSanity,
-      equivalent_sanity: lineSanity,
-      formula: unitSanity === null
-        ? `${material.name}(${material.id}) ${material.count} * 未估价`
-        : `${material.name}(${material.id}) ${material.count} * ${formatNumber(unitSanity)} = ${formatNumber(lineSanity)}`,
-    }
-  })
-  const pricedMaterialSanity = materialLines.reduce((sum, line) => (
-    typeof line.equivalent_sanity === 'number' ? sum + line.equivalent_sanity : sum
-  ), 0)
-  const pricedSubtotal = round(lmdSanity + expSanity + pricedMaterialSanity, 2)
-  const formulas = [
-    `龙门币 ${bucket.cash} * ${formatNumber(lmdUnitSanity)} = ${formatNumber(lmdSanity)}`,
-    `作战经验 ${bucket.exp} * ${formatNumber(FIXED_SANITY_PER_EXP)} = ${formatNumber(expSanity)}`,
-    ...materialLines.map((line) => line.formula),
-  ]
-  return {
-    total_equivalent_sanity: result.value,
-    priced_subtotal: pricedSubtotal,
-    formula: `${formulas.join(' + ')} => ${result.value === null ? `部分未估价，已估价小计 ${formatNumber(pricedSubtotal)}` : formatNumber(result.value)}`,
-    lmd: {
-      count: bucket.cash,
-      gross_unit_sanity: FIXED_SANITY_PER_LMD_GROSS,
-      pure_gold_per_lmd: TRADE_PURE_GOLD_PER_LMD,
-      pure_gold_unit_sanity: pureGoldSanity,
-      pure_gold_source: getPureGoldSanitySource(pricing),
-      net_unit_sanity: lmdUnitSanity,
-      equivalent_sanity: lmdSanity,
-      unit_formula: `${formatNumber(FIXED_SANITY_PER_LMD_GROSS)} - ${formatNumber(pureGoldSanity)} * ${formatNumber(TRADE_PURE_GOLD_PER_LMD)} = ${formatNumber(lmdUnitSanity)}`,
-    },
-    exp: {
-      count: bucket.exp,
-      unit_sanity: FIXED_SANITY_PER_EXP,
-      equivalent_sanity: expSanity,
-      formula: `${bucket.exp} * ${formatNumber(FIXED_SANITY_PER_EXP)} = ${formatNumber(expSanity)}`,
-    },
-    materials: materialLines,
-    unpriced_items: result.unpricedItems.map((item) => ({
-      id: item.id,
-      name: item.name,
-      count: item.count,
-    })),
-  }
 }
 
 async function getYituliuPricing(): Promise<PricingState> {
@@ -734,6 +663,7 @@ function createUnavailableCost(message: string): UpgradeTrainingCost {
   return {
     status: 'unavailable',
     totals: emptyBucket(),
+    available: emptyBucket(),
     missing: emptyBucket(),
     equivalent_sanity: null,
     unpriced_items: [],
@@ -862,11 +792,6 @@ function numberValue(value: unknown): number | null {
 function round(value: number, digits: number): number {
   const factor = 10 ** digits
   return Math.round(value * factor) / factor
-}
-
-function formatNumber(value: number | null): string {
-  if (value === null) return 'null'
-  return Number.isInteger(value) ? String(value) : String(round(value, 6))
 }
 
 const LEVEL = levelData as LevelData

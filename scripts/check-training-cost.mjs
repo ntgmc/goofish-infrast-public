@@ -18,15 +18,6 @@ await esbuild.build({
 })
 
 const training = await import(`${pathToFileURL(modulePath).href}?t=${Date.now()}`)
-const sanityDebugLogs = []
-const originalConsoleInfo = console.info
-console.info = (...args) => {
-  if (args[0] === '[training-cost sanity debug]') {
-    sanityDebugLogs.push(args)
-    return
-  }
-  originalConsoleInfo(...args)
-}
 
 const operators = [
   { id: 'char_test_a', name: '测试干员A', own: true, elite: 0, level: 1, rarity: 2 },
@@ -87,6 +78,12 @@ if (partial.totals.materials[0]?.id !== '3001' || partial.totals.materials[0].co
 if (partial.missing.materials.find((item) => item.id === '3001')?.count !== 2) {
   throw new Error('material inventory should be deducted from missing count')
 }
+if (!partial.available || partial.available.cash !== partial.totals.cash - partial.missing.cash || partial.available.exp !== partial.totals.exp - partial.missing.exp) {
+  throw new Error('available bucket should reflect stocked cash and exp')
+}
+if (partial.available.materials.find((item) => item.id === '3001')?.count !== 1) {
+  throw new Error('available bucket should keep stocked material counts')
+}
 if (partial.equivalent_sanity === null || partial.equivalent_sanity <= 0) {
   throw new Error('priced missing materials should produce equivalent sanity')
 }
@@ -101,13 +98,6 @@ const oldGrossSanity =
   partial.totals.materials.reduce((sum, item) => sum + (item.equivalent_sanity ?? 0), 0)
 if (partial.equivalent_sanity >= oldGrossSanity) {
   throw new Error('LMD equivalent sanity should deduct pure gold consumed by trading post')
-}
-const firstSanityDebug = JSON.parse(sanityDebugLogs[0]?.[1] ?? '{}')
-if (!String(firstSanityDebug.formula ?? '').includes(' * ') || !String(firstSanityDebug.formula ?? '').includes('龙门币')) {
-  throw new Error('sanity debug log should include a readable multiplication formula')
-}
-if (!String(firstSanityDebug.lmd?.unit_formula ?? '').includes('0.002')) {
-  throw new Error('sanity debug log should show pure gold deduction in LMD unit formula')
 }
 
 const enough = training.calculateEliteTrainingCostForTest({
@@ -129,6 +119,12 @@ const enough = training.calculateEliteTrainingCostForTest({
 
 if (enough.missing.cash !== 0 || enough.missing.exp !== 0 || enough.missing.materials.length !== 0) {
   throw new Error('fully stocked inventory should have no missing resources')
+}
+if (!enough.available || enough.available.cash !== enough.totals.cash || enough.available.exp !== enough.totals.exp) {
+  throw new Error('fully stocked inventory should expose available cash and exp equal to totals')
+}
+if (enough.available.materials.find((item) => item.id === '3001')?.count !== enough.totals.materials.find((item) => item.id === '3001')?.count) {
+  throw new Error('fully stocked inventory should expose available materials equal to totals')
 }
 if (enough.equivalent_sanity === null || enough.equivalent_sanity <= 0 || enough.totals.equivalent_sanity !== enough.equivalent_sanity) {
   throw new Error('fully stocked inventory should still keep total-demand equivalent sanity')
@@ -203,5 +199,4 @@ if (priceMap.get('3001') !== 19 || priceMap.get('3002') !== 31 || priceMap.get('
   throw new Error('Yituliu price map should read itemValueAp and prefer the lowest positive apExpect')
 }
 
-console.info = originalConsoleInfo
 console.log('training cost smoke check ok')
