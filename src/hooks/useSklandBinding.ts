@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AuthSuccessResponse, UserGameAccount } from '../lib/types'
 import { apiJson } from '../lib/api-client'
 
+type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
+
 export type SklandPreview = {
   uid: string
   nickname: string
@@ -19,6 +21,10 @@ export type SklandPayload = AuthSuccessResponse & {
     channel_name: string
     operator_count: number
     imported_at: string
+    intermediate_inventory?: Record<IntermediateProduct, number>
+    inventory_synced: boolean
+    config_saved: boolean
+    inventory_warning?: string
   }
   error?: string
   code?: 'skland_credential_invalid' | 'skland_refresh_failed' | 'skland_not_bound' | 'skland_depot_refresh_forbidden'
@@ -357,7 +363,21 @@ function errorWithRecovery(caught: unknown, fallback: string): string {
 
 function formatImportedMessage(data: SklandPayload, isDepot: boolean): string {
   if (isDepot) return '森空岛已保存，正在读取仓库库存。'
-  return data.skland_import
-    ? `已导入 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}`
-    : '森空岛干员数据已导入。'
+  if (!data.skland_import) return '森空岛干员数据已导入。'
+  const inventoryMessage = formatSklandInventoryMessage(data.skland_import)
+  return `已导入 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}${inventoryMessage ? `。${inventoryMessage}` : ''}`
+}
+
+function formatSklandInventoryMessage(imported: NonNullable<SklandPayload['skland_import']>): string {
+  if (imported.inventory_synced && imported.intermediate_inventory) {
+    return `已同步${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}到基建配置`
+  }
+  if (imported.inventory_warning) return '干员已导入，库存同步失败，可稍后刷新'
+  return ''
+}
+
+function formatInventoryAmount(product: IntermediateProduct, value: number | undefined): string {
+  const label = product === 'Pure Gold' ? '赤金' : '源石碎片'
+  const count = Number(value ?? 0)
+  return `${label} ${Number.isFinite(count) ? count : 0}`
 }

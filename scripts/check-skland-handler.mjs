@@ -32,6 +32,8 @@ await assertEncodedCredentialPreview()
 await assertInvalidCredentialPreview()
 await assertOversizedCredentialPreview()
 await assertConfirmImport()
+await assertNoConfigImportCreatesDefaultConfig()
+await assertInventoryFailureStillImportsOperators()
 await assertDepotValueConfirmDoesNotWriteWorkspace()
 await assertRefreshImport()
 await assertRefreshTransientFailurePreservesBinding()
@@ -269,8 +271,84 @@ async function assertConfirmImport() {
   if (workspace.config?.desc !== 'existing config') {
     throw new Error('confirm import: existing config was not preserved')
   }
+  if (workspace.config?.product_requirements?.manufacturing_stations?.['Battle Record'] !== 2) {
+    throw new Error('confirm import: existing manufacturing plan was not preserved')
+  }
+  if (
+    workspace.config?.intermediate_inventory?.['Pure Gold'] !== 123 ||
+    workspace.config?.intermediate_inventory?.['Originium Shard'] !== 45 ||
+    workspace.config?.auto_balance_source !== 'intermediate_inventory' ||
+    workspace.config?.drones?.auto_strategy !== 'trading_priority'
+  ) {
+    throw new Error(`confirm import: intermediate inventory was not saved to config ${JSON.stringify(workspace.config)}`)
+  }
+  if (
+    result.body.skland_import?.inventory_synced !== true ||
+    result.body.skland_import?.config_saved !== true ||
+    result.body.skland_import?.intermediate_inventory?.['Pure Gold'] !== 123 ||
+    result.body.skland_import?.intermediate_inventory?.['Originium Shard'] !== 45
+  ) {
+    throw new Error(`confirm import: import summary missing inventory sync ${JSON.stringify(result.body.skland_import)}`)
+  }
   if (Object.keys(workspace.elite_overrides ?? {}).length !== 0 || workspace.last_result !== null) {
     throw new Error('confirm import: workspace transient fields were not cleared')
+  }
+}
+
+async function assertNoConfigImportCreatesDefaultConfig() {
+  seedProfile({ id: 'profile-no-config', status: 'active' })
+  store.workspaces.set('profile-no-config', {
+    ...store.workspaces.get('profile-no-config'),
+    config: null,
+  })
+  setFetchMode('complete')
+  const preview = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-no-config',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  const result = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-no-config',
+    confirmation_id: preview.body.confirmation_id,
+  })
+  if (result.status !== 200) {
+    throw new Error(`no config import: expected success, got ${result.status}`)
+  }
+  const config = store.workspaces.get('profile-no-config')?.config
+  if (
+    config?.layout !== '2-4-3' ||
+    config?.product_requirements?.trading_stations?.LMD !== 2 ||
+    config?.intermediate_inventory?.['Pure Gold'] !== 123 ||
+    config?.intermediate_inventory?.['Originium Shard'] !== 45
+  ) {
+    throw new Error(`no config import: default config was not created with inventory ${JSON.stringify(config)}`)
+  }
+}
+
+async function assertInventoryFailureStillImportsOperators() {
+  seedProfile({ id: 'profile-inventory-fail', status: 'active' })
+  setFetchMode('inventory-fail')
+  const preview = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-inventory-fail',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  const result = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-inventory-fail',
+    confirmation_id: preview.body.confirmation_id,
+  })
+  if (result.status !== 200 || result.body.skland_import?.operator_count !== 2) {
+    throw new Error(`inventory failure import: expected operator import success, got ${result.status}`)
+  }
+  if (result.body.skland_import?.inventory_synced !== false || !result.body.skland_import?.inventory_warning) {
+    throw new Error(`inventory failure import: expected inventory warning ${JSON.stringify(result.body.skland_import)}`)
+  }
+  const workspace = store.workspaces.get('profile-inventory-fail')
+  if (workspace?.operators?.length !== 2) {
+    throw new Error('inventory failure import: operators were not saved')
+  }
+  if (workspace.config?.auto_balance_source === 'intermediate_inventory') {
+    throw new Error('inventory failure import: should not mark config as inventory-balanced without inventory')
   }
 }
 
@@ -338,6 +416,16 @@ async function assertRefreshImport() {
   }
   if (store.fetchCalls.some((url) => url.includes('hypergryph.com'))) {
     throw new Error('refresh import: should not call Hypergryph APIs')
+  }
+  const workspace = store.workspaces.get('profile-1')
+  if (
+    workspace?.config?.intermediate_inventory?.['Pure Gold'] !== 9 ||
+    workspace?.config?.intermediate_inventory?.['Originium Shard'] !== 8
+  ) {
+    throw new Error(`refresh import: intermediate inventory was not refreshed ${JSON.stringify(workspace?.config?.intermediate_inventory)}`)
+  }
+  if (workspace?.last_result !== null) {
+    throw new Error('refresh import: stale result should be cleared')
   }
 }
 
@@ -499,7 +587,20 @@ function seedProfile({ id, status }) {
     version: 1,
     profile_id: id,
     operators: [{ id: 'char_old', name: '旧干员', own: true, elite: 0, rarity: 3 }],
-    config: { desc: 'existing config' },
+    config: {
+      layout: '2-4-3',
+      desc: 'existing config',
+      schedule_mode: 'maa',
+      dormitory_rule: 'fixed',
+      trading_stations_count: 2,
+      manufacturing_stations_count: 4,
+      product_requirements: {
+        trading_stations: { LMD: 2 },
+        manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 2 },
+      },
+      Fiammetta: { enable: true },
+      drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+    },
     elite_overrides: { char_old: 2 },
     last_result: { stale: true },
     saved_configs: [],
@@ -604,6 +705,36 @@ function setFetchMode(mode) {
         },
       },
     })
+    }
+    if (textUrl.endsWith('/api/v1/game/cultivate/info')) {
+      if (mode === 'inventory-fail') {
+        return jsonResponse({ code: 1, message: 'TEMPORARY_UNAVAILABLE', data: null })
+      }
+      return jsonResponse({
+        code: 0,
+        message: 'OK',
+        data: {
+          items: {
+            3003: { name: '赤金' },
+            shard_item: { id: 'shard_item', name: '源石碎片' },
+          },
+        },
+      })
+    }
+    if (textUrl.includes('/api/v1/game/cultivate/player')) {
+      if (mode === 'inventory-fail') {
+        return jsonResponse({ code: 1, message: 'TEMPORARY_UNAVAILABLE', data: null })
+      }
+      return jsonResponse({
+        code: 0,
+        message: 'OK',
+        data: {
+          items: [
+            { id: '3003', count: mode === 'refresh' ? 9 : 123 },
+            { id: 'shard_item', count: mode === 'refresh' ? 8 : 45 },
+          ],
+        },
+      })
     }
     throw new Error(`unexpected fetch ${textUrl}`)
   }
@@ -723,6 +854,9 @@ function memoryUserStoreModule() {
     export function isDepotValueProfile(profile) {
       return profile?.kind === 'depot_value'
     }
+    export function isFreePreviewProfile(profile) {
+      return profile?.kind === 'free_preview'
+    }
     function normalizeWorkspace(workspace) {
       return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }
     }
@@ -815,6 +949,33 @@ function memoryLicenseUtilsModule() {
         }
       }
       return { ok: true, operators }
+    }
+    export function validateConfig(config) {
+      if (!config || typeof config !== 'object' || !config.layout || !config.product_requirements) {
+        return { ok: false, message: 'invalid config' }
+      }
+      if (!Number.isInteger(config.trading_stations_count) || !Number.isInteger(config.manufacturing_stations_count)) {
+        return { ok: false, message: 'invalid station counts' }
+      }
+      const trading = config.product_requirements.trading_stations
+      const manufacturing = config.product_requirements.manufacturing_stations
+      if (!isCountRecord(trading) || !isCountRecord(manufacturing)) {
+        return { ok: false, message: 'invalid product requirements' }
+      }
+      if (sumCounts(trading) !== config.trading_stations_count || sumCounts(manufacturing) !== config.manufacturing_stations_count) {
+        return { ok: false, message: 'product count mismatch' }
+      }
+      return { ok: true, config }
+    }
+    export function resolveConfigForPermission(permission, config) {
+      return { ok: true, config }
+    }
+    function isCountRecord(value) {
+      if (!value || typeof value !== 'object') return false
+      return Object.values(value).every((item) => Number.isInteger(item) && item >= 0)
+    }
+    function sumCounts(counts) {
+      return Object.values(counts).reduce((sum, value) => sum + value, 0)
     }
   `
 }

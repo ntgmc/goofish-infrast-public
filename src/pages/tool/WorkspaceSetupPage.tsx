@@ -11,6 +11,7 @@ import { countOwnedOperators, formatDate, getProfileAccessLabel, isFreePreviewPr
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
 
 type WorkspaceSetupSection = 'operators' | 'config'
+type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 type SklandRefreshNotice = {
   kind: 'success' | 'error'
   message: string
@@ -89,6 +90,7 @@ export default function WorkspaceSetupPage({
   const applySklandPayload = useCallback((data: SklandPayload) => {
     if (!data.user) return
     setOperators(data.workspace?.operators ?? null)
+    if (data.workspace?.config) setConfig(normalizeConfig(data.workspace.config))
     setOperatorFileName(null)
     setError(null)
     setStatus(null)
@@ -112,7 +114,7 @@ export default function WorkspaceSetupPage({
       setSklandRefreshNotice({
         kind: 'success',
         message: data.skland_import
-          ? `已刷新 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}`
+          ? formatSklandImportNotice(data.skland_import, '已刷新')
           : '森空岛干员数据已刷新。',
       })
     } catch (caught) {
@@ -457,6 +459,21 @@ function SectionFallback() {
 function sklandPayloadFromError(caught: unknown): Partial<SklandPayload> | null {
   if (!(caught instanceof ApiError) || !caught.data || typeof caught.data !== 'object') return null
   return caught.data as Partial<SklandPayload>
+}
+
+function formatSklandImportNotice(imported: NonNullable<SklandPayload['skland_import']>, verb: string): string {
+  const base = `${verb} ${imported.operator_count} 名干员：${imported.nickname}`
+  if (imported.inventory_synced && imported.intermediate_inventory) {
+    return `${base}。已同步${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}到基建配置。`
+  }
+  if (imported.inventory_warning) return `${base}。干员已导入，库存同步失败，可稍后刷新。`
+  return base
+}
+
+function formatInventoryAmount(product: IntermediateProduct, value: number | undefined): string {
+  const label = product === 'Pure Gold' ? '赤金' : '源石碎片'
+  const count = Number(value ?? 0)
+  return `${label} ${Number.isFinite(count) ? count : 0}`
 }
 
 function formatSklandRefreshError(data: Partial<SklandPayload> | null, status: number): string {

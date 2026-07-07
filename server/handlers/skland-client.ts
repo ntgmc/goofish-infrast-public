@@ -30,6 +30,17 @@ export interface SklandImportSummary extends SklandBindingSummary {
   status: 'imported'
   operator_count: number
   imported_at: string
+  intermediate_inventory?: IntermediateInventory
+  inventory_synced: boolean
+  config_saved: boolean
+  inventory_warning?: string
+}
+
+type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
+export type IntermediateInventory = Record<IntermediateProduct, number>
+
+type SklandImportOptions = {
+  includeInventory?: boolean
 }
 
 type ApiEnvelope = {
@@ -111,20 +122,79 @@ export async function getCredByHypergryphToken(token: string): Promise<string> {
   return cred.data.cred
 }
 
-export async function importSklandOperatorsByCred(cred: string): Promise<{
+export async function importSklandOperatorsByCred(cred: string, options: SklandImportOptions = {}): Promise<{
   binding: SklandBindingSummary
   operators: LicenseOperator[]
   importedAt: string
+  intermediateInventory?: IntermediateInventory
+  inventoryWarning?: string
 }> {
   const client = new SklandClient(cred)
   const binding = await client.getArknightsBinding()
   const playerInfo = await client.getGamePlayerInfo(binding.uid)
   const operators = convertSklandCharactersToOperators(playerInfo)
+  const inventoryResult = options.includeInventory
+    ? await readIntermediateInventoryForImport(client, binding.uid)
+    : {}
   return {
     binding,
     operators,
+    ...inventoryResult,
     importedAt: new Date().toISOString(),
   }
+}
+
+async function readIntermediateInventoryForImport(
+  client: SklandClient,
+  uid: string,
+): Promise<{ intermediateInventory?: IntermediateInventory; inventoryWarning?: string }> {
+  try {
+    const [calInfo, calPlayer] = await Promise.all([
+      client.getCultivateInfo(),
+      client.getCultivatePlayer(uid),
+    ])
+    return { intermediateInventory: readSklandIntermediateInventory(calInfo, calPlayer) }
+  } catch (error) {
+    if (error instanceof SklandClientError && (
+      error.code === 'credential_invalid' ||
+      error.code === 'credential_format_invalid'
+    )) {
+      throw error
+    }
+    const message = error instanceof Error ? error.message : '读取森空岛养成库存失败。'
+    return { inventoryWarning: message || '读取森空岛养成库存失败。' }
+  }
+}
+
+function readSklandIntermediateInventory(calInfo: unknown, calPlayer: unknown): IntermediateInventory {
+  const itemMeta = createItemMeta(unwrapDataRecord(calInfo).items)
+  const playerItems = unwrapDataRecord(calPlayer).items
+  if (!Array.isArray(playerItems)) throw new Error('森空岛养成库存为空或格式异常。')
+
+  const inventory: IntermediateInventory = {
+    'Originium Shard': 0,
+    'Pure Gold': 0,
+  }
+  for (const raw of playerItems) {
+    if (!isRecord(raw)) continue
+    const id = stringValue(raw.id ?? raw.itemId)
+    const count = numberValue(raw.count ?? raw.have ?? raw.quantity) ?? 0
+    if (!id || count <= 0) continue
+    const meta = isRecord(itemMeta[id]) ? itemMeta[id] : {}
+    const product = identifyIntermediateProduct(id, stringValue(meta.name ?? meta.itemName ?? raw.name ?? raw.itemName))
+    if (!product) continue
+    inventory[product] = roundInventoryCount(inventory[product] + count)
+  }
+  return inventory
+}
+
+function identifyIntermediateProduct(id: string, name: string): IntermediateProduct | null {
+  if (id === '3003') return 'Pure Gold'
+  const normalized = name.replace(/\s+/g, '').toLowerCase()
+  if (!normalized) return null
+  if (normalized.includes('赤金') || normalized.includes('puregold')) return 'Pure Gold'
+  if (normalized.includes('源石碎片') || normalized.includes('originiumshard')) return 'Originium Shard'
+  return null
 }
 
 export function convertSklandCharactersToOperators(gamePlayerInfo: unknown): LicenseOperator[] {
@@ -358,9 +428,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function getEnvelopeData(envelope: ApiEnvelope, message: string): unknown {
   if (envelope.code !== 0 || envelope.message !== 'OK' || envelope.data === undefined || envelope.data === null) {
+    if (isCredentialInvalidEnvelope(envelope)) {
+      throw new SklandClientError('credential_invalid', '森空岛凭据已失效，请重新扫码绑定。')
+    }
     throw new Error(message)
   }
   return envelope.data
+}
+
+function isCredentialInvalidEnvelope(envelope: ApiEnvelope): boolean {
+  const code = String(envelope.code ?? '').trim()
+  const message = String(envelope.message ?? '').trim().toLowerCase()
+  return ['401', '403', '10001', '10002', '10003', '10004'].includes(code)
+    || /credential|token|unauthori[sz]ed|forbidden|登录|登陆|凭据|认证|授权|过期|失效/.test(message)
 }
 
 function stringValue(value: unknown): string {
@@ -411,4 +491,33 @@ function getNestedRecord(value: unknown, path: string[]): Record<string, unknown
     current = current[key]
   }
   return isRecord(current) ? current : null
+}
+
+function createItemMeta(value: unknown): Record<string, unknown> {
+  if (Array.isArray(value)) {
+    const map: Record<string, unknown> = {}
+    for (const item of value) {
+      if (!isRecord(item)) continue
+      const id = stringValue(item.id ?? item.itemId)
+      if (id) map[id] = item
+    }
+    return map
+  }
+  if (!isRecord(value)) return {}
+  const map: Record<string, unknown> = { ...value }
+  for (const item of Object.values(value)) {
+    if (!isRecord(item)) continue
+    const id = stringValue(item.id ?? item.itemId)
+    if (id) map[id] = item
+  }
+  return map
+}
+
+function unwrapDataRecord(value: unknown): Record<string, unknown> {
+  const record = isRecord(value) ? value : {}
+  return isRecord(record.data) ? record.data : record
+}
+
+function roundInventoryCount(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.round(value * 100) / 100) : 0
 }
