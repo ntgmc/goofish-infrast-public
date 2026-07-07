@@ -449,6 +449,8 @@ export interface ShiftRoom {
   efficiency?: number;
   final_efficiency?: number;
   overflow?: RoomOverflow;
+  dynamic_resources?: Record<string, number>;
+  dynamic_resource_details?: Record<string, unknown>[];
   mood?: Record<string, {
     start?: number;
     cost_per_hour?: number;
@@ -488,6 +490,8 @@ export interface DailyProduction {
   consumption?: Record<string, number>;
   net?: Record<string, number>;
   drones?: Record<string, number>;
+  dynamic_resources?: Record<string, number>;
+  dynamic_resource_details?: Record<string, unknown>[];
   details?: Record<string, unknown>[];
 }
 
@@ -538,6 +542,8 @@ export interface ShiftPlan {
     mood_recovery?: Record<string, unknown>;
   };
   drones?: DroneAssignment;
+  dynamic_resources?: Record<string, number>;
+  dynamic_resource_details?: Record<string, unknown>[];
   mood_valid?: boolean;
   mood_errors?: Record<string, unknown>[];
     mood_assumptions?: {
