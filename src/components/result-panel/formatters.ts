@@ -1,14 +1,8 @@
 import type { DailyProduction, OptimizeResult, ShiftRoom } from '../../lib/types'
+import { calculateProductionSanity } from '../../lib/production-sanity'
 import { PRODUCT_LABELS, ROOM_LABELS } from './labels'
 import type { PreparedPlan } from './types'
 
-const SANITY_PER_LMD = 36 / 10000
-const SANITY_PER_EXP = 36 / 10000
-const SANITY_PER_BATTLE_RECORD = SANITY_PER_EXP * 1000
-const SANITY_PER_PURE_GOLD = SANITY_PER_EXP * (145 / 229) * (50 / 3) * 24
-const SANITY_PER_ORUNDUM = 3 / 4
-const SANITY_PER_PURCHASE_CERTIFICATE = 30 * (1 - SANITY_PER_LMD * 12) / 21
-const SANITY_PER_ORIGINIUM_SHARD = SANITY_PER_PURCHASE_CERTIFICATE * 90
 const MAX_MOOD_FALLBACK = 24
 
 export type DroneGainSummary = {
@@ -200,29 +194,6 @@ function getMoodDetail(room: ShiftRoom, isRotationMode = false): string {
   return parts.join('，')
 }
 
-function calculateProductionSanity(daily: Partial<DailyProduction>): { value: number; note: string } {
-  const manufacturing = daily.manufacturing ?? {}
-  const trading = daily.trading ?? {}
-  const consumption = daily.consumption ?? {}
-
-  const manufacturingSanity =
-    getResourceAmount(manufacturing, 'Pure Gold') * SANITY_PER_PURE_GOLD +
-    getResourceAmount(manufacturing, 'Battle Record') * SANITY_PER_BATTLE_RECORD +
-    getResourceAmount(manufacturing, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
-  const tradingSanity =
-    getResourceAmount(trading, 'LMD') * SANITY_PER_LMD +
-    getResourceAmount(trading, 'Orundum') * SANITY_PER_ORUNDUM
-  const consumptionSanity =
-    getResourceAmount(consumption, 'Pure Gold') * SANITY_PER_PURE_GOLD +
-    getResourceAmount(consumption, 'Originium Shard') * SANITY_PER_ORIGINIUM_SHARD
-  const value = manufacturingSanity + tradingSanity - consumptionSanity
-
-  return {
-    value,
-    note: `制造 ${formatAmount(manufacturingSanity)} + 贸易 ${formatAmount(tradingSanity)} - 消耗 ${formatAmount(consumptionSanity)}`,
-  }
-}
-
 function summarizeDroneGains(details: NonNullable<DailyProduction['details']>): DroneGainSummary {
   const produced: Record<string, number> = {}
   const consumed: Record<string, number> = {}
@@ -265,11 +236,6 @@ function summarizeDroneGains(details: NonNullable<DailyProduction['details']>): 
       consumedParts.length > 0 ? `消耗 ${consumedParts.join('，')}` : '',
     ].filter(Boolean).join('；'),
   }
-}
-
-function getResourceAmount(values: Record<string, number>, key: string): number {
-  const value = values[key] ?? 0
-  return Number.isFinite(value) ? value : 0
 }
 
 function formatResourceParts(values: Record<string, number>, preferredOrder: string[]): string[] {

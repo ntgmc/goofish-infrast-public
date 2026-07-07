@@ -330,6 +330,7 @@ function aggregateOperatorCosts(operatorCosts: OperatorCost[], pricing: PricingS
   totals.equivalent_sanity = totalSanity.value
   const missingSanity = calculateBucketSanity(missing, pricing)
   missing.equivalent_sanity = missingSanity.value
+  const available = calculateAvailableBucket(totals, missing, pricing)
 
   const unpricedItems = totalSanity.unpricedItems
   const status: UpgradeTrainingCost['status'] = unpricedItems.length > 0 ? 'partial' : 'available'
@@ -344,6 +345,7 @@ function aggregateOperatorCosts(operatorCosts: OperatorCost[], pricing: PricingS
       }
       : undefined,
     totals,
+    available,
     missing,
     equivalent_sanity: totals.equivalent_sanity,
     unpriced_items: unpricedItems,
@@ -355,6 +357,21 @@ function aggregateOperatorCosts(operatorCosts: OperatorCost[], pricing: PricingS
     warnings,
     operators: operatorCosts,
   }
+}
+
+function calculateAvailableBucket(totals: CostBucket, missing: CostBucket, pricing: PricingState): CostBucket {
+  const available = emptyBucket()
+  available.cash = Math.max(0, totals.cash - missing.cash)
+  available.exp = Math.max(0, totals.exp - missing.exp)
+  for (const totalMaterial of totals.materials) {
+    const missingMaterial = missing.materials.find((item) => item.id === totalMaterial.id)
+    const count = Math.max(0, totalMaterial.count - (missingMaterial?.count ?? 0))
+    if (count > 0) {
+      available.materials.push({ ...totalMaterial, count })
+    }
+  }
+  available.equivalent_sanity = calculateBucketSanity(available, pricing).value
+  return available
 }
 
 function calculateMissingBucket(totals: CostBucket, inventory: InventoryItem[], pricing: PricingState): CostBucket {
@@ -646,6 +663,7 @@ function createUnavailableCost(message: string): UpgradeTrainingCost {
   return {
     status: 'unavailable',
     totals: emptyBucket(),
+    available: emptyBucket(),
     missing: emptyBucket(),
     equivalent_sanity: null,
     unpriced_items: [],
