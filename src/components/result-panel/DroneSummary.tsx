@@ -12,7 +12,7 @@ export default function DroneSummary({ drones }: { drones: DroneAssignment }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md bg-brand-100 px-2 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-900 dark:text-brand-200">
-              无人机{drones.mode === 'auto' ? ' Auto' : ''}
+              {drones.mode === 'auto' ? '自动无人机' : '无人机'}
             </span>
             <span className="text-sm font-medium text-ink-primary">
               {roomLabel} {drones.index}

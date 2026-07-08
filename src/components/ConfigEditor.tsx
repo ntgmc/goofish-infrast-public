@@ -271,7 +271,7 @@ export default function ConfigEditor({
   const autoInventoryOnly = !canEdit && canUseIntermediateInventory
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
-  const droneTargets = (config.drones?.targets ?? []).join(', ')
+  const droneTargets = formatDroneTargetsInput(config.drones?.targets ?? [])
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
   const validationMessage = validation.ok === false ? validation.message : null
@@ -381,7 +381,7 @@ export default function ConfigEditor({
             )}
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-2 text-xs font-medium text-ink-muted">Schedule mode</p>
+                <p className="mb-2 text-xs font-medium text-ink-muted">排班模式</p>
                 <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
                   {(['maa', 'rotation'] as const).map((mode) => (
                     <button
@@ -407,7 +407,7 @@ export default function ConfigEditor({
                 </div>
               </div>
               <div>
-                <p className="mb-2 text-xs font-medium text-ink-muted">Dormitory rule</p>
+                <p className="mb-2 text-xs font-medium text-ink-muted">宿舍规则</p>
                 <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
                   {(['fixed', 'maa_autofill'] as const).map((rule) => (
                     <button
@@ -598,7 +598,7 @@ export default function ConfigEditor({
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-              <span>无人机 Auto</span>
+              <span>无人机自动配置</span>
               <input
                 type="checkbox"
                   checked={!rotationMode && (config.drones?.auto ?? false)}
@@ -630,8 +630,8 @@ export default function ConfigEditor({
                 })}
                 className="w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary disabled:text-ink-muted"
               >
-                <option value="pre">pre</option>
-                <option value="post">post</option>
+                <option value="pre">换班前</option>
+                <option value="post">换班后</option>
               </select>
             </div>
             <div>
@@ -645,7 +645,7 @@ export default function ConfigEditor({
                   onChange={(value) => onUpdate((next) => {
                     next.drones = {
                       ...(next.drones ?? { enable: true, order: 'pre' }),
-                      targets: value.split(',').map((item) => item.trim()).filter(Boolean),
+                    targets: parseDroneTargetsInput(value),
                     }
                     applyCounts(next)
                   })}
@@ -697,6 +697,25 @@ function fitProductCounts(
     next[fallbackProduct] = (next[fallbackProduct] ?? 0) + remaining
   }
   return next
+}
+
+function formatProductName(product: string): string {
+  return PRODUCT_LABELS[product] ?? product
+}
+
+function parseProductName(value: string): string {
+  const text = value.trim()
+  if (!text) return ''
+  const matched = Object.entries(PRODUCT_LABELS).find(([key, label]) => key === text || label === text)
+  return matched?.[0] ?? text
+}
+
+function formatDroneTargetsInput(targets: string[]): string {
+  return targets.map(formatProductName).join('，')
+}
+
+function parseDroneTargetsInput(value: string): string[] {
+  return value.split(/[，,]/).map(parseProductName).filter(Boolean)
 }
 
 function formatStockValue(value: number | null): string {
@@ -825,7 +844,7 @@ function DroneTargetsInput({
           event.currentTarget.blur()
         }
       }}
-      placeholder="LMD, Pure Gold, LMD"
+      placeholder="龙门币，赤金，龙门币"
       className="w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted disabled:text-ink-muted"
     />
   )
