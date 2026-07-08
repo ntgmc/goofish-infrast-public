@@ -36,7 +36,7 @@ export default function ResultPanel({
     {
       label: isRotationMode ? '统计方式' : '统计周期',
       value: isRotationMode
-        ? '不计算固定时间'
+        ? `每队列 ${result.rotation_mode?.shift_hours_per_queue ?? 12}h · 日产量折算 ${result.rotation_mode?.daily_production_normalized_hours ?? 24}h`
         : totalScheduleHours
         ? `${formatCompactNumber(totalScheduleHours)} 小时`
         : '按班次配置',

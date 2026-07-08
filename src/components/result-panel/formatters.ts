@@ -22,6 +22,8 @@ export type PreparedIntermediateDepletion = {
 export type PreparedResult = {
   totalEff: number;
   rawTotalEff: number;
+  hasDailyProduction: boolean;
+  rotationStatsNote?: string;
   plans: PreparedPlan[];
   productionStats: {
     manufacturing: Record<string, number>;
@@ -59,6 +61,10 @@ export function prepareResult(
   const rawTotalEff = result.raw_total_efficiency ??
     result.raw_results.reduce((sum, item) => sum + (item?.total_efficiency ?? 0), 0)
   const totalEff = result.total_efficiency ?? rawTotalEff
+  const hasDailyProduction = Boolean(result.daily_production)
+  const rotationStatsNote = isRotationMode
+    ? `按每队列 ${result.rotation_mode?.shift_hours_per_queue ?? 12}h 计算，日产量折算 ${result.rotation_mode?.daily_production_normalized_hours ?? 24}h`
+    : undefined
   const plans: PreparedPlan[] = result.plans.map((plan, planIndex) => ({
     ...plan,
     rows: Object.entries(plan.rooms ?? {}).flatMap(([roomType, rooms]) => {
@@ -172,7 +178,18 @@ export function prepareResult(
     roomCount: plans.reduce((sum, plan) => sum + plan.rows.length, 0),
   }
 
-  return { totalEff, rawTotalEff, plans, productionStats, productionSanity, intermediateDepletion, maaDefaultComparison, detailStats }
+  return {
+    totalEff,
+    rawTotalEff,
+    hasDailyProduction,
+    rotationStatsNote,
+    plans,
+    productionStats,
+    productionSanity,
+    intermediateDepletion,
+    maaDefaultComparison,
+    detailStats,
+  }
 }
 
 function buildOperatorLookup(operators: LicenseOperator[]): Map<string, LicenseOperator> {
