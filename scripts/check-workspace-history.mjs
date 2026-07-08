@@ -82,6 +82,7 @@ await assertSavedConfigActions()
 await assertSavedConfigLimitAndPermission()
 await assertOptimizeHistory()
 await assertFreePreviewWorkspaceAndOptimizeLimits()
+await assertFreeScheduleEntitlementLifecycle()
 await assertOperatorsPatchKeepsHistory()
 
 console.log('workspace history smoke check ok')
@@ -445,6 +446,253 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
   }
 }
 
+async function assertFreeScheduleEntitlementLifecycle() {
+  await assertFreeScheduleRevisionLimit()
+  await assertFreeScheduleConfirmLocks()
+  await assertFreeScheduleWindowExpiry()
+  await assertStrongReorderBonusGeneration()
+}
+
+async function assertFreeScheduleRevisionLimit() {
+  const profile = seedFreePreviewProfile('preview-entitlement-revisions', { bound: true })
+  store.workspaces.set(profile.id, {
+    ...emptyWorkspace(profile.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+  })
+
+  const first = await generateFreeSchedule(profile.id)
+  if (first.status !== 200) throw new Error(`免费完整排班首次生成：预期 200，实际 ${first.status}`)
+  assertEntitlementState(profile.id, {
+    revision_count: 1,
+    locked: false,
+    label: '免费完整排班首次生成',
+  })
+  if (first.body?.preview_limit?.free_schedule_entitlement?.revision_count !== 1) {
+    throw new Error('免费完整排班首次生成：响应缺少权益状态')
+  }
+
+  const second = await generateFreeSchedule(profile.id)
+  if (second.status !== 200) throw new Error(`免费完整排班第 2 次修正：预期 200，实际 ${second.status}`)
+  assertEntitlementState(profile.id, {
+    revision_count: 2,
+    locked: false,
+    label: '免费完整排班第 2 次修正',
+  })
+
+  const third = await generateFreeSchedule(profile.id)
+  if (third.status !== 200) throw new Error(`免费完整排班第 3 次修正：预期 200，实际 ${third.status}`)
+  assertEntitlementState(profile.id, {
+    revision_count: 3,
+    locked: true,
+    lock_reason: 'revision_limit',
+    label: '免费完整排班第 3 次修正',
+  })
+
+  const beforeBlocked = store.workspaces.get(profile.id)
+  const blocked = await generateFreeSchedule(profile.id)
+  const afterBlocked = store.workspaces.get(profile.id)
+  if (blocked.status !== 403) throw new Error(`免费完整排班第 4 次生成：预期 403，实际 ${blocked.status}`)
+  if (afterBlocked?.result_history.length !== beforeBlocked?.result_history.length || afterBlocked?.last_result !== beforeBlocked?.last_result) {
+    throw new Error('免费完整排班第 4 次生成：不应写入 last_result 或历史')
+  }
+}
+
+async function assertFreeScheduleConfirmLocks() {
+  const profile = seedFreePreviewProfile('preview-entitlement-confirm', { bound: true })
+  store.workspaces.set(profile.id, {
+    ...emptyWorkspace(profile.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+  })
+
+  const generated = await generateFreeSchedule(profile.id)
+  if (generated.status !== 200) throw new Error(`免费完整排班确认前生成：预期 200，实际 ${generated.status}`)
+  const historyId = store.workspaces.get(profile.id)?.result_history[0]?.id
+  const confirmed = await call(workspaceHandler, '/api/user/workspace/free-schedule/confirm', {
+    profile_id: profile.id,
+    result_history_id: historyId,
+  }, { method: 'POST' })
+  if (confirmed.status !== 200) throw new Error(`免费完整排班确认接口：预期 200，实际 ${confirmed.status}`)
+  assertEntitlementState(profile.id, {
+    revision_count: 1,
+    locked: true,
+    lock_reason: 'confirmed',
+    label: '免费完整排班确认接口',
+  })
+
+  const beforeBlocked = store.workspaces.get(profile.id)
+  const blocked = await generateFreeSchedule(profile.id)
+  if (blocked.status !== 403) throw new Error(`免费完整排班确认后生成：预期 403，实际 ${blocked.status}`)
+  if (store.workspaces.get(profile.id)?.result_history.length !== beforeBlocked?.result_history.length) {
+    throw new Error('免费完整排班确认后生成：不应写入历史')
+  }
+}
+
+async function assertFreeScheduleWindowExpiry() {
+  const profile = seedFreePreviewProfile('preview-entitlement-expired', { bound: true })
+  const firstGeneratedAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
+  store.workspaces.set(profile.id, {
+    ...emptyWorkspace(profile.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+    free_schedule_entitlement: createFreeScheduleEntitlement({
+      first_generated_at: firstGeneratedAt,
+      revision_count: 1,
+    }),
+  })
+
+  const blocked = await generateFreeSchedule(profile.id)
+  if (blocked.status !== 403) throw new Error(`免费完整排班确认期过期生成：预期 403，实际 ${blocked.status}`)
+  assertEntitlementState(profile.id, {
+    revision_count: 1,
+    locked: true,
+    lock_reason: 'window_expired',
+    label: '免费完整排班确认期过期生成',
+  })
+}
+
+async function assertStrongReorderBonusGeneration() {
+  const profile = seedFreePreviewProfile('preview-entitlement-bonus', { bound: true })
+  const baselineResult = cloneWithRoomOperator(
+    createBaselineOptimizeResult(),
+    'trading',
+    0,
+    { id: 'old-trade', name: 'Old Trade' },
+  )
+  const historyItem = createHistoryItem(profile.id, baselineResult)
+  const lockedEntitlement = createFreeScheduleEntitlement({
+    first_generated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    revision_count: 3,
+    locked_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    lock_reason: 'revision_limit',
+  })
+  store.workspaces.set(profile.id, {
+    ...emptyWorkspace(profile.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+    last_result: baselineResult,
+    result_history: [historyItem],
+    free_schedule_entitlement: lockedEntitlement,
+  })
+
+  const beforeCheck = store.workspaces.get(profile.id)
+  const checked = await call(optimizeHandler, '/api/optimize/reorder-check', {
+    profile_id: profile.id,
+    config: free333OrundumConfig,
+    baseline_history_id: historyItem.id,
+  })
+  if (checked.status !== 200 || checked.body?.recommendation !== 'strongly_recommended') {
+    throw new Error(`强烈建议重排 bonus 授予：预期 200 strongly_recommended，实际 ${checked.status} ${checked.body?.recommendation}`)
+  }
+  const granted = store.workspaces.get(profile.id)?.free_schedule_entitlement?.strong_reorder_bonus
+  if (!granted || granted.used_at) throw new Error('强烈建议重排 bonus 授予：预期写入未使用的当月 bonus')
+  if (store.workspaces.get(profile.id)?.result_history.length !== beforeCheck?.result_history.length) {
+    throw new Error('强烈建议重排检测：不应写入排班历史')
+  }
+
+  const bonusGenerate = await generateFreeSchedule(profile.id)
+  if (bonusGenerate.status !== 200) throw new Error(`强烈建议重排 bonus 生成：预期 200，实际 ${bonusGenerate.status}`)
+  const usedBonus = store.workspaces.get(profile.id)?.free_schedule_entitlement?.strong_reorder_bonus
+  if (!usedBonus?.used_at) throw new Error('强烈建议重排 bonus 生成：预期标记 used_at')
+
+  const beforeSecondBonus = store.workspaces.get(profile.id)
+  const blocked = await generateFreeSchedule(profile.id)
+  if (blocked.status !== 403) throw new Error(`强烈建议重排 bonus 二次生成：预期 403，实际 ${blocked.status}`)
+  if (store.workspaces.get(profile.id)?.result_history.length !== beforeSecondBonus?.result_history.length) {
+    throw new Error('强烈建议重排 bonus 二次生成：不应写入历史')
+  }
+}
+
+function createBaselineOptimizeResult() {
+  return {
+    author: 'test',
+    title: 'baseline',
+    description: 'test baseline',
+    schedule_mode: 'maa',
+    buildingType: 333,
+    planTimes: '3 shifts',
+    plans: [{ name: 'A', rooms: createTestRooms() }],
+    raw_results: [],
+    daily_production: {
+      manufacturing: { 'Pure Gold': 1 },
+      trading: { LMD: 1 },
+      consumption: {},
+      net: {},
+      drones: {},
+    },
+  }
+}
+
+function createTestRooms() {
+  const room = (id, name, product) => ({
+    id,
+    name,
+    product,
+    operators: [{ id: 'char_002_amiya', name: 'Amiya' }],
+    final_efficiency: 1.23,
+    efficiency: 1.23,
+  })
+  return {
+    trading: [
+      room('trade-1', 'Trading 1', 'LMD'),
+      room('trade-2', 'Trading 2', 'LMD'),
+    ],
+    manufacture: [
+      room('mfg-1', 'Factory 1', 'Pure Gold'),
+      room('mfg-2', 'Factory 2', 'Originium Shard'),
+    ],
+    power: [
+      room('power-1', 'Power 1', ''),
+    ],
+    dormitory: [
+      { id: 'dorm-1', name: 'Dorm 1', operators: [] },
+    ],
+  }
+}
+
+async function generateFreeSchedule(profileId) {
+  return call(optimizeHandler, '/api/optimize', {
+    profile_id: profileId,
+    license: null,
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+    ignore_elite: false,
+  })
+}
+
+function createFreeScheduleEntitlement(overrides = {}) {
+  return {
+    first_generated_at: null,
+    revision_count: 0,
+    revision_limit: 3,
+    revision_window_hours: 24,
+    confirmed_at: null,
+    locked_at: null,
+    lock_reason: null,
+    strong_reorder_bonus: null,
+    ...overrides,
+  }
+}
+
+function assertEntitlementState(profileId, expected) {
+  const entitlement = store.workspaces.get(profileId)?.free_schedule_entitlement
+  if (!entitlement) throw new Error(`${expected.label}：缺少免费完整排班权益状态`)
+  if (entitlement.revision_count !== expected.revision_count) {
+    throw new Error(`${expected.label}：revision_count 预期 ${expected.revision_count}，实际 ${entitlement.revision_count}`)
+  }
+  if (entitlement.revision_limit !== 3 || entitlement.revision_window_hours !== 24) {
+    throw new Error(`${expected.label}：权益限制元数据错误`)
+  }
+  if (expected.locked) {
+    if (!entitlement.locked_at || entitlement.lock_reason !== expected.lock_reason) {
+      throw new Error(`${expected.label}：预期锁定为 ${expected.lock_reason}，实际 ${entitlement.lock_reason}`)
+    }
+  } else if (entitlement.locked_at || entitlement.lock_reason) {
+    throw new Error(`${expected.label}：不应锁定权益`)
+  }
+}
+
 async function assertFreeConfigPatchStatus(profileId, config, expectedStatus, label) {
   const result = await call(workspaceHandler, '/api/user/workspace', {
     profile_id: profileId,
@@ -535,6 +783,12 @@ async function assertReorderRecommendationFromBaseline(profileId, baselineResult
     throw new Error(`免费档案重排检测 ${expectedRecommendation}：预期 200 ${expectedRecommendation}，实际 ${checked.status} ${checked.body?.recommendation}`)
   }
   assertReorderCheckResult(checked.body, `免费档案重排检测 ${expectedRecommendation}`)
+  const bonus = store.workspaces.get(profile.id)?.free_schedule_entitlement?.strong_reorder_bonus
+  if (expectedRecommendation === 'strongly_recommended') {
+    if (!bonus || bonus.used_at) throw new Error('免费档案强烈建议重排：预期授予未使用的当月额外生成权益')
+  } else if (bonus) {
+    throw new Error(`免费档案重排检测 ${expectedRecommendation}：不应授予额外生成权益`)
+  }
 }
 
 async function assertReorderQuotaLimit(baselineResult) {
@@ -714,9 +968,9 @@ function memoryUsageStatsModule() {
 function memoryUserStoreModule() {
   return `
     const store = globalThis.__workspaceHistorySmokeStore
-    export function emptyWorkspace(profileId) {
-      return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
-    }
+export function emptyWorkspace(profileId) {
+return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], free_schedule_entitlement: null, updated_at: new Date().toISOString() }
+}
     export async function listProfilesForUser(userId) {
       return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
     }
@@ -762,9 +1016,10 @@ function memoryUserStoreModule() {
         elite_overrides: normalized?.elite_overrides ?? {},
         last_result: normalized?.last_result ?? null,
         saved_configs: normalized?.saved_configs ?? [],
-        result_history: normalized?.result_history ?? [],
-        updated_at: normalized?.updated_at ?? null,
-      }
+result_history: normalized?.result_history ?? [],
+free_schedule_entitlement: normalized?.free_schedule_entitlement ?? null,
+updated_at: normalized?.updated_at ?? null,
+}
     }
     export function toPublicProfile(profile, workspace) {
       return {
@@ -1118,5 +1373,5 @@ function createMemoryStore() {
 }
 
 function emptyWorkspace(profileId) {
-  return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
+  return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], free_schedule_entitlement: null, updated_at: new Date().toISOString() }
 }

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { OptimizeResult, PermissionMode } from '../../src/lib/types'
+import type { FreeScheduleEntitlement, OptimizeResult, PermissionMode } from '../../src/lib/types'
 import {
   emptyWorkspace,
   getProfileForUser,
@@ -14,6 +14,8 @@ import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, v
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 
 const WORKSPACE_SAVED_CONFIG_LIMIT = 20
+const FREE_SCHEDULE_REVISION_LIMIT = 3
+const FREE_SCHEDULE_REVISION_WINDOW_HOURS = 24
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -21,9 +23,10 @@ export default async (req: Request): Promise<Response> => {
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
+    const url = new URL(req.url)
 
     if (req.method === 'GET') {
-      const profileId = new URL(req.url).searchParams.get('profile_id')
+      const profileId = url.searchParams.get('profile_id')
       if (!profileId) return jsonResponse({ error: '缺少 profile_id。' }, 400)
       const profile = await getProfileForUser(auth.user.id, profileId)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
@@ -33,7 +36,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (req.method !== 'PATCH' && req.method !== 'POST') {
-      return jsonResponse({ error: 'Method not allowed' }, 405)
+      return jsonResponse({ error: '方法不允许。' }, 405)
     }
 
     const body = await req.json() as {
@@ -43,6 +46,7 @@ export default async (req: Request): Promise<Response> => {
       elite_overrides?: unknown
       last_result?: unknown
       saved_config_action?: unknown
+      result_history_id?: unknown
     }
     if (typeof body.profile_id !== 'string' || !body.profile_id) {
       return jsonResponse({ error: '缺少 profile_id。' }, 400)
@@ -55,6 +59,32 @@ export default async (req: Request): Promise<Response> => {
     const isPreviewProfile = isFreePreviewProfile(profile)
     if (isPreviewProfile && !profile.skland_binding) {
       return jsonResponse({ error: '免费个人排班档案必须先绑定森空岛后才能保存工作区数据。' }, 403)
+    }
+
+    if (url.pathname.endsWith('/free-schedule/confirm')) {
+      if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
+      if (!isPreviewProfile) return jsonResponse({ error: '只有免费个人排班档案需要确认免费方案。' }, 403)
+      const workspace = await getProfileWorkspace(profile.id) ?? emptyWorkspace(profile.id)
+      const historyItem = typeof body.result_history_id === 'string' && body.result_history_id.trim()
+        ? workspace.result_history.find((item) => item.id === body.result_history_id)
+        : workspace.result_history[0]
+      if (!historyItem) return jsonResponse({ error: '暂无可确认的免费排班方案。' }, 409)
+      const now = new Date().toISOString()
+      const current = normalizeFreeScheduleEntitlementForConfirm(workspace.free_schedule_entitlement)
+      const next: UserWorkspaceRecord = {
+        ...workspace,
+        free_schedule_entitlement: {
+          ...current,
+          first_generated_at: current.first_generated_at ?? historyItem.created_at,
+          revision_count: Math.max(1, current.revision_count),
+          confirmed_at: now,
+          locked_at: now,
+          lock_reason: 'confirmed',
+        },
+        updated_at: now,
+      }
+      await saveProfileWorkspace(next)
+      return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(next) })
     }
 
     const existing = await getProfileWorkspace(profile.id)
@@ -223,4 +253,17 @@ function normalizeActionId(value: unknown): { ok: true; id: string } | { ok: fal
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizeFreeScheduleEntitlementForConfirm(value: FreeScheduleEntitlement | null | undefined): FreeScheduleEntitlement {
+  return {
+    first_generated_at: typeof value?.first_generated_at === 'string' ? value.first_generated_at : null,
+    revision_count: Math.max(0, Math.floor(Number(value?.revision_count ?? 0))),
+    revision_limit: FREE_SCHEDULE_REVISION_LIMIT,
+    revision_window_hours: FREE_SCHEDULE_REVISION_WINDOW_HOURS,
+    confirmed_at: typeof value?.confirmed_at === 'string' ? value.confirmed_at : null,
+    locked_at: typeof value?.locked_at === 'string' ? value.locked_at : null,
+    lock_reason: value?.lock_reason ?? null,
+    strong_reorder_bonus: value?.strong_reorder_bonus ?? null,
+  }
 }

@@ -288,8 +288,26 @@ export interface OptimizeResult {
     room_limit?: number;
     hidden_room_count: number;
     notice: string;
+    free_schedule_entitlement?: FreeScheduleEntitlement;
   };
   build_meta?: AppBuildMeta;
+}
+
+export type FreeScheduleEntitlementLockReason = 'confirmed' | 'revision_limit' | 'window_expired';
+
+export interface FreeScheduleEntitlement {
+  first_generated_at: string | null;
+  revision_count: number;
+  revision_limit: 3;
+  revision_window_hours: 24;
+  confirmed_at: string | null;
+  locked_at: string | null;
+  lock_reason: FreeScheduleEntitlementLockReason | null;
+  strong_reorder_bonus: {
+    month: string;
+    granted_at: string;
+    used_at: string | null;
+  } | null;
 }
 
 export type ReorderCheckRecommendation = 'no_need' | 'recommended' | 'strongly_recommended';
@@ -323,6 +341,7 @@ export interface ReorderCheckResult {
     created_at: string;
     name: string;
   };
+  free_schedule_entitlement?: FreeScheduleEntitlement;
   reasons: string[];
   build_meta?: AppBuildMeta;
 }
@@ -670,6 +689,7 @@ export interface UserWorkspace {
   last_result: OptimizeResult | null;
   saved_configs: WorkspaceSavedConfig[];
   result_history: WorkspaceResultHistoryItem[];
+  free_schedule_entitlement: FreeScheduleEntitlement | null;
   updated_at: string | null;
 }
 

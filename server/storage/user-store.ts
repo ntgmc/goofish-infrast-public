@@ -2,6 +2,7 @@ import { getPool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import type {
   LicenseConfig,
+  FreeScheduleEntitlement,
   LicenseOperator,
   OptimizeResult,
   PermissionMode,
@@ -126,6 +127,7 @@ export interface UserWorkspaceRecord {
   last_result: OptimizeResult | null
   saved_configs: WorkspaceSavedConfig[]
   result_history: WorkspaceResultHistoryItem[]
+  free_schedule_entitlement: FreeScheduleEntitlement | null
   updated_at: string
 }
 
@@ -138,6 +140,7 @@ interface LegacyUserWorkspaceRecord {
   last_result: OptimizeResult | null
   saved_configs?: WorkspaceSavedConfig[]
   result_history?: WorkspaceResultHistoryItem[]
+  free_schedule_entitlement?: FreeScheduleEntitlement | null
   updated_at: string
 }
 
@@ -640,6 +643,7 @@ export function emptyWorkspace(profileId: string): UserWorkspaceRecord {
     last_result: null,
     saved_configs: [],
     result_history: [],
+    free_schedule_entitlement: null,
     updated_at: new Date().toISOString(),
   }
 }
@@ -655,6 +659,7 @@ export function toPublicWorkspace(workspace: UserWorkspaceRecord | null): UserWo
     last_result: normalized?.last_result ?? null,
     saved_configs: normalized?.saved_configs ?? [],
     result_history: resultHistory,
+    free_schedule_entitlement: normalized?.free_schedule_entitlement ?? null,
     updated_at: normalized?.updated_at ?? null,
   }
 }
@@ -698,7 +703,37 @@ export function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null |
     last_result: isRecord(workspace.last_result) ? workspace.last_result as OptimizeResult : null,
     saved_configs: normalizeSavedConfigs((workspace as { saved_configs?: unknown }).saved_configs),
     result_history: normalizeResultHistory((workspace as { result_history?: unknown }).result_history),
+    free_schedule_entitlement: normalizeFreeScheduleEntitlement((workspace as { free_schedule_entitlement?: unknown }).free_schedule_entitlement),
     updated_at: typeof workspace.updated_at === 'string' ? workspace.updated_at : new Date().toISOString(),
+  }
+}
+
+function normalizeFreeScheduleEntitlement(value: unknown): FreeScheduleEntitlement | null {
+  if (!isRecord(value)) return null
+  const firstGeneratedAt = typeof value.first_generated_at === 'string' ? value.first_generated_at : null
+  const revisionCount = Number(value.revision_count ?? 0)
+  const confirmedAt = typeof value.confirmed_at === 'string' ? value.confirmed_at : null
+  const lockedAt = typeof value.locked_at === 'string' ? value.locked_at : null
+  const lockReason = value.lock_reason === 'confirmed' || value.lock_reason === 'revision_limit' || value.lock_reason === 'window_expired'
+    ? value.lock_reason
+    : null
+  const rawBonus = isRecord(value.strong_reorder_bonus) ? value.strong_reorder_bonus : null
+  const strongReorderBonus = rawBonus && typeof rawBonus.month === 'string' && typeof rawBonus.granted_at === 'string'
+    ? {
+      month: rawBonus.month,
+      granted_at: rawBonus.granted_at,
+      used_at: typeof rawBonus.used_at === 'string' ? rawBonus.used_at : null,
+    }
+    : null
+  return {
+    first_generated_at: firstGeneratedAt,
+    revision_count: Number.isFinite(revisionCount) ? Math.max(0, Math.floor(revisionCount)) : 0,
+    revision_limit: 3,
+    revision_window_hours: 24,
+    confirmed_at: confirmedAt,
+    locked_at: lockedAt,
+    lock_reason: lockReason,
+    strong_reorder_bonus: strongReorderBonus,
   }
 }
 
