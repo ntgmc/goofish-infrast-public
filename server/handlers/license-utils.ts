@@ -389,10 +389,20 @@ export function resolveConfigForPermission(
   return { ok: true, config: resolvePresetMode(config, preset) }
 }
 
-export function resolveFreePreviewConfig(config: LicenseConfig): { ok: true; config: LicenseConfig } | { ok: false; message: string } {
-  const validation = validateConfig(cloneConfig(config))
-  if (!validation.ok) return validation
-  return { ok: true, config: validation.config }
+export function resolveFreePreviewConfig(
+  config: LicenseConfig,
+): { ok: true; config: LicenseConfig } | { ok: false; message: string } {
+  if (config.optimizer_search) {
+    return { ok: false, message: 'free_preview does not allow optimizer_search settings.' }
+  }
+  if (hasForbiddenFreePreviewDroneConfig(config)) {
+    return { ok: false, message: 'free_preview only allows preset drones or intermediate-inventory auto drones.' }
+  }
+  const preset = PRESET_CONFIGS.find((item) => isPresetConfigMatch(config, item))
+  if (!preset) {
+    return { ok: false, message: 'free_preview only supports 243 balanced, 243 orundum, and 333 orundum presets.' }
+  }
+  return { ok: true, config: resolveFreePreviewPresetMode(config, preset) }
 }
 
 function isRawPermissionMode(value: string): value is RawPermissionMode {
@@ -416,6 +426,41 @@ function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): Licens
     resolved.drones = cloneConfig(config).drones
   }
   return resolved
+}
+
+function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConfig): LicenseConfig {
+  const resolved = cloneConfig(preset)
+  resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
+  delete resolved.optimizer_search
+  if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
+    resolved.schedule_mode = 'rotation'
+    resolved.Fiammetta = { ...(resolved.Fiammetta ?? {}), enable: false }
+    resolved.drones = { ...(resolved.drones ?? { order: 'pre', targets: [] }), enable: false }
+  } else if (isIntermediateAutoConfig(config)) {
+    resolved.intermediate_inventory = config.intermediate_inventory
+    resolved.auto_balance_source = config.auto_balance_source
+    resolved.drones = {
+      ...(resolved.drones ?? { order: 'pre', targets: [] }),
+      enable: true,
+      auto: true,
+      auto_strategy: 'trading_priority',
+      order: resolved.drones?.order ?? 'pre',
+      targets: Array.isArray(resolved.drones?.targets) ? resolved.drones.targets : [],
+    }
+    delete resolved.drones.auto_target_product
+  }
+  return resolved
+}
+
+function hasForbiddenFreePreviewDroneConfig(config: LicenseConfig): boolean {
+  if (normalizeScheduleMode(config.schedule_mode) === 'rotation') return false
+  const drones = config.drones
+  if (!drones) return false
+  const strategy = typeof drones.auto_strategy === 'string' ? drones.auto_strategy : ''
+  const target = typeof drones.auto_target_product === 'string' ? drones.auto_target_product : ''
+  if (target) return true
+  if (!strategy) return false
+  return !(isIntermediateAutoConfig(config) && strategy === 'trading_priority')
 }
 
 function isPresetConfigMatch(config: LicenseConfig, preset: LicenseConfig): boolean {

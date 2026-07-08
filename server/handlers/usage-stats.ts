@@ -296,6 +296,26 @@ export async function listUsageEvents(prefix = EVENT_PREFIX): Promise<UsageEvent
   return store.list(prefix)
 }
 
+export async function countSuccessfulUsageEventsForProfileInRange(
+  event: UsageEventName,
+  profileId: string,
+  startAt: string,
+  endAt: string,
+): Promise<number> {
+  const store = await getUsageEventStore()
+  if (store.countSuccessfulByProfileInRange) {
+    return store.countSuccessfulByProfileInRange(event, profileId, startAt, endAt)
+  }
+  const events = await store.list(EVENT_PREFIX)
+  return events.filter((record) => (
+    record.event === event &&
+    record.profile_id === profileId &&
+    record.status !== 'failure' &&
+    record.created_at >= startAt &&
+    record.created_at < endAt
+  )).length
+}
+
 export function setUsageEventStoreForTesting(store: UsageEventStore | null): void {
   ;(globalThis as unknown as { __maaUsageEventStoreForTesting?: UsageEventStore }).__maaUsageEventStoreForTesting =
     store ?? undefined

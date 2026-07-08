@@ -1,9 +1,19 @@
-import type { LicenseConfig, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { LicenseConfig, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { formatResultSummary, formatWorkspaceDate, isMaaJsonDownloadable } from '../../../lib/workspace-history'
 import GenerateControlBar, { DashboardMiniStat } from './GenerateControlBar'
 import { SmallActionButton } from './feedback'
 import type { ValidationState } from './types'
+
+type ReorderCheckViewState = {
+  visible: boolean;
+  disabledReason: string | null;
+  loading: boolean;
+  error: string | null;
+  result: ReorderCheckResult | null;
+  onCheck: () => void;
+  onGenerate: () => void;
+}
 
 export default function OverviewSection({
   activeConfig,
@@ -21,6 +31,7 @@ export default function OverviewSection({
   savedConfigCount,
   resultHistoryCount,
   latestResult,
+  reorderCheck,
   onGenerate,
   onReset,
   onOpenPlans,
@@ -45,6 +56,7 @@ export default function OverviewSection({
   savedConfigCount: number;
   resultHistoryCount: number;
   latestResult: WorkspaceResultHistoryItem | null;
+  reorderCheck?: ReorderCheckViewState;
   onGenerate: () => void;
   onReset: () => void;
   onOpenPlans: () => void;
@@ -72,6 +84,10 @@ export default function OverviewSection({
         onGenerate={onGenerate}
         onReset={onReset}
       />
+
+      {reorderCheck?.visible && (
+        <ReorderCheckCard state={reorderCheck} />
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <section className="rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
@@ -138,4 +154,137 @@ export default function OverviewSection({
       </div>
     </div>
   )
+}
+
+function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
+  const result = state.result
+  const disabled = state.loading || Boolean(state.disabledReason)
+  return (
+    <section className="rounded-xl border border-brand-600/25 bg-surface-1 p-5 shadow-sm shadow-brand-950/10 sm:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-brand-400">免费个人排班</p>
+          <h2 className="mt-1 text-lg font-semibold text-ink-primary">检测是否需要重排</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
+            只返回收益区间、影响设施和关键干员摘要，不展示完整新方案。
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={state.onCheck}
+          disabled={disabled}
+          className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted"
+        >
+          {state.loading ? '检测中' : '检测是否需要重排'}
+        </button>
+      </div>
+
+      {state.disabledReason && (
+        <div className="mt-4 rounded-lg border border-surface-3 bg-surface-2 px-4 py-3 text-sm leading-6 text-ink-secondary">
+          {state.disabledReason}
+        </div>
+      )}
+
+      {state.error && (
+        <div role="alert" className="mt-4 rounded-lg border border-error/40 bg-error/10 px-4 py-3 text-sm leading-6 text-error">
+          {state.error}
+        </div>
+      )}
+
+      {result && (
+        <div className="mt-5 space-y-4">
+          <div className={`rounded-lg border px-4 py-3 ${getRecommendationTone(result.recommendation)}`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">{formatRecommendationTitle(result.recommendation)}</p>
+                <p className="mt-1 text-sm leading-6">{formatRecommendationSummary(result.recommendation)}</p>
+              </div>
+              <span className="inline-flex w-fit rounded-md bg-surface-1/80 px-2.5 py-1 text-xs font-semibold text-ink-secondary">
+                {formatReorderQuota(result)}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <DashboardMiniStat label="收益区间" value={result.estimated_gain_range.label} />
+            <DashboardMiniStat label="变化房间" value={`${result.changed_room_count}`} />
+            <DashboardMiniStat label="当前方案" value={result.current_plan_usable ? '可继续用' : '不建议长期用'} />
+            <DashboardMiniStat label="本月剩余" value={`${result.quota.remaining}/${result.quota.limit}`} />
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <SummaryBlock
+              label="影响设施"
+              value={result.affected_facility_types.length > 0
+                ? result.affected_facility_types.map(formatFacilityType).join(' / ')
+                : '无明显变化'}
+            />
+            <SummaryBlock
+              label="可能受益干员"
+              value={result.key_operators.length > 0
+                ? result.key_operators.map((operator) => `${operator.name} x${operator.occurrence_count}`).join(' / ')
+                : '无新增关键干员'}
+            />
+          </div>
+
+          {result.reasons.length > 0 && (
+            <div className="rounded-lg border border-surface-3 bg-surface-2 px-4 py-3 text-sm leading-6 text-ink-secondary">
+              {result.reasons.join(' ')}
+            </div>
+          )}
+
+          {result.recommendation === 'strongly_recommended' && (
+            <div>
+              <SmallActionButton onClick={state.onGenerate}>生成完整个人排班</SmallActionButton>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function SummaryBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-surface-3 bg-surface-2 px-4 py-3">
+      <p className="text-xs font-semibold text-ink-muted">{label}</p>
+      <p className="mt-1 break-words text-sm leading-6 text-ink-primary">{value}</p>
+    </div>
+  )
+}
+
+function formatRecommendationTitle(recommendation: ReorderCheckResult['recommendation']): string {
+  if (recommendation === 'strongly_recommended') return '强烈建议重排'
+  if (recommendation === 'recommended') return '建议重排'
+  return '无需重排'
+}
+
+function formatRecommendationSummary(recommendation: ReorderCheckResult['recommendation']): string {
+  if (recommendation === 'strongly_recommended') return '核心贸易/制造组合可能受影响，建议生成完整个人排班。'
+  if (recommendation === 'recommended') return '新干员或新练度可能改变部分房间，方便时可以重新生成。'
+  return '预计收益提升很小，继续用当前方案即可。'
+}
+
+function getRecommendationTone(recommendation: ReorderCheckResult['recommendation']): string {
+  if (recommendation === 'strongly_recommended') return 'border-error/40 bg-error/10 text-error'
+  if (recommendation === 'recommended') return 'border-warning/40 bg-warning/10 text-warning'
+  return 'border-success/40 bg-success/10 text-success'
+}
+
+function formatFacilityType(type: string): string {
+  const labels: Record<string, string> = {
+    trading: '贸易站',
+    manufacture: '制造站',
+    manufacturing: '制造站',
+    power: '发电站',
+    meeting: '会客室',
+    control: '控制中枢',
+    dormitory: '宿舍',
+    office: '办公室',
+  }
+  return labels[type] ?? type
+}
+
+function formatReorderQuota(result: ReorderCheckResult): string {
+  return `本月剩余 ${result.quota.remaining}/${result.quota.limit} · ${formatWorkspaceDate(result.quota.reset_at)} 重置`
 }

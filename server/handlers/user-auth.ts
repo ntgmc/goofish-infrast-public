@@ -48,8 +48,8 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ANNOUNCEMENT_KEY = 'current.json'
 const PASSWORD_RESET_DEFAULT_TTL_MINUTES = 30
 const PASSWORD_RESET_RESEND_WINDOW_MS = 1000 * 60 * 5
-export const PASSWORD_RESET_REQUEST_MESSAGE = '如果该邮箱已注册，我们会发送重置密码邮件。'
-const PASSWORD_RESET_INVALID_MESSAGE = '重置链接无效或已过期。'
+export const PASSWORD_RESET_REQUEST_MESSAGE = 'If the email exists, a reset link has been sent.'
+const PASSWORD_RESET_INVALID_MESSAGE = 'The reset link is invalid or expired.'
 
 export interface AuthContext {
   user: UserAccountRecord
@@ -80,9 +80,9 @@ export function normalizeEmail(value: unknown): string | null {
 }
 
 export function validatePassword(value: unknown): { ok: true; password: string } | { ok: false; message: string } {
-  if (typeof value !== 'string') return { ok: false, message: '请填写密码。' }
-  if (value.length < 8) return { ok: false, message: '密码至少需要 8 位。' }
-  if (value.length > 128) return { ok: false, message: '密码不能超过 128 位。' }
+  if (typeof value !== 'string') return { ok: false, message: 'Password must be a string.' }
+  if (value.length < 8) return { ok: false, message: 'Password must be at least 8 characters.' }
+  if (value.length > 128) return { ok: false, message: 'Password must be at most 128 characters.' }
   return { ok: true, password: value }
 }
 
@@ -95,11 +95,11 @@ export async function registerUser(
   | { ok: false; status: number; message: string }
 > {
   const email = normalizeEmail(emailValue)
-  if (!email) return { ok: false, status: 400, message: '邮箱格式不正确。' }
+  if (!email) return { ok: false, status: 400, message: 'Invalid email format.' }
   const passwordCheck = validatePassword(passwordValue)
   if (!passwordCheck.ok) return { ok: false, status: 400, message: passwordCheck.message }
   const existing = await getUserByEmail(email)
-  if (existing) return { ok: false, status: 409, message: '该邮箱已注册。' }
+  if (existing) return { ok: false, status: 409, message: 'Email is already registered.' }
 
   const now = new Date().toISOString()
   const passwordHash = hashPassword(passwordCheck.password)
@@ -121,7 +121,7 @@ export async function registerUser(
   await saveUserAccount(user)
 
   if (typeof cdkValue === 'string' && cdkValue.trim()) {
-    const redeemed = await redeemProfileCdk(user, cdkValue, '账号 1', '')
+    const redeemed = await redeemProfileCdk(user, cdkValue, '璐﹀彿 1', '')
     if (!redeemed.ok) {
       await deleteUserAccount(user.id)
       return redeemed
@@ -154,15 +154,15 @@ export async function loginUser(
   | { ok: false; status: number; message: string }
 > {
   const email = normalizeEmail(emailValue)
-  if (!email) return { ok: false, status: 400, message: '邮箱格式不正确。' }
-  if (typeof passwordValue !== 'string') return { ok: false, status: 400, message: '请填写密码。' }
+  if (!email) return { ok: false, status: 400, message: 'Invalid email format.' }
+  if (typeof passwordValue !== 'string') return { ok: false, status: 400, message: 'Password must be a string.' }
 
   const user = await getUserByEmail(email)
   if (!user || !verifyPassword(passwordValue, user)) {
-    return { ok: false, status: 401, message: '邮箱或密码错误。' }
+    return { ok: false, status: 401, message: 'Invalid email or password.' }
   }
   if (user.status !== 'active') {
-    return { ok: false, status: 403, message: '账号状态不可用，请联系卖家。' }
+    return { ok: false, status: 403, message: 'Account is not active.' }
   }
 
   await migrateLegacyUserIfNeeded(user)
@@ -177,7 +177,7 @@ export async function changeUserPassword(
   keepTokenHash: string,
 ): Promise<{ ok: true; user: UserAccountRecord } | { ok: false; status: number; message: string }> {
   if (typeof oldPasswordValue !== 'string' || !verifyPassword(oldPasswordValue, user)) {
-    return { ok: false, status: 401, message: '当前密码不正确。' }
+    return { ok: false, status: 401, message: "Invalid license signature." };
   }
   const nextPassword = validatePassword(newPasswordValue)
   if (!nextPassword.ok) return { ok: false, status: 400, message: nextPassword.message }
@@ -271,7 +271,7 @@ export async function redeemProfileCdk(
   | { ok: false; status: number; message: string }
 > {
   if (typeof codeValue !== 'string' || !codeValue.trim()) {
-    return { ok: false, status: 400, message: '请填写 CDK。' }
+  if (typeof codeValue !== 'string' || !codeValue.trim()) return { ok: false, status: 400, message: 'Please enter a CDK.' }
   }
 
   const normalizedCode = normalizeCode(codeValue)
@@ -279,10 +279,10 @@ export async function redeemProfileCdk(
   const cdkKey = `cdk/${codeHash}.json`
   const cdkStore = await getCdkRecordStore()
   const cdkRecord = await cdkStore.get(cdkKey)
-  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK 不存在。' }
-  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已冻结，请联系卖家。' }
-  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已撤销，请联系卖家。' }
-  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
+  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK does not exist.' }
+  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK is frozen.' }
+  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK has been revoked.' }
+  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK has already been used.' }
 
   const now = new Date().toISOString()
   const profileId = randomUUID()
@@ -328,7 +328,10 @@ export async function createOrReusePreviewProfile(
   user: UserAccountRecord,
   displayNameValue?: unknown,
   noteValue?: unknown,
-): Promise<{ ok: true; profile: UserGameAccountRecord }> {
+): Promise<
+  | { ok: true; profile: UserGameAccountRecord }
+  | { ok: false; status: number; message: string }
+> {
   const profiles = await listProfilesForUser(user.id)
   const existing = profiles.find((profile) => isFreePreviewProfile(profile))
   const displayName = normalizeProfileDisplayName(displayNameValue)
@@ -346,25 +349,11 @@ export async function createOrReusePreviewProfile(
     return { ok: true, profile: updated }
   }
 
-  const now = new Date().toISOString()
-  const profile: UserGameAccountRecord = {
-    version: 1,
-    id: randomUUID(),
-    user_id: user.id,
-    kind: 'free_preview',
-    cdk_key: null,
-    cdk_code_hash: null,
-    cdk_order_hash: null,
-    permission: 'growth',
-    status: 'active',
-    display_name: displayName || '免费预览',
-    note: note || '免费预览档案，输入 CDK 后可解锁完整结果。',
-    created_at: now,
-    updated_at: now,
+  return {
+    ok: false,
+    status: 400,
+    message: 'Free preview profiles must be claimed with Skland login.',
   }
-  await saveUserProfile(profile)
-  await saveProfileWorkspace(emptyWorkspace(profile.id))
-  return { ok: true, profile }
 }
 
 export async function upgradePreviewProfileWithCdk(
@@ -378,16 +367,18 @@ export async function upgradePreviewProfileWithCdk(
   | { ok: false; status: number; message: string }
 > {
   if (typeof profileIdValue !== 'string' || !profileIdValue.trim()) {
-    return { ok: false, status: 400, message: '缺少免费预览档案。' }
+    return { ok: false, status: 400, message: 'Missing free preview profile.' }
   }
   const profile = await getProfileForUser(user.id, profileIdValue.trim())
-  if (!profile) return { ok: false, status: 404, message: '账号档案不存在。' }
+  if (!profile) return { ok: false, status: 404, message: 'Profile does not exist.' }
   if (!isFreePreviewProfile(profile)) {
-    return { ok: false, status: 400, message: '只有免费预览档案可以原地解锁。' }
+    return { ok: false, status: 400, message: 'Only free preview profiles can be upgraded in place.' }
   }
-  if (profile.status !== 'active') return { ok: false, status: 403, message: '账号档案状态不可用。' }
+  if (profile.status !== 'active') {
+    return { ok: false, status: 403, message: 'Profile is not active.' }
+  }
   if (typeof codeValue !== 'string' || !codeValue.trim()) {
-    return { ok: false, status: 400, message: '请填写 CDK。' }
+    return { ok: false, status: 400, message: 'Missing CDK code.' }
   }
 
   const normalizedCode = normalizeCode(codeValue)
@@ -395,10 +386,10 @@ export async function upgradePreviewProfileWithCdk(
   const cdkKey = `cdk/${codeHash}.json`
   const cdkStore = await getCdkRecordStore()
   const cdkRecord = await cdkStore.get(cdkKey)
-  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK 不存在。' }
-  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已冻结，请联系卖家。' }
-  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已撤销，请联系卖家。' }
-  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
+  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK does not exist.' }
+  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK is frozen.' }
+  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK is revoked.' }
+  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK has already been used.' }
 
   const now = new Date().toISOString()
   const permission = normalizePermissionMode(cdkRecord.permission)
@@ -412,7 +403,7 @@ export async function upgradePreviewProfileWithCdk(
     cdk_code_hash: codeHash,
     cdk_order_hash: cdkOrderHash,
     permission,
-    display_name: displayName || profile.display_name || '账号',
+    display_name: displayName || profile.display_name || 'Free preview',
     note: note || profile.note,
     updated_at: now,
   }
@@ -608,7 +599,7 @@ function createAccountOrderHash(codeHash: string, profileId: string): string {
 
 async function nextDefaultProfileName(userId: string): Promise<string> {
   const profiles = await listProfilesForUser(userId)
-  return `账号 ${profiles.length + 1}`
+  return `璐﹀彿 ${profiles.length + 1}`
 }
 
 function normalizeProfileDisplayName(value: unknown): string {
