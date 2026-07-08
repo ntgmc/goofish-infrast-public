@@ -493,6 +493,7 @@ export default function OptimizePage({
         queuePosition: next.queue_position,
         priority: next.priority,
         jobId: next.job_id,
+        lastUpdatedAt: Date.now(),
       }))
     }
 
@@ -569,6 +570,7 @@ export default function OptimizePage({
       queuePosition: activeJob.queue_position,
       priority: activeJob.priority,
       jobId: activeJob.job_id,
+      lastUpdatedAt: Date.now(),
     })
 
     let cancelled = false
@@ -584,11 +586,13 @@ export default function OptimizePage({
         )
         if (cancelled) return
         completed = true
-        setProgress({
+        setProgress((current) => ({
+          ...current,
           mode: active.mode,
-          startedAt: Date.parse(activeJob.submitted_at) || Date.now(),
+          startedAt: current?.startedAt ?? (Date.parse(activeJob.submitted_at) || Date.now()),
           completedAt: Date.now(),
-        })
+          lastUpdatedAt: Date.now(),
+        }))
         await waitForProgressCompletion()
         if (active.mode === 'apply') {
           setFinalResult(result)
@@ -729,7 +733,7 @@ export default function OptimizePage({
     setPhase('idle')
     setLoading(true)
     const startedAt = Date.now()
-    setProgress({ mode: 'generate', startedAt })
+    setProgress({ mode: 'generate', startedAt, lastUpdatedAt: Date.now() })
     let completed = false
     try {
       const potential = userCanUseUpgradeFeatures ? await runOptimize(true, true) : null
@@ -788,7 +792,13 @@ export default function OptimizePage({
             })
         : []
       completed = true
-      setProgress({ mode: 'generate', startedAt, completedAt: Date.now() })
+      setProgress((current) => ({
+        ...current,
+        mode: 'generate',
+        startedAt: current?.startedAt ?? startedAt,
+        completedAt: Date.now(),
+        lastUpdatedAt: Date.now(),
+      }))
       await waitForProgressCompletion()
       setSuggestions(upgradeList.sort((a, b) => b.gain - a.gain).slice(0, 20))
       setPhase('suggestions')
@@ -815,7 +825,7 @@ export default function OptimizePage({
     optimizeInFlightRef.current = true
     setInlineError(null)
     const startedAt = Date.now()
-    setProgress({ mode: 'apply', startedAt })
+    setProgress({ mode: 'apply', startedAt, lastUpdatedAt: Date.now() })
     let completed = false
     const selectedSet = new Set(selectedIds)
     const newOverrides = { ...eliteOverrides }
@@ -845,7 +855,13 @@ export default function OptimizePage({
       }
       const data = await runOptimizeJob(applyPayload, 'apply', '优化失败')
       completed = true
-      setProgress({ mode: 'apply', startedAt, completedAt: Date.now() })
+      setProgress((current) => ({
+        ...current,
+        mode: 'apply',
+        startedAt: current?.startedAt ?? startedAt,
+        completedAt: Date.now(),
+        lastUpdatedAt: Date.now(),
+      }))
       await waitForProgressCompletion()
       setFinalResult(data)
       setPhase('final')

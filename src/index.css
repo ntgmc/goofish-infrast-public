@@ -485,6 +485,81 @@ body {
   transform: translateX(-100%);
 }
 
+.schedule-task-shell {
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
+}
+
+.schedule-task-shell::before {
+  background:
+    linear-gradient(90deg, transparent, color-mix(in oklch, var(--color-brand-500) 8%, transparent), transparent),
+    linear-gradient(180deg, color-mix(in oklch, var(--color-surface-0) 22%, transparent), transparent 42%);
+  content: "";
+  inset: 0;
+  opacity: 0.8;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-72%);
+}
+
+.schedule-task-shell[data-status="queued"]::before {
+  animation: schedule-task-scan 3.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.schedule-task-shell[data-status="running"]::before,
+.schedule-task-shell[data-status="finishing"]::before {
+  animation: schedule-task-scan 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.schedule-task-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.schedule-task-meter {
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--color-brand-500) 18%, transparent),
+    0 14px 28px color-mix(in oklch, var(--color-surface-0) 18%, transparent);
+}
+
+.schedule-task-meter::after {
+  border: 1px solid color-mix(in oklch, var(--color-brand-400) 40%, transparent);
+  border-radius: 999px;
+  content: "";
+  inset: -4px;
+  opacity: 0.5;
+  position: absolute;
+}
+
+.schedule-task-shell[data-status="queued"] .schedule-task-meter::after {
+  animation: schedule-task-breathe 2.5s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.schedule-task-shell[data-status="running"] .schedule-task-meter::after,
+.schedule-task-shell[data-status="finishing"] .schedule-task-meter::after {
+  animation: schedule-task-orbit 1.6s linear infinite;
+  border-color: var(--color-brand-400) transparent transparent transparent;
+}
+
+.schedule-task-fill {
+  overflow: hidden;
+  position: relative;
+}
+
+.schedule-task-fill::after {
+  animation: schedule-progress-sheen 1.35s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.44), transparent);
+  content: "";
+  inset: 0;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
+.schedule-task-dot {
+  animation: schedule-task-dot 1.25s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
 @keyframes landing-hero-enter {
   from {
     opacity: 0;
@@ -730,6 +805,48 @@ body {
   }
 }
 
+@keyframes schedule-task-scan {
+  0%, 22% {
+    opacity: 0;
+    transform: translateX(-72%);
+  }
+  42% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(72%);
+  }
+}
+
+@keyframes schedule-task-breathe {
+  0%, 100% {
+    opacity: 0.28;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.045);
+  }
+}
+
+@keyframes schedule-task-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes schedule-task-dot {
+  0%, 100% {
+    opacity: 0.58;
+    transform: scale(0.82);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -755,7 +872,11 @@ body {
   .landing-generate-card::after,
   .landing-preview-slot::before,
   .landing-progress-fill,
-  .landing-progress-fill::after {
+  .landing-progress-fill::after,
+  .schedule-task-shell::before,
+  .schedule-task-meter::after,
+  .schedule-task-fill::after,
+  .schedule-task-dot {
     animation: none !important;
   }
 
