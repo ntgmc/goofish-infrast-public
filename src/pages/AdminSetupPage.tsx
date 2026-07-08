@@ -79,7 +79,7 @@ export default function AdminSetupPage() {
       <div className="mx-auto max-w-5xl">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-brand-500">Root setup</p>
+            <p className="text-sm font-semibold text-brand-500">Root 设置</p>
             <h1 className="mt-2 text-2xl font-semibold text-ink-primary">管理账号设置</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">
               这里使用 `MAA_ADMIN_PASSWORD` 创建日常管理账号。创建完成后，回到后台使用账号密码登录，减少 root 口令暴露次数。

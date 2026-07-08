@@ -24,6 +24,11 @@ const DORMITORY_RULE_LABELS: Record<string, string> = {
   maa_autofill: 'MAA 自动填满',
 }
 
+const DRONE_ORDER_LABELS: Record<string, string> = {
+  pre: '换班前',
+  post: '换班后',
+}
+
 export function describeConfigDiff(current: LicenseConfig, previous: LicenseConfig | null | undefined): ConfigDiffItem[] {
   if (!previous) {
     return [{ label: '上次配置', before: '无记录', after: formatConfigBrief(current) }]
@@ -116,11 +121,26 @@ function formatProduct(product: string): string {
   return PRODUCT_LABELS[product] ?? product
 }
 
+function formatDroneOrder(order: string | undefined): string {
+  return DRONE_ORDER_LABELS[order ?? 'pre'] ?? '自定义顺序'
+}
+
+function formatDroneAutoStrategy(config: LicenseConfig): string {
+  const strategy = config.drones?.auto_strategy
+  if (!strategy) return '默认策略'
+  if (strategy === 'trading_priority') return '贸易站优先'
+  if (strategy === 'manufacture_product') {
+    const target = config.drones?.auto_target_product
+    return target ? `制造站优先：${formatProduct(target)}` : '制造站优先'
+  }
+  return '自定义策略'
+}
+
 function formatDrones(config: LicenseConfig): string {
   if (!config.drones?.enable) return '未启用'
-  if (config.drones.auto) return `自动 · ${config.drones.auto_strategy ?? '默认策略'}`
+  if (config.drones.auto) return `自动 · ${formatDroneAutoStrategy(config)}`
   const targets = config.drones.targets?.length ? config.drones.targets.map(formatProduct).join(' / ') : '未指定目标'
-  return `${config.drones.order || 'pre'} · ${targets}`
+  return `${formatDroneOrder(config.drones.order)} · ${targets}`
 }
 
 function formatIntermediateInventory(config: LicenseConfig): string {

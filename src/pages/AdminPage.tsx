@@ -1073,7 +1073,7 @@ const summary = useMemo(
         <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-8 lg:grid-cols-[1fr_380px]">
           <section>
             <div className="max-w-2xl">
-              <p className="text-sm font-semibold text-brand-500">MAA Infrast Admin</p>
+              <p className="text-sm font-semibold text-brand-500">MAA 基建管理后台</p>
               <h1 className="mt-3 text-3xl font-semibold text-ink-primary sm:text-4xl">管理工作台</h1>
               <p className="mt-4 max-w-xl text-sm leading-6 text-ink-secondary">
                 使用独立管理账号进入后台。Root 口令只用于创建和维护管理账号，日常操作不再需要反复输入。
@@ -1132,7 +1132,7 @@ const summary = useMemo(
     <div className="min-h-screen bg-surface-0 text-ink-primary">
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-surface-3 bg-surface-1 px-4 py-5 lg:block">
         <div className="px-2">
-          <p className="text-sm font-semibold text-brand-500">MAA Admin</p>
+          <p className="text-sm font-semibold text-brand-500">MAA 管理后台</p>
           <p className="mt-1 truncate text-xs text-ink-muted">{credentials?.user}</p>
         </div>
         <nav className="mt-8 space-y-1">
