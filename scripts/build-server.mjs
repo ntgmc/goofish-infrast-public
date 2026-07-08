@@ -4,6 +4,7 @@ await build({
   entryPoints: {
     index: 'server/index.ts',
     routes: 'server/routes.ts',
+    'optimize-worker': 'server/optimize-worker.ts',
   },
   outdir: 'server/dist',
   bundle: true,

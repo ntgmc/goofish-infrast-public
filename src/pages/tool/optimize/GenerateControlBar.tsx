@@ -84,7 +84,7 @@ export default function GenerateControlBar({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                {syncing ? '正在同步授权...' : '正在计算...'}
+                {syncing ? '正在同步授权...' : progress?.queueStatus === 'queued' ? '排队中...' : '正在计算...'}
               </span>
             ) : resultIsCurrent ? '方案已是最新' : hasResult ? '重新计算排班' : '生成排班方案'}
           </button>

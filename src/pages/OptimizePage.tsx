@@ -6,6 +6,8 @@ import type {
   LicenseConfig,
   LicenseFile,
   LicenseOperator,
+  OptimizeJobAccepted,
+  OptimizeJobStatusResponse,
   OptimizeRequest,
   OptimizeResult,
   ReorderCheckResult,
@@ -119,6 +121,7 @@ export default function OptimizePage({
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const operatorFileRef = useRef<HTMLInputElement>(null)
   const optimizeInFlightRef = useRef(false)
+  const optimizeRestoreKeyRef = useRef<string | null>(null)
   const configToastTimerRef = useRef<number | null>(null)
   const configToastIdRef = useRef(0)
   const pendingLicenseSyncRef = useRef<{ license: LicenseFile; message: string } | null>(null)
@@ -472,6 +475,163 @@ export default function OptimizePage({
     downloadOptimizeResult(item.result, `maa-schedule-${item.id.slice(0, 8) || 'history'}`)
   }, [])
 
+  const pollOptimizeJob = useCallback(async (
+    job: OptimizeJobAccepted | OptimizeJobStatusResponse,
+    storageKey: string,
+    progressMode: ScheduleProgressState['mode'],
+    fallbackMessage: string,
+    isCancelled?: () => boolean,
+  ): Promise<OptimizeResult> => {
+    const throwIfCancelled = () => {
+      if (isCancelled?.()) throw new OptimizeJobPollCancelledError()
+    }
+    const updateProgress = (next: OptimizeJobAccepted | OptimizeJobStatusResponse) => {
+      setProgress((current) => ({
+        mode: current?.mode ?? progressMode,
+        startedAt: current?.startedAt ?? (Date.parse(next.submitted_at) || Date.now()),
+        queueStatus: next.status === 'queued' || next.status === 'running' ? next.status : current?.queueStatus,
+        queuePosition: next.queue_position,
+        priority: next.priority,
+        jobId: next.job_id,
+      }))
+    }
+
+    updateProgress(job)
+    let pollAfterMs = job.poll_after_ms || (job.status === 'queued' ? 1200 : 900)
+    while (true) {
+      throwIfCancelled()
+      await waitForOptimizePoll(pollAfterMs)
+      throwIfCancelled()
+      const status = await apiJson<OptimizeJobStatusResponse>('/api/optimize/job?id=' + encodeURIComponent(job.job_id), {
+        fallbackMessage,
+      })
+      throwIfCancelled()
+      writeActiveOptimizeJob(storageKey, status)
+      updateProgress(status)
+
+      if (status.status === 'succeeded') {
+        if (!status.result) throw new Error('优化任务缺少结果。')
+        clearActiveOptimizeJob(storageKey)
+        return status.result
+      }
+      if (status.status === 'failed') {
+        clearActiveOptimizeJob(storageKey)
+        throw new Error(status.error || '优化任务失败，请重试。')
+      }
+      pollAfterMs = status.poll_after_ms || (status.status === 'queued' ? 1200 : 900)
+    }
+  }, [])
+
+  const runOptimizeJob = useCallback(async (
+    payload: OptimizeRequest,
+    progressMode: ScheduleProgressState['mode'],
+    fallbackMessage: string,
+  ): Promise<OptimizeResult> => {
+    const accepted = await apiJson<OptimizeJobAccepted>('/api/optimize', {
+      method: 'POST',
+      json: payload,
+      fallbackMessage,
+    })
+    const storageKey = buildOptimizeJobStorageKey(profileId, license.order_hash, optimizeSignature, progressMode)
+    writeActiveOptimizeJob(storageKey, accepted)
+
+    try {
+      return await pollOptimizeJob(accepted, storageKey, progressMode, fallbackMessage)
+    } catch (error) {
+      if (!isOptimizeJobPollCancelled(error)) {
+        clearActiveOptimizeJob(storageKey)
+      }
+      throw error
+    }
+  }, [license.order_hash, optimizeSignature, pollOptimizeJob, profileId])
+
+  useEffect(() => {
+    if (optimizeInFlightRef.current) return
+    const modes: ScheduleProgressState['mode'][] = ['apply', 'generate']
+    const active = modes
+      .map((mode) => {
+        const storageKey = buildOptimizeJobStorageKey(profileId, license.order_hash, optimizeSignature, mode)
+        return { mode, storageKey, job: readActiveOptimizeJob(storageKey) }
+      })
+      .find(({ job }) => isActiveOptimizeJob(job))
+    if (!active || !isActiveOptimizeJob(active.job)) return
+    if (optimizeRestoreKeyRef.current === active.storageKey) return
+    const activeJob = active.job
+
+    optimizeRestoreKeyRef.current = active.storageKey
+    optimizeInFlightRef.current = true
+    setLoading(true)
+    setInlineError(null)
+    setProgress({
+      mode: active.mode,
+      startedAt: Date.parse(activeJob.submitted_at) || Date.now(),
+      queueStatus: activeJob.status,
+      queuePosition: activeJob.queue_position,
+      priority: activeJob.priority,
+      jobId: activeJob.job_id,
+    })
+
+    let cancelled = false
+    void (async () => {
+      let completed = false
+      try {
+        const result = await pollOptimizeJob(
+          activeJob,
+          active.storageKey,
+          active.mode,
+          active.mode === 'apply' ? '优化失败' : '优化请求失败',
+          () => cancelled,
+        )
+        if (cancelled) return
+        completed = true
+        setProgress({
+          mode: active.mode,
+          startedAt: Date.parse(activeJob.submitted_at) || Date.now(),
+          completedAt: Date.now(),
+        })
+        await waitForProgressCompletion()
+        if (active.mode === 'apply') {
+          setFinalResult(result)
+          setPhase('final')
+        } else {
+          const current = result.current_result ?? result
+          setCurrentResult(current)
+          setFinalResult(null)
+          setHistoryItem(null)
+          setSuggestions((result.upgrade_suggestions ?? []) as UpgradeSuggestion[])
+          if (current.preview_limit?.free_schedule_entitlement) {
+            setFreeScheduleEntitlementOverride(current.preview_limit.free_schedule_entitlement)
+          }
+          setPhase('suggestions')
+        }
+        setSection('result')
+        setLastGeneratedSignature(optimizeSignature)
+      } catch (error) {
+        if (!cancelled && !isOptimizeJobPollCancelled(error)) {
+          clearActiveOptimizeJob(active.storageKey)
+          setInlineError({
+            scope: active.mode === 'apply' ? 'apply' : 'generate',
+            message: formatOptimizeError(error instanceof Error ? error.message : String(error)),
+          })
+        }
+      } finally {
+        if (!cancelled) {
+          optimizeInFlightRef.current = false
+          setLoading(false)
+          flushPendingLicenseSync()
+          if (!completed) {
+            setProgress(null)
+          }
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      optimizeInFlightRef.current = false
+    }
+  }, [flushPendingLicenseSync, license.order_hash, optimizeSignature, pollOptimizeJob, profileId])
+
   const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false) => {
     const payload: OptimizeRequest = {
       profile_id: profileId,
@@ -482,13 +642,22 @@ export default function OptimizePage({
       activation_token: getActivationTokenForLicense(license),
       ...(includeCurrent && { include_current: true }),
     }
-    return await apiJson<OptimizeResult>('/api/optimize', {
-      method: 'POST',
-      json: payload,
-      fallbackMessage: '优化请求失败',
-    })
-  }, [activeConfig, license, mergedOperators, profileId])
+    return await runOptimizeJob(payload, 'generate', '优化请求失败')
+  }, [activeConfig, license, mergedOperators, profileId, runOptimizeJob])
 
+  const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
+    const payload: OptimizeRequest = {
+      profile_id: profileId,
+      license,
+      operators: mergedOperators,
+      config: activeConfig,
+      ignore_elite: true,
+      activation_token: getActivationTokenForLicense(license),
+      suggestions_only: true,
+      upgrade_task_payload: taskPayload,
+    }
+    return await runOptimizeJob(payload, 'generate', '练度建议请求失败。')
+  }, [activeConfig, license, mergedOperators, profileId, runOptimizeJob])
   const handleReorderCheck = useCallback(async () => {
     if (!isPreviewProfile || reorderCheckLoading || loading) return
     if (reorderCheckDisabledReason) {
@@ -540,24 +709,6 @@ export default function OptimizePage({
       setFreeScheduleConfirming(false)
     }
   }, [freeScheduleConfirming, isPreviewProfile, latestWorkspaceResult, profileId])
-
-  const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
-    const payload: OptimizeRequest = {
-      profile_id: profileId,
-      license,
-      operators: mergedOperators,
-      config: activeConfig,
-      ignore_elite: true,
-      activation_token: getActivationTokenForLicense(license),
-      suggestions_only: true,
-      upgrade_task_payload: taskPayload,
-    }
-    return await apiJson<OptimizeResult>('/api/optimize', {
-      method: 'POST',
-      json: payload,
-      fallbackMessage: '练度建议请求失败。',
-    })
-  }, [activeConfig, license, mergedOperators, profileId])
 
   const handleGenerate = useCallback(async () => {
     if (licenseSyncing || loading || optimizeInFlightRef.current) return
@@ -683,19 +834,16 @@ export default function OptimizePage({
     setEliteOverrides(newOverrides)
     setLoading(true)
     try {
-      const data = await apiJson<OptimizeResult>('/api/optimize', {
-        method: 'POST',
-        json: {
-          profile_id: profileId,
-          license,
-          operators: mergeOperators(license.operators, newOverrides),
-          config: activeConfig,
-          ignore_elite: false,
-          activation_token: getActivationTokenForLicense(license),
-          history_source: 'applied_suggestions',
-        },
-        fallbackMessage: '优化失败',
-      })
+      const applyPayload: OptimizeRequest = {
+        profile_id: profileId,
+        license,
+        operators: mergeOperators(license.operators, newOverrides),
+        config: activeConfig,
+        ignore_elite: false,
+        activation_token: getActivationTokenForLicense(license),
+        history_source: 'applied_suggestions',
+      }
+      const data = await runOptimizeJob(applyPayload, 'apply', '优化失败')
       completed = true
       setProgress({ mode: 'apply', startedAt, completedAt: Date.now() })
       await waitForProgressCompletion()
@@ -712,7 +860,7 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [activeConfig, eliteOverrides, loading, resultIsCurrent, suggestions, license, profileId, setEliteOverrides])
+  }, [activeConfig, eliteOverrides, loading, resultIsCurrent, runOptimizeJob, suggestions, license, profileId, setEliteOverrides])
 
   const handleDownloadMAA = useCallback(() => {
     const data = finalResult || currentResult || historyItem?.result
@@ -940,6 +1088,71 @@ function formatConfigPresetLabel(config: LicenseConfig): string {
 
 function waitForProgressCompletion(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, SCHEDULE_PROGRESS_COMPLETION_DURATION_MS))
+}
+
+function waitForOptimizePoll(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, Math.max(500, ms)))
+}
+
+function buildOptimizeJobStorageKey(
+  profileId: string,
+  orderHash: string,
+  signature: string,
+  mode: ScheduleProgressState['mode'],
+): string {
+  return ['maa-optimize-job', profileId || orderHash || 'anonymous', mode, signature].join(':')
+}
+
+function writeActiveOptimizeJob(key: string, job: OptimizeJobAccepted | OptimizeJobStatusResponse): void {
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(job))
+  } catch {
+    // Session storage is best-effort only.
+  }
+}
+
+function readActiveOptimizeJob(key: string): OptimizeJobAccepted | OptimizeJobStatusResponse | null {
+  try {
+    const raw = window.sessionStorage.getItem(key)
+    if (!raw) return null
+    const value = JSON.parse(raw) as Partial<OptimizeJobAccepted | OptimizeJobStatusResponse>
+    if (
+      typeof value.job_id === 'string'
+      && (value.status === 'queued' || value.status === 'running' || value.status === 'succeeded' || value.status === 'failed')
+      && (value.priority === 'paid' || value.priority === 'standard')
+      && typeof value.submitted_at === 'string'
+    ) {
+      return value as OptimizeJobAccepted | OptimizeJobStatusResponse
+    }
+  } catch {
+    // Session storage is best-effort only.
+  }
+  return null
+}
+
+function isActiveOptimizeJob(
+  job: OptimizeJobAccepted | OptimizeJobStatusResponse | null,
+): job is OptimizeJobAccepted | (OptimizeJobStatusResponse & { status: 'queued' | 'running' }) {
+  return job?.status === 'queued' || job?.status === 'running'
+}
+
+function clearActiveOptimizeJob(key: string): void {
+  try {
+    window.sessionStorage.removeItem(key)
+  } catch {
+    // Session storage is best-effort only.
+  }
+}
+
+class OptimizeJobPollCancelledError extends Error {
+  constructor() {
+    super('optimize job polling cancelled')
+    this.name = 'OptimizeJobPollCancelledError'
+  }
+}
+
+function isOptimizeJobPollCancelled(error: unknown): boolean {
+  return error instanceof OptimizeJobPollCancelledError
 }
 
 function formatOptimizeError(message: string): string {

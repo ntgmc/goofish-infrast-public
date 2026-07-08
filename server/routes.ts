@@ -62,6 +62,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/user/workspace/free-schedule/confirm', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/optimize', optimizeHandler as unknown as ApiHandler],
+  ['/api/optimize/job', optimizeHandler as unknown as ApiHandler],
   ['/api/optimize/reorder-check', optimizeHandler as unknown as ApiHandler],
 ])
 
