@@ -289,6 +289,41 @@ export interface OptimizeResult {
   build_meta?: AppBuildMeta;
 }
 
+export type ReorderCheckRecommendation = 'no_need' | 'recommended' | 'strongly_recommended';
+
+export interface ReorderCheckResult {
+  recommendation: ReorderCheckRecommendation;
+  estimated_gain_range: {
+    min: number | null;
+    max: number | null;
+    unit: 'equivalent_sanity_per_day' | 'room_change_only';
+    label: string;
+  };
+  changed_room_count: number;
+  affected_facility_types: string[];
+  key_operators: {
+    id?: string;
+    name: string;
+    reason: 'newly_used' | 'core_combo_changed';
+    occurrence_count: number;
+  }[];
+  current_plan_usable: boolean;
+  quota: {
+    limit: 2;
+    used: number;
+    remaining: number;
+    reset_at: string;
+    timezone: 'Asia/Shanghai';
+  };
+  baseline: {
+    history_id: string;
+    created_at: string;
+    name: string;
+  };
+  reasons: string[];
+  build_meta?: AppBuildMeta;
+}
+
 export interface ScheduleAnalysisSummary {
   source: 'imported_schedule';
   plan_count: number;

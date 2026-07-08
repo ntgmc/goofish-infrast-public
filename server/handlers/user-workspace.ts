@@ -10,7 +10,7 @@ import {
   toPublicWorkspace,
   type UserWorkspaceRecord,
 } from '../storage/user-store'
-import { resolveConfigForPermission, validateConfig, validateOperators } from './license-utils'
+import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 
 const WORKSPACE_SAVED_CONFIG_LIMIT = 20
@@ -52,11 +52,19 @@ export default async (req: Request): Promise<Response> => {
     if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案不能保存排班工作区。' }, 403)
     if (profile.status !== 'active') return jsonResponse({ error: '账号档案状态不可用。' }, 403)
 
+    const isPreviewProfile = isFreePreviewProfile(profile)
+    if (isPreviewProfile && !profile.skland_binding) {
+      return jsonResponse({ error: 'Free preview profiles must be bound to Skland before saving workspace data.' }, 403)
+    }
+
     const existing = await getProfileWorkspace(profile.id)
     const next: UserWorkspaceRecord = existing ?? emptyWorkspace(profile.id)
     let operatorsPatched = false
 
     if ('operators' in body) {
+      if (isPreviewProfile) {
+        return jsonResponse({ error: 'Free preview operator data can only be updated from Skland import.' }, 403)
+      }
       operatorsPatched = true
       if (body.operators === null) {
         next.operators = null
@@ -73,8 +81,8 @@ export default async (req: Request): Promise<Response> => {
       } else {
         const configCheck = validateConfig(body.config)
         if (!configCheck.ok) return jsonResponse({ error: configCheck.message }, 400)
-        const permissionCheck = isFreePreviewProfile(profile)
-          ? { ok: true as const, config: configCheck.config }
+        const permissionCheck = isPreviewProfile
+          ? resolveFreePreviewConfig(configCheck.config)
           : resolveConfigForPermission(profile.permission, configCheck.config)
         if (!permissionCheck.ok) return jsonResponse({ error: permissionCheck.message }, 403)
         next.config = permissionCheck.config
@@ -90,7 +98,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if ('saved_config_action' in body) {
-      const savedConfigResult = applySavedConfigAction(next, body.saved_config_action, profile.permission, isFreePreviewProfile(profile))
+      const savedConfigResult = applySavedConfigAction(next, body.saved_config_action, profile.permission, isPreviewProfile)
       if (!savedConfigResult.ok) return jsonResponse({ error: savedConfigResult.message }, savedConfigResult.status ?? 400)
     }
 
@@ -125,7 +133,7 @@ function applySavedConfigAction(
   workspace: UserWorkspaceRecord,
   rawAction: unknown,
   permission: PermissionMode,
-  allowAnyConfig = false,
+  isPreviewProfile = false,
 ): SavedConfigActionResult {
   if (!isRecord(rawAction) || typeof rawAction.type !== 'string') {
     return { ok: false, message: '保存方案操作不正确。' }
@@ -137,8 +145,8 @@ function applySavedConfigAction(
 
     const configCheck = validateConfig(rawAction.config)
     if (!configCheck.ok) return { ok: false, message: configCheck.message }
-    const permissionCheck = allowAnyConfig
-      ? { ok: true as const, config: configCheck.config }
+    const permissionCheck = isPreviewProfile
+      ? resolveFreePreviewConfig(configCheck.config)
       : resolveConfigForPermission(permission, configCheck.config)
     if (!permissionCheck.ok) return { ok: false, message: permissionCheck.message, status: 403 }
 
