@@ -250,7 +250,10 @@ export interface OptimizeResult {
     queue_count: number;
     quick_switch: true;
     training_policy: 'assume_not_training';
-    suppress_total_efficiency: true;
+    shift_hours_per_queue?: number;
+    daily_production_normalized_hours?: number;
+    total_cycle_hours?: number;
+    suppress_total_efficiency?: false;
   };
   shift_hours?: number[];
   shift_pattern?: string;
@@ -521,6 +524,8 @@ export interface DroneAssignment {
 
 export interface DailyProduction {
   hours?: number;
+  source_hours?: number;
+  normalization_factor?: number;
   shift_hours?: number[];
   manufacturing?: Record<string, number>;
   trading?: Record<string, number>;

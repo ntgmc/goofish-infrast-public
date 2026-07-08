@@ -20,11 +20,24 @@ export default function ResultMetrics({
   analysisSummary: OptimizeResult['analysis_summary'];
   prepared: PreparedResult;
 }) {
-  const { totalEff, rawTotalEff, productionStats, productionSanity, intermediateDepletion, maaDefaultComparison, detailStats } = prepared
+  const {
+    totalEff,
+    rawTotalEff,
+    hasDailyProduction,
+    rotationStatsNote,
+    productionStats,
+    productionSanity,
+    intermediateDepletion,
+    maaDefaultComparison,
+    detailStats,
+  } = prepared
+  const showProductionMetrics = !isRotationMode || hasDailyProduction
   const showMaaDefaultComparison = Boolean(maaDefaultComparison) && !isAnalysis && !isRotationMode
   const productionSanityNote = showMaaDefaultComparison && maaDefaultComparison
     ? maaDefaultComparison.sanityDeltaNote
-    : productionSanity.note
+    : isRotationMode && rotationStatsNote
+      ? `${rotationStatsNote}；${productionSanity.note}`
+      : productionSanity.note
   const intermediateDepletionSummary = !isAnalysis && !isRotationMode
     ? formatIntermediateDepletionSummary(intermediateDepletion)
     : ''
@@ -55,24 +68,24 @@ export default function ResultMetrics({
               : '未发现红脸风险'}
             highlight={(analysisSummary?.red_face_risk_count ?? 0) > 0}
           />
-        ) : isRotationMode ? (
+        ) : isRotationMode && !showProductionMetrics ? (
           <MetricCard label="预设队列" value={String(detailStats.planCount)} suffix="组" highlight />
         ) : (
           <MetricCard
             label="预计总效率"
             value={totalEff.toFixed(2)}
             suffix="%"
-            note={Math.abs(totalEff - rawTotalEff) >= 0.05 ? `原始房间和 ${rawTotalEff.toFixed(2)}%` : undefined}
+            note={rotationStatsNote ?? (Math.abs(totalEff - rawTotalEff) >= 0.05 ? `原始房间和 ${rawTotalEff.toFixed(2)}%` : undefined)}
             highlight
           />
         )}
         <MetricCard
-          label={isRotationMode ? '房间预设' : '制造站产量'}
-          value={isRotationMode ? String(detailStats.roomCount) : formatAmount(productionStats.manufacturingTotal)}
-          suffix={isRotationMode ? '间' : '件/日'}
-          note={isRotationMode ? '按每个设施分别录入队列 1 / 队列 2' : formatProductionBreakdown(productionStats.manufacturing)}
+          label={isRotationMode && !showProductionMetrics ? '房间预设' : '制造站产量'}
+          value={isRotationMode && !showProductionMetrics ? String(detailStats.roomCount) : formatAmount(productionStats.manufacturingTotal)}
+          suffix={isRotationMode && !showProductionMetrics ? '间' : '件/日'}
+          note={isRotationMode && !showProductionMetrics ? '按每个设施分别录入队列' : formatProductionBreakdown(productionStats.manufacturing)}
         />
-        {!isRotationMode && (
+        {showProductionMetrics && (
           <>
             <MetricCard
               label="预计日产出"
