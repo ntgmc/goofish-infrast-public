@@ -143,6 +143,33 @@ export interface OptimizeRequest {
   upgrade_task_payload?: UpgradeTaskPayload;
 }
 
+export type OptimizeJobPriority = 'paid' | 'standard';
+export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface OptimizeJobAccepted {
+  job_id: string;
+  status: 'queued' | 'running';
+  priority: OptimizeJobPriority;
+  priority_label: string;
+  queue_position: number | null;
+  submitted_at: string;
+  poll_after_ms: number;
+}
+
+export interface OptimizeJobStatusResponse {
+  job_id: string;
+  status: OptimizeJobStatus;
+  priority: OptimizeJobPriority;
+  priority_label: string;
+  queue_position: number | null;
+  submitted_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  poll_after_ms: number;
+  result?: OptimizeResult;
+  error?: string;
+}
+
 export interface AnalyzeScheduleRequest {
   operators: LicenseOperator[];
   schedule: unknown;

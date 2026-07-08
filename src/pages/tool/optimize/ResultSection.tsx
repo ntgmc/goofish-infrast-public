@@ -5,7 +5,7 @@ import type {
   UpgradeSuggestion,
   WorkspaceResultHistoryItem,
 } from '../../../lib/types'
-import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
+import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { isMaaJsonDownloadable } from '../../../lib/workspace-history'
 import { ResultFallback } from './feedback'
 import type { OptimizePhase } from './types'
@@ -54,7 +54,11 @@ export default function ResultSection({
 }) {
   return (
     <section className="min-w-0">
-      {phase === 'idle' && (
+      {phase === 'idle' && loading && progress && (
+        <ScheduleProgress progress={progress} />
+      )}
+
+      {phase === 'idle' && !(loading && progress) && (
         <div className="rounded-xl border border-dashed border-surface-3 bg-surface-1/70 px-5 py-10 text-center">
           <p className="text-base font-semibold text-ink-primary">生成后将在这里显示排班结果</p>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">

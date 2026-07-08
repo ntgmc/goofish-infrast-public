@@ -18,6 +18,7 @@ const expectedRoutes = [
   '/api/health',
   '/api/license-status',
   '/api/optimize',
+  '/api/optimize/job',
   '/api/optimize/reorder-check',
   '/api/redeem-cdk',
   '/api/user/announcements',

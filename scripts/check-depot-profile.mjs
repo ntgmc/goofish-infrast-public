@@ -98,6 +98,7 @@ async function bundleHandler(entryPoint) {
     bundle: true,
     platform: 'node',
     format: 'esm',
+    external: ['pg'],
     write: false,
     plugins: [memoryStorePlugin()],
   })

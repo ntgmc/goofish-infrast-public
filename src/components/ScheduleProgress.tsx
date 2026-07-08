@@ -5,6 +5,10 @@ export interface ScheduleProgressState {
   startedAt: number;
   completedAt?: number;
   estimatedDurationMs?: number;
+  queueStatus?: 'queued' | 'running';
+  queuePosition?: number | null;
+  priority?: 'paid' | 'standard';
+  jobId?: string;
 }
 
 interface Props {
@@ -15,7 +19,7 @@ interface Props {
 export default function ScheduleProgress({ progress, className = '' }: Props) {
   const [rawPercent, setRawPercent] = useState(() => getTimedPercent(progress, Date.now()))
   const percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
-  const progressCopy = useMemo(() => getProgressCopy(progress.mode, rawPercent), [progress.mode, rawPercent])
+  const progressCopy = useMemo(() => getProgressCopy(progress, rawPercent), [progress, rawPercent])
 
   useEffect(() => {
     let frame = 0
@@ -152,14 +156,27 @@ function getWaitingPercent(startedAt: number, now: number, estimatedDurationMs: 
   return ratio * MAX_WAITING_PERCENT
 }
 
-function getProgressCopy(mode: ScheduleProgressState['mode'], percent: number) {
+function getProgressCopy(progress: ScheduleProgressState, percent: number) {
+  if (progress.queueStatus === 'queued') {
+    const queueText = typeof progress.queuePosition === 'number' && progress.queuePosition > 1
+      ? ',前方还有 ' + String(progress.queuePosition - 1) + ' 个任务'
+      : ''
+    return {
+      label: '已加入计算队列',
+      detail: (progress.priority === 'paid' ? '付费优先队列' : '普通队列') + queueText + '，稍后会自动开始计算。',
+      stepIndex: 0,
+      steps: PROGRESS_COPY[progress.mode].map((stage) => stage.step),
+    }
+  }
+
+  const mode = progress.mode
   const stages = PROGRESS_COPY[mode]
   const stepIndex = Math.min(stages.length - 1, Math.floor((Math.min(percent, 99.9) / 100) * stages.length))
   const current = stages[stepIndex]
 
   return {
-    label: percent >= 100 ? (mode === 'generate' ? '排班方案已就绪' : '最终方案已就绪') : current.label,
-    detail: percent >= 100 ? '正在展示结果。' : current.detail,
+    label: percent >= 100 ? (mode === 'generate' ? '排班方案已就绪' : '最终方案已就绪') : progress.queueStatus === 'running' ? '正在计算排班' : current.label,
+    detail: percent >= 100 ? '正在展示结果。' : progress.queueStatus === 'running' ? '任务已开始执行，结果完成后会自动展示。' : current.detail,
     stepIndex,
     steps: stages.map((stage) => stage.step),
   }
