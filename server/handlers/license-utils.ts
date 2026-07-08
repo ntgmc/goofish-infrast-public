@@ -389,6 +389,12 @@ export function resolveConfigForPermission(
   return { ok: true, config: resolvePresetMode(config, preset) }
 }
 
+export function resolveFreePreviewConfig(config: LicenseConfig): { ok: true; config: LicenseConfig } | { ok: false; message: string } {
+  const validation = validateConfig(cloneConfig(config))
+  if (!validation.ok) return validation
+  return { ok: true, config: validation.config }
+}
+
 function isRawPermissionMode(value: string): value is RawPermissionMode {
   return (VALID_PERMISSION_MODES as string[]).includes(value)
 }

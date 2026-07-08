@@ -66,7 +66,7 @@ async function assertDepotProfileCannotOptimize() {
     ignore_elite: false,
     license: null,
   })
-  if (result.status !== 403 || !result.body.error?.includes('仓库分析档案')) {
+  if (result.status !== 403 || !result.body.error?.includes('Depot value profiles cannot be used for scheduling.')) {
     throw new Error(`depot optimize guard: expected 403 depot guard, got ${result.status}`)
   }
 }
@@ -265,6 +265,7 @@ function memoryLicenseUtilsModule() {
     export function normalizePermissionMode(permission) { return permission ?? 'growth' }
     export async function recordSoftBlockedRiskEvent() { return { message: 'blocked', frozen: false } }
     export function resolveConfigForPermission(_permission, config) { return { ok: true, config } }
+    export function resolveFreePreviewConfig(config) { return { ok: true, config } }
     export function requireEnv() { return 'secret' }
     export function shouldFreezeBindingRisk() { return false }
     export function validateConfig(config) { return { ok: true, config } }
