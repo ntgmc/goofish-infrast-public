@@ -4,13 +4,14 @@ import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import { ApiError, apiJson } from '../../lib/api-client'
-import { CONFIG_PRESETS, PERMISSION_LABELS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
+import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
 import { canonicalJson } from '../../lib/crypto'
-import { countOwnedOperators, formatDate, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
+import { countOwnedOperators, formatDate, getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
 
 type WorkspaceSetupSection = 'operators' | 'config'
+type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 type SklandRefreshNotice = {
   kind: 'success' | 'error'
   message: string
@@ -50,8 +51,11 @@ export default function WorkspaceSetupPage({
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
+  const isPreviewProfile = isFreePreviewProfile(profile)
   const canEditConfig = profile.permission === 'advanced' || profile.permission === 'ultimate' || profile.permission === 'admin'
-  const canEditLimitedConfig = profile.permission === 'recommended' || profile.permission === 'growth'
+  const canEditLimitedConfig = isPreviewProfile || profile.permission === 'recommended' || profile.permission === 'growth'
+  const freePreviewNeedsBinding = isPreviewProfile && !profile.skland_binding
+  const canManualEditOperators = !isPreviewProfile
   const ownedOperatorCount = useMemo(() => countOwnedOperators(operators), [operators])
   const configChanged = workspace?.config ? canonicalJson(normalizedConfig) !== canonicalJson(workspace.config) : true
   const filteredOperators = useMemo(() => {
@@ -76,6 +80,12 @@ export default function WorkspaceSetupPage({
     setError(null)
     setStatus(null)
     setSklandRefreshNotice(null)
+    if (isPreviewProfile) {
+      setOperatorFileName(null)
+      setError('免费个人排班档案的干员数据只能通过森空岛导入。')
+      event.currentTarget.value = ''
+      return
+    }
     if (!file) return
     try {
       setOperators(parseOperatorsText(await file.text()))
@@ -88,6 +98,7 @@ export default function WorkspaceSetupPage({
   const applySklandPayload = useCallback((data: SklandPayload) => {
     if (!data.user) return
     setOperators(data.workspace?.operators ?? null)
+    if (data.workspace?.config) setConfig(normalizeConfig(data.workspace.config))
     setOperatorFileName(null)
     setError(null)
     setStatus(null)
@@ -111,7 +122,7 @@ export default function WorkspaceSetupPage({
       setSklandRefreshNotice({
         kind: 'success',
         message: data.skland_import
-          ? `已刷新 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}`
+          ? formatSklandImportNotice(data.skland_import, '已刷新')
           : '森空岛干员数据已刷新。',
       })
     } catch (caught) {
@@ -133,6 +144,10 @@ export default function WorkspaceSetupPage({
       setError('请先上传干员识别文件。')
       return
     }
+    if (freePreviewNeedsBinding) {
+      setError('免费个人排班档案必须先绑定森空岛后才能保存工作区数据。')
+      return
+    }
     if (!configValidation.ok) {
       setError(configValidation.message)
       return
@@ -146,7 +161,7 @@ export default function WorkspaceSetupPage({
         method: 'PATCH',
         json: {
           profile_id: profile.id,
-          operators,
+          ...(isPreviewProfile ? {} : { operators }),
           config: normalizedConfig,
           elite_overrides: workspace?.elite_overrides ?? {},
         },
@@ -227,7 +242,7 @@ export default function WorkspaceSetupPage({
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                     <label className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-surface-2 px-4 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">
                       {operatorFileName ? `已选择：${operatorFileName}` : operators ? `已载入 ${ownedOperatorCount} 名拥有干员` : '选择干员识别文件'}
-                      <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} className="hidden" />
+                      <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} disabled={!canManualEditOperators} className="hidden" />
                     </label>
                     {operators && <span className="text-sm text-brand-400">拥有干员 {ownedOperatorCount} 名</span>}
                   </div>
@@ -272,7 +287,7 @@ export default function WorkspaceSetupPage({
               <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
                 <h2 className="text-base font-semibold text-ink-primary">准备情况</h2>
                 <dl className="mt-4 space-y-3 text-sm">
-                  <InfoRow label="套餐" value={PERMISSION_LABELS[profile.permission]} />
+                  <InfoRow label="套餐" value={getProfileAccessLabel(profile)} />
                   <InfoRow label="干员" value={operators ? `${ownedOperatorCount} 名` : '还未上传'} />
                   <InfoRow label="已拥有" value={operators ? `${ownedOperatorCount} 名` : '-'} />
                   <div className="flex items-center justify-between gap-4">
@@ -281,7 +296,7 @@ export default function WorkspaceSetupPage({
                   </div>
                 </dl>
               </section>
-              <button type="submit" disabled={saving || !operators || !configValidation.ok} className="w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+              <button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} className="w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
                 {saving ? '正在保存...' : '保存工作区并开始排班'}
               </button>
             </aside>
@@ -456,6 +471,21 @@ function SectionFallback() {
 function sklandPayloadFromError(caught: unknown): Partial<SklandPayload> | null {
   if (!(caught instanceof ApiError) || !caught.data || typeof caught.data !== 'object') return null
   return caught.data as Partial<SklandPayload>
+}
+
+function formatSklandImportNotice(imported: NonNullable<SklandPayload['skland_import']>, verb: string): string {
+  const base = `${verb} ${imported.operator_count} 名干员：${imported.nickname}`
+  if (imported.inventory_synced && imported.intermediate_inventory) {
+    return `${base}。已同步${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}到基建配置。`
+  }
+  if (imported.inventory_warning) return `${base}。干员已导入，库存同步失败，可稍后刷新。`
+  return base
+}
+
+function formatInventoryAmount(product: IntermediateProduct, value: number | undefined): string {
+  const label = product === 'Pure Gold' ? '赤金' : '源石碎片'
+  const count = Number(value ?? 0)
+  return `${label} ${Number.isFinite(count) ? count : 0}`
 }
 
 function formatSklandRefreshError(data: Partial<SklandPayload> | null, status: number): string {

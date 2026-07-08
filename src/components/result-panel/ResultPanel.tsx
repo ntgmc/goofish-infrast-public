@@ -14,6 +14,7 @@ export default function ResultPanel({
   detailDefaultOpen = false,
   variant = 'optimize',
   suggestionsSlot,
+  previewLimit,
 }: ResultPanelProps) {
   const isRotationMode = result.schedule_mode === 'rotation'
   const isMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_autofill'
@@ -24,6 +25,7 @@ export default function ResultPanel({
     [result, isRotationMode, isMaaDormitoryAutofill, operators],
   )
   const { detailStats } = prepared
+  const isPreview = Boolean(previewLimit)
 
   const shiftPattern = result.shift_pattern ?? result.shift_hours?.map((hour) => `${hour}h`).join('-') ?? result.planTimes
   const totalScheduleHours = result.total_schedule_hours ?? result.daily_production?.hours
@@ -34,7 +36,7 @@ export default function ResultPanel({
     {
       label: isRotationMode ? '统计方式' : '统计周期',
       value: isRotationMode
-        ? '不计算固定时间'
+        ? `每队列 ${result.rotation_mode?.shift_hours_per_queue ?? 12}h · 日产量折算 ${result.rotation_mode?.daily_production_normalized_hours ?? 24}h`
         : totalScheduleHours
         ? `${formatCompactNumber(totalScheduleHours)} 小时`
         : '按班次配置',
@@ -45,16 +47,20 @@ export default function ResultPanel({
     },
   ]
   const tabs: Array<{ id: ResultTabId; label: string }> = [
-    { id: 'data', label: '数据' },
     { id: 'board', label: '总览图' },
     { id: 'detail', label: isRotationMode ? '预设队列' : '详情' },
-    { id: 'import', label: isRotationMode ? '设置' : '导入' },
-    ...(suggestionsSlot ? [{ id: 'suggestions' as const, label: '建议' }] : []),
+    ...(!isPreview ? [{ id: 'data' as const, label: '数据' }] : []),
+    ...(!isPreview ? [{ id: 'import' as const, label: isRotationMode ? '设置' : '导入' }] : []),
+    ...(!isPreview && suggestionsSlot ? [{ id: 'suggestions' as const, label: '建议' }] : []),
   ] as const
   const [activeTab, setActiveTab] = useState<ResultTabId>(
     detailDefaultOpen ? 'detail' : isAnalysis ? 'data' : 'board',
   )
-  const selectedTab = activeTab === 'suggestions' && !suggestionsSlot ? 'data' : activeTab
+  const selectedTab = isPreview && (activeTab === 'data' || activeTab === 'import' || activeTab === 'suggestions')
+    ? 'board'
+    : activeTab === 'suggestions' && !suggestionsSlot
+      ? 'data'
+      : activeTab
 
   return (
     <div className="space-y-6">
@@ -62,10 +68,12 @@ export default function ResultPanel({
         <div className="flex flex-col gap-5 border-b border-surface-3/60 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-ink-primary">
-              {isAnalysis ? '排班表分析完成' : '排班方案已就绪'}
+              {isPreview ? '免费个人排班已就绪' : isAnalysis ? '排班表分析完成' : '排班方案已就绪'}
             </h2>
             <p className="mt-1 text-sm text-ink-secondary">
-              {isAnalysis
+              {isPreview
+                ? '这是按正常流程生成的免费个人排班结果，可照着设置完整游戏内轮换，但不包含导出和高级分析。'
+                : isAnalysis
                 ? '已根据导入排班表计算红脸风险、日产量和爆仓信息。'
                 : isRotationMode
                   ? '按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。'
@@ -95,6 +103,12 @@ export default function ResultPanel({
             </div>
           )}
         </div>
+        {previewLimit && (
+          <div className="border-b border-brand-600/20 bg-brand-600/10 px-5 py-3 text-sm leading-6 text-brand-300 sm:px-6">
+            {previewLimit.notice}
+            {previewLimit.hidden_room_count > 0 ? ` 另有 ${previewLimit.hidden_room_count} 个房间已隐藏。` : ''}
+          </div>
+        )}
         <div className="border-b border-surface-3/60 px-5 py-3 sm:px-6">
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-muted">
             {contextItems.map((item) => (

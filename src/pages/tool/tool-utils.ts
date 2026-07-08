@@ -17,7 +17,24 @@ export function countOwnedOperators(operators: LicenseOperator[] | null | undefi
 }
 
 export function isCdkProfile(profile: UserGameAccount): boolean {
-  return profile.kind !== 'depot_value'
+  return profile.kind === 'cdk'
+}
+
+export function isFreePreviewProfile(profile: UserGameAccount): boolean {
+  return profile.kind === 'free_preview'
+}
+
+export function isSchedulableProfile(profile: UserGameAccount): boolean {
+  return profile.kind === 'cdk' || profile.kind === 'free_preview'
+}
+
+export function getProfileAccessLabel(profile: UserGameAccount): string {
+  if (isFreePreviewProfile(profile)) return '免费预览'
+  if (profile.permission === 'recommended') return '单次重置卡'
+  if (profile.permission === 'growth') return '练度提升卡'
+  if (profile.permission === 'advanced') return '单账号终身卡'
+  if (profile.permission === 'ultimate' || profile.permission === 'admin') return 'Admin卡'
+  return '练度提升卡'
 }
 
 export function sortOperatorsForPreview(operators: LicenseOperator[]): LicenseOperator[] {

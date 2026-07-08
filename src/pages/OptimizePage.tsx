@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react'
 import type {
   Announcement,
   AuthSuccessResponse,
@@ -7,8 +7,10 @@ import type {
   LicenseOperator,
   OptimizeRequest,
   OptimizeResult,
+  ReorderCheckResult,
   UpgradeSuggestion,
   UpgradeTaskPayload,
+  UserGameAccount,
   UserWorkspace,
   WorkspaceResultHistoryItem,
   WorkspaceSavedConfig,
@@ -19,7 +21,7 @@ import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from 
 import { getActivationTokenForLicense } from '../lib/activation-token'
 import AnnouncementBanner from '../components/AnnouncementBanner'
 import { apiJson } from '../lib/api-client'
-import { normalizeConfig, validateConfig, PERMISSION_LABELS, normalizeScheduleMode, normalizeDormitoryRule } from '../lib/config'
+import { normalizeConfig, validateConfig, normalizeScheduleMode, normalizeDormitoryRule } from '../lib/config'
 import {
   SCHEDULE_PROGRESS_COMPLETION_DURATION_MS,
   type ScheduleProgressState,
@@ -37,9 +39,11 @@ import OverviewSection from './tool/optimize/OverviewSection'
 import PlansSection from './tool/optimize/PlansSection'
 import ResultSection from './tool/optimize/ResultSection'
 import type { OptimizePhase, OptimizeSection } from './tool/optimize/types'
+import { getProfileAccessLabel, isFreePreviewProfile } from './tool/tool-utils'
 
 interface Props {
   profileId: string;
+  profile: UserGameAccount;
   license: LicenseFile;
   workspace: UserWorkspace | null;
   setLicense: (v: LicenseFile) => void;
@@ -52,6 +56,7 @@ interface Props {
   announcement: Announcement | null;
   redeemedNotice: string | null;
   onRedownloadLicense: (() => void) | null;
+  onProfileUpgraded: (payload: AuthSuccessResponse) => void;
 }
 
 type WorkspacePatch = Partial<UserWorkspace> & { saved_config_action?: WorkspaceSavedConfigAction }
@@ -69,6 +74,7 @@ interface LicenseStatusResponse {
 
 export default function OptimizePage({
   profileId,
+  profile,
   license,
   workspace,
   setLicense,
@@ -81,6 +87,7 @@ export default function OptimizePage({
   announcement,
   redeemedNotice,
   onRedownloadLicense,
+  onProfileUpgraded,
 }: Props) {
   const initialHistoryItem = workspace?.result_history?.[0] ?? null
   const [suggestions, setSuggestions] = useState<UpgradeSuggestion[]>([])
@@ -95,10 +102,16 @@ export default function OptimizePage({
   const [licenseSyncing, setLicenseSyncing] = useState(true)
   const [licenseSyncStatus, setLicenseSyncStatus] = useState<string | null>(null)
   const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
+  const [reorderCheckLoading, setReorderCheckLoading] = useState(false)
+  const [reorderCheckResult, setReorderCheckResult] = useState<ReorderCheckResult | null>(null)
+  const [reorderCheckError, setReorderCheckError] = useState<string | null>(null)
   const [configToast, setConfigToast] = useState<{ id: number; message: string } | null>(null)
   const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const [workspaceBusyAction, setWorkspaceBusyAction] = useState<string | null>(null)
+  const [upgradeCdk, setUpgradeCdk] = useState('')
+  const [upgradeLoading, setUpgradeLoading] = useState(false)
+  const [upgradeError, setUpgradeError] = useState<string | null>(null)
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const operatorFileRef = useRef<HTMLInputElement>(null)
   const optimizeInFlightRef = useRef(false)
@@ -106,12 +119,13 @@ export default function OptimizePage({
   const configToastIdRef = useRef(0)
   const pendingLicenseSyncRef = useRef<{ license: LicenseFile; message: string } | null>(null)
 
+  const isPreviewProfile = isFreePreviewProfile(profile)
   const permission = getPermissionMode(license)
   const userCanReplaceOperators = false
   const userCanEditConfig = canEditConfig(license)
-  const userCanUseIntermediateAutoConfig = permission === 'recommended' || permission === 'growth'
+  const userCanUseIntermediateAutoConfig = isPreviewProfile || permission === 'recommended' || permission === 'growth'
   const userCanApplyConfigOverride = true
-  const userCanUseUpgradeFeatures = canUseUpgradeFeatures(license)
+  const userCanUseUpgradeFeatures = !isPreviewProfile && canUseUpgradeFeatures(license)
   const activeConfig = useMemo(
     () => normalizeConfig(configOverride ?? license.config),
     [configOverride, license.config]
@@ -127,6 +141,14 @@ export default function OptimizePage({
   const savedConfigs = workspace?.saved_configs ?? []
   const resultHistory = workspace?.result_history ?? []
   const latestWorkspaceResult = resultHistory[0] ?? null
+  const reorderCheckDisabledReason = useMemo(() => {
+    if (!isPreviewProfile) return null
+    if (!profile.skland_binding) return '请先绑定森空岛后再检测。'
+    if (!latestWorkspaceResult) return '请先生成一次个人排班作为检测基线。'
+    if (licenseSyncing) return '干员数据同步中，稍后再检测。'
+    if (configValidationMessage) return configValidationMessage
+    return null
+  }, [configValidationMessage, isPreviewProfile, latestWorkspaceResult, licenseSyncing, profile.skland_binding])
   const configDiffRows = useMemo(
     () => describeConfigDiff(activeConfig, latestWorkspaceResult?.config ?? null),
     [activeConfig, latestWorkspaceResult]
@@ -189,7 +211,12 @@ export default function OptimizePage({
     setPhase(nextHistoryItem ? 'history' : 'idle')
     setSection('overview')
     setInlineError(null)
+    setReorderCheckLoading(false)
+    setReorderCheckResult(null)
+    setReorderCheckError(null)
     setLastGeneratedSignature(null)
+    setUpgradeCdk('')
+    setUpgradeError(null)
   }, [profileId, workspace?.profile_id])
 
   const mergedOperators = useMemo(
@@ -318,12 +345,16 @@ export default function OptimizePage({
       showConfigValidationToast(nextValidation.message)
     }
     setInlineError(null)
+    setReorderCheckResult(null)
+    setReorderCheckError(null)
   }, [activeConfig, clearConfigValidationToast, normalizeAllowedConfigOverride, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
 
   const resetConfig = useCallback(() => {
     setConfigOverride(null)
     clearConfigValidationToast()
     setInlineError(null)
+    setReorderCheckResult(null)
+    setReorderCheckError(null)
   }, [clearConfigValidationToast, setConfigOverride])
 
   const runSavedConfigAction = useCallback(async (
@@ -441,6 +472,34 @@ export default function OptimizePage({
     })
   }, [activeConfig, license, mergedOperators, profileId])
 
+  const handleReorderCheck = useCallback(async () => {
+    if (!isPreviewProfile || reorderCheckLoading || loading) return
+    if (reorderCheckDisabledReason) {
+      setReorderCheckError(reorderCheckDisabledReason)
+      return
+    }
+    if (!latestWorkspaceResult) return
+    setReorderCheckLoading(true)
+    setReorderCheckResult(null)
+    setReorderCheckError(null)
+    try {
+      const data = await apiJson<ReorderCheckResult>('/api/optimize/reorder-check', {
+        method: 'POST',
+        json: {
+          profile_id: profileId,
+          config: activeConfig,
+          baseline_history_id: latestWorkspaceResult.id,
+        },
+        fallbackMessage: '重排检测失败',
+      })
+      setReorderCheckResult(data)
+    } catch (error) {
+      setReorderCheckError((error as Error).message)
+    } finally {
+      setReorderCheckLoading(false)
+    }
+  }, [activeConfig, isPreviewProfile, latestWorkspaceResult, loading, profileId, reorderCheckDisabledReason, reorderCheckLoading])
+
   const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
     const payload: OptimizeRequest = {
       profile_id: profileId,
@@ -468,6 +527,8 @@ export default function OptimizePage({
     }
     optimizeInFlightRef.current = true
     setInlineError(null)
+    setReorderCheckResult(null)
+    setReorderCheckError(null)
     setHistoryItem(null)
     setPhase('idle')
     setLoading(true)
@@ -611,6 +672,26 @@ export default function OptimizePage({
     downloadOptimizeResult(data, 'maa_schedule_optimized')
   }, [finalResult, currentResult, historyItem])
 
+  const handleUpgradePreviewProfile = useCallback(async (event: FormEvent) => {
+    event.preventDefault()
+    if (!isPreviewProfile || upgradeLoading) return
+    setUpgradeLoading(true)
+    setUpgradeError(null)
+    try {
+      const data = await apiJson<AuthSuccessResponse>('/api/user/profiles/redeem', {
+        method: 'POST',
+        json: { profile_id: profileId, cdk: upgradeCdk },
+        fallbackMessage: '解锁失败',
+      })
+      setUpgradeCdk('')
+      onProfileUpgraded(data)
+    } catch (error) {
+      setUpgradeError((error as Error).message)
+    } finally {
+      setUpgradeLoading(false)
+    }
+  }, [isPreviewProfile, onProfileUpgraded, profileId, upgradeCdk, upgradeLoading])
+
   const handleSaveWorkfile = useCallback(async () => {
     const savedConfigOverride = configChanged ? activeConfig : undefined
     const derivedKey = await deriveClientKey(license.sig)
@@ -647,7 +728,7 @@ export default function OptimizePage({
   return (
     <OptimizeShell
       section={section}
-      permissionLabel={PERMISSION_LABELS[permission]}
+      permissionLabel={getProfileAccessLabel(profile)}
       badges={{
         plans: `${savedConfigs.length}/${resultHistory.length}`,
         result: hasResult ? '有结果' : undefined,
@@ -694,6 +775,15 @@ export default function OptimizePage({
             savedConfigCount={savedConfigs.length}
             resultHistoryCount={resultHistory.length}
             latestResult={latestWorkspaceResult}
+            reorderCheck={{
+              visible: isPreviewProfile,
+              disabledReason: reorderCheckDisabledReason,
+              loading: reorderCheckLoading,
+              error: reorderCheckError,
+              result: reorderCheckResult,
+              onCheck: handleReorderCheck,
+              onGenerate: handleGenerate,
+            }}
             onGenerate={handleGenerate}
             onReset={onReset}
             onOpenPlans={() => setSection('plans')}
@@ -763,7 +853,13 @@ export default function OptimizePage({
             loading={loading}
             progress={progress}
             inlineError={inlineError}
-            onDownloadMAA={handleDownloadMAA}
+            previewProfile={isPreviewProfile}
+            upgradeCdk={upgradeCdk}
+            upgradeLoading={upgradeLoading}
+            upgradeError={upgradeError}
+            onUpgradeCdkChange={setUpgradeCdk}
+            onUpgradePreviewProfile={handleUpgradePreviewProfile}
+            onDownloadMAA={isPreviewProfile ? undefined : handleDownloadMAA}
             onApplySuggestions={handleApplySuggestions}
             onReset={onReset}
           />

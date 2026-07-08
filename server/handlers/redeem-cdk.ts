@@ -14,6 +14,7 @@ import {
   type CdkRecord,
 } from './license-utils'
 import { recordUsageEvent } from './usage-stats'
+import type { UsageReasonCode } from '../storage/usage-store'
 
 const PERMISSION_LABELS: Record<string, string> = {
 recommended: '单次重置卡',
@@ -31,6 +32,7 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'Method not allowed' }, 405)
   }
 
+  const startedAt = Date.now()
   try {
     const body = await req.json() as {
       code?: string;
@@ -41,6 +43,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (!body.code || typeof body.code !== 'string') {
+      await recordCdkRedeem('failure', 'validation_failed', startedAt)
       return jsonResponse({ error: '请填写 CDK。' }, 400)
     }
     if (body.validate_only) {
@@ -48,10 +51,12 @@ export default async (req: Request): Promise<Response> => {
     }
     const operatorsCheck = validateOperators(body.operators)
     if (!operatorsCheck.ok) {
+      await recordCdkRedeem('failure', 'validation_failed', startedAt)
       return jsonResponse({ error: operatorsCheck.message }, 400)
     }
     const configCheck = validateConfig(body.config)
     if (!configCheck.ok) {
+      await recordCdkRedeem('failure', 'validation_failed', startedAt)
       return jsonResponse({ error: configCheck.message }, 400)
     }
 
@@ -63,17 +68,21 @@ export default async (req: Request): Promise<Response> => {
     const existing = await store.get(key) as CdkRecord | null
 
     if (!existing) {
+      await recordCdkRedeem('failure', 'cdk_missing', startedAt, undefined, 'missing')
       return jsonResponse({ error: 'CDK 不存在。' }, 404)
     }
     if (existing.status === 'used' || existing.status === 'frozen') {
+      await recordCdkRedeem('failure', existing.status === 'frozen' ? 'cdk_frozen' : 'cdk_used', startedAt, existing.permission, existing.status)
       return jsonResponse({ error: 'CDK 已使用。' }, 409)
     }
     if (existing.status !== 'unused') {
+      await recordCdkRedeem('failure', 'cdk_status_invalid', startedAt, existing.permission, existing.status)
       return jsonResponse({ error: 'CDK 状态不正确。' }, 409)
     }
     const permission = normalizePermissionMode(existing.permission)
     const configForPermission = resolveConfigForPermission(permission, configCheck.config)
     if (!configForPermission.ok) {
+      await recordCdkRedeem('failure', 'permission_denied', startedAt, permission, existing.status)
       return jsonResponse({ error: configForPermission.message }, 403)
     }
 
@@ -98,12 +107,13 @@ export default async (req: Request): Promise<Response> => {
     if (permission === 'advanced') {
       const binding = await createAdvancedRiskBinding(updated, operatorsCheck.operators, req, body.activation_token)
       if (!binding.ok) {
+        await recordCdkRedeem('failure', 'risk_soft_blocked', startedAt, permission, existing.status)
         return jsonResponse({ error: binding.event.reason }, 400)
       }
       updated = binding.record
     }
     await store.set(key, updated)
-    await recordCdkRedeem()
+    await recordCdkRedeem('success', 'ok', startedAt, permission, updated.status)
 
     return jsonResponse({
       license_file_content: licenseFileContent,
@@ -111,14 +121,28 @@ export default async (req: Request): Promise<Response> => {
     })
   } catch (error) {
     console.error('redeem cdk error:', error)
+    await recordCdkRedeem('failure', 'unknown_failure', startedAt)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
   }
 }
 
-async function recordCdkRedeem(): Promise<void> {
+async function recordCdkRedeem(
+  status: 'success' | 'failure',
+  reasonCode: UsageReasonCode,
+  startedAt: number,
+  permission?: string,
+  cdkStatus?: string,
+): Promise<void> {
   try {
-    await recordUsageEvent('cdk_redeem')
+    await recordUsageEvent('cdk_redeem', {
+      status,
+      reason_code: reasonCode,
+      duration_ms: Date.now() - startedAt,
+      permission,
+      cdk_status: cdkStatus,
+      source: 'redeem_cdk',
+    })
   } catch (error) {
     console.warn('usage stats cdk redeem skipped:', error)
   }

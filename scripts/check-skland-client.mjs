@@ -132,10 +132,30 @@ globalThis.fetch = async (url, init) => {
     })
   }
   if (String(url).endsWith('/api/v1/game/cultivate/info')) {
-    return jsonResponse({ code: 0, message: 'OK', data: { characters: [], items: {} } })
+    return jsonResponse({
+      code: 0,
+      message: 'OK',
+      data: {
+        characters: [],
+        items: {
+          3003: { name: '赤金' },
+          shard_item: { id: 'shard_item', name: '源石碎片' },
+        },
+      },
+    })
   }
   if (String(url).includes('/api/v1/game/cultivate/player')) {
-    return jsonResponse({ code: 0, message: 'OK', data: { items: [], characters: [] } })
+    return jsonResponse({
+      code: 0,
+      message: 'OK',
+      data: {
+        items: [
+          { id: '3003', count: 123 },
+          { id: 'shard_item', count: '45' },
+        ],
+        characters: [],
+      },
+    })
   }
   if (String(url).includes('/api/v1/game/cultivate/character')) {
     return jsonResponse({ code: 0, message: 'OK', data: { evolvePhaseCost: [] } })
@@ -153,9 +173,21 @@ if (await skland.getScanCode('scan-1') !== 'scan-code-1') {
 const accountToken = await skland.getHypergryphTokenByScanCode('scan-code-1')
 const cred = await skland.getCredByHypergryphToken(accountToken)
 if (cred !== 'skland-cred') throw new Error('cred exchange failed')
+const cultivateCallsBeforeDefaultImport = calls.filter((call) => String(call.url).includes('/api/v1/game/cultivate/')).length
 const imported = await skland.importSklandOperatorsByCred(cred)
 if (imported.binding.uid !== '12345678' || imported.operators.length !== 1) {
   throw new Error('skland import flow failed')
+}
+const cultivateCallsAfterDefaultImport = calls.filter((call) => String(call.url).includes('/api/v1/game/cultivate/')).length
+if (cultivateCallsAfterDefaultImport !== cultivateCallsBeforeDefaultImport) {
+  throw new Error('default skland import should not read cultivate inventory')
+}
+const importedWithInventory = await skland.importSklandOperatorsByCred(cred, { includeInventory: true })
+if (
+  importedWithInventory.intermediateInventory?.['Pure Gold'] !== 123 ||
+  importedWithInventory.intermediateInventory?.['Originium Shard'] !== 45
+) {
+  throw new Error(`skland import should read intermediate inventory, got ${JSON.stringify(importedWithInventory.intermediateInventory)}`)
 }
 const blankDefaultUidImported = await skland.importSklandOperatorsByCred('blank-default-uid-cred')
 if (

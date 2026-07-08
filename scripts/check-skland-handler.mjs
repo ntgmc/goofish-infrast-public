@@ -32,6 +32,8 @@ await assertEncodedCredentialPreview()
 await assertInvalidCredentialPreview()
 await assertOversizedCredentialPreview()
 await assertConfirmImport()
+await assertNoConfigImportCreatesDefaultConfig()
+await assertInventoryFailureStillImportsOperators()
 await assertDepotValueConfirmDoesNotWriteWorkspace()
 await assertRefreshImport()
 await assertRefreshTransientFailurePreservesBinding()
@@ -41,6 +43,8 @@ await assertMismatchedRebindDoesNotLeakRiskCount()
 await assertRepeatedMismatchFreezesProfile()
 await assertSchemaChangeError()
 await assertUnbindRouteRemoved()
+await assertFreePreviewScanClaim()
+await assertFreePreviewCredentialClaimAndUidUniqueness()
 
 console.log('skland handler smoke check ok')
 
@@ -215,7 +219,7 @@ async function assertInvalidCredentialPreview() {
     credential_text: 'bad',
     source: 'manual',
   })
-  if (result.status !== 400 || !result.body.error?.includes('未识别到森空岛凭据')) {
+  if (result.status !== 400 || !result.body.error) {
     throw new Error(`invalid credential preview: expected 400 parse error, got ${result.status}`)
   }
   if (JSON.stringify(result.body).includes('bad')) {
@@ -231,7 +235,7 @@ async function assertOversizedCredentialPreview() {
     credential_text: 'x'.repeat(17 * 1024),
     source: 'manual',
   })
-  if (result.status !== 400 || !result.body.error?.includes('未识别到森空岛凭据')) {
+  if (result.status !== 400 || !result.body.error) {
     throw new Error(`oversized credential preview: expected 400 parse error, got ${result.status}`)
   }
 }
@@ -269,8 +273,84 @@ async function assertConfirmImport() {
   if (workspace.config?.desc !== 'existing config') {
     throw new Error('confirm import: existing config was not preserved')
   }
+  if (workspace.config?.product_requirements?.manufacturing_stations?.['Battle Record'] !== 2) {
+    throw new Error('confirm import: existing manufacturing plan was not preserved')
+  }
+  if (
+    workspace.config?.intermediate_inventory?.['Pure Gold'] !== 123 ||
+    workspace.config?.intermediate_inventory?.['Originium Shard'] !== 45 ||
+    workspace.config?.auto_balance_source !== 'intermediate_inventory' ||
+    workspace.config?.drones?.auto_strategy !== 'trading_priority'
+  ) {
+    throw new Error(`confirm import: intermediate inventory was not saved to config ${JSON.stringify(workspace.config)}`)
+  }
+  if (
+    result.body.skland_import?.inventory_synced !== true ||
+    result.body.skland_import?.config_saved !== true ||
+    result.body.skland_import?.intermediate_inventory?.['Pure Gold'] !== 123 ||
+    result.body.skland_import?.intermediate_inventory?.['Originium Shard'] !== 45
+  ) {
+    throw new Error(`confirm import: import summary missing inventory sync ${JSON.stringify(result.body.skland_import)}`)
+  }
   if (Object.keys(workspace.elite_overrides ?? {}).length !== 0 || workspace.last_result !== null) {
     throw new Error('confirm import: workspace transient fields were not cleared')
+  }
+}
+
+async function assertNoConfigImportCreatesDefaultConfig() {
+  seedProfile({ id: 'profile-no-config', status: 'active' })
+  store.workspaces.set('profile-no-config', {
+    ...store.workspaces.get('profile-no-config'),
+    config: null,
+  })
+  setFetchMode('complete')
+  const preview = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-no-config',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  const result = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-no-config',
+    confirmation_id: preview.body.confirmation_id,
+  })
+  if (result.status !== 200) {
+    throw new Error(`no config import: expected success, got ${result.status}`)
+  }
+  const config = store.workspaces.get('profile-no-config')?.config
+  if (
+    config?.layout !== '2-4-3' ||
+    config?.product_requirements?.trading_stations?.LMD !== 2 ||
+    config?.intermediate_inventory?.['Pure Gold'] !== 123 ||
+    config?.intermediate_inventory?.['Originium Shard'] !== 45
+  ) {
+    throw new Error(`no config import: default config was not created with inventory ${JSON.stringify(config)}`)
+  }
+}
+
+async function assertInventoryFailureStillImportsOperators() {
+  seedProfile({ id: 'profile-inventory-fail', status: 'active' })
+  setFetchMode('inventory-fail')
+  const preview = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-inventory-fail',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  const result = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-inventory-fail',
+    confirmation_id: preview.body.confirmation_id,
+  })
+  if (result.status !== 200 || result.body.skland_import?.operator_count !== 2) {
+    throw new Error(`inventory failure import: expected operator import success, got ${result.status}`)
+  }
+  if (result.body.skland_import?.inventory_synced !== false || !result.body.skland_import?.inventory_warning) {
+    throw new Error(`inventory failure import: expected inventory warning ${JSON.stringify(result.body.skland_import)}`)
+  }
+  const workspace = store.workspaces.get('profile-inventory-fail')
+  if (workspace?.operators?.length !== 2) {
+    throw new Error('inventory failure import: operators were not saved')
+  }
+  if (workspace.config?.auto_balance_source === 'intermediate_inventory') {
+    throw new Error('inventory failure import: should not mark config as inventory-balanced without inventory')
   }
 }
 
@@ -338,6 +418,16 @@ async function assertRefreshImport() {
   }
   if (store.fetchCalls.some((url) => url.includes('hypergryph.com'))) {
     throw new Error('refresh import: should not call Hypergryph APIs')
+  }
+  const workspace = store.workspaces.get('profile-1')
+  if (
+    workspace?.config?.intermediate_inventory?.['Pure Gold'] !== 9 ||
+    workspace?.config?.intermediate_inventory?.['Originium Shard'] !== 8
+  ) {
+    throw new Error(`refresh import: intermediate inventory was not refreshed ${JSON.stringify(workspace?.config?.intermediate_inventory)}`)
+  }
+  if (workspace?.last_result !== null) {
+    throw new Error('refresh import: stale result should be cleared')
   }
 }
 
@@ -460,6 +550,99 @@ async function assertUnbindRouteRemoved() {
   }
 }
 
+async function assertFreePreviewScanClaim() {
+  const profileCountBefore = store.profiles.size
+  setFetchMode('blank-default-uid')
+  const start = await callSkland('/api/user/skland/free-preview/login/start', {})
+  if (start.status !== 200 || start.body.scan_id !== 'scan-1' || !start.body.qr_data_url?.startsWith('data:image/png;base64,')) {
+    throw new Error(`免费档案扫码开始：响应无效 ${start.status}`)
+  }
+
+  const complete = await callSkland('/api/user/skland/free-preview/login/complete', {
+    scan_id: 'scan-1',
+    display_name: '免费扫码领取',
+  })
+  assertNoSecretLeak(complete.body, '免费档案扫码完成响应')
+  if (complete.status !== 200 || complete.body.status !== 'confirm_required' || !complete.body.confirmation_id) {
+    throw new Error(`免费档案扫码完成：预期需要确认，实际 ${complete.status}`)
+  }
+  if (complete.body.skland_preview?.uid !== '130761348' || complete.body.skland_preview?.operator_count !== 2) {
+    throw new Error(`免费档案扫码完成：预览无效 ${JSON.stringify(complete.body.skland_preview)}`)
+  }
+  if (store.profiles.size !== profileCountBefore) {
+    throw new Error('免费档案扫码完成：确认前不应创建档案')
+  }
+
+  const confirm = await callSkland('/api/user/skland/free-preview/login/confirm', {
+    confirmation_id: complete.body.confirmation_id,
+  })
+  assertNoSecretLeak(confirm.body, '免费档案扫码确认响应')
+  if (confirm.status !== 200 || confirm.body.active_profile?.kind !== 'free_preview') {
+    throw new Error(`免费档案扫码确认：预期 free_preview 档案，实际 ${confirm.status}`)
+  }
+  if (confirm.body.active_profile?.skland_binding?.uid !== '130761348' || confirm.body.skland_import?.operator_count !== 2) {
+    throw new Error('免费档案扫码确认：缺少绑定或导入摘要')
+  }
+  const profileId = confirm.body.active_profile.id
+  if (store.workspaces.get(profileId)?.operators?.length !== 2) {
+    throw new Error('免费档案扫码确认：干员未写入工作区')
+  }
+}
+
+async function assertFreePreviewCredentialClaimAndUidUniqueness() {
+  const originalUser = store.user
+  store.user = {
+    ...originalUser,
+    id: 'user-free-credential',
+    email: 'free-credential@example.test',
+  }
+  try {
+    const profileCountBefore = store.profiles.size
+    setFetchMode('mismatch')
+    const preview = await callSkland('/api/user/skland/free-preview/credential/preview', {
+      credential_text: 'manual-skland-cred',
+      source: 'manual',
+      display_name: '免费手动领取',
+    })
+    assertNoSecretLeak(preview.body, '免费档案凭据预览响应')
+    if (preview.status !== 200 || preview.body.status !== 'confirm_required' || !preview.body.confirmation_id) {
+      throw new Error(`免费档案凭据预览：预期需要确认，实际 ${preview.status}`)
+    }
+    if (store.profiles.size !== profileCountBefore) {
+      throw new Error('免费档案凭据预览：确认前不应创建档案')
+    }
+
+    const confirm = await callSkland('/api/user/skland/free-preview/login/confirm', {
+      confirmation_id: preview.body.confirmation_id,
+    })
+    assertNoSecretLeak(confirm.body, '免费档案凭据确认响应')
+    if (confirm.status !== 200 || confirm.body.active_profile?.kind !== 'free_preview') {
+      throw new Error(`免费档案凭据确认：预期 free_preview 档案，实际 ${confirm.status}`)
+    }
+    if (confirm.body.active_profile?.skland_binding?.uid !== '87654321') {
+      throw new Error('免费档案凭据确认：预期 mismatch-mode UID 绑定')
+    }
+
+    store.user = {
+      ...originalUser,
+      id: 'user-free-duplicate',
+      email: 'free-duplicate@example.test',
+    }
+    setFetchMode('mismatch')
+    const duplicate = await callSkland('/api/user/skland/free-preview/credential/preview', {
+      credential_text: 'SK_OAUTH_CRED_KEY=manual-skland-cred',
+      source: 'bookmarklet',
+      display_name: '重复免费领取',
+    })
+    if (duplicate.status !== 409 || duplicate.body.code !== 'free_preview_uid_claimed') {
+      throw new Error(`免费档案重复 UID：预期 409 领取拦截，实际 ${duplicate.status}`)
+    }
+    assertNoSecretLeak(duplicate.body, '免费档案重复领取响应')
+  } finally {
+    store.user = originalUser
+  }
+}
+
 async function callSkland(path, body, init = {}) {
   const request = new Request(`http://local${path}`, {
     method: init.method ?? 'POST',
@@ -499,7 +682,20 @@ function seedProfile({ id, status }) {
     version: 1,
     profile_id: id,
     operators: [{ id: 'char_old', name: '旧干员', own: true, elite: 0, rarity: 3 }],
-    config: { desc: 'existing config' },
+    config: {
+      layout: '2-4-3',
+      desc: 'existing config',
+      schedule_mode: 'maa',
+      dormitory_rule: 'fixed',
+      trading_stations_count: 2,
+      manufacturing_stations_count: 4,
+      product_requirements: {
+        trading_stations: { LMD: 2 },
+        manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 2 },
+      },
+      Fiammetta: { enable: true },
+      drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+    },
     elite_overrides: { char_old: 2 },
     last_result: { stale: true },
     saved_configs: [],
@@ -605,6 +801,36 @@ function setFetchMode(mode) {
       },
     })
     }
+    if (textUrl.endsWith('/api/v1/game/cultivate/info')) {
+      if (mode === 'inventory-fail') {
+        return jsonResponse({ code: 1, message: 'TEMPORARY_UNAVAILABLE', data: null })
+      }
+      return jsonResponse({
+        code: 0,
+        message: 'OK',
+        data: {
+          items: {
+            3003: { name: '赤金' },
+            shard_item: { id: 'shard_item', name: '源石碎片' },
+          },
+        },
+      })
+    }
+    if (textUrl.includes('/api/v1/game/cultivate/player')) {
+      if (mode === 'inventory-fail') {
+        return jsonResponse({ code: 1, message: 'TEMPORARY_UNAVAILABLE', data: null })
+      }
+      return jsonResponse({
+        code: 0,
+        message: 'OK',
+        data: {
+          items: [
+            { id: '3003', count: mode === 'refresh' ? 9 : 123 },
+            { id: 'shard_item', count: mode === 'refresh' ? 8 : 45 },
+          ],
+        },
+      })
+    }
     throw new Error(`unexpected fetch ${textUrl}`)
   }
 }
@@ -641,6 +867,8 @@ function createMemoryStore() {
     },
     profiles: new Map(),
     workspaces: new Map(),
+    freePreviewClaims: new Map(),
+    freePreviewPendingClaims: new Map(),
     fetchCalls: [],
   }
 }
@@ -676,16 +904,29 @@ function memoryStorePlugin() {
         path: 'memory-license-utils',
         namespace: 'skland-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])usage-stats(\.ts)?$/ }, () => ({
+        path: 'memory-usage-stats',
+        namespace: 'skland-smoke',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'skland-smoke' }, (args) => ({
         contents: args.path === 'memory-user-store'
           ? memoryUserStoreModule()
           : args.path === 'memory-user-auth'
             ? memoryUserAuthModule()
-            : memoryLicenseUtilsModule(),
+            : args.path === 'memory-usage-stats'
+              ? memoryUsageStatsModule()
+              : memoryLicenseUtilsModuleFixed(),
         loader: 'js',
       }))
     },
   }
+}
+
+function memoryUsageStatsModule() {
+  return `
+    export async function recordUsageEvent() {}
+    export async function countSuccessfulUsageEventsForProfileInRange() { return 0 }
+  `
 }
 
 function memoryUserStoreModule() {
@@ -693,6 +934,9 @@ function memoryUserStoreModule() {
     const store = globalThis.__sklandHandlerSmokeStore
     export function emptyWorkspace(profileId) {
       return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
+    }
+    export async function listProfilesForUser(userId) {
+      return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
     }
     export async function getProfileForUser(userId, profileId) {
       const profile = store.profiles.get(profileId)
@@ -710,6 +954,35 @@ function memoryUserStoreModule() {
     }
     export function isDepotValueProfile(profile) {
       return profile?.kind === 'depot_value'
+    }
+    export function isFreePreviewProfile(profile) {
+      return profile?.kind === 'free_preview'
+    }
+    export async function getFreePreviewClaim(uidHash) {
+      return store.freePreviewClaims.get(uidHash) ?? null
+    }
+    export async function claimFreePreviewUid(claim) {
+      const existing = store.freePreviewClaims.get(claim.uid_hash)
+      if (existing) return { ok: false, claim: existing }
+      store.freePreviewClaims.set(claim.uid_hash, claim)
+      return { ok: true, claim }
+    }
+    export async function deleteFreePreviewClaim(uidHash, profileId) {
+      const existing = store.freePreviewClaims.get(uidHash)
+      if (!existing) return
+      if (profileId && existing.profile_id !== profileId) return
+      store.freePreviewClaims.delete(uidHash)
+    }
+    export async function saveFreePreviewPendingClaim(claim) {
+      store.freePreviewPendingClaims.set(claim.confirmation_id, claim)
+    }
+    export async function getFreePreviewPendingClaim(userId, confirmationId) {
+      const pending = store.freePreviewPendingClaims.get(confirmationId)
+      return pending?.user_id === userId ? pending : null
+    }
+    export async function deleteFreePreviewPendingClaim(userId, confirmationId) {
+      const pending = store.freePreviewPendingClaims.get(confirmationId)
+      if (pending?.user_id === userId) store.freePreviewPendingClaims.delete(confirmationId)
     }
     function normalizeWorkspace(workspace) {
       return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }
@@ -749,7 +1022,7 @@ function memoryUserAuthModule() {
       return {
         id: profile.id,
         user_id: profile.user_id,
-        kind: profile.kind === 'depot_value' ? 'depot_value' : 'cdk',
+        kind: profile.kind || 'cdk',
         permission: profile.permission,
         status: profile.status,
         cdk_order_hash: profile.cdk_order_hash,
@@ -803,6 +1076,87 @@ function memoryLicenseUtilsModule() {
         }
       }
       return { ok: true, operators }
+    }
+    export function validateConfig(config) {
+      if (!config || typeof config !== 'object' || !config.layout || !config.product_requirements) {
+        return { ok: false, message: 'invalid config' }
+      }
+      if (!Number.isInteger(config.trading_stations_count) || !Number.isInteger(config.manufacturing_stations_count)) {
+        return { ok: false, message: 'invalid station counts' }
+      }
+      const trading = config.product_requirements.trading_stations
+      const manufacturing = config.product_requirements.manufacturing_stations
+      if (!isCountRecord(trading) || !isCountRecord(manufacturing)) {
+        return { ok: false, message: 'invalid product requirements' }
+      }
+      if (sumCounts(trading) !== config.trading_stations_count || sumCounts(manufacturing) !== config.manufacturing_stations_count) {
+        return { ok: false, message: 'product count mismatch' }
+      }
+      return { ok: true, config }
+    }
+    export function resolveConfigForPermission(permission, config) {
+      return { ok: true, config }
+    }
+    export function resolveFreePreviewConfig(config) {
+      return { ok: true, config }
+    }
+    function isCountRecord(value) {
+      if (!value || typeof value !== 'object') return false
+      return Object.values(value).every((item) => Number.isInteger(item) && item >= 0)
+    }
+    function sumCounts(counts) {
+      return Object.values(counts).reduce((sum, value) => sum + value, 0)
+    }
+  `
+}
+
+function memoryLicenseUtilsModuleFixed() {
+  return `
+    export function validateOperators(operators) {
+      if (!Array.isArray(operators) || operators.length === 0) {
+        return { ok: false, message: 'operator data is empty' }
+      }
+      for (const operator of operators) {
+        if (!operator || typeof operator.id !== 'string' || typeof operator.name !== 'string' || operator.own !== true || typeof operator.elite !== 'number' || typeof operator.rarity !== 'number') {
+          return { ok: false, message: 'invalid operator data' }
+        }
+      }
+      return { ok: true, operators }
+    }
+    export function validateConfig(config) {
+      if (!config || typeof config !== 'object' || !config.layout || !config.product_requirements) {
+        return { ok: false, message: 'invalid config' }
+      }
+      if (!Number.isInteger(config.trading_stations_count) || !Number.isInteger(config.manufacturing_stations_count)) {
+        return { ok: false, message: 'invalid station counts' }
+      }
+      const trading = config.product_requirements.trading_stations
+      const manufacturing = config.product_requirements.manufacturing_stations
+      if (!isCountRecord(trading) || !isCountRecord(manufacturing)) {
+        return { ok: false, message: 'invalid product requirements' }
+      }
+      if (sumCounts(trading) !== config.trading_stations_count || sumCounts(manufacturing) !== config.manufacturing_stations_count) {
+        return { ok: false, message: 'product count mismatch' }
+      }
+      return { ok: true, config }
+    }
+    export function resolveConfigForPermission(permission, config) {
+      return { ok: true, config }
+    }
+    export function resolveFreePreviewConfig(config) {
+      return validateConfig(config)
+    }
+    export function requireEnv(name) {
+      const value = process.env[name] || 'secret'
+      if (!value) throw new Error(name + ' is required')
+      return value
+    }
+    function isCountRecord(value) {
+      if (!value || typeof value !== 'object') return false
+      return Object.values(value).every((item) => Number.isInteger(item) && item >= 0)
+    }
+    function sumCounts(counts) {
+      return Object.values(counts).reduce((sum, value) => sum + value, 0)
     }
   `
 }

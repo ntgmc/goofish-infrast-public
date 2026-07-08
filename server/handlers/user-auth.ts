@@ -7,6 +7,7 @@ import {
   emptyWorkspace,
   getAnnouncementReads,
   getPasswordResetTokenByHash,
+  getProfileForUser,
   getProfileWorkspace,
   getRecentPasswordResetTokenForUser,
   getSessionByTokenHash,
@@ -21,6 +22,7 @@ import {
   saveUserAccount,
   saveUserProfile,
   saveUserSession,
+  isFreePreviewProfile,
   toPublicProfile,
   toPublicWorkspace,
   touchSession,
@@ -46,8 +48,8 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ANNOUNCEMENT_KEY = 'current.json'
 const PASSWORD_RESET_DEFAULT_TTL_MINUTES = 30
 const PASSWORD_RESET_RESEND_WINDOW_MS = 1000 * 60 * 5
-export const PASSWORD_RESET_REQUEST_MESSAGE = '如果该邮箱已注册，我们会发送重置密码邮件。'
-const PASSWORD_RESET_INVALID_MESSAGE = '重置链接无效或已过期。'
+export const PASSWORD_RESET_REQUEST_MESSAGE = 'If the email exists, a reset link has been sent.'
+const PASSWORD_RESET_INVALID_MESSAGE = 'The reset link is invalid or expired.'
 
 export interface AuthContext {
   user: UserAccountRecord
@@ -78,9 +80,9 @@ export function normalizeEmail(value: unknown): string | null {
 }
 
 export function validatePassword(value: unknown): { ok: true; password: string } | { ok: false; message: string } {
-  if (typeof value !== 'string') return { ok: false, message: '请填写密码。' }
-  if (value.length < 8) return { ok: false, message: '密码至少需要 8 位。' }
-  if (value.length > 128) return { ok: false, message: '密码不能超过 128 位。' }
+  if (typeof value !== 'string') return { ok: false, message: 'Password must be a string.' }
+  if (value.length < 8) return { ok: false, message: 'Password must be at least 8 characters.' }
+  if (value.length > 128) return { ok: false, message: 'Password must be at most 128 characters.' }
   return { ok: true, password: value }
 }
 
@@ -93,11 +95,11 @@ export async function registerUser(
   | { ok: false; status: number; message: string }
 > {
   const email = normalizeEmail(emailValue)
-  if (!email) return { ok: false, status: 400, message: '邮箱格式不正确。' }
+  if (!email) return { ok: false, status: 400, message: 'Invalid email format.' }
   const passwordCheck = validatePassword(passwordValue)
   if (!passwordCheck.ok) return { ok: false, status: 400, message: passwordCheck.message }
   const existing = await getUserByEmail(email)
-  if (existing) return { ok: false, status: 409, message: '该邮箱已注册。' }
+  if (existing) return { ok: false, status: 409, message: 'Email is already registered.' }
 
   const now = new Date().toISOString()
   const passwordHash = hashPassword(passwordCheck.password)
@@ -119,7 +121,7 @@ export async function registerUser(
   await saveUserAccount(user)
 
   if (typeof cdkValue === 'string' && cdkValue.trim()) {
-    const redeemed = await redeemProfileCdk(user, cdkValue, '账号 1', '')
+    const redeemed = await redeemProfileCdk(user, cdkValue, '璐﹀彿 1', '')
     if (!redeemed.ok) {
       await deleteUserAccount(user.id)
       return redeemed
@@ -152,15 +154,15 @@ export async function loginUser(
   | { ok: false; status: number; message: string }
 > {
   const email = normalizeEmail(emailValue)
-  if (!email) return { ok: false, status: 400, message: '邮箱格式不正确。' }
-  if (typeof passwordValue !== 'string') return { ok: false, status: 400, message: '请填写密码。' }
+  if (!email) return { ok: false, status: 400, message: 'Invalid email format.' }
+  if (typeof passwordValue !== 'string') return { ok: false, status: 400, message: 'Password must be a string.' }
 
   const user = await getUserByEmail(email)
   if (!user || !verifyPassword(passwordValue, user)) {
-    return { ok: false, status: 401, message: '邮箱或密码错误。' }
+    return { ok: false, status: 401, message: 'Invalid email or password.' }
   }
   if (user.status !== 'active') {
-    return { ok: false, status: 403, message: '账号状态不可用，请联系卖家。' }
+    return { ok: false, status: 403, message: 'Account is not active.' }
   }
 
   await migrateLegacyUserIfNeeded(user)
@@ -175,7 +177,7 @@ export async function changeUserPassword(
   keepTokenHash: string,
 ): Promise<{ ok: true; user: UserAccountRecord } | { ok: false; status: number; message: string }> {
   if (typeof oldPasswordValue !== 'string' || !verifyPassword(oldPasswordValue, user)) {
-    return { ok: false, status: 401, message: '当前密码不正确。' }
+    return { ok: false, status: 401, message: "Invalid license signature." };
   }
   const nextPassword = validatePassword(newPasswordValue)
   if (!nextPassword.ok) return { ok: false, status: 400, message: nextPassword.message }
@@ -269,7 +271,7 @@ export async function redeemProfileCdk(
   | { ok: false; status: number; message: string }
 > {
   if (typeof codeValue !== 'string' || !codeValue.trim()) {
-    return { ok: false, status: 400, message: '请填写 CDK。' }
+  if (typeof codeValue !== 'string' || !codeValue.trim()) return { ok: false, status: 400, message: 'Please enter a CDK.' }
   }
 
   const normalizedCode = normalizeCode(codeValue)
@@ -277,10 +279,10 @@ export async function redeemProfileCdk(
   const cdkKey = `cdk/${codeHash}.json`
   const cdkStore = await getCdkRecordStore()
   const cdkRecord = await cdkStore.get(cdkKey)
-  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK 不存在。' }
-  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已冻结，请联系卖家。' }
-  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已撤销，请联系卖家。' }
-  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
+  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK does not exist.' }
+  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK is frozen.' }
+  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK has been revoked.' }
+  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK has already been used.' }
 
   const now = new Date().toISOString()
   const profileId = randomUUID()
@@ -320,6 +322,110 @@ export async function redeemProfileCdk(
   } as CdkRecord)
 
   return { ok: true, profile }
+}
+
+export async function createOrReusePreviewProfile(
+  user: UserAccountRecord,
+  displayNameValue?: unknown,
+  noteValue?: unknown,
+): Promise<
+  | { ok: true; profile: UserGameAccountRecord }
+  | { ok: false; status: number; message: string }
+> {
+  const profiles = await listProfilesForUser(user.id)
+  const existing = profiles.find((profile) => isFreePreviewProfile(profile))
+  const displayName = normalizeProfileDisplayName(displayNameValue)
+  const note = normalizeProfileNote(noteValue)
+
+  if (existing) {
+    if (!displayName && !note) return { ok: true, profile: existing }
+    const updated: UserGameAccountRecord = {
+      ...existing,
+      display_name: displayName || existing.display_name,
+      note: note || existing.note,
+      updated_at: new Date().toISOString(),
+    }
+    await saveUserProfile(updated)
+    return { ok: true, profile: updated }
+  }
+
+  return {
+    ok: false,
+    status: 400,
+    message: '免费个人排班档案必须通过森空岛登录领取。',
+  }
+}
+
+export async function upgradePreviewProfileWithCdk(
+  user: UserAccountRecord,
+  profileIdValue: unknown,
+  codeValue: unknown,
+  displayNameValue?: unknown,
+  noteValue?: unknown,
+): Promise<
+  | { ok: true; profile: UserGameAccountRecord }
+  | { ok: false; status: number; message: string }
+> {
+  if (typeof profileIdValue !== 'string' || !profileIdValue.trim()) {
+    return { ok: false, status: 400, message: '缺少免费个人排班档案。' }
+  }
+  const profile = await getProfileForUser(user.id, profileIdValue.trim())
+  if (!profile) return { ok: false, status: 404, message: '档案不存在。' }
+  if (!isFreePreviewProfile(profile)) {
+    return { ok: false, status: 400, message: '只有免费个人排班档案可以原地升级。' }
+  }
+  if (profile.status !== 'active') {
+    return { ok: false, status: 403, message: '档案当前不可用。' }
+  }
+  if (typeof codeValue !== 'string' || !codeValue.trim()) {
+    return { ok: false, status: 400, message: '缺少 CDK。' }
+  }
+
+  const normalizedCode = normalizeCode(codeValue)
+  const codeHash = hashCdk(normalizedCode, requireEnv('CDK_HASH_SECRET'))
+  const cdkKey = `cdk/${codeHash}.json`
+  const cdkStore = await getCdkRecordStore()
+  const cdkRecord = await cdkStore.get(cdkKey)
+  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK 不存在。' }
+  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已被冻结。' }
+  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已被撤销。' }
+  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
+
+  const now = new Date().toISOString()
+  const permission = normalizePermissionMode(cdkRecord.permission)
+  const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profile.id)
+  const displayName = normalizeProfileDisplayName(displayNameValue)
+  const note = normalizeProfileNote(noteValue)
+  const upgraded: UserGameAccountRecord = {
+    ...profile,
+    kind: 'cdk',
+    cdk_key: cdkKey,
+    cdk_code_hash: codeHash,
+    cdk_order_hash: cdkOrderHash,
+    permission,
+    display_name: displayName || profile.display_name || '免费个人排班',
+    note: note || profile.note,
+    updated_at: now,
+  }
+
+  await saveUserProfile(upgraded)
+  if (!(await getProfileWorkspace(upgraded.id))) {
+    await saveProfileWorkspace(emptyWorkspace(upgraded.id))
+  }
+  await cdkStore.set(cdkKey, {
+    ...cdkRecord,
+    status: 'used',
+    used_at: now,
+    license_order_hash: cdkOrderHash,
+    operator_count: cdkRecord.operator_count ?? null,
+    config_desc: cdkRecord.config_desc ?? null,
+    account_id: user.id,
+    profile_id: upgraded.id,
+    account_email_hash: createHash('sha256').update(user.email).digest('hex'),
+    bound_at: now,
+  } as CdkRecord)
+
+  return { ok: true, profile: upgraded }
 }
 
 export async function requireUserSession(req: Request): Promise<AuthContext | null> {
@@ -493,7 +599,7 @@ function createAccountOrderHash(codeHash: string, profileId: string): string {
 
 async function nextDefaultProfileName(userId: string): Promise<string> {
   const profiles = await listProfilesForUser(userId)
-  return `账号 ${profiles.length + 1}`
+  return `璐﹀彿 ${profiles.length + 1}`
 }
 
 function normalizeProfileDisplayName(value: unknown): string {

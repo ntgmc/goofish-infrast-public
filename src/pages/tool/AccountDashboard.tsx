@@ -3,13 +3,12 @@ import type { AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/t
 import BrandLogo from '../../components/BrandLogo'
 
 const ProfilesSection = lazy(() => import('./dashboard/ProfilesSection'))
-const FreePreviewSection = lazy(() => import('./dashboard/FreePreviewSection'))
 const ToolsSection = lazy(() => import('./dashboard/ToolsSection'))
 const RedeemSection = lazy(() => import('./dashboard/RedeemSection'))
 const AnnouncementsSection = lazy(() => import('./dashboard/AnnouncementsSection'))
 const SettingsSection = lazy(() => import('./dashboard/SettingsSection'))
 
-type DashboardSection = 'profiles' | 'preview' | 'tools' | 'redeem' | 'announcements' | 'settings'
+type DashboardSection = 'profiles' | 'tools' | 'redeem' | 'announcements' | 'settings'
 
 export default function AccountDashboard({
   user,
@@ -35,9 +34,8 @@ export default function AccountDashboard({
   const [section, setSection] = useState<DashboardSection>('profiles')
 const labels: Record<DashboardSection, string> = {
 profiles: '游戏账号',
-preview: '免费预览',
 tools: '工具',
-redeem: '兑换 CDK',
+redeem: '添加账号',
 announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCount})` : ''}`,
     settings: '账号设置',
   }
@@ -86,7 +84,6 @@ announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCou
           </div>
         )}
 <Suspense fallback={<SectionFallback />}>{section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} />}</Suspense>
-<Suspense fallback={<SectionFallback />}>{section === 'preview' && <FreePreviewSection onUseCdk={() => setSection('redeem')} />}</Suspense>
 <Suspense fallback={<SectionFallback />}>{section === 'tools' && <ToolsSection />}</Suspense>
 <Suspense fallback={<SectionFallback />}>{section === 'redeem' && <RedeemSection onRedeemed={(payload) => { onPayload(payload); setSection('profiles') }} />}</Suspense>
           <Suspense fallback={<SectionFallback />}>{section === 'announcements' && <AnnouncementsSection />}</Suspense>
