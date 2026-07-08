@@ -61,6 +61,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/optimize', optimizeHandler as unknown as ApiHandler],
+  ['/api/optimize/reorder-check', optimizeHandler as unknown as ApiHandler],
 ])
 
 export async function routeRequest(req: Request): Promise<Response> {

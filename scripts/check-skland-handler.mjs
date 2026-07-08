@@ -925,6 +925,7 @@ function memoryStorePlugin() {
 function memoryUsageStatsModule() {
   return `
     export async function recordUsageEvent() {}
+    export async function countSuccessfulUsageEventsForProfileInRange() { return 0 }
   `
 }
 

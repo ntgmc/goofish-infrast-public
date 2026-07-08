@@ -358,6 +358,36 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     throw new Error(`free preview suggestions_only: expected 403 without history append, got ${suggestionsOnly.status}`)
   }
 
+  const unboundReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
+    profile_id: unboundPreview.id,
+    config: free333OrundumConfig,
+  })
+  if (unboundReorder.status !== 403) {
+    throw new Error(`free preview reorder unbound: expected 403, got ${unboundReorder.status}`)
+  }
+
+  const cdkReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
+    profile_id: 'profile-1',
+    config: free333OrundumConfig,
+  })
+  if (cdkReorder.status !== 403) {
+    throw new Error(`free preview reorder cdk profile: expected 403, got ${cdkReorder.status}`)
+  }
+
+  const noBaselinePreview = seedFreePreviewProfile('preview-reorder-no-baseline', { bound: true })
+  store.workspaces.set(noBaselinePreview.id, {
+    ...emptyWorkspace(noBaselinePreview.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+  })
+  const noBaselineReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
+    profile_id: noBaselinePreview.id,
+    config: free333OrundumConfig,
+  })
+  if (noBaselineReorder.status !== 409) {
+    throw new Error(`free preview reorder no baseline: expected 409, got ${noBaselineReorder.status}`)
+  }
+
   const generated = await call(optimizeHandler, '/api/optimize', {
     profile_id: preview.id,
     license: null,
@@ -376,6 +406,35 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
   }
   assertFreePreviewResult(workspace.last_result, 'free preview stored last_result')
   assertFreePreviewResult(workspace.result_history[0].result, 'free preview stored history')
+
+  const reorderBeforeHistoryCount = workspace.result_history.length
+  const reorderBeforeLastResult = workspace.last_result
+  const noNeedReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
+    profile_id: preview.id,
+    config: free333OrundumConfig,
+    baseline_history_id: workspace.result_history[0].id,
+  })
+  if (noNeedReorder.status !== 200 || noNeedReorder.body?.recommendation !== 'no_need') {
+    throw new Error(`free preview reorder no change: expected no_need 200, got ${noNeedReorder.status}`)
+  }
+  assertReorderCheckResult(noNeedReorder.body, 'free preview reorder no change')
+  const reorderWorkspace = store.workspaces.get(preview.id)
+  if (reorderWorkspace?.result_history.length !== reorderBeforeHistoryCount || reorderWorkspace.last_result !== reorderBeforeLastResult) {
+    throw new Error('free preview reorder: should not write last_result or history')
+  }
+
+  const invalidConfigReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
+    profile_id: preview.id,
+    config: { ...free333OrundumConfig, trading_stations_count: 4 },
+    baseline_history_id: workspace.result_history[0].id,
+  })
+  if (invalidConfigReorder.status !== 403) {
+    throw new Error(`free preview reorder invalid config: expected 403, got ${invalidConfigReorder.status}`)
+  }
+
+  await assertReorderRecommendationFromBaseline('preview-reorder-recommended', cloneWithRoomOperator(workspace.last_result, 'power', 0, { id: 'old-power', name: 'Old Power' }), 'recommended')
+  await assertReorderRecommendationFromBaseline('preview-reorder-strong', cloneWithRoomOperator(workspace.last_result, 'trading', 0, { id: 'old-trade', name: 'Old Trader' }), 'strongly_recommended')
+  await assertReorderQuotaLimit(workspace.last_result)
 
   const previewEvents = store.usageEvents.filter((event) => event.profile_id === preview.id)
   if (!previewEvents.some((event) => event.event === 'schedule_generate' && event.status === 'success')) {
@@ -432,6 +491,112 @@ function assertFreePreviewResult(result, label) {
       throw new Error(`${label}: leaked ${key}`)
     }
   }
+}
+
+function assertReorderCheckResult(result, label) {
+  if (!result || typeof result !== 'object') {
+    throw new Error(`${label}: missing result`)
+  }
+  if (!['no_need', 'recommended', 'strongly_recommended'].includes(result.recommendation)) {
+    throw new Error(`${label}: invalid recommendation`)
+  }
+  if (!result.estimated_gain_range || !['equivalent_sanity_per_day', 'room_change_only'].includes(result.estimated_gain_range.unit)) {
+    throw new Error(`${label}: invalid gain range`)
+  }
+  if (!result.quota || result.quota.limit !== 2 || result.quota.timezone !== 'Asia/Shanghai') {
+    throw new Error(`${label}: invalid quota`)
+  }
+  if (!result.baseline?.history_id || !result.baseline.created_at) {
+    throw new Error(`${label}: missing baseline metadata`)
+  }
+  for (const key of ['plans', 'raw_results', 'assignment_detail', 'daily_production', 'upgrade_suggestions', 'maa_default_comparison', 'current_result', 'upgrade_task_payload']) {
+    if (key in result) {
+      throw new Error(`${label}: leaked ${key}`)
+    }
+  }
+}
+
+async function assertReorderRecommendationFromBaseline(profileId, baselineResult, expectedRecommendation) {
+  const profile = seedFreePreviewProfile(profileId, { bound: true })
+  const historyItem = createHistoryItem(profileId, baselineResult)
+  store.workspaces.set(profile.id, {
+    ...emptyWorkspace(profile.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+    last_result: baselineResult,
+    result_history: [historyItem],
+  })
+  const checked = await call(optimizeHandler, '/api/optimize/reorder-check', {
+    profile_id: profile.id,
+    config: free333OrundumConfig,
+    baseline_history_id: historyItem.id,
+  })
+  if (checked.status !== 200 || checked.body?.recommendation !== expectedRecommendation) {
+    throw new Error(`free preview reorder ${expectedRecommendation}: expected 200 ${expectedRecommendation}, got ${checked.status} ${checked.body?.recommendation}`)
+  }
+  assertReorderCheckResult(checked.body, `free preview reorder ${expectedRecommendation}`)
+}
+
+async function assertReorderQuotaLimit(baselineResult) {
+  const profile = seedFreePreviewProfile('preview-reorder-quota', { bound: true })
+  const historyItem = createHistoryItem(profile.id, baselineResult)
+  store.workspaces.set(profile.id, {
+    ...emptyWorkspace(profile.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+    last_result: baselineResult,
+    result_history: [historyItem],
+  })
+
+  const failedBeforeQuota = await call(optimizeHandler, '/api/optimize/reorder-check', {
+    profile_id: profile.id,
+    config: { ...free333OrundumConfig, optimizer_search: { max_iterations: 999 } },
+    baseline_history_id: historyItem.id,
+  })
+  if (failedBeforeQuota.status !== 403) {
+    throw new Error(`free preview reorder quota preflight failure: expected 403, got ${failedBeforeQuota.status}`)
+  }
+
+  for (let index = 0; index < 2; index++) {
+    const checked = await call(optimizeHandler, '/api/optimize/reorder-check', {
+      profile_id: profile.id,
+      config: free333OrundumConfig,
+      baseline_history_id: historyItem.id,
+    })
+    if (checked.status !== 200 || checked.body?.quota?.used !== index + 1) {
+      throw new Error(`free preview reorder quota success ${index + 1}: expected used ${index + 1}, got ${checked.status}`)
+    }
+  }
+
+  const exceeded = await call(optimizeHandler, '/api/optimize/reorder-check', {
+    profile_id: profile.id,
+    config: free333OrundumConfig,
+    baseline_history_id: historyItem.id,
+  })
+  if (exceeded.status !== 429 || exceeded.body?.code !== 'reorder_check_quota_exceeded' || exceeded.body?.quota?.remaining !== 0) {
+    throw new Error(`free preview reorder quota exceeded: expected 429 with quota, got ${exceeded.status}`)
+  }
+}
+
+function createHistoryItem(profileId, result) {
+  const now = new Date().toISOString()
+  return {
+    id: `history-${profileId}`,
+    name: `History ${profileId}`,
+    created_at: now,
+    config: free333OrundumConfig,
+    result,
+    operator_count: sampleOperators.length,
+    source: 'generated',
+  }
+}
+
+function cloneWithRoomOperator(result, roomType, roomIndex, operator) {
+  const cloned = JSON.parse(JSON.stringify(result))
+  const room = cloned?.plans?.[0]?.rooms?.[roomType]?.[roomIndex]
+  if (!room) throw new Error(`test baseline missing ${roomType} room ${roomIndex}`)
+  room.operators = [operator]
+  return cloned
 }
 
 function countVisibleRooms(plans) {
@@ -522,10 +687,28 @@ function memoryModule(path) {
   if (path === 'memory-user-store') return memoryUserStoreModule()
   if (path === 'memory-user-auth') return memoryUserAuthModule()
   if (path === 'memory-license-utils') return memoryLicenseUtilsModule()
-  if (path === 'memory-usage-stats') return 'export async function recordUsageEvent(event, payload = {}) { globalThis.__workspaceHistorySmokeStore.usageEvents.push({ event, ...payload }) }'
+  if (path === 'memory-usage-stats') return memoryUsageStatsModule()
   if (path === 'memory-training-cost') return 'export async function attachTrainingCostsToUpgradeSuggestions({ suggestions }) { return suggestions }'
   if (path === 'memory-optimizer') return memoryOptimizerModule()
   return 'export const APP_BUILD_META = { frontend_version: "test", backend_version: "test", data_version: "test", generated_at: "test", source_summary: "test" }'
+}
+
+function memoryUsageStatsModule() {
+  return `
+    export async function recordUsageEvent(event, payload = {}) {
+      const now = new Date().toISOString()
+      globalThis.__workspaceHistorySmokeStore.usageEvents.push({ id: 'usage-' + globalThis.__workspaceHistorySmokeStore.usageEvents.length, event, created_at: now, date: now.slice(0, 10), ...payload })
+    }
+    export async function countSuccessfulUsageEventsForProfileInRange(event, profileId, startAt, endAt) {
+      return globalThis.__workspaceHistorySmokeStore.usageEvents.filter((record) =>
+        record.event === event &&
+        record.profile_id === profileId &&
+        record.status !== 'failure' &&
+        record.created_at >= startAt &&
+        record.created_at < endAt
+      ).length
+    }
+  `
 }
 
 function memoryUserStoreModule() {
@@ -851,6 +1034,15 @@ function memoryOptimizerModule() {
             drones: {},
           },
           shift_hours: [8, 16, 24],
+        }
+      }
+      calculateDailyProduction() {
+        return {
+          manufacturing: { 'Pure Gold': 1 },
+          trading: { LMD: 1 },
+          consumption: {},
+          net: {},
+          drones: {},
         }
       }
       calculateUpgradeTargetSuggestions() { return [] }

@@ -7,6 +7,7 @@ import type {
   LicenseOperator,
   OptimizeRequest,
   OptimizeResult,
+  ReorderCheckResult,
   UpgradeSuggestion,
   UpgradeTaskPayload,
   UserGameAccount,
@@ -101,6 +102,9 @@ export default function OptimizePage({
   const [licenseSyncing, setLicenseSyncing] = useState(true)
   const [licenseSyncStatus, setLicenseSyncStatus] = useState<string | null>(null)
   const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string } | null>(null)
+  const [reorderCheckLoading, setReorderCheckLoading] = useState(false)
+  const [reorderCheckResult, setReorderCheckResult] = useState<ReorderCheckResult | null>(null)
+  const [reorderCheckError, setReorderCheckError] = useState<string | null>(null)
   const [configToast, setConfigToast] = useState<{ id: number; message: string } | null>(null)
   const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
@@ -137,6 +141,14 @@ export default function OptimizePage({
   const savedConfigs = workspace?.saved_configs ?? []
   const resultHistory = workspace?.result_history ?? []
   const latestWorkspaceResult = resultHistory[0] ?? null
+  const reorderCheckDisabledReason = useMemo(() => {
+    if (!isPreviewProfile) return null
+    if (!profile.skland_binding) return '请先绑定森空岛后再检测。'
+    if (!latestWorkspaceResult) return '请先生成一次个人排班作为检测基线。'
+    if (licenseSyncing) return '干员数据同步中，稍后再检测。'
+    if (configValidationMessage) return configValidationMessage
+    return null
+  }, [configValidationMessage, isPreviewProfile, latestWorkspaceResult, licenseSyncing, profile.skland_binding])
   const configDiffRows = useMemo(
     () => describeConfigDiff(activeConfig, latestWorkspaceResult?.config ?? null),
     [activeConfig, latestWorkspaceResult]
@@ -199,6 +211,9 @@ export default function OptimizePage({
     setPhase(nextHistoryItem ? 'history' : 'idle')
     setSection('overview')
     setInlineError(null)
+    setReorderCheckLoading(false)
+    setReorderCheckResult(null)
+    setReorderCheckError(null)
     setLastGeneratedSignature(null)
     setUpgradeCdk('')
     setUpgradeError(null)
@@ -330,12 +345,16 @@ export default function OptimizePage({
       showConfigValidationToast(nextValidation.message)
     }
     setInlineError(null)
+    setReorderCheckResult(null)
+    setReorderCheckError(null)
   }, [activeConfig, clearConfigValidationToast, normalizeAllowedConfigOverride, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
 
   const resetConfig = useCallback(() => {
     setConfigOverride(null)
     clearConfigValidationToast()
     setInlineError(null)
+    setReorderCheckResult(null)
+    setReorderCheckError(null)
   }, [clearConfigValidationToast, setConfigOverride])
 
   const runSavedConfigAction = useCallback(async (
@@ -453,6 +472,34 @@ export default function OptimizePage({
     })
   }, [activeConfig, license, mergedOperators, profileId])
 
+  const handleReorderCheck = useCallback(async () => {
+    if (!isPreviewProfile || reorderCheckLoading || loading) return
+    if (reorderCheckDisabledReason) {
+      setReorderCheckError(reorderCheckDisabledReason)
+      return
+    }
+    if (!latestWorkspaceResult) return
+    setReorderCheckLoading(true)
+    setReorderCheckResult(null)
+    setReorderCheckError(null)
+    try {
+      const data = await apiJson<ReorderCheckResult>('/api/optimize/reorder-check', {
+        method: 'POST',
+        json: {
+          profile_id: profileId,
+          config: activeConfig,
+          baseline_history_id: latestWorkspaceResult.id,
+        },
+        fallbackMessage: '重排检测失败',
+      })
+      setReorderCheckResult(data)
+    } catch (error) {
+      setReorderCheckError((error as Error).message)
+    } finally {
+      setReorderCheckLoading(false)
+    }
+  }, [activeConfig, isPreviewProfile, latestWorkspaceResult, loading, profileId, reorderCheckDisabledReason, reorderCheckLoading])
+
   const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
     const payload: OptimizeRequest = {
       profile_id: profileId,
@@ -480,6 +527,8 @@ export default function OptimizePage({
     }
     optimizeInFlightRef.current = true
     setInlineError(null)
+    setReorderCheckResult(null)
+    setReorderCheckError(null)
     setHistoryItem(null)
     setPhase('idle')
     setLoading(true)
@@ -726,6 +775,15 @@ export default function OptimizePage({
             savedConfigCount={savedConfigs.length}
             resultHistoryCount={resultHistory.length}
             latestResult={latestWorkspaceResult}
+            reorderCheck={{
+              visible: isPreviewProfile,
+              disabledReason: reorderCheckDisabledReason,
+              loading: reorderCheckLoading,
+              error: reorderCheckError,
+              result: reorderCheckResult,
+              onCheck: handleReorderCheck,
+              onGenerate: handleGenerate,
+            }}
             onGenerate={handleGenerate}
             onReset={onReset}
             onOpenPlans={() => setSection('plans')}

@@ -6,6 +6,7 @@ export type UsageEventName =
   | 'register'
   | 'cdk_redeem'
   | 'schedule_generate'
+  | 'reorder_check'
   | 'skland_import'
   | 'announcement_impression'
   | 'announcement_read'
@@ -29,6 +30,7 @@ export type UsageReasonCode =
   | 'permission_denied'
   | 'optimizer_runtime_error'
   | 'workspace_save_failed'
+  | 'monthly_quota_exceeded'
   | 'registration_failed'
   | 'skland_credential_invalid'
   | 'skland_refresh_forbidden'
@@ -178,6 +180,7 @@ export interface UsageEventStore {
   set: (key: string, record: UsageEventRecord) => Promise<void>
   getStats: (dates: string[]) => Promise<UsageStats>
   list: (prefix: string) => Promise<UsageEventRecord[]>
+  countSuccessfulByProfileInRange?: (event: UsageEventName, profileId: string, startAt: string, endAt: string) => Promise<number>
 }
 
 export function createPostgresUsageEventStore(): UsageEventStore {
@@ -198,6 +201,20 @@ export function createPostgresUsageEventStore(): UsageEventStore {
       [`${prefix}%`, startDate, endDate],
     )
     return result.rows.map((row) => row.record_json)
+  }
+
+  const countSuccessfulByProfileInRange = async (event: UsageEventName, profileId: string, startAt: string, endAt: string) => {
+    const result = await query<{ count: string }>(
+      `select count(*)::text as count
+       from usage_events
+       where event = $1
+         and created_at >= $2
+         and created_at < $3
+         and record_json->>'profile_id' = $4
+         and coalesce(record_json->>'status', 'success') = 'success'`,
+      [event, startAt, endAt, profileId],
+    )
+    return Number(result.rows[0]?.count ?? 0)
   }
 
   return {
@@ -228,6 +245,7 @@ export function createPostgresUsageEventStore(): UsageEventStore {
       return buildUsageStats(events, dates)
     },
     list,
+    countSuccessfulByProfileInRange,
   }
 }
 
