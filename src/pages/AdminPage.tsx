@@ -20,6 +20,20 @@ interface CdkTableFilters {
   generated: BinaryFilter;
 }
 
+interface GeneratedCdk {
+  code: string;
+  permission: GeneratedPermission;
+  created_at: string;
+}
+
+interface AdminCdkCreateResponse {
+  code?: string;
+  permission?: GeneratedPermission;
+  created_at?: string;
+  count?: number;
+  cdks?: Array<Partial<GeneratedCdk>>;
+}
+
 interface AdminCdkRecord {
   code_hash: string;
   cdk_id: string;
@@ -395,6 +409,7 @@ const announcementSortLabels: Record<AnnouncementSortKey, string> = {
 }
 
 const cdkProductPermissions: GeneratedPermission[] = ['recommended', 'growth', 'advanced', 'ultimate']
+const MAX_CDK_BATCH_COUNT = 100
 const cdkProductPermissionRank: Record<GeneratedPermission, number> = {
   recommended: 0,
   growth: 1,
@@ -426,7 +441,8 @@ export default function AdminPage() {
   const [riskSettings, setRiskSettings] = useState<RiskControlSettings>(DEFAULT_RISK_SETTINGS)
   const [permission, setPermission] = useState<GeneratedPermission>('growth')
   const [orderNote, setOrderNote] = useState('')
-  const [generatedCode, setGeneratedCode] = useState<{ code: string; permission: GeneratedPermission; created_at: string } | null>(null)
+  const [cdkCount, setCdkCount] = useState('1')
+  const [generatedCodes, setGeneratedCodes] = useState<GeneratedCdk[]>([])
   const [selectedCdkHashes, setSelectedCdkHashes] = useState<string[]>([])
   const [selectedCdkDetail, setSelectedCdkDetail] = useState<AdminCdkDetail | null>(null)
   const [selectedUserDetail, setSelectedUserDetail] = useState<AdminUserDetail | null>(null)
@@ -588,27 +604,53 @@ const summary = useMemo(
 
   const handleGenerateCdk = async (event: FormEvent) => {
     event.preventDefault()
-    setBusyAction('generate')
+    const batchCount = Number(cdkCount)
     setError(null)
     setNotice(null)
+    if (!Number.isInteger(batchCount) || batchCount < 1 || batchCount > MAX_CDK_BATCH_COUNT) {
+      setGeneratedCodes([])
+      setError(`生成数量必须是 1-${MAX_CDK_BATCH_COUNT} 的整数`)
+      return
+    }
+
+    setBusyAction('generate')
     try {
-      const data = await apiJson<{ code?: string; permission?: GeneratedPermission; created_at?: string }>('/api/admin/cdk', {
+      const data = await apiJson<AdminCdkCreateResponse>('/api/admin/cdk', {
         method: 'POST',
         headers: authHeaders,
-        json: { admin_user: credentials?.user, admin_password: credentials?.password, permission, order_note: orderNote },
+        json: { admin_user: credentials?.user, admin_password: credentials?.password, permission, order_note: orderNote, count: batchCount },
         fallbackMessage: '生成失败',
       })
-      if (!data.code || !data.permission || !data.created_at) {
+      const nextGeneratedCodes = normalizeGeneratedCdks(data)
+      if (nextGeneratedCodes.length === 0) {
         throw new Error('生成失败')
       }
-      setGeneratedCode({ code: data.code, permission: data.permission, created_at: data.created_at })
+      setGeneratedCodes(nextGeneratedCodes)
       setOrderNote('')
+      setNotice(`已生成 ${nextGeneratedCodes.length} 个 CDK`)
       await loadDashboard()
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
       setBusyAction(null)
     }
+  }
+
+  const handleCopyGeneratedCdks = async () => {
+    if (generatedCodes.length === 0) return
+    try {
+      await navigator.clipboard.writeText(generatedCodes.map((item) => item.code).join('\n'))
+      setNotice(generatedCodes.length === 1 ? 'CDK 已复制' : `已复制 ${generatedCodes.length} 个 CDK`)
+    } catch (caught) {
+      setError((caught as Error).message || '复制失败')
+    }
+  }
+
+  const handleDownloadGeneratedCdks = () => {
+    if (generatedCodes.length === 0) return
+    const blob = new Blob([`\uFEFF${buildGeneratedCdkCsv(generatedCodes)}`], { type: 'text/csv;charset=utf-8' })
+    downloadBlob(blob, `generated-cdks-${formatDownloadTimestamp()}.csv`)
+    setNotice('CDK CSV 已导出')
   }
 
   const handleSaveAnnouncement = async (event: FormEvent) => {
@@ -1217,32 +1259,49 @@ const summary = useMemo(
             </section>
           )}
 
-          {activeSection === 'cdk' && (
-            <section className="space-y-5">
-              <form onSubmit={handleGenerateCdk} className="rounded-xl border border-surface-3 bg-surface-1 p-5">
-                <div className="grid gap-4 lg:grid-cols-[220px_1fr_auto] lg:items-end">
-                  <label>
-                    <span className="mb-2 block text-sm font-medium text-ink-secondary">授权类型</span>
-                    <select value={permission} onChange={(event) => setPermission(event.currentTarget.value as GeneratedPermission)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary">
-                      {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
-                    </select>
-                  </label>
-                  <label>
-                    <span className="mb-2 block text-sm font-medium text-ink-secondary">订单备注</span>
-                    <input value={orderNote} maxLength={120} onChange={(event) => setOrderNote(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="闲鱼订单号、用户昵称或售后备注" />
-                  </label>
-                  <button type="submit" disabled={busyAction === 'generate'} className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">{busyAction === 'generate' ? '生成中...' : '生成 CDK'}</button>
-                </div>
-                {generatedCode && (
-                  <div className="mt-4 flex flex-col gap-3 rounded-lg bg-surface-2 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="font-mono text-base font-semibold text-ink-primary">{generatedCode.code}</div>
-                      <div className="mt-1 text-xs text-ink-muted">{permissionLabels[generatedCode.permission]} · {formatDate(generatedCode.created_at)}</div>
-                    </div>
-                    <button type="button" onClick={() => navigator.clipboard.writeText(generatedCode.code)} className="rounded-lg bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">复制 CDK</button>
+      {activeSection === 'cdk' && (
+        <section className="space-y-5">
+          <form onSubmit={handleGenerateCdk} className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+            <div className="grid gap-4 lg:grid-cols-[220px_140px_1fr_auto] lg:items-end">
+              <label>
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">授权类型</span>
+                <select value={permission} onChange={(event) => setPermission(event.currentTarget.value as GeneratedPermission)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary">
+                  {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">生成数量</span>
+                <input type="number" min={1} max={MAX_CDK_BATCH_COUNT} step={1} value={cdkCount} onChange={(event) => setCdkCount(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-medium text-ink-secondary">订单备注</span>
+                <input value={orderNote} maxLength={120} onChange={(event) => setOrderNote(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="闲鱼订单号、用户昵称或售后备注" />
+              </label>
+              <button type="submit" disabled={busyAction === 'generate'} className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">{busyAction === 'generate' ? '生成中...' : '生成 CDK'}</button>
+            </div>
+            {generatedCodes.length > 0 && (
+              <div className="mt-4 border-t border-surface-3 pt-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-ink-primary">已生成 {generatedCodes.length} 个 CDK</div>
+                    <div className="mt-1 text-xs text-ink-muted">{permissionLabels[generatedCodes[0].permission]} · {formatDate(generatedCodes[0].created_at)}</div>
                   </div>
-                )}
-              </form>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={handleCopyGeneratedCdks} className="rounded-lg bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">{generatedCodes.length === 1 ? '复制 CDK' : '复制全部'}</button>
+                    <button type="button" onClick={handleDownloadGeneratedCdks} className="rounded-lg bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">下载 CSV</button>
+                  </div>
+                </div>
+                <div className="mt-3 max-h-64 overflow-auto rounded-lg border border-surface-3 bg-surface-0">
+                  {generatedCodes.map((item) => (
+                    <div key={item.code} className="flex flex-col gap-1 border-b border-surface-3 px-3 py-2 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="break-all font-mono text-sm font-semibold text-ink-primary">{item.code}</span>
+                      <span className="text-xs text-ink-muted">{formatDate(item.created_at)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </form>
               <CdkRecordDistributionPanel summary={cdkOpsSummary} />
               <CdkTable
                 records={visibleRecords}
@@ -3034,6 +3093,26 @@ function getNextProductPermission(permission: Permission): GeneratedPermission |
   return cdkProductPermissions.find((item) => cdkProductPermissionRank[item] === cdkProductPermissionRank[current] + 1) ?? null
 }
 
+function normalizeGeneratedCdks(data: AdminCdkCreateResponse): GeneratedCdk[] {
+  const cdks = Array.isArray(data.cdks)
+    ? data.cdks
+      .map((item) => {
+        const permission = typeof item.permission === 'string' ? normalizeProductPermission(item.permission) : null
+        if (typeof item.code !== 'string' || !item.code.trim() || !permission || typeof item.created_at !== 'string') return null
+        return { code: item.code, permission, created_at: item.created_at }
+      })
+      .filter((item): item is GeneratedCdk => Boolean(item))
+    : []
+
+  if (cdks.length > 0) return cdks
+
+  const permission = typeof data.permission === 'string' ? normalizeProductPermission(data.permission) : null
+  if (typeof data.code === 'string' && data.code.trim() && permission && typeof data.created_at === 'string') {
+    return [{ code: data.code, permission, created_at: data.created_at }]
+  }
+  return []
+}
+
 function normalizeProductPermission(permission: string): GeneratedPermission | null {
   if (permission === 'basic') return 'growth'
   if (permission === 'premium') return 'advanced'
@@ -3132,6 +3211,14 @@ function buildCurrentOpsReportCsv(report: ReturnType<typeof buildCurrentOpsRepor
     rows.push(['announcement_item', 'reads', item.title, item.updated_at, String(item.stats.reads), extra])
     rows.push(['announcement_item', 'read_rate', item.title, item.updated_at, String(item.stats.read_rate), extra])
   }
+  return rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
+}
+
+function buildGeneratedCdkCsv(cdks: GeneratedCdk[]): string {
+  const rows = [
+    ['code', 'permission', 'permission_label', 'created_at'],
+    ...cdks.map((item) => [item.code, item.permission, permissionLabels[item.permission], item.created_at]),
+  ]
   return rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
 }
 
