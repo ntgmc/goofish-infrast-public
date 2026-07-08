@@ -970,6 +970,9 @@ function memoryLicenseUtilsModule() {
     export function resolveConfigForPermission(permission, config) {
       return { ok: true, config }
     }
+    export function resolveFreePreviewConfig(config) {
+      return { ok: true, config }
+    }
     function isCountRecord(value) {
       if (!value || typeof value !== 'object') return false
       return Object.values(value).every((item) => Number.isInteger(item) && item >= 0)

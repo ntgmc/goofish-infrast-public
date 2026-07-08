@@ -335,11 +335,8 @@ function assertPreviewResultIsLimited(result, label) {
   if (!result || typeof result !== 'object') {
     throw new Error(`${label}: missing result`)
   }
-  if (result.preview_limit?.room_limit !== 3 || result.preview_limit.hidden_room_count < 1) {
+  if (result.preview_limit?.mode !== 'full_rotation_without_export' || result.preview_limit.hidden_room_count !== 0) {
     throw new Error(`${label}: missing preview_limit metadata`)
-  }
-  if (countVisibleRooms(result.plans) > 3) {
-    throw new Error(`${label}: leaked more than three visible rooms`)
   }
   if (!Array.isArray(result.raw_results) || result.raw_results.length !== 0) {
     throw new Error(`${label}: raw_results should be empty`)
@@ -531,7 +528,7 @@ function memoryUserAuthModule() {
       }
       const now = new Date().toISOString()
       const id = 'preview-' + (++store.previewCounter)
-      const profile = { version: 1, id, user_id: user.id, kind: 'free_preview', cdk_key: null, cdk_code_hash: null, cdk_order_hash: null, permission: 'growth', status: 'active', display_name: displayName || '免费预览', note: note || '', created_at: now, updated_at: now }
+      const profile = { version: 1, id, user_id: user.id, kind: 'free_preview', cdk_key: null, cdk_code_hash: null, cdk_order_hash: null, permission: 'growth', status: 'active', display_name: displayName || '免费预览', note: note || '', skland_binding: { uid: 'preview-smoke', encrypted_cred: 'preview-smoke' }, created_at: now, updated_at: now }
       store.profiles.set(id, profile)
       store.workspaces.set(id, emptyWorkspace(id))
       return { ok: true, profile }
@@ -631,6 +628,7 @@ function memoryLicenseUtilsModule() {
     export function normalizePermissionMode(permission) { return permission ?? 'advanced' }
     export async function recordSoftBlockedRiskEvent() { return { message: 'blocked', frozen: false } }
     export function resolveConfigForPermission(_permission, config) { return config?.permission_blocked ? { ok: false, message: 'permission blocked' } : { ok: true, config } }
+    export function resolveFreePreviewConfig(config) { return { ok: true, config } }
     export function requireEnv() { return 'secret' }
     export function shouldFreezeBindingRisk() { return false }
     export function validateConfig(config) { return config && typeof config === 'object' ? { ok: true, config } : { ok: false, message: 'invalid config' } }

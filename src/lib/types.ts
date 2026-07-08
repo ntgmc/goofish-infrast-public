@@ -20,7 +20,9 @@ export interface LicenseConfig {
     manufacturing_stations: Record<string, number>;
   };
   Fiammetta?: { enable: boolean; candidate_mode?: string };
+  optimization_mode?: 'fast' | 'exact' | 'exhaustive' | string;
   optimizer_search?: {
+    optimization_mode?: 'fast' | 'exact' | 'exhaustive' | string;
     beam?: boolean;
     candidate_limit?: number;
     beam_width?: number;
@@ -261,6 +263,17 @@ export interface OptimizeResult {
   daily_production?: DailyProduction;
   total_efficiency?: number;
   raw_total_efficiency?: number;
+  optimization_mode?: 'fast' | 'exact' | 'exhaustive' | string;
+  optimality?: 'global_within_candidate_set' | 'bounded_candidate_optimum' | 'approximate' | string;
+  search_nodes?: number;
+  pruned_nodes?: number;
+  candidate_count?: number;
+  elapsed_ms?: number;
+  search_space_size?: string;
+  optimal_objective_value?: number;
+  cache_key?: string;
+  job_recommended?: boolean;
+  cross_shift_trace?: Record<string, unknown>[];
   maa_default_comparison?: MaaDefaultComparison;
   intermediate_depletion?: IntermediateDepletion[];
   upgrade_suggestions?: RawUpgradeSuggestion[];
@@ -268,7 +281,8 @@ export interface OptimizeResult {
   upgrade_task_payload?: UpgradeTaskPayload;
   analysis_summary?: ScheduleAnalysisSummary;
   preview_limit?: {
-    room_limit: number;
+    mode?: 'room_limited' | 'full_rotation_without_export';
+    room_limit?: number;
     hidden_room_count: number;
     notice: string;
   };
