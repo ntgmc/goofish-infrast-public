@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import type { AuthSuccessResponse, UserGameAccount } from '../../../lib/types'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
-import { PERMISSION_LABELS } from '../../../lib/config'
-import { formatDate } from '../tool-utils'
+import { formatDate, getProfileAccessLabel, isFreePreviewProfile } from '../tool-utils'
 
 
 export default function ProfilesSection({
@@ -20,7 +19,7 @@ export default function ProfilesSection({
     return (
 <section className="rounded-xl border border-surface-3 bg-surface-1 p-6">
 <h2 className="text-lg font-semibold text-ink-primary">还没有添加游戏账号</h2>
-<p className="mt-2 text-sm leading-6 text-ink-secondary">可以先进入“免费预览”查看账号优化方向；正式添加游戏账号仍需要未使用的 CDK。</p>
+<p className="mt-2 text-sm leading-6 text-ink-secondary">可以在“添加账号”里创建免费预览，或输入未使用的 CDK 添加正式游戏账号。</p>
 </section>
     )
   }
@@ -81,9 +80,9 @@ function ProfileCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-lg font-semibold text-ink-primary">{profile.display_name || fallbackName}</h2>
-            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-brand-300">{PERMISSION_LABELS[profile.permission]}</span>
+            <span className={`rounded-md px-2 py-1 text-xs font-semibold ${isFreePreviewProfile(profile) ? 'bg-warning/10 text-warning' : 'bg-surface-2 text-brand-300'}`}>{getProfileAccessLabel(profile)}</span>
           </div>
-          <p className="mt-2 text-sm leading-6 text-ink-secondary">{profile.note || '暂无备注'}</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">{profile.note || (isFreePreviewProfile(profile) ? '免费个人排班可查看完整游戏内轮换，但不提供导出和高级分析。' : '暂无备注')}</p>
           <p className="mt-3 text-xs text-ink-muted">{profile.operator_count} 名干员 · 更新 {formatDate(profile.updated_at)}</p>
         </div>
         <button

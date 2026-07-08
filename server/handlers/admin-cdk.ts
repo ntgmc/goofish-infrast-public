@@ -15,6 +15,9 @@ import {
 
 type CdkStatusFilter = CdkStatus | 'all'
 
+const MAX_BATCH_CREATE_COUNT = 100
+const MAX_CDK_GENERATION_ATTEMPTS = 10
+
 const PRODUCT_PERMISSION_RANK: Record<ProductPermissionMode, number> = {
   recommended: 0,
   growth: 1,
@@ -45,8 +48,9 @@ export default async (req: Request): Promise<Response> => {
       admin_user?: string;
       permission?: string;
       order_note?: string;
+      count?: unknown;
     }
-    const { permission, order_note } = body
+    const { permission, order_note, count } = body
     const hashSecret = requireEnv('CDK_HASH_SECRET')
 
     if (!(await authenticateAdminRequest(req, body))) {
@@ -58,40 +62,101 @@ export default async (req: Request): Promise<Response> => {
     const cdkPermission = permission as ProductPermissionMode
 
     const store = await getCdkRecordStore()
-    let code = generateCdk()
-    let codeHash = hashCdk(code, hashSecret)
-    let key = `cdk/${codeHash}.json`
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const existing = await store.get(key)
-      if (!existing) break
-      code = generateCdk()
-      codeHash = hashCdk(code, hashSecret)
-      key = `cdk/${codeHash}.json`
+    const batchCount = normalizeCreateCount(count)
+    if (batchCount === null) {
+      return jsonResponse({ error: `生成数量必须是 1-${MAX_BATCH_CREATE_COUNT} 的整数。` }, 400)
     }
-
     const createdAt = new Date().toISOString()
-    const record: CdkRecord = {
-      version: 1,
-      code_hash: codeHash,
+    const orderNote = order_note?.trim() || null
+    const createdCdks = await createCdkBatch(store, {
+      count: batchCount,
+      createdAt,
+      hashSecret,
+      orderNote,
       permission: cdkPermission,
-      status: 'unused',
+    })
+    const response = {
+      permission: cdkPermission,
       created_at: createdAt,
-      used_at: null,
-      revoked_at: null,
-      order_note: order_note?.trim() || null,
-      license_order_hash: null,
-      operator_count: null,
-      config_desc: null,
-      schedule_generate_count: 0,
+      count: createdCdks.length,
+      cdks: createdCdks.map(({ code }) => ({ code, permission: cdkPermission, created_at: createdAt })),
     }
-    await store.set(key, record)
 
-    return jsonResponse({ code, permission: cdkPermission, created_at: createdAt })
+    return jsonResponse(batchCount === 1 ? { code: createdCdks[0]?.code, ...response } : response)
   } catch (error) {
     console.error('admin cdk error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
   }
+}
+
+interface CreatedCdk {
+  code: string;
+  codeHash: string;
+}
+
+interface CreateCdkBatchOptions {
+  count: number;
+  createdAt: string;
+  hashSecret: string;
+  orderNote: string | null;
+  permission: ProductPermissionMode;
+}
+
+function normalizeCreateCount(value: unknown): number | null {
+  if (value === undefined) return 1
+  if (typeof value !== 'number' || !Number.isInteger(value)) return null
+  if (value < 1 || value > MAX_BATCH_CREATE_COUNT) return null
+  return value
+}
+
+async function createCdkBatch(
+  store: Awaited<ReturnType<typeof getCdkRecordStore>>,
+  options: CreateCdkBatchOptions,
+): Promise<CreatedCdk[]> {
+  const created: CreatedCdk[] = []
+  const generatedHashes = new Set<string>()
+
+  for (let index = 0; index < options.count; index += 1) {
+    const generated = await generateUniqueCdk(store, options.hashSecret, generatedHashes)
+    generatedHashes.add(generated.codeHash)
+
+    const record: CdkRecord = {
+      version: 1,
+      code_hash: generated.codeHash,
+      permission: options.permission,
+      status: 'unused',
+      created_at: options.createdAt,
+      used_at: null,
+      revoked_at: null,
+      order_note: options.orderNote,
+      license_order_hash: null,
+      operator_count: null,
+      config_desc: null,
+      schedule_generate_count: 0,
+    }
+    await store.set(`cdk/${generated.codeHash}.json`, record)
+    created.push(generated)
+  }
+
+  return created
+}
+
+async function generateUniqueCdk(
+  store: Awaited<ReturnType<typeof getCdkRecordStore>>,
+  hashSecret: string,
+  generatedHashes: Set<string>,
+): Promise<CreatedCdk> {
+  for (let attempt = 0; attempt < MAX_CDK_GENERATION_ATTEMPTS; attempt += 1) {
+    const code = generateCdk()
+    const codeHash = hashCdk(code, hashSecret)
+    if (generatedHashes.has(codeHash)) continue
+
+    const existing = await store.get(`cdk/${codeHash}.json`)
+    if (!existing) return { code, codeHash }
+  }
+
+  throw new Error('生成 CDK 失败，请重试。')
 }
 
 async function handleList(req: Request): Promise<Response> {
@@ -384,6 +449,7 @@ function toAdminCdkRecord(record: CdkRecord) {
     user_agent_count: new Set((record.user_agent_events ?? []).map((event) => event.hash)).size,
     ip_prefix_count: new Set((record.ip_prefix_events ?? []).map((event) => event.hash)).size,
     risk_event_count: record.risk_events?.length ?? 0,
+    risk_events: (record.risk_events ?? []).map(summarizeRiskEvent).filter((event): event is NonNullable<ReturnType<typeof summarizeRiskEvent>> => Boolean(event)),
     latest_risk_event: summarizeRiskEvent(record.risk_events?.at(-1)),
   }
 }
@@ -394,6 +460,8 @@ function summarizeRiskEvent(event: NonNullable<CdkRecord['risk_events']>[number]
     at: event.at,
     type: event.type,
     reason: event.reason,
+    soft_block: event.detail?.soft_block === true,
+    escalation: event.type === 'soft_block_threshold',
   }
 }
 

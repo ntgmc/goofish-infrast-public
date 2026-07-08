@@ -20,7 +20,9 @@ export interface LicenseConfig {
     manufacturing_stations: Record<string, number>;
   };
   Fiammetta?: { enable: boolean; candidate_mode?: string };
+  optimization_mode?: 'fast' | 'exact' | 'exhaustive' | string;
   optimizer_search?: {
+    optimization_mode?: 'fast' | 'exact' | 'exhaustive' | string;
     beam?: boolean;
     candidate_limit?: number;
     beam_width?: number;
@@ -41,12 +43,21 @@ export interface LicenseConfig {
   [key: string]: unknown;
 }
 
+export type IntermediateProduct = 'Originium Shard' | 'Pure Gold';
+
+export interface IntermediateDepletion {
+  product: IntermediateProduct;
+  stock: number;
+  net_per_day: number;
+  days_remaining: number | null;
+}
+
 export type LegacyPermissionMode = 'basic' | 'premium';
 export type ProductPermissionMode = 'recommended' | 'growth' | 'advanced' | 'ultimate';
 export type InternalPermissionMode = 'admin';
 export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | InternalPermissionMode;
 export type PermissionMode = ProductPermissionMode | InternalPermissionMode;
-export type UserGameAccountKind = 'cdk' | 'depot_value';
+export type UserGameAccountKind = 'cdk' | 'free_preview' | 'depot_value';
 
 export interface OperatorUpdateGrant {
   remaining: number;
@@ -105,8 +116,18 @@ export interface AnnouncementPublicResponse {
   announcements: Announcement[];
 }
 
+export interface AnnouncementStats {
+  impressions: number;
+  reads: number;
+  server_reads: number;
+  local_reads: number;
+  unread: number;
+  read_rate: number;
+}
+
 export interface AnnouncementAdminResponse {
   announcements: Announcement[];
+  stats?: Record<string, AnnouncementStats>;
 }
 
 export interface OptimizeRequest {
@@ -127,43 +148,6 @@ export interface AnalyzeScheduleRequest {
   schedule: unknown;
   config?: Partial<LicenseConfig>;
   ignore_elite?: boolean;
-}
-
-export interface FreePreviewRequest {
-  operators: LicenseOperator[];
-  config: LicenseConfig;
-}
-
-export interface FreePreviewResult {
-  operator_count: number;
-  support: {
-    supported: boolean;
-    label: string;
-    reason: string;
-  };
-  directions: string[];
-  potential_range: {
-    min: string;
-    max: string;
-    label: string;
-    note: string;
-  };
-  limited_schedule: {
-    plan_name: string;
-    plan_count: number;
-    room_limit: number;
-    hidden_room_count: number;
-    rooms: {
-      key: string;
-      label: string;
-      index_label: string;
-      product: string;
-      operators: string[];
-      efficiency: number;
-    }[];
-  };
-  notices: string[];
-  build_meta: AppBuildMeta;
 }
 
 export type DepotValueSource = 'upload' | 'skland';
@@ -266,7 +250,10 @@ export interface OptimizeResult {
     queue_count: number;
     quick_switch: true;
     training_policy: 'assume_not_training';
-    suppress_total_efficiency: true;
+    shift_hours_per_queue?: number;
+    daily_production_normalized_hours?: number;
+    total_cycle_hours?: number;
+    suppress_total_efficiency?: false;
   };
   shift_hours?: number[];
   shift_pattern?: string;
@@ -279,11 +266,64 @@ export interface OptimizeResult {
   daily_production?: DailyProduction;
   total_efficiency?: number;
   raw_total_efficiency?: number;
+  optimization_mode?: 'fast' | 'exact' | 'exhaustive' | string;
+  optimality?: 'global_within_candidate_set' | 'bounded_candidate_optimum' | 'approximate' | string;
+  search_nodes?: number;
+  pruned_nodes?: number;
+  candidate_count?: number;
+  elapsed_ms?: number;
+  search_space_size?: string;
+  optimal_objective_value?: number;
+  cache_key?: string;
+  job_recommended?: boolean;
+  cross_shift_trace?: Record<string, unknown>[];
   maa_default_comparison?: MaaDefaultComparison;
+  intermediate_depletion?: IntermediateDepletion[];
   upgrade_suggestions?: RawUpgradeSuggestion[];
   current_result?: OptimizeResult;
   upgrade_task_payload?: UpgradeTaskPayload;
   analysis_summary?: ScheduleAnalysisSummary;
+  preview_limit?: {
+    mode?: 'room_limited' | 'full_rotation_without_export';
+    room_limit?: number;
+    hidden_room_count: number;
+    notice: string;
+  };
+  build_meta?: AppBuildMeta;
+}
+
+export type ReorderCheckRecommendation = 'no_need' | 'recommended' | 'strongly_recommended';
+
+export interface ReorderCheckResult {
+  recommendation: ReorderCheckRecommendation;
+  estimated_gain_range: {
+    min: number | null;
+    max: number | null;
+    unit: 'equivalent_sanity_per_day' | 'room_change_only';
+    label: string;
+  };
+  changed_room_count: number;
+  affected_facility_types: string[];
+  key_operators: {
+    id?: string;
+    name: string;
+    reason: 'newly_used' | 'core_combo_changed';
+    occurrence_count: number;
+  }[];
+  current_plan_usable: boolean;
+  quota: {
+    limit: 2;
+    used: number;
+    remaining: number;
+    reset_at: string;
+    timezone: 'Asia/Shanghai';
+  };
+  baseline: {
+    history_id: string;
+    created_at: string;
+    name: string;
+  };
+  reasons: string[];
   build_meta?: AppBuildMeta;
 }
 
@@ -484,6 +524,8 @@ export interface DroneAssignment {
 
 export interface DailyProduction {
   hours?: number;
+  source_hours?: number;
+  normalization_factor?: number;
   shift_hours?: number[];
   manufacturing?: Record<string, number>;
   trading?: Record<string, number>;

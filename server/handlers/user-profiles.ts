@@ -9,7 +9,15 @@ import {
   saveUserProfile,
   toPublicProfile,
 } from '../storage/user-store'
-import { buildAuthPayload, jsonResponse, redeemProfileCdk, requireUserSession, toPublicUser } from './user-auth'
+import {
+  buildAuthPayload,
+  createOrReusePreviewProfile,
+  jsonResponse,
+  redeemProfileCdk,
+  requireUserSession,
+  toPublicUser,
+  upgradePreviewProfileWithCdk,
+} from './user-auth'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -29,6 +37,14 @@ export default async (req: Request): Promise<Response> => {
       })
     }
 
+    if (pathname.endsWith('/preview')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      const body = await req.json() as { display_name?: unknown; note?: unknown }
+      const preview = await createOrReusePreviewProfile(auth.user, body.display_name, body.note)
+      if (!preview.ok) return jsonResponse({ error: preview.message }, preview.status)
+      return jsonResponse(await buildAuthPayload(auth.user, preview.profile.id))
+    }
+
     if (req.method === 'GET') {
       const profiles = await listProfilesForUser(auth.user.id)
       return jsonResponse({
@@ -39,8 +55,10 @@ export default async (req: Request): Promise<Response> => {
 
     if (pathname.endsWith('/redeem')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      const body = await req.json() as { cdk?: unknown; display_name?: unknown; note?: unknown }
-      const redeemed = await redeemProfileCdk(auth.user, body.cdk, body.display_name, body.note)
+      const body = await req.json() as { cdk?: unknown; display_name?: unknown; note?: unknown; profile_id?: unknown }
+      const redeemed = typeof body.profile_id === 'string' && body.profile_id.trim()
+        ? await upgradePreviewProfileWithCdk(auth.user, body.profile_id, body.cdk, body.display_name, body.note)
+        : await redeemProfileCdk(auth.user, body.cdk, body.display_name, body.note)
       if (!redeemed.ok) return jsonResponse({ error: redeemed.message }, redeemed.status)
       return jsonResponse(await buildAuthPayload(auth.user, redeemed.profile.id))
     }

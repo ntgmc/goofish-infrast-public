@@ -1,6 +1,7 @@
 import type { OptimizeResult } from '../../lib/types'
 import {
   formatAmount,
+  formatIntermediateDepletionSummary,
   formatOverflowSummary,
   formatProductionBreakdown,
   formatSigned,
@@ -19,11 +20,27 @@ export default function ResultMetrics({
   analysisSummary: OptimizeResult['analysis_summary'];
   prepared: PreparedResult;
 }) {
-  const { totalEff, rawTotalEff, productionStats, productionSanity, maaDefaultComparison, detailStats } = prepared
+  const {
+    totalEff,
+    rawTotalEff,
+    hasDailyProduction,
+    rotationStatsNote,
+    productionStats,
+    productionSanity,
+    intermediateDepletion,
+    maaDefaultComparison,
+    detailStats,
+  } = prepared
+  const showProductionMetrics = !isRotationMode || hasDailyProduction
   const showMaaDefaultComparison = Boolean(maaDefaultComparison) && !isAnalysis && !isRotationMode
   const productionSanityNote = showMaaDefaultComparison && maaDefaultComparison
     ? maaDefaultComparison.sanityDeltaNote
-    : productionSanity.note
+    : isRotationMode && rotationStatsNote
+      ? `${rotationStatsNote}；${productionSanity.note}`
+      : productionSanity.note
+  const intermediateDepletionSummary = !isAnalysis && !isRotationMode
+    ? formatIntermediateDepletionSummary(intermediateDepletion)
+    : ''
 
   return (
     <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
@@ -51,24 +68,24 @@ export default function ResultMetrics({
               : '未发现红脸风险'}
             highlight={(analysisSummary?.red_face_risk_count ?? 0) > 0}
           />
-        ) : isRotationMode ? (
+        ) : isRotationMode && !showProductionMetrics ? (
           <MetricCard label="预设队列" value={String(detailStats.planCount)} suffix="组" highlight />
         ) : (
           <MetricCard
             label="预计总效率"
             value={totalEff.toFixed(2)}
             suffix="%"
-            note={Math.abs(totalEff - rawTotalEff) >= 0.05 ? `原始房间和 ${rawTotalEff.toFixed(2)}%` : undefined}
+            note={rotationStatsNote ?? (Math.abs(totalEff - rawTotalEff) >= 0.05 ? `原始房间和 ${rawTotalEff.toFixed(2)}%` : undefined)}
             highlight
           />
         )}
         <MetricCard
-          label={isRotationMode ? '房间预设' : '制造站产量'}
-          value={isRotationMode ? String(detailStats.roomCount) : formatAmount(productionStats.manufacturingTotal)}
-          suffix={isRotationMode ? '间' : '件/日'}
-          note={isRotationMode ? '按每个设施分别录入队列 1 / 队列 2' : formatProductionBreakdown(productionStats.manufacturing)}
+          label={isRotationMode && !showProductionMetrics ? '房间预设' : '制造站产量'}
+          value={isRotationMode && !showProductionMetrics ? String(detailStats.roomCount) : formatAmount(productionStats.manufacturingTotal)}
+          suffix={isRotationMode && !showProductionMetrics ? '间' : '件/日'}
+          note={isRotationMode && !showProductionMetrics ? '按每个设施分别录入队列' : formatProductionBreakdown(productionStats.manufacturing)}
         />
-        {!isRotationMode && (
+        {showProductionMetrics && (
           <>
             <MetricCard
               label="预计日产出"
@@ -94,6 +111,11 @@ export default function ResultMetrics({
           </>
         )}
       </div>
+      {intermediateDepletionSummary && (
+        <div className="border-t border-surface-3/60 px-5 py-3 text-xs leading-5 text-ink-secondary sm:px-6">
+          <span className="font-medium text-ink-primary">中间产物库存：</span>{intermediateDepletionSummary}
+        </div>
+      )}
       {showMaaDefaultComparison && maaDefaultComparison ? (
         <div className="border-t border-surface-3/60 px-5 pb-5 pt-3 text-xs leading-5 text-ink-secondary sm:px-6">
           MAA 默认基准：总效率 {formatAmount(maaDefaultComparison.baselineTotalEfficiency)}%，龙门币 {formatAmount(maaDefaultComparison.baselineLmd)}/日，赤金净变动 {formatSigned(maaDefaultComparison.baselineGoldNet)}/日

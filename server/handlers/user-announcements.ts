@@ -1,6 +1,7 @@
 import type { UserAnnouncementRead } from '../../src/lib/types'
 import { getAnnouncementReads, markAnnouncementRead } from '../storage/user-store'
 import { getActiveAnnouncements, jsonResponse, requireUserSession } from './user-auth'
+import { recordUsageEvent } from './usage-stats'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -23,6 +24,7 @@ export default async (req: Request): Promise<Response> => {
           : []
       if (ids.length === 0) return jsonResponse({ error: '缺少公告 ID。' }, 400)
       for (const id of ids) await markAnnouncementRead(auth.user.id, id)
+      await recordAnnouncementReads(ids, announcements)
       return jsonResponse(await buildAnnouncementPayload(auth.user.id))
     }
 
@@ -31,6 +33,24 @@ export default async (req: Request): Promise<Response> => {
     console.error('user announcements error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
+  }
+}
+
+async function recordAnnouncementReads(ids: string[], announcements: Array<{ id: string; kind: string }>): Promise<void> {
+  const byId = new Map(announcements.map((announcement) => [announcement.id, announcement]))
+  try {
+    await Promise.all(ids.map((id) => {
+      const announcement = byId.get(id)
+      return recordUsageEvent('announcement_read', {
+        status: 'success',
+        reason_code: 'ok',
+        source: 'user_announcements',
+        announcement_id: id,
+        ...(announcement?.kind && { announcement_kind: announcement.kind }),
+      })
+    }))
+  } catch (error) {
+    console.warn('usage stats announcement read skipped:', error)
   }
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Announcement } from '../lib/types'
+import { apiVoid } from '../lib/api-client'
 
 const READ_PREFIX = 'maa-announcement-read:'
 
@@ -23,6 +24,7 @@ export default function AnnouncementPopup({ announcements }: Props) {
 
   const markCurrentRead = () => {
     markAnnouncementRead(current)
+    void reportAnnouncementRead(current)
     setQueue((items) => items.slice(1))
   }
 
@@ -71,6 +73,22 @@ function isAnnouncementRead(announcement: Announcement): boolean {
 function markAnnouncementRead(announcement: Announcement): void {
   if (!canUseLocalStorage()) return
   window.localStorage.setItem(readKey(announcement), announcement.updated_at)
+}
+
+async function reportAnnouncementRead(announcement: Announcement): Promise<void> {
+  try {
+    await apiVoid('/api/usage-stats', {
+      method: 'POST',
+      json: {
+        event: 'announcement_read',
+        announcement_id: announcement.id,
+        announcement_kind: announcement.kind,
+        source: 'popup_local',
+      },
+    })
+  } catch {
+    // Local read state must keep working for logged-out/offline users.
+  }
 }
 
 function readKey(announcement: Announcement): string {

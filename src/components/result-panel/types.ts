@@ -9,6 +9,7 @@ export interface ResultPanelProps {
   detailDefaultOpen?: boolean;
   variant?: 'optimize' | 'analysis';
   suggestionsSlot?: ReactNode;
+  previewLimit?: OptimizeResult['preview_limit'];
 }
 
 export type RoomOperator = {

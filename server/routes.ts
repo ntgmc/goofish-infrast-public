@@ -6,7 +6,6 @@ import announcementHandler from './handlers/announcement'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
 import depotValueHandler from './handlers/depot-value'
-import freePreviewHandler from './handlers/free-preview'
 import licenseStatusHandler from './handlers/license-status'
 import optimizeHandler from './handlers/optimize'
 import redeemCdkHandler from './handlers/redeem-cdk'
@@ -43,21 +42,26 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/analyze-schedule', analyzeScheduleHandler as unknown as ApiHandler],
   ['/api/depot-value', depotValueHandler as unknown as ApiHandler],
-  ['/api/free-preview', freePreviewHandler as unknown as ApiHandler],
   ['/api/redeem-cdk', redeemCdkHandler as unknown as ApiHandler],
   ['/api/license-status', licenseStatusHandler as unknown as ApiHandler],
   ['/api/user/announcements', userAnnouncementsHandler as unknown as ApiHandler],
   ['/api/user/profiles', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/depot-value', userProfilesHandler as unknown as ApiHandler],
+  ['/api/user/profiles/preview', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/redeem', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/skland/login/start', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/login/complete', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/login/confirm', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/credential/preview', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/free-preview/login/start', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/free-preview/login/complete', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/free-preview/login/confirm', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/free-preview/credential/preview', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/import/refresh', userSklandHandler as unknown as ApiHandler],
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/optimize', optimizeHandler as unknown as ApiHandler],
+  ['/api/optimize/reorder-check', optimizeHandler as unknown as ApiHandler],
 ])
 
 export async function routeRequest(req: Request): Promise<Response> {
