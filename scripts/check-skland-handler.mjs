@@ -587,6 +587,28 @@ async function assertFreePreviewScanClaim() {
   if (store.workspaces.get(profileId)?.operators?.length !== 2) {
     throw new Error('免费档案扫码确认：干员未写入工作区')
   }
+  const entitlement = {
+    first_generated_at: '2026-01-01T00:00:00.000Z',
+    revision_count: 2,
+    revision_limit: 3,
+    revision_window_hours: 24,
+    confirmed_at: null,
+    locked_at: null,
+    lock_reason: null,
+    strong_reorder_bonus: null,
+  }
+  store.workspaces.set(profileId, {
+    ...store.workspaces.get(profileId),
+    free_schedule_entitlement: entitlement,
+  })
+  setFetchMode('blank-default-uid')
+  const refresh = await callSkland('/api/user/skland/import/refresh', { profile_id: profileId })
+  if (refresh.status !== 200) {
+    throw new Error(`免费档案森空岛刷新：预期 200，实际 ${refresh.status}`)
+  }
+  if (JSON.stringify(store.workspaces.get(profileId)?.free_schedule_entitlement) !== JSON.stringify(entitlement)) {
+    throw new Error('免费档案森空岛刷新：不应重置免费完整排班权益')
+  }
 }
 
 async function assertFreePreviewCredentialClaimAndUidUniqueness() {
@@ -700,6 +722,7 @@ function seedProfile({ id, status }) {
     last_result: { stale: true },
     saved_configs: [],
     result_history: [],
+    free_schedule_entitlement: null,
     updated_at: now,
   })
 }
@@ -932,9 +955,9 @@ function memoryUsageStatsModule() {
 function memoryUserStoreModule() {
   return `
     const store = globalThis.__sklandHandlerSmokeStore
-    export function emptyWorkspace(profileId) {
-      return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
-    }
+export function emptyWorkspace(profileId) {
+return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], free_schedule_entitlement: null, updated_at: new Date().toISOString() }
+}
     export async function listProfilesForUser(userId) {
       return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
     }
@@ -1054,9 +1077,10 @@ function memoryUserAuthModule() {
         elite_overrides: workspace?.elite_overrides ?? {},
         last_result: workspace?.last_result ?? null,
         saved_configs: workspace?.saved_configs ?? [],
-        result_history: workspace?.result_history ?? [],
-        updated_at: workspace?.updated_at ?? null,
-      }
+result_history: workspace?.result_history ?? [],
+free_schedule_entitlement: workspace?.free_schedule_entitlement ?? null,
+updated_at: workspace?.updated_at ?? null,
+}
     }
     function normalizeWorkspace(workspace) {
       return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }

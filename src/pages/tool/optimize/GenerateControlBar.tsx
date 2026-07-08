@@ -17,6 +17,7 @@ export default function GenerateControlBar({
   hasResult,
   resultIsCurrent,
   error,
+  extraDisabledReason,
   onGenerate,
   onReset,
 }: {
@@ -32,6 +33,7 @@ export default function GenerateControlBar({
   hasResult: boolean;
   resultIsCurrent: boolean;
   error: string | null;
+  extraDisabledReason?: string | null;
   onGenerate: () => void;
   onReset: () => void;
 }) {
@@ -73,7 +75,7 @@ export default function GenerateControlBar({
           <button
             type="button"
             onClick={onGenerate}
-            disabled={loading || syncing || !validation.ok || resultIsCurrent}
+            disabled={loading || syncing || !validation.ok || resultIsCurrent || Boolean(extraDisabledReason)}
             className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted"
           >
             {loading || syncing ? (
@@ -91,6 +93,9 @@ export default function GenerateControlBar({
           )}
           {!validation.ok && (
             <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">{validation.message}</p>
+          )}
+          {extraDisabledReason && (
+            <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">{extraDisabledReason}</p>
           )}
         </div>
       </div>

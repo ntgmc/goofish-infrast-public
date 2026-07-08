@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } fro
 import type {
   Announcement,
   AuthSuccessResponse,
+  FreeScheduleEntitlement,
   LicenseConfig,
   LicenseFile,
   LicenseOperator,
@@ -105,6 +106,9 @@ export default function OptimizePage({
   const [reorderCheckLoading, setReorderCheckLoading] = useState(false)
   const [reorderCheckResult, setReorderCheckResult] = useState<ReorderCheckResult | null>(null)
   const [reorderCheckError, setReorderCheckError] = useState<string | null>(null)
+  const [freeScheduleEntitlementOverride, setFreeScheduleEntitlementOverride] = useState<FreeScheduleEntitlement | null>(null)
+  const [freeScheduleConfirming, setFreeScheduleConfirming] = useState(false)
+  const [freeScheduleConfirmError, setFreeScheduleConfirmError] = useState<string | null>(null)
   const [configToast, setConfigToast] = useState<{ id: number; message: string } | null>(null)
   const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
@@ -141,6 +145,16 @@ export default function OptimizePage({
   const savedConfigs = workspace?.saved_configs ?? []
   const resultHistory = workspace?.result_history ?? []
   const latestWorkspaceResult = resultHistory[0] ?? null
+  const freeScheduleEntitlement =
+    freeScheduleEntitlementOverride
+    ?? finalResult?.preview_limit?.free_schedule_entitlement
+    ?? reorderCheckResult?.free_schedule_entitlement
+    ?? workspace?.free_schedule_entitlement
+    ?? null
+  const freeScheduleGenerateBlockedReason = useMemo(
+    () => getFreeScheduleGenerateBlockedReason(isPreviewProfile, freeScheduleEntitlement),
+    [freeScheduleEntitlement, isPreviewProfile],
+  )
   const reorderCheckDisabledReason = useMemo(() => {
     if (!isPreviewProfile) return null
     if (!profile.skland_binding) return '请先绑定森空岛后再检测。'
@@ -214,6 +228,9 @@ export default function OptimizePage({
     setReorderCheckLoading(false)
     setReorderCheckResult(null)
     setReorderCheckError(null)
+    setFreeScheduleEntitlementOverride(null)
+    setFreeScheduleConfirming(false)
+    setFreeScheduleConfirmError(null)
     setLastGeneratedSignature(null)
     setUpgradeCdk('')
     setUpgradeError(null)
@@ -493,12 +510,36 @@ export default function OptimizePage({
         fallbackMessage: '重排检测失败',
       })
       setReorderCheckResult(data)
+      if (data.free_schedule_entitlement) {
+        setFreeScheduleEntitlementOverride(data.free_schedule_entitlement)
+      }
     } catch (error) {
       setReorderCheckError((error as Error).message)
     } finally {
       setReorderCheckLoading(false)
     }
   }, [activeConfig, isPreviewProfile, latestWorkspaceResult, loading, profileId, reorderCheckDisabledReason, reorderCheckLoading])
+
+  const handleConfirmFreeSchedule = useCallback(async () => {
+    if (!isPreviewProfile || freeScheduleConfirming || !latestWorkspaceResult) return
+    setFreeScheduleConfirming(true)
+    setFreeScheduleConfirmError(null)
+    try {
+      const data = await apiJson<AuthSuccessResponse>('/api/user/workspace/free-schedule/confirm', {
+        method: 'POST',
+        json: {
+          profile_id: profileId,
+          result_history_id: latestWorkspaceResult.id,
+        },
+        fallbackMessage: '确认免费排班失败',
+      })
+      setFreeScheduleEntitlementOverride(data.workspace?.free_schedule_entitlement ?? null)
+    } catch (error) {
+      setFreeScheduleConfirmError((error as Error).message)
+    } finally {
+      setFreeScheduleConfirming(false)
+    }
+  }, [freeScheduleConfirming, isPreviewProfile, latestWorkspaceResult, profileId])
 
   const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
     const payload: OptimizeRequest = {
@@ -514,13 +555,17 @@ export default function OptimizePage({
     return await apiJson<OptimizeResult>('/api/optimize', {
       method: 'POST',
       json: payload,
-      fallbackMessage: 'upgrade suggestions request failed',
+      fallbackMessage: '练度建议请求失败。',
     })
   }, [activeConfig, license, mergedOperators, profileId])
 
   const handleGenerate = useCallback(async () => {
     if (licenseSyncing || loading || optimizeInFlightRef.current) return
     if (hasResult && lastGeneratedSignature === optimizeSignature) return
+    if (freeScheduleGenerateBlockedReason) {
+      setInlineError({ scope: 'generate', message: freeScheduleGenerateBlockedReason })
+      return
+    }
     if (configValidationMessage) {
       showConfigValidationToast(configValidationMessage)
       return
@@ -538,6 +583,9 @@ export default function OptimizePage({
     try {
       const potential = userCanUseUpgradeFeatures ? await runOptimize(true, true) : null
       const current = potential?.current_result ?? (await runOptimize(false))
+      if (current.preview_limit?.free_schedule_entitlement) {
+        setFreeScheduleEntitlementOverride(current.preview_limit.free_schedule_entitlement)
+      }
       setCurrentResult(current)
       const suggestionResult = potential?.upgrade_task_payload
         ? await runUpgradeSuggestions(potential.upgrade_task_payload)
@@ -605,7 +653,7 @@ export default function OptimizePage({
         setProgress(null)
       }
     }
-  }, [configValidationMessage, flushPendingLicenseSync, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, runOptimize, runUpgradeSuggestions, showConfigValidationToast, userCanUseUpgradeFeatures])
+  }, [configValidationMessage, flushPendingLicenseSync, freeScheduleGenerateBlockedReason, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, runOptimize, runUpgradeSuggestions, showConfigValidationToast, userCanUseUpgradeFeatures])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
     if (loading || optimizeInFlightRef.current) return
@@ -775,6 +823,14 @@ export default function OptimizePage({
             savedConfigCount={savedConfigs.length}
             resultHistoryCount={resultHistory.length}
             latestResult={latestWorkspaceResult}
+            freeSchedule={{
+              visible: isPreviewProfile,
+              entitlement: freeScheduleEntitlement,
+              generateBlockedReason: freeScheduleGenerateBlockedReason,
+              confirming: freeScheduleConfirming,
+              confirmError: freeScheduleConfirmError,
+              onConfirm: handleConfirmFreeSchedule,
+            }}
             reorderCheck={{
               visible: isPreviewProfile,
               disabledReason: reorderCheckDisabledReason,
@@ -890,6 +946,38 @@ function formatOptimizeError(message: string): string {
   return message.includes('冻结') || message.includes('被冻结') || message.includes('已拦截')
     ? message
     : `优化失败: ${message}`
+}
+
+function getFreeScheduleGenerateBlockedReason(
+  isPreviewProfile: boolean,
+  entitlement: FreeScheduleEntitlement | null,
+): string | null {
+  if (!isPreviewProfile || !entitlement) return null
+  if (hasUnusedStrongReorderBonus(entitlement)) return null
+  if (!entitlement.first_generated_at) return null
+  if (entitlement.confirmed_at || entitlement.locked_at) {
+    return '免费完整排班权益已锁定。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。'
+  }
+  const firstGeneratedAt = Date.parse(entitlement.first_generated_at)
+  if (!Number.isFinite(firstGeneratedAt)) return null
+  const windowMs = entitlement.revision_window_hours * 60 * 60 * 1000
+  if (Date.now() - firstGeneratedAt >= windowMs) {
+    return '免费完整排班确认期已结束。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。'
+  }
+  if (entitlement.revision_count >= entitlement.revision_limit) {
+    return '免费完整排班修正次数已用完。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。'
+  }
+  return null
+}
+
+function hasUnusedStrongReorderBonus(entitlement: FreeScheduleEntitlement): boolean {
+  const bonus = entitlement.strong_reorder_bonus
+  return Boolean(bonus && bonus.month === getShanghaiMonthKey() && !bonus.used_at)
+}
+
+function getShanghaiMonthKey(date = new Date()): string {
+  const shanghai = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+  return `${shanghai.getUTCFullYear()}-${String(shanghai.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
 function formatLocalDate(date: Date): string {
