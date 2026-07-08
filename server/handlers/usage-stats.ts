@@ -24,6 +24,9 @@ type UsageEventInput = string | null | Partial<Pick<
   | 'profile_id'
   | 'cdk_status'
   | 'source'
+  | 'schedule_mode'
+  | 'fiammetta_enabled'
+  | 'estimate_bucket'
   | 'announcement_id'
   | 'announcement_kind'
 >>
@@ -70,6 +73,9 @@ export async function recordUsageEvent(event: UsageEventName, input: UsageEventI
     ...(options.profile_id && { profile_id: options.profile_id }),
     ...(options.cdk_status && { cdk_status: options.cdk_status }),
     ...(options.source && { source: options.source }),
+    ...(options.schedule_mode && { schedule_mode: options.schedule_mode }),
+    ...(typeof options.fiammetta_enabled === 'boolean' && { fiammetta_enabled: options.fiammetta_enabled }),
+    ...(options.estimate_bucket && { estimate_bucket: options.estimate_bucket }),
     ...(options.announcement_id && { announcement_id: options.announcement_id }),
     ...(options.announcement_kind && { announcement_kind: options.announcement_kind }),
   }
@@ -192,6 +198,9 @@ function normalizeUsageEventInput(input: UsageEventInput): Required<Pick<UsageEv
     ...(normalizeNullableString(input.profile_id, 80) && { profile_id: normalizeNullableString(input.profile_id, 80) as string }),
     ...(normalizeNullableString(input.cdk_status, 40) && { cdk_status: normalizeNullableString(input.cdk_status, 40) as string }),
     ...(normalizeNullableString(input.source, 80) && { source: normalizeNullableString(input.source, 80) as string }),
+    ...(normalizeNullableString(input.schedule_mode, 40) && { schedule_mode: normalizeNullableString(input.schedule_mode, 40) as string }),
+    ...(typeof input.fiammetta_enabled === 'boolean' && { fiammetta_enabled: input.fiammetta_enabled }),
+    ...(normalizeNullableString(input.estimate_bucket, 40) && { estimate_bucket: normalizeNullableString(input.estimate_bucket, 40) as string }),
     ...(normalizeNullableString(input.announcement_id, 120) && { announcement_id: normalizeNullableString(input.announcement_id, 120) as string }),
     ...(normalizeAnnouncementKind(input.announcement_kind) && { announcement_kind: normalizeAnnouncementKind(input.announcement_kind) as string }),
   }
@@ -316,9 +325,43 @@ export async function countSuccessfulUsageEventsForProfileInRange(
   )).length
 }
 
+export async function getScheduleGenerateDurationStatsByBucket(
+  bucket: string,
+  startAt: string,
+  endAt: string,
+): Promise<{ p95_ms: number; sample_count: number }> {
+  const store = await getUsageEventStore()
+  if (store.getScheduleGenerateDurationStatsByBucket) {
+    return store.getScheduleGenerateDurationStatsByBucket(bucket, startAt, endAt)
+  }
+  const events = await store.list(EVENT_PREFIX)
+  const durations = events
+    .filter((record) =>
+      record.event === 'schedule_generate'
+      && record.status !== 'failure'
+      && record.estimate_bucket === bucket
+      && record.created_at >= startAt
+      && record.created_at < endAt
+      && typeof record.duration_ms === 'number'
+      && Number.isFinite(record.duration_ms)
+    )
+    .map((record) => Math.max(0, Math.round(record.duration_ms ?? 0)))
+  return {
+    p95_ms: percentile(durations, 95),
+    sample_count: durations.length,
+  }
+}
+
 export function setUsageEventStoreForTesting(store: UsageEventStore | null): void {
   ;(globalThis as unknown as { __maaUsageEventStoreForTesting?: UsageEventStore }).__maaUsageEventStoreForTesting =
     store ?? undefined
+}
+
+function percentile(values: number[], percentileValue: number): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((left, right) => left - right)
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil((percentileValue / 100) * sorted.length) - 1))
+  return sorted[index] ?? 0
 }
 
 function getTestingUsageEventStore(): UsageEventStore | null {

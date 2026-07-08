@@ -56,6 +56,9 @@ export interface UsageEventRecord {
   profile_id?: string
   cdk_status?: string
   source?: string
+  schedule_mode?: string
+  fiammetta_enabled?: boolean
+  estimate_bucket?: string
   announcement_id?: string
   announcement_kind?: string
 }
@@ -181,6 +184,7 @@ export interface UsageEventStore {
   getStats: (dates: string[]) => Promise<UsageStats>
   list: (prefix: string) => Promise<UsageEventRecord[]>
   countSuccessfulByProfileInRange?: (event: UsageEventName, profileId: string, startAt: string, endAt: string) => Promise<number>
+  getScheduleGenerateDurationStatsByBucket?: (bucket: string, startAt: string, endAt: string) => Promise<{ p95_ms: number; sample_count: number }>
 }
 
 export function createPostgresUsageEventStore(): UsageEventStore {
@@ -217,6 +221,28 @@ export function createPostgresUsageEventStore(): UsageEventStore {
     return Number(result.rows[0]?.count ?? 0)
   }
 
+  const getScheduleGenerateDurationStatsByBucket = async (bucket: string, startAt: string, endAt: string) => {
+    const result = await query<{ duration_ms: string | number | null }>(
+      `select record_json->>'duration_ms' as duration_ms
+       from usage_events
+       where event = $1
+         and created_at >= $2
+         and created_at < $3
+         and coalesce(record_json->>'status', 'success') = 'success'
+         and record_json->>'estimate_bucket' = $4
+         and record_json ? 'duration_ms'`,
+      ['schedule_generate', startAt, endAt, bucket],
+    )
+    const durations = result.rows
+      .map((row) => Number(row.duration_ms))
+      .filter((value) => Number.isFinite(value) && value >= 0)
+      .map((value) => Math.round(value))
+    return {
+      p95_ms: percentile(durations, 95),
+      sample_count: durations.length,
+    }
+  }
+
   return {
     set: async (key, record) => {
       await query(
@@ -246,6 +272,7 @@ export function createPostgresUsageEventStore(): UsageEventStore {
     },
     list,
     countSuccessfulByProfileInRange,
+    getScheduleGenerateDurationStatsByBucket,
   }
 }
 
