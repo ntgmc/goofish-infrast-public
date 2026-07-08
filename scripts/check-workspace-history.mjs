@@ -100,7 +100,7 @@ async function assertPreviewProfileLifecycle() {
   }
 
   const denied = await call(profilesHandler, '/api/user/profiles/preview', {
-    display_name: 'free preview',
+    display_name: '免费个人排班',
   })
   if (denied.status !== 400 || [...store.profiles.values()].some((profile) => profile.kind === 'free_preview')) {
     throw new Error(`preview profile create: expected Skland claim requirement, got ${denied.status}`)
@@ -114,7 +114,7 @@ async function assertPreviewProfileLifecycle() {
   })
 
   const reused = await call(profilesHandler, '/api/user/profiles/preview', {
-    display_name: 'Updated free preview',
+    display_name: '更新后的免费个人排班',
   })
   if (reused.status !== 200 || reused.body?.active_profile?.id !== preview.id) {
     throw new Error('preview profile reuse: expected existing preview profile')
@@ -297,7 +297,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     config: free333OrundumConfig,
   }, { method: 'PATCH' })
   if (unboundSave.status !== 403) {
-    throw new Error(`free preview unbound save: expected 403, got ${unboundSave.status}`)
+    throw new Error(`免费档案未绑定保存：预期 403，实际 ${unboundSave.status}`)
   }
 
   const unboundOptimize = await call(optimizeHandler, '/api/optimize', {
@@ -308,7 +308,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     ignore_elite: false,
   })
   if (unboundOptimize.status !== 403) {
-    throw new Error(`free preview unbound optimize: expected 403, got ${unboundOptimize.status}`)
+    throw new Error(`免费档案未绑定生成：预期 403，实际 ${unboundOptimize.status}`)
   }
 
   const preview = seedFreePreviewProfile('preview-bound', { bound: true })
@@ -323,7 +323,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     operators: sampleOperators,
   }, { method: 'PATCH' })
   if (operatorsPatch.status !== 403) {
-    throw new Error(`free preview operators patch: expected 403, got ${operatorsPatch.status}`)
+    throw new Error(`免费档案手动修改干员：预期 403，实际 ${operatorsPatch.status}`)
   }
 
   await assertFreeConfigPatchStatus(preview.id, { ...free333OrundumConfig, trading_stations_count: 4 }, 403, 'custom station count')
@@ -335,7 +335,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     },
   }, 403, 'custom product ratio')
   await assertFreeConfigPatchStatus(preview.id, { ...free333OrundumConfig, optimizer_search: { max_iterations: 999 } }, 403, 'optimizer_search')
-  await assertFreeConfigPatchStatus(preview.id, { ...free333OrundumConfig, drones: { enable: true, auto: true, targets: ['LMD'] } }, 403, 'advanced drone strategy')
+  await assertFreeConfigPatchStatus(preview.id, { ...free333OrundumConfig, drones: { enable: true, auto: true, targets: ['LMD'] } }, 403, '高级无人机策略')
 
   await assertFreeConfigPatchStatus(preview.id, free243BalancedConfig, 200, '243 balanced')
   await assertFreeConfigPatchStatus(preview.id, free243OrundumInventoryConfig, 200, '243 orundum with inventory assist')
@@ -355,7 +355,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     },
   })
   if (suggestionsOnly.status !== 403 || store.workspaces.get(preview.id)?.result_history.length !== beforeHistoryCount) {
-    throw new Error(`free preview suggestions_only: expected 403 without history append, got ${suggestionsOnly.status}`)
+    throw new Error(`免费档案 suggestions_only：预期 403 且不追加历史，实际 ${suggestionsOnly.status}`)
   }
 
   const unboundReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
@@ -363,7 +363,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     config: free333OrundumConfig,
   })
   if (unboundReorder.status !== 403) {
-    throw new Error(`free preview reorder unbound: expected 403, got ${unboundReorder.status}`)
+    throw new Error(`免费档案未绑定重排检测：预期 403，实际 ${unboundReorder.status}`)
   }
 
   const cdkReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
@@ -371,7 +371,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     config: free333OrundumConfig,
   })
   if (cdkReorder.status !== 403) {
-    throw new Error(`free preview reorder cdk profile: expected 403, got ${cdkReorder.status}`)
+    throw new Error(`CDK 档案重排检测：预期 403，实际 ${cdkReorder.status}`)
   }
 
   const noBaselinePreview = seedFreePreviewProfile('preview-reorder-no-baseline', { bound: true })
@@ -385,7 +385,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     config: free333OrundumConfig,
   })
   if (noBaselineReorder.status !== 409) {
-    throw new Error(`free preview reorder no baseline: expected 409, got ${noBaselineReorder.status}`)
+    throw new Error(`免费档案无历史基线重排检测：预期 409，实际 ${noBaselineReorder.status}`)
   }
 
   const generated = await call(optimizeHandler, '/api/optimize', {
@@ -396,16 +396,16 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     ignore_elite: false,
   })
   if (generated.status !== 200) {
-    throw new Error(`free preview optimize: expected 200, got ${generated.status}`)
+    throw new Error(`免费档案生成排班：预期 200，实际 ${generated.status}`)
   }
-  assertFreePreviewResult(generated.body, 'free preview optimize response')
+  assertFreePreviewResult(generated.body, '免费档案生成响应')
 
   const workspace = store.workspaces.get(preview.id)
   if (!workspace?.last_result || workspace.result_history.length !== beforeHistoryCount + 1) {
-    throw new Error('free preview optimize: expected limited result stored in history')
+    throw new Error('免费档案生成：预期受限结果写入历史')
   }
-  assertFreePreviewResult(workspace.last_result, 'free preview stored last_result')
-  assertFreePreviewResult(workspace.result_history[0].result, 'free preview stored history')
+  assertFreePreviewResult(workspace.last_result, '免费档案保存的 last_result')
+  assertFreePreviewResult(workspace.result_history[0].result, '免费档案保存的历史结果')
 
   const reorderBeforeHistoryCount = workspace.result_history.length
   const reorderBeforeLastResult = workspace.last_result
@@ -415,12 +415,12 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     baseline_history_id: workspace.result_history[0].id,
   })
   if (noNeedReorder.status !== 200 || noNeedReorder.body?.recommendation !== 'no_need') {
-    throw new Error(`free preview reorder no change: expected no_need 200, got ${noNeedReorder.status}`)
+    throw new Error(`免费档案无变化重排检测：预期 200 no_need，实际 ${noNeedReorder.status}`)
   }
-  assertReorderCheckResult(noNeedReorder.body, 'free preview reorder no change')
+  assertReorderCheckResult(noNeedReorder.body, '免费档案无变化重排检测')
   const reorderWorkspace = store.workspaces.get(preview.id)
   if (reorderWorkspace?.result_history.length !== reorderBeforeHistoryCount || reorderWorkspace.last_result !== reorderBeforeLastResult) {
-    throw new Error('free preview reorder: should not write last_result or history')
+    throw new Error('免费档案重排检测：不应写入 last_result 或历史')
   }
 
   const invalidConfigReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
@@ -429,7 +429,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     baseline_history_id: workspace.result_history[0].id,
   })
   if (invalidConfigReorder.status !== 403) {
-    throw new Error(`free preview reorder invalid config: expected 403, got ${invalidConfigReorder.status}`)
+    throw new Error(`免费档案非法配置重排检测：预期 403，实际 ${invalidConfigReorder.status}`)
   }
 
   await assertReorderRecommendationFromBaseline('preview-reorder-recommended', cloneWithRoomOperator(workspace.last_result, 'power', 0, { id: 'old-power', name: 'Old Power' }), 'recommended')
@@ -438,10 +438,10 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
 
   const previewEvents = store.usageEvents.filter((event) => event.profile_id === preview.id)
   if (!previewEvents.some((event) => event.event === 'schedule_generate' && event.status === 'success')) {
-    throw new Error('free preview optimize: missing schedule_generate usage event')
+    throw new Error('免费档案生成：缺少 schedule_generate 统计事件')
   }
   if (!previewEvents.some((event) => event.event === 'free_preview' && event.status === 'success')) {
-    throw new Error('free preview optimize: missing free_preview usage event')
+    throw new Error('免费档案生成：缺少 free_preview 统计事件')
   }
 }
 
@@ -451,7 +451,7 @@ async function assertFreeConfigPatchStatus(profileId, config, expectedStatus, la
     config,
   }, { method: 'PATCH' })
   if (result.status !== expectedStatus) {
-    throw new Error(`free preview config ${label}: expected ${expectedStatus}, got ${result.status}`)
+    throw new Error(`免费档案配置 ${label}：预期 ${expectedStatus}，实际 ${result.status}`)
   }
 }
 
@@ -532,9 +532,9 @@ async function assertReorderRecommendationFromBaseline(profileId, baselineResult
     baseline_history_id: historyItem.id,
   })
   if (checked.status !== 200 || checked.body?.recommendation !== expectedRecommendation) {
-    throw new Error(`free preview reorder ${expectedRecommendation}: expected 200 ${expectedRecommendation}, got ${checked.status} ${checked.body?.recommendation}`)
+    throw new Error(`免费档案重排检测 ${expectedRecommendation}：预期 200 ${expectedRecommendation}，实际 ${checked.status} ${checked.body?.recommendation}`)
   }
-  assertReorderCheckResult(checked.body, `free preview reorder ${expectedRecommendation}`)
+  assertReorderCheckResult(checked.body, `免费档案重排检测 ${expectedRecommendation}`)
 }
 
 async function assertReorderQuotaLimit(baselineResult) {
@@ -554,7 +554,7 @@ async function assertReorderQuotaLimit(baselineResult) {
     baseline_history_id: historyItem.id,
   })
   if (failedBeforeQuota.status !== 403) {
-    throw new Error(`free preview reorder quota preflight failure: expected 403, got ${failedBeforeQuota.status}`)
+    throw new Error(`免费档案重排检测额度预检失败：预期 403，实际 ${failedBeforeQuota.status}`)
   }
 
   for (let index = 0; index < 2; index++) {
@@ -564,7 +564,7 @@ async function assertReorderQuotaLimit(baselineResult) {
       baseline_history_id: historyItem.id,
     })
     if (checked.status !== 200 || checked.body?.quota?.used !== index + 1) {
-      throw new Error(`free preview reorder quota success ${index + 1}: expected used ${index + 1}, got ${checked.status}`)
+      throw new Error(`免费档案重排检测额度成功 ${index + 1}：预期已用 ${index + 1}，实际 ${checked.status}`)
     }
   }
 
@@ -574,7 +574,7 @@ async function assertReorderQuotaLimit(baselineResult) {
     baseline_history_id: historyItem.id,
   })
   if (exceeded.status !== 429 || exceeded.body?.code !== 'reorder_check_quota_exceeded' || exceeded.body?.quota?.remaining !== 0) {
-    throw new Error(`free preview reorder quota exceeded: expected 429 with quota, got ${exceeded.status}`)
+    throw new Error(`免费档案重排检测额度耗尽：预期 429 且包含额度信息，实际 ${exceeded.status}`)
   }
 }
 
@@ -808,18 +808,18 @@ function memoryUserAuthModule() {
         store.profiles.set(updated.id, updated)
         return { ok: true, profile: updated }
       }
-      return { ok: false, status: 400, message: 'Free preview profiles must be claimed with Skland login.' }
+      return { ok: false, status: 400, message: '免费个人排班档案必须通过森空岛登录领取。' }
     }
     export async function upgradePreviewProfileWithCdk(user, profileIdValue, cdkValue, displayNameValue, noteValue) {
       const profileId = typeof profileIdValue === 'string' ? profileIdValue.trim() : ''
       const profile = store.profiles.get(profileId)
-      if (!profile || profile.user_id !== user.id) return { ok: false, status: 404, message: 'Profile does not exist.' }
-      if (profile.kind !== 'free_preview') return { ok: false, status: 400, message: 'Only free preview profiles can be upgraded in place.' }
+      if (!profile || profile.user_id !== user.id) return { ok: false, status: 404, message: '档案不存在。' }
+      if (profile.kind !== 'free_preview') return { ok: false, status: 400, message: '只有免费个人排班档案可以原地升级。' }
       const cdk = typeof cdkValue === 'string' ? cdkValue.trim() : ''
-      if (!cdk) return { ok: false, status: 400, message: 'Missing CDK.' }
+      if (!cdk) return { ok: false, status: 400, message: '缺少 CDK。' }
       const record = store.cdks.get(cdk)
-      if (!record) return { ok: false, status: 404, message: 'CDK does not exist.' }
-      if (record.status !== 'unused') return { ok: false, status: 409, message: 'CDK has already been used.' }
+      if (!record) return { ok: false, status: 404, message: 'CDK 不存在。' }
+      if (record.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
       const now = new Date().toISOString()
       const displayName = normalizeDisplayName(displayNameValue)
       const note = normalizeNote(noteValue)
@@ -831,9 +831,9 @@ function memoryUserAuthModule() {
     }
     export async function redeemProfileCdk(user, cdkValue, displayNameValue, noteValue) {
       const cdk = typeof cdkValue === 'string' ? cdkValue.trim() : ''
-      if (!cdk) return { ok: false, status: 400, message: 'Missing CDK.' }
+      if (!cdk) return { ok: false, status: 400, message: '缺少 CDK。' }
       const record = store.cdks.get(cdk) || { status: 'unused', permission: 'growth', license_order_hash: 'order-' + cdk }
-      if (record.status !== 'unused') return { ok: false, status: 409, message: 'CDK has already been used.' }
+      if (record.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
       const now = new Date().toISOString()
       const id = 'cdk-profile-' + (++store.profileCounter)
       const profile = { version: 1, id, user_id: user.id, kind: 'cdk', cdk_key: 'cdk/' + cdk + '.json', cdk_code_hash: 'hash-' + cdk, cdk_order_hash: record.license_order_hash, permission: record.permission, status: 'active', display_name: normalizeDisplayName(displayNameValue) || 'Account', note: normalizeNote(noteValue), created_at: now, updated_at: now }
@@ -912,9 +912,9 @@ function memoryLicenseUtilsModule() {
       const valid = validateConfig(config)
       if (!valid.ok) return valid
       if (config.permission_blocked) return { ok: false, message: 'permission blocked' }
-      if (config.optimizer_search) return { ok: false, message: 'optimizer_search is not allowed for free preview' }
-      if (!matchesFreePreset(config)) return { ok: false, message: 'free preview only supports preset layouts' }
-      if (hasForbiddenDroneConfig(config)) return { ok: false, message: 'advanced drone strategy is not allowed for free preview' }
+      if (config.optimizer_search) return { ok: false, message: '免费个人排班不允许设置 optimizer_search' }
+      if (!matchesFreePreset(config)) return { ok: false, message: '免费个人排班仅支持预设布局' }
+      if (hasForbiddenDroneConfig(config)) return { ok: false, message: '免费个人排班不允许高级无人机策略' }
       return { ok: true, config: { ...config, optimizer_search: undefined } }
     }
     export function requireEnv() { return 'secret' }
@@ -1066,7 +1066,7 @@ function seedFreePreviewProfile(id, { bound }) {
     cdk_order_hash: null,
     permission: 'growth',
     status: 'active',
-    display_name: 'Free preview',
+    display_name: '免费个人排班',
     note: '',
     skland_binding: bound ? {
       uid: `${id}-uid`,

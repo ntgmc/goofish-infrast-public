@@ -393,14 +393,14 @@ export function resolveFreePreviewConfig(
   config: LicenseConfig,
 ): { ok: true; config: LicenseConfig } | { ok: false; message: string } {
   if (config.optimizer_search) {
-    return { ok: false, message: 'free_preview does not allow optimizer_search settings.' }
+    return { ok: false, message: '免费个人排班不允许设置 optimizer_search。' }
   }
   if (hasForbiddenFreePreviewDroneConfig(config)) {
-    return { ok: false, message: 'free_preview only allows preset drones or intermediate-inventory auto drones.' }
+    return { ok: false, message: '免费个人排班仅允许预设无人机策略或中间产物库存派生的自动无人机策略。' }
   }
   const preset = PRESET_CONFIGS.find((item) => isPresetConfigMatch(config, item))
   if (!preset) {
-    return { ok: false, message: 'free_preview only supports 243 balanced, 243 orundum, and 333 orundum presets.' }
+    return { ok: false, message: '免费个人排班仅支持 243 均衡、243 搓玉和 333 搓玉预设。' }
   }
   return { ok: true, config: resolveFreePreviewPresetMode(config, preset) }
 }

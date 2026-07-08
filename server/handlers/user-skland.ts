@@ -117,7 +117,7 @@ export default async (req: Request): Promise<Response> => {
       const body = await readJsonBody(req)
       const source = normalizeCredentialSource(body.source)
       const cred = extractSklandCredential(body.credential_text)
-      if (!cred) return jsonResponse({ error: 'Missing Skland credential.' }, 400)
+      if (!cred) return jsonResponse({ error: '缺少森空岛凭据。' }, 400)
       return createPendingFreePreviewClaimFromCred(auth.user, cred, body.display_name, body.note, source)
     }
 
@@ -172,7 +172,7 @@ export default async (req: Request): Promise<Response> => {
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       const source = normalizeCredentialSource(body.source)
       const cred = extractSklandCredential(body.credential_text)
-      if (!cred) return jsonResponse({ error: 'Missing Skland credential.' }, 400)
+      if (!cred) return jsonResponse({ error: '缺少森空岛凭据。' }, 400)
       return createPendingSklandBindingFromCred(auth.user, profile, cred, source)
     }
 
@@ -310,16 +310,16 @@ async function createPendingFreePreviewClaimFromCred(
   const preview = toSklandPreview(imported.binding, operatorsCheck.operators.length)
   const existingPreview = (await listProfilesForUser(user.id)).find((profile) => isFreePreviewProfile(profile))
   if (existingPreview?.skland_binding) {
-    return jsonResponse({ error: 'This account already has a claimed free preview profile.', code: 'free_preview_already_claimed' }, 409)
+    return jsonResponse({ error: '当前网站账号已经领取过免费个人排班档案。', code: 'free_preview_already_claimed' }, 409)
   }
   if (existingPreview && existingPreview.status !== 'active') {
-    return jsonResponse({ error: 'Free preview profile is not active.' }, 403)
+    return jsonResponse({ error: '免费个人排班档案当前不可用。' }, 403)
   }
 
   const uidHash = hashFreePreviewUid(imported.binding.uid)
   const existingClaim = await getFreePreviewClaim(uidHash)
   if (existingClaim && existingClaim.profile_id !== existingPreview?.id) {
-    return jsonResponse({ error: 'This Skland UID has already claimed a free preview profile.', code: 'free_preview_uid_claimed' }, 409)
+    return jsonResponse({ error: '该森空岛 UID 已经领取过免费个人排班档案。', code: 'free_preview_uid_claimed' }, 409)
   }
 
   const now = new Date()
@@ -343,29 +343,29 @@ async function createPendingFreePreviewClaimFromCred(
     confirmation_id: confirmationId,
     skland_preview: preview,
     warning: source === 'bookmarklet'
-      ? 'Bookmarklet credential was read. Confirm the nickname and UID before creating the free preview profile.'
-      : 'Confirm the nickname and UID before creating the free preview profile.',
+      ? '已读取书签脚本凭据，请确认昵称和 UID 后再创建免费个人排班档案。'
+      : '请确认昵称和 UID 后再创建免费个人排班档案。',
   })
 }
 
 async function confirmFreePreviewClaim(user: AuthPayloadUser, confirmationId: string): Promise<Response> {
   const pending = await getFreePreviewPendingClaim(user.id, confirmationId)
   if (!pending) {
-    return jsonResponse({ error: 'Free preview confirmation has expired. Please log in to Skland again.' }, 400)
+    return jsonResponse({ error: '免费个人排班确认已过期，请重新登录森空岛。' }, 400)
   }
   if (Date.now() > Date.parse(pending.expires_at)) {
     await deleteFreePreviewPendingClaim(user.id, confirmationId)
-    return jsonResponse({ error: 'Free preview confirmation has expired. Please log in to Skland again.' }, 400)
+    return jsonResponse({ error: '免费个人排班确认已过期，请重新登录森空岛。' }, 400)
   }
 
   const profiles = await listProfilesForUser(user.id)
   const existingPreview = profiles.find((profile) => isFreePreviewProfile(profile))
   if (existingPreview?.skland_binding) {
     await deleteFreePreviewPendingClaim(user.id, confirmationId)
-    return jsonResponse({ error: 'This account already has a claimed free preview profile.', code: 'free_preview_already_claimed' }, 409)
+    return jsonResponse({ error: '当前网站账号已经领取过免费个人排班档案。', code: 'free_preview_already_claimed' }, 409)
   }
   if (existingPreview && existingPreview.status !== 'active') {
-    return jsonResponse({ error: 'Free preview profile is not active.' }, 403)
+    return jsonResponse({ error: '免费个人排班档案当前不可用。' }, 403)
   }
 
   const now = new Date().toISOString()
@@ -379,8 +379,8 @@ async function confirmFreePreviewClaim(user: AuthPayloadUser, confirmationId: st
     cdk_order_hash: null,
     permission: 'growth',
     status: 'active',
-    display_name: pending.display_name || 'Free preview',
-    note: pending.note || 'Skland-bound free personal schedule profile.',
+    display_name: pending.display_name || '免费个人排班',
+    note: pending.note || '已绑定森空岛的免费个人排班档案。',
     skland_binding: null,
     skland_pending_binding: null,
     skland_risk: null,
@@ -390,7 +390,7 @@ async function confirmFreePreviewClaim(user: AuthPayloadUser, confirmationId: st
   const uidHash = hashFreePreviewUid(pending.uid)
   const claim = await claimFreePreviewUid(buildFreePreviewClaim(uidHash, user.id, profile.id, pending, now))
   if (!claim.ok && claim.claim?.profile_id !== profile.id) {
-    return jsonResponse({ error: 'This Skland UID has already claimed a free preview profile.', code: 'free_preview_uid_claimed' }, 409)
+    return jsonResponse({ error: '该森空岛 UID 已经领取过免费个人排班档案。', code: 'free_preview_uid_claimed' }, 409)
   }
 
   try {
@@ -413,7 +413,7 @@ async function claimFreePreviewProfileUid(
   const uidHash = hashFreePreviewUid(binding.uid)
   const claim = await claimFreePreviewUid(buildFreePreviewClaim(uidHash, userId, profile.id, binding, claimedAt))
   if (!claim.ok && claim.claim?.profile_id !== profile.id) {
-    return { ok: false, message: 'This Skland UID has already claimed a free preview profile.' }
+    return { ok: false, message: '该森空岛 UID 已经领取过免费个人排班档案。' }
   }
   return { ok: true }
 }
@@ -481,7 +481,7 @@ async function createPendingSklandBindingFromCred(
   if (isFreePreviewProfile(profile)) {
     const existingClaim = await getFreePreviewClaim(hashFreePreviewUid(imported.binding.uid))
     if (existingClaim && existingClaim.profile_id !== profile.id) {
-      return jsonResponse({ error: 'This Skland UID has already claimed a free preview profile.', code: 'free_preview_uid_claimed' }, 409)
+      return jsonResponse({ error: '该森空岛 UID 已经领取过免费个人排班档案。', code: 'free_preview_uid_claimed' }, 409)
     }
   }
 
@@ -558,7 +558,7 @@ async function saveSklandImport(
   const operatorsCheck = validateOperators(imported.operators)
   if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
   if (profile.skland_binding?.uid && profile.skland_binding.uid !== imported.binding.uid) {
-    throw new Error('Skland account does not match the bound profile UID.')
+    throw new Error('森空岛账号与当前档案绑定的 UID 不一致。')
   }
   if (isFreePreviewProfile(profile)) {
     const claim = await claimFreePreviewProfileUid(userId, profile, imported.binding, imported.importedAt)

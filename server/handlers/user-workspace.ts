@@ -54,7 +54,7 @@ export default async (req: Request): Promise<Response> => {
 
     const isPreviewProfile = isFreePreviewProfile(profile)
     if (isPreviewProfile && !profile.skland_binding) {
-      return jsonResponse({ error: 'Free preview profiles must be bound to Skland before saving workspace data.' }, 403)
+      return jsonResponse({ error: '免费个人排班档案必须先绑定森空岛后才能保存工作区数据。' }, 403)
     }
 
     const existing = await getProfileWorkspace(profile.id)
@@ -63,7 +63,7 @@ export default async (req: Request): Promise<Response> => {
 
     if ('operators' in body) {
       if (isPreviewProfile) {
-        return jsonResponse({ error: 'Free preview operator data can only be updated from Skland import.' }, 403)
+        return jsonResponse({ error: '免费个人排班档案的干员数据只能通过森空岛导入更新。' }, 403)
       }
       operatorsPatched = true
       if (body.operators === null) {

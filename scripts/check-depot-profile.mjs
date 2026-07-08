@@ -66,7 +66,7 @@ async function assertDepotProfileCannotOptimize() {
     ignore_elite: false,
     license: null,
   })
-  if (result.status !== 403 || !result.body.error?.includes('Depot value profiles cannot be used for scheduling.')) {
+  if (result.status !== 403 || !result.body.error?.includes('仓库分析档案不能用于生成排班。')) {
     throw new Error(`depot optimize guard: expected 403 depot guard, got ${result.status}`)
   }
 }

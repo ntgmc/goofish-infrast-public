@@ -442,7 +442,7 @@ function addCdkDistribution(cdkDistribution: Map<string, UsageCdkDistributionIte
 
 function buildFunnel(totals: UsageDayStats): UsageFunnelStep[] {
   const steps: Array<{ key: UsageFunnelStep['key']; label: string; count: number }> = [
-    { key: 'free_preview', label: 'Free preview', count: totals.free_previews },
+    { key: 'free_preview', label: '免费预览', count: totals.free_previews },
     { key: 'register', label: 'Register', count: totals.registers },
     { key: 'cdk_redeem', label: 'Redeem CDK', count: totals.cdk_redeems },
     { key: 'schedule_generate', label: 'Generate schedule', count: totals.schedule_generates },
