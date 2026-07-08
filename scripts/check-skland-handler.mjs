@@ -555,37 +555,37 @@ async function assertFreePreviewScanClaim() {
   setFetchMode('blank-default-uid')
   const start = await callSkland('/api/user/skland/free-preview/login/start', {})
   if (start.status !== 200 || start.body.scan_id !== 'scan-1' || !start.body.qr_data_url?.startsWith('data:image/png;base64,')) {
-    throw new Error(`free preview scan start: invalid response ${start.status}`)
+    throw new Error(`免费档案扫码开始：响应无效 ${start.status}`)
   }
 
   const complete = await callSkland('/api/user/skland/free-preview/login/complete', {
     scan_id: 'scan-1',
-    display_name: 'Free scan',
+    display_name: '免费扫码领取',
   })
-  assertNoSecretLeak(complete.body, 'free preview scan complete response')
+  assertNoSecretLeak(complete.body, '免费档案扫码完成响应')
   if (complete.status !== 200 || complete.body.status !== 'confirm_required' || !complete.body.confirmation_id) {
-    throw new Error(`free preview scan complete: expected confirm_required, got ${complete.status}`)
+    throw new Error(`免费档案扫码完成：预期需要确认，实际 ${complete.status}`)
   }
   if (complete.body.skland_preview?.uid !== '130761348' || complete.body.skland_preview?.operator_count !== 2) {
-    throw new Error(`free preview scan complete: invalid preview ${JSON.stringify(complete.body.skland_preview)}`)
+    throw new Error(`免费档案扫码完成：预览无效 ${JSON.stringify(complete.body.skland_preview)}`)
   }
   if (store.profiles.size !== profileCountBefore) {
-    throw new Error('free preview scan complete: should not create profile before confirm')
+    throw new Error('免费档案扫码完成：确认前不应创建档案')
   }
 
   const confirm = await callSkland('/api/user/skland/free-preview/login/confirm', {
     confirmation_id: complete.body.confirmation_id,
   })
-  assertNoSecretLeak(confirm.body, 'free preview scan confirm response')
+  assertNoSecretLeak(confirm.body, '免费档案扫码确认响应')
   if (confirm.status !== 200 || confirm.body.active_profile?.kind !== 'free_preview') {
-    throw new Error(`free preview scan confirm: expected free_preview profile, got ${confirm.status}`)
+    throw new Error(`免费档案扫码确认：预期 free_preview 档案，实际 ${confirm.status}`)
   }
   if (confirm.body.active_profile?.skland_binding?.uid !== '130761348' || confirm.body.skland_import?.operator_count !== 2) {
-    throw new Error('free preview scan confirm: missing binding or import summary')
+    throw new Error('免费档案扫码确认：缺少绑定或导入摘要')
   }
   const profileId = confirm.body.active_profile.id
   if (store.workspaces.get(profileId)?.operators?.length !== 2) {
-    throw new Error('free preview scan confirm: operators were not written to workspace')
+    throw new Error('免费档案扫码确认：干员未写入工作区')
   }
 }
 
@@ -602,25 +602,25 @@ async function assertFreePreviewCredentialClaimAndUidUniqueness() {
     const preview = await callSkland('/api/user/skland/free-preview/credential/preview', {
       credential_text: 'manual-skland-cred',
       source: 'manual',
-      display_name: 'Free manual',
+      display_name: '免费手动领取',
     })
-    assertNoSecretLeak(preview.body, 'free preview credential preview response')
+    assertNoSecretLeak(preview.body, '免费档案凭据预览响应')
     if (preview.status !== 200 || preview.body.status !== 'confirm_required' || !preview.body.confirmation_id) {
-      throw new Error(`free preview credential preview: expected confirm_required, got ${preview.status}`)
+      throw new Error(`免费档案凭据预览：预期需要确认，实际 ${preview.status}`)
     }
     if (store.profiles.size !== profileCountBefore) {
-      throw new Error('free preview credential preview: should not create profile before confirm')
+      throw new Error('免费档案凭据预览：确认前不应创建档案')
     }
 
     const confirm = await callSkland('/api/user/skland/free-preview/login/confirm', {
       confirmation_id: preview.body.confirmation_id,
     })
-    assertNoSecretLeak(confirm.body, 'free preview credential confirm response')
+    assertNoSecretLeak(confirm.body, '免费档案凭据确认响应')
     if (confirm.status !== 200 || confirm.body.active_profile?.kind !== 'free_preview') {
-      throw new Error(`free preview credential confirm: expected free_preview profile, got ${confirm.status}`)
+      throw new Error(`免费档案凭据确认：预期 free_preview 档案，实际 ${confirm.status}`)
     }
     if (confirm.body.active_profile?.skland_binding?.uid !== '87654321') {
-      throw new Error('free preview credential confirm: expected mismatch-mode UID binding')
+      throw new Error('免费档案凭据确认：预期 mismatch-mode UID 绑定')
     }
 
     store.user = {
@@ -632,12 +632,12 @@ async function assertFreePreviewCredentialClaimAndUidUniqueness() {
     const duplicate = await callSkland('/api/user/skland/free-preview/credential/preview', {
       credential_text: 'SK_OAUTH_CRED_KEY=manual-skland-cred',
       source: 'bookmarklet',
-      display_name: 'Duplicate free',
+      display_name: '重复免费领取',
     })
     if (duplicate.status !== 409 || duplicate.body.code !== 'free_preview_uid_claimed') {
-      throw new Error(`free preview duplicate UID: expected 409 claim block, got ${duplicate.status}`)
+      throw new Error(`免费档案重复 UID：预期 409 领取拦截，实际 ${duplicate.status}`)
     }
-    assertNoSecretLeak(duplicate.body, 'free preview duplicate response')
+    assertNoSecretLeak(duplicate.body, '免费档案重复领取响应')
   } finally {
     store.user = originalUser
   }

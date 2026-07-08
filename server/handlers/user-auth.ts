@@ -352,7 +352,7 @@ export async function createOrReusePreviewProfile(
   return {
     ok: false,
     status: 400,
-    message: 'Free preview profiles must be claimed with Skland login.',
+    message: '免费个人排班档案必须通过森空岛登录领取。',
   }
 }
 
@@ -367,18 +367,18 @@ export async function upgradePreviewProfileWithCdk(
   | { ok: false; status: number; message: string }
 > {
   if (typeof profileIdValue !== 'string' || !profileIdValue.trim()) {
-    return { ok: false, status: 400, message: 'Missing free preview profile.' }
+    return { ok: false, status: 400, message: '缺少免费个人排班档案。' }
   }
   const profile = await getProfileForUser(user.id, profileIdValue.trim())
-  if (!profile) return { ok: false, status: 404, message: 'Profile does not exist.' }
+  if (!profile) return { ok: false, status: 404, message: '档案不存在。' }
   if (!isFreePreviewProfile(profile)) {
-    return { ok: false, status: 400, message: 'Only free preview profiles can be upgraded in place.' }
+    return { ok: false, status: 400, message: '只有免费个人排班档案可以原地升级。' }
   }
   if (profile.status !== 'active') {
-    return { ok: false, status: 403, message: 'Profile is not active.' }
+    return { ok: false, status: 403, message: '档案当前不可用。' }
   }
   if (typeof codeValue !== 'string' || !codeValue.trim()) {
-    return { ok: false, status: 400, message: 'Missing CDK code.' }
+    return { ok: false, status: 400, message: '缺少 CDK。' }
   }
 
   const normalizedCode = normalizeCode(codeValue)
@@ -386,10 +386,10 @@ export async function upgradePreviewProfileWithCdk(
   const cdkKey = `cdk/${codeHash}.json`
   const cdkStore = await getCdkRecordStore()
   const cdkRecord = await cdkStore.get(cdkKey)
-  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK does not exist.' }
-  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK is frozen.' }
-  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK is revoked.' }
-  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK has already been used.' }
+  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK 不存在。' }
+  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已被冻结。' }
+  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已被撤销。' }
+  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
 
   const now = new Date().toISOString()
   const permission = normalizePermissionMode(cdkRecord.permission)
@@ -403,7 +403,7 @@ export async function upgradePreviewProfileWithCdk(
     cdk_code_hash: codeHash,
     cdk_order_hash: cdkOrderHash,
     permission,
-    display_name: displayName || profile.display_name || 'Free preview',
+    display_name: displayName || profile.display_name || '免费个人排班',
     note: note || profile.note,
     updated_at: now,
   }
