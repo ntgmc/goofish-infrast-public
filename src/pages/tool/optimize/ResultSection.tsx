@@ -55,7 +55,7 @@ export default function ResultSection({
   return (
     <section className="min-w-0">
       {phase === 'idle' && loading && progress && (
-        <ScheduleProgress progress={progress} />
+        <ScheduleProgress progress={progress} variant="focus" />
       )}
 
       {phase === 'idle' && !(loading && progress) && (

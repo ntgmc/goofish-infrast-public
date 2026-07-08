@@ -39,6 +39,13 @@ export default function GenerateControlBar({
 }) {
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const readyLabel = resultIsCurrent ? '方案已是最新' : hasResult ? '已有结果' : '待生成'
+  const busyLabel = syncing
+    ? '正在同步授权...'
+    : progress?.queueStatus === 'queued'
+      ? '排队中...'
+      : progress?.completedAt
+        ? '即将完成...'
+        : '正在计算...'
   const configLabel = showConfigDetails
     ? `${SCHEDULE_MODE_LABELS[scheduleMode]} · ${config.layout} · ${config.desc}`
     : `${SCHEDULE_MODE_LABELS[scheduleMode]} · ${configPresetLabel}`
@@ -84,7 +91,7 @@ export default function GenerateControlBar({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                {syncing ? '正在同步授权...' : progress?.queueStatus === 'queued' ? '排队中...' : '正在计算...'}
+                {busyLabel}
               </span>
             ) : resultIsCurrent ? '方案已是最新' : hasResult ? '重新计算排班' : '生成排班方案'}
           </button>
@@ -101,7 +108,7 @@ export default function GenerateControlBar({
       </div>
       {loading && progress && (
         <div className="border-t border-surface-3/60 px-4 py-4 sm:px-5">
-          <ScheduleProgress progress={progress} />
+          <ScheduleProgress progress={progress} variant="embedded" />
         </div>
       )}
       {error && (
