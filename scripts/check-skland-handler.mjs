@@ -949,6 +949,7 @@ function memoryUsageStatsModule() {
   return `
     export async function recordUsageEvent() {}
     export async function countSuccessfulUsageEventsForProfileInRange() { return 0 }
+    export async function getScheduleGenerateDurationStatsByBucket() { return { p95_ms: 0, sample_count: 0 } }
   `
 }
 

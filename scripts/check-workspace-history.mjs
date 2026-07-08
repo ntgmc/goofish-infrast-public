@@ -974,16 +974,31 @@ function memoryUsageStatsModule() {
       const now = new Date().toISOString()
       globalThis.__workspaceHistorySmokeStore.usageEvents.push({ id: 'usage-' + globalThis.__workspaceHistorySmokeStore.usageEvents.length, event, created_at: now, date: now.slice(0, 10), ...payload })
     }
-    export async function countSuccessfulUsageEventsForProfileInRange(event, profileId, startAt, endAt) {
-      return globalThis.__workspaceHistorySmokeStore.usageEvents.filter((record) =>
-        record.event === event &&
-        record.profile_id === profileId &&
-        record.status !== 'failure' &&
-        record.created_at >= startAt &&
-        record.created_at < endAt
-      ).length
-    }
-  `
+export async function countSuccessfulUsageEventsForProfileInRange(event, profileId, startAt, endAt) {
+  return globalThis.__workspaceHistorySmokeStore.usageEvents.filter((record) =>
+    record.event === event &&
+    record.profile_id === profileId &&
+    record.status !== 'failure' &&
+    record.created_at >= startAt &&
+    record.created_at < endAt
+  ).length
+}
+export async function getScheduleGenerateDurationStatsByBucket(bucket, startAt, endAt) {
+  const durations = globalThis.__workspaceHistorySmokeStore.usageEvents
+    .filter((record) =>
+      record.event === 'schedule_generate' &&
+      record.status !== 'failure' &&
+      record.estimate_bucket === bucket &&
+      record.created_at >= startAt &&
+      record.created_at < endAt &&
+      Number.isFinite(record.duration_ms)
+    )
+    .map((record) => Math.max(0, Math.round(record.duration_ms)))
+    .sort((left, right) => left - right)
+  const index = Math.min(durations.length - 1, Math.max(0, Math.ceil(0.95 * durations.length) - 1))
+  return { p95_ms: durations[index] ?? 0, sample_count: durations.length }
+}
+`
 }
 
 function memoryUserStoreModule() {

@@ -493,6 +493,7 @@ export default function OptimizePage({
         queuePosition: next.queue_position,
         priority: next.priority,
         jobId: next.job_id,
+        estimatedDurationMs: next.estimated_duration_ms,
         lastUpdatedAt: Date.now(),
       }))
     }
@@ -570,6 +571,7 @@ export default function OptimizePage({
       queuePosition: activeJob.queue_position,
       priority: activeJob.priority,
       jobId: activeJob.job_id,
+      estimatedDurationMs: activeJob.estimated_duration_ms,
       lastUpdatedAt: Date.now(),
     })
 

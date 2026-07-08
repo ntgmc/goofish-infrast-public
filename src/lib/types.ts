@@ -145,6 +145,8 @@ export interface OptimizeRequest {
 
 export type OptimizeJobPriority = 'paid' | 'standard';
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+export type OptimizeEstimateBucket = 'maa_fiammetta' | 'maa_plain' | 'rotation';
+export type OptimizeEstimateSource = 'history_p95' | 'fallback_p95';
 
 export interface OptimizeJobAccepted {
   job_id: string;
@@ -154,6 +156,10 @@ export interface OptimizeJobAccepted {
   queue_position: number | null;
   submitted_at: string;
   poll_after_ms: number;
+  estimated_duration_ms: number;
+  estimate_bucket: OptimizeEstimateBucket;
+  estimate_source: OptimizeEstimateSource;
+  estimate_sample_count: number;
 }
 
 export interface OptimizeJobStatusResponse {
@@ -166,6 +172,10 @@ export interface OptimizeJobStatusResponse {
   started_at?: string | null;
   finished_at?: string | null;
   poll_after_ms: number;
+  estimated_duration_ms: number;
+  estimate_bucket: OptimizeEstimateBucket;
+  estimate_source: OptimizeEstimateSource;
+  estimate_sample_count: number;
   result?: OptimizeResult;
   error?: string;
 }
