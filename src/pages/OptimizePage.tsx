@@ -120,6 +120,7 @@ export default function OptimizePage({
   const [upgradeError, setUpgradeError] = useState<string | null>(null)
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
   const operatorFileRef = useRef<HTMLInputElement>(null)
+  const progressRef = useRef<ScheduleProgressState | null>(null)
   const optimizeInFlightRef = useRef(false)
   const optimizeRestoreKeyRef = useRef<string | null>(null)
   const configToastTimerRef = useRef<number | null>(null)
@@ -133,6 +134,10 @@ export default function OptimizePage({
   const userCanUseIntermediateAutoConfig = isPreviewProfile || permission === 'recommended' || permission === 'growth'
   const userCanApplyConfigOverride = true
   const userCanUseUpgradeFeatures = !isPreviewProfile && canUseUpgradeFeatures(license)
+
+  useEffect(() => {
+    progressRef.current = progress
+  }, [progress])
   const activeConfig = useMemo(
     () => normalizeConfig(configOverride ?? license.config),
     [configOverride, license.config]
@@ -486,16 +491,13 @@ export default function OptimizePage({
       if (isCancelled?.()) throw new OptimizeJobPollCancelledError()
     }
     const updateProgress = (next: OptimizeJobAccepted | OptimizeJobStatusResponse) => {
-      setProgress((current) => ({
-        mode: current?.mode ?? progressMode,
-        startedAt: current?.startedAt ?? (Date.parse(next.submitted_at) || Date.now()),
-        queueStatus: next.status === 'queued' || next.status === 'running' ? next.status : current?.queueStatus,
-        queuePosition: next.queue_position,
-        priority: next.priority,
-        jobId: next.job_id,
-        estimatedDurationMs: next.estimated_duration_ms,
-        lastUpdatedAt: Date.now(),
-      }))
+      const stored = readActiveOptimizeJob(storageKey)
+      const storedProgress = stored?.job.job_id === next.job_id ? stored.progress : null
+      const nextProgress = mergeOptimizeJobProgress(progressRef.current ?? storedProgress, next, progressMode, Date.now())
+      progressRef.current = nextProgress
+      setProgress(nextProgress)
+      writeActiveOptimizeJob(storageKey, next, nextProgress)
+      return nextProgress
     }
 
     updateProgress(job)
@@ -508,7 +510,6 @@ export default function OptimizePage({
         fallbackMessage,
       })
       throwIfCancelled()
-      writeActiveOptimizeJob(storageKey, status)
       updateProgress(status)
 
       if (status.status === 'succeeded') {
@@ -535,7 +536,6 @@ export default function OptimizePage({
       fallbackMessage,
     })
     const storageKey = buildOptimizeJobStorageKey(profileId, license.order_hash, optimizeSignature, progressMode)
-    writeActiveOptimizeJob(storageKey, accepted)
 
     try {
       return await pollOptimizeJob(accepted, storageKey, progressMode, fallbackMessage)
@@ -553,27 +553,21 @@ export default function OptimizePage({
     const active = modes
       .map((mode) => {
         const storageKey = buildOptimizeJobStorageKey(profileId, license.order_hash, optimizeSignature, mode)
-        return { mode, storageKey, job: readActiveOptimizeJob(storageKey) }
+        return { mode, storageKey, entry: readActiveOptimizeJob(storageKey) }
       })
-      .find(({ job }) => isActiveOptimizeJob(job))
-    if (!active || !isActiveOptimizeJob(active.job)) return
+      .find(({ entry }) => isActiveOptimizeJob(entry?.job ?? null))
+    if (!active || !active.entry || !isActiveOptimizeJob(active.entry.job)) return
     if (optimizeRestoreKeyRef.current === active.storageKey) return
-    const activeJob = active.job
+    const activeJob = active.entry.job
+    const restoredProgress = mergeOptimizeJobProgress(active.entry.progress ?? null, activeJob, active.mode, Date.now())
 
     optimizeRestoreKeyRef.current = active.storageKey
     optimizeInFlightRef.current = true
     setLoading(true)
     setInlineError(null)
-    setProgress({
-      mode: active.mode,
-      startedAt: Date.parse(activeJob.submitted_at) || Date.now(),
-      queueStatus: activeJob.status,
-      queuePosition: activeJob.queue_position,
-      priority: activeJob.priority,
-      jobId: activeJob.job_id,
-      estimatedDurationMs: activeJob.estimated_duration_ms,
-      lastUpdatedAt: Date.now(),
-    })
+    progressRef.current = restoredProgress
+    setProgress(restoredProgress)
+    writeActiveOptimizeJob(active.storageKey, activeJob, restoredProgress)
 
     let cancelled = false
     void (async () => {
@@ -593,6 +587,9 @@ export default function OptimizePage({
           mode: active.mode,
           startedAt: current?.startedAt ?? (Date.parse(activeJob.submitted_at) || Date.now()),
           completedAt: Date.now(),
+          estimatedRemainingMs: 0,
+          estimatePhase: 'completed',
+          estimateAdjustment: undefined,
           lastUpdatedAt: Date.now(),
         }))
         await waitForProgressCompletion()
@@ -862,6 +859,9 @@ export default function OptimizePage({
         mode: 'apply',
         startedAt: current?.startedAt ?? startedAt,
         completedAt: Date.now(),
+        estimatedRemainingMs: 0,
+        estimatePhase: 'completed',
+        estimateAdjustment: undefined,
         lastUpdatedAt: Date.now(),
       }))
       await waitForProgressCompletion()
@@ -1112,6 +1112,234 @@ function waitForOptimizePoll(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, Math.max(500, ms)))
 }
 
+function getOptimizeEstimateAdjustment(
+  current: ScheduleProgressState | null | undefined,
+  next: OptimizeJobAccepted | OptimizeJobStatusResponse,
+): string | undefined {
+  if (next.estimate_phase === 'overdue') return '已超过预估，后台仍在计算'
+  if (!current) return undefined
+
+  if (current.jobId === next.job_id && current.observedRunning && next.status === 'queued') {
+    return '后台正在确认任务状态，计算仍在继续'
+  }
+
+  if (current.queueStatus === 'queued' && next.status === 'running') {
+    return '任务已开始，预计用时已重新校准'
+  }
+
+  if (
+    current.queueStatus === 'queued'
+    && next.status === 'queued'
+    && typeof current.queuePosition === 'number'
+    && typeof next.queue_position === 'number'
+  ) {
+    if (next.queue_position > current.queuePosition) return '队列发生变化，预计已延长'
+    if (next.queue_position < current.queuePosition) return '队列推进中，预计已缩短'
+  }
+
+  return undefined
+}
+
+function mergeOptimizeJobProgress(
+  current: ScheduleProgressState | null | undefined,
+  next: OptimizeJobAccepted | OptimizeJobStatusResponse,
+  mode: ScheduleProgressState['mode'],
+  now: number,
+): ScheduleProgressState {
+  const sameJob = current?.jobId === next.job_id
+  const startedAt = sameJob && current ? current.startedAt : Date.parse(next.submitted_at) || now
+  const observedRunning = Boolean(
+    (sameJob && current?.observedRunning)
+    || next.status === 'running'
+    || next.estimate_phase === 'running'
+    || next.estimate_phase === 'overdue'
+    || getOptimizeJobStartedAt(next),
+  )
+  const queueStatus = getStableOptimizeQueueStatus(current, next, observedRunning)
+  const estimatePhase = getStableOptimizeEstimatePhase(current, next, observedRunning)
+  const estimatedRemainingMs = getStableOptimizeRemainingMs(current, next, now, observedRunning)
+  const estimatedTotalMs = getStableOptimizeTotalMs(current, next, estimatedRemainingMs, startedAt, now, observedRunning)
+  const previousPercentFloor = sameJob && current ? Math.max(current.percentFloor ?? 0, getOptimizeProgressPercent(current, now)) : 0
+
+  return {
+    mode: sameJob ? current?.mode ?? mode : mode,
+    startedAt,
+    queueStatus,
+    queuePosition: observedRunning ? null : next.queue_position,
+    priority: next.priority,
+    jobId: next.job_id,
+    observedRunning,
+    percentFloor: Math.max(0, Math.min(96, previousPercentFloor)),
+    estimatedDurationMs: next.estimated_duration_ms,
+    estimatedRemainingMs,
+    estimatedTotalMs,
+    estimatePhase,
+    estimateUpdatedAt: next.estimate_updated_at,
+    estimateAdjustment: getOptimizeEstimateAdjustment(current, next),
+    lastUpdatedAt: now,
+  }
+}
+
+function getStableOptimizeQueueStatus(
+  current: ScheduleProgressState | null | undefined,
+  next: OptimizeJobAccepted | OptimizeJobStatusResponse,
+  observedRunning: boolean,
+): ScheduleProgressState['queueStatus'] {
+  if (next.status === 'running') return 'running'
+  if (next.status === 'queued') return observedRunning ? 'running' : 'queued'
+  return current?.queueStatus
+}
+
+function getStableOptimizeEstimatePhase(
+  current: ScheduleProgressState | null | undefined,
+  next: OptimizeJobAccepted | OptimizeJobStatusResponse,
+  observedRunning: boolean,
+): ScheduleProgressState['estimatePhase'] {
+  if (
+    current?.jobId === next.job_id
+    && current.estimatePhase === 'overdue'
+    && next.estimate_phase !== 'completed'
+    && next.estimate_phase !== 'failed'
+  ) {
+    return 'overdue'
+  }
+  if (next.estimate_phase === 'queued' && observedRunning) {
+    return current?.estimatePhase === 'overdue' ? 'overdue' : 'running'
+  }
+  return next.estimate_phase
+}
+
+function getStableOptimizeRemainingMs(
+  current: ScheduleProgressState | null | undefined,
+  next: OptimizeJobAccepted | OptimizeJobStatusResponse,
+  now: number,
+  observedRunning: boolean,
+): number | null {
+  const incoming = next.estimated_remaining_ms
+  if (
+    current?.jobId === next.job_id
+    && current.estimatePhase === 'overdue'
+    && next.estimate_phase !== 'completed'
+    && next.estimate_phase !== 'failed'
+  ) {
+    return null
+  }
+  if (incoming === null || !Number.isFinite(incoming)) return incoming
+  if (current?.jobId !== next.job_id) return incoming
+
+  const projected = getProjectedOptimizeRemainingMs(current, now)
+  if (projected === null) return incoming
+
+  if (observedRunning) {
+    if (next.status === 'queued' || incoming > projected) return Math.max(0, Math.round(projected))
+    return incoming
+  }
+
+  const queuePositionWorsened = (
+    current.queueStatus === 'queued'
+    && next.status === 'queued'
+    && typeof current.queuePosition === 'number'
+    && typeof next.queue_position === 'number'
+    && next.queue_position > current.queuePosition
+  )
+  if (!queuePositionWorsened && incoming > projected) return Math.max(0, Math.round(projected))
+  return incoming
+}
+
+function getStableOptimizeTotalMs(
+  current: ScheduleProgressState | null | undefined,
+  next: OptimizeJobAccepted | OptimizeJobStatusResponse,
+  remainingMs: number | null,
+  startedAt: number,
+  now: number,
+  observedRunning: boolean,
+): number | null {
+  const incomingTotalMs = next.estimated_total_ms
+  if (remainingMs === null) {
+    const currentTotalMs = current?.estimatedTotalMs
+    if (
+      current?.jobId === next.job_id
+      && current.estimatePhase === 'overdue'
+      && typeof currentTotalMs === 'number'
+      && Number.isFinite(currentTotalMs)
+      && next.estimate_phase !== 'completed'
+      && next.estimate_phase !== 'failed'
+    ) {
+      return currentTotalMs
+    }
+    if (
+      current?.jobId === next.job_id
+      && typeof currentTotalMs === 'number'
+      && Number.isFinite(currentTotalMs)
+      && observedRunning
+      && next.status === 'queued'
+    ) {
+      return currentTotalMs
+    }
+    return incomingTotalMs
+  }
+
+  const localTotalMs = Math.max(0, now - startedAt) + remainingMs
+  if (current?.jobId === next.job_id && observedRunning && next.status === 'queued') {
+    return current.estimatedTotalMs ?? localTotalMs
+  }
+
+  if (typeof incomingTotalMs === 'number' && Number.isFinite(incomingTotalMs) && incomingTotalMs > 0) {
+    return shouldAllowOptimizeEstimateExtension(current, next, observedRunning)
+      ? Math.max(incomingTotalMs, localTotalMs)
+      : Math.min(incomingTotalMs, localTotalMs)
+  }
+  return localTotalMs
+}
+
+function shouldAllowOptimizeEstimateExtension(
+  current: ScheduleProgressState | null | undefined,
+  next: OptimizeJobAccepted | OptimizeJobStatusResponse,
+  observedRunning: boolean,
+): boolean {
+  return Boolean(
+    current?.jobId === next.job_id
+    && !observedRunning
+    && current.queueStatus === 'queued'
+    && next.status === 'queued'
+    && typeof current.queuePosition === 'number'
+    && typeof next.queue_position === 'number'
+    && next.queue_position > current.queuePosition,
+  )
+}
+
+function getProjectedOptimizeRemainingMs(progress: ScheduleProgressState, now: number): number | null {
+  if (typeof progress.estimatedRemainingMs !== 'number' || !Number.isFinite(progress.estimatedRemainingMs)) return null
+  const updatedAt = parseOptimizeEstimateUpdatedAt(progress)
+  const elapsedSinceUpdate = updatedAt === null ? 0 : Math.max(0, now - updatedAt)
+  return Math.max(0, progress.estimatedRemainingMs - elapsedSinceUpdate)
+}
+
+function getOptimizeProgressPercent(progress: ScheduleProgressState, now: number): number {
+  const elapsed = Math.max(0, now - progress.startedAt)
+  const estimatedTotalMs = getOptimizeProgressTotalMs(progress, now)
+  return Math.min(96, (elapsed / estimatedTotalMs) * 96)
+}
+
+function getOptimizeProgressTotalMs(progress: ScheduleProgressState, now: number): number {
+  if (typeof progress.estimatedTotalMs === 'number' && Number.isFinite(progress.estimatedTotalMs) && progress.estimatedTotalMs > 0) {
+    return progress.estimatedTotalMs
+  }
+  const fallback = progress.estimatedDurationMs ?? 28_000
+  if (progress.estimatePhase === 'overdue') return Math.max(fallback, Math.max(1_000, now - progress.startedAt))
+  return Math.max(1_000, fallback)
+}
+
+function getOptimizeJobStartedAt(job: OptimizeJobAccepted | OptimizeJobStatusResponse): string | null | undefined {
+  return 'started_at' in job ? job.started_at : undefined
+}
+
+function parseOptimizeEstimateUpdatedAt(progress: ScheduleProgressState): number | null {
+  const parsed = Date.parse(progress.estimateUpdatedAt ?? '')
+  if (Number.isFinite(parsed)) return parsed
+  return typeof progress.lastUpdatedAt === 'number' && Number.isFinite(progress.lastUpdatedAt) ? progress.lastUpdatedAt : null
+}
+
 function buildOptimizeJobStorageKey(
   profileId: string,
   orderHash: string,
@@ -1121,31 +1349,59 @@ function buildOptimizeJobStorageKey(
   return ['maa-optimize-job', profileId || orderHash || 'anonymous', mode, signature].join(':')
 }
 
-function writeActiveOptimizeJob(key: string, job: OptimizeJobAccepted | OptimizeJobStatusResponse): void {
+interface ActiveOptimizeJobStorageEntry {
+  job: OptimizeJobAccepted | OptimizeJobStatusResponse;
+  progress?: ScheduleProgressState;
+}
+
+function writeActiveOptimizeJob(
+  key: string,
+  job: OptimizeJobAccepted | OptimizeJobStatusResponse,
+  progress?: ScheduleProgressState,
+): void {
   try {
-    window.sessionStorage.setItem(key, JSON.stringify(job))
+    if (!isActiveOptimizeJob(job)) {
+      window.sessionStorage.removeItem(key)
+      return
+    }
+    window.sessionStorage.setItem(key, JSON.stringify({ version: 2, job, progress }))
   } catch {
     // Session storage is best-effort only.
   }
 }
 
-function readActiveOptimizeJob(key: string): OptimizeJobAccepted | OptimizeJobStatusResponse | null {
+function readActiveOptimizeJob(key: string): ActiveOptimizeJobStorageEntry | null {
   try {
     const raw = window.sessionStorage.getItem(key)
     if (!raw) return null
-    const value = JSON.parse(raw) as Partial<OptimizeJobAccepted | OptimizeJobStatusResponse>
-    if (
-      typeof value.job_id === 'string'
-      && (value.status === 'queued' || value.status === 'running' || value.status === 'succeeded' || value.status === 'failed')
-      && (value.priority === 'paid' || value.priority === 'standard')
-      && typeof value.submitted_at === 'string'
-    ) {
-      return value as OptimizeJobAccepted | OptimizeJobStatusResponse
-    }
+    const value = JSON.parse(raw) as unknown
+    const maybeRecord = isObjectRecord(value) && isObjectRecord(value.job) ? value.job : value
+    if (!isStoredOptimizeJob(maybeRecord)) return null
+    const progress = isObjectRecord(value) && isStoredScheduleProgress(value.progress) ? value.progress : undefined
+    return { job: maybeRecord, progress }
   } catch {
     // Session storage is best-effort only.
   }
   return null
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object')
+}
+
+function isStoredOptimizeJob(value: unknown): value is OptimizeJobAccepted | OptimizeJobStatusResponse {
+  if (!isObjectRecord(value)) return false
+  return typeof value.job_id === 'string'
+    && (value.status === 'queued' || value.status === 'running' || value.status === 'succeeded' || value.status === 'failed')
+    && (value.priority === 'paid' || value.priority === 'standard')
+    && typeof value.submitted_at === 'string'
+}
+
+function isStoredScheduleProgress(value: unknown): value is ScheduleProgressState {
+  if (!isObjectRecord(value)) return false
+  return (value.mode === 'generate' || value.mode === 'apply')
+    && typeof value.startedAt === 'number'
+    && Number.isFinite(value.startedAt)
 }
 
 function isActiveOptimizeJob(

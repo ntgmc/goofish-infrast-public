@@ -147,6 +147,7 @@ export type OptimizeJobPriority = 'paid' | 'standard';
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
 export type OptimizeEstimateBucket = 'maa_fiammetta' | 'maa_plain' | 'rotation';
 export type OptimizeEstimateSource = 'history_p95' | 'fallback_p95';
+export type OptimizeRuntimeEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed';
 
 export interface OptimizeJobAccepted {
   job_id: string;
@@ -160,6 +161,10 @@ export interface OptimizeJobAccepted {
   estimate_bucket: OptimizeEstimateBucket;
   estimate_source: OptimizeEstimateSource;
   estimate_sample_count: number;
+  estimated_remaining_ms: number | null;
+  estimated_total_ms: number | null;
+  estimate_phase: OptimizeRuntimeEstimatePhase;
+  estimate_updated_at: string;
 }
 
 export interface OptimizeJobStatusResponse {
@@ -176,6 +181,10 @@ export interface OptimizeJobStatusResponse {
   estimate_bucket: OptimizeEstimateBucket;
   estimate_source: OptimizeEstimateSource;
   estimate_sample_count: number;
+  estimated_remaining_ms: number | null;
+  estimated_total_ms: number | null;
+  estimate_phase: OptimizeRuntimeEstimatePhase;
+  estimate_updated_at: string;
   result?: OptimizeResult;
   error?: string;
 }
