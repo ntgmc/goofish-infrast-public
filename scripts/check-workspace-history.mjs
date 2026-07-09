@@ -43,6 +43,12 @@ const free333OrundumConfig = {
   },
 }
 
+const free333RoundTripConfig = {
+  ...free333OrundumConfig,
+  Fiammetta: { enable: true },
+  drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
+}
+
 const free243BalancedConfig = {
   layout: '2-4-3',
   desc: '243 balanced',
@@ -375,6 +381,8 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
   await assertFreeConfigPatchStatus(preview.id, free243OrundumInventoryConfig, 200, '243 orundum with inventory assist')
   await assertFreeConfigPatchStatus(preview.id, free333OrundumConfig, 200, '333 orundum')
 
+  await assertFreePreviewModeRoundTrip()
+
   const beforeHistoryCount = store.workspaces.get(preview.id)?.result_history.length ?? 0
   const suggestionsOnly = await call(optimizeHandler, '/api/optimize', {
     profile_id: preview.id,
@@ -476,6 +484,45 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
   }
   if (!previewEvents.some((event) => event.event === 'free_preview' && event.status === 'success')) {
     throw new Error('免费档案生成：缺少 free_preview 统计事件')
+  }
+}
+
+async function assertFreePreviewModeRoundTrip() {
+  const preview = seedFreePreviewProfile('preview-mode-round-trip', { bound: true })
+  store.workspaces.set(preview.id, {
+    ...emptyWorkspace(preview.id),
+    operators: sampleOperators,
+    config: free333RoundTripConfig,
+  })
+
+  const rotationConfig = { ...free333RoundTripConfig, schedule_mode: 'rotation' }
+  const rotation = await call(workspaceHandler, '/api/user/workspace', {
+    profile_id: preview.id,
+    config: rotationConfig,
+  }, { method: 'PATCH' })
+  const storedRotation = store.workspaces.get(preview.id)?.config
+  if (rotation.status !== 200 || !storedRotation?.Fiammetta?.enable || !storedRotation?.drones?.enable) {
+    throw new Error(`免费档案模式往返：轮换配置未保留休眠设置，实际 ${rotation.status}`)
+  }
+
+  const maa = await call(workspaceHandler, '/api/user/workspace', {
+    profile_id: preview.id,
+    config: free333RoundTripConfig,
+  }, { method: 'PATCH' })
+  const storedMaa = store.workspaces.get(preview.id)?.config
+  if (maa.status !== 200 || storedMaa?.schedule_mode !== 'maa' || !storedMaa.Fiammetta?.enable || !storedMaa.drones?.enable) {
+    throw new Error(`免费档案模式往返：切回 MAA 后设置丢失，实际 ${maa.status}`)
+  }
+
+  const generated = await call(optimizeHandler, '/api/optimize', {
+    profile_id: preview.id,
+    license: null,
+    operators: sampleOperators,
+    config: free333RoundTripConfig,
+    ignore_elite: false,
+  })
+  if (generated.status !== 200) {
+    throw new Error(`免费档案模式往返：切回 MAA 后生成失败，实际 ${generated.status}`)
   }
 }
 
@@ -1285,6 +1332,12 @@ function memoryLicenseUtilsModule() {
       if (!config.drones) return false
       const drone = config.drones
       if (drone.enable === false) return false
+      const presetDrone = drone.enable === true
+        && drone.auto === true
+        && (drone.order ?? 'pre') === 'pre'
+        && JSON.stringify(drone.targets ?? []) === JSON.stringify(['LMD', 'Pure Gold', 'LMD'])
+        && !drone.auto_strategy
+        && !drone.auto_target_product
       const inventoryAssist = config.auto_balance_source === 'intermediate_inventory'
         && config.intermediate_inventory
         && drone.enable === true
@@ -1293,7 +1346,7 @@ function memoryLicenseUtilsModule() {
         && !drone.targets
         && !drone.order
         && !drone.auto_target_product
-      return !inventoryAssist
+      return !(presetDrone || inventoryAssist)
     }
   `
 }

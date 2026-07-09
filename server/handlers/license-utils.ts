@@ -398,7 +398,9 @@ export function resolveFreePreviewConfig(
   if (hasForbiddenFreePreviewDroneConfig(config)) {
     return { ok: false, message: '免费个人排班仅允许预设无人机策略或中间产物库存派生的自动无人机策略。' }
   }
-  const preset = PRESET_CONFIGS.find((item) => isPresetConfigMatch(config, item))
+  const preset = PRESET_CONFIGS.find((item) =>
+    isPresetConfigMatch(config, item) || isLegacyFreePreviewMaaConfigMatch(config, item)
+  )
   if (!preset) {
     return { ok: false, message: '免费个人排班仅支持 243 均衡、243 搓玉和 333 搓玉预设。' }
   }
@@ -418,8 +420,6 @@ function resolvePresetMode(config: LicenseConfig, preset: LicenseConfig): Licens
   resolved.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
     resolved.schedule_mode = 'rotation'
-    resolved.Fiammetta = { ...(resolved.Fiammetta ?? {}), enable: false }
-    resolved.drones = { ...(resolved.drones ?? { order: 'pre', targets: [] }), enable: false }
   } else if (isIntermediateAutoConfig(config)) {
     resolved.intermediate_inventory = config.intermediate_inventory
     resolved.auto_balance_source = config.auto_balance_source
@@ -434,8 +434,6 @@ function resolveFreePreviewPresetMode(config: LicenseConfig, preset: LicenseConf
   delete resolved.optimizer_search
   if (normalizeScheduleMode(config.schedule_mode) === 'rotation') {
     resolved.schedule_mode = 'rotation'
-    resolved.Fiammetta = { ...(resolved.Fiammetta ?? {}), enable: false }
-    resolved.drones = { ...(resolved.drones ?? { order: 'pre', targets: [] }), enable: false }
   } else if (isIntermediateAutoConfig(config)) {
     resolved.intermediate_inventory = config.intermediate_inventory
     resolved.auto_balance_source = config.auto_balance_source
@@ -475,6 +473,16 @@ function isPresetConfigMatch(config: LicenseConfig, preset: LicenseConfig): bool
     && countsMatch(config.product_requirements?.manufacturing_stations, preset.product_requirements.manufacturing_stations, MANUFACTURING_PRODUCTS)
     && (scheduleMode === 'rotation' || Boolean(config.Fiammetta?.enable) === Boolean(preset.Fiammetta?.enable))
     && (scheduleMode === 'rotation' || dronesMatch(config.drones, preset.drones))
+}
+
+function isLegacyFreePreviewMaaConfigMatch(config: LicenseConfig, preset: LicenseConfig): boolean {
+  if (normalizeScheduleMode(config.schedule_mode) !== 'maa') return false
+  if (config.Fiammetta?.enable !== false || config.drones?.enable !== false) return false
+
+  const restored = cloneConfig(config)
+  restored.Fiammetta = { ...(restored.Fiammetta ?? {}), enable: Boolean(preset.Fiammetta?.enable) }
+  restored.drones = { ...(restored.drones ?? { order: 'pre', targets: [] }), enable: Boolean(preset.drones?.enable) }
+  return isPresetConfigMatch(restored, preset)
 }
 
 function normalizeScheduleMode(mode: unknown): string {

@@ -415,10 +415,6 @@ export default function ConfigEditor({
                       type="button"
                       onClick={() => onUpdate((next) => {
                         next.schedule_mode = mode
-                        if (mode === 'rotation') {
-                          next.Fiammetta = { ...(next.Fiammetta ?? {}), enable: false }
-                          next.drones = { ...(next.drones ?? { order: 'pre', targets: [] }), enable: false }
-                        }
                         applyCounts(next)
                       })}
                       className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 ${
@@ -568,15 +564,12 @@ export default function ConfigEditor({
               <p className="mb-2 text-xs font-medium text-ink-muted">排班模式</p>
               <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
                 {(['maa', 'rotation'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                  disabled={false}
-                onClick={() => onUpdate((next) => {
-                  next.schedule_mode = mode
-                  if (mode === 'rotation') {
-                    next.Fiammetta = { ...(next.Fiammetta ?? {}), enable: false }
-                      }
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={false}
+                    onClick={() => onUpdate((next) => {
+                      next.schedule_mode = mode
                       applyCounts(next)
                     })}
                     className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 ${
@@ -588,7 +581,7 @@ export default function ConfigEditor({
                     {SCHEDULE_MODE_LABELS[mode]}
                   </button>
                 ))}
-            </div>
+              </div>
               <p className="mt-2 text-xs leading-5 text-ink-muted">
                 游戏内轮换会生成两个设施预设队列，按游戏内“队列轮换/快速切换”使用；不会生成 MAA 排班 JSON。
               </p>

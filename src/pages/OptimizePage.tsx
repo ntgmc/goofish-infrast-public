@@ -184,10 +184,7 @@ export default function OptimizePage({
     const limited = normalizeConfig(baseConfig)
     limited.schedule_mode = normalizeScheduleMode(next.schedule_mode)
     limited.dormitory_rule = normalizeDormitoryRule(next.dormitory_rule)
-    if (limited.schedule_mode === 'rotation') {
-      limited.Fiammetta = { ...(limited.Fiammetta ?? {}), enable: false }
-      limited.drones = { ...(limited.drones ?? { order: 'pre', targets: [] }), enable: false }
-    } else if (userCanUseIntermediateAutoConfig && (next.auto_balance_source === 'intermediate_inventory' || next.auto_balance_source === 'limited_config')) {
+    if (limited.schedule_mode !== 'rotation' && userCanUseIntermediateAutoConfig && (next.auto_balance_source === 'intermediate_inventory' || next.auto_balance_source === 'limited_config')) {
       limited.intermediate_inventory = next.intermediate_inventory
       limited.auto_balance_source = next.auto_balance_source
       limited.drones = next.drones
