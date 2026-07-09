@@ -514,6 +514,19 @@
           {
             "combo": [
               "伺夜/2",
+              "贝洛内"
+            ],
+            "note": "基础效率70%，但+2订单上限",
+            "efficiency": 70,
+            "priority": 3131,
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "贝洛内": -0.1
+            }
+          },
+          {
+            "combo": [
+              "伺夜/2",
               "贝洛内/2"
             ],
             "control_center": [
@@ -529,12 +542,39 @@
           },
           {
             "combo": [
+              "伺夜/2",
+              "贝洛内"
+            ],
+            "control_center": [
+              "八幡海铃/2"
+            ],
+            "note": "基础效率80%，但+2订单上限",
+            "efficiency": 80,
+            "priority": 3079,
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "贝洛内": -0.1
+            }
+          },
+          {
+            "combo": [
               "蕾缪安/2",
               "能天使/2"
             ],
             "note": "基础效率80%",
             "efficiency": 80,
             "priority": 3000
+          },
+          {
+            "combo": [
+              "推进之王",
+              "摩根/2"
+            ],
+            "control_center": [
+              "戴菲恩/2"
+            ],
+            "efficiency": 95,
+            "priority": 3132
           },
           {
             "combo": [
@@ -594,46 +634,46 @@
             "apply_each": true,
             "priority": 2500
           },
-        {
-          "combo": [
-            "深巡/2"
-          ],
-          "efficiency": 40,
-          "note": "旧静态40%；动态=30%+乌尔比安在基建内10%",
-          "dynamic_effects": {
-            "type": "operator_presence_count",
-            "base": 30,
-            "per_operator": 10,
-            "operators": [
-              "乌尔比安"
+          {
+            "combo": [
+              "深巡/2"
             ],
-            "dependency_scope": "facility",
-            "scope": "trading_station",
-            "detail": "old_static=40; dynamic=30+10 if Ulpianus is assigned in facility"
+            "efficiency": 40,
+            "note": "旧静态40%；动态=30%+乌尔比安在基建内10%",
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "base": 30,
+              "per_operator": 10,
+              "operators": [
+                "乌尔比安"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "old_static=40; dynamic=30+10 if Ulpianus is assigned in facility"
+            },
+            "priority": 2500
           },
-          "priority": 2500
-        },
-        {
-          "combo": [
-            "赫德雷/2"
-          ],
-          "efficiency": 40,
-          "note": "旧静态40%；动态=30%+伊内丝/W在工作场所各5%",
-          "dynamic_effects": {
-            "type": "operator_presence_count",
-            "base": 30,
-            "per_operator": 5,
-            "operators": [
-              "伊内丝",
-              "W"
+          {
+            "combo": [
+              "赫德雷/2"
             ],
-            "dependency_scope": "workplace",
-            "cap": 2,
-            "scope": "trading_station",
-            "detail": "old_static=40; dynamic=30+5 for each of Ines/W assigned in workplace"
+            "efficiency": 40,
+            "note": "旧静态40%；动态=30%+伊内丝/W在工作场所各5%",
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "base": 30,
+              "per_operator": 5,
+              "operators": [
+                "伊内丝",
+                "W"
+              ],
+              "dependency_scope": "workplace",
+              "cap": 2,
+              "scope": "trading_station",
+              "detail": "old_static=40; dynamic=30+5 for each of Ines/W assigned in workplace"
+            },
+            "priority": 2500
           },
-          "priority": 2500
-        },
           {
             "combo": [
               "月见夜",
@@ -671,40 +711,68 @@
               "八幡海铃/2"
             ],
             "efficiency": 35,
-            "priority": 2347,
-            "order_limit_delta": 2,
-            "mood_consumption_delta": {
-              "贝洛内": -0.1
-            }
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "base": 35,
+              "per_operator": 10,
+              "operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "家族经营·β：基础35%，伺夜在基建内时额外+10%。"
+            },
+            "priority": 2347
           },
           {
-          "combo": [
-            "齐尔查克/2"
-          ],
-          "dormitory": [
-            "森西/2"
-          ],
-          "efficiency": 30,
-          "dynamic_resource_contributions": {
-            "resource": "monster_cuisine",
-            "per_group_operator": 5,
-            "group": "monster_cuisine_providers",
-            "scope": "facility",
-            "cap": 5,
-            "key": "monster_cuisine_senshi_dorm",
-            "detail": "森西大食堂：宿舍森西按默认5级宿舍提供5点魔物料理。"
+            "combo": [
+              "贝洛内"
+            ],
+            "control_center": [
+              "八幡海铃/2"
+            ],
+            "efficiency": 30,
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "base": 30,
+              "per_operator": 5,
+              "operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "家族经营·α：基础30%，伺夜在基建内时额外+5%。"
+            },
+            "priority": 2346
           },
-          "dynamic_resource_effects": {
-            "resource": "monster_cuisine",
-            "type": "efficiency_per_resource",
-            "per_resource": 1,
-            "scope": "trading_station",
-            "detail": "齐尔查克：每1点魔物料理+1%订单获取效率。"
+          {
+            "combo": [
+              "齐尔查克/2"
+            ],
+            "dormitory": [
+              "森西/2"
+            ],
+            "efficiency": 30,
+            "dynamic_resource_contributions": {
+              "resource": "monster_cuisine",
+              "per_group_operator": 5,
+              "group": "monster_cuisine_providers",
+              "scope": "facility",
+              "cap": 5,
+              "key": "monster_cuisine_senshi_dorm",
+              "detail": "森西大食堂：宿舍森西按默认5级宿舍提供5点魔物料理。"
+            },
+            "dynamic_resource_effects": {
+              "resource": "monster_cuisine",
+              "type": "efficiency_per_resource",
+              "per_resource": 1,
+              "scope": "trading_station",
+              "detail": "齐尔查克：每1点魔物料理+1%订单获取效率。"
+            },
+            "note": "动态：迷宫谈判术，基础30%，每1点魔物料理+1%，需宿舍有森西。",
+            "priority": 2280,
+            "order_limit_delta": 1
           },
-          "note": "动态：迷宫谈判术，基础30%，每1点魔物料理+1%，需宿舍有森西。",
-          "priority": 2280,
-          "order_limit_delta": 1
-        },
           {
             "combo": [
               "海蒂/2",
@@ -715,32 +783,58 @@
             "apply_each": true,
             "priority": 2250
           },
-        {
-          "combo": [
-            "石英/1"
-          ],
-          "efficiency": 34,
-          "note": "旧静态34%；动态=30%+2%*制造配方种类数",
-          "dynamic_effects": {
-            "type": "manufacturing_recipe_kinds",
-            "base": 30,
-            "per_recipe_kind": 2,
-            "scope": "trading_station",
-            "detail": "old_static=34; dynamic=30+2*manufacturingRecipeKinds"
+          {
+            "combo": [
+              "石英/1"
+            ],
+            "efficiency": 34,
+            "note": "旧静态34%；动态=30%+2%*制造配方种类数",
+            "dynamic_effects": {
+              "type": "manufacturing_recipe_kinds",
+              "base": 30,
+              "per_recipe_kind": 2,
+              "scope": "trading_station",
+              "detail": "old_static=34; dynamic=30+2*manufacturingRecipeKinds"
+            },
+            "priority": 2200
           },
-          "priority": 2200
-        },
           {
             "combo": [
               "贝洛内/2"
             ],
             "efficiency": 30,
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "base": 30,
+              "per_operator": 10,
+              "operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "家族经营·β：基础30%，伺夜在基建内时额外+10%。"
+            },
             "apply_each": true,
-            "priority": 2172,
-            "order_limit_delta": 2,
-            "mood_consumption_delta": {
-              "贝洛内": -0.1
-            }
+            "priority": 2172
+          },
+          {
+            "combo": [
+              "贝洛内"
+            ],
+            "efficiency": 25,
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "base": 25,
+              "per_operator": 5,
+              "operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "家族经营·α：基础25%，伺夜在基建内时额外+5%。"
+            },
+            "apply_each": true,
+            "priority": 2171
           },
           {
             "combo": [
@@ -852,6 +946,63 @@
           },
           {
             "combo": [
+              "贝洛内",
+              "伺夜/2"
+            ],
+            "control_center": [
+              "八幡海铃/2"
+            ],
+            "efficiency": 80,
+            "priority": 3096,
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "贝洛内": -0.1
+            }
+          },
+          {
+            "combo": [
+              "贝洛内/2"
+            ],
+            "control_center": [
+              "八幡海铃/2"
+            ],
+            "efficiency": 35,
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "base": 35,
+              "per_operator": 10,
+              "operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "家族经营·β：基础35%，伺夜在基建内时额外+10%。"
+            },
+            "priority": 3095
+          },
+          {
+            "combo": [
+              "贝洛内"
+            ],
+            "control_center": [
+              "八幡海铃/2"
+            ],
+            "efficiency": 30,
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "base": 30,
+              "per_operator": 5,
+              "operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "家族经营·α：基础30%，伺夜在基建内时额外+5%。"
+            },
+            "priority": 3094
+          },
+          {
+            "combo": [
               "孑",
               "银灰/2"
             ],
@@ -895,6 +1046,54 @@
           },
           {
             "combo": [
+              "贝洛内",
+              "伺夜/2"
+            ],
+            "efficiency": 70,
+            "priority": 2798,
+            "order_limit_delta": 2,
+            "mood_consumption_delta": {
+              "贝洛内": -0.1
+            }
+          },
+          {
+            "combo": [
+              "贝洛内/2"
+            ],
+            "efficiency": 30,
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "base": 30,
+              "per_operator": 10,
+              "operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "家族经营·β：基础30%，伺夜在基建内时额外+10%。"
+            },
+            "priority": 2797
+          },
+          {
+            "combo": [
+              "贝洛内"
+            ],
+            "efficiency": 25,
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "base": 25,
+              "per_operator": 5,
+              "operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "家族经营·α：基础25%，伺夜在基建内时额外+5%。"
+            },
+            "priority": 2796
+          },
+          {
+            "combo": [
               "蕾缪安/2",
               "能天使/2"
             ],
@@ -926,337 +1125,337 @@
             "note": "黑键乌有混用满挂件（迷迭香）",
             "priority": 2260
           },
-        {
-          "combo": [
-            "黑键/2",
-            "伺夜/2"
-          ],
-          "control_center": [
-            "夕",
-            "令/2"
-          ],
-          "hire": [
-            "絮雨/2"
-          ],
-          "dormitory": [
-            "车尔尼/2",
-            "爱丽丝/2"
-          ],
-          "efficiency": 40,
-          "dynamic_resource_contributions": [
-            {
-              "resource": "perception_information",
-              "amount": 20,
-              "key": "logos_dorm_full_occupancy",
-              "detail": "黑键：默认4宿舍满员提供20点感知信息。"
-            },
-            {
-              "resource": "perception_information",
-              "per_group_operator": 10,
-              "group": "perception_control_providers",
-              "scope": "control_center",
-              "cap": 20,
-              "key": "perception_control_dusk_ling",
-              "detail": "夕/令在控制中枢时各提供10点感知信息。"
-            },
-            {
-              "resource": "memory_fragment",
-              "per_group_operator": 30,
-              "group": "perception_hire_providers",
-              "scope": "hire",
-              "cap": 30,
-              "key": "perception_hire_whisperain",
-              "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
-            },
-            {
-              "resource": "dream",
-              "per_group_operator": 5,
-              "group": "perception_dream_providers",
-              "scope": "dormitory",
-              "cap": 5,
-              "key": "perception_dream_alice",
-              "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
-            },
-            {
-              "resource": "melody",
-              "per_group_operator": 5,
-              "group": "perception_melody_providers",
-              "scope": "dormitory",
-              "cap": 5,
-              "key": "perception_melody_czerny",
-              "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
-            }
-          ],
-          "dynamic_resource_effects": [
-            {
-              "resource": "memory_fragment",
-              "type": "resource_conversion",
-              "key": "memory_fragment_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "dream",
-              "type": "resource_conversion",
-              "key": "dream_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "melody",
-              "type": "resource_conversion",
-              "key": "melody_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "perception_information",
-              "type": "resource_conversion",
-              "key": "perception_information_to_silent_resonance",
-              "step_size": 1,
-              "output_resource": "silent_resonance",
-              "output_per_step": 1,
-              "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "silent_resonance",
-              "type": "efficiency_per_step",
-              "step_size": 2,
-              "per_step": 1,
-              "scope": "trading_station",
-              "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
-            }
-          ],
-          "note": "动态：但书+黑键+伺夜，伺夜按40%，黑键按无声共鸣链读取挂件。",
-          "priority": 2420
-        },
-        {
-          "combo": [
-            "黑键/2",
-            "空弦/2"
-          ],
-          "control_center": [
-            "夕",
-            "令/2"
-          ],
-          "hire": [
-            "絮雨/2"
-          ],
-          "dormitory": [
-            "车尔尼/2",
-            "爱丽丝/2"
-          ],
-          "efficiency": 45,
-          "dynamic_resource_contributions": [
-            {
-              "resource": "perception_information",
-              "amount": 20,
-              "key": "logos_dorm_full_occupancy",
-              "detail": "黑键：默认4宿舍满员提供20点感知信息。"
-            },
-            {
-              "resource": "perception_information",
-              "per_group_operator": 10,
-              "group": "perception_control_providers",
-              "scope": "control_center",
-              "cap": 20,
-              "key": "perception_control_dusk_ling",
-              "detail": "夕/令在控制中枢时各提供10点感知信息。"
-            },
-            {
-              "resource": "memory_fragment",
-              "per_group_operator": 30,
-              "group": "perception_hire_providers",
-              "scope": "hire",
-              "cap": 30,
-              "key": "perception_hire_whisperain",
-              "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
-            },
-            {
-              "resource": "dream",
-              "per_group_operator": 5,
-              "group": "perception_dream_providers",
-              "scope": "dormitory",
-              "cap": 5,
-              "key": "perception_dream_alice",
-              "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
-            },
-            {
-              "resource": "melody",
-              "per_group_operator": 5,
-              "group": "perception_melody_providers",
-              "scope": "dormitory",
-              "cap": 5,
-              "key": "perception_melody_czerny",
-              "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
-            }
-          ],
-          "dynamic_resource_effects": [
-            {
-              "resource": "memory_fragment",
-              "type": "resource_conversion",
-              "key": "memory_fragment_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "dream",
-              "type": "resource_conversion",
-              "key": "dream_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "melody",
-              "type": "resource_conversion",
-              "key": "melody_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "perception_information",
-              "type": "resource_conversion",
-              "key": "perception_information_to_silent_resonance",
-              "step_size": 1,
-              "output_resource": "silent_resonance",
-              "output_per_step": 1,
-              "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "silent_resonance",
-              "type": "efficiency_per_step",
-              "step_size": 2,
-              "per_step": 1,
-              "scope": "trading_station",
-              "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
-            }
-          ],
-          "note": "动态：但书+黑键+空弦，空弦按45%，黑键按无声共鸣链读取挂件。",
-          "priority": 2640
-        },
-        {
-          "combo": [
-            "黑键/2",
-            "伺夜/2"
-          ],
-          "control_center": [
-            "八幡海铃/2",
-            "夕",
-            "令/2"
-          ],
-          "hire": [
-            "絮雨/2"
-          ],
-          "dormitory": [
-            "车尔尼/2",
-            "爱丽丝/2"
-          ],
-          "efficiency": 45,
-          "dynamic_resource_contributions": [
-            {
-              "resource": "perception_information",
-              "amount": 20,
-              "key": "logos_dorm_full_occupancy",
-              "detail": "黑键：默认4宿舍满员提供20点感知信息。"
-            },
-            {
-              "resource": "perception_information",
-              "per_group_operator": 10,
-              "group": "perception_control_providers",
-              "scope": "control_center",
-              "cap": 20,
-              "key": "perception_control_dusk_ling",
-              "detail": "夕/令在控制中枢时各提供10点感知信息。"
-            },
-            {
-              "resource": "memory_fragment",
-              "per_group_operator": 30,
-              "group": "perception_hire_providers",
-              "scope": "hire",
-              "cap": 30,
-              "key": "perception_hire_whisperain",
-              "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
-            },
-            {
-              "resource": "dream",
-              "per_group_operator": 5,
-              "group": "perception_dream_providers",
-              "scope": "dormitory",
-              "cap": 5,
-              "key": "perception_dream_alice",
-              "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
-            },
-            {
-              "resource": "melody",
-              "per_group_operator": 5,
-              "group": "perception_melody_providers",
-              "scope": "dormitory",
-              "cap": 5,
-              "key": "perception_melody_czerny",
-              "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
-            }
-          ],
-          "dynamic_resource_effects": [
-            {
-              "resource": "memory_fragment",
-              "type": "resource_conversion",
-              "key": "memory_fragment_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "dream",
-              "type": "resource_conversion",
-              "key": "dream_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "melody",
-              "type": "resource_conversion",
-              "key": "melody_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "perception_information",
-              "type": "resource_conversion",
-              "key": "perception_information_to_silent_resonance",
-              "step_size": 1,
-              "output_resource": "silent_resonance",
-              "output_per_step": 1,
-              "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "silent_resonance",
-              "type": "efficiency_per_step",
-              "step_size": 2,
-              "per_step": 1,
-              "scope": "trading_station",
-              "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
-            }
-          ],
-          "note": "动态：但书+黑键+伺夜+八幡海铃，伺夜按45%，黑键按无声共鸣链读取挂件。",
-          "priority": 2760
-        }
+          {
+            "combo": [
+              "黑键/2",
+              "伺夜/2"
+            ],
+            "control_center": [
+              "夕",
+              "令/2"
+            ],
+            "hire": [
+              "絮雨/2"
+            ],
+            "dormitory": [
+              "车尔尼/2",
+              "爱丽丝/2"
+            ],
+            "efficiency": 40,
+            "dynamic_resource_contributions": [
+              {
+                "resource": "perception_information",
+                "amount": 20,
+                "key": "logos_dorm_full_occupancy",
+                "detail": "黑键：默认4宿舍满员提供20点感知信息。"
+              },
+              {
+                "resource": "perception_information",
+                "per_group_operator": 10,
+                "group": "perception_control_providers",
+                "scope": "control_center",
+                "cap": 20,
+                "key": "perception_control_dusk_ling",
+                "detail": "夕/令在控制中枢时各提供10点感知信息。"
+              },
+              {
+                "resource": "memory_fragment",
+                "per_group_operator": 30,
+                "group": "perception_hire_providers",
+                "scope": "hire",
+                "cap": 30,
+                "key": "perception_hire_whisperain",
+                "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
+              },
+              {
+                "resource": "dream",
+                "per_group_operator": 5,
+                "group": "perception_dream_providers",
+                "scope": "dormitory",
+                "cap": 5,
+                "key": "perception_dream_alice",
+                "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
+              },
+              {
+                "resource": "melody",
+                "per_group_operator": 5,
+                "group": "perception_melody_providers",
+                "scope": "dormitory",
+                "cap": 5,
+                "key": "perception_melody_czerny",
+                "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
+              }
+            ],
+            "dynamic_resource_effects": [
+              {
+                "resource": "memory_fragment",
+                "type": "resource_conversion",
+                "key": "memory_fragment_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "dream",
+                "type": "resource_conversion",
+                "key": "dream_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "melody",
+                "type": "resource_conversion",
+                "key": "melody_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "perception_information",
+                "type": "resource_conversion",
+                "key": "perception_information_to_silent_resonance",
+                "step_size": 1,
+                "output_resource": "silent_resonance",
+                "output_per_step": 1,
+                "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "silent_resonance",
+                "type": "efficiency_per_step",
+                "step_size": 2,
+                "per_step": 1,
+                "scope": "trading_station",
+                "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
+              }
+            ],
+            "note": "动态：但书+黑键+伺夜，伺夜按40%，黑键按无声共鸣链读取挂件。",
+            "priority": 2420
+          },
+          {
+            "combo": [
+              "黑键/2",
+              "空弦/2"
+            ],
+            "control_center": [
+              "夕",
+              "令/2"
+            ],
+            "hire": [
+              "絮雨/2"
+            ],
+            "dormitory": [
+              "车尔尼/2",
+              "爱丽丝/2"
+            ],
+            "efficiency": 45,
+            "dynamic_resource_contributions": [
+              {
+                "resource": "perception_information",
+                "amount": 20,
+                "key": "logos_dorm_full_occupancy",
+                "detail": "黑键：默认4宿舍满员提供20点感知信息。"
+              },
+              {
+                "resource": "perception_information",
+                "per_group_operator": 10,
+                "group": "perception_control_providers",
+                "scope": "control_center",
+                "cap": 20,
+                "key": "perception_control_dusk_ling",
+                "detail": "夕/令在控制中枢时各提供10点感知信息。"
+              },
+              {
+                "resource": "memory_fragment",
+                "per_group_operator": 30,
+                "group": "perception_hire_providers",
+                "scope": "hire",
+                "cap": 30,
+                "key": "perception_hire_whisperain",
+                "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
+              },
+              {
+                "resource": "dream",
+                "per_group_operator": 5,
+                "group": "perception_dream_providers",
+                "scope": "dormitory",
+                "cap": 5,
+                "key": "perception_dream_alice",
+                "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
+              },
+              {
+                "resource": "melody",
+                "per_group_operator": 5,
+                "group": "perception_melody_providers",
+                "scope": "dormitory",
+                "cap": 5,
+                "key": "perception_melody_czerny",
+                "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
+              }
+            ],
+            "dynamic_resource_effects": [
+              {
+                "resource": "memory_fragment",
+                "type": "resource_conversion",
+                "key": "memory_fragment_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "dream",
+                "type": "resource_conversion",
+                "key": "dream_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "melody",
+                "type": "resource_conversion",
+                "key": "melody_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "perception_information",
+                "type": "resource_conversion",
+                "key": "perception_information_to_silent_resonance",
+                "step_size": 1,
+                "output_resource": "silent_resonance",
+                "output_per_step": 1,
+                "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "silent_resonance",
+                "type": "efficiency_per_step",
+                "step_size": 2,
+                "per_step": 1,
+                "scope": "trading_station",
+                "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
+              }
+            ],
+            "note": "动态：但书+黑键+空弦，空弦按45%，黑键按无声共鸣链读取挂件。",
+            "priority": 2640
+          },
+          {
+            "combo": [
+              "黑键/2",
+              "伺夜/2"
+            ],
+            "control_center": [
+              "八幡海铃/2",
+              "夕",
+              "令/2"
+            ],
+            "hire": [
+              "絮雨/2"
+            ],
+            "dormitory": [
+              "车尔尼/2",
+              "爱丽丝/2"
+            ],
+            "efficiency": 45,
+            "dynamic_resource_contributions": [
+              {
+                "resource": "perception_information",
+                "amount": 20,
+                "key": "logos_dorm_full_occupancy",
+                "detail": "黑键：默认4宿舍满员提供20点感知信息。"
+              },
+              {
+                "resource": "perception_information",
+                "per_group_operator": 10,
+                "group": "perception_control_providers",
+                "scope": "control_center",
+                "cap": 20,
+                "key": "perception_control_dusk_ling",
+                "detail": "夕/令在控制中枢时各提供10点感知信息。"
+              },
+              {
+                "resource": "memory_fragment",
+                "per_group_operator": 30,
+                "group": "perception_hire_providers",
+                "scope": "hire",
+                "cap": 30,
+                "key": "perception_hire_whisperain",
+                "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
+              },
+              {
+                "resource": "dream",
+                "per_group_operator": 5,
+                "group": "perception_dream_providers",
+                "scope": "dormitory",
+                "cap": 5,
+                "key": "perception_dream_alice",
+                "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
+              },
+              {
+                "resource": "melody",
+                "per_group_operator": 5,
+                "group": "perception_melody_providers",
+                "scope": "dormitory",
+                "cap": 5,
+                "key": "perception_melody_czerny",
+                "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
+              }
+            ],
+            "dynamic_resource_effects": [
+              {
+                "resource": "memory_fragment",
+                "type": "resource_conversion",
+                "key": "memory_fragment_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "dream",
+                "type": "resource_conversion",
+                "key": "dream_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "melody",
+                "type": "resource_conversion",
+                "key": "melody_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "perception_information",
+                "type": "resource_conversion",
+                "key": "perception_information_to_silent_resonance",
+                "step_size": 1,
+                "output_resource": "silent_resonance",
+                "output_per_step": 1,
+                "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "silent_resonance",
+                "type": "efficiency_per_step",
+                "step_size": 2,
+                "per_step": 1,
+                "scope": "trading_station",
+                "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
+              }
+            ],
+            "note": "动态：但书+黑键+伺夜+八幡海铃，伺夜按45%，黑键按无声共鸣链读取挂件。",
+            "priority": 2760
+          }
         ]
       },
       "孑12体系": {
@@ -1499,6 +1698,21 @@
         },
         {
           "combo": [
+            "贝洛内",
+            "伺夜/2"
+          ],
+          "control_center": [
+            "八幡海铃/2"
+          ],
+          "efficiency": 80,
+          "priority": 4596,
+          "order_limit_delta": 2,
+          "mood_consumption_delta": {
+            "贝洛内": -0.1
+          }
+        },
+        {
+          "combo": [
             "推进之王",
             "摩根/2",
             "维娜/2"
@@ -1516,6 +1730,18 @@
           ],
           "efficiency": 80,
           "priority": 4132,
+          "order_limit_delta": 2,
+          "mood_consumption_delta": {
+            "贝洛内": -0.1
+          }
+        },
+        {
+          "combo": [
+            "贝洛内",
+            "伺夜/2"
+          ],
+          "efficiency": 70,
+          "priority": 4131,
           "order_limit_delta": 2,
           "mood_consumption_delta": {
             "贝洛内": -0.1
@@ -1755,11 +1981,39 @@
             "八幡海铃/2"
           ],
           "efficiency": 35,
-          "priority": 3597,
-          "order_limit_delta": 2,
-          "mood_consumption_delta": {
-            "贝洛内": -0.1
-          }
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 35,
+            "per_operator": 10,
+            "operators": [
+              "伺夜"
+            ],
+            "dependency_scope": "facility",
+            "scope": "trading_station",
+            "detail": "家族经营·β：基础35%，伺夜在基建内时额外+10%。"
+          },
+          "priority": 3597
+        },
+        {
+          "combo": [
+            "贝洛内"
+          ],
+          "control_center": [
+            "八幡海铃/2"
+          ],
+          "efficiency": 30,
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 30,
+            "per_operator": 5,
+            "operators": [
+              "伺夜"
+            ],
+            "dependency_scope": "facility",
+            "scope": "trading_station",
+            "detail": "家族经营·α：基础30%，伺夜在基建内时额外+5%。"
+          },
+          "priority": 3596
         },
         {
           "combo": [
@@ -1929,12 +2183,38 @@
             "贝洛内/2"
           ],
           "efficiency": 30,
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 30,
+            "per_operator": 10,
+            "operators": [
+              "伺夜"
+            ],
+            "dependency_scope": "facility",
+            "scope": "trading_station",
+            "detail": "家族经营·β：基础30%，伺夜在基建内时额外+10%。"
+          },
           "apply_each": true,
-          "priority": 3172,
-          "order_limit_delta": 2,
-          "mood_consumption_delta": {
-            "贝洛内": -0.1
-          }
+          "priority": 3172
+        },
+        {
+          "combo": [
+            "贝洛内"
+          ],
+          "efficiency": 25,
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 25,
+            "per_operator": 5,
+            "operators": [
+              "伺夜"
+            ],
+            "dependency_scope": "facility",
+            "scope": "trading_station",
+            "detail": "家族经营·α：基础25%，伺夜在基建内时额外+5%。"
+          },
+          "apply_each": true,
+          "priority": 3171
         },
         {
           "combo": [
@@ -2320,10 +2600,10 @@
     },
     "manufacturing_station": {
       "迷迭香": [
-      {
-        "combo": [
-          "迷迭香/2"
-        ],
+        {
+          "combo": [
+            "迷迭香/2"
+          ],
           "control_center": [
             "重岳",
             "令/2",
@@ -2337,102 +2617,102 @@
             "车尔尼/2",
             "爱丽丝/2"
           ],
-        "process": [
-          "年"
-        ],
-        "efficiency": 0,
-        "dynamic_resource_contributions": [
-          {
-            "resource": "perception_information",
-            "amount": 20,
-            "key": "rosmontis_dorm_full_occupancy",
-            "detail": "迷迭香：默认4宿舍满员提供20点感知信息。"
-          },
-          {
-            "resource": "perception_information",
-            "per_group_operator": 10,
-            "group": "perception_control_providers",
-            "scope": "control_center",
-            "cap": 20,
-            "key": "perception_control_dusk_ling",
-            "detail": "夕/令在控制中枢时各提供10点感知信息。"
-          },
-          {
-            "resource": "memory_fragment",
-            "per_group_operator": 30,
-            "group": "perception_hire_providers",
-            "scope": "hire",
-            "cap": 30,
-            "key": "perception_hire_whisperain",
-            "detail": "絮雨：默认满级办公室4招募位，额外3个招募位提供30点记忆碎片。"
-          },
-          {
-            "resource": "dream",
-            "per_group_operator": 5,
-            "group": "perception_dream_providers",
-            "scope": "dormitory",
-            "cap": 5,
-            "key": "perception_dream_alice",
-            "detail": "爱丽丝：默认5级宿舍提供5层梦境。"
-          },
-          {
-            "resource": "melody",
-            "per_group_operator": 5,
-            "group": "perception_melody_providers",
-            "scope": "dormitory",
-            "cap": 5,
-            "key": "perception_melody_czerny",
-            "detail": "车尔尼：默认5级宿舍提供5个小节。"
-          }
-        ],
-        "dynamic_resource_effects": [
-          {
-            "resource": "memory_fragment",
-            "type": "resource_conversion",
-            "key": "memory_fragment_to_perception_information",
-            "step_size": 1,
-            "output_resource": "perception_information",
-            "output_per_step": 1,
-            "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
-          },
-          {
-            "resource": "dream",
-            "type": "resource_conversion",
-            "key": "dream_to_perception_information",
-            "step_size": 1,
-            "output_resource": "perception_information",
-            "output_per_step": 1,
-            "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
-          },
-          {
-            "resource": "melody",
-            "type": "resource_conversion",
-            "key": "melody_to_perception_information",
-            "step_size": 1,
-            "output_resource": "perception_information",
-            "output_per_step": 1,
-            "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
-          },
-          {
-            "resource": "perception_information",
-            "type": "resource_conversion",
-            "key": "perception_information_to_thinking_chain",
-            "step_size": 1,
-            "output_resource": "thinking_chain",
-            "output_per_step": 1,
-            "detail": "每1点感知信息转化为1点思维链环；该转化不影响原本中间产物数目。"
-          },
-          {
-            "resource": "thinking_chain",
-            "type": "efficiency_per_resource",
-            "per_resource": 1,
-            "scope": "manufacturing_station",
-            "detail": "迷迭香精二：每1点思维链环+1%生产力。"
-          }
-        ],
-        "note": "动态：思维链环完整挂件，默认按4宿舍满员、5级宿舍、4招募位办公室计算。",
-        "priority": 21360
-      }
+          "process": [
+            "年"
+          ],
+          "efficiency": 0,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "perception_information",
+              "amount": 20,
+              "key": "rosmontis_dorm_full_occupancy",
+              "detail": "迷迭香：默认4宿舍满员提供20点感知信息。"
+            },
+            {
+              "resource": "perception_information",
+              "per_group_operator": 10,
+              "group": "perception_control_providers",
+              "scope": "control_center",
+              "cap": 20,
+              "key": "perception_control_dusk_ling",
+              "detail": "夕/令在控制中枢时各提供10点感知信息。"
+            },
+            {
+              "resource": "memory_fragment",
+              "per_group_operator": 30,
+              "group": "perception_hire_providers",
+              "scope": "hire",
+              "cap": 30,
+              "key": "perception_hire_whisperain",
+              "detail": "絮雨：默认满级办公室4招募位，额外3个招募位提供30点记忆碎片。"
+            },
+            {
+              "resource": "dream",
+              "per_group_operator": 5,
+              "group": "perception_dream_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_dream_alice",
+              "detail": "爱丽丝：默认5级宿舍提供5层梦境。"
+            },
+            {
+              "resource": "melody",
+              "per_group_operator": 5,
+              "group": "perception_melody_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_melody_czerny",
+              "detail": "车尔尼：默认5级宿舍提供5个小节。"
+            }
+          ],
+          "dynamic_resource_effects": [
+            {
+              "resource": "memory_fragment",
+              "type": "resource_conversion",
+              "key": "memory_fragment_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "dream",
+              "type": "resource_conversion",
+              "key": "dream_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "melody",
+              "type": "resource_conversion",
+              "key": "melody_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "perception_information",
+              "type": "resource_conversion",
+              "key": "perception_information_to_thinking_chain",
+              "step_size": 1,
+              "output_resource": "thinking_chain",
+              "output_per_step": 1,
+              "detail": "每1点感知信息转化为1点思维链环；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "thinking_chain",
+              "type": "efficiency_per_resource",
+              "per_resource": 1,
+              "scope": "manufacturing_station",
+              "detail": "迷迭香精二：每1点思维链环+1%生产力。"
+            }
+          ],
+          "note": "动态：思维链环完整挂件，默认按4宿舍满员、5级宿舍、4招募位办公室计算。",
+          "priority": 21360
+        }
       ],
       "莱茵生命": {
         "base_combo": [
