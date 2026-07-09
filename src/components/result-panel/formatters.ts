@@ -4,6 +4,12 @@ import { PRODUCT_LABELS, ROOM_LABELS } from './labels'
 import type { PreparedPlan, RoomOperator } from './types'
 
 const MAX_MOOD_FALLBACK = 24
+const ROOM_DISPLAY_ORDER = ['trading', 'manufacture', 'power', 'control', 'meeting', 'dormitory'] as const
+const UNKNOWN_ROOM_DISPLAY_RANK = ROOM_DISPLAY_ORDER.length
+const ROOM_DISPLAY_RANK: Record<string, number> = ROOM_DISPLAY_ORDER.reduce(
+  (rank, roomType, index) => ({ ...rank, [roomType]: index }),
+  {},
+)
 
 export type DroneGainSummary = {
   value: string;
@@ -51,6 +57,20 @@ export type PreparedResult = {
   detailStats: { planCount: number; roomCount: number };
 }
 
+function getSortedRoomEntries(roomsByType: Record<string, ShiftRoom[]>): [string, ShiftRoom[]][] {
+  return Object.entries(roomsByType)
+    .map((entry, index) => ({ entry, index }))
+    .sort((left, right) => {
+      const rankDelta = getRoomDisplayRank(left.entry[0]) - getRoomDisplayRank(right.entry[0])
+      return rankDelta !== 0 ? rankDelta : left.index - right.index
+    })
+    .map(({ entry }) => entry)
+}
+
+function getRoomDisplayRank(roomType: string): number {
+  return ROOM_DISPLAY_RANK[roomType] ?? UNKNOWN_ROOM_DISPLAY_RANK
+}
+
 export function prepareResult(
   result: OptimizeResult,
   isRotationMode: boolean,
@@ -67,7 +87,7 @@ export function prepareResult(
     : undefined
   const plans: PreparedPlan[] = result.plans.map((plan, planIndex) => ({
     ...plan,
-    rows: Object.entries(plan.rooms ?? {}).flatMap(([roomType, rooms]) => {
+    rows: getSortedRoomEntries(plan.rooms ?? {}).flatMap(([roomType, rooms]) => {
       if (!Array.isArray(rooms)) return []
       if (isRotationMode && roomType === 'dormitory') return []
       return rooms.flatMap((room, index) => {
