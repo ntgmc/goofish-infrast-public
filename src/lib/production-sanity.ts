@@ -1,12 +1,11 @@
+import {
+  SANITY_PER_BATTLE_RECORD,
+  SANITY_PER_LMD,
+  SANITY_PER_ORIGINIUM_SHARD,
+  SANITY_PER_ORUNDUM,
+  SANITY_PER_PURE_GOLD,
+} from './orundum-economy'
 import type { DailyProduction } from './types'
-
-const SANITY_PER_LMD = 36 / 10000
-const SANITY_PER_EXP = 36 / 10000
-const SANITY_PER_BATTLE_RECORD = SANITY_PER_EXP * 1000
-const SANITY_PER_PURE_GOLD = SANITY_PER_EXP * (145 / 229) * (50 / 3) * 24
-const SANITY_PER_ORUNDUM = 3 / 4
-const SANITY_PER_PURCHASE_CERTIFICATE = 30 * (1 - SANITY_PER_LMD * 12) / 21
-const SANITY_PER_ORIGINIUM_SHARD = SANITY_PER_PURCHASE_CERTIFICATE * 90
 
 export type ProductionSanitySummary = {
   value: number;

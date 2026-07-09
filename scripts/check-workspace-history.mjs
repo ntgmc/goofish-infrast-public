@@ -81,6 +81,7 @@ const sampleOperators = [
 await assertRequiresLogin()
 await assertPreviewProfileLifecycle()
 await assertSavedConfigActions()
+await assertOrirockInventoryPersistence()
 await assertSavedConfigLimitAndPermission()
 await assertOptimizeHistory()
 await assertFreePreviewWorkspaceAndOptimizeLimits()
@@ -204,6 +205,36 @@ async function assertSavedConfigActions() {
   }
 }
 
+async function assertOrirockInventoryPersistence() {
+  store.workspaces.set('profile-1', emptyWorkspace('profile-1'))
+  const config = {
+    ...sampleConfig,
+    intermediate_inventory: { 'Pure Gold': 123, 'Originium Shard': 45, 'Orirock Cube': 7658 },
+    auto_balance_source: 'intermediate_inventory',
+    drones: { ...sampleConfig.drones, auto_strategy: 'trading_priority' },
+  }
+  const savedWorkspace = await call(workspaceHandler, '/api/user/workspace', {
+    profile_id: 'profile-1',
+    config,
+  }, { method: 'PATCH' })
+  if (
+    savedWorkspace.status !== 200 ||
+    savedWorkspace.body.workspace.config?.intermediate_inventory?.['Orirock Cube'] !== 7658
+  ) {
+    throw new Error(`orirock workspace persistence failed: ${JSON.stringify(savedWorkspace.body)}`)
+  }
+
+  const savedConfig = await call(workspaceHandler, '/api/user/workspace', {
+    profile_id: 'profile-1',
+    saved_config_action: { type: 'save', name: 'orirock inventory', config },
+  }, { method: 'PATCH' })
+  if (
+    savedConfig.status !== 200 ||
+    savedConfig.body.workspace.saved_configs[0]?.config?.intermediate_inventory?.['Orirock Cube'] !== 7658
+  ) {
+    throw new Error(`orirock saved config persistence failed: ${JSON.stringify(savedConfig.body)}`)
+  }
+}
 async function assertSavedConfigLimitAndPermission() {
   const now = new Date().toISOString()
   store.workspaces.set('profile-1', {
