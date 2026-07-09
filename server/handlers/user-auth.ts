@@ -121,7 +121,7 @@ export async function registerUser(
   await saveUserAccount(user)
 
   if (typeof cdkValue === 'string' && cdkValue.trim()) {
-    const redeemed = await redeemProfileCdk(user, cdkValue, '璐﹀彿 1', '')
+    const redeemed = await redeemProfileCdk(user, cdkValue, '账号 1', '')
     if (!redeemed.ok) {
       await deleteUserAccount(user.id)
       return redeemed
@@ -599,7 +599,7 @@ function createAccountOrderHash(codeHash: string, profileId: string): string {
 
 async function nextDefaultProfileName(userId: string): Promise<string> {
   const profiles = await listProfilesForUser(userId)
-  return `璐﹀彿 ${profiles.length + 1}`
+  return `账号 ${profiles.length + 1}`
 }
 
 function normalizeProfileDisplayName(value: unknown): string {
