@@ -19,6 +19,9 @@ export interface ScheduleProgressState {
   observedRunning?: boolean;
   percentFloor?: number;
   lastUpdatedAt?: number;
+  connectionStatus?: 'connected' | 'reconnecting';
+  consecutivePollFailures?: number;
+  lastSuccessfulSyncAt?: number;
 }
 
 interface Props {
@@ -222,7 +225,8 @@ function getWaitingPercent(startedAt: number, now: number, estimatedDurationMs: 
 }
 
 function getTaskView(progress: ScheduleProgressState, percent: number, now: number) {
-  const status = getTaskStatus(progress, percent)
+  const status = getTaskStatus(progress, percent, now)
+  const reconnecting = progress.connectionStatus === 'reconnecting'
   const aheadCount = typeof progress.queuePosition === 'number' ? Math.max(0, progress.queuePosition - 1) : null
   const queueLabel = getQueueLabel(progress, aheadCount)
   const priorityLabel = progress.priority === 'paid' ? '付费优先' : '普通队列'
@@ -230,17 +234,24 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
     ? 'bg-brand-600/15 text-brand-300 ring-1 ring-brand-500/25'
     : 'bg-surface-2 text-ink-secondary ring-1 ring-surface-3'
   const jobLabel = progress.jobId ? `任务 #${progress.jobId.slice(0, 8)}` : null
-  const title = getStatusTitle(progress.mode, status)
+  const title = reconnecting ? '连接恢复中' : getStatusTitle(progress.mode, status)
   const remainingLabel = getRemainingLabel(progress, status, now)
   const estimateContext = getEstimateContext(progress, aheadCount)
-  const detail = getStatusDetail(progress, status, queueLabel, remainingLabel, estimateContext)
-  const adjustmentLabel = getAdjustmentLabel(progress, status)
-  const syncLabel = progress.lastUpdatedAt ? formatSyncAge(now - progress.lastUpdatedAt) : '等待同步'
+  const detail = reconnecting
+    ? '暂时无法同步最新状态，任务仍在后台执行，连接恢复后会自动继续。'
+    : getStatusDetail(progress, status, queueLabel, remainingLabel, estimateContext)
+  const adjustmentLabel = reconnecting
+    ? `正在进行第 ${Math.max(1, progress.consecutivePollFailures ?? 1)} 次重连`
+    : getAdjustmentLabel(progress, status)
+  const syncAt = reconnecting ? progress.lastSuccessfulSyncAt : progress.lastUpdatedAt
+  const syncLabel = syncAt ? formatSyncAge(now - syncAt) : '等待同步'
   const elapsedLabel = formatElapsed(now - progress.startedAt)
-  const footer = adjustmentLabel
-    ?? (progress.priority === 'paid' && status === 'queued'
-      ? '优先领取已生效；不会中断正在运行的任务。'
-      : '页面可保持打开，结果完成后会自动展示。')
+  const footer = reconnecting
+    ? '不会重复提交任务；当前任务完成后仍会自动展示结果。'
+    : adjustmentLabel
+      ?? (progress.priority === 'paid' && status === 'queued'
+        ? '优先领取已生效；不会中断正在运行的任务。'
+        : '页面可保持打开，结果完成后会自动展示。')
   return {
     status,
     title,
@@ -261,7 +272,8 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
   }
 }
 
-function getTaskStatus(progress: ScheduleProgressState, percent: number): TaskStatus {
+function getTaskStatus(progress: ScheduleProgressState, percent: number, now: number): TaskStatus {
+  if (!progress.completedAt && progress.observedRunning && getCurrentRemainingMs(progress, now) === 0) return 'overdue'
   if (progress.completedAt || percent >= 100 || progress.estimatePhase === 'completed') return 'completed'
   if (progress.estimatePhase === 'overdue') return 'overdue'
   const isRunning = progress.observedRunning || progress.queueStatus === 'running' || progress.estimatePhase === 'running'
@@ -320,7 +332,7 @@ function getAdjustmentLabel(progress: ScheduleProgressState, status: TaskStatus)
 
 function getRemainingLabel(progress: ScheduleProgressState, status: TaskStatus, now: number): string {
   if (progress.completedAt || progress.estimatePhase === 'completed') return '约 0 秒'
-  if (progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return '正在校准'
+  if (status === 'overdue' || progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return '正在校准'
   if (status === 'finishing') return '即将完成'
   const currentRemainingMs = getCurrentRemainingMs(progress, now)
   if (currentRemainingMs !== null) return `约 ${formatDuration(currentRemainingMs, 'ceil')}`
@@ -347,7 +359,7 @@ function parseEstimateUpdatedAt(progress: ScheduleProgressState): number | null 
 }
 
 function getRemainingAriaLabel(progress: ScheduleProgressState, remainingLabel: string): string {
-  if (progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return '预计还需正在校准'
+  if (remainingLabel === '正在校准' || progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return '预计耗时正在校准'
   if (remainingLabel === '即将完成') return '预计即将完成'
   return `预计还需${remainingLabel}`
 }

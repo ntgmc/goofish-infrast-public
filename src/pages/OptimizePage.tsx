@@ -23,7 +23,8 @@ import { canEditConfig, canReplaceOperators, canUseUpgradeFeatures, getPermissio
 import { deriveClientKey, signClientState, encryptPayload, canonicalJson } from '../lib/crypto'
 import { getActivationTokenForLicense } from '../lib/activation-token'
 import AnnouncementBanner from '../components/AnnouncementBanner'
-import { apiJson } from '../lib/api-client'
+import { ApiError, apiJson } from '../lib/api-client'
+import { getOptimizePollRetryDelayMs, isRetryableOptimizePollStatus } from '../lib/optimize-poll'
 import { normalizeConfig, validateConfig, normalizeScheduleMode, normalizeDormitoryRule } from '../lib/config'
 import {
   SCHEDULE_PROGRESS_COMPLETION_DURATION_MS,
@@ -486,31 +487,71 @@ export default function OptimizePage({
     progressMode: ScheduleProgressState['mode'],
     fallbackMessage: string,
     isCancelled?: () => boolean,
+    continueProgress = false,
   ): Promise<OptimizeResult> => {
     const throwIfCancelled = () => {
       if (isCancelled?.()) throw new OptimizeJobPollCancelledError()
     }
-    const updateProgress = (next: OptimizeJobAccepted | OptimizeJobStatusResponse) => {
+    let latestJob = job
+    const updateProgress = (
+      next: OptimizeJobAccepted | OptimizeJobStatusResponse,
+      connection?: Pick<ScheduleProgressState, 'connectionStatus' | 'consecutivePollFailures'>,
+    ) => {
       const stored = readActiveOptimizeJob(storageKey)
       const storedProgress = stored?.job.job_id === next.job_id ? stored.progress : null
-      const nextProgress = mergeOptimizeJobProgress(progressRef.current ?? storedProgress, next, progressMode, Date.now())
+      const currentProgress = progressRef.current ?? storedProgress
+      const isContinuationStart = Boolean(continueProgress && currentProgress && currentProgress.jobId !== next.job_id)
+      const progressSeed = continueProgress
+        ? prepareOptimizeContinuationProgress(currentProgress, next, Date.now())
+        : currentProgress
+      const nextProgress = {
+        ...mergeOptimizeJobProgress(progressSeed, next, progressMode, Date.now()),
+        ...(isContinuationStart && { estimateAdjustment: "排班已完成，正在整理练度建议" }),
+        connectionStatus: connection?.connectionStatus ?? 'connected',
+        consecutivePollFailures: connection?.consecutivePollFailures ?? 0,
+        lastSuccessfulSyncAt: connection?.connectionStatus === 'reconnecting'
+          ? progressRef.current?.lastSuccessfulSyncAt ?? storedProgress?.lastSuccessfulSyncAt
+          : Date.now(),
+      } satisfies ScheduleProgressState
       progressRef.current = nextProgress
       setProgress(nextProgress)
       writeActiveOptimizeJob(storageKey, next, nextProgress)
       return nextProgress
     }
 
-    updateProgress(job)
+    const initialStoredProgress = readActiveOptimizeJob(storageKey)?.progress
+    const initialFailures = initialStoredProgress?.connectionStatus === 'reconnecting'
+      ? Math.max(1, initialStoredProgress.consecutivePollFailures ?? 1)
+      : 0
+    updateProgress(job, initialFailures > 0
+      ? { connectionStatus: 'reconnecting', consecutivePollFailures: initialFailures }
+      : undefined)
+    let consecutivePollFailures = initialFailures
     let pollAfterMs = job.poll_after_ms || (job.status === 'queued' ? 1200 : 900)
     while (true) {
       throwIfCancelled()
-      await waitForOptimizePoll(pollAfterMs)
+      await waitForOptimizePoll(pollAfterMs, isCancelled)
       throwIfCancelled()
-      const status = await apiJson<OptimizeJobStatusResponse>('/api/optimize/job?id=' + encodeURIComponent(job.job_id), {
-        fallbackMessage,
-      })
+
+      let status: OptimizeJobStatusResponse
+      try {
+        status = await fetchOptimizeJobStatus(job.job_id, fallbackMessage, isCancelled)
+      } catch (error) {
+        throwIfCancelled()
+        if (!isRetryableOptimizePollError(error)) throw error
+
+        consecutivePollFailures += 1
+        updateProgress(latestJob, {
+          connectionStatus: 'reconnecting',
+          consecutivePollFailures,
+        })
+        pollAfterMs = getOptimizePollRetryDelayMs(consecutivePollFailures)
+        continue
+      }
+
       throwIfCancelled()
-      updateProgress(status)
+      latestJob = status
+      consecutivePollFailures = 0
 
       if (status.status === 'succeeded') {
         if (!status.result) throw new Error('优化任务缺少结果。')
@@ -521,14 +562,16 @@ export default function OptimizePage({
         clearActiveOptimizeJob(storageKey)
         throw new Error(status.error || '优化任务失败，请重试。')
       }
+
+      updateProgress(status)
       pollAfterMs = status.poll_after_ms || (status.status === 'queued' ? 1200 : 900)
     }
   }, [])
-
   const runOptimizeJob = useCallback(async (
     payload: OptimizeRequest,
     progressMode: ScheduleProgressState['mode'],
     fallbackMessage: string,
+    continueProgress = false,
   ): Promise<OptimizeResult> => {
     const accepted = await apiJson<OptimizeJobAccepted>('/api/optimize', {
       method: 'POST',
@@ -538,7 +581,7 @@ export default function OptimizePage({
     const storageKey = buildOptimizeJobStorageKey(profileId, license.order_hash, optimizeSignature, progressMode)
 
     try {
-      return await pollOptimizeJob(accepted, storageKey, progressMode, fallbackMessage)
+      return await pollOptimizeJob(accepted, storageKey, progressMode, fallbackMessage, undefined, continueProgress)
     } catch (error) {
       if (!isOptimizeJobPollCancelled(error)) {
         clearActiveOptimizeJob(storageKey)
@@ -659,7 +702,7 @@ export default function OptimizePage({
       suggestions_only: true,
       upgrade_task_payload: taskPayload,
     }
-    return await runOptimizeJob(payload, 'generate', '练度建议请求失败。')
+    return await runOptimizeJob(payload, 'generate', '练度建议请求失败。', true)
   }, [activeConfig, license, mergedOperators, profileId, runOptimizeJob])
   const handleReorderCheck = useCallback(async () => {
     if (!isPreviewProfile || reorderCheckLoading || loading) return
@@ -1110,8 +1153,63 @@ function waitForProgressCompletion(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, SCHEDULE_PROGRESS_COMPLETION_DURATION_MS))
 }
 
-function waitForOptimizePoll(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, Math.max(500, ms)))
+const OPTIMIZE_POLL_REQUEST_TIMEOUT_MS = 10_000
+function waitForOptimizePoll(ms: number, isCancelled?: () => boolean): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const delayMs = Math.max(500, ms)
+    const startedAt = Date.now()
+    const check = () => {
+      if (isCancelled?.()) {
+        reject(new OptimizeJobPollCancelledError())
+        return
+      }
+      const remainingMs = delayMs - (Date.now() - startedAt)
+      if (remainingMs <= 0) {
+        resolve()
+        return
+      }
+      window.setTimeout(check, Math.min(250, remainingMs))
+    }
+    check()
+  })
+}
+
+async function fetchOptimizeJobStatus(
+  jobId: string,
+  fallbackMessage: string,
+  isCancelled?: () => boolean,
+): Promise<OptimizeJobStatusResponse> {
+  const controller = new AbortController()
+  let cancellationRequested = false
+  const timeout = window.setTimeout(() => controller.abort(), OPTIMIZE_POLL_REQUEST_TIMEOUT_MS)
+  const cancellationCheck = window.setInterval(() => {
+    if (isCancelled?.()) {
+      cancellationRequested = true
+      controller.abort()
+    }
+  }, 100)
+
+  try {
+    return await apiJson<OptimizeJobStatusResponse>('/api/optimize/job?id=' + encodeURIComponent(jobId), {
+      fallbackMessage,
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (cancellationRequested || isCancelled?.()) {
+      throw new OptimizeJobPollCancelledError()
+    }
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+    window.clearInterval(cancellationCheck)
+  }
+}
+
+function isRetryableOptimizePollError(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    return isRetryableOptimizePollStatus(error.status)
+  }
+  return error instanceof TypeError || (error instanceof DOMException && error.name === 'AbortError')
 }
 
 function getOptimizeEstimateAdjustment(
@@ -1142,6 +1240,30 @@ function getOptimizeEstimateAdjustment(
   return undefined
 }
 
+function prepareOptimizeContinuationProgress(
+  current: ScheduleProgressState | null | undefined,
+  next: OptimizeJobAccepted | OptimizeJobStatusResponse,
+  now: number,
+): ScheduleProgressState | null | undefined {
+  if (!current || current.jobId === next.job_id) return current
+  return {
+    ...current,
+    jobId: next.job_id,
+    completedAt: undefined,
+    queueStatus: 'running',
+    queuePosition: null,
+    observedRunning: true,
+    percentFloor: Math.max(92, current.percentFloor ?? 0, getOptimizeProgressPercent(current, now)),
+    estimatedRemainingMs: next.estimated_remaining_ms,
+    estimatedTotalMs: Math.max(
+      current.estimatedTotalMs ?? 0,
+      Math.max(0, now - current.startedAt) + Math.max(0, next.estimated_remaining_ms ?? 0),
+    ),
+    estimatePhase: next.estimate_phase === 'overdue' ? 'overdue' : 'running',
+    estimateAdjustment: '排班已完成，正在整理练度建议',
+    lastUpdatedAt: now,
+  }
+}
 function mergeOptimizeJobProgress(
   current: ScheduleProgressState | null | undefined,
   next: OptimizeJobAccepted | OptimizeJobStatusResponse,
