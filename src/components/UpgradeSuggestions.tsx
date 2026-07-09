@@ -301,12 +301,17 @@ function OperatorPortraits({ suggestion }: { suggestion: UpgradeSuggestion }) {
 
 function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?: UpgradeTrainingCost }) {
   const roi = suggestion.roi
+  const orundumRoi = suggestion.orundum_roi
   const totalSanity = cost?.totals.equivalent_sanity ?? cost?.equivalent_sanity ?? null
   const missingSanity = cost?.missing.equivalent_sanity ?? null
   const metrics = [
     { label: '提升收益', value: `+${formatCostNumber(roi?.efficiency_gain ?? suggestion.gain)}%`, tone: 'brand' as const },
-    { label: '每日理智收益', value: formatSignedSanity(roi?.daily_sanity_gain), tone: 'success' as const },
-    { label: '预计回本', value: formatPayback(roi?.payback_days), tone: 'warning' as const },
+    orundumRoi
+      ? { label: '每日合成玉', value: formatSignedAmount(orundumRoi.daily_orundum_gain), tone: 'success' as const }
+      : { label: '每日理智收益', value: formatSignedSanity(roi?.daily_sanity_gain), tone: 'success' as const },
+    orundumRoi
+      ? { label: '机会成本', value: `${formatSignedAmount(orundumRoi.opportunity_cost_delta)} 理智/日`, tone: 'warning' as const }
+      : { label: '预计回本', value: formatPayback(roi?.payback_days), tone: 'warning' as const },
     { label: '总需求理智', value: formatSanity(totalSanity), tone: 'default' as const },
     { label: '缺口理智', value: formatSanity(missingSanity), tone: 'default' as const },
     { label: '库存状态', value: getStockLabel(cost), tone: isStockEnough(cost) ? 'success' as const : 'default' as const },
@@ -472,21 +477,25 @@ function PartialOutcomeRow({ outcome }: { outcome: UpgradePartialOutcome }) {
 
 function compareSuggestions(left: UpgradeSuggestion, right: UpgradeSuggestion, mode: SortMode, leftIndex: number, rightIndex: number): number {
   if (mode === 'gain') {
-    return compareNullableDesc(left.roi?.daily_sanity_gain, right.roi?.daily_sanity_gain)
+    return compareNullableDesc(primaryDailyGain(left), primaryDailyGain(right))
       || right.gain - left.gain
       || leftIndex - rightIndex
   }
   if (mode === 'stock') {
     return Number(isStockEnough(right.training_cost)) - Number(isStockEnough(left.training_cost))
       || compareNullableAsc(left.training_cost?.missing.equivalent_sanity, right.training_cost?.missing.equivalent_sanity)
-      || compareNullableAsc(left.roi?.payback_days, right.roi?.payback_days)
-      || right.gain - left.gain
+    || compareNullableAsc(left.roi?.payback_days, right.roi?.payback_days)
+    || right.gain - left.gain
       || leftIndex - rightIndex
   }
   return compareNullableAsc(left.roi?.payback_days, right.roi?.payback_days)
-    || compareNullableDesc(left.roi?.daily_sanity_gain, right.roi?.daily_sanity_gain)
+    || compareNullableDesc(primaryDailyGain(left), primaryDailyGain(right))
     || right.gain - left.gain
     || leftIndex - rightIndex
+}
+
+function primaryDailyGain(suggestion: UpgradeSuggestion): number | null | undefined {
+  return suggestion.orundum_roi?.daily_orundum_gain ?? suggestion.roi?.daily_sanity_gain
 }
 
 function compareNullableAsc(left: number | null | undefined, right: number | null | undefined): number {
@@ -564,6 +573,12 @@ function formatSignedSanity(value: number | null | undefined): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '暂不可算'
   const sign = value > 0 ? '+' : ''
   return `${sign}${formatCostNumber(value)} 理智/日`
+}
+
+function formatSignedAmount(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '暂不可算'
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${formatCostNumber(value)}`
 }
 
 function formatSanity(value: number | null | undefined): string {

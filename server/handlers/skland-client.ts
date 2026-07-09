@@ -36,7 +36,7 @@ export interface SklandImportSummary extends SklandBindingSummary {
   inventory_warning?: string
 }
 
-type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
+type IntermediateProduct = 'Originium Shard' | 'Pure Gold' | 'Orirock Cube'
 export type IntermediateInventory = Record<IntermediateProduct, number>
 
 type SklandImportOptions = {
@@ -174,6 +174,7 @@ function readSklandIntermediateInventory(calInfo: unknown, calPlayer: unknown): 
   const inventory: IntermediateInventory = {
     'Originium Shard': 0,
     'Pure Gold': 0,
+    'Orirock Cube': 0,
   }
   for (const raw of playerItems) {
     if (!isRecord(raw)) continue
@@ -190,10 +191,12 @@ function readSklandIntermediateInventory(calInfo: unknown, calPlayer: unknown): 
 
 function identifyIntermediateProduct(id: string, name: string): IntermediateProduct | null {
   if (id === '3003') return 'Pure Gold'
+  if (id === '30012') return 'Orirock Cube'
   const normalized = name.replace(/\s+/g, '').toLowerCase()
   if (!normalized) return null
   if (normalized.includes('赤金') || normalized.includes('puregold')) return 'Pure Gold'
   if (normalized.includes('源石碎片') || normalized.includes('originiumshard')) return 'Originium Shard'
+  if (normalized === '固源岩' || normalized === 'orirockcube') return 'Orirock Cube'
   return null
 }
 

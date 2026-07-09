@@ -279,6 +279,7 @@ async function assertConfirmImport() {
   if (
     workspace.config?.intermediate_inventory?.['Pure Gold'] !== 123 ||
     workspace.config?.intermediate_inventory?.['Originium Shard'] !== 45 ||
+    workspace.config?.intermediate_inventory?.['Orirock Cube'] !== 7658 ||
     workspace.config?.auto_balance_source !== 'intermediate_inventory' ||
     workspace.config?.drones?.auto_strategy !== 'trading_priority'
   ) {
@@ -288,7 +289,8 @@ async function assertConfirmImport() {
     result.body.skland_import?.inventory_synced !== true ||
     result.body.skland_import?.config_saved !== true ||
     result.body.skland_import?.intermediate_inventory?.['Pure Gold'] !== 123 ||
-    result.body.skland_import?.intermediate_inventory?.['Originium Shard'] !== 45
+    result.body.skland_import?.intermediate_inventory?.['Originium Shard'] !== 45 ||
+    result.body.skland_import?.intermediate_inventory?.['Orirock Cube'] !== 7658
   ) {
     throw new Error(`confirm import: import summary missing inventory sync ${JSON.stringify(result.body.skland_import)}`)
   }
@@ -422,7 +424,8 @@ async function assertRefreshImport() {
   const workspace = store.workspaces.get('profile-1')
   if (
     workspace?.config?.intermediate_inventory?.['Pure Gold'] !== 9 ||
-    workspace?.config?.intermediate_inventory?.['Originium Shard'] !== 8
+    workspace?.config?.intermediate_inventory?.['Originium Shard'] !== 8 ||
+    workspace?.config?.intermediate_inventory?.['Orirock Cube'] !== 76
   ) {
     throw new Error(`refresh import: intermediate inventory was not refreshed ${JSON.stringify(workspace?.config?.intermediate_inventory)}`)
   }
@@ -834,6 +837,7 @@ function setFetchMode(mode) {
         data: {
           items: {
             3003: { name: '赤金' },
+            30012: { name: '固源岩' },
             shard_item: { id: 'shard_item', name: '源石碎片' },
           },
         },
@@ -849,6 +853,7 @@ function setFetchMode(mode) {
         data: {
           items: [
             { id: '3003', count: mode === 'refresh' ? 9 : 123 },
+            { id: '30012', count: mode === 'refresh' ? 76 : 7658 },
             { id: 'shard_item', count: mode === 'refresh' ? 8 : 45 },
           ],
         },

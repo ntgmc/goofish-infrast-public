@@ -1,4 +1,4 @@
-import type { DailyProduction, LicenseOperator, OptimizeResult, ShiftRoom } from '../../lib/types'
+import type { DailyProduction, LicenseOperator, OptimizeResult, OrundumEconomy, OrundumRoi, ShiftRoom } from '../../lib/types'
 import { calculateProductionSanity } from '../../lib/production-sanity'
 import { PRODUCT_LABELS, ROOM_LABELS } from './labels'
 import type { PreparedPlan, RoomOperator } from './types'
@@ -40,6 +40,7 @@ export type PreparedResult = {
     droneGain: DroneGainSummary;
   };
   productionSanity: { value: number; note: string };
+  orundumEconomy?: OrundumEconomy;
   intermediateDepletion: PreparedIntermediateDepletion[];
   maaDefaultComparison?: {
     sanityDelta: number;
@@ -53,6 +54,7 @@ export type PreparedResult = {
     baselineLmd: number;
     baselineGoldNet: number;
     warnings: string[];
+    orundumEconomyDelta?: OrundumRoi;
   };
   detailStats: { planCount: number; roomCount: number };
 }
@@ -158,6 +160,7 @@ export function prepareResult(
     droneGain,
   }
   const productionSanity = calculateProductionSanity(daily)
+  const orundumEconomy = result.orundum_economy
   const intermediateDepletion = (result.intermediate_depletion ?? []).map((item) => ({
     product: item.product,
     label: formatProduct(item.product),
@@ -185,12 +188,13 @@ export function prepareResult(
           rawTotalEfficiencyDelta: comparison.delta.raw_total_efficiency,
           lmdDelta: comparison.delta.trading.LMD ?? 0,
           goldNetDelta: comparison.delta.net['Pure Gold'] ?? 0,
-          baselineTotalEfficiency: comparison.baseline.total_efficiency,
-          baselineLmd: comparison.baseline.daily_production?.trading?.LMD ?? 0,
-          baselineGoldNet: comparison.baseline.daily_production?.net?.['Pure Gold'] ?? 0,
-          warnings: comparison.warnings,
-        }
-      })()
+      baselineTotalEfficiency: comparison.baseline.total_efficiency,
+      baselineLmd: comparison.baseline.daily_production?.trading?.LMD ?? 0,
+      baselineGoldNet: comparison.baseline.daily_production?.net?.['Pure Gold'] ?? 0,
+      warnings: comparison.warnings,
+      orundumEconomyDelta: comparison.orundum_economy?.delta,
+    }
+  })()
     : undefined
 
   const detailStats = {
@@ -206,6 +210,7 @@ export function prepareResult(
     plans,
     productionStats,
     productionSanity,
+    orundumEconomy,
     intermediateDepletion,
     maaDefaultComparison,
     detailStats,

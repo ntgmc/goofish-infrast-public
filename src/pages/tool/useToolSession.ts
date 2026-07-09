@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   Announcement,
   AnnouncementPublicResponse,
@@ -31,6 +31,7 @@ export function useToolSession() {
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0)
   const [openingProfileId, setOpeningProfileId] = useState<string | null>(null)
   const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null)
+  const workspacePatchQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null, nextMode?: WorkspaceMode) => {
     const nextUser = payload?.user ?? null
@@ -99,15 +100,20 @@ export function useToolSession() {
     }
   }, [applyAuthPayload])
 
-  const persistWorkspacePatch = useCallback(async (patch: WorkspacePatch) => {
-    if (!activeProfile) throw new Error('请先选择游戏账号。')
-    const data = await apiJson<AuthSuccessResponse>('/api/user/workspace', {
-      method: 'PATCH',
-      json: { ...patch, profile_id: activeProfile.id },
-      fallbackMessage: '保存失败',
-    })
-    applyAuthPayload(data, workspaceMode)
-    return data
+  const persistWorkspacePatch = useCallback((patch: WorkspacePatch) => {
+    if (!activeProfile) return Promise.reject(new Error('请先选择游戏账号。'))
+    const runPatch = async () => {
+      const data = await apiJson<AuthSuccessResponse>('/api/user/workspace', {
+        method: 'PATCH',
+        json: { ...patch, profile_id: activeProfile.id },
+        fallbackMessage: '保存失败',
+      })
+      applyAuthPayload(data, workspaceMode)
+      return data
+    }
+    const request = workspacePatchQueueRef.current.then(runPatch, runPatch)
+    workspacePatchQueueRef.current = request.then(() => undefined, () => undefined)
+    return request
   }, [activeProfile, applyAuthPayload, workspaceMode])
 
   const setEliteOverrides = useCallback((next: Record<string, number>) => {

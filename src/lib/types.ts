@@ -7,6 +7,9 @@ export interface LicenseOperator {
   [key: string]: unknown;
 }
 
+export type IntermediateProduct = 'Originium Shard' | 'Pure Gold' | 'Orirock Cube';
+export type IntermediateInventory = Partial<Record<IntermediateProduct, number>>;
+
 export interface LicenseConfig {
   layout: string;
   desc: string;
@@ -38,18 +41,51 @@ export interface LicenseConfig {
     order: string;
     targets: string[];
   };
-  intermediate_inventory?: Record<string, number>;
+  orundum_planning?: {
+    daily_sanity_budget?: number;
+    monthly_card?: boolean;
+  };
+  intermediate_inventory?: IntermediateInventory;
   auto_balance_source?: string;
   [key: string]: unknown;
 }
 
-export type IntermediateProduct = 'Originium Shard' | 'Pure Gold';
 
 export interface IntermediateDepletion {
   product: IntermediateProduct;
   stock: number;
   net_per_day: number;
   days_remaining: number | null;
+}
+
+export interface OrundumEconomy {
+  daily_sanity_budget: number;
+  monthly_card: boolean;
+  total_daily_sanity_budget: number;
+  daily_orirock_supply: number;
+  rock_limited_orundum: number;
+  factory_orundum_capacity: number;
+  trade_orundum_capacity: number;
+  sustainable_orundum: number;
+  short_term_orundum: number;
+  case: 'capacity_limited' | 'budget_limited' | 'inventory_burst';
+  bottleneck: 'orirock_budget' | 'manufacture' | 'trading' | 'inventory';
+  hard_lmd_cost: number;
+  inventory_depletion_days: number | null;
+  shard_inventory_depletion_days: number | null;
+  orirock_inventory_depletion_days: number | null;
+  opportunity_cost_sanity: number;
+  opportunity_lmd_equivalent: number;
+}
+
+export interface OrundumRoi {
+  case: OrundumEconomy['case'];
+  daily_orundum_gain: number;
+  sustainable_orundum_gain: number;
+  monthly_pulls_gain: number;
+  opportunity_cost_delta: number;
+  opportunity_lmd_equivalent_delta: number;
+  inventory_depletion_days_delta: number | null;
 }
 
 export type LegacyPermissionMode = 'basic' | 'premium';
@@ -259,6 +295,7 @@ export interface UpgradeTaskPayload {
   tasks: RawUpgradeTask[];
   baselineScore: number;
   baselineDailySanity?: number;
+  baselineOrundumEconomy?: OrundumEconomy;
   currentFiammettaTargets?: string[];
   potentialFiammettaTargets?: string[];
 }
@@ -324,6 +361,7 @@ export interface OptimizeResult {
   job_recommended?: boolean;
   cross_shift_trace?: Record<string, unknown>[];
   maa_default_comparison?: MaaDefaultComparison;
+  orundum_economy?: OrundumEconomy;
   intermediate_depletion?: IntermediateDepletion[];
   upgrade_suggestions?: RawUpgradeSuggestion[];
   current_result?: OptimizeResult;
@@ -525,6 +563,7 @@ export type RawUpgradeSuggestion = (
 ) & {
   training_cost?: UpgradeTrainingCost;
   roi?: UpgradeSuggestionRoi;
+  orundum_roi?: OrundumRoi;
   impact?: UpgradeImpact;
   partial_outcomes?: UpgradePartialOutcome[];
   partial_outcomes_truncated?: boolean;
@@ -628,6 +667,11 @@ export interface MaaDefaultComparison {
     room_count: number;
   };
   delta: DailyProductionDelta;
+  orundum_economy?: {
+    current: OrundumEconomy;
+    baseline: OrundumEconomy;
+    delta: OrundumRoi;
+  };
   warnings: string[];
 }
 
@@ -682,6 +726,7 @@ export interface UpgradeSuggestion {
   desc?: string;
   training_cost?: UpgradeTrainingCost;
   roi?: UpgradeSuggestionRoi;
+  orundum_roi?: OrundumRoi;
   impact?: UpgradeImpact;
   partial_outcomes?: UpgradePartialOutcome[];
   partial_outcomes_truncated?: boolean;
