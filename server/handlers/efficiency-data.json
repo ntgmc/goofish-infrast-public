@@ -308,6 +308,26 @@
         "星源"
       ]
     },
+    "work_platforms": {
+      "name": "作业平台",
+      "operators": [
+        "Lancet-2",
+        "Castle-3",
+        "THRM-EX",
+        "正义骑士号",
+        "Friston-3",
+        "PhonoR-0",
+        "CONFESS-47",
+        "GALLUS²"
+      ]
+    },
+    "controlled_mood_operators": {
+      "name": "需要控制心情的干员",
+      "description": "不参与自动宿舍恢复，允许按技能需要维持0心情工作。",
+      "operators": [
+        "Lancet-2"
+      ]
+    },
     "pinus_sylvestris": {
       "name": "红松骑士团",
       "operators": [
@@ -3059,10 +3079,14 @@
           "combo": [
             "温蒂/2"
           ],
-          "power": [
-            "承曦格雷伊/2"
-          ],
-          "efficiency": 60,
+          "efficiency": 45,
+          "dynamic_effects": {
+            "type": "facility_count_formula",
+            "base": 0,
+            "per_power_station": 15,
+            "scope": "manufacturing_station",
+            "detail": "仿生海龙：每个有效发电站为当前制造站+15%生产力。"
+          },
           "priority": 5975
         },
         {
@@ -3071,28 +3095,44 @@
             "森蚺/2",
             "清流/1"
           ],
-          "power": [
-            "承曦格雷伊/2"
-          ],
-          "efficiency": 150,
+          "efficiency": 115,
+          "dynamic_effects": {
+            "type": "facility_count_formula",
+            "base": 0,
+            "per_power_station": 25,
+            "per_trading_station": 20,
+            "scope": "manufacturing_station",
+            "detail": "自动化完整三人组：温蒂与森蚺合计每个有效发电站+25%，清流每个贸易站+20%。"
+          },
           "priority": 4975,
-          "note": "自动化完整三人组。"
+          "note": "动态：自动化完整三人组按有效发电站数和贸易站数计算。"
         },
         {
           "combo": [
-            "温蒂/2"
+            "温蒂"
           ],
-          "efficiency": 45,
+          "efficiency": 30,
+          "dynamic_effects": {
+            "type": "facility_count_formula",
+            "base": 0,
+            "per_power_station": 10,
+            "scope": "manufacturing_station",
+            "detail": "自动化·β：每个有效发电站为当前制造站+10%生产力。"
+          },
           "priority": 4500
         },
         {
           "combo": [
             "森蚺/2"
           ],
-          "power": [
-            "承曦格雷伊/2"
-          ],
-          "efficiency": 40,
+          "efficiency": 30,
+          "dynamic_effects": {
+            "type": "facility_count_formula",
+            "base": 0,
+            "per_power_station": 10,
+            "scope": "manufacturing_station",
+            "detail": "自动化·β：每个有效发电站为当前制造站+10%生产力。"
+          },
           "priority": 3975
         },
         {
@@ -3114,32 +3154,33 @@
         },
         {
           "combo": [
-            "森蚺/2"
-          ],
-          "efficiency": 30,
-          "priority": 3000
-        },
-        {
-          "combo": [
             "异客/2",
             "掠风/2"
           ],
-          "power": [
-            "承曦格雷伊/2"
-          ],
-          "efficiency": 20,
+          "efficiency": 15,
           "apply_each": true,
-          "priority": 1975
+          "dynamic_effects": {
+            "type": "facility_count_formula",
+            "base": 0,
+            "per_power_station": 5,
+            "scope": "manufacturing_station",
+            "detail": "自动化·α：每个有效发电站为当前制造站+5%生产力。"
+          },
+          "priority": 1500
         },
         {
           "combo": [
-            "异客/2",
-            "掠风/2",
             "森蚺"
           ],
           "efficiency": 15,
-          "apply_each": true,
-          "priority": 1500
+          "dynamic_effects": {
+            "type": "facility_count_formula",
+            "base": 0,
+            "per_power_station": 5,
+            "scope": "manufacturing_station",
+            "detail": "自动化·α：每个有效发电站为当前制造站+5%生产力。"
+          },
+          "priority": 1499
         }
       ],
       "红松林": {
@@ -4044,6 +4085,21 @@
     },
     "power_station": {
       "单人": [
+        {
+          "combo": [
+            "承曦格雷伊/2"
+          ],
+          "efficiency": 23,
+          "dynamic_facility_count_contributions": {
+            "type": "conditional_power_station_count_bonus",
+            "amount": 1,
+            "group": "work_platforms",
+            "other_rooms_only": true,
+            "zero_mood_is_absent": true,
+            "detail": "晨曦：其他发电站没有仍有心情的作业平台时，有效发电站数+1。"
+          },
+          "priority": 2301
+        },
         {
           "combo": [
             "承曦格雷伊"
@@ -5146,9 +5202,30 @@
       ]
     },
     {
+      "operator": "森蚺/2",
+      "description": "我寻思能行：Lancet-2进驻发电站时，有效发电站数+2。",
+      "priority": 25,
+      "effects": [
+        {
+          "target": "modeled_facility_count",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "eunectes_lancet_power_count"
+        }
+      ],
+      "dynamic_facility_count_contributions": {
+        "type": "power_station_count_bonus",
+        "amount": 2,
+        "required_operators": [
+          "Lancet-2"
+        ],
+        "dependency_scope": "power",
+        "detail": "我寻思能行：森蚺进驻控制中枢且Lancet-2进驻发电站时，有效发电站数+2。"
+      }
+    },
+    {
       "operator": [
         "布丁/1",
-        "森蚺/2",
         "摆渡人",
         "摆渡人/1",
         "妮芙/2",
