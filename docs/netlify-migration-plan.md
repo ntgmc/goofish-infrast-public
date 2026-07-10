@@ -114,8 +114,13 @@ NETLIFY_BLOBS_CONTEXT
 `server {}` 中删除旧的 `/api/` location 并包含它：
 
 ```bash
+sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
 ```
+
+`goofish-rate-limit-zones.conf` 必须从 Nginx 的 `http {}` 上下文加载；如果当前
+安装不在该上下文中自动包含 `/etc/nginx/conf.d/*.conf`，需在 `nginx.conf` 中
+显式包含。
 
 ```nginx
 server {
@@ -137,7 +142,7 @@ server {
 受管片段将普通请求体限制为 256 KiB，并为 `/api/depot-value` 保留 1 MiB
 限额。同步后运行 `sudo nginx -t`，检查成功再执行
 `sudo systemctl reload nginx`。超过代理层限额的请求由 Nginx 直接返回 413，
-响应正文可能使用 Nginx 默认格式。
+登录或管理认证超过 IP 速率时返回 429；响应正文可能使用 Nginx 默认格式。
 
 ## systemd 概念配置
 

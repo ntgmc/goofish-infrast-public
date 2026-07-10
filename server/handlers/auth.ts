@@ -4,6 +4,7 @@ import {
   clearSessionCookie,
   jsonResponse,
   loginUser,
+  normalizeEmail,
   logoutRequest,
   requestPasswordReset,
   registerUser,
@@ -11,6 +12,9 @@ import {
   resetPasswordWithToken,
 } from './user-auth'
 import { recordUsageEvent } from './usage-stats'
+import { reserveUserLoginAttempt } from '../security/auth-rate-limit'
+import { getRequestClientIp } from '../security/client-ip'
+import { PasswordWorkCapacityError } from '../security/password'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -34,8 +38,24 @@ export default async (req: Request): Promise<Response> => {
     if (pathname.endsWith('/login')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       const body = await req.json() as { email?: unknown; password?: unknown }
-      const loggedIn = await loginUser(body.email, body.password)
-      if (!loggedIn.ok) return jsonResponse({ error: loggedIn.message }, loggedIn.status)
+      const rateLimit = reserveUserLoginAttempt(
+        getRequestClientIp(req),
+        normalizeEmail(body.email) ?? 'invalid',
+      )
+      if (!rateLimit.allowed) return loginRateLimitResponse(rateLimit.retryAfterSeconds)
+
+      let loggedIn: Awaited<ReturnType<typeof loginUser>>
+      try {
+        loggedIn = await loginUser(body.email, body.password)
+      } catch (error) {
+        rateLimit.attempt.refund()
+        throw error
+      }
+      if (!loggedIn.ok) {
+        rateLimit.attempt.retainFailure()
+        return jsonResponse({ error: loggedIn.message }, loggedIn.status)
+      }
+      rateLimit.attempt.refund()
       return jsonResponse(await buildAuthPayload(loggedIn.user), 200, { 'Set-Cookie': loggedIn.cookie })
     }
 
@@ -78,10 +98,35 @@ export default async (req: Request): Promise<Response> => {
 
     return jsonResponse({ error: 'API route not found' }, 404)
   } catch (error) {
+    if (error instanceof PasswordWorkCapacityError) return passwordCapacityResponse()
     console.error('auth error:', error)
     if (pathname.endsWith('/register')) await recordRegister('failure', startedAt)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
+  }
+}
+
+function loginRateLimitResponse(retryAfterSeconds: number): Response {
+  return jsonResponse(
+    { error: 'Too many login attempts. Try again later.' },
+    429,
+    rateLimitHeaders(retryAfterSeconds),
+  )
+}
+
+function passwordCapacityResponse(): Response {
+  return jsonResponse(
+    { error: 'Authentication service is busy. Try again shortly.' },
+    429,
+    rateLimitHeaders(1),
+  )
+}
+
+function rateLimitHeaders(retryAfterSeconds: number): Record<string, string> {
+  return {
+    'Retry-After': String(retryAfterSeconds),
+    'Cache-Control': 'no-store',
+    'Access-Control-Expose-Headers': 'Retry-After',
   }
 }
 

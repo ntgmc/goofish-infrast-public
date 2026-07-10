@@ -165,13 +165,18 @@ npm run check:migration
 
 生产环境建议由 Nginx 提供静态文件和 TLS，并使用仓库内受管的
 `deploy/nginx/goofish-api-production.conf` 片段把 `/api/` 反向代理到 Node 后端。
-该片段将普通请求体限制为 256 KiB，并为 `/api/depot-value` 保留 1 MiB 限额。
+该片段将普通请求体限制为 256 KiB，为 `/api/depot-value` 保留 1 MiB 限额，
+并配合 `deploy/nginx/goofish-rate-limit-zones.conf` 限制登录与管理认证洪泛。
 
-先安装或同步片段：
+先把 zone 配置安装到 Nginx 的 `http {}` 上下文，再安装 server 片段：
 
 ```bash
+sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
 ```
+
+如果当前 Nginx 不在 `http {}` 中加载 `/etc/nginx/conf.d/*.conf`，需要在
+`nginx.conf` 的 `http {}` 中显式包含该 zone 文件。
 
 然后在现有 `server {}` 中删除旧的 `/api/` location，并包含该片段：
 
@@ -190,7 +195,8 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-超过代理层限额时由 Nginx 直接返回 413，响应正文可能使用 Nginx 默认格式。
+超过请求体限额时由 Nginx 直接返回 413；登录或管理认证请求超过 IP 速率时
+返回 429。代理层响应正文可能使用 Nginx 默认格式。
 
 ## 环境变量
 

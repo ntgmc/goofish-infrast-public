@@ -117,9 +117,8 @@ async function handlePublicPost(req: Request): Promise<Response> {
 }
 
 async function handleAdminGet(req: Request): Promise<Response> {
-  if (!(await authenticateAdminRequest(req))) {
-    return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-  }
+  const authentication = await authenticateAdminRequest(req)
+  if (!authentication.ok) return authentication.response
 
   const store = await getUsageEventStore()
   const dateRange = parseDateRange(new URL(req.url))

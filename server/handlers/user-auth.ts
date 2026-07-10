@@ -1,4 +1,4 @@
-import { createHash, pbkdf2Sync, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Announcement, AuthSuccessResponse, AuthUser, PermissionMode, UserGameAccount } from '../../src/lib/types'
 import {
   deleteSessionByTokenHash,
@@ -31,6 +31,7 @@ import {
   type UserSessionRecord,
 } from '../storage/user-store'
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
+import { createPasswordHash, verifyPasswordHash } from '../security/password'
 import { sendPasswordResetEmail } from './email'
 import {
   getCdkRecordStore,
@@ -43,7 +44,6 @@ import {
 
 const SESSION_COOKIE = 'maa_session'
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
-const PASSWORD_ITERATIONS = 120_000
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ANNOUNCEMENT_KEY = 'current.json'
 const PASSWORD_RESET_DEFAULT_TTL_MINUTES = 30
@@ -102,14 +102,14 @@ export async function registerUser(
   if (existing) return { ok: false, status: 409, message: 'Email is already registered.' }
 
   const now = new Date().toISOString()
-  const passwordHash = hashPassword(passwordCheck.password)
+  const passwordHash = await createPasswordHash(passwordCheck.password)
   const user: UserAccountRecord = {
     version: 1,
     id: randomUUID(),
     email,
-    password_hash: passwordHash.hash,
+    password_hash: passwordHash.password_hash,
     salt: passwordHash.salt,
-    iterations: PASSWORD_ITERATIONS,
+    iterations: passwordHash.iterations,
     permission: 'growth',
     status: 'active',
     cdk_key: null,
@@ -158,7 +158,7 @@ export async function loginUser(
   if (typeof passwordValue !== 'string') return { ok: false, status: 400, message: 'Password must be a string.' }
 
   const user = await getUserByEmail(email)
-  if (!user || !verifyPassword(passwordValue, user)) {
+  if (!user || !(await verifyPasswordHash(passwordValue, user))) {
     return { ok: false, status: 401, message: 'Invalid email or password.' }
   }
   if (user.status !== 'active') {
@@ -176,7 +176,7 @@ export async function changeUserPassword(
   newPasswordValue: unknown,
   keepTokenHash: string,
 ): Promise<{ ok: true; user: UserAccountRecord } | { ok: false; status: number; message: string }> {
-  if (typeof oldPasswordValue !== 'string' || !verifyPassword(oldPasswordValue, user)) {
+  if (typeof oldPasswordValue !== 'string' || !(await verifyPasswordHash(oldPasswordValue, user))) {
     return { ok: false, status: 401, message: "Invalid license signature." };
   }
   const nextPassword = validatePassword(newPasswordValue)
@@ -518,30 +518,16 @@ export function clearSessionCookie(): string {
 }
 
 async function setUserPassword(user: UserAccountRecord, password: string): Promise<UserAccountRecord> {
-  const passwordHash = hashPassword(password)
+  const passwordHash = await createPasswordHash(password)
   const updated: UserAccountRecord = {
     ...user,
-    password_hash: passwordHash.hash,
+    password_hash: passwordHash.password_hash,
     salt: passwordHash.salt,
-    iterations: PASSWORD_ITERATIONS,
+    iterations: passwordHash.iterations,
     updated_at: new Date().toISOString(),
   }
   await saveUserAccount(updated)
   return updated
-}
-
-function hashPassword(password: string): { hash: string; salt: string } {
-  const salt = randomBytes(16).toString('hex')
-  return {
-    salt,
-    hash: pbkdf2Sync(password, salt, PASSWORD_ITERATIONS, 32, 'sha256').toString('hex'),
-  }
-}
-
-function verifyPassword(password: string, user: UserAccountRecord): boolean {
-  const actual = Buffer.from(pbkdf2Sync(password, user.salt, user.iterations, 32, 'sha256').toString('hex'), 'hex')
-  const expected = Buffer.from(user.password_hash, 'hex')
-  return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
 async function createSession(userId: string): Promise<{ cookie: string }> {
