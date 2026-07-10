@@ -18,6 +18,8 @@ try {
   assertSlidingWindowRateLimits(rateLimitModule)
   assertClientIpResolution(clientIpModule)
   await assertUserPasswordMigration(passwordModule)
+  await assertUserSessionTouchAndAuthPayload()
+  await assertUserSessionStorage()
   await assertUserLoginRateLimits()
   await assertAdminAuthenticationRateLimits()
   await assertNoBrowserReadableAdminPasswords()
@@ -221,6 +223,188 @@ async function assertUserPasswordMigration(passwordModule) {
     false,
     'user upgrade warnings should not include passwords',
   )
+}
+
+async function assertUserSessionTouchAndAuthPayload() {
+  const userAuth = await bundleInlineModule(
+    "export { buildAuthPayload, requireUserSession, USER_SESSION_TOUCH_INTERVAL_MS } from './server/handlers/user-auth.ts'",
+    'user-session-auth',
+    [userSessionAuthPlugin()],
+  )
+  const now = new Date('2026-07-10T12:00:00.000Z')
+  const request = new Request('http://local/api/optimize/job/test', {
+    headers: { Cookie: 'maa_session=test-session-token' },
+  })
+  const activeUser = {
+    version: 1,
+    id: 'user-1',
+    email: 'session@example.com',
+    password_hash: 'unused',
+    salt: 'unused',
+    iterations: 2,
+    password_algorithm: 'argon2id',
+    permission: 'growth',
+    status: 'active',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  }
+  const sessionAt = (lastSeenAt, expiresAt = '2026-08-10T12:00:00.000Z') => ({
+    version: 1,
+    id: 'session-1',
+    user_id: activeUser.id,
+    token_hash: 'stored-token-hash',
+    created_at: '2026-07-01T00:00:00.000Z',
+    last_seen_at: lastSeenAt,
+    expires_at: expiresAt,
+  })
+  const authenticateAt = async (session, user = activeUser) => {
+    globalThis.__authSecurityUserSession = session
+    globalThis.__authSecuritySessionUser = user
+    globalThis.__authSecuritySessionTouches = []
+    globalThis.__authSecuritySessionDeletes = []
+    globalThis.__authSecurityProfiles = []
+    return userAuth.requireUserSession(request, now)
+  }
+
+  const fresh = sessionAt(new Date(now.getTime() - userAuth.USER_SESSION_TOUCH_INTERVAL_MS + 1).toISOString())
+  assert(await authenticateAt(fresh), 'fresh user session should authenticate')
+  assert.equal(globalThis.__authSecuritySessionTouches.length, 0, 'fresh user session should not be touched')
+
+  const boundary = sessionAt(new Date(now.getTime() - userAuth.USER_SESSION_TOUCH_INTERVAL_MS).toISOString())
+  assert(await authenticateAt(boundary), 'boundary user session should authenticate')
+  assert.equal(globalThis.__authSecuritySessionTouches.length, 1, 'touch interval boundary should be inclusive')
+  assert.equal(globalThis.__authSecuritySessionTouches[0].now, now.toISOString())
+  assert.equal(globalThis.__authSecuritySessionTouches[0].cutoff, boundary.last_seen_at)
+
+  const stale = sessionAt(new Date(now.getTime() - userAuth.USER_SESSION_TOUCH_INTERVAL_MS - 1).toISOString())
+  assert(await authenticateAt(stale), 'stale user session should authenticate')
+  assert.equal(globalThis.__authSecuritySessionTouches.length, 1, 'stale user session should be touched once')
+
+  assert(await authenticateAt(sessionAt('not-a-date')), 'session with invalid last_seen_at should authenticate')
+  assert.equal(globalThis.__authSecuritySessionTouches.length, 1, 'invalid last_seen_at should be repaired')
+
+  assert(await authenticateAt(sessionAt('2026-07-10T12:01:00.000Z')), 'future last_seen_at session should authenticate')
+  assert.equal(globalThis.__authSecuritySessionTouches.length, 0, 'future last_seen_at should not be touched')
+
+  assert.equal(await authenticateAt(sessionAt(stale.last_seen_at, now.toISOString())), null)
+  assert.equal(globalThis.__authSecuritySessionDeletes.length, 1, 'expired session should be deleted')
+  assert.equal(globalThis.__authSecuritySessionTouches.length, 0, 'expired session should not be touched')
+
+  assert.equal(await authenticateAt(stale, null), null)
+  assert.equal(globalThis.__authSecuritySessionDeletes.length, 1, 'session for missing user should be deleted')
+  assert.equal(globalThis.__authSecuritySessionTouches.length, 0)
+
+  for (const status of ['frozen', 'revoked']) {
+    assert.equal(await authenticateAt(stale, { ...activeUser, status }), null)
+    assert.equal(globalThis.__authSecuritySessionDeletes.length, 1, `${status} user session should be deleted`)
+    assert.equal(globalThis.__authSecuritySessionTouches.length, 0, `${status} user session should not be touched`)
+  }
+
+  const profiles = [
+    { id: 'profile-2', user_id: activeUser.id, kind: 'cdk', display_name: 'Second' },
+    { id: 'profile-1', user_id: activeUser.id, kind: 'cdk', display_name: 'First' },
+  ]
+  globalThis.__authSecurityProfiles = profiles
+  globalThis.__authSecurityWorkspaces = new Map([
+    ['profile-1', { profile_id: 'profile-1', updated_at: '2026-07-10T11:00:00.000Z' }],
+  ])
+  globalThis.__authSecurityWorkspaceBatchCalls = []
+  globalThis.__authSecurityWorkspaceSingleCalls = 0
+  const payload = await userAuth.buildAuthPayload(activeUser, 'profile-1')
+  assert.deepEqual(globalThis.__authSecurityWorkspaceBatchCalls, [['profile-2', 'profile-1']])
+  assert.equal(globalThis.__authSecurityWorkspaceSingleCalls, 0, 'auth payload should not read workspaces individually')
+  assert.deepEqual(payload.profiles.map((profile) => profile.id), ['profile-2', 'profile-1'])
+  assert.equal(payload.profiles[0].workspace_profile_id, null)
+  assert.equal(payload.profiles[1].workspace_profile_id, 'profile-1')
+  assert.equal(payload.active_profile.id, 'profile-1')
+  assert.equal(payload.active_profile.workspace_profile_id, 'profile-1')
+  assert.equal(payload.workspace.profile_id, 'profile-1')
+
+  globalThis.__authSecurityWorkspaceBatchCalls = []
+  const fallbackPayload = await userAuth.buildAuthPayload(activeUser, 'missing-profile')
+  assert.deepEqual(globalThis.__authSecurityWorkspaceBatchCalls, [['profile-2', 'profile-1']])
+  assert.equal(fallbackPayload.active_profile.id, 'profile-2')
+  assert.equal(fallbackPayload.workspace, null)
+
+  globalThis.__authSecurityProfiles = [profiles[1]]
+  globalThis.__authSecurityWorkspaceBatchCalls = []
+  const singleProfilePayload = await userAuth.buildAuthPayload(activeUser)
+  assert.deepEqual(globalThis.__authSecurityWorkspaceBatchCalls, [['profile-1']])
+  assert.deepEqual(singleProfilePayload.profiles.map((profile) => profile.id), ['profile-1'])
+  assert.equal(singleProfilePayload.active_profile.id, 'profile-1')
+  assert.equal(singleProfilePayload.workspace.profile_id, 'profile-1')
+
+  globalThis.__authSecurityProfiles = []
+  globalThis.__authSecurityWorkspaceBatchCalls = []
+  const emptyPayload = await userAuth.buildAuthPayload(activeUser, 'missing-profile')
+  assert.deepEqual(globalThis.__authSecurityWorkspaceBatchCalls, [[]])
+  assert.deepEqual(emptyPayload.profiles, [])
+  assert.equal(emptyPayload.active_profile, null)
+  assert.equal(emptyPayload.workspace, null)
+}
+
+async function assertUserSessionStorage() {
+  globalThis.__authSecurityStorageQueries = []
+  globalThis.__authSecurityStoredLastSeenAt = '2026-07-10T11:49:59.000Z'
+  globalThis.__authSecurityStoredSession = null
+  globalThis.__authSecurityStoredWorkspaces = new Map()
+  const userStore = await bundleInlineModule(
+    "export { listProfileWorkspaces, touchSession } from './server/storage/user-store.ts'",
+    'user-session-storage',
+    [userSessionStoragePlugin()],
+  )
+  const now = new Date('2026-07-10T12:00:00.000Z')
+  const cutoff = new Date('2026-07-10T11:50:00.000Z')
+  const session = {
+    version: 1,
+    id: 'session-1',
+    user_id: 'user-1',
+    token_hash: 'stored-token-hash',
+    created_at: '2026-07-01T00:00:00.000Z',
+    last_seen_at: globalThis.__authSecurityStoredLastSeenAt,
+    expires_at: '2026-08-01T00:00:00.000Z',
+  }
+  const touches = await Promise.all([
+    userStore.touchSession(session, now, cutoff),
+    userStore.touchSession(session, now, cutoff),
+    userStore.touchSession(session, now, cutoff),
+  ])
+  assert.deepEqual(touches.sort(), [false, false, true], 'concurrent stale touches should produce one physical update')
+  assert.equal(globalThis.__authSecurityStoredLastSeenAt, now.toISOString())
+  assert.equal(globalThis.__authSecurityStoredSession.last_seen_at, now.toISOString())
+  const updateQueries = globalThis.__authSecurityStorageQueries.filter(({ text }) => /update user_sessions/i.test(text))
+  assert.equal(updateQueries.length, 3)
+  assert(updateQueries.every(({ text }) => /last_seen_at <= \$5/i.test(text)))
+  assert(updateQueries.every(({ text }) => !/insert into user_sessions/i.test(text)))
+
+  const workspaceRecord = (profileId, updatedAt) => ({
+    version: 1,
+    profile_id: profileId,
+    operators: null,
+    config: null,
+    elite_overrides: {},
+    last_result: null,
+    updated_at: updatedAt,
+  })
+  globalThis.__authSecurityStoredWorkspaces = new Map([
+    ['profile-1', workspaceRecord('profile-1', '2026-07-10T10:00:00.000Z')],
+    ['profile-2', workspaceRecord('profile-2', '2026-07-10T11:00:00.000Z')],
+  ])
+  const beforeEmptyBatch = globalThis.__authSecurityStorageQueries.length
+  assert.equal((await userStore.listProfileWorkspaces([])).size, 0)
+  assert.equal(globalThis.__authSecurityStorageQueries.length, beforeEmptyBatch, 'empty profile batch should not query')
+
+  const workspaces = await userStore.listProfileWorkspaces(['profile-1', 'missing', 'profile-2'])
+  const batchQueries = globalThis.__authSecurityStorageQueries.filter(({ text }) => /from user_profile_workspaces/i.test(text))
+  assert.equal(batchQueries.length, 1)
+  assert(/any\(\$1::text\[\]\)/i.test(batchQueries[0].text))
+  assert.deepEqual([...workspaces.keys()].sort(), ['profile-1', 'profile-2'])
+  assert.equal(workspaces.get('profile-1').profile_id, 'profile-1')
+  assert.deepEqual(workspaces.get('profile-1').saved_configs, [])
+  assert.deepEqual(workspaces.get('profile-2').result_history, [])
 }
 
 function legacyUserRecord(email, password) {
@@ -798,6 +982,49 @@ function userAuthMigrationPlugin() {
   }
 }
 
+function userSessionAuthPlugin() {
+  return {
+    name: 'auth-security-user-session-mocks',
+    setup(build) {
+      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'email']) {
+        build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
+          path: moduleName,
+          namespace: 'auth-security-user-session',
+        }))
+      }
+      build.onLoad({ filter: /.*/, namespace: 'auth-security-user-session' }, (args) => {
+        const mocks = {
+          'user-store': userSessionAuthStoreMock(),
+          'announcement-store': announcementStoreMock(),
+          'license-utils': userLicenseUtilsMock(),
+          email: emailMock(),
+        }
+        return { contents: mocks[args.path], loader: 'js' }
+      })
+    },
+  }
+}
+
+function userSessionStoragePlugin() {
+  return {
+    name: 'auth-security-user-session-storage-mocks',
+    setup(build) {
+      build.onResolve({ filter: /(^|[\\/])postgres(\.ts)?$/ }, () => ({
+        path: 'postgres',
+        namespace: 'auth-security-user-session-storage',
+      }))
+      build.onResolve({ filter: /(^|[\\/])schema(\.ts)?$/ }, () => ({
+        path: 'schema',
+        namespace: 'auth-security-user-session-storage',
+      }))
+      build.onLoad({ filter: /.*/, namespace: 'auth-security-user-session-storage' }, (args) => ({
+        contents: args.path === 'postgres' ? userSessionPostgresMock() : 'export async function ensureDatabaseSchema() {}',
+        loader: 'js',
+      }))
+    },
+  }
+}
+
 function userAuthMock() {
   return `
     export function jsonResponse(body, status = 200, headers = {}) {
@@ -948,6 +1175,7 @@ function userStoreMigrationMock() {
     export async function getRecentPasswordResetTokenForUser() { return null }
     export async function getSessionByTokenHash() { return null }
     export async function getUserById() { return null }
+    export async function listProfileWorkspaces() { return new Map() }
     export async function listProfilesForUser() { return [] }
     export async function markPasswordResetTokenUsed() {}
     export async function markAnnouncementRead() {}
@@ -959,6 +1187,90 @@ function userStoreMigrationMock() {
     export function toPublicProfile(value) { return value }
     export function toPublicWorkspace(value) { return value }
     export async function touchSession() {}
+  `
+}
+
+function userSessionAuthStoreMock() {
+  return `
+    export async function getSessionByTokenHash() {
+      return globalThis.__authSecurityUserSession ?? null
+    }
+    export async function getUserById() {
+      return globalThis.__authSecuritySessionUser ?? null
+    }
+    export async function deleteSessionByTokenHash(tokenHash) {
+      globalThis.__authSecuritySessionDeletes.push(tokenHash)
+    }
+    export async function touchSession(session, now, cutoff) {
+      globalThis.__authSecuritySessionTouches.push({
+        session,
+        now: now.toISOString(),
+        cutoff: cutoff.toISOString(),
+      })
+      return true
+    }
+    export async function migrateLegacyUserIfNeeded() {
+      return globalThis.__authSecurityProfiles ?? []
+    }
+    export async function listProfileWorkspaces(profileIds) {
+      globalThis.__authSecurityWorkspaceBatchCalls.push([...profileIds])
+      return new Map(globalThis.__authSecurityWorkspaces ?? [])
+    }
+    export async function getProfileWorkspace() {
+      globalThis.__authSecurityWorkspaceSingleCalls += 1
+      return null
+    }
+    export function toPublicProfile(profile, workspace) {
+      return { ...profile, workspace_profile_id: workspace?.profile_id ?? null }
+    }
+    export function toPublicWorkspace(workspace) { return workspace }
+    export async function getAnnouncementReads() { return [] }
+    export async function deleteSessionsForUser() {}
+    export async function deleteUserAccount() {}
+    export function emptyWorkspace() { return null }
+    export async function getPasswordResetTokenByHash() { return null }
+    export async function getProfileForUser() { return null }
+    export async function getRecentPasswordResetTokenForUser() { return null }
+    export async function getUserByEmail() { return null }
+    export async function listProfilesForUser() { return [] }
+    export async function markPasswordResetTokenUsed() {}
+    export async function markAnnouncementRead() {}
+    export async function savePasswordResetToken() {}
+    export async function saveProfileWorkspace() {}
+    export async function saveUserAccount() {}
+    export async function saveUserProfile() {}
+    export async function saveUserSession() {}
+    export function isFreePreviewProfile() { return false }
+    export async function upgradeUserPasswordHash() { return null }
+  `
+}
+
+function userSessionPostgresMock() {
+  return `
+    export function getPool() { throw new Error('getPool should not be used by these checks') }
+    export async function query(text, values = []) {
+      globalThis.__authSecurityStorageQueries.push({ text, values })
+      if (/update user_sessions/i.test(text)) {
+        const cutoff = Date.parse(values[4])
+        if (Date.parse(globalThis.__authSecurityStoredLastSeenAt) <= cutoff) {
+          globalThis.__authSecurityStoredLastSeenAt = values[2]
+          globalThis.__authSecurityStoredSession = JSON.parse(values[3])
+          return { rows: [], rowCount: 1 }
+        }
+        return { rows: [], rowCount: 0 }
+      }
+      if (/from user_profile_workspaces/i.test(text) && text.includes('where profile_id = any($1::text[])')) {
+        const rows = [...values[0]]
+          .reverse()
+          .filter((profileId) => globalThis.__authSecurityStoredWorkspaces.has(profileId))
+          .map((profileId) => ({
+            profile_id: profileId,
+            record_json: globalThis.__authSecurityStoredWorkspaces.get(profileId),
+          }))
+        return { rows, rowCount: rows.length }
+      }
+      throw new Error('Unexpected query in user session storage check: ' + text)
+    }
   `
 }
 
