@@ -1,8 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import type { Announcement } from '../lib/types'
 import { apiVoid } from '../lib/api-client'
 
 const READ_PREFIX = 'maa-announcement-read:'
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
 
 interface Props {
   announcements: Announcement[];
@@ -14,12 +22,49 @@ export default function AnnouncementPopup({ announcements }: Props) {
     [announcements],
   )
   const [queue, setQueue] = useState<Announcement[]>([])
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const initialFocusRef = useRef<HTMLButtonElement>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(null)
+  const dismissedRef = useRef(new Set<string>())
 
   useEffect(() => {
-    setQueue(candidates.filter((item) => !isAnnouncementRead(item)))
+    setQueue(candidates.filter((item) => (
+      !isAnnouncementRead(item) && !dismissedRef.current.has(announcementVersionKey(item))
+    )))
   }, [candidates])
 
   const current = queue[0]
+
+  useEffect(() => {
+    if (!current) return
+
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    const activeElement = document.activeElement
+    restoreFocusRef.current = activeElement instanceof HTMLElement && activeElement !== document.body
+      ? activeElement
+      : null
+
+    const previousOverflow = document.documentElement.style.overflow
+    document.documentElement.style.overflow = 'hidden'
+    if (!dialog.open) dialog.showModal()
+    initialFocusRef.current?.focus()
+
+    return () => {
+      if (dialog.open) dialog.close()
+      document.documentElement.style.overflow = previousOverflow
+
+      const restoreTarget = restoreFocusRef.current
+      if (restoreTarget?.isConnected) {
+        restoreTarget.focus()
+      } else {
+        focusFirstAppControl()
+      }
+      restoreFocusRef.current = null
+    }
+  }, [Boolean(current)])
+
   if (!current) return null
 
   const markCurrentRead = () => {
@@ -28,12 +73,26 @@ export default function AnnouncementPopup({ announcements }: Props) {
     setQueue((items) => items.slice(1))
   }
 
+  const dismissPopupSession = () => {
+    queue.forEach((item) => dismissedRef.current.add(announcementVersionKey(item)))
+    setQueue([])
+  }
+
+  const handleCancel = (event: SyntheticEvent<HTMLDialogElement>) => {
+    event.preventDefault()
+    dismissPopupSession()
+  }
+
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink-primary/45 px-4 py-8">
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="announcement-popup-title"
+      aria-describedby="announcement-popup-body"
+      aria-modal="true"
+      onCancel={handleCancel}
+      className="m-auto max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto border-0 bg-transparent p-0 text-left backdrop:bg-ink-primary/45"
+    >
       <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="announcement-popup-title"
         className="w-full max-w-lg rounded-xl bg-surface-0 p-5 text-left shadow-xl"
       >
         <div className="flex items-start justify-between gap-4">
@@ -45,24 +104,43 @@ export default function AnnouncementPopup({ announcements }: Props) {
           </div>
           <a
             href="/announcements"
-            className="shrink-0 text-sm font-semibold text-brand-600 underline-offset-4 hover:underline"
+            className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-brand-600 underline-offset-4 hover:underline"
           >
             历史
           </a>
         </div>
-        <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{current.body}</p>
+        <p id="announcement-popup-body" className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{current.body}</p>
         <div className="mt-6 flex justify-end">
           <button
+            ref={initialFocusRef}
             type="button"
             onClick={markCurrentRead}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
+            className="min-h-11 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
           >
             已读
           </button>
         </div>
       </section>
-    </div>
+    </dialog>
   )
+}
+
+function announcementVersionKey(announcement: Announcement): string {
+  return `${announcement.id}:${announcement.updated_at}`
+}
+
+function focusFirstAppControl(): void {
+  const root = document.getElementById('root')
+  const target = Array.from(root?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [])
+    .find(isAvailableFocusTarget)
+  target?.focus()
+}
+
+function isAvailableFocusTarget(element: HTMLElement): boolean {
+  if (element.closest('[hidden], [aria-hidden="true"], [inert]')) return false
+  if (element.closest('details:not([open])')) return false
+  const style = window.getComputedStyle(element)
+  return style.display !== 'none' && style.visibility !== 'hidden'
 }
 
 function isAnnouncementRead(announcement: Announcement): boolean {
