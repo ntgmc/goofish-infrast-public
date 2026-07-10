@@ -19,8 +19,10 @@ import {
   getUserById,
   getProfileById,
   getProfileWorkspace,
+  isFreePreviewProfile,
   listProfilesForUser,
   listUserAccounts,
+  normalizeProfileKind,
   saveProfileWorkspace,
   saveUserProfile,
   saveUserAccount,
@@ -71,15 +73,13 @@ export default async (req: Request): Promise<Response> => {
         if (!user) return jsonResponse({ error: '用户不存在。' }, 404)
         return jsonResponse({ detail: await buildAdminUserDetail(user) })
       }
-      const appUsers = await Promise.all((await listUserAccounts()).map(async (user) => ({
-        id: user.id,
-        email: user.email,
-        status: user.status,
-        permission: user.permission,
-        profile_count: (await listProfilesForUser(user.id)).length,
-        created_at: user.created_at,
-        updated_at: user.updated_at,
-      })))
+      const appUsers = await Promise.all((await listUserAccounts()).map(async (user) => {
+        const profiles = await listProfilesForUser(user.id)
+        return {
+          ...toAdminAppUser(user, profiles),
+          profile_count: profiles.length,
+        }
+      }))
       return jsonResponse({ users: await listAdminUsers(), app_users: appUsers })
     }
 
@@ -109,6 +109,7 @@ export default async (req: Request): Promise<Response> => {
         && body.action !== 'update_profile'
         && body.action !== 'set_profile_status'
         && body.action !== 'set_profile_permission'
+        && body.action !== 'upgrade_preview_profile'
         && body.action !== 'clear_profile_skland_binding'
         && body.action !== 'clear_profile_workspace'
       ) {
@@ -121,6 +122,7 @@ export default async (req: Request): Promise<Response> => {
         body.action === 'update_profile'
         || body.action === 'set_profile_status'
         || body.action === 'set_profile_permission'
+        || body.action === 'upgrade_preview_profile'
         || body.action === 'clear_profile_skland_binding'
         || body.action === 'clear_profile_workspace'
       ) {
@@ -145,6 +147,22 @@ export default async (req: Request): Promise<Response> => {
           if (!permission) return jsonResponse({ error: '档案权限必须是 recommended、growth、advanced 或 ultimate。' }, 400)
           const updated = await saveProfilePatch(profile, { permission })
           await syncLinkedCdkPermission(updated, permission)
+          return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(updated) })
+        }
+
+        if (body.action === 'upgrade_preview_profile') {
+          if (!isFreePreviewProfile(profile)) {
+            return jsonResponse({ error: '只有免费预览档案可以免 CDK 升级。' }, 409)
+          }
+          const permission = normalizeProductPermission(body.permission)
+          if (!permission) return jsonResponse({ error: '档案权限必须是 recommended、growth、advanced 或 ultimate。' }, 400)
+          const updated = await saveProfilePatch(profile, {
+            kind: 'cdk',
+            permission,
+            cdk_key: null,
+            cdk_code_hash: null,
+            cdk_order_hash: null,
+          })
           return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(updated) })
         }
 
@@ -270,7 +288,7 @@ async function syncLinkedCdkPermission(profile: UserGameAccountRecord, permissio
 async function buildAdminUserDetail(user: UserAccountRecord) {
   const profiles = await listProfilesForUser(user.id)
   return {
-    user: { ...toAdminAppUser(user), profile_count: profiles.length },
+    user: { ...toAdminAppUser(user, profiles), profile_count: profiles.length },
     profiles: await Promise.all(profiles.map((profile) => buildAdminProfileSummary(profile))),
   }
 }
@@ -385,13 +403,17 @@ function summarizeCdkForProfile(record: CdkRecord | null) {
   }
 }
 
-function toAdminAppUser(user: UserAccountRecord) {
+function toAdminAppUser(user: UserAccountRecord, profiles: UserGameAccountRecord[] = []) {
   return {
     id: user.id,
     email: user.email,
     permission: user.permission,
     status: user.status,
     cdk_order_hash: user.cdk_order_hash,
+    profile_access: profiles.map((profile) => ({
+      kind: normalizeProfileKind(profile),
+      permission: profile.permission,
+    })),
     created_at: user.created_at,
     updated_at: user.updated_at,
   }

@@ -248,8 +248,14 @@ interface AppUserSummary {
   status: AppUserStatus;
   cdk_order_hash?: string | null;
   profile_count: number;
+  profile_access: AdminProfileAccessSummary[];
   created_at: string;
   updated_at: string;
+}
+
+interface AdminProfileAccessSummary {
+  kind: UserGameAccountKind;
+  permission: Permission;
 }
 
 interface AdminWorkspaceSummary {
@@ -285,7 +291,7 @@ interface AdminLinkedCdkSummary {
 interface AdminProfileSummary {
   id: string;
   user_id: string;
-  kind?: string;
+  kind: UserGameAccountKind;
   display_name: string;
   note: string;
   permission: Permission;
@@ -894,7 +900,7 @@ const summary = useMemo(
 
   const patchUserProfile = async (
     profile: AdminProfileSummary,
-    action: 'update_profile' | 'set_profile_status' | 'set_profile_permission' | 'clear_profile_skland_binding' | 'clear_profile_workspace',
+    action: 'update_profile' | 'set_profile_status' | 'set_profile_permission' | 'upgrade_preview_profile' | 'clear_profile_skland_binding' | 'clear_profile_workspace',
     extraBody: Record<string, unknown> = {},
   ) => {
     if (!selectedUserDetail) return
@@ -961,6 +967,22 @@ const summary = useMemo(
       return
     }
     await patchUserProfile(profile, 'set_profile_permission', { permission: permissionValue })
+  }
+
+  const handleUpgradePreviewProfile = async (profile: AdminProfileSummary) => {
+    const nextPermission = window.prompt(
+      `请选择免 CDK 升级后的档案权限：${cdkProductPermissions.join(' / ')}`,
+      'growth',
+    )
+    if (nextPermission === null) return
+    const permissionValue = normalizeProductPermission(nextPermission.trim())
+    if (!permissionValue) {
+      setNotice(null)
+      setError('档案权限必须是 recommended、growth、advanced 或 ultimate。')
+      return
+    }
+    if (!window.confirm(`确认将档案「${profile.display_name}」免 CDK 升级为${permissionLabels[permissionValue]}？此操作不可撤销。`)) return
+    await patchUserProfile(profile, 'upgrade_preview_profile', { permission: permissionValue })
   }
 
   const handleClearProfileSklandBinding = async (profile: AdminProfileSummary) => {
@@ -1515,7 +1537,7 @@ const summary = useMemo(
                         <tr key={item.id} className="hover:bg-surface-2/50">
                           <td className="px-4 py-4 font-medium text-ink-primary">{item.email}</td>
                           <td className="px-4 py-4"><UserStatusPill status={item.status} /></td>
-                          <td className="px-4 py-4 text-ink-secondary">{item.permission ? permissionLabels[item.permission] : '-'}</td>
+                          <td className="px-4 py-4 text-ink-secondary">{formatAdminProfileAccess(item.profile_access)}</td>
                           <td className="px-4 py-4 text-ink-secondary">{item.profile_count}</td>
                           <td className="px-4 py-4 text-xs text-ink-muted">{formatDate(item.updated_at)}</td>
                           <td className="px-4 py-4">
@@ -1546,6 +1568,7 @@ const summary = useMemo(
                   onUpdateProfile={handleUpdateProfile}
                   onSetProfileStatus={handleSetProfileStatus}
                   onSetProfilePermission={handleSetProfilePermission}
+                  onUpgradePreviewProfile={handleUpgradePreviewProfile}
                   onClearSklandBinding={handleClearProfileSklandBinding}
                   onClearWorkspace={handleClearProfileWorkspace}
                   onViewOperators={handleViewProfileOperators}
@@ -1572,6 +1595,7 @@ function UserDetailPanel({
   onUpdateProfile,
   onSetProfileStatus,
   onSetProfilePermission,
+  onUpgradePreviewProfile,
   onClearSklandBinding,
   onClearWorkspace,
   onViewOperators,
@@ -1588,6 +1612,7 @@ function UserDetailPanel({
   onUpdateProfile: (profile: AdminProfileSummary) => Promise<void>;
   onSetProfileStatus: (profile: AdminProfileSummary) => Promise<void>;
   onSetProfilePermission: (profile: AdminProfileSummary) => Promise<void>;
+  onUpgradePreviewProfile: (profile: AdminProfileSummary) => Promise<void>;
   onClearSklandBinding: (profile: AdminProfileSummary) => Promise<void>;
   onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
   onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
@@ -1604,7 +1629,7 @@ function UserDetailPanel({
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="break-all text-lg font-semibold text-ink-primary">{user.email}</h2>
             <UserStatusPill status={user.status} />
-            {user.permission && <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{permissionLabels[user.permission]}</span>}
+            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{formatAdminProfileAccess(user.profile_access)}</span>
           </div>
           <p className="mt-2 break-all text-sm text-ink-muted">用户 ID：{user.id}</p>
         </div>
@@ -1638,6 +1663,7 @@ function UserDetailPanel({
               onUpdateProfile={onUpdateProfile}
               onSetProfileStatus={onSetProfileStatus}
               onSetProfilePermission={onSetProfilePermission}
+              onUpgradePreviewProfile={onUpgradePreviewProfile}
               onClearSklandBinding={onClearSklandBinding}
               onClearWorkspace={onClearWorkspace}
               onViewOperators={onViewOperators}
@@ -1658,6 +1684,7 @@ function ProfileDetailCard({
   onUpdateProfile,
   onSetProfileStatus,
   onSetProfilePermission,
+  onUpgradePreviewProfile,
   onClearSklandBinding,
   onClearWorkspace,
   onViewOperators,
@@ -1670,6 +1697,7 @@ function ProfileDetailCard({
   onUpdateProfile: (profile: AdminProfileSummary) => Promise<void>;
   onSetProfileStatus: (profile: AdminProfileSummary) => Promise<void>;
   onSetProfilePermission: (profile: AdminProfileSummary) => Promise<void>;
+  onUpgradePreviewProfile: (profile: AdminProfileSummary) => Promise<void>;
   onClearSklandBinding: (profile: AdminProfileSummary) => Promise<void>;
   onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
   onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
@@ -1688,7 +1716,7 @@ function ProfileDetailCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-semibold text-ink-primary">{profile.display_name || '账号档案'}</h3>
             <UserStatusPill status={profile.status} />
-            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{permissionLabels[profile.permission]}</span>
+            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{getAdminProfileAccessLabel(profile)}</span>
           </div>
           <p className="mt-2 break-all text-xs text-ink-muted">档案 ID：{profile.id}</p>
           {profile.note && <p className="mt-2 text-sm text-ink-secondary">{profile.note}</p>}
@@ -1697,6 +1725,7 @@ function ProfileDetailCard({
           <SmallButton onClick={() => void onUpdateProfile(profile)} loading={busyAction === `profile:update_profile:${profile.id}`}>改名称</SmallButton>
           <SmallButton onClick={() => void onSetProfileStatus(profile)} loading={busyAction === `profile:set_profile_status:${profile.id}`}>改状态</SmallButton>
           <SmallButton onClick={() => void onSetProfilePermission(profile)} loading={busyAction === `profile:set_profile_permission:${profile.id}`}>改权限</SmallButton>
+          {profile.kind === 'free_preview' && <SmallButton onClick={() => void onUpgradePreviewProfile(profile)} loading={busyAction === `profile:upgrade_preview_profile:${profile.id}`} tone="success">免 CDK 升级</SmallButton>}
           <SmallButton onClick={() => void onViewOperators(profile)} loading={busyAction === `profile-operators:${profile.id}`}>{operatorsExpanded ? '收起干员' : '查看干员'}</SmallButton>
           <SmallButton onClick={() => void onDownloadOperators(profile)} loading={busyAction === `profile-operators-download:${profile.id}`}>下载 JSON</SmallButton>
           <SmallButton onClick={() => void onClearSklandBinding(profile)} loading={busyAction === `profile:clear_profile_skland_binding:${profile.id}`} tone="danger">清绑定</SmallButton>
@@ -1705,7 +1734,7 @@ function ProfileDetailCard({
       </div>
 
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
-        <DetailItem label="档案类型" value={profile.kind || '-'} />
+        <DetailItem label="档案类型" value={profile.kind} />
         <DetailItem label="CDK 订单标识" value={profile.cdk_order_hash || profile.cdk?.license_order_hash || '-'} />
         <DetailItem label="森空岛绑定" value={sklandSummary} />
         <DetailItem label="绑定时间" value={formatDate(profile.skland_binding?.bound_at ?? null)} />
@@ -3091,6 +3120,17 @@ function getNextProductPermission(permission: Permission): GeneratedPermission |
   const current = permission === 'basic' ? 'growth' : permission === 'premium' ? 'advanced' : cdkProductPermissions.includes(permission as GeneratedPermission) ? permission as GeneratedPermission : null
   if (!current) return null
   return cdkProductPermissions.find((item) => cdkProductPermissionRank[item] === cdkProductPermissionRank[current] + 1) ?? null
+}
+
+function getAdminProfileAccessLabel(profile: AdminProfileAccessSummary): string {
+  if (profile.kind === 'free_preview') return '免费预览'
+  if (profile.kind === 'depot_value') return '仓库分析'
+  return permissionLabels[profile.permission] ?? profile.permission
+}
+
+function formatAdminProfileAccess(profileAccess: AdminProfileAccessSummary[]): string {
+  const labels = [...new Set(profileAccess.map(getAdminProfileAccessLabel))]
+  return labels.length > 0 ? labels.join(' / ') : '-'
 }
 
 function normalizeGeneratedCdks(data: AdminCdkCreateResponse): GeneratedCdk[] {
