@@ -21,8 +21,8 @@ export default async (req: Request): Promise<Response> => {
         risk_status: 'ok',
       })
     }
-    if (isDepotValueProfile(profile) || !profile.cdk_key) return jsonResponse({ error: '仓库分析档案没有 CDK 授权状态。' }, 403)
-    const cdkRecord = await (await getCdkRecordStore()).get(profile.cdk_key)
+    if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有 CDK 授权状态。' }, 403)
+    const cdkRecord = profile.cdk_key ? await (await getCdkRecordStore()).get(profile.cdk_key) : null
     if (profile.status === 'frozen' || cdkRecord?.status === 'frozen') {
       return jsonResponse({ error: cdkRecord?.freeze_reason || '账号授权已冻结，请联系卖家。' }, 403)
     }
