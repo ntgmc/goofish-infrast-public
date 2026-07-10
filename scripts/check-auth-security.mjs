@@ -234,7 +234,7 @@ async function assertUserSessionTouchAndAuthPayload() {
     [userSessionAuthPlugin()],
   )
   const now = new Date('2026-07-10T12:00:00.000Z')
-  const request = new Request('http://local/api/optimize/job/test', {
+  const request = new Request('http://local/api/optimization/jobs/test', {
     headers: { Cookie: 'maa_session=test-session-token' },
   })
   const activeUser = {

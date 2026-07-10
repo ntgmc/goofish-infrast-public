@@ -75,6 +75,10 @@ function readErrorMessage(data: unknown, fallback: string): string {
   if (data && typeof data === 'object') {
     const error = 'error' in data ? (data as { error?: unknown }).error : undefined
     if (typeof error === 'string' && error) return error
+    if (error && typeof error === 'object' && 'message' in error) {
+      const structuredMessage = (error as { message?: unknown }).message
+      if (typeof structuredMessage === 'string' && structuredMessage) return structuredMessage
+    }
     const message = 'message' in data ? (data as { message?: unknown }).message : undefined
     if (typeof message === 'string' && message) return message
   }
