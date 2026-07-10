@@ -14,9 +14,9 @@ import {
   getUserById,
   listProfileWorkspaces,
   listProfilesForUser,
-  markPasswordResetTokenUsed,
   markAnnouncementRead,
   migrateLegacyUserIfNeeded,
+  resetUserPasswordWithToken,
   savePasswordResetToken,
   saveProfileWorkspace,
   saveUserAccount,
@@ -254,7 +254,8 @@ export async function resetPasswordWithToken(
     return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
   }
 
-  const resetToken = await getPasswordResetTokenByHash(hashPasswordResetToken(tokenValue.trim()))
+  const tokenHash = hashPasswordResetToken(tokenValue.trim())
+  const resetToken = await getPasswordResetTokenByHash(tokenHash)
   if (!resetToken || resetToken.used_at || Date.parse(resetToken.expires_at) <= Date.now()) {
     return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
   }
@@ -267,9 +268,9 @@ export async function resetPasswordWithToken(
   const nextPassword = validatePassword(newPasswordValue)
   if (!nextPassword.ok) return { ok: false, status: 400, message: nextPassword.message }
 
-  await setUserPassword(user, nextPassword.password)
-  await markPasswordResetTokenUsed(resetToken.id)
-  await deleteSessionsForUser(user.id)
+  const passwordHash = await createPasswordHash(nextPassword.password)
+  const updated = await resetUserPasswordWithToken(tokenHash, passwordHash, new Date())
+  if (!updated) return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
   return { ok: true }
 }
 
