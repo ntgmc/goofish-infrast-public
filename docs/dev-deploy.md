@@ -128,6 +128,7 @@ repository-managed development API proxy snippet:
 ```bash
 sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-development.conf /etc/nginx/snippets/goofish-api-development.conf
+sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
 ```
 
 If this Nginx installation does not load `/etc/nginx/conf.d/*.conf` from inside
@@ -154,6 +155,17 @@ server {
 ```
 
 Add TLS for `dev.maatool.com` with the server's normal certificate process.
+Inside the resulting HTTPS `server {}` only, include the security baseline before
+the API snippet:
+
+```nginx
+include /etc/nginx/snippets/goofish-security-headers.conf;
+include /etc/nginx/snippets/goofish-api-development.conf;
+```
+
+Do not include `goofish-security-headers.conf` in the plain HTTP redirect server;
+it contains one-year HSTS with `includeSubDomains`. The policy is enforced, not
+Report-Only, and API responses intentionally contain no CORS allow headers.
 Validate and reload Nginx after installing the snippet:
 
 ```bash

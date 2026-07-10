@@ -76,6 +76,27 @@ headers without additional directives. No new location is required. Legacy
 authentication has been removed; operational scripts must log in through
 `POST /api/admin/session` and retain a cookie jar for subsequent requests.
 
+Install the repository-managed request security baseline alongside the existing
+API proxy snippet:
+
+```bash
+sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
+```
+
+Include it only in the production HTTPS/TLS `server {}` and never in the plain
+HTTP redirect server:
+
+```nginx
+include /etc/nginx/snippets/goofish-security-headers.conf;
+include /etc/nginx/snippets/goofish-api-production.conf;
+```
+
+The snippet directly enforces CSP and adds one-year HSTS with
+`includeSubDomains`; it also covers static files and Nginx-generated 413/429
+responses. API responses are same-origin only and expose no CORS allow headers.
+After changing the site configuration, run `sudo nginx -t` and reload Nginx only
+after the validation succeeds.
+
 ## GitHub Settings
 
 Create these repository or environment secrets:

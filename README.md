@@ -167,20 +167,25 @@ npm run check:migration
 `deploy/nginx/goofish-api-production.conf` 片段把 `/api/` 反向代理到 Node 后端。
 该片段将普通请求体限制为 256 KiB，为 `/api/depot-value` 保留 1 MiB 限额，
 并配合 `deploy/nginx/goofish-rate-limit-zones.conf` 限制登录与管理认证洪泛。
+`deploy/nginx/goofish-security-headers.conf` 为静态页面、API 和 Nginx 自身错误响应
+提供统一的 CSP、HSTS、frame、MIME、referrer 和 Permissions Policy 基线。
 
 先把 zone 配置安装到 Nginx 的 `http {}` 上下文，再安装 server 片段：
 
 ```bash
 sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
+sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
 ```
 
 如果当前 Nginx 不在 `http {}` 中加载 `/etc/nginx/conf.d/*.conf`，需要在
 `nginx.conf` 的 `http {}` 中显式包含该 zone 文件。
 
-然后在现有 `server {}` 中删除旧的 `/api/` location，并包含该片段：
+然后在现有 HTTPS `server {}` 中删除旧的 `/api/` location，并包含 API 与安全头
+片段。安全头片段包含一年 `includeSubDomains` HSTS，不得放入纯 HTTP 重定向 server：
 
 ```nginx
+include /etc/nginx/snippets/goofish-security-headers.conf;
 include /etc/nginx/snippets/goofish-api-production.conf;
 
 location / {
@@ -196,7 +201,9 @@ sudo systemctl reload nginx
 ```
 
 超过请求体限额时由 Nginx 直接返回 413；登录或管理认证请求超过 IP 速率时
-返回 429。代理层响应正文可能使用 Nginx 默认格式。
+返回 429。代理层响应正文可能使用 Nginx 默认格式，但仍会携带统一安全头。
+浏览器 API 已固定为完全同源，不再返回任何 `Access-Control-Allow-*`；外部浏览器
+应用必须经同源反向代理访问，服务器端客户端不受浏览器 CORS 限制。
 
 ## 密码存储
 

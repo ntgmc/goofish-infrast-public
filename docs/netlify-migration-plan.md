@@ -116,6 +116,7 @@ NETLIFY_BLOBS_CONTEXT
 ```bash
 sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
+sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
 ```
 
 `goofish-rate-limit-zones.conf` 必须从 Nginx 的 `http {}` 上下文加载；如果当前
@@ -124,12 +125,15 @@ sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippet
 
 ```nginx
 server {
-  listen 80;
+  listen 443 ssl;
   server_name your-domain.com;
+
+  # ssl_certificate / ssl_certificate_key 使用站点现有 TLS 配置。
 
   root /var/www/goofish-infrast-v1/dist;
   index index.html;
 
+  include /etc/nginx/snippets/goofish-security-headers.conf;
   include /etc/nginx/snippets/goofish-api-production.conf;
 
   location / {
@@ -137,6 +141,10 @@ server {
   }
 }
 ```
+
+`goofish-security-headers.conf` 只能包含在 HTTPS server 中，不得放入监听 80 的
+重定向 server。它直接执行 CSP，并设置一年 `includeSubDomains` HSTS；API 采用完全
+同源策略，不返回 `Access-Control-Allow-*`。
 
 `try_files $uri $uri/ /index.html;` 必须保留，否则 Vite SPA 路由刷新会 404。
 受管片段将普通请求体限制为 256 KiB，并为 `/api/depot-value` 保留 1 MiB
