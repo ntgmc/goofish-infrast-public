@@ -12,6 +12,6 @@ await build({
   target: 'node20',
   format: 'esm',
   sourcemap: true,
-  external: ['pg', 'qrcode'],
+  external: ['@node-rs/argon2', 'pg', 'qrcode'],
   logLevel: 'info',
 })

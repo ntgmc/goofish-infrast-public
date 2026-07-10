@@ -26,6 +26,7 @@ import {
   toPublicProfile,
   toPublicWorkspace,
   touchSession,
+  upgradeUserPasswordHash,
   type UserAccountRecord,
   type UserGameAccountRecord,
   type UserSessionRecord,
@@ -110,6 +111,7 @@ export async function registerUser(
     password_hash: passwordHash.password_hash,
     salt: passwordHash.salt,
     iterations: passwordHash.iterations,
+    password_algorithm: passwordHash.password_algorithm,
     permission: 'growth',
     status: 'active',
     cdk_key: null,
@@ -157,12 +159,20 @@ export async function loginUser(
   if (!email) return { ok: false, status: 400, message: 'Invalid email format.' }
   if (typeof passwordValue !== 'string') return { ok: false, status: 400, message: 'Password must be a string.' }
 
-  const user = await getUserByEmail(email)
-  if (!user || !(await verifyPasswordHash(passwordValue, user))) {
+  let user = await getUserByEmail(email)
+  if (!user) {
+    return { ok: false, status: 401, message: 'Invalid email or password.' }
+  }
+  const passwordVerification = await verifyPasswordHash(passwordValue, user)
+  if (!passwordVerification.verified) {
     return { ok: false, status: 401, message: 'Invalid email or password.' }
   }
   if (user.status !== 'active') {
     return { ok: false, status: 403, message: 'Account is not active.' }
+  }
+
+  if (passwordVerification.needsRehash) {
+    user = await tryUpgradeUserPasswordHash(user, passwordValue)
   }
 
   await migrateLegacyUserIfNeeded(user)
@@ -176,7 +186,11 @@ export async function changeUserPassword(
   newPasswordValue: unknown,
   keepTokenHash: string,
 ): Promise<{ ok: true; user: UserAccountRecord } | { ok: false; status: number; message: string }> {
-  if (typeof oldPasswordValue !== 'string' || !(await verifyPasswordHash(oldPasswordValue, user))) {
+  if (typeof oldPasswordValue !== 'string') {
+    return { ok: false, status: 401, message: "Invalid license signature." };
+  }
+  const passwordVerification = await verifyPasswordHash(oldPasswordValue, user)
+  if (!passwordVerification.verified) {
     return { ok: false, status: 401, message: "Invalid license signature." };
   }
   const nextPassword = validatePassword(newPasswordValue)
@@ -524,10 +538,24 @@ async function setUserPassword(user: UserAccountRecord, password: string): Promi
     password_hash: passwordHash.password_hash,
     salt: passwordHash.salt,
     iterations: passwordHash.iterations,
+    password_algorithm: passwordHash.password_algorithm,
     updated_at: new Date().toISOString(),
   }
   await saveUserAccount(updated)
   return updated
+}
+
+async function tryUpgradeUserPasswordHash(
+  user: UserAccountRecord,
+  password: string,
+): Promise<UserAccountRecord> {
+  try {
+    const replacement = await createPasswordHash(password)
+    return await upgradeUserPasswordHash(user.id, user.password_hash, replacement) ?? user
+  } catch (error) {
+    console.warn('user password hash upgrade skipped:', error instanceof Error ? error.name : 'UnknownError')
+    return user
+  }
 }
 
 async function createSession(userId: string): Promise<{ cookie: string }> {
