@@ -7,6 +7,7 @@ export default function OptimizeShell({
   section,
   permissionLabel,
   badges,
+  showScenarioLab,
   onSectionChange,
   onReset,
   children,
@@ -14,11 +15,13 @@ export default function OptimizeShell({
   section: OptimizeSection;
   permissionLabel: string;
   badges?: Partial<Record<OptimizeSection, string>>;
+  showScenarioLab: boolean;
   onSectionChange: (section: OptimizeSection) => void;
   onReset: () => void;
   children: ReactNode;
 }) {
-  const current = OPTIMIZE_SECTIONS.find((item) => item.id === section) ?? OPTIMIZE_SECTIONS[0]
+  const sections = OPTIMIZE_SECTIONS.filter((item) => item.id !== 'lab' || showScenarioLab)
+  const current = sections.find((item) => item.id === section) ?? sections[0]
 
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">
@@ -31,7 +34,7 @@ export default function OptimizeShell({
           </div>
         </div>
         <nav className="mt-8 space-y-1" aria-label="排班工作台分区">
-          {OPTIMIZE_SECTIONS.map((item) => (
+          {sections.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -86,7 +89,7 @@ export default function OptimizeShell({
             </div>
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden" role="tablist" aria-label="排班工作台分区">
-            {OPTIMIZE_SECTIONS.map((item) => (
+            {sections.map((item) => (
               <button
                 key={item.id}
                 type="button"

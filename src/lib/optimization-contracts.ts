@@ -9,6 +9,7 @@ import type {
   ReorderCheckResult,
   UpgradeTaskPayload,
 } from './types'
+import type { ScenarioComparisonFactors, ScenarioComparisonResult } from './scenario-comparison'
 
 export type OptimizationIdentity =
   | { type: 'profile'; profileId: string }
@@ -30,6 +31,11 @@ export type CreateOptimizationJobRequest =
   | (OptimizationJobInput & {
       kind: 'upgrade_suggestions';
       upgradeTaskPayload: UpgradeTaskPayload;
+    })
+  | (Omit<OptimizationJobInput, 'identity'> & {
+      kind: 'scenario_comparison';
+      identity: Extract<OptimizationIdentity, { type: 'profile' }>;
+      factors: ScenarioComparisonFactors;
     })
 
 export interface CreateReorderCheckRequest {
@@ -77,15 +83,18 @@ interface OptimizationJobSnapshotBase {
   estimate: OptimizationEstimateSnapshot;
 }
 
-export type OptimizationJobSnapshot =
+export type OptimizationJobSnapshot<TResult = OptimizeResult> =
   | (OptimizationJobSnapshotBase & { status: 'queued' })
   | (OptimizationJobSnapshotBase & { status: 'running' })
-  | (OptimizationJobSnapshotBase & { status: 'succeeded'; result: OptimizeResult })
+  | (OptimizationJobSnapshotBase & { status: 'succeeded'; result: TResult })
   | (OptimizationJobSnapshotBase & { status: 'failed'; error: ApiContractError })
 
-export interface CreateOptimizationJobResponse {
-  job: OptimizationJobSnapshot;
+export interface CreateOptimizationJobResponse<TResult = OptimizeResult> {
+  job: OptimizationJobSnapshot<TResult>;
 }
+
+export type ScenarioComparisonJobSnapshot = OptimizationJobSnapshot<ScenarioComparisonResult>
+export type CreateScenarioComparisonJobResponse = CreateOptimizationJobResponse<ScenarioComparisonResult>
 
 export interface ReorderCheckResponse {
   result: ReorderCheckResult;

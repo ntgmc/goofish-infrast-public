@@ -110,14 +110,9 @@ function parseShiftHours(value: unknown): number[] | null {
   return hours.map((hour) => Math.round(hour * 100) / 100)
 }
 
-function isFixedShiftHours(hours: number[]): boolean {
-  return hours.length > 0 && hours.every((hour) => Math.abs(hour - hours[0]) <= 0.0001)
-}
-
 function isValidShiftHours(hours: number[]): boolean {
   const total = hours.reduce((sum, hour) => sum + hour, 0)
-  if (Math.abs(total - 24) <= 0.0001) return true
-  return isFixedShiftHours(hours) && (Math.abs(hours[0] - 8) <= 0.0001 || Math.abs(hours[0] - 12) <= 0.0001)
+  return Math.abs(total - 24) <= 0.0001
 }
 
 function sumCounts(counts: Record<string, number> | undefined): number {
@@ -126,6 +121,7 @@ function sumCounts(counts: Record<string, number> | undefined): number {
 
 export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   const next = cloneConfig(config)
+  const parsedShiftHours = parseShiftHours(next.shift_hours)
   next.product_requirements = {
     trading_stations: { ...(next.product_requirements?.trading_stations ?? {}) },
     manufacturing_stations: { ...(next.product_requirements?.manufacturing_stations ?? {}) },
@@ -134,7 +130,9 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.manufacturing_stations_count = Number.isFinite(next.manufacturing_stations_count) ? next.manufacturing_stations_count : 4
   next.schedule_mode = normalizeScheduleMode(next.schedule_mode ?? next.mode)
   next.dormitory_rule = normalizeDormitoryRule(next.dormitory_rule)
-  next.shift_hours = [...DEFAULT_SHIFT_HOURS]
+  next.shift_hours = parsedShiftHours && isValidShiftHours(parsedShiftHours)
+    ? parsedShiftHours
+    : [...DEFAULT_SHIFT_HOURS]
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
   next.desc = next.desc || `${next.layout} 基建配置`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
@@ -176,7 +174,7 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
   }
   const shiftHours = parseShiftHours(config.shift_hours)
   if (!rotationMode && (!shiftHours || !isValidShiftHours(shiftHours))) {
-    return { ok: false, message: '换班间隔已固定为 8-8-8，请重新载入配置后再试。' }
+    return { ok: false, message: 'MAA 换班间隔需要由 1–6 个正数构成，并覆盖完整 24 小时。' }
   }
   if (!rotationMode && config.drones?.enable && !config.drones.auto && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
     return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
