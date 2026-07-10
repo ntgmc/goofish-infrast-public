@@ -350,9 +350,73 @@ export async function getRecentPasswordResetTokenForUser(
   return result.rows[0] ?? null
 }
 
-export async function markPasswordResetTokenUsed(tokenId: string, usedAt = new Date().toISOString()): Promise<void> {
+export async function resetUserPasswordWithToken(
+  tokenHash: string,
+  passwordHash: PasswordHashRecord,
+  claimedAt: Date,
+): Promise<UserAccountRecord | null> {
   await ensureSchema()
-  await query('update password_reset_tokens set used_at = $2 where id = $1 and used_at is null', [tokenId, usedAt])
+  const client = await getPool().connect()
+  const claimedAtIso = claimedAt.toISOString()
+  try {
+    await client.query('begin')
+    const claimed = await client.query<{ id: string; user_id: string }>(
+      `update password_reset_tokens
+       set used_at = $2
+       where token_hash = $1
+         and used_at is null
+         and expires_at > $2
+       returning id, user_id`,
+      [tokenHash, claimedAtIso],
+    )
+    if (claimed.rowCount === 0) {
+      await client.query('rollback')
+      return null
+    }
+    if (claimed.rowCount !== 1 || !claimed.rows[0]) {
+      throw new Error('Password reset token claim affected an unexpected number of rows.')
+    }
+
+    const passwordPatch = {
+      ...passwordHash,
+      updated_at: claimedAtIso,
+    }
+    const updated = await client.query<{ record_json: UserAccountRecord }>(
+      `update user_accounts
+       set password_hash = $2,
+           salt = $3,
+           iterations = $4,
+           record_json = record_json || $5::jsonb,
+           updated_at = $6
+       where id = $1
+         and status = 'active'
+       returning record_json`,
+      [
+        claimed.rows[0].user_id,
+        passwordHash.password_hash,
+        passwordHash.salt,
+        passwordHash.iterations,
+        JSON.stringify(passwordPatch),
+        claimedAtIso,
+      ],
+    )
+    if (updated.rowCount === 0) {
+      await client.query('rollback')
+      return null
+    }
+    if (updated.rowCount !== 1 || !updated.rows[0]) {
+      throw new Error('Password reset user update affected an unexpected number of rows.')
+    }
+
+    await client.query('delete from user_sessions where user_id = $1', [claimed.rows[0].user_id])
+    await client.query('commit')
+    return updated.rows[0].record_json
+  } catch (error) {
+    await client.query('rollback')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 export async function listProfilesForUser(userId: string): Promise<UserGameAccountRecord[]> {

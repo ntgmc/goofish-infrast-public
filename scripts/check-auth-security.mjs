@@ -20,6 +20,8 @@ try {
   await assertUserPasswordMigration(passwordModule)
   await assertUserSessionTouchAndAuthPayload()
   await assertUserSessionStorage()
+  await assertAtomicPasswordResetHandler()
+  await assertAtomicPasswordResetStorage()
   await assertUserLoginRateLimits()
   await assertAdminAuthenticationRateLimits()
   await assertNoBrowserReadableAdminPasswords()
@@ -405,6 +407,249 @@ async function assertUserSessionStorage() {
   assert.equal(workspaces.get('profile-1').profile_id, 'profile-1')
   assert.deepEqual(workspaces.get('profile-1').saved_configs, [])
   assert.deepEqual(workspaces.get('profile-2').result_history, [])
+}
+
+async function assertAtomicPasswordResetHandler() {
+  const userAuth = await bundleInlineModule(
+    "export { resetPasswordWithToken } from './server/handlers/user-auth.ts'",
+    'atomic-password-reset-handler',
+    [passwordResetAuthPlugin()],
+  )
+  const activeUser = {
+    version: 1,
+    id: 'reset-user-1',
+    email: 'reset@example.com',
+    password_hash: 'old-password-hash',
+    salt: 'old-salt',
+    iterations: 2,
+    password_algorithm: 'argon2id',
+    permission: 'growth',
+    status: 'active',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  }
+  const validToken = {
+    id: 'reset-token-1',
+    user_id: activeUser.id,
+    token_hash: 'stored-reset-token-hash',
+    expires_at: '2999-01-01T00:00:00.000Z',
+    used_at: null,
+    created_at: '2026-07-10T00:00:00.000Z',
+  }
+  const resetHandlerState = (overrides = {}) => {
+    globalThis.__authSecurityResetSequence = []
+    globalThis.__authSecurityResetToken = validToken
+    globalThis.__authSecurityResetUser = activeUser
+    globalThis.__authSecurityResetMode = 'success'
+    globalThis.__authSecurityResetClaimed = false
+    globalThis.__authSecurityResetCalls = []
+    Object.assign(globalThis, overrides)
+  }
+
+  resetHandlerState()
+  const success = await userAuth.resetPasswordWithToken('raw-reset-token', 'StrongResetPassword!2026')
+  assert.deepEqual(success, { ok: true })
+  assert.deepEqual(globalThis.__authSecurityResetSequence, ['token-preflight', 'user-preflight', 'hash', 'transaction'])
+  assert.equal(globalThis.__authSecurityResetCalls.length, 1)
+  assert.match(globalThis.__authSecurityResetCalls[0].tokenHash, /^[a-f0-9]{64}$/)
+  assert.notEqual(globalThis.__authSecurityResetCalls[0].tokenHash, 'raw-reset-token')
+  assert.deepEqual(globalThis.__authSecurityResetCalls[0].passwordHash, {
+    password_hash: 'new-password-hash',
+    salt: 'new-password-salt',
+    iterations: 2,
+    password_algorithm: 'argon2id',
+  })
+  assert(globalThis.__authSecurityResetCalls[0].claimedAt instanceof Date)
+
+  resetHandlerState({ __authSecurityResetMode: 'concurrent' })
+  const concurrent = await Promise.all([
+    userAuth.resetPasswordWithToken('same-reset-token', 'StrongResetPassword!2026'),
+    userAuth.resetPasswordWithToken('same-reset-token', 'AnotherStrongPassword!2026'),
+  ])
+  assert.equal(concurrent.filter((result) => result.ok).length, 1)
+  const concurrentFailure = concurrent.find((result) => !result.ok)
+  assert.deepEqual(concurrentFailure, {
+    ok: false,
+    status: 400,
+    message: 'The reset link is invalid or expired.',
+  })
+  assert.equal(globalThis.__authSecurityResetCalls.length, 2)
+
+  for (const token of [
+    null,
+    { ...validToken, used_at: '2026-07-10T01:00:00.000Z' },
+    { ...validToken, expires_at: '2000-01-01T00:00:00.000Z' },
+  ]) {
+    resetHandlerState({ __authSecurityResetToken: token })
+    const invalid = await userAuth.resetPasswordWithToken('invalid-reset-token', 'StrongResetPassword!2026')
+    assert.equal(invalid.ok, false)
+    assert.equal(invalid.status, 400)
+    assert.deepEqual(globalThis.__authSecurityResetSequence, ['token-preflight'])
+  }
+
+  for (const user of [null, { ...activeUser, status: 'frozen' }, { ...activeUser, status: 'revoked' }]) {
+    resetHandlerState({ __authSecurityResetUser: user })
+    const invalid = await userAuth.resetPasswordWithToken('invalid-user-token', 'StrongResetPassword!2026')
+    assert.equal(invalid.ok, false)
+    assert.equal(invalid.status, 400)
+    assert.deepEqual(globalThis.__authSecurityResetSequence, ['token-preflight', 'user-preflight'])
+  }
+
+  resetHandlerState()
+  const weakPassword = await userAuth.resetPasswordWithToken('raw-reset-token', 'short')
+  assert.equal(weakPassword.ok, false)
+  assert.deepEqual(globalThis.__authSecurityResetSequence, ['token-preflight', 'user-preflight'])
+
+  resetHandlerState({ __authSecurityResetMode: 'expire-during-hash' })
+  const expiredDuringHash = await userAuth.resetPasswordWithToken('raw-reset-token', 'StrongResetPassword!2026')
+  assert.deepEqual(expiredDuringHash, {
+    ok: false,
+    status: 400,
+    message: 'The reset link is invalid or expired.',
+  })
+  assert.deepEqual(globalThis.__authSecurityResetSequence, ['token-preflight', 'user-preflight', 'hash', 'transaction'])
+}
+
+async function assertAtomicPasswordResetStorage() {
+  const userStore = await bundleInlineModule(
+    "export { resetUserPasswordWithToken } from './server/storage/user-store.ts'",
+    'atomic-password-reset-storage',
+    [passwordResetStoragePlugin()],
+  )
+  const claimedAt = new Date('2026-07-10T12:00:00.000Z')
+  const passwordHash = {
+    password_hash: 'replacement-password-hash',
+    salt: 'replacement-password-salt',
+    iterations: 2,
+    password_algorithm: 'argon2id',
+  }
+  const baseUser = {
+    version: 1,
+    id: 'reset-user-1',
+    email: 'reset@example.com',
+    password_hash: 'old-password-hash',
+    salt: 'old-password-salt',
+    iterations: 1,
+    password_algorithm: 'pbkdf2-sha256',
+    permission: 'growth',
+    status: 'active',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  }
+  const resetStorageState = (overrides = {}) => {
+    globalThis.__authSecurityPasswordResetDb = {
+      token: {
+        id: 'reset-token-1',
+        user_id: baseUser.id,
+        token_hash: 'reset-token-hash',
+        expires_at: '2026-07-10T12:01:00.000Z',
+        used_at: null,
+      },
+      user: structuredClone(baseUser),
+      sessions: ['session-1', 'session-2'],
+    }
+    globalThis.__authSecurityPasswordResetTrace = []
+    globalThis.__authSecurityPasswordResetReleased = 0
+    globalThis.__authSecurityPasswordResetFailure = null
+    globalThis.__authSecurityPasswordResetClaimRowCount = null
+    globalThis.__authSecurityPasswordResetUserRowCount = null
+    globalThis.__authSecurityPasswordResetClaimSql = null
+    Object.assign(globalThis, overrides)
+  }
+
+  resetStorageState()
+  const updated = await userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt)
+  assert(updated)
+  assert.deepEqual(globalThis.__authSecurityPasswordResetTrace, ['begin', 'claim', 'update-user', 'delete-sessions', 'commit', 'release'])
+  assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /update password_reset_tokens/i)
+  assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /token_hash = \$1/i)
+  assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /used_at is null/i)
+  assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /expires_at > \$2/i)
+  assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /returning id, user_id/i)
+  assert.deepEqual(globalThis.__authSecurityPasswordResetClaimSql.values, ['reset-token-hash', claimedAt.toISOString()])
+  assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, claimedAt.toISOString())
+  assert.deepEqual(globalThis.__authSecurityPasswordResetDb.sessions, [])
+  assert.equal(updated.email, baseUser.email)
+  assert.equal(updated.permission, baseUser.permission)
+  assert.equal(updated.password_hash, passwordHash.password_hash)
+  assert.equal(updated.salt, passwordHash.salt)
+  assert.equal(updated.iterations, passwordHash.iterations)
+  assert.equal(updated.password_algorithm, passwordHash.password_algorithm)
+  assert.equal(updated.updated_at, claimedAt.toISOString())
+  assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, passwordHash.password_hash)
+  assert.equal(globalThis.__authSecurityPasswordResetReleased, 1)
+
+  const second = await userStore.resetUserPasswordWithToken('reset-token-hash', {
+    ...passwordHash,
+    password_hash: 'losing-password-hash',
+  }, claimedAt)
+  assert.equal(second, null)
+  assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, passwordHash.password_hash)
+  assert.equal(globalThis.__authSecurityPasswordResetReleased, 2)
+
+  for (const tokenOverride of [
+    { used_at: claimedAt.toISOString() },
+    { expires_at: claimedAt.toISOString() },
+    { token_hash: 'different-token-hash' },
+  ]) {
+    resetStorageState()
+    Object.assign(globalThis.__authSecurityPasswordResetDb.token, tokenOverride)
+    const rejected = await userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt)
+    assert.equal(rejected, null)
+    assert.deepEqual(globalThis.__authSecurityPasswordResetTrace, ['begin', 'claim', 'rollback', 'release'])
+    assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, baseUser.password_hash)
+    assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, tokenOverride.used_at ?? null)
+  }
+
+  for (const status of ['frozen', 'revoked']) {
+    resetStorageState()
+    globalThis.__authSecurityPasswordResetDb.user.status = status
+    const rejected = await userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt)
+    assert.equal(rejected, null)
+    assert.deepEqual(globalThis.__authSecurityPasswordResetTrace, ['begin', 'claim', 'update-user', 'rollback', 'release'])
+    assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, null)
+    assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, baseUser.password_hash)
+  }
+
+  resetStorageState()
+  globalThis.__authSecurityPasswordResetDb.user = null
+  const missingUser = await userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt)
+  assert.equal(missingUser, null)
+  assert.deepEqual(globalThis.__authSecurityPasswordResetTrace, ['begin', 'claim', 'update-user', 'rollback', 'release'])
+  assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, null)
+
+  for (const failure of ['update-user', 'delete-sessions', 'commit']) {
+    resetStorageState({ __authSecurityPasswordResetFailure: failure })
+    await assert.rejects(
+      userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt),
+      new RegExp(`Injected ${failure} failure`),
+    )
+    assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, null)
+    assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, baseUser.password_hash)
+    assert.deepEqual(globalThis.__authSecurityPasswordResetDb.sessions, ['session-1', 'session-2'])
+    assert.equal(globalThis.__authSecurityPasswordResetTrace.at(-1), 'release')
+  }
+
+  resetStorageState({ __authSecurityPasswordResetClaimRowCount: 2 })
+  await assert.rejects(
+    userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt),
+    /token claim affected an unexpected number of rows/i,
+  )
+  assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, null)
+
+  resetStorageState({ __authSecurityPasswordResetUserRowCount: 2 })
+  await assert.rejects(
+    userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt),
+    /user update affected an unexpected number of rows/i,
+  )
+  assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, null)
+  assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, baseUser.password_hash)
 }
 
 function legacyUserRecord(email, password) {
@@ -1025,6 +1270,50 @@ function userSessionStoragePlugin() {
   }
 }
 
+function passwordResetAuthPlugin() {
+  return {
+    name: 'auth-security-password-reset-mocks',
+    setup(build) {
+      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'email']) {
+        build.onResolve({ filter: new RegExp(`(^|[\\/])${moduleName}(\.ts)?$`) }, () => ({
+          path: moduleName,
+          namespace: 'auth-security-password-reset',
+        }))
+      }
+      build.onLoad({ filter: /.*/, namespace: 'auth-security-password-reset' }, (args) => {
+        const mocks = {
+          'user-store': passwordResetAuthStoreMock(),
+          password: passwordResetPasswordMock(),
+          'announcement-store': announcementStoreMock(),
+          'license-utils': userLicenseUtilsMock(),
+          email: emailMock(),
+        }
+        return { contents: mocks[args.path], loader: 'js' }
+      })
+    },
+  }
+}
+
+function passwordResetStoragePlugin() {
+  return {
+    name: 'auth-security-password-reset-storage-mocks',
+    setup(build) {
+      build.onResolve({ filter: /(^|[\/])postgres(\.ts)?$/ }, () => ({
+        path: 'postgres',
+        namespace: 'auth-security-password-reset-storage',
+      }))
+      build.onResolve({ filter: /(^|[\/])schema(\.ts)?$/ }, () => ({
+        path: 'schema',
+        namespace: 'auth-security-password-reset-storage',
+      }))
+      build.onLoad({ filter: /.*/, namespace: 'auth-security-password-reset-storage' }, (args) => ({
+        contents: args.path === 'postgres' ? passwordResetPostgresMock() : 'export async function ensureDatabaseSchema() {}',
+        loader: 'js',
+      }))
+    },
+  }
+}
+
 function userAuthMock() {
   return `
     export function jsonResponse(body, status = 200, headers = {}) {
@@ -1177,12 +1466,12 @@ function userStoreMigrationMock() {
     export async function getUserById() { return null }
     export async function listProfileWorkspaces() { return new Map() }
     export async function listProfilesForUser() { return [] }
-    export async function markPasswordResetTokenUsed() {}
     export async function markAnnouncementRead() {}
     export async function savePasswordResetToken() {}
     export async function saveProfileWorkspace() {}
     export async function saveUserAccount() {}
     export async function saveUserProfile() {}
+    export async function resetUserPasswordWithToken() { return null }
     export function isFreePreviewProfile() { return false }
     export function toPublicProfile(value) { return value }
     export function toPublicWorkspace(value) { return value }
@@ -1233,13 +1522,13 @@ function userSessionAuthStoreMock() {
     export async function getRecentPasswordResetTokenForUser() { return null }
     export async function getUserByEmail() { return null }
     export async function listProfilesForUser() { return [] }
-    export async function markPasswordResetTokenUsed() {}
     export async function markAnnouncementRead() {}
     export async function savePasswordResetToken() {}
     export async function saveProfileWorkspace() {}
     export async function saveUserAccount() {}
     export async function saveUserProfile() {}
     export async function saveUserSession() {}
+    export async function resetUserPasswordWithToken() { return null }
     export function isFreePreviewProfile() { return false }
     export async function upgradeUserPasswordHash() { return null }
   `
@@ -1270,6 +1559,158 @@ function userSessionPostgresMock() {
         return { rows, rowCount: rows.length }
       }
       throw new Error('Unexpected query in user session storage check: ' + text)
+    }
+  `
+}
+
+function passwordResetAuthStoreMock() {
+  return `
+    export async function getPasswordResetTokenByHash() {
+      globalThis.__authSecurityResetSequence.push('token-preflight')
+      return globalThis.__authSecurityResetToken
+    }
+    export async function getUserById() {
+      globalThis.__authSecurityResetSequence.push('user-preflight')
+      return globalThis.__authSecurityResetUser
+    }
+    export async function resetUserPasswordWithToken(tokenHash, passwordHash, claimedAt) {
+      globalThis.__authSecurityResetSequence.push('transaction')
+      globalThis.__authSecurityResetCalls.push({ tokenHash, passwordHash, claimedAt })
+      if (globalThis.__authSecurityResetMode === 'expire-during-hash') return null
+      if (globalThis.__authSecurityResetMode === 'concurrent') {
+        if (globalThis.__authSecurityResetClaimed) return null
+        globalThis.__authSecurityResetClaimed = true
+      }
+      return { ...globalThis.__authSecurityResetUser, ...passwordHash }
+    }
+    export async function deleteSessionByTokenHash() {}
+    export async function deleteSessionsForUser() {}
+    export async function deleteUserAccount() {}
+    export function emptyWorkspace() { return null }
+    export async function getAnnouncementReads() { return [] }
+    export async function getProfileForUser() { return null }
+    export async function getRecentPasswordResetTokenForUser() { return null }
+    export async function getSessionByTokenHash() { return null }
+    export async function getUserByEmail() { return null }
+    export async function listProfileWorkspaces() { return new Map() }
+    export async function listProfilesForUser() { return [] }
+    export async function markAnnouncementRead() {}
+    export async function migrateLegacyUserIfNeeded() { return [] }
+    export async function savePasswordResetToken() {}
+    export async function saveProfileWorkspace() {}
+    export async function saveUserAccount() {}
+    export async function saveUserProfile() {}
+    export async function saveUserSession() {}
+    export function isFreePreviewProfile() { return false }
+    export function toPublicProfile(value) { return value }
+    export function toPublicWorkspace(value) { return value }
+    export async function touchSession() { return false }
+    export async function upgradeUserPasswordHash() { return null }
+  `
+}
+
+function passwordResetPasswordMock() {
+  return `
+    export async function createPasswordHash() {
+      globalThis.__authSecurityResetSequence.push('hash')
+      return {
+        password_hash: 'new-password-hash',
+        salt: 'new-password-salt',
+        iterations: 2,
+        password_algorithm: 'argon2id',
+      }
+    }
+    export async function verifyPasswordHash() {
+      return { verified: false, needsRehash: false }
+    }
+  `
+}
+
+function passwordResetPostgresMock() {
+  return `
+    export function getPool() {
+      return {
+        connect: async () => {
+          let snapshot = null
+          return {
+            query: async (text, values = []) => {
+              const normalized = text.trim().toLowerCase()
+              if (normalized === 'begin') {
+                globalThis.__authSecurityPasswordResetTrace.push('begin')
+                snapshot = structuredClone(globalThis.__authSecurityPasswordResetDb)
+                return { rows: [], rowCount: null }
+              }
+              if (normalized === 'rollback') {
+                globalThis.__authSecurityPasswordResetTrace.push('rollback')
+                if (snapshot) globalThis.__authSecurityPasswordResetDb = structuredClone(snapshot)
+                snapshot = null
+                return { rows: [], rowCount: null }
+              }
+              if (normalized === 'commit') {
+                globalThis.__authSecurityPasswordResetTrace.push('commit')
+                if (globalThis.__authSecurityPasswordResetFailure === 'commit') {
+                  throw new Error('Injected commit failure')
+                }
+                snapshot = null
+                return { rows: [], rowCount: null }
+              }
+              if (/update password_reset_tokens/i.test(text)) {
+                globalThis.__authSecurityPasswordResetTrace.push('claim')
+                globalThis.__authSecurityPasswordResetClaimSql = { text, values }
+                const db = globalThis.__authSecurityPasswordResetDb
+                const token = db.token
+                const eligible = token
+                  && token.token_hash === values[0]
+                  && token.used_at === null
+                  && Date.parse(token.expires_at) > Date.parse(values[1])
+                if (!eligible) return { rows: [], rowCount: 0 }
+                token.used_at = values[1]
+                const rowCount = globalThis.__authSecurityPasswordResetClaimRowCount ?? 1
+                const row = { id: token.id, user_id: token.user_id }
+                return { rows: rowCount === 2 ? [row, row] : [row], rowCount }
+              }
+              if (/update user_accounts/i.test(text)) {
+                globalThis.__authSecurityPasswordResetTrace.push('update-user')
+                if (globalThis.__authSecurityPasswordResetFailure === 'update-user') {
+                  throw new Error('Injected update-user failure')
+                }
+                const db = globalThis.__authSecurityPasswordResetDb
+                if (!db.user || db.user.id !== values[0] || db.user.status !== 'active') {
+                  return { rows: [], rowCount: 0 }
+                }
+                const patch = JSON.parse(values[4])
+                db.user = {
+                  ...db.user,
+                  password_hash: values[1],
+                  salt: values[2],
+                  iterations: values[3],
+                  ...patch,
+                  updated_at: values[5],
+                }
+                const rowCount = globalThis.__authSecurityPasswordResetUserRowCount ?? 1
+                const row = { record_json: structuredClone(db.user) }
+                return { rows: rowCount === 2 ? [row, row] : [row], rowCount }
+              }
+              if (/delete from user_sessions/i.test(text)) {
+                globalThis.__authSecurityPasswordResetTrace.push('delete-sessions')
+                if (globalThis.__authSecurityPasswordResetFailure === 'delete-sessions') {
+                  throw new Error('Injected delete-sessions failure')
+                }
+                globalThis.__authSecurityPasswordResetDb.sessions = []
+                return { rows: [], rowCount: 2 }
+              }
+              throw new Error('Unexpected password reset transaction query: ' + text)
+            },
+            release: () => {
+              globalThis.__authSecurityPasswordResetTrace.push('release')
+              globalThis.__authSecurityPasswordResetReleased += 1
+            },
+          }
+        },
+      }
+    }
+    export async function query() {
+      throw new Error('Shared query helper should not be used by password reset transaction checks')
     }
   `
 }
