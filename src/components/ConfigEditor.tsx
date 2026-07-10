@@ -1,4 +1,11 @@
 import { useEffect, useState } from 'react'
+import {
+  isValidShiftHours,
+  normalizeConfig,
+  normalizeDormitoryRule,
+  normalizeScheduleMode,
+  parseShiftHours,
+} from '../lib/config'
 import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
 
@@ -18,15 +25,13 @@ export const PRODUCT_LABELS: Record<string, string> = {
 export const SCHEDULE_MODE_LABELS: Record<string, string> = {
   maa: 'MAA 排班表',
   rotation: '游戏内轮换',
+  variable: 'MAA 自动非固定',
 }
 
 export const DORMITORY_RULE_LABELS: Record<string, string> = {
   fixed: '排班表写死',
   maa_autofill: 'MAA 自动填满',
 }
-
-const DEFAULT_SHIFT_HOURS = [8, 8, 8]
-
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: '单次重置卡',
@@ -81,109 +86,10 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   },
 }
 
-export function cloneConfig(config: LicenseConfig): LicenseConfig {
-  return JSON.parse(JSON.stringify(config)) as LicenseConfig
-}
-
-export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' {
-  const modeText = String(mode ?? 'maa').trim().toLowerCase()
-  return ['rotation', 'rotate', 'game_rotation', 'in_game_rotation', '轮换', '轮换模式', '游戏内轮换'].includes(modeText)
-    ? 'rotation'
-    : 'maa'
-}
-
-export function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' {
-  const ruleText = String(rule ?? 'fixed').trim().toLowerCase()
-  return ['maa_autofill', 'maa-autofill', 'autofill', 'auto', 'maa自动填满', '自动填满'].includes(ruleText)
-    ? 'maa_autofill'
-    : 'fixed'
-}
-
-function parseShiftHours(value: unknown): number[] | null {
-  const items = Array.isArray(value)
-    ? value
-    : typeof value === 'string'
-      ? value.split(/[-,，、\s]+/).filter(Boolean)
-      : null
-  if (!items) return null
-  const hours = items.map((item) => Number(item))
-  if (hours.length === 0 || hours.length > 6) return null
-  if (hours.some((hour) => !Number.isFinite(hour) || hour <= 0)) return null
-  return hours.map((hour) => Math.round(hour * 100) / 100)
-}
-
-function isFixedShiftHours(hours: number[]): boolean {
-  return hours.length > 0 && hours.every((hour) => Math.abs(hour - hours[0]) <= 0.0001)
-}
-
-function isValidShiftHours(hours: number[]): boolean {
-  const total = hours.reduce((sum, hour) => sum + hour, 0)
-  if (Math.abs(total - 24) <= 0.0001) return true
-  return isFixedShiftHours(hours) && (Math.abs(hours[0] - 8) <= 0.0001 || Math.abs(hours[0] - 12) <= 0.0001)
-}
-
-function sumCounts(counts: Record<string, number> | undefined): number {
-  return Object.values(counts ?? {}).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0)
-}
-
-export function normalizeConfig(config: LicenseConfig): LicenseConfig {
-  const next = cloneConfig(config)
-  next.product_requirements = {
-    trading_stations: { ...(next.product_requirements?.trading_stations ?? {}) },
-    manufacturing_stations: { ...(next.product_requirements?.manufacturing_stations ?? {}) },
-  }
-  next.trading_stations_count = Number.isFinite(next.trading_stations_count) ? next.trading_stations_count : 2
-  next.manufacturing_stations_count = Number.isFinite(next.manufacturing_stations_count) ? next.manufacturing_stations_count : 4
-  next.schedule_mode = normalizeScheduleMode(next.schedule_mode ?? next.mode)
-  next.dormitory_rule = normalizeDormitoryRule(next.dormitory_rule)
-  next.shift_hours = [...DEFAULT_SHIFT_HOURS]
-  next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
-  next.desc = next.desc || `${next.layout} 基建配置`
-  next.Fiammetta = next.Fiammetta ?? { enable: false }
-  next.drones = {
-    enable: next.drones?.enable ?? false,
-    auto: next.drones?.auto ?? false,
-    auto_strategy: next.drones?.auto_strategy,
-    auto_target_product: next.drones?.auto_target_product,
-    order: next.drones?.order ?? 'pre',
-    targets: Array.isArray(next.drones?.targets) ? next.drones.targets : [],
-  }
-  next.intermediate_inventory = normalizeIntermediateInventory(next.intermediate_inventory)
-  return next
-}
-
 function applyCounts(config: LicenseConfig): LicenseConfig {
   config.layout = `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`
   config.desc = `${config.layout} 自定义配置`
   return config
-}
-
-export function validateConfig(config: LicenseConfig): { ok: true } | { ok: false; message: string } {
-  const rotationMode = normalizeScheduleMode(config.schedule_mode) === 'rotation'
-  const tradingCount = config.trading_stations_count
-  const manufacturingCount = config.manufacturing_stations_count
-  if (!Number.isInteger(tradingCount) || !Number.isInteger(manufacturingCount)) {
-    return { ok: false, message: '贸易站和制造站数量必须是整数。' }
-  }
-  if (tradingCount < 1 || manufacturingCount < 1 || tradingCount + manufacturingCount !== 6) {
-    return { ok: false, message: '当前版本固定 3 个发电站，贸易站 + 制造站需要等于 6。' }
-  }
-  const tradingTotal = sumCounts(config.product_requirements.trading_stations)
-  if (tradingTotal !== tradingCount) {
-    return { ok: false, message: `贸易产物数量合计为 ${tradingTotal}，需要等于 ${tradingCount}。` }
-  }
-  const manufacturingTotal = sumCounts(config.product_requirements.manufacturing_stations)
-  if (manufacturingTotal !== manufacturingCount) {
-    return { ok: false, message: `制造产物数量合计为 ${manufacturingTotal}，需要等于 ${manufacturingCount}。` }
-  }
-  const shiftHours = parseShiftHours(config.shift_hours)
-  if (!rotationMode && (!shiftHours || !isValidShiftHours(shiftHours))) {
-    return { ok: false, message: '换班间隔已固定为 8-8-8，请重新载入配置后再试。' }
-  }
-  if (!rotationMode && config.drones?.enable && !config.drones.auto && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
-    return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
-  }
-  return { ok: true }
 }
 
 function normalizeIntermediateInventory(value: unknown): Record<IntermediateProduct, number> {
@@ -586,6 +492,22 @@ export default function ConfigEditor({
                 游戏内轮换会生成两个设施预设队列，按游戏内“队列轮换/快速切换”使用；不会生成 MAA 排班 JSON。
               </p>
             </div>
+            {!rotationMode && (
+              <ShiftHoursEditor
+                value={config.shift_hours}
+                canEdit={canEdit}
+                onChange={(hours) => onUpdate((next) => {
+                  next.schedule_mode = 'maa'
+                  next.shift_hours = hours
+                  next.variable_shift_schedule = {
+                    ...(next.variable_shift_schedule ?? {}),
+                    enable: false,
+                    enabled: false,
+                  }
+                  applyCounts(next)
+                })}
+              />
+            )}
             <div>
               <p className="mb-2 text-xs font-medium text-ink-muted">宿舍规则</p>
               <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
@@ -879,6 +801,75 @@ function IntermediateInventoryField({
         />
       </span>
     </label>
+  )
+}
+
+function ShiftHoursEditor({
+  value,
+  canEdit,
+  onChange,
+}: {
+  value: LicenseConfig['shift_hours'];
+  canEdit: boolean;
+  onChange: (hours: number[]) => void;
+}) {
+  const normalized = parseShiftHours(value) ?? [8, 8, 8]
+  const formatted = normalized.join('-')
+  const [draftValue, setDraftValue] = useState(formatted)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setDraftValue(formatted)
+    setError(null)
+  }, [formatted])
+
+  const commitDraft = () => {
+    if (!canEdit) return
+    const parsed = parseShiftHours(draftValue)
+    if (!parsed || !isValidShiftHours(parsed)) {
+      setError('请输入 1–6 个正数，并确保总计为 24 小时。')
+      return
+    }
+    setError(null)
+    setDraftValue(parsed.join('-'))
+    if (parsed.some((hours, index) => Math.abs(hours - (normalized[index] ?? -1)) > 0.0001)
+      || parsed.length !== normalized.length) {
+      onChange(parsed)
+    }
+  }
+
+  return (
+    <div>
+      <label htmlFor="config-shift-hours" className="mb-2 block text-xs font-medium text-ink-muted">MAA 换班间隔</label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          id="config-shift-hours"
+          type="text"
+          inputMode="decimal"
+          value={draftValue}
+          disabled={!canEdit}
+          aria-invalid={Boolean(error)}
+          aria-describedby="config-shift-hours-help"
+          onChange={(event) => setDraftValue(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') commitDraft()
+          }}
+          className="min-h-11 min-w-0 flex-1 rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm tabular-nums text-ink-primary disabled:text-ink-muted"
+        />
+        {canEdit && (
+          <button
+            type="button"
+            onClick={commitDraft}
+            className="min-h-11 rounded-lg bg-surface-2 px-4 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/45"
+          >
+            应用间隔
+          </button>
+        )}
+      </div>
+      <p id="config-shift-hours-help" className={`mt-2 text-xs leading-5 ${error ? 'text-error' : 'text-ink-muted'}`}>
+        {error ?? '使用短横线或逗号分隔，例如 12-6-6；最多 6 班，总计 24 小时。'}
+      </p>
+    </div>
   )
 }
 

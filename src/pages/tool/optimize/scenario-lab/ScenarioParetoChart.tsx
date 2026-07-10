@@ -81,7 +81,15 @@ export default function ScenarioParetoChart({
               {(selected || focused) && <circle cx={px} cy={py} r="11" fill="none" stroke="var(--color-warning)" strokeWidth="2" />}
               {point.scheduleMode === 'rotation'
                 ? <rect x={px - 5} y={py - 5} width="10" height="10" rx="1" fill={fill} stroke="var(--color-surface-0)" strokeWidth="1.5" />
-                : <circle cx={px} cy={py} r="6" fill={fill} stroke="var(--color-surface-0)" strokeWidth="1.5" />}
+                : <circle
+                    cx={px}
+                    cy={py}
+                    r="6"
+                    fill={fill}
+                    stroke="var(--color-surface-0)"
+                    strokeWidth="1.5"
+                    strokeDasharray={point.scheduleStrategy === 'variable' ? '2 2' : undefined}
+                  />}
             </g>
           )
         })}
@@ -91,6 +99,7 @@ export default function ScenarioParetoChart({
         <LegendMark shape="circle" className="bg-brand-300" label="精确复核" />
         <LegendMark shape="circle" className="bg-brand-500" label="已验证前沿" />
         <LegendMark shape="square" className="bg-surface-4" label="游戏内轮换" />
+        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full border border-dashed border-ink-muted" />自动非固定</span>
       </div>
     </div>
   )

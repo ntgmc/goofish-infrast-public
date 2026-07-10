@@ -10,8 +10,14 @@ import type { ScenarioComparisonFactors, ScenarioComparisonResult } from '../../
 import type { LicenseConfig, LicenseOperator } from '../../../../lib/types'
 
 const DEFAULT_FACTORS: ScenarioComparisonFactors = {
-  layouts: [{ layout: '243', splits: [{ pureGold: 2, battleRecord: 2 }] }],
-  maaShiftHours: [8, 12],
+  layouts: [{
+    layout: '243',
+    plans: [{
+      trading: { lmd: 2, orundum: 0 },
+      manufacturing: { pureGold: 2, battleRecord: 2, originiumShard: 0 },
+    }],
+  }],
+  maaSchedules: ['variable', '8x3', '12x2'],
   includeRotation: true,
   droneStrategies: ['off', 'auto'],
 }
@@ -159,7 +165,7 @@ export function useScenarioComparison({
 }
 
 function sessionKey(profileId: string): string {
-  return `maa:scenario-lab:${profileId}`
+  return `maa:scenario-lab:v2:${profileId}`
 }
 
 function readSession(profileId: string): StoredScenarioSession | null {

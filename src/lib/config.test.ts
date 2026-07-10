@@ -6,6 +6,7 @@ describe('shift hour normalization', () => {
     [6, 6, 6, 6],
     [8, 8, 8],
     [12, 12],
+    [12, 6, 6],
   ])('preserves valid 24-hour patterns', (...hours) => {
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: hours })
     expect(config.shift_hours).toEqual(hours)

@@ -1,23 +1,32 @@
+import { useState } from 'react'
 import type {
   ScenarioComparisonFactors,
   ScenarioDroneStrategy,
   ScenarioLayout,
-  ScenarioMaaShiftHours,
-  ScenarioProductSplit,
+  ScenarioMaaSchedule,
+  ScenarioProductionPlan,
 } from '../../../../lib/scenario-comparison'
 
-const LAYOUTS: Array<{ id: ScenarioLayout; manufacturing: number }> = [
-  { id: '153', manufacturing: 5 },
-  { id: '243', manufacturing: 4 },
-  { id: '333', manufacturing: 3 },
+const LAYOUTS: Array<{ id: ScenarioLayout; trading: number; manufacturing: number }> = [
+  { id: '153', trading: 1, manufacturing: 5 },
+  { id: '243', trading: 2, manufacturing: 4 },
+  { id: '333', trading: 3, manufacturing: 3 },
+]
+
+const SCHEDULES: Array<{ id: ScenarioMaaSchedule; label: string }> = [
+  { id: 'variable', label: 'MAA 自动非固定间隔（2–4 班）' },
+  { id: '8x3', label: 'MAA 8 小时 × 3' },
+  { id: '12x2', label: 'MAA 12 小时 × 2' },
 ]
 
 const DRONES: Array<{ id: ScenarioDroneStrategy; label: string }> = [
   { id: 'off', label: '关闭' },
   { id: 'auto', label: '自动选择' },
   { id: 'lmd', label: '龙门币' },
+  { id: 'orundum', label: '合成玉' },
   { id: 'pure_gold', label: '赤金' },
   { id: 'battle_record', label: '作战记录' },
+  { id: 'originium_shard', label: '源石碎片' },
 ]
 
 export default function ScenarioFactors({
@@ -29,24 +38,13 @@ export default function ScenarioFactors({
   disabled: boolean;
   onChange: (next: ScenarioComparisonFactors) => void;
 }) {
-  const toggleSplit = (layout: ScenarioLayout, split: ScenarioProductSplit) => {
-    const current = factors.layouts.find((item) => item.layout === layout)
-    const selected = current?.splits.some((item) => sameSplit(item, split)) ?? false
-    const nextSplits = selected
-      ? (current?.splits ?? []).filter((item) => !sameSplit(item, split))
-      : [...(current?.splits ?? []), split]
-    const nextLayouts = factors.layouts.filter((item) => item.layout !== layout)
-    if (nextSplits.length > 0) nextLayouts.push({ layout, splits: nextSplits })
-    onChange({ ...factors, layouts: nextLayouts.sort((a, b) => a.layout.localeCompare(b.layout)) })
-  }
-
-  const toggleShift = (value: ScenarioMaaShiftHours) => {
-    const selected = factors.maaShiftHours.includes(value)
+  const toggleSchedule = (value: ScenarioMaaSchedule) => {
+    const selected = factors.maaSchedules.includes(value)
     onChange({
       ...factors,
-      maaShiftHours: selected
-        ? factors.maaShiftHours.filter((item) => item !== value)
-        : [...factors.maaShiftHours, value].sort((a, b) => a - b),
+      maaSchedules: selected
+        ? factors.maaSchedules.filter((item) => item !== value)
+        : [...factors.maaSchedules, value].sort(scheduleOrder),
     })
   }
 
@@ -60,29 +58,29 @@ export default function ScenarioFactors({
     })
   }
 
+  const updatePlans = (layout: ScenarioLayout, plans: ScenarioProductionPlan[]) => {
+    const layouts = factors.layouts.filter((item) => item.layout !== layout)
+    if (plans.length > 0) layouts.push({ layout, plans: [...plans].sort((left, right) => planKey(left).localeCompare(planKey(right))) })
+    onChange({ ...factors, layouts: layouts.sort((left, right) => left.layout.localeCompare(right.layout)) })
+  }
+
   return (
     <fieldset disabled={disabled} className="space-y-5">
       <legend className="sr-only">场景组合因子</legend>
       <div>
-        <h3 className="text-sm font-semibold text-ink-primary">布局与赤金/经验线</h3>
-        <p className="mt-1 text-xs leading-5 text-ink-muted">每个布局可选择多个精确整数拆分。</p>
-        <div className="mt-3 grid gap-3 xl:grid-cols-3">
+        <h3 className="text-sm font-semibold text-ink-primary">布局与精确生产方案</h3>
+        <p className="mt-1 text-xs leading-5 text-ink-muted">选择合成玉、源石碎片和赤金线数，其余龙门币与经验线自动补足。</p>
+        <div
+          data-testid="scenario-layout-grid"
+          className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3"
+        >
           {LAYOUTS.map((layout) => (
-            <div key={layout.id} className="rounded-lg border border-surface-3 bg-surface-2/45 p-3">
-              <p className="text-sm font-semibold text-ink-primary">{layout.id}</p>
-              <div className="mt-2 grid gap-2">
-                {splitOptions(layout.manufacturing).map((split) => {
-                  const id = `scenario-${layout.id}-${split.pureGold}-${split.battleRecord}`
-                  const checked = factors.layouts.find((item) => item.layout === layout.id)?.splits.some((item) => sameSplit(item, split)) ?? false
-                  return (
-                    <label key={id} htmlFor={id} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 text-sm text-ink-secondary hover:bg-surface-2">
-                      <input id={id} type="checkbox" checked={checked} onChange={() => toggleSplit(layout.id, split)} className="h-4 w-4 accent-brand-500" />
-                      赤金 {split.pureGold} 线 + 经验 {split.battleRecord} 线
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
+            <LayoutPlanEditor
+              key={layout.id}
+              layout={layout}
+              plans={factors.layouts.find((item) => item.layout === layout.id)?.plans ?? []}
+              onChange={(plans) => updatePlans(layout.id, plans)}
+            />
           ))}
         </div>
       </div>
@@ -91,23 +89,37 @@ export default function ScenarioFactors({
         <div>
           <h3 className="text-sm font-semibold text-ink-primary">排班模式</h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {([6, 8, 12] as ScenarioMaaShiftHours[]).map((hours) => (
-              <CheckOption key={hours} id={`shift-${hours}`} checked={factors.maaShiftHours.includes(hours)} onChange={() => toggleShift(hours)}>
-                MAA {hours} 小时 × {24 / hours}
+            {SCHEDULES.map((schedule) => (
+              <CheckOption
+                key={schedule.id}
+                id={`shift-${schedule.id}`}
+                checked={factors.maaSchedules.includes(schedule.id)}
+                onChange={() => toggleSchedule(schedule.id)}
+              >
+                {schedule.label}
               </CheckOption>
             ))}
-            <CheckOption id="shift-rotation" checked={factors.includeRotation} onChange={() => onChange({ ...factors, includeRotation: !factors.includeRotation })}>
+            <CheckOption
+              id="shift-rotation"
+              checked={factors.includeRotation}
+              onChange={() => onChange({ ...factors, includeRotation: !factors.includeRotation })}
+            >
               游戏内轮换 12 小时 × 2
             </CheckOption>
           </div>
-          <p className="mt-2 text-xs leading-5 text-ink-muted">游戏内轮换固定关闭无人机和菲亚梅塔，不随下方策略重复展开。</p>
+          <p className="mt-2 text-xs leading-5 text-ink-muted">自动模式先快速选择实际间隔，再冻结该数组精确复核；轮换不随无人机策略重复展开。</p>
         </div>
 
         <div>
           <h3 className="text-sm font-semibold text-ink-primary">MAA 无人机策略</h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {DRONES.map((drone) => (
-              <CheckOption key={drone.id} id={`drone-${drone.id}`} checked={factors.droneStrategies.includes(drone.id)} onChange={() => toggleDrone(drone.id)}>
+              <CheckOption
+                key={drone.id}
+                id={`drone-${drone.id}`}
+                checked={factors.droneStrategies.includes(drone.id)}
+                onChange={() => toggleDrone(drone.id)}
+              >
                 {drone.label}
               </CheckOption>
             ))}
@@ -116,6 +128,113 @@ export default function ScenarioFactors({
         </div>
       </div>
     </fieldset>
+  )
+}
+
+function LayoutPlanEditor({
+  layout,
+  plans,
+  onChange,
+}: {
+  layout: { id: ScenarioLayout; trading: number; manufacturing: number };
+  plans: ScenarioProductionPlan[];
+  onChange: (plans: ScenarioProductionPlan[]) => void;
+}) {
+  const [orundum, setOrundum] = useState(0)
+  const [originiumShard, setOriginiumShard] = useState(0)
+  const [pureGold, setPureGold] = useState(Math.min(2, layout.manufacturing))
+  const maxPureGold = layout.manufacturing - originiumShard
+  const boundedPureGold = Math.min(pureGold, maxPureGold)
+  const draft = buildPlan(layout, orundum, originiumShard, boundedPureGold)
+  const duplicate = plans.some((plan) => samePlan(plan, draft))
+
+  return (
+    <section className="min-w-0 rounded-lg border border-surface-3 bg-surface-2/45 p-3" aria-labelledby={`layout-${layout.id}-title`}>
+      <div className="flex items-center justify-between gap-2">
+        <h4 id={`layout-${layout.id}-title`} className="text-sm font-semibold text-ink-primary">{layout.id}</h4>
+        <span className="text-xs tabular-nums text-ink-muted">已选 {plans.length}</span>
+      </div>
+      <div className="mt-3 grid gap-3">
+        <SelectField
+          id={`layout-${layout.id}-orundum`}
+          label="合成玉贸易线"
+          value={orundum}
+          max={layout.trading}
+          onChange={setOrundum}
+        />
+        <SelectField
+          id={`layout-${layout.id}-shard`}
+          label="源石碎片制造线"
+          value={originiumShard}
+          max={layout.manufacturing}
+          onChange={(value) => {
+            setOriginiumShard(value)
+            setPureGold((current) => Math.min(current, layout.manufacturing - value))
+          }}
+        />
+        <SelectField
+          id={`layout-${layout.id}-gold`}
+          label="赤金制造线"
+          value={boundedPureGold}
+          max={maxPureGold}
+          onChange={setPureGold}
+        />
+      </div>
+      <p className="mt-3 text-xs leading-5 text-ink-secondary">{planLabel(draft)}</p>
+      <button
+        type="button"
+        disabled={duplicate}
+        onClick={() => onChange([...plans, draft])}
+        className="mt-3 min-h-11 w-full rounded-lg bg-surface-1 px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/45 disabled:cursor-not-allowed disabled:text-ink-muted"
+      >
+        {duplicate ? '方案已添加' : '添加生产方案'}
+      </button>
+      {plans.length > 0 && (
+        <ul className="mt-3 space-y-2" aria-label={`${layout.id} 已选生产方案`}>
+          {plans.map((plan) => (
+            <li key={planKey(plan)} className="flex min-h-11 items-center gap-2 rounded-lg bg-surface-1 px-3 py-2">
+              <span className="min-w-0 flex-1 text-xs leading-5 text-ink-secondary">{planLabel(plan)}</span>
+              <button
+                type="button"
+                onClick={() => onChange(plans.filter((item) => !samePlan(item, plan)))}
+                aria-label={`删除 ${layout.id} ${planLabel(plan)}`}
+                className="min-h-11 shrink-0 rounded-md px-3 text-xs font-medium text-error transition-colors duration-150 hover:bg-error/10 focus:outline-none focus:ring-2 focus:ring-error/35"
+              >
+                删除
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function SelectField({
+  id,
+  label,
+  value,
+  max,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label htmlFor={id} className="grid grid-cols-[minmax(0,1fr)_4rem] items-center gap-2 text-xs text-ink-secondary">
+      <span>{label}</span>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(Number(event.currentTarget.value))}
+        className="min-h-11 rounded-md border border-surface-4 bg-surface-1 px-2 text-sm tabular-nums text-ink-primary"
+      >
+        {Array.from({ length: max + 1 }, (_, item) => <option key={item} value={item}>{item}</option>)}
+      </select>
+    </label>
   )
 }
 
@@ -128,13 +247,34 @@ function CheckOption({ id, checked, onChange, children }: { id: string; checked:
   )
 }
 
-function splitOptions(manufacturing: number): ScenarioProductSplit[] {
-  return Array.from({ length: manufacturing + 1 }, (_, pureGold) => ({
-    pureGold,
-    battleRecord: manufacturing - pureGold,
-  }))
+function buildPlan(
+  layout: { trading: number; manufacturing: number },
+  orundum: number,
+  originiumShard: number,
+  pureGold: number,
+): ScenarioProductionPlan {
+  return {
+    trading: { lmd: layout.trading - orundum, orundum },
+    manufacturing: {
+      pureGold,
+      battleRecord: layout.manufacturing - originiumShard - pureGold,
+      originiumShard,
+    },
+  }
 }
 
-function sameSplit(left: ScenarioProductSplit, right: ScenarioProductSplit): boolean {
-  return left.pureGold === right.pureGold && left.battleRecord === right.battleRecord
+function planLabel(plan: ScenarioProductionPlan): string {
+  return `贸：币${plan.trading.lmd}/玉${plan.trading.orundum} · 制：赤${plan.manufacturing.pureGold}/经${plan.manufacturing.battleRecord}/碎${plan.manufacturing.originiumShard}`
+}
+
+function planKey(plan: ScenarioProductionPlan): string {
+  return `${plan.trading.lmd}-${plan.trading.orundum}-${plan.manufacturing.pureGold}-${plan.manufacturing.battleRecord}-${plan.manufacturing.originiumShard}`
+}
+
+function samePlan(left: ScenarioProductionPlan, right: ScenarioProductionPlan): boolean {
+  return planKey(left) === planKey(right)
+}
+
+function scheduleOrder(left: ScenarioMaaSchedule, right: ScenarioMaaSchedule): number {
+  return ['variable', '8x3', '12x2'].indexOf(left) - ['variable', '8x3', '12x2'].indexOf(right)
 }

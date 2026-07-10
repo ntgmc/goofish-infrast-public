@@ -196,7 +196,7 @@ export async function prepareOptimizeJob(
             effectiveConfig,
             activeProfileId,
             factors: body.factors,
-            estimate: buildScenarioComparisonEstimate(expansion.scenarios.length),
+            estimate: buildScenarioComparisonEstimate(expansion.scenarios.length, expansion.variableScenarioCount),
           },
         },
       };
