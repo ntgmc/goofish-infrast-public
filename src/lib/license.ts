@@ -184,6 +184,11 @@ export function canEditConfig(license: LicenseFile): boolean {
   return permission === "advanced" || permission === "ultimate" || permission === "admin";
 }
 
+export function canUseScenarioComparison(license: LicenseFile): boolean {
+  const permission = getPermissionMode(license)
+  return permission === 'advanced' || permission === 'ultimate' || permission === 'admin'
+}
+
 export function isIntermediateAutoConfig(config: LicenseConfig | null | undefined): boolean {
   return config?.auto_balance_source === "intermediate_inventory" || config?.auto_balance_source === "limited_config";
 }

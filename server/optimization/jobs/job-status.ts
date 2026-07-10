@@ -7,7 +7,7 @@ import { requireUserSession } from "../../handlers/user-auth";
 import { getOptimizeJobStore, type OptimizeJobPriority, type OptimizeJobRecord } from "../../storage/optimize-job-store";
 import { getOptimizePollAfterMs, kickOptimizeJobProcessing } from "../../optimize-job-runner";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
-import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizeJobPayload } from './shared';
+import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload } from './shared';
 import { OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
 import { jsonResponse } from './http-core';
 import { prepareOptimizeJob } from './prepare-job';
@@ -124,15 +124,15 @@ export function formatOptimizationJobSnapshot(
 }
 
 export function formatJobPriority(job: Pick<OptimizeJobRecord, 'priority'>): OptimizeJobPriority {
-  return job.priority > 0 ? 'paid' : 'standard';
+  return job.priority >= 10 ? 'paid' : job.priority > 0 ? 'analysis' : 'standard';
 }
 
 export function formatJobPriorityLabel(job: Pick<OptimizeJobRecord, 'priority'>): string {
-  return job.priority > 0 ? '付费优先' : '普通队列';
+  return job.priority >= 10 ? '付费优先' : job.priority > 0 ? '高级分析' : '普通队列';
 }
 
 export function getOptimizeJobEstimate(job: OptimizeJobRecord): OptimizeDurationEstimate {
-  const payload = job.payload_json as Partial<OptimizeJobPayload> | null;
+  const payload = job.payload_json as Partial<OptimizationJobPayload> | null;
   if (isOptimizeDurationEstimate(payload?.estimate)) return payload.estimate;
   const bucket = payload?.effectiveConfig ? getOptimizeEstimateBucket(payload.effectiveConfig) : 'maa_plain';
   return buildFallbackOptimizeEstimate(bucket);
@@ -216,7 +216,7 @@ export function isOptimizeDurationEstimate(value: unknown): value is OptimizeDur
 }
 
 export function isOptimizeEstimateBucket(value: unknown): value is OptimizeEstimateBucket {
-  return value === 'maa_fiammetta' || value === 'maa_plain' || value === 'rotation';
+  return value === 'maa_fiammetta' || value === 'maa_plain' || value === 'rotation' || value === 'scenario_comparison';
 }
 
 export function getOptimizeEstimateBucket(config: LicenseConfig): OptimizeEstimateBucket {
@@ -235,6 +235,7 @@ export function isEstimateFiammettaEnabled(bucket: OptimizeEstimateBucket): bool
 
 export async function resolveOptimizeDurationEstimate(bucket: OptimizeEstimateBucket): Promise<OptimizeDurationEstimate> {
   const fallback = buildFallbackOptimizeEstimate(bucket);
+  if (bucket === 'scenario_comparison') return fallback;
   const endAt = new Date();
   const startAt = new Date(endAt.getTime() - OPTIMIZE_ESTIMATE_HISTORY_DAYS * 24 * 60 * 60 * 1000);
   try {
@@ -251,6 +252,17 @@ export async function resolveOptimizeDurationEstimate(bucket: OptimizeEstimateBu
   } catch (error) {
     console.warn('optimize duration estimate fallback used:', error);
     return fallback;
+  }
+}
+
+export function buildScenarioComparisonEstimate(scenarioCount: number): OptimizeDurationEstimate {
+  const count = Math.max(1, Math.min(24, Math.floor(scenarioCount)))
+  const estimatedVerifications = Math.min(9, count)
+  return {
+    estimated_duration_ms: clampOptimizeEstimateMs(count * 4_000 + estimatedVerifications * 9_000),
+    estimate_bucket: 'scenario_comparison',
+    estimate_source: 'fallback_p95',
+    estimate_sample_count: 0,
   }
 }
 

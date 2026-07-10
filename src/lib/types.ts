@@ -179,9 +179,9 @@ export interface OptimizeRequest {
   upgrade_task_payload?: UpgradeTaskPayload;
 }
 
-export type OptimizeJobPriority = 'paid' | 'standard';
+export type OptimizeJobPriority = 'paid' | 'analysis' | 'standard';
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
-export type OptimizeEstimateBucket = 'maa_fiammetta' | 'maa_plain' | 'rotation';
+export type OptimizeEstimateBucket = 'maa_fiammetta' | 'maa_plain' | 'rotation' | 'scenario_comparison';
 export type OptimizeEstimateSource = 'history_p95' | 'fallback_p95';
 export type OptimizeRuntimeEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed';
 
