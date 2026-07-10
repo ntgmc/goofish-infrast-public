@@ -13,7 +13,9 @@ await checkFile('src/pages/AdminPage.tsx', 400)
 await checkFile('src/pages/OptimizePage.tsx', 400)
 await checkFile('server/handlers/optimization.ts', 300)
 await checkGlob('server/optimization/engine/**/*.ts', 300)
-checkNewPageModuleUnusedSymbols()
+const typeProgram = createArchitectureTypeProgram()
+checkNewPageModuleUnusedSymbols(typeProgram)
+checkOptimizationUnusedImports(typeProgram)
 
 const engineFiles = []
 for await (const filename of glob('server/optimization/**/*.ts')) engineFiles.push(filename)
@@ -46,15 +48,16 @@ async function checkFile(filename, limit) {
   failures.push(message)
 }
 
-function checkNewPageModuleUnusedSymbols() {
+function createArchitectureTypeProgram() {
   const configResult = ts.readConfigFile('tsconfig.json', ts.sys.readFile)
   if (configResult.error) {
     failures.push(ts.flattenDiagnosticMessageText(configResult.error.messageText, '\n'))
-    return
+    return null
   }
   const config = ts.parseJsonConfigFileContent(configResult.config, ts.sys, process.cwd())
-  const program = ts.createProgram({
-    rootNames: config.fileNames,
+  const serverFiles = ts.sys.readDirectory('server', ['.ts'], undefined, ['**/*.ts'])
+  return ts.createProgram({
+    rootNames: [...new Set([...config.fileNames, ...serverFiles])],
     options: {
       ...config.options,
       noEmit: true,
@@ -62,6 +65,10 @@ function checkNewPageModuleUnusedSymbols() {
       noUnusedParameters: true,
     },
   })
+}
+
+function checkNewPageModuleUnusedSymbols(program) {
+  if (!program) return
   const unusedCodes = new Set([6133, 6192, 6196])
   const pageModulePattern = /\/src\/pages\/(?:admin\/|tool\/optimize\/)/
   for (const diagnostic of program.getSemanticDiagnostics()) {
@@ -72,5 +79,45 @@ function checkNewPageModuleUnusedSymbols() {
     failures.push(
       `${filename}:${position.line + 1}:${position.character + 1} ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`,
     )
+  }
+}
+
+function checkOptimizationUnusedImports(program) {
+  if (!program) return
+  const checker = program.getTypeChecker()
+  const optimizationPattern = /\/server\/optimization\//
+  for (const sourceFile of program.getSourceFiles()) {
+    const filename = sourceFile.fileName.replaceAll('\\', '/')
+    if (!optimizationPattern.test(filename) || sourceFile.isDeclarationFile) continue
+
+    const referencedSymbols = new Set()
+    const visit = (node) => {
+      if (ts.isIdentifier(node)) {
+        const symbol = checker.getSymbolAtLocation(node)
+        if (symbol) referencedSymbols.add(symbol)
+      }
+      ts.forEachChild(node, visit)
+    }
+    for (const statement of sourceFile.statements) {
+      if (!ts.isImportDeclaration(statement)) visit(statement)
+    }
+
+    for (const declaration of sourceFile.statements.filter(ts.isImportDeclaration)) {
+      const clause = declaration.importClause
+      if (!clause) continue
+      const bindings = []
+      if (clause.name) bindings.push(clause.name)
+      if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) {
+        bindings.push(clause.namedBindings.name)
+      } else if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+        bindings.push(...clause.namedBindings.elements.map((element) => element.name))
+      }
+      for (const binding of bindings) {
+        const symbol = checker.getSymbolAtLocation(binding)
+        if (symbol && referencedSymbols.has(symbol)) continue
+        const position = sourceFile.getLineAndCharacterOfPosition(binding.getStart(sourceFile))
+        failures.push(`${filename}:${position.line + 1}:${position.character + 1} unused import ${binding.text}`)
+      }
+    }
   }
 }
