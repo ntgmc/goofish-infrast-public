@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { LicenseConfig, OptimizeEstimateBucket, OptimizeResult } from "../../../src/lib/types";
+import { SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT } from '../../../src/lib/scenario-comparison';
 import type { OptimizationJobSnapshot } from "../../../src/lib/optimization-contracts";
 import { getScheduleGenerateDurationStatsByBucket } from "../../handlers/usage-stats";
 import { getProfileForUser } from "../../storage/user-store";
@@ -8,7 +9,7 @@ import { getOptimizeJobStore, type OptimizeJobPriority, type OptimizeJobRecord }
 import { getOptimizePollAfterMs, kickOptimizeJobProcessing } from "../../optimize-job-runner";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
 import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload } from './shared';
-import { OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
+import { OPTIMIZE_ANALYSIS_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
 import { jsonResponse } from './http-core';
 import { prepareOptimizeJob } from './prepare-job';
 
@@ -255,11 +256,16 @@ export async function resolveOptimizeDurationEstimate(bucket: OptimizeEstimateBu
   }
 }
 
-export function buildScenarioComparisonEstimate(scenarioCount: number): OptimizeDurationEstimate {
+export function buildScenarioComparisonEstimate(scenarioCount: number, variableScenarioCount = 0): OptimizeDurationEstimate {
   const count = Math.max(1, Math.min(24, Math.floor(scenarioCount)))
+  const variableCount = Math.max(0, Math.min(count, Math.floor(variableScenarioCount)))
+  const fixedCount = count - variableCount
   const estimatedVerifications = Math.min(9, count)
   return {
-    estimated_duration_ms: clampOptimizeEstimateMs(count * 4_000 + estimatedVerifications * 9_000),
+    estimated_duration_ms: clampOptimizeEstimateMs(
+      fixedCount * 4_000 + variableCount * SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT * 4_000 + estimatedVerifications * 9_000,
+      OPTIMIZE_ANALYSIS_ESTIMATE_MAX_MS,
+    ),
     estimate_bucket: 'scenario_comparison',
     estimate_source: 'fallback_p95',
     estimate_sample_count: 0,
@@ -275,7 +281,7 @@ export function buildFallbackOptimizeEstimate(bucket: OptimizeEstimateBucket): O
   };
 }
 
-export function clampOptimizeEstimateMs(value: number): number {
+export function clampOptimizeEstimateMs(value: number, maxMs = OPTIMIZE_ESTIMATE_MAX_MS): number {
   if (!Number.isFinite(value)) return OPTIMIZE_ESTIMATE_FALLBACK_MS.maa_plain;
-  return Math.max(OPTIMIZE_ESTIMATE_MIN_MS, Math.min(OPTIMIZE_ESTIMATE_MAX_MS, Math.round(value)));
+  return Math.max(OPTIMIZE_ESTIMATE_MIN_MS, Math.min(maxMs, Math.round(value)));
 }

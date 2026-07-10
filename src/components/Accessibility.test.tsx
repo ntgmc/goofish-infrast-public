@@ -125,7 +125,7 @@ describe('mobile touch targets', () => {
     expect(screen.getByRole('button', { name: '注册' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('uses document flow on mobile and fixed positioning from the small breakpoint', () => {
+  it('uses document flow on mobile, fixed desktop positioning, and a compact version badge', () => {
     render(<BuildMetaStrip placement="corner" />)
 
     const strip = screen.getByText(/当前规则数据更新于/).parentElement
@@ -133,7 +133,8 @@ describe('mobile touch targets', () => {
     expect(strip?.className).toContain('relative')
     expect(strip?.className).toContain('sm:fixed')
     expect(strip?.className).toContain('env(safe-area-inset-bottom)')
-    expect(summary).toHaveClass('min-h-11', 'min-w-11')
+    expect(summary).toHaveClass('px-2.5', 'py-1')
+    expect(summary).not.toHaveClass('min-h-11', 'min-w-11')
   })
 })
 

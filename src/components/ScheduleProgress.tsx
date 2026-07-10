@@ -196,8 +196,8 @@ const TASK_STEPS: Record<ScheduleProgressState['mode'], Array<{ label: string; d
   scenario: [
     { label: '校验组合', detail: '检查账号权限、场景因子和运行上限。' },
     { label: '进入队列', detail: '等待高级分析 worker 领取任务。' },
-    { label: '快速筛选', detail: '计算全部场景并按操作成本分组。' },
-    { label: '精确复核', detail: '复核候选并生成 Pareto 前沿。' },
+    { label: '快速筛选', detail: '计算全部场景；自动非固定模式同时选择班次数组。' },
+    { label: '精确复核', detail: '按实际操作成本分组，冻结候选班次后生成 Pareto 前沿。' },
   ],
 }
 

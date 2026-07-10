@@ -21,7 +21,7 @@ export default function BuildMetaStrip({ meta = APP_BUILD_META, className = '', 
         当前规则数据更新于 {formatDate(meta.generated_at)}
       </span>
       <details className="group relative">
-        <summary className="inline-grid min-h-11 min-w-11 cursor-pointer list-none place-items-center rounded-full border border-surface-3 bg-surface-1/95 px-2.5 py-1 text-ink-muted shadow-sm transition-colors duration-150 hover:border-surface-4 hover:text-ink-secondary [&::-webkit-details-marker]:hidden">
+        <summary className="cursor-pointer list-none rounded-full border border-surface-3 bg-surface-1/95 px-2.5 py-1 text-ink-muted shadow-sm transition-colors duration-150 hover:border-surface-4 hover:text-ink-secondary [&::-webkit-details-marker]:hidden">
           版本
         </summary>
         <div className={detailPanelClassName}>

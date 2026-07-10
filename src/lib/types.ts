@@ -13,7 +13,7 @@ export type IntermediateInventory = Partial<Record<IntermediateProduct, number>>
 export interface LicenseConfig {
   layout: string;
   desc: string;
-  schedule_mode?: 'maa' | 'rotation' | string;
+  schedule_mode?: 'maa' | 'rotation' | 'variable' | string;
   dormitory_rule?: 'fixed' | 'maa_autofill' | string;
   shift_hours?: number[] | string;
   trading_stations_count: number;
@@ -44,6 +44,16 @@ export interface LicenseConfig {
   orundum_planning?: {
     daily_sanity_budget?: number;
     monthly_card?: boolean;
+  };
+  variable_shift_schedule?: {
+    enable?: boolean;
+    enabled?: boolean;
+    max_shifts?: number;
+    shift_step_minutes?: number;
+    min_low_hours?: number;
+    beam_width?: number;
+    trace_variable_shifts?: boolean;
+    trace_mood_cycle?: boolean;
   };
   intermediate_inventory?: IntermediateInventory;
   auto_balance_source?: string;

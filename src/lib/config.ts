@@ -16,6 +16,7 @@ export const PRODUCT_LABELS: Record<string, string> = {
 export const SCHEDULE_MODE_LABELS: Record<string, string> = {
   maa: 'MAA 排班表',
   rotation: '游戏内轮换',
+  variable: 'MAA 自动非固定',
 }
 
 export const DORMITORY_RULE_LABELS: Record<string, string> = {
@@ -83,11 +84,15 @@ export function cloneConfig(config: LicenseConfig): LicenseConfig {
   return JSON.parse(JSON.stringify(config)) as LicenseConfig
 }
 
-export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' {
+export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' | 'variable' {
   const modeText = String(mode ?? 'maa').trim().toLowerCase()
-  return ['rotation', 'rotate', 'game_rotation', 'in_game_rotation', '轮换', '轮换模式', '游戏内轮换'].includes(modeText)
-    ? 'rotation'
-    : 'maa'
+  if (['rotation', 'rotate', 'game_rotation', 'in_game_rotation', '轮换', '轮换模式', '游戏内轮换'].includes(modeText)) {
+    return 'rotation'
+  }
+  if (['variable', 'variable_shift', 'variable-shift', 'variable_shift_schedule', '一天n换', '一天 n 换', '非固定间隔'].includes(modeText)) {
+    return 'variable'
+  }
+  return 'maa'
 }
 
 export function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' {
@@ -97,7 +102,7 @@ export function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' 
     : 'fixed'
 }
 
-function parseShiftHours(value: unknown): number[] | null {
+export function parseShiftHours(value: unknown): number[] | null {
   const items = Array.isArray(value)
     ? value
     : typeof value === 'string'
@@ -110,7 +115,7 @@ function parseShiftHours(value: unknown): number[] | null {
   return hours.map((hour) => Math.round(hour * 100) / 100)
 }
 
-function isValidShiftHours(hours: number[]): boolean {
+export function isValidShiftHours(hours: number[]): boolean {
   const total = hours.reduce((sum, hour) => sum + hour, 0)
   return Math.abs(total - 24) <= 0.0001
 }
