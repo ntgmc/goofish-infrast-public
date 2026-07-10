@@ -8,11 +8,11 @@ import {
   getAnnouncementReads,
   getPasswordResetTokenByHash,
   getProfileForUser,
-  getProfileWorkspace,
   getRecentPasswordResetTokenForUser,
   getSessionByTokenHash,
   getUserByEmail,
   getUserById,
+  listProfileWorkspaces,
   listProfilesForUser,
   markPasswordResetTokenUsed,
   markAnnouncementRead,
@@ -45,6 +45,7 @@ import {
 
 const SESSION_COOKIE = 'maa_session'
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
+export const USER_SESSION_TOUCH_INTERVAL_MS = 10 * 60 * 1000
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ANNOUNCEMENT_KEY = 'current.json'
 const PASSWORD_RESET_DEFAULT_TTL_MINUTES = 30
@@ -439,13 +440,13 @@ export async function upgradePreviewProfileWithCdk(
   return { ok: true, profile: upgraded }
 }
 
-export async function requireUserSession(req: Request): Promise<AuthContext | null> {
+export async function requireUserSession(req: Request, now = new Date()): Promise<AuthContext | null> {
   const token = getSessionToken(req)
   if (!token) return null
   const tokenHash = hashSessionToken(token)
   const session = await getSessionByTokenHash(tokenHash)
   if (!session) return null
-  if (Date.parse(session.expires_at) <= Date.now()) {
+  if (Date.parse(session.expires_at) <= now.getTime()) {
     await deleteSessionByTokenHash(tokenHash)
     return null
   }
@@ -461,7 +462,11 @@ export async function requireUserSession(req: Request): Promise<AuthContext | nu
   const profiles = await migrateLegacyUserIfNeeded(user)
   const activeProfile = profiles.find((profile) => profile.kind !== 'depot_value') ?? profiles[0] ?? null
   const cdkRecord = activeProfile ? await getCdkRecordForProfile(activeProfile) : null
-  await touchSession(session)
+  const touchCutoff = new Date(now.getTime() - USER_SESSION_TOUCH_INTERVAL_MS)
+  const lastSeenAt = Date.parse(session.last_seen_at)
+  if (!Number.isFinite(lastSeenAt) || lastSeenAt <= touchCutoff.getTime()) {
+    await touchSession(session, now, touchCutoff)
+  }
   return { user, session, tokenHash, profiles, activeProfile, cdkRecord }
 }
 
@@ -473,21 +478,24 @@ export async function logoutRequest(req: Request): Promise<void> {
 
 export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?: string | null): Promise<AuthSuccessResponse> {
   const records = await migrateLegacyUserIfNeeded(user)
-  const publicProfiles: UserGameAccount[] = []
-  for (const profile of records) {
-    publicProfiles.push(toPublicProfile(profile, await getProfileWorkspace(profile.id)))
-  }
+  const [workspaces, announcementUnreadCount] = await Promise.all([
+    listProfileWorkspaces(records.map((profile) => profile.id)),
+    getAnnouncementUnreadCount(user.id),
+  ])
+  const publicProfiles: UserGameAccount[] = records.map((profile) => (
+    toPublicProfile(profile, workspaces.get(profile.id) ?? null)
+  ))
   const defaultActiveProfile = records.find((profile) => profile.kind !== 'depot_value') ?? records[0] ?? null
   const activeProfileRecord = activeProfileId
     ? records.find((profile) => profile.id === activeProfileId) ?? defaultActiveProfile
     : defaultActiveProfile
-  const activeWorkspace = activeProfileRecord ? await getProfileWorkspace(activeProfileRecord.id) : null
+  const activeWorkspace = activeProfileRecord ? workspaces.get(activeProfileRecord.id) ?? null : null
   return {
     user: toPublicUser(user),
     profiles: publicProfiles,
     active_profile: activeProfileRecord ? toPublicProfile(activeProfileRecord, activeWorkspace) : null,
     workspace: activeProfileRecord ? toPublicWorkspace(activeWorkspace) : null,
-    announcement_unread_count: await getAnnouncementUnreadCount(user.id),
+    announcement_unread_count: announcementUnreadCount,
   }
 }
 

@@ -278,9 +278,20 @@ export async function getSessionByTokenHash(tokenHash: string): Promise<UserSess
   return result.rows[0]?.record_json ?? null
 }
 
-export async function touchSession(session: UserSessionRecord): Promise<void> {
-  const updated = { ...session, last_seen_at: new Date().toISOString() }
-  await saveUserSession(updated)
+export async function touchSession(session: UserSessionRecord, now: Date, cutoff: Date): Promise<boolean> {
+  await ensureSchema()
+  const lastSeenAt = now.toISOString()
+  const updated = { ...session, last_seen_at: lastSeenAt }
+  const result = await query(
+    `update user_sessions
+     set record_json = $4::jsonb,
+         last_seen_at = $3
+     where id = $1
+       and token_hash = $2
+       and last_seen_at <= $5`,
+    [session.id, session.token_hash, lastSeenAt, JSON.stringify(updated), cutoff.toISOString()],
+  )
+  return (result.rowCount ?? 0) > 0
 }
 
 export async function deleteSessionByTokenHash(tokenHash: string): Promise<void> {
@@ -522,6 +533,23 @@ export async function getProfileWorkspace(profileId: string): Promise<UserWorksp
     [profileId],
   )
   return normalizeWorkspaceRecord(result.rows[0]?.record_json ?? null)
+}
+
+export async function listProfileWorkspaces(profileIds: string[]): Promise<Map<string, UserWorkspaceRecord>> {
+  if (profileIds.length === 0) return new Map()
+  await ensureSchema()
+  const result = await query<{ profile_id: string; record_json: UserWorkspaceRecord }>(
+    `select profile_id, record_json
+     from user_profile_workspaces
+     where profile_id = any($1::text[])`,
+    [profileIds],
+  )
+  const workspaces = new Map<string, UserWorkspaceRecord>()
+  for (const row of result.rows) {
+    const workspace = normalizeWorkspaceRecord(row.record_json)
+    if (workspace) workspaces.set(row.profile_id, workspace)
+  }
+  return workspaces
 }
 
 export async function getLegacyWorkspace(userId: string): Promise<LegacyUserWorkspaceRecord | null> {
