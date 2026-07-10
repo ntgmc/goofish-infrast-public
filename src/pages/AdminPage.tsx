@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { Announcement, AnnouncementAdminResponse, AnnouncementKind, AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../lib/types'
-import { apiJson, apiVoid } from '../lib/api-client'
+import { apiJson as requestJson, apiVoid as requestVoid } from '../lib/api-client'
+import {
+  ADMIN_SESSION_EXPIRED_EVENT,
+  adminApiJson as apiJson,
+  adminApiVoid as apiVoid,
+  clearLegacyAdminCredentials,
+} from '../lib/admin-api-client'
 
 type Permission = RawPermissionMode
 type GeneratedPermission = ProductPermissionMode
@@ -424,10 +430,11 @@ const cdkProductPermissionRank: Record<GeneratedPermission, number> = {
 }
 
 export default function AdminPage() {
-  const [credentials, setCredentials] = useState(() => readStoredCredentials())
-  const [loginUser, setLoginUser] = useState(credentials?.user ?? '')
-  const [loginPassword, setLoginPassword] = useState(credentials?.password ?? '')
-  const [authenticated, setAuthenticated] = useState(Boolean(credentials))
+  const [adminUsername, setAdminUsername] = useState<string | null>(null)
+  const [loginUser, setLoginUser] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [authenticated, setAuthenticated] = useState(false)
+  const [sessionChecking, setSessionChecking] = useState(true)
   const [activeSection, setActiveSection] = useState<AdminSection>('overview')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [permissionFilter, setPermissionFilter] = useState<PermissionFilter>('all')
@@ -463,13 +470,6 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const authHeaders = useMemo<Record<string, string>>(() => {
-    if (!credentials) return {} as Record<string, string>
-    return {
-      'X-Admin-User': credentials.user,
-      'X-Admin-Password': credentials.password,
-    }
-  }, [credentials])
   const usageStatsQuery = useMemo(
     () => buildUsageStatsQuery(usageRange, usageRangeFrom, usageRangeTo),
     [usageRange, usageRangeFrom, usageRangeTo],
@@ -504,70 +504,8 @@ const summary = useMemo(
     return records.filter((record) => selected.has(record.code_hash))
   }, [records, selectedCdkHashes])
 
-  const loadDashboard = useCallback(async (nextCredentials = credentials) => {
-    if (!nextCredentials) return
-    if (!usageStatsQuery) {
-      setError('自定义时间范围无效，请选择开始和结束日期')
-      return
-    }
-    setLoading(true)
-    setError(null)
-    try {
-      const headers = {
-        'X-Admin-User': nextCredentials.user,
-        'X-Admin-Password': nextCredentials.password,
-      }
-      const [cdkData, usageData, announcementData, usersData, riskSettingsData] = await Promise.all([
-        apiJson<{ cdks?: AdminCdkRecord[] }>('/api/admin/cdk?status=all', { headers, fallbackMessage: '加载 CDK 失败' }),
-        apiJson<Partial<UsageStatsResponse>>(`/api/admin/usage-stats?${usageStatsQuery}`, { headers, fallbackMessage: '加载统计失败' }),
-        apiJson<Partial<AnnouncementAdminResponse>>('/api/admin/announcement', { headers, fallbackMessage: '加载公告失败' }),
-        apiJson<{ users?: AdminUserSummary[]; app_users?: AppUserSummary[] }>('/api/admin/users', { headers, fallbackMessage: '加载账号失败' }),
-        apiJson<{ settings?: Partial<RiskControlSettings> }>('/api/admin/risk-settings', { headers, fallbackMessage: '加载风控设置失败' }),
-      ])
-      const nextAnnouncements = normalizeAnnouncementList(announcementData.announcements)
-      setRecords(cdkData.cdks ?? [])
-      setUsageStats(normalizeUsageStats(usageData))
-      setAnnouncements(nextAnnouncements)
-      setAnnouncementStats(normalizeAnnouncementStatsMap(announcementData.stats, nextAnnouncements))
-      setRiskSettings(normalizeRiskSettings(riskSettingsData.settings))
-      setUsers(usersData.users ?? [])
-      setAppUsers(usersData.app_users ?? [])
-      setAuthenticated(true)
-    } catch (caught) {
-      setError((caught as Error).message)
-      setAuthenticated(false)
-      clearStoredCredentials()
-      setCredentials(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [credentials, usageStatsQuery])
-
-  useEffect(() => {
-    if (credentials) void loadDashboard(credentials)
-  }, [usageStatsQuery])
-
-  useEffect(() => {
-    const available = new Set(records.map((record) => record.code_hash))
-    setSelectedCdkHashes((current) => current.filter((hash) => available.has(hash)))
-  }, [records])
-
-  const handleLogin = async (event: FormEvent) => {
-    event.preventDefault()
-    const nextErrors: FieldErrors = {}
-    if (!loginUser.trim()) nextErrors.loginUser = '请输入账号'
-    if (!loginPassword) nextErrors.loginPassword = '请输入密码'
-    setLoginFieldErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) return
-    const next = { user: loginUser.trim(), password: loginPassword }
-    setCredentials(next)
-    storeCredentials(next)
-    await loadDashboard(next)
-  }
-
-  const handleLogout = () => {
-    clearStoredCredentials()
-    setCredentials(null)
+  const resetAdminState = useCallback(() => {
+    setAdminUsername(null)
     setAuthenticated(false)
     setRecords([])
     setUsers([])
@@ -581,10 +519,109 @@ const summary = useMemo(
     setSelectedUserDetail(null)
     setOperatorDataByProfileId({})
     setExpandedOperatorProfileId(null)
+  }, [])
+
+  const loadDashboard = useCallback(async () => {
+    if (!usageStatsQuery) {
+      setError('自定义时间范围无效，请选择开始和结束日期')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      const [cdkData, usageData, announcementData, usersData, riskSettingsData] = await Promise.all([
+        apiJson<{ cdks?: AdminCdkRecord[] }>('/api/admin/cdk?status=all', { fallbackMessage: '加载 CDK 失败' }),
+        apiJson<Partial<UsageStatsResponse>>(`/api/admin/usage-stats?${usageStatsQuery}`, { fallbackMessage: '加载统计失败' }),
+        apiJson<Partial<AnnouncementAdminResponse>>('/api/admin/announcement', { fallbackMessage: '加载公告失败' }),
+        apiJson<{ users?: AdminUserSummary[]; app_users?: AppUserSummary[] }>('/api/admin/users', { fallbackMessage: '加载账号失败' }),
+        apiJson<{ settings?: Partial<RiskControlSettings> }>('/api/admin/risk-settings', { fallbackMessage: '加载风控设置失败' }),
+      ])
+      const nextAnnouncements = normalizeAnnouncementList(announcementData.announcements)
+      setRecords(cdkData.cdks ?? [])
+      setUsageStats(normalizeUsageStats(usageData))
+      setAnnouncements(nextAnnouncements)
+      setAnnouncementStats(normalizeAnnouncementStatsMap(announcementData.stats, nextAnnouncements))
+      setRiskSettings(normalizeRiskSettings(riskSettingsData.settings))
+      setUsers(usersData.users ?? [])
+      setAppUsers(usersData.app_users ?? [])
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }, [usageStatsQuery])
+
+  useEffect(() => {
+    clearLegacyAdminCredentials()
+    let active = true
+    requestJson<{ user?: { username?: string } }>('/api/admin/session', { fallbackMessage: '管理员会话检查失败' })
+      .then((data) => {
+        if (!active || !data.user?.username) return
+        setAdminUsername(data.user.username)
+        setLoginUser(data.user.username)
+        setAuthenticated(true)
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setSessionChecking(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (authenticated) void loadDashboard()
+  }, [authenticated, loadDashboard])
+
+  useEffect(() => {
+    const handleSessionExpired = () => resetAdminState()
+    window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired)
+    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, handleSessionExpired)
+  }, [resetAdminState])
+
+  useEffect(() => {
+    const available = new Set(records.map((record) => record.code_hash))
+    setSelectedCdkHashes((current) => current.filter((hash) => available.has(hash)))
+  }, [records])
+
+  const handleLogin = async (event: FormEvent) => {
+    event.preventDefault()
+    const nextErrors: FieldErrors = {}
+    if (!loginUser.trim()) nextErrors.loginUser = '请输入账号'
+    if (!loginPassword) nextErrors.loginPassword = '请输入密码'
+    setLoginFieldErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await requestJson<{ user?: { username?: string } }>('/api/admin/session', {
+        method: 'POST',
+        json: { username: loginUser.trim(), password: loginPassword },
+        fallbackMessage: '管理账号或密码错误',
+      })
+      if (!data.user?.username) throw new Error('管理员登录响应无效')
+      setAdminUsername(data.user.username)
+      setLoginUser(data.user.username)
+      setLoginPassword('')
+      setAuthenticated(true)
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogout = () => {
+    resetAdminState()
+    setSessionChecking(true)
+    void requestVoid('/api/admin/session', { method: 'DELETE' })
+      .catch(() => undefined)
+      .finally(() => setSessionChecking(false))
   }
 
   const handleExportUsageReport = async (format: 'csv' | 'json') => {
-    if (!credentials) return
+    if (!authenticated) return
     if (!usageStats) {
       setError('统计数据尚未加载完成')
       return
@@ -623,8 +660,7 @@ const summary = useMemo(
     try {
       const data = await apiJson<AdminCdkCreateResponse>('/api/admin/cdk', {
         method: 'POST',
-        headers: authHeaders,
-        json: { admin_user: credentials?.user, admin_password: credentials?.password, permission, order_note: orderNote, count: batchCount },
+        json: { permission, order_note: orderNote, count: batchCount },
         fallbackMessage: '生成失败',
       })
       const nextGeneratedCodes = normalizeGeneratedCdks(data)
@@ -667,10 +703,7 @@ const summary = useMemo(
     try {
       const data = await apiJson<Partial<AnnouncementAdminResponse>>('/api/admin/announcement', {
         method: 'PUT',
-        headers: authHeaders,
         json: {
-          admin_user: credentials?.user,
-          admin_password: credentials?.password,
           announcements,
         },
         fallbackMessage: '保存公告失败',
@@ -693,10 +726,7 @@ const summary = useMemo(
     try {
       const data = await apiJson<{ settings?: Partial<RiskControlSettings> }>('/api/admin/risk-settings', {
         method: 'PUT',
-        headers: authHeaders,
         json: {
-          admin_user: credentials?.user,
-          admin_password: credentials?.password,
           ...patch,
         },
         fallbackMessage: '保存风控设置失败',
@@ -733,10 +763,7 @@ const summary = useMemo(
     try {
       const data = await apiJson<{ cdk?: AdminCdkDetail }>('/api/admin/cdk', {
         method: 'PATCH',
-        headers: authHeaders,
         json: {
-          admin_user: credentials?.user,
-          admin_password: credentials?.password,
           code_hash: record.code_hash,
           action,
           ...(nextPermission ? { permission: nextPermission } : {}),
@@ -748,7 +775,6 @@ const summary = useMemo(
         setSelectedCdkDetail(data.cdk)
       } else if (selectedCdkDetail?.code_hash === record.code_hash) {
         const detailData = await apiJson<{ cdk?: AdminCdkDetail }>(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}`, {
-          headers: authHeaders,
           fallbackMessage: '加载 CDK 详情失败',
         })
         if (detailData.cdk) setSelectedCdkDetail(detailData.cdk)
@@ -769,8 +795,7 @@ const summary = useMemo(
     try {
       await apiVoid('/api/admin/cdk', {
         method: 'DELETE',
-        headers: authHeaders,
-        json: { admin_user: credentials?.user, admin_password: credentials?.password, code_hash: record.code_hash },
+        json: { code_hash: record.code_hash },
         fallbackMessage: '删除失败',
       })
       if (selectedCdkDetail?.code_hash === record.code_hash) setSelectedCdkDetail(null)
@@ -787,7 +812,6 @@ const summary = useMemo(
     setError(null)
     try {
       const data = await apiJson<{ cdk?: AdminCdkDetail }>(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}`, {
-        headers: authHeaders,
         fallbackMessage: '加载 CDK 详情失败',
       })
       if (!data.cdk) throw new Error('加载 CDK 详情失败')
@@ -832,7 +856,6 @@ const summary = useMemo(
     setError(null)
     try {
       const data = await apiJson<{ detail?: AdminUserDetail }>(`/api/admin/users?user_id=${encodeURIComponent(user.id)}`, {
-        headers: authHeaders,
         fallbackMessage: '加载用户详情失败',
       })
       if (!data.detail) throw new Error('加载用户详情失败')
@@ -859,7 +882,6 @@ const summary = useMemo(
       const data = await apiJson<{ operator_data?: AdminProfileOperatorData }>(
         `/api/admin/users?user_id=${encodeURIComponent(selectedUserDetail.user.id)}&profile_id=${encodeURIComponent(profile.id)}&include=operators`,
         {
-          headers: authHeaders,
           fallbackMessage: '加载干员数据失败',
         },
       )
@@ -911,10 +933,7 @@ const summary = useMemo(
     try {
       const data = await apiJson<{ detail?: AdminUserDetail }>('/api/admin/users', {
         method: 'PATCH',
-        headers: authHeaders,
         json: {
-          admin_user: credentials?.user,
-          admin_password: credentials?.password,
           action,
           user_id: selectedUserDetail.user.id,
           profile_id: profile.id,
@@ -1010,10 +1029,7 @@ const summary = useMemo(
     try {
       const data = await apiJson<{ user?: { email: string } }>('/api/admin/users', {
         method: 'PATCH',
-        headers: authHeaders,
         json: {
-          admin_user: credentials?.user,
-          admin_password: credentials?.password,
           action: 'reset_password',
           email: resetUserEmail,
           new_password: resetPassword,
@@ -1044,10 +1060,7 @@ const summary = useMemo(
     try {
       const data = await apiJson<{ detail?: AdminUserDetail; deleted?: boolean }>('/api/admin/users', {
         method: 'PATCH',
-        headers: authHeaders,
         json: {
-          admin_user: credentials?.user,
-          admin_password: credentials?.password,
           action,
           user_id: user.id,
           ...extraBody,
@@ -1087,6 +1100,14 @@ const summary = useMemo(
       return
     }
     await patchAppUser(user, 'delete_account', '已删除账号', { confirm_email: confirmedEmail.trim() })
+  }
+
+  if (sessionChecking) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-surface-0 px-6 text-ink-secondary">
+        <p className="text-sm">正在检查管理员会话...</p>
+      </main>
+    )
   }
 
   if (!authenticated) {
@@ -1155,7 +1176,7 @@ const summary = useMemo(
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-surface-3 bg-surface-1 px-4 py-5 lg:block">
         <div className="px-2">
           <p className="text-sm font-semibold text-brand-500">MAA 管理后台</p>
-          <p className="mt-1 truncate text-xs text-ink-muted">{credentials?.user}</p>
+          <p className="mt-1 truncate text-xs text-ink-muted">{adminUsername}</p>
         </div>
         <nav className="mt-8 space-y-1">
           {(Object.keys(sectionLabels) as AdminSection[]).map((section) => (
@@ -3396,22 +3417,5 @@ function formatRiskValue(value: unknown): string {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (Array.isArray(value)) return `${value.length} 项`
   return '对象摘要'
-}
-
-function readStoredCredentials(): { user: string; password: string } | null {
-  try {
-    const raw = window.sessionStorage.getItem('maa-admin-credentials')
-    return raw ? JSON.parse(raw) as { user: string; password: string } : null
-  } catch {
-    return null
-  }
-}
-
-function storeCredentials(credentials: { user: string; password: string }): void {
-  window.sessionStorage.setItem('maa-admin-credentials', JSON.stringify(credentials))
-}
-
-function clearStoredCredentials(): void {
-  window.sessionStorage.removeItem('maa-admin-credentials')
 }
 

@@ -1,5 +1,6 @@
 import adminCdkHandler from './handlers/admin-cdk'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
+import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
 import analyzeScheduleHandler from './handlers/analyze-schedule'
 import announcementHandler from './handlers/announcement'
@@ -22,12 +23,13 @@ type ApiHandler = (req: Request) => Promise<Response>
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Password, X-Admin-User, X-Cdk-Status',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Cdk-Status',
 }
 
 const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/cdk', adminCdkHandler as unknown as ApiHandler],
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
   ['/api/auth/register', authHandler as unknown as ApiHandler],
   ['/api/auth/login', authHandler as unknown as ApiHandler],

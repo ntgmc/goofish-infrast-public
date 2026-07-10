@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { Algorithm, Version, hash as argon2Hash } from '@node-rs/argon2'
 import { pbkdf2Sync } from 'node:crypto'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import * as esbuild from 'esbuild'
@@ -20,6 +20,7 @@ try {
   await assertUserPasswordMigration(passwordModule)
   await assertUserLoginRateLimits()
   await assertAdminAuthenticationRateLimits()
+  await assertNoBrowserReadableAdminPasswords()
 
   console.log('[check-auth-security] async password work and authentication rate limits passed')
 } finally {
@@ -318,35 +319,181 @@ async function assertUserLoginRateLimits() {
 async function assertAdminAuthenticationRateLimits() {
   process.env.MAA_ADMIN_PASSWORD = 'root-admin-password'
   globalThis.__authSecurityAdminStore = new Map()
+  globalThis.__authSecurityAdminSessions = new Map()
   globalThis.__authSecurityAdminGets = 0
   globalThis.__authSecurityAdminUpgradeModes = new Map()
   const adminAuth = await bundleModule('server/handlers/admin-auth.ts', 'admin-auth', [adminAuthPlugin()])
+  const adminSessionHandler = await bundleModule('server/handlers/admin-session.ts', 'admin-session', [adminAuthPlugin()])
   const created = await adminAuth.createAdminUser('security_admin', 'correct-admin-password')
   assert.equal(created.ok, true)
+
+  const loginTime = new Date('2026-07-10T00:00:00.000Z')
+  const login = await adminAuth.loginAdminRequest(
+    adminLoginRequest('198.51.100.70'),
+    'security_admin',
+    'correct-admin-password',
+    loginTime,
+  )
+  assert.equal(login.ok, true)
+  assert.match(login.cookie, /^maa_admin_session=[A-Za-z0-9_-]{43};/)
+  assert.match(login.cookie, /; HttpOnly/)
+  assert.match(login.cookie, /; SameSite=Strict/)
+  assert.match(login.cookie, /; Path=\/api\/admin/)
+  assert.doesNotMatch(login.cookie, /Max-Age|Expires=/i, 'admin session cookie should close with the browser')
+  assert.doesNotMatch(login.cookie, /; Secure/, 'development admin cookie should work over HTTP')
+  const sessionToken = adminCookieToken(login.cookie)
+  assert.equal(Buffer.from(sessionToken, 'base64url').length, 32)
+  const storedSessions = [...globalThis.__authSecurityAdminSessions.values()]
+  assert.equal(storedSessions.length, 1)
+  assert.match(storedSessions[0].token_hash, /^[a-f0-9]{64}$/)
+  assert.equal(storedSessions[0].token_hash === sessionToken, false)
+  assert.equal(JSON.stringify(storedSessions).includes(sessionToken), false, 'raw admin token must not be stored')
+
+  const getsBeforeSessionRequests = globalThis.__authSecurityAdminGets
+  const successfulRequests = Array.from({ length: 5 }, () => adminSessionRequest(login.cookie))
+  const successfulResults = await Promise.all(successfulRequests.map((request) => (
+    adminAuth.authenticateAdminRequest(request, new Date('2026-07-10T00:01:00.000Z'))
+  )))
+  assert(successfulResults.every((result) => result.ok && result.username === 'security_admin'))
+  assert.equal(
+    globalThis.__authSecurityAdminGets,
+    getsBeforeSessionRequests,
+    'authenticated admin requests should not query password records',
+  )
+
+  const legacyHeaders = await adminAuth.authenticateAdminRequest(adminLegacyHeaderRequest(
+    'security_admin',
+    'correct-admin-password',
+  ))
+  assert.equal(legacyHeaders.ok, false)
+  assert.equal(legacyHeaders.response.status, 401, 'legacy password headers must not authenticate')
+  const legacyBody = await adminAuth.authenticateAdminRequest(new Request('http://local/api/admin/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      admin_user: 'security_admin',
+      admin_password: 'correct-admin-password',
+    }),
+  }))
+  assert.equal(legacyBody.ok, false)
+  assert.equal(legacyBody.response.status, 401, 'legacy password body fields must not authenticate')
+
+  const malformedCookie = await adminAuth.authenticateAdminRequest(new Request('http://local/api/admin/test', {
+    headers: { Cookie: 'maa_admin_session=not-a-valid-token' },
+  }))
+  assert.equal(malformedCookie.ok, false)
+  assert.match(malformedCookie.response.headers.get('Set-Cookie') ?? '', /Max-Age=0/)
+
+  const crossOrigin = await adminAuth.authenticateAdminRequest(adminSessionRequest(login.cookie, {
+    method: 'PATCH',
+    origin: 'https://attacker.example',
+  }))
+  assert.equal(crossOrigin.ok, false)
+  assert.equal(crossOrigin.response.status, 403)
+  const sameOrigin = await adminAuth.authenticateAdminRequest(adminSessionRequest(login.cookie, {
+    method: 'PATCH',
+    origin: 'http://local',
+  }), new Date('2026-07-10T00:02:00.000Z'))
+  assert.equal(sameOrigin.ok, true)
+
+  const idleBoundaryLogin = await adminAuth.loginAdminRequest(
+    adminLoginRequest('198.51.100.71'),
+    'security_admin',
+    'correct-admin-password',
+    loginTime,
+  )
+  assert.equal(idleBoundaryLogin.ok, true)
+  const justBeforeIdleExpiry = await adminAuth.authenticateAdminRequest(
+    adminSessionRequest(idleBoundaryLogin.cookie),
+    new Date(loginTime.getTime() + adminAuth.ADMIN_SESSION_IDLE_MS - 1),
+  )
+  assert.equal(justBeforeIdleExpiry.ok, true, 'admin session should work just before idle expiry')
+
+  const idleExpiredLogin = await adminAuth.loginAdminRequest(
+    adminLoginRequest('198.51.100.72'),
+    'security_admin',
+    'correct-admin-password',
+    loginTime,
+  )
+  assert.equal(idleExpiredLogin.ok, true)
+  const idleExpired = await adminAuth.authenticateAdminRequest(
+    adminSessionRequest(idleExpiredLogin.cookie),
+    new Date(loginTime.getTime() + adminAuth.ADMIN_SESSION_IDLE_MS),
+  )
+  assert.equal(idleExpired.ok, false)
+  assert.equal(idleExpired.response.status, 401)
+  assert.match(idleExpired.response.headers.get('Set-Cookie') ?? '', /Max-Age=0/)
+
+  const absoluteLogin = await adminAuth.loginAdminRequest(
+    adminLoginRequest('198.51.100.73'),
+    'security_admin',
+    'correct-admin-password',
+    loginTime,
+  )
+  assert.equal(absoluteLogin.ok, true)
+  for (
+    let elapsed = 29 * 60 * 1000;
+    elapsed < adminAuth.ADMIN_SESSION_ABSOLUTE_MS;
+    elapsed += 29 * 60 * 1000
+  ) {
+    const active = await adminAuth.authenticateAdminRequest(
+      adminSessionRequest(absoluteLogin.cookie),
+      new Date(loginTime.getTime() + elapsed),
+    )
+    assert.equal(active.ok, true, 'activity should keep the idle window alive before absolute expiry')
+  }
+  const absoluteExpired = await adminAuth.authenticateAdminRequest(
+    adminSessionRequest(absoluteLogin.cookie),
+    new Date(loginTime.getTime() + adminAuth.ADMIN_SESSION_ABSOLUTE_MS),
+  )
+  assert.equal(absoluteExpired.ok, false, 'absolute expiry must never be extended')
+
+  const productionMode = process.env.NODE_ENV
+  process.env.NODE_ENV = 'production'
+  try {
+    const secureLogin = await adminAuth.loginAdminRequest(
+      adminLoginRequest('198.51.100.74'),
+      'security_admin',
+      'correct-admin-password',
+      loginTime,
+    )
+    assert.equal(secureLogin.ok, true)
+    assert.match(secureLogin.cookie, /; Secure/)
+  } finally {
+    if (productionMode === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = productionMode
+  }
 
   const legacyPassword = 'legacy-admin-password'
   const legacyAdmin = legacyAdminRecord('legacy_admin', legacyPassword)
   globalThis.__authSecurityAdminStore.set(legacyAdmin.username, legacyAdmin)
-  const migratedAdmin = await adminAuth.authenticateAdminRequest(adminRequest(
+  const migratedAdmin = await adminAuth.loginAdminRequest(
+    adminLoginRequest('198.51.100.80'),
     legacyAdmin.username,
     legacyPassword,
-    '198.51.100.80',
-  ))
+    loginTime,
+  )
   assert.equal(migratedAdmin.ok, true, 'legacy administrator should still authenticate')
   assert.equal(
     globalThis.__authSecurityAdminStore.get(legacyAdmin.username).password_algorithm,
     'argon2id',
     'legacy administrator should be upgraded after successful authentication',
   )
+  assert.equal(
+    (await adminAuth.authenticateAdminRequest(adminSessionRequest(migratedAdmin.cookie), loginTime)).ok,
+    true,
+    'Argon2id rehash should not revoke the newly created admin session',
+  )
 
   const conflictAdmin = legacyAdminRecord('conflict_admin', legacyPassword)
   globalThis.__authSecurityAdminStore.set(conflictAdmin.username, conflictAdmin)
   globalThis.__authSecurityAdminUpgradeModes.set(conflictAdmin.username, 'conflict')
-  const conflictAuthentication = await adminAuth.authenticateAdminRequest(adminRequest(
+  const conflictAuthentication = await adminAuth.loginAdminRequest(
+    adminLoginRequest('198.51.100.81'),
     conflictAdmin.username,
     legacyPassword,
-    '198.51.100.81',
-  ))
+    loginTime,
+  )
   assert.equal(conflictAuthentication.ok, true, 'admin upgrade conflicts should not block authentication')
   assert.equal(
     globalThis.__authSecurityAdminStore.get(conflictAdmin.username).password_hash,
@@ -361,11 +508,12 @@ async function assertAdminAuthenticationRateLimits() {
   const originalWarn = console.warn
   console.warn = (...args) => warnings.push(args)
   try {
-    const failureAuthentication = await adminAuth.authenticateAdminRequest(adminRequest(
+    const failureAuthentication = await adminAuth.loginAdminRequest(
+      adminLoginRequest('198.51.100.82'),
       failingAdmin.username,
       legacyPassword,
-      '198.51.100.82',
-    ))
+      loginTime,
+    )
     assert.equal(failureAuthentication.ok, true, 'admin upgrade failures should not block authentication')
   } finally {
     console.warn = originalWarn
@@ -374,47 +522,115 @@ async function assertAdminAuthenticationRateLimits() {
   assert.equal(JSON.stringify(warnings).includes(failingAdmin.username), false)
   assert.equal(JSON.stringify(warnings).includes(legacyPassword), false)
 
-  const successfulRequests = Array.from({ length: 5 }, (_, index) => adminRequest(
-    'security_admin',
-    'correct-admin-password',
-    `198.51.100.${100 + index}`,
-  ))
-  const successfulResults = await Promise.all(successfulRequests.map((request) => (
-    adminAuth.authenticateAdminRequest(request)
-  )))
-  assert(successfulResults.every((result) => result.ok), 'five concurrent valid admin requests should pass')
-
   for (let index = 0; index < 10; index += 1) {
-    const result = await adminAuth.authenticateAdminRequest(adminRequest(
-      'security_admin',
+    const result = await adminAuth.loginAdminRequest(
+      adminLoginRequest(`203.0.113.${100 + index}`),
+      'blocked_admin',
       'wrong-admin-password',
-      `203.0.113.${100 + index}`,
-    ))
+    )
     assert.equal(result.ok, false)
     assert.equal(result.response.status, 401)
   }
   const getsBeforeBlockedAttempt = globalThis.__authSecurityAdminGets
-  const accountBlocked = await adminAuth.authenticateAdminRequest(adminRequest(
-    'security_admin',
+  const accountBlocked = await adminAuth.loginAdminRequest(
+    adminLoginRequest('203.0.113.200'),
+    'blocked_admin',
     'wrong-admin-password',
-    '203.0.113.200',
-  ))
+  )
   assert.equal(accountBlocked.ok, false)
   assertRateLimitedResponse(accountBlocked.response, 'admin account limit')
   assert.equal(globalThis.__authSecurityAdminGets, getsBeforeBlockedAttempt, 'blocked admin attempt should skip storage and password work')
 
   const rootIp = '192.0.2.90'
-  for (let index = 0; index < 5; index += 1) {
+  for (let index = 0; index < 10; index += 1) {
     const result = await adminAuth.requireRootAdminPassword(rootRequest(rootIp), 'wrong-root-password')
-    assert.equal(result.response.status, 401)
-  }
-  for (let index = 0; index < 5; index += 1) {
-    const result = await adminAuth.authenticateAdminRequest(rootRequest(rootIp, 'wrong-root-password'))
     assert.equal(result.response.status, 401)
   }
   const rootBlocked = await adminAuth.requireRootAdminPassword(rootRequest(rootIp), 'wrong-root-password')
   assert.equal(rootBlocked.ok, false)
   assertRateLimitedResponse(rootBlocked.response, 'shared root authentication limit')
+
+  const logoutLogin = await adminAuth.loginAdminRequest(
+    adminLoginRequest('198.51.100.75'),
+    'security_admin',
+    'correct-admin-password',
+  )
+  assert.equal(logoutLogin.ok, true)
+  const logout = await adminAuth.logoutAdminRequest(adminSessionRequest(logoutLogin.cookie, { method: 'DELETE' }))
+  assert.equal(logout.ok, true)
+  assert.match(logout.cookie, /Max-Age=0/)
+  assert.equal(
+    (await adminAuth.authenticateAdminRequest(adminSessionRequest(logoutLogin.cookie))).ok,
+    false,
+    'logout should revoke the current session',
+  )
+
+  const replacedLogin = await adminAuth.loginAdminRequest(
+    adminLoginRequest('198.51.100.76'),
+    'security_admin',
+    'correct-admin-password',
+  )
+  assert.equal(replacedLogin.ok, true)
+  assert.equal((await adminAuth.createAdminUser('security_admin', 'replacement-password')).ok, true)
+  assert.equal(
+    (await adminAuth.authenticateAdminRequest(adminSessionRequest(replacedLogin.cookie))).ok,
+    false,
+    'replacing an admin password should revoke existing sessions',
+  )
+
+  const deleteCreated = await adminAuth.createAdminUser('delete_admin', 'delete-admin-password')
+  assert.equal(deleteCreated.ok, true)
+  const deleteLogin = await adminAuth.loginAdminRequest(
+    adminLoginRequest('198.51.100.77'),
+    'delete_admin',
+    'delete-admin-password',
+  )
+  assert.equal(deleteLogin.ok, true)
+  assert.equal((await adminAuth.deleteAdminUser('delete_admin')).ok, true)
+  assert.equal(
+    (await adminAuth.authenticateAdminRequest(adminSessionRequest(deleteLogin.cookie))).ok,
+    false,
+    'deleting an admin should revoke existing sessions',
+  )
+
+  const handlerLoginResponse = await adminSessionHandler.default(new Request('http://local/api/admin/session', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goofish-Client-IP': '192.0.2.100',
+    },
+    body: JSON.stringify({ username: 'security_admin', password: 'replacement-password' }),
+  }))
+  assert.equal(handlerLoginResponse.status, 200)
+  assert.equal(handlerLoginResponse.headers.get('Cache-Control'), 'no-store')
+  const handlerCookie = handlerLoginResponse.headers.get('Set-Cookie')
+  assert(handlerCookie)
+  const handlerSessionResponse = await adminSessionHandler.default(adminSessionRequest(handlerCookie))
+  assert.equal(handlerSessionResponse.status, 200)
+  const handlerLogoutResponse = await adminSessionHandler.default(adminSessionRequest(handlerCookie, { method: 'DELETE' }))
+  assert.equal(handlerLogoutResponse.status, 200)
+  assert.match(handlerLogoutResponse.headers.get('Set-Cookie') ?? '', /Max-Age=0/)
+  const handlerMethodResponse = await adminSessionHandler.default(adminSessionRequest('', { method: 'PUT' }))
+  assert.equal(handlerMethodResponse.status, 405)
+  const idempotentLogout = await adminSessionHandler.default(adminSessionRequest('', { method: 'DELETE' }))
+  assert.equal(idempotentLogout.status, 200)
+
+  for (let index = 0; index < 10; index += 1) {
+    const wrongPassword = await callAdminSessionLoginHandler(
+      adminSessionHandler.default,
+      'handler_blocked',
+      'wrong-password',
+      `192.0.2.${120 + index}`,
+    )
+    assert.equal(wrongPassword.status, 401)
+  }
+  const handlerRateLimited = await callAdminSessionLoginHandler(
+    adminSessionHandler.default,
+    'handler_blocked',
+    'wrong-password',
+    '192.0.2.140',
+  )
+  assertRateLimitedResponse(handlerRateLimited, 'admin session handler account limit')
 }
 
 function legacyAdminRecord(username, password) {
@@ -441,22 +657,53 @@ function callLogin(handler, email, password, clientIp) {
   }))
 }
 
-function adminRequest(username, password, clientIp) {
+function adminLoginRequest(clientIp) {
+  return new Request('http://local/api/admin/session', {
+    method: 'POST',
+    headers: { 'X-Goofish-Client-IP': clientIp },
+  })
+}
+
+function callAdminSessionLoginHandler(handler, username, password, clientIp) {
+  return handler(new Request('http://local/api/admin/session', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goofish-Client-IP': clientIp,
+    },
+    body: JSON.stringify({ username, password }),
+  }))
+}
+
+function adminSessionRequest(cookie, options = {}) {
+  const headers = new Headers()
+  if (cookie) headers.set('Cookie', cookie.split(';', 1)[0])
+  if (options.origin) headers.set('Origin', options.origin)
+  return new Request('http://local/api/admin/test', {
+    method: options.method ?? 'GET',
+    headers,
+  })
+}
+
+function adminLegacyHeaderRequest(username, password) {
   return new Request('http://local/api/admin/test', {
     headers: {
       'X-Admin-User': username,
       'X-Admin-Password': password,
-      'X-Goofish-Client-IP': clientIp,
     },
   })
 }
 
-function rootRequest(clientIp, password) {
+function adminCookieToken(cookie) {
+  const value = /^maa_admin_session=([^;]+)/.exec(cookie)?.[1]
+  assert(value, 'admin session cookie should contain a token')
+  return decodeURIComponent(value)
+}
+
+function rootRequest(clientIp) {
   return new Request('http://local/api/admin/test', {
-    headers: {
-      ...(password ? { 'X-Admin-Password': password } : {}),
-      'X-Goofish-Client-IP': clientIp,
-    },
+    method: 'POST',
+    headers: { 'X-Goofish-Client-IP': clientIp },
   })
 }
 
@@ -464,6 +711,20 @@ function assertRateLimitedResponse(response, label) {
   assert.equal(response.status, 429, `${label} should return 429`)
   assert(Number(response.headers.get('Retry-After')) >= 1, `${label} should include Retry-After`)
   assert.equal(response.headers.get('Cache-Control'), 'no-store')
+}
+
+async function assertNoBrowserReadableAdminPasswords() {
+  const adminPage = await readFile('src/pages/AdminPage.tsx', 'utf8')
+  const adminSetupPage = await readFile('src/pages/AdminSetupPage.tsx', 'utf8')
+  const adminClient = await readFile('src/lib/admin-api-client.ts', 'utf8')
+  const productionAdminSources = `${adminPage}\n${adminSetupPage}\n${adminClient}`
+
+  assert.equal(productionAdminSources.includes('maa-admin-credentials'), false)
+  assert.equal(productionAdminSources.includes('X-Admin-Password'), false)
+  assert.equal(productionAdminSources.includes('X-Admin-User'), false)
+  assert.equal(/\badmin_password\b/.test(productionAdminSources), false)
+  assert.equal(/\badmin_user\b/.test(productionAdminSources), false)
+  assert.equal(/sessionStorage\.(?:getItem|setItem)/.test(productionAdminSources), false)
 }
 
 function authHandlerPlugin() {
@@ -494,12 +755,20 @@ function adminAuthPlugin() {
         path: 'admin-user-store',
         namespace: 'auth-security',
       }))
+      build.onResolve({ filter: /(^|[\\/])admin-session-store(\.ts)?$/ }, () => ({
+        path: 'admin-session-store',
+        namespace: 'auth-security',
+      }))
       build.onResolve({ filter: /(^|[\\/])license-utils(\.ts)?$/ }, () => ({
         path: 'license-utils',
         namespace: 'auth-security',
       }))
       build.onLoad({ filter: /.*/, namespace: 'auth-security' }, (args) => ({
-        contents: args.path === 'license-utils' ? licenseUtilsMock() : adminUserStoreMock(),
+        contents: args.path === 'license-utils'
+          ? licenseUtilsMock()
+          : args.path === 'admin-session-store'
+            ? adminSessionStoreMock()
+            : adminUserStoreMock(),
         loader: 'js',
       }))
     },
@@ -570,7 +839,12 @@ function adminUserStoreMock() {
           globalThis.__authSecurityAdminGets += 1
           return globalThis.__authSecurityAdminStore.get(username) ?? null
         },
-        set: async (username, user) => globalThis.__authSecurityAdminStore.set(username, user),
+        set: async (username, user) => {
+          globalThis.__authSecurityAdminStore.set(username, user)
+          for (const [tokenHash, session] of globalThis.__authSecurityAdminSessions) {
+            if (session.username === username) globalThis.__authSecurityAdminSessions.delete(tokenHash)
+          }
+        },
         upgradePasswordHash: async (username, expectedPasswordHash, replacement) => {
           const current = globalThis.__authSecurityAdminStore.get(username)
           const mode = globalThis.__authSecurityAdminUpgradeModes.get(username)
@@ -591,8 +865,41 @@ function adminUserStoreMock() {
           globalThis.__authSecurityAdminStore.set(username, updated)
           return updated
         },
-        delete: async (username) => globalThis.__authSecurityAdminStore.delete(username),
+        delete: async (username) => {
+          globalThis.__authSecurityAdminStore.delete(username)
+          for (const [tokenHash, session] of globalThis.__authSecurityAdminSessions) {
+            if (session.username === username) globalThis.__authSecurityAdminSessions.delete(tokenHash)
+          }
+        },
         list: async () => [...globalThis.__authSecurityAdminStore.values()],
+      }
+    }
+  `
+}
+
+function adminSessionStoreMock() {
+  return `
+    export function createPostgresAdminSessionStore() {
+      return {
+        save: async (session) => globalThis.__authSecurityAdminSessions.set(session.token_hash, session),
+        authenticateAndTouch: async (tokenHash, now, idleCutoff) => {
+          const session = globalThis.__authSecurityAdminSessions.get(tokenHash)
+          if (!session || session.expires_at <= now || session.last_seen_at <= idleCutoff) {
+            globalThis.__authSecurityAdminSessions.delete(tokenHash)
+            return null
+          }
+          const updated = { ...session, last_seen_at: now }
+          globalThis.__authSecurityAdminSessions.set(tokenHash, updated)
+          return updated
+        },
+        deleteByTokenHash: async (tokenHash) => globalThis.__authSecurityAdminSessions.delete(tokenHash),
+        deleteExpired: async (now, idleCutoff) => {
+          for (const [tokenHash, session] of globalThis.__authSecurityAdminSessions) {
+            if (session.expires_at <= now || session.last_seen_at <= idleCutoff) {
+              globalThis.__authSecurityAdminSessions.delete(tokenHash)
+            }
+          }
+        },
       }
     }
   `

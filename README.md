@@ -217,6 +217,31 @@ Linux glibc/musl 及 ARM 对应的预编译原生包，不需要 node-gyp/postin
 约束：最多 2 个活动任务和 32 个等待任务，两个并发 Argon2id 任务的主要内存开销约
 38 MiB。
 
+## 管理员会话
+
+管理后台登录通过 `POST /api/admin/session` 创建独立的 PostgreSQL 会话。浏览器只保存
+`maa_admin_session` 不透明 Cookie；Cookie 使用 `HttpOnly`、`SameSite=Strict` 和
+`Path=/api/admin`，生产环境额外使用 `Secure`。数据库只保存 32 字节随机 token 的
+SHA-256 摘要，不保存原始 token。会话在闲置 30 分钟或登录满 8 小时后失效，且不设置
+持久化 Cookie，关闭浏览器即退出。
+
+旧的 `X-Admin-User`、`X-Admin-Password`、`admin_user` 和 `admin_password` 认证方式
+已移除。自动化脚本必须先登录并使用 Cookie jar，例如：
+
+```bash
+curl -fsS -c admin.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"ADMIN_USERNAME","password":"ADMIN_PASSWORD"}' \
+  https://maatool.com/api/admin/session
+curl -fsS -b admin.cookies https://maatool.com/api/admin/users
+curl -fsS -X DELETE -b admin.cookies https://maatool.com/api/admin/session
+rm -f admin.cookies
+```
+
+`MAA_ADMIN_PASSWORD` 仍只用于创建、替换和删除管理员账号，不会创建后台会话。生产服务
+必须设置 `NODE_ENV=production` 并通过 TLS 访问，以启用 `Secure` Cookie。现有 Nginx
+`^~ /api/admin/` 代理片段会自动转发 Cookie 和 `Set-Cookie`，无需增加新的 location。
+
 ## 环境变量
 
 不要把真实密钥提交到仓库、文档或日志。生产环境请通过 systemd `EnvironmentFile`、服务器环境变量或等价的 secret 管理方式注入。
@@ -224,6 +249,7 @@ Linux glibc/musl 及 ARM 对应的预编译原生包，不需要 node-gyp/postin
 | Name | Required | Purpose |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | PostgreSQL 连接字符串 |
+| `NODE_ENV` | Production | 生产环境必须设为 `production`，启用安全 Cookie 和生产保护 |
 | `MAA_ADMIN_PASSWORD` | Yes | 管理后台主口令 |
 | `CDK_HASH_SECRET` | Yes | CDK 哈希计算密钥 |
 | `MAA_ADMIN_SECRET` | Yes | 授权文件签名密钥 |

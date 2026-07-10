@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { apiJson, apiVoid, getApiErrorMessage } from '../lib/api-client'
+import { adminApiJson, clearLegacyAdminCredentials } from '../lib/admin-api-client'
 
 interface AdminUserSummary {
   username: string;
@@ -17,14 +18,8 @@ export default function AdminSetupPage() {
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
-    const credentials = readStoredCredentials()
-    if (!credentials) return
-    apiJson<{ users?: AdminUserSummary[] }>('/api/admin/users', {
-      headers: {
-        'X-Admin-User': credentials.user,
-        'X-Admin-Password': credentials.password,
-      },
-    })
+    clearLegacyAdminCredentials()
+    adminApiJson<{ users?: AdminUserSummary[] }>('/api/admin/users')
       .then((data) => {
         setUsers(data.users ?? [])
       })
@@ -50,6 +45,7 @@ export default function AdminSetupPage() {
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
+      setRootPassword('')
       setLoading(false)
     }
   }
@@ -70,6 +66,7 @@ export default function AdminSetupPage() {
     } catch (caught) {
       setError(getApiErrorMessage(caught, '删除失败'))
     } finally {
+      setRootPassword('')
       setLoading(false)
     }
   }
@@ -133,15 +130,6 @@ export default function AdminSetupPage() {
       </div>
     </main>
   )
-}
-
-function readStoredCredentials(): { user: string; password: string } | null {
-  try {
-    const raw = window.sessionStorage.getItem('maa-admin-credentials')
-    return raw ? JSON.parse(raw) as { user: string; password: string } : null
-  } catch {
-    return null
-  }
 }
 
 function formatDate(value: string | null): string {

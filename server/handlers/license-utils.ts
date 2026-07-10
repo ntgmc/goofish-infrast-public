@@ -179,7 +179,7 @@ export function jsonResponse(body: unknown, status = 200, headers: Record<string
       ...(status === 204 ? {} : { 'Content-Type': 'application/json' }),
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Password, X-Admin-User, X-Cdk-Status',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Cdk-Status',
       ...headers,
     },
   })
