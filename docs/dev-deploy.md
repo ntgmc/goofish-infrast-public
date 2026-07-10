@@ -122,7 +122,21 @@ required for a controlled compatibility test.
 
 ## Nginx
 
-Example virtual host:
+Install the rate-limit zones in the Nginx `http` context, then install the
+repository-managed development API proxy snippet:
+
+```bash
+sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
+sudo install -m 0644 deploy/nginx/goofish-api-development.conf /etc/nginx/snippets/goofish-api-development.conf
+sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
+```
+
+If this Nginx installation does not load `/etc/nginx/conf.d/*.conf` from inside
+`http {}`, include the zone file explicitly in that context.
+
+Then remove the old `/api/` location from the development virtual host and include
+the snippet. It limits ordinary request bodies to 256 KiB and allows up to 1 MiB
+for `/api/depot-value`:
 
 ```nginx
 server {
@@ -132,14 +146,7 @@ server {
   root /opt/goofish-infrast-v1-dev/dist;
   index index.html;
 
-  location /api/ {
-    proxy_pass http://127.0.0.1:3001/api/;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
+  include /etc/nginx/snippets/goofish-api-development.conf;
 
   location / {
     try_files $uri $uri/ /index.html;
@@ -148,6 +155,37 @@ server {
 ```
 
 Add TLS for `dev.maatool.com` with the server's normal certificate process.
+Inside the resulting HTTPS `server {}` only, include the security baseline before
+the API snippet:
+
+```nginx
+include /etc/nginx/snippets/goofish-security-headers.conf;
+include /etc/nginx/snippets/goofish-api-development.conf;
+```
+
+Do not include `goofish-security-headers.conf` in the plain HTTP redirect server;
+it contains one-year HSTS with `includeSubDomains`. The policy is enforced, not
+Report-Only, and API responses intentionally contain no CORS allow headers.
+Validate and reload Nginx after installing the snippet:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Nginx returns 413 directly when a request exceeds the proxy-layer body limit.
+Login and management authentication IP floods return 429. The response body may
+use the default Nginx format.
+
+Administrator authentication uses the `maa_admin_session` HttpOnly,
+SameSite=Strict cookie. The existing `^~ /api/admin/` location already forwards
+Cookie and Set-Cookie headers, so no additional location is required. With the
+documented `NODE_ENV=production` setting, the cookie is `Secure` and therefore
+the development site must be accessed through its configured HTTPS origin.
+Sessions expire after 30 minutes of inactivity or 8 hours absolutely and close
+with the browser. Legacy administrator password headers and business-body
+credentials are not accepted; scripts must use `POST /api/admin/session` and a
+cookie jar.
 
 ## GitHub Settings
 

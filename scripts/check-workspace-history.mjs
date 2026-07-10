@@ -5,12 +5,14 @@ import { pathToFileURL } from 'node:url'
 
 const bundleDir = resolve('.cache/check-workspace-history')
 await mkdir(bundleDir, { recursive: true })
+process.env.NODE_ENV = 'test'
 
 const store = createMemoryStore()
 globalThis.__workspaceHistorySmokeStore = store
+globalThis.__maaOptimizeJobStoreForTesting = createMemoryOptimizeJobStore()
 
 const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts')
-const optimizeHandler = await bundleHandler('server/handlers/optimize.ts')
+const optimizeHandler = await bundleHandler('server/handlers/optimization.ts')
 const profilesHandler = await bundleHandler('server/handlers/user-profiles.ts')
 
 const sampleConfig = {
@@ -39,6 +41,12 @@ const free333OrundumConfig = {
     trading_stations: { LMD: 2, Orundum: 1 },
     manufacturing_stations: { 'Pure Gold': 2, 'Originium Shard': 1 },
   },
+}
+
+const free333RoundTripConfig = {
+  ...free333OrundumConfig,
+  Fiammetta: { enable: true },
+  drones: { enable: true, auto: true, order: 'pre', targets: ['LMD', 'Pure Gold', 'LMD'] },
 }
 
 const free243BalancedConfig = {
@@ -79,9 +87,11 @@ const sampleOperators = [
 await assertRequiresLogin()
 await assertPreviewProfileLifecycle()
 await assertSavedConfigActions()
+await assertOrirockInventoryPersistence()
 await assertSavedConfigLimitAndPermission()
 await assertOptimizeHistory()
 await assertFreePreviewWorkspaceAndOptimizeLimits()
+await assertFreeScheduleEntitlementLifecycle()
 await assertOperatorsPatchKeepsHistory()
 
 console.log('workspace history smoke check ok')
@@ -201,6 +211,36 @@ async function assertSavedConfigActions() {
   }
 }
 
+async function assertOrirockInventoryPersistence() {
+  store.workspaces.set('profile-1', emptyWorkspace('profile-1'))
+  const config = {
+    ...sampleConfig,
+    intermediate_inventory: { 'Pure Gold': 123, 'Originium Shard': 45, 'Orirock Cube': 7658 },
+    auto_balance_source: 'intermediate_inventory',
+    drones: { ...sampleConfig.drones, auto_strategy: 'trading_priority' },
+  }
+  const savedWorkspace = await call(workspaceHandler, '/api/user/workspace', {
+    profile_id: 'profile-1',
+    config,
+  }, { method: 'PATCH' })
+  if (
+    savedWorkspace.status !== 200 ||
+    savedWorkspace.body.workspace.config?.intermediate_inventory?.['Orirock Cube'] !== 7658
+  ) {
+    throw new Error(`orirock workspace persistence failed: ${JSON.stringify(savedWorkspace.body)}`)
+  }
+
+  const savedConfig = await call(workspaceHandler, '/api/user/workspace', {
+    profile_id: 'profile-1',
+    saved_config_action: { type: 'save', name: 'orirock inventory', config },
+  }, { method: 'PATCH' })
+  if (
+    savedConfig.status !== 200 ||
+    savedConfig.body.workspace.saved_configs[0]?.config?.intermediate_inventory?.['Orirock Cube'] !== 7658
+  ) {
+    throw new Error(`orirock saved config persistence failed: ${JSON.stringify(savedConfig.body)}`)
+  }
+}
 async function assertSavedConfigLimitAndPermission() {
   const now = new Date().toISOString()
   store.workspaces.set('profile-1', {
@@ -341,6 +381,8 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
   await assertFreeConfigPatchStatus(preview.id, free243OrundumInventoryConfig, 200, '243 orundum with inventory assist')
   await assertFreeConfigPatchStatus(preview.id, free333OrundumConfig, 200, '333 orundum')
 
+  await assertFreePreviewModeRoundTrip()
+
   const beforeHistoryCount = store.workspaces.get(preview.id)?.result_history.length ?? 0
   const suggestionsOnly = await call(optimizeHandler, '/api/optimize', {
     profile_id: preview.id,
@@ -445,6 +487,292 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
   }
 }
 
+async function assertFreePreviewModeRoundTrip() {
+  const preview = seedFreePreviewProfile('preview-mode-round-trip', { bound: true })
+  store.workspaces.set(preview.id, {
+    ...emptyWorkspace(preview.id),
+    operators: sampleOperators,
+    config: free333RoundTripConfig,
+  })
+
+  const rotationConfig = { ...free333RoundTripConfig, schedule_mode: 'rotation' }
+  const rotation = await call(workspaceHandler, '/api/user/workspace', {
+    profile_id: preview.id,
+    config: rotationConfig,
+  }, { method: 'PATCH' })
+  const storedRotation = store.workspaces.get(preview.id)?.config
+  if (rotation.status !== 200 || !storedRotation?.Fiammetta?.enable || !storedRotation?.drones?.enable) {
+    throw new Error(`免费档案模式往返：轮换配置未保留休眠设置，实际 ${rotation.status}`)
+  }
+
+  const maa = await call(workspaceHandler, '/api/user/workspace', {
+    profile_id: preview.id,
+    config: free333RoundTripConfig,
+  }, { method: 'PATCH' })
+  const storedMaa = store.workspaces.get(preview.id)?.config
+  if (maa.status !== 200 || storedMaa?.schedule_mode !== 'maa' || !storedMaa.Fiammetta?.enable || !storedMaa.drones?.enable) {
+    throw new Error(`免费档案模式往返：切回 MAA 后设置丢失，实际 ${maa.status}`)
+  }
+
+  const generated = await call(optimizeHandler, '/api/optimize', {
+    profile_id: preview.id,
+    license: null,
+    operators: sampleOperators,
+    config: free333RoundTripConfig,
+    ignore_elite: false,
+  })
+  if (generated.status !== 200) {
+    throw new Error(`免费档案模式往返：切回 MAA 后生成失败，实际 ${generated.status}`)
+  }
+}
+
+async function assertFreeScheduleEntitlementLifecycle() {
+  await assertFreeScheduleRevisionLimit()
+  await assertFreeScheduleConfirmLocks()
+  await assertFreeScheduleWindowExpiry()
+  await assertStrongReorderBonusGeneration()
+}
+
+async function assertFreeScheduleRevisionLimit() {
+  const profile = seedFreePreviewProfile('preview-entitlement-revisions', { bound: true })
+  store.workspaces.set(profile.id, {
+    ...emptyWorkspace(profile.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+  })
+
+  const first = await generateFreeSchedule(profile.id)
+  if (first.status !== 200) throw new Error(`免费完整排班首次生成：预期 200，实际 ${first.status}`)
+  assertEntitlementState(profile.id, {
+    revision_count: 1,
+    locked: false,
+    label: '免费完整排班首次生成',
+  })
+  if (first.body?.preview_limit?.free_schedule_entitlement?.revision_count !== 1) {
+    throw new Error('免费完整排班首次生成：响应缺少权益状态')
+  }
+
+  const second = await generateFreeSchedule(profile.id)
+  if (second.status !== 200) throw new Error(`免费完整排班第 2 次修正：预期 200，实际 ${second.status}`)
+  assertEntitlementState(profile.id, {
+    revision_count: 2,
+    locked: false,
+    label: '免费完整排班第 2 次修正',
+  })
+
+  const third = await generateFreeSchedule(profile.id)
+  if (third.status !== 200) throw new Error(`免费完整排班第 3 次修正：预期 200，实际 ${third.status}`)
+  assertEntitlementState(profile.id, {
+    revision_count: 3,
+    locked: true,
+    lock_reason: 'revision_limit',
+    label: '免费完整排班第 3 次修正',
+  })
+
+  const beforeBlocked = store.workspaces.get(profile.id)
+  const blocked = await generateFreeSchedule(profile.id)
+  const afterBlocked = store.workspaces.get(profile.id)
+  if (blocked.status !== 403) throw new Error(`免费完整排班第 4 次生成：预期 403，实际 ${blocked.status}`)
+  if (afterBlocked?.result_history.length !== beforeBlocked?.result_history.length || afterBlocked?.last_result !== beforeBlocked?.last_result) {
+    throw new Error('免费完整排班第 4 次生成：不应写入 last_result 或历史')
+  }
+}
+
+async function assertFreeScheduleConfirmLocks() {
+  const profile = seedFreePreviewProfile('preview-entitlement-confirm', { bound: true })
+  store.workspaces.set(profile.id, {
+    ...emptyWorkspace(profile.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+  })
+
+  const generated = await generateFreeSchedule(profile.id)
+  if (generated.status !== 200) throw new Error(`免费完整排班确认前生成：预期 200，实际 ${generated.status}`)
+  const historyId = store.workspaces.get(profile.id)?.result_history[0]?.id
+  const confirmed = await call(workspaceHandler, '/api/user/workspace/free-schedule/confirm', {
+    profile_id: profile.id,
+    result_history_id: historyId,
+  }, { method: 'POST' })
+  if (confirmed.status !== 200) throw new Error(`免费完整排班确认接口：预期 200，实际 ${confirmed.status}`)
+  assertEntitlementState(profile.id, {
+    revision_count: 1,
+    locked: true,
+    lock_reason: 'confirmed',
+    label: '免费完整排班确认接口',
+  })
+
+  const beforeBlocked = store.workspaces.get(profile.id)
+  const blocked = await generateFreeSchedule(profile.id)
+  if (blocked.status !== 403) throw new Error(`免费完整排班确认后生成：预期 403，实际 ${blocked.status}`)
+  if (store.workspaces.get(profile.id)?.result_history.length !== beforeBlocked?.result_history.length) {
+    throw new Error('免费完整排班确认后生成：不应写入历史')
+  }
+}
+
+async function assertFreeScheduleWindowExpiry() {
+  const profile = seedFreePreviewProfile('preview-entitlement-expired', { bound: true })
+  const firstGeneratedAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
+  store.workspaces.set(profile.id, {
+    ...emptyWorkspace(profile.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+    free_schedule_entitlement: createFreeScheduleEntitlement({
+      first_generated_at: firstGeneratedAt,
+      revision_count: 1,
+    }),
+  })
+
+  const blocked = await generateFreeSchedule(profile.id)
+  if (blocked.status !== 403) throw new Error(`免费完整排班确认期过期生成：预期 403，实际 ${blocked.status}`)
+  assertEntitlementState(profile.id, {
+    revision_count: 1,
+    locked: true,
+    lock_reason: 'window_expired',
+    label: '免费完整排班确认期过期生成',
+  })
+}
+
+async function assertStrongReorderBonusGeneration() {
+  const profile = seedFreePreviewProfile('preview-entitlement-bonus', { bound: true })
+  const baselineResult = cloneWithRoomOperator(
+    createBaselineOptimizeResult(),
+    'trading',
+    0,
+    { id: 'old-trade', name: 'Old Trade' },
+  )
+  const historyItem = createHistoryItem(profile.id, baselineResult)
+  const lockedEntitlement = createFreeScheduleEntitlement({
+    first_generated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    revision_count: 3,
+    locked_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    lock_reason: 'revision_limit',
+  })
+  store.workspaces.set(profile.id, {
+    ...emptyWorkspace(profile.id),
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+    last_result: baselineResult,
+    result_history: [historyItem],
+    free_schedule_entitlement: lockedEntitlement,
+  })
+
+  const beforeCheck = store.workspaces.get(profile.id)
+  const checked = await call(optimizeHandler, '/api/optimize/reorder-check', {
+    profile_id: profile.id,
+    config: free333OrundumConfig,
+    baseline_history_id: historyItem.id,
+  })
+  if (checked.status !== 200 || checked.body?.recommendation !== 'strongly_recommended') {
+    throw new Error(`强烈建议重排 bonus 授予：预期 200 strongly_recommended，实际 ${checked.status} ${checked.body?.recommendation}`)
+  }
+  const granted = store.workspaces.get(profile.id)?.free_schedule_entitlement?.strong_reorder_bonus
+  if (!granted || granted.used_at) throw new Error('强烈建议重排 bonus 授予：预期写入未使用的当月 bonus')
+  if (store.workspaces.get(profile.id)?.result_history.length !== beforeCheck?.result_history.length) {
+    throw new Error('强烈建议重排检测：不应写入排班历史')
+  }
+
+  const bonusGenerate = await generateFreeSchedule(profile.id)
+  if (bonusGenerate.status !== 200) throw new Error(`强烈建议重排 bonus 生成：预期 200，实际 ${bonusGenerate.status}`)
+  const usedBonus = store.workspaces.get(profile.id)?.free_schedule_entitlement?.strong_reorder_bonus
+  if (!usedBonus?.used_at) throw new Error('强烈建议重排 bonus 生成：预期标记 used_at')
+
+  const beforeSecondBonus = store.workspaces.get(profile.id)
+  const blocked = await generateFreeSchedule(profile.id)
+  if (blocked.status !== 403) throw new Error(`强烈建议重排 bonus 二次生成：预期 403，实际 ${blocked.status}`)
+  if (store.workspaces.get(profile.id)?.result_history.length !== beforeSecondBonus?.result_history.length) {
+    throw new Error('强烈建议重排 bonus 二次生成：不应写入历史')
+  }
+}
+
+function createBaselineOptimizeResult() {
+  return {
+    author: 'test',
+    title: 'baseline',
+    description: 'test baseline',
+    schedule_mode: 'maa',
+    buildingType: 333,
+    planTimes: '3 shifts',
+    plans: [{ name: 'A', rooms: createTestRooms() }],
+    raw_results: [],
+    daily_production: {
+      manufacturing: { 'Pure Gold': 1 },
+      trading: { LMD: 1 },
+      consumption: {},
+      net: {},
+      drones: {},
+    },
+  }
+}
+
+function createTestRooms() {
+  const room = (id, name, product) => ({
+    id,
+    name,
+    product,
+    operators: [{ id: 'char_002_amiya', name: 'Amiya' }],
+    final_efficiency: 1.23,
+    efficiency: 1.23,
+  })
+  return {
+    trading: [
+      room('trade-1', 'Trading 1', 'LMD'),
+      room('trade-2', 'Trading 2', 'LMD'),
+    ],
+    manufacture: [
+      room('mfg-1', 'Factory 1', 'Pure Gold'),
+      room('mfg-2', 'Factory 2', 'Originium Shard'),
+    ],
+    power: [
+      room('power-1', 'Power 1', ''),
+    ],
+    dormitory: [
+      { id: 'dorm-1', name: 'Dorm 1', operators: [] },
+    ],
+  }
+}
+
+async function generateFreeSchedule(profileId) {
+  return call(optimizeHandler, '/api/optimize', {
+    profile_id: profileId,
+    license: null,
+    operators: sampleOperators,
+    config: free333OrundumConfig,
+    ignore_elite: false,
+  })
+}
+
+function createFreeScheduleEntitlement(overrides = {}) {
+  return {
+    first_generated_at: null,
+    revision_count: 0,
+    revision_limit: 3,
+    revision_window_hours: 24,
+    confirmed_at: null,
+    locked_at: null,
+    lock_reason: null,
+    strong_reorder_bonus: null,
+    ...overrides,
+  }
+}
+
+function assertEntitlementState(profileId, expected) {
+  const entitlement = store.workspaces.get(profileId)?.free_schedule_entitlement
+  if (!entitlement) throw new Error(`${expected.label}：缺少免费完整排班权益状态`)
+  if (entitlement.revision_count !== expected.revision_count) {
+    throw new Error(`${expected.label}：revision_count 预期 ${expected.revision_count}，实际 ${entitlement.revision_count}`)
+  }
+  if (entitlement.revision_limit !== 3 || entitlement.revision_window_hours !== 24) {
+    throw new Error(`${expected.label}：权益限制元数据错误`)
+  }
+  if (expected.locked) {
+    if (!entitlement.locked_at || entitlement.lock_reason !== expected.lock_reason) {
+      throw new Error(`${expected.label}：预期锁定为 ${expected.lock_reason}，实际 ${entitlement.lock_reason}`)
+    }
+  } else if (entitlement.locked_at || entitlement.lock_reason) {
+    throw new Error(`${expected.label}：不应锁定权益`)
+  }
+}
+
 async function assertFreeConfigPatchStatus(profileId, config, expectedStatus, label) {
   const result = await call(workspaceHandler, '/api/user/workspace', {
     profile_id: profileId,
@@ -481,7 +809,7 @@ function assertFreePreviewResult(result, label) {
     throw new Error(`${label}: missing full rotation preview metadata`)
   }
   if (countVisibleRooms(result.plans) <= 3) {
-    throw new Error(`${label}: expected complete visible plans, got ${countVisibleRooms(result.plans)} rooms`)
+    throw new Error(`${label}: expected complete visible plans, got ${countVisibleRooms(result.plans)} rooms; keys=${Object.keys(result).join(',')}`)
   }
   if (!Array.isArray(result.raw_results) || result.raw_results.length !== 0) {
     throw new Error(`${label}: raw_results should be empty`)
@@ -535,6 +863,12 @@ async function assertReorderRecommendationFromBaseline(profileId, baselineResult
     throw new Error(`免费档案重排检测 ${expectedRecommendation}：预期 200 ${expectedRecommendation}，实际 ${checked.status} ${checked.body?.recommendation}`)
   }
   assertReorderCheckResult(checked.body, `免费档案重排检测 ${expectedRecommendation}`)
+  const bonus = store.workspaces.get(profile.id)?.free_schedule_entitlement?.strong_reorder_bonus
+  if (expectedRecommendation === 'strongly_recommended') {
+    if (!bonus || bonus.used_at) throw new Error('免费档案强烈建议重排：预期授予未使用的当月额外生成权益')
+  } else if (bonus) {
+    throw new Error(`免费档案重排检测 ${expectedRecommendation}：不应授予额外生成权益`)
+  }
 }
 
 async function assertReorderQuotaLimit(baselineResult) {
@@ -612,6 +946,16 @@ function countVisibleRooms(plans) {
 }
 
 async function call(handler, path, body = {}, init = {}) {
+  const requestPath = path === '/api/optimize'
+    ? '/api/optimization/jobs'
+    : path === '/api/optimize/reorder-check'
+      ? '/api/optimization/reorder-checks'
+      : path
+  const requestBody = path === '/api/optimize'
+    ? toOptimizationRequest(body)
+    : path === '/api/optimize/reorder-check'
+      ? { profileId: body.profile_id, config: body.config, baselineHistoryId: body.baseline_history_id }
+      : body
   const method = init.method ?? 'POST'
   const requestInit = {
     method,
@@ -621,13 +965,53 @@ async function call(handler, path, body = {}, init = {}) {
     },
   }
   if (method !== 'GET' && method !== 'HEAD') {
-    requestInit.body = JSON.stringify(body)
+    requestInit.body = JSON.stringify(requestBody)
   }
-  const response = await handler(new Request(`http://local${path}`, requestInit))
+  const response = await handler(new Request('http://local' + requestPath, requestInit))
   const text = await response.text()
-  return { status: response.status, body: text ? JSON.parse(text) : null }
+  let parsed = text ? JSON.parse(text) : null
+  if (parsed?.error && typeof parsed.error === 'object') {
+    parsed = { ...(parsed.error.details ?? {}), code: parsed.error.code, error: parsed.error.message }
+  }
+  if (path === '/api/optimize/reorder-check' && parsed?.result) parsed = parsed.result
+  if (path === '/api/optimize' && response.status === 202 && parsed?.job?.id) {
+    return await waitForOptimizeJob(handler, parsed.job.id)
+  }
+  return { status: response.status, body: parsed }
 }
 
+async function waitForOptimizeJob(handler, jobId) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    const response = await handler(new Request('http://local/api/optimization/jobs/' + encodeURIComponent(jobId), {
+      method: 'GET',
+      headers: { cookie: 'maa_session=test-session' },
+    }))
+    const text = await response.text()
+    const body = text ? JSON.parse(text) : null
+    if (body?.status === 'succeeded') return { status: 200, body: body.result }
+    if (body?.status === 'failed') return { status: 500, body: { ...body, error: body.error?.message } }
+  }
+  throw new Error('optimize job did not finish')
+}
+
+function toOptimizationRequest(body) {
+  const identity = body.profile_id
+    ? { type: 'profile', profileId: body.profile_id }
+    : { type: 'license', license: body.license, activationToken: body.activation_token }
+  if (body.suggestions_only) {
+    return {
+      kind: 'upgrade_suggestions', identity, operators: body.operators, config: body.config,
+      upgradeTaskPayload: body.upgrade_task_payload,
+    }
+  }
+  return {
+    kind: 'schedule', identity, operators: body.operators, config: body.config,
+    ignoreElite: body.ignore_elite ?? false,
+    includeCurrent: body.include_current,
+    historySource: body.history_source,
+  }
+}
 async function bundleHandler(entryPoint) {
   const outputPath = resolve(bundleDir, `${entryPoint.replace(/[\\/.:]/g, '-')}.mjs`)
   const result = await esbuild.build({
@@ -635,6 +1019,7 @@ async function bundleHandler(entryPoint) {
     bundle: true,
     platform: 'node',
     format: 'esm',
+    external: ['pg'],
     write: false,
     plugins: [memoryStorePlugin()],
   })
@@ -667,7 +1052,7 @@ function memoryStorePlugin() {
         path: 'memory-training-cost',
         namespace: 'workspace-history-smoke',
       }))
-      build.onResolve({ filter: /(^|[\\/])optimizer(\.ts)?$/ }, () => ({
+      build.onResolve({ filter: /(^|[\\/])optimizer(?:-engine)?(\.ts)?$/ }, () => ({
         path: 'memory-optimizer',
         namespace: 'workspace-history-smoke',
       }))
@@ -699,24 +1084,39 @@ function memoryUsageStatsModule() {
       const now = new Date().toISOString()
       globalThis.__workspaceHistorySmokeStore.usageEvents.push({ id: 'usage-' + globalThis.__workspaceHistorySmokeStore.usageEvents.length, event, created_at: now, date: now.slice(0, 10), ...payload })
     }
-    export async function countSuccessfulUsageEventsForProfileInRange(event, profileId, startAt, endAt) {
-      return globalThis.__workspaceHistorySmokeStore.usageEvents.filter((record) =>
-        record.event === event &&
-        record.profile_id === profileId &&
-        record.status !== 'failure' &&
-        record.created_at >= startAt &&
-        record.created_at < endAt
-      ).length
-    }
-  `
+export async function countSuccessfulUsageEventsForProfileInRange(event, profileId, startAt, endAt) {
+  return globalThis.__workspaceHistorySmokeStore.usageEvents.filter((record) =>
+    record.event === event &&
+    record.profile_id === profileId &&
+    record.status !== 'failure' &&
+    record.created_at >= startAt &&
+    record.created_at < endAt
+  ).length
+}
+export async function getScheduleGenerateDurationStatsByBucket(bucket, startAt, endAt) {
+  const durations = globalThis.__workspaceHistorySmokeStore.usageEvents
+    .filter((record) =>
+      record.event === 'schedule_generate' &&
+      record.status !== 'failure' &&
+      record.estimate_bucket === bucket &&
+      record.created_at >= startAt &&
+      record.created_at < endAt &&
+      Number.isFinite(record.duration_ms)
+    )
+    .map((record) => Math.max(0, Math.round(record.duration_ms)))
+    .sort((left, right) => left - right)
+  const index = Math.min(durations.length - 1, Math.max(0, Math.ceil(0.95 * durations.length) - 1))
+  return { p95_ms: durations[index] ?? 0, sample_count: durations.length }
+}
+`
 }
 
 function memoryUserStoreModule() {
   return `
     const store = globalThis.__workspaceHistorySmokeStore
-    export function emptyWorkspace(profileId) {
-      return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
-    }
+export function emptyWorkspace(profileId) {
+return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], free_schedule_entitlement: null, updated_at: new Date().toISOString() }
+}
     export async function listProfilesForUser(userId) {
       return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
     }
@@ -762,9 +1162,10 @@ function memoryUserStoreModule() {
         elite_overrides: normalized?.elite_overrides ?? {},
         last_result: normalized?.last_result ?? null,
         saved_configs: normalized?.saved_configs ?? [],
-        result_history: normalized?.result_history ?? [],
-        updated_at: normalized?.updated_at ?? null,
-      }
+result_history: normalized?.result_history ?? [],
+free_schedule_entitlement: normalized?.free_schedule_entitlement ?? null,
+updated_at: normalized?.updated_at ?? null,
+}
     }
     export function toPublicProfile(profile, workspace) {
       return {
@@ -963,6 +1364,12 @@ function memoryLicenseUtilsModule() {
       if (!config.drones) return false
       const drone = config.drones
       if (drone.enable === false) return false
+      const presetDrone = drone.enable === true
+        && drone.auto === true
+        && (drone.order ?? 'pre') === 'pre'
+        && JSON.stringify(drone.targets ?? []) === JSON.stringify(['LMD', 'Pure Gold', 'LMD'])
+        && !drone.auto_strategy
+        && !drone.auto_target_product
       const inventoryAssist = config.auto_balance_source === 'intermediate_inventory'
         && config.intermediate_inventory
         && drone.enable === true
@@ -971,7 +1378,7 @@ function memoryLicenseUtilsModule() {
         && !drone.targets
         && !drone.order
         && !drone.auto_target_product
-      return !inventoryAssist
+      return !(presetDrone || inventoryAssist)
     }
   `
 }
@@ -997,7 +1404,7 @@ function memoryOptimizerModule() {
     function room(id, name, product) {
       return { id, name, product, operators: [{ id: 'char_002_amiya', name: 'Amiya' }], final_efficiency: 1.23, efficiency: 1.23 }
     }
-    export class WorkplaceOptimizer {
+    export class OptimizerEngine {
       constructor(operators, config) {
         this.operators = operators
         this.config = config
@@ -1021,6 +1428,9 @@ function memoryOptimizerModule() {
           },
           total_efficiency: ignoreElite ? 200 : 100,
         }
+      }
+      generateSchedule(ignoreElite) {
+        return this.getOptimalAssignments(undefined, ignoreElite)
       }
       simulateMaaDefaultAssignments() {
         return {
@@ -1048,6 +1458,7 @@ function memoryOptimizerModule() {
       calculateUpgradeTargetSuggestions() { return [] }
       collectUpgradeTasks() { return [] }
       simulateUpgradeTasks() { return [] }
+      simulateUpgrades(...args) { return this.simulateUpgradeTasks(...args) }
       _calculateDailyTotalScore() { return 0 }
       extractFiammettaTargets() { return [] }
     }
@@ -1088,6 +1499,64 @@ function seedFreePreviewProfile(id, { bound }) {
   return profile
 }
 
+function createMemoryOptimizeJobStore() {
+  const records = new Map()
+  const clone = (value) => JSON.parse(JSON.stringify(value))
+  const activeStatuses = new Set(['queued', 'running'])
+  return {
+    records,
+    createJob: async (input) => {
+      const now = input.created_at || new Date().toISOString()
+      const record = { id: input.id, status: 'queued', priority: input.priority, owner_key: input.owner_key, permission: input.permission, source: input.source, payload_json: clone(input.payload_json), result_json: null, error_message: null, attempt_count: 0, lock_token: null, lock_expires_at: null, created_at: now, started_at: null, finished_at: null, updated_at: now }
+      records.set(record.id, record)
+      return clone(record)
+    },
+    getJob: async (id) => records.has(id) ? clone(records.get(id)) : null,
+    findActiveByOwnerKey: async (ownerKey) => [...records.values()].filter((job) => job.owner_key === ownerKey && activeStatuses.has(job.status)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] || null,
+    getQueuePosition: async (id) => {
+      const job = records.get(id)
+      if (!job || job.status !== 'queued') return null
+      return [...records.values()].filter((candidate) => candidate.status === 'queued' && (candidate.priority > job.priority || (candidate.priority === job.priority && Date.parse(candidate.created_at) < Date.parse(job.created_at)))).length + 1
+    },
+    claimNextJob: async (lockToken, lockExpiresAt, maxAttempts) => {
+      const next = [...records.values()].filter((job) => job.status === 'queued' && job.attempt_count < maxAttempts).sort((a, b) => b.priority - a.priority || Date.parse(a.created_at) - Date.parse(b.created_at))[0]
+      if (!next) return null
+      const now = new Date().toISOString()
+      next.status = 'running'
+      next.attempt_count += 1
+      next.lock_token = lockToken
+      next.lock_expires_at = lockExpiresAt
+      next.started_at ||= now
+      next.updated_at = now
+      return clone(next)
+    },
+    markSucceeded: async (id, lockToken, result) => {
+      const job = records.get(id)
+      if (!job || job.lock_token !== lockToken) return
+      const now = new Date().toISOString()
+      job.status = 'succeeded'
+      job.result_json = clone(result)
+      job.lock_token = null
+      job.lock_expires_at = null
+      job.finished_at = now
+      job.updated_at = now
+    },
+    markFailed: async (id, lockToken, message) => {
+      const job = records.get(id)
+      if (!job || job.lock_token !== lockToken) return
+      const now = new Date().toISOString()
+      job.status = 'failed'
+      job.error_message = message
+      job.lock_token = null
+      job.lock_expires_at = null
+      job.finished_at = now
+      job.updated_at = now
+    },
+    heartbeat: async () => undefined,
+    resetExpiredRunningJobs: async () => undefined,
+    cleanupOldJobs: async () => undefined,
+  }
+}
 function createMemoryStore() {
   const now = new Date().toISOString()
   return {
@@ -1118,5 +1587,5 @@ function createMemoryStore() {
 }
 
 function emptyWorkspace(profileId) {
-  return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], updated_at: new Date().toISOString() }
+  return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], free_schedule_entitlement: null, updated_at: new Date().toISOString() }
 }

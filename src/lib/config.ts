@@ -1,4 +1,4 @@
-import type { LicenseConfig, PermissionMode } from './types'
+import type { IntermediateProduct, LicenseConfig, PermissionMode } from './types'
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
 
@@ -25,7 +25,6 @@ export const DORMITORY_RULE_LABELS: Record<string, string> = {
 
 const DEFAULT_SHIFT_HOURS = [8, 8, 8]
 
-type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: '单次重置卡',
@@ -190,6 +189,7 @@ function normalizeIntermediateInventory(value: unknown): Record<IntermediateProd
   const next: Record<IntermediateProduct, number> = {
     'Originium Shard': 0,
     'Pure Gold': 0,
+    'Orirock Cube': 0,
   }
   for (const product of Object.keys(next) as IntermediateProduct[]) {
     const count = Number(source[product])

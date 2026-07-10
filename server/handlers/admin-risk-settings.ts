@@ -17,9 +17,8 @@ export default async (req: Request): Promise<Response> => {
 
 async function handleGet(req: Request): Promise<Response> {
   try {
-    if (!(await authenticateAdminRequest(req))) {
-      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-    }
+    const authentication = await authenticateAdminRequest(req)
+    if (!authentication.ok) return authentication.response
     return jsonResponse({ settings: await getRiskControlSettings() })
   } catch (error) {
     console.error('admin risk settings get error:', error)
@@ -31,9 +30,8 @@ async function handleGet(req: Request): Promise<Response> {
 async function handleSave(req: Request): Promise<Response> {
   try {
     const body = await req.json() as Record<string, unknown>
-    if (!(await authenticateAdminRequest(req, body))) {
-      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-    }
+    const authentication = await authenticateAdminRequest(req)
+    if (!authentication.ok) return authentication.response
 
     const patch: RiskControlSettingsPatch = {}
     if ('operator_data_risk_enabled' in body) {

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { apiJson, apiVoid, getApiErrorMessage } from '../lib/api-client'
+import { adminApiJson, clearLegacyAdminCredentials } from '../lib/admin-api-client'
 
 interface AdminUserSummary {
   username: string;
@@ -17,14 +18,8 @@ export default function AdminSetupPage() {
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
-    const credentials = readStoredCredentials()
-    if (!credentials) return
-    apiJson<{ users?: AdminUserSummary[] }>('/api/admin/users', {
-      headers: {
-        'X-Admin-User': credentials.user,
-        'X-Admin-Password': credentials.password,
-      },
-    })
+    clearLegacyAdminCredentials()
+    adminApiJson<{ users?: AdminUserSummary[] }>('/api/admin/users')
       .then((data) => {
         setUsers(data.users ?? [])
       })
@@ -50,6 +45,7 @@ export default function AdminSetupPage() {
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
+      setRootPassword('')
       setLoading(false)
     }
   }
@@ -70,6 +66,7 @@ export default function AdminSetupPage() {
     } catch (caught) {
       setError(getApiErrorMessage(caught, '删除失败'))
     } finally {
+      setRootPassword('')
       setLoading(false)
     }
   }
@@ -79,7 +76,7 @@ export default function AdminSetupPage() {
       <div className="mx-auto max-w-5xl">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-brand-500">Root setup</p>
+            <p className="text-sm font-semibold text-brand-500">Root 设置</p>
             <h1 className="mt-2 text-2xl font-semibold text-ink-primary">管理账号设置</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">
               这里使用 `MAA_ADMIN_PASSWORD` 创建日常管理账号。创建完成后，回到后台使用账号密码登录，减少 root 口令暴露次数。
@@ -133,15 +130,6 @@ export default function AdminSetupPage() {
       </div>
     </main>
   )
-}
-
-function readStoredCredentials(): { user: string; password: string } | null {
-  try {
-    const raw = window.sessionStorage.getItem('maa-admin-credentials')
-    return raw ? JSON.parse(raw) as { user: string; password: string } : null
-  } catch {
-    return null
-  }
 }
 
 function formatDate(value: string | null): string {

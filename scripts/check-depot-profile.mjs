@@ -13,7 +13,7 @@ globalThis.__depotProfileSmokeStore = store
 
 const profileHandler = await bundleHandler('server/handlers/user-profiles.ts')
 const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts')
-const optimizeHandler = await bundleHandler('server/handlers/optimize.ts')
+const optimizeHandler = await bundleHandler('server/handlers/optimization.ts')
 
 await assertRequiresLogin()
 await assertCreateAndReuseDepotProfile()
@@ -59,14 +59,14 @@ async function assertDepotProfileCannotUseWorkspace() {
 
 async function assertDepotProfileCannotOptimize() {
   const profileId = [...store.profiles.values()][0]?.id
-  const result = await call(optimizeHandler, '/api/optimize', {
-    profile_id: profileId,
+  const result = await call(optimizeHandler, '/api/optimization/jobs', {
+    kind: 'schedule',
+    identity: { type: 'profile', profileId },
     operators: [],
     config: {},
-    ignore_elite: false,
-    license: null,
+    ignoreElite: false,
   })
-  if (result.status !== 403 || !result.body.error?.includes('仓库分析档案不能用于生成排班。')) {
+  if (result.status !== 403 || !result.body.error?.message?.includes('仓库分析档案不能用于生成排班。')) {
     throw new Error(`depot optimize guard: expected 403 depot guard, got ${result.status}`)
   }
 }
@@ -98,6 +98,7 @@ async function bundleHandler(entryPoint) {
     bundle: true,
     platform: 'node',
     format: 'esm',
+    external: ['pg'],
     write: false,
     plugins: [memoryStorePlugin()],
   })
@@ -239,9 +240,10 @@ function memoryUserStoreModule() {
 
 function memoryUsageStatsModule() {
   return `
-    export async function recordUsageEvent() {}
-    export async function countSuccessfulUsageEventsForProfileInRange() { return 0 }
-  `
+export async function recordUsageEvent() {}
+export async function countSuccessfulUsageEventsForProfileInRange() { return 0 }
+export async function getScheduleGenerateDurationStatsByBucket() { return { p95_ms: 0, sample_count: 0 } }
+`
 }
 
 function memoryLicenseUtilsModule() {

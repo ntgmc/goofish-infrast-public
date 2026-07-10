@@ -27,12 +27,16 @@ export default function ResultMetrics({
     rotationStatsNote,
     productionStats,
     productionSanity,
+    orundumEconomy,
     intermediateDepletion,
     maaDefaultComparison,
     detailStats,
   } = prepared
   const showProductionMetrics = !isRotationMode || hasDailyProduction
   const showMaaDefaultComparison = Boolean(maaDefaultComparison) && !isAnalysis && !isRotationMode
+  const orundumEconomyNote = orundumEconomy
+    ? `长期 ${formatAmount(orundumEconomy.sustainable_orundum)}/日 · 固源岩预算 ${formatAmount(orundumEconomy.daily_orirock_supply)}/日 · 龙门币硬成本 ${formatAmount(orundumEconomy.hard_lmd_cost)}/日${orundumEconomy.inventory_depletion_days !== null ? ` · 库存约 ${formatAmount(orundumEconomy.inventory_depletion_days)} 天` : ''}`
+    : ''
   const productionSanityNote = showMaaDefaultComparison && maaDefaultComparison
     ? maaDefaultComparison.sanityDeltaNote
     : isRotationMode && rotationStatsNote
@@ -102,10 +106,10 @@ export default function ResultMetrics({
               />
             ) : (
               <MetricCard
-                label="等效理智"
-                value={formatAmount(productionSanity.value)}
-                suffix="理智"
-                note={productionSanityNote}
+                label={orundumEconomy ? '搓玉经济' : '等效理智'}
+                value={formatAmount(orundumEconomy?.short_term_orundum ?? productionSanity.value)}
+                suffix={orundumEconomy ? '合成玉/日' : '理智'}
+                note={orundumEconomy ? orundumEconomyNote : productionSanityNote}
               />
             )}
           </>
@@ -117,10 +121,13 @@ export default function ResultMetrics({
         </div>
       )}
       {showMaaDefaultComparison && maaDefaultComparison ? (
-        <div className="border-t border-surface-3/60 px-5 pb-5 pt-3 text-xs leading-5 text-ink-secondary sm:px-6">
-          MAA 默认基准：总效率 {formatAmount(maaDefaultComparison.baselineTotalEfficiency)}%，龙门币 {formatAmount(maaDefaultComparison.baselineLmd)}/日，赤金净变动 {formatSigned(maaDefaultComparison.baselineGoldNet)}/日
-          {maaDefaultComparison.warnings.length > 0
-            ? `；模拟提示 ${maaDefaultComparison.warnings.slice(0, 3).join('、')}`
+      <div className="border-t border-surface-3/60 px-5 pb-5 pt-3 text-xs leading-5 text-ink-secondary sm:px-6">
+        MAA 默认基准：总效率 {formatAmount(maaDefaultComparison.baselineTotalEfficiency)}%，龙门币 {formatAmount(maaDefaultComparison.baselineLmd)}/日，赤金净变动 {formatSigned(maaDefaultComparison.baselineGoldNet)}/日
+        {orundumEconomy && maaDefaultComparison.orundumEconomyDelta
+          ? `；搓玉对比：合成玉 ${formatSigned(maaDefaultComparison.orundumEconomyDelta.daily_orundum_gain)}/日，长期 ${formatSigned(maaDefaultComparison.orundumEconomyDelta.sustainable_orundum_gain)}/日，机会成本 ${formatSigned(maaDefaultComparison.orundumEconomyDelta.opportunity_cost_delta)} 理智/日`
+          : ''}
+        {maaDefaultComparison.warnings.length > 0
+          ? `；模拟提示 ${maaDefaultComparison.warnings.slice(0, 3).join('、')}`
             : ''}
         </div>
       ) : null}

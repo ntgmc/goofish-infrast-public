@@ -1,4 +1,4 @@
-import type { LicenseConfig, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { FreeScheduleEntitlement, LicenseConfig, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { formatResultSummary, formatWorkspaceDate, isMaaJsonDownloadable } from '../../../lib/workspace-history'
 import GenerateControlBar, { DashboardMiniStat } from './GenerateControlBar'
@@ -13,6 +13,15 @@ type ReorderCheckViewState = {
   result: ReorderCheckResult | null;
   onCheck: () => void;
   onGenerate: () => void;
+}
+
+type FreeScheduleViewState = {
+  visible: boolean;
+  entitlement: FreeScheduleEntitlement | null;
+  generateBlockedReason: string | null;
+  confirming: boolean;
+  confirmError: string | null;
+  onConfirm: () => void;
 }
 
 export default function OverviewSection({
@@ -31,6 +40,7 @@ export default function OverviewSection({
   savedConfigCount,
   resultHistoryCount,
   latestResult,
+  freeSchedule,
   reorderCheck,
   onGenerate,
   onReset,
@@ -56,6 +66,7 @@ export default function OverviewSection({
   savedConfigCount: number;
   resultHistoryCount: number;
   latestResult: WorkspaceResultHistoryItem | null;
+  freeSchedule?: FreeScheduleViewState;
   reorderCheck?: ReorderCheckViewState;
   onGenerate: () => void;
   onReset: () => void;
@@ -81,9 +92,14 @@ export default function OverviewSection({
         hasResult={hasResult}
         resultIsCurrent={resultIsCurrent}
         error={error}
+        extraDisabledReason={freeSchedule?.generateBlockedReason ?? null}
         onGenerate={onGenerate}
         onReset={onReset}
       />
+
+      {freeSchedule?.visible && (
+        <FreeScheduleEntitlementCard state={freeSchedule} />
+      )}
 
       {reorderCheck?.visible && (
         <ReorderCheckCard state={reorderCheck} />
@@ -154,6 +170,66 @@ export default function OverviewSection({
       </div>
     </div>
   )
+}
+
+function FreeScheduleEntitlementCard({ state }: { state: FreeScheduleViewState }) {
+  const entitlement = state.entitlement
+  const remaining = entitlement
+    ? Math.max(0, entitlement.revision_limit - entitlement.revision_count)
+    : 3
+  const windowEndsAt = entitlement?.first_generated_at
+    ? new Date(Date.parse(entitlement.first_generated_at) + entitlement.revision_window_hours * 60 * 60 * 1000).toISOString()
+    : null
+  const locked = Boolean(state.generateBlockedReason)
+  const bonusAvailable = entitlement?.strong_reorder_bonus && !entitlement.strong_reorder_bonus.used_at
+
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-brand-400">免费完整排班权益</p>
+          <h2 className="mt-1 text-lg font-semibold text-ink-primary">{formatFreeScheduleTitle(entitlement, locked, Boolean(bonusAvailable))}</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
+            首次生成后 24 小时内最多可修正生成 3 次；确认或次数用完后，只保留重排检测和历史查看。
+          </p>
+        </div>
+        {entitlement?.first_generated_at && !locked && !entitlement.confirmed_at && !entitlement.locked_at && (
+          <SmallActionButton onClick={state.onConfirm} disabled={state.confirming}>
+            {state.confirming ? '确认中' : '确认使用此方案'}
+          </SmallActionButton>
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <DashboardMiniStat label="剩余修正" value={entitlement?.first_generated_at ? `${remaining}/${entitlement.revision_limit}` : '3/3'} />
+        <DashboardMiniStat label="确认期截止" value={windowEndsAt ? formatWorkspaceDate(windowEndsAt) : '首次生成后 24 小时'} />
+        <DashboardMiniStat label="额外重排" value={bonusAvailable ? '本月可用 1 次' : '暂无'} />
+      </div>
+
+      {state.generateBlockedReason && (
+        <div className="mt-4 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning">
+          {state.generateBlockedReason}
+        </div>
+      )}
+
+      {state.confirmError && (
+        <div role="alert" className="mt-4 rounded-lg border border-error/40 bg-error/10 px-4 py-3 text-sm leading-6 text-error">
+          {state.confirmError}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function formatFreeScheduleTitle(
+  entitlement: FreeScheduleEntitlement | null,
+  locked: boolean,
+  bonusAvailable: boolean,
+): string {
+  if (bonusAvailable) return '强烈建议重排，本月可额外生成 1 次完整免费方案'
+  if (!entitlement?.first_generated_at) return '可生成 1 套免费完整个人排班'
+  if (locked) return '免费完整排班权益已锁定'
+  return '确认期内可修正生成'
 }
 
 function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {

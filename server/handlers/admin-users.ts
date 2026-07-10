@@ -5,6 +5,7 @@ import {
   listAdminUsers,
   requireRootAdminPassword,
 } from './admin-auth'
+import { PasswordWorkCapacityError } from '../security/password'
 import {
   CDK_PRODUCT_PERMISSIONS,
   getCdkRecordStore,
@@ -19,8 +20,10 @@ import {
   getUserById,
   getProfileById,
   getProfileWorkspace,
+  isFreePreviewProfile,
   listProfilesForUser,
   listUserAccounts,
+  normalizeProfileKind,
   saveProfileWorkspace,
   saveUserProfile,
   saveUserAccount,
@@ -38,9 +41,8 @@ export default async (req: Request): Promise<Response> => {
   try {
     if (req.method === 'POST') {
       const body = await req.json() as { root_password?: unknown; username?: unknown; password?: unknown }
-      if (!(await requireRootAdminPassword(body.root_password))) {
-        return jsonResponse({ error: 'Root 口令错误。' }, 401)
-      }
+      const authentication = await requireRootAdminPassword(req, body.root_password)
+      if (!authentication.ok) return authentication.response
       const created = await createAdminUser(body.username, body.password)
       if (!created.ok) return jsonResponse({ error: created.message }, 400)
       return jsonResponse({
@@ -53,9 +55,8 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (req.method === 'GET') {
-      if (!(await authenticateAdminRequest(req))) {
-        return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-      }
+      const authentication = await authenticateAdminRequest(req)
+      if (!authentication.ok) return authentication.response
       const url = new URL(req.url)
       const userId = url.searchParams.get('user_id')
       const profileId = url.searchParams.get('profile_id')
@@ -71,22 +72,18 @@ export default async (req: Request): Promise<Response> => {
         if (!user) return jsonResponse({ error: '用户不存在。' }, 404)
         return jsonResponse({ detail: await buildAdminUserDetail(user) })
       }
-      const appUsers = await Promise.all((await listUserAccounts()).map(async (user) => ({
-        id: user.id,
-        email: user.email,
-        status: user.status,
-        permission: user.permission,
-        profile_count: (await listProfilesForUser(user.id)).length,
-        created_at: user.created_at,
-        updated_at: user.updated_at,
-      })))
+      const appUsers = await Promise.all((await listUserAccounts()).map(async (user) => {
+        const profiles = await listProfilesForUser(user.id)
+        return {
+          ...toAdminAppUser(user, profiles),
+          profile_count: profiles.length,
+        }
+      }))
       return jsonResponse({ users: await listAdminUsers(), app_users: appUsers })
     }
 
     if (req.method === 'PATCH') {
       const body = await req.json() as {
-        admin_user?: unknown
-        admin_password?: unknown
         action?: unknown
         user_id?: unknown
         email?: unknown
@@ -98,9 +95,8 @@ export default async (req: Request): Promise<Response> => {
         status?: unknown
         permission?: unknown
       }
-      if (!(await authenticateAdminRequest(req, body))) {
-        return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-      }
+      const authentication = await authenticateAdminRequest(req)
+      if (!authentication.ok) return authentication.response
       if (
         body.action !== 'reset_password'
         && body.action !== 'freeze_account'
@@ -109,6 +105,7 @@ export default async (req: Request): Promise<Response> => {
         && body.action !== 'update_profile'
         && body.action !== 'set_profile_status'
         && body.action !== 'set_profile_permission'
+        && body.action !== 'upgrade_preview_profile'
         && body.action !== 'clear_profile_skland_binding'
         && body.action !== 'clear_profile_workspace'
       ) {
@@ -121,6 +118,7 @@ export default async (req: Request): Promise<Response> => {
         body.action === 'update_profile'
         || body.action === 'set_profile_status'
         || body.action === 'set_profile_permission'
+        || body.action === 'upgrade_preview_profile'
         || body.action === 'clear_profile_skland_binding'
         || body.action === 'clear_profile_workspace'
       ) {
@@ -145,6 +143,22 @@ export default async (req: Request): Promise<Response> => {
           if (!permission) return jsonResponse({ error: '档案权限必须是 recommended、growth、advanced 或 ultimate。' }, 400)
           const updated = await saveProfilePatch(profile, { permission })
           await syncLinkedCdkPermission(updated, permission)
+          return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(updated) })
+        }
+
+        if (body.action === 'upgrade_preview_profile') {
+          if (!isFreePreviewProfile(profile)) {
+            return jsonResponse({ error: '只有免费预览档案可以免 CDK 升级。' }, 409)
+          }
+          const permission = normalizeProductPermission(body.permission)
+          if (!permission) return jsonResponse({ error: '档案权限必须是 recommended、growth、advanced 或 ultimate。' }, 400)
+          const updated = await saveProfilePatch(profile, {
+            kind: 'cdk',
+            permission,
+            cdk_key: null,
+            cdk_code_hash: null,
+            cdk_order_hash: null,
+          })
           return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(updated) })
         }
 
@@ -192,9 +206,8 @@ export default async (req: Request): Promise<Response> => {
 
     if (req.method === 'DELETE') {
       const body = await req.json() as { root_password?: unknown; username?: unknown }
-      if (!(await requireRootAdminPassword(body.root_password))) {
-        return jsonResponse({ error: 'Root 口令错误。' }, 401)
-      }
+      const authentication = await requireRootAdminPassword(req, body.root_password)
+      if (!authentication.ok) return authentication.response
       const deleted = await deleteAdminUser(body.username)
       if (!deleted.ok) return jsonResponse({ error: deleted.message }, 400)
       return jsonResponse({ deleted: true })
@@ -202,6 +215,17 @@ export default async (req: Request): Promise<Response> => {
 
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
+    if (error instanceof PasswordWorkCapacityError) {
+      return jsonResponse(
+        { error: '认证服务繁忙，请稍后重试。' },
+        429,
+        {
+          'Retry-After': '1',
+          'Cache-Control': 'no-store',
+          'Access-Control-Expose-Headers': 'Retry-After',
+        },
+      )
+    }
     console.error('admin users error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
@@ -270,7 +294,7 @@ async function syncLinkedCdkPermission(profile: UserGameAccountRecord, permissio
 async function buildAdminUserDetail(user: UserAccountRecord) {
   const profiles = await listProfilesForUser(user.id)
   return {
-    user: { ...toAdminAppUser(user), profile_count: profiles.length },
+    user: { ...toAdminAppUser(user, profiles), profile_count: profiles.length },
     profiles: await Promise.all(profiles.map((profile) => buildAdminProfileSummary(profile))),
   }
 }
@@ -385,13 +409,17 @@ function summarizeCdkForProfile(record: CdkRecord | null) {
   }
 }
 
-function toAdminAppUser(user: UserAccountRecord) {
+function toAdminAppUser(user: UserAccountRecord, profiles: UserGameAccountRecord[] = []) {
   return {
     id: user.id,
     email: user.email,
     permission: user.permission,
     status: user.status,
     cdk_order_hash: user.cdk_order_hash,
+    profile_access: profiles.map((profile) => ({
+      kind: normalizeProfileKind(profile),
+      permission: profile.permission,
+    })),
     created_at: user.created_at,
     updated_at: user.updated_at,
   }

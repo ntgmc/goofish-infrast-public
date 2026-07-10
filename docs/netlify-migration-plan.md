@@ -109,22 +109,32 @@ NETLIFY_BLOBS_CONTEXT
 
 ## Nginx 概念配置
 
+生产环境 API 代理使用仓库内受管的
+`deploy/nginx/goofish-api-production.conf` 片段。安装片段后，在现有站点的
+`server {}` 中删除旧的 `/api/` location 并包含它：
+
+```bash
+sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
+sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
+sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
+```
+
+`goofish-rate-limit-zones.conf` 必须从 Nginx 的 `http {}` 上下文加载；如果当前
+安装不在该上下文中自动包含 `/etc/nginx/conf.d/*.conf`，需在 `nginx.conf` 中
+显式包含。
+
 ```nginx
 server {
-  listen 80;
+  listen 443 ssl;
   server_name your-domain.com;
+
+  # ssl_certificate / ssl_certificate_key 使用站点现有 TLS 配置。
 
   root /var/www/goofish-infrast-v1/dist;
   index index.html;
 
-  location /api/ {
-    proxy_pass http://127.0.0.1:3000/api/;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
+  include /etc/nginx/snippets/goofish-security-headers.conf;
+  include /etc/nginx/snippets/goofish-api-production.conf;
 
   location / {
     try_files $uri $uri/ /index.html;
@@ -132,7 +142,15 @@ server {
 }
 ```
 
+`goofish-security-headers.conf` 只能包含在 HTTPS server 中，不得放入监听 80 的
+重定向 server。它直接执行 CSP，并设置一年 `includeSubDomains` HSTS；API 采用完全
+同源策略，不返回 `Access-Control-Allow-*`。
+
 `try_files $uri $uri/ /index.html;` 必须保留，否则 Vite SPA 路由刷新会 404。
+受管片段将普通请求体限制为 256 KiB，并为 `/api/depot-value` 保留 1 MiB
+限额。同步后运行 `sudo nginx -t`，检查成功再执行
+`sudo systemctl reload nginx`。超过代理层限额的请求由 Nginx 直接返回 413，
+登录或管理认证超过 IP 速率时返回 429；响应正文可能使用 Nginx 默认格式。
 
 ## systemd 概念配置
 

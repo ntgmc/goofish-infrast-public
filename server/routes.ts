@@ -1,5 +1,6 @@
 import adminCdkHandler from './handlers/admin-cdk'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
+import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
 import analyzeScheduleHandler from './handlers/analyze-schedule'
 import announcementHandler from './handlers/announcement'
@@ -7,7 +8,7 @@ import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
 import depotValueHandler from './handlers/depot-value'
 import licenseStatusHandler from './handlers/license-status'
-import optimizeHandler from './handlers/optimize'
+import optimizationHandler from './handlers/optimization'
 import redeemCdkHandler from './handlers/redeem-cdk'
 import userAnnouncementsHandler from './handlers/user-announcements'
 import userProfilesHandler from './handlers/user-profiles'
@@ -16,18 +17,14 @@ import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
 import usageStatsHandler from './handlers/usage-stats'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
+import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
 
 type ApiHandler = (req: Request) => Promise<Response>
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Password, X-Admin-User, X-Cdk-Status',
-}
 
 const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/cdk', adminCdkHandler as unknown as ApiHandler],
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
   ['/api/auth/register', authHandler as unknown as ApiHandler],
   ['/api/auth/login', authHandler as unknown as ApiHandler],
@@ -60,11 +57,17 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/skland/import/refresh', userSklandHandler as unknown as ApiHandler],
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
-  ['/api/optimize', optimizeHandler as unknown as ApiHandler],
-  ['/api/optimize/reorder-check', optimizeHandler as unknown as ApiHandler],
+  ['/api/user/workspace/free-schedule/confirm', userWorkspaceHandler as unknown as ApiHandler],
+  ['/api/optimization/jobs', optimizationHandler as unknown as ApiHandler],
+  ['/api/optimization/reorder-checks', optimizationHandler as unknown as ApiHandler],
 ])
 
 export async function routeRequest(req: Request): Promise<Response> {
+  const response = await dispatchRequest(req)
+  return applyHttpSecurityHeaders(response, isSecureWebRequest(req))
+}
+
+async function dispatchRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
 
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -74,7 +77,9 @@ export async function routeRequest(req: Request): Promise<Response> {
     return jsonResponse({ metadata: EFFICIENCY_DATA_METADATA, data: EFFICIENCY_DATA })
   }
 
-  const handler = ROUTES.get(url.pathname)
+  const handler = url.pathname.startsWith('/api/optimization/jobs/')
+    ? optimizationHandler as unknown as ApiHandler
+    : ROUTES.get(url.pathname)
   if (!handler) {
     return jsonResponse({ error: 'API route not found' }, 404)
   }
@@ -83,7 +88,7 @@ export async function routeRequest(req: Request): Promise<Response> {
 }
 
 export function getRegisteredApiRoutes(): string[] {
-  return ['/api/health', '/api/data', ...ROUTES.keys()].sort()
+  return ['/api/health', '/api/data', '/api/optimization/jobs/:jobId', ...ROUTES.keys()].sort()
 }
 
 async function handleHealth(): Promise<Response> {
@@ -109,7 +114,6 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: {
       ...(status === 204 ? {} : { 'Content-Type': 'application/json' }),
-      ...CORS_HEADERS,
     },
   })
 }

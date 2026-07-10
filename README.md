@@ -163,22 +163,91 @@ npm run check:migration
 9. 重启 Node 后端服务。
 10. 访问 <https://maatool.com/>，并检查 `/api/health` 与核心接口。
 
-生产环境建议由 Nginx 提供静态文件和 TLS，并把 `/api/` 反向代理到 Node 后端：
+生产环境建议由 Nginx 提供静态文件和 TLS，并使用仓库内受管的
+`deploy/nginx/goofish-api-production.conf` 片段把 `/api/` 反向代理到 Node 后端。
+该片段将普通请求体限制为 256 KiB，为 `/api/depot-value` 保留 1 MiB 限额，
+并配合 `deploy/nginx/goofish-rate-limit-zones.conf` 限制登录与管理认证洪泛。
+`deploy/nginx/goofish-security-headers.conf` 为静态页面、API 和 Nginx 自身错误响应
+提供统一的 CSP、HSTS、frame、MIME、referrer 和 Permissions Policy 基线。
+
+先把 zone 配置安装到 Nginx 的 `http {}` 上下文，再安装 server 片段：
+
+```bash
+sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
+sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
+sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
+```
+
+如果当前 Nginx 不在 `http {}` 中加载 `/etc/nginx/conf.d/*.conf`，需要在
+`nginx.conf` 的 `http {}` 中显式包含该 zone 文件。
+
+然后在现有 HTTPS `server {}` 中删除旧的 `/api/` location，并包含 API 与安全头
+片段。安全头片段包含一年 `includeSubDomains` HSTS，不得放入纯 HTTP 重定向 server：
 
 ```nginx
-location /api/ {
-  proxy_pass http://127.0.0.1:3000/api/;
-  proxy_http_version 1.1;
-  proxy_set_header Host $host;
-  proxy_set_header X-Real-IP $remote_addr;
-  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-  proxy_set_header X-Forwarded-Proto $scheme;
-}
+include /etc/nginx/snippets/goofish-security-headers.conf;
+include /etc/nginx/snippets/goofish-api-production.conf;
 
 location / {
   try_files $uri $uri/ /index.html;
 }
 ```
+
+应用前必须检查配置，检查成功后再平滑重载：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+超过请求体限额时由 Nginx 直接返回 413；登录或管理认证请求超过 IP 速率时
+返回 429。代理层响应正文可能使用 Nginx 默认格式，但仍会携带统一安全头。
+浏览器 API 已固定为完全同源，不再返回任何 `Access-Control-Allow-*`；外部浏览器
+应用必须经同源反向代理访问，服务器端客户端不受浏览器 CORS 限制。
+
+## 密码存储
+
+新注册、密码重置、密码修改及管理员账号创建统一使用 Argon2id，密码哈希以标准
+PHC 字符串保存。参数固定为 Argon2 版本 19、`memoryCost=19456 KiB`、
+`timeCost=2`、`parallelism=1`、32 字节输出和 16 字节随机 salt；运行时不提供
+降级为 PBKDF2 或放宽参数的环境变量。
+
+历史 PBKDF2-SHA256（120,000 次）记录无需数据库 schema 迁移，仍可正常验证。
+用户登录或管理员认证成功后，服务会以旧哈希为条件，最佳努力地原子写回 Argon2id；
+并发密码修改或写回失败不会覆盖新密码，也不会阻断已经验证成功的认证，下次成功认证
+会再次尝试。无法在没有明文密码的情况下离线批量迁移。
+
+服务端构建将 `@node-rs/argon2` 保留为运行时依赖，由 `npm ci` 安装 Windows、
+Linux glibc/musl 及 ARM 对应的预编译原生包，不需要 node-gyp/postinstall 编译链。
+发布时必须连同 `node_modules` 中匹配目标平台的原生包部署；如果目标平台无法加载该包，
+构建或服务启动会明确失败，不会静默回退到 PBKDF2。密码派生和验证仍受全局有界队列
+约束：最多 2 个活动任务和 32 个等待任务，两个并发 Argon2id 任务的主要内存开销约
+38 MiB。
+
+## 管理员会话
+
+管理后台登录通过 `POST /api/admin/session` 创建独立的 PostgreSQL 会话。浏览器只保存
+`maa_admin_session` 不透明 Cookie；Cookie 使用 `HttpOnly`、`SameSite=Strict` 和
+`Path=/api/admin`，生产环境额外使用 `Secure`。数据库只保存 32 字节随机 token 的
+SHA-256 摘要，不保存原始 token。会话在闲置 30 分钟或登录满 8 小时后失效，且不设置
+持久化 Cookie，关闭浏览器即退出。
+
+旧的 `X-Admin-User`、`X-Admin-Password`、`admin_user` 和 `admin_password` 认证方式
+已移除。自动化脚本必须先登录并使用 Cookie jar，例如：
+
+```bash
+curl -fsS -c admin.cookies \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"ADMIN_USERNAME","password":"ADMIN_PASSWORD"}' \
+  https://maatool.com/api/admin/session
+curl -fsS -b admin.cookies https://maatool.com/api/admin/users
+curl -fsS -X DELETE -b admin.cookies https://maatool.com/api/admin/session
+rm -f admin.cookies
+```
+
+`MAA_ADMIN_PASSWORD` 仍只用于创建、替换和删除管理员账号，不会创建后台会话。生产服务
+必须设置 `NODE_ENV=production` 并通过 TLS 访问，以启用 `Secure` Cookie。现有 Nginx
+`^~ /api/admin/` 代理片段会自动转发 Cookie 和 `Set-Cookie`，无需增加新的 location。
 
 ## 环境变量
 
@@ -187,6 +256,7 @@ location / {
 | Name | Required | Purpose |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | PostgreSQL 连接字符串 |
+| `NODE_ENV` | Production | 生产环境必须设为 `production`，启用安全 Cookie 和生产保护 |
 | `MAA_ADMIN_PASSWORD` | Yes | 管理后台主口令 |
 | `CDK_HASH_SECRET` | Yes | CDK 哈希计算密钥 |
 | `MAA_ADMIN_SECRET` | Yes | 授权文件签名密钥 |
