@@ -66,9 +66,6 @@ export function jsonResponse(body: unknown, status = 200, headers: Record<string
     status,
     headers: {
       ...(status === 204 ? {} : { 'Content-Type': 'application/json' }),
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
       ...headers,
     },
   })

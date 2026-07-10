@@ -17,14 +17,9 @@ import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
 import usageStatsHandler from './handlers/usage-stats'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
+import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
 
 type ApiHandler = (req: Request) => Promise<Response>
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Cdk-Status',
-}
 
 const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/cdk', adminCdkHandler as unknown as ApiHandler],
@@ -69,6 +64,11 @@ const ROUTES = new Map<string, ApiHandler>([
 ])
 
 export async function routeRequest(req: Request): Promise<Response> {
+  const response = await dispatchRequest(req)
+  return applyHttpSecurityHeaders(response, isSecureWebRequest(req))
+}
+
+async function dispatchRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
 
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -113,7 +113,6 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: {
       ...(status === 204 ? {} : { 'Content-Type': 'application/json' }),
-      ...CORS_HEADERS,
     },
   })
 }
