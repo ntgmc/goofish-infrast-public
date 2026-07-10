@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { Announcement, AnnouncementAdminResponse, AnnouncementKind, AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../lib/types'
 import { apiJson, apiVoid } from '../lib/api-client'
 
@@ -1555,7 +1555,7 @@ const summary = useMemo(
                 </div>
               </section>
               {selectedUserDetail && (
-                <UserDetailPanel
+                <UserDetailDialog
                   detail={selectedUserDetail}
                   busyAction={busyAction}
                   operatorDataByProfileId={operatorDataByProfileId}
@@ -1586,6 +1586,96 @@ const summary = useMemo(
   )
 }
 
+interface UserDetailPanelProps {
+  detail: AdminUserDetail;
+  busyAction: string | null;
+  operatorDataByProfileId: Record<string, AdminProfileOperatorData>;
+  expandedOperatorProfileId: string | null;
+  onClose: () => void;
+  onUpdateProfile: (profile: AdminProfileSummary) => Promise<void>;
+  onSetProfileStatus: (profile: AdminProfileSummary) => Promise<void>;
+  onSetProfilePermission: (profile: AdminProfileSummary) => Promise<void>;
+  onUpgradePreviewProfile: (profile: AdminProfileSummary) => Promise<void>;
+  onClearSklandBinding: (profile: AdminProfileSummary) => Promise<void>;
+  onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
+  onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
+  onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
+  onFreezeUser: (user: AppUserSummary) => Promise<void>;
+  onUnfreezeUser: (user: AppUserSummary) => Promise<void>;
+  onDeleteUser: (user: AppUserSummary) => Promise<void>;
+}
+
+function UserDetailDialog(props: UserDetailPanelProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const onCloseRef = useRef(props.onClose)
+  onCloseRef.current = props.onClose
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const focusFrame = window.requestAnimationFrame(() => {
+      const preferredTarget = dialog.querySelector<HTMLElement>('[data-dialog-initial-focus]')
+      const focusTarget = preferredTarget ?? dialog
+      focusTarget.focus()
+    })
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current()
+    }
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame)
+      document.removeEventListener('keydown', handleEscape)
+      document.body.style.overflow = previousOverflow
+      returnFocusRef.current?.focus()
+    }
+  }, [])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 sm:p-8"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) props.onClose()
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-user-detail-title"
+        tabIndex={-1}
+        className="max-h-full w-full max-w-6xl overflow-y-auto rounded-xl bg-surface-1 shadow-2xl focus:outline-none"
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab') return
+          const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ))
+          if (focusable.length === 0) {
+            event.preventDefault()
+            return
+          }
+          const first = focusable[0]
+          const last = focusable[focusable.length - 1]
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault()
+            last.focus()
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault()
+            first.focus()
+          }
+        }}
+      >
+        <UserDetailPanel {...props} />
+      </div>
+    </div>
+  )
+}
+
 function UserDetailPanel({
   detail,
   busyAction,
@@ -1603,31 +1693,14 @@ function UserDetailPanel({
   onFreezeUser,
   onUnfreezeUser,
   onDeleteUser,
-}: {
-  detail: AdminUserDetail;
-  busyAction: string | null;
-  operatorDataByProfileId: Record<string, AdminProfileOperatorData>;
-  expandedOperatorProfileId: string | null;
-  onClose: () => void;
-  onUpdateProfile: (profile: AdminProfileSummary) => Promise<void>;
-  onSetProfileStatus: (profile: AdminProfileSummary) => Promise<void>;
-  onSetProfilePermission: (profile: AdminProfileSummary) => Promise<void>;
-  onUpgradePreviewProfile: (profile: AdminProfileSummary) => Promise<void>;
-  onClearSklandBinding: (profile: AdminProfileSummary) => Promise<void>;
-  onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
-  onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
-  onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
-  onFreezeUser: (user: AppUserSummary) => Promise<void>;
-  onUnfreezeUser: (user: AppUserSummary) => Promise<void>;
-  onDeleteUser: (user: AppUserSummary) => Promise<void>;
-}) {
+}: UserDetailPanelProps) {
   const user = detail.user
   return (
     <section className="rounded-xl border border-surface-3 bg-surface-1">
       <div className="flex flex-col gap-3 border-b border-surface-3 p-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="break-all text-lg font-semibold text-ink-primary">{user.email}</h2>
+            <h2 id="admin-user-detail-title" className="break-all text-lg font-semibold text-ink-primary">{user.email}</h2>
             <UserStatusPill status={user.status} />
             <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{formatAdminProfileAccess(user.profile_access)}</span>
           </div>
@@ -1637,7 +1710,7 @@ function UserDetailPanel({
           {user.status === 'active' && <SmallButton onClick={() => void onFreezeUser(user)} loading={busyAction === `app-user:freeze_account:${user.id}`}>冻结用户</SmallButton>}
           {user.status === 'frozen' && <SmallButton onClick={() => void onUnfreezeUser(user)} loading={busyAction === `app-user:unfreeze_account:${user.id}`} tone="success">解冻用户</SmallButton>}
           <SmallButton onClick={() => void onDeleteUser(user)} loading={busyAction === `app-user:delete_account:${user.id}`} tone="danger">删除用户</SmallButton>
-          <SmallButton onClick={onClose}>关闭</SmallButton>
+          <SmallButton onClick={onClose} autoFocus>关闭</SmallButton>
         </div>
       </div>
 
@@ -2689,13 +2762,13 @@ function UserStatusPill({ status }: { status: AppUserStatus }) {
   return <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${className}`}>{appUserStatusLabels[status]}</span>
 }
 
-function SmallButton({ children, onClick, loading, tone = 'default' }: { children: string; onClick: () => void; loading?: boolean; tone?: 'default' | 'success' | 'danger' }) {
+function SmallButton({ children, onClick, loading, tone = 'default', autoFocus = false }: { children: string; onClick: () => void; loading?: boolean; tone?: 'default' | 'success' | 'danger'; autoFocus?: boolean }) {
   const className = tone === 'danger'
     ? 'bg-error/10 text-error hover:bg-error/20'
     : tone === 'success'
       ? 'bg-success/10 text-success hover:bg-success/20'
       : 'bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'
-  return <button type="button" onClick={onClick} disabled={loading} className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150 disabled:bg-surface-3 disabled:text-ink-muted ${className}`}>{loading ? '处理中' : children}</button>
+  return <button type="button" onClick={onClick} disabled={loading} autoFocus={autoFocus} data-dialog-initial-focus={autoFocus ? '' : undefined} className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1 disabled:bg-surface-3 disabled:text-ink-muted ${className}`}>{loading ? '处理中' : children}</button>
 }
 
 function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0) {
