@@ -305,7 +305,7 @@ function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?
   const totalSanity = cost?.totals.equivalent_sanity ?? cost?.equivalent_sanity ?? null
   const missingSanity = cost?.missing.equivalent_sanity ?? null
   const metrics = [
-    { label: '提升收益', value: `+${formatCostNumber(roi?.efficiency_gain ?? suggestion.gain)}%`, tone: 'brand' as const },
+    { label: '得分提升', value: `+${formatCostNumber(roi?.efficiency_gain ?? suggestion.gain)}`, tone: 'brand' as const },
     orundumRoi
       ? { label: '每日合成玉', value: formatSignedAmount(orundumRoi.daily_orundum_gain), tone: 'success' as const }
       : { label: '每日理智收益', value: formatSignedSanity(roi?.daily_sanity_gain), tone: 'success' as const },
