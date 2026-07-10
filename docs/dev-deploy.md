@@ -122,11 +122,16 @@ required for a controlled compatibility test.
 
 ## Nginx
 
-Install the repository-managed development API proxy snippet:
+Install the rate-limit zones in the Nginx `http` context, then install the
+repository-managed development API proxy snippet:
 
 ```bash
+sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-development.conf /etc/nginx/snippets/goofish-api-development.conf
 ```
+
+If this Nginx installation does not load `/etc/nginx/conf.d/*.conf` from inside
+`http {}`, include the zone file explicitly in that context.
 
 Then remove the old `/api/` location from the development virtual host and include
 the snippet. It limits ordinary request bodies to 256 KiB and allows up to 1 MiB
@@ -156,8 +161,9 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-Nginx returns 413 directly when a request exceeds the proxy-layer limit; its
-response body may use the default Nginx format.
+Nginx returns 413 directly when a request exceeds the proxy-layer body limit.
+Login and management authentication IP floods return 429. The response body may
+use the default Nginx format.
 
 ## GitHub Settings
 

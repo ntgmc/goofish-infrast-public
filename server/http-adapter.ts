@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getRequestBodyLimitBytes, RequestBodyTooLargeError } from './request-body-limits'
+import { INTERNAL_CLIENT_IP_HEADER, resolveIncomingClientIp } from './security/client-ip'
 
 export async function nodeRequestToWebRequest(req: IncomingMessage): Promise<Request> {
   const host = firstHeaderValue(req.headers.host) || '127.0.0.1'
@@ -15,6 +16,7 @@ export async function nodeRequestToWebRequest(req: IncomingMessage): Promise<Req
       headers.set(key, value)
     }
   }
+  headers.set(INTERNAL_CLIENT_IP_HEADER, resolveIncomingClientIp(req))
 
   const method = req.method || 'GET'
   const init: RequestInit = { method, headers }

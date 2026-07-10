@@ -53,9 +53,8 @@ export default async (req: Request): Promise<Response> => {
     const { permission, order_note, count } = body
     const hashSecret = requireEnv('CDK_HASH_SECRET')
 
-    if (!(await authenticateAdminRequest(req, body))) {
-      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-    }
+    const authentication = await authenticateAdminRequest(req, body)
+    if (!authentication.ok) return authentication.response
     if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
       return jsonResponse({ error: 'CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
     }
@@ -161,9 +160,8 @@ async function generateUniqueCdk(
 
 async function handleList(req: Request): Promise<Response> {
   try {
-    if (!(await authenticateAdminRequest(req))) {
-      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-    }
+    const authentication = await authenticateAdminRequest(req)
+    if (!authentication.ok) return authentication.response
 
     const detailCodeHash = new URL(req.url).searchParams.get('code_hash')
     if (detailCodeHash) {
@@ -206,9 +204,8 @@ async function handlePatch(req: Request): Promise<Response> {
     }
     const { code_hash, action, permission, order_note } = body
 
-    if (!(await authenticateAdminRequest(req, body))) {
-      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-    }
+    const authentication = await authenticateAdminRequest(req, body)
+    if (!authentication.ok) return authentication.response
     if (
       action !== 'revoke'
       && action !== 'upgrade'
@@ -389,9 +386,8 @@ async function handleDelete(req: Request): Promise<Response> {
     }
     const { code_hash } = body
 
-    if (!(await authenticateAdminRequest(req, body))) {
-      return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-    }
+    const authentication = await authenticateAdminRequest(req, body)
+    if (!authentication.ok) return authentication.response
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
       return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
     }

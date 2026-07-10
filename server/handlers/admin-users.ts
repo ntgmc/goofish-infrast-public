@@ -5,6 +5,7 @@ import {
   listAdminUsers,
   requireRootAdminPassword,
 } from './admin-auth'
+import { PasswordWorkCapacityError } from '../security/password'
 import {
   CDK_PRODUCT_PERMISSIONS,
   getCdkRecordStore,
@@ -40,9 +41,8 @@ export default async (req: Request): Promise<Response> => {
   try {
     if (req.method === 'POST') {
       const body = await req.json() as { root_password?: unknown; username?: unknown; password?: unknown }
-      if (!(await requireRootAdminPassword(body.root_password))) {
-        return jsonResponse({ error: 'Root 口令错误。' }, 401)
-      }
+      const authentication = await requireRootAdminPassword(req, body.root_password)
+      if (!authentication.ok) return authentication.response
       const created = await createAdminUser(body.username, body.password)
       if (!created.ok) return jsonResponse({ error: created.message }, 400)
       return jsonResponse({
@@ -55,9 +55,8 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (req.method === 'GET') {
-      if (!(await authenticateAdminRequest(req))) {
-        return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-      }
+      const authentication = await authenticateAdminRequest(req)
+      if (!authentication.ok) return authentication.response
       const url = new URL(req.url)
       const userId = url.searchParams.get('user_id')
       const profileId = url.searchParams.get('profile_id')
@@ -98,9 +97,8 @@ export default async (req: Request): Promise<Response> => {
         status?: unknown
         permission?: unknown
       }
-      if (!(await authenticateAdminRequest(req, body))) {
-        return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-      }
+      const authentication = await authenticateAdminRequest(req, body)
+      if (!authentication.ok) return authentication.response
       if (
         body.action !== 'reset_password'
         && body.action !== 'freeze_account'
@@ -210,9 +208,8 @@ export default async (req: Request): Promise<Response> => {
 
     if (req.method === 'DELETE') {
       const body = await req.json() as { root_password?: unknown; username?: unknown }
-      if (!(await requireRootAdminPassword(body.root_password))) {
-        return jsonResponse({ error: 'Root 口令错误。' }, 401)
-      }
+      const authentication = await requireRootAdminPassword(req, body.root_password)
+      if (!authentication.ok) return authentication.response
       const deleted = await deleteAdminUser(body.username)
       if (!deleted.ok) return jsonResponse({ error: deleted.message }, 400)
       return jsonResponse({ deleted: true })
@@ -220,6 +217,17 @@ export default async (req: Request): Promise<Response> => {
 
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
+    if (error instanceof PasswordWorkCapacityError) {
+      return jsonResponse(
+        { error: '认证服务繁忙，请稍后重试。' },
+        429,
+        {
+          'Retry-After': '1',
+          'Cache-Control': 'no-store',
+          'Access-Control-Expose-Headers': 'Retry-After',
+        },
+      )
+    }
     console.error('admin users error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)

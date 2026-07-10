@@ -1,6 +1,13 @@
-import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto'
-import { requireEnv } from './license-utils'
+import { requireEnv, jsonResponse } from './license-utils'
 import { createPostgresAdminUserStore } from '../storage/admin-user-store'
+import { reserveAdminAuthenticationAttempt } from '../security/auth-rate-limit'
+import { getRequestClientIp } from '../security/client-ip'
+import {
+  constantTimeSecretEqual,
+  createPasswordHash,
+  PasswordWorkCapacityError,
+  verifyPasswordHash,
+} from '../security/password'
 
 export interface AdminUserRecord {
   version: 1;
@@ -19,28 +26,64 @@ interface AdminUserStore {
   list: () => Promise<AdminUserRecord[]>;
 }
 
-const PASSWORD_ITERATIONS = 120_000
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]{3,32}$/
 
-export async function authenticateAdminRequest(req: Request, body?: { admin_password?: unknown; admin_user?: unknown }): Promise<boolean> {
+export type AdminAuthenticationResult =
+  | { ok: true }
+  | { ok: false; response: Response }
+
+export async function authenticateAdminRequest(
+  req: Request,
+  body?: { admin_password?: unknown; admin_user?: unknown },
+): Promise<AdminAuthenticationResult> {
   const rootPassword = requireEnv('MAA_ADMIN_PASSWORD')
   const headerPassword = req.headers.get('X-Admin-Password') ?? ''
   const bodyPassword = typeof body?.admin_password === 'string' ? body.admin_password : ''
   const headerUser = req.headers.get('X-Admin-User') ?? ''
   const bodyUser = typeof body?.admin_user === 'string' ? body.admin_user : ''
+  const suppliedUser = headerUser || bodyUser
+  const username = normalizeUsername(suppliedUser)
+  const rateLimit = reserveAdminAuthenticationAttempt(
+    getRequestClientIp(req),
+    username ?? (suppliedUser ? 'invalid' : 'root'),
+  )
+  if (!rateLimit.allowed) return rateLimitedResult(rateLimit.retryAfterSeconds)
 
-  if (!headerUser && !bodyUser && (headerPassword === rootPassword || bodyPassword === rootPassword)) {
-    return true
+  try {
+    const rootAuthenticated = !suppliedUser && (
+      (Boolean(headerPassword) && constantTimeSecretEqual(headerPassword, rootPassword))
+      || (Boolean(bodyPassword) && constantTimeSecretEqual(bodyPassword, rootPassword))
+    )
+    const password = headerPassword || bodyPassword
+    const authenticated = rootAuthenticated || Boolean(
+      username && password && await verifyAdminUser(username, password),
+    )
+
+    if (authenticated) {
+      rateLimit.attempt.refund()
+      return { ok: true }
+    }
+    rateLimit.attempt.retainFailure()
+    return unauthorizedResult('管理账号或密码错误。')
+  } catch (error) {
+    rateLimit.attempt.refund()
+    if (error instanceof PasswordWorkCapacityError) return passwordCapacityResult()
+    throw error
   }
-
-  const username = normalizeUsername(headerUser || bodyUser)
-  const password = headerPassword || bodyPassword
-  if (!username || !password) return false
-  return verifyAdminUser(username, password)
 }
 
-export async function requireRootAdminPassword(value: unknown): Promise<boolean> {
-  return typeof value === 'string' && value === requireEnv('MAA_ADMIN_PASSWORD')
+export async function requireRootAdminPassword(req: Request, value: unknown): Promise<AdminAuthenticationResult> {
+  const rootPassword = requireEnv('MAA_ADMIN_PASSWORD')
+  const rateLimit = reserveAdminAuthenticationAttempt(getRequestClientIp(req), 'root')
+  if (!rateLimit.allowed) return rateLimitedResult(rateLimit.retryAfterSeconds)
+
+  const authenticated = typeof value === 'string' && constantTimeSecretEqual(value, rootPassword)
+  if (authenticated) {
+    rateLimit.attempt.refund()
+    return { ok: true }
+  }
+  rateLimit.attempt.retainFailure()
+  return unauthorizedResult('Root 口令错误。')
 }
 
 export async function createAdminUser(usernameValue: unknown, passwordValue: unknown): Promise<{ ok: true; user: AdminUserRecord } | { ok: false; message: string }> {
@@ -51,13 +94,13 @@ export async function createAdminUser(usernameValue: unknown, passwordValue: unk
   }
 
   const now = new Date().toISOString()
-  const salt = randomBytes(16).toString('hex')
+  const passwordHash = await createPasswordHash(passwordValue)
   const user: AdminUserRecord = {
     version: 1,
     username,
-    password_hash: hashPassword(passwordValue, salt, PASSWORD_ITERATIONS),
-    salt,
-    iterations: PASSWORD_ITERATIONS,
+    password_hash: passwordHash.password_hash,
+    salt: passwordHash.salt,
+    iterations: passwordHash.iterations,
     created_at: now,
     updated_at: now,
   }
@@ -85,13 +128,7 @@ async function verifyAdminUser(username: string, password: string): Promise<bool
   const store = await getAdminUserStore()
   const user = await store.get(username)
   if (!user) return false
-  const actual = Buffer.from(hashPassword(password, user.salt, user.iterations), 'hex')
-  const expected = Buffer.from(user.password_hash, 'hex')
-  return actual.length === expected.length && timingSafeEqual(actual, expected)
-}
-
-function hashPassword(password: string, salt: string, iterations: number): string {
-  return pbkdf2Sync(password, salt, iterations, 32, 'sha256').toString('hex')
+  return verifyPasswordHash(password, user)
 }
 
 function normalizeUsername(value: unknown): string | null {
@@ -102,4 +139,38 @@ function normalizeUsername(value: unknown): string | null {
 
 async function getAdminUserStore(): Promise<AdminUserStore> {
   return createPostgresAdminUserStore()
+}
+
+function unauthorizedResult(message: string): AdminAuthenticationResult {
+  return { ok: false, response: jsonResponse({ error: message }, 401) }
+}
+
+function rateLimitedResult(retryAfterSeconds: number): AdminAuthenticationResult {
+  return {
+    ok: false,
+    response: jsonResponse(
+      { error: '认证尝试过多，请稍后重试。' },
+      429,
+      rateLimitHeaders(retryAfterSeconds),
+    ),
+  }
+}
+
+function passwordCapacityResult(): AdminAuthenticationResult {
+  return {
+    ok: false,
+    response: jsonResponse(
+      { error: '认证服务繁忙，请稍后重试。' },
+      429,
+      rateLimitHeaders(1),
+    ),
+  }
+}
+
+function rateLimitHeaders(retryAfterSeconds: number): Record<string, string> {
+  return {
+    'Retry-After': String(retryAfterSeconds),
+    'Cache-Control': 'no-store',
+    'Access-Control-Expose-Headers': 'Retry-After',
+  }
 }
