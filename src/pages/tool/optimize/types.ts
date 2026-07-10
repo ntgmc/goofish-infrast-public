@@ -1,4 +1,6 @@
-export type OptimizeSection = 'overview' | 'plans' | 'config' | 'result' | 'lab'
+import type { OptimizeSection } from '../../../lib/app-routes'
+
+export type { OptimizeSection } from '../../../lib/app-routes'
 
 export type OptimizePhase = 'idle' | 'history' | 'suggestions' | 'final'
 

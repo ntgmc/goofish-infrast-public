@@ -7,11 +7,12 @@ import { ApiError, apiJson } from '../../lib/api-client'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
 import { canonicalJson } from '../../lib/crypto'
 import { ACTIVE_PURCHASE_CHANNEL } from '../../lib/purchase'
+import type { WorkspaceSetupSection } from '../../lib/app-routes'
 import { countOwnedOperators, formatDate, getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
 
-type WorkspaceSetupSection = 'operators' | 'config' | 'cdk'
+export type { WorkspaceSetupSection } from '../../lib/app-routes'
 type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 type SklandRefreshNotice = {
   kind: 'success' | 'error'
@@ -24,6 +25,8 @@ export default function WorkspaceSetupPage({
   profile,
   workspace,
   announcement,
+  activeSection,
+  onSectionChange,
   onSaved,
   onSynced,
   onBack,
@@ -34,6 +37,8 @@ export default function WorkspaceSetupPage({
   profile: UserGameAccount
   workspace: UserWorkspace | null
   announcement: Announcement | null
+  activeSection: WorkspaceSetupSection
+  onSectionChange: (section: WorkspaceSetupSection) => void
   onSaved: (payload: AuthSuccessResponse) => void
   onSynced: (payload: AuthSuccessResponse) => void
   onBack: () => void
@@ -44,7 +49,6 @@ export default function WorkspaceSetupPage({
   const [operatorFileName, setOperatorFileName] = useState<string | null>(null)
   const [operatorSearch, setOperatorSearch] = useState('')
   const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(workspace?.config ?? cloneConfig(CONFIG_PRESETS['243'])))
-  const [activeSection, setActiveSection] = useState<WorkspaceSetupSection>('operators')
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -193,7 +197,7 @@ export default function WorkspaceSetupPage({
         </div>
         <nav className="mt-8 space-y-1" aria-label="工作区设置">
           {setupSections.map((section) => (
-            <button key={section.id} type="button" onClick={() => setActiveSection(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className={`flex min-h-11 w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${activeSection === section.id ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}>
+            <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className={`flex min-h-11 w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${activeSection === section.id ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}>
               <span>{section.label}</span>
               {section.ready !== undefined && <span className={`h-2 w-2 rounded-full ${section.ready ? 'bg-success' : 'bg-surface-4'}`} />}
             </button>
@@ -203,7 +207,7 @@ export default function WorkspaceSetupPage({
         <button type="button" onClick={onLogout} className="absolute bottom-5 left-4 right-4 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3">退出登录</button>
       </aside>
 
-      <main className="lg:pl-64">
+      <main className="lg:pl-64" tabIndex={-1} data-route-focus>
         <header className="sticky top-0 z-20 border-b border-surface-3 bg-surface-0/95 px-5 py-4 backdrop-blur sm:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
@@ -221,7 +225,7 @@ export default function WorkspaceSetupPage({
           </div>
           <nav className="mt-4 flex gap-2 overflow-x-auto lg:hidden" aria-label="移动端工作区设置">
             {setupSections.map((section) => (
-              <button key={section.id} type="button" onClick={() => setActiveSection(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className={`min-h-11 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${activeSection === section.id ? 'bg-brand-600 text-white' : 'bg-surface-1 text-ink-secondary'}`}>{section.label}</button>
+              <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className={`min-h-11 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${activeSection === section.id ? 'bg-brand-600 text-white' : 'bg-surface-1 text-ink-secondary'}`}>{section.label}</button>
             ))}
           </nav>
           {announcement?.active && <AnnouncementBanner announcement={announcement} className="mt-4" />}

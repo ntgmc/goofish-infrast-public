@@ -1,4 +1,7 @@
 import type { Announcement, AnnouncementKind, AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../../lib/types'
+import type { AdminSection } from '../../lib/app-routes'
+
+export type { AdminSection } from '../../lib/app-routes'
 export type Permission = RawPermissionMode
 
 export type GeneratedPermission = ProductPermissionMode
@@ -12,8 +15,6 @@ export type StatusFilter = CdkStatus | 'all'
 export type PermissionFilter = GeneratedPermission | 'all'
 
 export type BinaryFilter = 'all' | 'yes' | 'no'
-
-export type AdminSection = 'overview' | 'cdk' | 'risk' | 'announcement' | 'users'
 
 export type FieldErrors = Record<string, string>
 

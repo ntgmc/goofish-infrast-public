@@ -1,4 +1,5 @@
 import BrandLogo from '../components/BrandLogo'
+import { Link } from 'react-router-dom'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 
 interface Props {
@@ -52,23 +53,23 @@ export default function LandingPage({ onStart }: Props) {
   const purchaseHref = ACTIVE_PURCHASE_CHANNEL?.href
 
   return (
-    <main className="landing-shell min-h-screen overflow-hidden bg-surface-0 text-white">
+    <main className="landing-shell min-h-screen overflow-hidden bg-surface-0 text-white" tabIndex={-1} data-route-focus>
       <section className="mx-auto grid min-h-screen w-full max-w-7xl items-center gap-12 px-5 pb-16 pt-6 sm:px-8 lg:grid-cols-[0.86fr_1.14fr] lg:px-10 lg:pb-20 lg:pt-8">
         <div className="relative z-10 min-w-0">
           <nav className="landing-hero-enter mb-12 flex items-center justify-between gap-4">
-            <a href="/" className="flex min-h-11 items-center gap-3 rounded-lg pr-3 text-left">
+            <Link to="/" className="flex min-h-11 items-center gap-3 rounded-lg pr-3 text-left">
               <BrandLogo size="md" />
               <span>
                 <span className="block text-sm font-semibold text-white">MAA 基建排班优化器</span>
                 <span className="block text-xs text-brand-100/64">森空岛，等效理智，MAA JSON</span>
               </span>
-            </a>
-            <a
-              href="/announcements"
+            </Link>
+            <Link
+              to="/announcements"
               className="hidden min-h-11 items-center rounded-lg border border-white/12 px-4 text-sm font-medium text-white/74 transition duration-150 hover:border-brand-200/40 hover:bg-white/[0.05] hover:text-white sm:inline-flex"
             >
               查看公告
-            </a>
+            </Link>
           </nav>
 
           <div className="max-w-2xl">
@@ -84,12 +85,12 @@ export default function LandingPage({ onStart }: Props) {
             </p>
 
             <div className="landing-hero-enter landing-enter-delay-4 mt-8 flex flex-col gap-3 sm:flex-row">
-              <a
-                href="/tools/depot-value"
+              <Link
+                to="/tools/depot-value"
                 className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-5 py-3 text-sm font-semibold text-brand-950 transition duration-150 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-surface-0"
               >
                 免费仓库估值
-              </a>
+              </Link>
               <button
                 type="button"
                 onClick={onStart}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { Announcement, AnnouncementPublicResponse } from '../lib/types'
 import { apiJson } from '../lib/api-client'
 
@@ -29,19 +30,19 @@ export default function AnnouncementsPage() {
   }, [])
 
   return (
-    <main className="min-h-screen bg-surface-0 px-4 py-8 text-ink-primary">
+    <main className="min-h-screen bg-surface-0 px-4 py-8 text-ink-primary" tabIndex={-1} data-route-focus>
       <div className="mx-auto max-w-3xl">
         <div className="flex flex-col gap-3 border-b border-surface-3 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">公告</h1>
             <p className="mt-2 text-sm leading-6 text-ink-secondary">这里会集中展示近期通知，方便你随时回看。</p>
           </div>
-          <a
-            href="/tool"
+          <Link
+            to="/tool/profiles"
             className="text-sm font-semibold text-brand-600 underline-offset-4 hover:underline"
           >
             返回工具
-          </a>
+          </Link>
         </div>
 
         {loading && <p className="mt-6 text-sm text-ink-secondary">正在加载公告...</p>}

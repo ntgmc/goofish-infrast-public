@@ -1,5 +1,6 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense } from 'react'
 import type { AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
+import type { DashboardSection } from '../../lib/app-routes'
 import BrandLogo from '../../components/BrandLogo'
 
 const ProfilesSection = lazy(() => import('./dashboard/ProfilesSection'))
@@ -8,7 +9,7 @@ const RedeemSection = lazy(() => import('./dashboard/RedeemSection'))
 const AnnouncementsSection = lazy(() => import('./dashboard/AnnouncementsSection'))
 const SettingsSection = lazy(() => import('./dashboard/SettingsSection'))
 
-export type DashboardSection = 'profiles' | 'tools' | 'redeem' | 'announcements' | 'settings'
+export type { DashboardSection } from '../../lib/app-routes'
 
 export default function AccountDashboard({
   user,
@@ -17,7 +18,8 @@ export default function AccountDashboard({
   announcementUnreadCount,
   openingProfileId,
   workspaceLoadError,
-  initialSection = 'profiles',
+  section,
+  onSectionChange,
   onLogout,
   onPayload,
   onOpenProfile,
@@ -28,12 +30,12 @@ export default function AccountDashboard({
   announcementUnreadCount: number
   openingProfileId: string | null
   workspaceLoadError: string | null
-  initialSection?: DashboardSection
+  section: DashboardSection
+  onSectionChange: (section: DashboardSection, options?: { replace?: boolean }) => void
   onLogout: () => void
   onPayload: (payload: AuthSuccessResponse) => void
   onOpenProfile: (profile: UserGameAccount) => void
 }) {
-  const [section, setSection] = useState<DashboardSection>(initialSection)
 const labels: Record<DashboardSection, string> = {
 profiles: '游戏账号',
 tools: '工具',
@@ -54,14 +56,14 @@ announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCou
         </div>
         <nav className="mt-8 space-y-1">
           {(Object.keys(labels) as DashboardSection[]).map((key) => (
-            <button key={key} type="button" onClick={() => setSection(key)} className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${section === key ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}>
+            <button key={key} type="button" onClick={() => onSectionChange(key)} aria-current={section === key ? 'page' : undefined} className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${section === key ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}>
               {labels[key]}
             </button>
           ))}
         </nav>
         <button type="button" onClick={onLogout} className="absolute bottom-5 left-4 right-4 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">退出登录</button>
       </aside>
-      <main className="lg:pl-64">
+      <main className="lg:pl-64" tabIndex={-1} data-route-focus>
         <header className="sticky top-0 z-20 border-b border-surface-3 bg-surface-0/95 px-5 py-4 backdrop-blur sm:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
@@ -75,7 +77,7 @@ announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCou
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
             {(Object.keys(labels) as DashboardSection[]).map((key) => (
-              <button key={key} type="button" onClick={() => setSection(key)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${section === key ? 'bg-brand-600 text-white' : 'bg-surface-1 text-ink-secondary'}`}>{labels[key]}</button>
+              <button key={key} type="button" onClick={() => onSectionChange(key)} aria-current={section === key ? 'page' : undefined} className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${section === key ? 'bg-brand-600 text-white' : 'bg-surface-1 text-ink-secondary'}`}>{labels[key]}</button>
             ))}
           </div>
         </header>
@@ -87,7 +89,7 @@ announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCou
         )}
 <Suspense fallback={<SectionFallback />}>{section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} />}</Suspense>
 <Suspense fallback={<SectionFallback />}>{section === 'tools' && <ToolsSection />}</Suspense>
-<Suspense fallback={<SectionFallback />}>{section === 'redeem' && <RedeemSection onRedeemed={(payload) => { onPayload(payload); setSection('profiles') }} />}</Suspense>
+<Suspense fallback={<SectionFallback />}>{section === 'redeem' && <RedeemSection onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}</Suspense>
           <Suspense fallback={<SectionFallback />}>{section === 'announcements' && <AnnouncementsSection />}</Suspense>
           <Suspense fallback={<SectionFallback />}>{section === 'settings' && <SettingsSection />}</Suspense>
         </div>

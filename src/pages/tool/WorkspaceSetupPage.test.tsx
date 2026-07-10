@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import AccountDashboard from './AccountDashboard'
@@ -73,7 +74,8 @@ describe('WorkspaceSetupPage CDK paths', () => {
         announcementUnreadCount={0}
         openingProfileId={null}
         workspaceLoadError={null}
-        initialSection="redeem"
+        section="redeem"
+        onSectionChange={vi.fn()}
         onLogout={vi.fn()}
         onPayload={vi.fn()}
         onOpenProfile={vi.fn()}
@@ -97,18 +99,31 @@ function renderWorkspace(overrides: {
   onSynced?: (payload: AuthSuccessResponse) => void
   onRedeemNewProfile?: () => void
 } = {}) {
-  return render(
+  return render(<WorkspaceSetupHarness overrides={overrides} />)
+}
+
+function WorkspaceSetupHarness({ overrides }: {
+  overrides: {
+    onSynced?: (payload: AuthSuccessResponse) => void
+    onRedeemNewProfile?: () => void
+  }
+}) {
+  const [activeSection, setActiveSection] = useState<'operators' | 'config' | 'cdk'>('operators')
+
+  return (
     <WorkspaceSetupPage
       user={{ id: 'user-1', email: 'test@example.com' } as AuthUser}
       profile={createPreviewProfile()}
       workspace={null}
       announcement={null}
+      activeSection={activeSection}
+      onSectionChange={setActiveSection}
       onSaved={vi.fn()}
       onSynced={overrides.onSynced ?? vi.fn()}
       onBack={vi.fn()}
       onRedeemNewProfile={overrides.onRedeemNewProfile ?? vi.fn()}
       onLogout={vi.fn()}
-    />,
+    />
   )
 }
 

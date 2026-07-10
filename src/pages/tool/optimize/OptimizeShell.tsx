@@ -62,7 +62,7 @@ export default function OptimizeShell({
         </button>
       </aside>
 
-      <main className="lg:pl-64">
+      <main className="lg:pl-64" tabIndex={-1} data-route-focus>
         <header className="sticky top-0 z-20 border-b border-surface-3 bg-surface-0/95 px-5 py-4 backdrop-blur sm:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
