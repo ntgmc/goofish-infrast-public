@@ -1,6 +1,6 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import AnnouncementPopup from '../components/AnnouncementPopup'
-import AccountDashboard from './tool/AccountDashboard'
+import AccountDashboard, { type DashboardSection } from './tool/AccountDashboard'
 import AuthPage from './tool/AuthPage'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
 import { isSchedulableProfile } from './tool/tool-utils'
@@ -9,6 +9,7 @@ import { useToolSession } from './tool/useToolSession'
 const OptimizePage = lazy(() => import('./OptimizePage'))
 
 export default function ToolPage() {
+  const [dashboardSection, setDashboardSection] = useState<DashboardSection>('profiles')
   const {
     authLoading,
     user,
@@ -52,6 +53,7 @@ export default function ToolPage() {
           announcementUnreadCount={announcementUnreadCount}
           openingProfileId={openingProfileId}
           workspaceLoadError={workspaceLoadError}
+          initialSection={dashboardSection}
           onLogout={handleLogout}
           onPayload={(payload) => applyAuthPayload(payload, 'dashboard')}
           onOpenProfile={(profile) => {
@@ -66,7 +68,14 @@ export default function ToolPage() {
           announcement={banner}
           onSaved={(payload) => applyAuthPayload(payload, 'optimize')}
           onSynced={(payload) => applyAuthPayload(payload, 'setup')}
-          onBack={() => setWorkspaceMode('dashboard')}
+          onBack={() => {
+            setDashboardSection('profiles')
+            setWorkspaceMode('dashboard')
+          }}
+          onRedeemNewProfile={() => {
+            setDashboardSection('redeem')
+            setWorkspaceMode('dashboard')
+          }}
           onLogout={handleLogout}
         />
       ) : activeProfile && isSchedulableProfile(activeProfile) && license ? (
@@ -97,6 +106,7 @@ export default function ToolPage() {
           announcementUnreadCount={announcementUnreadCount}
           openingProfileId={openingProfileId}
           workspaceLoadError={workspaceLoadError}
+          initialSection={dashboardSection}
           onLogout={handleLogout}
           onPayload={(payload) => applyAuthPayload(payload, 'dashboard')}
           onOpenProfile={(profile) => {

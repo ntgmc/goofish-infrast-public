@@ -6,11 +6,12 @@ import SklandBindingDialog, { type SklandPayload } from '../../components/Skland
 import { ApiError, apiJson } from '../../lib/api-client'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
 import { canonicalJson } from '../../lib/crypto'
+import { ACTIVE_PURCHASE_CHANNEL } from '../../lib/purchase'
 import { countOwnedOperators, formatDate, getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
 
-type WorkspaceSetupSection = 'operators' | 'config'
+type WorkspaceSetupSection = 'operators' | 'config' | 'cdk'
 type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 type SklandRefreshNotice = {
   kind: 'success' | 'error'
@@ -26,6 +27,7 @@ export default function WorkspaceSetupPage({
   onSaved,
   onSynced,
   onBack,
+  onRedeemNewProfile,
   onLogout,
 }: {
   user: AuthUser
@@ -35,6 +37,7 @@ export default function WorkspaceSetupPage({
   onSaved: (payload: AuthSuccessResponse) => void
   onSynced: (payload: AuthSuccessResponse) => void
   onBack: () => void
+  onRedeemNewProfile: () => void
   onLogout: () => void
 }) {
   const [operators, setOperators] = useState<LicenseOperator[] | null>(workspace?.operators ?? null)
@@ -63,9 +66,10 @@ export default function WorkspaceSetupPage({
     const source = sortOperatorsForPreview((operators ?? []).filter((operator) => operator.own !== false))
     return keyword ? source.filter((operator) => operator.name.toLowerCase().includes(keyword)) : source
   }, [operatorSearch, operators])
-  const setupSections: Array<{ id: WorkspaceSetupSection; label: string; ready: boolean }> = [
+  const setupSections: Array<{ id: WorkspaceSetupSection; label: string; ready?: boolean }> = [
     { id: 'operators', label: '干员数据', ready: Boolean(operators) },
     { id: 'config', label: '基建配置', ready: configValidation.ok },
+    { id: 'cdk', label: '档案与 CDK' },
   ]
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
@@ -187,11 +191,11 @@ export default function WorkspaceSetupPage({
             <p className="mt-3 truncate text-sm font-medium text-ink-primary">{profile.display_name}</p>
           </div>
         </div>
-        <nav className="mt-8 space-y-1">
+        <nav className="mt-8 space-y-1" aria-label="工作区设置">
           {setupSections.map((section) => (
-            <button key={section.id} type="button" onClick={() => setActiveSection(section.id)} className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${activeSection === section.id ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}>
+            <button key={section.id} type="button" onClick={() => setActiveSection(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className={`flex min-h-11 w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${activeSection === section.id ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}>
               <span>{section.label}</span>
-              <span className={`h-2 w-2 rounded-full ${section.ready ? 'bg-success' : 'bg-surface-4'}`} />
+              {section.ready !== undefined && <span className={`h-2 w-2 rounded-full ${section.ready ? 'bg-success' : 'bg-surface-4'}`} />}
             </button>
           ))}
         </nav>
@@ -215,15 +219,20 @@ export default function WorkspaceSetupPage({
               <button type="button" onClick={onLogout} className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-surface-3 lg:hidden">退出登录</button>
             </div>
           </div>
-          <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
+          <nav className="mt-4 flex gap-2 overflow-x-auto lg:hidden" aria-label="移动端工作区设置">
             {setupSections.map((section) => (
-              <button key={section.id} type="button" onClick={() => setActiveSection(section.id)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${activeSection === section.id ? 'bg-brand-600 text-white' : 'bg-surface-1 text-ink-secondary'}`}>{section.label}</button>
+              <button key={section.id} type="button" onClick={() => setActiveSection(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className={`min-h-11 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium ${activeSection === section.id ? 'bg-brand-600 text-white' : 'bg-surface-1 text-ink-secondary'}`}>{section.label}</button>
             ))}
-          </div>
+          </nav>
           {announcement?.active && <AnnouncementBanner announcement={announcement} className="mt-4" />}
         </header>
 
-        <form onSubmit={handleSave} className="px-5 py-6 sm:px-8">
+        {activeSection === 'cdk' ? (
+          <div className="px-5 py-6 sm:px-8">
+            <ProfileCdkPaths profile={profile} onUpgraded={onSynced} onRedeemNewProfile={onRedeemNewProfile} />
+          </div>
+        ) : (
+          <form onSubmit={handleSave} className="px-5 py-6 sm:px-8">
           <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
             <div className="space-y-5">
               {error && <div className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
@@ -301,7 +310,8 @@ export default function WorkspaceSetupPage({
               </button>
             </aside>
           </div>
-        </form>
+          </form>
+        )}
       </main>
 
       <SklandBindingDialog
@@ -312,6 +322,109 @@ export default function WorkspaceSetupPage({
         onPayload={applySklandPayload}
       />
     </div>
+  )
+}
+
+function ProfileCdkPaths({
+  profile,
+  onUpgraded,
+  onRedeemNewProfile,
+}: {
+  profile: UserGameAccount
+  onUpgraded: (payload: AuthSuccessResponse) => void
+  onRedeemNewProfile: () => void
+}) {
+  const [upgradeCdk, setUpgradeCdk] = useState('')
+  const [upgradeLoading, setUpgradeLoading] = useState(false)
+  const [upgradeError, setUpgradeError] = useState<string | null>(null)
+  const isPreviewProfile = isFreePreviewProfile(profile)
+
+  const handleUpgrade = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!isPreviewProfile || upgradeLoading) return
+    setUpgradeLoading(true)
+    setUpgradeError(null)
+    try {
+      const data = await apiJson<AuthSuccessResponse>('/api/user/profiles/redeem', {
+        method: 'POST',
+        json: { profile_id: profile.id, cdk: upgradeCdk },
+        fallbackMessage: '免费档案升级失败',
+      })
+      setUpgradeCdk('')
+      onUpgraded(data)
+    } catch (caught) {
+      setUpgradeError((caught as Error).message)
+    } finally {
+      setUpgradeLoading(false)
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6" aria-labelledby="profile-cdk-paths-title">
+      <div>
+        <h2 id="profile-cdk-paths-title" className="text-lg font-semibold text-ink-primary">档案与 CDK</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
+          {isPreviewProfile
+            ? '可以用 CDK 原地升级当前免费档案并保留工作区，也可以兑换为新的独立档案。'
+            : '当前档案已经使用正式授权；如需管理其他游戏账号，可以继续兑换新的独立档案。'}
+        </p>
+      </div>
+
+      <div className={`mt-5 grid gap-4 ${isPreviewProfile ? 'lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        {isPreviewProfile && (
+          <form onSubmit={handleUpgrade} className="rounded-lg border border-brand-600/30 bg-brand-600/10 p-4">
+            <h3 className="text-sm font-semibold text-ink-primary">升级当前免费档案</h3>
+            <p className="mt-2 text-sm leading-6 text-ink-secondary">保留干员、森空岛绑定、基建配置与历史记录，直接解锁 CDK 权益。</p>
+            <label htmlFor="workspace-upgrade-cdk" className="mt-4 block text-sm font-medium text-ink-secondary">升级 CDK</label>
+            <input
+              id="workspace-upgrade-cdk"
+              value={upgradeCdk}
+              onChange={(event) => setUpgradeCdk(event.currentTarget.value)}
+              className="mt-2 min-h-11 w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink-primary"
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+            {upgradeError && <p className="mt-3 text-sm leading-6 text-error" role="alert">{upgradeError}</p>}
+            <button
+              type="submit"
+              disabled={upgradeLoading}
+              className="mt-4 min-h-11 w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-wait disabled:bg-surface-3 disabled:text-ink-muted"
+            >
+              {upgradeLoading ? '正在升级...' : '升级当前免费档案'}
+            </button>
+          </form>
+        )}
+
+        <div className="flex flex-col rounded-lg border border-surface-3 bg-surface-0 p-4">
+          <h3 className="text-sm font-semibold text-ink-primary">兑换新的 CDK 档案</h3>
+          <p className="mt-2 flex-1 text-sm leading-6 text-ink-secondary">前往“添加账号”输入未使用的 CDK，创建独立档案；当前工作区不会改变。</p>
+          <button
+            type="button"
+            onClick={onRedeemNewProfile}
+            className="mt-4 min-h-11 rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+          >
+            前往兑换新档案
+          </button>
+        </div>
+
+        {ACTIVE_PURCHASE_CHANNEL && (
+          <div className="flex flex-col rounded-lg border border-surface-3 bg-surface-0 p-4">
+            <h3 className="text-sm font-semibold text-ink-primary">还没有 CDK</h3>
+            <p className="mt-2 flex-1 text-sm leading-6 text-ink-secondary">通过当前可用的购买渠道获取 CDK，购买后返回此处升级或兑换。</p>
+            <a
+              href={ACTIVE_PURCHASE_CHANNEL.href ?? undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+            >
+              {ACTIVE_PURCHASE_CHANNEL.actionLabel}
+            </a>
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
 
