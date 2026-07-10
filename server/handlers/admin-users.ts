@@ -84,8 +84,6 @@ export default async (req: Request): Promise<Response> => {
 
     if (req.method === 'PATCH') {
       const body = await req.json() as {
-        admin_user?: unknown
-        admin_password?: unknown
         action?: unknown
         user_id?: unknown
         email?: unknown
@@ -97,7 +95,7 @@ export default async (req: Request): Promise<Response> => {
         status?: unknown
         permission?: unknown
       }
-      const authentication = await authenticateAdminRequest(req, body)
+      const authentication = await authenticateAdminRequest(req)
       if (!authentication.ok) return authentication.response
       if (
         body.action !== 'reset_password'

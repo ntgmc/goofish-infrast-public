@@ -1,4 +1,7 @@
 import { build } from 'esbuild'
+import { rm } from 'node:fs/promises'
+
+await rm('server/dist', { recursive: true, force: true })
 
 await build({
   entryPoints: {

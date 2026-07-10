@@ -44,8 +44,6 @@ export default async (req: Request): Promise<Response> => {
 
   try {
     const body = await req.json() as {
-      admin_password?: string;
-      admin_user?: string;
       permission?: string;
       order_note?: string;
       count?: unknown;
@@ -53,7 +51,7 @@ export default async (req: Request): Promise<Response> => {
     const { permission, order_note, count } = body
     const hashSecret = requireEnv('CDK_HASH_SECRET')
 
-    const authentication = await authenticateAdminRequest(req, body)
+    const authentication = await authenticateAdminRequest(req)
     if (!authentication.ok) return authentication.response
     if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
       return jsonResponse({ error: 'CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
@@ -195,8 +193,6 @@ async function handleList(req: Request): Promise<Response> {
 async function handlePatch(req: Request): Promise<Response> {
   try {
     const body = await req.json() as {
-      admin_password?: string;
-      admin_user?: string;
       code_hash?: string;
       action?: string;
       permission?: string;
@@ -204,7 +200,7 @@ async function handlePatch(req: Request): Promise<Response> {
     }
     const { code_hash, action, permission, order_note } = body
 
-    const authentication = await authenticateAdminRequest(req, body)
+    const authentication = await authenticateAdminRequest(req)
     if (!authentication.ok) return authentication.response
     if (
       action !== 'revoke'
@@ -380,13 +376,11 @@ async function handlePatch(req: Request): Promise<Response> {
 async function handleDelete(req: Request): Promise<Response> {
   try {
     const body = await req.json() as {
-      admin_password?: string;
-      admin_user?: string;
       code_hash?: string;
     }
     const { code_hash } = body
 
-    const authentication = await authenticateAdminRequest(req, body)
+    const authentication = await authenticateAdminRequest(req)
     if (!authentication.ok) return authentication.response
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
       return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)

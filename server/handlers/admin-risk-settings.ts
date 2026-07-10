@@ -30,7 +30,7 @@ async function handleGet(req: Request): Promise<Response> {
 async function handleSave(req: Request): Promise<Response> {
   try {
     const body = await req.json() as Record<string, unknown>
-    const authentication = await authenticateAdminRequest(req, body)
+    const authentication = await authenticateAdminRequest(req)
     if (!authentication.ok) return authentication.response
 
     const patch: RiskControlSettingsPatch = {}

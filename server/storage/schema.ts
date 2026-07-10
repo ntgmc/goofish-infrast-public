@@ -69,6 +69,19 @@ CREATE TABLE IF NOT EXISTS admin_users (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL REFERENCES admin_users(username) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_token_hash ON admin_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_username ON admin_sessions(username);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_last_seen_at ON admin_sessions(last_seen_at);
+
 CREATE TABLE IF NOT EXISTS user_accounts (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,

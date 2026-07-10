@@ -165,6 +165,16 @@ Nginx returns 413 directly when a request exceeds the proxy-layer body limit.
 Login and management authentication IP floods return 429. The response body may
 use the default Nginx format.
 
+Administrator authentication uses the `maa_admin_session` HttpOnly,
+SameSite=Strict cookie. The existing `^~ /api/admin/` location already forwards
+Cookie and Set-Cookie headers, so no additional location is required. With the
+documented `NODE_ENV=production` setting, the cookie is `Secure` and therefore
+the development site must be accessed through its configured HTTPS origin.
+Sessions expire after 30 minutes of inactivity or 8 hours absolutely and close
+with the browser. Legacy administrator password headers and business-body
+credentials are not accepted; scripts must use `POST /api/admin/session` and a
+cookie jar.
+
 ## GitHub Settings
 
 Create a `development` environment in GitHub and configure these secrets:

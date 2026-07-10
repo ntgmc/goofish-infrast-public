@@ -65,6 +65,17 @@ Keep production secrets such as `DATABASE_URL`, `MAA_ADMIN_PASSWORD`,
 not store them in GitHub Actions secrets unless the workflow truly needs them.
 This workflow does not need those application secrets.
 
+The production service must set `NODE_ENV=production`. Administrator login now
+uses the `maa_admin_session` HttpOnly, SameSite=Strict cookie, and production
+mode adds the required `Secure` attribute. Sessions expire after 30 minutes of
+inactivity or 8 hours absolutely and are removed when the browser closes.
+
+The existing `^~ /api/admin/` Nginx location forwards Cookie and Set-Cookie
+headers without additional directives. No new location is required. Legacy
+`X-Admin-User` / `X-Admin-Password` and `admin_user` / `admin_password`
+authentication has been removed; operational scripts must log in through
+`POST /api/admin/session` and retain a cookie jar for subsequent requests.
+
 ## GitHub Settings
 
 Create these repository or environment secrets:
