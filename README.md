@@ -163,22 +163,34 @@ npm run check:migration
 9. 重启 Node 后端服务。
 10. 访问 <https://maatool.com/>，并检查 `/api/health` 与核心接口。
 
-生产环境建议由 Nginx 提供静态文件和 TLS，并把 `/api/` 反向代理到 Node 后端：
+生产环境建议由 Nginx 提供静态文件和 TLS，并使用仓库内受管的
+`deploy/nginx/goofish-api-production.conf` 片段把 `/api/` 反向代理到 Node 后端。
+该片段将普通请求体限制为 256 KiB，并为 `/api/depot-value` 保留 1 MiB 限额。
+
+先安装或同步片段：
+
+```bash
+sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
+```
+
+然后在现有 `server {}` 中删除旧的 `/api/` location，并包含该片段：
 
 ```nginx
-location /api/ {
-  proxy_pass http://127.0.0.1:3000/api/;
-  proxy_http_version 1.1;
-  proxy_set_header Host $host;
-  proxy_set_header X-Real-IP $remote_addr;
-  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-  proxy_set_header X-Forwarded-Proto $scheme;
-}
+include /etc/nginx/snippets/goofish-api-production.conf;
 
 location / {
   try_files $uri $uri/ /index.html;
 }
 ```
+
+应用前必须检查配置，检查成功后再平滑重载：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+超过代理层限额时由 Nginx 直接返回 413，响应正文可能使用 Nginx 默认格式。
 
 ## 环境变量
 
