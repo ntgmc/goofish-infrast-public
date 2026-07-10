@@ -9,6 +9,7 @@ import type {
   LicenseOperator,
 } from '../../src/lib/types'
 import { APP_BUILD_META } from '../../src/lib/build-meta'
+import { DEPOT_VALUE_REQUEST_BODY_LIMIT_BYTES } from '../request-body-limits'
 import { requireUserSession } from './user-auth'
 import { convertSklandCharactersToOperators, decryptSklandCredential, SklandClient } from './skland-client'
 import {
@@ -24,7 +25,6 @@ import {
   type DepotValueSampleStore,
 } from '../storage/depot-value-sample-store'
 
-const MAX_BODY_BYTES = 1024 * 1024
 const TOP_ITEM_LIMIT = 8
 const UNPRICED_ITEM_LIMIT = 12
 const SAMPLE_WEIGHT_PRIOR_COUNT = 200
@@ -598,11 +598,11 @@ function unwrapDataRecord(value: unknown): Record<string, unknown> {
 
 function readLimitedJsonBody(req: Request): Promise<unknown> {
   const contentLength = Number(req.headers.get('content-length') ?? 0)
-  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+  if (Number.isFinite(contentLength) && contentLength > DEPOT_VALUE_REQUEST_BODY_LIMIT_BYTES) {
     throw createError('仓库 JSON 不能超过 1 MB。', 413)
   }
   return req.text().then((text) => {
-    if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) {
+    if (new TextEncoder().encode(text).length > DEPOT_VALUE_REQUEST_BODY_LIMIT_BYTES) {
       throw createError('仓库 JSON 不能超过 1 MB。', 413)
     }
     try {

@@ -122,7 +122,15 @@ required for a controlled compatibility test.
 
 ## Nginx
 
-Example virtual host:
+Install the repository-managed development API proxy snippet:
+
+```bash
+sudo install -m 0644 deploy/nginx/goofish-api-development.conf /etc/nginx/snippets/goofish-api-development.conf
+```
+
+Then remove the old `/api/` location from the development virtual host and include
+the snippet. It limits ordinary request bodies to 256 KiB and allows up to 1 MiB
+for `/api/depot-value`:
 
 ```nginx
 server {
@@ -132,14 +140,7 @@ server {
   root /opt/goofish-infrast-v1-dev/dist;
   index index.html;
 
-  location /api/ {
-    proxy_pass http://127.0.0.1:3001/api/;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
+  include /etc/nginx/snippets/goofish-api-development.conf;
 
   location / {
     try_files $uri $uri/ /index.html;
@@ -148,6 +149,15 @@ server {
 ```
 
 Add TLS for `dev.maatool.com` with the server's normal certificate process.
+Validate and reload Nginx after installing the snippet:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Nginx returns 413 directly when a request exceeds the proxy-layer limit; its
+response body may use the default Nginx format.
 
 ## GitHub Settings
 

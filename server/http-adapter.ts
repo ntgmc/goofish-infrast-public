@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { getRequestBodyLimitBytes, RequestBodyTooLargeError } from './request-body-limits'
 
 export async function nodeRequestToWebRequest(req: IncomingMessage): Promise<Request> {
   const host = firstHeaderValue(req.headers.host) || '127.0.0.1'
@@ -18,7 +19,8 @@ export async function nodeRequestToWebRequest(req: IncomingMessage): Promise<Req
   const method = req.method || 'GET'
   const init: RequestInit = { method, headers }
   if (method !== 'GET' && method !== 'HEAD') {
-    init.body = new Uint8Array(await readRequestBody(req))
+    const bodyLimitBytes = getRequestBodyLimitBytes(new URL(url).pathname)
+    init.body = new Uint8Array(await readRequestBody(req, bodyLimitBytes))
   }
 
   return new Request(url, init)
@@ -45,13 +47,58 @@ function firstHeaderValue(value: string | string[] | undefined): string | null {
   return value ?? null
 }
 
-function readRequestBody(req: IncomingMessage): Promise<Buffer> {
+function readRequestBody(req: IncomingMessage, limitBytes: number): Promise<Buffer> {
+  const contentLength = parseContentLength(firstHeaderValue(req.headers['content-length']))
+  if (contentLength !== null && contentLength > limitBytes) {
+    req.pause()
+    return Promise.reject(new RequestBodyTooLargeError(limitBytes))
+  }
+
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
-    req.on('data', (chunk) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-    })
-    req.on('end', () => resolve(Buffer.concat(chunks)))
-    req.on('error', reject)
+    let totalBytes = 0
+    let settled = false
+
+    const cleanup = () => {
+      req.off('data', onData)
+      req.off('end', onEnd)
+      req.off('error', onError)
+      req.off('aborted', onAborted)
+    }
+    const fail = (error: Error) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(error)
+    }
+    const onData = (chunk: Buffer | string) => {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      if (buffer.length > limitBytes - totalBytes) {
+        req.pause()
+        fail(new RequestBodyTooLargeError(limitBytes))
+        return
+      }
+      chunks.push(buffer)
+      totalBytes += buffer.length
+    }
+    const onEnd = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(Buffer.concat(chunks, totalBytes))
+    }
+    const onError = (error: Error) => fail(error)
+    const onAborted = () => fail(new Error('Request aborted'))
+
+    req.on('data', onData)
+    req.on('end', onEnd)
+    req.on('error', onError)
+    req.on('aborted', onAborted)
   })
+}
+
+function parseContentLength(value: string | null): number | null {
+  if (value === null || !/^\d+$/.test(value)) return null
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) ? parsed : Number.POSITIVE_INFINITY
 }
