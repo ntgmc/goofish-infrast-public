@@ -1,9 +1,15 @@
 import { query } from './postgres'
 import type { AdminUserRecord } from '../handlers/admin-auth'
+import type { PasswordHashRecord } from '../security/password'
 
 export interface AdminUserStore {
   get: (username: string) => Promise<AdminUserRecord | null>
   set: (username: string, user: AdminUserRecord) => Promise<void>
+  upgradePasswordHash: (
+    username: string,
+    expectedPasswordHash: string,
+    replacement: PasswordHashRecord,
+  ) => Promise<AdminUserRecord | null>
   delete: (username: string) => Promise<void>
   list: () => Promise<AdminUserRecord[]>
 }
@@ -39,6 +45,36 @@ export function createPostgresAdminUserStore(): AdminUserStore {
           user.updated_at,
         ],
       )
+    },
+    upgradePasswordHash: async (username, expectedPasswordHash, replacement) => {
+      const updatedAt = new Date().toISOString()
+      const passwordPatch = {
+        password_hash: replacement.password_hash,
+        salt: replacement.salt,
+        iterations: replacement.iterations,
+        password_algorithm: replacement.password_algorithm,
+        updated_at: updatedAt,
+      }
+      const result = await query<{ record_json: AdminUserRecord }>(
+        `update admin_users
+         set password_hash = $3,
+             salt = $4,
+             iterations = $5,
+             record_json = record_json || $6::jsonb,
+             updated_at = $7
+         where username = $1 and password_hash = $2
+         returning record_json`,
+        [
+          username,
+          expectedPasswordHash,
+          replacement.password_hash,
+          replacement.salt,
+          replacement.iterations,
+          JSON.stringify(passwordPatch),
+          updatedAt,
+        ],
+      )
+      return result.rows[0]?.record_json ?? null
     },
     delete: async (username) => {
       await query('delete from admin_users where username = $1', [username])

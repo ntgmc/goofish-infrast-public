@@ -5,6 +5,8 @@ import { getRequestClientIp } from '../security/client-ip'
 import {
   constantTimeSecretEqual,
   createPasswordHash,
+  type PasswordAlgorithm,
+  type PasswordHashRecord,
   PasswordWorkCapacityError,
   verifyPasswordHash,
 } from '../security/password'
@@ -15,6 +17,7 @@ export interface AdminUserRecord {
   password_hash: string;
   salt: string;
   iterations: number;
+  password_algorithm?: PasswordAlgorithm;
   created_at: string;
   updated_at: string;
 }
@@ -22,6 +25,11 @@ export interface AdminUserRecord {
 interface AdminUserStore {
   get: (username: string) => Promise<AdminUserRecord | null>;
   set: (username: string, user: AdminUserRecord) => Promise<void>;
+  upgradePasswordHash: (
+    username: string,
+    expectedPasswordHash: string,
+    replacement: PasswordHashRecord,
+  ) => Promise<AdminUserRecord | null>;
   delete: (username: string) => Promise<void>;
   list: () => Promise<AdminUserRecord[]>;
 }
@@ -101,6 +109,7 @@ export async function createAdminUser(usernameValue: unknown, passwordValue: unk
     password_hash: passwordHash.password_hash,
     salt: passwordHash.salt,
     iterations: passwordHash.iterations,
+    password_algorithm: passwordHash.password_algorithm,
     created_at: now,
     updated_at: now,
   }
@@ -128,7 +137,17 @@ async function verifyAdminUser(username: string, password: string): Promise<bool
   const store = await getAdminUserStore()
   const user = await store.get(username)
   if (!user) return false
-  return verifyPasswordHash(password, user)
+  const passwordVerification = await verifyPasswordHash(password, user)
+  if (!passwordVerification.verified) return false
+  if (passwordVerification.needsRehash) {
+    try {
+      const replacement = await createPasswordHash(password)
+      await store.upgradePasswordHash(username, user.password_hash, replacement)
+    } catch (error) {
+      console.warn('admin password hash upgrade skipped:', error instanceof Error ? error.name : 'UnknownError')
+    }
+  }
+  return true
 }
 
 function normalizeUsername(value: unknown): string | null {

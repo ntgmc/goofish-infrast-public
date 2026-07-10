@@ -26,7 +26,7 @@ try {
     platform: 'node',
     target: 'node20',
     format: 'esm',
-    external: ['pg', 'qrcode'],
+    external: ['@node-rs/argon2', 'pg', 'qrcode'],
     logLevel: 'silent',
   })
 

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { Algorithm, Version, hash as argon2Hash } from '@node-rs/argon2'
 import { pbkdf2Sync } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -16,6 +17,7 @@ try {
   await assertPasswordSecurity(passwordModule)
   assertSlidingWindowRateLimits(rateLimitModule)
   assertClientIpResolution(clientIpModule)
+  await assertUserPasswordMigration(passwordModule)
   await assertUserLoginRateLimits()
   await assertAdminAuthenticationRateLimits()
 
@@ -30,33 +32,213 @@ async function assertPasswordSecurity(passwordModule) {
   const password_hash = pbkdf2Sync(password, salt, 120_000, 32, 'sha256').toString('hex')
   const record = { password_hash, salt, iterations: 120_000 }
 
-  assert.equal(await passwordModule.verifyPasswordHash(password, record), true, 'legacy password hash should verify')
-  assert.equal(await passwordModule.verifyPasswordHash('wrong-password', record), false, 'wrong password should fail')
+  assert.deepEqual(
+    await passwordModule.verifyPasswordHash(password, record),
+    { verified: true, needsRehash: true },
+    'legacy password hash should verify and request migration',
+  )
+  assert.deepEqual(
+    await passwordModule.verifyPasswordHash('wrong-password', record),
+    { verified: false, needsRehash: false },
+    'wrong legacy password should fail',
+  )
 
   const created = await passwordModule.createPasswordHash(password)
-  assert.equal(created.iterations, 120_000, 'new password hash should preserve iteration count')
+  assert.equal(created.password_algorithm, 'argon2id')
+  assert.equal(created.iterations, 2, 'compatibility iteration column should store Argon2 time cost')
   assert.match(created.salt, /^[a-f0-9]{32}$/, 'new password salt should remain 16-byte hex')
-  assert.match(created.password_hash, /^[a-f0-9]{64}$/, 'new password hash should remain 32-byte hex')
-  assert.equal(await passwordModule.verifyPasswordHash(password, created), true, 'new password hash should verify')
+  assert.match(
+    created.password_hash,
+    /^\$argon2id\$v=19\$m=19456,t=2,p=1\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$/,
+    'new password hash should use the configured Argon2id PHC format',
+  )
+  const createdPhcParts = created.password_hash.split('$')
+  assert.equal(Buffer.from(createdPhcParts[4], 'base64').length, 16, 'Argon2id PHC salt should be 16 bytes')
+  assert.equal(Buffer.from(createdPhcParts[5], 'base64').length, 32, 'Argon2id output should be 32 bytes')
+  assert.deepEqual(
+    await passwordModule.verifyPasswordHash(password, created),
+    { verified: true, needsRehash: false },
+    'current Argon2id password hash should verify without rehash',
+  )
+  const { password_algorithm: _algorithm, ...argonWithoutAlgorithmMetadata } = created
+  assert.deepEqual(
+    await passwordModule.verifyPasswordHash(password, argonWithoutAlgorithmMetadata),
+    { verified: true, needsRehash: true },
+    'Argon2id records missing algorithm metadata should request rehash',
+  )
+  assert.deepEqual(
+    await passwordModule.verifyPasswordHash('wrong-password', created),
+    { verified: false, needsRehash: false },
+    'wrong Argon2id password should fail',
+  )
+
+  const outdatedSalt = Buffer.from('ffeeddccbbaa99887766554433221100', 'hex')
+  const outdatedHash = await argon2Hash(password, {
+    algorithm: Algorithm.Argon2id,
+    version: Version.V0x13,
+    memoryCost: 4096,
+    timeCost: 3,
+    parallelism: 1,
+    outputLen: 32,
+    salt: outdatedSalt,
+  })
+  assert.deepEqual(
+    await passwordModule.verifyPasswordHash(password, {
+      password_hash: outdatedHash,
+      salt: outdatedSalt.toString('hex'),
+      iterations: 3,
+      password_algorithm: 'argon2id',
+    }),
+    { verified: true, needsRehash: true },
+    'outdated Argon2id parameters should request rehash',
+  )
+  assert.deepEqual(
+    await passwordModule.verifyPasswordHash(password, {
+      password_hash: '$argon2id$invalid',
+      salt: created.salt,
+      iterations: 2,
+      password_algorithm: 'argon2id',
+    }),
+    { verified: false, needsRehash: false },
+    'malformed Argon2id hashes should fail closed',
+  )
+  assert.deepEqual(
+    await passwordModule.verifyPasswordHash(password, {
+      password_hash: created.password_hash,
+      salt: created.salt,
+      iterations: 2,
+      password_algorithm: 'unknown-algorithm',
+    }),
+    { verified: false, needsRehash: false },
+    'unknown algorithms should fail closed',
+  )
+  assert.deepEqual(
+    await passwordModule.verifyPasswordHash(password, {
+      password_hash: null,
+      salt: null,
+      iterations: 2,
+    }),
+    { verified: false, needsRehash: false },
+    'non-string password metadata should fail closed',
+  )
   assert.equal(passwordModule.constantTimeSecretEqual('root-secret', 'root-secret'), true)
   assert.equal(passwordModule.constantTimeSecretEqual('root-secret', 'wrong-secret'), false)
 
-  let timerRan = false
-  const asynchronousVerification = passwordModule.verifyPasswordHash(password, record)
-  setTimeout(() => {
-    timerRan = true
-  }, 0)
-  await asynchronousVerification
-  assert.equal(timerRan, true, 'PBKDF2 should not block the event loop timer phase')
-
-  const jobs = Array.from({ length: 35 }, () => passwordModule.verifyPasswordHash(password, record))
-  const results = await Promise.allSettled(jobs)
+  let completedPasswordJobs = 0
+  let timerObservedPendingPasswordWork = false
+  const jobs = Array.from({ length: 35 }, () => (
+    passwordModule.createPasswordHash(password).then((value) => {
+      completedPasswordJobs += 1
+      return value
+    })
+  ))
+  const resultsPromise = Promise.allSettled(jobs)
+  await new Promise((resolveTimer) => {
+    setTimeout(() => {
+      timerObservedPendingPasswordWork = completedPasswordJobs < 34
+      resolveTimer()
+    }, 0)
+  })
+  const results = await resultsPromise
   const capacityFailures = results.filter((result) => (
     result.status === 'rejected' && result.reason?.name === 'PasswordWorkCapacityError'
   ))
+  assert.equal(timerObservedPendingPasswordWork, true, 'Argon2id should not block the event loop timer phase')
   assert.equal(passwordModule.MAX_ACTIVE_PASSWORD_JOBS, 2)
   assert.equal(passwordModule.MAX_QUEUED_PASSWORD_JOBS, 32)
   assert.equal(capacityFailures.length, 1, 'the 35th concurrent password job should fail fast')
+}
+
+async function assertUserPasswordMigration(passwordModule) {
+  globalThis.__authSecurityUsers = new Map()
+  globalThis.__authSecurityUserUpgradeCalls = 0
+  globalThis.__authSecurityUserUpgradeModes = new Map()
+  globalThis.__authSecuritySessions = []
+  const userAuth = await bundleInlineModule(
+    "export { loginUser } from './server/handlers/user-auth.ts'",
+    'user-auth-migration',
+    [userAuthMigrationPlugin()],
+  )
+  const password = 'legacy-user-password'
+
+  const migratedUser = legacyUserRecord('migrated@example.com', password)
+  globalThis.__authSecurityUsers.set(migratedUser.email, migratedUser)
+  const migrated = await userAuth.loginUser(migratedUser.email, password)
+  assert.equal(migrated.ok, true, 'legacy user should still be able to log in')
+  const upgradedUser = globalThis.__authSecurityUsers.get(migratedUser.email)
+  assert.equal(upgradedUser.password_algorithm, 'argon2id')
+  assert.match(upgradedUser.password_hash, /^\$argon2id\$/)
+  assert.deepEqual(
+    await passwordModule.verifyPasswordHash(password, upgradedUser),
+    { verified: true, needsRehash: false },
+    'migrated user password should use current Argon2id parameters',
+  )
+
+  const wrongPasswordUser = legacyUserRecord('wrong-password@example.com', password)
+  globalThis.__authSecurityUsers.set(wrongPasswordUser.email, wrongPasswordUser)
+  const upgradesBeforeWrongPassword = globalThis.__authSecurityUserUpgradeCalls
+  const rejected = await userAuth.loginUser(wrongPasswordUser.email, 'incorrect-password')
+  assert.equal(rejected.ok, false)
+  assert.equal(rejected.status, 401)
+  assert.equal(
+    globalThis.__authSecurityUserUpgradeCalls,
+    upgradesBeforeWrongPassword,
+    'wrong user password should not attempt an upgrade',
+  )
+
+  const conflictUser = legacyUserRecord('conflict@example.com', password)
+  globalThis.__authSecurityUsers.set(conflictUser.email, conflictUser)
+  globalThis.__authSecurityUserUpgradeModes.set(conflictUser.id, 'conflict')
+  const conflictLogin = await userAuth.loginUser(conflictUser.email, password)
+  assert.equal(conflictLogin.ok, true, 'conditional user upgrade conflicts should not block login')
+  assert.equal(
+    globalThis.__authSecurityUsers.get(conflictUser.email).password_hash,
+    'concurrently-updated-password-hash',
+    'conditional user upgrade should not overwrite a concurrent password change',
+  )
+
+  const failingUser = legacyUserRecord('upgrade-failure@example.com', password)
+  globalThis.__authSecurityUsers.set(failingUser.email, failingUser)
+  globalThis.__authSecurityUserUpgradeModes.set(failingUser.id, 'failure')
+  const warnings = []
+  const originalWarn = console.warn
+  console.warn = (...args) => warnings.push(args)
+  try {
+    const failureLogin = await userAuth.loginUser(failingUser.email, password)
+    assert.equal(failureLogin.ok, true, 'user upgrade failures should not block verified login')
+  } finally {
+    console.warn = originalWarn
+  }
+  assert.deepEqual(warnings, [['user password hash upgrade skipped:', 'Error']])
+  assert.equal(
+    JSON.stringify(warnings).includes(failingUser.email),
+    false,
+    'user upgrade warnings should not include account identifiers',
+  )
+  assert.equal(
+    JSON.stringify(warnings).includes(password),
+    false,
+    'user upgrade warnings should not include passwords',
+  )
+}
+
+function legacyUserRecord(email, password) {
+  const salt = '00112233445566778899aabbccddeeff'
+  return {
+    version: 1,
+    id: `user-${email}`,
+    email,
+    password_hash: pbkdf2Sync(password, salt, 120_000, 32, 'sha256').toString('hex'),
+    salt,
+    iterations: 120_000,
+    permission: 'growth',
+    status: 'active',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  }
 }
 
 function assertSlidingWindowRateLimits(rateLimitModule) {
@@ -137,9 +319,60 @@ async function assertAdminAuthenticationRateLimits() {
   process.env.MAA_ADMIN_PASSWORD = 'root-admin-password'
   globalThis.__authSecurityAdminStore = new Map()
   globalThis.__authSecurityAdminGets = 0
+  globalThis.__authSecurityAdminUpgradeModes = new Map()
   const adminAuth = await bundleModule('server/handlers/admin-auth.ts', 'admin-auth', [adminAuthPlugin()])
   const created = await adminAuth.createAdminUser('security_admin', 'correct-admin-password')
   assert.equal(created.ok, true)
+
+  const legacyPassword = 'legacy-admin-password'
+  const legacyAdmin = legacyAdminRecord('legacy_admin', legacyPassword)
+  globalThis.__authSecurityAdminStore.set(legacyAdmin.username, legacyAdmin)
+  const migratedAdmin = await adminAuth.authenticateAdminRequest(adminRequest(
+    legacyAdmin.username,
+    legacyPassword,
+    '198.51.100.80',
+  ))
+  assert.equal(migratedAdmin.ok, true, 'legacy administrator should still authenticate')
+  assert.equal(
+    globalThis.__authSecurityAdminStore.get(legacyAdmin.username).password_algorithm,
+    'argon2id',
+    'legacy administrator should be upgraded after successful authentication',
+  )
+
+  const conflictAdmin = legacyAdminRecord('conflict_admin', legacyPassword)
+  globalThis.__authSecurityAdminStore.set(conflictAdmin.username, conflictAdmin)
+  globalThis.__authSecurityAdminUpgradeModes.set(conflictAdmin.username, 'conflict')
+  const conflictAuthentication = await adminAuth.authenticateAdminRequest(adminRequest(
+    conflictAdmin.username,
+    legacyPassword,
+    '198.51.100.81',
+  ))
+  assert.equal(conflictAuthentication.ok, true, 'admin upgrade conflicts should not block authentication')
+  assert.equal(
+    globalThis.__authSecurityAdminStore.get(conflictAdmin.username).password_hash,
+    'concurrently-updated-admin-password-hash',
+    'conditional admin upgrade should not overwrite a concurrent password change',
+  )
+
+  const failingAdmin = legacyAdminRecord('failing_admin', legacyPassword)
+  globalThis.__authSecurityAdminStore.set(failingAdmin.username, failingAdmin)
+  globalThis.__authSecurityAdminUpgradeModes.set(failingAdmin.username, 'failure')
+  const warnings = []
+  const originalWarn = console.warn
+  console.warn = (...args) => warnings.push(args)
+  try {
+    const failureAuthentication = await adminAuth.authenticateAdminRequest(adminRequest(
+      failingAdmin.username,
+      legacyPassword,
+      '198.51.100.82',
+    ))
+    assert.equal(failureAuthentication.ok, true, 'admin upgrade failures should not block authentication')
+  } finally {
+    console.warn = originalWarn
+  }
+  assert.deepEqual(warnings, [['admin password hash upgrade skipped:', 'Error']])
+  assert.equal(JSON.stringify(warnings).includes(failingAdmin.username), false)
+  assert.equal(JSON.stringify(warnings).includes(legacyPassword), false)
 
   const successfulRequests = Array.from({ length: 5 }, (_, index) => adminRequest(
     'security_admin',
@@ -168,7 +401,7 @@ async function assertAdminAuthenticationRateLimits() {
   ))
   assert.equal(accountBlocked.ok, false)
   assertRateLimitedResponse(accountBlocked.response, 'admin account limit')
-  assert.equal(globalThis.__authSecurityAdminGets, getsBeforeBlockedAttempt, 'blocked admin attempt should skip storage and PBKDF2')
+  assert.equal(globalThis.__authSecurityAdminGets, getsBeforeBlockedAttempt, 'blocked admin attempt should skip storage and password work')
 
   const rootIp = '192.0.2.90'
   for (let index = 0; index < 5; index += 1) {
@@ -182,6 +415,19 @@ async function assertAdminAuthenticationRateLimits() {
   const rootBlocked = await adminAuth.requireRootAdminPassword(rootRequest(rootIp), 'wrong-root-password')
   assert.equal(rootBlocked.ok, false)
   assertRateLimitedResponse(rootBlocked.response, 'shared root authentication limit')
+}
+
+function legacyAdminRecord(username, password) {
+  const salt = 'ffeeddccbbaa99887766554433221100'
+  return {
+    version: 1,
+    username,
+    password_hash: pbkdf2Sync(password, salt, 120_000, 32, 'sha256').toString('hex'),
+    salt,
+    iterations: 120_000,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  }
 }
 
 function callLogin(handler, email, password, clientIp) {
@@ -260,6 +506,29 @@ function adminAuthPlugin() {
   }
 }
 
+function userAuthMigrationPlugin() {
+  return {
+    name: 'auth-security-user-migration-mocks',
+    setup(build) {
+      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'email']) {
+        build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
+          path: moduleName,
+          namespace: 'auth-security-user-migration',
+        }))
+      }
+      build.onLoad({ filter: /.*/, namespace: 'auth-security-user-migration' }, (args) => {
+        const mocks = {
+          'user-store': userStoreMigrationMock(),
+          'announcement-store': announcementStoreMock(),
+          'license-utils': userLicenseUtilsMock(),
+          email: emailMock(),
+        }
+        return { contents: mocks[args.path], loader: 'js' }
+      })
+    },
+  }
+}
+
 function userAuthMock() {
   return `
     export function jsonResponse(body, status = 200, headers = {}) {
@@ -302,11 +571,106 @@ function adminUserStoreMock() {
           return globalThis.__authSecurityAdminStore.get(username) ?? null
         },
         set: async (username, user) => globalThis.__authSecurityAdminStore.set(username, user),
+        upgradePasswordHash: async (username, expectedPasswordHash, replacement) => {
+          const current = globalThis.__authSecurityAdminStore.get(username)
+          const mode = globalThis.__authSecurityAdminUpgradeModes.get(username)
+          if (mode === 'conflict' && current) {
+            globalThis.__authSecurityAdminStore.set(username, {
+              ...current,
+              password_hash: 'concurrently-updated-admin-password-hash',
+            })
+          }
+          if (mode === 'failure') throw new Error('sensitive admin migration detail')
+          const latest = globalThis.__authSecurityAdminStore.get(username)
+          if (!latest || latest.password_hash !== expectedPasswordHash) return null
+          const updated = {
+            ...latest,
+            ...replacement,
+            updated_at: new Date().toISOString(),
+          }
+          globalThis.__authSecurityAdminStore.set(username, updated)
+          return updated
+        },
         delete: async (username) => globalThis.__authSecurityAdminStore.delete(username),
         list: async () => [...globalThis.__authSecurityAdminStore.values()],
       }
     }
   `
+}
+
+function userStoreMigrationMock() {
+  return `
+    export async function getUserByEmail(email) {
+      return globalThis.__authSecurityUsers.get(email) ?? null
+    }
+    export async function upgradeUserPasswordHash(userId, expectedPasswordHash, replacement) {
+      globalThis.__authSecurityUserUpgradeCalls += 1
+      const entry = [...globalThis.__authSecurityUsers.entries()].find(([, user]) => user.id === userId)
+      if (!entry) return null
+      const [email, current] = entry
+      const mode = globalThis.__authSecurityUserUpgradeModes.get(userId)
+      if (mode === 'conflict') {
+        globalThis.__authSecurityUsers.set(email, {
+          ...current,
+          password_hash: 'concurrently-updated-password-hash',
+        })
+      }
+      if (mode === 'failure') throw new Error('sensitive user migration detail')
+      const latest = globalThis.__authSecurityUsers.get(email)
+      if (!latest || latest.password_hash !== expectedPasswordHash) return null
+      const updated = {
+        ...latest,
+        ...replacement,
+        updated_at: new Date().toISOString(),
+      }
+      globalThis.__authSecurityUsers.set(email, updated)
+      return updated
+    }
+    export async function migrateLegacyUserIfNeeded() {}
+    export async function saveUserSession(session) {
+      globalThis.__authSecuritySessions.push(session)
+    }
+    export async function deleteSessionByTokenHash() {}
+    export async function deleteSessionsForUser() {}
+    export async function deleteUserAccount() {}
+    export function emptyWorkspace() { return null }
+    export async function getAnnouncementReads() { return [] }
+    export async function getPasswordResetTokenByHash() { return null }
+    export async function getProfileForUser() { return null }
+    export async function getProfileWorkspace() { return null }
+    export async function getRecentPasswordResetTokenForUser() { return null }
+    export async function getSessionByTokenHash() { return null }
+    export async function getUserById() { return null }
+    export async function listProfilesForUser() { return [] }
+    export async function markPasswordResetTokenUsed() {}
+    export async function markAnnouncementRead() {}
+    export async function savePasswordResetToken() {}
+    export async function saveProfileWorkspace() {}
+    export async function saveUserAccount() {}
+    export async function saveUserProfile() {}
+    export function isFreePreviewProfile() { return false }
+    export function toPublicProfile(value) { return value }
+    export function toPublicWorkspace(value) { return value }
+    export async function touchSession() {}
+  `
+}
+
+function announcementStoreMock() {
+  return 'export function createPostgresAnnouncementStore() { return { get: async () => null } }'
+}
+
+function userLicenseUtilsMock() {
+  return `
+    export function getCdkRecordStore() { return { get: async () => null } }
+    export function hashCdk(value) { return value }
+    export function normalizeCode(value) { return value }
+    export function normalizePermissionMode(value) { return value }
+    export function requireEnv(name) { return process.env[name] ?? '' }
+  `
+}
+
+function emailMock() {
+  return 'export async function sendPasswordResetEmail() {}'
 }
 
 function licenseUtilsMock() {
@@ -334,11 +698,36 @@ async function bundleModule(entryPoint, name, plugins = []) {
     target: 'node20',
     format: 'esm',
     write: false,
+    external: ['@node-rs/argon2'],
     plugins,
     logLevel: 'silent',
   })
   const bundledCode = result.outputFiles[0]?.text
   if (!bundledCode) throw new Error(`Failed to bundle ${entryPoint}`)
+  await writeFile(outputPath, bundledCode, 'utf8')
+  return import(`${pathToFileURL(outputPath).href}?t=${Date.now()}-${Math.random()}`)
+}
+
+async function bundleInlineModule(contents, name, plugins = []) {
+  const outputPath = resolve(bundleDir, `${name}.mjs`)
+  const result = await esbuild.build({
+    stdin: {
+      contents,
+      loader: 'ts',
+      resolveDir: resolve('.'),
+      sourcefile: `${name}.ts`,
+    },
+    bundle: true,
+    platform: 'node',
+    target: 'node20',
+    format: 'esm',
+    write: false,
+    external: ['@node-rs/argon2'],
+    plugins,
+    logLevel: 'silent',
+  })
+  const bundledCode = result.outputFiles[0]?.text
+  if (!bundledCode) throw new Error(`Failed to bundle inline module ${name}`)
   await writeFile(outputPath, bundledCode, 'utf8')
   return import(`${pathToFileURL(outputPath).href}?t=${Date.now()}-${Math.random()}`)
 }

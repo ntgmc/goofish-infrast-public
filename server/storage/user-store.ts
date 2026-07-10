@@ -1,5 +1,6 @@
 import { getPool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import type { PasswordAlgorithm, PasswordHashRecord } from '../security/password'
 import type {
   LicenseConfig,
   FreeScheduleEntitlement,
@@ -26,6 +27,7 @@ export interface UserAccountRecord {
   password_hash: string
   salt: string
   iterations: number
+  password_algorithm?: PasswordAlgorithm
   permission: PermissionMode
   status: 'active' | 'frozen' | 'revoked'
   cdk_key: string | null
@@ -646,6 +648,42 @@ export function emptyWorkspace(profileId: string): UserWorkspaceRecord {
     free_schedule_entitlement: null,
     updated_at: new Date().toISOString(),
   }
+}
+
+export async function upgradeUserPasswordHash(
+  userId: string,
+  expectedPasswordHash: string,
+  replacement: PasswordHashRecord,
+): Promise<UserAccountRecord | null> {
+  await ensureSchema()
+  const updatedAt = new Date().toISOString()
+  const passwordPatch = {
+    password_hash: replacement.password_hash,
+    salt: replacement.salt,
+    iterations: replacement.iterations,
+    password_algorithm: replacement.password_algorithm,
+    updated_at: updatedAt,
+  }
+  const result = await query<{ record_json: UserAccountRecord }>(
+    `update user_accounts
+     set password_hash = $3,
+         salt = $4,
+         iterations = $5,
+         record_json = record_json || $6::jsonb,
+         updated_at = $7
+     where id = $1 and password_hash = $2
+     returning record_json`,
+    [
+      userId,
+      expectedPasswordHash,
+      replacement.password_hash,
+      replacement.salt,
+      replacement.iterations,
+      JSON.stringify(passwordPatch),
+      updatedAt,
+    ],
+  )
+  return result.rows[0]?.record_json ?? null
 }
 
 export function toPublicWorkspace(workspace: UserWorkspaceRecord | null): UserWorkspace {
