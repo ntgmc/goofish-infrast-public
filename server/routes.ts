@@ -8,7 +8,7 @@ import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
 import depotValueHandler from './handlers/depot-value'
 import licenseStatusHandler from './handlers/license-status'
-import optimizeHandler from './handlers/optimize'
+import optimizationHandler from './handlers/optimization'
 import redeemCdkHandler from './handlers/redeem-cdk'
 import userAnnouncementsHandler from './handlers/user-announcements'
 import userProfilesHandler from './handlers/user-profiles'
@@ -58,9 +58,8 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/user/workspace/free-schedule/confirm', userWorkspaceHandler as unknown as ApiHandler],
-  ['/api/optimize', optimizeHandler as unknown as ApiHandler],
-  ['/api/optimize/job', optimizeHandler as unknown as ApiHandler],
-  ['/api/optimize/reorder-check', optimizeHandler as unknown as ApiHandler],
+  ['/api/optimization/jobs', optimizationHandler as unknown as ApiHandler],
+  ['/api/optimization/reorder-checks', optimizationHandler as unknown as ApiHandler],
 ])
 
 export async function routeRequest(req: Request): Promise<Response> {
@@ -78,7 +77,9 @@ async function dispatchRequest(req: Request): Promise<Response> {
     return jsonResponse({ metadata: EFFICIENCY_DATA_METADATA, data: EFFICIENCY_DATA })
   }
 
-  const handler = ROUTES.get(url.pathname)
+  const handler = url.pathname.startsWith('/api/optimization/jobs/')
+    ? optimizationHandler as unknown as ApiHandler
+    : ROUTES.get(url.pathname)
   if (!handler) {
     return jsonResponse({ error: 'API route not found' }, 404)
   }
@@ -87,7 +88,7 @@ async function dispatchRequest(req: Request): Promise<Response> {
 }
 
 export function getRegisteredApiRoutes(): string[] {
-  return ['/api/health', '/api/data', ...ROUTES.keys()].sort()
+  return ['/api/health', '/api/data', '/api/optimization/jobs/:jobId', ...ROUTES.keys()].sort()
 }
 
 async function handleHealth(): Promise<Response> {

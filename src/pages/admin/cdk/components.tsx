@@ -1,0 +1,321 @@
+import { GeneratedPermission, StatusFilter, PermissionFilter, BinaryFilter, CdkTableFilters, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
+import { DetailItem, StatusPill, SmallButton, formatDate, getNextProductPermission, formatNullableNumber, formatRiskDetail } from '../shared/helpers'
+
+export function CdkTable({ records, selected, filters, busyAction, onFilterChange, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
+  records: AdminCdkRecord[];
+  selected: string[];
+  filters: CdkTableFilters;
+  busyAction: string | null;
+  onFilterChange: (patch: Partial<CdkTableFilters>) => void;
+  onSelect: (hashes: string[]) => void;
+  onBulkRevoke: () => void;
+  onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
+  onOpenDetail: (record: AdminCdkRecord) => Promise<void>;
+  onDelete: (record: AdminCdkRecord) => Promise<void>;
+}) {
+  const allSelected = records.length > 0 && records.every((record) => selected.includes(record.code_hash))
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1">
+      <div className="flex flex-col gap-3 border-b border-surface-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {(['all', 'unused', 'used', 'frozen', 'revoked'] as StatusFilter[]).map((item) => (
+            <button key={item} type="button" onClick={() => onFilterChange({ status: item })} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${filters.status === item ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3'}`}>
+              {item === 'all' ? '全部' : statusLabels[item]}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={onBulkRevoke} disabled={selected.length === 0} className="rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error hover:bg-error/20 disabled:bg-surface-2 disabled:text-ink-muted">批量撤销</button>
+      </div>
+      <div className="grid gap-3 border-b border-surface-3 p-4 md:grid-cols-4">
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-medium text-ink-muted">权限</span>
+          <select value={filters.permission} onChange={(event) => onFilterChange({ permission: event.currentTarget.value as PermissionFilter })} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary">
+            <option value="all">全部权限</option>
+            {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
+          </select>
+        </label>
+        <BinaryFilterSelect label="设备绑定" value={filters.bound} onChange={(value) => onFilterChange({ bound: value })} />
+        <BinaryFilterSelect label="风险事件" value={filters.risk} onChange={(value) => onFilterChange({ risk: value })} />
+        <BinaryFilterSelect label="生成过排班" value={filters.generated} onChange={(value) => onFilterChange({ generated: value })} />
+      </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
+            <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
+              <tr>
+                <th className="w-12 px-4 py-3"><input type="checkbox" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></th>
+                <th className="w-36 px-4 py-3">CDK</th>
+                <th className="w-32 px-4 py-3">状态</th>
+                <th className="w-56 px-4 py-3">数据</th>
+                <th className="w-44 px-4 py-3">时间</th>
+                <th className="w-48 px-4 py-3">备注</th>
+                <th className="w-64 px-4 py-3">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-3">
+            {records.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">当前筛选没有记录。</td></tr>
+            ) : records.map((record) => {
+              const nextPermission = getNextProductPermission(record.permission)
+              return (
+                <tr key={record.code_hash} className="hover:bg-surface-2/50">
+                    <td className="px-4 py-4 align-top"><input type="checkbox" checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
+                    <td className="px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
+                    <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{permissionLabels[record.permission]}</div></td>
+                    <td className="px-4 py-4 align-top text-ink-secondary">
+                      <div>{record.operator_count ?? '-'} 干员 / 生成 {record.schedule_generate_count ?? 0}</div>
+                      <div className="mt-1 text-xs text-ink-muted">终身更新 {record.operator_update_event_count ?? 0} / 风险 {record.risk_event_count ?? 0}</div>
+                    </td>
+                    <td className="px-4 py-4 align-top text-xs text-ink-secondary"><div>创建 {formatDate(record.created_at)}</div><div className="mt-1">使用 {formatDate(record.used_at)}</div></td>
+                    <td className="px-4 py-4 align-top text-ink-secondary"><div className="truncate" title={record.order_note || undefined}>{record.order_note || '-'}</div></td>
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex min-w-0 flex-wrap gap-2">
+                      <SmallButton onClick={() => void onOpenDetail(record)} loading={busyAction === `cdk-detail:${record.code_hash}`}>详情</SmallButton>
+                      {nextPermission && record.status !== 'frozen' && record.status !== 'revoked' && <SmallButton onClick={() => onPatch(record, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${record.code_hash}`}>升级</SmallButton>}
+                      {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
+                      {(record.status === 'used' || record.status === 'frozen') && <SmallButton onClick={() => onPatch(record, 'revoke')} loading={busyAction === `revoke:${record.code_hash}`} tone="danger">撤销</SmallButton>}
+                      {record.status === 'unused' && <SmallButton onClick={() => onDelete(record)} loading={busyAction === `delete:${record.code_hash}`} tone="danger">删除</SmallButton>}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+export function BinaryFilterSelect({ label, value, onChange }: { label: string; value: BinaryFilter; onChange: (value: BinaryFilter) => void }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-medium text-ink-muted">{label}</span>
+      <select value={value} onChange={(event) => onChange(event.currentTarget.value as BinaryFilter)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary">
+        <option value="all">全部</option>
+        <option value="yes">是</option>
+        <option value="no">否</option>
+      </select>
+    </label>
+  )
+}
+
+export function CdkDetailPanel({
+  detail,
+  busyAction,
+  onClose,
+  onPatch,
+  onUpdateNote,
+  onSetPermission,
+}: {
+  detail: AdminCdkDetail;
+  busyAction: string | null;
+  onClose: () => void;
+  onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
+  onUpdateNote: (record: AdminCdkDetail) => Promise<void>;
+  onSetPermission: (record: AdminCdkDetail) => Promise<void>;
+}) {
+  const nextPermission = getNextProductPermission(detail.permission)
+  const canGrantOperatorUpdate = detail.status === 'used' && Boolean(detail.license_order_hash)
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1">
+      <div className="flex flex-col gap-3 border-b border-surface-3 p-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-mono text-base font-semibold text-ink-primary">{detail.cdk_id}</h2>
+            <StatusPill status={detail.status} />
+            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{permissionLabels[detail.permission]}</span>
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">订单备注：{detail.order_note || '-'}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <SmallButton onClick={() => void onUpdateNote(detail)} loading={busyAction === `update_note:${detail.code_hash}`}>改备注</SmallButton>
+          {detail.status !== 'revoked' && <SmallButton onClick={() => void onSetPermission(detail)} loading={busyAction === `set_permission:${detail.code_hash}`}>改授权</SmallButton>}
+          {nextPermission && detail.status !== 'frozen' && detail.status !== 'revoked' && <SmallButton onClick={() => void onPatch(detail, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${detail.code_hash}`}>升级</SmallButton>}
+          {canGrantOperatorUpdate && <SmallButton onClick={() => void onPatch(detail, 'grant_operator_update')} loading={busyAction === `grant_operator_update:${detail.code_hash}`}>发放更新</SmallButton>}
+          {detail.status === 'frozen' && <SmallButton onClick={() => void onPatch(detail, 'unfreeze')} loading={busyAction === `unfreeze:${detail.code_hash}`} tone="success">解冻</SmallButton>}
+          {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => void onPatch(detail, 'revoke')} loading={busyAction === `revoke:${detail.code_hash}`} tone="danger">撤销</SmallButton>}
+          <SmallButton onClick={onClose}>关闭</SmallButton>
+        </div>
+      </div>
+
+      <div className="grid gap-5 p-4 xl:grid-cols-[1fr_1fr]">
+        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+          <h3 className="text-sm font-semibold text-ink-primary">授权摘要</h3>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <DetailItem label="订单标识" value={detail.license_order_hash || '-'} />
+            <DetailItem label="工作区干员" value={formatNullableNumber(detail.operator_count)} />
+            <DetailItem label="初始干员数" value={formatNullableNumber(detail.baseline_operator_count)} />
+            <DetailItem label="最近干员数" value={formatNullableNumber(detail.latest_operator_count)} />
+            <DetailItem label="排班生成" value={String(detail.schedule_generate_count ?? 0)} />
+            <DetailItem label="配置摘要" value={detail.config_desc || '-'} />
+            <DetailItem label="创建时间" value={formatDate(detail.created_at)} />
+            <DetailItem label="使用时间" value={formatDate(detail.used_at)} />
+            <DetailItem label="冻结时间" value={formatDate(detail.frozen_at ?? null)} />
+            <DetailItem label="撤销时间" value={formatDate(detail.revoked_at)} />
+          </dl>
+        </section>
+
+        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+          <h3 className="text-sm font-semibold text-ink-primary">设备和更新</h3>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <DetailItem label="设备绑定" value={(detail.device_signals?.activation_bound ?? detail.activation_bound) ? '已绑定' : '未绑定'} />
+            <DetailItem label="UA 摘要数" value={String(detail.device_signals?.user_agent_count ?? detail.user_agent_count ?? 0)} />
+            <DetailItem label="IP 段摘要数" value={String(detail.device_signals?.ip_prefix_count ?? detail.ip_prefix_count ?? 0)} />
+            <DetailItem label="更新权限剩余" value={String(detail.operator_update_grant_remaining ?? 0)} />
+            <DetailItem label="更新权限发放" value={String(detail.operator_update_grant_count ?? 0)} />
+            <DetailItem label="更新权限使用" value={String(detail.operator_update_used_count ?? 0)} />
+            <DetailItem label="发放时间" value={formatDate(detail.operator_update_granted_at ?? null)} />
+            <DetailItem label="使用时间" value={formatDate(detail.operator_update_consumed_at ?? null)} />
+          </dl>
+          {detail.linked_account && (
+            <p className="mt-4 break-all rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-secondary">
+              关联用户：{detail.linked_account.account_id} / 档案 {detail.linked_account.profile_id}
+            </p>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-ink-primary">风控事件</h3>
+            <span className="text-xs text-ink-muted">{detail.risk_events?.length ?? 0} 条</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {(detail.risk_events ?? []).length === 0 ? (
+              <p className="text-sm text-ink-muted">暂无风控事件。</p>
+            ) : (detail.risk_events ?? []).slice().reverse().slice(0, 8).map((event, index) => (
+              <article key={`${event.at}-${index}`} className="rounded-lg bg-surface-2 px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-ink-primary">{event.type}</span>
+                  <span className="text-xs text-ink-muted">{formatDate(event.at)}</span>
+                </div>
+                <p className="mt-1 text-ink-secondary">{event.reason}</p>
+                {event.detail && <p className="mt-1 break-all text-xs text-ink-muted">{formatRiskDetail(event.detail)}</p>}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-ink-primary">干员更新事件</h3>
+            <span className="text-xs text-ink-muted">{detail.operator_update_events?.length ?? 0} 条</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {(detail.operator_update_events ?? []).length === 0 ? (
+              <p className="text-sm text-ink-muted">暂无干员更新事件。</p>
+            ) : (detail.operator_update_events ?? []).slice().reverse().slice(0, 8).map((event, index) => (
+              <article key={`${event.at}-${index}`} className="rounded-lg bg-surface-2 px-3 py-2 text-sm">
+                <div className="font-medium text-ink-primary">{event.operator_count} 名干员</div>
+                <div className="mt-1 text-xs text-ink-muted">{formatDate(event.at)}</div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </section>
+  )
+}
+
+export function RiskSettingsPanel({
+  settings,
+  saving,
+  onChange,
+}: {
+  settings: RiskControlSettings;
+  saving: boolean;
+  onChange: (patch: RiskControlSettingsPatch) => Promise<void>;
+}) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-3 p-4">
+        <div>
+          <h2 className="text-base font-semibold text-ink-primary">风控开关</h2>
+          <p className="mt-1 text-sm text-ink-muted">设备风控默认关闭，避免浏览器或网络变化造成误触发。</p>
+        </div>
+        <span className="text-xs text-ink-muted">{saving ? '保存中...' : `更新 ${formatDate(settings.updated_at)}`}</span>
+      </div>
+      <div className="grid gap-3 p-4 md:grid-cols-2">
+        <RiskToggle
+          label="干员数据风控"
+          description="校验干员消失、练度回退和拥有数异常下降。"
+          checked={settings.operator_data_risk_enabled}
+          disabled={saving}
+          onChange={(checked) => onChange({ operator_data_risk_enabled: checked })}
+        />
+        <RiskToggle
+          label="设备风控"
+          description="校验设备 Token、浏览器环境和网络位置。"
+          checked={settings.device_risk_enabled}
+          disabled={saving}
+          onChange={(checked) => onChange({ device_risk_enabled: checked })}
+        />
+      </div>
+    </section>
+  )
+}
+
+export function RiskToggle({
+  label,
+  description,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => Promise<void>;
+}) {
+  return (
+    <label className={`flex min-h-28 items-start justify-between gap-4 rounded-lg border p-4 transition-colors duration-150 ${checked ? 'border-brand-500/50 bg-brand-500/10' : 'border-surface-3 bg-surface-2/40'} ${disabled ? 'opacity-70' : 'cursor-pointer hover:border-brand-400/60'}`}>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-ink-primary">{label}</span>
+        <span className="mt-2 block text-sm leading-6 text-ink-secondary">{description}</span>
+        <span className={`mt-3 inline-flex rounded-md px-2 py-1 text-xs font-semibold ${checked ? 'bg-success/10 text-success' : 'bg-surface-3 text-ink-muted'}`}>{checked ? '已启用' : '已关闭'}</span>
+      </span>
+      <span className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full p-0.5 transition-colors duration-150 ${checked ? 'bg-brand-600' : 'bg-surface-4'}`}>
+        <input
+          type="checkbox"
+          className="sr-only"
+          checked={checked}
+          disabled={disabled}
+          onChange={(event) => void onChange(event.currentTarget.checked)}
+        />
+        <span className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-150 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      </span>
+    </label>
+  )
+}
+
+export function RiskTable({ records, busyAction, onPatch, onOpenDetail }: { records: AdminCdkRecord[]; busyAction: string | null; onPatch: (record: AdminCdkRecord, action: string) => Promise<void>; onOpenDetail: (record: AdminCdkRecord) => Promise<void> }) {
+  return (
+    <section className="rounded-xl border border-surface-3 bg-surface-1">
+      <div className="border-b border-surface-3 p-4">
+        <h2 className="text-base font-semibold text-ink-primary">风险记录</h2>
+      </div>
+      <div className="divide-y divide-surface-3">
+        {records.length === 0 ? <div className="p-8 text-center text-sm text-ink-muted">暂无风险记录。</div> : records.map((record) => (
+          <div key={record.code_hash} className="grid gap-3 p-4 lg:grid-cols-[180px_1fr_auto] lg:items-center">
+            <div><div className="font-mono text-sm text-ink-primary">{record.cdk_id}</div><StatusPill status={record.status} /></div>
+            <div className="text-sm text-ink-secondary">
+              <div>{record.freeze_reason || record.latest_risk_event?.reason || '记录了风控事件'}</div>
+              <div className="mt-1 text-xs text-ink-muted">风险 {record.risk_event_count ?? 0} / UA {record.user_agent_count ?? 0} / IP {record.ip_prefix_count ?? 0} / 冻结 {formatDate(record.frozen_at ?? null)}</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <SmallButton onClick={() => void onOpenDetail(record)} loading={busyAction === `cdk-detail:${record.code_hash}`}>详情</SmallButton>
+              {record.status === 'frozen' && <SmallButton onClick={() => onPatch(record, 'unfreeze')} loading={busyAction === `unfreeze:${record.code_hash}`} tone="success">解冻</SmallButton>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+export function Metric({ label, value, tone = 'default' }: { label: string; value: number | string; tone?: 'default' | 'warning' }) {
+return <div className={`rounded-xl border p-4 ${tone === 'warning' ? 'border-warning/30 bg-warning/10' : 'border-surface-3 bg-surface-1'}`}>
+<div className="text-2xl font-semibold text-ink-primary">{value}</div>
+<div className="mt-1 text-sm text-ink-muted">{label}</div>
+</div>
+}

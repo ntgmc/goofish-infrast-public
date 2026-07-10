@@ -12,7 +12,7 @@ globalThis.__workspaceHistorySmokeStore = store
 globalThis.__maaOptimizeJobStoreForTesting = createMemoryOptimizeJobStore()
 
 const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts')
-const optimizeHandler = await bundleHandler('server/handlers/optimize.ts')
+const optimizeHandler = await bundleHandler('server/handlers/optimization.ts')
 const profilesHandler = await bundleHandler('server/handlers/user-profiles.ts')
 
 const sampleConfig = {
@@ -809,7 +809,7 @@ function assertFreePreviewResult(result, label) {
     throw new Error(`${label}: missing full rotation preview metadata`)
   }
   if (countVisibleRooms(result.plans) <= 3) {
-    throw new Error(`${label}: expected complete visible plans, got ${countVisibleRooms(result.plans)} rooms`)
+    throw new Error(`${label}: expected complete visible plans, got ${countVisibleRooms(result.plans)} rooms; keys=${Object.keys(result).join(',')}`)
   }
   if (!Array.isArray(result.raw_results) || result.raw_results.length !== 0) {
     throw new Error(`${label}: raw_results should be empty`)
@@ -946,6 +946,16 @@ function countVisibleRooms(plans) {
 }
 
 async function call(handler, path, body = {}, init = {}) {
+  const requestPath = path === '/api/optimize'
+    ? '/api/optimization/jobs'
+    : path === '/api/optimize/reorder-check'
+      ? '/api/optimization/reorder-checks'
+      : path
+  const requestBody = path === '/api/optimize'
+    ? toOptimizationRequest(body)
+    : path === '/api/optimize/reorder-check'
+      ? { profileId: body.profile_id, config: body.config, baselineHistoryId: body.baseline_history_id }
+      : body
   const method = init.method ?? 'POST'
   const requestInit = {
     method,
@@ -955,13 +965,17 @@ async function call(handler, path, body = {}, init = {}) {
     },
   }
   if (method !== 'GET' && method !== 'HEAD') {
-    requestInit.body = JSON.stringify(body)
+    requestInit.body = JSON.stringify(requestBody)
   }
-  const response = await handler(new Request('http://local' + path, requestInit))
+  const response = await handler(new Request('http://local' + requestPath, requestInit))
   const text = await response.text()
-  const parsed = text ? JSON.parse(text) : null
-  if (path === '/api/optimize' && response.status === 202 && parsed?.job_id) {
-    return await waitForOptimizeJob(handler, parsed.job_id)
+  let parsed = text ? JSON.parse(text) : null
+  if (parsed?.error && typeof parsed.error === 'object') {
+    parsed = { ...(parsed.error.details ?? {}), code: parsed.error.code, error: parsed.error.message }
+  }
+  if (path === '/api/optimize/reorder-check' && parsed?.result) parsed = parsed.result
+  if (path === '/api/optimize' && response.status === 202 && parsed?.job?.id) {
+    return await waitForOptimizeJob(handler, parsed.job.id)
   }
   return { status: response.status, body: parsed }
 }
@@ -969,16 +983,34 @@ async function call(handler, path, body = {}, init = {}) {
 async function waitForOptimizeJob(handler, jobId) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 5))
-    const response = await handler(new Request('http://local/api/optimize/job?id=' + encodeURIComponent(jobId), {
+    const response = await handler(new Request('http://local/api/optimization/jobs/' + encodeURIComponent(jobId), {
       method: 'GET',
       headers: { cookie: 'maa_session=test-session' },
     }))
     const text = await response.text()
     const body = text ? JSON.parse(text) : null
     if (body?.status === 'succeeded') return { status: 200, body: body.result }
-    if (body?.status === 'failed') return { status: 500, body }
+    if (body?.status === 'failed') return { status: 500, body: { ...body, error: body.error?.message } }
   }
   throw new Error('optimize job did not finish')
+}
+
+function toOptimizationRequest(body) {
+  const identity = body.profile_id
+    ? { type: 'profile', profileId: body.profile_id }
+    : { type: 'license', license: body.license, activationToken: body.activation_token }
+  if (body.suggestions_only) {
+    return {
+      kind: 'upgrade_suggestions', identity, operators: body.operators, config: body.config,
+      upgradeTaskPayload: body.upgrade_task_payload,
+    }
+  }
+  return {
+    kind: 'schedule', identity, operators: body.operators, config: body.config,
+    ignoreElite: body.ignore_elite ?? false,
+    includeCurrent: body.include_current,
+    historySource: body.history_source,
+  }
 }
 async function bundleHandler(entryPoint) {
   const outputPath = resolve(bundleDir, `${entryPoint.replace(/[\\/.:]/g, '-')}.mjs`)
@@ -1020,7 +1052,7 @@ function memoryStorePlugin() {
         path: 'memory-training-cost',
         namespace: 'workspace-history-smoke',
       }))
-      build.onResolve({ filter: /(^|[\\/])optimizer(\.ts)?$/ }, () => ({
+      build.onResolve({ filter: /(^|[\\/])optimizer(?:-engine)?(\.ts)?$/ }, () => ({
         path: 'memory-optimizer',
         namespace: 'workspace-history-smoke',
       }))
@@ -1372,7 +1404,7 @@ function memoryOptimizerModule() {
     function room(id, name, product) {
       return { id, name, product, operators: [{ id: 'char_002_amiya', name: 'Amiya' }], final_efficiency: 1.23, efficiency: 1.23 }
     }
-    export class WorkplaceOptimizer {
+    export class OptimizerEngine {
       constructor(operators, config) {
         this.operators = operators
         this.config = config
@@ -1396,6 +1428,9 @@ function memoryOptimizerModule() {
           },
           total_efficiency: ignoreElite ? 200 : 100,
         }
+      }
+      generateSchedule(ignoreElite) {
+        return this.getOptimalAssignments(undefined, ignoreElite)
       }
       simulateMaaDefaultAssignments() {
         return {
@@ -1423,6 +1458,7 @@ function memoryOptimizerModule() {
       calculateUpgradeTargetSuggestions() { return [] }
       collectUpgradeTasks() { return [] }
       simulateUpgradeTasks() { return [] }
+      simulateUpgrades(...args) { return this.simulateUpgradeTasks(...args) }
       _calculateDailyTotalScore() { return 0 }
       extractFiammettaTargets() { return [] }
     }

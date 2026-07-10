@@ -1,10 +1,5 @@
 import { lazy, Suspense, type FormEvent } from 'react'
-import type {
-  LicenseOperator,
-  OptimizeResult,
-  UpgradeSuggestion,
-  WorkspaceResultHistoryItem,
-} from '../../../lib/types'
+import type { LicenseOperator, OptimizeResult, UpgradeSuggestion, WorkspaceResultHistoryItem } from '../../../lib/types'
 import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { isMaaJsonDownloadable } from '../../../lib/workspace-history'
 import { ResultFallback } from './feedback'
