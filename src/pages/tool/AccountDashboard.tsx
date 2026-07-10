@@ -8,7 +8,7 @@ const RedeemSection = lazy(() => import('./dashboard/RedeemSection'))
 const AnnouncementsSection = lazy(() => import('./dashboard/AnnouncementsSection'))
 const SettingsSection = lazy(() => import('./dashboard/SettingsSection'))
 
-type DashboardSection = 'profiles' | 'tools' | 'redeem' | 'announcements' | 'settings'
+export type DashboardSection = 'profiles' | 'tools' | 'redeem' | 'announcements' | 'settings'
 
 export default function AccountDashboard({
   user,
@@ -17,6 +17,7 @@ export default function AccountDashboard({
   announcementUnreadCount,
   openingProfileId,
   workspaceLoadError,
+  initialSection = 'profiles',
   onLogout,
   onPayload,
   onOpenProfile,
@@ -27,11 +28,12 @@ export default function AccountDashboard({
   announcementUnreadCount: number
   openingProfileId: string | null
   workspaceLoadError: string | null
+  initialSection?: DashboardSection
   onLogout: () => void
   onPayload: (payload: AuthSuccessResponse) => void
   onOpenProfile: (profile: UserGameAccount) => void
 }) {
-  const [section, setSection] = useState<DashboardSection>('profiles')
+  const [section, setSection] = useState<DashboardSection>(initialSection)
 const labels: Record<DashboardSection, string> = {
 profiles: '游戏账号',
 tools: '工具',
