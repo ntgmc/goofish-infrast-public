@@ -182,7 +182,7 @@ export default function WorkspaceSetupPage({
         <div className="flex items-start gap-3 px-2">
           <BrandLogo size="sm" />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-brand-500">MAA Workspace</p>
+            <p className="text-sm font-semibold text-brand-500">MAA 工作台</p>
             <p className="mt-1 truncate text-xs text-ink-muted">{user.email}</p>
             <p className="mt-3 truncate text-sm font-medium text-ink-primary">{profile.display_name}</p>
           </div>

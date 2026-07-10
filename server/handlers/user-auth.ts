@@ -1,4 +1,4 @@
-import { createHash, pbkdf2Sync, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Announcement, AuthSuccessResponse, AuthUser, PermissionMode, UserGameAccount } from '../../src/lib/types'
 import {
   deleteSessionByTokenHash,
@@ -8,15 +8,15 @@ import {
   getAnnouncementReads,
   getPasswordResetTokenByHash,
   getProfileForUser,
-  getProfileWorkspace,
   getRecentPasswordResetTokenForUser,
   getSessionByTokenHash,
   getUserByEmail,
   getUserById,
+  listProfileWorkspaces,
   listProfilesForUser,
-  markPasswordResetTokenUsed,
   markAnnouncementRead,
   migrateLegacyUserIfNeeded,
+  resetUserPasswordWithToken,
   savePasswordResetToken,
   saveProfileWorkspace,
   saveUserAccount,
@@ -26,11 +26,13 @@ import {
   toPublicProfile,
   toPublicWorkspace,
   touchSession,
+  upgradeUserPasswordHash,
   type UserAccountRecord,
   type UserGameAccountRecord,
   type UserSessionRecord,
 } from '../storage/user-store'
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
+import { createPasswordHash, verifyPasswordHash } from '../security/password'
 import { sendPasswordResetEmail } from './email'
 import {
   getCdkRecordStore,
@@ -43,7 +45,7 @@ import {
 
 const SESSION_COOKIE = 'maa_session'
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
-const PASSWORD_ITERATIONS = 120_000
+export const USER_SESSION_TOUCH_INTERVAL_MS = 10 * 60 * 1000
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ANNOUNCEMENT_KEY = 'current.json'
 const PASSWORD_RESET_DEFAULT_TTL_MINUTES = 30
@@ -65,9 +67,6 @@ export function jsonResponse(body: unknown, status = 200, headers: Record<string
     status,
     headers: {
       ...(status === 204 ? {} : { 'Content-Type': 'application/json' }),
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
       ...headers,
     },
   })
@@ -102,14 +101,15 @@ export async function registerUser(
   if (existing) return { ok: false, status: 409, message: 'Email is already registered.' }
 
   const now = new Date().toISOString()
-  const passwordHash = hashPassword(passwordCheck.password)
+  const passwordHash = await createPasswordHash(passwordCheck.password)
   const user: UserAccountRecord = {
     version: 1,
     id: randomUUID(),
     email,
-    password_hash: passwordHash.hash,
+    password_hash: passwordHash.password_hash,
     salt: passwordHash.salt,
-    iterations: PASSWORD_ITERATIONS,
+    iterations: passwordHash.iterations,
+    password_algorithm: passwordHash.password_algorithm,
     permission: 'growth',
     status: 'active',
     cdk_key: null,
@@ -121,7 +121,7 @@ export async function registerUser(
   await saveUserAccount(user)
 
   if (typeof cdkValue === 'string' && cdkValue.trim()) {
-    const redeemed = await redeemProfileCdk(user, cdkValue, '璐﹀彿 1', '')
+    const redeemed = await redeemProfileCdk(user, cdkValue, '账号 1', '')
     if (!redeemed.ok) {
       await deleteUserAccount(user.id)
       return redeemed
@@ -157,12 +157,20 @@ export async function loginUser(
   if (!email) return { ok: false, status: 400, message: 'Invalid email format.' }
   if (typeof passwordValue !== 'string') return { ok: false, status: 400, message: 'Password must be a string.' }
 
-  const user = await getUserByEmail(email)
-  if (!user || !verifyPassword(passwordValue, user)) {
+  let user = await getUserByEmail(email)
+  if (!user) {
+    return { ok: false, status: 401, message: 'Invalid email or password.' }
+  }
+  const passwordVerification = await verifyPasswordHash(passwordValue, user)
+  if (!passwordVerification.verified) {
     return { ok: false, status: 401, message: 'Invalid email or password.' }
   }
   if (user.status !== 'active') {
     return { ok: false, status: 403, message: 'Account is not active.' }
+  }
+
+  if (passwordVerification.needsRehash) {
+    user = await tryUpgradeUserPasswordHash(user, passwordValue)
   }
 
   await migrateLegacyUserIfNeeded(user)
@@ -176,7 +184,11 @@ export async function changeUserPassword(
   newPasswordValue: unknown,
   keepTokenHash: string,
 ): Promise<{ ok: true; user: UserAccountRecord } | { ok: false; status: number; message: string }> {
-  if (typeof oldPasswordValue !== 'string' || !verifyPassword(oldPasswordValue, user)) {
+  if (typeof oldPasswordValue !== 'string') {
+    return { ok: false, status: 401, message: "Invalid license signature." };
+  }
+  const passwordVerification = await verifyPasswordHash(oldPasswordValue, user)
+  if (!passwordVerification.verified) {
     return { ok: false, status: 401, message: "Invalid license signature." };
   }
   const nextPassword = validatePassword(newPasswordValue)
@@ -242,7 +254,8 @@ export async function resetPasswordWithToken(
     return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
   }
 
-  const resetToken = await getPasswordResetTokenByHash(hashPasswordResetToken(tokenValue.trim()))
+  const tokenHash = hashPasswordResetToken(tokenValue.trim())
+  const resetToken = await getPasswordResetTokenByHash(tokenHash)
   if (!resetToken || resetToken.used_at || Date.parse(resetToken.expires_at) <= Date.now()) {
     return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
   }
@@ -255,9 +268,9 @@ export async function resetPasswordWithToken(
   const nextPassword = validatePassword(newPasswordValue)
   if (!nextPassword.ok) return { ok: false, status: 400, message: nextPassword.message }
 
-  await setUserPassword(user, nextPassword.password)
-  await markPasswordResetTokenUsed(resetToken.id)
-  await deleteSessionsForUser(user.id)
+  const passwordHash = await createPasswordHash(nextPassword.password)
+  const updated = await resetUserPasswordWithToken(tokenHash, passwordHash, new Date())
+  if (!updated) return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
   return { ok: true }
 }
 
@@ -428,13 +441,13 @@ export async function upgradePreviewProfileWithCdk(
   return { ok: true, profile: upgraded }
 }
 
-export async function requireUserSession(req: Request): Promise<AuthContext | null> {
+export async function requireUserSession(req: Request, now = new Date()): Promise<AuthContext | null> {
   const token = getSessionToken(req)
   if (!token) return null
   const tokenHash = hashSessionToken(token)
   const session = await getSessionByTokenHash(tokenHash)
   if (!session) return null
-  if (Date.parse(session.expires_at) <= Date.now()) {
+  if (Date.parse(session.expires_at) <= now.getTime()) {
     await deleteSessionByTokenHash(tokenHash)
     return null
   }
@@ -450,7 +463,11 @@ export async function requireUserSession(req: Request): Promise<AuthContext | nu
   const profiles = await migrateLegacyUserIfNeeded(user)
   const activeProfile = profiles.find((profile) => profile.kind !== 'depot_value') ?? profiles[0] ?? null
   const cdkRecord = activeProfile ? await getCdkRecordForProfile(activeProfile) : null
-  await touchSession(session)
+  const touchCutoff = new Date(now.getTime() - USER_SESSION_TOUCH_INTERVAL_MS)
+  const lastSeenAt = Date.parse(session.last_seen_at)
+  if (!Number.isFinite(lastSeenAt) || lastSeenAt <= touchCutoff.getTime()) {
+    await touchSession(session, now, touchCutoff)
+  }
   return { user, session, tokenHash, profiles, activeProfile, cdkRecord }
 }
 
@@ -462,21 +479,24 @@ export async function logoutRequest(req: Request): Promise<void> {
 
 export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?: string | null): Promise<AuthSuccessResponse> {
   const records = await migrateLegacyUserIfNeeded(user)
-  const publicProfiles: UserGameAccount[] = []
-  for (const profile of records) {
-    publicProfiles.push(toPublicProfile(profile, await getProfileWorkspace(profile.id)))
-  }
+  const [workspaces, announcementUnreadCount] = await Promise.all([
+    listProfileWorkspaces(records.map((profile) => profile.id)),
+    getAnnouncementUnreadCount(user.id),
+  ])
+  const publicProfiles: UserGameAccount[] = records.map((profile) => (
+    toPublicProfile(profile, workspaces.get(profile.id) ?? null)
+  ))
   const defaultActiveProfile = records.find((profile) => profile.kind !== 'depot_value') ?? records[0] ?? null
   const activeProfileRecord = activeProfileId
     ? records.find((profile) => profile.id === activeProfileId) ?? defaultActiveProfile
     : defaultActiveProfile
-  const activeWorkspace = activeProfileRecord ? await getProfileWorkspace(activeProfileRecord.id) : null
+  const activeWorkspace = activeProfileRecord ? workspaces.get(activeProfileRecord.id) ?? null : null
   return {
     user: toPublicUser(user),
     profiles: publicProfiles,
     active_profile: activeProfileRecord ? toPublicProfile(activeProfileRecord, activeWorkspace) : null,
     workspace: activeProfileRecord ? toPublicWorkspace(activeWorkspace) : null,
-    announcement_unread_count: await getAnnouncementUnreadCount(user.id),
+    announcement_unread_count: announcementUnreadCount,
   }
 }
 
@@ -518,30 +538,30 @@ export function clearSessionCookie(): string {
 }
 
 async function setUserPassword(user: UserAccountRecord, password: string): Promise<UserAccountRecord> {
-  const passwordHash = hashPassword(password)
+  const passwordHash = await createPasswordHash(password)
   const updated: UserAccountRecord = {
     ...user,
-    password_hash: passwordHash.hash,
+    password_hash: passwordHash.password_hash,
     salt: passwordHash.salt,
-    iterations: PASSWORD_ITERATIONS,
+    iterations: passwordHash.iterations,
+    password_algorithm: passwordHash.password_algorithm,
     updated_at: new Date().toISOString(),
   }
   await saveUserAccount(updated)
   return updated
 }
 
-function hashPassword(password: string): { hash: string; salt: string } {
-  const salt = randomBytes(16).toString('hex')
-  return {
-    salt,
-    hash: pbkdf2Sync(password, salt, PASSWORD_ITERATIONS, 32, 'sha256').toString('hex'),
+async function tryUpgradeUserPasswordHash(
+  user: UserAccountRecord,
+  password: string,
+): Promise<UserAccountRecord> {
+  try {
+    const replacement = await createPasswordHash(password)
+    return await upgradeUserPasswordHash(user.id, user.password_hash, replacement) ?? user
+  } catch (error) {
+    console.warn('user password hash upgrade skipped:', error instanceof Error ? error.name : 'UnknownError')
+    return user
   }
-}
-
-function verifyPassword(password: string, user: UserAccountRecord): boolean {
-  const actual = Buffer.from(pbkdf2Sync(password, user.salt, user.iterations, 32, 'sha256').toString('hex'), 'hex')
-  const expected = Buffer.from(user.password_hash, 'hex')
-  return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
 async function createSession(userId: string): Promise<{ cookie: string }> {
@@ -599,7 +619,7 @@ function createAccountOrderHash(codeHash: string, profileId: string): string {
 
 async function nextDefaultProfileName(userId: string): Promise<string> {
   const profiles = await listProfilesForUser(userId)
-  return `璐﹀彿 ${profiles.length + 1}`
+  return `账号 ${profiles.length + 1}`
 }
 
 function normalizeProfileDisplayName(value: unknown): string {

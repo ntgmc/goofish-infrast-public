@@ -65,6 +65,38 @@ Keep production secrets such as `DATABASE_URL`, `MAA_ADMIN_PASSWORD`,
 not store them in GitHub Actions secrets unless the workflow truly needs them.
 This workflow does not need those application secrets.
 
+The production service must set `NODE_ENV=production`. Administrator login now
+uses the `maa_admin_session` HttpOnly, SameSite=Strict cookie, and production
+mode adds the required `Secure` attribute. Sessions expire after 30 minutes of
+inactivity or 8 hours absolutely and are removed when the browser closes.
+
+The existing `^~ /api/admin/` Nginx location forwards Cookie and Set-Cookie
+headers without additional directives. No new location is required. Legacy
+`X-Admin-User` / `X-Admin-Password` and `admin_user` / `admin_password`
+authentication has been removed; operational scripts must log in through
+`POST /api/admin/session` and retain a cookie jar for subsequent requests.
+
+Install the repository-managed request security baseline alongside the existing
+API proxy snippet:
+
+```bash
+sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
+```
+
+Include it only in the production HTTPS/TLS `server {}` and never in the plain
+HTTP redirect server:
+
+```nginx
+include /etc/nginx/snippets/goofish-security-headers.conf;
+include /etc/nginx/snippets/goofish-api-production.conf;
+```
+
+The snippet directly enforces CSP and adds one-year HSTS with
+`includeSubDomains`; it also covers static files and Nginx-generated 413/429
+responses. API responses are same-origin only and expose no CORS allow headers.
+After changing the site configuration, run `sudo nginx -t` and reload Nginx only
+after the validation succeeds.
+
 ## GitHub Settings
 
 Create these repository or environment secrets:

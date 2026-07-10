@@ -17,8 +17,9 @@ const expectedRoutes = [
   '/api/depot-value',
   '/api/health',
   '/api/license-status',
-  '/api/optimize',
-  '/api/optimize/reorder-check',
+  '/api/optimization/jobs',
+  '/api/optimization/jobs/:jobId',
+  '/api/optimization/reorder-checks',
   '/api/redeem-cdk',
   '/api/user/announcements',
   '/api/user/profiles',
@@ -31,6 +32,7 @@ const expectedRoutes = [
   '/api/user/skland/free-preview/login/start',
   '/api/user/status',
   '/api/user/workspace',
+  '/api/user/workspace/free-schedule/confirm',
   '/api/usage-stats',
 ]
 
@@ -39,6 +41,12 @@ const actualRoutes = getRegisteredApiRoutes()
 const missing = expectedRoutes.filter((route) => !actualRoutes.includes(route))
 if (missing.length > 0) {
   throw new Error(`missing server API routes: ${missing.join(', ')}`)
+}
+
+const removedRoutes = ['/api/optimize', '/api/optimize/job', '/api/optimize/reorder-check']
+const stale = removedRoutes.filter((route) => actualRoutes.includes(route))
+if (stale.length > 0) {
+  throw new Error(`removed optimize routes are still registered: ${stale.join(', ')}`)
 }
 
 console.log(`[check-server-routes] ${actualRoutes.length} API routes registered`)

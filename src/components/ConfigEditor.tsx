@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { LicenseConfig, PermissionMode } from '../lib/types'
+import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
+import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
 
@@ -26,7 +27,6 @@ export const DORMITORY_RULE_LABELS: Record<string, string> = {
 
 const DEFAULT_SHIFT_HOURS = [8, 8, 8]
 
-type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: '单次重置卡',
@@ -191,6 +191,7 @@ function normalizeIntermediateInventory(value: unknown): Record<IntermediateProd
   const next: Record<IntermediateProduct, number> = {
     'Originium Shard': 0,
     'Pure Gold': 0,
+    'Orirock Cube': 0,
   }
   for (const product of Object.keys(next) as IntermediateProduct[]) {
     const count = Number(source[product])
@@ -271,11 +272,15 @@ export default function ConfigEditor({
   const autoInventoryOnly = !canEdit && canUseIntermediateInventory
   const tradingProducts = uniqueProducts(TRADING_PRODUCTS, config.product_requirements.trading_stations)
   const manufacturingProducts = uniqueProducts(MANUFACTURING_PRODUCTS, config.product_requirements.manufacturing_stations)
-  const droneTargets = (config.drones?.targets ?? []).join(', ')
+  const droneTargets = formatDroneTargetsInput(config.drones?.targets ?? [])
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
   const validationMessage = validation.ok === false ? validation.message : null
   const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
+  const orundumPlanning = normalizeOrundumPlanning(config)
+  const showOrundumPlanning =
+    (config.product_requirements.trading_stations.Orundum ?? 0) > 0 ||
+    (config.product_requirements.manufacturing_stations['Originium Shard'] ?? 0) > 0
 
   const applyPreset = (preset: LicenseConfig) => {
     onUpdate((next) => {
@@ -320,6 +325,27 @@ export default function ConfigEditor({
         [product]: stock,
       }
       markIntermediateInventoryForOptimizer(next)
+      applyCounts(next)
+    })
+  }
+
+  const setOrundumDailySanityBudget = (value: number) => {
+    onUpdate((next) => {
+      next.orundum_planning = {
+        ...(next.orundum_planning ?? {}),
+        daily_sanity_budget: Number.isFinite(value) ? Math.max(0, value) : BASE_DAILY_SANITY_BUDGET,
+      }
+      applyCounts(next)
+    })
+  }
+
+  const setOrundumMonthlyCard = (enabled: boolean) => {
+    onUpdate((next) => {
+      next.orundum_planning = {
+        ...(next.orundum_planning ?? {}),
+        daily_sanity_budget: normalizeOrundumPlanning(next).daily_sanity_budget,
+        monthly_card: enabled,
+      }
       applyCounts(next)
     })
   }
@@ -381,7 +407,7 @@ export default function ConfigEditor({
             )}
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-2 text-xs font-medium text-ink-muted">Schedule mode</p>
+                <p className="mb-2 text-xs font-medium text-ink-muted">排班模式</p>
                 <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
                   {(['maa', 'rotation'] as const).map((mode) => (
                     <button
@@ -389,10 +415,6 @@ export default function ConfigEditor({
                       type="button"
                       onClick={() => onUpdate((next) => {
                         next.schedule_mode = mode
-                        if (mode === 'rotation') {
-                          next.Fiammetta = { ...(next.Fiammetta ?? {}), enable: false }
-                          next.drones = { ...(next.drones ?? { order: 'pre', targets: [] }), enable: false }
-                        }
                         applyCounts(next)
                       })}
                       className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 ${
@@ -407,7 +429,7 @@ export default function ConfigEditor({
                 </div>
               </div>
               <div>
-                <p className="mb-2 text-xs font-medium text-ink-muted">Dormitory rule</p>
+                <p className="mb-2 text-xs font-medium text-ink-muted">宿舍规则</p>
                 <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
                   {(['fixed', 'maa_autofill'] as const).map((rule) => (
                     <button
@@ -434,6 +456,7 @@ export default function ConfigEditor({
               <IntermediateInventoryEditor
                 canEdit={canUseIntermediateInventory}
                 inventory={intermediateInventory}
+                showOrirock={showOrundumPlanning}
                 onChange={setIntermediateInventory}
               />
             </div>
@@ -491,27 +514,62 @@ export default function ConfigEditor({
             <IntermediateInventoryEditor
               canEdit={canEdit}
               inventory={intermediateInventory}
+              showOrirock={showOrundumPlanning}
               onChange={setIntermediateInventory}
             />
           </div>
         </div>
 
         <div className="rounded-lg bg-surface-2/60 p-4">
-          <h3 className="font-semibold text-ink-primary">特殊策略</h3>
-          <div className="mt-4 space-y-4">
-            <div>
+            <h3 className="font-semibold text-ink-primary">特殊策略</h3>
+            <div className="mt-4 space-y-4">
+              {showOrundumPlanning && (
+                <div className="rounded-lg bg-surface-1 px-3 py-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-ink-primary">搓玉预算</p>
+                  <p className="mt-1 text-xs leading-5 text-ink-muted">
+                    默认每日 {BASE_DAILY_SANITY_BUDGET} 理智；月卡额外 +{MONTHLY_CARD_DAILY_SANITY_BONUS} 理智，仅用于合成玉经济口径。
+                  </p>
+                </div>
+                <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary sm:min-w-36">
+                  <span>月卡</span>
+                  <input
+                    type="checkbox"
+                    checked={orundumPlanning.monthly_card}
+                    disabled={!canEdit}
+                    onChange={(event) => setOrundumMonthlyCard(event.currentTarget.checked)}
+                    className="h-4 w-4 accent-brand-500"
+                  />
+                </label>
+              </div>
+              <label className="mt-3 flex items-center justify-between gap-3 text-sm text-ink-secondary">
+                <span>每日固源岩理智预算</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={orundumPlanning.daily_sanity_budget}
+                  disabled={!canEdit}
+                  onChange={(event) => setOrundumDailySanityBudget(Number(event.currentTarget.value))}
+                  className="number-input-clean w-24 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary disabled:text-ink-muted"
+                />
+              </label>
+              <p className="mt-2 text-xs leading-5 text-ink-muted">
+                  当前长期预算 {orundumPlanning.total_daily_sanity_budget} 理智/日，用于判断搓玉产能、库存透支和机会成本。
+                </p>
+                </div>
+              )}
+              <div>
               <p className="mb-2 text-xs font-medium text-ink-muted">排班模式</p>
               <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
                 {(['maa', 'rotation'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                  disabled={false}
-                onClick={() => onUpdate((next) => {
-                  next.schedule_mode = mode
-                  if (mode === 'rotation') {
-                    next.Fiammetta = { ...(next.Fiammetta ?? {}), enable: false }
-                      }
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={false}
+                    onClick={() => onUpdate((next) => {
+                      next.schedule_mode = mode
                       applyCounts(next)
                     })}
                     className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 ${
@@ -523,7 +581,7 @@ export default function ConfigEditor({
                     {SCHEDULE_MODE_LABELS[mode]}
                   </button>
                 ))}
-            </div>
+              </div>
               <p className="mt-2 text-xs leading-5 text-ink-muted">
                 游戏内轮换会生成两个设施预设队列，按游戏内“队列轮换/快速切换”使用；不会生成 MAA 排班 JSON。
               </p>
@@ -598,7 +656,7 @@ export default function ConfigEditor({
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-              <span>无人机 Auto</span>
+              <span>无人机自动配置</span>
               <input
                 type="checkbox"
                   checked={!rotationMode && (config.drones?.auto ?? false)}
@@ -630,8 +688,8 @@ export default function ConfigEditor({
                 })}
                 className="w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary disabled:text-ink-muted"
               >
-                <option value="pre">pre</option>
-                <option value="post">post</option>
+                <option value="pre">换班前</option>
+                <option value="post">换班后</option>
               </select>
             </div>
             <div>
@@ -645,7 +703,7 @@ export default function ConfigEditor({
                   onChange={(value) => onUpdate((next) => {
                     next.drones = {
                       ...(next.drones ?? { enable: true, order: 'pre' }),
-                      targets: value.split(',').map((item) => item.trim()).filter(Boolean),
+                    targets: parseDroneTargetsInput(value),
                     }
                     applyCounts(next)
                   })}
@@ -699,6 +757,25 @@ function fitProductCounts(
   return next
 }
 
+function formatProductName(product: string): string {
+  return PRODUCT_LABELS[product] ?? product
+}
+
+function parseProductName(value: string): string {
+  const text = value.trim()
+  if (!text) return ''
+  const matched = Object.entries(PRODUCT_LABELS).find(([key, label]) => key === text || label === text)
+  return matched?.[0] ?? text
+}
+
+function formatDroneTargetsInput(targets: string[]): string {
+  return targets.map(formatProductName).join('，')
+}
+
+function parseDroneTargetsInput(value: string): string[] {
+  return value.split(/[，,]/).map(parseProductName).filter(Boolean)
+}
+
 function formatStockValue(value: number | null): string {
   return value === null ? '' : String(value)
 }
@@ -706,10 +783,12 @@ function formatStockValue(value: number | null): string {
 function IntermediateInventoryEditor({
   canEdit,
   inventory,
+  showOrirock,
   onChange,
 }: {
   canEdit: boolean;
   inventory: Record<IntermediateProduct, number>;
+  showOrirock: boolean;
   onChange: (product: IntermediateProduct, value: number) => void;
 }) {
   return (
@@ -730,6 +809,15 @@ function IntermediateInventoryEditor({
           canEdit={canEdit}
           onChange={onChange}
         />
+        {showOrirock && (
+          <IntermediateInventoryField
+            label="固源岩"
+            product="Orirock Cube"
+            value={inventory['Orirock Cube']}
+            canEdit={canEdit}
+            onChange={onChange}
+          />
+        )}
       </div>
     </div>
   )
@@ -774,7 +862,13 @@ function IntermediateInventoryField({
           step={1}
           value={draftValue}
           disabled={!canEdit}
-          onChange={(event) => setDraftValue(event.currentTarget.value)}
+          onChange={(event) => {
+            const nextDraftValue = event.currentTarget.value
+            setDraftValue(nextDraftValue)
+            if (!canEdit || nextDraftValue.trim() === '') return
+            const nextValue = Number(nextDraftValue)
+            if (Number.isFinite(nextValue) && nextValue !== value) onChange(product, nextValue)
+          }}
           onBlur={commitDraft}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
@@ -825,7 +919,7 @@ function DroneTargetsInput({
           event.currentTarget.blur()
         }
       }}
-      placeholder="LMD, Pure Gold, LMD"
+      placeholder="龙门币，赤金，龙门币"
       className="w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted disabled:text-ink-muted"
     />
   )

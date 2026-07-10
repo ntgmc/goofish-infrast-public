@@ -37,6 +37,28 @@ CREATE TABLE IF NOT EXISTS usage_events (
 CREATE INDEX IF NOT EXISTS idx_usage_events_date ON usage_events(date);
 CREATE INDEX IF NOT EXISTS idx_usage_events_event ON usage_events(event);
 
+CREATE TABLE IF NOT EXISTS optimize_jobs (
+  id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  priority INTEGER NOT NULL,
+  owner_key TEXT NOT NULL,
+  permission TEXT,
+  source TEXT NOT NULL,
+  payload_json JSONB NOT NULL,
+  result_json JSONB,
+  error_message TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  lock_token TEXT,
+  lock_expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  started_at TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_status_priority_created_at ON optimize_jobs(status, priority DESC, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_owner_status_created_at ON optimize_jobs(owner_key, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_lock_expires_at ON optimize_jobs(lock_expires_at);
+
 CREATE TABLE IF NOT EXISTS admin_users (
   username TEXT PRIMARY KEY,
   password_hash TEXT NOT NULL,
@@ -46,6 +68,19 @@ CREATE TABLE IF NOT EXISTS admin_users (
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL REFERENCES admin_users(username) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_token_hash ON admin_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_username ON admin_sessions(username);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_last_seen_at ON admin_sessions(last_seen_at);
 
 CREATE TABLE IF NOT EXISTS user_accounts (
   id TEXT PRIMARY KEY,

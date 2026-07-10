@@ -1,7 +1,9 @@
 import { getPool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import type { PasswordAlgorithm, PasswordHashRecord } from '../security/password'
 import type {
   LicenseConfig,
+  FreeScheduleEntitlement,
   LicenseOperator,
   OptimizeResult,
   PermissionMode,
@@ -25,6 +27,7 @@ export interface UserAccountRecord {
   password_hash: string
   salt: string
   iterations: number
+  password_algorithm?: PasswordAlgorithm
   permission: PermissionMode
   status: 'active' | 'frozen' | 'revoked'
   cdk_key: string | null
@@ -126,6 +129,7 @@ export interface UserWorkspaceRecord {
   last_result: OptimizeResult | null
   saved_configs: WorkspaceSavedConfig[]
   result_history: WorkspaceResultHistoryItem[]
+  free_schedule_entitlement: FreeScheduleEntitlement | null
   updated_at: string
 }
 
@@ -138,6 +142,7 @@ interface LegacyUserWorkspaceRecord {
   last_result: OptimizeResult | null
   saved_configs?: WorkspaceSavedConfig[]
   result_history?: WorkspaceResultHistoryItem[]
+  free_schedule_entitlement?: FreeScheduleEntitlement | null
   updated_at: string
 }
 
@@ -273,9 +278,20 @@ export async function getSessionByTokenHash(tokenHash: string): Promise<UserSess
   return result.rows[0]?.record_json ?? null
 }
 
-export async function touchSession(session: UserSessionRecord): Promise<void> {
-  const updated = { ...session, last_seen_at: new Date().toISOString() }
-  await saveUserSession(updated)
+export async function touchSession(session: UserSessionRecord, now: Date, cutoff: Date): Promise<boolean> {
+  await ensureSchema()
+  const lastSeenAt = now.toISOString()
+  const updated = { ...session, last_seen_at: lastSeenAt }
+  const result = await query(
+    `update user_sessions
+     set record_json = $4::jsonb,
+         last_seen_at = $3
+     where id = $1
+       and token_hash = $2
+       and last_seen_at <= $5`,
+    [session.id, session.token_hash, lastSeenAt, JSON.stringify(updated), cutoff.toISOString()],
+  )
+  return (result.rowCount ?? 0) > 0
 }
 
 export async function deleteSessionByTokenHash(tokenHash: string): Promise<void> {
@@ -334,9 +350,73 @@ export async function getRecentPasswordResetTokenForUser(
   return result.rows[0] ?? null
 }
 
-export async function markPasswordResetTokenUsed(tokenId: string, usedAt = new Date().toISOString()): Promise<void> {
+export async function resetUserPasswordWithToken(
+  tokenHash: string,
+  passwordHash: PasswordHashRecord,
+  claimedAt: Date,
+): Promise<UserAccountRecord | null> {
   await ensureSchema()
-  await query('update password_reset_tokens set used_at = $2 where id = $1 and used_at is null', [tokenId, usedAt])
+  const client = await getPool().connect()
+  const claimedAtIso = claimedAt.toISOString()
+  try {
+    await client.query('begin')
+    const claimed = await client.query<{ id: string; user_id: string }>(
+      `update password_reset_tokens
+       set used_at = $2
+       where token_hash = $1
+         and used_at is null
+         and expires_at > $2
+       returning id, user_id`,
+      [tokenHash, claimedAtIso],
+    )
+    if (claimed.rowCount === 0) {
+      await client.query('rollback')
+      return null
+    }
+    if (claimed.rowCount !== 1 || !claimed.rows[0]) {
+      throw new Error('Password reset token claim affected an unexpected number of rows.')
+    }
+
+    const passwordPatch = {
+      ...passwordHash,
+      updated_at: claimedAtIso,
+    }
+    const updated = await client.query<{ record_json: UserAccountRecord }>(
+      `update user_accounts
+       set password_hash = $2,
+           salt = $3,
+           iterations = $4,
+           record_json = record_json || $5::jsonb,
+           updated_at = $6
+       where id = $1
+         and status = 'active'
+       returning record_json`,
+      [
+        claimed.rows[0].user_id,
+        passwordHash.password_hash,
+        passwordHash.salt,
+        passwordHash.iterations,
+        JSON.stringify(passwordPatch),
+        claimedAtIso,
+      ],
+    )
+    if (updated.rowCount === 0) {
+      await client.query('rollback')
+      return null
+    }
+    if (updated.rowCount !== 1 || !updated.rows[0]) {
+      throw new Error('Password reset user update affected an unexpected number of rows.')
+    }
+
+    await client.query('delete from user_sessions where user_id = $1', [claimed.rows[0].user_id])
+    await client.query('commit')
+    return updated.rows[0].record_json
+  } catch (error) {
+    await client.query('rollback')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 export async function listProfilesForUser(userId: string): Promise<UserGameAccountRecord[]> {
@@ -519,6 +599,23 @@ export async function getProfileWorkspace(profileId: string): Promise<UserWorksp
   return normalizeWorkspaceRecord(result.rows[0]?.record_json ?? null)
 }
 
+export async function listProfileWorkspaces(profileIds: string[]): Promise<Map<string, UserWorkspaceRecord>> {
+  if (profileIds.length === 0) return new Map()
+  await ensureSchema()
+  const result = await query<{ profile_id: string; record_json: UserWorkspaceRecord }>(
+    `select profile_id, record_json
+     from user_profile_workspaces
+     where profile_id = any($1::text[])`,
+    [profileIds],
+  )
+  const workspaces = new Map<string, UserWorkspaceRecord>()
+  for (const row of result.rows) {
+    const workspace = normalizeWorkspaceRecord(row.record_json)
+    if (workspace) workspaces.set(row.profile_id, workspace)
+  }
+  return workspaces
+}
+
 export async function getLegacyWorkspace(userId: string): Promise<LegacyUserWorkspaceRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: LegacyUserWorkspaceRecord }>(
@@ -640,8 +737,45 @@ export function emptyWorkspace(profileId: string): UserWorkspaceRecord {
     last_result: null,
     saved_configs: [],
     result_history: [],
+    free_schedule_entitlement: null,
     updated_at: new Date().toISOString(),
   }
+}
+
+export async function upgradeUserPasswordHash(
+  userId: string,
+  expectedPasswordHash: string,
+  replacement: PasswordHashRecord,
+): Promise<UserAccountRecord | null> {
+  await ensureSchema()
+  const updatedAt = new Date().toISOString()
+  const passwordPatch = {
+    password_hash: replacement.password_hash,
+    salt: replacement.salt,
+    iterations: replacement.iterations,
+    password_algorithm: replacement.password_algorithm,
+    updated_at: updatedAt,
+  }
+  const result = await query<{ record_json: UserAccountRecord }>(
+    `update user_accounts
+     set password_hash = $3,
+         salt = $4,
+         iterations = $5,
+         record_json = record_json || $6::jsonb,
+         updated_at = $7
+     where id = $1 and password_hash = $2
+     returning record_json`,
+    [
+      userId,
+      expectedPasswordHash,
+      replacement.password_hash,
+      replacement.salt,
+      replacement.iterations,
+      JSON.stringify(passwordPatch),
+      updatedAt,
+    ],
+  )
+  return result.rows[0]?.record_json ?? null
 }
 
 export function toPublicWorkspace(workspace: UserWorkspaceRecord | null): UserWorkspace {
@@ -655,6 +789,7 @@ export function toPublicWorkspace(workspace: UserWorkspaceRecord | null): UserWo
     last_result: normalized?.last_result ?? null,
     saved_configs: normalized?.saved_configs ?? [],
     result_history: resultHistory,
+    free_schedule_entitlement: normalized?.free_schedule_entitlement ?? null,
     updated_at: normalized?.updated_at ?? null,
   }
 }
@@ -698,7 +833,37 @@ export function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null |
     last_result: isRecord(workspace.last_result) ? workspace.last_result as OptimizeResult : null,
     saved_configs: normalizeSavedConfigs((workspace as { saved_configs?: unknown }).saved_configs),
     result_history: normalizeResultHistory((workspace as { result_history?: unknown }).result_history),
+    free_schedule_entitlement: normalizeFreeScheduleEntitlement((workspace as { free_schedule_entitlement?: unknown }).free_schedule_entitlement),
     updated_at: typeof workspace.updated_at === 'string' ? workspace.updated_at : new Date().toISOString(),
+  }
+}
+
+function normalizeFreeScheduleEntitlement(value: unknown): FreeScheduleEntitlement | null {
+  if (!isRecord(value)) return null
+  const firstGeneratedAt = typeof value.first_generated_at === 'string' ? value.first_generated_at : null
+  const revisionCount = Number(value.revision_count ?? 0)
+  const confirmedAt = typeof value.confirmed_at === 'string' ? value.confirmed_at : null
+  const lockedAt = typeof value.locked_at === 'string' ? value.locked_at : null
+  const lockReason = value.lock_reason === 'confirmed' || value.lock_reason === 'revision_limit' || value.lock_reason === 'window_expired'
+    ? value.lock_reason
+    : null
+  const rawBonus = isRecord(value.strong_reorder_bonus) ? value.strong_reorder_bonus : null
+  const strongReorderBonus = rawBonus && typeof rawBonus.month === 'string' && typeof rawBonus.granted_at === 'string'
+    ? {
+      month: rawBonus.month,
+      granted_at: rawBonus.granted_at,
+      used_at: typeof rawBonus.used_at === 'string' ? rawBonus.used_at : null,
+    }
+    : null
+  return {
+    first_generated_at: firstGeneratedAt,
+    revision_count: Number.isFinite(revisionCount) ? Math.max(0, Math.floor(revisionCount)) : 0,
+    revision_limit: 3,
+    revision_window_hours: 24,
+    confirmed_at: confirmedAt,
+    locked_at: lockedAt,
+    lock_reason: lockReason,
+    strong_reorder_bonus: strongReorderBonus,
   }
 }
 

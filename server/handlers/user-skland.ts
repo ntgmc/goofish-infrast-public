@@ -650,6 +650,7 @@ function applyIntermediateInventoryToConfig(config: LicenseConfig, inventory: In
   config.intermediate_inventory = {
     'Originium Shard': normalizeInventoryCount(inventory['Originium Shard']),
     'Pure Gold': normalizeInventoryCount(inventory['Pure Gold']),
+    'Orirock Cube': normalizeInventoryCount(inventory['Orirock Cube']),
   }
   config.auto_balance_source = 'intermediate_inventory'
   config.drones = {

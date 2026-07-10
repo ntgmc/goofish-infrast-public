@@ -46,7 +46,7 @@ announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCou
         <div className="flex items-center gap-3 px-2">
           <BrandLogo size="sm" />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-brand-500">MAA Workspace</p>
+            <p className="text-sm font-semibold text-brand-500">MAA 工作台</p>
             <p className="mt-1 truncate text-xs text-ink-muted">{user.email}</p>
           </div>
         </div>

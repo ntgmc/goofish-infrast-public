@@ -88,9 +88,8 @@ async function recordAnnouncementEvent(
 }
 
 async function handleAdminGet(req: Request): Promise<Response> {
-  if (!(await authenticateAdminRequest(req))) {
-    return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-  }
+  const authentication = await authenticateAdminRequest(req)
+  if (!authentication.ok) return authentication.response
 
   const data = await readAnnouncementData()
   return jsonResponse({
@@ -100,9 +99,8 @@ async function handleAdminGet(req: Request): Promise<Response> {
 }
 
 async function handleAdminPut(req: Request): Promise<Response> {
-  if (!(await authenticateAdminRequest(req))) {
-    return jsonResponse({ error: '管理账号或密码错误。' }, 401)
-  }
+  const authentication = await authenticateAdminRequest(req)
+  if (!authentication.ok) return authentication.response
 
   const body = await req.json() as { announcements?: unknown }
   const current = await readAnnouncementData()
