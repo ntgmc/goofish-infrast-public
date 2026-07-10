@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
+import { Link } from 'react-router-dom'
 import type { Announcement } from '../lib/types'
 import { apiVoid } from '../lib/api-client'
 
@@ -102,12 +103,12 @@ export default function AnnouncementPopup({ announcements }: Props) {
               {current.title}
             </h2>
           </div>
-          <a
-            href="/announcements"
+          <Link
+            to="/announcements"
             className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-brand-600 underline-offset-4 hover:underline"
           >
             历史
-          </a>
+          </Link>
         </div>
         <p id="announcement-popup-body" className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{current.body}</p>
         <div className="mt-6 flex justify-end">

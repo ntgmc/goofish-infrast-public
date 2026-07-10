@@ -1,4 +1,5 @@
 import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
+import { Link } from 'react-router-dom'
 import { apiVoid } from '../lib/api-client'
 
 type FieldErrors = Record<string, string>
@@ -46,7 +47,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-surface-0 px-6 py-10 text-ink-primary">
+    <main className="flex min-h-screen items-center justify-center bg-surface-0 px-6 py-10 text-ink-primary" tabIndex={-1} data-route-focus>
       <form onSubmit={handleSubmit} noValidate className="w-full max-w-md rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8">
         <p className="text-sm font-semibold text-brand-500">MAA Infrast</p>
         <h1 className="mt-3 text-2xl font-semibold text-ink-primary">重置密码</h1>
@@ -98,9 +99,9 @@ export default function ResetPasswordPage() {
           </>
         )}
 
-        <a href="/tool" className="mt-5 block text-center text-sm font-medium text-brand-500 underline-offset-4 hover:underline">
+        <Link to="/tool/profiles" className="mt-5 block text-center text-sm font-medium text-brand-500 underline-offset-4 hover:underline">
           返回登录
-        </a>
+        </Link>
       </form>
     </main>
   )

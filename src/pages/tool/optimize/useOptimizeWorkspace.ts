@@ -21,7 +21,7 @@ type UseOptimizeWorkspaceOptions = {
   setWorkspaceNotice: Setter<string | null>
   setWorkspaceError: Setter<string | null>
   setWorkspaceBusyAction: Setter<string | null>
-  setSection: Setter<OptimizeSection>
+  setSection: (section: OptimizeSection) => void
 }
 
 export function useOptimizeWorkspace({

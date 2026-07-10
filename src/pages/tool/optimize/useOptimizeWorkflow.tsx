@@ -31,6 +31,8 @@ export interface Props {
   configOverride: LicenseConfig | null;
   setConfigOverride: (v: LicenseConfig | null) => void;
   onWorkspacePatch: (patch: WorkspacePatch) => Promise<AuthSuccessResponse | void>;
+  section: OptimizeSection;
+  onSectionChange: (section: OptimizeSection) => void;
   onReset: () => void;
   announcement: Announcement | null;
   redeemedNotice: string | null;
@@ -61,6 +63,8 @@ export function useOptimizeWorkflow(props: Props) {
   configOverride,
   setConfigOverride,
   onWorkspacePatch,
+  section,
+  onSectionChange,
   onReset,
   announcement,
   redeemedNotice,
@@ -82,7 +86,7 @@ export function useOptimizeWorkflow(props: Props) {
 
   const [phase, setPhase] = useState<OptimizePhase>(initialHistoryItem ? 'history' : 'idle')
 
-  const [section, setSection] = useState<OptimizeSection>('overview')
+  const setSection = onSectionChange
 
   const [operatorUploadStatus, setOperatorUploadStatus] = useState<string | null>(null)
 
@@ -255,7 +259,6 @@ export function useOptimizeWorkflow(props: Props) {
       setHistoryItem(nextHistoryItem)
       setProgress(null)
       setPhase(nextHistoryItem ? 'history' : 'idle')
-      setSection('overview')
       setInlineError(null)
       setReorderCheckLoading(false)
       setReorderCheckResult(null)
@@ -266,7 +269,7 @@ export function useOptimizeWorkflow(props: Props) {
       setLastGeneratedSignature(null)
       setUpgradeCdk('')
       setUpgradeError(null)
-    }, [profileId, workspace?.profile_id])
+  }, [profileId, workspace?.profile_id])
 
   const mergedOperators = useMemo(
       () => mergeOperators(license.operators, eliteOverrides),

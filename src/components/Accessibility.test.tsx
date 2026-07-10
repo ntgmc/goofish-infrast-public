@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Announcement } from '../lib/types'
 import AnnouncementPopup from './AnnouncementPopup'
@@ -45,7 +46,7 @@ describe('AnnouncementPopup accessibility', () => {
   it('opens modally, focuses the acknowledgement, and dismisses with Escape without marking read', async () => {
     const { container, opener } = createAppRoot()
     const announcement = createAnnouncement('one', '第一条公告')
-    const { rerender } = render(<AnnouncementPopup announcements={[announcement]} />, { container })
+    const { rerender } = render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} /></MemoryRouter>, { container })
 
     const dialog = await screen.findByRole('dialog', { name: '第一条公告' })
     expect(HTMLDialogElement.prototype.showModal).toHaveBeenCalledOnce()
@@ -61,7 +62,7 @@ describe('AnnouncementPopup accessibility', () => {
     expect(window.localStorage.getItem('maa-announcement-read:one')).toBeNull()
     expect(apiVoidMock).not.toHaveBeenCalled()
 
-    rerender(<AnnouncementPopup announcements={[{ ...announcement }]} />)
+    rerender(<MemoryRouter><AnnouncementPopup announcements={[{ ...announcement }]} /></MemoryRouter>)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
@@ -70,7 +71,7 @@ describe('AnnouncementPopup accessibility', () => {
     const { container, opener } = createAppRoot()
     const first = createAnnouncement('one', '第一条公告')
     const second = createAnnouncement('two', '第二条公告')
-    render(<AnnouncementPopup announcements={[first, second]} />, { container })
+    render(<MemoryRouter><AnnouncementPopup announcements={[first, second]} /></MemoryRouter>, { container })
 
     await user.click(await screen.findByRole('button', { name: '已读' }))
     expect(window.localStorage.getItem('maa-announcement-read:one')).toBe(first.updated_at)
@@ -98,7 +99,7 @@ describe('AnnouncementPopup accessibility', () => {
     root.append(closedDetails, fallbackButton, container)
     document.body.append(root)
 
-    render(<AnnouncementPopup announcements={[createAnnouncement('fallback', '自动弹出公告')]} />, { container })
+    render(<MemoryRouter><AnnouncementPopup announcements={[createAnnouncement('fallback', '自动弹出公告')]} /></MemoryRouter>, { container })
     await user.click(await screen.findByRole('button', { name: '已读' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

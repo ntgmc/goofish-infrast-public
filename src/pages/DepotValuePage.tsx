@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { Link } from 'react-router-dom'
 import AuthForm from '../components/AuthForm'
 import BrandLogo from '../components/BrandLogo'
 import SklandBindingDialog, { type SklandPayload } from '../components/SklandBindingDialog'
@@ -195,7 +196,7 @@ export default function DepotValuePage() {
   }
 
   return (
-    <main className="min-h-screen bg-surface-0 px-4 py-6 text-ink-primary sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-surface-0 px-4 py-6 text-ink-primary sm:px-6 lg:px-8" tabIndex={-1} data-route-focus>
       <div className="mx-auto max-w-6xl">
         <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
@@ -209,18 +210,18 @@ export default function DepotValuePage() {
             </div>
           </div>
           <nav className="flex flex-wrap gap-2">
-            <a
-              href="/"
+            <Link
+              to="/"
               className="rounded-lg border border-surface-3 bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary"
             >
               返回首页
-            </a>
-            <a
-              href="/tool"
+            </Link>
+            <Link
+              to="/tool/profiles"
               className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
             >
               进入工作区
-            </a>
+            </Link>
           </nav>
         </header>
 

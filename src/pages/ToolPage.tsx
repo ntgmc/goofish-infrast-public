@@ -1,15 +1,29 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense } from 'react'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import AnnouncementPopup from '../components/AnnouncementPopup'
-import AccountDashboard, { type DashboardSection } from './tool/AccountDashboard'
+import { canUseScenarioComparison } from '../lib/license'
+import {
+  dashboardPath,
+  fallbackToolPath,
+  optimizePath,
+  resolveToolRoute,
+  workspaceSetupPath,
+  type DashboardSection,
+  type OptimizeSection,
+  type WorkspaceSetupSection,
+} from '../lib/app-routes'
+import AccountDashboard from './tool/AccountDashboard'
 import AuthPage from './tool/AuthPage'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
-import { isSchedulableProfile } from './tool/tool-utils'
+import { isFreePreviewProfile, isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
 
 export default function ToolPage() {
-  const [dashboardSection, setDashboardSection] = useState<DashboardSection>('profiles')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const route = resolveToolRoute(location.pathname)
   const {
     authLoading,
     user,
@@ -17,8 +31,6 @@ export default function ToolPage() {
     activeCdkProfile,
     cdkProfiles,
     workspace,
-    workspaceMode,
-    setWorkspaceMode,
     license,
     setLicense,
     eliteOverrides,
@@ -36,16 +48,31 @@ export default function ToolPage() {
     handleLogout,
   } = useToolSession()
 
+  if (!route) return <Navigate to={fallbackToolPath(location.pathname)} replace />
+
   if (authLoading) {
     return <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">正在确认登录信息...</div>
   }
 
-  return (
-    <>
-      <AnnouncementPopup announcements={popups} />
-      {!user ? (
-        <AuthPage announcement={banner} onAuthenticated={(payload) => applyAuthPayload(payload, 'dashboard')} />
-      ) : workspaceMode === 'dashboard' ? (
+  if (!user) {
+    return (
+      <>
+        <AnnouncementPopup announcements={popups} />
+        <AuthPage announcement={banner} onAuthenticated={applyAuthPayload} />
+      </>
+    )
+  }
+
+  const navigateDashboard = (section: DashboardSection, options?: { replace?: boolean }) => {
+    navigate(dashboardPath(section), { replace: options?.replace })
+  }
+  const navigateSetup = (section: WorkspaceSetupSection) => navigate(workspaceSetupPath(section))
+  const navigateOptimize = (section: OptimizeSection) => navigate(optimizePath(section))
+
+  if (route.kind === 'dashboard') {
+    return (
+      <>
+        <AnnouncementPopup announcements={popups} />
         <AccountDashboard
           user={user}
           profiles={cdkProfiles}
@@ -53,67 +80,80 @@ export default function ToolPage() {
           announcementUnreadCount={announcementUnreadCount}
           openingProfileId={openingProfileId}
           workspaceLoadError={workspaceLoadError}
-          initialSection={dashboardSection}
+          section={route.section}
+          onSectionChange={navigateDashboard}
           onLogout={handleLogout}
-          onPayload={(payload) => applyAuthPayload(payload, 'dashboard')}
+          onPayload={applyAuthPayload}
           onOpenProfile={(profile) => {
-            void refreshProfileWorkspace(profile, 'setup').catch(console.error)
+            void refreshProfileWorkspace(profile)
+              .then(() => navigate(workspaceSetupPath('operators')))
+              .catch(console.error)
           }}
         />
-      ) : activeProfile && isSchedulableProfile(activeProfile) && (workspaceMode === 'setup' || !license) ? (
+      </>
+    )
+  }
+
+  if (!activeProfile || !isSchedulableProfile(activeProfile)) {
+    return <Navigate to={dashboardPath('profiles')} replace />
+  }
+
+  if (route.kind === 'setup') {
+    return (
+      <>
+        <AnnouncementPopup announcements={popups} />
         <WorkspaceSetupPage
           user={user}
           profile={activeProfile}
           workspace={workspace}
           announcement={banner}
-          onSaved={(payload) => applyAuthPayload(payload, 'optimize')}
-          onSynced={(payload) => applyAuthPayload(payload, 'setup')}
-          onBack={() => {
-            setDashboardSection('profiles')
-            setWorkspaceMode('dashboard')
+          activeSection={route.section}
+          onSectionChange={navigateSetup}
+          onSaved={(payload) => {
+            applyAuthPayload(payload)
+            navigate(optimizePath('overview'))
           }}
-          onRedeemNewProfile={() => {
-            setDashboardSection('redeem')
-            setWorkspaceMode('dashboard')
-          }}
+          onSynced={applyAuthPayload}
+          onBack={() => navigate(dashboardPath('profiles'))}
+          onRedeemNewProfile={() => navigate(dashboardPath('redeem'))}
           onLogout={handleLogout}
         />
-      ) : activeProfile && isSchedulableProfile(activeProfile) && license ? (
-        <Suspense fallback={<div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">正在载入排班工具...</div>}>
-          <OptimizePage
-            profileId={activeProfile.id}
-            profile={activeProfile}
-            license={license}
-            workspace={workspace}
-            setLicense={(next) => setLicense(next)}
-            eliteOverrides={eliteOverrides}
-            setEliteOverrides={setEliteOverrides}
-            configOverride={configOverride}
-            setConfigOverride={setConfigOverride}
-            onWorkspacePatch={persistWorkspacePatch}
-            onReset={() => setWorkspaceMode('setup')}
-            announcement={banner}
-            redeemedNotice={null}
-            onRedownloadLicense={null}
-            onProfileUpgraded={(payload) => applyAuthPayload(payload, 'optimize')}
-          />
-        </Suspense>
-      ) : (
-        <AccountDashboard
-          user={user}
-          profiles={cdkProfiles}
-          activeProfile={activeCdkProfile}
-          announcementUnreadCount={announcementUnreadCount}
-          openingProfileId={openingProfileId}
-          workspaceLoadError={workspaceLoadError}
-          initialSection={dashboardSection}
-          onLogout={handleLogout}
-          onPayload={(payload) => applyAuthPayload(payload, 'dashboard')}
-          onOpenProfile={(profile) => {
-            void refreshProfileWorkspace(profile, 'setup').catch(console.error)
-          }}
+      </>
+    )
+  }
+
+  if (!license) {
+    return <Navigate to={workspace?.operators ? workspaceSetupPath('config') : workspaceSetupPath('operators')} replace />
+  }
+
+  if (route.section === 'lab' && (isFreePreviewProfile(activeProfile) || !canUseScenarioComparison(license))) {
+    return <Navigate to={optimizePath('overview')} replace />
+  }
+
+  return (
+    <>
+      <AnnouncementPopup announcements={popups} />
+      <Suspense fallback={<div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">正在载入排班工具...</div>}>
+        <OptimizePage
+          profileId={activeProfile.id}
+          profile={activeProfile}
+          license={license}
+          workspace={workspace}
+          setLicense={setLicense}
+          eliteOverrides={eliteOverrides}
+          setEliteOverrides={setEliteOverrides}
+          configOverride={configOverride}
+          setConfigOverride={setConfigOverride}
+          onWorkspacePatch={persistWorkspacePatch}
+          section={route.section}
+          onSectionChange={navigateOptimize}
+          onReset={() => navigate(workspaceSetupPath('operators'))}
+          announcement={banner}
+          redeemedNotice={null}
+          onRedownloadLicense={null}
+          onProfileUpgraded={applyAuthPayload}
         />
-      )}
+      </Suspense>
     </>
   )
 }

@@ -74,13 +74,13 @@ export default function DeferredFeatureMenu({ className = '' }: DeferredFeatureM
             )
 
             return feature.href ? (
-              <a
+              <Link
                 key={feature.title}
-                href={feature.href}
+                to={feature.href}
                 className="block px-4 py-3 transition-colors duration-150 hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-500/45"
               >
                 {content}
-              </a>
+              </Link>
             ) : (
               <div key={feature.title} className="px-4 py-3">
                 {content}
@@ -92,3 +92,4 @@ export default function DeferredFeatureMenu({ className = '' }: DeferredFeatureM
     </details>
   )
 }
+import { Link } from 'react-router-dom'
