@@ -2,7 +2,7 @@ import { query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
-export type OptimizeJobPriority = 'paid' | 'standard'
+export type OptimizeJobPriority = 'paid' | 'analysis' | 'standard'
 
 export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
   id: string

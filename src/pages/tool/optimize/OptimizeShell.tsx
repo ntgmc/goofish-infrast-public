@@ -7,6 +7,7 @@ export default function OptimizeShell({
   section,
   permissionLabel,
   badges,
+  showScenarioLab,
   onSectionChange,
   onReset,
   children,
@@ -14,11 +15,13 @@ export default function OptimizeShell({
   section: OptimizeSection;
   permissionLabel: string;
   badges?: Partial<Record<OptimizeSection, string>>;
+  showScenarioLab: boolean;
   onSectionChange: (section: OptimizeSection) => void;
   onReset: () => void;
   children: ReactNode;
 }) {
-  const current = OPTIMIZE_SECTIONS.find((item) => item.id === section) ?? OPTIMIZE_SECTIONS[0]
+  const sections = OPTIMIZE_SECTIONS.filter((item) => item.id !== 'lab' || showScenarioLab)
+  const current = sections.find((item) => item.id === section) ?? sections[0]
 
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">
@@ -31,7 +34,7 @@ export default function OptimizeShell({
           </div>
         </div>
         <nav className="mt-8 space-y-1" aria-label="排班工作台分区">
-          {OPTIMIZE_SECTIONS.map((item) => (
+          {sections.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -59,7 +62,7 @@ export default function OptimizeShell({
         </button>
       </aside>
 
-      <main className="lg:pl-64">
+      <main className="lg:pl-64" tabIndex={-1} data-route-focus>
         <header className="sticky top-0 z-20 border-b border-surface-3 bg-surface-0/95 px-5 py-4 backdrop-blur sm:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
@@ -86,7 +89,7 @@ export default function OptimizeShell({
             </div>
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden" role="tablist" aria-label="排班工作台分区">
-            {OPTIMIZE_SECTIONS.map((item) => (
+            {sections.map((item) => (
               <button
                 key={item.id}
                 type="button"

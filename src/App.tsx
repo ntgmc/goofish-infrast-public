@@ -1,5 +1,7 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense } from 'react'
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import BuildMetaStrip from './components/BuildMetaStrip'
+import RouteLifecycle from './components/RouteLifecycle'
 import LandingPage from './pages/LandingPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 
@@ -10,103 +12,36 @@ const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage'))
 const DepotValuePage = lazy(() => import('./pages/DepotValuePage'))
 const ScheduleAnalysisPage = lazy(() => import('./pages/ScheduleAnalysisPage'))
 
-type Route = 'home' | 'tool' | 'resetPassword' | 'announcements' | 'admin' | 'adminSetup' | 'scheduleAnalysis' | 'depotValue'
-
-function App() {
-  const [route, setRoute] = useState<Route>(() => resolveRoute(window.location.pathname) ?? 'home')
-
-  useEffect(() => {
-    const syncRoute = () => {
-      const nextRoute = resolveRoute(window.location.pathname)
-      if (!nextRoute) {
-        window.history.replaceState(null, '', '/')
-        setRoute('home')
-        return
-      }
-      setRoute(nextRoute)
-    }
-
-    syncRoute()
-    window.addEventListener('popstate', syncRoute)
-    return () => window.removeEventListener('popstate', syncRoute)
-  }, [])
-
-  const navigateToTool = useCallback(() => {
-    window.history.pushState(null, '', '/tool')
-    setRoute('tool')
-  }, [])
-
-  if (route === 'admin' || route === 'adminSetup') {
-    return (
-      <div className="min-h-screen bg-surface-0 text-ink-primary">
-        <Suspense fallback={
-          <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
-            正在载入管理后台...
-          </div>
-        }>
-          {route === 'admin' ? <AdminPage /> : <AdminSetupPage />}
-        </Suspense>
-        <BuildMetaStrip placement="corner" />
-      </div>
-    )
-  }
+export default function App() {
+  const navigate = useNavigate()
 
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">
-      {route === 'home' && <LandingPage onStart={navigateToTool} />}
-      {route === 'tool' && (
-        <Suspense fallback={
-          <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
-            正在载入工作台...
-          </div>
-        }>
-          <ToolPage />
-        </Suspense>
-      )}
-      {route === 'resetPassword' && <ResetPasswordPage />}
-      {route === 'announcements' && (
-        <Suspense fallback={
-          <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
-            正在载入公告...
-          </div>
-        }>
-          <AnnouncementsPage />
-        </Suspense>
-      )}
-      {route === 'scheduleAnalysis' && (
-        <Suspense fallback={
-          <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
-            正在载入排班表分析...
-          </div>
-        }>
-          <ScheduleAnalysisPage />
-        </Suspense>
-      )}
-      {route === 'depotValue' && (
-        <Suspense fallback={
-          <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
-            正在载入仓库价值分析器...
-          </div>
-        }>
-          <DepotValuePage />
-        </Suspense>
-      )}
+      <RouteLifecycle />
+      <Routes>
+        <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
+        <Route path="/tool/*" element={<LazyPage fallback="正在载入工作台..."><ToolPage /></LazyPage>} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/announcements" element={<LazyPage fallback="正在载入公告..."><AnnouncementsPage /></LazyPage>} />
+        <Route path="/tools/schedule-analysis" element={<LazyPage fallback="正在载入排班表分析..."><ScheduleAnalysisPage /></LazyPage>} />
+        <Route path="/tools/depot-value" element={<LazyPage fallback="正在载入仓库价值分析器..."><DepotValuePage /></LazyPage>} />
+        <Route path="/admin/setup" element={<LazyPage fallback="正在载入管理后台..."><AdminSetupPage /></LazyPage>} />
+        <Route path="/admin/*" element={<LazyPage fallback="正在载入管理后台..."><AdminPage /></LazyPage>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
       <BuildMetaStrip placement="corner" />
     </div>
   )
 }
 
-function resolveRoute(pathname: string): Route | null {
-  const path = pathname.replace(/\/+$/, '') || '/'
-  if (path === '/') return 'home'
-  if (path === '/tool') return 'tool'
-  if (path === '/tools/schedule-analysis') return 'scheduleAnalysis'
-  if (path === '/tools/depot-value') return 'depotValue'
-  if (path === '/reset-password') return 'resetPassword'
-  if (path === '/announcements') return 'announcements'
-  if (path === '/admin') return 'admin'
-  if (path === '/admin/setup') return 'adminSetup'
-  return null
+function LazyPage({ fallback, children }: { fallback: string; children: React.ReactNode }) {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
+        {fallback}
+      </div>
+    }>
+      {children}
+    </Suspense>
+  )
 }
-
-export default App

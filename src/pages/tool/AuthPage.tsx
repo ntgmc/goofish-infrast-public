@@ -14,7 +14,7 @@ export default function AuthPage({
   onAuthenticated: (payload: AuthSuccessResponse) => void
 }) {
   return (
-    <main className="min-h-screen bg-surface-0 px-4 py-8 sm:px-6">
+    <main className="min-h-screen bg-surface-0 px-4 py-8 sm:px-6" tabIndex={-1} data-route-focus>
       <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
         <section className="rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8">
           <div className="mb-5 flex items-start justify-between gap-4">

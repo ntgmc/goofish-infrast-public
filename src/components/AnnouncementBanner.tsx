@@ -1,4 +1,5 @@
 import type { Announcement } from '../lib/types'
+import { Link } from 'react-router-dom'
 
 interface Props {
   announcement: Announcement | null;
@@ -18,12 +19,12 @@ export default function AnnouncementBanner({ announcement, className = '' }: Pro
           <h2 className="text-sm font-semibold text-ink-primary">{announcement.title}</h2>
           <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{announcement.body}</p>
         </div>
-        <a
-          href="/announcements"
+        <Link
+          to="/announcements"
           className="shrink-0 text-sm font-semibold text-brand-600 underline-offset-4 hover:underline"
         >
           查看公告
-        </a>
+        </Link>
       </div>
     </section>
   )
