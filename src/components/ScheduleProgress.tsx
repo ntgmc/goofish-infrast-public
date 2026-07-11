@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 export type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed'
 
 export interface ScheduleProgressState {
-  mode: 'generate' | 'apply';
+  mode: 'generate' | 'apply' | 'scenario';
   startedAt: number;
   completedAt?: number;
   estimatedDurationMs?: number;
@@ -14,7 +14,7 @@ export interface ScheduleProgressState {
   estimateAdjustment?: string;
   queueStatus?: 'queued' | 'running';
   queuePosition?: number | null;
-  priority?: 'paid' | 'standard';
+  priority?: 'paid' | 'analysis' | 'standard';
   jobId?: string;
   observedRunning?: boolean;
   percentFloor?: number;
@@ -78,7 +78,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
       className={`schedule-task-shell rounded-xl border border-surface-3 bg-surface-1 ${compact ? 'p-4' : 'p-5 sm:p-6'} ${className}`}
       data-status={task.status}
       aria-live="polite"
-      aria-label={progress.mode === 'generate' ? '排班生成任务状态' : '练度建议任务状态'}
+      aria-label={progress.mode === 'generate' ? '排班生成任务状态' : progress.mode === 'scenario' ? '场景对比任务状态' : '练度建议任务状态'}
     >
       <div className="relative z-10">
         <div className={`flex ${compact ? 'flex-col gap-4 sm:flex-row sm:items-center' : 'flex-col gap-5 md:flex-row md:items-center'}`}>
@@ -193,6 +193,12 @@ const TASK_STEPS: Record<ScheduleProgressState['mode'], Array<{ label: string; d
     { label: '重新计算', detail: '应用练度变化并生成最终方案。' },
     { label: '生成最终方案', detail: '整理可下载结果和效率对比。' },
   ],
+  scenario: [
+    { label: '校验组合', detail: '检查账号权限、场景因子和运行上限。' },
+    { label: '进入队列', detail: '等待高级分析 worker 领取任务。' },
+    { label: '快速筛选', detail: '计算全部场景；自动非固定模式同时选择班次数组。' },
+    { label: '精确复核', detail: '按实际操作成本分组，冻结候选班次后生成 Pareto 前沿。' },
+  ],
 }
 
 function getTimedPercent(progress: ScheduleProgressState, now: number): number {
@@ -229,8 +235,8 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
   const reconnecting = progress.connectionStatus === 'reconnecting'
   const aheadCount = typeof progress.queuePosition === 'number' ? Math.max(0, progress.queuePosition - 1) : null
   const queueLabel = getQueueLabel(progress, aheadCount)
-  const priorityLabel = progress.priority === 'paid' ? '付费优先' : '普通队列'
-  const priorityClass = progress.priority === 'paid'
+  const priorityLabel = progress.priority === 'paid' ? '付费优先' : progress.priority === 'analysis' ? '高级分析' : '普通队列'
+  const priorityClass = progress.priority === 'paid' || progress.priority === 'analysis'
     ? 'bg-brand-600/15 text-brand-300 ring-1 ring-brand-500/25'
     : 'bg-surface-2 text-ink-secondary ring-1 ring-surface-3'
   const jobLabel = progress.jobId ? `任务 #${progress.jobId.slice(0, 8)}` : null
@@ -257,7 +263,7 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
     title,
     detail,
     adjustmentLabel,
-    eyebrow: progress.mode === 'generate' ? '排班优化任务' : '练度建议任务',
+    eyebrow: progress.mode === 'generate' ? '排班优化任务' : progress.mode === 'scenario' ? '场景对比任务' : '练度建议任务',
     meterLabel: getMeterLabel(status),
     priorityLabel,
     priorityClass,
@@ -284,10 +290,10 @@ function getTaskStatus(progress: ScheduleProgressState, percent: number, now: nu
 }
 
 function getStatusTitle(mode: ScheduleProgressState['mode'], status: TaskStatus): string {
-  if (status === 'completed') return mode === 'generate' ? '排班方案已就绪' : '最终方案已就绪'
+  if (status === 'completed') return mode === 'generate' ? '排班方案已就绪' : mode === 'scenario' ? '场景前沿已就绪' : '最终方案已就绪'
   if (status === 'overdue') return '正在校准预估'
   if (status === 'finishing') return '即将完成'
-  if (status === 'running') return mode === 'generate' ? '正在计算排班' : '正在重新计算'
+  if (status === 'running') return mode === 'generate' ? '正在计算排班' : mode === 'scenario' ? '正在比较场景' : '正在重新计算'
   if (status === 'queued') return '已加入队列'
   return '正在提交任务'
 }
@@ -304,7 +310,7 @@ function getStatusDetail(
   if (status === 'finishing') return '后台计算已进入收尾阶段，结果完成后会自动展示。'
   if (status === 'running') return `任务已开始执行，预计还需 ${remainingLabel}，会随实际耗时自动校准。`
   if (status === 'queued') {
-    const priorityText = progress.priority === 'paid' ? '付费优先队列' : '普通队列'
+    const priorityText = progress.priority === 'paid' ? '付费优先队列' : progress.priority === 'analysis' ? '高级分析队列' : '普通队列'
     return `${priorityText}，${queueLabel}，预计还需 ${remainingLabel}${estimateContext ? `，${estimateContext}` : ''}。`
   }
   return '正在提交优化请求，完成校验后会进入后台队列。'

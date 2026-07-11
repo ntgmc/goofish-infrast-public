@@ -9,10 +9,10 @@ interface Props {
 
 export default function BuildMetaStrip({ meta = APP_BUILD_META, className = '', placement = 'inline' }: Props) {
   const rootClassName = placement === 'corner'
-    ? `fixed bottom-3 right-3 z-40 flex max-w-[calc(100vw-1.5rem)] items-end gap-2 text-xs text-ink-muted ${className}`
+    ? `relative z-40 mt-3 flex w-full max-w-full flex-wrap items-end justify-end gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-xs text-ink-muted sm:fixed sm:bottom-3 sm:right-3 sm:mt-0 sm:w-auto sm:max-w-[calc(100vw-1.5rem)] sm:px-0 sm:pb-0 ${className}`
     : `flex flex-wrap items-center gap-2 text-xs text-ink-secondary ${className}`
   const detailPanelClassName = placement === 'corner'
-    ? 'absolute bottom-full right-0 mb-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-lg border border-surface-3 bg-surface-1 p-3 text-left shadow-sm'
+    ? 'absolute bottom-full right-0 z-20 mb-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-lg border border-surface-3 bg-surface-1 p-3 text-left shadow-sm'
     : 'absolute left-0 top-full z-20 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-lg border border-surface-3 bg-surface-1 p-3 text-left shadow-sm'
 
   return (

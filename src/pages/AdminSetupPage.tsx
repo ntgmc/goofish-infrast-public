@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { apiJson, apiVoid, getApiErrorMessage } from '../lib/api-client'
 import { adminApiJson, clearLegacyAdminCredentials } from '../lib/admin-api-client'
 
@@ -72,7 +73,7 @@ export default function AdminSetupPage() {
   }
 
   return (
-    <main className="min-h-screen bg-surface-0 px-6 py-10 text-ink-primary">
+    <main className="min-h-screen bg-surface-0 px-6 py-10 text-ink-primary" tabIndex={-1} data-route-focus>
       <div className="mx-auto max-w-5xl">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -82,7 +83,7 @@ export default function AdminSetupPage() {
               这里使用 `MAA_ADMIN_PASSWORD` 创建日常管理账号。创建完成后，回到后台使用账号密码登录，减少 root 口令暴露次数。
             </p>
           </div>
-          <a href="/admin" className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">返回后台</a>
+          <Link to="/admin/overview" className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">返回后台</Link>
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[380px_1fr]">

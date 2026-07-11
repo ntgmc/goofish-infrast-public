@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react'
 import type { Announcement, AuthSuccessResponse, FreeScheduleEntitlement, LicenseConfig, LicenseFile, OptimizeResult, ReorderCheckResult, UpgradeSuggestion, UpgradeTaskPayload, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { CreateOptimizationJobRequest } from '../../../lib/optimization-contracts'
-import { canEditConfig, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../../../lib/license'
+import { canEditConfig, canUseScenarioComparison, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../../../lib/license'
 import { canonicalJson } from '../../../lib/crypto'
 import { getActivationTokenForLicense } from '../../../lib/activation-token'
 
@@ -31,6 +31,8 @@ export interface Props {
   configOverride: LicenseConfig | null;
   setConfigOverride: (v: LicenseConfig | null) => void;
   onWorkspacePatch: (patch: WorkspacePatch) => Promise<AuthSuccessResponse | void>;
+  section: OptimizeSection;
+  onSectionChange: (section: OptimizeSection) => void;
   onReset: () => void;
   announcement: Announcement | null;
   redeemedNotice: string | null;
@@ -61,6 +63,8 @@ export function useOptimizeWorkflow(props: Props) {
   configOverride,
   setConfigOverride,
   onWorkspacePatch,
+  section,
+  onSectionChange,
   onReset,
   announcement,
   redeemedNotice,
@@ -82,7 +86,7 @@ export function useOptimizeWorkflow(props: Props) {
 
   const [phase, setPhase] = useState<OptimizePhase>(initialHistoryItem ? 'history' : 'idle')
 
-  const [section, setSection] = useState<OptimizeSection>('overview')
+  const setSection = onSectionChange
 
   const [operatorUploadStatus, setOperatorUploadStatus] = useState<string | null>(null)
 
@@ -147,6 +151,7 @@ export function useOptimizeWorkflow(props: Props) {
   const userCanApplyConfigOverride = true
 
   const userCanUseUpgradeFeatures = !isPreviewProfile && canUseUpgradeFeatures(license)
+  const userCanUseScenarioLab = !isPreviewProfile && canUseScenarioComparison(license)
 
   useEffect(() => {
       progressRef.current = progress
@@ -254,7 +259,6 @@ export function useOptimizeWorkflow(props: Props) {
       setHistoryItem(nextHistoryItem)
       setProgress(null)
       setPhase(nextHistoryItem ? 'history' : 'idle')
-      setSection('overview')
       setInlineError(null)
       setReorderCheckLoading(false)
       setReorderCheckResult(null)
@@ -265,7 +269,7 @@ export function useOptimizeWorkflow(props: Props) {
       setLastGeneratedSignature(null)
       setUpgradeCdk('')
       setUpgradeError(null)
-    }, [profileId, workspace?.profile_id])
+  }, [profileId, workspace?.profile_id])
 
   const mergedOperators = useMemo(
       () => mergeOperators(license.operators, eliteOverrides),
@@ -352,6 +356,16 @@ export function useOptimizeWorkflow(props: Props) {
       setReorderCheckResult(null)
       setReorderCheckError(null)
     }, [activeConfig, clearConfigValidationToast, normalizeAllowedConfigOverride, setConfigOverride, showConfigValidationToast, userCanApplyConfigOverride])
+
+  const handleApplyScenarioConfig = useCallback((scenarioConfig: LicenseConfig) => {
+    updateConfig((draft) => {
+      for (const key of Object.keys(draft)) delete (draft as Record<string, unknown>)[key]
+      Object.assign(draft, JSON.parse(JSON.stringify(scenarioConfig)) as LicenseConfig)
+    })
+    configToastIdRef.current += 1
+    setConfigToast({ id: configToastIdRef.current, message: '已应用实验场景，请确认配置后再生成排班。' })
+    setSection('config')
+  }, [updateConfig])
 
   const resetConfig = useCallback(() => {
       setConfigOverride(null)
@@ -752,5 +766,5 @@ export function useOptimizeWorkflow(props: Props) {
       }
     }, [isPreviewProfile, onProfileUpgraded, profileId, upgradeCdk, upgradeLoading])
 
-  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, operatorUploadStatus, licenseSyncing, licenseSyncStatus, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, operatorFileRef, isPreviewProfile, userCanReplaceOperators, userCanEditConfig, userCanUseIntermediateAutoConfig, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, handleReplaceOperators, updateConfig, resetConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile }
+  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, operatorUploadStatus, licenseSyncing, licenseSyncStatus, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, operatorFileRef, isPreviewProfile, userCanReplaceOperators, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, handleReplaceOperators, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile }
 }

@@ -8,6 +8,8 @@ import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, Opti
 import { sanitizeConfigForPublicOptimize, jsonResponse } from './http-core';
 import { validateRequestLicense, recordScheduleGenerate, scheduleFailure, resolveFreeScheduleGenerateDecision } from './entitlements';
 import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammettaEnabled, resolveOptimizeDurationEstimate } from './job-status';
+import { buildScenarioComparisonEstimate } from './job-status';
+import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -15,14 +17,16 @@ export async function prepareOptimizeJob(
   const submittedAt = Date.now();
   let checkedCdkRecord: CdkRecord | null = null;
   let scheduleUsage = scheduleFailure('optimizer_runtime_error');
+  let isScenarioComparison = false;
 
   const fail = async (body: Record<string, unknown>, status: number): Promise<{ ok: false; response: Response }> => {
-    await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, submittedAt);
+    if (!isScenarioComparison) await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, submittedAt);
     return { ok: false, response: jsonResponse(body, status) };
   };
 
   try {
     const body = await req.json() as CreateOptimizationJobRequest;
+    isScenarioComparison = body.kind === 'scenario_comparison';
     const operators = body.operators;
     const config = body.config;
     const license = body.identity?.type === 'license' ? body.identity.license : undefined;
@@ -33,6 +37,10 @@ export async function prepareOptimizeJob(
     const suggestions_only = body.kind === 'upgrade_suggestions';
     const upgrade_task_payload = body.kind === 'upgrade_suggestions' ? body.upgradeTaskPayload : undefined;
     const history_source = body.kind === 'schedule' ? body.historySource : undefined;
+
+    if (isScenarioComparison && body.identity?.type !== 'profile') {
+      return fail({ error: '场景对比实验室必须使用已登录的账号档案。' }, 403);
+    }
 
     if (!operators || !config) {
       scheduleUsage = scheduleFailure('validation_failed');
@@ -110,6 +118,10 @@ export async function prepareOptimizeJob(
     };
     scheduleUsage = scheduleFailure('optimizer_runtime_error', scheduleUsageBase);
 
+    if (isScenarioComparison && !['advanced', 'ultimate', 'admin'].includes(optimizePermission)) {
+      return fail({ error: '当前套餐不包含场景对比实验室。' }, 403);
+    }
+
     if (checkedCdkRecord && normalizePermissionMode(checkedCdkRecord.permission) === 'advanced') {
       const riskSettings = await getRiskControlSettings();
       let riskCheckedRecord = checkedCdkRecord;
@@ -160,6 +172,35 @@ export async function prepareOptimizeJob(
     }
 
     const effectiveConfig = sanitizeConfigForPublicOptimize(configForPermission.config, optimizePermission);
+    if (body.kind === 'scenario_comparison') {
+      if (!activeProfileId) return fail({ error: '场景对比实验室缺少账号档案。' }, 400);
+      let expansion;
+      try {
+        expansion = expandScenarioComparison(effectiveConfig, body.factors);
+      } catch (error) {
+        return fail({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
+      return {
+        ok: true,
+        prepared: {
+          ownerKey: 'profile:' + activeProfileId,
+          priority: 'analysis',
+          priorityValue: 5,
+          permission: optimizePermission,
+          source: 'scenario_comparison',
+          payload: {
+            version: 3,
+            kind: 'scenario_comparison',
+            submittedAt,
+            operators,
+            effectiveConfig,
+            activeProfileId,
+            factors: body.factors,
+            estimate: buildScenarioComparisonEstimate(expansion.scenarios.length, expansion.variableScenarioCount),
+          },
+        },
+      };
+    }
     const estimateBucket = getOptimizeEstimateBucket(effectiveConfig);
     Object.assign(scheduleUsageBase, {
       schedule_mode: getEstimateScheduleMode(estimateBucket),
@@ -225,7 +266,7 @@ export async function prepareOptimizeJob(
   } catch (err: unknown) {
     console.error('optimize-schedule enqueue error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';
-    await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, submittedAt);
+    if (!isScenarioComparison) await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, submittedAt);
     return { ok: false, response: jsonResponse({ error: message }, 500) };
   }
 }

@@ -13,7 +13,6 @@ import type {
 import { apiJson, apiJsonOrNull, apiVoid } from '../../lib/api-client'
 import { createAccountLicense, isSchedulableProfile } from './tool-utils'
 
-export type WorkspaceMode = 'dashboard' | 'setup' | 'optimize'
 export type WorkspacePatch = Partial<UserWorkspace> & { saved_config_action?: WorkspaceSavedConfigAction }
 
 export function useToolSession() {
@@ -22,7 +21,6 @@ export function useToolSession() {
   const [profiles, setProfiles] = useState<UserGameAccount[]>([])
   const [activeProfile, setActiveProfile] = useState<UserGameAccount | null>(null)
   const [workspace, setWorkspace] = useState<UserWorkspace | null>(null)
-  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('dashboard')
   const [license, setLicense] = useState<LicenseFile | null>(null)
   const [eliteOverrides, setEliteOverridesState] = useState<Record<string, number>>({})
   const [configOverride, setConfigOverrideState] = useState<LicenseConfig | null>(null)
@@ -33,7 +31,7 @@ export function useToolSession() {
   const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null)
   const workspacePatchQueueRef = useRef<Promise<void>>(Promise.resolve())
 
-  const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null, nextMode?: WorkspaceMode) => {
+  const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null) => {
     const nextUser = payload?.user ?? null
     const nextProfiles = payload?.profiles ?? []
     const nextProfile = payload?.active_profile ?? null
@@ -48,7 +46,6 @@ export function useToolSession() {
     setLicense(nextProfile && nextWorkspace?.operators && nextWorkspace.config
       ? createAccountLicense(nextProfile, nextWorkspace.operators, nextWorkspace.config)
       : null)
-    setWorkspaceMode(nextMode ?? 'dashboard')
   }, [])
 
   useEffect(() => {
@@ -69,7 +66,7 @@ export function useToolSession() {
           applyAuthPayload(null)
           return
         }
-        applyAuthPayload(data as AuthSuccessResponse, 'dashboard')
+        applyAuthPayload(data as AuthSuccessResponse)
       })
       .catch(() => {
         if (!cancelled) applyAuthPayload(null)
@@ -83,14 +80,14 @@ export function useToolSession() {
     }
   }, [applyAuthPayload])
 
-  const refreshProfileWorkspace = useCallback(async (profile: UserGameAccount, mode: WorkspaceMode) => {
+  const refreshProfileWorkspace = useCallback(async (profile: UserGameAccount) => {
     setOpeningProfileId(profile.id)
     setWorkspaceLoadError(null)
     try {
       const data = await apiJson<AuthSuccessResponse>(`/api/user/workspace?profile_id=${encodeURIComponent(profile.id)}`, {
         fallbackMessage: '加载账号资料失败',
       })
-      applyAuthPayload(data, mode)
+      applyAuthPayload(data)
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : '加载账号资料失败，请稍后重试。'
       setWorkspaceLoadError(message)
@@ -108,13 +105,13 @@ export function useToolSession() {
         json: { ...patch, profile_id: activeProfile.id },
         fallbackMessage: '保存失败',
       })
-      applyAuthPayload(data, workspaceMode)
+      applyAuthPayload(data)
       return data
     }
     const request = workspacePatchQueueRef.current.then(runPatch, runPatch)
     workspacePatchQueueRef.current = request.then(() => undefined, () => undefined)
     return request
-  }, [activeProfile, applyAuthPayload, workspaceMode])
+  }, [activeProfile, applyAuthPayload])
 
   const setEliteOverrides = useCallback((next: Record<string, number>) => {
     setEliteOverridesState(next)
@@ -143,8 +140,6 @@ export function useToolSession() {
     activeCdkProfile,
     cdkProfiles,
     workspace,
-    workspaceMode,
-    setWorkspaceMode,
     license,
     setLicense,
     eliteOverrides,
