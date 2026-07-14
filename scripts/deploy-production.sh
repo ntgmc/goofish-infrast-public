@@ -7,8 +7,11 @@ BRANCH="${BRANCH:-main}"
 REMOTE="${REMOTE:-origin}"
 SERVICE_NAME="${SERVICE_NAME:-goofish-infrast-v1}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"
+PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 HEALTH_RETRIES="${HEALTH_RETRIES:-20}"
 HEALTH_DELAY_SECONDS="${HEALTH_DELAY_SECONDS:-3}"
+PUBLIC_SMOKE_RETRIES="${PUBLIC_SMOKE_RETRIES:-$HEALTH_RETRIES}"
+PUBLIC_SMOKE_DELAY_SECONDS="${PUBLIC_SMOKE_DELAY_SECONDS:-$HEALTH_DELAY_SECONDS}"
 LOCK_FILE="${LOCK_FILE:-/tmp/goofish-infrast-v1.deploy.lock}"
 INSTALL_COMMAND="${INSTALL_COMMAND:-npm ci}"
 BUILD_COMMAND="${BUILD_COMMAND:-npm run build}"
@@ -121,10 +124,27 @@ check_health() {
   return 1
 }
 
+check_public_smoke() {
+  local attempt
+
+  for attempt in $(seq 1 "$PUBLIC_SMOKE_RETRIES"); do
+    if node scripts/check-public-http-smoke.mjs "$PUBLIC_BASE_URL"; then
+      log "public HTTPS smoke test passed on attempt $attempt"
+      return 0
+    fi
+
+    log "public HTTPS smoke test attempt $attempt/$PUBLIC_SMOKE_RETRIES failed"
+    sleep "$PUBLIC_SMOKE_DELAY_SECONDS"
+  done
+
+  return 1
+}
+
 require_command git
 require_command npm
 require_command curl
 require_command grep
+require_command node
 require_command systemctl
 
 if [[ "$(id -u)" != "0" ]]; then
@@ -132,6 +152,8 @@ if [[ "$(id -u)" != "0" ]]; then
 fi
 
 check_systemctl_access
+
+[[ -n "$PUBLIC_BASE_URL" ]] || fail "PUBLIC_BASE_URL is required for the public HTTPS smoke test"
 
 mkdir -p "$(dirname "$LOCK_FILE")"
 exec 9>"$LOCK_FILE"
@@ -198,7 +220,11 @@ else
 fi
 
 if check_health; then
-  log "deployment complete: $before_sha -> $after_sha"
+  if check_public_smoke; then
+    log "deployment complete: $before_sha -> $after_sha"
+  else
+    fail "public HTTPS smoke test failed after deploying $after_sha; previous commit was $before_sha"
+  fi
 else
   run_systemctl status "$SERVICE_NAME" --no-pager --lines=50 || true
   fail "health check failed after deploying $after_sha; previous commit was $before_sha"

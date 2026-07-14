@@ -26,6 +26,7 @@ The default workflow assumes these production paths and names:
 APP_DIR=/opt/goofish-infrast-v1
 SERVICE_NAME=goofish-infrast-v1
 HEALTH_URL=http://127.0.0.1:3000/api/health
+PUBLIC_BASE_URL=https://maatool.com
 ```
 
 On the server, make sure the repository exists and the deploy script is
@@ -42,6 +43,7 @@ Run one manual deployment before enabling automatic deploys:
 APP_DIR=/opt/goofish-infrast-v1 \
 SERVICE_NAME=goofish-infrast-v1 \
 HEALTH_URL=http://127.0.0.1:3000/api/health \
+PUBLIC_BASE_URL=https://maatool.com \
 bash scripts/deploy-production.sh
 ```
 
@@ -86,6 +88,7 @@ API proxy snippet:
 
 ```bash
 sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
+sudo install -m 0644 deploy/nginx/goofish-static-files.conf /etc/nginx/snippets/goofish-static-files.conf
 ```
 
 Include it only in the production HTTPS/TLS `server {}` and never in the plain
@@ -94,6 +97,7 @@ HTTP redirect server:
 ```nginx
 include /etc/nginx/snippets/goofish-security-headers.conf;
 include /etc/nginx/snippets/goofish-api-production.conf;
+include /etc/nginx/snippets/goofish-static-files.conf;
 ```
 
 The snippet directly enforces CSP and adds one-year HSTS with
@@ -101,6 +105,12 @@ The snippet directly enforces CSP and adds one-year HSTS with
 responses. API responses are same-origin only and expose no CORS allow headers.
 After changing the site configuration, run `sudo nginx -t` and reload Nginx only
 after the validation succeeds.
+
+The static snippet owns `location ^~ /assets/` and `location /`. Remove any
+conflicting static or SPA fallback location from the HTTPS vhost before adding
+it. It re-includes the security header snippet inside both locations because
+Nginx otherwise drops inherited `add_header` directives after Cache-Control is
+defined locally. The HTTP redirect vhost remains unchanged.
 
 ## GitHub Settings
 
@@ -123,6 +133,7 @@ your server:
 | `DEPLOY_SCRIPT` | `/opt/goofish-infrast-v1/scripts/deploy-production.sh` |
 | `DEPLOY_SERVICE_NAME` | `goofish-infrast-v1` |
 | `DEPLOY_HEALTH_URL` | `http://127.0.0.1:3000/api/health` |
+| `DEPLOY_PUBLIC_BASE_URL` | `https://maatool.com` |
 
 To get the recommended `DEPLOY_KNOWN_HOSTS` value:
 
@@ -145,6 +156,8 @@ The deploy script is intentionally conservative:
   restarting the service.
 - It requires `/api/health` to return `ok=true` and, by default,
   `storage.type=postgres`.
+- It requires the public HTTPS smoke test to validate `/`, `/tool`,
+  `/api/health`, static asset cache headers, and a missing asset 404.
 
 Set `FORCE_DEPLOY=true` for a manual rebuild and restart when the server is
 already on the latest commit.
@@ -158,6 +171,7 @@ these commands on the server:
 ```bash
 sudo systemctl status goofish-infrast-v1 --no-pager --lines=50
 curl -fsS http://127.0.0.1:3000/api/health
+node scripts/check-public-http-smoke.mjs https://maatool.com
 ```
 
 Rollback should be explicit: check out the previous known-good commit on the
