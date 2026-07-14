@@ -51,20 +51,24 @@ function assertAtLeast(actual, expectedCount, label) {
 async function assertIndexes() {
   const result = await pool.query(
     `select indexname from pg_indexes
-     where tablename in ('cdk_records', 'usage_events')
+     where tablename in ('cdk_records', 'usage_events', 'user_game_accounts')
      and indexname = any($1::text[])`,
     [
       [
         'idx_cdk_records_status',
         'idx_cdk_records_license_order_hash',
+        'uq_cdk_records_license_order_hash',
         'idx_usage_events_date',
         'idx_usage_events_event',
+        'uq_user_game_accounts_cdk_code_hash',
       ],
     ],
   )
-  if (result.rows.length !== 4) {
+  if (result.rows.length !== 6) {
     throw new Error('missing required migration indexes')
   }
+  const idempotencyTable = await pool.query("select to_regclass('public.cdk_redemption_idempotency') as name")
+  if (!idempotencyTable.rows[0]?.name) throw new Error('missing cdk_redemption_idempotency table')
 }
 
 async function verifyLicenseStatusIfConfigured() {

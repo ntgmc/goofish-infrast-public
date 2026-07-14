@@ -26,7 +26,7 @@ export default async (req: Request): Promise<Response> => {
     if (pathname.endsWith('/register')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       const body = await req.json() as { email?: unknown; password?: unknown; cdk?: unknown }
-      const registered = await registerUser(body.email, body.password, body.cdk)
+      const registered = await registerUser(body.email, body.password, body.cdk, req.headers.get('Idempotency-Key'))
       if (!registered.ok) {
         await recordRegister('failure', startedAt)
         return jsonResponse({ error: registered.message }, registered.status)
