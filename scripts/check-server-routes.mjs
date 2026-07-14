@@ -26,6 +26,8 @@ const expectedRoutes = [
   '/api/user/profiles/depot-value',
   '/api/user/profiles/preview',
   '/api/user/profiles/redeem',
+  '/api/user/skland/account/select',
+  '/api/user/skland/free-preview/account/select',
   '/api/user/skland/free-preview/credential/preview',
   '/api/user/skland/free-preview/login/complete',
   '/api/user/skland/free-preview/login/confirm',

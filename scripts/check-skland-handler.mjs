@@ -28,6 +28,7 @@ await assertPendingComplete()
 await assertCompleteRequiresConfirmation()
 await assertManualCredentialPreview()
 await assertBlankDefaultUidCredentialPreview()
+await assertMultiAccountSelection()
 await assertManualCredentialConfirm()
 await assertCookieCredentialPreview()
 await assertEncodedCredentialPreview()
@@ -46,6 +47,7 @@ await assertRepeatedMismatchFreezesProfile()
 await assertSchemaChangeError()
 await assertUnbindRouteRemoved()
 await assertFreePreviewScanClaim()
+await assertFreePreviewMultiAccountSelection()
 await assertFreePreviewCredentialClaimAndUidUniqueness()
 
 console.log('skland handler smoke check ok')
@@ -165,6 +167,165 @@ async function assertBlankDefaultUidCredentialPreview() {
   }
   if (store.fetchCalls.some((url) => url.includes('/api/v1/game/player/info?uid=434207645'))) {
     throw new Error('blank defaultUid preview: should ignore Endfield uid')
+  }
+}
+
+async function assertMultiAccountSelection() {
+  seedProfile({ id: 'profile-multi-scan', status: 'active' })
+  setFetchMode('multi-account')
+  const scanSelection = await callSkland('/api/user/skland/login/complete', {
+    profile_id: 'profile-multi-scan',
+    scan_id: 'scan-1',
+  })
+  if (scanSelection.status !== 200 || scanSelection.body.status !== 'account_selection_required' || !scanSelection.body.selection_id) {
+    throw new Error(`multi-account scan selection: invalid response ${scanSelection.status}`)
+  }
+  if (store.fetchCalls.some((url) => url.includes('/api/v1/game/player/info'))) {
+    throw new Error('multi-account scan selection: should not read player info before account selection')
+  }
+
+  seedProfile({ id: 'profile-multi', status: 'active' })
+  setFetchMode('multi-account')
+  const beforeCount = store.workspaces.get('profile-multi')?.operators?.length
+  const selection = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-multi',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  assertNoSecretLeak(selection.body, 'multi-account selection response')
+  if (
+    selection.status !== 200
+    || selection.body.status !== 'account_selection_required'
+    || !selection.body.selection_id
+    || selection.body.skland_accounts?.length !== 2
+  ) {
+    throw new Error(`multi-account selection: invalid response ${selection.status}: ${JSON.stringify(selection.body)}`)
+  }
+  if (selection.body.skland_accounts[0]?.uid !== '12345678' || !selection.body.skland_accounts[0]?.is_default) {
+    throw new Error('multi-account selection: default account should be listed first and marked')
+  }
+  if (store.fetchCalls.some((url) => url.includes('/api/v1/game/player/info'))) {
+    throw new Error('multi-account selection: should not read player info before an account is selected')
+  }
+  if (store.profiles.get('profile-multi')?.skland_pending_binding?.stage !== 'account_selection') {
+    throw new Error('multi-account selection: encrypted selection state was not stored')
+  }
+  if (store.workspaces.get('profile-multi')?.operators?.length !== beforeCount) {
+    throw new Error('multi-account selection: workspace changed before confirmation')
+  }
+
+  const preview = await callSkland('/api/user/skland/account/select', {
+    profile_id: 'profile-multi',
+    selection_id: selection.body.selection_id,
+    uid: '87654321',
+  })
+  assertNoSecretLeak(preview.body, 'multi-account selected preview response')
+  if (preview.status !== 200 || preview.body.status !== 'confirm_required' || preview.body.skland_preview?.uid !== '87654321') {
+    throw new Error(`multi-account selection: selected preview invalid ${preview.status}: ${JSON.stringify(preview.body)}`)
+  }
+  if (!store.fetchCalls.some((url) => url.includes('/api/v1/game/player/info?uid=87654321'))) {
+    throw new Error('multi-account selection: player info should use selected non-default uid')
+  }
+
+  const confirm = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-multi',
+    confirmation_id: preview.body.confirmation_id,
+  })
+  if (confirm.status !== 200 || confirm.body.active_profile?.skland_binding?.uid !== '87654321') {
+    throw new Error(`multi-account selection: final binding did not preserve selected uid ${confirm.status}`)
+  }
+
+  setFetchMode('multi-account')
+  const rebind = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-multi',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  if (rebind.status !== 200 || rebind.body.status !== 'confirm_required' || rebind.body.skland_preview?.uid !== '87654321') {
+    throw new Error('multi-account rebind: an existing profile should automatically keep its bound uid')
+  }
+  if (rebind.body.selection_id) {
+    throw new Error('multi-account rebind: an existing profile must not offer a uid switch')
+  }
+  const wrongStage = await callSkland('/api/user/skland/account/select', {
+    profile_id: 'profile-multi',
+    selection_id: rebind.body.confirmation_id,
+    uid: '87654321',
+  })
+  if (wrongStage.status !== 400 || store.profiles.get('profile-multi')?.skland_pending_binding?.stage !== 'confirmation') {
+    throw new Error('multi-account selection: confirmation records must not be accepted as selection records')
+  }
+
+  setFetchMode('multi-account')
+  const refresh = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-multi' })
+  if (refresh.status !== 200 || refresh.body.active_profile?.skland_binding?.uid !== '87654321') {
+    throw new Error('multi-account refresh: stored uid should remain bound when defaultUid points elsewhere')
+  }
+  if (!store.fetchCalls.some((url) => url.includes('/api/v1/game/player/info?uid=87654321'))) {
+    throw new Error('multi-account refresh: player info should use the stored bound uid')
+  }
+
+  seedProfile({ id: 'depot-multi', status: 'active' })
+  store.profiles.set('depot-multi', { ...store.profiles.get('depot-multi'), kind: 'depot_value' })
+  store.workspaces.delete('depot-multi')
+  setFetchMode('multi-account')
+  const depotSelection = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'depot-multi',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  const depotPreview = await callSkland('/api/user/skland/account/select', {
+    profile_id: 'depot-multi',
+    selection_id: depotSelection.body.selection_id,
+    uid: '87654321',
+  })
+  const depotConfirm = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'depot-multi',
+    confirmation_id: depotPreview.body.confirmation_id,
+  })
+  if (depotConfirm.status !== 200 || depotConfirm.body.active_profile?.skland_binding?.uid !== '87654321') {
+    throw new Error('multi-account depot selection: selected uid was not saved')
+  }
+  if (store.workspaces.has('depot-multi')) {
+    throw new Error('multi-account depot selection: depot confirmation should not write a workspace')
+  }
+
+  seedProfile({ id: 'profile-multi-invalid', status: 'active' })
+  setFetchMode('multi-account')
+  const invalidSelection = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-multi-invalid',
+    credential_text: 'manual-skland-cred',
+  })
+  const invalidUid = await callSkland('/api/user/skland/account/select', {
+    profile_id: 'profile-multi-invalid',
+    selection_id: invalidSelection.body.selection_id,
+    uid: '99999999',
+  })
+  if (invalidUid.status !== 400 || store.profiles.get('profile-multi-invalid')?.skland_pending_binding) {
+    throw new Error('multi-account selection: invalid uid should clear pending selection without importing')
+  }
+
+  seedProfile({ id: 'profile-multi-expired', status: 'active' })
+  setFetchMode('multi-account')
+  const expiredSelection = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-multi-expired',
+    credential_text: 'manual-skland-cred',
+  })
+  const expiredProfile = store.profiles.get('profile-multi-expired')
+  store.profiles.set('profile-multi-expired', {
+    ...expiredProfile,
+    skland_pending_binding: {
+      ...expiredProfile.skland_pending_binding,
+      expires_at: '2000-01-01T00:00:00.000Z',
+    },
+  })
+  const expired = await callSkland('/api/user/skland/account/select', {
+    profile_id: 'profile-multi-expired',
+    selection_id: expiredSelection.body.selection_id,
+    uid: '87654321',
+  })
+  if (expired.status !== 400 || store.profiles.get('profile-multi-expired')?.skland_pending_binding) {
+    throw new Error('multi-account selection: expired selection should be rejected and cleared')
   }
 }
 
@@ -616,6 +777,46 @@ async function assertFreePreviewScanClaim() {
   }
 }
 
+async function assertFreePreviewMultiAccountSelection() {
+  const originalUser = store.user
+  store.user = {
+    ...originalUser,
+    id: 'user-free-multi',
+    email: 'free-multi@example.test',
+  }
+  try {
+    const profileCountBefore = store.profiles.size
+    setFetchMode('multi-account')
+    const selection = await callSkland('/api/user/skland/free-preview/credential/preview', {
+      credential_text: 'manual-skland-cred',
+      source: 'bookmarklet',
+      display_name: '免费多账号领取',
+    })
+    assertNoSecretLeak(selection.body, 'free preview multi-account selection response')
+    if (selection.status !== 200 || selection.body.status !== 'account_selection_required' || !selection.body.selection_id) {
+      throw new Error(`免费档案多账号选择：预期选择账号，实际 ${selection.status}`)
+    }
+    if (store.profiles.size !== profileCountBefore) {
+      throw new Error('免费档案多账号选择：选择前不应创建档案')
+    }
+    const preview = await callSkland('/api/user/skland/free-preview/account/select', {
+      selection_id: selection.body.selection_id,
+      uid: '12345678',
+    })
+    if (preview.status !== 200 || preview.body.status !== 'confirm_required' || preview.body.skland_preview?.uid !== '12345678') {
+      throw new Error(`免费档案多账号选择：所选预览无效 ${preview.status}`)
+    }
+    const confirm = await callSkland('/api/user/skland/free-preview/login/confirm', {
+      confirmation_id: preview.body.confirmation_id,
+    })
+    if (confirm.status !== 200 || confirm.body.active_profile?.skland_binding?.uid !== '12345678') {
+      throw new Error(`免费档案多账号选择：最终绑定 UID 无效 ${confirm.status}`)
+    }
+  } finally {
+    store.user = originalUser
+  }
+}
+
 async function assertFreePreviewCredentialClaimAndUidUniqueness() {
   const originalUser = store.user
   store.user = {
@@ -762,6 +963,30 @@ function setFetchMode(mode) {
     }
     if (textUrl.endsWith('/api/v1/game/player/binding')) {
       const mismatch = mode === 'mismatch'
+      if (mode === 'multi-account') {
+        return jsonResponse({
+          code: 0,
+          message: 'OK',
+          data: {
+            list: [{
+              appCode: 'arknights',
+              defaultUid: '12345678',
+              bindingList: [{
+                uid: '12345678',
+                nickName: '默认博士',
+                channelName: '官服',
+              }, {
+                uid: '87654321',
+                nickName: '另一个博士',
+                channelName: 'B服',
+              }],
+            }, {
+              appCode: 'endfield',
+              bindingList: [{ uid: '434207645', nickName: '终末地博士', channelName: '官服' }],
+            }],
+          },
+        })
+      }
       if (mode === 'blank-default-uid') {
         return jsonResponse({
           code: 0,

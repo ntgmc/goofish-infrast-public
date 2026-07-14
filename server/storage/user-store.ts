@@ -70,16 +70,37 @@ export interface SklandBindingRecord {
   credential_invalid_reason?: SklandCredentialInvalidReason | null
 }
 
-export interface SklandPendingBindingRecord {
-  confirmation_id: string
+export interface SklandPendingAccountOption {
   uid: string
   nickname: string
   channel_name: string
+  is_default: boolean
+}
+
+interface SklandPendingBindingBase {
+  confirmation_id: string
   encrypted_cred: string
-  operator_count: number
   created_at: string
   expires_at: string
 }
+
+export interface SklandPendingAccountSelectionRecord extends SklandPendingBindingBase {
+  stage: 'account_selection'
+  accounts: SklandPendingAccountOption[]
+  source?: 'manual' | 'bookmarklet'
+}
+
+export interface SklandPendingConfirmationRecord extends SklandPendingBindingBase {
+  stage?: 'confirmation'
+  uid: string
+  nickname: string
+  channel_name: string
+  operator_count: number
+}
+
+export type SklandPendingBindingRecord =
+  | SklandPendingAccountSelectionRecord
+  | SklandPendingConfirmationRecord
 
 export interface SklandRiskRecord {
   uid_mismatch_count: number
@@ -98,19 +119,33 @@ export interface FreePreviewClaimRecord {
   channel_name?: string
 }
 
-export interface FreePreviewPendingClaimRecord {
+interface FreePreviewPendingClaimBase {
   confirmation_id: string
   user_id: string
-  uid: string
-  nickname: string
-  channel_name: string
   encrypted_cred: string
-  operator_count: number
   display_name: string
   note: string
   created_at: string
   expires_at: string
 }
+
+export interface FreePreviewPendingAccountSelectionRecord extends FreePreviewPendingClaimBase {
+  stage: 'account_selection'
+  accounts: SklandPendingAccountOption[]
+  source?: 'manual' | 'bookmarklet'
+}
+
+export interface FreePreviewPendingConfirmationRecord extends FreePreviewPendingClaimBase {
+  stage?: 'confirmation'
+  uid: string
+  nickname: string
+  channel_name: string
+  operator_count: number
+}
+
+export type FreePreviewPendingClaimRecord =
+  | FreePreviewPendingAccountSelectionRecord
+  | FreePreviewPendingConfirmationRecord
 
 export interface UserSessionRecord {
   version: 1

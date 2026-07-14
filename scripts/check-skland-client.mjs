@@ -96,6 +96,27 @@ globalThis.fetch = async (url, init) => {
     return jsonResponse({ code: 0, message: 'OK', data: { token: 'skland-token' }, timestamp: 1700000000 })
   }
   if (String(url).endsWith('/api/v1/game/player/binding')) {
+    if (init?.headers?.cred === 'multi-account-cred') {
+      return jsonResponse({
+        code: 0,
+        message: 'OK',
+        data: {
+          list: [{
+            appCode: 'arknights',
+            defaultUid: '22222222',
+            bindingList: [
+              { uid: '11111111', nickName: '账号一', channelName: '官服' },
+              { uid: '22222222', nickName: '账号二', channelName: 'B服' },
+              { uid: '11111111', nickName: '重复账号', channelName: '官服' },
+              { uid: '', nickName: '无效账号', channelName: '官服' },
+            ],
+          }, {
+            appCode: 'endfield',
+            bindingList: [{ uid: '33333333', nickName: '终末地账号', channelName: '官服' }],
+          }],
+        },
+      })
+    }
     if (init?.headers?.cred === 'blank-default-uid-cred') {
       return jsonResponse({
         code: 0,
@@ -187,7 +208,7 @@ const accountToken = await skland.getHypergryphTokenByScanCode('scan-code-1')
 const cred = await skland.getCredByHypergryphToken(accountToken)
 if (cred !== 'skland-cred') throw new Error('cred exchange failed')
 const cultivateCallsBeforeDefaultImport = calls.filter((call) => String(call.url).includes('/api/v1/game/cultivate/')).length
-const imported = await skland.importSklandOperatorsByCred(cred)
+const imported = await skland.importSklandOperatorsByCred(cred, { uid: '12345678' })
 if (imported.binding.uid !== '12345678' || imported.operators.length !== 1) {
   throw new Error('skland import flow failed')
 }
@@ -195,14 +216,14 @@ const cultivateCallsAfterDefaultImport = calls.filter((call) => String(call.url)
 if (cultivateCallsAfterDefaultImport !== cultivateCallsBeforeDefaultImport) {
   throw new Error('default skland import should not read cultivate inventory')
 }
-const importedWithInventory = await skland.importSklandOperatorsByCred(cred, { includeInventory: true })
+const importedWithInventory = await skland.importSklandOperatorsByCred(cred, { uid: '12345678', includeInventory: true })
 if (
   importedWithInventory.intermediateInventory?.['Pure Gold'] !== 123 ||
   importedWithInventory.intermediateInventory?.['Originium Shard'] !== 45
 ) {
   throw new Error(`skland import should read intermediate inventory, got ${JSON.stringify(importedWithInventory.intermediateInventory)}`)
 }
-const blankDefaultUidImported = await skland.importSklandOperatorsByCred('blank-default-uid-cred')
+const blankDefaultUidImported = await skland.importSklandOperatorsByCred('blank-default-uid-cred', { uid: '130761348' })
 if (
   blankDefaultUidImported.binding.uid !== '130761348'
   || blankDefaultUidImported.binding.nickname !== 'Blank Default Doctor'
@@ -217,6 +238,33 @@ if (!calls.some((call) => String(call.url).endsWith('/api/v1/game/player/info?ui
 if (calls.some((call) => String(call.url).endsWith('/api/v1/game/player/info?uid=434207645'))) {
   throw new Error('blank defaultUid import should ignore Endfield uid')
 }
+const multiAccounts = await skland.listSklandArknightsBindingsByCred('multi-account-cred')
+if (
+  multiAccounts.length !== 2
+  || multiAccounts[0].uid !== '22222222'
+  || !multiAccounts[0].is_default
+  || multiAccounts[1].uid !== '11111111'
+  || multiAccounts[1].is_default
+) {
+  throw new Error(`multi-account binding parsing failed: ${JSON.stringify(multiAccounts)}`)
+}
+const selectedImport = await skland.importSklandOperatorsByCred('multi-account-cred', { uid: '11111111', includeInventory: true })
+if (selectedImport.binding.uid !== '11111111') {
+  throw new Error(`explicit account selection imported the wrong uid: ${selectedImport.binding.uid}`)
+}
+if (!calls.some((call) => String(call.url).endsWith('/api/v1/game/player/info?uid=11111111'))) {
+  throw new Error('explicit account selection should read player info for the selected uid')
+}
+if (!calls.some((call) => String(call.url).endsWith('/api/v1/game/cultivate/player?uid=11111111'))) {
+  throw new Error('explicit account selection should read inventory for the selected uid')
+}
+let rejectedUnknownUid = false
+try {
+  await skland.importSklandOperatorsByCred('multi-account-cred', { uid: '99999999' })
+} catch (error) {
+  rejectedUnknownUid = String(error?.message ?? error).includes('不在森空岛绑定列表')
+}
+if (!rejectedUnknownUid) throw new Error('unknown selected uid should be rejected')
 const refreshCallsBeforeCultivate = calls.filter((call) => String(call.url).endsWith('/api/v1/auth/refresh')).length
 const cultivateClient = new skland.SklandClient('cultivate-cred')
 await cultivateClient.getCultivateInfo()
