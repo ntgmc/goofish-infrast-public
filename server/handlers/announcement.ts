@@ -9,7 +9,7 @@ import type { AnnouncementStats } from '../../src/lib/types'
 
 const ANNOUNCEMENT_KEY = 'current.json'
 const MAX_TITLE_LENGTH = 80
-const MAX_BODY_LENGTH = 600
+export const MAX_BODY_LENGTH = 5000
 const VALID_KINDS = new Set<AnnouncementKind>(['banner', 'popup'])
 
 interface AnnouncementData {
@@ -154,7 +154,7 @@ async function buildAnnouncementStats(announcements: Announcement[]): Promise<Re
   }))
 }
 
-function validateAnnouncementList(
+export function validateAnnouncementList(
   value: unknown,
   current: Announcement[],
 ): { ok: true; announcements: Announcement[] } | { ok: false; message: string } {
@@ -179,7 +179,7 @@ function validateAnnouncementList(
     }
 
     const title = typeof item.title === 'string' ? item.title.trim() : ''
-    const body = typeof item.body === 'string' ? item.body.trim() : ''
+    const body = typeof item.body === 'string' ? item.body : ''
     const active = item.active === true
 
     if (title.length > MAX_TITLE_LENGTH) {
@@ -188,7 +188,7 @@ function validateAnnouncementList(
     if (body.length > MAX_BODY_LENGTH) {
       return { ok: false, message: `第 ${index + 1} 条公告正文不能超过 ${MAX_BODY_LENGTH} 字。` }
     }
-    if (active && (!title || !body)) {
+    if (active && (!title || !body.trim())) {
       return { ok: false, message: `第 ${index + 1} 条公告启用时必须填写标题和正文。` }
     }
 
@@ -255,7 +255,7 @@ function normalizeAnnouncementItem(value: unknown): Announcement | null {
   const kind = normalizeKind(value.kind)
   if (!kind) return null
   const title = typeof value.title === 'string' ? value.title.trim() : ''
-  const body = typeof value.body === 'string' ? value.body.trim() : ''
+  const body = typeof value.body === 'string' ? value.body : ''
   const now = new Date().toISOString()
 
   return {
@@ -273,7 +273,7 @@ function normalizeLegacyAnnouncement(value: unknown): Announcement | null {
   if (!isRecord(value)) return null
   const legacy = value as LegacyAnnouncement
   const title = typeof legacy.title === 'string' ? legacy.title.trim() : ''
-  const body = typeof legacy.body === 'string' ? legacy.body.trim() : ''
+  const body = typeof legacy.body === 'string' ? legacy.body : ''
   const updatedAt = normalizeIsoString(legacy.updated_at) ?? new Date().toISOString()
 
   if (!title && !body && legacy.enabled !== true) return null
