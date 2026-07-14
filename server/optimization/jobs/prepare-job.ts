@@ -152,8 +152,13 @@ export async function prepareOptimizeJob(
 
       if (riskCheckedRecord !== checkedCdkRecord) {
         const store = await getCdkRecordStore();
-        await store.set('cdk/' + riskCheckedRecord.code_hash + '.json', riskCheckedRecord);
-        checkedCdkRecord = riskCheckedRecord;
+        checkedCdkRecord = await store.mutate('cdk/' + riskCheckedRecord.code_hash + '.json', (current) => ({
+          ...current,
+          activation_token_hash: riskCheckedRecord.activation_token_hash,
+          bound_user_agent_hash: riskCheckedRecord.bound_user_agent_hash,
+          user_agent_events: riskCheckedRecord.user_agent_events,
+          ip_prefix_events: riskCheckedRecord.ip_prefix_events,
+        })) ?? checkedCdkRecord;
       }
     }
 

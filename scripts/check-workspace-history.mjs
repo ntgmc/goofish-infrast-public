@@ -1299,7 +1299,7 @@ function memoryLicenseUtilsModule() {
     export function formatRiskFreezeMessage(message) { return message }
     export async function freezeCdkRecord(record) { return record }
     export function getPermissionMode(license) { return license?.permission ?? 'advanced' }
-    export async function getCdkRecordStore() { return { get: async () => null, set: async () => undefined } }
+    export async function getCdkRecordStore() { return { get: async () => null, mutate: async () => null } }
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, device_risk_enabled: false, updated_at: null } }
     export async function findCdkRecordByLicenseOrderHash() { return null }
     export async function incrementCdkScheduleGenerateCount() {}

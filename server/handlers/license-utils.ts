@@ -148,7 +148,13 @@ export interface CdkRecord {
 export interface CdkRecordStore {
   get: (key: string) => Promise<CdkRecord | null>;
   getByLicenseOrderHash: (orderHash: string) => Promise<CdkRecord | null>;
-  set: (key: string, record: CdkRecord) => Promise<void>;
+  create: (key: string, record: CdkRecord) => Promise<void>;
+  mutate: (
+    key: string,
+    mutate: (current: CdkRecord) => CdkRecord | null,
+    options?: { allowedStatuses?: CdkStatus[] },
+  ) => Promise<CdkRecord | null>;
+  incrementScheduleGenerateCount: (key: string) => Promise<boolean>;
   delete: (key: string) => Promise<void>;
   list: (prefix: string) => Promise<CdkRecord[]>;
 }
@@ -525,10 +531,7 @@ export async function findCdkRecordByCode(code: string, hashSecret: string): Pro
 
 export async function incrementCdkScheduleGenerateCount(record: CdkRecord): Promise<void> {
   const store = await getCdkRecordStore()
-  await store.set(`cdk/${record.code_hash}.json`, {
-    ...record,
-    schedule_generate_count: (record.schedule_generate_count ?? 0) + 1,
-  })
+  await store.incrementScheduleGenerateCount(`cdk/${record.code_hash}.json`)
 }
 
 export function getOperatorUpdateGrantRemaining(record: CdkRecord | null | undefined): number {
@@ -551,15 +554,13 @@ export function hasOperatorUpdateGrant(record: CdkRecord | null | undefined): bo
 
 export async function consumeOperatorUpdateGrant(record: CdkRecord, operatorCount: number): Promise<CdkRecord> {
   const consumedAt = new Date().toISOString()
-  const updated: CdkRecord = {
-    ...record,
-    operator_count: operatorCount,
-    operator_update_used_count: (record.operator_update_used_count ?? 0) + 1,
-    operator_update_consumed_at: consumedAt,
-  }
   const store = await getCdkRecordStore()
-  await store.set(`cdk/${record.code_hash}.json`, updated)
-  return updated
+  return (await store.mutate(`cdk/${record.code_hash}.json`, (current) => ({
+    ...current,
+    operator_count: operatorCount,
+    operator_update_used_count: (current.operator_update_used_count ?? 0) + 1,
+    operator_update_consumed_at: consumedAt,
+  }), { allowedStatuses: ['used'] })) ?? record
 }
 
 const ADVANCED_UPDATE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
@@ -713,42 +714,37 @@ export async function recordSoftBlockedRiskEvent(
       soft_block: true,
     },
   }
-  const riskEvents = [...(record.risk_events ?? []), softEvent].slice(-20)
-  const cutoff = Date.parse(now) - SOFT_BLOCK_WINDOW_MS
-  const softBlockCount = riskEvents.filter((item) => {
-    const at = Date.parse(item.at)
-    return Number.isFinite(at) && at > cutoff && item.detail?.soft_block === true
-  }).length
-  const updated: CdkRecord = {
-    ...record,
-    risk_events: riskEvents,
-  }
-
-  if (softBlockCount >= SOFT_BLOCK_FREEZE_COUNT) {
-    const thresholdEvent: RiskEvent = {
-      at: now,
-      type: 'soft_block_threshold',
-      reason: `24 小时内第 ${SOFT_BLOCK_FREEZE_COUNT} 次尝试被拦截。最近原因：${event.reason}`,
-      detail: {
-        soft_block_count: softBlockCount,
-        latest_block_type: event.type,
-      },
-    }
-    const thresholdUpdated: CdkRecord = {
-      ...updated,
-      risk_events: [...(updated.risk_events ?? []), thresholdEvent].slice(-20),
-    }
-    const store = await getCdkRecordStore()
-    await store.set(`cdk/${record.code_hash}.json`, thresholdUpdated)
-    return {
-      frozen: true,
-      record: thresholdUpdated,
-      message: formatRiskFreezeMessage(thresholdEvent.reason),
-    }
-  }
-
   const store = await getCdkRecordStore()
-  await store.set(`cdk/${record.code_hash}.json`, updated)
+  let thresholdReason: string | null = null
+  const updated = await store.mutate(`cdk/${record.code_hash}.json`, (current) => {
+    const riskEvents = [...(current.risk_events ?? []), softEvent].slice(-20)
+    const cutoff = Date.parse(now) - SOFT_BLOCK_WINDOW_MS
+    const softBlockCount = riskEvents.filter((item) => {
+      const at = Date.parse(item.at)
+      return Number.isFinite(at) && at > cutoff && item.detail?.soft_block === true
+    }).length
+    if (softBlockCount < SOFT_BLOCK_FREEZE_COUNT) return { ...current, risk_events: riskEvents }
+
+    thresholdReason = `24 小时内第 ${SOFT_BLOCK_FREEZE_COUNT} 次尝试被拦截。最近原因：${event.reason}`
+    return {
+      ...current,
+      risk_events: [...riskEvents, {
+        at: now,
+        type: 'soft_block_threshold',
+        reason: thresholdReason,
+        detail: { soft_block_count: softBlockCount, latest_block_type: event.type },
+      }].slice(-20),
+    }
+  })
+  if (!updated || updated.status === 'revoked') {
+    return { frozen: true, record: updated ?? record, message: updated?.freeze_reason || '授权已撤销。' }
+  }
+  if (thresholdReason) {
+    return { frozen: true, record: updated, message: formatRiskFreezeMessage(thresholdReason) }
+  }
+  if (updated.status === 'frozen') {
+    return { frozen: true, record: updated, message: updated.freeze_reason || formatRiskFreezeMessage(thresholdReason || event.reason) }
+  }
   return {
     frozen: false,
     record: updated,
@@ -848,8 +844,19 @@ export async function syncAdvancedCdkBinding(
   }
   if (binding.record === record) return { ok: true, record }
   const store = await getCdkRecordStore()
-  await store.set(`cdk/${record.code_hash}.json`, binding.record)
-  return { ok: true, record: binding.record }
+  const updated = await store.mutate(`cdk/${record.code_hash}.json`, (current) => ({
+    ...current,
+    activation_token_hash: binding.record.activation_token_hash,
+    bound_user_agent_hash: binding.record.bound_user_agent_hash,
+    user_agent_events: binding.record.user_agent_events,
+    ip_prefix_events: binding.record.ip_prefix_events,
+    baseline_operator_fingerprint: current.baseline_operator_fingerprint ?? binding.record.baseline_operator_fingerprint,
+    latest_operator_fingerprint: binding.record.latest_operator_fingerprint,
+  }))
+  if (!updated || updated.status !== 'used') {
+    return { ok: false, status: 403, message: updated?.freeze_reason || 'License is no longer active.', record: updated ?? record }
+  }
+  return { ok: true, record: updated }
 }
 
 export async function recordAdvancedOperatorUpdate(
@@ -909,51 +916,48 @@ export async function recordAdvancedOperatorUpdate(
 
   const now = new Date().toISOString()
   const cutoff = Date.now() - ADVANCED_UPDATE_WINDOW_MS
-  const updateEvents = [
-    ...(bindingRecord.operator_update_events ?? []).filter((event) => Date.parse(event.at) > cutoff),
-    {
-      at: now,
-      operator_count: operators.length,
-      fingerprint_hash: operatorRisk.fingerprint.hash,
-    },
-  ]
-  const updated: CdkRecord = {
-    ...bindingRecord,
-    operator_count: operators.length,
-    baseline_operator_fingerprint: bindingRecord.baseline_operator_fingerprint ?? operatorRisk.fingerprint,
-    latest_operator_fingerprint: operatorRisk.fingerprint,
-    operator_update_events: updateEvents,
-  }
   const store = await getCdkRecordStore()
-  await store.set(`cdk/${record.code_hash}.json`, updated)
+  const updated = await store.mutate(`cdk/${record.code_hash}.json`, (current) => ({
+    ...current,
+    activation_token_hash: bindingRecord.activation_token_hash,
+    bound_user_agent_hash: bindingRecord.bound_user_agent_hash,
+    user_agent_events: bindingRecord.user_agent_events,
+    ip_prefix_events: bindingRecord.ip_prefix_events,
+    operator_count: operators.length,
+    baseline_operator_fingerprint: current.baseline_operator_fingerprint ?? operatorRisk.fingerprint,
+    latest_operator_fingerprint: operatorRisk.fingerprint,
+    operator_update_events: [
+      ...(current.operator_update_events ?? []).filter((event) => Date.parse(event.at) > cutoff),
+      { at: now, operator_count: operators.length, fingerprint_hash: operatorRisk.fingerprint.hash },
+    ],
+  }), { allowedStatuses: ['used'] })
+  if (!updated || updated.status !== 'used') {
+    return { ok: false, status: 403, message: updated?.freeze_reason || 'License is no longer active.', record: updated ?? record }
+  }
   return { ok: true, record: updated, limit: checkAdvancedOperatorUpdateLimit(updated).limit }
 }
 
 export async function freezeCdkRecord(record: CdkRecord, reason: string, event: RiskEvent): Promise<CdkRecord> {
   const frozenAt = event.at || new Date().toISOString()
   const freezeReason = formatRiskFreezeMessage(reason)
-  const updated: CdkRecord = {
-    ...record,
+  const store = await getCdkRecordStore()
+  return (await store.mutate(`cdk/${record.code_hash}.json`, (current) => ({
+    ...current,
     status: 'frozen',
     frozen_at: frozenAt,
     freeze_reason: freezeReason,
-    risk_events: [...(record.risk_events ?? []), event].slice(-20),
-  }
-  const store = await getCdkRecordStore()
-  await store.set(`cdk/${record.code_hash}.json`, updated)
-  return updated
+    risk_events: [...(current.risk_events ?? []), event].slice(-20),
+  }), { allowedStatuses: ['used', 'frozen'] })) ?? record
 }
 
 export async function unfreezeCdkRecord(record: CdkRecord): Promise<CdkRecord> {
-  const updated: CdkRecord = {
-    ...record,
+  const store = await getCdkRecordStore()
+  return (await store.mutate(`cdk/${record.code_hash}.json`, (current) => ({
+    ...current,
     status: 'used',
     frozen_at: null,
     freeze_reason: null,
-  }
-  const store = await getCdkRecordStore()
-  await store.set(`cdk/${record.code_hash}.json`, updated)
-  return updated
+  }), { allowedStatuses: ['frozen'] })) ?? record
 }
 
 function hashActivationToken(value: unknown): string | null {
