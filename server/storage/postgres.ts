@@ -1,4 +1,4 @@
-import { Pool, type QueryResult, type QueryResultRow } from 'pg'
+import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg'
 
 let pool: Pool | null = null
 const DEADLOCK_DETECTED = '40P01'
@@ -41,6 +41,30 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
         throw error
       }
       await sleep(retryDelayMs(attempt))
+    }
+  }
+}
+
+export async function withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+  let attempt = 0
+  while (true) {
+    const client = await getPool().connect()
+    try {
+      await client.query('begin')
+      const result = await work(client)
+      await client.query('commit')
+      return result
+    } catch (error) {
+      try {
+        await client.query('rollback')
+      } catch {
+        // Preserve the original transaction failure.
+      }
+      attempt += 1
+      if (!isRetriablePostgresError(error) || attempt > MAX_QUERY_RETRIES) throw error
+      await sleep(retryDelayMs(attempt))
+    } finally {
+      client.release()
     }
   }
 }

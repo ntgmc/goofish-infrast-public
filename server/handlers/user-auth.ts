@@ -42,6 +42,15 @@ import {
   requireEnv,
   type CdkRecord,
 } from './license-utils'
+import {
+  CdkAlreadyRedeemedError,
+  IdempotencyConflictError,
+  createRequestHash,
+  hasCompletedIdempotentRedemption,
+  redeemCdkAtomically,
+  saveProfileInTransaction,
+  saveWorkspaceInTransaction,
+} from '../storage/cdk-redemption'
 
 const SESSION_COOKIE = 'maa_session'
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
@@ -89,6 +98,7 @@ export async function registerUser(
   emailValue: unknown,
   passwordValue: unknown,
   cdkValue?: unknown,
+  idempotencyKey?: string | null,
 ): Promise<
   | { ok: true; user: UserAccountRecord; cookie: string }
   | { ok: false; status: number; message: string }
@@ -98,7 +108,24 @@ export async function registerUser(
   const passwordCheck = validatePassword(passwordValue)
   if (!passwordCheck.ok) return { ok: false, status: 400, message: passwordCheck.message }
   const existing = await getUserByEmail(email)
-  if (existing) return { ok: false, status: 409, message: 'Email is already registered.' }
+  const normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey)
+  const registrationRequestHash = typeof cdkValue === 'string' && cdkValue.trim()
+    ? createRequestHash({ code: normalizeCode(cdkValue), email, password: passwordCheck.password })
+    : null
+  if (existing) {
+    if (!normalizedIdempotencyKey || !registrationRequestHash) return { ok: false, status: 409, message: 'Email is already registered.' }
+    try {
+      const replayed = await hasCompletedIdempotentRedemption(`register:${email}`, normalizedIdempotencyKey, registrationRequestHash)
+      if (!replayed) return { ok: false, status: 409, message: 'Email is already registered.' }
+      const passwordVerification = await verifyPasswordHash(passwordCheck.password, existing)
+      if (!passwordVerification.verified) return { ok: false, status: 401, message: 'Invalid email or password.' }
+      const session = await createSession(existing.id)
+      return { ok: true, user: existing, cookie: session.cookie }
+    } catch (error) {
+      if (error instanceof IdempotencyConflictError) return { ok: false, status: 409, message: error.message }
+      throw error
+    }
+  }
 
   const now = new Date().toISOString()
   const passwordHash = await createPasswordHash(passwordCheck.password)
@@ -118,12 +145,9 @@ export async function registerUser(
     created_at: now,
     updated_at: now,
   }
-  await saveUserAccount(user)
-
   if (typeof cdkValue === 'string' && cdkValue.trim()) {
-    const redeemed = await redeemProfileCdk(user, cdkValue, '账号 1', '')
+    const redeemed = await redeemRegistrationCdk(user, cdkValue, normalizedIdempotencyKey, registrationRequestHash!)
     if (!redeemed.ok) {
-      await deleteUserAccount(user.id)
       return redeemed
     }
     const primary = {
@@ -140,6 +164,8 @@ export async function registerUser(
     user.cdk_code_hash = primary.cdk_code_hash
     user.cdk_order_hash = primary.cdk_order_hash
     user.updated_at = primary.updated_at
+  } else {
+    await saveUserAccount(user)
   }
 
   const session = await createSession(user.id)
@@ -279,6 +305,7 @@ export async function redeemProfileCdk(
   codeValue: unknown,
   displayNameValue?: unknown,
   noteValue?: unknown,
+  idempotencyKey?: string | null,
 ): Promise<
   | { ok: true; profile: UserGameAccountRecord }
   | { ok: false; status: number; message: string }
@@ -290,51 +317,41 @@ export async function redeemProfileCdk(
   const normalizedCode = normalizeCode(codeValue)
   const codeHash = hashCdk(normalizedCode, requireEnv('CDK_HASH_SECRET'))
   const cdkKey = `cdk/${codeHash}.json`
-  const cdkStore = await getCdkRecordStore()
-  const cdkRecord = await cdkStore.get(cdkKey)
+  const cdkRecord = await (await getCdkRecordStore()).get(cdkKey)
   if (!cdkRecord) return { ok: false, status: 404, message: 'CDK does not exist.' }
-  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK is frozen.' }
-  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK has been revoked.' }
-  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK has already been used.' }
-
+  if (!idempotencyKey && cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK is frozen.' }
+  if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK has been revoked.' }
   const now = new Date().toISOString()
   const profileId = randomUUID()
-  const permission = normalizePermissionMode(cdkRecord.permission)
-  const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profileId)
   const displayName = normalizeProfileDisplayName(displayNameValue) || await nextDefaultProfileName(user.id)
   const note = normalizeProfileNote(noteValue)
-  const profile: UserGameAccountRecord = {
-    version: 1,
-    id: profileId,
-    user_id: user.id,
-    kind: 'cdk',
-    cdk_key: cdkKey,
-    cdk_code_hash: codeHash,
-    cdk_order_hash: cdkOrderHash,
-    permission,
-    status: 'active',
-    display_name: displayName,
-    note,
-    created_at: now,
-    updated_at: now,
+  try {
+    const redeemed = await redeemCdkAtomically({
+      key: cdkKey,
+      idempotencyKey: normalizeIdempotencyKey(idempotencyKey),
+      idempotencyScope: `profile:${user.id}`,
+      requestHash: createRequestHash({ codeHash, displayName, note }),
+      complete: async (client, cdkRecord) => {
+        const permission = normalizePermissionMode(cdkRecord.permission)
+        const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profileId)
+        const profile: UserGameAccountRecord = {
+          version: 1, id: profileId, user_id: user.id, kind: 'cdk', cdk_key: cdkKey, cdk_code_hash: codeHash,
+          cdk_order_hash: cdkOrderHash, permission, status: 'active', display_name: displayName, note, created_at: now, updated_at: now,
+        }
+        await saveProfileInTransaction(client, profile)
+        await saveWorkspaceInTransaction(client, emptyWorkspace(profile.id))
+        const record = {
+          ...cdkRecord, status: 'used' as const, used_at: now, license_order_hash: cdkOrderHash,
+          operator_count: cdkRecord.operator_count ?? null, config_desc: cdkRecord.config_desc ?? null,
+          account_id: user.id, profile_id: profile.id, account_email_hash: createHash('sha256').update(user.email).digest('hex'), bound_at: now,
+        }
+        return { record, response: profile }
+      },
+    })
+    return { ok: true, profile: redeemed.response }
+  } catch (error) {
+    return redemptionFailure(error, 'CDK has already been used.')
   }
-
-  await saveUserProfile(profile)
-  await saveProfileWorkspace(emptyWorkspace(profile.id))
-  await cdkStore.set(cdkKey, {
-    ...cdkRecord,
-    status: 'used',
-    used_at: now,
-    license_order_hash: cdkOrderHash,
-    operator_count: cdkRecord.operator_count ?? null,
-    config_desc: cdkRecord.config_desc ?? null,
-    account_id: user.id,
-    profile_id: profile.id,
-    account_email_hash: createHash('sha256').update(user.email).digest('hex'),
-    bound_at: now,
-  } as CdkRecord)
-
-  return { ok: true, profile }
 }
 
 export async function createOrReusePreviewProfile(
@@ -375,6 +392,7 @@ export async function upgradePreviewProfileWithCdk(
   codeValue: unknown,
   displayNameValue?: unknown,
   noteValue?: unknown,
+  idempotencyKey?: string | null,
 ): Promise<
   | { ok: true; profile: UserGameAccountRecord }
   | { ok: false; status: number; message: string }
@@ -384,10 +402,10 @@ export async function upgradePreviewProfileWithCdk(
   }
   const profile = await getProfileForUser(user.id, profileIdValue.trim())
   if (!profile) return { ok: false, status: 404, message: '档案不存在。' }
-  if (!isFreePreviewProfile(profile)) {
+  if (!idempotencyKey && !isFreePreviewProfile(profile)) {
     return { ok: false, status: 400, message: '只有免费个人排班档案可以原地升级。' }
   }
-  if (profile.status !== 'active') {
+  if (!idempotencyKey && profile.status !== 'active') {
     return { ok: false, status: 403, message: '档案当前不可用。' }
   }
   if (typeof codeValue !== 'string' || !codeValue.trim()) {
@@ -397,48 +415,99 @@ export async function upgradePreviewProfileWithCdk(
   const normalizedCode = normalizeCode(codeValue)
   const codeHash = hashCdk(normalizedCode, requireEnv('CDK_HASH_SECRET'))
   const cdkKey = `cdk/${codeHash}.json`
-  const cdkStore = await getCdkRecordStore()
-  const cdkRecord = await cdkStore.get(cdkKey)
+  const cdkRecord = await (await getCdkRecordStore()).get(cdkKey)
   if (!cdkRecord) return { ok: false, status: 404, message: 'CDK 不存在。' }
-  if (cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已被冻结。' }
-  if (cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已被撤销。' }
-  if (cdkRecord.status !== 'unused') return { ok: false, status: 409, message: 'CDK 已被使用。' }
-
+  if (!idempotencyKey && cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已被冻结。' }
+  if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已被撤销。' }
   const now = new Date().toISOString()
-  const permission = normalizePermissionMode(cdkRecord.permission)
-  const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profile.id)
   const displayName = normalizeProfileDisplayName(displayNameValue)
   const note = normalizeProfileNote(noteValue)
-  const upgraded: UserGameAccountRecord = {
-    ...profile,
-    kind: 'cdk',
-    cdk_key: cdkKey,
-    cdk_code_hash: codeHash,
-    cdk_order_hash: cdkOrderHash,
-    permission,
-    display_name: displayName || profile.display_name || '免费个人排班',
-    note: note || profile.note,
-    updated_at: now,
+  try {
+    const redeemed = await redeemCdkAtomically({
+      key: cdkKey,
+      idempotencyKey: normalizeIdempotencyKey(idempotencyKey),
+      idempotencyScope: `profile-upgrade:${user.id}:${profile.id}`,
+      requestHash: createRequestHash({ codeHash, profileId: profile.id, displayName, note }),
+      complete: async (client, cdkRecord) => {
+        const locked = await client.query<{ record_json: UserGameAccountRecord }>(
+          'select record_json from user_game_accounts where id = $1 and user_id = $2 for update', [profile.id, user.id],
+        )
+        const current = locked.rows[0]?.record_json
+        if (!current || !isFreePreviewProfile(current) || current.status !== 'active') throw new Error('档案当前不可用。')
+        const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, current.id)
+        const upgraded: UserGameAccountRecord = {
+          ...current, kind: 'cdk', cdk_key: cdkKey, cdk_code_hash: codeHash, cdk_order_hash: cdkOrderHash,
+          permission: normalizePermissionMode(cdkRecord.permission), display_name: displayName || current.display_name || '免费个人排班', note: note || current.note, updated_at: now,
+        }
+        await saveProfileInTransaction(client, upgraded)
+        await saveWorkspaceInTransaction(client, emptyWorkspace(upgraded.id))
+        const record = {
+          ...cdkRecord, status: 'used' as const, used_at: now, license_order_hash: cdkOrderHash,
+          operator_count: cdkRecord.operator_count ?? null, config_desc: cdkRecord.config_desc ?? null,
+          account_id: user.id, profile_id: upgraded.id, account_email_hash: createHash('sha256').update(user.email).digest('hex'), bound_at: now,
+        }
+        return { record, response: upgraded }
+      },
+    })
+    return { ok: true, profile: redeemed.response }
+  } catch (error) {
+    return redemptionFailure(error, 'CDK 已被使用。')
   }
+}
 
-  await saveUserProfile(upgraded)
-  if (!(await getProfileWorkspace(upgraded.id))) {
-    await saveProfileWorkspace(emptyWorkspace(upgraded.id))
+async function redeemRegistrationCdk(
+  user: UserAccountRecord,
+  codeValue: string,
+  idempotencyKey?: string | null,
+  requestHash?: string,
+): Promise<{ ok: true; profile: UserGameAccountRecord } | { ok: false; status: number; message: string }> {
+  const codeHash = hashCdk(normalizeCode(codeValue), requireEnv('CDK_HASH_SECRET'))
+  const cdkKey = `cdk/${codeHash}.json`
+  const now = new Date().toISOString()
+  const profileId = randomUUID()
+  try {
+    const redeemed = await redeemCdkAtomically({
+      key: cdkKey,
+      idempotencyKey: normalizeIdempotencyKey(idempotencyKey),
+      idempotencyScope: `register:${user.email}`,
+      requestHash: requestHash ?? createRequestHash({ codeHash, email: user.email }),
+      complete: async (client, cdkRecord) => {
+        const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profileId)
+        const permission = normalizePermissionMode(cdkRecord.permission)
+        const boundUser: UserAccountRecord = {
+          ...user, permission, cdk_key: cdkKey, cdk_code_hash: codeHash, cdk_order_hash: cdkOrderHash, updated_at: now,
+        }
+        const profile: UserGameAccountRecord = {
+          version: 1, id: profileId, user_id: user.id, kind: 'cdk', cdk_key: cdkKey, cdk_code_hash: codeHash,
+          cdk_order_hash: cdkOrderHash, permission, status: 'active', display_name: '账号 1', note: '', created_at: now, updated_at: now,
+        }
+        await saveUserAccountInTransaction(client, boundUser)
+        await saveProfileInTransaction(client, profile)
+        await saveWorkspaceInTransaction(client, emptyWorkspace(profile.id))
+        return {
+          record: {
+            ...cdkRecord, status: 'used' as const, used_at: now, license_order_hash: cdkOrderHash,
+            operator_count: cdkRecord.operator_count ?? null, config_desc: cdkRecord.config_desc ?? null,
+            account_id: user.id, profile_id: profile.id, account_email_hash: createHash('sha256').update(user.email).digest('hex'), bound_at: now,
+          },
+          response: profile,
+        }
+      },
+    })
+    return { ok: true, profile: redeemed.response }
+  } catch (error) {
+    return redemptionFailure(error, 'CDK has already been used.')
   }
-  await cdkStore.set(cdkKey, {
-    ...cdkRecord,
-    status: 'used',
-    used_at: now,
-    license_order_hash: cdkOrderHash,
-    operator_count: cdkRecord.operator_count ?? null,
-    config_desc: cdkRecord.config_desc ?? null,
-    account_id: user.id,
-    profile_id: upgraded.id,
-    account_email_hash: createHash('sha256').update(user.email).digest('hex'),
-    bound_at: now,
-  } as CdkRecord)
+}
 
-  return { ok: true, profile: upgraded }
+function normalizeIdempotencyKey(value: string | null | undefined): string | null {
+  const key = value?.trim() ?? ''
+  return key && key.length <= 200 ? key : null
+}
+
+function redemptionFailure(error: unknown, defaultMessage: string): { ok: false; status: number; message: string } {
+  if (error instanceof CdkAlreadyRedeemedError || error instanceof IdempotencyConflictError) return { ok: false, status: 409, message: error.message }
+  return { ok: false, status: 500, message: error instanceof Error ? error.message : defaultMessage }
 }
 
 export async function requireUserSession(req: Request, now = new Date()): Promise<AuthContext | null> {
