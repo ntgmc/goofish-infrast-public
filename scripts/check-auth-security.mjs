@@ -1724,6 +1724,7 @@ function announcementStoreMock() {
 
 function userLicenseUtilsMock() {
   return `
+    export async function findCdkRecordByCode() { return null }
     export function getCdkRecordStore() { return { get: async () => null } }
     export function hashCdk(value) { return value }
     export function normalizeCode(value) { return value }

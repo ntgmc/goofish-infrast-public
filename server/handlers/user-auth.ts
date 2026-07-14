@@ -35,11 +35,10 @@ import { createPostgresAnnouncementStore } from '../storage/announcement-store'
 import { createPasswordHash, verifyPasswordHash } from '../security/password'
 import { sendPasswordResetEmail } from './email'
 import {
+  findCdkRecordByCode,
   getCdkRecordStore,
-  hashCdk,
   normalizeCode,
   normalizePermissionMode,
-  requireEnv,
   type CdkRecord,
 } from './license-utils'
 import {
@@ -315,10 +314,9 @@ export async function redeemProfileCdk(
   }
 
   const normalizedCode = normalizeCode(codeValue)
-  const codeHash = hashCdk(normalizedCode, requireEnv('CDK_HASH_SECRET'))
-  const cdkKey = `cdk/${codeHash}.json`
-  const cdkRecord = await (await getCdkRecordStore()).get(cdkKey)
-  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK does not exist.' }
+  const cdkMatch = await findCdkRecordByCode(normalizedCode)
+  if (!cdkMatch) return { ok: false, status: 404, message: 'CDK does not exist.' }
+  const { codeHash, key: cdkKey, record: cdkRecord } = cdkMatch
   if (!idempotencyKey && cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK is frozen.' }
   if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK has been revoked.' }
   const now = new Date().toISOString()
@@ -413,10 +411,9 @@ export async function upgradePreviewProfileWithCdk(
   }
 
   const normalizedCode = normalizeCode(codeValue)
-  const codeHash = hashCdk(normalizedCode, requireEnv('CDK_HASH_SECRET'))
-  const cdkKey = `cdk/${codeHash}.json`
-  const cdkRecord = await (await getCdkRecordStore()).get(cdkKey)
-  if (!cdkRecord) return { ok: false, status: 404, message: 'CDK 不存在。' }
+  const cdkMatch = await findCdkRecordByCode(normalizedCode)
+  if (!cdkMatch) return { ok: false, status: 404, message: 'CDK 不存在。' }
+  const { codeHash, key: cdkKey, record: cdkRecord } = cdkMatch
   if (!idempotencyKey && cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已被冻结。' }
   if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已被撤销。' }
   const now = new Date().toISOString()
@@ -461,8 +458,9 @@ async function redeemRegistrationCdk(
   idempotencyKey?: string | null,
   requestHash?: string,
 ): Promise<{ ok: true; profile: UserGameAccountRecord } | { ok: false; status: number; message: string }> {
-  const codeHash = hashCdk(normalizeCode(codeValue), requireEnv('CDK_HASH_SECRET'))
-  const cdkKey = `cdk/${codeHash}.json`
+  const cdkMatch = await findCdkRecordByCode(normalizeCode(codeValue))
+  if (!cdkMatch) return { ok: false, status: 404, message: 'CDK does not exist.' }
+  const { codeHash, key: cdkKey } = cdkMatch
   const now = new Date().toISOString()
   const profileId = randomUUID()
   try {

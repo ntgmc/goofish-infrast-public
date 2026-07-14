@@ -9,6 +9,8 @@ await mkdir(bundleDir, { recursive: true })
 const store = createMemoryStore()
 globalThis.__sklandHandlerSmokeStore = store
 process.env.SKLAND_CREDENTIAL_SECRET = 'check-skland-handler-secret'
+process.env.DEPOT_SAMPLE_HASH_SECRET = 'check-depot-sample-secret'
+process.env.FREE_PREVIEW_UID_HASH_SECRET = 'check-free-preview-secret'
 const originalConsoleError = console.error
 console.error = (...args) => {
   if (String(args[0] ?? '').startsWith('user skland error:')) return
@@ -113,7 +115,7 @@ async function assertCompleteRequiresConfirmation() {
   if (store.profiles.get('profile-1')?.skland_binding) {
     throw new Error('complete confirmation: binding should not be finalized before confirm')
   }
-  if (!store.profiles.get('profile-1')?.skland_pending_binding?.encrypted_cred?.startsWith('SKLAND-V1:')) {
+  if (!store.profiles.get('profile-1')?.skland_pending_binding?.encrypted_cred?.startsWith('SKLAND-V2:active:')) {
     throw new Error('complete confirmation: pending encrypted cred was not saved')
   }
 }
@@ -134,7 +136,7 @@ async function assertManualCredentialPreview() {
   if (store.workspaces.get('profile-manual')?.operators?.length !== beforeCount) {
     throw new Error('manual credential preview: workspace should not be imported before confirm')
   }
-  if (!store.profiles.get('profile-manual')?.skland_pending_binding?.encrypted_cred?.startsWith('SKLAND-V1:')) {
+  if (!store.profiles.get('profile-manual')?.skland_pending_binding?.encrypted_cred?.startsWith('SKLAND-V2:active:')) {
     throw new Error('manual credential preview: pending encrypted cred was not saved')
   }
 }
@@ -263,7 +265,7 @@ async function assertConfirmImport() {
   if (store.profiles.get('profile-1')?.skland_pending_binding) {
     throw new Error('confirm import: pending binding was not cleared')
   }
-  if (!store.profiles.get('profile-1')?.skland_binding?.encrypted_cred?.startsWith('SKLAND-V1:')) {
+  if (!store.profiles.get('profile-1')?.skland_binding?.encrypted_cred?.startsWith('SKLAND-V2:active:')) {
     throw new Error('confirm import: encrypted cred was not persisted')
   }
   const workspace = store.workspaces.get('profile-1')
@@ -865,7 +867,7 @@ function setFetchMode(mode) {
 
 function assertNoSecretLeak(value, label) {
   const serialized = JSON.stringify(value)
-  for (const secret of ['account-token', 'skland-token', 'skland-cred', 'manual-skland-cred', 'mismatch-cred', 'ignored-token', 'SKLAND-V1:']) {
+  for (const secret of ['account-token', 'skland-token', 'skland-cred', 'manual-skland-cred', 'mismatch-cred', 'ignored-token', 'SKLAND-V1:', 'SKLAND-V2:']) {
     if (serialized.includes(secret)) {
       throw new Error(`${label}: leaked ${secret}`)
     }

@@ -280,6 +280,7 @@ function memoryLicenseUtilsModule() {
     export function validateLicenseForRequest() { return { ok: false, status: 400, message: 'license not needed in depot guard' } }
     export function validateOperators(operators) { return { ok: true, operators: Array.isArray(operators) ? operators : [] } }
     export function verifyLicenseSignature() { return true }
+    export function verifyLicenseSignatureWithKeyring() { return true }
   `
 }
 

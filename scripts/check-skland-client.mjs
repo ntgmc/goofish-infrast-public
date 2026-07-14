@@ -1,4 +1,5 @@
 import * as esbuild from 'esbuild'
+import { createCipheriv, createHash, randomBytes } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -24,6 +25,18 @@ if (encrypted.includes('cred-secret')) {
 }
 if (skland.decryptSklandCredential(encrypted) !== 'cred-secret') {
   throw new Error('credential decrypt roundtrip failed')
+}
+const legacyCredential = encryptLegacyCredential('legacy-cred', 'check-skland-credential-secret')
+process.env.SKLAND_CREDENTIAL_SECRET = 'check-skland-credential-rotated-secret'
+process.env.SKLAND_CREDENTIAL_SECRET_PREVIOUS = 'check-skland-credential-secret'
+process.env.SKLAND_CREDENTIAL_KEY_ID = '2026q3'
+process.env.SKLAND_CREDENTIAL_KEY_ID_PREVIOUS = '2026q2'
+if (skland.decryptSklandCredential(legacyCredential) !== 'legacy-cred') {
+  throw new Error('legacy credential should decrypt with the previous rotation key')
+}
+const rotatedCredential = skland.encryptSklandCredential('rotated-cred')
+if (!rotatedCredential.startsWith('SKLAND-V2:2026q3:') || !skland.isSklandCredentialCurrent(rotatedCredential)) {
+  throw new Error('rotated credential should use the active V2 key id')
 }
 
 const operators = skland.convertSklandCharactersToOperators({
@@ -243,4 +256,12 @@ function jsonResponse(body) {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+function encryptLegacyCredential(credential, secret) {
+  const iv = randomBytes(12)
+  const key = createHash('sha256').update(secret).digest()
+  const cipher = createCipheriv('aes-256-gcm', key, iv)
+  const ciphertext = Buffer.concat([cipher.update(credential, 'utf8'), cipher.final()])
+  return 'SKLAND-V1:' + Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString('base64')
 }
