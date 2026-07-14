@@ -1,4 +1,5 @@
 import { GeneratedPermission, StatusFilter, PermissionFilter, BinaryFilter, CdkTableFilters, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
+import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, SmallButton, formatDate, getNextProductPermission, formatNullableNumber, formatRiskDetail } from '../shared/helpers'
 
 export function CdkTable({ records, selected, filters, busyAction, onFilterChange, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
@@ -113,6 +114,23 @@ export function BinaryFilterSelect({ label, value, onChange }: { label: string; 
   )
 }
 
+interface CdkDetailPanelProps {
+  detail: AdminCdkDetail;
+  busyAction: string | null;
+  onClose: () => void;
+  onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
+  onUpdateNote: (record: AdminCdkDetail) => Promise<void>;
+  onSetPermission: (record: AdminCdkDetail) => Promise<void>;
+}
+
+export function CdkDetailDialog(props: CdkDetailPanelProps) {
+  return (
+    <AdminDetailDialog labelledBy="admin-cdk-detail-title" onClose={props.onClose}>
+      <CdkDetailPanel {...props} />
+    </AdminDetailDialog>
+  )
+}
+
 export function CdkDetailPanel({
   detail,
   busyAction,
@@ -120,22 +138,15 @@ export function CdkDetailPanel({
   onPatch,
   onUpdateNote,
   onSetPermission,
-}: {
-  detail: AdminCdkDetail;
-  busyAction: string | null;
-  onClose: () => void;
-  onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
-  onUpdateNote: (record: AdminCdkDetail) => Promise<void>;
-  onSetPermission: (record: AdminCdkDetail) => Promise<void>;
-}) {
+}: CdkDetailPanelProps) {
   const nextPermission = getNextProductPermission(detail.permission)
   const canGrantOperatorUpdate = detail.status === 'used' && Boolean(detail.license_order_hash)
   return (
-    <section className="tool-panel">
+    <section className="tool-panel overflow-hidden">
       <div className="tool-panel-header flex flex-col gap-3 p-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-mono text-base font-semibold text-ink-primary">{detail.cdk_id}</h2>
+            <h2 id="admin-cdk-detail-title" className="font-mono text-base font-semibold text-ink-primary">{detail.cdk_id}</h2>
             <StatusPill status={detail.status} />
             <span className="tool-status tool-status--current">{permissionLabels[detail.permission]}</span>
           </div>
@@ -148,7 +159,7 @@ export function CdkDetailPanel({
           {canGrantOperatorUpdate && <SmallButton onClick={() => void onPatch(detail, 'grant_operator_update')} loading={busyAction === `grant_operator_update:${detail.code_hash}`}>发放更新</SmallButton>}
           {detail.status === 'frozen' && <SmallButton onClick={() => void onPatch(detail, 'unfreeze')} loading={busyAction === `unfreeze:${detail.code_hash}`} tone="success">解冻</SmallButton>}
           {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => void onPatch(detail, 'revoke')} loading={busyAction === `revoke:${detail.code_hash}`} tone="danger">撤销</SmallButton>}
-          <SmallButton onClick={onClose}>关闭</SmallButton>
+          <SmallButton onClick={onClose} autoFocus>关闭</SmallButton>
         </div>
       </div>
 

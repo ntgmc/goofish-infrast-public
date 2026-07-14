@@ -41,7 +41,7 @@ export function SmallButton({ children, onClick, loading, tone = 'default', auto
     : tone === 'success'
       ? 'border-success/40 bg-success/10 text-success hover:border-success/60 hover:bg-success/20 hover:text-success'
       : ''
-  return <button type="button" onClick={onClick} disabled={loading} autoFocus={autoFocus} data-dialog-initial-focus={autoFocus ? '' : undefined} className={`tool-secondary-action min-h-11 px-3 text-xs ${className}`}>{loading ? '处理中' : children}</button>
+  return <button type="button" onClick={onClick} disabled={loading} data-dialog-initial-focus={autoFocus ? '' : undefined} className={`tool-secondary-action min-h-11 px-3 text-xs ${className}`}>{loading ? '处理中' : children}</button>
 }
 
 export function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0) {
