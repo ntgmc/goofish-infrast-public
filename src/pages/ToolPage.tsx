@@ -17,6 +17,7 @@ import AuthPage from './tool/AuthPage'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
 import { isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
+import { useToolVisitReporter } from './tool/useToolVisitReporter'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
 
@@ -24,6 +25,7 @@ export default function ToolPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const route = resolveToolRoute(location.pathname)
+  useToolVisitReporter(Boolean(route))
   const {
     authLoading,
     user,
