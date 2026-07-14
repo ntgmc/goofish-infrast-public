@@ -8,11 +8,13 @@ CREATE TABLE IF NOT EXISTS cdk_records (
   permission TEXT NOT NULL,
   license_order_hash TEXT,
   record_json JSONB NOT NULL,
+  record_revision INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_cdk_records_status ON cdk_records(status);
 CREATE INDEX IF NOT EXISTS idx_cdk_records_license_order_hash ON cdk_records(license_order_hash);
+ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS record_revision INTEGER NOT NULL DEFAULT 0;
 DO $$
 DECLARE conflict_details TEXT;
 BEGIN
