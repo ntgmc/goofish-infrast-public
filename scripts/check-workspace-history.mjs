@@ -1,4 +1,5 @@
 import * as esbuild from 'esbuild'
+import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -863,7 +864,7 @@ async function assertReorderRecommendationFromBaseline(profileId, baselineResult
     throw new Error(`免费档案重排检测 ${expectedRecommendation}：预期 200 ${expectedRecommendation}，实际 ${checked.status} ${checked.body?.recommendation}`)
   }
   assertReorderCheckResult(checked.body, `免费档案重排检测 ${expectedRecommendation}`)
-  const bonus = store.workspaces.get(profile.id)?.free_schedule_entitlement?.strong_reorder_bonus
+  const bonus = checked.body?.free_schedule_entitlement?.strong_reorder_bonus
   if (expectedRecommendation === 'strongly_recommended') {
     if (!bonus || bonus.used_at) throw new Error('免费档案强烈建议重排：预期授予未使用的当月额外生成权益')
   } else if (bonus) {
@@ -961,6 +962,9 @@ async function call(handler, path, body = {}, init = {}) {
     method,
     headers: {
       'Content-Type': 'application/json',
+      ...(requestPath === '/api/optimization/jobs' || requestPath === '/api/optimization/reorder-checks'
+        ? { 'Idempotency-Key': `workspace-history-${randomUUID()}` }
+        : {}),
       cookie: init.auth === false ? '' : 'maa_session=test-session',
     },
   }
