@@ -1335,6 +1335,7 @@ function memoryLicenseUtilsModule() {
     export function validateLicenseForRequest(license) { return license ? { ok: true, license } : { ok: false, message: 'invalid license' } }
     export function validateOperators(operators) { return Array.isArray(operators) ? { ok: true, operators } : { ok: false, message: 'invalid operators' } }
     export function verifyLicenseSignature() { return true }
+    export function verifyLicenseSignatureWithKeyring() { return true }
     function matchesFreePreset(config) {
       return matchesPreset(config, {
         layout: '2-4-3',

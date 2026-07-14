@@ -533,8 +533,8 @@ function readAccountLevel(value: unknown): number | null {
 }
 
 function hashSklandUid(uid: string): string | null {
-  const secret = process.env.DEPOT_SAMPLE_HASH_SECRET?.trim() || process.env.CDK_HASH_SECRET?.trim()
-  if (!secret) return null
+  const secret = process.env.DEPOT_SAMPLE_HASH_SECRET?.trim()
+  if (!secret) throw new Error('DEPOT_SAMPLE_HASH_SECRET is not configured')
   return createHmac('sha256', secret).update(`skland:${uid}`).digest('hex')
 }
 

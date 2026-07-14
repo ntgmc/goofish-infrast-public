@@ -244,9 +244,33 @@ function getTestingRiskControlSettingsStore(): RiskControlSettingsStore | null {
 }
 
 export function requireEnv(name: string): string {
-  const value = process.env[name] || readLocalEnv(name)
+  const value = readOptionalEnv(name)
   if (!value) throw new Error(`${name} is not configured`)
   return value
+}
+
+export function readOptionalEnv(name: string): string | undefined {
+  const value = process.env[name] || readLocalEnv(name)
+  const normalized = value?.trim()
+  return normalized || undefined
+}
+
+export function getSecretKeyring(name: string): string[] {
+  const active = requireEnv(name)
+  const previous = readOptionalEnv(`${name}_PREVIOUS`)
+  return previous && previous !== active ? [active, previous] : [active]
+}
+
+export function getCurrentCdkHashSecret(): string {
+  return requireEnv('CDK_HASH_SECRET')
+}
+
+export function getCdkHashSecretKeyring(): string[] {
+  return getSecretKeyring('CDK_HASH_SECRET')
+}
+
+export function verifyLicenseSignatureWithKeyring(license: unknown): license is LicenseFile {
+  return getSecretKeyring('MAA_ADMIN_SECRET').some((secret) => verifyLicenseSignature(license, secret))
 }
 
 function readLocalEnv(name: string): string | undefined {
@@ -523,10 +547,21 @@ export async function findCdkRecordByLicenseOrderHash(orderHash: string): Promis
   return store.getByLicenseOrderHash(orderHash)
 }
 
-export async function findCdkRecordByCode(code: string, hashSecret: string): Promise<CdkRecord | null> {
-  const codeHash = hashCdk(normalizeCode(code), hashSecret)
+export interface CdkCodeMatch {
+  record: CdkRecord;
+  codeHash: string;
+  key: string;
+}
+
+export async function findCdkRecordByCode(code: string, hashSecrets = getCdkHashSecretKeyring()): Promise<CdkCodeMatch | null> {
   const store = await getCdkRecordStore()
-  return store.get(`cdk/${codeHash}.json`)
+  for (const hashSecret of hashSecrets) {
+    const codeHash = hashCdk(normalizeCode(code), hashSecret)
+    const key = `cdk/${codeHash}.json`
+    const record = await store.get(key)
+    if (record) return { record, codeHash, key }
+  }
+  return null
 }
 
 export async function incrementCdkScheduleGenerateCount(record: CdkRecord): Promise<void> {

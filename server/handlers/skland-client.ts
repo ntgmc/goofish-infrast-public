@@ -236,19 +236,42 @@ export function convertSklandCharactersToOperators(gamePlayerInfo: unknown): Lic
 }
 
 export function encryptSklandCredential(cred: string): string {
-  const secret = getCredentialSecret()
+  const keyConfig = getCredentialKeyring()[0]
   const iv = randomBytes(12)
-  const key = createHash('sha256').update(secret).digest()
+  const key = createHash('sha256').update(keyConfig.secret).digest()
   const cipher = createCipheriv('aes-256-gcm', key, iv)
   const encrypted = Buffer.concat([cipher.update(cred, 'utf8'), cipher.final()])
   const tag = cipher.getAuthTag()
-  return 'SKLAND-V1:' + Buffer.concat([iv, tag, encrypted]).toString('base64')
+  return `SKLAND-V2:${keyConfig.id}:` + Buffer.concat([iv, tag, encrypted]).toString('base64')
 }
 
 export function decryptSklandCredential(encrypted: string): string {
-  const secret = getCredentialSecret()
+  const keyring = getCredentialKeyring()
+  const v2 = encrypted.match(/^SKLAND-V2:([A-Za-z0-9_-]{1,64}):(.+)$/)
+  if (v2) {
+    const keyConfig = keyring.find((candidate) => candidate.id === v2[1])
+    if (!keyConfig) throw new SklandClientError('credential_format_invalid', '森空岛绑定凭据使用的密钥不可用，请重新扫码绑定。')
+    return decryptCredentialPayload(v2[2], keyConfig.secret)
+  }
+
   const payload = encrypted.startsWith('SKLAND-V1:') ? encrypted.slice('SKLAND-V1:'.length) : ''
   if (!payload) throw new SklandClientError('credential_format_invalid', '森空岛绑定凭据格式无效，请重新扫码绑定。')
+  for (const keyConfig of keyring) {
+    try {
+      return decryptCredentialPayload(payload, keyConfig.secret)
+    } catch {
+      // Try the previous key while the rotation window is open.
+    }
+  }
+  throw new SklandClientError('credential_format_invalid', '森空岛绑定凭据格式无效，请重新扫码绑定。')
+}
+
+export function isSklandCredentialCurrent(encrypted: string): boolean {
+  const active = getCredentialKeyring()[0]
+  return encrypted.startsWith(`SKLAND-V2:${active.id}:`)
+}
+
+function decryptCredentialPayload(payload: string, secret: string): string {
   const raw = Buffer.from(payload, 'base64')
   if (raw.length <= 28) throw new SklandClientError('credential_format_invalid', '森空岛绑定凭据格式无效，请重新扫码绑定。')
   try {
@@ -265,7 +288,7 @@ export function decryptSklandCredential(encrypted: string): string {
 }
 
 export function ensureSklandCredentialSecret(): void {
-  getCredentialSecret()
+  getCredentialKeyring()
 }
 
 export function generateSklandSign(token: string, path: string, queryOrBody: string, timestamp: string): string {
@@ -417,12 +440,34 @@ async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
   return data as T
 }
 
-function getCredentialSecret(): string {
+interface SklandCredentialKey {
+  id: string;
+  secret: string;
+}
+
+function getCredentialKeyring(): SklandCredentialKey[] {
   const secret = process.env.SKLAND_CREDENTIAL_SECRET?.trim()
   if (!secret || secret.length < 16) {
     throw new Error('SKLAND_CREDENTIAL_SECRET 未配置或长度不足，无法保存森空岛绑定。')
   }
-  return secret
+  const activeId = normalizeCredentialKeyId(process.env.SKLAND_CREDENTIAL_KEY_ID, 'active')
+  const keys: SklandCredentialKey[] = [{ id: activeId, secret }]
+  const previous = process.env.SKLAND_CREDENTIAL_SECRET_PREVIOUS?.trim()
+  if (previous && previous.length < 16) {
+    throw new Error('SKLAND_CREDENTIAL_SECRET_PREVIOUS 长度不足。')
+  }
+  if (previous && previous !== secret) {
+    const previousId = normalizeCredentialKeyId(process.env.SKLAND_CREDENTIAL_KEY_ID_PREVIOUS, 'previous')
+    if (previousId === activeId) throw new Error('SKLAND 凭据当前和前代密钥 ID 不能相同。')
+    keys.push({ id: previousId, secret: previous })
+  }
+  return keys
+}
+
+function normalizeCredentialKeyId(value: string | undefined, fallback: string): string {
+  const id = value?.trim() || fallback
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new Error('SKLAND 凭据密钥 ID 格式无效。')
+  return id
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

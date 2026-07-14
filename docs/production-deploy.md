@@ -65,6 +65,11 @@ Keep production secrets such as `DATABASE_URL`, `MAA_ADMIN_PASSWORD`,
 not store them in GitHub Actions secrets unless the workflow truly needs them.
 This workflow does not need those application secrets.
 
+Production additionally requires independent `DEPOT_SAMPLE_HASH_SECRET`,
+`FREE_PREVIEW_UID_HASH_SECRET`, and `SKLAND_CREDENTIAL_SECRET` values. Backup,
+recovery, key rotation, and quarterly restore-drill instructions are in
+[disaster-recovery.md](disaster-recovery.md).
+
 The production service must set `NODE_ENV=production`. Administrator login now
 uses the `maa_admin_session` HttpOnly, SameSite=Strict cookie, and production
 mode adds the required `Secure` attribute. Sessions expire after 30 minutes of

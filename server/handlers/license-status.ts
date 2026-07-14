@@ -13,7 +13,7 @@ import {
   syncAdvancedCdkBinding,
   validateLicenseForRequest,
   validateOperators,
-  verifyLicenseSignature,
+  verifyLicenseSignatureWithKeyring,
   type CdkRecord,
 } from './license-utils'
 import type { OperatorUpdateGrant } from '../../src/lib/types'
@@ -42,10 +42,10 @@ export default async (req: Request): Promise<Response> => {
       return jsonResponse({ error: licenseCheck.message }, 400)
     }
 
-    const adminSecret = requireEnv('MAA_ADMIN_SECRET')
-    if (!verifyLicenseSignature(licenseCheck.license, adminSecret)) {
+    if (!verifyLicenseSignatureWithKeyring(licenseCheck.license)) {
       return jsonResponse({ error: '授权签名无效。' }, 401)
     }
+    const adminSecret = requireEnv('MAA_ADMIN_SECRET')
 
     const cdkRecord = await findCdkRecordByLicenseOrderHash(licenseCheck.license.order_hash)
     if (cdkRecord?.status === 'revoked') {

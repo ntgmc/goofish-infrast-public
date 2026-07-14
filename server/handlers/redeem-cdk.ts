@@ -2,8 +2,6 @@ import {
   createAdvancedRiskBinding,
   createSignedLicenseFile,
   findCdkRecordByCode,
-  getCdkRecordStore,
-  hashCdk,
   jsonResponse,
   normalizePermissionMode,
   normalizeCode,
@@ -11,7 +9,6 @@ import {
   resolveConfigForPermission,
   validateConfig,
   validateOperators,
-  type CdkRecord,
 } from './license-utils'
 import { recordUsageEvent } from './usage-stats'
 import type { UsageReasonCode } from '../storage/usage-store'
@@ -61,18 +58,15 @@ export default async (req: Request): Promise<Response> => {
       return jsonResponse({ error: configCheck.message }, 400)
     }
 
-    const hashSecret = requireEnv('CDK_HASH_SECRET')
     const adminSecret = requireEnv('MAA_ADMIN_SECRET')
-    const codeHash = hashCdk(normalizeCode(body.code), hashSecret)
-    const key = `cdk/${codeHash}.json`
-    const store = await getCdkRecordStore()
-    const existing = await store.get(key) as CdkRecord | null
+    const cdkMatch = await findCdkRecordByCode(normalizeCode(body.code))
     const idempotencyKey = normalizeIdempotencyKey(req.headers.get('Idempotency-Key'))
 
-    if (!existing) {
+    if (!cdkMatch) {
       await recordCdkRedeem('failure', 'cdk_missing', startedAt, undefined, 'missing')
       return jsonResponse({ error: 'CDK 不存在。' }, 404)
     }
+    const { codeHash, key, record: existing } = cdkMatch
     if (!idempotencyKey && (existing.status === 'used' || existing.status === 'frozen')) {
       await recordCdkRedeem('failure', existing.status === 'frozen' ? 'cdk_frozen' : 'cdk_used', startedAt, existing.permission, existing.status)
       return jsonResponse({ error: 'CDK 已使用。' }, 409)
@@ -161,11 +155,11 @@ async function validateCdkCode(code: string): Promise<Response> {
     if (!code || !code.trim()) {
       return jsonResponse({ error: '请填写 CDK。' }, 400)
     }
-    const hashSecret = requireEnv('CDK_HASH_SECRET')
-    const record = await findCdkRecordByCode(code, hashSecret)
-    if (!record) {
+    const match = await findCdkRecordByCode(code)
+    if (!match) {
       return jsonResponse({ error: 'CDK 不存在。' }, 404)
     }
+    const record = match.record
     if (record.status === 'used' || record.status === 'frozen') {
       return jsonResponse({ error: 'CDK 已使用。' }, 409)
     }

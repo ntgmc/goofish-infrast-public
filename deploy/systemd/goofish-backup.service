@@ -1,0 +1,29 @@
+[Unit]
+Description=Encrypted PostgreSQL and runtime configuration backup for goofish-infrast-v1
+Wants=network-online.target
+After=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/goofish-infrast-v1
+EnvironmentFile=/etc/goofish-infrast-v1/backend.env
+EnvironmentFile=/etc/goofish-infrast-v1/backup.env
+ExecStart=/opt/goofish-infrast-v1/scripts/backup-postgres.sh
+UMask=0077
+RuntimeDirectory=goofish-backup
+RuntimeDirectoryMode=0700
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/run/goofish-backup
+TimeoutStartSec=1h
