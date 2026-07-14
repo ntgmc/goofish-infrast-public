@@ -32,7 +32,7 @@ const VALID_PERMISSION_MODES: RawPermissionMode[] = [
   'admin',
 ]
 export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = ['recommended', 'growth', 'advanced', 'ultimate']
-export type CdkStatus = 'unused' | 'used' | 'frozen' | 'revoked'
+export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
 
 export interface OperatorFingerprint {
   hash: string;
@@ -313,7 +313,7 @@ export function validateLicenseForRequest(license: unknown): { ok: true; license
   }
   const candidate = license as Partial<LicenseFile>
   if (
-    candidate.version !== 1 ||
+    (candidate.version !== 1 && candidate.version !== 2) ||
     typeof candidate.order_hash !== 'string' ||
     !Array.isArray(candidate.operators) ||
     !candidate.config ||
@@ -1052,7 +1052,7 @@ export function createSignedLicenseFile({
     .slice(0, 16)
 
   const unsigned = {
-    version: 1,
+    version: 2,
     order_hash: orderHash,
     operators,
     config,
@@ -1079,6 +1079,7 @@ export function reissueSignedLicenseFile(
   const activationToken = normalizeLicenseActivationToken(overrides.activationToken)
   const unsigned = {
     ...license,
+    version: 2 as const,
     permission,
     ...(overrides.operators ? { operators: overrides.operators } : {}),
     ...(activationToken ? { activation_token: activationToken } : {}),

@@ -57,8 +57,8 @@ export default async (req: Request): Promise<Response> => {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       const body = await req.json() as { cdk?: unknown; display_name?: unknown; note?: unknown; profile_id?: unknown }
       const redeemed = typeof body.profile_id === 'string' && body.profile_id.trim()
-        ? await upgradePreviewProfileWithCdk(auth.user, body.profile_id, body.cdk, body.display_name, body.note)
-        : await redeemProfileCdk(auth.user, body.cdk, body.display_name, body.note)
+        ? await upgradePreviewProfileWithCdk(auth.user, body.profile_id, body.cdk, body.display_name, body.note, req.headers.get('Idempotency-Key'))
+        : await redeemProfileCdk(auth.user, body.cdk, body.display_name, body.note, req.headers.get('Idempotency-Key'))
       if (!redeemed.ok) return jsonResponse({ error: redeemed.message }, redeemed.status)
       return jsonResponse(await buildAuthPayload(auth.user, redeemed.profile.id))
     }

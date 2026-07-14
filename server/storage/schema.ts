@@ -13,6 +13,20 @@ CREATE TABLE IF NOT EXISTS cdk_records (
 );
 CREATE INDEX IF NOT EXISTS idx_cdk_records_status ON cdk_records(status);
 CREATE INDEX IF NOT EXISTS idx_cdk_records_license_order_hash ON cdk_records(license_order_hash);
+DO $$
+DECLARE conflict_details TEXT;
+BEGIN
+  SELECT string_agg(format('%s [%s]', license_order_hash, record_keys), '; ')
+    INTO conflict_details
+  FROM (
+    SELECT license_order_hash, string_agg(key, ', ' ORDER BY key) AS record_keys
+    FROM cdk_records WHERE license_order_hash IS NOT NULL
+    GROUP BY license_order_hash HAVING COUNT(*) > 1
+  ) duplicates;
+  IF conflict_details IS NOT NULL THEN RAISE EXCEPTION 'duplicate cdk license_order_hash values must be resolved before migration: %', conflict_details; END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_cdk_records_license_order_hash
+  ON cdk_records(license_order_hash) WHERE license_order_hash IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS announcements (
   key TEXT PRIMARY KEY,
@@ -141,6 +155,31 @@ CREATE TABLE IF NOT EXISTS user_game_accounts (
 );
 CREATE INDEX IF NOT EXISTS idx_user_game_accounts_user_id ON user_game_accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_game_accounts_cdk_code_hash ON user_game_accounts(cdk_code_hash);
+DO $$
+DECLARE conflict_details TEXT;
+BEGIN
+  SELECT string_agg(format('%s [%s]', cdk_code_hash, profile_ids), '; ')
+    INTO conflict_details
+  FROM (
+    SELECT cdk_code_hash, string_agg(id, ', ' ORDER BY id) AS profile_ids
+    FROM user_game_accounts WHERE cdk_code_hash IS NOT NULL
+    GROUP BY cdk_code_hash HAVING COUNT(*) > 1
+  ) duplicates;
+  IF conflict_details IS NOT NULL THEN RAISE EXCEPTION 'duplicate user_game_accounts cdk_code_hash values must be resolved before migration: %', conflict_details; END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_game_accounts_cdk_code_hash
+  ON user_game_accounts(cdk_code_hash) WHERE cdk_code_hash IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS cdk_redemption_idempotency (
+  scope TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status TEXT NOT NULL,
+  response_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (scope, idempotency_key)
+);
 
 CREATE TABLE IF NOT EXISTS free_preview_claims (
   uid_hash TEXT PRIMARY KEY,

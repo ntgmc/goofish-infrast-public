@@ -66,6 +66,9 @@ export async function validateRequestLicense(license: unknown): Promise<
   }
 
   const cdkRecord = await findCdkRecordByLicenseOrderHash(structure.license.order_hash);
+  if (structure.license.version === 2 && (!cdkRecord || cdkRecord.status !== "used")) {
+    return { ok: false, status: 403, message: "License is not linked to an active CDK record." };
+  }
   if (cdkRecord?.status === "revoked") {
     return { ok: false, status: 403, message: "License has been revoked." };
   }

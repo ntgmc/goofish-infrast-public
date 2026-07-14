@@ -151,3 +151,9 @@ jobs:
 
       - name: Run API smoke check
         run: npm run check:api
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run PostgreSQL redemption integration tests
+        run: npm run test:postgres

@@ -1,8 +1,31 @@
+import type { PoolClient } from 'pg'
 import { query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import type { CdkRecord, CdkRecordStore } from '../handlers/license-utils'
 
 let schemaReady: Promise<void> | null = null
+
+export async function claimCdkRecord(client: PoolClient, key: string): Promise<CdkRecord | null> {
+  const result = await client.query<{ record_json: CdkRecord }>(
+    `update cdk_records
+     set status = 'claiming', updated_at = now(),
+         record_json = jsonb_set(record_json, '{status}', '"claiming"'::jsonb)
+     where key = $1 and status = 'unused'
+     returning record_json`,
+    [key],
+  )
+  return result.rows[0]?.record_json ?? null
+}
+
+export async function completeCdkRedemption(client: PoolClient, key: string, record: CdkRecord): Promise<void> {
+  const result = await client.query(
+    `update cdk_records
+     set status = 'used', permission = $2, license_order_hash = $3, record_json = $4::jsonb, updated_at = now()
+     where key = $1 and status = 'claiming'`,
+    [key, record.permission, record.license_order_hash, JSON.stringify(record)],
+  )
+  if (result.rowCount !== 1) throw new Error('CDK redemption claim was lost before completion')
+}
 
 export function createPostgresCdkRecordStore(): CdkRecordStore {
   return {

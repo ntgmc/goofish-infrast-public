@@ -15,6 +15,7 @@ import {
 } from './license-utils'
 import { recordUsageEvent } from './usage-stats'
 import type { UsageReasonCode } from '../storage/usage-store'
+import { CdkAlreadyRedeemedError, IdempotencyConflictError, createRequestHash, redeemCdkAtomically } from '../storage/cdk-redemption'
 
 const PERMISSION_LABELS: Record<string, string> = {
 recommended: '单次重置卡',
@@ -66,16 +67,17 @@ export default async (req: Request): Promise<Response> => {
     const key = `cdk/${codeHash}.json`
     const store = await getCdkRecordStore()
     const existing = await store.get(key) as CdkRecord | null
+    const idempotencyKey = normalizeIdempotencyKey(req.headers.get('Idempotency-Key'))
 
     if (!existing) {
       await recordCdkRedeem('failure', 'cdk_missing', startedAt, undefined, 'missing')
       return jsonResponse({ error: 'CDK 不存在。' }, 404)
     }
-    if (existing.status === 'used' || existing.status === 'frozen') {
+    if (!idempotencyKey && (existing.status === 'used' || existing.status === 'frozen')) {
       await recordCdkRedeem('failure', existing.status === 'frozen' ? 'cdk_frozen' : 'cdk_used', startedAt, existing.permission, existing.status)
       return jsonResponse({ error: 'CDK 已使用。' }, 409)
     }
-    if (existing.status !== 'unused') {
+    if (!idempotencyKey && existing.status !== 'unused') {
       await recordCdkRedeem('failure', 'cdk_status_invalid', startedAt, existing.permission, existing.status)
       return jsonResponse({ error: 'CDK 状态不正确。' }, 409)
     }
@@ -86,45 +88,51 @@ export default async (req: Request): Promise<Response> => {
       return jsonResponse({ error: configForPermission.message }, 403)
     }
 
-    const { license, licenseFileContent } = createSignedLicenseFile({
-      adminSecret,
-      operators: operatorsCheck.operators,
-      config: configForPermission.config,
-      permission,
-      codeHash,
-      activationToken: body.activation_token,
+    const redeemed = await redeemCdkAtomically({
+      key,
+      idempotencyKey,
+      idempotencyScope: 'license-file',
+      requestHash: createRequestHash({ codeHash, operators: operatorsCheck.operators, config: configForPermission.config, activationToken: body.activation_token ?? null }),
+      complete: async (_client, claimed) => {
+        const { license, licenseFileContent } = createSignedLicenseFile({
+          adminSecret,
+          operators: operatorsCheck.operators,
+          config: configForPermission.config,
+          permission,
+          codeHash,
+          activationToken: body.activation_token,
+        })
+        let updated: CdkRecord = {
+          ...claimed,
+          status: 'used',
+          used_at: new Date().toISOString(),
+          license_order_hash: license.order_hash,
+          operator_count: operatorsCheck.operators.length,
+          config_desc: configForPermission.config.desc || configForPermission.config.layout || null,
+        }
+        if (permission === 'advanced') {
+          const binding = await createAdvancedRiskBinding(updated, operatorsCheck.operators, req, body.activation_token)
+          if (!binding.ok) throw new Error(binding.event.reason)
+          updated = binding.record
+        }
+        return { record: updated, response: { license_file_content: licenseFileContent, license } }
+      },
     })
-
-    let updated: CdkRecord = {
-      ...existing,
-      status: 'used',
-      used_at: new Date().toISOString(),
-      license_order_hash: license.order_hash,
-      operator_count: operatorsCheck.operators.length,
-      config_desc: configForPermission.config.desc || configForPermission.config.layout || null,
-    }
-
-    if (permission === 'advanced') {
-      const binding = await createAdvancedRiskBinding(updated, operatorsCheck.operators, req, body.activation_token)
-      if (!binding.ok) {
-        await recordCdkRedeem('failure', 'risk_soft_blocked', startedAt, permission, existing.status)
-        return jsonResponse({ error: binding.event.reason }, 400)
-      }
-      updated = binding.record
-    }
-    await store.set(key, updated)
-    await recordCdkRedeem('success', 'ok', startedAt, permission, updated.status)
-
-    return jsonResponse({
-      license_file_content: licenseFileContent,
-      license,
-    })
+    await recordCdkRedeem('success', 'ok', startedAt, permission, 'used')
+    return jsonResponse(redeemed.response)
   } catch (error) {
     console.error('redeem cdk error:', error)
     await recordCdkRedeem('failure', 'unknown_failure', startedAt)
+    if (error instanceof CdkAlreadyRedeemedError) return jsonResponse({ error: error.message }, 409)
+    if (error instanceof IdempotencyConflictError) return jsonResponse({ error: error.message }, 409)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
   }
+}
+
+function normalizeIdempotencyKey(value: string | null): string | null {
+  const key = value?.trim() ?? ''
+  return key && key.length <= 200 ? key : null
 }
 
 async function recordCdkRedeem(
