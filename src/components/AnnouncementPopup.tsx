@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react
 import { Link } from 'react-router-dom'
 import type { Announcement } from '../lib/types'
 import { apiVoid } from '../lib/api-client'
+import AnnouncementMarkdown from './AnnouncementMarkdown'
 
 const READ_PREFIX = 'maa-announcement-read:'
 const FOCUSABLE_SELECTOR = [
@@ -110,7 +111,7 @@ export default function AnnouncementPopup({ announcements }: Props) {
             历史
           </Link>
         </div>
-        <p id="announcement-popup-body" className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{current.body}</p>
+        <AnnouncementMarkdown id="announcement-popup-body" className="mt-4">{current.body}</AnnouncementMarkdown>
         <div className="mt-6 flex justify-end">
           <button
             ref={initialFocusRef}
