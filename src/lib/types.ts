@@ -111,7 +111,7 @@ export interface OperatorUpdateGrant {
 }
 
 export interface LicenseFile {
-  version: number;
+  version: 1 | 2;
   order_hash: string;
   operators: LicenseOperator[];
   config: LicenseConfig;

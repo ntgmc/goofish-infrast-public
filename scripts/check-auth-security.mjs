@@ -1208,7 +1208,7 @@ function userAuthMigrationPlugin() {
   return {
     name: 'auth-security-user-migration-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'email']) {
+      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-migration',
@@ -1219,6 +1219,7 @@ function userAuthMigrationPlugin() {
           'user-store': userStoreMigrationMock(),
           'announcement-store': announcementStoreMock(),
           'license-utils': userLicenseUtilsMock(),
+          'cdk-redemption': cdkRedemptionMock(),
           email: emailMock(),
         }
         return { contents: mocks[args.path], loader: 'js' }
@@ -1231,7 +1232,7 @@ function userSessionAuthPlugin() {
   return {
     name: 'auth-security-user-session-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'email']) {
+      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-session',
@@ -1242,6 +1243,7 @@ function userSessionAuthPlugin() {
           'user-store': userSessionAuthStoreMock(),
           'announcement-store': announcementStoreMock(),
           'license-utils': userLicenseUtilsMock(),
+          'cdk-redemption': cdkRedemptionMock(),
           email: emailMock(),
         }
         return { contents: mocks[args.path], loader: 'js' }
@@ -1274,7 +1276,7 @@ function passwordResetAuthPlugin() {
   return {
     name: 'auth-security-password-reset-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'email']) {
+      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\/])${moduleName}(\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-password-reset',
@@ -1286,6 +1288,7 @@ function passwordResetAuthPlugin() {
           password: passwordResetPasswordMock(),
           'announcement-store': announcementStoreMock(),
           'license-utils': userLicenseUtilsMock(),
+          'cdk-redemption': cdkRedemptionMock(),
           email: emailMock(),
         }
         return { contents: mocks[args.path], loader: 'js' }
@@ -1726,6 +1729,19 @@ function userLicenseUtilsMock() {
     export function normalizeCode(value) { return value }
     export function normalizePermissionMode(value) { return value }
     export function requireEnv(name) { return process.env[name] ?? '' }
+  `
+}
+
+function cdkRedemptionMock() {
+  return `
+    export class CdkAlreadyRedeemedError extends Error {}
+    export class IdempotencyConflictError extends Error {}
+    export function createRequestHash(value) { return JSON.stringify(value) }
+    export async function hasCompletedIdempotentRedemption() { return false }
+    export async function redeemCdkAtomically() { throw new Error('redeem should not run in this check') }
+    export async function saveUserAccountInTransaction() {}
+    export async function saveProfileInTransaction() {}
+    export async function saveWorkspaceInTransaction() {}
   `
 }
 
