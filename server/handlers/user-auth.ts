@@ -29,9 +29,11 @@ import {
   upgradeUserPasswordHash,
   type UserAccountRecord,
   type UserGameAccountRecord,
+  type UserWorkspaceRecord,
   type UserSessionRecord,
 } from '../storage/user-store'
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
+import { getFreePreviewTrial, hasFreePreviewTrialEnded } from '../free-preview-trial'
 import { createPasswordHash, verifyPasswordHash } from '../security/password'
 import { sendPasswordResetEmail } from './email'
 import {
@@ -39,6 +41,8 @@ import {
   getCdkRecordStore,
   normalizeCode,
   normalizePermissionMode,
+  getFreePreviewDefaultConfig,
+  resolveFreePreviewConfig,
   type CdkRecord,
 } from './license-utils'
 import {
@@ -550,8 +554,15 @@ export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?
     listProfileWorkspaces(records.map((profile) => profile.id)),
     getAnnouncementUnreadCount(user.id),
   ])
+  for (const profile of records) {
+    const workspace = workspaces.get(profile.id) ?? null
+    const downgraded = normalizeExpiredFreePreviewWorkspace(profile, workspace)
+    if (!downgraded) continue
+    await saveProfileWorkspace(downgraded)
+    workspaces.set(profile.id, downgraded)
+  }
   const publicProfiles: UserGameAccount[] = records.map((profile) => (
-    toPublicProfile(profile, workspaces.get(profile.id) ?? null)
+    toPublicProfile(profile, workspaces.get(profile.id) ?? null, getFreePreviewTrial(profile))
   ))
   const defaultActiveProfile = records.find((profile) => profile.kind !== 'depot_value') ?? records[0] ?? null
   const activeProfileRecord = activeProfileId
@@ -561,9 +572,42 @@ export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?
   return {
     user: toPublicUser(user),
     profiles: publicProfiles,
-    active_profile: activeProfileRecord ? toPublicProfile(activeProfileRecord, activeWorkspace) : null,
+    active_profile: activeProfileRecord
+      ? toPublicProfile(activeProfileRecord, activeWorkspace, getFreePreviewTrial(activeProfileRecord))
+      : null,
     workspace: activeProfileRecord ? toPublicWorkspace(activeWorkspace) : null,
     announcement_unread_count: announcementUnreadCount,
+  }
+}
+
+function normalizeExpiredFreePreviewWorkspace(
+  profile: UserGameAccountRecord,
+  workspace: UserWorkspaceRecord | null,
+): UserWorkspaceRecord | null {
+  if (!workspace || !hasFreePreviewTrialEnded(profile)) return null
+  const currentConfigNeedsDowngrade = Boolean(workspace.config && !resolveFreePreviewConfig(workspace.config).ok)
+  const archivedConfig = currentConfigNeedsDowngrade ? JSON.stringify(workspace.config) : null
+  const savedConfigs = workspace.saved_configs.map((item) => (
+    resolveFreePreviewConfig(item.config).ok ? item : { ...item, read_only: true }
+  ))
+  const savedConfigsChanged = savedConfigs.some((item, index) => item.read_only !== workspace.saved_configs[index]?.read_only)
+  if (archivedConfig && !savedConfigs.some((item) => item.read_only && JSON.stringify(item.config) === archivedConfig)) {
+    savedConfigs.unshift({
+      id: randomUUID(),
+      name: '体验期高级配置（只读）',
+      config: workspace.config,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_used_at: null,
+      read_only: true,
+    })
+  }
+  if (!currentConfigNeedsDowngrade && !savedConfigsChanged) return null
+  return {
+    ...workspace,
+    config: currentConfigNeedsDowngrade ? getFreePreviewDefaultConfig() : workspace.config,
+    saved_configs: savedConfigs.slice(0, 20),
+    updated_at: new Date().toISOString(),
   }
 }
 

@@ -8,7 +8,7 @@ import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '..
 import { canonicalJson } from '../../lib/crypto'
 import { ACTIVE_PURCHASE_CHANNEL } from '../../lib/purchase'
 import type { WorkspaceSetupSection } from '../../lib/app-routes'
-import { countOwnedOperators, formatDate, getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
+import { countOwnedOperators, formatDate, getEffectiveProfilePermission, getProfileAccessLabel, isFreePreviewProfile, isFreePreviewTrialActive, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
 
@@ -59,10 +59,12 @@ export default function WorkspaceSetupPage({
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
   const isPreviewProfile = isFreePreviewProfile(profile)
-  const canEditConfig = profile.permission === 'advanced' || profile.permission === 'ultimate' || profile.permission === 'admin'
-  const canEditLimitedConfig = isPreviewProfile || profile.permission === 'recommended' || profile.permission === 'growth'
+  const isPreviewTrial = isFreePreviewTrialActive(profile)
+  const effectivePermission = getEffectiveProfilePermission(profile)
+  const canEditConfig = effectivePermission === 'advanced' || effectivePermission === 'ultimate' || effectivePermission === 'admin'
+  const canEditLimitedConfig = !canEditConfig && (isPreviewProfile || effectivePermission === 'recommended' || effectivePermission === 'growth')
   const freePreviewNeedsBinding = isPreviewProfile && !profile.skland_binding
-  const canManualEditOperators = !isPreviewProfile
+  const canManualEditOperators = !isPreviewProfile || isPreviewTrial
   const ownedOperatorCount = useMemo(() => countOwnedOperators(operators), [operators])
   const configChanged = workspace?.config ? canonicalJson(normalizedConfig) !== canonicalJson(workspace.config) : true
   const filteredOperators = useMemo(() => {
@@ -88,7 +90,7 @@ export default function WorkspaceSetupPage({
     setError(null)
     setStatus(null)
     setSklandRefreshNotice(null)
-    if (isPreviewProfile) {
+    if (isPreviewProfile && !isPreviewTrial) {
       setOperatorFileName(null)
       setError('免费个人排班档案的干员数据只能通过森空岛导入。')
       event.currentTarget.value = ''
@@ -169,7 +171,7 @@ export default function WorkspaceSetupPage({
         method: 'PATCH',
         json: {
           profile_id: profile.id,
-          ...(isPreviewProfile ? {} : { operators }),
+          ...((isPreviewProfile && !isPreviewTrial) ? {} : { operators }),
           config: normalizedConfig,
           elite_overrides: workspace?.elite_overrides ?? {},
         },

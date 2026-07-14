@@ -158,9 +158,9 @@ export default function PlansSection({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
-                    <SmallActionButton onClick={() => onUseSavedConfig(item)} disabled={busyAction === `touch:${item.id}`}>载入</SmallActionButton>
-                    <SmallActionButton onClick={() => void onRenameSavedConfig(item)} disabled={busyAction === `rename:${item.id}`}>改名</SmallActionButton>
-                    <SmallActionButton onClick={() => void onDeleteSavedConfig(item)} disabled={busyAction === `delete:${item.id}`} tone="danger">删除</SmallActionButton>
+                    <SmallActionButton onClick={() => onUseSavedConfig(item)} disabled={item.read_only || busyAction === `touch:${item.id}`}>载入</SmallActionButton>
+                    <SmallActionButton onClick={() => void onRenameSavedConfig(item)} disabled={item.read_only || busyAction === `rename:${item.id}`}>改名</SmallActionButton>
+                    <SmallActionButton onClick={() => void onDeleteSavedConfig(item)} disabled={item.read_only || busyAction === `delete:${item.id}`} tone="danger">删除</SmallActionButton>
                   </div>
                 </div>
               </div>
