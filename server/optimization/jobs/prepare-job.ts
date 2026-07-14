@@ -152,8 +152,13 @@ export async function prepareOptimizeJob(
 
       if (riskCheckedRecord !== checkedCdkRecord) {
         const store = await getCdkRecordStore();
-        await store.set('cdk/' + riskCheckedRecord.code_hash + '.json', riskCheckedRecord);
-        checkedCdkRecord = riskCheckedRecord;
+        checkedCdkRecord = await store.mutate('cdk/' + riskCheckedRecord.code_hash + '.json', (current) => ({
+          ...current,
+          activation_token_hash: riskCheckedRecord.activation_token_hash,
+          bound_user_agent_hash: riskCheckedRecord.bound_user_agent_hash,
+          user_agent_events: riskCheckedRecord.user_agent_events,
+          ip_prefix_events: riskCheckedRecord.ip_prefix_events,
+        })) ?? checkedCdkRecord;
       }
     }
 
@@ -180,6 +185,10 @@ export async function prepareOptimizeJob(
       } catch (error) {
         return fail({ error: error instanceof Error ? error.message : String(error) }, 400);
       }
+      const estimate = buildScenarioComparisonEstimate(expansion.scenarios.length, expansion.variableScenarioCount);
+      if (estimate.estimated_duration_ms > 10 * 60_000) {
+        return fail({ error: '场景组合预计计算时间超过十分钟上限，请减少场景或变量。', code: 'scenario_cost_exceeded' }, 429);
+      }
       return {
         ok: true,
         prepared: {
@@ -196,7 +205,7 @@ export async function prepareOptimizeJob(
             effectiveConfig,
             activeProfileId,
             factors: body.factors,
-            estimate: buildScenarioComparisonEstimate(expansion.scenarios.length, expansion.variableScenarioCount),
+            estimate,
           },
         },
       };
@@ -254,9 +263,7 @@ export async function prepareOptimizeJob(
           checkedCdkRecord,
           scheduleUsageBase,
           activeProfileId,
-          activeProfile,
           isPreviewProfile,
-          previewWorkspaceForGeneration,
           freeScheduleDecision,
           estimate,
           request: { ignore_elite, include_current, suggestions_only, upgrade_task_payload, history_source },

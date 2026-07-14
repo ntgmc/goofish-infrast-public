@@ -1,4 +1,5 @@
 import BrandLogo from '../components/BrandLogo'
+import PublicFooter from '../components/PublicFooter'
 import { Link } from 'react-router-dom'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 
@@ -218,6 +219,7 @@ export default function LandingPage({ onStart }: Props) {
           </button>
         </div>
       </section>
+      <PublicFooter />
     </main>
   )
 }

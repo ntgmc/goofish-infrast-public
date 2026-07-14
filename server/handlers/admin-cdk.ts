@@ -132,7 +132,7 @@ async function createCdkBatch(
       config_desc: null,
       schedule_generate_count: 0,
     }
-    await store.set(`cdk/${generated.codeHash}.json`, record)
+    await store.create(`cdk/${generated.codeHash}.json`, record)
     created.push(generated)
   }
 
@@ -225,11 +225,9 @@ async function handlePatch(req: Request): Promise<Response> {
     }
 
     if (action === 'update_note') {
-      const updated: CdkRecord = {
-        ...existing,
-        order_note: typeof order_note === 'string' && order_note.trim() ? order_note.trim().slice(0, 500) : null,
-      }
-      await store.set(key, updated)
+      const note = typeof order_note === 'string' && order_note.trim() ? order_note.trim().slice(0, 500) : null
+      const updated = await store.mutate(key, (current) => ({ ...current, order_note: note })) ?? existing
+      if (updated.status === 'revoked') return jsonResponse({ error: '已撤销授权不能修改备注。' }, 409)
       return jsonResponse({ updated: true, cdk: toAdminCdkDetail(updated) })
     }
 
@@ -240,11 +238,8 @@ async function handlePatch(req: Request): Promise<Response> {
       if (existing.status === 'revoked') {
         return jsonResponse({ error: '已撤销授权不能调整权限。' }, 409)
       }
-      const updated: CdkRecord = {
-        ...existing,
-        permission: permission as ProductPermissionMode,
-      }
-      await store.set(key, updated)
+      const updated = await store.mutate(key, (current) => ({ ...current, permission: permission as ProductPermissionMode })) ?? existing
+      if (updated.status === 'revoked') return jsonResponse({ error: '已撤销授权不能调整权限。' }, 409)
       return jsonResponse({
         updated: true,
         cdk_id: existing.code_hash.slice(0, 12),
@@ -290,11 +285,8 @@ async function handlePatch(req: Request): Promise<Response> {
         return jsonResponse({ error: '只能升级到更高等级的授权。' }, 409)
       }
 
-      const updated: CdkRecord = {
-        ...existing,
-        permission: nextPermission,
-      }
-      await store.set(key, updated)
+      const updated = await store.mutate(key, (current) => ({ ...current, permission: nextPermission })) ?? existing
+      if (updated.status === 'revoked') return jsonResponse({ error: '已撤销授权不能升级。' }, 409)
       return jsonResponse({
         upgraded: true,
         cdk_id: existing.code_hash.slice(0, 12),
@@ -326,12 +318,12 @@ async function handlePatch(req: Request): Promise<Response> {
       }
 
       const grantedAt = new Date().toISOString()
-      const updated: CdkRecord = {
-        ...existing,
-        operator_update_grant_count: (existing.operator_update_grant_count ?? 0) + 1,
+      const updated = await store.mutate(key, (current) => ({
+        ...current,
+        operator_update_grant_count: (current.operator_update_grant_count ?? 0) + 1,
         operator_update_granted_at: grantedAt,
-      }
-      await store.set(key, updated)
+      }), { allowedStatuses: ['used'] }) ?? existing
+      if (updated.status !== 'used') return jsonResponse({ error: '只能给已使用 CDK 发放干员更新权限。' }, 409)
       return jsonResponse({
         granted: true,
         already_granted: false,
@@ -354,12 +346,12 @@ async function handlePatch(req: Request): Promise<Response> {
     }
 
     const revokedAt = new Date().toISOString()
-    const updated: CdkRecord = {
-      ...existing,
+    const updated = await store.mutate(key, (current) => ({
+      ...current,
       status: 'revoked',
       revoked_at: revokedAt,
-    }
-    await store.set(key, updated)
+    }), { allowedStatuses: ['used', 'frozen'] }) ?? existing
+    if (updated.status !== 'revoked') return jsonResponse({ error: 'Only used or frozen CDKs can be revoked.' }, 409)
     return jsonResponse({
       revoked: true,
       already_revoked: false,

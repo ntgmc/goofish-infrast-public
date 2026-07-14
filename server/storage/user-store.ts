@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto'
 import { getPool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import type { PasswordAlgorithm, PasswordHashRecord } from '../security/password'
@@ -29,7 +30,7 @@ export interface UserAccountRecord {
   iterations: number
   password_algorithm?: PasswordAlgorithm
   permission: PermissionMode
-  status: 'active' | 'frozen' | 'revoked'
+  status: 'active' | 'frozen' | 'revoked' | 'pending_deletion'
   cdk_key: string | null
   cdk_code_hash: string | null
   cdk_order_hash: string | null
@@ -228,6 +229,21 @@ export async function deleteUserAccount(userId: string): Promise<void> {
   const client = await getPool().connect()
   try {
     await client.query('begin')
+    const profileRows = await client.query<{ record_json: UserGameAccountRecord }>('select record_json from user_game_accounts where user_id = $1', [userId])
+    const sampleSecret = process.env.DEPOT_SAMPLE_HASH_SECRET?.trim()
+    if (!sampleSecret) throw new Error('DEPOT_SAMPLE_HASH_SECRET is not configured')
+    const sampleHashes = profileRows.rows
+      .map((row) => row.record_json.skland_binding?.uid)
+      .filter((uid): uid is string => Boolean(uid))
+      .map((uid) => createHmac('sha256', sampleSecret).update(`skland:${uid}`).digest('hex'))
+    await client.query('delete from depot_value_samples where contributor_profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
+    if (sampleHashes.length > 0) await client.query('delete from depot_value_samples where uid_hash = any($1)', [sampleHashes])
+    await client.query('delete from usage_events where user_id = $1 or profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
+    await client.query("delete from optimization_idempotency where owner_key in (select 'profile:' || id from user_game_accounts where user_id = $1)", [userId])
+    await client.query("delete from optimization_submissions where owner_key in (select 'profile:' || id from user_game_accounts where user_id = $1)", [userId])
+    await client.query("delete from optimize_jobs where profile_id in (select id from user_game_accounts where user_id = $1) or owner_key in (select 'profile:' || id from user_game_accounts where user_id = $1)", [userId])
+    await client.query('delete from free_preview_pending_claims where user_id = $1', [userId])
+    await client.query('delete from free_preview_claims where user_id = $1 or profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
     await client.query(
       'delete from user_profile_workspaces where profile_id in (select id from user_game_accounts where user_id = $1)',
       [userId],

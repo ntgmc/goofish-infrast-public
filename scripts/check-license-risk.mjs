@@ -26,6 +26,7 @@ const regressedOperators = [
 let operatorRiskRecord = createRecord('operator-risk')
 operatorRiskRecord.baseline_operator_fingerprint = licenseUtils.buildOperatorFingerprint(baselineOperators)
 operatorRiskRecord.latest_operator_fingerprint = operatorRiskRecord.baseline_operator_fingerprint
+await store.create(`cdk/${operatorRiskRecord.code_hash}.json`, operatorRiskRecord)
 for (let index = 0; index < 3; index += 1) {
   const result = await licenseUtils.recordAdvancedOperatorUpdate(
     operatorRiskRecord,
@@ -48,6 +49,7 @@ for (let index = 0; index < 3; index += 1) {
 }
 
 let defaultDeviceRiskRecord = createRecord('device-risk-default-off')
+await store.create(`cdk/${defaultDeviceRiskRecord.code_hash}.json`, defaultDeviceRiskRecord)
 for (const userAgent of ['agent-a', 'agent-b', 'agent-c']) {
   const result = await licenseUtils.recordAdvancedOperatorUpdate(
     defaultDeviceRiskRecord,
@@ -65,6 +67,7 @@ await riskSettingsStore.set({ operator_data_risk_enabled: false, device_risk_ena
 let disabledOperatorRiskRecord = createRecord('operator-risk-disabled')
 disabledOperatorRiskRecord.baseline_operator_fingerprint = licenseUtils.buildOperatorFingerprint(baselineOperators)
 disabledOperatorRiskRecord.latest_operator_fingerprint = disabledOperatorRiskRecord.baseline_operator_fingerprint
+await store.create(`cdk/${disabledOperatorRiskRecord.code_hash}.json`, disabledOperatorRiskRecord)
 const disabledOperatorResult = await licenseUtils.recordAdvancedOperatorUpdate(
   disabledOperatorRiskRecord,
   regressedOperators,
@@ -77,6 +80,7 @@ if (!disabledOperatorResult.ok || disabledOperatorResult.profile_freeze_required
 
 await riskSettingsStore.set({ operator_data_risk_enabled: true, device_risk_enabled: true, updated_at: null })
 let enabledDeviceRiskRecord = createRecord('device-risk-enabled')
+await store.create(`cdk/${enabledDeviceRiskRecord.code_hash}.json`, enabledDeviceRiskRecord)
 for (const userAgent of ['agent-a', 'agent-b', 'agent-c']) {
   const result = await licenseUtils.recordAdvancedOperatorUpdate(
     enabledDeviceRiskRecord,
@@ -121,6 +125,23 @@ function createMemoryCdkRecordStore() {
   return {
     get: async (key) => records.get(key) ?? null,
     getByLicenseOrderHash: async (orderHash) => [...records.values()].find((record) => record.license_order_hash === orderHash) ?? null,
+    create: async (key, record) => {
+      if (records.has(key)) throw new Error('CDK record already exists')
+      records.set(key, record)
+    },
+    mutate: async (key, mutate, options) => {
+      const current = records.get(key) ?? null
+      if (!current || current.status === 'revoked' || (options?.allowedStatuses && !options.allowedStatuses.includes(current.status))) return current
+      const next = mutate(current)
+      if (next) records.set(key, next)
+      return records.get(key)
+    },
+    incrementScheduleGenerateCount: async (key) => {
+      const current = records.get(key)
+      if (!current || current.status !== 'used') return false
+      records.set(key, { ...current, schedule_generate_count: (current.schedule_generate_count ?? 0) + 1 })
+      return true
+    },
     set: async (key, record) => {
       records.set(key, record)
     },

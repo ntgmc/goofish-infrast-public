@@ -50,6 +50,7 @@ APP_DIR=/opt/goofish-infrast-v1-dev \
 BRANCH=dev \
 SERVICE_NAME=goofish-infrast-v1-dev \
 HEALTH_URL=http://127.0.0.1:3001/api/health \
+PUBLIC_BASE_URL=https://dev.maatool.com \
 LOCK_FILE=/tmp/goofish-infrast-v1-dev.deploy.lock \
 bash scripts/deploy-production.sh
 ```
@@ -129,6 +130,7 @@ repository-managed development API proxy snippet:
 sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-development.conf /etc/nginx/snippets/goofish-api-development.conf
 sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
+sudo install -m 0644 deploy/nginx/goofish-static-files.conf /etc/nginx/snippets/goofish-static-files.conf
 ```
 
 If this Nginx installation does not load `/etc/nginx/conf.d/*.conf` from inside
@@ -161,12 +163,16 @@ the API snippet:
 ```nginx
 include /etc/nginx/snippets/goofish-security-headers.conf;
 include /etc/nginx/snippets/goofish-api-development.conf;
+include /etc/nginx/snippets/goofish-static-files.conf;
 ```
 
 Do not include `goofish-security-headers.conf` in the plain HTTP redirect server;
 it contains one-year HSTS with `includeSubDomains`. The policy is enforced, not
 Report-Only, and API responses intentionally contain no CORS allow headers.
-Validate and reload Nginx after installing the snippet:
+Remove conflicting `location /` or `/assets/` definitions from the HTTPS vhost:
+the static snippet provides SPA fallback, immutable cache for real assets, and
+404 responses for missing assets while re-including static response security
+headers. Validate and reload Nginx after installing the snippet:
 
 ```bash
 sudo nginx -t
@@ -207,6 +213,7 @@ Optional `development` environment variables:
 | `DEPLOY_SCRIPT` | `/opt/goofish-infrast-v1-dev/scripts/deploy-production.sh` |
 | `DEPLOY_SERVICE_NAME` | `goofish-infrast-v1-dev` |
 | `DEPLOY_HEALTH_URL` | `http://127.0.0.1:3001/api/health` |
+| `DEPLOY_PUBLIC_BASE_URL` | `https://dev.maatool.com` |
 | `DEPLOY_LOCK_FILE` | `/tmp/goofish-infrast-v1-dev.deploy.lock` |
 
 Application secrets such as `DATABASE_URL`, `MAA_ADMIN_PASSWORD`,
@@ -221,6 +228,7 @@ After a dev deployment:
 sudo systemctl status goofish-infrast-v1-dev --no-pager --lines=50
 curl -fsS http://127.0.0.1:3001/api/health
 curl -fsS https://dev.maatool.com/api/health
+node scripts/check-public-http-smoke.mjs https://dev.maatool.com
 ```
 
 Also verify:

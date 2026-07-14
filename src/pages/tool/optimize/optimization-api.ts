@@ -5,9 +5,11 @@ import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../li
 export async function submitOptimizationJob(
   request: CreateOptimizationJobRequest,
   fallbackMessage: string,
+  idempotencyKey = crypto.randomUUID(),
 ): Promise<OptimizeJobAccepted> {
   const response = await apiJson<CreateOptimizationJobResponse>('/api/optimization/jobs', {
     method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
     json: request,
     fallbackMessage,
   })
@@ -29,9 +31,11 @@ export async function fetchOptimizationJob(
 export async function requestReorderCheck(
   request: CreateReorderCheckRequest,
   fallbackMessage: string,
+  idempotencyKey = crypto.randomUUID(),
 ): Promise<ReorderCheckResponse['result']> {
   const response = await apiJson<ReorderCheckResponse>('/api/optimization/reorder-checks', {
     method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
     json: request,
     fallbackMessage,
   })

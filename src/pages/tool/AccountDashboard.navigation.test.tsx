@@ -27,12 +27,12 @@ describe('AccountDashboard route navigation', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/announcements'))
 
     await act(async () => router.navigate(-1))
-    expect(router.state.location.pathname).toBe('/tool/tools')
-    expect(screen.getByRole('heading', { name: '工具' })).toBeInTheDocument()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/tools'))
+    await waitFor(() => expect(screen.getByRole('heading', { name: '工具' })).toBeInTheDocument())
 
     await act(async () => router.navigate(1))
-    expect(router.state.location.pathname).toBe('/tool/announcements')
-    expect(screen.getByRole('heading', { name: '公告' })).toBeInTheDocument()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/announcements'))
+    await waitFor(() => expect(screen.getByRole('heading', { name: '公告' })).toBeInTheDocument())
   })
 })
 

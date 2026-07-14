@@ -747,7 +747,7 @@ export interface AuthUser {
   id: string;
   email: string;
   permission: PermissionMode;
-  status: 'active' | 'frozen' | 'revoked';
+  status: 'active' | 'frozen' | 'revoked' | 'pending_deletion';
   cdk_status: string;
   cdk_order_hash: string | null;
   created_at: string;

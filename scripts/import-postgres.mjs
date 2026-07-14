@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS cdk_records (
   permission TEXT NOT NULL,
   license_order_hash TEXT,
   record_json JSONB NOT NULL,
+  record_revision INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 );

@@ -21,7 +21,7 @@ import {
   type UserGameAccountRecord,
   type UserWorkspaceRecord,
 } from '../storage/user-store'
-import { requireEnv, resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
+import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
 import {
   createHypergryphScan,
   decryptSklandCredential,
@@ -31,6 +31,7 @@ import {
   getHypergryphTokenByScanCode,
   getScanCode,
   importSklandOperatorsByCred,
+  isSklandCredentialCurrent,
   SklandClientError,
   type IntermediateInventory,
   type SklandBindingSummary,
@@ -748,7 +749,8 @@ function toSklandPreview(binding: SklandBindingSummary, operatorCount: number): 
 }
 
 function hashFreePreviewUid(uid: string): string {
-  const secret = process.env.FREE_PREVIEW_UID_HASH_SECRET || requireEnv('CDK_HASH_SECRET')
+  const secret = process.env.FREE_PREVIEW_UID_HASH_SECRET?.trim()
+  if (!secret) throw new Error('FREE_PREVIEW_UID_HASH_SECRET is not configured')
   return createHmac('sha256', secret)
     .update(`skland:${uid.trim()}`)
     .digest('hex')
@@ -839,7 +841,11 @@ function decodeCredentialCandidate(value: string): string {
 }
 
 function shouldReuseEncryptedCred(existingBinding: SklandBindingRecord | null | undefined, cred: string): existingBinding is SklandBindingRecord {
-  return Boolean(existingBinding?.encrypted_cred && cred === decryptIfPossible(existingBinding.encrypted_cred))
+  return Boolean(
+    existingBinding?.encrypted_cred
+      && isSklandCredentialCurrent(existingBinding.encrypted_cred)
+      && cred === decryptIfPossible(existingBinding.encrypted_cred),
+  )
 }
 
 function decryptIfPossible(encrypted: string): string | null {

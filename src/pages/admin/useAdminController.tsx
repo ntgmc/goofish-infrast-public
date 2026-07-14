@@ -708,7 +708,7 @@ export function useAdminController() {
     }
 
   const handleDeleteAppUser = async (user: AppUserSummary) => {
-      const confirmedEmail = window.prompt(`删除账号会清空 ${user.email} 的用户数据。请输入该邮箱确认删除。`)
+      const confirmedEmail = window.prompt(`立即永久擦除 ${user.email} 的全部个人数据（含档案、工作区、任务、样本与使用记录）。请输入该邮箱确认。`)
       if (confirmedEmail === null) return
       if (confirmedEmail.trim().toLowerCase() !== user.email.toLowerCase()) {
         setNotice(null)

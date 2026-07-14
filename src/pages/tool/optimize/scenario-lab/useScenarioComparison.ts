@@ -110,6 +110,7 @@ export function useScenarioComparison({
     try {
       const response = await apiJson<CreateScenarioComparisonJobResponse>('/api/optimization/jobs', {
         method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
         json: request,
         fallbackMessage: '提交场景对比任务失败',
       })

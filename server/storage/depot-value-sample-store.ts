@@ -4,6 +4,7 @@ import { ensureDatabaseSchema } from './schema'
 export interface DepotValueSampleRecord {
   version: 1
   uid_hash: string
+  contributor_profile_id?: string | null
   total_equivalent_sanity: number
   account_level: number | null
   operator_power_score: number
@@ -29,6 +30,7 @@ export interface DepotValueSampleDistribution {
 export interface DepotValueSampleStore {
   save: (record: DepotValueSampleRecord) => Promise<void>
   getDistribution: (totalEquivalentSanity: number) => Promise<DepotValueSampleDistribution>
+  deleteForProfile: (profileId: string) => Promise<void>
 }
 
 let schemaReady: Promise<void> | null = null
@@ -46,11 +48,12 @@ export function createPostgresDepotValueSampleStore(): DepotValueSampleStore {
       await ensureSchema()
       await query(
         `insert into depot_value_samples
-          (uid_hash, total_equivalent_sanity, account_level, operator_power_score, operator_count, elite2_count,
+          (uid_hash, contributor_profile_id, total_equivalent_sanity, account_level, operator_power_score, operator_count, elite2_count,
            six_star_count, six_star_e2_count, e2_90_count, inventory_item_count, priced_count, unpriced_count,
            sample_json, sampled_at, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16)
          on conflict (uid_hash) do update set
+           contributor_profile_id = excluded.contributor_profile_id,
            total_equivalent_sanity = excluded.total_equivalent_sanity,
            account_level = excluded.account_level,
            operator_power_score = excluded.operator_power_score,
@@ -67,6 +70,7 @@ export function createPostgresDepotValueSampleStore(): DepotValueSampleStore {
            updated_at = excluded.updated_at`,
         [
           record.uid_hash,
+          record.contributor_profile_id ?? null,
           record.total_equivalent_sanity,
           record.account_level,
           record.operator_power_score,
@@ -103,6 +107,10 @@ export function createPostgresDepotValueSampleStore(): DepotValueSampleStore {
         less_count: result.rows[0]?.less_count ?? 0,
         equal_count: result.rows[0]?.equal_count ?? 0,
       }
+    },
+    deleteForProfile: async (profileId) => {
+      await ensureSchema()
+      await query('delete from depot_value_samples where contributor_profile_id = $1', [profileId])
     },
   }
 }

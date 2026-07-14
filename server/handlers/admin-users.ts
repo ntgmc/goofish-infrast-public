@@ -288,7 +288,7 @@ async function syncLinkedCdkPermission(profile: UserGameAccountRecord, permissio
   const store = await getCdkRecordStore()
   const record = await store.get(profile.cdk_key)
   if (!record) return
-  await store.set(profile.cdk_key, { ...record, permission })
+  await store.mutate(profile.cdk_key, (current) => ({ ...current, permission }))
 }
 
 async function buildAdminUserDetail(user: UserAccountRecord) {

@@ -1,4 +1,5 @@
 import * as esbuild from 'esbuild'
+import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -863,7 +864,7 @@ async function assertReorderRecommendationFromBaseline(profileId, baselineResult
     throw new Error(`免费档案重排检测 ${expectedRecommendation}：预期 200 ${expectedRecommendation}，实际 ${checked.status} ${checked.body?.recommendation}`)
   }
   assertReorderCheckResult(checked.body, `免费档案重排检测 ${expectedRecommendation}`)
-  const bonus = store.workspaces.get(profile.id)?.free_schedule_entitlement?.strong_reorder_bonus
+  const bonus = checked.body?.free_schedule_entitlement?.strong_reorder_bonus
   if (expectedRecommendation === 'strongly_recommended') {
     if (!bonus || bonus.used_at) throw new Error('免费档案强烈建议重排：预期授予未使用的当月额外生成权益')
   } else if (bonus) {
@@ -961,6 +962,9 @@ async function call(handler, path, body = {}, init = {}) {
     method,
     headers: {
       'Content-Type': 'application/json',
+      ...(requestPath === '/api/optimization/jobs' || requestPath === '/api/optimization/reorder-checks'
+        ? { 'Idempotency-Key': `workspace-history-${randomUUID()}` }
+        : {}),
       cookie: init.auth === false ? '' : 'maa_session=test-session',
     },
   }
@@ -1123,6 +1127,9 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
     export async function getProfileForUser(userId, profileId) {
       const profile = store.profiles.get(profileId)
       return profile?.user_id === userId ? profile : null
+    }
+    export async function getProfileById(profileId) {
+      return store.profiles.get(profileId) ?? null
     }
     export async function saveUserProfile(profile) {
       store.profiles.set(profile.id, profile)
@@ -1299,7 +1306,7 @@ function memoryLicenseUtilsModule() {
     export function formatRiskFreezeMessage(message) { return message }
     export async function freezeCdkRecord(record) { return record }
     export function getPermissionMode(license) { return license?.permission ?? 'advanced' }
-    export async function getCdkRecordStore() { return { get: async () => null, set: async () => undefined } }
+    export async function getCdkRecordStore() { return { get: async () => null, mutate: async () => null } }
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, device_risk_enabled: false, updated_at: null } }
     export async function findCdkRecordByLicenseOrderHash() { return null }
     export async function incrementCdkScheduleGenerateCount() {}
@@ -1328,6 +1335,7 @@ function memoryLicenseUtilsModule() {
     export function validateLicenseForRequest(license) { return license ? { ok: true, license } : { ok: false, message: 'invalid license' } }
     export function validateOperators(operators) { return Array.isArray(operators) ? { ok: true, operators } : { ok: false, message: 'invalid operators' } }
     export function verifyLicenseSignature() { return true }
+    export function verifyLicenseSignatureWithKeyring() { return true }
     function matchesFreePreset(config) {
       return matchesPreset(config, {
         layout: '2-4-3',
