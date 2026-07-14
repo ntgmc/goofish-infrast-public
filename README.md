@@ -169,6 +169,8 @@ npm run check:migration
 并配合 `deploy/nginx/goofish-rate-limit-zones.conf` 限制登录与管理认证洪泛。
 `deploy/nginx/goofish-security-headers.conf` 为静态页面、API 和 Nginx 自身错误响应
 提供统一的 CSP、HSTS、frame、MIME、referrer 和 Permissions Policy 基线。
+`deploy/nginx/goofish-static-files.conf` 将 `/assets/` 与 SPA 路由分开：哈希资源
+只允许命中真实文件并长期缓存，HTML 文档保持可重新验证。
 
 先把 zone 配置安装到 Nginx 的 `http {}` 上下文，再安装 server 片段：
 
@@ -176,6 +178,7 @@ npm run check:migration
 sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
 sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
+sudo install -m 0644 deploy/nginx/goofish-static-files.conf /etc/nginx/snippets/goofish-static-files.conf
 ```
 
 如果当前 Nginx 不在 `http {}` 中加载 `/etc/nginx/conf.d/*.conf`，需要在
@@ -187,10 +190,7 @@ sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snipp
 ```nginx
 include /etc/nginx/snippets/goofish-security-headers.conf;
 include /etc/nginx/snippets/goofish-api-production.conf;
-
-location / {
-  try_files $uri $uri/ /index.html;
-}
+include /etc/nginx/snippets/goofish-static-files.conf;
 ```
 
 应用前必须检查配置，检查成功后再平滑重载：
@@ -198,6 +198,14 @@ location / {
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
+```
+
+首次切换后，对生产和 dev HTTPS vhost 分别运行公网验收。它会检查 `/`、`/tool`、
+`/api/health` 的安全头、首页引用的真实 JS/CSS 缓存，以及不存在 asset 是否为 404：
+
+```bash
+node scripts/check-public-http-smoke.mjs https://maatool.com
+node scripts/check-public-http-smoke.mjs https://dev.maatool.com
 ```
 
 超过请求体限额时由 Nginx 直接返回 413；登录或管理认证请求超过 IP 速率时

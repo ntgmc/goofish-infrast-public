@@ -130,6 +130,7 @@ try {
   }
 
   await assertNginxBaseline()
+  await assertStaticNginxBaseline()
   await assertNoServerCorsHeaders()
   await assertDeploymentDocumentation()
 
@@ -178,6 +179,19 @@ async function assertNginxBaseline() {
   assert.equal(nginx.includes('Content-Security-Policy-Report-Only'), false)
 }
 
+async function assertStaticNginxBaseline() {
+  const nginx = await readFile('deploy/nginx/goofish-static-files.conf', 'utf8')
+  assert(nginx.includes('location ^~ /assets/ {'), 'Nginx should reserve /assets/ for static files')
+  assert(nginx.includes('try_files $uri =404;'), 'missing /assets/ files must return 404')
+  assert(nginx.includes('add_header Cache-Control "public, max-age=31536000, immutable";'))
+  assert.equal(nginx.includes('add_header Cache-Control "public, max-age=31536000, immutable" always;'), false)
+  assert(nginx.includes('location / {'), 'Nginx should retain an SPA fallback location')
+  assert(nginx.includes('try_files $uri $uri/ /index.html;'), 'SPA routes must fall back to index.html')
+  assert(nginx.includes('add_header Cache-Control "no-cache";'))
+  const securityIncludes = nginx.match(/include \/etc\/nginx\/snippets\/goofish-security-headers\.conf;/g) ?? []
+  assert.equal(securityIncludes.length, 2, 'static Nginx locations must restore security headers after add_header')
+}
+
 async function assertNoServerCorsHeaders() {
   const paths = await readdir('server', { recursive: true })
   const sourcePaths = paths
@@ -196,6 +210,7 @@ async function assertDeploymentDocumentation() {
   ]) {
     const contents = await readFile(path, 'utf8')
     assert(contents.includes('goofish-security-headers.conf'), `${path} should install the security header snippet`)
+    assert(contents.includes('goofish-static-files.conf'), `${path} should install the static Nginx snippet`)
     assert(/HTTPS|TLS/i.test(contents), `${path} should limit the security snippet to TLS`)
   }
 }

@@ -117,6 +117,7 @@ NETLIFY_BLOBS_CONTEXT
 sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
 sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
+sudo install -m 0644 deploy/nginx/goofish-static-files.conf /etc/nginx/snippets/goofish-static-files.conf
 ```
 
 `goofish-rate-limit-zones.conf` 必须从 Nginx 的 `http {}` 上下文加载；如果当前
@@ -135,10 +136,7 @@ server {
 
   include /etc/nginx/snippets/goofish-security-headers.conf;
   include /etc/nginx/snippets/goofish-api-production.conf;
-
-  location / {
-    try_files $uri $uri/ /index.html;
-  }
+  include /etc/nginx/snippets/goofish-static-files.conf;
 }
 ```
 
@@ -147,6 +145,8 @@ server {
 同源策略，不返回 `Access-Control-Allow-*`。
 
 `try_files $uri $uri/ /index.html;` 必须保留，否则 Vite SPA 路由刷新会 404。
+受管静态片段将该 fallback 与 `/assets/` 的 `try_files $uri =404` 分开，避免
+不存在的 chunk 被首页伪装为成功；真实哈希资源使用一年 immutable 缓存。
 受管片段将普通请求体限制为 256 KiB，并为 `/api/depot-value` 保留 1 MiB
 限额。同步后运行 `sudo nginx -t`，检查成功再执行
 `sudo systemctl reload nginx`。超过代理层限额的请求由 Nginx 直接返回 413，
