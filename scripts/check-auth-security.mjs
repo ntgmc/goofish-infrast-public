@@ -1729,6 +1729,8 @@ function userLicenseUtilsMock() {
     export function hashCdk(value) { return value }
     export function normalizeCode(value) { return value }
     export function normalizePermissionMode(value) { return value }
+    export function getFreePreviewDefaultConfig() { return {} }
+    export function resolveFreePreviewConfig(config) { return { ok: true, config } }
     export function requireEnv(name) { return process.env[name] ?? '' }
   `
 }
