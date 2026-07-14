@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import BuildMetaStrip from './components/BuildMetaStrip'
 import RouteLifecycle from './components/RouteLifecycle'
+import RouteMetadata from './components/RouteMetadata'
 import LandingPage from './pages/LandingPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import CancelAccountDeletionPage from './pages/CancelAccountDeletionPage'
@@ -19,6 +20,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">
+      <RouteMetadata />
       <RouteLifecycle />
       <Routes>
         <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
