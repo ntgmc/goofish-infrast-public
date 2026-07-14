@@ -144,6 +144,15 @@ CREATE TABLE IF NOT EXISTS user_accounts (
 CREATE INDEX IF NOT EXISTS idx_user_accounts_email ON user_accounts(email);
 CREATE INDEX IF NOT EXISTS idx_user_accounts_cdk_code_hash ON user_accounts(cdk_code_hash);
 
+CREATE TABLE IF NOT EXISTS account_deletion_requests (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE REFERENCES user_accounts(id) ON DELETE CASCADE,
+  cancel_token_hash TEXT NOT NULL UNIQUE,
+  scheduled_for TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_scheduled_for ON account_deletion_requests(scheduled_for);
+
 CREATE TABLE IF NOT EXISTS user_sessions (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
@@ -376,6 +385,37 @@ CREATE TABLE IF NOT EXISTS depot_value_samples (
 CREATE INDEX IF NOT EXISTS idx_depot_value_samples_total_sanity ON depot_value_samples(total_equivalent_sanity);
 CREATE INDEX IF NOT EXISTS idx_depot_value_samples_account_level ON depot_value_samples(account_level);
 CREATE INDEX IF NOT EXISTS idx_depot_value_samples_operator_power ON depot_value_samples(operator_power_score);
+
+ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS user_id TEXT;
+ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS profile_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_usage_events_user_id ON usage_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_usage_events_profile_id ON usage_events(profile_id);
+UPDATE usage_events SET profile_id = record_json->>'profile_id' WHERE profile_id IS NULL AND record_json ? 'profile_id';
+
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS profile_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_profile_id ON optimize_jobs(profile_id);
+UPDATE optimize_jobs SET profile_id = substring(owner_key from '^profile:(.*)$') WHERE profile_id IS NULL AND owner_key LIKE 'profile:%';
+UPDATE optimize_jobs
+SET payload_json = payload_json - 'activeProfile' - 'previewWorkspaceForGeneration'
+WHERE payload_json ? 'activeProfile' OR payload_json ? 'previewWorkspaceForGeneration';
+
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS contributor_profile_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_depot_value_samples_contributor_profile_id ON depot_value_samples(contributor_profile_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_usage_events_user') THEN
+    ALTER TABLE usage_events ADD CONSTRAINT fk_usage_events_user FOREIGN KEY (user_id) REFERENCES user_accounts(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_usage_events_profile') THEN
+    ALTER TABLE usage_events ADD CONSTRAINT fk_usage_events_profile FOREIGN KEY (profile_id) REFERENCES user_game_accounts(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_optimize_jobs_profile') THEN
+    ALTER TABLE optimize_jobs ADD CONSTRAINT fk_optimize_jobs_profile FOREIGN KEY (profile_id) REFERENCES user_game_accounts(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_depot_samples_profile') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT fk_depot_samples_profile FOREIGN KEY (contributor_profile_id) REFERENCES user_game_accounts(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+END $$;
 
 ALTER TABLE user_accounts ALTER COLUMN cdk_key DROP NOT NULL;
 ALTER TABLE user_accounts ALTER COLUMN cdk_code_hash DROP NOT NULL;

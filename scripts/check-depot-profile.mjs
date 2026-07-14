@@ -178,6 +178,9 @@ function memoryUserStoreModule() {
       const profile = store.profiles.get(profileId)
       return profile?.user_id === userId ? profile : null
     }
+    export async function getProfileById(profileId) {
+      return store.profiles.get(profileId) ?? null
+    }
     export async function getProfileWorkspace(profileId) {
       return store.workspaces.get(profileId) ?? null
     }

@@ -4,6 +4,7 @@ import BuildMetaStrip from './components/BuildMetaStrip'
 import RouteLifecycle from './components/RouteLifecycle'
 import LandingPage from './pages/LandingPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import CancelAccountDeletionPage from './pages/CancelAccountDeletionPage'
 
 const ToolPage = lazy(() => import('./pages/ToolPage'))
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'))
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
         <Route path="/tool/*" element={<LazyPage fallback="正在载入工作台..."><ToolPage /></LazyPage>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/cancel-account-deletion" element={<CancelAccountDeletionPage />} />
         <Route path="/announcements" element={<LazyPage fallback="正在载入公告..."><AnnouncementsPage /></LazyPage>} />
         <Route path="/faq" element={<LazyPage fallback="正在载入常见问题..."><PublicInfoPage page="faq" /></LazyPage>} />
         <Route path="/support" element={<LazyPage fallback="正在载入客服信息..."><PublicInfoPage page="support" /></LazyPage>} />

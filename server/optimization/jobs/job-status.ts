@@ -28,6 +28,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       id: randomUUID(),
       priority: prepared.priorityValue,
       owner_key: prepared.ownerKey,
+      profile_id: (prepared.payload as { activeProfileId?: string | null }).activeProfileId ?? null,
       permission: prepared.permission,
       source: prepared.source,
       payload_json: prepared.payload,

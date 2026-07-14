@@ -246,13 +246,14 @@ export function createPostgresUsageEventStore(): UsageEventStore {
   return {
     set: async (key, record) => {
       await query(
-        `insert into usage_events (key, event, visitor_id, date, created_at, record_json)
-         values ($1, $2, $3, $4, $5, $6::jsonb)
+        `insert into usage_events (key, event, visitor_id, date, created_at, profile_id, record_json)
+         values ($1, $2, $3, $4, $5, $6, $7::jsonb)
          on conflict (key) do update set
           event = excluded.event,
           visitor_id = excluded.visitor_id,
           date = excluded.date,
           created_at = excluded.created_at,
+          profile_id = excluded.profile_id,
           record_json = excluded.record_json`,
         [
           key,
@@ -260,6 +261,7 @@ export function createPostgresUsageEventStore(): UsageEventStore {
           record.visitor_id,
           record.date,
           record.created_at,
+          record.profile_id ?? null,
           JSON.stringify(record),
         ],
       )
