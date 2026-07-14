@@ -9,7 +9,12 @@ import { ensureDatabaseSchema } from './schema'
 import type { CdkRecord } from '../handlers/license-utils'
 
 export class CdkAlreadyRedeemedError extends Error {}
-export class IdempotencyConflictError extends Error {}
+export class IdempotencyConflictError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'IdempotencyConflictError'
+  }
+}
 
 export function createRequestHash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
