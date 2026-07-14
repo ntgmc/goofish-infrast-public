@@ -6,7 +6,7 @@ export function createAccountLicense(profile: UserGameAccount, operators: Licens
     order_hash: profile.cdk_order_hash ?? profile.id.slice(0, 16),
     operators,
     config,
-    permission: normalizePermission(profile.permission),
+    permission: normalizePermission(getEffectiveProfilePermission(profile)),
     issued_at: profile.created_at,
     sig: `account-${profile.id}`,
   }
@@ -24,11 +24,20 @@ export function isFreePreviewProfile(profile: UserGameAccount): boolean {
   return profile.kind === 'free_preview'
 }
 
+export function isFreePreviewTrialActive(profile: UserGameAccount): boolean {
+  return isFreePreviewProfile(profile) && profile.trial?.active === true
+}
+
+export function getEffectiveProfilePermission(profile: UserGameAccount): PermissionMode {
+  return profile.trial?.effective_permission ?? profile.permission
+}
+
 export function isSchedulableProfile(profile: UserGameAccount): boolean {
   return profile.kind === 'cdk' || profile.kind === 'free_preview'
 }
 
 export function getProfileAccessLabel(profile: UserGameAccount): string {
+  if (isFreePreviewTrialActive(profile)) return '高级版限时体验'
   if (isFreePreviewProfile(profile)) return '免费预览'
   if (profile.permission === 'recommended') return '单次重置卡'
   if (profile.permission === 'growth') return '练度提升卡'

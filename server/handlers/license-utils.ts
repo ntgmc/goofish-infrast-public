@@ -553,6 +553,10 @@ export interface CdkCodeMatch {
   key: string;
 }
 
+export function getFreePreviewDefaultConfig(): LicenseConfig {
+  return cloneConfig(PRESET_CONFIGS[0])
+}
+
 export async function findCdkRecordByCode(code: string, hashSecrets = getCdkHashSecretKeyring()): Promise<CdkCodeMatch | null> {
   const store = await getCdkRecordStore()
   for (const hashSecret of hashSecrets) {

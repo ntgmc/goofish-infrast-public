@@ -772,6 +772,7 @@ export interface UserGameAccount {
   user_id: string;
   kind: UserGameAccountKind;
   permission: PermissionMode;
+  trial?: FreePreviewTrial | null;
   status: 'active' | 'frozen' | 'revoked';
   cdk_order_hash: string | null;
   display_name: string;
@@ -780,6 +781,14 @@ export interface UserGameAccount {
   operator_count: number;
   updated_at: string | null;
   created_at: string;
+}
+
+export interface FreePreviewTrial {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  active: boolean;
+  effective_permission: 'advanced' | null;
 }
 
 export interface UserWorkspace {
@@ -801,6 +810,7 @@ export interface WorkspaceSavedConfig {
   created_at: string;
   updated_at: string;
   last_used_at: string | null;
+  read_only?: boolean;
 }
 
 export type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legacy';

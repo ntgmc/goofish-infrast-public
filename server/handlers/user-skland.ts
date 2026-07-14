@@ -22,6 +22,7 @@ import {
   type UserWorkspaceRecord,
 } from '../storage/user-store'
 import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
+import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
 import {
   createHypergryphScan,
   decryptSklandCredential,
@@ -632,9 +633,9 @@ function resolveSklandImportConfig(
       lastMessage = configCheck.message
       continue
     }
-    const permissionCheck = isFreePreviewProfile(profile)
+    const permissionCheck = isFreePreviewProfile(profile) && !isFreePreviewTrialActive(profile)
       ? resolveFreePreviewConfig(configCheck.config)
-      : resolveConfigForPermission(profile.permission, configCheck.config)
+      : resolveConfigForPermission(getEffectiveProfilePermission(profile), configCheck.config)
     if (permissionCheck.ok) return { config: permissionCheck.config }
     lastMessage = permissionCheck.message
   }

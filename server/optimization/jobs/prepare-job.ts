@@ -10,6 +10,7 @@ import { validateRequestLicense, recordScheduleGenerate, scheduleFailure, resolv
 import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammettaEnabled, resolveOptimizeDurationEstimate } from './job-status';
 import { buildScenarioComparisonEstimate } from './job-status';
 import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
+import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../../free-preview-trial';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -56,6 +57,7 @@ export async function prepareOptimizeJob(
     let activeProfileId: string | null = null;
     let activeProfile: UserGameAccountRecord | null = null;
     let isPreviewProfile = false;
+    let isPreviewTrial = false;
 
     if (auth) {
       activeProfileId = typeof profile_id === 'string' && profile_id ? profile_id : auth.activeProfile?.id ?? null;
@@ -74,6 +76,7 @@ export async function prepareOptimizeJob(
       }
       activeProfile = profile;
       isPreviewProfile = isFreePreviewProfile(profile);
+      isPreviewTrial = isFreePreviewTrialActive(profile);
       if (isPreviewProfile && !profile.skland_binding) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: 'free_preview', source: 'free_preview' });
         return fail({ error: '免费个人排班档案必须先绑定森空岛后才能生成排班。' }, 403);
@@ -93,7 +96,7 @@ export async function prepareOptimizeJob(
         order_hash: profile.cdk_order_hash || profile.id.slice(0, 16),
         operators,
         config,
-        permission: profile.permission,
+        permission: getEffectiveProfilePermission(profile),
         issued_at: profile.created_at,
         sig: 'account-' + profile.id,
       };
@@ -107,7 +110,7 @@ export async function prepareOptimizeJob(
       effectiveLicense = licenseCheck.license;
     }
 
-    const optimizePermission: OptimizeConfigPermission = isPreviewProfile
+    const optimizePermission: OptimizeConfigPermission = isPreviewProfile && !isPreviewTrial
       ? 'free_preview'
       : getPermissionMode(effectiveLicense);
     const scheduleUsageBase: Partial<ScheduleUsageContext> = {
@@ -162,13 +165,13 @@ export async function prepareOptimizeJob(
       }
     }
 
-    const canUseUpgrades = !isPreviewProfile && canUseUpgradeFeatures(effectiveLicense);
+    const canUseUpgrades = (!isPreviewProfile || isPreviewTrial) && canUseUpgradeFeatures(effectiveLicense);
     if (!canUseUpgrades && (ignore_elite || include_current || suggestions_only)) {
       scheduleUsage = scheduleFailure('permission_denied', scheduleUsageBase);
       return fail({ error: '当前套餐不包含练度提升建议。' }, 403);
     }
 
-    const configForPermission = isPreviewProfile
+    const configForPermission = isPreviewProfile && !isPreviewTrial
       ? resolveFreePreviewConfig(config)
       : resolveConfigForPermission(getPermissionMode(effectiveLicense), config);
     if (!configForPermission.ok) {
@@ -221,7 +224,7 @@ export async function prepareOptimizeJob(
       ? await getWorkspace(activeProfileId) ?? emptyWorkspace(activeProfileId)
       : null;
     let freeScheduleDecision: Extract<FreeScheduleGenerateDecision, { ok: true }> | null = null;
-    if (isPreviewProfile && activeProfileId && previewWorkspaceForGeneration) {
+    if (isPreviewProfile && !isPreviewTrial && activeProfileId && previewWorkspaceForGeneration) {
       const decision = resolveFreeScheduleGenerateDecision(previewWorkspaceForGeneration.free_schedule_entitlement);
       if (!decision.ok) {
         scheduleUsage = scheduleFailure('permission_denied', scheduleUsageBase);
@@ -264,6 +267,7 @@ export async function prepareOptimizeJob(
           scheduleUsageBase,
           activeProfileId,
           isPreviewProfile,
+          isPreviewTrial,
           freeScheduleDecision,
           estimate,
           request: { ignore_elite, include_current, suggestions_only, upgrade_task_payload, history_source },

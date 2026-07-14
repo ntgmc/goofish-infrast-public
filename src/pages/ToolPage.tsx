@@ -15,7 +15,7 @@ import {
 import AccountDashboard from './tool/AccountDashboard'
 import AuthPage from './tool/AuthPage'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
-import { isFreePreviewProfile, isSchedulableProfile } from './tool/tool-utils'
+import { isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
@@ -126,7 +126,7 @@ export default function ToolPage() {
     return <Navigate to={workspace?.operators ? workspaceSetupPath('config') : workspaceSetupPath('operators')} replace />
   }
 
-  if (route.section === 'lab' && (isFreePreviewProfile(activeProfile) || !canUseScenarioComparison(license))) {
+  if (route.section === 'lab' && !canUseScenarioComparison(license)) {
     return <Navigate to={optimizePath('overview')} replace />
   }
 

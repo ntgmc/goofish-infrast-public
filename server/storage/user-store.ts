@@ -15,6 +15,7 @@ import type {
   UserWorkspace,
   WorkspaceResultHistoryItem,
   WorkspaceSavedConfig,
+  FreePreviewTrial,
 } from '../../src/lib/types'
 
 let schemaReady: Promise<void> | null = null
@@ -810,12 +811,17 @@ export function toPublicWorkspace(workspace: UserWorkspaceRecord | null): UserWo
   }
 }
 
-export function toPublicProfile(profile: UserGameAccountRecord, workspace?: UserWorkspaceRecord | null): UserGameAccount {
+export function toPublicProfile(
+  profile: UserGameAccountRecord,
+  workspace?: UserWorkspaceRecord | null,
+  trial: FreePreviewTrial | null = null,
+): UserGameAccount {
   return {
     id: profile.id,
     user_id: profile.user_id,
     kind: normalizeProfileKind(profile),
     permission: profile.permission,
+    trial,
     status: profile.status,
     cdk_order_hash: profile.cdk_order_hash,
     display_name: profile.display_name,
@@ -899,6 +905,7 @@ function normalizeSavedConfigs(value: unknown): WorkspaceSavedConfig[] {
       created_at: createdAt,
       updated_at: updatedAt,
       last_used_at: typeof raw.last_used_at === 'string' ? raw.last_used_at : null,
+      read_only: raw.read_only === true,
     }]
   }).slice(0, WORKSPACE_SAVED_CONFIG_LIMIT)
 }
