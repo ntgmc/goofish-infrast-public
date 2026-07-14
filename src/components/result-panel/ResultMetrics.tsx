@@ -47,12 +47,13 @@ export default function ResultMetrics({
     : ''
 
   return (
-    <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
-      <div className="border-b border-surface-3/60 px-5 py-4 sm:px-6">
+    <section className="tool-panel overflow-hidden">
+      <div className="tool-panel-header px-5 py-4 sm:px-6">
+        <p className="tool-eyebrow">关键指标</p>
         <h3 className="text-base font-semibold text-ink-primary">数据</h3>
       </div>
       {isAnalysis && analysisSummary?.warnings.length ? (
-        <div className="mx-5 mt-5 rounded-xl border border-warning/30 bg-warning/10 p-4 sm:mx-6">
+        <div className="tool-alert tool-alert--warning mx-5 mt-5 sm:mx-6">
           <p className="text-sm font-semibold text-warning">分析提示</p>
           <ul className="mt-2 space-y-1 text-sm leading-6 text-ink-secondary">
             {analysisSummary.warnings.slice(0, 5).map((warning, index) => (
@@ -61,7 +62,7 @@ export default function ResultMetrics({
           </ul>
         </div>
       ) : null}
-      <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
+      <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
         {isAnalysis ? (
           <MetricCard
             label="红脸风险"

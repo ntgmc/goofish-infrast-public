@@ -196,13 +196,13 @@ export default function DepotValuePage() {
   }
 
   return (
-    <main className="min-h-screen bg-surface-0 px-4 py-6 text-ink-primary sm:px-6 lg:px-8" tabIndex={-1} data-route-focus>
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <main className="tool-page" tabIndex={-1} data-route-focus>
+      <div className="tool-page-frame max-w-6xl">
+        <header className="tool-page-header flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <BrandLogo size="md" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-brand-500">MAA 小工具</p>
+              <p className="tool-eyebrow">MAA 小工具</p>
               <h1 className="mt-2 text-2xl font-semibold text-ink-primary">仓库价值分析器</h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
                 上传 MAA 仓库 JSON，按等价理智估算资产，并生成适合贴吧和 QQ 群分享的结果图。
@@ -212,21 +212,21 @@ export default function DepotValuePage() {
           <nav className="flex flex-wrap gap-2">
             <Link
               to="/"
-              className="rounded-lg border border-surface-3 bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary"
+              className="tool-secondary-action"
             >
               返回首页
             </Link>
             <Link
               to="/tool/profiles"
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
+              className="tool-primary-action"
             >
               进入工作区
             </Link>
           </nav>
         </header>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr] lg:items-start">
-          <section className="rounded-lg border border-surface-3 bg-surface-1 p-5 sm:p-6">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.9fr] lg:items-start">
+          <section className="tool-panel p-5 sm:p-6">
             <div>
               <div>
                 <h2 className="text-lg font-semibold text-ink-primary">导入仓库</h2>
@@ -237,13 +237,13 @@ export default function DepotValuePage() {
             </div>
 
             {error && (
-              <div className="mt-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">
+              <div className="tool-alert tool-alert--error mt-5" role="alert">
                 {error}
               </div>
             )}
 
             <form onSubmit={analyzeUpload} className="mt-5 space-y-5">
-              <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+              <section className="tool-inset p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-ink-primary">粘贴仓库 JSON</h3>
@@ -255,7 +255,7 @@ export default function DepotValuePage() {
                   <button
                     type="button"
                     onClick={() => void readClipboard()}
-                    className="rounded-lg border border-surface-3 bg-surface-1 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary"
+                    className="tool-secondary-action"
                   >
                     读取剪贴板
                   </button>
@@ -268,11 +268,11 @@ export default function DepotValuePage() {
                     setError(null)
                   }}
                   rows={9}
-                  className="mt-4 w-full resize-y rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 font-mono text-sm text-ink-primary outline-none transition-colors duration-150 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                  className="tool-field mt-4 resize-y font-mono"
                   placeholder='粘贴 JSON，例如 {"2001":16000,"30011":982}'
                 />
                 {depotText.trim() && (
-                  <span className="mt-3 inline-flex rounded-md bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+                  <span className="tool-status tool-status--success mt-3">
                     已粘贴 {depotText.trim().length} 个字符
                   </span>
                 )}
@@ -281,7 +281,7 @@ export default function DepotValuePage() {
               <button
                 type="submit"
                 disabled={loading !== null || !depotText.trim()}
-                className="w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+                className="tool-primary-action w-full"
               >
                 {loading === 'upload' ? '正在估算...' : '分析剪贴板仓库'}
               </button>
@@ -296,15 +296,15 @@ export default function DepotValuePage() {
                   </p>
                 </div>
                 {auth?.user && (
-                  <span className="inline-flex whitespace-nowrap rounded-md bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+                  <span className="tool-status tool-status--success whitespace-nowrap">
                     已登录
                   </span>
                 )}
               </div>
               {authLoading ? (
-                <p className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-3 text-sm text-ink-secondary">正在确认登录状态...</p>
+                <p className="tool-inset mt-4 p-3 text-sm text-ink-secondary">正在确认登录状态...</p>
               ) : !auth?.user ? (
-                <div className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-4">
+                <div className="tool-inset mt-4 p-4">
                   <AuthForm
                     compact
                     allowCdk={false}
@@ -320,7 +320,7 @@ export default function DepotValuePage() {
                         <select
                           value={selectedSklandProfile?.id ?? selectedProfileId}
                           onChange={(event) => setSelectedProfileId(event.currentTarget.value)}
-                          className="min-h-11 flex-1 rounded-lg border border-surface-4 bg-surface-0 px-3 text-sm text-ink-primary outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                          className="tool-field flex-1"
                         >
                           {sklandProfiles.map((profile) => (
                             <option key={profile.id} value={profile.id}>
@@ -332,7 +332,7 @@ export default function DepotValuePage() {
                           type="button"
                           onClick={() => void analyzeSkland()}
                           disabled={loading !== null || profilePreparing}
-                          className="rounded-lg border border-surface-3 bg-surface-0 px-5 py-2.5 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary disabled:bg-surface-2 disabled:text-ink-muted"
+                          className="tool-secondary-action"
                         >
                           {loading === 'skland'
                             ? '正在读取...'
@@ -342,7 +342,7 @@ export default function DepotValuePage() {
                         </button>
                       </div>
                       {selectedSklandProfile?.skland_binding?.credential_status === 'invalid' && (
-                        <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm leading-6 text-error" role="alert">
+                        <p className="tool-alert tool-alert--error" role="alert">
                           当前选择的森空岛凭据已失效。请重新绑定后再读取仓库库存。
                         </p>
                       )}
@@ -353,21 +353,22 @@ export default function DepotValuePage() {
                       type="button"
                       onClick={() => void openSklandBinding()}
                       disabled={loading !== null || profilePreparing}
-                      className="w-full rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted"
+                      className="tool-primary-action w-full"
                     >
                       {profilePreparing ? '正在准备账号...' : '绑定森空岛并分析仓库'}
                     </button>
                   )}
                 </div>
               )}
-              <p className="mt-4 rounded-lg border border-surface-3 bg-surface-0 p-3 text-sm leading-6 text-ink-secondary">
+              <p className="tool-alert tool-alert--warning mt-4">
                 使用森空岛导入会默认匿名贡献本次统计结果；样本不包含仓库明细、干员明细、昵称、UID 明文或凭据。
               </p>
             </div>
           </section>
 
-          <section className="rounded-lg border border-surface-3 bg-surface-1 p-5 sm:p-6">
-            <h2 className="text-lg font-semibold text-ink-primary">怎么算的</h2>
+          <section className="tool-panel p-5 sm:p-6">
+            <p className="tool-eyebrow">估值口径</p>
+            <h2 className="mt-2 text-lg font-semibold text-ink-primary">怎么算的</h2>
             <div className="mt-4 space-y-4 text-sm leading-6 text-ink-secondary">
               <p>作战记录会先换算成经验，再折成大致理智；龙门币和材料也会尽量换算成同一个理智数。</p>
               <p>材料价格优先参考一图流/企鹅物流的物品价值。模组数据块、数据增补仪、数据增补条、家具零件不会参与计算。</p>
@@ -398,12 +399,12 @@ export default function DepotValuePage() {
 
 function ResultSummary({ result }: { result: DepotValueResponse }) {
   return (
-    <section className="rounded-lg border border-brand-600/25 bg-surface-1 p-5 sm:p-6">
-      <p className="text-sm font-semibold text-brand-500">分析完成</p>
+    <section className="tool-panel border-brand-600/25 p-5 sm:p-6">
+      <p className="tool-eyebrow">分析完成</p>
       <h2 className="mt-2 text-2xl font-semibold text-ink-primary">
         你的仓库资产击败了 {result.percentile}% 博士
       </h2>
-      <p className="mt-3 rounded-lg border border-surface-3 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-secondary">
+      <p className="tool-inset mt-3 px-3 py-2 text-sm leading-6 text-ink-secondary">
         {formatRankingNote(result)}
       </p>
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -415,7 +416,7 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
       {result.warnings.length > 0 && (
         <div className="mt-5 space-y-2">
           {result.warnings.map((warning) => (
-            <p key={warning} className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+            <p key={warning} className="tool-alert tool-alert--warning" role="status">
               {warning}
             </p>
           ))}
@@ -424,10 +425,10 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
 
       <div className="mt-5">
         <h3 className="text-sm font-semibold text-ink-primary">最值钱的库存</h3>
-        <div className="mt-3 divide-y divide-surface-3 overflow-hidden rounded-lg border border-surface-3">
+        <div className="tool-inset mt-3 divide-y divide-surface-3 overflow-hidden">
           {result.top_items.map((item, index) => (
             <div key={item.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 bg-surface-0 px-4 py-3">
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-500/10 text-xs font-semibold text-brand-500">
+              <span className="tool-status h-7 w-7 justify-center p-0 text-brand-300">
                 {index + 1}
               </span>
               <div className="min-w-0">
@@ -445,7 +446,7 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
           <h3 className="text-sm font-semibold text-ink-primary">未计入估值</h3>
           <div className="mt-3 flex flex-wrap gap-2">
             {result.unpriced_items.map((item) => (
-              <span key={item.id} className="rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-ink-secondary">
+              <span key={item.id} className="tool-status">
                 {item.name} × {formatNumber(item.count)}
               </span>
             ))}
@@ -466,7 +467,7 @@ function SharePanel({
   onDownload: () => void
 }) {
   return (
-    <section className="rounded-lg border border-surface-3 bg-surface-1 p-5 sm:p-6">
+    <section className="tool-panel p-5 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-ink-primary">分析截图</h2>
@@ -477,7 +478,7 @@ function SharePanel({
         <button
           type="button"
           onClick={onDownload}
-          className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
+          className="tool-primary-action"
         >
           下载 PNG
         </button>
@@ -487,7 +488,7 @@ function SharePanel({
           ref={canvasRef}
           width={900}
           height={1600}
-          className="aspect-[9/16] w-full max-w-[24rem] rounded-lg border border-surface-3 bg-surface-0 shadow-sm"
+          className="tool-inset aspect-[9/16] w-full max-w-[24rem] shadow-sm"
           aria-label={`你的仓库资产击败了 ${result.percentile}% 博士`}
         />
       </div>
@@ -497,7 +498,7 @@ function SharePanel({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-surface-0 p-4">
+    <div className="tool-inset p-4">
       <p className="text-xs font-medium text-ink-muted">{label}</p>
       <p className="mt-1 text-xl font-semibold text-ink-primary">{value}</p>
     </div>

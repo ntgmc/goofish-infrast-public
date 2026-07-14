@@ -87,10 +87,10 @@ export function validatePasswordInput(value: string): string | null {
 }
 
 export function inputClassName(hasError: boolean, extra = ''): string {
-  const base = 'w-full rounded-lg border px-3 py-2 text-sm text-ink-primary outline-none transition-colors duration-150 focus:ring-2'
+  const base = 'tool-field'
   const state = hasError
     ? 'border-error/70 bg-error/10 focus:border-error focus:ring-error/20'
-    : 'border-surface-4 bg-surface-0 focus:border-brand-500 focus:ring-brand-500/20'
+    : ''
   return `${base} ${state} ${extra}`.trim()
 }
 

@@ -32,7 +32,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               {licenseSyncing && <LicenseSyncPanel />}
   
               {licenseSyncStatus && (
-                <div className="rounded-lg border border-brand-600/30 bg-brand-600/10 px-4 py-3 text-sm leading-6 text-brand-300">
+                <div className="tool-alert border-brand-600/30 bg-brand-600/10 text-brand-200" role="status" aria-live="polite">
                   {licenseSyncStatus}
                 </div>
               )}
@@ -40,7 +40,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               <AnnouncementBanner announcement={announcement} />
   
               {redeemedNotice && (
-                <div role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning">
+                <div role="status" aria-live="polite" className="tool-alert tool-alert--warning">
                   {redeemedNotice}
                 </div>
               )}

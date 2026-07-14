@@ -73,43 +73,43 @@ export default function AdminSetupPage() {
   }
 
   return (
-    <main className="min-h-screen bg-surface-0 px-6 py-10 text-ink-primary" tabIndex={-1} data-route-focus>
-      <div className="mx-auto max-w-5xl">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <main className="tool-page" tabIndex={-1} data-route-focus>
+      <div className="tool-page-frame max-w-5xl">
+        <div className="tool-page-header flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-brand-500">Root 设置</p>
+            <p className="tool-eyebrow">Root 设置</p>
             <h1 className="mt-2 text-2xl font-semibold text-ink-primary">管理账号设置</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">
               这里使用 `MAA_ADMIN_PASSWORD` 创建日常管理账号。创建完成后，回到后台使用账号密码登录，减少 root 口令暴露次数。
             </p>
           </div>
-          <Link to="/admin/overview" className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary">返回后台</Link>
+          <Link to="/admin/overview" className="tool-secondary-action">返回后台</Link>
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[380px_1fr]">
-          <form onSubmit={handleCreate} className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+          <form onSubmit={handleCreate} className="tool-panel p-5">
             <h2 className="text-base font-semibold text-ink-primary">添加账号</h2>
             <label className="mt-5 block">
               <span className="mb-2 block text-sm font-medium text-ink-secondary">Root 口令</span>
-              <input type="password" value={rootPassword} onChange={(event) => setRootPassword(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" autoComplete="current-password" />
+              <input type="password" value={rootPassword} onChange={(event) => setRootPassword(event.currentTarget.value)} className="tool-field" autoComplete="current-password" />
             </label>
             <label className="mt-4 block">
               <span className="mb-2 block text-sm font-medium text-ink-secondary">管理账号</span>
-              <input value={username} onChange={(event) => setUsername(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="3-32 位字母、数字、_ 或 -" autoComplete="username" />
+              <input value={username} onChange={(event) => setUsername(event.currentTarget.value)} className="tool-field" placeholder="3-32 位字母、数字、_ 或 -" autoComplete="username" />
             </label>
             <label className="mt-4 block">
               <span className="mb-2 block text-sm font-medium text-ink-secondary">账号密码</span>
-              <input type="password" value={password} onChange={(event) => setPassword(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" autoComplete="new-password" />
+              <input type="password" value={password} onChange={(event) => setPassword(event.currentTarget.value)} className="tool-field" autoComplete="new-password" />
             </label>
-            {error && <div className="mt-4 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">{error}</div>}
-            {notice && <div className="mt-4 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">{notice}</div>}
-            <button type="submit" disabled={loading || !rootPassword || !username.trim() || password.length < 8} className="mt-5 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+            {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
+            {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
+            <button type="submit" disabled={loading || !rootPassword || !username.trim() || password.length < 8} className="tool-primary-action mt-5 w-full">
               {loading ? '处理中...' : '创建管理账号'}
             </button>
           </form>
 
-          <section className="rounded-xl border border-surface-3 bg-surface-1">
-            <div className="border-b border-surface-3 p-5">
+          <section className="tool-panel overflow-hidden">
+            <div className="tool-panel-header p-5">
               <h2 className="text-base font-semibold text-ink-primary">已有账号</h2>
               <p className="mt-1 text-sm text-ink-muted">删除账号同样需要 Root 口令。</p>
             </div>
@@ -122,7 +122,7 @@ export default function AdminSetupPage() {
                     <div className="font-medium text-ink-primary">{user.username}</div>
                     <div className="mt-1 text-xs text-ink-muted">创建 {formatDate(user.created_at)} · 更新 {formatDate(user.updated_at)}</div>
                   </div>
-                  <button type="button" onClick={() => handleDelete(user.username)} disabled={loading || !rootPassword} className="rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error hover:bg-error/20 disabled:bg-surface-3 disabled:text-ink-muted">删除账号</button>
+                  <button type="button" onClick={() => handleDelete(user.username)} disabled={loading || !rootPassword} className="tool-secondary-action border-error/35 bg-error/10 text-error hover:bg-error/20">删除账号</button>
                 </div>
               ))}
             </div>

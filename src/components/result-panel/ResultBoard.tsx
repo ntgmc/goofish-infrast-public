@@ -17,17 +17,6 @@ type BoardSlot = {
   row?: RoomRow;
 }
 
-const ROOM_TONE: Record<string, string> = {
-  trading: 'border-brand-500/35 bg-brand-500/10',
-  manufacture: 'border-warning/35 bg-warning/10',
-  power: 'border-success/35 bg-success/10',
-  control: 'border-brand-300/25 bg-surface-2/45',
-  meeting: 'border-surface-4/70 bg-surface-2/35',
-  hire: 'border-surface-4/70 bg-surface-2/35',
-  processing: 'border-surface-4/70 bg-surface-2/35',
-  dormitory: 'border-success/25 bg-success/10',
-}
-
 export default function ResultBoard({
   prepared,
   isRotationMode,
@@ -42,8 +31,8 @@ export default function ResultBoard({
   const queueLabel = planTimes ?? `${prepared.detailStats.planCount} 个${isRotationMode ? '队列' : '班次'}`
 
   return (
-    <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
-      <div className="border-b border-surface-3/60 bg-surface-2/35 px-4 py-3 sm:px-5">
+    <section className="tool-panel overflow-hidden">
+      <div className="tool-panel-header px-4 py-3 sm:px-5">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-ink-primary">{modeLabel}</h2>
@@ -52,24 +41,21 @@ export default function ResultBoard({
             </p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-surface-0 px-2.5 py-1 font-semibold text-ink-secondary">{queueLabel}</span>
-            <span className="rounded-full bg-surface-0 px-2.5 py-1 font-semibold text-ink-secondary">{groups.length} 个房间</span>
+            <span className="tool-status">{queueLabel}</span>
+            <span className="tool-status">{groups.length} 个房间</span>
           </div>
         </div>
       </div>
 
       <div className="p-3 sm:p-4">
         {groups.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-surface-3 bg-surface-0 px-4 py-8 text-center text-sm text-ink-muted">
+          <div className="tool-inset border-dashed px-4 py-8 text-center text-sm text-ink-muted">
             暂无可展示的排班总览。
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {groups.map((group) => (
-              <article
-                key={group.key}
-                className={`overflow-hidden rounded-lg border border-dashed ${ROOM_TONE[group.roomType] ?? 'border-surface-3 bg-surface-2/35'}`}
-              >
+              <article key={group.key} className="tool-inset overflow-hidden">
                 <div className="border-b border-surface-3/50 px-3 py-2 text-center">
                   <h3 className="truncate text-sm font-semibold text-ink-primary">
                     {group.label}
@@ -87,17 +73,17 @@ export default function ResultBoard({
                       </span>
                       {slot.row ? (
                         slot.row.isAutofill ? (
-                          <p className="rounded-md bg-surface-0/80 px-2 py-1.5 text-xs leading-5 text-ink-secondary">{slot.row.operatorText}</p>
+                          <p className="tool-inset border-transparent bg-surface-0/80 px-2 py-1.5 text-xs leading-5 text-ink-secondary">{slot.row.operatorText}</p>
                         ) : (
                           <OperatorAvatarStrip operators={slot.row.operators} fallbackText={slot.row.operatorText} micro showFullNames />
                         )
                       ) : (
-                        <p className="rounded-md border border-dashed border-surface-3/70 bg-surface-0/55 px-2 py-1.5 text-xs leading-5 text-ink-muted">
+                        <p className="tool-inset border-dashed bg-surface-0/55 px-2 py-1.5 text-xs leading-5 text-ink-muted">
                           未安排
                         </p>
                       )}
                       {slot.row && !slot.row.isAutofill && (
-                        <span className="pt-1 text-[11px] font-semibold text-brand-400">{slot.row.efficiency}</span>
+                        <span className="pt-1 font-mono text-[11px] font-semibold text-brand-300">{slot.row.efficiency}</span>
                       )}
                     </div>
                   ))}

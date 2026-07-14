@@ -15,6 +15,7 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [loading, setLoading] = useState(false)
   const [privacyLoading, setPrivacyLoading] = useState<string | null>(null)
+  const [privacyError, setPrivacyError] = useState<string | null>(null)
   const [deleteEmail, setDeleteEmail] = useState('')
   const [deletePassword, setDeletePassword] = useState('')
 
@@ -63,6 +64,7 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
   }
 
   const downloadExport = async () => {
+    setPrivacyError(null)
     setPrivacyLoading('export')
     try {
       const response = await fetch('/api/user/data/export')
@@ -73,32 +75,39 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
       link.download = 'maa-personal-data.json'
       link.click()
       URL.revokeObjectURL(url)
+    } catch (caught) {
+      setPrivacyError(caught instanceof Error ? caught.message : '导出个人数据失败，请稍后重试。')
     } finally { setPrivacyLoading(null) }
   }
 
   const profileAction = async (action: 'credential/clear' | 'skland/unlink' | 'depot-sample/revoke', profile: UserGameAccount) => {
     const labels = { 'credential/clear': '清除森空岛凭据', 'skland/unlink': '解绑森空岛', 'depot-sample/revoke': '撤回仓库样本' }
     if (!window.confirm(`确定要${labels[action]}吗？此操作可能影响后续导入。`)) return
+    setPrivacyError(null)
     setPrivacyLoading(`${action}:${profile.id}`)
     try { await apiVoid(`/api/user/data/${action}`, { method: 'POST', json: { profile_id: profile.id } }) }
+    catch (caught) { setPrivacyError(caught instanceof Error ? caught.message : `${labels[action]}失败，请稍后重试。`) }
     finally { setPrivacyLoading(null) }
   }
 
   const requestDeletion = async () => {
     if (!window.confirm('注销请求会立即退出登录，并在 7 天后永久删除个人数据。确定继续吗？')) return
+    setPrivacyError(null)
     setPrivacyLoading('delete')
     try {
       await apiVoid('/api/user/data/delete-request', { method: 'POST', json: { email: deleteEmail, password: deletePassword } })
       onLogout()
+    } catch (caught) {
+      setPrivacyError(caught instanceof Error ? caught.message : '注销请求提交失败，请检查邮箱和密码后重试。')
     } finally { setPrivacyLoading(null) }
   }
 
   return (
     <div className="max-w-2xl space-y-6">
-    <form onSubmit={submit} noValidate className="rounded-xl border border-surface-3 bg-surface-1 p-6">
+    <form onSubmit={submit} noValidate className="tool-panel p-6">
       <h2 className="text-lg font-semibold text-ink-primary">修改登录密码</h2>
-      {error && <div className="mt-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
-      {status && <div className="mt-5 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{status}</div>}
+      {error && <div className="tool-alert tool-alert--error mt-5" role="alert">{error}</div>}
+      {status && <div className="tool-alert tool-alert--success mt-5" role="status" aria-live="polite">{status}</div>}
       <label className="mt-5 block">
         <span className="mb-2 block text-sm font-medium text-ink-secondary">当前密码</span>
         <input
@@ -114,7 +123,7 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
           aria-invalid={Boolean(fieldErrors.oldPassword)}
           aria-describedby={fieldErrors.oldPassword ? 'settings-old-password-error' : undefined}
         />
-        {fieldErrors.oldPassword && <p id="settings-old-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.oldPassword}</p>}
+        {fieldErrors.oldPassword && <p id="settings-old-password-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.oldPassword}</p>}
       </label>
       <label className="mt-4 block">
         <span className="mb-2 block text-sm font-medium text-ink-secondary">新密码</span>
@@ -132,7 +141,7 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
           aria-invalid={Boolean(fieldErrors.newPassword)}
           aria-describedby={fieldErrors.newPassword ? 'settings-new-password-error' : undefined}
         />
-        {fieldErrors.newPassword && <p id="settings-new-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.newPassword}</p>}
+        {fieldErrors.newPassword && <p id="settings-new-password-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.newPassword}</p>}
       </label>
       <label className="mt-4 block">
         <span className="mb-2 block text-sm font-medium text-ink-secondary">确认新密码</span>
@@ -149,32 +158,39 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
           aria-invalid={Boolean(fieldErrors.confirmPassword)}
           aria-describedby={fieldErrors.confirmPassword ? 'settings-confirm-password-error' : undefined}
         />
-        {fieldErrors.confirmPassword && <p id="settings-confirm-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.confirmPassword}</p>}
+        {fieldErrors.confirmPassword && <p id="settings-confirm-password-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.confirmPassword}</p>}
       </label>
-      <button type="submit" disabled={loading} className="mt-5 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">{loading ? '保存中...' : '修改密码'}</button>
+      <button type="submit" disabled={loading} className="tool-primary-action mt-5">{loading ? '保存中...' : '修改密码'}</button>
     </form>
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-6">
+    <section className="tool-panel p-6">
       <h2 className="text-lg font-semibold text-ink-primary">数据与隐私</h2>
       <p className="mt-2 text-sm text-ink-secondary">我们保存登录资料、游戏档案、工作区、使用记录和你主动贡献的仓库样本。注销后进入 7 天冷静期，期满会删除所有可关联数据；仅保留无法关联的汇总统计。</p>
-      <button type="button" onClick={() => void downloadExport()} disabled={privacyLoading !== null} className="mt-4 rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-primary">{privacyLoading === 'export' ? '正在导出...' : '导出个人数据'}</button>
+      {privacyError && <div className="tool-alert tool-alert--error mt-4" role="alert">{privacyError}</div>}
+      <button type="button" onClick={() => void downloadExport()} disabled={privacyLoading !== null} className="tool-secondary-action mt-4">{privacyLoading === 'export' ? '正在导出...' : '导出个人数据'}</button>
       <div className="mt-5 space-y-3">
         {profiles.filter((profile) => profile.skland_binding || profile.kind === 'depot_value').map((profile) => (
-          <div key={profile.id} className="rounded-lg border border-surface-3 p-4">
-            <p className="font-medium">{profile.display_name}</p>
+          <div key={profile.id} className="tool-inset p-4">
+            <p className="font-medium text-ink-primary">{profile.display_name}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {profile.skland_binding && <button type="button" onClick={() => void profileAction('credential/clear', profile)} disabled={privacyLoading !== null} className="rounded-lg bg-surface-2 px-3 py-2 text-sm">清除凭据</button>}
-              {profile.skland_binding && <button type="button" onClick={() => void profileAction('skland/unlink', profile)} disabled={privacyLoading !== null} className="rounded-lg bg-surface-2 px-3 py-2 text-sm">解绑森空岛</button>}
-              <button type="button" onClick={() => void profileAction('depot-sample/revoke', profile)} disabled={privacyLoading !== null} className="rounded-lg bg-surface-2 px-3 py-2 text-sm">撤回仓库样本</button>
+              {profile.skland_binding && <button type="button" onClick={() => void profileAction('credential/clear', profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">清除凭据</button>}
+              {profile.skland_binding && <button type="button" onClick={() => void profileAction('skland/unlink', profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">解绑森空岛</button>}
+              <button type="button" onClick={() => void profileAction('depot-sample/revoke', profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">撤回仓库样本</button>
             </div>
           </div>
         ))}
       </div>
-      <div className="mt-6 rounded-lg border border-error/30 bg-error/10 p-4">
+      <div className="tool-alert tool-alert--error mt-6 p-5">
         <h3 className="font-semibold text-error">注销账号</h3>
         <p className="mt-1 text-sm text-ink-secondary">提交后会退出登录并发送撤销链接。7 天内可撤销；到期后将永久擦除账户、档案、凭据、样本、任务和使用记录。</p>
-        <input value={deleteEmail} onChange={(event) => setDeleteEmail(event.currentTarget.value)} placeholder="确认邮箱" className="mt-3 w-full rounded-lg border border-surface-3 bg-surface-0 px-3 py-2" />
-        <input value={deletePassword} onChange={(event) => setDeletePassword(event.currentTarget.value)} type="password" placeholder="当前密码" className="mt-2 w-full rounded-lg border border-surface-3 bg-surface-0 px-3 py-2" />
-        <button type="button" onClick={() => void requestDeletion()} disabled={privacyLoading !== null || !deleteEmail || !deletePassword} className="mt-3 rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white">{privacyLoading === 'delete' ? '正在提交...' : '发起注销请求'}</button>
+        <label className="mt-3 block" htmlFor="settings-delete-email">
+          <span className="mb-2 block text-sm font-medium text-ink-secondary">确认邮箱</span>
+          <input id="settings-delete-email" value={deleteEmail} onChange={(event) => setDeleteEmail(event.currentTarget.value)} autoComplete="email" className="tool-field" />
+        </label>
+        <label className="mt-3 block" htmlFor="settings-delete-password">
+          <span className="mb-2 block text-sm font-medium text-ink-secondary">当前密码</span>
+          <input id="settings-delete-password" value={deletePassword} onChange={(event) => setDeletePassword(event.currentTarget.value)} type="password" autoComplete="current-password" className="tool-field" />
+        </label>
+        <button type="button" onClick={() => void requestDeletion()} disabled={privacyLoading !== null || !deleteEmail || !deletePassword} className="tool-danger-action mt-4">{privacyLoading === 'delete' ? '正在提交...' : '发起注销请求'}</button>
       </div>
     </section>
     </div>

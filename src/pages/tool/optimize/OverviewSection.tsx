@@ -106,8 +106,8 @@ export default function OverviewSection({
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <section className="rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
-          <p className="text-sm font-semibold text-brand-400">工作台状态</p>
+        <section className="tool-panel p-5 sm:p-6">
+          <p className="tool-eyebrow">工作台状态</p>
           <h2 className="mt-1 text-lg font-semibold text-ink-primary">当前排班准备情况</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
             <DashboardMiniStat label="已保存方案" value={`${savedConfigCount}/20`} />
@@ -118,14 +118,14 @@ export default function OverviewSection({
             <button
               type="button"
               onClick={onOpenConfig}
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
+              className="tool-secondary-action"
             >
               调整配置
             </button>
             <button
               type="button"
               onClick={onOpenPlans}
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
+              className="tool-secondary-action"
             >
               管理方案
             </button>
@@ -133,17 +133,17 @@ export default function OverviewSection({
               type="button"
               onClick={onOpenResult}
               disabled={!hasResult}
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3 disabled:cursor-not-allowed disabled:text-ink-muted"
+              className="tool-secondary-action"
             >
               查看结果
             </button>
           </div>
         </section>
 
-        <section className="rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
+        <section className="tool-panel p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-brand-400">最近结果</p>
+              <p className="tool-eyebrow">最近结果</p>
               <h2 className="mt-1 text-lg font-semibold text-ink-primary">
                 {latestResult ? latestResult.name : '还没有生成过排班结果'}
               </h2>
@@ -154,7 +154,7 @@ export default function OverviewSection({
               </p>
             </div>
             {latestResult && (
-              <span className="rounded-md bg-surface-2 px-2.5 py-1 text-xs font-semibold text-brand-300">
+              <span className="tool-status tool-status--current">
                 {latestResult.source === 'applied_suggestions' ? '建议后' : latestResult.source === 'legacy' ? '旧结果' : '生成'}
               </span>
             )}
@@ -184,7 +184,7 @@ function FreeScheduleEntitlementCard({ state }: { state: FreeScheduleViewState }
   const bonusAvailable = entitlement?.strong_reorder_bonus && !entitlement.strong_reorder_bonus.used_at
 
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
+    <section className="tool-panel p-5 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-brand-400">免费完整排班权益</p>
@@ -207,13 +207,13 @@ function FreeScheduleEntitlementCard({ state }: { state: FreeScheduleViewState }
       </div>
 
       {state.generateBlockedReason && (
-        <div className="mt-4 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning">
+        <div className="tool-alert tool-alert--warning mt-4">
           {state.generateBlockedReason}
         </div>
       )}
 
       {state.confirmError && (
-        <div role="alert" className="mt-4 rounded-lg border border-error/40 bg-error/10 px-4 py-3 text-sm leading-6 text-error">
+        <div role="alert" className="tool-alert tool-alert--error mt-4">
           {state.confirmError}
         </div>
       )}
@@ -236,7 +236,7 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
   const result = state.result
   const disabled = state.loading || Boolean(state.disabledReason)
   return (
-    <section className="rounded-xl border border-brand-600/25 bg-surface-1 p-5 shadow-sm shadow-brand-950/10 sm:p-6">
+    <section className="tool-panel border-brand-600/25 p-5 shadow-sm shadow-brand-950/10 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-brand-400">免费个人排班</p>
@@ -256,20 +256,20 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
       </div>
 
       {state.disabledReason && (
-        <div className="mt-4 rounded-lg border border-surface-3 bg-surface-2 px-4 py-3 text-sm leading-6 text-ink-secondary">
+        <div className="tool-inset mt-4 px-4 py-3 text-sm leading-6 text-ink-secondary">
           {state.disabledReason}
         </div>
       )}
 
       {state.error && (
-        <div role="alert" className="mt-4 rounded-lg border border-error/40 bg-error/10 px-4 py-3 text-sm leading-6 text-error">
+        <div role="alert" className="tool-alert tool-alert--error mt-4">
           {state.error}
         </div>
       )}
 
       {result && (
         <div className="mt-5 space-y-4">
-          <div className={`rounded-lg border px-4 py-3 ${getRecommendationTone(result.recommendation)}`}>
+          <div className={`tool-inset px-4 py-3 ${getRecommendationTone(result.recommendation)}`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-sm font-semibold">{formatRecommendationTitle(result.recommendation)}</p>
@@ -304,14 +304,14 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
           </div>
 
           {result.reasons.length > 0 && (
-            <div className="rounded-lg border border-surface-3 bg-surface-2 px-4 py-3 text-sm leading-6 text-ink-secondary">
+            <div className="tool-inset px-4 py-3 text-sm leading-6 text-ink-secondary">
               {result.reasons.join(' ')}
             </div>
           )}
 
           {result.recommendation === 'strongly_recommended' && (
             <div>
-              <SmallActionButton onClick={state.onGenerate}>生成完整个人排班</SmallActionButton>
+              <SmallActionButton onClick={state.onGenerate} tone="primary">生成完整个人排班</SmallActionButton>
             </div>
           )}
         </div>
@@ -322,7 +322,7 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
 
 function SummaryBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-surface-3 bg-surface-2 px-4 py-3">
+    <div className="tool-inset px-4 py-3">
       <p className="text-xs font-semibold text-ink-muted">{label}</p>
       <p className="mt-1 break-words text-sm leading-6 text-ink-primary">{value}</p>
     </div>

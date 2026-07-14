@@ -29,8 +29,8 @@ export default function ResultDetail({
   const displayedRoomCount = isRotationMode ? rotationGroups.length : detailStats.roomCount
 
   return (
-    <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
-      <div className="flex items-center justify-between gap-4 border-b border-surface-3/60 px-5 py-4 text-sm font-semibold text-ink-primary sm:px-6">
+    <section className="tool-panel overflow-hidden">
+      <div className="tool-panel-header flex items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary sm:px-6">
         <span>{isRotationMode ? '预设队列' : '排班详情'}</span>
         <span className="text-xs font-medium text-ink-muted">
           {planTimes ?? `${detailStats.planCount} 个${isRotationMode ? '队列' : '班次'}`}，{displayedRoomCount} 个房间
@@ -49,7 +49,7 @@ function MaaPlanList({ plans }: { plans: PreparedPlan[] }) {
   return (
     <div className="space-y-5">
       {plans.map((plan, i) => (
-        <div key={`${plan.name || 'plan'}-${i}`} className="overflow-hidden rounded-xl bg-surface-1">
+        <div key={`${plan.name || 'plan'}-${i}`} className="tool-inset overflow-hidden">
           <div className="flex flex-col gap-2 bg-surface-2/50 px-3 py-3 sm:px-4 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <span className="font-semibold text-ink-primary">
@@ -62,7 +62,7 @@ function MaaPlanList({ plans }: { plans: PreparedPlan[] }) {
               )}
             </div>
             {plan.Fiammetta?.enable && plan.Fiammetta.target && (
-              <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning">
+              <span className="tool-status tool-status--warning w-fit">
                 菲亚梅塔 → {plan.Fiammetta.target}
               </span>
             )}
@@ -106,7 +106,7 @@ function MaaRoomRow({ row }: { row: RoomRow }) {
       </div>
       <div className="mt-3 min-w-0 md:mt-0">
         {row.isAutofill ? (
-          <div className="rounded-lg border border-surface-3/70 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-secondary">
+          <div className="tool-inset px-3 py-2 text-sm leading-6 text-ink-secondary">
             {row.operatorText}
             {row.detail && <span className="mt-1 block text-xs text-ink-muted">{row.detail}</span>}
           </div>
@@ -117,7 +117,7 @@ function MaaRoomRow({ row }: { row: RoomRow }) {
       <div className="mt-3 md:mt-0 md:text-right">
         {!row.isAutofill && (
           <>
-            <div className="inline-flex rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-semibold text-brand-400 md:font-mono">
+            <div className="tool-status tool-status--current font-mono">
               {row.efficiency}
             </div>
             <EfficiencyDisclosure row={row} />
@@ -131,7 +131,7 @@ function MaaRoomRow({ row }: { row: RoomRow }) {
 function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
   if (groups.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-surface-3 bg-surface-0 px-4 py-8 text-center text-sm text-ink-muted">
+      <div className="tool-inset border-dashed px-4 py-8 text-center text-sm text-ink-muted">
         暂无可展示的预设队列。
       </div>
     )
@@ -140,7 +140,7 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
   return (
     <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
       {groups.map((group) => (
-        <article key={group.key} className="overflow-hidden rounded-lg border border-surface-3 bg-surface-1">
+        <article key={group.key} className="tool-inset overflow-hidden">
           <div className="flex items-start justify-between gap-3 border-b border-surface-3/60 bg-surface-2/50 px-3 py-2.5">
             <div className="min-w-0">
               <h3 className="truncate text-sm font-semibold text-ink-primary">
@@ -149,7 +149,7 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
               </h3>
               <p className="mt-1 truncate text-xs text-ink-muted">{group.product}</p>
             </div>
-            <span className="shrink-0 rounded-full bg-surface-0 px-2.5 py-1 text-xs font-semibold text-ink-secondary">
+            <span className="tool-status shrink-0">
               {group.rows.length} 队列
             </span>
           </div>
@@ -157,7 +157,7 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
             {group.rows.map((row) => (
               <div key={row.key} className="px-3 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="inline-flex rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-semibold text-brand-400">
+                  <span className="tool-status tool-status--current">
                     {row.queueLabel}
                   </span>
                   <span className="text-xs font-medium text-ink-muted">快速切换</span>
@@ -179,8 +179,8 @@ function EfficiencyDisclosure({ row, compact = false }: { row: RoomRow; compact?
   const detailItems = row.detailItems.length > 0 ? row.detailItems : ['暂无额外效率数据']
 
   return (
-    <details className={`group ${compact ? 'mt-3' : 'mt-2'} rounded-lg border border-surface-3/70 bg-surface-0/80 text-left`}>
-      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 px-2.5 py-1.5 text-xs font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-brand-500/45 [&::-webkit-details-marker]:hidden">
+    <details className={`tool-inset group ${compact ? 'mt-3' : 'mt-2'} bg-surface-0/80 text-left`}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-2.5 py-1.5 text-xs font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-brand-500/45 [&::-webkit-details-marker]:hidden">
         <span>效率数据</span>
         <span className="inline-flex items-center gap-2 text-ink-muted">
           {row.efficiency}

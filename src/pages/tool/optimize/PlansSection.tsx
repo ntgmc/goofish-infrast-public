@@ -52,11 +52,11 @@ export default function PlansSection({
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
-      <div className="border-b border-surface-3/60 px-5 py-4 sm:px-6">
+    <section className="tool-panel overflow-hidden">
+      <div className="tool-panel-header px-5 py-4 sm:px-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-brand-400">我的方案</p>
+            <p className="tool-eyebrow">我的方案</p>
             <h2 className="mt-1 text-lg font-semibold text-ink-primary">方案库与历史结果</h2>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
               保存常用配置，回看最近生成结果；离开页面后也能重新下载上次 MAA JSON。
@@ -69,21 +69,21 @@ export default function PlansSection({
                 value={draftName}
                 onChange={(event) => setDraftName(event.currentTarget.value)}
                 maxLength={40}
-                className="min-h-11 w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary"
+                className="tool-field"
                 placeholder="例如：243 刷钱"
               />
             </label>
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:cursor-wait disabled:bg-surface-3 disabled:text-ink-muted"
+              className="tool-primary-action disabled:cursor-wait"
             >
               {saving ? '保存中...' : '保存当前配置'}
             </button>
           </form>
         </div>
         {(notice || error) && (
-          <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${error ? 'border-error/30 bg-error/10 text-error' : 'border-success/30 bg-success/10 text-success'}`}>
+          <div className={`tool-alert mt-4 ${error ? 'tool-alert--error' : 'tool-alert--success'}`} role={error ? 'alert' : 'status'} aria-live={error ? 'assertive' : 'polite'}>
             {error ?? notice}
           </div>
         )}
@@ -99,7 +99,7 @@ export default function PlansSection({
               </p>
             </div>
             {latestResult && (
-              <span className="rounded-md bg-surface-2 px-2.5 py-1 text-xs font-semibold text-brand-300">
+              <span className={`tool-status ${latestResult.source === 'applied_suggestions' ? 'tool-status--success' : 'tool-status--current'}`}>
                 {latestResult.source === 'applied_suggestions' ? '建议后' : latestResult.source === 'legacy' ? '旧结果' : '生成'}
               </span>
             )}
@@ -114,7 +114,7 @@ export default function PlansSection({
               </div>
             </>
           ) : (
-            <p className="mt-4 rounded-lg bg-surface-2 px-3 py-3 text-sm text-ink-muted">生成一次排班后，这里会保留可回看的上次结果。</p>
+            <p className="tool-inset mt-4 px-3 py-3 text-sm text-ink-muted">生成一次排班后，这里会保留可回看的上次结果。</p>
           )}
         </div>
 
@@ -124,7 +124,7 @@ export default function PlansSection({
             diffRows.length > 0 ? (
               <div className="mt-4 grid gap-2">
                 {diffRows.map((row) => (
-                  <div key={row.label} className="grid gap-2 rounded-lg bg-surface-2 px-3 py-3 text-sm md:grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)]">
+                  <div key={row.label} className="tool-inset grid gap-2 px-3 py-3 text-sm md:grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)]">
                     <span className="font-medium text-ink-primary">{row.label}</span>
                     <span className="min-w-0 text-ink-muted">上次：{row.before}</span>
                     <span className="min-w-0 text-brand-300">当前：{row.after}</span>
@@ -132,10 +132,10 @@ export default function PlansSection({
                 ))}
               </div>
             ) : (
-              <p className="mt-4 rounded-lg bg-success/10 px-3 py-3 text-sm text-success">当前配置与上次生成配置一致。</p>
+              <p className="tool-alert tool-alert--success mt-4" role="status">当前配置与上次生成配置一致。</p>
             )
           ) : (
-            <p className="mt-4 rounded-lg bg-surface-2 px-3 py-3 text-sm text-ink-muted">暂无上次方案可对比。</p>
+            <p className="tool-inset mt-4 px-3 py-3 text-sm text-ink-muted">暂无上次方案可对比。</p>
           )}
         </div>
       </div>
@@ -147,9 +147,9 @@ export default function PlansSection({
             <span className="text-xs text-ink-muted">{savedConfigs.length}/20</span>
           </div>
           <div className="mt-4 space-y-3">
-            {savedConfigs.length === 0 && <p className="rounded-lg bg-surface-2 px-3 py-3 text-sm text-ink-muted">还没有保存配置。</p>}
+            {savedConfigs.length === 0 && <p className="tool-inset px-3 py-3 text-sm text-ink-muted">还没有保存配置。</p>}
             {savedConfigs.map((item) => (
-              <div key={item.id} className="rounded-lg border border-surface-3 bg-surface-0 px-3 py-3">
+              <div key={item.id} className="tool-inset px-3 py-3">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>
@@ -174,9 +174,9 @@ export default function PlansSection({
             <span className="text-xs text-ink-muted">{resultHistory.length}/10</span>
           </div>
           <div className="mt-4 space-y-3">
-            {resultHistory.length === 0 && <p className="rounded-lg bg-surface-2 px-3 py-3 text-sm text-ink-muted">暂无历史结果。</p>}
+            {resultHistory.length === 0 && <p className="tool-inset px-3 py-3 text-sm text-ink-muted">暂无历史结果。</p>}
             {resultHistory.map((item) => (
-              <div key={item.id} className={`rounded-lg border px-3 py-3 ${selectedHistoryId === item.id ? 'border-brand-500/60 bg-brand-600/10' : 'border-surface-3 bg-surface-0'}`}>
+              <div key={item.id} className={`tool-inset px-3 py-3 ${selectedHistoryId === item.id ? 'border-brand-500/60 bg-brand-600/10' : ''}`}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>

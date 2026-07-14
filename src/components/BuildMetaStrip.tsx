@@ -12,16 +12,16 @@ export default function BuildMetaStrip({ meta = APP_BUILD_META, className = '', 
     ? `relative z-40 mt-3 flex w-full max-w-full flex-wrap items-end justify-end gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-xs text-ink-muted sm:fixed sm:bottom-3 sm:right-3 sm:mt-0 sm:w-auto sm:max-w-[calc(100vw-1.5rem)] sm:px-0 sm:pb-0 ${className}`
     : `flex flex-wrap items-center gap-2 text-xs text-ink-secondary ${className}`
   const detailPanelClassName = placement === 'corner'
-    ? 'absolute bottom-full right-0 z-20 mb-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-lg border border-surface-3 bg-surface-1 p-3 text-left shadow-sm'
-    : 'absolute left-0 top-full z-20 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-lg border border-surface-3 bg-surface-1 p-3 text-left shadow-sm'
+    ? 'tool-inset absolute bottom-full right-0 z-20 mb-2 w-[min(20rem,calc(100vw-1.5rem))] p-3 text-left shadow-sm'
+    : 'tool-inset absolute left-0 top-full z-20 mt-2 w-[min(20rem,calc(100vw-1.5rem))] p-3 text-left shadow-sm'
 
   return (
     <div className={rootClassName}>
-      <span className="rounded-full border border-surface-3 bg-surface-1/95 px-2.5 py-1 font-medium text-ink-secondary shadow-sm">
+      <span className="tool-status bg-surface-1/95 shadow-sm">
         当前规则数据更新于 {formatDate(meta.generated_at)}
       </span>
       <details className="group relative">
-        <summary className="cursor-pointer list-none rounded-full border border-surface-3 bg-surface-1/95 px-2.5 py-1 text-ink-muted shadow-sm transition-colors duration-150 hover:border-surface-4 hover:text-ink-secondary [&::-webkit-details-marker]:hidden">
+        <summary className="tool-secondary-action min-h-8 list-none bg-surface-1/95 px-2.5 py-1 text-xs text-ink-muted shadow-sm [&::-webkit-details-marker]:hidden">
           版本
         </summary>
         <div className={detailPanelClassName}>
