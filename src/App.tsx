@@ -11,6 +11,7 @@ const AdminPage = lazy(() => import('./pages/AdminPage'))
 const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage'))
 const DepotValuePage = lazy(() => import('./pages/DepotValuePage'))
 const ScheduleAnalysisPage = lazy(() => import('./pages/ScheduleAnalysisPage'))
+const PublicInfoPage = lazy(() => import('./pages/PublicInfoPage'))
 
 export default function App() {
   const navigate = useNavigate()
@@ -23,6 +24,11 @@ export default function App() {
         <Route path="/tool/*" element={<LazyPage fallback="正在载入工作台..."><ToolPage /></LazyPage>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/announcements" element={<LazyPage fallback="正在载入公告..."><AnnouncementsPage /></LazyPage>} />
+        <Route path="/faq" element={<LazyPage fallback="正在载入常见问题..."><PublicInfoPage page="faq" /></LazyPage>} />
+        <Route path="/support" element={<LazyPage fallback="正在载入客服信息..."><PublicInfoPage page="support" /></LazyPage>} />
+        <Route path="/privacy" element={<LazyPage fallback="正在载入隐私政策..."><PublicInfoPage page="privacy" /></LazyPage>} />
+        <Route path="/terms" element={<LazyPage fallback="正在载入用户服务协议..."><PublicInfoPage page="terms" /></LazyPage>} />
+        <Route path="/disclaimer" element={<LazyPage fallback="正在载入免责声明..."><PublicInfoPage page="disclaimer" /></LazyPage>} />
         <Route path="/tools/schedule-analysis" element={<LazyPage fallback="正在载入排班表分析..."><ScheduleAnalysisPage /></LazyPage>} />
         <Route path="/tools/depot-value" element={<LazyPage fallback="正在载入仓库价值分析器..."><DepotValuePage /></LazyPage>} />
         <Route path="/admin/setup" element={<LazyPage fallback="正在载入管理后台..."><AdminSetupPage /></LazyPage>} />
