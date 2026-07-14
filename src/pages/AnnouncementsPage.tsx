@@ -31,34 +31,35 @@ export default function AnnouncementsPage() {
   }, [])
 
   return (
-    <main className="min-h-screen bg-surface-0 px-4 py-8 text-ink-primary" tabIndex={-1} data-route-focus>
-      <div className="mx-auto max-w-3xl">
-        <div className="flex flex-col gap-3 border-b border-surface-3 pb-5 sm:flex-row sm:items-end sm:justify-between">
+    <main className="tool-page" tabIndex={-1} data-route-focus>
+      <div className="tool-page-frame max-w-3xl">
+        <div className="tool-page-header flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
+            <p className="tool-eyebrow">MaaTool 官方</p>
             <h1 className="text-2xl font-semibold">公告</h1>
             <p className="mt-2 text-sm leading-6 text-ink-secondary">这里会集中展示近期通知，方便你随时回看。</p>
           </div>
           <Link
             to="/tool/profiles"
-            className="text-sm font-semibold text-brand-600 underline-offset-4 hover:underline"
+            className="tool-secondary-action shrink-0"
           >
             返回工具
           </Link>
         </div>
 
-        {loading && <p className="mt-6 text-sm text-ink-secondary">正在加载公告...</p>}
-        {error && <div className="mt-6 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
+        {loading && <p className="tool-inset mt-6 px-4 py-3 text-sm text-ink-secondary" role="status">正在加载公告...</p>}
+        {error && <div className="tool-alert tool-alert--error mt-6" role="alert">{error}</div>}
         {!loading && !error && announcements.length === 0 && (
-          <div className="mt-6 rounded-lg border border-surface-3 bg-surface-1 px-4 py-5 text-sm text-ink-secondary">
+          <div className="tool-inset mt-6 px-4 py-5 text-sm leading-6 text-ink-secondary">
             暂时没有新的公告。
           </div>
         )}
 
         <div className="mt-6 space-y-4">
           {announcements.map((announcement) => (
-            <article key={announcement.id} className="rounded-lg border border-surface-3 bg-surface-1 p-4">
+            <article key={announcement.id} className="tool-panel p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-muted">
+                <span className="tool-status">
                   {announcement.kind === 'banner' ? '横幅' : '弹出式公告'}
                 </span>
                 <time className="text-xs text-ink-muted">{formatDate(announcement.updated_at)}</time>

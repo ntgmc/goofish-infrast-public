@@ -57,21 +57,21 @@ export default function AnnouncementsSection() {
           type="button"
           onClick={() => void markRead()}
           disabled={markingAll || markingId !== null}
-          className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:cursor-wait disabled:bg-surface-2 disabled:text-ink-muted"
+          className="tool-secondary-action disabled:cursor-wait"
         >
           {markingAll ? '处理中...' : '全部设为已读'}
         </button>
       </div>
-      {loading && <p className="text-sm text-ink-secondary">正在加载公告...</p>}
-      {error && <div className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
-      {!loading && items.length === 0 && <div className="rounded-xl border border-surface-3 bg-surface-1 p-6 text-sm text-ink-secondary">暂时没有新的公告。</div>}
+      {loading && <p className="tool-inset p-4 text-sm text-ink-secondary" role="status">正在加载公告...</p>}
+      {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
+      {!loading && items.length === 0 && <div className="tool-panel p-6 text-sm text-ink-secondary">暂时没有新的公告。</div>}
       {items.map(({ announcement, read_at }) => (
-        <article key={announcement.id} className={`rounded-xl border p-5 ${read_at ? 'border-surface-3 bg-surface-1' : 'border-brand-500/50 bg-brand-500/10'}`}>
+        <article key={announcement.id} className={`tool-panel p-5 ${read_at ? '' : 'border-brand-500/50 bg-brand-500/10'}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg font-semibold text-ink-primary">{announcement.title}</h2>
-                {!read_at && <span className="rounded-md bg-brand-600 px-2 py-1 text-xs font-semibold text-white">未读</span>}
+                {!read_at && <span className="tool-status tool-status--current">未读</span>}
               </div>
               <AnnouncementMarkdown className="mt-2">{announcement.body}</AnnouncementMarkdown>
               <p className="mt-3 text-xs text-ink-muted">更新 {formatDate(announcement.updated_at)}</p>
@@ -81,7 +81,7 @@ export default function AnnouncementsSection() {
                 type="button"
                 onClick={() => void markRead(announcement.id)}
                 disabled={markingAll || markingId === announcement.id}
-                className="w-full shrink-0 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:cursor-wait disabled:bg-surface-3 disabled:text-ink-muted sm:w-28"
+                className="tool-primary-action w-full shrink-0 disabled:cursor-wait sm:w-28"
               >
                 {markingId === announcement.id ? '标记中...' : '标为已读'}
               </button>

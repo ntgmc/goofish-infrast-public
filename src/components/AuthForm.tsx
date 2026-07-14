@@ -77,15 +77,15 @@ export default function AuthForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'space-y-5 rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8'}>
-      <div className="grid grid-cols-2 rounded-lg bg-surface-2 p-1">
+    <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'tool-panel space-y-5 p-6 sm:p-8'}>
+      <div className="tool-inset grid grid-cols-2 p-1" role="group" aria-label="登录方式">
         <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>登录</button>
         <button type="button" aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>注册</button>
       </div>
 
       {intro && <p className="text-sm leading-6 text-ink-secondary">{intro}</p>}
-      {error && <div className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
-      {notice && <div className="rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{notice}</div>}
+      {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
+      {notice && <div className="tool-alert tool-alert--success" role="status" aria-live="polite">{notice}</div>}
       {mode === 'forgot' && <h2 className="text-lg font-semibold text-ink-primary">重置密码</h2>}
 
       <label className="block">
@@ -103,7 +103,7 @@ export default function AuthForm({
           aria-invalid={Boolean(fieldErrors.email)}
           aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
         />
-        {fieldErrors.email && <p id="auth-email-error" className="mt-1.5 text-sm text-error">{fieldErrors.email}</p>}
+        {fieldErrors.email && <p id="auth-email-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.email}</p>}
       </label>
 
       {mode !== 'forgot' && (
@@ -122,29 +122,29 @@ export default function AuthForm({
             aria-invalid={Boolean(fieldErrors.password)}
             aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
           />
-          {fieldErrors.password && <p id="auth-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.password}</p>}
+          {fieldErrors.password && <p id="auth-password-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.password}</p>}
         </label>
       )}
 
       {allowCdk && mode === 'register' && (
         <label className="block">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK（可选）</span>
-          <input type="text" value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="min-h-11 w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink-primary" placeholder="可注册后再兑换" />
+          <input type="text" value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="tool-field min-h-11 font-mono uppercase tracking-wide" placeholder="可注册后再兑换" />
         </label>
       )}
 
       {mode === 'login' && (
-        <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}) }} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-500 underline-offset-4 hover:underline">
+        <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
           忘记密码？
         </button>
       )}
       {mode === 'forgot' && (
-        <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null); setFieldErrors({}) }} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-500 underline-offset-4 hover:underline">
+        <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null); setFieldErrors({}) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
           返回登录
         </button>
       )}
 
-      <button type="submit" disabled={loading} className={`min-h-12 ${submitClassName ?? 'w-full rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted'}`}>
+      <button type="submit" disabled={loading} className={`min-h-12 ${submitClassName ?? 'tool-primary-action w-full px-6 py-3'}`}>
         {loading ? '处理中...' : mode === 'login' ? '登录' : mode === 'register' ? '创建账号' : '发送重置邮件'}
       </button>
     </form>
@@ -165,9 +165,9 @@ function validatePasswordInput(value: string): string | null {
 }
 
 function inputClassName(hasError: boolean): string {
-  const base = 'min-h-11 w-full rounded-lg border px-3 py-2 text-sm text-ink-primary outline-none transition-colors duration-150 focus:ring-2'
+  const base = 'tool-field min-h-11'
   const state = hasError
     ? 'border-error/70 bg-error/10 focus:border-error focus:ring-error/20'
-    : 'border-surface-4 bg-surface-0 focus:border-brand-500 focus:ring-brand-500/20'
+    : ''
   return `${base} ${state}`
 }

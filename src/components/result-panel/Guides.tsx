@@ -1,7 +1,7 @@
 export function RotationManualGuide({ compact = false }: { compact?: boolean }) {
   return (
     <div className={compact ? '' : 'mt-6 border-t border-surface-3/60 pt-5'}>
-      <div className={compact ? '' : 'rounded-lg bg-surface-2/60 px-4 py-4'}>
+      <div className={compact ? '' : 'tool-inset px-4 py-4'}>
         <h3 className="text-base font-semibold text-ink-primary">
           游戏内快速切换设置
         </h3>
@@ -15,7 +15,7 @@ export function RotationManualGuide({ compact = false }: { compact?: boolean }) 
 
 export function MaaImportGuide({ compact = false }: { compact?: boolean }) {
   return (
-    <details className={`${compact ? '' : 'mt-6 '}overflow-hidden rounded-lg border border-surface-3/70 bg-surface-2/40`}>
+    <details className={`${compact ? '' : 'mt-6 '}tool-inset overflow-hidden`}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/80">
         <span>如何在 MAA 中使用排班 JSON</span>
         <span className="text-xs font-medium text-ink-muted">展开查看</span>
@@ -28,7 +28,7 @@ export function MaaImportGuide({ compact = false }: { compact?: boolean }) {
           <li><span className="font-medium text-ink-primary">内置配置</span> 选择 <span className="font-medium text-ink-primary">自定义</span></li>
           <li>点击选择，选择本站下载的排班 JSON</li>
         </ol>
-        <div className="overflow-hidden rounded-lg border border-surface-3 bg-surface-0">
+        <div className="tool-inset overflow-hidden">
           <picture>
             <source srcSet="/assets/maa-import-schedule-json-dark.png" media="(prefers-color-scheme: dark)" />
             <img

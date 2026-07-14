@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
-import type { LicenseConfig, PermissionMode, WorkspaceResultHistoryItem } from '../../../lib/types'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
 import type { ConfigDiffItem } from '../../../lib/workspace-history'
+import type { LicenseConfig, PermissionMode, WorkspaceResultHistoryItem } from '../../../lib/types'
 import { ResultFallback } from './feedback'
 import type { ValidationState } from './types'
 
@@ -20,50 +20,36 @@ export default function ConfigSection({
   updateConfig,
   resetConfig,
 }: {
-  activeConfig: LicenseConfig;
-  permission: PermissionMode;
-  userCanEditConfig: boolean;
-  userCanUseIntermediateAutoConfig: boolean;
-  configChanged: boolean;
-  configPresetLabel: string;
-  configValidation: ValidationState;
-  latestResult: WorkspaceResultHistoryItem | null;
-  diffRows: ConfigDiffItem[];
-  updateConfig: (mutate: (config: LicenseConfig) => void) => void;
-  resetConfig: () => void;
+  activeConfig: LicenseConfig
+  permission: PermissionMode
+  userCanEditConfig: boolean
+  userCanUseIntermediateAutoConfig: boolean
+  configChanged: boolean
+  configPresetLabel: string
+  configValidation: ValidationState
+  latestResult: WorkspaceResultHistoryItem | null
+  diffRows: ConfigDiffItem[]
+  updateConfig: (mutate: (config: LicenseConfig) => void) => void
+  resetConfig: () => void
 }) {
+  const description = `${SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · ${userCanEditConfig ? `${activeConfig.layout} · ${activeConfig.desc}` : configPresetLabel}`
+
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.42fr)]">
-      <section className="min-w-0 overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
-        <div className="border-b border-surface-3/60 px-5 py-4 sm:px-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-semibold text-ink-primary">基建配置</h2>
-                {configChanged && (
-                  <span className="inline-flex w-max shrink-0 whitespace-nowrap rounded-full bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning">
-                    已修改
-                  </span>
-                )}
-                {!configValidation.ok && (
-                  <span className="inline-flex w-max shrink-0 whitespace-nowrap rounded-full bg-error/10 px-2.5 py-1 text-xs font-medium text-error">
-                    需处理
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 text-sm leading-6 text-ink-secondary">
-                {SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · {userCanEditConfig ? `${activeConfig.layout} · ${activeConfig.desc}` : configPresetLabel}
-              </p>
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(19rem,0.42fr)]">
+      <section className="tool-panel min-w-0 overflow-hidden" aria-labelledby="config-section-title">
+        <div className="tool-panel-header flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="tool-eyebrow">工作区输入</p>
+              {configChanged && <span className="tool-status tool-status--warning">已修改</span>}
+              {!configValidation.ok && <span className="tool-status tool-status--error">需处理</span>}
             </div>
-            <button
-              type="button"
-              onClick={resetConfig}
-              disabled={!configChanged}
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:cursor-not-allowed disabled:text-ink-muted"
-            >
-              重置配置
-            </button>
+            <h2 id="config-section-title" className="mt-2 text-base font-semibold text-ink-primary">基建配置</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-secondary">{description}</p>
           </div>
+          <button type="button" onClick={resetConfig} disabled={!configChanged} className="tool-secondary-action shrink-0">
+            恢复已保存配置
+          </button>
         </div>
         <div className="p-4 sm:p-5">
           <Suspense fallback={<ResultFallback />}>
@@ -82,25 +68,29 @@ export default function ConfigSection({
         </div>
       </section>
 
-      <aside className="min-w-0 rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
-        <p className="text-sm font-semibold text-brand-400">配置对比</p>
-        <h3 className="mt-1 text-base font-semibold text-ink-primary">当前方案 vs 上次方案</h3>
+      <aside className="tool-panel min-w-0 p-5 sm:p-6" aria-labelledby="config-diff-title">
+        <p className="tool-eyebrow">变化记录</p>
+        <h3 id="config-diff-title" className="mt-2 text-base font-semibold text-ink-primary">当前配置与上次生成</h3>
+        <p className="mt-1 text-sm leading-6 text-ink-secondary">只有会影响结果的差异才需要重新计算。</p>
+
         {latestResult ? (
           diffRows.length > 0 ? (
-            <div className="mt-4 grid gap-2">
+            <dl className="mt-5 divide-y divide-surface-3 border-y border-surface-3">
               {diffRows.map((row) => (
-                <div key={row.label} className="rounded-lg bg-surface-2 px-3 py-3 text-sm">
-                  <p className="font-medium text-ink-primary">{row.label}</p>
-                  <p className="mt-1 text-ink-muted">上次：{row.before}</p>
-                  <p className="mt-1 text-brand-300">当前：{row.after}</p>
+                <div key={row.label} className="py-3">
+                  <dt className="text-sm font-medium text-ink-primary">{row.label}</dt>
+                  <dd className="mt-2 grid gap-1 text-xs leading-5 sm:grid-cols-2">
+                    <span className="text-ink-muted">上次：{row.before}</span>
+                    <span className="font-medium text-brand-200">当前：{row.after}</span>
+                  </dd>
                 </div>
               ))}
-            </div>
+            </dl>
           ) : (
-            <p className="mt-4 rounded-lg bg-success/10 px-3 py-3 text-sm text-success">当前配置与上次生成配置一致。</p>
+            <p className="tool-alert tool-alert--success mt-5" role="status" aria-live="polite">当前配置与上次生成配置一致。</p>
           )
         ) : (
-          <p className="mt-4 rounded-lg bg-surface-2 px-3 py-3 text-sm text-ink-muted">暂无上次方案可对比。</p>
+          <p className="mt-5 tool-inset px-3 py-3 text-sm leading-6 text-ink-muted">暂无上次方案可对比。生成一次后，这里会记录会影响结果的配置变化。</p>
         )}
       </aside>
     </div>

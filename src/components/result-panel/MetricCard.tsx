@@ -12,9 +12,9 @@ export default function MetricCard({
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-surface-3/60 bg-surface-2/60 p-5">
+    <div className="tool-inset p-4 sm:p-5">
       <p className="mb-2 text-sm font-medium text-ink-muted">{label}</p>
-      <p className={`text-3xl font-bold ${highlight ? 'text-brand-400' : 'text-ink-primary'}`}>
+      <p className={`font-mono text-3xl font-semibold tracking-[-0.03em] ${highlight ? 'text-brand-300' : 'text-ink-primary'}`}>
         {value}
         {suffix && <span className="ml-1 text-sm font-medium text-ink-muted">{suffix}</span>}
       </p>

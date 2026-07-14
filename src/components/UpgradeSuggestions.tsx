@@ -61,7 +61,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
   }, [])
 
   return (
-    <div className={embedded ? 'space-y-4' : 'space-y-8'}>
+    <div className={embedded ? 'space-y-4' : 'tool-panel space-y-6 p-5 sm:p-6'}>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           {!embedded && (
@@ -74,23 +74,24 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
           </p>
         </div>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center xl:flex-shrink-0">
-          <div className="inline-flex w-full overflow-hidden rounded-lg border border-surface-3 bg-surface-0 p-1 lg:w-auto" role="group" aria-label="建议排序">
+          <div className="tool-inset inline-flex w-full overflow-hidden p-1 lg:w-auto" role="group" aria-label="建议排序">
             {SORT_OPTIONS.map((option) => (
               <button
                 key={option.id}
                 type="button"
                 onClick={() => setSortMode(option.id)}
-                className={`min-h-10 flex-1 whitespace-nowrap rounded-md px-3 text-sm font-semibold transition-colors duration-150 lg:flex-none ${
+                aria-pressed={sortMode === option.id}
+                className={`tool-secondary-action min-h-11 flex-1 whitespace-nowrap px-3 text-sm lg:flex-none ${
                   sortMode === option.id
-                    ? 'bg-brand-600 text-white'
-                    : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'
+                    ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100'
+                    : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
                 }`}
               >
                 {option.label}
               </button>
             ))}
           </div>
-          <label className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-surface-3 bg-surface-0 px-3 text-sm font-semibold text-ink-secondary">
+          <label className="tool-inset inline-flex min-h-11 items-center gap-2 px-3 text-sm font-semibold text-ink-secondary">
             <input
               type="checkbox"
               checked={singleOnly}
@@ -102,7 +103,8 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
           <button
             onClick={() => onApply(selectedIds)}
             disabled={loading || selected.size === 0}
-            className="min-h-11 rounded-lg bg-surface-2 px-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3 disabled:cursor-not-allowed disabled:text-ink-muted lg:flex-shrink-0"
+            aria-describedby="upgrade-selection-note"
+            className="tool-primary-action lg:flex-shrink-0"
           >
             {loading ? (
               <span className="inline-flex items-center gap-3">
@@ -124,7 +126,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
       )}
 
       {error && (
-        <div className="rounded-lg border border-error/40 bg-error/10 p-4">
+        <div className="tool-alert tool-alert--error" role="alert">
           <p className="text-sm font-semibold text-error">应用建议失败</p>
           <p className="mt-1 text-sm leading-6 text-ink-secondary">{error}</p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -132,14 +134,14 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
               type="button"
               onClick={() => onApply(selectedIds)}
               disabled={loading || selected.size === 0}
-              className="min-h-10 rounded-lg bg-error px-3 text-sm font-semibold text-white transition-colors duration-150 hover:bg-error/90 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted"
+              className="tool-primary-action"
             >
               重试
             </button>
             <button
               type="button"
               onClick={onReset}
-              className="min-h-10 rounded-lg bg-surface-2 px-3 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
+              className="tool-secondary-action"
             >
               重新选择文件
             </button>
@@ -164,13 +166,15 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
       </div>
 
       {visibleSuggestions.length === 0 && (
-        <div className={`${embedded ? 'bg-surface-2/60' : 'bg-surface-1'} rounded-lg p-4 text-sm text-ink-secondary`}>
+        <div className="tool-inset p-4 text-sm text-ink-secondary">
           当前筛选下没有可展示的建议。
         </div>
       )}
 
-      <div className={`${embedded ? 'bg-surface-2/60' : 'bg-surface-1'} rounded-lg p-4 text-sm leading-6 text-ink-secondary`}>
-        已选 {selected.size} 项。应用建议后会重新计算并生成新方案，当前方案仍可下载留底。
+      <div id="upgrade-selection-note" className="tool-inset p-4 text-sm leading-6 text-ink-secondary" role="status" aria-live="polite">
+        {selected.size === 0
+          ? '选择至少一项建议后，才可应用并重新计算；当前方案仍可下载留底。'
+          : `已选 ${selected.size} 项。应用建议后会重新计算并生成新方案，当前方案仍可下载留底。`}
       </div>
     </div>
   )
@@ -201,21 +205,19 @@ function SuggestionCard({
   const stockLabel = getStockLabel(cost)
 
   return (
-    <article
-      className={`
-        rounded-lg border transition-colors duration-150
-        ${selected ? 'border-brand-500/40 bg-brand-500/10' : `${embedded ? 'border-surface-3 bg-surface-2/60' : 'border-surface-3 bg-surface-1'} hover:border-surface-4`}
-      `}
-    >
+    <article className={`tool-panel transition-colors duration-150 ${selected ? 'border-brand-500/40 bg-brand-500/10' : `${embedded ? 'bg-surface-2/60' : ''} hover:border-surface-4`}`}>
       <div className="grid gap-4 p-4 lg:grid-cols-[auto_1fr] lg:items-start">
         <div className="flex items-start gap-3">
+          <label className="mt-1 inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md bg-surface-0">
           <input
             type="checkbox"
             checked={selected}
             onChange={onToggle}
-            className="mt-3 h-5 w-5 flex-shrink-0 accent-brand-500"
+            className="h-5 w-5 accent-brand-500"
             aria-label={`选择 ${title}`}
           />
+            <span className="sr-only">选择 {title}</span>
+          </label>
           <OperatorPortraits suggestion={suggestion} />
         </div>
 
@@ -223,9 +225,9 @@ function SuggestionCard({
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-surface-0 px-2 py-1 text-xs font-semibold text-ink-muted">#{rank}</span>
+                <span className="tool-status">#{rank}</span>
                 <h3 className="text-base font-semibold text-ink-primary sm:text-lg">{title}</h3>
-                <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${stockEnough ? 'border-success/30 bg-success/10 text-success' : 'border-surface-4 bg-surface-0 text-ink-muted'}`}>
+                <span className={`tool-status ${stockEnough ? 'tool-status--success' : ''}`}>
                   {stockLabel}
                 </span>
               </div>
@@ -241,7 +243,7 @@ function SuggestionCard({
             <button
               type="button"
               onClick={onToggleExpanded}
-              className="min-h-10 rounded-lg bg-surface-0 px-3 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-ink-primary xl:flex-shrink-0"
+              className="tool-secondary-action px-3 text-sm xl:flex-shrink-0"
               aria-expanded={expanded}
             >
               {expanded ? '收起解释' : '查看解释'}
@@ -320,7 +322,7 @@ function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?
   return (
     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
       {metrics.map((metric) => (
-        <div key={metric.label} className="min-h-20 rounded-lg border border-surface-3 bg-surface-0 px-3 py-2">
+        <div key={metric.label} className="tool-inset min-h-20 px-3 py-2">
           <p className="text-xs font-medium text-ink-muted">{metric.label}</p>
           <p className={`mt-1 break-words text-sm font-semibold ${metricToneClass(metric.tone)}`}>{metric.value}</p>
         </div>
@@ -332,7 +334,7 @@ function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?
 function TrainingCostPanel({ cost }: { cost?: UpgradeTrainingCost }) {
   if (!cost || cost.status === 'unavailable') {
     return (
-      <div className="rounded-lg border border-surface-3 bg-surface-0/70 px-3 py-2 text-sm leading-6 text-ink-muted">
+      <div className="tool-inset px-3 py-2 text-sm leading-6 text-ink-muted">
         {cost?.warnings[0] || '材料成本暂不可用'}
       </div>
     )
@@ -364,7 +366,7 @@ function CostColumn({
   const isEmpty = bucket.cash === 0 && bucket.exp === 0 && materialTotal === 0
 
   return (
-    <div className="rounded-lg border border-surface-3 bg-surface-0 p-3">
+    <div className="tool-inset p-3">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-ink-primary">{title}</p>
         <p className={`text-xs font-semibold ${emphasizeMissing ? 'text-warning' : 'text-ink-muted'}`}>
@@ -401,7 +403,7 @@ function ImpactPanel({ suggestion }: { suggestion: UpgradeSuggestion }) {
   const partials = suggestion.partial_outcomes ?? []
   return (
     <div className="grid gap-3 xl:grid-cols-[1fr_0.95fr]">
-      <div className="rounded-lg border border-surface-3 bg-surface-0 p-3">
+      <div className="tool-inset p-3">
         <p className="text-sm font-semibold text-ink-primary">影响房间/组合</p>
         {impactRooms.length > 0 ? (
           <div className="mt-2 space-y-2">
@@ -419,7 +421,7 @@ function ImpactPanel({ suggestion }: { suggestion: UpgradeSuggestion }) {
         )}
       </div>
 
-      <div className="rounded-lg border border-surface-3 bg-surface-0 p-3">
+      <div className="tool-inset p-3">
         <p className="text-sm font-semibold text-ink-primary">组合拆分收益</p>
         {suggestion.type !== 'bundle' ? (
           <p className="mt-2 text-sm leading-6 text-ink-muted">单人提升不需要拆分模拟。</p>
@@ -445,7 +447,7 @@ function ImpactRoomRow({ room }: { room: UpgradeImpactRoom }) {
   const operators = room.operators.join(' + ') || '-'
   const missing = room.missing_operators.join(' + ') || '-'
   return (
-    <div className="rounded-md bg-surface-2 px-3 py-2">
+    <div className="tool-inset px-3 py-2">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-semibold text-ink-primary">{room.room_name || room.room_type}</p>
         <p className="text-xs font-semibold text-brand-300">+{formatCostNumber(room.estimated_gain)}%</p>
@@ -460,7 +462,7 @@ function ImpactRoomRow({ room }: { room: UpgradeImpactRoom }) {
 
 function PartialOutcomeRow({ outcome }: { outcome: UpgradePartialOutcome }) {
   return (
-    <div className="rounded-md bg-surface-2 px-3 py-2">
+    <div className="tool-inset px-3 py-2">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-semibold text-ink-primary">缺 {outcome.missing_operator.name}</p>
         <p className={`text-xs font-semibold ${outcome.has_benefit ? 'text-success' : 'text-ink-muted'}`}>

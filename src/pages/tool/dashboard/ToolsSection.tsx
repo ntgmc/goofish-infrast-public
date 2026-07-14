@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 export default function ToolsSection() {
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-surface-3 bg-surface-1 p-5 sm:p-6">
+      <section className="tool-panel p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink-primary">仓库价值分析器</h2>
@@ -14,13 +14,13 @@ export default function ToolsSection() {
           </div>
           <Link
             to="/tools/depot-value"
-            className="inline-flex w-fit items-center justify-center rounded-lg border border-surface-3 bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary"
+            className="tool-secondary-action w-fit"
           >
             打开独立页面
           </Link>
         </div>
       </section>
-      <section className="rounded-lg border border-surface-3 bg-surface-1 p-5 sm:p-6">
+      <section className="tool-panel p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink-primary">排班表分析</h2>
@@ -30,7 +30,7 @@ export default function ToolsSection() {
           </div>
           <Link
             to="/tools/schedule-analysis"
-            className="inline-flex w-fit items-center justify-center rounded-lg border border-surface-3 bg-surface-0 px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors duration-150 hover:border-surface-4 hover:bg-surface-2 hover:text-ink-primary"
+            className="tool-secondary-action w-fit"
           >
             打开独立页面
           </Link>
