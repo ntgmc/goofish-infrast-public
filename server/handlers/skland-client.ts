@@ -26,6 +26,10 @@ export interface SklandBindingSummary {
   channel_name: string
 }
 
+export interface SklandAccountOption extends SklandBindingSummary {
+  is_default: boolean
+}
+
 export interface SklandImportSummary extends SklandBindingSummary {
   status: 'imported'
   operator_count: number
@@ -40,6 +44,7 @@ type IntermediateProduct = 'Originium Shard' | 'Pure Gold' | 'Orirock Cube'
 export type IntermediateInventory = Record<IntermediateProduct, number>
 
 type SklandImportOptions = {
+  uid: string
   includeInventory?: boolean
 }
 
@@ -122,15 +127,23 @@ export async function getCredByHypergryphToken(token: string): Promise<string> {
   return cred.data.cred
 }
 
-export async function importSklandOperatorsByCred(cred: string, options: SklandImportOptions = {}): Promise<{
+export async function listSklandArknightsBindingsByCred(cred: string): Promise<SklandAccountOption[]> {
+  return new SklandClient(cred).getArknightsBindings()
+}
+
+export async function importSklandOperatorsByCred(cred: string, options: SklandImportOptions): Promise<{
   binding: SklandBindingSummary
   operators: LicenseOperator[]
   importedAt: string
   intermediateInventory?: IntermediateInventory
   inventoryWarning?: string
 }> {
+  const selectedUid = stringValue(options.uid)
+  if (!selectedUid) throw new Error('缺少要导入的森空岛 UID。')
   const client = new SklandClient(cred)
-  const binding = await client.getArknightsBinding()
+  const bindings = await client.getArknightsBindings()
+  const binding = bindings.find((candidate) => candidate.uid === selectedUid)
+  if (!binding) throw new Error('所选账号已不在森空岛绑定列表中，请重新授权。')
   const playerInfo = await client.getGamePlayerInfo(binding.uid)
   const operators = convertSklandCharactersToOperators(playerInfo)
   const inventoryResult = options.includeInventory
@@ -309,24 +322,37 @@ export class SklandClient {
 
   constructor(private readonly cred: string) {}
 
-  async getArknightsBinding(): Promise<SklandBindingSummary> {
+  async getArknightsBindings(): Promise<SklandAccountOption[]> {
     const data = await this.getSigned<ApiEnvelope>('/api/v1/game/player/binding')
     if (data.code !== 0 || data.message !== 'OK' || !isRecord(data.data) || !Array.isArray(data.data.list)) {
       throw new Error('读取森空岛绑定角色失败，请重新扫码绑定。')
     }
+    const accounts: SklandAccountOption[] = []
+    const seenUids = new Set<string>()
     for (const item of data.data.list) {
       if (!isRecord(item) || item.appCode !== 'arknights' || !Array.isArray(item.bindingList)) continue
       const bindings = item.bindingList.filter(isRecord)
       const defaultUid = stringValue(item.defaultUid)
-      const binding = defaultUid
-        ? bindings.find((candidate) => stringValue(candidate.uid) === defaultUid) ?? bindings[0]
-        : bindings.find((candidate) => stringValue(candidate.uid))
-      const uid = defaultUid || stringValue(binding?.uid)
-      const nickname = stringValue(binding?.nickName ?? binding?.nickname ?? uid)
-      const channel = stringValue(binding?.channelName ?? binding?.channel ?? '官方')
-      if (uid && nickname) {
-        return { uid, nickname, channel_name: channel || '官方' }
+      for (const binding of bindings) {
+        const bindingUid = stringValue(binding.uid)
+        const uid = bindingUid || (bindings.length === 1 ? defaultUid : '')
+        if (!uid || seenUids.has(uid)) continue
+        const nickname = stringValue(binding.nickName ?? binding.nickname ?? uid) || uid
+        const channel = stringValue(binding.channelName ?? binding.channel ?? '官方')
+        seenUids.add(uid)
+        accounts.push({
+          uid,
+          nickname,
+          channel_name: channel || '官方',
+          is_default: uid === defaultUid,
+        })
       }
+    }
+    if (accounts.length > 0) {
+      return accounts
+        .map((account, index) => ({ account, index }))
+        .sort((left, right) => Number(right.account.is_default) - Number(left.account.is_default) || left.index - right.index)
+        .map(({ account }) => account)
     }
     throw new Error('森空岛账号未找到已绑定的明日方舟角色。')
   }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import type { UserGameAccount } from '../lib/types'
-import { useSklandBinding, type SklandImportMode, type SklandLoginState, type SklandPayload, type SklandPreview } from '../hooks/useSklandBinding'
+import { useSklandBinding, type SklandAccountOption, type SklandImportMode, type SklandLoginState, type SklandPayload, type SklandPreview } from '../hooks/useSklandBinding'
 
 export type { SklandPayload } from '../hooks/useSklandBinding'
 
@@ -47,6 +47,8 @@ export default function SklandBindingDialog({
     completeSklandLogin,
     startSklandLogin,
     previewCredential,
+    selectAccount,
+    previewSelectedAccount,
     confirmSklandLogin,
     close,
     selectMode,
@@ -54,6 +56,7 @@ export default function SklandBindingDialog({
   } = useSklandBinding({ open, profile, context, claimProfileMeta, autoStart, onOpenChange, onPayload, onCompleted })
   const dialogRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const firstAccountRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -65,6 +68,12 @@ export default function SklandBindingDialog({
       if (previousActiveElement?.isConnected) previousActiveElement.focus()
     }
   }, [open])
+
+  useEffect(() => {
+    if (!open || sklandLogin.status !== 'account_selection_required') return
+    const focusTimer = window.setTimeout(() => firstAccountRef.current?.focus(), 0)
+    return () => window.clearTimeout(focusTimer)
+  }, [open, sklandLogin.status])
 
   if (!open) return null
 
@@ -177,6 +186,15 @@ export default function SklandBindingDialog({
           )}
         </div>
 
+        {sklandLogin.status === 'account_selection_required' && sklandLogin.accountOptions.length > 0 && (
+          <AccountSelectionPanel
+            accounts={sklandLogin.accountOptions}
+            selectedUid={sklandLogin.selectedUid}
+            firstAccountRef={firstAccountRef}
+            onSelect={selectAccount}
+          />
+        )}
+
         {sklandLogin.preview && (
           <PreviewPanel
             preview={sklandLogin.preview}
@@ -209,6 +227,11 @@ export default function SklandBindingDialog({
           {sklandLogin.status === 'waiting' && sklandLogin.scanId && (
             <button type="button" onClick={() => void completeSklandLogin(sklandLogin.scanId!)} disabled={busy} className="tool-secondary-action">
               立即检查授权
+            </button>
+          )}
+          {sklandLogin.status === 'account_selection_required' && (
+            <button type="button" onClick={previewSelectedAccount} disabled={busy || !sklandLogin.selectedUid} className="tool-primary-action">
+              {busy ? '正在读取所选账号' : '读取所选账号'}
             </button>
           )}
           {sklandLogin.status === 'confirm_required' && (
@@ -370,6 +393,56 @@ function PreviewPanel({ preview, status, isDepot }: { preview: SklandPreview; st
   )
 }
 
+function AccountSelectionPanel({
+  accounts,
+  selectedUid,
+  firstAccountRef,
+  onSelect,
+}: {
+  accounts: SklandAccountOption[]
+  selectedUid: string | null
+  firstAccountRef: RefObject<HTMLInputElement>
+  onSelect: (uid: string) => void
+}) {
+  return (
+    <fieldset className="tool-inset mt-5 p-4">
+      <legend className="px-1 text-sm font-semibold text-ink-primary">选择要导入的明日方舟账号</legend>
+      <p className="mt-1 text-xs leading-5 text-ink-muted">每个档案只能绑定一个 UID，请主动选择并核对后继续。</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {accounts.map((account, index) => {
+          const selected = selectedUid === account.uid
+          return (
+            <label
+              key={account.uid}
+              className={'tool-inset flex min-h-24 cursor-pointer items-start gap-3 p-3 transition-colors duration-150 ' + (selected ? 'border-brand-500 bg-brand-500/10' : 'hover:bg-surface-3')}
+            >
+              <input
+                ref={index === 0 ? firstAccountRef : undefined}
+                type="radio"
+                name="skland-account"
+                value={account.uid}
+                checked={selected}
+                onChange={() => onSelect(account.uid)}
+                className="mt-1 h-5 w-5 shrink-0 accent-brand-500 focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="break-words text-sm font-semibold text-ink-primary">{account.nickname}</span>
+                  {account.is_default && (
+                    <span className="rounded-full border border-brand-500/50 bg-brand-500/10 px-2 py-0.5 text-[11px] font-semibold text-brand-300">默认账号</span>
+                  )}
+                </span>
+                <span className="mt-1 block break-all text-xs text-ink-secondary">UID {account.uid}</span>
+                <span className="mt-1 block text-xs text-ink-muted">{account.channel_name}</span>
+              </span>
+            </label>
+          )
+        })}
+      </div>
+    </fieldset>
+  )
+}
+
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="tool-inset px-3 py-2">
@@ -389,7 +462,7 @@ function StepBox({ index, label }: { index: string; label: string }) {
 }
 
 function stepForStatus(status: SklandLoginState['status']): 1 | 2 | 3 {
-  if (status === 'confirm_required' || status === 'account_mismatch') return 2
+  if (status === 'account_selection_required' || status === 'confirm_required' || status === 'account_mismatch') return 2
   if (status === 'importing' || status === 'imported') return 3
   return 1
 }
