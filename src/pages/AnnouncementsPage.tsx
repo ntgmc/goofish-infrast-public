@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Announcement, AnnouncementPublicResponse } from '../lib/types'
 import { apiJson } from '../lib/api-client'
+import AnnouncementMarkdown from '../components/AnnouncementMarkdown'
 
 export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -63,7 +64,7 @@ export default function AnnouncementsPage() {
                 <time className="text-xs text-ink-muted">{formatDate(announcement.updated_at)}</time>
               </div>
               <h2 className="mt-3 text-base font-semibold text-ink-primary">{announcement.title}</h2>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{announcement.body}</p>
+              <AnnouncementMarkdown className="mt-2">{announcement.body}</AnnouncementMarkdown>
             </article>
           ))}
         </div>

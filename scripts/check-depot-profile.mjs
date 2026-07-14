@@ -1,4 +1,5 @@
 import * as esbuild from 'esbuild'
+import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -76,6 +77,7 @@ async function call(handler, path, body = {}, init = {}) {
     method: init.method ?? 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(path === '/api/optimization/jobs' ? { 'Idempotency-Key': `depot-profile-${randomUUID()}` } : {}),
       cookie: init.auth === false ? '' : 'maa_session=test-session',
     },
     body: JSON.stringify(body),
@@ -176,6 +178,9 @@ function memoryUserStoreModule() {
       const profile = store.profiles.get(profileId)
       return profile?.user_id === userId ? profile : null
     }
+    export async function getProfileById(profileId) {
+      return store.profiles.get(profileId) ?? null
+    }
     export async function getProfileWorkspace(profileId) {
       return store.workspaces.get(profileId) ?? null
     }
@@ -261,7 +266,7 @@ function memoryLicenseUtilsModule() {
     export function formatRiskFreezeMessage(message) { return message }
     export async function freezeCdkRecord(record) { return record }
     export function getPermissionMode(license) { return license?.permission ?? 'growth' }
-    export async function getCdkRecordStore() { return { get: async () => null, set: async () => undefined } }
+    export async function getCdkRecordStore() { return { get: async () => null, mutate: async () => null } }
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, device_risk_enabled: false, updated_at: null } }
     export async function findCdkRecordByLicenseOrderHash() { return null }
     export async function incrementCdkScheduleGenerateCount() {}
@@ -275,6 +280,7 @@ function memoryLicenseUtilsModule() {
     export function validateLicenseForRequest() { return { ok: false, status: 400, message: 'license not needed in depot guard' } }
     export function validateOperators(operators) { return { ok: true, operators: Array.isArray(operators) ? operators : [] } }
     export function verifyLicenseSignature() { return true }
+    export function verifyLicenseSignatureWithKeyring() { return true }
   `
 }
 

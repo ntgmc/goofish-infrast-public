@@ -1,6 +1,7 @@
 import type { AnnouncementKind } from '../../lib/types'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
+import AnnouncementBodyEditor from '../../components/AnnouncementBodyEditor'
 
 import { GeneratedPermission, AdminSection, UsageRangeKey, AnnouncementSortKey, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, sectionLabels, announcementKindLabels, announcementSortLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailPanel, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, AnnouncementReachMetrics, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
 import { useAdminController } from './useAdminController'
@@ -378,16 +379,11 @@ export default function AdminDashboardView() {
                             className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary"
                           />
                         </label>
-                        <label className="mt-4 block">
-                          <span className="mb-2 block text-sm font-medium text-ink-secondary">正文</span>
-                          <textarea
-                            value={item.body}
-                            maxLength={600}
-                            rows={5}
-                            onChange={(event) => updateAnnouncement(item.id, { body: event.currentTarget.value })}
-                            className="w-full resize-y rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm leading-6 text-ink-primary"
-                          />
-                        </label>
+                        <AnnouncementBodyEditor
+                          id={`announcement-${item.id}`}
+                          value={item.body}
+                          onChange={(body) => updateAnnouncement(item.id, { body })}
+                        />
                         <p className="mt-3 text-xs text-ink-muted">更新时间：{formatDate(item.updated_at)}</p>
                       </article>
                     )

@@ -4,17 +4,43 @@ interface SendPasswordResetEmailInput {
   expiresMinutes: number
 }
 
+interface SendLifecycleEmailInput {
+  email: string
+  templateId: number
+  params: Record<string, string | number>
+}
+
 export async function sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void> {
+  await sendLifecycleEmail({
+    email: input.email,
+    templateId: requiredTemplateId('BREVO_RESET_TEMPLATE_ID'),
+    params: { reset_url: input.resetUrl, expires_minutes: input.expiresMinutes },
+  })
+}
+
+export async function sendAccountDeletionCancellationEmail(email: string, cancelUrl: string): Promise<void> {
+  await sendLifecycleEmail({
+    email,
+    templateId: requiredTemplateId('BREVO_ACCOUNT_DELETION_CANCEL_TEMPLATE_ID'),
+    params: { cancel_url: cancelUrl, expires_days: 7 },
+  })
+}
+
+export async function sendAccountDeletionReceiptEmail(email: string, receiptId: string): Promise<void> {
+  await sendLifecycleEmail({
+    email,
+    templateId: requiredTemplateId('BREVO_ACCOUNT_DELETION_RECEIPT_TEMPLATE_ID'),
+    params: { receipt_id: receiptId },
+  })
+}
+
+async function sendLifecycleEmail(input: SendLifecycleEmailInput): Promise<void> {
   const apiKey = process.env.BREVO_API_KEY?.trim()
   const senderEmail = process.env.BREVO_SENDER_EMAIL?.trim()
   const senderName = process.env.BREVO_SENDER_NAME?.trim() || 'MAA Admin'
-  const templateId = Number(process.env.BREVO_RESET_TEMPLATE_ID)
 
   if (!apiKey) throw new Error('BREVO_API_KEY not configured')
   if (!senderEmail) throw new Error('BREVO_SENDER_EMAIL not configured')
-  if (!Number.isInteger(templateId) || templateId <= 0) {
-    throw new Error('BREVO_RESET_TEMPLATE_ID not configured')
-  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -35,11 +61,8 @@ export async function sendPasswordResetEmail(input: SendPasswordResetEmailInput)
           email: input.email,
         },
       ],
-      templateId,
-      params: {
-        reset_url: input.resetUrl,
-        expires_minutes: input.expiresMinutes,
-      },
+      templateId: input.templateId,
+      params: input.params,
     }),
   })
 
@@ -47,4 +70,10 @@ export async function sendPasswordResetEmail(input: SendPasswordResetEmailInput)
     const text = await response.text()
     throw new Error(`Brevo send failed: ${response.status} ${text.slice(0, 500)}`)
   }
+}
+
+function requiredTemplateId(name: string): number {
+  const value = Number(process.env[name])
+  if (!Number.isInteger(value) || value <= 0) throw new Error(`${name} not configured`)
+  return value
 }

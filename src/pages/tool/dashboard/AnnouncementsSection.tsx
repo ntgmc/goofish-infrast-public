@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { UserAnnouncementRead } from '../../../lib/types'
 import { apiJson } from '../../../lib/api-client'
 import { formatDate } from '../tool-utils'
+import AnnouncementMarkdown from '../../../components/AnnouncementMarkdown'
 
 
 export default function AnnouncementsSection() {
@@ -72,7 +73,7 @@ export default function AnnouncementsSection() {
                 <h2 className="text-lg font-semibold text-ink-primary">{announcement.title}</h2>
                 {!read_at && <span className="rounded-md bg-brand-600 px-2 py-1 text-xs font-semibold text-white">未读</span>}
               </div>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{announcement.body}</p>
+              <AnnouncementMarkdown className="mt-2">{announcement.body}</AnnouncementMarkdown>
               <p className="mt-3 text-xs text-ink-muted">更新 {formatDate(announcement.updated_at)}</p>
             </div>
             {!read_at && (

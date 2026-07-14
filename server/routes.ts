@@ -15,6 +15,7 @@ import userProfilesHandler from './handlers/user-profiles'
 import userSklandHandler from './handlers/user-skland'
 import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
+import accountDataHandler from './handlers/account-data'
 import usageStatsHandler from './handlers/usage-stats'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
@@ -33,6 +34,12 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/auth/reset-password', authHandler as unknown as ApiHandler],
   ['/api/auth/change-password', authHandler as unknown as ApiHandler],
   ['/api/auth/me', authHandler as unknown as ApiHandler],
+  ['/api/user/data/export', accountDataHandler as unknown as ApiHandler],
+  ['/api/user/data/delete-request', accountDataHandler as unknown as ApiHandler],
+  ['/api/user/data/cancel', accountDataHandler as unknown as ApiHandler],
+  ['/api/user/data/credential/clear', accountDataHandler as unknown as ApiHandler],
+  ['/api/user/data/skland/unlink', accountDataHandler as unknown as ApiHandler],
+  ['/api/user/data/depot-sample/revoke', accountDataHandler as unknown as ApiHandler],
   ['/api/announcement', announcementHandler as unknown as ApiHandler],
   ['/api/admin/announcement', announcementHandler as unknown as ApiHandler],
   ['/api/usage-stats', usageStatsHandler as unknown as ApiHandler],

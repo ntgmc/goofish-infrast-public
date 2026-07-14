@@ -1,5 +1,5 @@
 import type { FreeScheduleEntitlement, LicenseOperator, LicenseConfig, LicenseFile, OptimizeResult } from "../../../src/lib/types";
-import { canonicalJson, formatRiskFreezeMessage, type CdkRecord, findCdkRecordByLicenseOrderHash, incrementCdkScheduleGenerateCount, normalizePermissionMode, requireEnv, validateLicenseForRequest, verifyLicenseSignature } from "../../handlers/license-utils";
+import { canonicalJson, formatRiskFreezeMessage, type CdkRecord, findCdkRecordByLicenseOrderHash, incrementCdkScheduleGenerateCount, normalizePermissionMode, validateLicenseForRequest, verifyLicenseSignatureWithKeyring } from "../../handlers/license-utils";
 import { countSuccessfulUsageEventsForProfileInRange, recordUsageEvent } from "../../handlers/usage-stats";
 import type { UsageReasonCode } from "../../storage/usage-store";
 import type { ReorderCheckQuota, ScheduleUsageContext, FreeScheduleGenerateDecision } from './shared';
@@ -60,8 +60,7 @@ export async function validateRequestLicense(license: unknown): Promise<
     return { ok: false, status: 400, message: structure.message };
   }
 
-  const adminSecret = requireEnv("MAA_ADMIN_SECRET");
-  if (!verifyLicenseSignature(structure.license, adminSecret)) {
+  if (!verifyLicenseSignatureWithKeyring(structure.license)) {
     return { ok: false, status: 401, message: "Invalid license signature." };
   }
 

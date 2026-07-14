@@ -15,11 +15,13 @@
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:watch": "vitest",
     "check:architecture": "node scripts/check-architecture.mjs",
+    "check:dr": "node scripts/check-disaster-recovery.mjs",
     "check:build-relevance": "node scripts/check-build-relevance.mjs --check",
-    "check:api": "node scripts/check-http-body-limit.mjs && node scripts/check-http-security-baseline.mjs && node scripts/check-auth-security.mjs && node scripts/check-api-handlers.mjs && node scripts/check-skland-client.mjs && node scripts/check-skland-handler.mjs && node scripts/check-training-cost.mjs && node scripts/check-depot-profile.mjs && node scripts/check-workspace-history.mjs && node scripts/check-depot-value.mjs && node scripts/check-license-risk.mjs",
+    "check:api": "node scripts/check-http-body-limit.mjs && node scripts/check-http-security-baseline.mjs && npm run check:public-http && node scripts/check-auth-security.mjs && node scripts/check-api-handlers.mjs && node scripts/check-skland-client.mjs && node scripts/check-skland-handler.mjs && node scripts/check-training-cost.mjs && node scripts/check-depot-profile.mjs && node scripts/check-workspace-history.mjs && node scripts/check-depot-value.mjs && node scripts/check-license-risk.mjs",
     "check:optimizer-dynamic-rules": "node scripts/check-optimizer-dynamic-rules.mjs",
+    "check:public-http": "node scripts/check-public-http-smoke.mjs --self-test",
     "check:migration": "npm run build && node scripts/check-server-routes.mjs && node scripts/verify-migrated-data.mjs",
-    "check:local": "npm run build && npm test && npm run check:architecture && npm run check:api && node scripts/check-server-routes.mjs",
+    "check:local": "npm run build && npm test && npm run check:architecture && npm run check:dr && npm run check:api && node scripts/check-server-routes.mjs",
     "start:server": "node server/dist/index.js",
     "preview": "vite preview"
   },
@@ -29,7 +31,9 @@
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.1"
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.18.1",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

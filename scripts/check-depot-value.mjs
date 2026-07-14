@@ -320,7 +320,7 @@ async function expectRawStatus(body, status, label) {
 
 function assertNoSecretLeak(value, label) {
   const serialized = JSON.stringify(value)
-  for (const secret of ['bound-secret', 'decrypted-skland-cred', 'SKLAND-V1:', '12345678', '博士']) {
+  for (const secret of ['bound-secret', 'decrypted-skland-cred', 'SKLAND-V1:', 'SKLAND-V2:', '12345678', '博士']) {
     if (serialized.includes(secret)) {
       throw new Error(`${label}: leaked ${secret}`)
     }
@@ -329,7 +329,7 @@ function assertNoSecretLeak(value, label) {
 
 function assertNoRawSampleLeak(value, label) {
   const serialized = JSON.stringify(value)
-  for (const secret of ['bound-secret', 'decrypted-skland-cred', 'SKLAND-V1:', '12345678', '博士', 'char_002_amiya', '阿米娅', '源岩']) {
+  for (const secret of ['bound-secret', 'decrypted-skland-cred', 'SKLAND-V1:', 'SKLAND-V2:', '12345678', '博士', 'char_002_amiya', '阿米娅', '源岩']) {
     if (serialized.includes(secret)) {
       throw new Error(`${label}: leaked raw value ${secret}`)
     }

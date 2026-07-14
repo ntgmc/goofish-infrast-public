@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { CdkAlreadyRedeemedError, createRequestHash, redeemCdkAtomically, saveProfileInTransaction, saveWorkspaceInTransaction } from './cdk-redemption'
+import { createPostgresCdkRecordStore } from './cdk-store'
 import { emptyWorkspace, type UserGameAccountRecord } from './user-store'
 import type { CdkRecord } from '../handlers/license-utils'
 
@@ -83,6 +84,49 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     expect((await query('select 1 from user_game_accounts where id = $1', [profileId])).rowCount).toBe(0)
     expect((await query<{ status: string }>('select status from cdk_records where key = $1', [key])).rows[0]?.status).toBe('unused')
   })
+
+  it('does not increment a stale job snapshot after the CDK is revoked or frozen', async () => {
+    const store = createPostgresCdkRecordStore()
+    const revokedKey = await seedUsedCdk({ schedule_generate_count: 3, permission: 'growth' })
+    const staleRevoked = await store.get(revokedKey)
+    await store.mutate(revokedKey, (current) => ({ ...current, status: 'revoked', revoked_at: new Date().toISOString() }), { allowedStatuses: ['used', 'frozen'] })
+    expect(await store.incrementScheduleGenerateCount(revokedKey)).toBe(false)
+    expect(await store.get(revokedKey)).toMatchObject({
+      status: 'revoked',
+      permission: 'growth',
+      schedule_generate_count: staleRevoked?.schedule_generate_count,
+    })
+
+    const frozenKey = await seedUsedCdk({ schedule_generate_count: 7, freeze_reason: 'risk event', risk_events: [{ at: new Date().toISOString(), type: 'risk', reason: 'risk event' }] })
+    await store.mutate(frozenKey, (current) => ({ ...current, status: 'frozen', frozen_at: new Date().toISOString() }), { allowedStatuses: ['used'] })
+    expect(await store.incrementScheduleGenerateCount(frozenKey)).toBe(false)
+    expect(await store.get(frozenKey)).toMatchObject({
+      status: 'frozen',
+      freeze_reason: 'risk event',
+      schedule_generate_count: 7,
+    })
+  })
+
+  it('atomically counts concurrent schedule completions and preserves the revoked terminal state', async () => {
+    const store = createPostgresCdkRecordStore()
+    const key = await seedUsedCdk({ schedule_generate_count: 0 })
+    const increments = await Promise.all(Array.from({ length: 24 }, () => store.incrementScheduleGenerateCount(key)))
+    expect(increments.every(Boolean)).toBe(true)
+    expect(await store.get(key)).toMatchObject({ status: 'used', schedule_generate_count: 24 })
+
+    await Promise.all([
+      store.mutate(key, (current) => ({ ...current, permission: 'ultimate' })),
+      store.mutate(key, (current) => ({
+        ...current,
+        risk_events: [...(current.risk_events ?? []), { at: new Date().toISOString(), type: 'concurrent_risk', reason: 'captured' }],
+      })),
+    ])
+    await store.mutate(key, (current) => ({ ...current, status: 'revoked', revoked_at: new Date().toISOString() }), { allowedStatuses: ['used', 'frozen'] })
+    const result = await store.mutate(key, (current) => ({ ...current, status: 'used', permission: 'growth' }))
+    expect(result).toMatchObject({ status: 'revoked', permission: 'ultimate' })
+    expect(result?.risk_events?.some((event) => event.type === 'concurrent_risk')).toBe(true)
+    expect((await query<{ record_revision: number }>('select record_revision from cdk_records where key = $1', [key])).rows[0]?.record_revision).toBeGreaterThan(0)
+  })
 })
 
 async function seedCdk(): Promise<string> {
@@ -96,6 +140,25 @@ async function seedCdk(): Promise<string> {
     `insert into cdk_records (key, code_hash, status, permission, license_order_hash, record_json, created_at, updated_at)
      values ($1,$2,$3,$4,$5,$6::jsonb,now(),now())`,
     [key, record.code_hash, record.status, record.permission, null, JSON.stringify(record)],
+  )
+  return key
+}
+
+async function seedUsedCdk(overrides: Partial<CdkRecord> = {}): Promise<string> {
+  const key = await seedCdk()
+  const stored = await query<{ record_json: CdkRecord }>('select record_json from cdk_records where key = $1', [key])
+  const record: CdkRecord = {
+    ...stored.rows[0]!.record_json,
+    ...overrides,
+    status: 'used',
+    used_at: new Date().toISOString(),
+    license_order_hash: overrides.license_order_hash ?? randomUUID(),
+  }
+  await query(
+    `update cdk_records
+     set status = $2, permission = $3, license_order_hash = $4, record_json = $5::jsonb, updated_at = now()
+     where key = $1`,
+    [key, record.status, record.permission, record.license_order_hash, JSON.stringify(record)],
   )
   return key
 }
