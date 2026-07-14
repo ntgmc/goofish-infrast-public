@@ -1,11 +1,11 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { LicenseConfig, OptimizeEstimateBucket, OptimizeResult } from "../../../src/lib/types";
 import { SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT } from '../../../src/lib/scenario-comparison';
 import type { OptimizationJobSnapshot } from "../../../src/lib/optimization-contracts";
 import { getScheduleGenerateDurationStatsByBucket } from "../../handlers/usage-stats";
 import { getProfileForUser } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
-import { getOptimizeJobStore, type OptimizeJobPriority, type OptimizeJobRecord } from "../../storage/optimize-job-store";
+import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobRecord } from "../../storage/optimize-job-store";
 import { getOptimizePollAfterMs, kickOptimizeJobProcessing } from "../../optimize-job-runner";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
 import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload } from './shared';
@@ -14,31 +14,46 @@ import { jsonResponse } from './http-core';
 import { prepareOptimizeJob } from './prepare-job';
 
 export async function submitOptimizationJob(req: Request): Promise<Response> {
+  const idempotencyKey = normalizeIdempotencyKey(req.headers.get('Idempotency-Key'));
+  if (!idempotencyKey) return jsonResponse({ error: '缺少或无效的 Idempotency-Key。', code: 'idempotency_key_required' }, 400);
+  const requestHash = createHash('sha256').update(await req.clone().text()).digest('hex');
   const preparedResult = await prepareOptimizeJob(req);
   if (!preparedResult.ok) return preparedResult.response;
 
   const store = getOptimizeJobStore();
   const prepared = preparedResult.prepared;
 
-  if (prepared.source === 'free_preview') {
-    const existing = await store.findActiveByOwnerKey(prepared.ownerKey);
-    if (existing) {
-      kickOptimizeJobProcessing();
-      return jsonResponse({ job: await buildOptimizeJobAccepted(existing) }, 202);
+  try {
+    const admissionInput = {
+      id: randomUUID(),
+      priority: prepared.priorityValue,
+      owner_key: prepared.ownerKey,
+      permission: prepared.permission,
+      source: prepared.source,
+      payload_json: prepared.payload,
+      idempotency_key: idempotencyKey,
+      request_hash: requestHash,
+      free_profile_id: prepared.source === 'free_preview' ? (prepared.payload as { activeProfileId?: string | null }).activeProfileId ?? null : null,
+    };
+    // Third-party test stores predating atomic admission remain read-only test
+    // doubles; production and the built-in memory store always implement admitJob.
+    const admitted = typeof (store as Partial<typeof store>).admitJob === 'function'
+      ? await store.admitJob(admissionInput)
+      : { job: await store.createJob(admissionInput), replayed: false };
+
+    kickOptimizeJobProcessing();
+    return jsonResponse({ job: await buildOptimizeJobAccepted(admitted.job) }, 202);
+  } catch (error) {
+    if (error instanceof OptimizeJobAdmissionError) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status);
     }
+    throw error;
   }
+}
 
-  const job = await store.createJob({
-    id: randomUUID(),
-    priority: prepared.priorityValue,
-    owner_key: prepared.ownerKey,
-    permission: prepared.permission,
-    source: prepared.source,
-    payload_json: prepared.payload,
-  });
-
-  kickOptimizeJobProcessing();
-  return jsonResponse({ job: await buildOptimizeJobAccepted(job) }, 202);
+function normalizeIdempotencyKey(value: string | null): string | null {
+  const key = value?.trim() ?? '';
+  return key && key.length <= 200 ? key : null;
 }
 
 export async function getOptimizationJob(req: Request, rawJobId: string): Promise<Response> {

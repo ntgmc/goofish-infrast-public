@@ -1,4 +1,5 @@
 import * as esbuild from 'esbuild'
+import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -76,6 +77,7 @@ async function call(handler, path, body = {}, init = {}) {
     method: init.method ?? 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(path === '/api/optimization/jobs' ? { 'Idempotency-Key': `depot-profile-${randomUUID()}` } : {}),
       cookie: init.auth === false ? '' : 'maa_session=test-session',
     },
     body: JSON.stringify(body),

@@ -185,6 +185,10 @@ export async function prepareOptimizeJob(
       } catch (error) {
         return fail({ error: error instanceof Error ? error.message : String(error) }, 400);
       }
+      const estimate = buildScenarioComparisonEstimate(expansion.scenarios.length, expansion.variableScenarioCount);
+      if (estimate.estimated_duration_ms > 10 * 60_000) {
+        return fail({ error: '场景组合预计计算时间超过十分钟上限，请减少场景或变量。', code: 'scenario_cost_exceeded' }, 429);
+      }
       return {
         ok: true,
         prepared: {
@@ -201,7 +205,7 @@ export async function prepareOptimizeJob(
             effectiveConfig,
             activeProfileId,
             factors: body.factors,
-            estimate: buildScenarioComparisonEstimate(expansion.scenarios.length, expansion.variableScenarioCount),
+            estimate,
           },
         },
       };

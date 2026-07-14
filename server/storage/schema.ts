@@ -75,6 +75,34 @@ CREATE INDEX IF NOT EXISTS idx_optimize_jobs_status_priority_created_at ON optim
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_owner_status_created_at ON optimize_jobs(owner_key, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_lock_expires_at ON optimize_jobs(lock_expires_at);
 
+CREATE TABLE IF NOT EXISTS optimization_submissions (
+  id TEXT PRIMARY KEY,
+  owner_key TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_optimization_submissions_owner_created_at
+  ON optimization_submissions(owner_key, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS optimization_idempotency (
+  owner_key TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status TEXT NOT NULL,
+  job_id TEXT,
+  response_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (owner_key, idempotency_key)
+);
+
+CREATE TABLE IF NOT EXISTS optimize_dispatch_state (
+  id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+  prioritized_streak INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+INSERT INTO optimize_dispatch_state (id, prioritized_streak, updated_at)
+VALUES (TRUE, 0, now()) ON CONFLICT (id) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS admin_users (
   username TEXT PRIMARY KEY,
   password_hash TEXT NOT NULL,
@@ -222,6 +250,104 @@ CREATE TABLE IF NOT EXISTS user_profile_workspaces (
   record_json JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS profile_entitlements (
+  profile_id TEXT PRIMARY KEY REFERENCES user_game_accounts(id) ON DELETE CASCADE,
+  first_generated_at TIMESTAMPTZ,
+  free_revision_count INTEGER NOT NULL DEFAULT 0,
+  confirmed_at TIMESTAMPTZ,
+  locked_at TIMESTAMPTZ,
+  lock_reason TEXT,
+  strong_reorder_bonus_month TEXT,
+  strong_reorder_bonus_granted_at TIMESTAMPTZ,
+  strong_reorder_bonus_used_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS entitlement_ledger (
+  id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL REFERENCES user_game_accounts(id) ON DELETE CASCADE,
+  entitlement_type TEXT NOT NULL,
+  status TEXT NOT NULL,
+  units INTEGER NOT NULL DEFAULT 1,
+  reference_type TEXT NOT NULL,
+  reference_id TEXT NOT NULL,
+  window_key TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  settled_at TIMESTAMPTZ,
+  UNIQUE (profile_id, entitlement_type, reference_type, reference_id)
+);
+CREATE INDEX IF NOT EXISTS idx_entitlement_ledger_profile_type_window
+  ON entitlement_ledger(profile_id, entitlement_type, window_key, created_at DESC);
+
+-- Preserve the current month's pre-ledger reorder usage as immutable balances.
+-- New checks write their reservation directly to the ledger and are therefore
+-- never double-counted with the telemetry event recorded after completion.
+INSERT INTO entitlement_ledger (
+  id, profile_id, entitlement_type, status, reference_type, reference_id,
+  window_key, created_at, settled_at
+)
+SELECT
+  'migration-reorder:' || usage.key,
+  usage.record_json->>'profile_id',
+  'reorder_check', 'consumed', 'usage_event', usage.key,
+  to_char(usage.created_at AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM'), usage.created_at, usage.created_at
+FROM usage_events usage
+JOIN user_game_accounts profile ON profile.id = usage.record_json->>'profile_id'
+WHERE usage.event = 'reorder_check'
+  AND coalesce(usage.record_json->>'status', 'success') <> 'failure'
+  AND usage.created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Shanghai') AT TIME ZONE 'Asia/Shanghai'
+ON CONFLICT (id) DO NOTHING;
+
+-- Backfill the legacy workspace snapshot once.  Subsequent writes use the
+-- normalized entitlement tables above and intentionally ignore this JSON copy.
+INSERT INTO profile_entitlements (
+  profile_id, first_generated_at, free_revision_count, confirmed_at, locked_at,
+  lock_reason, strong_reorder_bonus_month, strong_reorder_bonus_granted_at,
+  strong_reorder_bonus_used_at, updated_at
+)
+SELECT
+  workspace.profile_id,
+  nullif(workspace.record_json->'free_schedule_entitlement'->>'first_generated_at', '')::timestamptz,
+  coalesce((workspace.record_json->'free_schedule_entitlement'->>'revision_count')::integer, 0),
+  nullif(workspace.record_json->'free_schedule_entitlement'->>'confirmed_at', '')::timestamptz,
+  nullif(workspace.record_json->'free_schedule_entitlement'->>'locked_at', '')::timestamptz,
+  nullif(workspace.record_json->'free_schedule_entitlement'->>'lock_reason', ''),
+  nullif(workspace.record_json->'free_schedule_entitlement'->'strong_reorder_bonus'->>'month', ''),
+  nullif(workspace.record_json->'free_schedule_entitlement'->'strong_reorder_bonus'->>'granted_at', '')::timestamptz,
+  nullif(workspace.record_json->'free_schedule_entitlement'->'strong_reorder_bonus'->>'used_at', '')::timestamptz,
+  now()
+FROM user_profile_workspaces workspace
+WHERE workspace.record_json->'free_schedule_entitlement' IS NOT NULL
+ON CONFLICT (profile_id) DO NOTHING;
+
+-- Existing installations may already contain duplicate active jobs.  Keep the
+-- earliest running job (or earliest queued job) for each owner and fail the rest
+-- before creating the partial unique indexes below.
+WITH ranked_running AS (
+  SELECT id, row_number() OVER (PARTITION BY owner_key ORDER BY started_at NULLS LAST, created_at ASC) AS rank
+  FROM optimize_jobs WHERE status = 'running'
+)
+UPDATE optimize_jobs job
+SET status = 'failed', error_message = '任务因并发迁移被拒绝，请重试。', lock_token = NULL,
+    lock_expires_at = NULL, finished_at = now(), updated_at = now()
+FROM ranked_running ranked
+WHERE job.id = ranked.id AND ranked.rank > 1;
+
+WITH ranked_free AS (
+  SELECT id, row_number() OVER (PARTITION BY owner_key ORDER BY created_at ASC) AS rank
+  FROM optimize_jobs WHERE source = 'free_preview' AND status IN ('queued', 'running')
+)
+UPDATE optimize_jobs job
+SET status = 'failed', error_message = '任务因并发迁移被拒绝，请重试。', lock_token = NULL,
+    lock_expires_at = NULL, finished_at = now(), updated_at = now()
+FROM ranked_free ranked
+WHERE job.id = ranked.id AND ranked.rank > 1;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_optimize_jobs_owner_running
+  ON optimize_jobs(owner_key) WHERE status = 'running';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_optimize_jobs_free_owner_active
+  ON optimize_jobs(owner_key) WHERE source = 'free_preview' AND status IN ('queued', 'running');
 
 CREATE TABLE IF NOT EXISTS user_announcement_reads (
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
