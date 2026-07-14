@@ -28,6 +28,7 @@ export interface CreateOptimizeJobInput<TPayload = unknown> {
   id: string
   priority: number
   owner_key: string
+  profile_id?: string | null
   permission: string | null
   source: string
   payload_json: TPayload
@@ -82,10 +83,10 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       const now = input.created_at ?? new Date().toISOString()
       const result = await query<OptimizeJobRow>([
         'insert into optimize_jobs',
-        '  (id, status, priority, owner_key, permission, source, payload_json, result_json, error_message, attempt_count, lock_token, lock_expires_at, created_at, started_at, finished_at, updated_at)',
-        'values ($1, $2, $3, $4, $5, $6, $7, null, null, 0, null, null, $8, null, null, $8)',
+        '  (id, status, priority, owner_key, profile_id, permission, source, payload_json, result_json, error_message, attempt_count, lock_token, lock_expires_at, created_at, started_at, finished_at, updated_at)',
+        'values ($1, $2, $3, $4, $5, $6, $7, $8, null, null, 0, null, null, $9, null, null, $9)',
         'returning *',
-      ].join(' '), [input.id, 'queued', input.priority, input.owner_key, input.permission, input.source, input.payload_json, now])
+      ].join(' '), [input.id, 'queued', input.priority, input.owner_key, input.profile_id ?? null, input.permission, input.source, input.payload_json, now])
       return fromRow(result.rows[0])
     },
     admitJob: async (input) => {
@@ -173,10 +174,10 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
 
         const inserted = await client.query<OptimizeJobRow>([
           'insert into optimize_jobs',
-          '  (id, status, priority, owner_key, permission, source, payload_json, result_json, error_message, attempt_count, lock_token, lock_expires_at, created_at, started_at, finished_at, updated_at)',
-          'values ($1, $2, $3, $4, $5, $6, $7, null, null, 0, null, null, $8, null, null, $8)',
+          '  (id, status, priority, owner_key, profile_id, permission, source, payload_json, result_json, error_message, attempt_count, lock_token, lock_expires_at, created_at, started_at, finished_at, updated_at)',
+          'values ($1, $2, $3, $4, $5, $6, $7, $8, null, null, 0, null, null, $9, null, null, $9)',
           'returning *',
-        ].join(' '), [input.id, 'queued', input.priority, input.owner_key, input.permission, input.source, input.payload_json, now])
+        ].join(' '), [input.id, 'queued', input.priority, input.owner_key, input.profile_id ?? null, input.permission, input.source, input.payload_json, now])
         await client.query('insert into optimization_submissions (id, owner_key, created_at) values ($1, $2, $3)', [randomUUID(), input.owner_key, now])
         await client.query(
           `insert into optimization_idempotency (owner_key, idempotency_key, request_hash, status, job_id, created_at, updated_at)

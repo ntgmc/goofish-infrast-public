@@ -64,6 +64,7 @@ type DepotOperatorStats = {
 
 type DepotValueBuildOptions = {
   sample?: SklandSampleData | null
+  contributorProfileId?: string | null
 }
 
 const ITEM_NAMES: Record<string, string> = {
@@ -171,7 +172,8 @@ export default async (req: Request): Promise<Response> => {
     if (body.source === 'skland') {
       const skland = await readSklandInventory(req, body.profile_id, true)
       return jsonResponse(await buildDepotValueResponse(skland.inventory, 'skland', undefined, {
-        sample: skland.sample,
+      sample: skland.sample,
+      contributorProfileId: typeof body.profile_id === 'string' ? body.profile_id : null,
       }))
     }
     return jsonResponse({ error: '请指定 source 为 upload 或 skland。' }, 400)
@@ -230,6 +232,7 @@ export async function buildDepotValueResponse(
     pricedCount: pricedItems.length,
     unpricedCount: unpricedItems.length,
     sample: options.sample ?? null,
+    contributorProfileId: options.contributorProfileId ?? null,
     sampleStore,
     warnings,
   })
@@ -266,6 +269,7 @@ async function saveDepotSampleIfRequested({
   pricedCount,
   unpricedCount,
   sample,
+  contributorProfileId,
   sampleStore,
   warnings,
 }: {
@@ -275,6 +279,7 @@ async function saveDepotSampleIfRequested({
   pricedCount: number
   unpricedCount: number
   sample: SklandSampleData | null
+  contributorProfileId: string | null
   sampleStore: DepotValueSampleStore | null
   warnings: string[]
 }): Promise<DepotValueSampleContributionStatus> {
@@ -288,6 +293,7 @@ async function saveDepotSampleIfRequested({
   const record: DepotValueSampleRecord = {
     version: 1,
     uid_hash: uidHash,
+    contributor_profile_id: contributorProfileId,
     total_equivalent_sanity: total,
     account_level: sample.accountLevel,
     operator_power_score: sample.operatorStats.operator_power_score,

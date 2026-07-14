@@ -1128,6 +1128,9 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
       const profile = store.profiles.get(profileId)
       return profile?.user_id === userId ? profile : null
     }
+    export async function getProfileById(profileId) {
+      return store.profiles.get(profileId) ?? null
+    }
     export async function saveUserProfile(profile) {
       store.profiles.set(profile.id, profile)
     }

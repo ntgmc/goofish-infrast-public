@@ -91,7 +91,7 @@ announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCou
 <Suspense fallback={<SectionFallback />}>{section === 'tools' && <ToolsSection />}</Suspense>
 <Suspense fallback={<SectionFallback />}>{section === 'redeem' && <RedeemSection onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}</Suspense>
           <Suspense fallback={<SectionFallback />}>{section === 'announcements' && <AnnouncementsSection />}</Suspense>
-          <Suspense fallback={<SectionFallback />}>{section === 'settings' && <SettingsSection />}</Suspense>
+          <Suspense fallback={<SectionFallback />}>{section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} />}</Suspense>
         </div>
       </main>
     </div>
