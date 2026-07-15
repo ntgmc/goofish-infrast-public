@@ -1,5 +1,6 @@
 import adminCdkHandler from './handlers/admin-cdk'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
+import adminInvitationSettingsHandler from './handlers/admin-invitation-settings'
 import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
 import analyzeScheduleHandler from './handlers/analyze-schedule'
@@ -15,6 +16,8 @@ import userProfilesHandler from './handlers/user-profiles'
 import userSklandHandler from './handlers/user-skland'
 import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
+import userInvitationsHandler from './handlers/user-invitations'
+import userRewardsHandler from './handlers/user-rewards'
 import accountDataHandler from './handlers/account-data'
 import usageStatsHandler from './handlers/usage-stats'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
@@ -25,6 +28,7 @@ type ApiHandler = (req: Request) => Promise<Response>
 const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/cdk', adminCdkHandler as unknown as ApiHandler],
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/invitation-settings', adminInvitationSettingsHandler as unknown as ApiHandler],
   ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
   ['/api/auth/register', authHandler as unknown as ApiHandler],
@@ -67,6 +71,9 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/user/workspace/free-schedule/confirm', userWorkspaceHandler as unknown as ApiHandler],
+  ['/api/user/invitations', userInvitationsHandler as unknown as ApiHandler],
+  ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],
+  ['/api/user/rewards', userRewardsHandler as unknown as ApiHandler],
   ['/api/optimization/jobs', optimizationHandler as unknown as ApiHandler],
   ['/api/optimization/reorder-checks', optimizationHandler as unknown as ApiHandler],
 ])

@@ -2,6 +2,7 @@ import type { AnnouncementKind } from '../../lib/types'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
 import AnnouncementBodyEditor from '../../components/AnnouncementBodyEditor'
+import InvitationSettingsSection from './invitations/InvitationSettingsSection'
 
 import { GeneratedPermission, AdminSection, UsageRangeKey, AnnouncementSortKey, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, sectionLabels, announcementKindLabels, announcementSortLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, AnnouncementReachMetrics, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
 import { useAdminController } from './useAdminController'
@@ -308,7 +309,7 @@ export default function AdminDashboardView() {
               </section>
             )}
   
-          {activeSection === 'announcement' && (
+            {activeSection === 'announcement' && (
             <form onSubmit={handleSaveAnnouncement} className="space-y-5">
               <section className="tool-panel p-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -398,6 +399,8 @@ export default function AdminDashboardView() {
               </section>
               </form>
             )}
+
+            {activeSection === 'invitation' && <InvitationSettingsSection />}
   
             {activeSection === 'users' && (
               <section className="space-y-5">

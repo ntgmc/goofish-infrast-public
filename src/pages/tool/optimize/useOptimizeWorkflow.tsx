@@ -19,6 +19,7 @@ import type { WorkspacePatch } from '../useToolSession'
 import { useLicenseSync } from './useLicenseSync'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
 import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, parseOperatorsFile } from './workflow-utils'
+import { usePriorityCoupon as usePriorityCouponState } from './usePriorityCoupon'
 
 export interface Props {
   profileId: string;
@@ -123,6 +124,8 @@ export function useOptimizeWorkflow(props: Props) {
   const [upgradeLoading, setUpgradeLoading] = useState(false)
 
   const [upgradeError, setUpgradeError] = useState<string | null>(null)
+
+  const { balance: priorityCouponBalance, selected: usePriorityCoupon, setSelected: setUsePriorityCoupon, refresh: refreshRewardBalance } = usePriorityCouponState(profileId)
 
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
 
@@ -508,7 +511,7 @@ export function useOptimizeWorkflow(props: Props) {
       }
     }, [flushPendingLicenseSync, license.order_hash, optimizeSignature, pollOptimizeJob, profileId])
 
-  const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false) => {
+  const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false, useCoupon = false) => {
       const payload: CreateOptimizationJobRequest = {
         kind: 'schedule',
         identity: { type: 'profile', profileId },
@@ -516,6 +519,7 @@ export function useOptimizeWorkflow(props: Props) {
         config: activeConfig,
         ignoreElite,
         ...(includeCurrent && { includeCurrent: true }),
+        ...(useCoupon && { use_priority_coupon: true }),
       }
       return await runOptimizeJob(payload, 'generate', '优化请求失败')
     }, [activeConfig, license, mergedOperators, profileId, runOptimizeJob])
@@ -600,9 +604,12 @@ export function useOptimizeWorkflow(props: Props) {
       const startedAt = Date.now()
       setProgress({ mode: 'generate', startedAt, lastUpdatedAt: Date.now() })
       let completed = false
+      const useCoupon = usePriorityCoupon && (priorityCouponBalance?.available ?? 0) > 0
+      let couponSubmitted = false
       try {
-        const potential = userCanUseUpgradeFeatures ? await runOptimize(true, true) : null
-        const current = potential?.current_result ?? (await runOptimize(false))
+        couponSubmitted = useCoupon
+        const potential = userCanUseUpgradeFeatures ? await runOptimize(true, true, useCoupon) : null
+        const current = potential?.current_result ?? (await runOptimize(false, false, useCoupon && !potential))
         if (current.preview_limit?.free_schedule_entitlement) {
           setFreeScheduleEntitlementOverride(current.preview_limit.free_schedule_entitlement)
         }
@@ -674,6 +681,10 @@ export function useOptimizeWorkflow(props: Props) {
       } catch (e) {
         setInlineError({ scope: 'generate', message: formatOptimizeError((e as Error).message) })
       } finally {
+        if (couponSubmitted) {
+          setUsePriorityCoupon(false)
+          await refreshRewardBalance()
+        }
         optimizeInFlightRef.current = false
         setLoading(false)
         flushPendingLicenseSync()
@@ -681,7 +692,7 @@ export function useOptimizeWorkflow(props: Props) {
           setProgress(null)
         }
       }
-    }, [configValidationMessage, flushPendingLicenseSync, freeScheduleGenerateBlockedReason, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, runOptimize, runUpgradeSuggestions, showConfigValidationToast, userCanUseUpgradeFeatures])
+    }, [configValidationMessage, flushPendingLicenseSync, freeScheduleGenerateBlockedReason, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, refreshRewardBalance, runOptimize, runUpgradeSuggestions, showConfigValidationToast, usePriorityCoupon, userCanUseUpgradeFeatures])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
       if (loading || optimizeInFlightRef.current) return
@@ -773,5 +784,5 @@ export function useOptimizeWorkflow(props: Props) {
       }
     }, [isPreviewProfile, onProfileUpgraded, profileId, upgradeCdk, upgradeLoading])
 
-  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, operatorUploadStatus, licenseSyncing, licenseSyncStatus, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, operatorFileRef, isPreviewProfile, isRestrictedPreview, userCanReplaceOperators, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, handleReplaceOperators, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile }
+  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, operatorUploadStatus, licenseSyncing, licenseSyncStatus, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, operatorFileRef, isPreviewProfile, isRestrictedPreview, userCanReplaceOperators, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, handleReplaceOperators, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile }
 }

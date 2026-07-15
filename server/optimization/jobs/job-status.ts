@@ -35,6 +35,8 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       idempotency_key: idempotencyKey,
       request_hash: requestHash,
       free_profile_id: prepared.source === 'free_preview' ? (prepared.payload as { activeProfileId?: string | null }).activeProfileId ?? null : null,
+      reward_user_id: prepared.rewardUserId ?? null,
+      use_priority_coupon: prepared.usePriorityCoupon === true,
     };
     // Third-party test stores predating atomic admission remain read-only test
     // doubles; production and the built-in memory store always implement admitJob.
@@ -141,11 +143,11 @@ export function formatOptimizationJobSnapshot(
 }
 
 export function formatJobPriority(job: Pick<OptimizeJobRecord, 'priority'>): OptimizeJobPriority {
-  return job.priority >= 10 ? 'paid' : job.priority > 0 ? 'analysis' : 'standard';
+  return job.priority >= 20 ? 'priority_coupon' : job.priority >= 10 ? 'paid' : job.priority > 0 ? 'analysis' : 'standard';
 }
 
 export function formatJobPriorityLabel(job: Pick<OptimizeJobRecord, 'priority'>): string {
-  return job.priority >= 10 ? '付费优先' : job.priority > 0 ? '高级分析' : '普通队列';
+  return job.priority >= 20 ? '优先计算券' : job.priority >= 10 ? '付费优先' : job.priority > 0 ? '高级分析' : '普通队列';
 }
 
 export function getOptimizeJobEstimate(job: OptimizeJobRecord): OptimizeDurationEstimate {

@@ -1,6 +1,6 @@
 import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
-import type { LicenseConfig } from '../../../lib/types'
+import type { LicenseConfig, RewardBalance } from '../../../lib/types'
 import { InlineErrorPanel } from './feedback'
 import type { ValidationState } from './types'
 
@@ -17,6 +17,7 @@ export default function GenerateControlBar({
   hasResult,
   resultIsCurrent,
   error,
+  priorityCoupon,
   extraDisabledReason,
   onGenerate,
   onReset,
@@ -33,6 +34,7 @@ export default function GenerateControlBar({
   hasResult: boolean
   resultIsCurrent: boolean
   error: string | null
+  priorityCoupon: { balance: RewardBalance | null; selected: boolean; onChange: (selected: boolean) => void }
   extraDisabledReason?: string | null
   onGenerate: () => void
   onReset: () => void
@@ -78,6 +80,26 @@ export default function GenerateControlBar({
         </div>
 
         <div className="flex min-w-0 flex-col gap-2">
+          <label className="tool-inset flex items-start gap-3 px-3 py-3 text-sm text-ink-secondary" htmlFor="use-priority-coupon">
+            <input
+              id="use-priority-coupon"
+              type="checkbox"
+              checked={priorityCoupon.selected}
+              disabled={(priorityCoupon.balance?.available ?? 0) < 1 || loading || syncing}
+              onChange={(event) => priorityCoupon.onChange(event.currentTarget.checked)}
+              className="mt-0.5 h-4 w-4 accent-brand-600"
+              aria-describedby="priority-coupon-description"
+            />
+            <span>
+              <span className="block font-semibold text-ink-primary">使用 1 张优先计算券</span>
+              <span id="priority-coupon-description" className="mt-1 block text-xs leading-5 text-ink-muted">
+                本次主排班任务将进入最高优先队列，排在普通付费和免费任务之前。券只影响排队顺序；入队失败不扣券，服务端执行失败或最终超时会自动退回。
+                <span className="mt-1 block text-ink-secondary">
+                  当前可用 {priorityCoupon.balance?.available ?? 0} 张{priorityCoupon.balance?.next_expiry_at ? ` · 最近 ${new Date(priorityCoupon.balance.next_expiry_at).toLocaleDateString('zh-CN')} 到期` : ''}
+                </span>
+              </span>
+            </span>
+          </label>
           <button
             type="button"
             onClick={onGenerate}

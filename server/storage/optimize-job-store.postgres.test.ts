@@ -4,6 +4,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { createPostgresOptimizeJobStore, OptimizeJobAdmissionError } from './optimize-job-store'
+import {
+  ensureInvitationCode,
+  getRewardBalances,
+  saveInvitationSettings,
+  settleInvitationForActivatedUser,
+} from './invitation-store'
 
 let container: PostgreSqlContainer
 
@@ -44,6 +50,56 @@ describe('PostgreSQL optimization job admission', () => {
     await store.admitJob(input({ owner_key: owner }))
     await store.admitJob(input({ owner_key: owner }))
     await expect(store.admitJob(input({ owner_key: owner }))).rejects.toMatchObject({ code: 'queue_capacity_exceeded', status: 429 })
+  })
+
+  it('settles an activated invitation once using the current settings', async () => {
+    const inviterProfileId = await seedProfile()
+    const inviter = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviterProfileId])).rows[0]!.user_id
+    const code = await ensureInvitationCode(inviter)
+    const inviteeProfileId = await seedProfile()
+    const invitee = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviteeProfileId])).rows[0]!.user_id
+    await query(
+      `insert into invitations (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, updated_at)
+       values ($1, $2, $3, $4, 'registered', now(), now())`,
+      [randomUUID(), inviter, invitee, code],
+    )
+    await saveInvitationSettings({
+      rewards: [
+        { recipient: 'inviter', type: 'priority_compute_coupon', quantity: 1, validity_days: 0 },
+        { recipient: 'invitee', type: 'priority_compute_coupon', quantity: 1, validity_days: 30 },
+      ],
+    })
+    await Promise.all(Array.from({ length: 4 }, () => settleInvitationForActivatedUser(invitee)))
+    expect((await getRewardBalances(inviter))[0].available).toBe(1)
+    expect((await getRewardBalances(invitee))[0].available).toBe(1)
+    expect((await query<{ count: string }>('select count(*)::text as count from reward_grants where source_type = $1 and user_id = $2', ['invitation', inviter])).rows[0]?.count).toBe('1')
+  })
+
+  it('atomically consumes a priority coupon and refunds it once on terminal failure', async () => {
+    const profileId = await seedProfile()
+    const userId = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [profileId])).rows[0]!.user_id
+    await query(
+      `insert into reward_grants
+        (id, user_id, reward_type, source_type, source_id, recipient_role, original_quantity, remaining_quantity, validity_days, metadata_json, created_at)
+       values ($1, $2, 'priority_compute_coupon', 'test', $3, 'inviter', 1, 1, 0, '{}'::jsonb, now())`,
+      [randomUUID(), userId, randomUUID()],
+    )
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      priority: 20,
+      source: 'account_profile',
+      reward_user_id: userId,
+      use_priority_coupon: true,
+    }))
+    expect((await getRewardBalances(userId))[0].available).toBe(0)
+    const claimed = await store.claimNextJob('coupon-lock', new Date(Date.now() + 60_000).toISOString(), 2)
+    expect(claimed?.id).toBe(admitted.job.id)
+    await store.markFailed(admitted.job.id, 'coupon-lock', 'system failure')
+    await store.markFailed(admitted.job.id, 'coupon-lock', 'duplicate failure')
+    expect((await getRewardBalances(userId))[0].available).toBe(1)
+    expect((await query<{ status: string }>('select status from reward_consumptions where optimization_job_id = $1', [admitted.job.id])).rows[0]?.status).toBe('refunded')
   })
 })
 

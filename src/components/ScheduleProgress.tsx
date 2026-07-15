@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { OptimizeJobPriority } from '../lib/types'
 
 export type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed'
 
@@ -14,7 +15,7 @@ export interface ScheduleProgressState {
   estimateAdjustment?: string;
   queueStatus?: 'queued' | 'running';
   queuePosition?: number | null;
-  priority?: 'paid' | 'analysis' | 'standard';
+  priority?: OptimizeJobPriority;
   jobId?: string;
   observedRunning?: boolean;
   percentFloor?: number;
@@ -220,8 +221,8 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
   const reconnecting = progress.connectionStatus === 'reconnecting'
   const aheadCount = typeof progress.queuePosition === 'number' ? Math.max(0, progress.queuePosition - 1) : null
   const queueLabel = getQueueLabel(progress, aheadCount)
-  const priorityLabel = progress.priority === 'paid' ? '付费优先' : progress.priority === 'analysis' ? '高级分析' : '普通队列'
-  const priorityClass = progress.priority === 'paid' || progress.priority === 'analysis'
+  const priorityLabel = progress.priority === 'priority_coupon' ? '优先计算券' : progress.priority === 'paid' ? '付费优先' : progress.priority === 'analysis' ? '高级分析' : '普通队列'
+  const priorityClass = progress.priority === 'priority_coupon' || progress.priority === 'paid' || progress.priority === 'analysis'
     ? 'bg-brand-600/15 text-brand-300 ring-1 ring-brand-500/25'
     : 'bg-surface-2 text-ink-secondary ring-1 ring-surface-3'
   const jobLabel = progress.jobId ? `任务 #${progress.jobId.slice(0, 8)}` : null
@@ -240,8 +241,8 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
   const footer = reconnecting
     ? '不会重复提交任务；当前任务完成后仍会自动展示结果。'
     : adjustmentLabel
-      ?? (progress.priority === 'paid' && status === 'queued'
-        ? '优先领取已生效；不会中断正在运行的任务。'
+      ?? ((progress.priority === 'paid' || progress.priority === 'priority_coupon') && status === 'queued'
+        ? `${progress.priority === 'priority_coupon' ? '优先计算券' : '优先队列'}已生效；不会中断正在运行的任务。`
         : '页面可保持打开，结果完成后会自动展示。')
   return {
     status,
@@ -295,7 +296,7 @@ function getStatusDetail(
   if (status === 'finishing') return '后台计算已进入收尾阶段，结果完成后会自动展示。'
   if (status === 'running') return `任务已开始执行，预计还需 ${remainingLabel}，会随实际耗时自动校准。`
   if (status === 'queued') {
-    const priorityText = progress.priority === 'paid' ? '付费优先队列' : progress.priority === 'analysis' ? '高级分析队列' : '普通队列'
+    const priorityText = progress.priority === 'priority_coupon' ? '优先计算券队列' : progress.priority === 'paid' ? '付费优先队列' : progress.priority === 'analysis' ? '高级分析队列' : '普通队列'
     return `${priorityText}，${queueLabel}，预计还需 ${remainingLabel}${estimateContext ? `，${estimateContext}` : ''}。`
   }
   return '正在提交优化请求，完成校验后会进入后台队列。'

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { AuthSuccessResponse } from '../lib/types'
-import { apiJson } from '../lib/api-client'
+import { ApiError, apiJson } from '../lib/api-client'
 
 type AuthMode = 'login' | 'register' | 'forgot'
 type FieldErrors = Record<string, string>
@@ -24,6 +24,7 @@ export default function AuthForm({
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [cdk, setCdk] = useState('')
+  const [inviteCode, setInviteCode] = useState(() => new URLSearchParams(window.location.search).get('invite')?.trim().toUpperCase() ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -34,8 +35,10 @@ export default function AuthForm({
     const nextErrors: FieldErrors = {}
     const emailError = validateEmailInput(email)
     const passwordError = mode === 'forgot' ? null : validatePasswordInput(password)
+    const inviteCodeError = mode === 'register' ? validateInviteCodeInput(inviteCode) : null
     if (emailError) nextErrors.email = emailError
     if (passwordError) nextErrors.password = passwordError
+    if (inviteCodeError) nextErrors.inviteCode = inviteCodeError
     setFieldErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
@@ -55,12 +58,20 @@ export default function AuthForm({
 
       const data = await apiJson<AuthSuccessResponse>(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
         method: 'POST',
-        json: mode === 'login' ? { email, password } : { email, password, cdk: allowCdk ? cdk.trim() || undefined : undefined },
+        json: mode === 'login' ? { email, password } : {
+          email,
+          password,
+          cdk: allowCdk ? cdk.trim() || undefined : undefined,
+          invite_code: inviteCode.trim() || undefined,
+        },
         fallbackMessage: mode === 'login' ? '登录失败' : '注册失败',
       })
       if (!data.user) throw new Error(mode === 'login' ? '登录失败' : '注册失败')
       onAuthenticated(data)
     } catch (caught) {
+      if (mode === 'register' && caught instanceof ApiError && isInviteCodeError(caught.data)) {
+        setFieldErrors((current) => ({ ...current, inviteCode: caught.message }))
+      }
       setError((caught as Error).message)
     } finally {
       setLoading(false)
@@ -133,6 +144,31 @@ export default function AuthForm({
         </label>
       )}
 
+      {mode === 'register' && (
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-ink-secondary">邀请码（可选）</span>
+          <input
+            id={compact ? 'depot-auth-invite-code' : 'auth-invite-code'}
+            type="text"
+            value={inviteCode}
+            maxLength={10}
+            onChange={(event) => {
+              setInviteCode(event.currentTarget.value.toUpperCase())
+              clearFieldError('inviteCode')
+            }}
+            onFocus={() => clearFieldError('inviteCode')}
+            className={`${inputClassName(Boolean(fieldErrors.inviteCode))} font-mono uppercase tracking-wide`}
+            placeholder="10 位邀请码"
+            aria-invalid={Boolean(fieldErrors.inviteCode)}
+            aria-describedby={fieldErrors.inviteCode ? 'auth-invite-code-error' : 'auth-invite-code-description'}
+          />
+          <p id="auth-invite-code-description" className="mt-1.5 text-xs leading-5 text-ink-muted">
+            通过好友链接进入时会自动填写，也可以手动输入或清空。提交注册后将绑定邀请关系；首次兑换 CDK 或激活森空岛免费档案时，系统会按当前活动规则发放优先计算券。每张券可让一次主排班任务进入最高优先队列。
+          </p>
+          {fieldErrors.inviteCode && <p id="auth-invite-code-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.inviteCode}</p>}
+        </label>
+      )}
+
       {mode === 'login' && (
         <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
           忘记密码？
@@ -162,6 +198,18 @@ function validatePasswordInput(value: string): string | null {
   if (!value) return '请输入密码'
   if (value.length < 8) return '密码至少需要 8 位'
   return null
+}
+
+function validateInviteCodeInput(value: string): string | null {
+  const code = value.trim().toUpperCase()
+  if (!code) return null
+  return /^[0-9A-HJKMNP-TV-Z]{10}$/.test(code) ? null : '请输入有效的 10 位邀请码'
+}
+
+function isInviteCodeError(data: unknown): boolean {
+  if (!data || typeof data !== 'object' || !('code' in data)) return false
+  const code = (data as { code?: unknown }).code
+  return code === 'invalid_invite_code' || code === 'invitation_campaign_paused'
 }
 
 function inputClassName(hasError: boolean): string {

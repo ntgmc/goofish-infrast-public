@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS risk_settings (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS invitation_settings (
+  key TEXT PRIMARY KEY,
+  record_json JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS usage_events (
   key TEXT PRIMARY KEY,
   event TEXT NOT NULL,
@@ -143,6 +149,65 @@ CREATE TABLE IF NOT EXISTS user_accounts (
 );
 CREATE INDEX IF NOT EXISTS idx_user_accounts_email ON user_accounts(email);
 CREATE INDEX IF NOT EXISTS idx_user_accounts_cdk_code_hash ON user_accounts(cdk_code_hash);
+
+CREATE TABLE IF NOT EXISTS invitation_codes (
+  user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
+  code TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_invitation_codes_code ON invitation_codes(code);
+
+CREATE TABLE IF NOT EXISTS invitations (
+  id TEXT PRIMARY KEY,
+  inviter_user_id TEXT REFERENCES user_accounts(id) ON DELETE SET NULL,
+  invitee_user_id TEXT NOT NULL UNIQUE REFERENCES user_accounts(id) ON DELETE CASCADE,
+  invitation_code TEXT NOT NULL,
+  status TEXT NOT NULL,
+  registered_at TIMESTAMPTZ NOT NULL,
+  activated_at TIMESTAMPTZ,
+  settled_at TIMESTAMPTZ,
+  settings_snapshot JSONB,
+  settlement_json JSONB,
+  updated_at TIMESTAMPTZ NOT NULL,
+  CHECK (inviter_user_id IS NULL OR inviter_user_id <> invitee_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_invitations_inviter_registered_at ON invitations(inviter_user_id, registered_at DESC);
+CREATE INDEX IF NOT EXISTS idx_invitations_inviter_settled_at ON invitations(inviter_user_id, settled_at DESC);
+CREATE INDEX IF NOT EXISTS idx_invitations_invitation_code ON invitations(invitation_code);
+
+CREATE TABLE IF NOT EXISTS reward_grants (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  reward_type TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  recipient_role TEXT NOT NULL,
+  original_quantity INTEGER NOT NULL CHECK (original_quantity > 0),
+  remaining_quantity INTEGER NOT NULL CHECK (remaining_quantity >= 0),
+  validity_days INTEGER NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ,
+  metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (user_id, reward_type, source_type, source_id, recipient_role)
+);
+CREATE INDEX IF NOT EXISTS idx_reward_grants_available
+  ON reward_grants(user_id, reward_type, expires_at, created_at)
+  WHERE remaining_quantity > 0;
+CREATE INDEX IF NOT EXISTS idx_reward_grants_source ON reward_grants(source_type, source_id);
+
+CREATE TABLE IF NOT EXISTS reward_consumptions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  reward_type TEXT NOT NULL,
+  grant_id TEXT NOT NULL REFERENCES reward_grants(id) ON DELETE CASCADE,
+  optimization_job_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  validity_days INTEGER NOT NULL DEFAULT 0,
+  consumed_at TIMESTAMPTZ NOT NULL,
+  refunded_at TIMESTAMPTZ,
+  UNIQUE (optimization_job_id, reward_type)
+);
+CREATE INDEX IF NOT EXISTS idx_reward_consumptions_user ON reward_consumptions(user_id, consumed_at DESC);
 
 CREATE TABLE IF NOT EXISTS account_deletion_requests (
   id TEXT PRIMARY KEY,
