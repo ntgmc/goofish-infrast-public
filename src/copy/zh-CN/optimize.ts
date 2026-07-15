@@ -6,25 +6,25 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_003: "材料已够",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_004: "\r\n              练度优化建议\r\n            ",
+  components_UpgradeSuggestions_004: "练度优化建议",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_005: "\r\n            建议按缺口理智和每日理智收益估算回本，材料成本来自森空岛养成库存。\r\n          ",
+  components_UpgradeSuggestions_005: "建议按缺口理智和每日理智收益估算回本，材料成本来自森空岛养成库存。",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_006: "建议排序",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_007: "\r\n            只看单人提升\r\n          ",
+  components_UpgradeSuggestions_007: "只看单人提升",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_008: "\r\n                重新计算中\r\n              ",
+  components_UpgradeSuggestions_008: "重新计算中",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_009: "应用建议 (",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_010: "应用建议失败",
+  components_UpgradeSuggestions_010: "应用建议失败，请稍后重试",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_011: "\n              重试\n            ",
+  components_UpgradeSuggestions_011: "重试",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_012: "\r\n              重新选择文件\r\n            ",
+  components_UpgradeSuggestions_012: "重新选择文件",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_013: "\n          当前筛选下没有可展示的建议。\n        ",
+  components_UpgradeSuggestions_013: "当前筛选下没有可展示的建议。",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_014: "选择至少一项建议后，才可应用并重新计算；当前方案仍可下载留底。",
   // src/components/UpgradeSuggestions.tsx
@@ -82,7 +82,7 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_041: "材料 ",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_042: " 种\r\n            ",
+  components_UpgradeSuggestions_042: " 种",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_043: "影响房间/组合",
   // src/components/UpgradeSuggestions.tsx
@@ -150,15 +150,15 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_075: " 理智",
   // src/pages/tool/optimize/AdminOperatorPanel.tsx
-  pages_tool_optimize_AdminOperatorPanel_001: "\n          干员数据\n          ",
+  pages_tool_optimize_AdminOperatorPanel_001: "干员数据",
   // src/pages/tool/optimize/AdminOperatorPanel.tsx
-  pages_tool_optimize_AdminOperatorPanel_002: " 名干员\n          ",
+  pages_tool_optimize_AdminOperatorPanel_002: " 名干员",
   // src/pages/tool/optimize/AdminOperatorPanel.tsx
   pages_tool_optimize_AdminOperatorPanel_003: "管理员",
   // src/pages/tool/optimize/AdminOperatorPanel.tsx
-  pages_tool_optimize_AdminOperatorPanel_004: "\r\n          管理员可以替换当前授权内的干员数据。普通用户数据由账号空间同步。\r\n        ",
+  pages_tool_optimize_AdminOperatorPanel_004: "管理员可以替换当前授权内的干员数据。普通用户数据由账号空间同步。",
   // src/pages/tool/optimize/AdminOperatorPanel.tsx
-  pages_tool_optimize_AdminOperatorPanel_005: "\r\n            替换干员 JSON\r\n          ",
+  pages_tool_optimize_AdminOperatorPanel_005: "替换干员 JSON",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_001: "工作区输入",
   // src/pages/tool/optimize/ConfigSection.tsx
@@ -174,7 +174,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_007: "基建配置",
   // src/pages/tool/optimize/ConfigSection.tsx
-  pages_tool_optimize_ConfigSection_008: "\n            恢复已保存配置\n          ",
+  pages_tool_optimize_ConfigSection_008: "恢复已保存配置",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_009: "变化记录",
   // src/pages/tool/optimize/ConfigSection.tsx
@@ -214,7 +214,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_012: "查看排班计算说明",
   // src/pages/tool/optimize/GenerateControlBar.tsx
-  pages_tool_optimize_GenerateControlBar_013: "\n              计算会使用当前干员数据和基建配置。生成完成后可直接下载 MAA JSON，并按需查看效率明细。\n            ",
+  pages_tool_optimize_GenerateControlBar_013: "计算会使用当前干员数据和基建配置。生成完成后可直接下载 MAA JSON，并按需查看效率明细。",
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_014: "当前生成输入",
   // src/pages/tool/optimize/GenerateControlBar.tsx
@@ -234,7 +234,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_022: "查看优先计算券说明",
   // src/pages/tool/optimize/GenerateControlBar.tsx
-  pages_tool_optimize_GenerateControlBar_023: "\n                    本次主排班任务将进入最高优先队列，排在普通付费和免费任务之前。券只影响排队顺序；入队失败不扣券，服务端执行失败或最终超时会自动退回。\n                  ",
+  pages_tool_optimize_GenerateControlBar_023: "本次主排班任务将进入最高优先队列，排在普通付费和免费任务之前。券只影响排队顺序；入队失败不扣券，服务端执行失败或最终超时会自动退回。",
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_024: "\n                当前可用 ",
   // src/pages/tool/optimize/GenerateControlBar.tsx
@@ -310,7 +310,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_022: "查看免费完整排班权益说明",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_023: "\n              首次生成后 24 小时内最多可修正生成 3 次；确认或次数用完后，只保留重排检测和历史查看。\n            ",
+  pages_tool_optimize_OverviewSection_023: "首次生成后 24 小时内最多可修正生成 3 次；确认或次数用完后，只保留重排检测和历史查看。",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_024: "确认中",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -342,7 +342,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_038: "查看重排检测说明",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_039: "\n              只返回收益区间、影响设施和关键干员摘要，不展示完整新方案。\n            ",
+  pages_tool_optimize_OverviewSection_039: "只返回收益区间、影响设施和关键干员摘要，不展示完整新方案。",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_040: "检测中",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -406,7 +406,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_002: "方案库与历史结果",
   // src/pages/tool/optimize/PlansSection.tsx
-  pages_tool_optimize_PlansSection_003: "\r\n              保存常用配置，回看最近生成结果；离开页面后也能重新下载上次 MAA JSON。\r\n            ",
+  pages_tool_optimize_PlansSection_003: "保存常用配置，回看最近生成结果；离开页面后也能重新下载上次 MAA JSON。",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_004: "方案名称",
   // src/pages/tool/optimize/PlansSection.tsx
@@ -468,7 +468,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_001: "生成后将在这里显示排班结果",
   // src/pages/tool/optimize/ResultSection.tsx
-  pages_tool_optimize_ResultSection_002: "\r\n            确认总览状态并点击生成，结果会按数据、详情、导入和建议分区展示。\r\n          ",
+  pages_tool_optimize_ResultSection_002: "确认总览状态并点击生成，结果会按数据、详情、导入和建议分区展示。",
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_003: "解锁这个账号",
   // src/pages/tool/optimize/ResultSection.tsx
@@ -558,13 +558,13 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_039: " 天",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_040: "经济口径",
+  pages_tool_optimize_ScenarioLabSection_040: "经济计算",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_041: " · 预算 ",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_042: " + 月卡",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_043: "\r\n        应用到当前配置\r\n      ",
+  pages_tool_optimize_ScenarioLabSection_043: "应用到当前配置",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_044: "产能受限",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -582,19 +582,19 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/feedback.tsx
   pages_tool_optimize_feedback_001: "正在同步授权状态",
   // src/pages/tool/optimize/feedback.tsx
-  pages_tool_optimize_feedback_002: "\r\n              请稍候，正在检查 CDK 状态和权限变更，同步完成后即可生成排班。\r\n            ",
+  pages_tool_optimize_feedback_002: "请稍候，正在检查 CDK 状态和权限变更，同步完成后即可生成排班。",
   // src/pages/tool/optimize/feedback.tsx
   pages_tool_optimize_feedback_003: "通常只需几秒",
   // src/pages/tool/optimize/feedback.tsx
   pages_tool_optimize_feedback_004: "正在载入...",
   // src/pages/tool/optimize/feedback.tsx
-  pages_tool_optimize_feedback_005: "处理失败",
+  pages_tool_optimize_feedback_005: "处理失败，请稍后重试",
   // src/pages/tool/optimize/feedback.tsx
-  pages_tool_optimize_feedback_006: "处理失败",
+  pages_tool_optimize_feedback_006: "处理失败，请稍后重试",
   // src/pages/tool/optimize/feedback.tsx
-  pages_tool_optimize_feedback_007: "\r\n          重试\r\n        ",
+  pages_tool_optimize_feedback_007: "重试",
   // src/pages/tool/optimize/feedback.tsx
-  pages_tool_optimize_feedback_008: "\r\n          重新选择文件\r\n        ",
+  pages_tool_optimize_feedback_008: "重新选择文件",
   // src/pages/tool/optimize/job-progress.ts
   pages_tool_optimize_job_progress_001: "已超过预估，后台仍在计算",
   // src/pages/tool/optimize/job-progress.ts
@@ -636,7 +636,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_014: "排班模式",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
-  pages_tool_optimize_scenario_lab_ScenarioFactors_015: "\r\n              游戏内轮换 12 小时 × 2\r\n            ",
+  pages_tool_optimize_scenario_lab_ScenarioFactors_015: "游戏内轮换 12 小时 × 2",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_016: "自动模式先快速选择实际间隔，再冻结该数组精确复核；轮换不随无人机策略重复展开。",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
@@ -660,7 +660,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_026: "删除 ",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
-  pages_tool_optimize_scenario_lab_ScenarioFactors_027: "\r\n                删除\r\n              ",
+  pages_tool_optimize_scenario_lab_ScenarioFactors_027: "删除",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_028: "贸：币",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
@@ -802,11 +802,11 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_046: "加速源石碎片",
   // src/pages/tool/optimize/scenario-lab/useScenarioComparison.ts
-  pages_tool_optimize_scenario_lab_useScenarioComparison_001: "同步场景对比任务失败",
+  pages_tool_optimize_scenario_lab_useScenarioComparison_001: "同步场景对比任务失败，请稍后重试",
   // src/pages/tool/optimize/scenario-lab/useScenarioComparison.ts
   pages_tool_optimize_scenario_lab_useScenarioComparison_002: "同步场景对比任务失败",
   // src/pages/tool/optimize/scenario-lab/useScenarioComparison.ts
-  pages_tool_optimize_scenario_lab_useScenarioComparison_003: "提交场景对比任务失败",
+  pages_tool_optimize_scenario_lab_useScenarioComparison_003: "提交场景对比任务失败，请稍后重试",
   // src/pages/tool/optimize/scenario-lab/useScenarioComparison.ts
   pages_tool_optimize_scenario_lab_useScenarioComparison_004: "提交场景对比任务失败",
   // src/pages/tool/optimize/types.ts
@@ -830,7 +830,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/types.ts
   pages_tool_optimize_types_010: "比较场景与 Pareto 前沿",
   // src/pages/tool/optimize/useLicenseSync.ts
-  pages_tool_optimize_useLicenseSync_001: "账号授权状态同步失败",
+  pages_tool_optimize_useLicenseSync_001: "账号授权状态同步失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizationJob.ts
   pages_tool_optimize_useOptimizationJob_001: "排班已完成，正在整理练度建议",
   // src/pages/tool/optimize/useOptimizationJob.ts
@@ -848,9 +848,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_005: " 名干员。继续后会清空当前练度调整。单账号终身卡每 7 天最多更新 2 次，并会校验账号与设备绑定。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_006: "干员数据更新失败",
+  pages_tool_optimize_useOptimizeWorkflow_006: "干员数据更新失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_007: "干员数据更新失败",
+  pages_tool_optimize_useOptimizeWorkflow_007: "干员数据更新失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_008: "已更新授权内的干员数据，共 ",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
@@ -858,17 +858,17 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_010: "已应用实验场景，请确认配置后再生成排班。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_011: "优化失败",
+  pages_tool_optimize_useOptimizeWorkflow_011: "优化失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_012: "优化请求失败",
+  pages_tool_optimize_useOptimizeWorkflow_012: "优化请求失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_013: "优化请求失败",
+  pages_tool_optimize_useOptimizeWorkflow_013: "优化请求失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_014: "练度建议请求失败。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_015: "重排检测失败",
+  pages_tool_optimize_useOptimizeWorkflow_015: "重排检测失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_016: "确认免费排班失败",
+  pages_tool_optimize_useOptimizeWorkflow_016: "确认免费排班失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_017: ": 精",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
@@ -880,9 +880,9 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_021: "基建配置已修改，请先重新计算排班后再应用练度建议。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_022: "优化失败",
+  pages_tool_optimize_useOptimizeWorkflow_022: "优化失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_023: "解锁失败",
+  pages_tool_optimize_useOptimizeWorkflow_023: "解锁失败，请稍后重试",
   // src/pages/tool/optimize/workflow-utils.ts
   pages_tool_optimize_workflow_utils_001: "搓玉",
   // src/pages/tool/optimize/workflow-utils.ts

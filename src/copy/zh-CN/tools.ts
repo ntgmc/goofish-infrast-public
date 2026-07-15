@@ -4,13 +4,13 @@ export const toolsCopy = {
   // src/components/ScheduleAnalysisTool.tsx
   components_ScheduleAnalysisTool_002: "请先上传排班表 JSON。",
   // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_003: "分析失败",
+  components_ScheduleAnalysisTool_003: "分析失败，请稍后重试",
   // src/components/ScheduleAnalysisTool.tsx
   components_ScheduleAnalysisTool_004: "分析导入排班表",
   // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_005: "\r\n              上传干员数据和已生成的排班 JSON，直接计算红脸风险、日产量和爆仓信息。\r\n            ",
+  components_ScheduleAnalysisTool_005: "上传干员数据和已生成的排班 JSON，直接计算红脸风险、日产量和爆仓信息。",
   // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_006: "\n            免授权\r\n          ",
+  components_ScheduleAnalysisTool_006: "免授权",
   // src/components/ScheduleAnalysisTool.tsx
   components_ScheduleAnalysisTool_007: "干员数据",
   // src/components/ScheduleAnalysisTool.tsx
@@ -36,7 +36,7 @@ export const toolsCopy = {
   // src/components/ScheduleAnalysisTool.tsx
   components_ScheduleAnalysisTool_018: "排班表 JSON 需要是对象或数组。",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_001: "仓库分析失败",
+  pages_DepotValuePage_001: "仓库分析失败，请稍后重试",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_002: "创建仓库分析档案失败",
   // src/pages/DepotValuePage.tsx
@@ -56,21 +56,21 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_010: "仓库价值分析器",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_011: "\r\n                上传 MAA 仓库 JSON，按等价理智估算资产，并生成适合贴吧和 QQ 群分享的结果图。\r\n              ",
+  pages_DepotValuePage_011: "上传 MAA 仓库 JSON，按等效理智估算资产，并生成适合贴吧和 QQ 群分享的结果图。",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_012: "\r\n              返回首页\r\n            ",
+  pages_DepotValuePage_012: "返回首页",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_013: "\r\n              进入工作区\r\n            ",
+  pages_DepotValuePage_013: "进入工作区",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_014: "导入仓库",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_015: "\r\n                  在 MAA 的仓库识别里导出数据时，请选择“企鹅物流刷图规划”或“明日方舟工具箱”。\r\n                ",
+  pages_DepotValuePage_015: “在 MAA 的仓库识别里导出数据时，请选择”企鹅物流刷图规划”或”明日方舟工具箱”。”,
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_016: "粘贴仓库 JSON",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_017: "\r\n                      从 MAA 选择“企鹅物流刷图规划”或“明日方舟工具箱”导出，复制内容后粘贴到这里。\r\n                      粘贴 JSON 只用于本次分析，不会进入样本池。\r\n                    ",
+  pages_DepotValuePage_017: “从 MAA 选择”企鹅物流刷图规划”或”明日方舟工具箱”导出，复制内容后粘贴到这里。\n                      粘贴 JSON 只用于本次分析，不会进入样本池。\n                    “,
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_018: "\r\n                    读取剪贴板\r\n                  ",
+  pages_DepotValuePage_018: "读取剪贴板",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_019: "粘贴 JSON，例如 {\"2001\":16000,\"30011\":982}",
   // src/pages/DepotValuePage.tsx
@@ -86,7 +86,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_025: "\r\n                    使用森空岛导入会读取养成库存做本次估值，并匿名贡献聚合统计，用于改进击败百分比。\r\n                  ",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_026: "\n                    已登录\r\n                  ",
+  pages_DepotValuePage_026: "已登录",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_027: "正在确认登录状态...",
   // src/pages/DepotValuePage.tsx
@@ -98,15 +98,15 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_031: "使用森空岛库存",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_032: "\n                          当前选择的森空岛凭据已失效。请重新绑定后再读取仓库库存。\r\n                        ",
+  pages_DepotValuePage_032: "当前选择的森空岛凭据已失效。请重新绑定后再读取仓库库存。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_033: "正在准备账号...",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_034: "绑定森空岛并分析仓库",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_035: "\n                使用森空岛导入会默认匿名贡献本次统计结果；样本不包含仓库明细、干员明细、昵称、UID 明文或凭据。\r\n              ",
+  pages_DepotValuePage_035: "使用森空岛导入会默认匿名贡献本次统计结果；样本不包含仓库明细、干员明细、昵称、UID 明文或凭据。",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_036: "估值口径",
+  pages_DepotValuePage_036: "估值说明",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_037: "怎么算的",
   // src/pages/DepotValuePage.tsx
@@ -122,7 +122,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_043: "% 博士\r\n      ",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_044: "等价理智",
+  pages_DepotValuePage_044: "等效理智",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_045: "已估价物品",
   // src/pages/DepotValuePage.tsx
@@ -142,7 +142,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_053: "\r\n            下载 PNG 后可以直接发给朋友分析。\r\n          ",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_054: "\r\n          下载 PNG\r\n        ",
+  pages_DepotValuePage_054: "下载 PNG",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_055: "你的仓库资产击败了 ",
   // src/pages/DepotValuePage.tsx
@@ -162,7 +162,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_063: "% 博士",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_064: "等价理智",
+  pages_DepotValuePage_064: "等效理智",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_065: "仓库资产榜",
   // src/pages/DepotValuePage.tsx
@@ -198,9 +198,9 @@ export const toolsCopy = {
   // src/pages/ScheduleAnalysisPage.tsx
   pages_ScheduleAnalysisPage_002: "排班表分析",
   // src/pages/ScheduleAnalysisPage.tsx
-  pages_ScheduleAnalysisPage_003: "\r\n              不需要登录或 CDK，上传干员数据和已有排班表即可查看风险与产出。\r\n            ",
+  pages_ScheduleAnalysisPage_003: "不需要登录或 CDK，上传干员数据和已有排班表即可查看风险与产出。",
   // src/pages/ScheduleAnalysisPage.tsx
-  pages_ScheduleAnalysisPage_004: "\r\n              返回首页\r\n            ",
+  pages_ScheduleAnalysisPage_004: "返回首页",
   // src/pages/ScheduleAnalysisPage.tsx
-  pages_ScheduleAnalysisPage_005: "\r\n              进入工作区\r\n            ",
+  pages_ScheduleAnalysisPage_005: "进入工作区",
 } as const

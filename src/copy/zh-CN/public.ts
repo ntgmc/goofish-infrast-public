@@ -2,25 +2,25 @@ export const publicCopy = {
   // src/components/AnnouncementBanner.tsx
   components_AnnouncementBanner_001: "站内横幅",
   // src/components/AnnouncementBanner.tsx
-  components_AnnouncementBanner_002: "\r\n          查看公告\r\n        ",
+  components_AnnouncementBanner_002: "查看公告",
   // src/components/AnnouncementBodyEditor.tsx
   components_AnnouncementBodyEditor_001: "正文",
   // src/components/AnnouncementBodyEditor.tsx
   components_AnnouncementBodyEditor_002: "公告正文模式",
   // src/components/AnnouncementBodyEditor.tsx
-  components_AnnouncementBodyEditor_003: "\n            编辑\n          ",
+  components_AnnouncementBodyEditor_003: "编辑",
   // src/components/AnnouncementBodyEditor.tsx
-  components_AnnouncementBodyEditor_004: "\n            预览\n          ",
+  components_AnnouncementBodyEditor_004: "预览",
   // src/components/AnnouncementBodyEditor.tsx
   components_AnnouncementBodyEditor_005: "暂无正文可预览。",
   // src/components/AnnouncementBodyEditor.tsx
-  components_AnnouncementBodyEditor_006: " 字符\n      ",
+  components_AnnouncementBodyEditor_006: " 字符",
   // src/components/AnnouncementPopup.tsx
   components_AnnouncementPopup_001: "站内公告",
   // src/components/AnnouncementPopup.tsx
-  components_AnnouncementPopup_002: "\r\n            历史\r\n          ",
+  components_AnnouncementPopup_002: "历史",
   // src/components/AnnouncementPopup.tsx
-  components_AnnouncementPopup_003: "\r\n            已读\r\n          ",
+  components_AnnouncementPopup_003: "已读",
   // src/components/PublicFooter.tsx
   components_PublicFooter_001: "常见问题",
   // src/components/PublicFooter.tsx
@@ -40,11 +40,11 @@ export const publicCopy = {
   // src/components/PublicFooter.tsx
   components_PublicFooter_009: "常见问题",
   // src/components/PublicFooter.tsx
-  components_PublicFooter_010: "\n            加入 QQ 群\n          ",
+  components_PublicFooter_010: "加入 QQ 群",
   // src/components/PublicFooter.tsx
   components_PublicFooter_011: "加入 MaaTool 交流群",
   // src/pages/AnnouncementsPage.tsx
-  pages_AnnouncementsPage_001: "加载公告失败",
+  pages_AnnouncementsPage_001: "加载公告失败，请稍后重试",
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_002: "MaaTool 官方",
   // src/pages/AnnouncementsPage.tsx
@@ -52,11 +52,11 @@ export const publicCopy = {
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_004: "这里会集中展示近期通知，方便你随时回看。",
   // src/pages/AnnouncementsPage.tsx
-  pages_AnnouncementsPage_005: "\r\n            返回工具\r\n          ",
+  pages_AnnouncementsPage_005: "返回工具",
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_006: "正在加载公告...",
   // src/pages/AnnouncementsPage.tsx
-  pages_AnnouncementsPage_007: "\n            暂时没有新的公告。\n          ",
+  pages_AnnouncementsPage_007: "暂时没有新的公告。",
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_008: "横幅",
   // src/pages/AnnouncementsPage.tsx
@@ -94,29 +94,29 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_016: "337.1 / 日",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_017: "收益与培养成本放在同一口径",
+  pages_LandingPage_017: "收益与培养成本统一标准对比",
   // src/pages/LandingPage.tsx
   pages_LandingPage_018: "MAA 基建排班优化器",
   // src/pages/LandingPage.tsx
   pages_LandingPage_019: "森空岛导入 · 等效理智 · MAA JSON",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_020: "\n              公告\n            ",
+  pages_LandingPage_020: "公告",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_021: "\n              进入工作台\n            ",
+  pages_LandingPage_021: "进入工作台",
   // src/pages/LandingPage.tsx
   pages_LandingPage_022: "为当前干员池生成可执行排班",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_023: "\n              生成排班，确认收益，下载 JSON。\n            ",
+  pages_LandingPage_023: "生成排班，确认收益，下载 JSON。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_024: "\n              这是一个短时、结果导向的工具：导入干员与库存，确认基建配置，获得适配当前账号的 MAA 基建排班和透明的收益建议。\n            ",
+  pages_LandingPage_024: "导入干员与库存，确认基建配置，获得适配当前账号的 MAA 基建排班和透明的收益建议。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_025: "\n              不要求游戏账号密码。绑定森空岛前会先展示昵称与 UID，由你确认后才保存和导入数据。\n            ",
+  pages_LandingPage_025: "不要求游戏账号密码。绑定森空岛前会先展示昵称与 UID，由你确认后才保存和导入数据。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_026: "\n                开始准备排班\n              ",
+  pages_LandingPage_026: "开始准备排班",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_027: "\n                免费仓库估值\n              ",
+  pages_LandingPage_027: "免费仓库估值",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_028: "\n                  获取 CDK\n                ",
+  pages_LandingPage_028: "获取 CDK",
   // src/pages/LandingPage.tsx
   pages_LandingPage_029: "数据来源",
   // src/pages/LandingPage.tsx
@@ -126,33 +126,33 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_032: "排班 JSON",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_033: "决策口径",
+  pages_LandingPage_033: "决策依据",
   // src/pages/LandingPage.tsx
   pages_LandingPage_034: "等效理智",
   // src/pages/LandingPage.tsx
   pages_LandingPage_035: "三步完成",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_036: "\n              只保留完成任务所需的路径。\n            ",
+  pages_LandingPage_036: "聚焦核心流程，不设多余步骤。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_037: "\n              工具不要求每天维护，也不会用任务或弹窗阻碍离开。生成结果后，你可以直接下载、保存工作文件或结束会话。\n            ",
+  pages_LandingPage_037: "工具不设每日任务或挽留弹窗。生成结果后，你可以直接下载、保存工作文件或结束会话。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_038: "排班结果页，展示 JSON 下载、等效理智、效率指标和练度成本。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_039: "\n            结果页优先呈现可下载方案与关键收益；算法依据和房间明细按需展开。\n          ",
+  pages_LandingPage_039: "结果页优先呈现可下载方案与关键收益；算法依据和房间明细按需展开。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_040: "结果优先",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_041: "\n            一份方案，同时说明它为什么值得采用。\n          ",
+  pages_LandingPage_041: "一份方案，同时说明它为什么值得采用。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_042: "\n            除了排班 JSON，结果会清楚展示日产出、等效理智、练度成本和回本依据，让培养决策能够被复核。\n          ",
+  pages_LandingPage_042: "除了排班 JSON，结果会清楚展示日产出、等效理智、练度成本和回本依据，让培养决策能够被复核。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_043: "准备开始",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_044: "\n              用当前账号数据，得到下一份可执行的排班。\n            ",
+  pages_LandingPage_044: "用当前账号数据，生成下一份可执行的排班。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_045: "\n              可随时返回账号列表、保存本地工作文件或退出登录。你的操作路径和数据边界始终清晰可见。\n            ",
+  pages_LandingPage_045: "可随时返回账号列表、保存工作文件或退出登录。每一步操作和数据去向都保持透明。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_046: "\n            打开工作台\n          ",
+  pages_LandingPage_046: "打开工作台",
   // src/pages/LandingPage.tsx
   pages_LandingPage_047: "排班生成结果示意",
   // src/pages/LandingPage.tsx

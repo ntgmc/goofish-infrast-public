@@ -24,9 +24,9 @@ export const commonCopy = {
   // src/components/BrandLogo.tsx
   components_BrandLogo_001: "MAA 基建排班优化器",
   // src/components/BuildMetaStrip.tsx
-  components_BuildMetaStrip_001: "\n        当前规则数据更新于 ",
+  components_BuildMetaStrip_001: "当前规则数据更新于 ",
   // src/components/BuildMetaStrip.tsx
-  components_BuildMetaStrip_002: "\n          版本\r\n        ",
+  components_BuildMetaStrip_002: "版本",
   // src/components/BuildMetaStrip.tsx
   components_BuildMetaStrip_003: "数据",
   // src/components/BuildMetaStrip.tsx
@@ -78,7 +78,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_021: "基建配置",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_022: "\n                已修改\r\n              ",
+  components_ConfigEditor_022: "已修改",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_023: "修改配置后重新生成，保存进度文件会保留这次配置。",
   // src/components/ConfigEditor.tsx
@@ -102,7 +102,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_033: "按库存微调产物",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_034: "\r\n              先选择 243 或 333 预设；库存充足时保留原产物消耗，库存较少时只调整一个制造站产物。\r\n            ",
+  components_ConfigEditor_034: "先选择 243 或 333 预设；库存充足时保留原产物消耗，库存较少时只调整一个制造站产物。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_035: "243 均衡",
   // src/components/ConfigEditor.tsx
@@ -140,25 +140,25 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_052: "搓玉预算",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_053: "\r\n                    默认每日 ",
+  components_ConfigEditor_053: "默认每日 ",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_054: " 理智；月卡额外 +",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_055: " 理智，仅用于合成玉经济口径。\r\n                  ",
+  components_ConfigEditor_055: " 理智，仅用于合成玉经济计算。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_056: "月卡",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_057: "每日固源岩理智预算",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_058: "\r\n                  当前长期预算 ",
+  components_ConfigEditor_058: "当前长期预算 ",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_059: " 理智/日，用于判断搓玉产能、库存透支和机会成本。\r\n                ",
+  components_ConfigEditor_059: " 理智/日，用于判断搓玉产能、库存透支和机会成本。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_060: "排班模式",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_061: "排班模式",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_062: "\r\n                游戏内轮换会生成两个设施预设队列，按游戏内“队列轮换/快速切换”使用；不会生成 MAA 排班 JSON。\r\n              ",
+  components_ConfigEditor_062: "游戏内轮换会生成两个设施预设队列，按游戏内“队列轮换/快速切换”使用；不会生成 MAA 排班 JSON。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_063: "宿舍规则",
   // src/components/ConfigEditor.tsx
@@ -172,21 +172,21 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_068: "菲亚梅塔",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_069: "\n                游戏内轮换按两班生成，菲亚梅塔不会参与计算。\r\n              ",
+  components_ConfigEditor_069: "游戏内轮换按两班生成，菲亚梅塔不会参与计算。",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_070: "\n                菲亚梅塔按固定 8-8-8 换班节奏计算目标。\r\n              ",
+  components_ConfigEditor_070: "菲亚梅塔按固定 8-8-8 换班节奏计算目标。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_071: "无人机",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_072: "无人机自动配置",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_073: "\r\n                无人机顺序\r\n              ",
+  components_ConfigEditor_073: "无人机顺序",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_074: "换班前",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_075: "换班后",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_076: "\r\n                加速目标\r\n              ",
+  components_ConfigEditor_076: "加速目标",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_077: "中间产物库存",
   // src/components/ConfigEditor.tsx
@@ -200,7 +200,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_082: "MAA 换班间隔",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_083: "\r\n            应用间隔\r\n          ",
+  components_ConfigEditor_083: "应用间隔",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_084: "使用短横线或逗号分隔，例如 12-6-6；最多 6 班，总计 24 小时。",
   // src/components/ConfigEditor.tsx
@@ -236,7 +236,7 @@ export const commonCopy = {
   // src/components/DeferredFeatureMenu.tsx
   components_DeferredFeatureMenu_015: "未开放",
   // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_016: "\n        更多\r\n        ",
+  components_DeferredFeatureMenu_016: "更多",
   // src/components/DeferredFeatureMenu.tsx
   components_DeferredFeatureMenu_017: "工具与扩展",
   // src/components/DeferredFeatureMenu.tsx
@@ -548,7 +548,7 @@ export const commonCopy = {
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_009: "管理账号设置",
   // src/pages/AdminSetupPage.tsx
-  pages_AdminSetupPage_010: "\r\n              这里使用 `MAA_ADMIN_PASSWORD` 创建日常管理账号。创建完成后，回到后台使用账号密码登录，减少 root 口令暴露次数。\r\n            ",
+  pages_AdminSetupPage_010: "这里使用 `MAA_ADMIN_PASSWORD` 创建日常管理账号。创建完成后，回到后台使用账号密码登录，减少 root 口令暴露次数。",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_011: "返回后台",
   // src/pages/AdminSetupPage.tsx
@@ -598,7 +598,7 @@ export const commonCopy = {
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_008: "账号导航",
   // src/pages/tool/AccountDashboard.tsx
-  pages_tool_AccountDashboard_009: "\n            退出登录\n          ",
+  pages_tool_AccountDashboard_009: "退出登录",
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_010: "账号工作台",
   // src/pages/tool/AccountDashboard.tsx
@@ -606,7 +606,7 @@ export const commonCopy = {
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_012: "一个登录账号可以管理多个游戏账号。",
   // src/pages/tool/AccountDashboard.tsx
-  pages_tool_AccountDashboard_013: "\n              退出登录\n            ",
+  pages_tool_AccountDashboard_013: "退出登录",
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_014: "移动端账号导航",
   // src/pages/tool/AccountDashboard.tsx
@@ -620,7 +620,7 @@ export const commonCopy = {
   // src/pages/tool/useToolSession.ts
   pages_tool_useToolSession_004: "请先选择游戏账号。",
   // src/pages/tool/useToolSession.ts
-  pages_tool_useToolSession_005: "保存失败",
+  pages_tool_useToolSession_005: "保存失败，请稍后重试",
   // src/pages/tool/useToolSession.ts
   pages_tool_useToolSession_006: "保存配置失败",
 } as const

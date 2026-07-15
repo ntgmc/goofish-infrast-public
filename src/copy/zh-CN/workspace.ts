@@ -22,7 +22,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_011: "关闭森空岛导入",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_012: "\n            关闭\n          ",
+  components_SklandBindingDialog_012: "关闭",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_013: "获取凭据",
   // src/components/SklandBindingDialog.tsx
@@ -34,11 +34,11 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_017: "推荐使用扫码授权；无法扫码时，可粘贴凭据或使用书签脚本辅助复制。",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_018: "\n              重新生成二维码\n            ",
+  components_SklandBindingDialog_018: "重新生成二维码",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_019: "\n              改用粘贴凭据\n            ",
+  components_SklandBindingDialog_019: "改用粘贴凭据",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_020: "\n              立即检查授权\n            ",
+  components_SklandBindingDialog_020: "立即检查授权",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_021: "正在读取所选账号",
   // src/components/SklandBindingDialog.tsx
@@ -58,15 +58,15 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_029: "森空岛扫码授权二维码",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_030: "\n            立即检查授权\r\n          ",
+  components_SklandBindingDialog_030: "立即检查授权",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_031: "粘贴凭据",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_032: "在森空岛网页登录后，复制本地凭据并粘贴到这里。读取后会先展示昵称和 UID。",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_033: "\n          打开森空岛官网\r\n        ",
+  components_SklandBindingDialog_033: "打开森空岛官网",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_034: "\n          复制控制台命令\r\n        ",
+  components_SklandBindingDialog_034: "复制控制台命令",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_035: "控制台命令",
   // src/components/SklandBindingDialog.tsx
@@ -74,7 +74,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_037: "粘贴森空岛凭据",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_038: "\n        读取账号预览\r\n      ",
+  components_SklandBindingDialog_038: "读取账号预览",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_039: "书签脚本",
   // src/components/SklandBindingDialog.tsx
@@ -92,13 +92,13 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_046: "拖到浏览器书签栏后松开即可安装。",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_047: "\r\n          森空岛凭据助手\r\n        ",
+  components_SklandBindingDialog_047: "森空岛凭据助手",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_048: "如果浏览器禁止拖拽书签，可复制脚本手动新建书签。",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_049: "\n          复制书签脚本\r\n        ",
+  components_SklandBindingDialog_049: "复制书签脚本",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_050: "\n          打开森空岛\r\n        ",
+  components_SklandBindingDialog_050: "打开森空岛",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_051: "书签脚本内容",
   // src/components/SklandBindingDialog.tsx
@@ -106,7 +106,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_053: "粘贴书签脚本复制出的凭据",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_054: "\n        读取账号预览\r\n      ",
+  components_SklandBindingDialog_054: "读取账号预览",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_055: "仅预览，尚未保存",
   // src/components/SklandBindingDialog.tsx
@@ -200,9 +200,9 @@ export const workspaceCopy = {
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_035: "安装书签脚本后复制凭据，粘贴后读取账号预览。",
   // src/hooks/useSklandBinding.ts
-  hooks_useSklandBinding_036: "请确认森空岛账号信息，确认后将保存绑定并分析仓库。",
+  hooks_useSklandBinding_036: "请核对森空岛账号信息，确认后将保存绑定并分析仓库。",
   // src/hooks/useSklandBinding.ts
-  hooks_useSklandBinding_037: "请确认森空岛账号信息，确认后将保存绑定并导入干员数据。",
+  hooks_useSklandBinding_037: "请核对森空岛账号信息，确认后将保存绑定并导入干员数据。",
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_038: "森空岛已保存，正在读取仓库库存。",
   // src/hooks/useSklandBinding.ts
@@ -242,9 +242,9 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_010: "免费个人排班档案必须先绑定森空岛后才能保存工作区数据。",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_011: "保存失败",
+  pages_tool_WorkspaceSetupPage_011: "保存失败，请稍后重试",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_012: "保存失败",
+  pages_tool_WorkspaceSetupPage_012: "保存失败，请稍后重试",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_013: "MAA 工作台",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -316,7 +316,7 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_047: "保存工作区并开始排班",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_048: "免费档案升级失败",
+  pages_tool_WorkspaceSetupPage_048: "免费档案升级失败，请稍后重试",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_049: "档案与 CDK",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -338,7 +338,7 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_058: "前往“添加账号”输入未使用的 CDK，创建独立档案；当前工作区不会改变。",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_059: "\r\n            前往兑换新档案\r\n          ",
+  pages_tool_WorkspaceSetupPage_059: "前往兑换新档案",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_060: "还没有 CDK",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -374,9 +374,9 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_076: "刷新森空岛数据",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_077: "\n                重新绑定森空岛\r\n              ",
+  pages_tool_WorkspaceSetupPage_077: "重新绑定森空岛",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_078: "\n                再次刷新\r\n              ",
+  pages_tool_WorkspaceSetupPage_078: "再次刷新",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_079: "精 ",
   // src/pages/tool/WorkspaceSetupPage.tsx
