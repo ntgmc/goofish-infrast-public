@@ -160,11 +160,8 @@ export default function AuthForm({
             className={`${inputClassName(Boolean(fieldErrors.inviteCode))} font-mono uppercase tracking-wide`}
             placeholder="10 位邀请码"
             aria-invalid={Boolean(fieldErrors.inviteCode)}
-            aria-describedby={fieldErrors.inviteCode ? 'auth-invite-code-error' : 'auth-invite-code-description'}
+            aria-describedby={fieldErrors.inviteCode ? 'auth-invite-code-error' : undefined}
           />
-          <p id="auth-invite-code-description" className="mt-1.5 text-xs leading-5 text-ink-muted">
-            通过好友链接进入时会自动填写，也可以手动输入或清空。提交注册后将绑定邀请关系；首次兑换 CDK 或激活森空岛免费档案时，系统会按当前活动规则发放优先计算券。每张券可让一次主排班任务进入最高优先队列。
-          </p>
           {fieldErrors.inviteCode && <p id="auth-invite-code-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.inviteCode}</p>}
         </label>
       )}
