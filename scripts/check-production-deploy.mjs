@@ -101,6 +101,8 @@ function assertNginxBlueGreenConfig() {
 }
 
 function assertSystemdTemplate() {
+  assert.match(systemdUnit, /^User=ntgmc$/m)
+  assert.match(systemdUnit, /^Group=ntgmc$/m)
   assert.match(systemdUnit, /WorkingDirectory=\/opt\/goofish-infrast-v1\/slots\/%i/)
   assert.match(systemdUnit, /EnvironmentFile=\/etc\/goofish-infrast-v1\/%i\.env/)
   assert.match(systemdUnit, /Environment=HOST=127\.0\.0\.1/)

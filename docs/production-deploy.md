@@ -91,6 +91,9 @@ ready and Nginx has switched successfully.
    Preserve the existing secrets in
    `/etc/goofish-infrast-v1/backend.env`. It must not define `PORT` or a
    non-loopback `HOST`, because the slot files and unit own those settings.
+   The managed template runs both slots as the unprivileged `ntgmc` user and
+   group; adjust both fields before installation if the production application
+   account differs.
 
 3. Seed the runtime upstream files and active pointer while legacy port 3000 is
    still serving production:

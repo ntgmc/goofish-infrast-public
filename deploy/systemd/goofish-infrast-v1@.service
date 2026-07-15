@@ -5,6 +5,8 @@ Wants=postgresql.service
 
 [Service]
 Type=simple
+User=ntgmc
+Group=ntgmc
 WorkingDirectory=/opt/goofish-infrast-v1/slots/%i
 ExecStart=/usr/bin/node /opt/goofish-infrast-v1/slots/%i/server/dist/index.js
 Restart=always
