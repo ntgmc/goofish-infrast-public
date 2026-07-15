@@ -39,6 +39,9 @@ export default function ToolPage() {
     setEliteOverrides,
     configOverride,
     setConfigOverride,
+    configSyncStatus,
+    flushConfigSave,
+    retryConfigSave,
     banner,
     popups,
     announcementUnreadCount,
@@ -149,6 +152,9 @@ export default function ToolPage() {
           setEliteOverrides={setEliteOverrides}
           configOverride={configOverride}
           setConfigOverride={setConfigOverride}
+          configSyncStatus={configSyncStatus}
+          flushConfigSave={flushConfigSave}
+          retryConfigSave={retryConfigSave}
           onWorkspacePatch={persistWorkspacePatch}
           section={route.section}
           onSectionChange={navigateOptimize}
