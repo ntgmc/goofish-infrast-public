@@ -51,6 +51,7 @@ import {
   createRequestHash,
   hasCompletedIdempotentRedemption,
   redeemCdkAtomically,
+  saveUserAccountInTransaction,
   saveProfileInTransaction,
   saveWorkspaceInTransaction,
 } from '../storage/cdk-redemption'
