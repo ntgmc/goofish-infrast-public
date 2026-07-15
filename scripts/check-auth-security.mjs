@@ -18,6 +18,7 @@ try {
   assertSlidingWindowRateLimits(rateLimitModule)
   assertClientIpResolution(clientIpModule)
   await assertUserPasswordMigration(passwordModule)
+  await assertRegistrationCdkTransaction()
   await assertUserSessionTouchAndAuthPayload()
   await assertUserSessionStorage()
   await assertAtomicPasswordResetHandler()
@@ -225,6 +226,39 @@ async function assertUserPasswordMigration(passwordModule) {
     false,
     'user upgrade warnings should not include passwords',
   )
+}
+
+async function assertRegistrationCdkTransaction() {
+  globalThis.__authSecurityRegistrationTransactionTrace = []
+  globalThis.__authSecurityRegistrationAccountSyncs = []
+  globalThis.__authSecurityRegistrationSessions = []
+  const userAuth = await bundleInlineModule(
+    "export { registerUser } from './server/handlers/user-auth.ts'",
+    'user-registration-cdk',
+    [userRegistrationCdkPlugin()],
+  )
+
+  const registered = await userAuth.registerUser(
+    'new-user@example.com',
+    'valid-password',
+    'valid-cdk',
+    'registration-request',
+  )
+
+  assert.equal(registered.ok, true, 'a new user should be able to register with a valid CDK')
+  assert.deepEqual(
+    globalThis.__authSecurityRegistrationTransactionTrace.map(({ operation }) => operation),
+    ['account', 'profile', 'workspace'],
+    'CDK registration should persist the account, profile, and workspace inside the redemption transaction',
+  )
+  const [accountWrite, profileWrite, workspaceWrite] = globalThis.__authSecurityRegistrationTransactionTrace
+  assert.equal(accountWrite.value.id, registered.user.id)
+  assert.equal(accountWrite.value.cdk_key, 'cdk/valid')
+  assert.equal(profileWrite.value.user_id, registered.user.id)
+  assert.equal(profileWrite.value.cdk_key, 'cdk/valid')
+  assert.equal(workspaceWrite.value.profile_id, profileWrite.value.id)
+  assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 1)
+  assert.equal(globalThis.__authSecurityRegistrationSessions.length, 1)
 }
 
 async function assertUserSessionTouchAndAuthPayload() {
@@ -1229,6 +1263,32 @@ function userAuthMigrationPlugin() {
   }
 }
 
+function userRegistrationCdkPlugin() {
+  return {
+    name: 'auth-security-user-registration-cdk-mocks',
+    setup(build) {
+      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'email']) {
+        build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
+          path: moduleName,
+          namespace: 'auth-security-user-registration-cdk',
+        }))
+      }
+      build.onLoad({ filter: /.*/, namespace: 'auth-security-user-registration-cdk' }, (args) => {
+        const mocks = {
+          'user-store': userRegistrationCdkStoreMock(),
+          password: userRegistrationPasswordMock(),
+          'announcement-store': announcementStoreMock(),
+          'license-utils': userRegistrationLicenseUtilsMock(),
+          'cdk-redemption': userRegistrationCdkRedemptionMock(),
+          'invitation-store': invitationStoreMock(),
+          email: emailMock(),
+        }
+        return { contents: mocks[args.path], loader: 'js' }
+      })
+    },
+  }
+}
+
 function userSessionAuthPlugin() {
   return {
     name: 'auth-security-user-session-mocks',
@@ -1482,6 +1542,112 @@ function userStoreMigrationMock() {
     export function toPublicProfile(value) { return value }
     export function toPublicWorkspace(value) { return value }
     export async function touchSession() {}
+  `
+}
+
+function userRegistrationCdkStoreMock() {
+  return `
+    export async function getUserByEmail() { return null }
+    export async function saveUserAccount(user) {
+      globalThis.__authSecurityRegistrationAccountSyncs.push(structuredClone(user))
+    }
+    export async function saveUserSession(session) {
+      globalThis.__authSecurityRegistrationSessions.push(structuredClone(session))
+    }
+    export function emptyWorkspace(profileId) {
+      return {
+        version: 1,
+        profile_id: profileId,
+        operators: [],
+        config: {},
+        elite_overrides: {},
+        last_result: null,
+        updated_at: '2026-01-01T00:00:00.000Z',
+      }
+    }
+    export async function deleteSessionByTokenHash() {}
+    export async function deleteSessionsForUser() {}
+    export async function deleteUserAccount() {}
+    export async function getAnnouncementReads() { return [] }
+    export async function getPasswordResetTokenByHash() { return null }
+    export async function getProfileForUser() { return null }
+    export async function getRecentPasswordResetTokenForUser() { return null }
+    export async function getSessionByTokenHash() { return null }
+    export async function getUserById() { return null }
+    export async function listProfileWorkspaces() { return new Map() }
+    export async function listProfilesForUser() { return [] }
+    export async function markAnnouncementRead() {}
+    export async function migrateLegacyUserIfNeeded() { return [] }
+    export async function resetUserPasswordWithToken() { return null }
+    export async function savePasswordResetToken() {}
+    export async function saveProfileWorkspace() {}
+    export async function saveUserProfile() {}
+    export function isFreePreviewProfile() { return false }
+    export function toPublicProfile(value) { return value }
+    export function toPublicWorkspace(value) { return value }
+    export async function touchSession() { return false }
+    export async function upgradeUserPasswordHash() { return null }
+  `
+}
+
+function userRegistrationPasswordMock() {
+  return `
+    export async function createPasswordHash() {
+      return {
+        password_hash: 'registration-password-hash',
+        salt: 'registration-password-salt',
+        iterations: 2,
+        password_algorithm: 'argon2id',
+      }
+    }
+    export async function verifyPasswordHash() {
+      return { verified: false, needsRehash: false }
+    }
+  `
+}
+
+function userRegistrationLicenseUtilsMock() {
+  return `
+    export async function findCdkRecordByCode() {
+      return {
+        codeHash: 'valid-code-hash',
+        key: 'cdk/valid',
+        record: { status: 'unused', permission: 'growth' },
+      }
+    }
+    export function getCdkRecordStore() { return { get: async () => null } }
+    export function normalizeCode(value) { return value.trim().toUpperCase() }
+    export function normalizePermissionMode(value) { return value }
+    export function getFreePreviewDefaultConfig() { return {} }
+    export function resolveFreePreviewConfig(config) { return { ok: true, config } }
+  `
+}
+
+function userRegistrationCdkRedemptionMock() {
+  return `
+    export class CdkAlreadyRedeemedError extends Error {}
+    export class IdempotencyConflictError extends Error {}
+    export function createRequestHash(value) { return JSON.stringify(value) }
+    export async function hasCompletedIdempotentRedemption() { return false }
+    export async function redeemCdkAtomically(options) {
+      const completed = await options.complete({ id: 'registration-client' }, {
+        status: 'unused',
+        permission: 'growth',
+        license_order_hash: null,
+        operator_count: null,
+        config_desc: null,
+      })
+      return { response: completed.response, replayed: false }
+    }
+    export async function saveUserAccountInTransaction(client, value) {
+      globalThis.__authSecurityRegistrationTransactionTrace.push({ operation: 'account', client, value: structuredClone(value) })
+    }
+    export async function saveProfileInTransaction(client, value) {
+      globalThis.__authSecurityRegistrationTransactionTrace.push({ operation: 'profile', client, value: structuredClone(value) })
+    }
+    export async function saveWorkspaceInTransaction(client, value) {
+      globalThis.__authSecurityRegistrationTransactionTrace.push({ operation: 'workspace', client, value: structuredClone(value) })
+    }
   `
 }
 
