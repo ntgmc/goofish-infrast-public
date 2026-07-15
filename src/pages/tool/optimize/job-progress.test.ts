@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
-import { buildOptimizeJobStorageKey, isActiveOptimizeJob, mergeOptimizeJobProgress, readActiveOptimizeJob, writeActiveOptimizeJob } from './job-progress'
+import { buildOptimizeJobStorageKey, isActiveOptimizeJob, mergeOptimizeJobProgress, OPTIMIZE_POLL_REQUEST_TIMEOUT_MS, readActiveOptimizeJob, writeActiveOptimizeJob } from './job-progress'
+import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
 
 const accepted: OptimizeJobAccepted = {
   job_id: 'job-1',
@@ -48,6 +49,13 @@ describe('optimization job persistence', () => {
 })
 
 describe('optimization progress mapping', () => {
+  it('uses a slow-network timeout and bounded retry jitter', () => {
+    expect(OPTIMIZE_POLL_REQUEST_TIMEOUT_MS).toBe(20_000)
+    expect(getOptimizePollRetryDelayMs(1, () => 0)).toBe(800)
+    expect(getOptimizePollRetryDelayMs(1, () => 1)).toBe(1_200)
+    expect(getOptimizePollRetryDelayMs(99, () => 0.5)).toBe(10_000)
+  })
+
   it('keeps active state and maps server estimates', () => {
     expect(isActiveOptimizeJob(accepted)).toBe(true)
     const progress = mergeOptimizeJobProgress(null, accepted, 'generate', Date.parse(accepted.submitted_at))

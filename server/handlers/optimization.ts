@@ -24,10 +24,15 @@ export default async function optimizationHandler(req: Request): Promise<Respons
   const jobId = matchJobId(pathname)
   if (jobId !== null) {
     if (req.method !== 'GET') return methodNotAllowed()
-    return getOptimizationJob(req, jobId)
+    return noStoreResponse(await getOptimizationJob(req, jobId))
   }
 
   return jsonError('not_found', 'API route not found', 404)
+}
+
+export function noStoreResponse(response: Response): Response {
+  response.headers.set('Cache-Control', 'no-store')
+  return response
 }
 
 function matchJobId(pathname: string): string | null {

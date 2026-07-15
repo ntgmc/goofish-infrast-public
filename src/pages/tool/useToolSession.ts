@@ -14,6 +14,9 @@ import { apiJson, apiJsonOrNull, apiVoid } from '../../lib/api-client'
 import { createAccountLicense, isSchedulableProfile } from './tool-utils'
 
 export type WorkspacePatch = Partial<UserWorkspace> & { saved_config_action?: WorkspaceSavedConfigAction }
+export type ConfigSyncStatus = 'idle' | 'pending' | 'saving' | 'failed'
+
+const CONFIG_SAVE_DEBOUNCE_MS = 600
 
 export function useToolSession() {
   const [authLoading, setAuthLoading] = useState(true)
@@ -29,9 +32,32 @@ export function useToolSession() {
   const [announcementUnreadCount, setAnnouncementUnreadCount] = useState(0)
   const [openingProfileId, setOpeningProfileId] = useState<string | null>(null)
   const [workspaceLoadError, setWorkspaceLoadError] = useState<string | null>(null)
+  const [configSyncStatus, setConfigSyncStatus] = useState<ConfigSyncStatus>('idle')
   const workspacePatchQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const activeProfileRef = useRef<UserGameAccount | null>(null)
+  const licenseRef = useRef<LicenseFile | null>(null)
+  const configGenerationRef = useRef(0)
+  const configSaveTimerRef = useRef<number | null>(null)
+  const configSaveInFlightRef = useRef(false)
+  const pendingConfigRef = useRef<{ profileId: string; generation: number; config: LicenseConfig } | null>(null)
 
-  const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null) => {
+  activeProfileRef.current = activeProfile
+  licenseRef.current = license
+
+  const cancelPendingConfigSave = useCallback(() => {
+    configGenerationRef.current += 1
+    pendingConfigRef.current = null
+    if (configSaveTimerRef.current !== null) {
+      window.clearTimeout(configSaveTimerRef.current)
+      configSaveTimerRef.current = null
+    }
+    setConfigSyncStatus('idle')
+  }, [])
+
+  const applyAuthPayloadInternal = useCallback((
+    payload: AuthSuccessResponse | null,
+    options: { preserveConfigDraft?: boolean } = {},
+  ) => {
     const nextUser = payload?.user ?? null
     const nextProfiles = payload?.profiles ?? []
     const nextProfile = payload?.active_profile ?? null
@@ -42,11 +68,18 @@ export function useToolSession() {
     setWorkspace(nextWorkspace)
     setAnnouncementUnreadCount(payload?.announcement_unread_count ?? 0)
     setEliteOverridesState(nextWorkspace?.elite_overrides ?? {})
-    setConfigOverrideState(null)
+    if (!options.preserveConfigDraft) {
+      cancelPendingConfigSave()
+      setConfigOverrideState(null)
+    }
     setLicense(nextProfile && nextWorkspace?.operators && nextWorkspace.config
       ? createAccountLicense(nextProfile, nextWorkspace.operators, nextWorkspace.config)
       : null)
-  }, [])
+  }, [cancelPendingConfigSave])
+
+  const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null) => {
+    applyAuthPayloadInternal(payload)
+  }, [applyAuthPayloadInternal])
 
   useEffect(() => {
     let cancelled = false
@@ -80,7 +113,13 @@ export function useToolSession() {
     }
   }, [applyAuthPayload])
 
+  useEffect(() => () => {
+    pendingConfigRef.current = null
+    if (configSaveTimerRef.current !== null) window.clearTimeout(configSaveTimerRef.current)
+  }, [])
+
   const refreshProfileWorkspace = useCallback(async (profile: UserGameAccount) => {
+    cancelPendingConfigSave()
     setOpeningProfileId(profile.id)
     setWorkspaceLoadError(null)
     try {
@@ -95,7 +134,7 @@ export function useToolSession() {
     } finally {
       setOpeningProfileId(null)
     }
-  }, [applyAuthPayload])
+  }, [applyAuthPayload, cancelPendingConfigSave])
 
   const persistWorkspacePatch = useCallback((patch: WorkspacePatch) => {
     if (!activeProfile) return Promise.reject(new Error('请先选择游戏账号。'))
@@ -105,13 +144,50 @@ export function useToolSession() {
         json: { ...patch, profile_id: activeProfile.id },
         fallbackMessage: '保存失败',
       })
-      applyAuthPayload(data)
+      applyAuthPayloadInternal(data, { preserveConfigDraft: true })
       return data
     }
     const request = workspacePatchQueueRef.current.then(runPatch, runPatch)
     workspacePatchQueueRef.current = request.then(() => undefined, () => undefined)
     return request
-  }, [activeProfile, applyAuthPayload])
+  }, [activeProfile, applyAuthPayloadInternal])
+
+  const runPendingConfigSave = useCallback(async () => {
+    if (configSaveInFlightRef.current) return
+    const pending = pendingConfigRef.current
+    if (!pending) return
+    configSaveInFlightRef.current = true
+    setConfigSyncStatus('saving')
+    try {
+      const save = () => apiJson<AuthSuccessResponse>('/api/user/workspace', {
+          method: 'PATCH',
+          json: { config: pending.config, profile_id: pending.profileId },
+          fallbackMessage: '保存配置失败',
+        })
+      const request = workspacePatchQueueRef.current.then(save, save)
+      workspacePatchQueueRef.current = request.then(() => undefined, () => undefined)
+      const data = await request
+      const latest = pendingConfigRef.current
+      if (latest?.profileId === pending.profileId && latest.generation === pending.generation) {
+        applyAuthPayloadInternal(data, { preserveConfigDraft: true })
+        pendingConfigRef.current = null
+        setConfigOverrideState(null)
+        setConfigSyncStatus('idle')
+      }
+    } catch (error) {
+      const latest = pendingConfigRef.current
+      if (latest?.profileId === pending.profileId && latest.generation === pending.generation) {
+        setConfigSyncStatus('failed')
+      }
+      console.error(error)
+    } finally {
+      configSaveInFlightRef.current = false
+      const latest = pendingConfigRef.current
+      if (latest && latest.generation !== pending.generation) {
+        void runPendingConfigSave()
+      }
+    }
+  }, [applyAuthPayloadInternal])
 
   const setEliteOverrides = useCallback((next: Record<string, number>) => {
     setEliteOverridesState(next)
@@ -120,14 +196,38 @@ export function useToolSession() {
 
   const setConfigOverride = useCallback((next: LicenseConfig | null) => {
     setConfigOverrideState(next)
-    const nextConfig = next ?? license?.config ?? null
-    if (nextConfig) void persistWorkspacePatch({ config: nextConfig }).catch(console.error)
-  }, [license, persistWorkspacePatch])
+    const profile = activeProfileRef.current
+    const nextConfig = next ?? licenseRef.current?.config ?? null
+    if (!profile || !nextConfig) return
+    const generation = ++configGenerationRef.current
+    pendingConfigRef.current = { profileId: profile.id, generation, config: nextConfig }
+    setConfigSyncStatus('pending')
+    if (configSaveTimerRef.current !== null) window.clearTimeout(configSaveTimerRef.current)
+    configSaveTimerRef.current = window.setTimeout(() => {
+      configSaveTimerRef.current = null
+      void runPendingConfigSave()
+    }, CONFIG_SAVE_DEBOUNCE_MS)
+  }, [runPendingConfigSave])
+
+  const flushConfigSave = useCallback(() => {
+    if (configSaveTimerRef.current !== null) {
+      window.clearTimeout(configSaveTimerRef.current)
+      configSaveTimerRef.current = null
+    }
+    void runPendingConfigSave()
+  }, [runPendingConfigSave])
+
+  const retryConfigSave = useCallback(() => {
+    if (!pendingConfigRef.current) return
+    setConfigSyncStatus('pending')
+    flushConfigSave()
+  }, [flushConfigSave])
 
   const handleLogout = useCallback(async () => {
+    cancelPendingConfigSave()
     await apiVoid('/api/auth/logout', { method: 'POST' })
     applyAuthPayload(null)
-  }, [applyAuthPayload])
+  }, [applyAuthPayload, cancelPendingConfigSave])
 
   const cdkProfiles = useMemo(() => profiles.filter(isSchedulableProfile), [profiles])
   const activeCdkProfile = activeProfile && isSchedulableProfile(activeProfile) ? activeProfile : cdkProfiles[0] ?? null
@@ -146,6 +246,9 @@ export function useToolSession() {
     setEliteOverrides,
     configOverride,
     setConfigOverride,
+    configSyncStatus,
+    flushConfigSave,
+    retryConfigSave,
     banner,
     popups,
     announcementUnreadCount,
