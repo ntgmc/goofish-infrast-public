@@ -17,6 +17,19 @@ type BoardSlot = {
   row?: RoomRow;
 }
 
+const ROOM_TONE: Record<string, string> = {
+  trading: 'border-brand-500/35 bg-brand-500/10',
+  manufacture: 'border-warning/35 bg-warning/10',
+  power: 'border-success/35 bg-success/10',
+  control: 'border-brand-300/25 bg-surface-2/45',
+  meeting: 'border-surface-4/70 bg-surface-2/35',
+  hire: 'border-surface-4/70 bg-surface-2/35',
+  processing: 'border-surface-4/70 bg-surface-2/35',
+  dormitory: 'border-success/25 bg-success/10',
+}
+
+const DEFAULT_ROOM_TONE = 'border-surface-3 bg-surface-2/35'
+
 export default function ResultBoard({
   prepared,
   isRotationMode,
@@ -55,7 +68,10 @@ export default function ResultBoard({
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {groups.map((group) => (
-              <article key={group.key} className="tool-inset overflow-hidden">
+              <article
+                key={group.key}
+                className={`tool-inset overflow-hidden ${ROOM_TONE[group.roomType] ?? DEFAULT_ROOM_TONE}`}
+              >
                 <div className="border-b border-surface-3/50 px-3 py-2 text-center">
                   <h3 className="truncate text-sm font-semibold text-ink-primary">
                     {group.label}
