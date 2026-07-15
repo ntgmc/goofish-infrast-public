@@ -36,6 +36,7 @@ BUILD_DIR=""
 RELEASE_DIR=""
 CANDIDATE_SLOT=""
 CANDIDATE_STARTED=false
+CANDIDATE_ENABLED=false
 CUTOVER_STARTED=false
 DEPLOY_COMPLETE=false
 OLD_ACTIVE_SLOT=""
@@ -307,8 +308,13 @@ rollback() {
     rollback_ok=false
     log "CRITICAL: public smoke failed after rollback"
   fi
-  if [[ "$CANDIDATE_STARTED" == "true" ]]; then
+  if [[ "$CANDIDATE_ENABLED" == "true" ]]; then
+    run_systemctl disable --now "$(service_unit "$CANDIDATE_SLOT")" || true
+  elif [[ "$CANDIDATE_STARTED" == "true" ]]; then
     run_systemctl stop "$(service_unit "$CANDIDATE_SLOT")" || true
+  fi
+  if [[ -n "$OLD_ACTIVE_SLOT" ]]; then
+    run_systemctl enable --now "$(service_unit "$OLD_ACTIVE_SLOT")" || true
   fi
   restore_link "$OLD_CANDIDATE_TARGET" "$SLOTS_DIR/$CANDIDATE_SLOT"
   [[ "$rollback_ok" == "true" ]] || log "manual intervention required; do not stop the previous slot"
@@ -445,13 +451,16 @@ run_systemctl reload nginx
 PHASE="public-smoke"
 check_public_smoke || fail "public HTTPS smoke failed after cutover"
 
-DEPLOY_COMPLETE=true
+PHASE="boot-persistence"
+run_systemctl enable "$(service_unit "$CANDIDATE_SLOT")"
+CANDIDATE_ENABLED=true
 if [[ -n "$OLD_ACTIVE_SLOT" ]]; then
   PHASE="previous-slot-stop"
-  log "stopping drained previous slot $OLD_ACTIVE_SLOT"
-  run_systemctl stop "$(service_unit "$OLD_ACTIVE_SLOT")"
+  log "disabling and stopping drained previous slot $OLD_ACTIVE_SLOT"
+  run_systemctl disable --now "$(service_unit "$OLD_ACTIVE_SLOT")"
 fi
 
+DEPLOY_COMPLETE=true
 PHASE="release-cleanup"
 cleanup_old_releases
 log "deployment complete: ${OLD_CURRENT_TARGET:-legacy} -> $TARGET_SHA on $CANDIDATE_SLOT"

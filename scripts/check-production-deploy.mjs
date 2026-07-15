@@ -66,6 +66,7 @@ function assertDeploymentScript() {
     /check_readiness "\$CANDIDATE_SLOT"/,
     /CANDIDATE_ONLY/,
     /run_systemctl reload nginx/,
+    /run_systemctl enable "\$\(service_unit "\$CANDIDATE_SLOT"\)"/,
     /rollback\(\)/,
     /flock -n 9/,
   ]) {
@@ -81,7 +82,8 @@ function assertDeploymentScript() {
     'atomic_link "slots/$CANDIDATE_SLOT" "$CURRENT_LINK"',
     'run_systemctl reload nginx',
     'check_public_smoke || fail',
-    'run_systemctl stop "$(service_unit "$OLD_ACTIVE_SLOT")"',
+    'run_systemctl enable "$(service_unit "$CANDIDATE_SLOT")"',
+    'run_systemctl disable --now "$(service_unit "$OLD_ACTIVE_SLOT")"',
   ])
 
   const rollbackBody = extractFunction(deployScript, 'rollback')
