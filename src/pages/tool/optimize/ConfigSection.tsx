@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
 import type { ConfigDiffItem } from '../../../lib/workspace-history'
 import type { LicenseConfig, PermissionMode, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { ConfigSyncStatus } from '../useToolSession'
 import { ResultFallback } from './feedback'
 import type { ValidationState } from './types'
 
@@ -15,10 +16,12 @@ export default function ConfigSection({
   configChanged,
   configPresetLabel,
   configValidation,
+  configSyncStatus,
   latestResult,
   diffRows,
   updateConfig,
   resetConfig,
+  retryConfigSave,
 }: {
   activeConfig: LicenseConfig
   permission: PermissionMode
@@ -27,10 +30,12 @@ export default function ConfigSection({
   configChanged: boolean
   configPresetLabel: string
   configValidation: ValidationState
+  configSyncStatus: ConfigSyncStatus
   latestResult: WorkspaceResultHistoryItem | null
   diffRows: ConfigDiffItem[]
   updateConfig: (mutate: (config: LicenseConfig) => void) => void
   resetConfig: () => void
+  retryConfigSave: () => void
 }) {
   const description = `${SCHEDULE_MODE_LABELS[normalizeScheduleMode(activeConfig.schedule_mode)]} · ${userCanEditConfig ? `${activeConfig.layout} · ${activeConfig.desc}` : configPresetLabel}`
 
@@ -43,6 +48,11 @@ export default function ConfigSection({
               <p className="tool-eyebrow">工作区输入</p>
               {configChanged && <span className="tool-status tool-status--warning">已修改</span>}
               {!configValidation.ok && <span className="tool-status tool-status--error">需处理</span>}
+              {configSyncStatus === 'pending' && <span className="tool-status tool-status--warning">待同步</span>}
+              {configSyncStatus === 'saving' && <span className="tool-status">同步中</span>}
+              {configSyncStatus === 'failed' && (
+                <button type="button" onClick={retryConfigSave} className="tool-status tool-status--error">同步失败，重试</button>
+              )}
             </div>
             <h2 id="config-section-title" className="mt-2 text-base font-semibold text-ink-primary">基建配置</h2>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">{description}</p>
