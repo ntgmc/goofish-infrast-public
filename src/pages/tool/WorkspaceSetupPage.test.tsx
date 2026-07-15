@@ -44,7 +44,7 @@ describe('WorkspaceSetupPage CDK paths', () => {
     await waitFor(() => expect(apiJsonMock).toHaveBeenCalledWith('/api/user/profiles/redeem', {
       method: 'POST',
       json: { profile_id: 'preview-profile', cdk: 'test-cdk' },
-      fallbackMessage: '免费档案升级失败',
+      fallbackMessage: '免费档案升级失败，请稍后重试',
     }))
     expect(onSynced).toHaveBeenCalledWith(payload)
   })
