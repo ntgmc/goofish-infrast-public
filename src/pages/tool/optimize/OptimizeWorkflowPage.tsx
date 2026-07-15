@@ -9,6 +9,8 @@ import ResultSection from './ResultSection'
 import ScenarioLabSection from './ScenarioLabSection'
 import { getProfileAccessLabel } from '../tool-utils'
 import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
+import { copy } from '../../../copy/index'
+
 
 export default function OptimizeWorkflowPage(props: Props) {
   const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, operatorUploadStatus, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, operatorFileRef, isRestrictedPreview, userCanReplaceOperators, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, handleReplaceOperators, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile } = useOptimizeWorkflow(props)
@@ -20,7 +22,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         showScenarioLab={userCanUseScenarioLab}
         badges={{
           plans: `${savedConfigs.length}/${resultHistory.length}`,
-          result: hasResult ? '有结果' : undefined,
+          result: hasResult ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_001 : undefined,
         }}
         onSectionChange={setSection}
         onReset={onReset}

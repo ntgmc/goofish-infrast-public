@@ -3,6 +3,8 @@ import type { UserAnnouncementRead } from '../../../lib/types'
 import { apiJson } from '../../../lib/api-client'
 import { formatDate } from '../tool-utils'
 import AnnouncementMarkdown from '../../../components/AnnouncementMarkdown'
+import { copy } from '../../../copy/index'
+
 
 
 export default function AnnouncementsSection() {
@@ -15,7 +17,7 @@ export default function AnnouncementsSection() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await apiJson<{ announcements?: UserAnnouncementRead[] }>('/api/user/announcements', { fallbackMessage: '加载公告失败' })
+      const data = await apiJson<{ announcements?: UserAnnouncementRead[] }>('/api/user/announcements', { fallbackMessage: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_001 })
       setItems(data.announcements ?? [])
       setError(null)
     } catch (caught) {
@@ -37,7 +39,7 @@ export default function AnnouncementsSection() {
       const data = await apiJson<{ announcements?: UserAnnouncementRead[] }>('/api/user/announcements', {
         method: 'PATCH',
         json: announcementId ? { announcement_id: announcementId } : { all: true },
-        fallbackMessage: '标记公告失败',
+        fallbackMessage: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_002,
       })
       if (Array.isArray(data.announcements)) setItems(data.announcements)
       else await load()
@@ -52,29 +54,29 @@ export default function AnnouncementsSection() {
   return (
     <section className="max-w-4xl space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-ink-secondary">这里会显示近期通知，读过的内容会自动留在公告列表中方便回看。</p>
+        <p className="text-sm text-ink-secondary">{copy.dashboard.pages_tool_dashboard_AnnouncementsSection_003}</p>
         <button
           type="button"
           onClick={() => void markRead()}
           disabled={markingAll || markingId !== null}
           className="tool-secondary-action disabled:cursor-wait"
         >
-          {markingAll ? '处理中...' : '全部设为已读'}
+          {markingAll ? copy.dashboard.pages_tool_dashboard_AnnouncementsSection_004 : copy.dashboard.pages_tool_dashboard_AnnouncementsSection_005}
         </button>
       </div>
-      {loading && <p className="tool-inset p-4 text-sm text-ink-secondary" role="status">正在加载公告...</p>}
+      {loading && <p className="tool-inset p-4 text-sm text-ink-secondary" role="status">{copy.dashboard.pages_tool_dashboard_AnnouncementsSection_006}</p>}
       {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
-      {!loading && items.length === 0 && <div className="tool-panel p-6 text-sm text-ink-secondary">暂时没有新的公告。</div>}
+      {!loading && items.length === 0 && <div className="tool-panel p-6 text-sm text-ink-secondary">{copy.dashboard.pages_tool_dashboard_AnnouncementsSection_007}</div>}
       {items.map(({ announcement, read_at }) => (
         <article key={announcement.id} className={`tool-panel p-5 ${read_at ? '' : 'border-brand-500/50 bg-brand-500/10'}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-lg font-semibold text-ink-primary">{announcement.title}</h2>
-                {!read_at && <span className="tool-status tool-status--current">未读</span>}
+                {!read_at && <span className="tool-status tool-status--current">{copy.dashboard.pages_tool_dashboard_AnnouncementsSection_008}</span>}
               </div>
               <AnnouncementMarkdown className="mt-2">{announcement.body}</AnnouncementMarkdown>
-              <p className="mt-3 text-xs text-ink-muted">更新 {formatDate(announcement.updated_at)}</p>
+              <p className="mt-3 text-xs text-ink-muted">{copy.dashboard.pages_tool_dashboard_AnnouncementsSection_009}{formatDate(announcement.updated_at)}</p>
             </div>
             {!read_at && (
               <button
@@ -83,7 +85,7 @@ export default function AnnouncementsSection() {
                 disabled={markingAll || markingId === announcement.id}
                 className="tool-primary-action w-full shrink-0 disabled:cursor-wait sm:w-28"
               >
-                {markingId === announcement.id ? '标记中...' : '标为已读'}
+                {markingId === announcement.id ? copy.dashboard.pages_tool_dashboard_AnnouncementsSection_010 : copy.dashboard.pages_tool_dashboard_AnnouncementsSection_011}
               </button>
             )}
           </div>

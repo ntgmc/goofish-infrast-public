@@ -1,4 +1,6 @@
 import type { AppBuildMeta, LicenseConfig, OrundumEconomy } from './types'
+import { copy } from '../copy/index'
+
 
 export const SCENARIO_COMPARISON_MAX_SCENARIOS = 24
 export const SCENARIO_COMPARISON_VERIFY_PER_COST = 3
@@ -134,13 +136,13 @@ const SCHEDULES: Record<Exclude<ScenarioMaaSchedule, 'variable'>, number[]> = {
 }
 
 const DRONE_LABELS: Record<ScenarioDroneStrategy, string> = {
-  off: '无人机关闭',
-  auto: '无人机自动',
-  lmd: '无人机加速龙门币',
-  orundum: '无人机加速合成玉',
-  pure_gold: '无人机加速赤金',
-  battle_record: '无人机加速经验',
-  originium_shard: '无人机加速源石碎片',
+  off: copy.domain.lib_scenario_comparison_001,
+  auto: copy.domain.lib_scenario_comparison_002,
+  lmd: copy.domain.lib_scenario_comparison_003,
+  orundum: copy.domain.lib_scenario_comparison_004,
+  pure_gold: copy.domain.lib_scenario_comparison_005,
+  battle_record: copy.domain.lib_scenario_comparison_006,
+  originium_shard: copy.domain.lib_scenario_comparison_007,
 }
 
 export function expandScenarioComparison(
@@ -183,9 +185,9 @@ export function expandScenarioComparison(
     }
   }
 
-  if (scenarios.length === 0) throw new Error('请至少选择一个能够运行的场景组合。')
+  if (scenarios.length === 0) throw new Error(copy.domain.lib_scenario_comparison_008)
   if (scenarios.length > SCENARIO_COMPARISON_MAX_SCENARIOS) {
-    throw new Error(`有效场景共 ${scenarios.length} 组，最多允许 ${SCENARIO_COMPARISON_MAX_SCENARIOS} 组。`)
+    throw new Error(`${copy.domain.lib_scenario_comparison_009}${scenarios.length}${copy.domain.lib_scenario_comparison_010}${SCENARIO_COMPARISON_MAX_SCENARIOS}${copy.domain.lib_scenario_comparison_011}`)
   }
 
   const skipped: ScenarioSkipSummary[] = [...skippedTargets.entries()]
@@ -194,10 +196,10 @@ export function expandScenarioComparison(
       code: 'missing_product' as const,
       count,
       droneStrategy,
-      message: `${DRONE_LABELS[droneStrategy]}的目标产线在对应生产方案中不存在，已跳过。`,
+      message: `${DRONE_LABELS[droneStrategy]}${copy.domain.lib_scenario_comparison_012}`,
     }))
   if (duplicateCount > 0) {
-    skipped.push({ code: 'duplicate', count: duplicateCount, message: '重复场景已合并。' })
+    skipped.push({ code: 'duplicate', count: duplicateCount, message: copy.domain.lib_scenario_comparison_013 })
   }
   return { rawCombinationCount, variableScenarioCount, scenarios, skipped }
 }
@@ -239,7 +241,7 @@ export function freezeVariableScenarioConfig(
   const next = JSON.parse(JSON.stringify(config)) as LicenseConfig
   next.schedule_mode = 'maa'
   next.shift_hours = [...shiftHours]
-  next.desc = `${description} · 自动非固定选定 ${formatShiftHours(shiftHours)}`
+  next.desc = `${description}${copy.domain.lib_scenario_comparison_014}${formatShiftHours(shiftHours)}`
   next.variable_shift_schedule = {
     ...(next.variable_shift_schedule ?? {}),
     enable: false,
@@ -263,27 +265,27 @@ function dominates(left: ScenarioComparisonPoint, right: ScenarioComparisonPoint
 }
 
 function validateFactors(factors: ScenarioComparisonFactors): void {
-  assertExactKeys(factors, ['layouts', 'maaSchedules', 'includeRotation', 'droneStrategies'], '场景因子')
+  assertExactKeys(factors, ['layouts', 'maaSchedules', 'includeRotation', 'droneStrategies'], copy.domain.lib_scenario_comparison_015)
   if (!factors || !Array.isArray(factors.layouts) || !Array.isArray(factors.maaSchedules) || !Array.isArray(factors.droneStrategies)) {
-    throw new Error('场景因子格式不正确。')
+    throw new Error(copy.domain.lib_scenario_comparison_016)
   }
-  if (typeof factors.includeRotation !== 'boolean') throw new Error('游戏内轮换因子必须是布尔值。')
-  if (factors.layouts.length === 0) throw new Error('请至少选择一个基建布局和生产方案。')
-  if (factors.maaSchedules.length === 0 && !factors.includeRotation) throw new Error('请至少选择一种排班模式。')
-  if (factors.maaSchedules.length > 0 && factors.droneStrategies.length === 0) throw new Error('MAA 场景至少需要一种无人机策略。')
+  if (typeof factors.includeRotation !== 'boolean') throw new Error(copy.domain.lib_scenario_comparison_017)
+  if (factors.layouts.length === 0) throw new Error(copy.domain.lib_scenario_comparison_018)
+  if (factors.maaSchedules.length === 0 && !factors.includeRotation) throw new Error(copy.domain.lib_scenario_comparison_019)
+  if (factors.maaSchedules.length > 0 && factors.droneStrategies.length === 0) throw new Error(copy.domain.lib_scenario_comparison_020)
   for (const layoutFactor of factors.layouts) {
-    assertExactKeys(layoutFactor, ['layout', 'plans'], '布局因子')
+    assertExactKeys(layoutFactor, ['layout', 'plans'], copy.domain.lib_scenario_comparison_021)
     if (!Object.prototype.hasOwnProperty.call(LAYOUT_COUNTS, layoutFactor.layout)
       || !Array.isArray(layoutFactor.plans)
       || layoutFactor.plans.length === 0) {
-      throw new Error('布局或生产方案格式不正确。')
+      throw new Error(copy.domain.lib_scenario_comparison_022)
     }
   }
   if (factors.maaSchedules.some((value) => !['variable', '8x3', '12x2'].includes(value))) {
-    throw new Error('MAA 排班仅支持自动非固定、8×3 和 12×2。')
+    throw new Error(copy.domain.lib_scenario_comparison_023)
   }
   if (factors.droneStrategies.some((value) => !Object.prototype.hasOwnProperty.call(DRONE_LABELS, value))) {
-    throw new Error('包含未知的无人机策略。')
+    throw new Error(copy.domain.lib_scenario_comparison_024)
   }
 }
 
@@ -292,9 +294,9 @@ function validateProductionPlan(
   plan: ScenarioProductionPlan,
   counts: { trading: number; manufacturing: number },
 ): void {
-  assertExactKeys(plan, ['trading', 'manufacturing'], `${layout} 生产方案`)
-  assertExactKeys(plan?.trading, ['lmd', 'orundum'], `${layout} 贸易方案`)
-  assertExactKeys(plan?.manufacturing, ['pureGold', 'battleRecord', 'originiumShard'], `${layout} 制造方案`)
+  assertExactKeys(plan, ['trading', 'manufacturing'], `${layout}${copy.domain.lib_scenario_comparison_025}`)
+  assertExactKeys(plan?.trading, ['lmd', 'orundum'], `${layout}${copy.domain.lib_scenario_comparison_026}`)
+  assertExactKeys(plan?.manufacturing, ['pureGold', 'battleRecord', 'originiumShard'], `${layout}${copy.domain.lib_scenario_comparison_027}`)
   const values = [
     plan?.trading?.lmd,
     plan?.trading?.orundum,
@@ -303,20 +305,20 @@ function validateProductionPlan(
     plan?.manufacturing?.originiumShard,
   ]
   if (values.some((value) => !Number.isInteger(value) || value < 0)) {
-    throw new Error(`${layout} 的贸易与制造线数必须是非负整数。`)
+    throw new Error(`${layout}${copy.domain.lib_scenario_comparison_028}`)
   }
   if (plan.trading.lmd + plan.trading.orundum !== counts.trading) {
-    throw new Error(`${layout} 的贸易线数合计必须为 ${counts.trading}。`)
+    throw new Error(`${layout}${copy.domain.lib_scenario_comparison_029}${counts.trading}。`)
   }
   if (plan.manufacturing.pureGold + plan.manufacturing.battleRecord + plan.manufacturing.originiumShard !== counts.manufacturing) {
-    throw new Error(`${layout} 的制造线数合计必须为 ${counts.manufacturing}。`)
+    throw new Error(`${layout}${copy.domain.lib_scenario_comparison_030}${counts.manufacturing}。`)
   }
 }
 
 function assertExactKeys(value: unknown, allowed: string[], label: string): void {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label}格式不正确。`)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label}${copy.domain.lib_scenario_comparison_031}`)
   const unknown = Object.keys(value).filter((key) => !allowed.includes(key))
-  if (unknown.length > 0) throw new Error(`${label}包含未知字段：${unknown.sort().join('、')}。`)
+  if (unknown.length > 0) throw new Error(`${label}${copy.domain.lib_scenario_comparison_032}${unknown.sort().join('、')}。`)
 }
 
 function addScenario(
@@ -426,7 +428,7 @@ function compactCounts(counts: Record<string, number>): Record<string, number> {
 }
 
 function productionPlanLabel(layout: ScenarioLayout, plan: ScenarioProductionPlan): string {
-  return `${layout} 贸币${plan.trading.lmd}/玉${plan.trading.orundum} · 制赤${plan.manufacturing.pureGold}/经${plan.manufacturing.battleRecord}/碎${plan.manufacturing.originiumShard}`
+  return `${layout}${copy.domain.lib_scenario_comparison_033}${plan.trading.lmd}${copy.domain.lib_scenario_comparison_034}${plan.trading.orundum}${copy.domain.lib_scenario_comparison_035}${plan.manufacturing.pureGold}${copy.domain.lib_scenario_comparison_036}${plan.manufacturing.battleRecord}${copy.domain.lib_scenario_comparison_037}${plan.manufacturing.originiumShard}`
 }
 
 function scenarioDescription(
@@ -438,8 +440,8 @@ function scenarioDescription(
 }
 
 function scheduleLabel(strategy: ScenarioMaaSchedule | 'rotation'): string {
-  if (strategy === 'variable') return 'MAA 自动非固定'
+  if (strategy === 'variable') return copy.domain.lib_scenario_comparison_038
   if (strategy === '8x3') return 'MAA 8h×3'
   if (strategy === '12x2') return 'MAA 12h×2'
-  return '轮换 12h×2'
+  return copy.domain.lib_scenario_comparison_039
 }

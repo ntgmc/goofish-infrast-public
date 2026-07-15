@@ -8,6 +8,8 @@ import type {
   UpgradeTrainingMaterial,
 } from '../lib/types'
 import ScheduleProgress, { type ScheduleProgressState } from './ScheduleProgress'
+import { copy, CURRENT_LOCALE } from '../copy/index'
+
 
 interface Props {
   suggestions: UpgradeSuggestion[];
@@ -22,9 +24,9 @@ interface Props {
 type SortMode = 'payback' | 'gain' | 'stock'
 
 const SORT_OPTIONS: { id: SortMode; label: string }[] = [
-  { id: 'payback', label: '最快回本' },
-  { id: 'gain', label: '最大收益' },
-  { id: 'stock', label: '材料已够' },
+  { id: 'payback', label: copy.optimize.components_UpgradeSuggestions_001 },
+  { id: 'gain', label: copy.optimize.components_UpgradeSuggestions_002 },
+  { id: 'stock', label: copy.optimize.components_UpgradeSuggestions_003 },
 ]
 
 export default function UpgradeSuggestions({ suggestions, onApply, loading, progress, error, onReset, embedded = false }: Props) {
@@ -66,15 +68,13 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
         <div>
           {!embedded && (
             <h2 className="mb-2 text-xl font-semibold text-ink-primary">
-              练度优化建议
-            </h2>
+              {copy.optimize.components_UpgradeSuggestions_004}</h2>
           )}
           <p className="text-sm leading-6 text-ink-secondary">
-            建议按缺口理智和每日理智收益估算回本，材料成本来自森空岛养成库存。
-          </p>
+            {copy.optimize.components_UpgradeSuggestions_005}</p>
         </div>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center xl:flex-shrink-0">
-          <div className="tool-inset inline-flex w-full overflow-hidden p-1 lg:w-auto" role="group" aria-label="建议排序">
+          <div className="tool-inset inline-flex w-full overflow-hidden p-1 lg:w-auto" role="group" aria-label={copy.optimize.components_UpgradeSuggestions_006}>
             {SORT_OPTIONS.map((option) => (
               <button
                 key={option.id}
@@ -98,8 +98,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
               onChange={(event) => setSingleOnly(event.currentTarget.checked)}
               className="h-4 w-4 accent-brand-500"
             />
-            只看单人提升
-          </label>
+            {copy.optimize.components_UpgradeSuggestions_007}</label>
           <button
             onClick={() => onApply(selectedIds)}
             disabled={loading || selected.size === 0}
@@ -112,10 +111,9 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                重新计算中
-              </span>
+                {copy.optimize.components_UpgradeSuggestions_008}</span>
             ) : (
-              `应用建议 (${selected.size})`
+              `${copy.optimize.components_UpgradeSuggestions_009}${selected.size})`
             )}
           </button>
         </div>
@@ -127,7 +125,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
 
       {error && (
         <div className="tool-alert tool-alert--error" role="alert">
-          <p className="text-sm font-semibold text-error">应用建议失败</p>
+          <p className="text-sm font-semibold text-error">{copy.optimize.components_UpgradeSuggestions_010}</p>
           <p className="mt-1 text-sm leading-6 text-ink-secondary">{error}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -136,15 +134,13 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
               disabled={loading || selected.size === 0}
               className="tool-primary-action"
             >
-              重试
-            </button>
+              {copy.optimize.components_UpgradeSuggestions_011}</button>
             <button
               type="button"
               onClick={onReset}
               className="tool-secondary-action"
             >
-              重新选择文件
-            </button>
+              {copy.optimize.components_UpgradeSuggestions_012}</button>
           </div>
         </div>
       )}
@@ -167,14 +163,13 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
 
       {visibleSuggestions.length === 0 && (
         <div className="tool-inset p-4 text-sm text-ink-secondary">
-          当前筛选下没有可展示的建议。
-        </div>
+          {copy.optimize.components_UpgradeSuggestions_013}</div>
       )}
 
       <div id="upgrade-selection-note" className="tool-inset p-4 text-sm leading-6 text-ink-secondary" role="status" aria-live="polite">
         {selected.size === 0
-          ? '选择至少一项建议后，才可应用并重新计算；当前方案仍可下载留底。'
-          : `已选 ${selected.size} 项。应用建议后会重新计算并生成新方案，当前方案仍可下载留底。`}
+          ? copy.optimize.components_UpgradeSuggestions_014
+          : `${copy.optimize.components_UpgradeSuggestions_015}${selected.size}${copy.optimize.components_UpgradeSuggestions_016}`}
       </div>
     </div>
   )
@@ -199,7 +194,7 @@ function SuggestionCard({
   onToggleExpanded: () => void;
   embedded: boolean;
 }) {
-  const title = suggestion.name || suggestion.ops?.map((op) => op.name).join(' + ') || '升级建议'
+  const title = suggestion.name || suggestion.ops?.map((op) => op.name).join(' + ') || copy.optimize.components_UpgradeSuggestions_017
   const cost = suggestion.training_cost
   const stockEnough = isStockEnough(cost)
   const stockLabel = getStockLabel(cost)
@@ -214,9 +209,9 @@ function SuggestionCard({
             checked={selected}
             onChange={onToggle}
             className="h-5 w-5 accent-brand-500"
-            aria-label={`选择 ${title}`}
+            aria-label={`${copy.optimize.components_UpgradeSuggestions_018}${title}`}
           />
-            <span className="sr-only">选择 {title}</span>
+            <span className="sr-only">{copy.optimize.components_UpgradeSuggestions_019}{title}</span>
           </label>
           <OperatorPortraits suggestion={suggestion} />
         </div>
@@ -236,7 +231,7 @@ function SuggestionCard({
               )}
               {(suggestion.rooms || suggestion.impact?.summary) && (
                 <p className="mt-1 text-xs leading-5 text-ink-muted">
-                  {suggestion.impact?.summary || `影响 ${suggestion.rooms}`}
+                  {suggestion.impact?.summary || `${copy.optimize.components_UpgradeSuggestions_020}${suggestion.rooms}`}
                 </p>
               )}
             </div>
@@ -246,7 +241,7 @@ function SuggestionCard({
               className="tool-secondary-action px-3 text-sm xl:flex-shrink-0"
               aria-expanded={expanded}
             >
-              {expanded ? '收起解释' : '查看解释'}
+              {expanded ? copy.optimize.components_UpgradeSuggestions_021 : copy.optimize.components_UpgradeSuggestions_022}
             </button>
           </div>
 
@@ -307,16 +302,16 @@ function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?
   const totalSanity = cost?.totals.equivalent_sanity ?? cost?.equivalent_sanity ?? null
   const missingSanity = cost?.missing.equivalent_sanity ?? null
   const metrics = [
-    { label: '得分提升', value: `+${formatCostNumber(roi?.efficiency_gain ?? suggestion.gain)}`, tone: 'brand' as const },
+    { label: copy.optimize.components_UpgradeSuggestions_023, value: `+${formatCostNumber(roi?.efficiency_gain ?? suggestion.gain)}`, tone: 'brand' as const },
     orundumRoi
-      ? { label: '每日合成玉', value: formatSignedAmount(orundumRoi.daily_orundum_gain), tone: 'success' as const }
-      : { label: '每日理智收益', value: formatSignedSanity(roi?.daily_sanity_gain), tone: 'success' as const },
+      ? { label: copy.optimize.components_UpgradeSuggestions_024, value: formatSignedAmount(orundumRoi.daily_orundum_gain), tone: 'success' as const }
+      : { label: copy.optimize.components_UpgradeSuggestions_025, value: formatSignedSanity(roi?.daily_sanity_gain), tone: 'success' as const },
     orundumRoi
-      ? { label: '机会成本', value: `${formatSignedAmount(orundumRoi.opportunity_cost_delta)} 理智/日`, tone: 'warning' as const }
-      : { label: '预计回本', value: formatPayback(roi?.payback_days), tone: 'warning' as const },
-    { label: '总需求理智', value: formatSanity(totalSanity), tone: 'default' as const },
-    { label: '缺口理智', value: formatSanity(missingSanity), tone: 'default' as const },
-    { label: '库存状态', value: getStockLabel(cost), tone: isStockEnough(cost) ? 'success' as const : 'default' as const },
+      ? { label: copy.optimize.components_UpgradeSuggestions_026, value: `${formatSignedAmount(orundumRoi.opportunity_cost_delta)}${copy.optimize.components_UpgradeSuggestions_027}`, tone: 'warning' as const }
+      : { label: copy.optimize.components_UpgradeSuggestions_028, value: formatPayback(roi?.payback_days), tone: 'warning' as const },
+    { label: copy.optimize.components_UpgradeSuggestions_029, value: formatSanity(totalSanity), tone: 'default' as const },
+    { label: copy.optimize.components_UpgradeSuggestions_030, value: formatSanity(missingSanity), tone: 'default' as const },
+    { label: copy.optimize.components_UpgradeSuggestions_031, value: getStockLabel(cost), tone: isStockEnough(cost) ? 'success' as const : 'default' as const },
   ]
 
   return (
@@ -335,7 +330,7 @@ function TrainingCostPanel({ cost }: { cost?: UpgradeTrainingCost }) {
   if (!cost || cost.status === 'unavailable') {
     return (
       <div className="tool-inset px-3 py-2 text-sm leading-6 text-ink-muted">
-        {cost?.warnings[0] || '材料成本暂不可用'}
+        {cost?.warnings[0] || copy.optimize.components_UpgradeSuggestions_032}
       </div>
     )
   }
@@ -343,9 +338,9 @@ function TrainingCostPanel({ cost }: { cost?: UpgradeTrainingCost }) {
   const available = cost.available ?? deriveAvailableBucket(cost)
   return (
     <div className="grid gap-3 lg:grid-cols-3">
-      <CostColumn title="所需材料" bucket={cost.totals} emptyLabel="无额外需求" />
-      <CostColumn title="已有库存" bucket={available} emptyLabel="暂无可覆盖库存" />
-      <CostColumn title="缺口材料" bucket={cost.missing} emptyLabel="材料已够" emphasizeMissing />
+      <CostColumn title={copy.optimize.components_UpgradeSuggestions_033} bucket={cost.totals} emptyLabel={copy.optimize.components_UpgradeSuggestions_034} />
+      <CostColumn title={copy.optimize.components_UpgradeSuggestions_035} bucket={available} emptyLabel={copy.optimize.components_UpgradeSuggestions_036} />
+      <CostColumn title={copy.optimize.components_UpgradeSuggestions_037} bucket={cost.missing} emptyLabel={copy.optimize.components_UpgradeSuggestions_038} emphasizeMissing />
     </div>
   )
 }
@@ -374,9 +369,9 @@ function CostColumn({
         </p>
       </div>
       <div className="mt-2 grid gap-1 text-xs text-ink-secondary">
-        <span>龙门币 <span className="font-mono text-ink-primary">{formatCostNumber(bucket.cash)}</span></span>
-        <span>经验 <span className="font-mono text-ink-primary">{formatCostNumber(bucket.exp)}</span></span>
-        <span>材料 <span className="font-mono text-ink-primary">{formatCostNumber(materialTotal)}</span></span>
+        <span>{copy.optimize.components_UpgradeSuggestions_039}<span className="font-mono text-ink-primary">{formatCostNumber(bucket.cash)}</span></span>
+        <span>{copy.optimize.components_UpgradeSuggestions_040}<span className="font-mono text-ink-primary">{formatCostNumber(bucket.exp)}</span></span>
+        <span>{copy.optimize.components_UpgradeSuggestions_041}<span className="font-mono text-ink-primary">{formatCostNumber(materialTotal)}</span></span>
       </div>
       {isEmpty ? (
         <p className="mt-2 text-xs text-ink-muted">{emptyLabel}</p>
@@ -389,8 +384,7 @@ function CostColumn({
           ))}
           {bucket.materials.length > materials.length && (
             <span className="rounded-md bg-surface-2 px-2 py-1 text-xs text-ink-muted">
-              +{bucket.materials.length - materials.length} 种
-            </span>
+              +{bucket.materials.length - materials.length} {copy.optimize.components_UpgradeSuggestions_042}</span>
           )}
         </div>
       )}
@@ -404,27 +398,27 @@ function ImpactPanel({ suggestion }: { suggestion: UpgradeSuggestion }) {
   return (
     <div className="grid gap-3 xl:grid-cols-[1fr_0.95fr]">
       <div className="tool-inset p-3">
-        <p className="text-sm font-semibold text-ink-primary">影响房间/组合</p>
+        <p className="text-sm font-semibold text-ink-primary">{copy.optimize.components_UpgradeSuggestions_043}</p>
         {impactRooms.length > 0 ? (
           <div className="mt-2 space-y-2">
             {impactRooms.slice(0, 6).map((room, index) => (
               <ImpactRoomRow key={`${room.room_name}-${room.rule_description}-${index}`} room={room} />
             ))}
             {impactRooms.length > 6 && (
-              <p className="text-xs text-ink-muted">另有 {impactRooms.length - 6} 条影响已折叠到收益估算中。</p>
+              <p className="text-xs text-ink-muted">{copy.optimize.components_UpgradeSuggestions_044}{impactRooms.length - 6} {copy.optimize.components_UpgradeSuggestions_045}</p>
             )}
           </div>
         ) : (
           <p className="mt-2 text-sm leading-6 text-ink-muted">
-            {suggestion.rooms ? `影响 ${suggestion.rooms}` : '暂无结构化影响说明'}
+            {suggestion.rooms ? `${copy.optimize.components_UpgradeSuggestions_046}${suggestion.rooms}` : copy.optimize.components_UpgradeSuggestions_047}
           </p>
         )}
       </div>
 
       <div className="tool-inset p-3">
-        <p className="text-sm font-semibold text-ink-primary">组合拆分收益</p>
+        <p className="text-sm font-semibold text-ink-primary">{copy.optimize.components_UpgradeSuggestions_048}</p>
         {suggestion.type !== 'bundle' ? (
-          <p className="mt-2 text-sm leading-6 text-ink-muted">单人提升不需要拆分模拟。</p>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">{copy.optimize.components_UpgradeSuggestions_049}</p>
         ) : partials.length > 0 ? (
           <div className="mt-2 space-y-2">
             <p className="text-xs leading-5 text-ink-muted">{summarizePartialOutcomes(partials)}</p>
@@ -432,11 +426,11 @@ function ImpactPanel({ suggestion }: { suggestion: UpgradeSuggestion }) {
               <PartialOutcomeRow key={outcome.missing_operator.name} outcome={outcome} />
             ))}
             {suggestion.partial_outcomes_truncated && (
-              <p className="text-xs text-warning">{suggestion.partial_outcomes_unavailable_reason || '组合拆分模拟未完全完成。'}</p>
+              <p className="text-xs text-warning">{suggestion.partial_outcomes_unavailable_reason || copy.optimize.components_UpgradeSuggestions_050}</p>
             )}
           </div>
         ) : (
-          <p className="mt-2 text-sm leading-6 text-ink-muted">该组合暂无拆分模拟结果。</p>
+          <p className="mt-2 text-sm leading-6 text-ink-muted">{copy.optimize.components_UpgradeSuggestions_051}</p>
         )}
       </div>
     </div>
@@ -453,9 +447,9 @@ function ImpactRoomRow({ room }: { room: UpgradeImpactRoom }) {
         <p className="text-xs font-semibold text-brand-300">+{formatCostNumber(room.estimated_gain)}%</p>
       </div>
       <p className="mt-1 text-xs leading-5 text-ink-secondary">
-        {room.product || '全局'} · {room.rule_description || '目标组合'}
+        {room.product || copy.optimize.components_UpgradeSuggestions_052} · {room.rule_description || copy.optimize.components_UpgradeSuggestions_053}
       </p>
-      <p className="mt-1 text-xs leading-5 text-ink-muted">组合 {operators}；缺口 {missing}</p>
+      <p className="mt-1 text-xs leading-5 text-ink-muted">{copy.optimize.components_UpgradeSuggestions_054}{operators}{copy.optimize.components_UpgradeSuggestions_055}{missing}</p>
     </div>
   )
 }
@@ -464,15 +458,15 @@ function PartialOutcomeRow({ outcome }: { outcome: UpgradePartialOutcome }) {
   return (
     <div className="tool-inset px-3 py-2">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm font-semibold text-ink-primary">缺 {outcome.missing_operator.name}</p>
+        <p className="text-sm font-semibold text-ink-primary">{copy.optimize.components_UpgradeSuggestions_056}{outcome.missing_operator.name}</p>
         <p className={`text-xs font-semibold ${outcome.has_benefit ? 'text-success' : 'text-ink-muted'}`}>
-          {outcome.has_benefit ? '仍有收益' : '无明显收益'}
+          {outcome.has_benefit ? copy.optimize.components_UpgradeSuggestions_057 : copy.optimize.components_UpgradeSuggestions_058}
         </p>
       </div>
       <p className="mt-1 text-xs leading-5 text-ink-secondary">
-        剩余 {outcome.remaining_ops.map((op) => op.name).join(' + ') || '-'} · +{formatCostNumber(outcome.efficiency_gain)}% · {formatSignedSanity(outcome.daily_sanity_gain)}
+        {copy.optimize.components_UpgradeSuggestions_059}{outcome.remaining_ops.map((op) => op.name).join(' + ') || '-'} · +{formatCostNumber(outcome.efficiency_gain)}% · {formatSignedSanity(outcome.daily_sanity_gain)}
       </p>
-      {outcome.rooms && <p className="mt-1 text-xs text-ink-muted">影响 {outcome.rooms}</p>}
+      {outcome.rooms && <p className="mt-1 text-xs text-ink-muted">{copy.optimize.components_UpgradeSuggestions_060}{outcome.rooms}</p>}
     </div>
   )
 }
@@ -524,8 +518,8 @@ function isStockEnough(cost?: UpgradeTrainingCost): boolean {
 }
 
 function getStockLabel(cost?: UpgradeTrainingCost): string {
-  if (!cost || cost.status === 'unavailable') return '库存不可读'
-  return isStockEnough(cost) ? '材料已够' : '仍有缺口'
+  if (!cost || cost.status === 'unavailable') return copy.optimize.components_UpgradeSuggestions_061
+  return isStockEnough(cost) ? copy.optimize.components_UpgradeSuggestions_062 : copy.optimize.components_UpgradeSuggestions_063
 }
 
 function metricToneClass(tone: 'brand' | 'success' | 'warning' | 'default'): string {
@@ -560,36 +554,36 @@ function topMaterials(materials: UpgradeTrainingMaterial[]): UpgradeTrainingMate
 }
 
 function summarizePartialOutcomes(outcomes: UpgradePartialOutcome[]): string {
-  if (outcomes.every((outcome) => outcome.has_benefit)) return '缺任意一个成员时仍有收益，但收益会下降。'
-  if (outcomes.some((outcome) => outcome.has_benefit)) return '部分成员缺席时仍有收益，具体见下方拆分。'
-  return '缺少任意成员后都没有明显收益。'
+  if (outcomes.every((outcome) => outcome.has_benefit)) return copy.optimize.components_UpgradeSuggestions_064
+  if (outcomes.some((outcome) => outcome.has_benefit)) return copy.optimize.components_UpgradeSuggestions_065
+  return copy.optimize.components_UpgradeSuggestions_066
 }
 
 function formatPayback(value: number | null | undefined): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '暂不可算'
-  if (value === 0) return '0 天'
-  return `约 ${formatCostNumber(value)} 天`
+  if (typeof value !== 'number' || !Number.isFinite(value)) return copy.optimize.components_UpgradeSuggestions_067
+  if (value === 0) return copy.optimize.components_UpgradeSuggestions_068
+  return `${copy.optimize.components_UpgradeSuggestions_069}${formatCostNumber(value)}${copy.optimize.components_UpgradeSuggestions_070}`
 }
 
 function formatSignedSanity(value: number | null | undefined): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '暂不可算'
+  if (typeof value !== 'number' || !Number.isFinite(value)) return copy.optimize.components_UpgradeSuggestions_071
   const sign = value > 0 ? '+' : ''
-  return `${sign}${formatCostNumber(value)} 理智/日`
+  return `${sign}${formatCostNumber(value)}${copy.optimize.components_UpgradeSuggestions_072}`
 }
 
 function formatSignedAmount(value: number | null | undefined): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '暂不可算'
+  if (typeof value !== 'number' || !Number.isFinite(value)) return copy.optimize.components_UpgradeSuggestions_073
   const sign = value > 0 ? '+' : ''
   return `${sign}${formatCostNumber(value)}`
 }
 
 function formatSanity(value: number | null | undefined): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '暂不可算'
-  return `${formatCostNumber(value)} 理智`
+  if (typeof value !== 'number' || !Number.isFinite(value)) return copy.optimize.components_UpgradeSuggestions_074
+  return `${formatCostNumber(value)}${copy.optimize.components_UpgradeSuggestions_075}`
 }
 
 function formatCostNumber(value: number): string {
   if (!Number.isFinite(value)) return '-'
-  if (Math.abs(value) >= 1000) return Math.round(value).toLocaleString('zh-CN')
+  if (Math.abs(value) >= 1000) return Math.round(value).toLocaleString(CURRENT_LOCALE)
   return value % 1 === 0 ? String(value) : value.toFixed(1)
 }

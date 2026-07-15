@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
+import { copy } from '../copy/index'
 
-const DEFAULT_DESCRIPTION = '使用森空岛数据和 MAA 配置生成明日方舟基建排班，查看日产出等效理智、练度建议与仓库资产估值。'
+
+const DEFAULT_DESCRIPTION = copy.metadata.components_RouteMetadata_001
 const SOCIAL_IMAGE_PATH = '/assets/logo.png'
 
 type Metadata = {
@@ -12,55 +14,55 @@ type Metadata = {
 
 const PUBLIC_METADATA: Record<string, Metadata> = {
   '/': {
-    title: 'MAA 基建排班优化器 | MaaTool',
+    title: copy.metadata.components_RouteMetadata_002,
     description: DEFAULT_DESCRIPTION,
     indexable: true,
   },
   '/announcements': {
-    title: '公告 | MaaTool',
-    description: '查看 MaaTool 的功能更新、服务通知和使用公告。',
+    title: copy.metadata.components_RouteMetadata_003,
+    description: copy.metadata.components_RouteMetadata_004,
     indexable: true,
   },
   '/faq': {
-    title: '常见问题 | MaaTool',
-    description: '了解 MaaTool 的账号、CDK、森空岛导入、MAA JSON 和仓库估值使用方式。',
+    title: copy.metadata.components_RouteMetadata_005,
+    description: copy.metadata.components_RouteMetadata_006,
     indexable: true,
   },
   '/support': {
-    title: '联系客服 | MaaTool',
-    description: '通过 MaaTool QQ 群获取使用帮助、提交问题反馈或申请删除账号与工作台数据。',
+    title: copy.metadata.components_RouteMetadata_007,
+    description: copy.metadata.components_RouteMetadata_008,
     indexable: true,
   },
   '/privacy': {
-    title: '隐私政策 | MaaTool',
-    description: '了解 MaaTool 为提供排班服务而处理的信息及你的相关权利。',
+    title: copy.metadata.components_RouteMetadata_009,
+    description: copy.metadata.components_RouteMetadata_010,
     indexable: true,
   },
   '/terms': {
-    title: '用户服务协议 | MaaTool',
-    description: '阅读 MaaTool 账号、CDK、森空岛导入和排班功能的用户服务协议。',
+    title: copy.metadata.components_RouteMetadata_011,
+    description: copy.metadata.components_RouteMetadata_012,
     indexable: true,
   },
   '/disclaimer': {
-    title: '免责声明 | MaaTool',
-    description: '了解 MaaTool 排班建议、第三方服务与知识产权相关的使用边界。',
+    title: copy.metadata.components_RouteMetadata_013,
+    description: copy.metadata.components_RouteMetadata_014,
     indexable: true,
   },
   '/tools/schedule-analysis': {
-    title: '排班表分析 | MaaTool',
-    description: '上传干员数据和已有排班表，分析明日方舟基建排班的风险与产出。',
+    title: copy.metadata.components_RouteMetadata_015,
+    description: copy.metadata.components_RouteMetadata_016,
     indexable: true,
   },
   '/tools/depot-value': {
-    title: '仓库价值分析器 | MaaTool',
-    description: '上传 MAA 仓库 JSON，按等价理智估算明日方舟仓库资产并生成分享图。',
+    title: copy.metadata.components_RouteMetadata_017,
+    description: copy.metadata.components_RouteMetadata_018,
     indexable: true,
   },
 }
 
 const PRIVATE_METADATA: Metadata = {
-  title: 'MaaTool 工作台',
-  description: 'MaaTool 工作台。',
+  title: copy.metadata.components_RouteMetadata_019,
+  description: copy.metadata.components_RouteMetadata_020,
   indexable: false,
 }
 

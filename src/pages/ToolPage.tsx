@@ -18,6 +18,8 @@ import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
 import { isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
 import { useToolVisitReporter } from './tool/useToolVisitReporter'
+import { copy } from '../copy/index'
+
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
 
@@ -56,7 +58,7 @@ export default function ToolPage() {
   if (!route) return <Navigate to={fallbackToolPath(location.pathname)} replace />
 
   if (authLoading) {
-    return <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">正在确认登录信息...</div>
+    return <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">{copy.common.pages_ToolPage_001}</div>
   }
 
   if (!user) {
@@ -141,7 +143,7 @@ export default function ToolPage() {
   return (
     <>
       <AnnouncementPopup announcements={popups} />
-      <Suspense fallback={<div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">正在载入排班工具...</div>}>
+      <Suspense fallback={<div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">{copy.common.pages_ToolPage_002}</div>}>
         <OptimizePage
           profileId={activeProfile.id}
           profile={activeProfile}

@@ -1,6 +1,8 @@
 import { useEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import type { UserGameAccount } from '../lib/types'
 import { useSklandBinding, type SklandAccountOption, type SklandImportMode, type SklandLoginState, type SklandPayload, type SklandPreview } from '../hooks/useSklandBinding'
+import { copy } from '../copy/index'
+
 
 export type { SklandPayload } from '../hooks/useSklandBinding'
 
@@ -18,13 +20,13 @@ type SklandBindingDialogProps = {
   onCompleted?: (payload: SklandPayload) => void
 }
 
-const SKLAND_CONSOLE_CODE = `(()=>{const raw=localStorage.getItem('SK_OAUTH_CRED_KEY');let cred=raw;try{const data=JSON.parse(raw||'null');cred=data?.cred||data?.value||raw;}catch{}copy(encodeURIComponent(cred||''));console.log(cred?'已复制到粘贴板':'未找到森空岛凭据');})()`
-const SKLAND_BOOKMARKLET = `javascript:(()=>{const raw=localStorage.getItem("SK_OAUTH_CRED_KEY");if(!raw){alert("未找到森空岛凭据，请先登录森空岛网页。");return;}let cred=raw;try{const data=JSON.parse(raw);cred=data.cred||data.value||raw;}catch{}const text=encodeURIComponent(cred);const done=()=>alert("森空岛凭据已复制，请回到工具页粘贴。");navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(text).then(done).catch(()=>prompt("复制下面的森空岛凭据",text)):prompt("复制下面的森空岛凭据",text);})()`
+const SKLAND_CONSOLE_CODE = copy.workspace.components_SklandBindingDialog_001
+const SKLAND_BOOKMARKLET = copy.workspace.components_SklandBindingDialog_002
 
 const MODE_LABELS: Record<SklandImportMode, string> = {
-  scan: '扫码授权',
-  manual: '粘贴凭据',
-  bookmarklet: '书签脚本',
+  scan: copy.workspace.components_SklandBindingDialog_003,
+  manual: copy.workspace.components_SklandBindingDialog_004,
+  bookmarklet: copy.workspace.components_SklandBindingDialog_005,
 }
 
 export default function SklandBindingDialog({
@@ -80,12 +82,12 @@ export default function SklandBindingDialog({
   const currentStep = stepForStatus(sklandLogin.status)
   const hasError = sklandLogin.status === 'error' || sklandLogin.status === 'account_mismatch' || sklandLogin.status === 'frozen'
   const confirmDisabled = busy || sklandLogin.status !== 'confirm_required' || !sklandLogin.confirmationId
-  const title = isFreePreviewClaim ? '领取免费个人排班' : '森空岛导入'
+  const title = isFreePreviewClaim ? copy.workspace.components_SklandBindingDialog_006 : copy.workspace.components_SklandBindingDialog_007
   const description = isDepot
-    ? '先预览游戏昵称和 UID，确认后才会保存绑定并分析仓库。'
+    ? copy.workspace.components_SklandBindingDialog_008
     : isFreePreviewClaim
-      ? '先确认游戏 UID，确认后才会创建免费档案并导入干员。'
-      : '先预览游戏昵称和 UID，确认后才会保存绑定并导入干员。'
+      ? copy.workspace.components_SklandBindingDialog_009
+      : copy.workspace.components_SklandBindingDialog_010
 
   const handleDialogKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape') {
@@ -128,20 +130,19 @@ export default function SklandBindingDialog({
             <h2 id="skland-binding-title" className="text-lg font-semibold text-ink-primary">{title}</h2>
             <p id="skland-binding-description" className="mt-1 text-sm leading-6 text-ink-secondary">{description}</p>
           </div>
-          <button ref={closeButtonRef} type="button" onClick={close} className="tool-secondary-action shrink-0 px-3 py-2 text-sm" aria-label="关闭森空岛导入">
-            关闭
-          </button>
+          <button ref={closeButtonRef} type="button" onClick={close} className="tool-secondary-action shrink-0 px-3 py-2 text-sm" aria-label={copy.workspace.components_SklandBindingDialog_011}>
+            {copy.workspace.components_SklandBindingDialog_012}</button>
         </div>
 
         <ol className="mt-5 grid gap-2 text-xs font-semibold text-ink-secondary sm:grid-cols-3">
-          {['获取凭据', '预览账号', '确认保存'].map((label, index) => (
+          {[copy.workspace.components_SklandBindingDialog_013, copy.workspace.components_SklandBindingDialog_014, copy.workspace.components_SklandBindingDialog_015].map((label, index) => (
             <li key={label} className={'tool-inset px-3 py-2 ' + (currentStep === index + 1 ? 'border-brand-500 bg-brand-500/10 text-brand-300' : 'text-ink-secondary')}>
               {index + 1}. {label}
             </li>
           ))}
         </ol>
 
-        <div className="mt-5 grid grid-cols-3 gap-2" role="group" aria-label="森空岛导入方式">
+        <div className="mt-5 grid grid-cols-3 gap-2" role="group" aria-label={copy.workspace.components_SklandBindingDialog_016}>
           {(Object.keys(MODE_LABELS) as SklandImportMode[]).map((mode) => (
             <button
               key={mode}
@@ -154,7 +155,7 @@ export default function SklandBindingDialog({
             </button>
           ))}
         </div>
-        <p className="mt-2 text-xs text-ink-muted">推荐使用扫码授权；无法扫码时，可粘贴凭据或使用书签脚本辅助复制。</p>
+        <p className="mt-2 text-xs text-ink-muted">{copy.workspace.components_SklandBindingDialog_017}</p>
 
         <div className="mt-5">
           {sklandLogin.mode === 'scan' && (
@@ -216,27 +217,24 @@ export default function SklandBindingDialog({
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           {hasError && sklandLogin.mode === 'scan' && (
             <button type="button" onClick={startSklandLogin} disabled={busy || (!profile && !canStartWithoutProfile)} className="tool-primary-action">
-              重新生成二维码
-            </button>
+              {copy.workspace.components_SklandBindingDialog_018}</button>
           )}
           {hasError && (
             <button type="button" onClick={() => selectMode('manual')} disabled={busy} className="tool-secondary-action">
-              改用粘贴凭据
-            </button>
+              {copy.workspace.components_SklandBindingDialog_019}</button>
           )}
           {sklandLogin.status === 'waiting' && sklandLogin.scanId && (
             <button type="button" onClick={() => void completeSklandLogin(sklandLogin.scanId!)} disabled={busy} className="tool-secondary-action">
-              立即检查授权
-            </button>
+              {copy.workspace.components_SklandBindingDialog_020}</button>
           )}
           {sklandLogin.status === 'account_selection_required' && (
             <button type="button" onClick={previewSelectedAccount} disabled={busy || !sklandLogin.selectedUid} className="tool-primary-action">
-              {busy ? '正在读取所选账号' : '读取所选账号'}
+              {busy ? copy.workspace.components_SklandBindingDialog_021 : copy.workspace.components_SklandBindingDialog_022}
             </button>
           )}
           {sklandLogin.status === 'confirm_required' && (
             <button type="button" onClick={confirmSklandLogin} disabled={confirmDisabled} className="tool-primary-action">
-              {isDepot ? '确认保存并分析仓库' : '确认保存并导入'}
+              {isDepot ? copy.workspace.components_SklandBindingDialog_023 : copy.workspace.components_SklandBindingDialog_024}
             </button>
           )}
         </div>
@@ -265,19 +263,18 @@ function ScanModePanel({
     <section className="tool-inset p-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-ink-primary">扫码授权</h3>
-          <p className="mt-1 text-sm leading-6 text-ink-secondary">使用森空岛 App 扫码授权。授权后只会进入账号预览，需要再次确认才保存。</p>
+          <h3 className="text-sm font-semibold text-ink-primary">{copy.workspace.components_SklandBindingDialog_025}</h3>
+          <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.workspace.components_SklandBindingDialog_026}</p>
         </div>
         <button type="button" onClick={onStart} disabled={busy || (!profile && !canStartWithoutProfile)} className="tool-primary-action">
-          {waiting ? '重新生成二维码' : '生成扫码二维码'}
+          {waiting ? copy.workspace.components_SklandBindingDialog_027 : copy.workspace.components_SklandBindingDialog_028}
         </button>
       </div>
       {waiting && state.qrDataUrl && (
         <div className="tool-inset mt-4 flex flex-col items-center gap-3 p-4">
-          <img src={state.qrDataUrl} alt="森空岛扫码授权二维码" className="h-[240px] w-[240px] rounded-lg bg-white p-2" />
+          <img src={state.qrDataUrl} alt={copy.workspace.components_SklandBindingDialog_029} className="h-[240px] w-[240px] rounded-lg bg-white p-2" />
           <button type="button" onClick={onCheck} disabled={busy} className="tool-secondary-action">
-            立即检查授权
-          </button>
+            {copy.workspace.components_SklandBindingDialog_030}</button>
         </div>
       )}
     </section>
@@ -296,24 +293,21 @@ function ManualModePanel({
   return (
     <section className="tool-inset space-y-3 p-4">
       <div>
-        <h3 className="text-sm font-semibold text-ink-primary">粘贴凭据</h3>
-        <p className="mt-1 text-sm leading-6 text-ink-secondary">在森空岛网页登录后，复制本地凭据并粘贴到这里。读取后会先展示昵称和 UID。</p>
+        <h3 className="text-sm font-semibold text-ink-primary">{copy.workspace.components_SklandBindingDialog_031}</h3>
+        <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.workspace.components_SklandBindingDialog_032}</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => window.open('https://www.skland.com/index', '_blank', 'noopener,noreferrer')} className="tool-secondary-action">
-          打开森空岛官网
-        </button>
+          {copy.workspace.components_SklandBindingDialog_033}</button>
         <button type="button" onClick={() => void navigator.clipboard?.writeText(SKLAND_CONSOLE_CODE)} className="tool-secondary-action">
-          复制控制台命令
-        </button>
+          {copy.workspace.components_SklandBindingDialog_034}</button>
       </div>
-      <label htmlFor="skland-manual-command" className="block text-xs font-semibold text-ink-muted">控制台命令</label>
+      <label htmlFor="skland-manual-command" className="block text-xs font-semibold text-ink-muted">{copy.workspace.components_SklandBindingDialog_035}</label>
       <textarea id="skland-manual-command" readOnly value={SKLAND_CONSOLE_CODE} rows={3} className="tool-field resize-y font-mono text-xs text-ink-secondary" />
-      <label htmlFor="skland-manual-credential" className="block text-xs font-semibold text-ink-muted">森空岛凭据</label>
-      <textarea id="skland-manual-credential" ref={inputRef} rows={4} className="tool-field resize-y font-mono text-sm" placeholder="粘贴森空岛凭据" />
+      <label htmlFor="skland-manual-credential" className="block text-xs font-semibold text-ink-muted">{copy.workspace.components_SklandBindingDialog_036}</label>
+      <textarea id="skland-manual-credential" ref={inputRef} rows={4} className="tool-field resize-y font-mono text-sm" placeholder={copy.workspace.components_SklandBindingDialog_037} />
       <button type="button" onClick={onPreview} disabled={busy} className="tool-primary-action">
-        读取账号预览
-      </button>
+        {copy.workspace.components_SklandBindingDialog_038}</button>
     </section>
   )
 }
@@ -332,45 +326,41 @@ function BookmarkletModePanel({
   return (
     <section className="tool-inset space-y-3 p-4">
       <div>
-        <h3 className="text-sm font-semibold text-ink-primary">书签脚本</h3>
-        <p className="mt-1 text-sm leading-6 text-ink-secondary">把助手拖到浏览器书签栏，在森空岛网页登录后点击书签复制凭据，再回到这里粘贴预览。</p>
+        <h3 className="text-sm font-semibold text-ink-primary">{copy.workspace.components_SklandBindingDialog_039}</h3>
+        <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.workspace.components_SklandBindingDialog_040}</p>
       </div>
       <div className="grid gap-2 sm:grid-cols-3">
-        <StepBox index="1" label="显示浏览器书签栏" />
-        <StepBox index="2" label="拖动助手到书签栏" />
-        <StepBox index="3" label="登录森空岛后点击书签" />
+        <StepBox index="1" label={copy.workspace.components_SklandBindingDialog_041} />
+        <StepBox index="2" label={copy.workspace.components_SklandBindingDialog_042} />
+        <StepBox index="3" label={copy.workspace.components_SklandBindingDialog_043} />
       </div>
       <div className="tool-inset border-brand-500/30 bg-brand-500/10 px-4 py-5 text-center">
         <a
           href={SKLAND_BOOKMARKLET}
           draggable
-          title="森空岛凭据助手"
+          title={copy.workspace.components_SklandBindingDialog_044}
           onClick={(event) => {
             event.preventDefault()
-            onMessage('请按住这个按钮拖到浏览器书签栏，不要直接点击。')
+            onMessage(copy.workspace.components_SklandBindingDialog_045)
           }}
-          onDragStart={() => onMessage('拖到浏览器书签栏后松开即可安装。')}
+          onDragStart={() => onMessage(copy.workspace.components_SklandBindingDialog_046)}
           className="tool-secondary-action px-6 text-base"
         >
-          森空岛凭据助手
-        </a>
-        <p className="mt-3 text-xs text-ink-muted">如果浏览器禁止拖拽书签，可复制脚本手动新建书签。</p>
+          {copy.workspace.components_SklandBindingDialog_047}</a>
+        <p className="mt-3 text-xs text-ink-muted">{copy.workspace.components_SklandBindingDialog_048}</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => void navigator.clipboard?.writeText(SKLAND_BOOKMARKLET)} className="tool-secondary-action">
-          复制书签脚本
-        </button>
+          {copy.workspace.components_SklandBindingDialog_049}</button>
         <button type="button" onClick={() => window.open('https://www.skland.com/index', '_blank', 'noopener,noreferrer')} className="tool-secondary-action">
-          打开森空岛
-        </button>
+          {copy.workspace.components_SklandBindingDialog_050}</button>
       </div>
-      <label htmlFor="skland-bookmarklet-script" className="block text-xs font-semibold text-ink-muted">书签脚本内容</label>
+      <label htmlFor="skland-bookmarklet-script" className="block text-xs font-semibold text-ink-muted">{copy.workspace.components_SklandBindingDialog_051}</label>
       <textarea id="skland-bookmarklet-script" readOnly value={SKLAND_BOOKMARKLET} rows={4} className="tool-field resize-y font-mono text-xs text-ink-secondary" />
-      <label htmlFor="skland-bookmarklet-credential" className="block text-xs font-semibold text-ink-muted">书签复制出的凭据</label>
-      <textarea id="skland-bookmarklet-credential" ref={inputRef} rows={4} className="tool-field resize-y font-mono text-sm" placeholder="粘贴书签脚本复制出的凭据" />
+      <label htmlFor="skland-bookmarklet-credential" className="block text-xs font-semibold text-ink-muted">{copy.workspace.components_SklandBindingDialog_052}</label>
+      <textarea id="skland-bookmarklet-credential" ref={inputRef} rows={4} className="tool-field resize-y font-mono text-sm" placeholder={copy.workspace.components_SklandBindingDialog_053} />
       <button type="button" onClick={onPreview} disabled={busy} className="tool-primary-action">
-        读取账号预览
-      </button>
+        {copy.workspace.components_SklandBindingDialog_054}</button>
     </section>
   )
 }
@@ -379,15 +369,15 @@ function PreviewPanel({ preview, status, isDepot }: { preview: SklandPreview; st
   const isMismatch = status === 'account_mismatch'
   return (
     <section className="tool-inset mt-5 p-4">
-      <p className="tool-status tool-status--current">仅预览，尚未保存</p>
+      <p className="tool-status tool-status--current">{copy.workspace.components_SklandBindingDialog_055}</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <InfoTile label="昵称" value={preview.nickname} />
+        <InfoTile label={copy.workspace.components_SklandBindingDialog_056} value={preview.nickname} />
         <InfoTile label="UID" value={preview.uid} />
-        <InfoTile label="服务器" value={preview.channel_name} />
-        <InfoTile label={isDepot ? '可读取库存角色' : '可读取干员'} value={`${preview.operator_count} 名`} />
+        <InfoTile label={copy.workspace.components_SklandBindingDialog_057} value={preview.channel_name} />
+        <InfoTile label={isDepot ? copy.workspace.components_SklandBindingDialog_058 : copy.workspace.components_SklandBindingDialog_059} value={`${preview.operator_count}${copy.workspace.components_SklandBindingDialog_060}`} />
       </div>
       <p className={'tool-alert mt-3 ' + (isMismatch ? 'tool-alert--error' : 'tool-alert--warning')} role={isMismatch ? 'alert' : 'status'}>
-        {isMismatch ? '该账号与当前绑定 UID 不一致，没有保存任何变更。请重新登录正确账号。' : '确认后才会保存森空岛绑定；请核对昵称和 UID 后继续。'}
+        {isMismatch ? copy.workspace.components_SklandBindingDialog_061 : copy.workspace.components_SklandBindingDialog_062}
       </p>
     </section>
   )
@@ -406,8 +396,8 @@ function AccountSelectionPanel({
 }) {
   return (
     <fieldset className="tool-inset mt-5 p-4">
-      <legend className="px-1 text-sm font-semibold text-ink-primary">选择要导入的明日方舟账号</legend>
-      <p className="mt-1 text-xs leading-5 text-ink-muted">每个档案只能绑定一个 UID，请主动选择并核对后继续。</p>
+      <legend className="px-1 text-sm font-semibold text-ink-primary">{copy.workspace.components_SklandBindingDialog_063}</legend>
+      <p className="mt-1 text-xs leading-5 text-ink-muted">{copy.workspace.components_SklandBindingDialog_064}</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {accounts.map((account, index) => {
           const selected = selectedUid === account.uid
@@ -429,7 +419,7 @@ function AccountSelectionPanel({
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="break-words text-sm font-semibold text-ink-primary">{account.nickname}</span>
                   {account.is_default && (
-                    <span className="rounded-full border border-brand-500/50 bg-brand-500/10 px-2 py-0.5 text-[11px] font-semibold text-brand-300">默认账号</span>
+                    <span className="rounded-full border border-brand-500/50 bg-brand-500/10 px-2 py-0.5 text-[11px] font-semibold text-brand-300">{copy.workspace.components_SklandBindingDialog_065}</span>
                   )}
                 </span>
                 <span className="mt-1 block break-all text-xs text-ink-secondary">UID {account.uid}</span>

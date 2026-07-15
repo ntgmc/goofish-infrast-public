@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import type { AuthSuccessResponse } from '../lib/types'
 import { ApiError, apiJson } from '../lib/api-client'
+import { copy } from '../copy/index'
+
 
 type AuthMode = 'login' | 'register' | 'forgot'
 type FieldErrors = Record<string, string>
@@ -50,9 +52,9 @@ export default function AuthForm({
         const data = await apiJson<{ message?: string }>('/api/auth/forgot-password', {
           method: 'POST',
           json: { email },
-          fallbackMessage: '发送重置邮件失败',
+          fallbackMessage: copy.auth.components_AuthForm_001,
         })
-        setNotice(data.message || '如果该邮箱已注册，我们会发送重置密码邮件。')
+        setNotice(data.message || copy.auth.components_AuthForm_002)
         return
       }
 
@@ -64,9 +66,9 @@ export default function AuthForm({
           cdk: allowCdk ? cdk.trim() || undefined : undefined,
           invite_code: inviteCode.trim() || undefined,
         },
-        fallbackMessage: mode === 'login' ? '登录失败' : '注册失败',
+        fallbackMessage: mode === 'login' ? copy.auth.components_AuthForm_003 : copy.auth.components_AuthForm_004,
       })
-      if (!data.user) throw new Error(mode === 'login' ? '登录失败' : '注册失败')
+      if (!data.user) throw new Error(mode === 'login' ? copy.auth.components_AuthForm_005 : copy.auth.components_AuthForm_006)
       onAuthenticated(data)
     } catch (caught) {
       if (mode === 'register' && caught instanceof ApiError && isInviteCodeError(caught.data)) {
@@ -89,18 +91,18 @@ export default function AuthForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'tool-panel space-y-5 p-6 sm:p-8'}>
-      <div className="tool-inset grid grid-cols-2 p-1" role="group" aria-label="登录方式">
-        <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>登录</button>
-        <button type="button" aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>注册</button>
+      <div className="tool-inset grid grid-cols-2 p-1" role="group" aria-label={copy.auth.components_AuthForm_007}>
+        <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_008}</button>
+        <button type="button" aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_009}</button>
       </div>
 
       {intro && <p className="text-sm leading-6 text-ink-secondary">{intro}</p>}
       {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
       {notice && <div className="tool-alert tool-alert--success" role="status" aria-live="polite">{notice}</div>}
-      {mode === 'forgot' && <h2 className="text-lg font-semibold text-ink-primary">重置密码</h2>}
+      {mode === 'forgot' && <h2 className="text-lg font-semibold text-ink-primary">{copy.auth.components_AuthForm_010}</h2>}
 
       <label className="block">
-        <span className="mb-2 block text-sm font-medium text-ink-secondary">邮箱</span>
+        <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.auth.components_AuthForm_011}</span>
         <input
           id={compact ? 'depot-auth-email' : 'auth-email'}
           type="email"
@@ -119,7 +121,7 @@ export default function AuthForm({
 
       {mode !== 'forgot' && (
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-ink-secondary">密码</span>
+          <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.auth.components_AuthForm_012}</span>
           <input
             id={compact ? 'depot-auth-password' : 'auth-password'}
             type="password"
@@ -139,14 +141,14 @@ export default function AuthForm({
 
       {allowCdk && mode === 'register' && (
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK（可选）</span>
-          <input type="text" value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="tool-field min-h-11 font-mono uppercase tracking-wide" placeholder="可注册后再兑换" />
+          <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.auth.components_AuthForm_013}</span>
+          <input type="text" value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="tool-field min-h-11 font-mono uppercase tracking-wide" placeholder={copy.auth.components_AuthForm_014} />
         </label>
       )}
 
       {mode === 'register' && (
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-ink-secondary">邀请码（可选）</span>
+          <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.auth.components_AuthForm_015}</span>
           <input
             id={compact ? 'depot-auth-invite-code' : 'auth-invite-code'}
             type="text"
@@ -158,7 +160,7 @@ export default function AuthForm({
             }}
             onFocus={() => clearFieldError('inviteCode')}
             className={`${inputClassName(Boolean(fieldErrors.inviteCode))} font-mono uppercase tracking-wide`}
-            placeholder="10 位邀请码"
+            placeholder={copy.auth.components_AuthForm_016}
             aria-invalid={Boolean(fieldErrors.inviteCode)}
             aria-describedby={fieldErrors.inviteCode ? 'auth-invite-code-error' : undefined}
           />
@@ -168,17 +170,15 @@ export default function AuthForm({
 
       {mode === 'login' && (
         <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
-          忘记密码？
-        </button>
+          {copy.auth.components_AuthForm_017}</button>
       )}
       {mode === 'forgot' && (
         <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null); setFieldErrors({}) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
-          返回登录
-        </button>
+          {copy.auth.components_AuthForm_018}</button>
       )}
 
       <button type="submit" disabled={loading} className={`min-h-12 ${submitClassName ?? 'tool-primary-action w-full px-6 py-3'}`}>
-        {loading ? '处理中...' : mode === 'login' ? '登录' : mode === 'register' ? '创建账号' : '发送重置邮件'}
+        {loading ? copy.auth.components_AuthForm_019 : mode === 'login' ? copy.auth.components_AuthForm_020 : mode === 'register' ? copy.auth.components_AuthForm_021 : copy.auth.components_AuthForm_022}
       </button>
     </form>
   )
@@ -186,21 +186,21 @@ export default function AuthForm({
 
 function validateEmailInput(value: string): string | null {
   const email = value.trim()
-  if (!email) return '请输入邮箱'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return '请输入正确的邮箱地址'
+  if (!email) return copy.auth.components_AuthForm_023
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return copy.auth.components_AuthForm_024
   return null
 }
 
 function validatePasswordInput(value: string): string | null {
-  if (!value) return '请输入密码'
-  if (value.length < 8) return '密码至少需要 8 位'
+  if (!value) return copy.auth.components_AuthForm_025
+  if (value.length < 8) return copy.auth.components_AuthForm_026
   return null
 }
 
 function validateInviteCodeInput(value: string): string | null {
   const code = value.trim().toUpperCase()
   if (!code) return null
-  return /^[0-9A-HJKMNP-TV-Z]{10}$/.test(code) ? null : '请输入有效的 10 位邀请码'
+  return /^[0-9A-HJKMNP-TV-Z]{10}$/.test(code) ? null : copy.auth.components_AuthForm_027
 }
 
 function isInviteCodeError(data: unknown): boolean {

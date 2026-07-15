@@ -20,6 +20,8 @@ import { useLicenseSync } from './useLicenseSync'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
 import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, parseOperatorsFile } from './workflow-utils'
 import { usePriorityCoupon as usePriorityCouponState } from './usePriorityCoupon'
+import { copy } from '../../../copy/index'
+
 
 export interface Props {
   profileId: string;
@@ -206,9 +208,9 @@ export function useOptimizeWorkflow(props: Props) {
 
   const reorderCheckDisabledReason = useMemo(() => {
       if (!isRestrictedPreview) return null
-      if (!profile.skland_binding) return '请先绑定森空岛后再检测。'
-      if (!latestWorkspaceResult) return '请先生成一次个人排班作为检测基线。'
-      if (licenseSyncing) return '干员数据同步中，稍后再检测。'
+      if (!profile.skland_binding) return copy.optimize.pages_tool_optimize_useOptimizeWorkflow_001
+      if (!latestWorkspaceResult) return copy.optimize.pages_tool_optimize_useOptimizeWorkflow_002
+      if (licenseSyncing) return copy.optimize.pages_tool_optimize_useOptimizeWorkflow_003
       if (configValidationMessage) return configValidationMessage
       return null
     }, [configValidationMessage, isRestrictedPreview, latestWorkspaceResult, licenseSyncing, profile.skland_binding])
@@ -317,7 +319,7 @@ export function useOptimizeWorkflow(props: Props) {
       try {
         const nextOperators = parseOperatorsFile(await file.text())
         const confirmed = window.confirm(
-  `确认替换当前授权内的干员数据？\n\n新文件识别到 ${nextOperators.length} 名干员。继续后会清空当前练度调整。单账号终身卡每 7 天最多更新 2 次，并会校验账号与设备绑定。`
+  `${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_004}${nextOperators.length}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_005}`
         )
         if (!confirmed) {
           if (operatorFileRef.current) {
@@ -337,16 +339,16 @@ export function useOptimizeWorkflow(props: Props) {
               operators: nextOperators,
               activation_token: getActivationTokenForLicense(license),
             },
-            fallbackMessage: '干员数据更新失败',
+            fallbackMessage: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_006,
           })
           if (!data.license) {
-            throw new Error('干员数据更新失败')
+            throw new Error(copy.optimize.pages_tool_optimize_useOptimizeWorkflow_007)
           }
           setLicense(data.license)
         }
         setEliteOverrides({})
         clearGeneratedResult()
-        setOperatorUploadStatus(`已更新授权内的干员数据，共 ${nextOperators.length} 名。`)
+        setOperatorUploadStatus(`${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_008}${nextOperators.length}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_009}`)
         if (operatorFileRef.current) {
           operatorFileRef.current.value = ''
         }
@@ -379,7 +381,7 @@ export function useOptimizeWorkflow(props: Props) {
       Object.assign(draft, JSON.parse(JSON.stringify(scenarioConfig)) as LicenseConfig)
     })
     configToastIdRef.current += 1
-    setConfigToast({ id: configToastIdRef.current, message: '已应用实验场景，请确认配置后再生成排班。' })
+    setConfigToast({ id: configToastIdRef.current, message: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_010 })
     setSection('config')
   }, [updateConfig])
 
@@ -459,7 +461,7 @@ export function useOptimizeWorkflow(props: Props) {
             activeJob,
             active.storageKey,
             active.mode,
-            active.mode === 'apply' ? '优化失败' : '优化请求失败',
+            active.mode === 'apply' ? copy.optimize.pages_tool_optimize_useOptimizeWorkflow_011 : copy.optimize.pages_tool_optimize_useOptimizeWorkflow_012,
             () => cancelled,
           )
           if (cancelled) return
@@ -527,7 +529,7 @@ export function useOptimizeWorkflow(props: Props) {
         ...(includeCurrent && { includeCurrent: true }),
         ...(useCoupon && { use_priority_coupon: true }),
       }
-      return await runOptimizeJob(payload, 'generate', '优化请求失败')
+      return await runOptimizeJob(payload, 'generate', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_013)
     }, [activeConfig, license, mergedOperators, profileId, runOptimizeJob])
 
   const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
@@ -538,7 +540,7 @@ export function useOptimizeWorkflow(props: Props) {
         config: activeConfig,
         upgradeTaskPayload: taskPayload,
       }
-      return await runOptimizeJob(payload, 'generate', '练度建议请求失败。', true)
+      return await runOptimizeJob(payload, 'generate', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_014, true)
     }, [activeConfig, license, mergedOperators, profileId, runOptimizeJob])
 
   const handleReorderCheck = useCallback(async () => {
@@ -556,7 +558,7 @@ export function useOptimizeWorkflow(props: Props) {
           profileId,
           config: activeConfig,
           baselineHistoryId: latestWorkspaceResult.id,
-        }, '重排检测失败')
+        }, copy.optimize.pages_tool_optimize_useOptimizeWorkflow_015)
         setReorderCheckResult(data)
         if (data.free_schedule_entitlement) {
           setFreeScheduleEntitlementOverride(data.free_schedule_entitlement)
@@ -579,7 +581,7 @@ export function useOptimizeWorkflow(props: Props) {
             profile_id: profileId,
             result_history_id: latestWorkspaceResult.id,
           },
-          fallbackMessage: '确认免费排班失败',
+          fallbackMessage: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_016,
         })
         setFreeScheduleEntitlementOverride(data.workspace?.free_schedule_entitlement ?? null)
       } catch (error) {
@@ -635,7 +637,7 @@ export function useOptimizeWorkflow(props: Props) {
                     current_elite: s.current,
                     target_elite: s.target,
                     gain: Math.round(s.gain),
-                    desc: `${s.name}: 精${s.current} → 精${s.target}`,
+                    desc: `${s.name}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_017}${s.current}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_018}${s.target}`,
                     training_cost: s.training_cost,
                     rooms: s.rooms,
                     specialType: s.specialType,
@@ -651,7 +653,7 @@ export function useOptimizeWorkflow(props: Props) {
                   type: 'bundle' as const,
                   id: `bundle-${idx}`,
                   gain: Math.round(s.gain),
-                  desc: s.ops?.map(o => `${o.name}: 精${o.current}→精${o.target}`).join(', ') || '',
+                  desc: s.ops?.map(o => `${o.name}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_019}${o.current}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_020}${o.target}`).join(', ') || '',
                   ops: s.ops?.map(o => ({
                     id: o.id || o.name,
                     name: o.name,
@@ -704,7 +706,7 @@ export function useOptimizeWorkflow(props: Props) {
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
       if (loading || optimizeInFlightRef.current) return
       if (!resultIsCurrent) {
-        setInlineError({ scope: 'apply', message: '基建配置已修改，请先重新计算排班后再应用练度建议。' })
+        setInlineError({ scope: 'apply', message: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_021 })
         return
       }
       optimizeInFlightRef.current = true
@@ -737,7 +739,7 @@ export function useOptimizeWorkflow(props: Props) {
           ignoreElite: false,
           historySource: 'applied_suggestions',
         }
-        const data = await runOptimizeJob(applyPayload, 'apply', '优化失败')
+        const data = await runOptimizeJob(applyPayload, 'apply', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_022)
         completed = true
         setProgress((current) => ({
           ...current,
@@ -780,7 +782,7 @@ export function useOptimizeWorkflow(props: Props) {
         const data = await apiJson<AuthSuccessResponse>('/api/user/profiles/redeem', {
           method: 'POST',
           json: { profile_id: profileId, cdk: upgradeCdk },
-          fallbackMessage: '解锁失败',
+          fallbackMessage: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_023,
         })
         setUpgradeCdk('')
         onProfileUpgraded(data)

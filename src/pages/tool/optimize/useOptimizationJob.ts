@@ -5,6 +5,8 @@ import type { OptimizeJobAccepted, OptimizeJobStatusResponse, OptimizeResult } f
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { buildOptimizeJobStorageKey, clearActiveOptimizeJob, fetchOptimizeJobStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, mergeOptimizeJobProgress, OptimizeJobPollCancelledError, prepareOptimizeContinuationProgress, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
 import { submitOptimizationJob } from './optimization-api'
+import { copy } from '../../../copy/index'
+
 
 interface UseOptimizationJobOptions {
   profileId: string;
@@ -46,7 +48,7 @@ export function useOptimizationJob({
         : currentProgress
       const nextProgress = {
         ...mergeOptimizeJobProgress(progressSeed, next, progressMode, Date.now()),
-        ...(isContinuationStart && { estimateAdjustment: '排班已完成，正在整理练度建议' }),
+        ...(isContinuationStart && { estimateAdjustment: copy.optimize.pages_tool_optimize_useOptimizationJob_001 }),
         connectionStatus: connection?.connectionStatus ?? 'connected',
         consecutivePollFailures: connection?.consecutivePollFailures ?? 0,
         lastSuccessfulSyncAt: connection?.connectionStatus === 'reconnecting'
@@ -89,13 +91,13 @@ export function useOptimizationJob({
       latestJob = status
       consecutivePollFailures = 0
       if (status.status === 'succeeded') {
-        if (!status.result) throw new Error('优化任务缺少结果。')
+        if (!status.result) throw new Error(copy.optimize.pages_tool_optimize_useOptimizationJob_002)
         clearActiveOptimizeJob(storageKey)
         return status.result
       }
       if (status.status === 'failed') {
         clearActiveOptimizeJob(storageKey)
-        throw new Error(status.error || '优化任务失败，请重试。')
+        throw new Error(status.error || copy.optimize.pages_tool_optimize_useOptimizationJob_003)
       }
       updateProgress(status)
       pollAfterMs = status.poll_after_ms || (status.status === 'queued' ? 1200 : 900)

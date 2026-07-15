@@ -8,6 +8,8 @@ import {
 } from '../lib/config'
 import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
+import { copy } from '../copy/index'
+
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
 
@@ -15,36 +17,36 @@ export const TRADING_PRODUCTS = ['LMD', 'Orundum']
 export const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
 
 export const PRODUCT_LABELS: Record<string, string> = {
-  LMD: '龙门币',
-  Orundum: '合成玉',
-  'Pure Gold': '赤金',
-  'Battle Record': '作战记录',
-  'Originium Shard': '源石碎片',
+  LMD: copy.common.components_ConfigEditor_001,
+  Orundum: copy.common.components_ConfigEditor_002,
+  'Pure Gold': copy.common.components_ConfigEditor_003,
+  'Battle Record': copy.common.components_ConfigEditor_004,
+  'Originium Shard': copy.common.components_ConfigEditor_005,
 }
 
 export const SCHEDULE_MODE_LABELS: Record<string, string> = {
-  maa: 'MAA 排班表',
-  rotation: '游戏内轮换',
-  variable: 'MAA 自动非固定',
+  maa: copy.common.components_ConfigEditor_006,
+  rotation: copy.common.components_ConfigEditor_007,
+  variable: copy.common.components_ConfigEditor_008,
 }
 
 export const DORMITORY_RULE_LABELS: Record<string, string> = {
-  fixed: '排班表写死',
-  maa_autofill: 'MAA 自动填满',
+  fixed: copy.common.components_ConfigEditor_009,
+  maa_autofill: copy.common.components_ConfigEditor_010,
 }
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
-  recommended: '单次重置卡',
-  growth: '练度提升卡',
-  advanced: '单账号终身卡',
-  ultimate: 'Admin卡',
-  admin: 'Admin卡',
+  recommended: copy.common.components_ConfigEditor_011,
+  growth: copy.common.components_ConfigEditor_012,
+  advanced: copy.common.components_ConfigEditor_013,
+  ultimate: copy.common.components_ConfigEditor_014,
+  admin: copy.common.components_ConfigEditor_015,
 }
 
 export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   '243': {
     layout: '2-4-3',
-    desc: '243 均衡流 (2赤金/2经验)',
+    desc: copy.common.components_ConfigEditor_016,
     schedule_mode: 'maa',
     dormitory_rule: 'fixed',
     trading_stations_count: 2,
@@ -58,7 +60,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   },
   '243-1': {
     layout: '2-4-3',
-    desc: '243 搓玉 (2赤金/2源石)',
+    desc: copy.common.components_ConfigEditor_017,
     schedule_mode: 'maa',
     dormitory_rule: 'fixed',
     trading_stations_count: 2,
@@ -72,7 +74,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   },
   '333': {
     layout: '3-3-3',
-    desc: '333 搓玉流',
+    desc: copy.common.components_ConfigEditor_018,
     schedule_mode: 'maa',
     dormitory_rule: 'fixed',
     trading_stations_count: 3,
@@ -88,7 +90,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
 
 function applyCounts(config: LicenseConfig): LicenseConfig {
   config.layout = `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`
-  config.desc = `${config.layout} 自定义配置`
+  config.desc = `${config.layout}${copy.common.components_ConfigEditor_019}`
   return config
 }
 
@@ -168,7 +170,7 @@ export default function ConfigEditor({
   validation,
   onUpdate,
   onReset,
-  resetLabel = '恢复授权配置',
+  resetLabel = copy.common.components_ConfigEditor_020,
   note,
   embedded = false,
   hideHeader = false,
@@ -262,26 +264,25 @@ export default function ConfigEditor({
       <div className="flex flex-col gap-4 border-b border-surface-3/60 pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold text-ink-primary">基建配置</h2>
+            <h2 className="text-lg font-semibold text-ink-primary">{copy.common.components_ConfigEditor_021}</h2>
             {changed && (
               <span className="tool-status tool-status--warning">
-                已修改
-              </span>
+                {copy.common.components_ConfigEditor_022}</span>
             )}
           </div>
           <p className="mt-1 text-sm text-ink-secondary">
             {note ?? (canEdit
-              ? '修改配置后重新生成，保存进度文件会保留这次配置。'
+              ? copy.common.components_ConfigEditor_023
               : autoInventoryOnly
-                ? `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，可通过中间产物库存自动调整推荐配置，并可修改排班模式与宿舍规则。`
-                : `当前为 ${permission ? PERMISSION_LABELS[permission] : '练度提升卡'} 权限，可修改排班模式与宿舍规则；其他配置按当前套餐固定。`)}
+                ? `${copy.common.components_ConfigEditor_024}${permission ? PERMISSION_LABELS[permission] : copy.common.components_ConfigEditor_026}${copy.common.components_ConfigEditor_025}`
+                : `${copy.common.components_ConfigEditor_027}${permission ? PERMISSION_LABELS[permission] : copy.common.components_ConfigEditor_029}${copy.common.components_ConfigEditor_028}`)}
           </p>
         </div>
           {!hidePresetActions && (canEdit || (canSelectPreset && !autoInventoryOnly)) && (
           <div className="flex flex-wrap gap-2">
-            <PresetButton label="243 均衡" onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
-            <PresetButton label="243 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
-            <PresetButton label="333 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
+            <PresetButton label={copy.common.components_ConfigEditor_030} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
+            <PresetButton label={copy.common.components_ConfigEditor_031} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
+            <PresetButton label={copy.common.components_ConfigEditor_032} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
             {onReset && (
               <button
                 type="button"
@@ -300,21 +301,20 @@ export default function ConfigEditor({
       {autoInventoryOnly ? (
         <div className="pt-5">
           <div className="tool-inset p-4">
-            <h3 className="font-semibold text-ink-primary">按库存微调产物</h3>
+            <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_033}</h3>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
-              先选择 243 或 333 预设；库存充足时保留原产物消耗，库存较少时只调整一个制造站产物。
-            </p>
+              {copy.common.components_ConfigEditor_034}</p>
             {!hidePresetActions && canSelectPreset && (
               <div className="mt-4 flex flex-wrap gap-2">
-                <PresetButton label="243 均衡" onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
-                <PresetButton label="243 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
-                <PresetButton label="333 搓玉" onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
+                <PresetButton label={copy.common.components_ConfigEditor_035} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
+                <PresetButton label={copy.common.components_ConfigEditor_036} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
+                <PresetButton label={copy.common.components_ConfigEditor_037} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
               </div>
             )}
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-2 text-xs font-medium text-ink-muted">排班模式</p>
-                <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label="排班模式">
+                <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_038}</p>
+                <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_039}>
                   {(['maa', 'rotation'] as const).map((mode) => (
                     <button
                       key={mode}
@@ -336,8 +336,8 @@ export default function ConfigEditor({
                 </div>
               </div>
               <div>
-                <p className="mb-2 text-xs font-medium text-ink-muted">宿舍规则</p>
-                <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label="宿舍规则">
+                <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_040}</p>
+                <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_041}>
                   {(['fixed', 'maa_autofill'] as const).map((rule) => (
                     <button
                       key={rule}
@@ -374,20 +374,20 @@ export default function ConfigEditor({
       <div className="grid gap-5 pt-5 lg:grid-cols-[1fr_1fr_0.9fr]">
         <div className="tool-inset bg-surface-2/60 p-4">
           <div className="mb-4">
-            <h3 className="font-semibold text-ink-primary">房间结构</h3>
-            <p className="mt-1 text-xs text-ink-muted">当前: {config.layout}</p>
+            <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_042}</h3>
+            <p className="mt-1 text-xs text-ink-muted">{copy.common.components_ConfigEditor_043}{config.layout}</p>
           </div>
           {canEdit ? (
             <div className="grid grid-cols-2 gap-3">
               <CounterField
-                label="贸易站"
+                label={copy.common.components_ConfigEditor_044}
                 value={config.trading_stations_count}
                 min={1}
                 max={5}
                 onChange={(value) => setStationCounts(value, 6 - value)}
               />
               <CounterField
-                label="制造站"
+                label={copy.common.components_ConfigEditor_045}
                 value={config.manufacturing_stations_count}
                 min={1}
                 max={5}
@@ -396,24 +396,24 @@ export default function ConfigEditor({
             </div>
           ) : (
             <dl className="grid grid-cols-2 gap-3 text-sm">
-              <ReadOnlyMetric label="贸易站" value={config.trading_stations_count} />
-              <ReadOnlyMetric label="制造站" value={config.manufacturing_stations_count} />
+              <ReadOnlyMetric label={copy.common.components_ConfigEditor_046} value={config.trading_stations_count} />
+              <ReadOnlyMetric label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
             </dl>
           )}
         </div>
 
         <div className="tool-inset bg-surface-2/60 p-4">
-          <h3 className="font-semibold text-ink-primary">产物数量</h3>
+          <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_048}</h3>
           <div className="mt-4 space-y-4">
             <ProductGroupEditor
-              label="贸易"
+              label={copy.common.components_ConfigEditor_049}
               products={tradingProducts}
               counts={config.product_requirements.trading_stations}
               canEdit={canEdit}
               onChange={(product, value) => setProductCount('trading_stations', product, value)}
             />
             <ProductGroupEditor
-              label="制造"
+              label={copy.common.components_ConfigEditor_050}
               products={manufacturingProducts}
               counts={config.product_requirements.manufacturing_stations}
               canEdit={canEdit}
@@ -429,19 +429,18 @@ export default function ConfigEditor({
         </div>
 
         <div className="tool-inset bg-surface-2/60 p-4">
-            <h3 className="font-semibold text-ink-primary">特殊策略</h3>
+            <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_051}</h3>
             <div className="mt-4 space-y-4">
               {showOrundumPlanning && (
                 <div className="tool-inset px-3 py-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-ink-primary">搓玉预算</p>
+                  <p className="text-sm font-medium text-ink-primary">{copy.common.components_ConfigEditor_052}</p>
                   <p className="mt-1 text-xs leading-5 text-ink-muted">
-                    默认每日 {BASE_DAILY_SANITY_BUDGET} 理智；月卡额外 +{MONTHLY_CARD_DAILY_SANITY_BONUS} 理智，仅用于合成玉经济口径。
-                  </p>
+                    {copy.common.components_ConfigEditor_053}{BASE_DAILY_SANITY_BUDGET} {copy.common.components_ConfigEditor_054}{MONTHLY_CARD_DAILY_SANITY_BONUS} {copy.common.components_ConfigEditor_055}</p>
                 </div>
                 <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary sm:min-w-36">
-                  <span>月卡</span>
+                  <span>{copy.common.components_ConfigEditor_056}</span>
                   <input
                     type="checkbox"
                     checked={orundumPlanning.monthly_card}
@@ -452,7 +451,7 @@ export default function ConfigEditor({
                 </label>
               </div>
               <label className="mt-3 flex items-center justify-between gap-3 text-sm text-ink-secondary">
-                <span>每日固源岩理智预算</span>
+                <span>{copy.common.components_ConfigEditor_057}</span>
                 <input
                   type="number"
                   min={0}
@@ -464,13 +463,12 @@ export default function ConfigEditor({
                 />
               </label>
               <p className="mt-2 text-xs leading-5 text-ink-muted">
-                  当前长期预算 {orundumPlanning.total_daily_sanity_budget} 理智/日，用于判断搓玉产能、库存透支和机会成本。
-                </p>
+                  {copy.common.components_ConfigEditor_058}{orundumPlanning.total_daily_sanity_budget} {copy.common.components_ConfigEditor_059}</p>
                 </div>
               )}
               <div>
-              <p className="mb-2 text-xs font-medium text-ink-muted">排班模式</p>
-              <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label="排班模式">
+              <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_060}</p>
+              <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_061}>
                 {(['maa', 'rotation'] as const).map((mode) => (
                   <button
                     key={mode}
@@ -492,8 +490,7 @@ export default function ConfigEditor({
                 ))}
               </div>
               <p className="mt-2 text-xs leading-5 text-ink-muted">
-                游戏内轮换会生成两个设施预设队列，按游戏内“队列轮换/快速切换”使用；不会生成 MAA 排班 JSON。
-              </p>
+                {copy.common.components_ConfigEditor_062}</p>
             </div>
             {!rotationMode && (
               <ShiftHoursEditor
@@ -512,8 +509,8 @@ export default function ConfigEditor({
               />
             )}
             <div>
-              <p className="mb-2 text-xs font-medium text-ink-muted">宿舍规则</p>
-              <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label="宿舍规则">
+              <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_063}</p>
+              <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_064}>
                 {(['fixed', 'maa_autofill'] as const).map((rule) => (
                   <button
                     key={rule}
@@ -536,14 +533,14 @@ export default function ConfigEditor({
               </div>
               <p className="mt-2 text-xs leading-5 text-ink-muted">
                 {rotationMode
-                  ? '游戏内轮换不生成 MAA 排班 JSON，宿舍规则不参与导出。'
+                  ? copy.common.components_ConfigEditor_065
                   : normalizeDormitoryRule(config.dormitory_rule) === 'maa_autofill'
-                    ? '导出的 MAA JSON 不写死宿舍干员，宿舍由 MAA 自动填满；心情仍按自动填满估算。'
-                    : '导出的 MAA JSON 会固定宿舍干员，和当前行为一致。'}
+                    ? copy.common.components_ConfigEditor_066
+                    : copy.common.components_ConfigEditor_067}
               </p>
             </div>
           <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-            <span>菲亚梅塔</span>
+            <span>{copy.common.components_ConfigEditor_068}</span>
               <input
                 type="checkbox"
                 checked={!rotationMode && (config.Fiammetta?.enable ?? false)}
@@ -557,15 +554,13 @@ export default function ConfigEditor({
             </label>
             {rotationMode ? (
               <p className="tool-inset px-3 py-2 text-xs leading-5 text-ink-muted">
-                游戏内轮换按两班生成，菲亚梅塔不会参与计算。
-              </p>
+                {copy.common.components_ConfigEditor_069}</p>
             ) : config.Fiammetta?.enable && (
               <p className="tool-alert tool-alert--warning px-3 py-2 text-xs leading-5">
-                菲亚梅塔按固定 8-8-8 换班节奏计算目标。
-              </p>
+                {copy.common.components_ConfigEditor_070}</p>
             )}
             <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-              <span>无人机</span>
+              <span>{copy.common.components_ConfigEditor_071}</span>
               <input
                 type="checkbox"
                   checked={!rotationMode && (config.drones?.enable ?? false)}
@@ -582,7 +577,7 @@ export default function ConfigEditor({
               />
             </label>
             <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-              <span>无人机自动配置</span>
+              <span>{copy.common.components_ConfigEditor_072}</span>
               <input
                 type="checkbox"
                   checked={!rotationMode && (config.drones?.auto ?? false)}
@@ -599,8 +594,7 @@ export default function ConfigEditor({
             </label>
             <div>
               <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-order">
-                无人机顺序
-              </label>
+                {copy.common.components_ConfigEditor_073}</label>
               <select
                 id="drone-order"
                 value={config.drones?.order ?? 'pre'}
@@ -614,14 +608,13 @@ export default function ConfigEditor({
                 })}
                 className="tool-field disabled:text-ink-muted"
               >
-                <option value="pre">换班前</option>
-                <option value="post">换班后</option>
+                <option value="pre">{copy.common.components_ConfigEditor_074}</option>
+                <option value="post">{copy.common.components_ConfigEditor_075}</option>
               </select>
             </div>
             <div>
               <label className="mb-2 block text-xs font-medium text-ink-muted" htmlFor="drone-targets">
-                加速目标
-              </label>
+                {copy.common.components_ConfigEditor_076}</label>
                 <DroneTargetsInput
                   id="drone-targets"
                   value={droneTargets}
@@ -719,17 +712,17 @@ function IntermediateInventoryEditor({
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-medium text-ink-muted">中间产物库存</p>
+      <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_077}</p>
       <div className="space-y-2">
         <IntermediateInventoryField
-          label="源石碎片"
+          label={copy.common.components_ConfigEditor_078}
           product="Originium Shard"
           value={inventory['Originium Shard']}
           canEdit={canEdit}
           onChange={onChange}
         />
         <IntermediateInventoryField
-          label="赤金"
+          label={copy.common.components_ConfigEditor_079}
           product="Pure Gold"
           value={inventory['Pure Gold']}
           canEdit={canEdit}
@@ -737,7 +730,7 @@ function IntermediateInventoryEditor({
         />
         {showOrirock && (
           <IntermediateInventoryField
-            label="固源岩"
+            label={copy.common.components_ConfigEditor_080}
             product="Orirock Cube"
             value={inventory['Orirock Cube']}
             canEdit={canEdit}
@@ -831,7 +824,7 @@ function ShiftHoursEditor({
     if (!canEdit) return
     const parsed = parseShiftHours(draftValue)
     if (!parsed || !isValidShiftHours(parsed)) {
-      setError('请输入 1–6 个正数，并确保总计为 24 小时。')
+      setError(copy.common.components_ConfigEditor_081)
       return
     }
     setError(null)
@@ -844,7 +837,7 @@ function ShiftHoursEditor({
 
   return (
     <div>
-      <label htmlFor="config-shift-hours" className="mb-2 block text-xs font-medium text-ink-muted">MAA 换班间隔</label>
+      <label htmlFor="config-shift-hours" className="mb-2 block text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_082}</label>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
           id="config-shift-hours"
@@ -866,12 +859,11 @@ function ShiftHoursEditor({
             onClick={commitDraft}
             className="tool-secondary-action"
           >
-            应用间隔
-          </button>
+            {copy.common.components_ConfigEditor_083}</button>
         )}
       </div>
       <p id="config-shift-hours-help" role={error ? 'alert' : undefined} className={`mt-2 text-xs leading-5 ${error ? 'text-error' : 'text-ink-muted'}`}>
-        {error ?? '使用短横线或逗号分隔，例如 12-6-6；最多 6 班，总计 24 小时。'}
+        {error ?? copy.common.components_ConfigEditor_084}
       </p>
     </div>
   )
@@ -914,7 +906,7 @@ function DroneTargetsInput({
           event.currentTarget.blur()
         }
       }}
-      placeholder="龙门币，赤金，龙门币"
+      placeholder={copy.common.components_ConfigEditor_085}
       className="tool-field placeholder:text-ink-muted disabled:text-ink-muted"
     />
   )

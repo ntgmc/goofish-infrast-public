@@ -8,6 +8,8 @@ import type {
 } from '../../../../lib/optimization-contracts'
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from '../../../../lib/scenario-comparison'
 import type { LicenseConfig, LicenseOperator } from '../../../../lib/types'
+import { copy } from '../../../../copy/index'
+
 
 const DEFAULT_FACTORS: ScenarioComparisonFactors = {
   layouts: [{
@@ -61,7 +63,7 @@ export function useScenarioComparison({
       try {
         const snapshot = await apiJson<ScenarioComparisonJobSnapshot>(
           `/api/optimization/jobs/${encodeURIComponent(jobId)}`,
-          { fallbackMessage: '同步场景对比任务失败' },
+          { fallbackMessage: copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_001 },
         )
         if (pollRunRef.current !== runId) return
         failures = 0
@@ -82,7 +84,7 @@ export function useScenarioComparison({
       } catch (caught) {
         failures += 1
         if (failures >= 6) {
-          setError(caught instanceof Error ? caught.message : '同步场景对比任务失败')
+          setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_002)
           setLoading(false)
           return
         }
@@ -112,7 +114,7 @@ export function useScenarioComparison({
         method: 'POST',
         headers: { 'Idempotency-Key': crypto.randomUUID() },
         json: request,
-        fallbackMessage: '提交场景对比任务失败',
+        fallbackMessage: copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_003,
       })
       const nextJob = response.job
       setJob(nextJob)
@@ -120,7 +122,7 @@ export function useScenarioComparison({
       pollRunRef.current += 1
       await pollJob(nextJob.id, pollRunRef.current, factors)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '提交场景对比任务失败')
+      setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_004)
       setLoading(false)
       writeSession(profileId, { factors })
     }

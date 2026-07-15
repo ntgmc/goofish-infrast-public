@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ScenarioComparisonPoint } from '../../../../lib/scenario-comparison'
+import { copy, CURRENT_LOCALE } from '../../../../copy/index'
+
 
 const WIDTH = 720
 const HEIGHT = 320
@@ -24,8 +26,8 @@ export default function ScenarioParetoChart({
   const yMax = maxOutput + outputPadding
   const frontier = successful.filter((point) => point.isFrontier).sort((a, b) => a.operationsPerDay - b.operationsPerDay)
   const summary = frontier.length > 0
-    ? `已验证前沿包含 ${frontier.length} 个场景，操作成本从 ${frontier[0].operationsPerDay} 次到 ${frontier[frontier.length - 1]?.operationsPerDay ?? frontier[0].operationsPerDay} 次每日换班。`
-    : '当前没有形成已验证 Pareto 前沿。'
+    ? `${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_001}${frontier.length}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_002}${frontier[0].operationsPerDay}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_003}${frontier[frontier.length - 1]?.operationsPerDay ?? frontier[0].operationsPerDay}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_004}`
+    : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_005
 
   const x = (operations: number) => PADDING.left + ((operations - 2) / 2) * (WIDTH - PADDING.left - PADDING.right)
   const y = (output: number) => PADDING.top + (1 - (output - yMin) / Math.max(1, yMax - yMin)) * (HEIGHT - PADDING.top - PADDING.bottom)
@@ -34,12 +36,12 @@ export default function ScenarioParetoChart({
   return (
     <div>
       <svg className="h-auto w-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-labelledby="scenario-chart-title scenario-chart-desc">
-        <title id="scenario-chart-title">产量与每日换班次数 Pareto 图</title>
-        <desc id="scenario-chart-desc">{summary} 横轴越靠左操作越少，纵轴越靠上等效理智产量越高。</desc>
+        <title id="scenario-chart-title">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_006}</title>
+        <desc id="scenario-chart-desc">{summary} {copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_007}</desc>
         {[2, 3, 4].map((value) => (
           <g key={value}>
             <line x1={x(value)} x2={x(value)} y1={PADDING.top} y2={HEIGHT - PADDING.bottom} stroke="var(--color-surface-3)" strokeWidth="1" />
-            <text x={x(value)} y={HEIGHT - 24} textAnchor="middle" fill="var(--color-ink-muted)" fontSize="12">{value} 次</text>
+            <text x={x(value)} y={HEIGHT - 24} textAnchor="middle" fill="var(--color-ink-muted)" fontSize="12">{value} {copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_008}</text>
           </g>
         ))}
         {[0, 0.5, 1].map((ratio) => {
@@ -51,8 +53,8 @@ export default function ScenarioParetoChart({
             </g>
           )
         })}
-        <text x={(PADDING.left + WIDTH - PADDING.right) / 2} y={HEIGHT - 5} textAnchor="middle" fill="var(--color-ink-secondary)" fontSize="12">每日换班次数（越少越好）</text>
-        <text transform={`translate(17 ${(PADDING.top + HEIGHT - PADDING.bottom) / 2}) rotate(-90)`} textAnchor="middle" fill="var(--color-ink-secondary)" fontSize="12">等效理智/日（越高越好）</text>
+        <text x={(PADDING.left + WIDTH - PADDING.right) / 2} y={HEIGHT - 5} textAnchor="middle" fill="var(--color-ink-secondary)" fontSize="12">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_009}</text>
+        <text transform={`translate(17 ${(PADDING.top + HEIGHT - PADDING.bottom) / 2}) rotate(-90)`} textAnchor="middle" fill="var(--color-ink-secondary)" fontSize="12">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_010}</text>
         {frontierPath && <path d={frontierPath} fill="none" stroke="var(--color-brand-400)" strokeWidth="2.5" />}
         {successful.map((point) => {
           const value = metric(point)!
@@ -66,7 +68,7 @@ export default function ScenarioParetoChart({
               key={point.id}
               role="button"
               tabIndex={0}
-              aria-label={`${point.label}，${format(value.productionSanityPerDay)} 等效理智每日，${point.operationsPerDay} 次换班${point.isFrontier ? '，已验证前沿' : ''}`}
+              aria-label={`${point.label}，${format(value.productionSanityPerDay)}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_011}${point.operationsPerDay}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_012}${point.isFrontier ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_013 : ''}`}
               className="cursor-pointer focus:outline-none"
               onClick={() => onSelect(point.id)}
               onFocus={() => setFocusedId(point.id)}
@@ -94,12 +96,12 @@ export default function ScenarioParetoChart({
           )
         })}
       </svg>
-      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-xs text-ink-muted" aria-label="图例">
-        <LegendMark shape="circle" className="bg-surface-4" label="MAA 快速筛选" />
-        <LegendMark shape="circle" className="bg-brand-300" label="精确复核" />
-        <LegendMark shape="circle" className="bg-brand-500" label="已验证前沿" />
-        <LegendMark shape="square" className="bg-surface-4" label="游戏内轮换" />
-        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full border border-dashed border-ink-muted" />自动非固定</span>
+      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-xs text-ink-muted" aria-label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_014}>
+        <LegendMark shape="circle" className="bg-surface-4" label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_015} />
+        <LegendMark shape="circle" className="bg-brand-300" label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_016} />
+        <LegendMark shape="circle" className="bg-brand-500" label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_017} />
+        <LegendMark shape="square" className="bg-surface-4" label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_018} />
+        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full border border-dashed border-ink-muted" />{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_019}</span>
       </div>
     </div>
   )
@@ -114,5 +116,5 @@ function metric(point: ScenarioComparisonPoint) {
 }
 
 function format(value: number): string {
-  return value.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
+  return value.toLocaleString(CURRENT_LOCALE, { maximumFractionDigits: 1 })
 }

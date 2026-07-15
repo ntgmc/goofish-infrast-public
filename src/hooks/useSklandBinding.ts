@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AuthSuccessResponse, UserGameAccount } from '../lib/types'
 import { apiJson } from '../lib/api-client'
+import { copy } from '../copy/index'
+
 
 type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 
@@ -120,7 +122,7 @@ export function useSklandBinding({
         confirmationId: null,
         preview: null,
         status: 'account_selection_required',
-        message: data.warning || '检测到多个明日方舟账号，请选择要导入的账号。',
+        message: data.warning || copy.workspace.hooks_useSklandBinding_001,
       }))
       return true
     }
@@ -148,7 +150,7 @@ export function useSklandBinding({
         confirmationId: null,
         preview: data.skland_preview ?? null,
         status: 'account_mismatch',
-        message: data.warning || '该账号与当前绑定账号不一致。请重新登录正确的森空岛账号。',
+        message: data.warning || copy.workspace.hooks_useSklandBinding_002,
       }))
       return true
     }
@@ -163,7 +165,7 @@ export function useSklandBinding({
         confirmationId: null,
         preview: data.skland_preview ?? null,
         status: 'frozen',
-        message: data.warning || '当前游戏账号档案已冻结，请联系管理员处理。',
+        message: data.warning || copy.workspace.hooks_useSklandBinding_003,
       }))
       return true
     }
@@ -176,20 +178,20 @@ export function useSklandBinding({
     setSklandLogin((current) => ({
       ...current,
       status: 'waiting',
-      message: '正在检查扫码状态，请在森空岛 App 中确认授权。',
+      message: copy.workspace.hooks_useSklandBinding_004,
     }))
     try {
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/login/complete`, {
         method: 'POST',
         json: { ...profilePayload(), scan_id: scanId },
-        fallbackMessage: '森空岛导入失败',
+        fallbackMessage: copy.workspace.hooks_useSklandBinding_005,
       })
       if (data.status === 'pending') {
-        setSklandLogin((current) => ({ ...current, status: 'waiting', message: '等待森空岛 App 确认授权。' }))
+        setSklandLogin((current) => ({ ...current, status: 'waiting', message: copy.workspace.hooks_useSklandBinding_006 }))
         return
       }
       if (showPayloadState(data, previewFallbackMessage(isDepot))) return
-      if (!data.user) throw new Error(data.error || '森空岛导入失败')
+      if (!data.user) throw new Error(data.error || copy.workspace.hooks_useSklandBinding_007)
       applyCompletedPayload(data)
       setSklandLogin((current) => ({
         ...current,
@@ -200,7 +202,7 @@ export function useSklandBinding({
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: errorWithRecovery(caught, '扫码失败，请重新生成二维码，或改用粘贴凭据。'),
+        message: errorWithRecovery(caught, copy.workspace.hooks_useSklandBinding_008),
       }))
     } finally {
       setBusy(false)
@@ -212,7 +214,7 @@ export function useSklandBinding({
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: '请先创建或选择账号档案，然后再绑定森空岛。',
+        message: copy.workspace.hooks_useSklandBinding_009,
       }))
       return
     }
@@ -230,15 +232,15 @@ export function useSklandBinding({
       confirmationId: null,
       preview: null,
       status: 'starting',
-      message: '正在生成森空岛扫码授权二维码。',
+      message: copy.workspace.hooks_useSklandBinding_010,
     })
     try {
       const data = await apiJson<{ scan_id?: string; qr_data_url?: string; expires_at?: string }>(`${endpointPrefix}/login/start`, {
         method: 'POST',
         json: profilePayload(),
-        fallbackMessage: '生成森空岛二维码失败',
+        fallbackMessage: copy.workspace.hooks_useSklandBinding_011,
       })
-      if (!data.scan_id || !data.qr_data_url) throw new Error('生成森空岛二维码失败')
+      if (!data.scan_id || !data.qr_data_url) throw new Error(copy.workspace.hooks_useSklandBinding_012)
       if (startRequestRef.current !== requestId) return
       setSklandLogin({
         mode: 'scan',
@@ -251,7 +253,7 @@ export function useSklandBinding({
         confirmationId: null,
         preview: null,
         status: 'waiting',
-        message: '请使用森空岛 App 扫码确认。确认后会先展示昵称和 UID，不会立即保存。',
+        message: copy.workspace.hooks_useSklandBinding_013,
       })
       pollCountRef.current = 0
     } catch (caught) {
@@ -259,7 +261,7 @@ export function useSklandBinding({
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: errorWithRecovery(caught, '二维码生成失败，请稍后重试，或改用粘贴凭据。'),
+        message: errorWithRecovery(caught, copy.workspace.hooks_useSklandBinding_014),
       }))
     } finally {
       if (startRequestRef.current === requestId) setBusy(false)
@@ -271,7 +273,7 @@ export function useSklandBinding({
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: '请先创建或选择账号档案，然后再绑定森空岛。',
+        message: copy.workspace.hooks_useSklandBinding_015,
       }))
       return
     }
@@ -280,28 +282,28 @@ export function useSklandBinding({
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: '请先粘贴森空岛凭据，再读取账号预览。',
+        message: copy.workspace.hooks_useSklandBinding_016,
       }))
       credentialInputRef.current?.focus()
       return
     }
     setBusy(true)
-    setSklandLogin((current) => ({ ...current, status: 'starting', message: '正在读取森空岛账号信息。' }))
+    setSklandLogin((current) => ({ ...current, status: 'starting', message: copy.workspace.hooks_useSklandBinding_017 }))
     try {
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/credential/preview`, {
         method: 'POST',
         json: { ...profilePayload(), credential_text: credentialText, source },
-        fallbackMessage: '森空岛凭据读取失败',
+        fallbackMessage: copy.workspace.hooks_useSklandBinding_018,
       })
       if (!showPayloadState(data, previewFallbackMessage(isDepot))) {
-        throw new Error(data.error || '森空岛凭据已读取，但未返回可确认账号。')
+        throw new Error(data.error || copy.workspace.hooks_useSklandBinding_019)
       }
       if (credentialInputRef.current) credentialInputRef.current.value = ''
     } catch (caught) {
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: errorWithRecovery(caught, '请重新获取凭据，或改用扫码授权。'),
+        message: errorWithRecovery(caught, copy.workspace.hooks_useSklandBinding_020),
       }))
     } finally {
       setBusy(false)
@@ -315,7 +317,7 @@ export function useSklandBinding({
   const previewSelectedAccount = useCallback(async () => {
     if ((!profile && !isFreePreviewClaim) || !sklandLogin.selectionId || !sklandLogin.selectedUid || busy) return
     setBusy(true)
-    setSklandLogin((current) => ({ ...current, message: '正在读取所选森空岛账号的干员数据。' }))
+    setSklandLogin((current) => ({ ...current, message: copy.workspace.hooks_useSklandBinding_021 }))
     try {
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/account/select`, {
         method: 'POST',
@@ -324,16 +326,16 @@ export function useSklandBinding({
           selection_id: sklandLogin.selectionId,
           uid: sklandLogin.selectedUid,
         },
-        fallbackMessage: '读取所选森空岛账号失败',
+        fallbackMessage: copy.workspace.hooks_useSklandBinding_022,
       })
       if (!showPayloadState(data, previewFallbackMessage(isDepot))) {
-        throw new Error(data.error || '所选森空岛账号未返回可确认预览。')
+        throw new Error(data.error || copy.workspace.hooks_useSklandBinding_023)
       }
     } catch (caught) {
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: errorWithRecovery(caught, '请重新授权后再选择账号。'),
+        message: errorWithRecovery(caught, copy.workspace.hooks_useSklandBinding_024),
       }))
     } finally {
       setBusy(false)
@@ -346,15 +348,15 @@ export function useSklandBinding({
     setSklandLogin((current) => ({
       ...current,
       status: 'importing',
-      message: isDepot ? '正在保存森空岛绑定并准备分析仓库。' : '正在保存森空岛绑定并导入干员数据。',
+      message: isDepot ? copy.workspace.hooks_useSklandBinding_025 : copy.workspace.hooks_useSklandBinding_026,
     }))
     try {
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/login/confirm`, {
         method: 'POST',
         json: { ...profilePayload(), confirmation_id: sklandLogin.confirmationId },
-        fallbackMessage: '森空岛导入失败',
+        fallbackMessage: copy.workspace.hooks_useSklandBinding_027,
       })
-      if (!data.user) throw new Error('森空岛导入失败')
+      if (!data.user) throw new Error(copy.workspace.hooks_useSklandBinding_028)
       applyCompletedPayload(data)
       setSklandLogin((current) => ({
         ...current,
@@ -370,7 +372,7 @@ export function useSklandBinding({
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: errorWithRecovery(caught, isDepot ? '请重新预览后再保存仓库绑定。' : '请重新预览后再导入。'),
+        message: errorWithRecovery(caught, isDepot ? copy.workspace.hooks_useSklandBinding_029 : copy.workspace.hooks_useSklandBinding_030),
       }))
     } finally {
       setBusy(false)
@@ -428,7 +430,7 @@ export function useSklandBinding({
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: '二维码已过期。请重新生成二维码，或改用粘贴凭据。',
+        message: copy.workspace.hooks_useSklandBinding_031,
       }))
       return
     }
@@ -436,7 +438,7 @@ export function useSklandBinding({
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: '扫码等待超时。请重新生成二维码，或改用粘贴凭据。',
+        message: copy.workspace.hooks_useSklandBinding_032,
       }))
       return
     }
@@ -481,15 +483,15 @@ function createInitialState(): SklandLoginState {
 }
 
 function modeIntro(mode: SklandImportMode): string {
-  if (mode === 'scan') return '生成二维码后，使用森空岛 App 授权。授权后会先预览昵称和 UID。'
-  if (mode === 'manual') return '粘贴森空岛凭据后读取账号预览，确认前不会保存。'
-  return '安装书签脚本后复制凭据，粘贴后读取账号预览。'
+  if (mode === 'scan') return copy.workspace.hooks_useSklandBinding_033
+  if (mode === 'manual') return copy.workspace.hooks_useSklandBinding_034
+  return copy.workspace.hooks_useSklandBinding_035
 }
 
 function previewFallbackMessage(isDepot: boolean): string {
   return isDepot
-    ? '请确认森空岛账号信息，确认后将保存绑定并分析仓库。'
-    : '请确认森空岛账号信息，确认后将保存绑定并导入干员数据。'
+    ? copy.workspace.hooks_useSklandBinding_036
+    : copy.workspace.hooks_useSklandBinding_037
 }
 
 function errorWithRecovery(caught: unknown, fallback: string): string {
@@ -498,22 +500,22 @@ function errorWithRecovery(caught: unknown, fallback: string): string {
 }
 
 function formatImportedMessage(data: SklandPayload, isDepot: boolean): string {
-  if (isDepot) return '森空岛已保存，正在读取仓库库存。'
-  if (!data.skland_import) return '森空岛干员数据已导入。'
+  if (isDepot) return copy.workspace.hooks_useSklandBinding_038
+  if (!data.skland_import) return copy.workspace.hooks_useSklandBinding_039
   const inventoryMessage = formatSklandInventoryMessage(data.skland_import)
-  return `已导入 ${data.skland_import.operator_count} 名干员：${data.skland_import.nickname}${inventoryMessage ? `。${inventoryMessage}` : ''}`
+  return `${copy.workspace.hooks_useSklandBinding_040}${data.skland_import.operator_count}${copy.workspace.hooks_useSklandBinding_041}${data.skland_import.nickname}${inventoryMessage ? `。${inventoryMessage}` : ''}`
 }
 
 function formatSklandInventoryMessage(imported: NonNullable<SklandPayload['skland_import']>): string {
   if (imported.inventory_synced && imported.intermediate_inventory) {
-    return `已同步 ${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])} 到基建配置`
+    return `${copy.workspace.hooks_useSklandBinding_042}${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}${copy.workspace.hooks_useSklandBinding_043}`
   }
-  if (imported.inventory_warning) return '干员已导入，库存同步失败，可稍后刷新'
+  if (imported.inventory_warning) return copy.workspace.hooks_useSklandBinding_044
   return ''
 }
 
 function formatInventoryAmount(product: IntermediateProduct, value: number | undefined): string {
-  const label = product === 'Pure Gold' ? '赤金' : '源石碎片'
+  const label = product === 'Pure Gold' ? copy.workspace.hooks_useSklandBinding_045 : copy.workspace.hooks_useSklandBinding_046
   const count = Number(value ?? 0)
   return `${label} ${Number.isFinite(count) ? count : 0}`
 }

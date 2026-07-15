@@ -1,3 +1,4 @@
+import { copy } from '../copy/index'
 export type PurchaseChannelId = 'xianyu' | 'cardNetwork'
 
 export interface PurchaseChannel {
@@ -11,15 +12,15 @@ export interface PurchaseChannel {
 export const PURCHASE_CHANNELS: PurchaseChannel[] = [
   {
     id: 'xianyu',
-    label: '闲鱼',
-    actionLabel: '去闲鱼购买 CDK',
+    label: copy.common.lib_purchase_001,
+    actionLabel: copy.common.lib_purchase_002,
     href: 'https://m.tb.cn/h.RGCWZHH?tk=X063g9yLZxZ%20MF287',
     enabled: true,
   },
   {
     id: 'cardNetwork',
-    label: '发卡网',
-    actionLabel: '发卡网购买 CDK',
+    label: copy.common.lib_purchase_003,
+    actionLabel: copy.common.lib_purchase_004,
     href: null,
     enabled: false,
   },

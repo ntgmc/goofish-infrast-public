@@ -1,3 +1,4 @@
+import { copy } from '../copy/index'
 type BrandLogoSize = 'sm' | 'md' | 'lg'
 
 const sizeClasses: Record<BrandLogoSize, string> = {
@@ -16,7 +17,7 @@ export default function BrandLogo({ size = 'md', className = '' }: BrandLogoProp
     <span className={`inline-flex shrink-0 items-center justify-center overflow-hidden bg-white/95 shadow-sm ring-1 ring-black/5 ${sizeClasses[size]} ${className}`}>
       <img
         src="/assets/logo-256.png"
-        alt="MAA 基建排班优化器"
+        alt={copy.common.components_BrandLogo_001}
         className="h-full w-full object-contain"
         decoding="async"
       />

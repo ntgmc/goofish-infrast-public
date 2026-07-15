@@ -1,5 +1,7 @@
 import type { LicenseConfig, PermissionMode } from '../../../lib/types'
 import ConfigEditor from '../../../components/ConfigEditor'
+import { copy } from '../../../copy/index'
+
 
 type WorkspaceConfigSectionProps = {
   config: LicenseConfig
@@ -32,7 +34,7 @@ export default function WorkspaceConfigSection({
       permission={permission}
       validation={validation}
       onUpdate={onUpdate}
-      note="保存后，下次打开这个账号会自动带上这套配置。"
+      note={copy.workspace.pages_tool_workspace_WorkspaceConfigSection_001}
     />
   )
 }
