@@ -40,11 +40,11 @@ export default function ScenarioLabSection({
 
   const selected = result?.points.find((point) => point.id === selectedId) ?? null
   return (
-    <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(340px,0.46fr)_minmax(0,1fr)]">
+    <section aria-labelledby="scenario-lab-title" className="grid min-w-0 gap-4">
       <div className="tool-panel min-w-0 p-5 sm:p-6">
         <div>
           <p className="tool-eyebrow">组合网格</p>
-          <h2 className="mt-1 text-lg font-semibold text-ink-primary">定义比较场景</h2>
+          <h2 id="scenario-lab-title" className="mt-1 text-lg font-semibold text-ink-primary">定义比较场景</h2>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">使用当前账号干员、搓玉预算和库存；结果不会写入排班历史。</p>
         </div>
         <div className="mt-5">
