@@ -22,6 +22,7 @@ import accountDataHandler from './handlers/account-data'
 import usageStatsHandler from './handlers/usage-stats'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
+import { getServiceLifecycleState, isServiceReady } from './lifecycle'
 
 type ApiHandler = (req: Request) => Promise<Response>
 
@@ -87,7 +88,8 @@ async function dispatchRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
 
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
-  if (url.pathname === '/api/health') return handleHealth()
+  if (url.pathname === '/api/health/live') return handleLiveness()
+  if (url.pathname === '/api/health' || url.pathname === '/api/health/ready') return handleReadiness()
   if (url.pathname === '/api/data') {
     if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
     return jsonResponse({ metadata: EFFICIENCY_DATA_METADATA, data: EFFICIENCY_DATA })
@@ -104,15 +106,38 @@ async function dispatchRequest(req: Request): Promise<Response> {
 }
 
 export function getRegisteredApiRoutes(): string[] {
-  return ['/api/health', '/api/data', '/api/optimization/jobs/:jobId', ...ROUTES.keys()].sort()
+  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/optimization/jobs/:jobId', ...ROUTES.keys()].sort()
 }
 
-async function handleHealth(): Promise<Response> {
+function handleLiveness(): Response {
+  return jsonResponse({
+    ok: true,
+    state: getServiceLifecycleState(),
+    version: process.env.BACKEND_VERSION || process.env.APP_VERSION || null,
+  })
+}
+
+async function handleReadiness(): Promise<Response> {
+  const state = getServiceLifecycleState()
+  if (!isServiceReady()) {
+    return jsonResponse({
+      ok: false,
+      state,
+      version: process.env.BACKEND_VERSION || process.env.APP_VERSION || null,
+      storage: {
+        type: 'postgres',
+        configured: hasDatabaseUrl(),
+        ok: false,
+        error: `service is ${state}`,
+      },
+    }, 503)
+  }
   const database = await checkPostgresHealth()
   const ok = hasDatabaseUrl() && database.ok
   return jsonResponse(
     {
       ok,
+      state,
       version: process.env.BACKEND_VERSION || process.env.APP_VERSION || null,
       storage: {
         type: 'postgres',

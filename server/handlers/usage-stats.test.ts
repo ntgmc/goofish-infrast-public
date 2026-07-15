@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import usageStatsHandler, { setUsageEventStoreForTesting } from './usage-stats'
+import usageStatsHandler, { recordUsageEvent, setUsageEventStoreForTesting } from './usage-stats'
 import {
   buildUsageStats,
   type UsageEventRecord,
@@ -11,6 +11,24 @@ afterEach(() => {
 })
 
 describe('usage stats handler', () => {
+  it('upserts queue effects by a deterministic idempotency key', async () => {
+    const records = new Map<string, UsageEventRecord>()
+    const store: UsageEventStore = {
+      set: async (key, record) => {
+        records.set(key, record)
+      },
+      list: async () => [...records.values()],
+      getStats: async (dates) => buildUsageStats([...records.values()], dates),
+    }
+    setUsageEventStoreForTesting(store)
+
+    await recordUsageEvent('schedule_generate', { status: 'success' }, 'optimize-job/job-1/schedule-generate')
+    await recordUsageEvent('schedule_generate', { status: 'success' }, 'optimize-job/job-1/schedule-generate')
+
+    expect(records.size).toBe(1)
+    expect([...records.values()][0]).toMatchObject({ event: 'schedule_generate', status: 'success' })
+  })
+
   it('records public tool visits for the dashboard aggregates', async () => {
     const records: UsageEventRecord[] = []
     const store: UsageEventStore = {

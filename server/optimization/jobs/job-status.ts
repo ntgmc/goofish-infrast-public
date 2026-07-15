@@ -12,8 +12,16 @@ import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJob
 import { OPTIMIZE_ANALYSIS_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
 import { jsonResponse } from './http-core';
 import { prepareOptimizeJob } from './prepare-job';
+import { getServiceLifecycleState } from '../../lifecycle';
 
 export async function submitOptimizationJob(req: Request): Promise<Response> {
+  const lifecycleState = getServiceLifecycleState();
+  if (lifecycleState === 'draining' || lifecycleState === 'stopped') {
+    return new Response(JSON.stringify({ error: '服务正在重启或排空任务，请稍后重试。', code: 'service_draining' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
+    });
+  }
   const idempotencyKey = normalizeIdempotencyKey(req.headers.get('Idempotency-Key'));
   if (!idempotencyKey) return jsonResponse({ error: '缺少或无效的 Idempotency-Key。', code: 'idempotency_key_required' }, 400);
   const requestHash = createHash('sha256').update(await req.clone().text()).digest('hex');

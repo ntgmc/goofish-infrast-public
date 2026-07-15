@@ -100,6 +100,37 @@ include /etc/nginx/snippets/goofish-api-production.conf;
 include /etc/nginx/snippets/goofish-static-files.conf;
 ```
 
+The systemd service must allow the Node process to finish its queue drain before
+systemd escalates to `SIGKILL`. Keep the existing service command and environment,
+and include these lifecycle settings:
+
+```ini
+[Service]
+KillSignal=SIGTERM
+TimeoutStopSec=75s
+```
+
+The backend stops optimization admissions as soon as it receives `SIGTERM`, waits
+up to 60 seconds for active jobs, returns unfinished attempts to `queued`, closes
+HTTP connections, stops background loops, and then closes the PostgreSQL pool.
+Do not configure an `ExecStop` that sends `SIGKILL` directly.
+
+Queue lifecycle defaults can be overridden in `backend.env` when needed:
+
+```dotenv
+OPTIMIZE_QUEUE_POLL_MS=1000
+OPTIMIZE_JOB_HEARTBEAT_MS=15000
+OPTIMIZE_JOB_LOCK_TTL_MS=60000
+OPTIMIZE_JOB_HARD_TIMEOUT_MS=600000
+OPTIMIZE_JOB_MAX_ATTEMPTS=2
+OPTIMIZE_SHUTDOWN_GRACE_MS=60000
+```
+
+`/api/health/live` is the process liveness probe and does not query PostgreSQL.
+`/api/health/ready` is the explicit readiness probe and returns `503` while the
+service is starting, draining, or unable to query PostgreSQL. `/api/health`
+remains a backwards-compatible readiness alias used by the deployment workflow.
+
 The snippet directly enforces CSP and adds one-year HSTS with
 `includeSubDomains`; it also covers static files and Nginx-generated 413/429
 responses. API responses are same-origin only and expose no CORS allow headers.

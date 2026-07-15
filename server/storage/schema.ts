@@ -70,6 +70,9 @@ CREATE TABLE IF NOT EXISTS optimize_jobs (
   result_json JSONB,
   error_message TEXT,
   attempt_count INTEGER NOT NULL DEFAULT 0,
+  failure_count INTEGER NOT NULL DEFAULT 0,
+  worker_id TEXT,
+  heartbeat_at TIMESTAMPTZ,
   lock_token TEXT,
   lock_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
@@ -108,6 +111,33 @@ CREATE TABLE IF NOT EXISTS optimize_dispatch_state (
 );
 INSERT INTO optimize_dispatch_state (id, prioritized_streak, updated_at)
 VALUES (TRUE, 0, now()) ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS optimize_job_attempts (
+  job_id TEXT NOT NULL REFERENCES optimize_jobs(id) ON DELETE CASCADE,
+  attempt_no INTEGER NOT NULL,
+  worker_id TEXT NOT NULL,
+  lock_token TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  heartbeat_at TIMESTAMPTZ NOT NULL,
+  finished_at TIMESTAMPTZ,
+  failure_kind TEXT,
+  error_message TEXT,
+  PRIMARY KEY (job_id, attempt_no),
+  UNIQUE (lock_token)
+);
+CREATE INDEX IF NOT EXISTS idx_optimize_job_attempts_worker_status
+  ON optimize_job_attempts(worker_id, status);
+CREATE INDEX IF NOT EXISTS idx_optimize_job_attempts_heartbeat
+  ON optimize_job_attempts(heartbeat_at) WHERE status = 'running';
+
+CREATE TABLE IF NOT EXISTS optimization_job_effects (
+  job_id TEXT NOT NULL REFERENCES optimize_jobs(id) ON DELETE CASCADE,
+  effect_type TEXT NOT NULL,
+  metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  applied_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (job_id, effect_type)
+);
 
 CREATE TABLE IF NOT EXISTS admin_users (
   username TEXT PRIMARY KEY,
@@ -458,7 +488,24 @@ CREATE INDEX IF NOT EXISTS idx_usage_events_profile_id ON usage_events(profile_i
 UPDATE usage_events SET profile_id = record_json->>'profile_id' WHERE profile_id IS NULL AND record_json ? 'profile_id';
 
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS profile_id TEXT;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS failure_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS worker_id TEXT;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_profile_id ON optimize_jobs(profile_id);
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_worker_status ON optimize_jobs(worker_id, status);
+INSERT INTO optimize_job_attempts
+  (job_id, attempt_no, worker_id, lock_token, status, started_at, heartbeat_at)
+SELECT
+  id,
+  attempt_count,
+  coalesce(worker_id, 'legacy'),
+  coalesce(lock_token, 'legacy:' || id),
+  'running',
+  coalesce(started_at, updated_at),
+  coalesce(heartbeat_at, updated_at)
+FROM optimize_jobs
+WHERE status = 'running'
+ON CONFLICT (job_id, attempt_no) DO NOTHING;
 UPDATE optimize_jobs SET profile_id = substring(owner_key from '^profile:(.*)$') WHERE profile_id IS NULL AND owner_key LIKE 'profile:%';
 UPDATE optimize_jobs
 SET payload_json = payload_json - 'activeProfile' - 'previewWorkspaceForGeneration'

@@ -154,7 +154,7 @@ export interface CdkRecordStore {
     mutate: (current: CdkRecord) => CdkRecord | null,
     options?: { allowedStatuses?: CdkStatus[] },
   ) => Promise<CdkRecord | null>;
-  incrementScheduleGenerateCount: (key: string) => Promise<boolean>;
+  incrementScheduleGenerateCount: (key: string, jobId?: string) => Promise<boolean>;
   delete: (key: string) => Promise<void>;
   list: (prefix: string) => Promise<CdkRecord[]>;
 }
@@ -568,9 +568,9 @@ export async function findCdkRecordByCode(code: string, hashSecrets = getCdkHash
   return null
 }
 
-export async function incrementCdkScheduleGenerateCount(record: CdkRecord): Promise<void> {
+export async function incrementCdkScheduleGenerateCount(record: CdkRecord, jobId?: string): Promise<void> {
   const store = await getCdkRecordStore()
-  await store.incrementScheduleGenerateCount(`cdk/${record.code_hash}.json`)
+  await store.incrementScheduleGenerateCount(`cdk/${record.code_hash}.json`, jobId)
 }
 
 export function getOperatorUpdateGrantRemaining(record: CdkRecord | null | undefined): number {

@@ -72,6 +72,13 @@ export async function runPublicHttpSmoke(baseUrl, options = {}) {
   const healthBody = await health.json()
   assert.equal(healthBody?.ok, true, 'GET /api/health should return ok=true')
 
+  for (const healthPath of ['/api/health/live', '/api/health/ready']) {
+    const response = await fetchPath(fetchImpl, origin, healthPath, 'GET')
+    assert.equal(response.status, 200, `GET ${healthPath} should return 200`)
+    assertSecurityHeaders(response, `GET ${healthPath}`)
+    assert.equal((await response.json())?.ok, true, `GET ${healthPath} should return ok=true`)
+  }
+
   for (const path of ['/', '/tool']) {
     const response = await fetchPath(fetchImpl, origin, path, 'HEAD')
     assert.equal(response.status, 200, `HEAD ${path} should return 200`)
@@ -165,11 +172,11 @@ function createFixtureServer(mode) {
       return
     }
 
-    if (path === '/api/health') {
+    if (path === '/api/health' || path === '/api/health/live' || path === '/api/health/ready') {
       writeResponse(response, request.method, 200, {
         ...headers,
         'content-type': 'application/json',
-      }, JSON.stringify({ ok: true }))
+      }, JSON.stringify({ ok: true, state: 'ready' }))
       return
     }
 
