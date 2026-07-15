@@ -94,19 +94,17 @@ export default function AnnouncementPopup({ announcements }: Props) {
       onCancel={handleCancel}
       className="m-auto max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto border-0 bg-transparent p-0 text-left backdrop:bg-ink-primary/45"
     >
-      <section
-        className="w-full max-w-lg rounded-xl bg-surface-0 p-5 text-left shadow-xl"
-      >
+      <section className="tool-panel w-full max-w-lg p-5 text-left shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold text-brand-600">站内公告</p>
+            <p className="tool-eyebrow">站内公告</p>
             <h2 id="announcement-popup-title" className="mt-1 text-lg font-semibold text-ink-primary">
               {current.title}
             </h2>
           </div>
           <Link
             to="/announcements"
-            className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-brand-600 underline-offset-4 hover:underline"
+            className="tool-secondary-action shrink-0 px-3 text-sm"
           >
             历史
           </Link>
@@ -117,7 +115,7 @@ export default function AnnouncementPopup({ announcements }: Props) {
             ref={initialFocusRef}
             type="button"
             onClick={markCurrentRead}
-            className="min-h-11 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
+            className="tool-primary-action"
           >
             已读
           </button>

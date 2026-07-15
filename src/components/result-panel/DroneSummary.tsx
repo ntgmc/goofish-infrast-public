@@ -8,10 +8,10 @@ export default function DroneSummary({ drones }: { drones: DroneAssignment }) {
 
   return (
     <div className="mt-3 border-t border-surface-3/50 pt-3">
-      <div className="flex flex-col gap-2 rounded-lg bg-surface-2/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="tool-inset flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-md bg-brand-100 px-2 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-900 dark:text-brand-200">
+            <span className="tool-status tool-status--current">
               {drones.mode === 'auto' ? '自动无人机' : '无人机'}
             </span>
             <span className="text-sm font-medium text-ink-primary">

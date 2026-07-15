@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS risk_settings (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS invitation_settings (
+  key TEXT PRIMARY KEY,
+  record_json JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS usage_events (
   key TEXT PRIMARY KEY,
   event TEXT NOT NULL,
@@ -64,6 +70,9 @@ CREATE TABLE IF NOT EXISTS optimize_jobs (
   result_json JSONB,
   error_message TEXT,
   attempt_count INTEGER NOT NULL DEFAULT 0,
+  failure_count INTEGER NOT NULL DEFAULT 0,
+  worker_id TEXT,
+  heartbeat_at TIMESTAMPTZ,
   lock_token TEXT,
   lock_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
@@ -102,6 +111,33 @@ CREATE TABLE IF NOT EXISTS optimize_dispatch_state (
 );
 INSERT INTO optimize_dispatch_state (id, prioritized_streak, updated_at)
 VALUES (TRUE, 0, now()) ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS optimize_job_attempts (
+  job_id TEXT NOT NULL REFERENCES optimize_jobs(id) ON DELETE CASCADE,
+  attempt_no INTEGER NOT NULL,
+  worker_id TEXT NOT NULL,
+  lock_token TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  heartbeat_at TIMESTAMPTZ NOT NULL,
+  finished_at TIMESTAMPTZ,
+  failure_kind TEXT,
+  error_message TEXT,
+  PRIMARY KEY (job_id, attempt_no),
+  UNIQUE (lock_token)
+);
+CREATE INDEX IF NOT EXISTS idx_optimize_job_attempts_worker_status
+  ON optimize_job_attempts(worker_id, status);
+CREATE INDEX IF NOT EXISTS idx_optimize_job_attempts_heartbeat
+  ON optimize_job_attempts(heartbeat_at) WHERE status = 'running';
+
+CREATE TABLE IF NOT EXISTS optimization_job_effects (
+  job_id TEXT NOT NULL REFERENCES optimize_jobs(id) ON DELETE CASCADE,
+  effect_type TEXT NOT NULL,
+  metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  applied_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (job_id, effect_type)
+);
 
 CREATE TABLE IF NOT EXISTS admin_users (
   username TEXT PRIMARY KEY,
@@ -143,6 +179,65 @@ CREATE TABLE IF NOT EXISTS user_accounts (
 );
 CREATE INDEX IF NOT EXISTS idx_user_accounts_email ON user_accounts(email);
 CREATE INDEX IF NOT EXISTS idx_user_accounts_cdk_code_hash ON user_accounts(cdk_code_hash);
+
+CREATE TABLE IF NOT EXISTS invitation_codes (
+  user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
+  code TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_invitation_codes_code ON invitation_codes(code);
+
+CREATE TABLE IF NOT EXISTS invitations (
+  id TEXT PRIMARY KEY,
+  inviter_user_id TEXT REFERENCES user_accounts(id) ON DELETE SET NULL,
+  invitee_user_id TEXT NOT NULL UNIQUE REFERENCES user_accounts(id) ON DELETE CASCADE,
+  invitation_code TEXT NOT NULL,
+  status TEXT NOT NULL,
+  registered_at TIMESTAMPTZ NOT NULL,
+  activated_at TIMESTAMPTZ,
+  settled_at TIMESTAMPTZ,
+  settings_snapshot JSONB,
+  settlement_json JSONB,
+  updated_at TIMESTAMPTZ NOT NULL,
+  CHECK (inviter_user_id IS NULL OR inviter_user_id <> invitee_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_invitations_inviter_registered_at ON invitations(inviter_user_id, registered_at DESC);
+CREATE INDEX IF NOT EXISTS idx_invitations_inviter_settled_at ON invitations(inviter_user_id, settled_at DESC);
+CREATE INDEX IF NOT EXISTS idx_invitations_invitation_code ON invitations(invitation_code);
+
+CREATE TABLE IF NOT EXISTS reward_grants (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  reward_type TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  recipient_role TEXT NOT NULL,
+  original_quantity INTEGER NOT NULL CHECK (original_quantity > 0),
+  remaining_quantity INTEGER NOT NULL CHECK (remaining_quantity >= 0),
+  validity_days INTEGER NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ,
+  metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (user_id, reward_type, source_type, source_id, recipient_role)
+);
+CREATE INDEX IF NOT EXISTS idx_reward_grants_available
+  ON reward_grants(user_id, reward_type, expires_at, created_at)
+  WHERE remaining_quantity > 0;
+CREATE INDEX IF NOT EXISTS idx_reward_grants_source ON reward_grants(source_type, source_id);
+
+CREATE TABLE IF NOT EXISTS reward_consumptions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  reward_type TEXT NOT NULL,
+  grant_id TEXT NOT NULL REFERENCES reward_grants(id) ON DELETE CASCADE,
+  optimization_job_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  validity_days INTEGER NOT NULL DEFAULT 0,
+  consumed_at TIMESTAMPTZ NOT NULL,
+  refunded_at TIMESTAMPTZ,
+  UNIQUE (optimization_job_id, reward_type)
+);
+CREATE INDEX IF NOT EXISTS idx_reward_consumptions_user ON reward_consumptions(user_id, consumed_at DESC);
 
 CREATE TABLE IF NOT EXISTS account_deletion_requests (
   id TEXT PRIMARY KEY,
@@ -393,7 +488,24 @@ CREATE INDEX IF NOT EXISTS idx_usage_events_profile_id ON usage_events(profile_i
 UPDATE usage_events SET profile_id = record_json->>'profile_id' WHERE profile_id IS NULL AND record_json ? 'profile_id';
 
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS profile_id TEXT;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS failure_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS worker_id TEXT;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_profile_id ON optimize_jobs(profile_id);
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_worker_status ON optimize_jobs(worker_id, status);
+INSERT INTO optimize_job_attempts
+  (job_id, attempt_no, worker_id, lock_token, status, started_at, heartbeat_at)
+SELECT
+  id,
+  attempt_count,
+  coalesce(worker_id, 'legacy'),
+  coalesce(lock_token, 'legacy:' || id),
+  'running',
+  coalesce(started_at, updated_at),
+  coalesce(heartbeat_at, updated_at)
+FROM optimize_jobs
+WHERE status = 'running'
+ON CONFLICT (job_id, attempt_no) DO NOTHING;
 UPDATE optimize_jobs SET profile_id = substring(owner_key from '^profile:(.*)$') WHERE profile_id IS NULL AND owner_key LIKE 'profile:%';
 UPDATE optimize_jobs
 SET payload_json = payload_json - 'activeProfile' - 'previewWorkspaceForGeneration'

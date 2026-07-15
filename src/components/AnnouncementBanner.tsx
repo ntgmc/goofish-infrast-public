@@ -12,7 +12,7 @@ export default function AnnouncementBanner({ announcement, className = '' }: Pro
 
   return (
     <section
-      className={`rounded-lg border border-brand-500/25 bg-brand-500/10 px-4 py-3 text-left ${className}`}
+      className={`tool-alert border-brand-500/25 bg-brand-500/10 text-left ${className}`}
       aria-label="站内横幅"
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -22,7 +22,7 @@ export default function AnnouncementBanner({ announcement, className = '' }: Pro
         </div>
         <Link
           to="/announcements"
-          className="shrink-0 text-sm font-semibold text-brand-600 underline-offset-4 hover:underline"
+          className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-brand-600 underline-offset-4 hover:underline"
         >
           查看公告
         </Link>

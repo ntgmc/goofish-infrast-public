@@ -257,14 +257,14 @@ export default function ConfigEditor({
   }
 
   return (
-    <section className={embedded ? '' : 'bg-surface-1 rounded-xl p-5 sm:p-6'}>
+    <section className={embedded ? '' : 'tool-panel p-5 sm:p-6'}>
       {!hideHeader && (
       <div className="flex flex-col gap-4 border-b border-surface-3/60 pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-ink-primary">基建配置</h2>
             {changed && (
-              <span className="rounded-full bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning">
+              <span className="tool-status tool-status--warning">
                 已修改
               </span>
             )}
@@ -287,7 +287,7 @@ export default function ConfigEditor({
                 type="button"
                 onClick={onReset}
                 disabled={!changed}
-                className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary disabled:cursor-not-allowed disabled:text-ink-muted"
+                className="tool-secondary-action px-3 py-2 text-sm"
               >
                 {resetLabel}
               </button>
@@ -299,7 +299,7 @@ export default function ConfigEditor({
 
       {autoInventoryOnly ? (
         <div className="pt-5">
-          <div className="rounded-lg bg-surface-2/60 p-4">
+          <div className="tool-inset p-4">
             <h3 className="font-semibold text-ink-primary">按库存微调产物</h3>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
               先选择 243 或 333 预设；库存充足时保留原产物消耗，库存较少时只调整一个制造站产物。
@@ -314,19 +314,20 @@ export default function ConfigEditor({
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
                 <p className="mb-2 text-xs font-medium text-ink-muted">排班模式</p>
-                <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
+                <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label="排班模式">
                   {(['maa', 'rotation'] as const).map((mode) => (
                     <button
                       key={mode}
                       type="button"
+                      aria-pressed={scheduleMode === mode}
                       onClick={() => onUpdate((next) => {
                         next.schedule_mode = mode
                         applyCounts(next)
                       })}
-                      className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+                      className={`tool-secondary-action min-h-11 px-3 text-sm ${
                         scheduleMode === mode
-                          ? 'bg-brand-600 text-white'
-                          : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'
+                          ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100'
+                          : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
                       }`}
                     >
                       {SCHEDULE_MODE_LABELS[mode]}
@@ -336,20 +337,21 @@ export default function ConfigEditor({
               </div>
               <div>
                 <p className="mb-2 text-xs font-medium text-ink-muted">宿舍规则</p>
-                <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
+                <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label="宿舍规则">
                   {(['fixed', 'maa_autofill'] as const).map((rule) => (
                     <button
                       key={rule}
                       type="button"
+                      aria-pressed={normalizeDormitoryRule(config.dormitory_rule) === rule}
                       disabled={rotationMode}
                       onClick={() => onUpdate((next) => {
                         next.dormitory_rule = rule
                         applyCounts(next)
                       })}
-                      className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed ${
+                      className={`tool-secondary-action min-h-11 px-3 text-sm disabled:cursor-not-allowed ${
                         normalizeDormitoryRule(config.dormitory_rule) === rule
-                          ? 'bg-brand-600 text-white'
-                          : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
+                          ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100'
+                          : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
                       }`}
                     >
                       {DORMITORY_RULE_LABELS[rule]}
@@ -370,7 +372,7 @@ export default function ConfigEditor({
         </div>
       ) : (
       <div className="grid gap-5 pt-5 lg:grid-cols-[1fr_1fr_0.9fr]">
-        <div className="rounded-lg bg-surface-2/60 p-4">
+        <div className="tool-inset bg-surface-2/60 p-4">
           <div className="mb-4">
             <h3 className="font-semibold text-ink-primary">房间结构</h3>
             <p className="mt-1 text-xs text-ink-muted">当前: {config.layout}</p>
@@ -400,7 +402,7 @@ export default function ConfigEditor({
           )}
         </div>
 
-        <div className="rounded-lg bg-surface-2/60 p-4">
+        <div className="tool-inset bg-surface-2/60 p-4">
           <h3 className="font-semibold text-ink-primary">产物数量</h3>
           <div className="mt-4 space-y-4">
             <ProductGroupEditor
@@ -426,11 +428,11 @@ export default function ConfigEditor({
           </div>
         </div>
 
-        <div className="rounded-lg bg-surface-2/60 p-4">
+        <div className="tool-inset bg-surface-2/60 p-4">
             <h3 className="font-semibold text-ink-primary">特殊策略</h3>
             <div className="mt-4 space-y-4">
               {showOrundumPlanning && (
-                <div className="rounded-lg bg-surface-1 px-3 py-3">
+                <div className="tool-inset px-3 py-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-medium text-ink-primary">搓玉预算</p>
@@ -458,7 +460,7 @@ export default function ConfigEditor({
                   value={orundumPlanning.daily_sanity_budget}
                   disabled={!canEdit}
                   onChange={(event) => setOrundumDailySanityBudget(Number(event.currentTarget.value))}
-                  className="number-input-clean w-24 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary disabled:text-ink-muted"
+                  className="number-input-clean tool-field w-24 px-3 py-1 text-right disabled:text-ink-muted"
                 />
               </label>
               <p className="mt-2 text-xs leading-5 text-ink-muted">
@@ -468,20 +470,21 @@ export default function ConfigEditor({
               )}
               <div>
               <p className="mb-2 text-xs font-medium text-ink-muted">排班模式</p>
-              <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
+              <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label="排班模式">
                 {(['maa', 'rotation'] as const).map((mode) => (
                   <button
                     key={mode}
                     type="button"
+                    aria-pressed={scheduleMode === mode}
                     disabled={false}
                     onClick={() => onUpdate((next) => {
                       next.schedule_mode = mode
                       applyCounts(next)
                     })}
-                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+                    className={`tool-secondary-action min-h-11 px-3 text-sm ${
                       scheduleMode === mode
-                        ? 'bg-brand-600 text-white'
-                        : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'
+                        ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100'
+                        : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
                     }`}
                   >
                     {SCHEDULE_MODE_LABELS[mode]}
@@ -510,20 +513,21 @@ export default function ConfigEditor({
             )}
             <div>
               <p className="mb-2 text-xs font-medium text-ink-muted">宿舍规则</p>
-              <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-1 p-1">
+              <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label="宿舍规则">
                 {(['fixed', 'maa_autofill'] as const).map((rule) => (
                   <button
                     key={rule}
                     type="button"
+                    aria-pressed={normalizeDormitoryRule(config.dormitory_rule) === rule}
                     disabled={rotationMode}
                     onClick={() => onUpdate((next) => {
                       next.dormitory_rule = rule
                       applyCounts(next)
                     })}
-                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed ${
+                    className={`tool-secondary-action min-h-11 px-3 text-sm disabled:cursor-not-allowed ${
                       normalizeDormitoryRule(config.dormitory_rule) === rule
-                        ? 'bg-brand-600 text-white'
-                        : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
+                        ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100'
+                        : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
                     }`}
                   >
                     {DORMITORY_RULE_LABELS[rule]}
@@ -552,11 +556,11 @@ export default function ConfigEditor({
               />
             </label>
             {rotationMode ? (
-              <p className="rounded-lg bg-surface-1 px-3 py-2 text-xs leading-5 text-ink-muted">
+              <p className="tool-inset px-3 py-2 text-xs leading-5 text-ink-muted">
                 游戏内轮换按两班生成，菲亚梅塔不会参与计算。
               </p>
             ) : config.Fiammetta?.enable && (
-              <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
+              <p className="tool-alert tool-alert--warning px-3 py-2 text-xs leading-5">
                 菲亚梅塔按固定 8-8-8 换班节奏计算目标。
               </p>
             )}
@@ -608,7 +612,7 @@ export default function ConfigEditor({
                   }
                   applyCounts(next)
                 })}
-                className="w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary disabled:text-ink-muted"
+                className="tool-field disabled:text-ink-muted"
               >
                 <option value="pre">换班前</option>
                 <option value="post">换班后</option>
@@ -636,7 +640,7 @@ export default function ConfigEditor({
       </div>
       )}
       {validationMessage && (
-        <p className="mt-4 text-sm text-warning">{validationMessage}</p>
+        <p className="tool-alert tool-alert--warning mt-4" role="alert">{validationMessage}</p>
       )}
     </section>
   )
@@ -647,7 +651,7 @@ function PresetButton({ label, onClick }: { label: string; onClick: () => void }
     <button
       type="button"
       onClick={onClick}
-      className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary"
+      className="tool-secondary-action px-3 py-2 text-sm"
     >
       {label}
     </button>
@@ -775,7 +779,7 @@ function IntermediateInventoryField({
   }
 
   return (
-    <label className="block rounded-lg bg-surface-1 px-3 py-3 text-sm">
+    <label className="tool-inset block px-3 py-3 text-sm">
       <span className="flex items-center justify-between gap-3">
         <span className="text-ink-secondary">{label}</span>
         <input
@@ -797,7 +801,7 @@ function IntermediateInventoryField({
               event.currentTarget.blur()
             }
           }}
-          className="number-input-clean w-24 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary disabled:text-ink-muted"
+          className="number-input-clean tool-field w-24 px-3 py-1 text-right disabled:text-ink-muted"
         />
       </span>
     </label>
@@ -854,19 +858,19 @@ function ShiftHoursEditor({
           onKeyDown={(event) => {
             if (event.key === 'Enter') commitDraft()
           }}
-          className="min-h-11 min-w-0 flex-1 rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm tabular-nums text-ink-primary disabled:text-ink-muted"
+          className="tool-field min-w-0 flex-1 tabular-nums"
         />
         {canEdit && (
           <button
             type="button"
             onClick={commitDraft}
-            className="min-h-11 rounded-lg bg-surface-2 px-4 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/45"
+            className="tool-secondary-action"
           >
             应用间隔
           </button>
         )}
       </div>
-      <p id="config-shift-hours-help" className={`mt-2 text-xs leading-5 ${error ? 'text-error' : 'text-ink-muted'}`}>
+      <p id="config-shift-hours-help" role={error ? 'alert' : undefined} className={`mt-2 text-xs leading-5 ${error ? 'text-error' : 'text-ink-muted'}`}>
         {error ?? '使用短横线或逗号分隔，例如 12-6-6；最多 6 班，总计 24 小时。'}
       </p>
     </div>
@@ -911,7 +915,7 @@ function DroneTargetsInput({
         }
       }}
       placeholder="龙门币，赤金，龙门币"
-      className="w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted disabled:text-ink-muted"
+      className="tool-field placeholder:text-ink-muted disabled:text-ink-muted"
     />
   )
 }
@@ -964,7 +968,7 @@ function CounterField({
             event.currentTarget.blur()
           }
         }}
-        className="number-input-clean w-full rounded-lg border border-surface-4 bg-surface-1 px-3 py-2 text-sm text-ink-primary"
+        className="number-input-clean tool-field"
       />
     </label>
   )
@@ -972,7 +976,7 @@ function CounterField({
 
 function ReadOnlyMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg bg-surface-1 px-3 py-2">
+    <div className="tool-inset px-3 py-2">
       <dt className="text-xs text-ink-muted">{label}</dt>
       <dd className="mt-1 font-semibold text-ink-primary">{value}</dd>
     </div>
@@ -997,7 +1001,7 @@ function ProductGroupEditor({
       <p className="mb-2 text-xs font-medium text-ink-muted">{label}</p>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
         {products.map((product) => (
-        <label key={product} className="flex items-center justify-between gap-3 rounded-lg bg-surface-1 px-3 py-2 text-sm">
+        <label key={product} className="tool-inset flex items-center justify-between gap-3 px-3 py-2 text-sm">
           <span className="text-ink-secondary">{PRODUCT_LABELS[product] ?? product}</span>
           {canEdit ? (
             <ProductCountInput
@@ -1054,7 +1058,7 @@ function ProductCountInput({
           event.currentTarget.blur()
         }
       }}
-      className="number-input-clean w-16 rounded-md border border-surface-4 bg-surface-0 px-3 py-1 text-right text-ink-primary"
+      className="number-input-clean tool-field w-16 px-3 py-1 text-right"
     />
   )
 }

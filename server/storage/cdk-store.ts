@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg'
-import { query } from './postgres'
+import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import type { CdkRecord, CdkRecordStore } from '../handlers/license-utils'
 
@@ -105,8 +105,39 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
       }
       throw new Error('CDK record changed too frequently to update safely')
     },
-    incrementScheduleGenerateCount: async (key) => {
+    incrementScheduleGenerateCount: async (key, jobId) => {
       await ensureSchema()
+      if (jobId) {
+        return withTransaction(async (client) => {
+          const effect = await client.query(
+            `insert into optimization_job_effects (job_id, effect_type, metadata_json, applied_at)
+             values ($1, 'cdk_schedule_generate', $2::jsonb, now())
+             on conflict (job_id, effect_type) do nothing
+             returning job_id`,
+            [jobId, JSON.stringify({ key })],
+          )
+          if (!effect.rowCount) return true
+          const result = await client.query(
+            `update cdk_records
+             set record_json = jsonb_set(
+                   record_json,
+                   '{schedule_generate_count}',
+                   to_jsonb(coalesce(nullif(record_json->>'schedule_generate_count', '')::integer, 0) + 1),
+                   true
+                 ),
+                 record_revision = record_revision + 1,
+                 updated_at = now()
+             where key = $1 and status = 'used'`,
+            [key],
+          )
+          if (result.rowCount === 1) return true
+          await client.query(
+            `delete from optimization_job_effects where job_id = $1 and effect_type = 'cdk_schedule_generate'`,
+            [jobId],
+          )
+          return false
+        })
+      }
       const result = await query(
         `update cdk_records
          set record_json = jsonb_set(

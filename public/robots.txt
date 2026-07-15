@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /tool/
+Disallow: /admin/
+Disallow: /reset-password
+Disallow: /cancel-account-deletion
+
+Sitemap: https://maatool.com/sitemap.xml

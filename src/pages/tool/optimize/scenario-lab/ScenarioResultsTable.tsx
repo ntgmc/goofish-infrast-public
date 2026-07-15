@@ -21,7 +21,7 @@ export default function ScenarioResultsTable({
 
   return (
     <div>
-      <div className="hidden max-w-full overflow-x-auto rounded-lg border border-surface-3 md:block">
+      <div className="tool-inset hidden max-w-full overflow-x-auto md:block">
         <table className="min-w-[1320px] border-collapse text-left text-xs">
           <thead className="bg-surface-2 text-ink-secondary">
             <tr>
@@ -46,7 +46,7 @@ export default function ScenarioResultsTable({
               return (
                 <tr key={point.id} className={selected ? 'bg-brand-600/10' : 'bg-surface-1 hover:bg-surface-2/70'}>
                   <td className={`sticky left-0 z-10 p-0 ${selected ? 'bg-surface-2' : 'bg-surface-1'}`}>
-                    <button type="button" onClick={() => onSelect(point.id)} className="min-h-11 w-72 px-3 py-2 text-left font-medium text-ink-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-500/45">
+                    <button type="button" onClick={() => onSelect(point.id)} aria-pressed={selected} className="min-h-11 w-72 px-3 py-2 text-left font-medium text-ink-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-500/45">
                       <span className="block">{productionPlanLabel(point)}</span>
                       <span className="mt-0.5 block text-[11px] font-normal text-ink-muted">{scheduleLabel(point)} · {droneLabel(point.droneStrategy)}</span>
                     </button>
@@ -73,7 +73,7 @@ export default function ScenarioResultsTable({
         {sorted.map((point) => {
           const value = metric(point)
           return (
-            <button key={point.id} type="button" onClick={() => onSelect(point.id)} className={`min-h-11 rounded-lg border p-4 text-left focus:outline-none focus:ring-2 focus:ring-brand-500/45 ${point.id === selectedId ? 'border-brand-500 bg-brand-600/10' : 'border-surface-3 bg-surface-1'}`}>
+            <button key={point.id} type="button" onClick={() => onSelect(point.id)} aria-pressed={point.id === selectedId} className={`tool-inset min-h-11 p-4 text-left focus:outline-none focus:ring-2 focus:ring-brand-500/45 ${point.id === selectedId ? 'border-brand-500 bg-brand-600/10' : ''}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink-primary">{productionPlanLabel(point)}</p>
@@ -94,7 +94,7 @@ export default function ScenarioResultsTable({
                   <Stat label="赤金净变动" value={signed(value.pureGoldNetPerDay)} />
                   <Stat label="无人机使用" value={number(value.dronesUsedPerDay)} />
                 </dl>
-              ) : <p className="mt-3 text-xs text-error">{point.error ?? '场景计算失败'}</p>}
+              ) : <p className="mt-3 text-xs text-error" role="alert">{point.error ?? '场景计算失败'}</p>}
             </button>
           )
         })}
@@ -123,13 +123,13 @@ function Cell({ value, strong = false }: { value: string; strong?: boolean }) {
 }
 
 function Status({ point }: { point: ScenarioComparisonPoint }) {
-  const className = point.isFrontier ? 'bg-success/10 text-success' : point.verified ? 'bg-brand-600/10 text-brand-300' : point.status === 'failed' ? 'bg-error/10 text-error' : 'bg-surface-2 text-ink-muted'
+  const className = point.isFrontier ? 'tool-status--success' : point.verified ? 'tool-status--current' : point.status === 'failed' ? 'tool-status--error' : ''
   const label = point.isFrontier ? '前沿' : point.verified ? '精确' : point.status === 'failed' ? '失败' : '快速'
-  return <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold ${className}`}>{label}</span>
+  return <span className={`tool-status whitespace-nowrap ${className}`}>{label}</span>
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-md bg-surface-2 px-2 py-2"><dt className="text-ink-muted">{label}</dt><dd className="mt-0.5 font-semibold tabular-nums text-ink-primary">{value}</dd></div>
+  return <div className="tool-inset px-2 py-2"><dt className="text-ink-muted">{label}</dt><dd className="mt-0.5 font-semibold tabular-nums text-ink-primary">{value}</dd></div>
 }
 
 function metric(point: ScenarioComparisonPoint): ScenarioMetrics | undefined {

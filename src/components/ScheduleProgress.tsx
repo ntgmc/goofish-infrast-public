@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { OptimizeJobPriority } from '../lib/types'
 
 export type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed'
 
@@ -14,7 +15,7 @@ export interface ScheduleProgressState {
   estimateAdjustment?: string;
   queueStatus?: 'queued' | 'running';
   queuePosition?: number | null;
-  priority?: 'paid' | 'analysis' | 'standard';
+  priority?: OptimizeJobPriority;
   jobId?: string;
   observedRunning?: boolean;
   percentFloor?: number;
@@ -46,10 +47,6 @@ export default function ScheduleProgress({ progress, className = '', variant = '
   const percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
   const task = useMemo(() => getTaskView(progress, rawPercent, now), [progress, rawPercent, now])
   const compact = variant === 'embedded'
-  const meterSizeClass = compact ? 'h-24 w-24' : 'h-28 w-28 sm:h-32 sm:w-32'
-  const meterStyle = {
-    background: `conic-gradient(var(--color-brand-500) ${percent * 3.6}deg, color-mix(in oklch, var(--color-surface-3) 82%, transparent) 0deg)`,
-  } satisfies CSSProperties
 
   useEffect(() => {
     setPercentFloor((current) => {
@@ -75,71 +72,60 @@ export default function ScheduleProgress({ progress, className = '', variant = '
 
   return (
     <section
-      className={`schedule-task-shell rounded-xl border border-surface-3 bg-surface-1 ${compact ? 'p-4' : 'p-5 sm:p-6'} ${className}`}
+      className={`tool-panel ${compact ? 'p-4' : 'p-5 sm:p-6'} ${className}`}
       data-status={task.status}
       aria-live="polite"
       aria-label={progress.mode === 'generate' ? '排班生成任务状态' : progress.mode === 'scenario' ? '场景对比任务状态' : '练度建议任务状态'}
     >
-      <div className="relative z-10">
-        <div className={`flex ${compact ? 'flex-col gap-4 sm:flex-row sm:items-center' : 'flex-col gap-5 md:flex-row md:items-center'}`}>
-          <div className={`schedule-task-meter relative grid shrink-0 place-items-center rounded-full ${meterSizeClass}`} style={meterStyle}>
-            <div className="grid h-[calc(100%-14px)] w-[calc(100%-14px)] place-items-center rounded-full border border-surface-3 bg-surface-1 shadow-inner">
-              <div className="text-center">
-                <div className="text-[11px] font-semibold uppercase text-ink-muted">{task.meterLabel}</div>
-                <div className="mt-1 text-2xl font-bold tabular-nums text-ink-primary">{percent}%</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold uppercase text-brand-300">{task.eyebrow}</span>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${task.priorityClass}`}>{task.priorityLabel}</span>
-              {task.jobLabel && <span className="rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-ink-muted">{task.jobLabel}</span>}
+              <p className="tool-eyebrow">{task.eyebrow}</p>
+              <span className={`tool-status ${task.priorityClass}`}>{task.priorityLabel}</span>
+              {task.jobLabel && <span className="tool-status">{task.jobLabel}</span>}
             </div>
             <h3 className={`${compact ? 'mt-2 text-base' : 'mt-3 text-lg'} font-semibold text-ink-primary`}>{task.title}</h3>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-secondary">{task.detail}</p>
-            {task.adjustmentLabel && (
-              <p className="mt-2 inline-flex max-w-full rounded-full border border-brand-500/25 bg-brand-600/10 px-2.5 py-1 text-xs font-medium leading-5 text-brand-200">
-                {task.adjustmentLabel}
-              </p>
-            )}
+            {task.adjustmentLabel && <p className="mt-3 tool-status tool-status--current max-w-full">{task.adjustmentLabel}</p>}
           </div>
-
-          <div className="grid grid-cols-3 gap-2 sm:w-[25rem]">
-            <TaskMiniStat label="预计还需" value={task.remainingLabel} emphasis={task.status === 'overdue'} />
-            <TaskMiniStat label="已等待" value={task.elapsedLabel} />
-            <TaskMiniStat label="同步" value={task.syncLabel} />
+          <div className="shrink-0 text-left sm:text-right">
+            <p className="text-xs font-medium text-ink-muted">{task.meterLabel}</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums tracking-[-0.03em] text-ink-primary">{percent}%</p>
           </div>
         </div>
 
-        <div className={`${compact ? 'mt-4' : 'mt-5'} grid gap-2 sm:grid-cols-4`}>
+        <div
+          className="h-2 overflow-hidden rounded-full bg-surface-3"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          aria-valuetext={task.ariaText}
+        >
+          <div className="schedule-progress-fill h-full rounded-full bg-brand-500" style={{ width: `${percent}%` }} />
+        </div>
+
+        <ol className="grid gap-2 sm:grid-cols-4" aria-label="任务步骤">
           {task.steps.map((step, index) => (
-            <TaskStep key={step.label} label={step.label} detail={step.detail} state={getStepState(task.status, index)} />
+            <li key={step.label}>
+              <TaskStep label={step.label} detail={step.detail} state={getStepState(task.status, index)} />
+            </li>
           ))}
+        </ol>
+
+        <div className="grid grid-cols-3 gap-2">
+          <TaskMiniStat label="预计还需" value={task.remainingLabel} emphasis={task.status === 'overdue'} />
+          <TaskMiniStat label="已等待" value={task.elapsedLabel} />
+          <TaskMiniStat label="同步" value={task.syncLabel} />
         </div>
 
-        <div className="mt-4">
-          <div
-            className="h-2 overflow-hidden rounded-full bg-surface-3"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-            aria-valuetext={task.ariaText}
-          >
-            <div
-              className="schedule-task-fill h-full rounded-full bg-brand-500 transition-[width] duration-300 ease-out"
-              style={{ width: `${percent}%` }}
-            />
+        {!compact && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-surface-3 pt-3 text-xs leading-5 text-ink-muted">
+            <span>{task.footer}</span>
+            <span className="tabular-nums">{task.queueLabel}</span>
           </div>
-          {!compact && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs leading-5 text-ink-muted">
-              <span>{task.footer}</span>
-              <span className="tabular-nums">{task.queueLabel}</span>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </section>
   )
@@ -147,7 +133,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
 
 function TaskMiniStat({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   return (
-    <div className={`min-w-0 rounded-lg border px-3 py-2 ${emphasis ? 'border-brand-500/35 bg-brand-600/10' : 'border-surface-3/70 bg-surface-2/60'}`}>
+    <div className={`tool-inset min-w-0 px-3 py-2 ${emphasis ? 'border-warning/40 bg-warning/10' : 'bg-surface-2/60'}`}>
       <p className="text-[11px] font-medium text-ink-muted">{label}</p>
       <p className="mt-0.5 truncate text-xs font-semibold tabular-nums text-ink-primary" title={value}>{value}</p>
     </div>
@@ -156,7 +142,7 @@ function TaskMiniStat({ label, value, emphasis = false }: { label: string; value
 
 function TaskStep({ label, detail, state }: { label: string; detail: string; state: StepVisualState }) {
   return (
-    <div className={`rounded-lg border px-3 py-2.5 transition-colors duration-200 ${getStepClass(state)}`}>
+    <div className={`tool-inset h-full px-3 py-2.5 transition-colors duration-200 ${getStepClass(state)}`}>
       <div className="flex items-center gap-2">
         <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-semibold ${getStepDotClass(state)}`}>
           {state === 'done' ? <CheckIcon /> : state === 'active' ? <span className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
@@ -235,8 +221,8 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
   const reconnecting = progress.connectionStatus === 'reconnecting'
   const aheadCount = typeof progress.queuePosition === 'number' ? Math.max(0, progress.queuePosition - 1) : null
   const queueLabel = getQueueLabel(progress, aheadCount)
-  const priorityLabel = progress.priority === 'paid' ? '付费优先' : progress.priority === 'analysis' ? '高级分析' : '普通队列'
-  const priorityClass = progress.priority === 'paid' || progress.priority === 'analysis'
+  const priorityLabel = progress.priority === 'priority_coupon' ? '优先计算券' : progress.priority === 'paid' ? '付费优先' : progress.priority === 'analysis' ? '高级分析' : '普通队列'
+  const priorityClass = progress.priority === 'priority_coupon' || progress.priority === 'paid' || progress.priority === 'analysis'
     ? 'bg-brand-600/15 text-brand-300 ring-1 ring-brand-500/25'
     : 'bg-surface-2 text-ink-secondary ring-1 ring-surface-3'
   const jobLabel = progress.jobId ? `任务 #${progress.jobId.slice(0, 8)}` : null
@@ -255,8 +241,8 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
   const footer = reconnecting
     ? '不会重复提交任务；当前任务完成后仍会自动展示结果。'
     : adjustmentLabel
-      ?? (progress.priority === 'paid' && status === 'queued'
-        ? '优先领取已生效；不会中断正在运行的任务。'
+      ?? ((progress.priority === 'paid' || progress.priority === 'priority_coupon') && status === 'queued'
+        ? `${progress.priority === 'priority_coupon' ? '优先计算券' : '优先队列'}已生效；不会中断正在运行的任务。`
         : '页面可保持打开，结果完成后会自动展示。')
   return {
     status,
@@ -310,7 +296,7 @@ function getStatusDetail(
   if (status === 'finishing') return '后台计算已进入收尾阶段，结果完成后会自动展示。'
   if (status === 'running') return `任务已开始执行，预计还需 ${remainingLabel}，会随实际耗时自动校准。`
   if (status === 'queued') {
-    const priorityText = progress.priority === 'paid' ? '付费优先队列' : progress.priority === 'analysis' ? '高级分析队列' : '普通队列'
+    const priorityText = progress.priority === 'priority_coupon' ? '优先计算券队列' : progress.priority === 'paid' ? '付费优先队列' : progress.priority === 'analysis' ? '高级分析队列' : '普通队列'
     return `${priorityText}，${queueLabel}，预计还需 ${remainingLabel}${estimateContext ? `，${estimateContext}` : ''}。`
   }
   return '正在提交优化请求，完成校验后会进入后台队列。'
@@ -389,13 +375,13 @@ function getStepState(status: TaskStatus, index: number): StepVisualState {
 
 function getStepClass(state: StepVisualState): string {
   if (state === 'done') return 'border-brand-500/25 bg-brand-600/10'
-  if (state === 'active') return 'border-brand-500/40 bg-surface-2 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]'
+  if (state === 'active') return 'border-brand-500/40 bg-surface-2'
   return 'border-surface-3/70 bg-surface-2/35'
 }
 
 function getStepDotClass(state: StepVisualState): string {
   if (state === 'done') return 'border-brand-500 bg-brand-500 text-white'
-  if (state === 'active') return 'border-brand-400 text-brand-400 schedule-task-dot'
+  if (state === 'active') return 'border-brand-400 text-brand-400'
   return 'border-surface-4 text-ink-muted'
 }
 

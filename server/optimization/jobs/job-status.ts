@@ -12,8 +12,16 @@ import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJob
 import { OPTIMIZE_ANALYSIS_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
 import { jsonResponse } from './http-core';
 import { prepareOptimizeJob } from './prepare-job';
+import { getServiceLifecycleState } from '../../lifecycle';
 
 export async function submitOptimizationJob(req: Request): Promise<Response> {
+  const lifecycleState = getServiceLifecycleState();
+  if (lifecycleState === 'draining' || lifecycleState === 'stopped') {
+    return new Response(JSON.stringify({ error: '服务正在重启或排空任务，请稍后重试。', code: 'service_draining' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
+    });
+  }
   const idempotencyKey = normalizeIdempotencyKey(req.headers.get('Idempotency-Key'));
   if (!idempotencyKey) return jsonResponse({ error: '缺少或无效的 Idempotency-Key。', code: 'idempotency_key_required' }, 400);
   const requestHash = createHash('sha256').update(await req.clone().text()).digest('hex');
@@ -35,6 +43,8 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       idempotency_key: idempotencyKey,
       request_hash: requestHash,
       free_profile_id: prepared.source === 'free_preview' ? (prepared.payload as { activeProfileId?: string | null }).activeProfileId ?? null : null,
+      reward_user_id: prepared.rewardUserId ?? null,
+      use_priority_coupon: prepared.usePriorityCoupon === true,
     };
     // Third-party test stores predating atomic admission remain read-only test
     // doubles; production and the built-in memory store always implement admitJob.
@@ -141,11 +151,11 @@ export function formatOptimizationJobSnapshot(
 }
 
 export function formatJobPriority(job: Pick<OptimizeJobRecord, 'priority'>): OptimizeJobPriority {
-  return job.priority >= 10 ? 'paid' : job.priority > 0 ? 'analysis' : 'standard';
+  return job.priority >= 20 ? 'priority_coupon' : job.priority >= 10 ? 'paid' : job.priority > 0 ? 'analysis' : 'standard';
 }
 
 export function formatJobPriorityLabel(job: Pick<OptimizeJobRecord, 'priority'>): string {
-  return job.priority >= 10 ? '付费优先' : job.priority > 0 ? '高级分析' : '普通队列';
+  return job.priority >= 20 ? '优先计算券' : job.priority >= 10 ? '付费优先' : job.priority > 0 ? '高级分析' : '普通队列';
 }
 
 export function getOptimizeJobEstimate(job: OptimizeJobRecord): OptimizeDurationEstimate {

@@ -54,7 +54,7 @@ export default function ResultSection({
       )}
 
       {phase === 'idle' && !(loading && progress) && (
-        <div className="rounded-xl border border-dashed border-surface-3 bg-surface-1/70 px-5 py-10 text-center">
+        <div className="tool-panel border-dashed px-5 py-10 text-center">
           <p className="text-base font-semibold text-ink-primary">生成后将在这里显示排班结果</p>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">
             确认总览状态并点击生成，结果会按数据、详情、导入和建议分区展示。
@@ -128,19 +128,20 @@ function PreviewUpgradePanel({
   onSubmit: (event: FormEvent) => void;
 }) {
   return (
-    <form onSubmit={onSubmit} className="mt-5 rounded-xl border border-brand-600/25 bg-surface-1 p-5 sm:p-6">
+    <form onSubmit={onSubmit} className="tool-panel mt-5 border-brand-600/25 p-5 sm:p-6">
       <h3 className="text-base font-semibold text-ink-primary">解锁这个账号</h3>
       <p className="mt-2 text-sm leading-6 text-ink-secondary">输入未使用的 CDK 后，当前预览档案会保留干员数据、森空岛绑定、基建配置和历史记录，并解锁完整结果。</p>
-      {error && <div className="mt-4 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
+      {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <input
           value={cdk}
           onChange={(event) => onCdkChange(event.currentTarget.value)}
-          className="min-h-10 flex-1 rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink-primary"
+          className="tool-field flex-1 font-mono uppercase tracking-wide"
           placeholder="MAA-XXXX-XXXX-XXXX"
+          aria-label="用于解锁的 CDK"
           required
         />
-        <button type="submit" disabled={loading} className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
+        <button type="submit" disabled={loading} className="tool-primary-action">
           {loading ? '解锁中...' : '使用 CDK 解锁'}
         </button>
       </div>

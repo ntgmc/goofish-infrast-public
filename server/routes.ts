@@ -1,5 +1,6 @@
 import adminCdkHandler from './handlers/admin-cdk'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
+import adminInvitationSettingsHandler from './handlers/admin-invitation-settings'
 import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
 import analyzeScheduleHandler from './handlers/analyze-schedule'
@@ -15,16 +16,20 @@ import userProfilesHandler from './handlers/user-profiles'
 import userSklandHandler from './handlers/user-skland'
 import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
+import userInvitationsHandler from './handlers/user-invitations'
+import userRewardsHandler from './handlers/user-rewards'
 import accountDataHandler from './handlers/account-data'
 import usageStatsHandler from './handlers/usage-stats'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
+import { getServiceLifecycleState, isServiceReady } from './lifecycle'
 
 type ApiHandler = (req: Request) => Promise<Response>
 
 const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/cdk', adminCdkHandler as unknown as ApiHandler],
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/invitation-settings', adminInvitationSettingsHandler as unknown as ApiHandler],
   ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
   ['/api/auth/register', authHandler as unknown as ApiHandler],
@@ -57,14 +62,19 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/skland/login/complete', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/login/confirm', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/credential/preview', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/account/select', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/free-preview/login/start', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/free-preview/login/complete', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/free-preview/login/confirm', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/free-preview/credential/preview', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/free-preview/account/select', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/import/refresh', userSklandHandler as unknown as ApiHandler],
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/user/workspace/free-schedule/confirm', userWorkspaceHandler as unknown as ApiHandler],
+  ['/api/user/invitations', userInvitationsHandler as unknown as ApiHandler],
+  ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],
+  ['/api/user/rewards', userRewardsHandler as unknown as ApiHandler],
   ['/api/optimization/jobs', optimizationHandler as unknown as ApiHandler],
   ['/api/optimization/reorder-checks', optimizationHandler as unknown as ApiHandler],
 ])
@@ -78,7 +88,8 @@ async function dispatchRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
 
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
-  if (url.pathname === '/api/health') return handleHealth()
+  if (url.pathname === '/api/health/live') return handleLiveness()
+  if (url.pathname === '/api/health' || url.pathname === '/api/health/ready') return handleReadiness()
   if (url.pathname === '/api/data') {
     if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
     return jsonResponse({ metadata: EFFICIENCY_DATA_METADATA, data: EFFICIENCY_DATA })
@@ -95,15 +106,38 @@ async function dispatchRequest(req: Request): Promise<Response> {
 }
 
 export function getRegisteredApiRoutes(): string[] {
-  return ['/api/health', '/api/data', '/api/optimization/jobs/:jobId', ...ROUTES.keys()].sort()
+  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/optimization/jobs/:jobId', ...ROUTES.keys()].sort()
 }
 
-async function handleHealth(): Promise<Response> {
+function handleLiveness(): Response {
+  return jsonResponse({
+    ok: true,
+    state: getServiceLifecycleState(),
+    version: process.env.BACKEND_VERSION || process.env.APP_VERSION || null,
+  })
+}
+
+async function handleReadiness(): Promise<Response> {
+  const state = getServiceLifecycleState()
+  if (!isServiceReady()) {
+    return jsonResponse({
+      ok: false,
+      state,
+      version: process.env.BACKEND_VERSION || process.env.APP_VERSION || null,
+      storage: {
+        type: 'postgres',
+        configured: hasDatabaseUrl(),
+        ok: false,
+        error: `service is ${state}`,
+      },
+    }, 503)
+  }
   const database = await checkPostgresHealth()
   const ok = hasDatabaseUrl() && database.ok
   return jsonResponse(
     {
       ok,
+      state,
       version: process.env.BACKEND_VERSION || process.env.APP_VERSION || null,
       storage: {
         type: 'postgres',

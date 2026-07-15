@@ -63,10 +63,11 @@ export default function ResultPanel({
       : activeTab
 
   return (
-    <div className="space-y-6">
-      <div className="overflow-hidden rounded-xl bg-surface-1">
-        <div className="flex flex-col gap-5 border-b border-surface-3/60 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-4">
+      <div className="tool-panel overflow-hidden">
+        <div className="tool-panel-header flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
+            <p className="tool-eyebrow">生成结果</p>
             <h2 className="text-lg font-semibold text-ink-primary">
               {isPreview ? '免费个人排班已就绪' : isAnalysis ? '排班表分析完成' : '排班方案已就绪'}
             </h2>
@@ -86,7 +87,7 @@ export default function ResultPanel({
                 <button
                   type="button"
                   onClick={onDownload}
-                  className="rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white transition-colors duration-150 hover:bg-brand-500"
+                  className="tool-primary-action"
                 >
                   下载排班 JSON
                 </button>
@@ -95,7 +96,7 @@ export default function ResultPanel({
                 <button
                   type="button"
                   onClick={onSaveWorkfile}
-                  className="rounded-xl bg-surface-2 px-5 py-3 font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
+                  className="tool-secondary-action"
                 >
                   导出本地备份
                 </button>
@@ -104,7 +105,7 @@ export default function ResultPanel({
           )}
         </div>
         {previewLimit && (
-          <div className="border-b border-brand-600/20 bg-brand-600/10 px-5 py-3 text-sm leading-6 text-brand-300 sm:px-6">
+          <div className="tool-alert tool-alert--warning mx-5 mb-3 mt-5 text-sm sm:mx-6">
             {previewLimit.notice}
             {previewLimit.hidden_room_count > 0 ? ` 另有 ${previewLimit.hidden_room_count} 个房间已隐藏。` : ''}
           </div>
@@ -127,7 +128,7 @@ export default function ResultPanel({
         </div>
 
         <div className="border-b border-surface-3/60 px-5 pt-3 sm:px-6">
-          <div className="flex gap-2 overflow-x-auto" role="tablist" aria-label="排班结果视图">
+          <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="排班结果视图">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -135,10 +136,10 @@ export default function ResultPanel({
                 role="tab"
                 aria-selected={selectedTab === tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex w-max shrink-0 whitespace-nowrap rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors duration-150 ${
+                className={`inline-flex min-h-11 w-max shrink-0 border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${
                   selectedTab === tab.id
-                    ? 'bg-surface-2 text-brand-300'
-                    : 'text-ink-muted hover:bg-surface-2/60 hover:text-ink-primary'
+                    ? 'border-brand-400 text-ink-primary'
+                    : 'border-transparent text-ink-muted hover:border-surface-4 hover:text-ink-primary'
                 }`}
               >
                 {tab.label}
@@ -174,13 +175,13 @@ export default function ResultPanel({
       )}
 
       {selectedTab === 'import' && (
-        <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
+        <section className="tool-panel overflow-hidden p-5 sm:p-6">
           {isRotationMode ? <RotationManualGuide compact /> : <MaaImportGuide compact />}
         </section>
       )}
 
       {selectedTab === 'suggestions' && suggestionsSlot && (
-        <section className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1 p-5 sm:p-6">
+        <section className="tool-panel overflow-hidden p-5 sm:p-6">
           {suggestionsSlot}
         </section>
       )}

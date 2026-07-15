@@ -6,7 +6,7 @@ export function createAccountLicense(profile: UserGameAccount, operators: Licens
     order_hash: profile.cdk_order_hash ?? profile.id.slice(0, 16),
     operators,
     config,
-    permission: normalizePermission(profile.permission),
+    permission: normalizePermission(getEffectiveProfilePermission(profile)),
     issued_at: profile.created_at,
     sig: `account-${profile.id}`,
   }
@@ -24,11 +24,20 @@ export function isFreePreviewProfile(profile: UserGameAccount): boolean {
   return profile.kind === 'free_preview'
 }
 
+export function isFreePreviewTrialActive(profile: UserGameAccount): boolean {
+  return isFreePreviewProfile(profile) && profile.trial?.active === true
+}
+
+export function getEffectiveProfilePermission(profile: UserGameAccount): PermissionMode {
+  return profile.trial?.effective_permission ?? profile.permission
+}
+
 export function isSchedulableProfile(profile: UserGameAccount): boolean {
   return profile.kind === 'cdk' || profile.kind === 'free_preview'
 }
 
 export function getProfileAccessLabel(profile: UserGameAccount): string {
+  if (isFreePreviewTrialActive(profile)) return '高级版限时体验'
   if (isFreePreviewProfile(profile)) return '免费预览'
   if (profile.permission === 'recommended') return '单次重置卡'
   if (profile.permission === 'growth') return '练度提升卡'
@@ -78,10 +87,10 @@ export function validatePasswordInput(value: string): string | null {
 }
 
 export function inputClassName(hasError: boolean, extra = ''): string {
-  const base = 'w-full rounded-lg border px-3 py-2 text-sm text-ink-primary outline-none transition-colors duration-150 focus:ring-2'
+  const base = 'tool-field'
   const state = hasError
     ? 'border-error/70 bg-error/10 focus:border-error focus:ring-error/20'
-    : 'border-surface-4 bg-surface-0 focus:border-brand-500 focus:ring-brand-500/20'
+    : ''
   return `${base} ${state} ${extra}`.trim()
 }
 

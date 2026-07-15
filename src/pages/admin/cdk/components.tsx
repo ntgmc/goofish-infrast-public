@@ -1,4 +1,5 @@
 import { GeneratedPermission, StatusFilter, PermissionFilter, BinaryFilter, CdkTableFilters, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
+import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, SmallButton, formatDate, getNextProductPermission, formatNullableNumber, formatRiskDetail } from '../shared/helpers'
 
 export function CdkTable({ records, selected, filters, busyAction, onFilterChange, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
@@ -15,21 +16,35 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
 }) {
   const allSelected = records.length > 0 && records.every((record) => selected.includes(record.code_hash))
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1">
-      <div className="flex flex-col gap-3 border-b border-surface-3 p-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-2">
+    <section className="tool-panel">
+      <div className="tool-panel-header flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="CDK 状态筛选">
           {(['all', 'unused', 'used', 'frozen', 'revoked'] as StatusFilter[]).map((item) => (
-            <button key={item} type="button" onClick={() => onFilterChange({ status: item })} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${filters.status === item ? 'bg-brand-600 text-white' : 'bg-surface-2 text-ink-secondary hover:bg-surface-3'}`}>
+            <button
+              key={item}
+              type="button"
+              aria-pressed={filters.status === item}
+              onClick={() => onFilterChange({ status: item })}
+              className={`tool-secondary-action min-h-10 px-3 text-sm ${filters.status === item ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100' : ''}`}
+            >
               {item === 'all' ? '全部' : statusLabels[item]}
             </button>
           ))}
         </div>
-        <button type="button" onClick={onBulkRevoke} disabled={selected.length === 0} className="rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error hover:bg-error/20 disabled:bg-surface-2 disabled:text-ink-muted">批量撤销</button>
+        <button
+          type="button"
+          onClick={onBulkRevoke}
+          disabled={selected.length === 0}
+          aria-label={selected.length > 0 ? `批量撤销 ${selected.length} 个已选 CDK` : '请先选择要撤销的 CDK'}
+          className="tool-danger-action text-sm"
+        >
+          批量撤销{selected.length > 0 ? ` (${selected.length})` : ''}
+        </button>
       </div>
       <div className="grid gap-3 border-b border-surface-3 p-4 md:grid-cols-4">
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">权限</span>
-          <select value={filters.permission} onChange={(event) => onFilterChange({ permission: event.currentTarget.value as PermissionFilter })} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary">
+          <select value={filters.permission} onChange={(event) => onFilterChange({ permission: event.currentTarget.value as PermissionFilter })} className="tool-field">
             <option value="all">全部权限</option>
             {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
           </select>
@@ -42,7 +57,7 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
           <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
             <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
               <tr>
-                <th className="w-12 px-4 py-3"><input type="checkbox" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></th>
+                <th className="w-12 px-4 py-3"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label="选择当前筛选中的全部 CDK" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></th>
                 <th className="w-36 px-4 py-3">CDK</th>
                 <th className="w-32 px-4 py-3">状态</th>
                 <th className="w-56 px-4 py-3">数据</th>
@@ -58,7 +73,7 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
               const nextPermission = getNextProductPermission(record.permission)
               return (
                 <tr key={record.code_hash} className="hover:bg-surface-2/50">
-                    <td className="px-4 py-4 align-top"><input type="checkbox" checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
+                    <td className="px-4 py-4 align-top"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label={`选择 CDK ${record.cdk_id}`} checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
                     <td className="px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
                     <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{permissionLabels[record.permission]}</div></td>
                     <td className="px-4 py-4 align-top text-ink-secondary">
@@ -90,12 +105,29 @@ export function BinaryFilterSelect({ label, value, onChange }: { label: string; 
   return (
     <label className="block">
       <span className="mb-1.5 block text-xs font-medium text-ink-muted">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.currentTarget.value as BinaryFilter)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary">
+      <select value={value} onChange={(event) => onChange(event.currentTarget.value as BinaryFilter)} className="tool-field">
         <option value="all">全部</option>
         <option value="yes">是</option>
         <option value="no">否</option>
       </select>
     </label>
+  )
+}
+
+interface CdkDetailPanelProps {
+  detail: AdminCdkDetail;
+  busyAction: string | null;
+  onClose: () => void;
+  onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
+  onUpdateNote: (record: AdminCdkDetail) => Promise<void>;
+  onSetPermission: (record: AdminCdkDetail) => Promise<void>;
+}
+
+export function CdkDetailDialog(props: CdkDetailPanelProps) {
+  return (
+    <AdminDetailDialog labelledBy="admin-cdk-detail-title" onClose={props.onClose}>
+      <CdkDetailPanel {...props} />
+    </AdminDetailDialog>
   )
 }
 
@@ -106,24 +138,17 @@ export function CdkDetailPanel({
   onPatch,
   onUpdateNote,
   onSetPermission,
-}: {
-  detail: AdminCdkDetail;
-  busyAction: string | null;
-  onClose: () => void;
-  onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
-  onUpdateNote: (record: AdminCdkDetail) => Promise<void>;
-  onSetPermission: (record: AdminCdkDetail) => Promise<void>;
-}) {
+}: CdkDetailPanelProps) {
   const nextPermission = getNextProductPermission(detail.permission)
   const canGrantOperatorUpdate = detail.status === 'used' && Boolean(detail.license_order_hash)
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1">
-      <div className="flex flex-col gap-3 border-b border-surface-3 p-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="tool-panel overflow-hidden">
+      <div className="tool-panel-header flex flex-col gap-3 p-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-mono text-base font-semibold text-ink-primary">{detail.cdk_id}</h2>
+            <h2 id="admin-cdk-detail-title" className="font-mono text-base font-semibold text-ink-primary">{detail.cdk_id}</h2>
             <StatusPill status={detail.status} />
-            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{permissionLabels[detail.permission]}</span>
+            <span className="tool-status tool-status--current">{permissionLabels[detail.permission]}</span>
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">订单备注：{detail.order_note || '-'}</p>
         </div>
@@ -134,12 +159,12 @@ export function CdkDetailPanel({
           {canGrantOperatorUpdate && <SmallButton onClick={() => void onPatch(detail, 'grant_operator_update')} loading={busyAction === `grant_operator_update:${detail.code_hash}`}>发放更新</SmallButton>}
           {detail.status === 'frozen' && <SmallButton onClick={() => void onPatch(detail, 'unfreeze')} loading={busyAction === `unfreeze:${detail.code_hash}`} tone="success">解冻</SmallButton>}
           {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => void onPatch(detail, 'revoke')} loading={busyAction === `revoke:${detail.code_hash}`} tone="danger">撤销</SmallButton>}
-          <SmallButton onClick={onClose}>关闭</SmallButton>
+          <SmallButton onClick={onClose} autoFocus>关闭</SmallButton>
         </div>
       </div>
 
       <div className="grid gap-5 p-4 xl:grid-cols-[1fr_1fr]">
-        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+        <section className="tool-inset p-4">
           <h3 className="text-sm font-semibold text-ink-primary">授权摘要</h3>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <DetailItem label="订单标识" value={detail.license_order_hash || '-'} />
@@ -155,7 +180,7 @@ export function CdkDetailPanel({
           </dl>
         </section>
 
-        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+        <section className="tool-inset p-4">
           <h3 className="text-sm font-semibold text-ink-primary">设备和更新</h3>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <DetailItem label="设备绑定" value={(detail.device_signals?.activation_bound ?? detail.activation_bound) ? '已绑定' : '未绑定'} />
@@ -168,13 +193,13 @@ export function CdkDetailPanel({
             <DetailItem label="使用时间" value={formatDate(detail.operator_update_consumed_at ?? null)} />
           </dl>
           {detail.linked_account && (
-            <p className="mt-4 break-all rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-secondary">
+            <p className="tool-inset mt-4 break-all px-3 py-2 text-xs text-ink-secondary">
               关联用户：{detail.linked_account.account_id} / 档案 {detail.linked_account.profile_id}
             </p>
           )}
         </section>
 
-        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+        <section className="tool-inset p-4">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-ink-primary">风控事件</h3>
             <span className="text-xs text-ink-muted">{detail.risk_events?.length ?? 0} 条</span>
@@ -183,7 +208,7 @@ export function CdkDetailPanel({
             {(detail.risk_events ?? []).length === 0 ? (
               <p className="text-sm text-ink-muted">暂无风控事件。</p>
             ) : (detail.risk_events ?? []).slice().reverse().slice(0, 8).map((event, index) => (
-              <article key={`${event.at}-${index}`} className="rounded-lg bg-surface-2 px-3 py-2 text-sm">
+              <article key={`${event.at}-${index}`} className="tool-inset px-3 py-2 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-ink-primary">{event.type}</span>
                   <span className="text-xs text-ink-muted">{formatDate(event.at)}</span>
@@ -195,7 +220,7 @@ export function CdkDetailPanel({
           </div>
         </section>
 
-        <section className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+        <section className="tool-inset p-4">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-ink-primary">干员更新事件</h3>
             <span className="text-xs text-ink-muted">{detail.operator_update_events?.length ?? 0} 条</span>
@@ -204,7 +229,7 @@ export function CdkDetailPanel({
             {(detail.operator_update_events ?? []).length === 0 ? (
               <p className="text-sm text-ink-muted">暂无干员更新事件。</p>
             ) : (detail.operator_update_events ?? []).slice().reverse().slice(0, 8).map((event, index) => (
-              <article key={`${event.at}-${index}`} className="rounded-lg bg-surface-2 px-3 py-2 text-sm">
+              <article key={`${event.at}-${index}`} className="tool-inset px-3 py-2 text-sm">
                 <div className="font-medium text-ink-primary">{event.operator_count} 名干员</div>
                 <div className="mt-1 text-xs text-ink-muted">{formatDate(event.at)}</div>
               </article>
@@ -226,13 +251,13 @@ export function RiskSettingsPanel({
   onChange: (patch: RiskControlSettingsPatch) => Promise<void>;
 }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-3 p-4">
+    <section className="tool-panel">
+      <div className="tool-panel-header flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <h2 className="text-base font-semibold text-ink-primary">风控开关</h2>
           <p className="mt-1 text-sm text-ink-muted">设备风控默认关闭，避免浏览器或网络变化造成误触发。</p>
         </div>
-        <span className="text-xs text-ink-muted">{saving ? '保存中...' : `更新 ${formatDate(settings.updated_at)}`}</span>
+        <span className="text-xs text-ink-muted" role="status" aria-live="polite">{saving ? '保存中...' : `更新 ${formatDate(settings.updated_at)}`}</span>
       </div>
       <div className="grid gap-3 p-4 md:grid-cols-2">
         <RiskToggle
@@ -268,11 +293,11 @@ export function RiskToggle({
   onChange: (checked: boolean) => Promise<void>;
 }) {
   return (
-    <label className={`flex min-h-28 items-start justify-between gap-4 rounded-lg border p-4 transition-colors duration-150 ${checked ? 'border-brand-500/50 bg-brand-500/10' : 'border-surface-3 bg-surface-2/40'} ${disabled ? 'opacity-70' : 'cursor-pointer hover:border-brand-400/60'}`}>
+    <label className={`tool-inset flex min-h-28 items-start justify-between gap-4 p-4 transition-colors duration-150 focus-within:ring-2 focus-within:ring-brand-500/30 focus-within:ring-offset-2 focus-within:ring-offset-surface-1 ${checked ? 'border-brand-500/50 bg-brand-500/10' : ''} ${disabled ? 'opacity-70' : 'cursor-pointer hover:border-brand-400/60'}`}>
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-ink-primary">{label}</span>
         <span className="mt-2 block text-sm leading-6 text-ink-secondary">{description}</span>
-        <span className={`mt-3 inline-flex rounded-md px-2 py-1 text-xs font-semibold ${checked ? 'bg-success/10 text-success' : 'bg-surface-3 text-ink-muted'}`}>{checked ? '已启用' : '已关闭'}</span>
+        <span className={`tool-status mt-3 ${checked ? 'tool-status--success' : ''}`}>{checked ? '已启用' : '已关闭'}</span>
       </span>
       <span className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full p-0.5 transition-colors duration-150 ${checked ? 'bg-brand-600' : 'bg-surface-4'}`}>
         <input
@@ -290,8 +315,8 @@ export function RiskToggle({
 
 export function RiskTable({ records, busyAction, onPatch, onOpenDetail }: { records: AdminCdkRecord[]; busyAction: string | null; onPatch: (record: AdminCdkRecord, action: string) => Promise<void>; onOpenDetail: (record: AdminCdkRecord) => Promise<void> }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1">
-      <div className="border-b border-surface-3 p-4">
+    <section className="tool-panel">
+      <div className="tool-panel-header p-4">
         <h2 className="text-base font-semibold text-ink-primary">风险记录</h2>
       </div>
       <div className="divide-y divide-surface-3">
@@ -314,7 +339,7 @@ export function RiskTable({ records, busyAction, onPatch, onOpenDetail }: { reco
 }
 
 export function Metric({ label, value, tone = 'default' }: { label: string; value: number | string; tone?: 'default' | 'warning' }) {
-return <div className={`rounded-xl border p-4 ${tone === 'warning' ? 'border-warning/30 bg-warning/10' : 'border-surface-3 bg-surface-1'}`}>
+return <div className={`tool-inset p-4 ${tone === 'warning' ? 'border-warning/30 bg-warning/10' : ''}`}>
 <div className="text-2xl font-semibold text-ink-primary">{value}</div>
 <div className="mt-1 text-sm text-ink-muted">{label}</div>
 </div>

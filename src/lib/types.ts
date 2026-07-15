@@ -189,7 +189,7 @@ export interface OptimizeRequest {
   upgrade_task_payload?: UpgradeTaskPayload;
 }
 
-export type OptimizeJobPriority = 'paid' | 'analysis' | 'standard';
+export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard';
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
 export type OptimizeEstimateBucket = 'maa_fiammetta' | 'maa_plain' | 'rotation' | 'scenario_comparison';
 export type OptimizeEstimateSource = 'history_p95' | 'fallback_p95';
@@ -772,6 +772,7 @@ export interface UserGameAccount {
   user_id: string;
   kind: UserGameAccountKind;
   permission: PermissionMode;
+  trial?: FreePreviewTrial | null;
   status: 'active' | 'frozen' | 'revoked';
   cdk_order_hash: string | null;
   display_name: string;
@@ -780,6 +781,14 @@ export interface UserGameAccount {
   operator_count: number;
   updated_at: string | null;
   created_at: string;
+}
+
+export interface FreePreviewTrial {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  active: boolean;
+  effective_permission: 'advanced' | null;
 }
 
 export interface UserWorkspace {
@@ -801,6 +810,7 @@ export interface WorkspaceSavedConfig {
   created_at: string;
   updated_at: string;
   last_used_at: string | null;
+  read_only?: boolean;
 }
 
 export type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legacy';
@@ -840,6 +850,40 @@ export interface AuthSuccessResponse {
   active_profile: UserGameAccount | null;
   workspace: UserWorkspace | null;
   announcement_unread_count?: number;
+}
+
+export type InvitationRewardType = 'priority_compute_coupon';
+export type InvitationRewardRecipient = 'inviter' | 'invitee';
+
+export interface InvitationRewardRule {
+  recipient: InvitationRewardRecipient;
+  type: InvitationRewardType;
+  quantity: number;
+  validity_days: number;
+}
+
+export interface InvitationSettings {
+  version: 1;
+  enabled: boolean;
+  activation_rule: 'first_active_profile';
+  daily_inviter_reward_limit: number;
+  rewards: InvitationRewardRule[];
+  updated_at: string | null;
+}
+
+export interface InvitationSummary {
+  can_invite: boolean;
+  code: string | null;
+  share_url: string | null;
+  stats: { registered: number; activated: number; rewards_earned: number };
+  settings: InvitationSettings;
+}
+
+export interface RewardBalance {
+  type: InvitationRewardType;
+  available: number;
+  permanent: number;
+  next_expiry_at: string | null;
 }
 
 export type DepotValueProfileResponse = AuthSuccessResponse & {

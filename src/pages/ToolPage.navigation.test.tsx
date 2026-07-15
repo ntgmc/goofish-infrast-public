@@ -1,11 +1,21 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import type { AuthUser, UserGameAccount } from '../lib/types'
 import ToolPage from './ToolPage'
 
-const { sessionState } = vi.hoisted(() => ({ sessionState: { current: null as Record<string, unknown> | null } }))
+const { sessionState, toolsSectionImport } = vi.hoisted(() => {
+  let resolveToolsSection!: () => void
+  return {
+    sessionState: { current: null as Record<string, unknown> | null },
+    toolsSectionImport: {
+      pending: new Promise<void>((resolve) => { resolveToolsSection = resolve }),
+      resolve: () => resolveToolsSection(),
+    },
+  }
+})
 
 vi.mock('./tool/useToolSession', () => ({
   useToolSession: () => sessionState.current,
@@ -15,6 +25,11 @@ vi.mock('./OptimizePage', () => ({
   default: () => <main tabIndex={-1} data-route-focus>优化页</main>,
 }))
 
+vi.mock('./tool/dashboard/ToolsSection', async () => {
+  await toolsSectionImport.pending
+  return { default: () => <section>工具内容</section> }
+})
+
 beforeEach(() => {
   sessionState.current = createSession()
 })
@@ -22,6 +37,21 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('ToolPage route guards', () => {
+  it('updates the active dashboard tab immediately while its code is still loading', async () => {
+    const user = userEvent.setup()
+    const router = renderToolRoute('/tool/profiles')
+
+    await user.click(screen.getAllByRole('button', { name: '工具' })[0])
+
+    expect(router.state.location.pathname).toBe('/tool/tools')
+    expect(screen.getAllByRole('button', { name: '工具' })[0]).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('heading', { name: '工具' })).toBeInTheDocument()
+    expect(screen.getByText('正在载入...')).toBeInTheDocument()
+
+    toolsSectionImport.resolve()
+    expect(await screen.findByText('工具内容')).toBeInTheDocument()
+  })
+
   it('keeps a requested deep link while the user is signed out', async () => {
     const router = renderToolRoute('/tool/setup/config', { user: null })
 
