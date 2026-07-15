@@ -82,8 +82,8 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
     } finally { setPrivacyLoading(null) }
   }
 
-  const profileAction = async (action: 'credential/clear' | 'skland/unlink' | 'depot-sample/revoke', profile: UserGameAccount) => {
-    const labels = { 'credential/clear': copy.dashboard.pages_tool_dashboard_SettingsSection_008, 'skland/unlink': copy.dashboard.pages_tool_dashboard_SettingsSection_009, 'depot-sample/revoke': copy.dashboard.pages_tool_dashboard_SettingsSection_010 }
+  const profileAction = async (action: 'credential/clear' | 'depot-sample/revoke', profile: UserGameAccount) => {
+    const labels = { 'credential/clear': copy.dashboard.pages_tool_dashboard_SettingsSection_008, 'depot-sample/revoke': copy.dashboard.pages_tool_dashboard_SettingsSection_010 }
     if (!window.confirm(`${copy.dashboard.pages_tool_dashboard_SettingsSection_011}${labels[action]}${copy.dashboard.pages_tool_dashboard_SettingsSection_012}`)) return
     setPrivacyError(null)
     setPrivacyLoading(`${action}:${profile.id}`)
@@ -173,9 +173,9 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
         {profiles.filter((profile) => profile.skland_binding || profile.kind === 'depot_value').map((profile) => (
           <div key={profile.id} className="tool-inset p-4">
             <p className="font-medium text-ink-primary">{profile.display_name}</p>
+            {profile.skland_binding && <p className="mt-2 text-xs leading-5 text-ink-muted">{copy.dashboard.pages_tool_dashboard_SettingsSection_035}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               {profile.skland_binding && <button type="button" onClick={() => void profileAction('credential/clear', profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">{copy.dashboard.pages_tool_dashboard_SettingsSection_026}</button>}
-              {profile.skland_binding && <button type="button" onClick={() => void profileAction('skland/unlink', profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">{copy.dashboard.pages_tool_dashboard_SettingsSection_027}</button>}
               <button type="button" onClick={() => void profileAction('depot-sample/revoke', profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">{copy.dashboard.pages_tool_dashboard_SettingsSection_028}</button>
             </div>
           </div>

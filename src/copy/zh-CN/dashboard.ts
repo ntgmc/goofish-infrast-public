@@ -174,8 +174,6 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_008: "清除森空岛凭据",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_009: "解绑森空岛",
-  // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_010: "撤回仓库样本",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_011: "确定要",
@@ -210,8 +208,6 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_026: "清除凭据",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_027: "解绑森空岛",
-  // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_028: "撤回仓库样本",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_029: "注销账号",
@@ -225,6 +221,8 @@ export const dashboardCopy = {
   pages_tool_dashboard_SettingsSection_033: "正在提交...",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_034: "发起注销请求",
+  // src/pages/tool/dashboard/SettingsSection.tsx
+  pages_tool_dashboard_SettingsSection_035: "清除凭据只会撤销森空岛授权，不会解除游戏账号绑定；重新授权时必须使用相同的森空岛 UID。",
   // src/pages/tool/dashboard/ToolsSection.tsx
   pages_tool_dashboard_ToolsSection_001: "仓库价值分析器",
   // src/pages/tool/dashboard/ToolsSection.tsx
