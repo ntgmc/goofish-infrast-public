@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
 import {
@@ -54,11 +54,15 @@ export default async (req: Request): Promise<Response> => {
   }
 }
 
-export async function recordUsageEvent(event: UsageEventName, input: UsageEventInput = null): Promise<void> {
+export async function recordUsageEvent(event: UsageEventName, input: UsageEventInput = null, idempotencyKey?: string): Promise<void> {
   const createdAt = new Date().toISOString()
   const date = createdAt.slice(0, 10)
-  const id = randomUUID()
-  const key = `${EVENT_PREFIX}${date}/${createdAt.replace(/[:.]/g, '-')}-${id}.json`
+  const id = idempotencyKey
+    ? createHash('sha256').update(`${event}:${idempotencyKey}`).digest('hex')
+    : randomUUID()
+  const key = idempotencyKey
+    ? `${EVENT_PREFIX}idempotent/${id}.json`
+    : `${EVENT_PREFIX}${date}/${createdAt.replace(/[:.]/g, '-')}-${id}.json`
   const options = normalizeUsageEventInput(input)
   const record: UsageEventRecord = {
     id,

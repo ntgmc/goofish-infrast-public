@@ -27,6 +27,7 @@ export type CreateOptimizationJobRequest =
       ignoreElite: boolean;
       includeCurrent?: boolean;
       historySource?: 'generated' | 'applied_suggestions';
+      use_priority_coupon?: boolean;
     })
   | (OptimizationJobInput & {
       kind: 'upgrade_suggestions';

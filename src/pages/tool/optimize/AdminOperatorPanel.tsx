@@ -12,15 +12,15 @@ export default function AdminOperatorPanel({
   onReplace: () => void;
 }) {
   return (
-    <details className="rounded-xl bg-surface-1">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 sm:px-6">
+    <details className="tool-panel overflow-hidden">
+      <summary className="tool-panel-header flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 sm:px-6">
         <span className="flex flex-wrap items-center gap-2">
           干员数据
-          <span className="rounded-full bg-brand-500/10 px-2.5 py-1 text-xs font-medium text-brand-300">
+          <span className="tool-status tool-status--current">
             {operatorCount} 名干员
           </span>
         </span>
-        <span className="text-xs text-ink-muted">管理员</span>
+        <span className="tool-status">管理员</span>
       </summary>
       <div className="border-t border-surface-3/60 p-5 sm:p-6">
         <p className="text-sm leading-6 text-ink-secondary">
@@ -37,11 +37,11 @@ export default function AdminOperatorPanel({
           <button
             type="button"
             onClick={onReplace}
-            className="rounded-lg bg-surface-2 px-4 py-2 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
+            className="tool-secondary-action text-sm"
           >
             替换干员 JSON
           </button>
-          {status && <span className="text-sm text-ink-secondary">{status}</span>}
+          {status && <span className="tool-status" role="status" aria-live="polite">{status}</span>}
         </div>
       </div>
     </details>

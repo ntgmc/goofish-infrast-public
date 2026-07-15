@@ -315,16 +315,7 @@ async function buildAdminProfileSummary(profile: UserGameAccountRecord) {
           last_imported_at: profile.skland_binding.last_imported_at,
         }
       : null,
-    skland_pending_binding: profile.skland_pending_binding
-      ? {
-          uid: profile.skland_pending_binding.uid,
-          nickname: profile.skland_pending_binding.nickname,
-          channel_name: profile.skland_pending_binding.channel_name,
-          operator_count: profile.skland_pending_binding.operator_count,
-          created_at: profile.skland_pending_binding.created_at,
-          expires_at: profile.skland_pending_binding.expires_at,
-        }
-      : null,
+    skland_pending_binding: summarizeSklandPendingBinding(profile),
     skland_risk: profile.skland_risk
       ? {
           uid_mismatch_count: profile.skland_risk.uid_mismatch_count,
@@ -335,6 +326,28 @@ async function buildAdminProfileSummary(profile: UserGameAccountRecord) {
       : null,
     workspace: summarizeWorkspace(workspace),
     cdk: summarizeCdkForProfile(cdk),
+  }
+}
+
+function summarizeSklandPendingBinding(profile: UserGameAccountRecord) {
+  const pending = profile.skland_pending_binding
+  if (!pending) return null
+  if (pending.stage === 'account_selection') {
+    return {
+      stage: pending.stage,
+      account_count: pending.accounts.length,
+      created_at: pending.created_at,
+      expires_at: pending.expires_at,
+    }
+  }
+  return {
+    stage: pending.stage ?? 'confirmation',
+    uid: pending.uid,
+    nickname: pending.nickname,
+    channel_name: pending.channel_name,
+    operator_count: pending.operator_count,
+    created_at: pending.created_at,
+    expires_at: pending.expires_at,
   }
 }
 

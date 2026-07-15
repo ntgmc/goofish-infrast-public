@@ -19,7 +19,7 @@ export default function AnnouncementBodyEditor({ id, value, onChange }: Props) {
     <div className="mt-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm font-medium text-ink-secondary">正文</span>
-        <div role="tablist" aria-label="公告正文模式" className="inline-flex rounded-lg bg-surface-2 p-1">
+        <div role="tablist" aria-label="公告正文模式" className="tool-inset inline-flex p-1">
           <button
             id={`${id}-edit-tab`}
             type="button"
@@ -27,7 +27,7 @@ export default function AnnouncementBodyEditor({ id, value, onChange }: Props) {
             aria-selected={mode === 'edit'}
             aria-controls={editorId}
             onClick={() => setMode('edit')}
-            className={`min-h-11 rounded-md px-3 text-sm font-semibold transition-colors duration-150 ${mode === 'edit' ? 'bg-surface-0 text-ink-primary shadow-sm' : 'text-ink-secondary hover:text-ink-primary'}`}
+            className={`tool-secondary-action min-h-11 border-transparent bg-transparent px-3 text-sm ${mode === 'edit' ? 'border-surface-3 bg-surface-0 text-ink-primary shadow-sm' : 'text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'}`}
           >
             编辑
           </button>
@@ -38,7 +38,7 @@ export default function AnnouncementBodyEditor({ id, value, onChange }: Props) {
             aria-selected={mode === 'preview'}
             aria-controls={previewId}
             onClick={() => setMode('preview')}
-            className={`min-h-11 rounded-md px-3 text-sm font-semibold transition-colors duration-150 ${mode === 'preview' ? 'bg-surface-0 text-ink-primary shadow-sm' : 'text-ink-secondary hover:text-ink-primary'}`}
+            className={`tool-secondary-action min-h-11 border-transparent bg-transparent px-3 text-sm ${mode === 'preview' ? 'border-surface-3 bg-surface-0 text-ink-primary shadow-sm' : 'text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'}`}
           >
             预览
           </button>
@@ -54,11 +54,11 @@ export default function AnnouncementBodyEditor({ id, value, onChange }: Props) {
             rows={10}
             onChange={(event) => onChange(event.currentTarget.value)}
             aria-describedby={countId}
-            className="min-h-48 max-h-[50dvh] w-full resize-y overflow-y-auto rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-base leading-6 text-ink-primary sm:min-h-56 sm:max-h-96 sm:text-sm"
+            className="tool-field min-h-48 max-h-[50dvh] resize-y overflow-y-auto text-base leading-6 sm:min-h-56 sm:max-h-96 sm:text-sm"
           />
         </div>
       ) : (
-        <div id={previewId} role="tabpanel" aria-labelledby={`${id}-preview-tab`} className="mt-2 max-h-[50dvh] overflow-y-auto rounded-lg border border-surface-4 bg-surface-0 p-3 sm:max-h-96">
+        <div id={previewId} role="tabpanel" aria-labelledby={`${id}-preview-tab`} className="tool-inset mt-2 max-h-[50dvh] overflow-y-auto p-3 sm:max-h-96">
           {value ? <AnnouncementMarkdown>{value}</AnnouncementMarkdown> : <p className="text-sm text-ink-muted">暂无正文可预览。</p>}
         </div>
       )}

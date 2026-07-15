@@ -51,19 +51,20 @@ export default function RedeemSection({ onRedeemed }: { onRedeemed: (payload: Au
 
   return (
     <>
-      <form onSubmit={submit} className="max-w-2xl rounded-xl border border-surface-3 bg-surface-1 p-6">
+      <form onSubmit={submit} className="tool-panel max-w-2xl p-6">
         <h2 className="text-lg font-semibold text-ink-primary">新增账号档案</h2>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">
           CDK 用于解锁正式档案；免费个人排班需要通过森空岛确认游戏 UID 后领取。
         </p>
 
-        <div className="mt-5 inline-flex rounded-lg border border-surface-3 bg-surface-0 p-1">
+        <div className="tool-inset mt-5 inline-flex p-1" role="group" aria-label="新增档案方式">
           <button
             type="button"
             onClick={() => {
               setMode('cdk')
               setError(null)
             }}
+            aria-pressed={mode === 'cdk'}
             className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${mode === 'cdk' ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
           >
             CDK 解锁
@@ -74,35 +75,36 @@ export default function RedeemSection({ onRedeemed }: { onRedeemed: (payload: Au
               setMode('preview')
               setError(null)
             }}
+            aria-pressed={mode === 'preview'}
             className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${mode === 'preview' ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
           >
             免费个人排班
           </button>
         </div>
 
-        {error && <div className="mt-5 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
+        {error && <div className="tool-alert tool-alert--error mt-5" role="alert">{error}</div>}
 
         {mode === 'cdk' ? (
           <label className="mt-5 block">
             <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK</span>
-            <input value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink-primary" required />
+            <input value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="tool-field font-mono uppercase tracking-wide" required />
           </label>
         ) : (
-          <div className="mt-5 rounded-lg border border-brand-600/25 bg-brand-600/10 px-4 py-3 text-sm leading-6 text-brand-300">
+          <div className="tool-alert tool-alert--warning mt-5">
             免费个人排班会展示完整游戏内轮换队列，但不提供 MAA JSON 下载、原始数据、高级分析、批量导出或商用授权。
           </div>
         )}
 
         <label className="mt-4 block">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">档案名称</span>
-          <input value={displayName} onChange={(event) => setDisplayName(event.currentTarget.value)} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder={mode === 'preview' ? '例如：免费排班' : '例如：主账号'} />
+          <input value={displayName} onChange={(event) => setDisplayName(event.currentTarget.value)} className="tool-field" placeholder={mode === 'preview' ? '例如：免费排班' : '例如：主账号'} />
         </label>
         <label className="mt-4 block">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">备注</span>
-          <textarea value={note} onChange={(event) => setNote(event.currentTarget.value)} rows={4} className="w-full rounded-lg border border-surface-4 bg-surface-0 px-3 py-2 text-sm text-ink-primary" placeholder="可填写账号用途、区服或其他备注" />
+          <textarea value={note} onChange={(event) => setNote(event.currentTarget.value)} rows={4} className="tool-field resize-y" placeholder="可填写账号用途、区服或其他备注" />
         </label>
-        <button type="submit" disabled={loading} className="mt-5 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-500 disabled:bg-surface-3 disabled:text-ink-muted">
-          {loading ? 'Working...' : mode === 'preview' ? '通过森空岛领取免费个人排班' : 'Redeem CDK'}
+        <button type="submit" disabled={loading} className="tool-primary-action mt-5">
+          {loading ? '处理中...' : mode === 'preview' ? '通过森空岛领取免费个人排班' : '兑换 CDK'}
         </button>
       </form>
       <SklandBindingDialog

@@ -10,6 +10,7 @@ import { validateRequestLicense, recordScheduleGenerate, scheduleFailure, resolv
 import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammettaEnabled, resolveOptimizeDurationEstimate } from './job-status';
 import { buildScenarioComparisonEstimate } from './job-status';
 import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
+import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../../free-preview-trial';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -27,6 +28,10 @@ export async function prepareOptimizeJob(
   try {
     const body = await req.json() as CreateOptimizationJobRequest;
     isScenarioComparison = body.kind === 'scenario_comparison';
+    const rawBody = body as unknown as Record<string, unknown>;
+    if ('use_priority_coupon' in rawBody && typeof rawBody.use_priority_coupon !== 'boolean') {
+      return fail({ error: 'use_priority_coupon 必须是布尔值。', code: 'priority_coupon_not_applicable' }, 400);
+    }
     const operators = body.operators;
     const config = body.config;
     const license = body.identity?.type === 'license' ? body.identity.license : undefined;
@@ -37,6 +42,11 @@ export async function prepareOptimizeJob(
     const suggestions_only = body.kind === 'upgrade_suggestions';
     const upgrade_task_payload = body.kind === 'upgrade_suggestions' ? body.upgradeTaskPayload : undefined;
     const history_source = body.kind === 'schedule' ? body.historySource : undefined;
+    const usePriorityCoupon = rawBody.use_priority_coupon === true;
+
+    if (usePriorityCoupon && (body.kind !== 'schedule' || body.identity?.type !== 'profile')) {
+      return fail({ error: '优先计算券仅适用于已登录账号档案的主排班计算。', code: 'priority_coupon_not_applicable' }, 400);
+    }
 
     if (isScenarioComparison && body.identity?.type !== 'profile') {
       return fail({ error: '场景对比实验室必须使用已登录的账号档案。' }, 403);
@@ -56,6 +66,7 @@ export async function prepareOptimizeJob(
     let activeProfileId: string | null = null;
     let activeProfile: UserGameAccountRecord | null = null;
     let isPreviewProfile = false;
+    let isPreviewTrial = false;
 
     if (auth) {
       activeProfileId = typeof profile_id === 'string' && profile_id ? profile_id : auth.activeProfile?.id ?? null;
@@ -74,6 +85,7 @@ export async function prepareOptimizeJob(
       }
       activeProfile = profile;
       isPreviewProfile = isFreePreviewProfile(profile);
+      isPreviewTrial = isFreePreviewTrialActive(profile);
       if (isPreviewProfile && !profile.skland_binding) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: 'free_preview', source: 'free_preview' });
         return fail({ error: '免费个人排班档案必须先绑定森空岛后才能生成排班。' }, 403);
@@ -93,7 +105,7 @@ export async function prepareOptimizeJob(
         order_hash: profile.cdk_order_hash || profile.id.slice(0, 16),
         operators,
         config,
-        permission: profile.permission,
+        permission: getEffectiveProfilePermission(profile),
         issued_at: profile.created_at,
         sig: 'account-' + profile.id,
       };
@@ -107,7 +119,7 @@ export async function prepareOptimizeJob(
       effectiveLicense = licenseCheck.license;
     }
 
-    const optimizePermission: OptimizeConfigPermission = isPreviewProfile
+    const optimizePermission: OptimizeConfigPermission = isPreviewProfile && !isPreviewTrial
       ? 'free_preview'
       : getPermissionMode(effectiveLicense);
     const scheduleUsageBase: Partial<ScheduleUsageContext> = {
@@ -162,13 +174,13 @@ export async function prepareOptimizeJob(
       }
     }
 
-    const canUseUpgrades = !isPreviewProfile && canUseUpgradeFeatures(effectiveLicense);
+    const canUseUpgrades = (!isPreviewProfile || isPreviewTrial) && canUseUpgradeFeatures(effectiveLicense);
     if (!canUseUpgrades && (ignore_elite || include_current || suggestions_only)) {
       scheduleUsage = scheduleFailure('permission_denied', scheduleUsageBase);
       return fail({ error: '当前套餐不包含练度提升建议。' }, 403);
     }
 
-    const configForPermission = isPreviewProfile
+    const configForPermission = isPreviewProfile && !isPreviewTrial
       ? resolveFreePreviewConfig(config)
       : resolveConfigForPermission(getPermissionMode(effectiveLicense), config);
     if (!configForPermission.ok) {
@@ -197,6 +209,8 @@ export async function prepareOptimizeJob(
           priorityValue: 5,
           permission: optimizePermission,
           source: 'scenario_comparison',
+          rewardUserId: null,
+          usePriorityCoupon: false,
           payload: {
             version: 3,
             kind: 'scenario_comparison',
@@ -221,7 +235,7 @@ export async function prepareOptimizeJob(
       ? await getWorkspace(activeProfileId) ?? emptyWorkspace(activeProfileId)
       : null;
     let freeScheduleDecision: Extract<FreeScheduleGenerateDecision, { ok: true }> | null = null;
-    if (isPreviewProfile && activeProfileId && previewWorkspaceForGeneration) {
+    if (isPreviewProfile && !isPreviewTrial && activeProfileId && previewWorkspaceForGeneration) {
       const decision = resolveFreeScheduleGenerateDecision(previewWorkspaceForGeneration.free_schedule_entitlement);
       if (!decision.ok) {
         scheduleUsage = scheduleFailure('permission_denied', scheduleUsageBase);
@@ -242,7 +256,7 @@ export async function prepareOptimizeJob(
     const source: OptimizeJobSource = suggestions_only
       ? 'optimize_suggestions'
       : isPreviewProfile ? 'free_preview' : auth ? 'account_profile' : 'license_file';
-    const priority: OptimizeJobPriority = isPreviewProfile ? 'standard' : 'paid';
+    const priority: OptimizeJobPriority = usePriorityCoupon ? 'priority_coupon' : isPreviewProfile ? 'standard' : 'paid';
     const ownerKey = activeProfileId ? 'profile:' + activeProfileId : 'license:' + effectiveLicense.order_hash;
     const estimate = await resolveOptimizeDurationEstimate(estimateBucket);
 
@@ -251,9 +265,11 @@ export async function prepareOptimizeJob(
       prepared: {
         ownerKey,
         priority,
-        priorityValue: priority === 'paid' ? 10 : 0,
+        priorityValue: priority === 'priority_coupon' ? 20 : priority === 'paid' ? 10 : 0,
         permission: scheduleUsageBase.permission ?? null,
         source,
+        rewardUserId: usePriorityCoupon ? auth?.user.id ?? null : null,
+        usePriorityCoupon,
         payload: {
           version: 2,
           submittedAt,
@@ -264,6 +280,7 @@ export async function prepareOptimizeJob(
           scheduleUsageBase,
           activeProfileId,
           isPreviewProfile,
+          isPreviewTrial,
           freeScheduleDecision,
           estimate,
           request: { ignore_elite, include_current, suggestions_only, upgrade_task_payload, history_source },

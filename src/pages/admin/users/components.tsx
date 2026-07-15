@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
 import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, permissionLabels, appUserStatusLabels } from '../contracts'
+import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, UserStatusPill, SmallButton, formatDate, getAdminProfileAccessLabel, formatAdminProfileAccess, formatOperatorValue } from '../shared/helpers'
 
 export interface UserDetailPanelProps {
@@ -22,73 +22,10 @@ export interface UserDetailPanelProps {
 }
 
 export function UserDetailDialog(props: UserDetailPanelProps) {
-  const dialogRef = useRef<HTMLDivElement>(null)
-  const returnFocusRef = useRef<HTMLElement | null>(null)
-  const onCloseRef = useRef(props.onClose)
-  onCloseRef.current = props.onClose
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-
-    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const focusFrame = window.requestAnimationFrame(() => {
-      const preferredTarget = dialog.querySelector<HTMLElement>('[data-dialog-initial-focus]')
-      const focusTarget = preferredTarget ?? dialog
-      focusTarget.focus()
-    })
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current()
-    }
-    document.addEventListener('keydown', handleEscape)
-
-    return () => {
-      window.cancelAnimationFrame(focusFrame)
-      document.removeEventListener('keydown', handleEscape)
-      document.body.style.overflow = previousOverflow
-      returnFocusRef.current?.focus()
-    }
-  }, [])
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 sm:p-8"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) props.onClose()
-      }}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="admin-user-detail-title"
-        tabIndex={-1}
-        className="max-h-full w-full max-w-6xl overflow-y-auto rounded-xl bg-surface-1 shadow-2xl focus:outline-none"
-        onKeyDown={(event) => {
-          if (event.key !== 'Tab') return
-          const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-          ))
-          if (focusable.length === 0) {
-            event.preventDefault()
-            return
-          }
-          const first = focusable[0]
-          const last = focusable[focusable.length - 1]
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault()
-            last.focus()
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault()
-            first.focus()
-          }
-        }}
-      >
-        <UserDetailPanel {...props} />
-      </div>
-    </div>
+    <AdminDetailDialog labelledBy="admin-user-detail-title" onClose={props.onClose}>
+      <UserDetailPanel {...props} />
+    </AdminDetailDialog>
   )
 }
 
@@ -112,13 +49,13 @@ export function UserDetailPanel({
 }: UserDetailPanelProps) {
   const user = detail.user
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1">
-      <div className="flex flex-col gap-3 border-b border-surface-3 p-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="tool-panel overflow-hidden">
+      <div className="tool-panel-header flex flex-col gap-3 p-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="admin-user-detail-title" className="break-all text-lg font-semibold text-ink-primary">{user.email}</h2>
             <UserStatusPill status={user.status} />
-            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{formatAdminProfileAccess(user.profile_access)}</span>
+            <span className="tool-status tool-status--current">{formatAdminProfileAccess(user.profile_access)}</span>
           </div>
           <p className="mt-2 break-all text-sm text-ink-muted">用户 ID：{user.id}</p>
         </div>
@@ -141,7 +78,7 @@ export function UserDetailPanel({
 
         <div className="mt-5 space-y-4">
           {detail.profiles.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-surface-4 bg-surface-0 px-4 py-8 text-center text-sm text-ink-muted">该用户暂无档案。</div>
+            <div className="tool-inset border-dashed px-4 py-8 text-center text-sm text-ink-muted">该用户暂无档案。</div>
           ) : detail.profiles.map((profile) => (
             <ProfileDetailCard
               key={profile.id}
@@ -199,13 +136,13 @@ export function ProfileDetailCard({
       : '-'
   const riskCount = profile.skland_risk?.uid_mismatch_count ?? 0
   return (
-    <article className="rounded-lg border border-surface-3 bg-surface-0 p-4">
+    <article className="tool-inset p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-semibold text-ink-primary">{profile.display_name || '账号档案'}</h3>
             <UserStatusPill status={profile.status} />
-            <span className="rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold text-ink-secondary">{getAdminProfileAccessLabel(profile)}</span>
+            <span className="tool-status tool-status--current">{getAdminProfileAccessLabel(profile)}</span>
           </div>
           <p className="mt-2 break-all text-xs text-ink-muted">档案 ID：{profile.id}</p>
           {profile.note && <p className="mt-2 text-sm text-ink-secondary">{profile.note}</p>}
@@ -238,7 +175,7 @@ export function ProfileDetailCard({
       </dl>
 
       {profile.cdk && (
-        <div className="mt-4 rounded-lg bg-surface-2 p-3 text-sm">
+        <div className="tool-inset mt-4 p-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono font-medium text-ink-primary">{profile.cdk.cdk_id}</span>
             <StatusPill status={profile.cdk.status} />
@@ -269,9 +206,9 @@ export function ProfileOperatorsPanel({ data }: { data: AdminProfileOperatorData
           <p className="mt-1 text-xs text-ink-muted">生成时间：{formatDate(data.generated_at)}</p>
         </div>
         <div className="grid gap-2 text-xs text-ink-secondary sm:grid-cols-3 lg:min-w-[420px]">
-          <span className="rounded-md bg-surface-2 px-2 py-1">总记录 {data.total_operator_records}</span>
-          <span className="rounded-md bg-surface-2 px-2 py-1">拥有 {data.owned_operator_count}</span>
-          <span className="rounded-md bg-surface-2 px-2 py-1">更新 {formatDate(data.profile.workspace_updated_at)}</span>
+          <span className="tool-status">总记录 {data.total_operator_records}</span>
+          <span className="tool-status tool-status--success">拥有 {data.owned_operator_count}</span>
+          <span className="tool-status">更新 {formatDate(data.profile.workspace_updated_at)}</span>
         </div>
       </div>
       <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
@@ -279,7 +216,7 @@ export function ProfileOperatorsPanel({ data }: { data: AdminProfileOperatorData
         <DetailItem label="档案状态" value={appUserStatusLabels[data.profile.status]} />
         <DetailItem label="森空岛绑定" value={sklandSummary} />
       </dl>
-      <div className="mt-3 overflow-x-auto rounded-lg border border-surface-3">
+      <div className="tool-inset mt-3 overflow-x-auto">
         <table className="min-w-full text-left text-sm">
           <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
             <tr>

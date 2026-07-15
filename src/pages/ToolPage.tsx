@@ -15,8 +15,9 @@ import {
 import AccountDashboard from './tool/AccountDashboard'
 import AuthPage from './tool/AuthPage'
 import WorkspaceSetupPage from './tool/WorkspaceSetupPage'
-import { isFreePreviewProfile, isSchedulableProfile } from './tool/tool-utils'
+import { isSchedulableProfile } from './tool/tool-utils'
 import { useToolSession } from './tool/useToolSession'
+import { useToolVisitReporter } from './tool/useToolVisitReporter'
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
 
@@ -24,6 +25,7 @@ export default function ToolPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const route = resolveToolRoute(location.pathname)
+  useToolVisitReporter(Boolean(route))
   const {
     authLoading,
     user,
@@ -63,11 +65,14 @@ export default function ToolPage() {
     )
   }
 
-  const navigateDashboard = (section: DashboardSection, options?: { replace?: boolean }) => {
-    navigate(dashboardPath(section), { replace: options?.replace })
+  const navigateToToolPath = (path: string, options?: { replace?: boolean }) => {
+    navigate(path, { replace: options?.replace, flushSync: true })
   }
-  const navigateSetup = (section: WorkspaceSetupSection) => navigate(workspaceSetupPath(section))
-  const navigateOptimize = (section: OptimizeSection) => navigate(optimizePath(section))
+  const navigateDashboard = (section: DashboardSection, options?: { replace?: boolean }) => {
+    navigateToToolPath(dashboardPath(section), options)
+  }
+  const navigateSetup = (section: WorkspaceSetupSection) => navigateToToolPath(workspaceSetupPath(section))
+  const navigateOptimize = (section: OptimizeSection) => navigateToToolPath(optimizePath(section))
 
   if (route.kind === 'dashboard') {
     return (
@@ -126,7 +131,7 @@ export default function ToolPage() {
     return <Navigate to={workspace?.operators ? workspaceSetupPath('config') : workspaceSetupPath('operators')} replace />
   }
 
-  if (route.section === 'lab' && (isFreePreviewProfile(activeProfile) || !canUseScenarioComparison(license))) {
+  if (route.section === 'lab' && !canUseScenarioComparison(license)) {
     return <Navigate to={optimizePath('overview')} replace />
   }
 

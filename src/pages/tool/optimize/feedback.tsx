@@ -9,17 +9,17 @@ export function SmallActionButton({
   children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
-  tone?: 'default' | 'danger';
+  tone?: 'default' | 'danger' | 'primary';
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex min-h-9 items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-muted ${
+      className={`${tone === 'primary' ? 'tool-primary-action' : 'tool-secondary-action'} min-h-11 px-3 py-2 text-xs ${
         tone === 'danger'
-          ? 'bg-error/10 text-error hover:bg-error/15'
-          : 'bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'
+          ? 'border-error/40 bg-error/10 text-error hover:border-error/60 hover:bg-error/15 hover:text-error'
+          : ''
       }`}
     >
       {children}
@@ -32,7 +32,7 @@ export function LicenseSyncPanel() {
     <div
       role="status"
       aria-live="polite"
-      className="rounded-xl border border-brand-600/25 bg-surface-1 p-4"
+      className="tool-panel border-brand-600/25 p-4"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
@@ -59,17 +59,17 @@ export function LicenseSyncPanel() {
 }
 
 export function ResultFallback() {
-  return <div className="rounded-xl border border-surface-3 bg-surface-1 p-5 text-sm text-ink-secondary">正在载入...</div>
+  return <div className="tool-panel p-5 text-sm text-ink-secondary">正在载入...</div>
 }
 
 export function ConfigValidationToast({ message }: { message: string }) {
   return (
     <div
       className="config-validation-toast pointer-events-none fixed left-4 right-4 top-4 z-50 mx-auto max-w-xl sm:left-auto sm:right-6 sm:top-6 sm:mx-0"
-      role="status"
-      aria-live="polite"
+      role="alert"
+      aria-live="assertive"
     >
-      <div className="rounded-lg border border-error/30 bg-surface-1/95 px-4 py-3 shadow-[0_4px_8px_rgba(15,23,42,0.08)] backdrop-blur-sm">
+      <div className="tool-alert tool-alert--error bg-surface-1/95 shadow-[0_4px_8px_rgba(15,23,42,0.08)] backdrop-blur-sm">
         <p className="text-sm font-semibold text-error">处理失败</p>
         <p className="mt-1 text-sm leading-6 text-ink-secondary">{message}</p>
       </div>
@@ -87,21 +87,21 @@ export function InlineErrorPanel({
   onReset: () => void;
 }) {
   return (
-    <div className="mt-4 rounded-lg border border-error/40 bg-error/10 p-4">
+    <div className="tool-alert tool-alert--error mt-4" role="alert">
       <p className="text-sm font-semibold text-error">处理失败</p>
       <p className="mt-1 text-sm leading-6 text-ink-secondary">{message}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={onRetry}
-          className="rounded-lg bg-error px-3 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-error/90"
+          className="tool-primary-action"
         >
           重试
         </button>
         <button
           type="button"
           onClick={onReset}
-          className="rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-3"
+          className="tool-secondary-action"
         >
           重新选择文件
         </button>

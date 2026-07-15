@@ -149,10 +149,10 @@ function LayoutPlanEditor({
   const duplicate = plans.some((plan) => samePlan(plan, draft))
 
   return (
-    <section className="min-w-0 rounded-lg border border-surface-3 bg-surface-2/45 p-3" aria-labelledby={`layout-${layout.id}-title`}>
+    <section className="tool-inset min-w-0 p-3" aria-labelledby={`layout-${layout.id}-title`}>
       <div className="flex items-center justify-between gap-2">
         <h4 id={`layout-${layout.id}-title`} className="text-sm font-semibold text-ink-primary">{layout.id}</h4>
-        <span className="text-xs tabular-nums text-ink-muted">已选 {plans.length}</span>
+        <span className="tool-status tabular-nums">已选 {plans.length}</span>
       </div>
       <div className="mt-3 grid gap-3">
         <SelectField
@@ -185,20 +185,20 @@ function LayoutPlanEditor({
         type="button"
         disabled={duplicate}
         onClick={() => onChange([...plans, draft])}
-        className="mt-3 min-h-11 w-full rounded-lg bg-surface-1 px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-3 hover:text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/45 disabled:cursor-not-allowed disabled:text-ink-muted"
+        className="tool-secondary-action mt-3 w-full"
       >
         {duplicate ? '方案已添加' : '添加生产方案'}
       </button>
       {plans.length > 0 && (
         <ul className="mt-3 space-y-2" aria-label={`${layout.id} 已选生产方案`}>
           {plans.map((plan) => (
-            <li key={planKey(plan)} className="flex min-h-11 items-center gap-2 rounded-lg bg-surface-1 px-3 py-2">
+            <li key={planKey(plan)} className="tool-inset flex min-h-11 items-center gap-2 px-3 py-2">
               <span className="min-w-0 flex-1 text-xs leading-5 text-ink-secondary">{planLabel(plan)}</span>
               <button
                 type="button"
                 onClick={() => onChange(plans.filter((item) => !samePlan(item, plan)))}
                 aria-label={`删除 ${layout.id} ${planLabel(plan)}`}
-                className="min-h-11 shrink-0 rounded-md px-3 text-xs font-medium text-error transition-colors duration-150 hover:bg-error/10 focus:outline-none focus:ring-2 focus:ring-error/35"
+                className="tool-secondary-action min-h-11 shrink-0 border-error/40 bg-error/10 px-3 text-xs text-error hover:border-error/60 hover:bg-error/15 hover:text-error"
               >
                 删除
               </button>
@@ -230,7 +230,7 @@ function SelectField({
         id={id}
         value={value}
         onChange={(event) => onChange(Number(event.currentTarget.value))}
-        className="min-h-11 rounded-md border border-surface-4 bg-surface-1 px-2 text-sm tabular-nums text-ink-primary"
+        className="tool-field tabular-nums"
       >
         {Array.from({ length: max + 1 }, (_, item) => <option key={item} value={item}>{item}</option>)}
       </select>
@@ -240,7 +240,7 @@ function SelectField({
 
 function CheckOption({ id, checked, onChange, children }: { id: string; checked: boolean; onChange: () => void; children: React.ReactNode }) {
   return (
-    <label htmlFor={id} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-surface-3 bg-surface-2/45 px-3 text-sm text-ink-secondary hover:bg-surface-2">
+    <label htmlFor={id} className={`tool-inset flex min-h-11 cursor-pointer items-center gap-2 px-3 text-sm transition-colors duration-150 ${checked ? 'border-brand-500/55 bg-brand-500/10 text-ink-primary' : 'text-ink-secondary hover:bg-surface-2'}`}>
       <input id={id} type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 accent-brand-500" />
       {children}
     </label>

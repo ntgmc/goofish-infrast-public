@@ -17,11 +17,18 @@ import {
   saveFreePreviewPendingClaim,
   saveUserProfile,
   type FreePreviewClaimRecord,
+  type FreePreviewPendingAccountSelectionRecord,
+  type FreePreviewPendingClaimRecord,
+  type FreePreviewPendingConfirmationRecord,
   type SklandBindingRecord,
+  type SklandPendingAccountSelectionRecord,
+  type SklandPendingBindingRecord,
+  type SklandPendingConfirmationRecord,
   type UserGameAccountRecord,
   type UserWorkspaceRecord,
 } from '../storage/user-store'
 import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
+import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
 import {
   createHypergryphScan,
   decryptSklandCredential,
@@ -32,8 +39,10 @@ import {
   getScanCode,
   importSklandOperatorsByCred,
   isSklandCredentialCurrent,
+  listSklandArknightsBindingsByCred,
   SklandClientError,
   type IntermediateInventory,
+  type SklandAccountOption,
   type SklandBindingSummary,
   type SklandImportSummary,
 } from './skland-client'
@@ -122,6 +131,19 @@ export default async (req: Request): Promise<Response> => {
       return createPendingFreePreviewClaimFromCred(auth.user, cred, body.display_name, body.note, source)
     }
 
+    if (pathname.endsWith('/free-preview/account/select')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const body = await readJsonBody(req)
+      if (typeof body.selection_id !== 'string' || !body.selection_id.trim()) {
+        return jsonResponse({ error: '缺少 selection_id。' }, 400)
+      }
+      if (typeof body.uid !== 'string' || !body.uid.trim()) {
+        return jsonResponse({ error: '请选择要导入的森空岛账号。' }, 400)
+      }
+      return selectFreePreviewAccount(auth.user, body.selection_id.trim(), body.uid.trim())
+    }
+
     if (pathname.endsWith('/free-preview/login/confirm')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       ensureSklandCredentialSecret()
@@ -177,6 +199,20 @@ export default async (req: Request): Promise<Response> => {
       return createPendingSklandBindingFromCred(auth.user, profile, cred, source)
     }
 
+    if (pathname.endsWith('/account/select')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const body = await readJsonBody(req)
+      const profile = await requireActiveProfile(auth.user.id, body.profile_id)
+      if (typeof body.selection_id !== 'string' || !body.selection_id.trim()) {
+        return jsonResponse({ error: '缺少 selection_id。' }, 400)
+      }
+      if (typeof body.uid !== 'string' || !body.uid.trim()) {
+        return jsonResponse({ error: '请选择要导入的森空岛账号。' }, 400)
+      }
+      return selectSklandAccount(auth.user, profile, body.selection_id.trim(), body.uid.trim())
+    }
+
     if (pathname.endsWith('/login/confirm')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       ensureSklandCredentialSecret()
@@ -186,7 +222,7 @@ export default async (req: Request): Promise<Response> => {
         return jsonResponse({ error: '缺少 confirmation_id。' }, 400)
       }
       const pending = profile.skland_pending_binding
-      if (!pending || pending.confirmation_id !== body.confirmation_id.trim()) {
+      if (!isSklandConfirmationPending(pending) || pending.confirmation_id !== body.confirmation_id.trim()) {
         await recordSklandImport('failure', 'skland_confirm_invalid', startedAt, profile.id, 'login_confirm')
         return jsonResponse({ error: '森空岛绑定确认已失效，请重新登录森空岛。' }, 400)
       }
@@ -214,7 +250,7 @@ export default async (req: Request): Promise<Response> => {
 
       let imported: SklandImportSummary
       try {
-        imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(pending.encrypted_cred))
+        imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(pending.encrypted_cred), pending.uid)
       } catch (error) {
         if (isFreePreviewProfile(profile)) await deleteFreePreviewClaim(hashFreePreviewUid(pending.uid), profile.id)
         throw error
@@ -246,7 +282,7 @@ export default async (req: Request): Promise<Response> => {
         }, 404)
       }
       try {
-        const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(encryptedCred))
+        const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(encryptedCred), profile.skland_binding!.uid)
         await recordSklandImport('success', 'ok', startedAt, profile.id, 'refresh')
         return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
       } catch (caught) {
@@ -305,10 +341,6 @@ async function createPendingFreePreviewClaimFromCred(
   noteValue?: unknown,
   source?: CredentialSource,
 ): Promise<Response> {
-  const imported = await importSklandOperatorsByCred(cred)
-  const operatorsCheck = validateOperators(imported.operators)
-  if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
-  const preview = toSklandPreview(imported.binding, operatorsCheck.operators.length)
   const existingPreview = (await listProfilesForUser(user.id)).find((profile) => isFreePreviewProfile(profile))
   if (existingPreview?.skland_binding) {
     return jsonResponse({ error: '当前网站账号已经领取过免费个人排班档案。', code: 'free_preview_already_claimed' }, 409)
@@ -317,33 +349,122 @@ async function createPendingFreePreviewClaimFromCred(
     return jsonResponse({ error: '免费个人排班档案当前不可用。' }, 403)
   }
 
+  const accounts = await listSklandArknightsBindingsByCred(cred)
+  const now = new Date()
+  const confirmationId = randomUUID()
+  const displayName = normalizeProfileDisplayName(displayNameValue)
+  const note = normalizeProfileNote(noteValue)
+  const createdAt = now.toISOString()
+  const expiresAt = new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString()
+  if (accounts.length > 1) {
+    const pending: FreePreviewPendingAccountSelectionRecord = {
+      stage: 'account_selection',
+      confirmation_id: confirmationId,
+      user_id: user.id,
+      accounts,
+      encrypted_cred: encryptSklandCredential(cred),
+      display_name: displayName,
+      note,
+      ...(source && { source }),
+      created_at: createdAt,
+      expires_at: expiresAt,
+    }
+    await saveFreePreviewPendingClaim(pending)
+    return accountSelectionResponse(
+      confirmationId,
+      accounts,
+      source === 'bookmarklet'
+        ? '已读取书签脚本凭据，请选择要用于免费个人排班的明日方舟账号。'
+        : '检测到多个明日方舟账号，请选择要用于免费个人排班的账号。',
+    )
+  }
+
+  return createPendingFreePreviewConfirmationFromCred(user, cred, accounts[0].uid, {
+    confirmationId,
+    displayName,
+    note,
+    source,
+    createdAt,
+    expiresAt,
+  })
+}
+
+async function selectFreePreviewAccount(user: AuthPayloadUser, selectionId: string, uid: string): Promise<Response> {
+  const pending = await getFreePreviewPendingClaim(user.id, selectionId)
+  if (!isFreePreviewAccountSelectionPending(pending)) {
+    return jsonResponse({ error: '森空岛账号选择已失效，请重新授权。' }, 400)
+  }
+  if (Date.now() > Date.parse(pending.expires_at)) {
+    await deleteFreePreviewPendingClaim(user.id, selectionId)
+    return jsonResponse({ error: '森空岛账号选择已过期，请重新授权。' }, 400)
+  }
+  if (!pending.accounts.some((account) => account.uid === uid)) {
+    await deleteFreePreviewPendingClaim(user.id, selectionId)
+    return jsonResponse({ error: '所选森空岛账号无效，请重新授权。' }, 400)
+  }
+
+  const cred = decryptSklandCredential(pending.encrypted_cred)
+  const currentAccounts = await listSklandArknightsBindingsByCred(cred)
+  if (!currentAccounts.some((account) => account.uid === uid)) {
+    await deleteFreePreviewPendingClaim(user.id, selectionId)
+    return jsonResponse({ error: '所选账号已不在森空岛绑定列表中，请重新授权。' }, 400)
+  }
+
+  return createPendingFreePreviewConfirmationFromCred(user, cred, uid, {
+    confirmationId: pending.confirmation_id,
+    displayName: pending.display_name,
+    note: pending.note,
+    source: pending.source,
+    createdAt: pending.created_at,
+    expiresAt: pending.expires_at,
+  })
+}
+
+async function createPendingFreePreviewConfirmationFromCred(
+  user: AuthPayloadUser,
+  cred: string,
+  uid: string,
+  options: {
+    confirmationId: string
+    displayName: string
+    note: string
+    source?: CredentialSource
+    createdAt: string
+    expiresAt: string
+  },
+): Promise<Response> {
+  const imported = await importSklandOperatorsByCred(cred, { uid })
+  const operatorsCheck = validateOperators(imported.operators)
+  if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
+  const preview = toSklandPreview(imported.binding, operatorsCheck.operators.length)
+
   const uidHash = hashFreePreviewUid(imported.binding.uid)
   const existingClaim = await getFreePreviewClaim(uidHash)
+  const existingPreview = (await listProfilesForUser(user.id)).find((profile) => isFreePreviewProfile(profile))
   if (existingClaim && existingClaim.profile_id !== existingPreview?.id) {
     return jsonResponse({ error: '该森空岛 UID 已经领取过免费个人排班档案。', code: 'free_preview_uid_claimed' }, 409)
   }
 
-  const now = new Date()
-  const confirmationId = randomUUID()
   await saveFreePreviewPendingClaim({
-    confirmation_id: confirmationId,
+    stage: 'confirmation',
+    confirmation_id: options.confirmationId,
     user_id: user.id,
     uid: imported.binding.uid,
     nickname: imported.binding.nickname,
     channel_name: imported.binding.channel_name,
     encrypted_cred: encryptSklandCredential(cred),
     operator_count: operatorsCheck.operators.length,
-    display_name: normalizeProfileDisplayName(displayNameValue),
-    note: normalizeProfileNote(noteValue),
-    created_at: now.toISOString(),
-    expires_at: new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString(),
+    display_name: options.displayName,
+    note: options.note,
+    created_at: options.createdAt,
+    expires_at: options.expiresAt,
   })
 
   return jsonResponse({
     status: 'confirm_required',
-    confirmation_id: confirmationId,
+    confirmation_id: options.confirmationId,
     skland_preview: preview,
-    warning: source === 'bookmarklet'
+    warning: options.source === 'bookmarklet'
       ? '已读取书签脚本凭据，请确认昵称和 UID 后再创建免费个人排班档案。'
       : '请确认昵称和 UID 后再创建免费个人排班档案。',
   })
@@ -351,7 +472,7 @@ async function createPendingFreePreviewClaimFromCred(
 
 async function confirmFreePreviewClaim(user: AuthPayloadUser, confirmationId: string): Promise<Response> {
   const pending = await getFreePreviewPendingClaim(user.id, confirmationId)
-  if (!pending) {
+  if (!isFreePreviewConfirmationPending(pending)) {
     return jsonResponse({ error: '免费个人排班确认已过期，请重新登录森空岛。' }, 400)
   }
   if (Date.now() > Date.parse(pending.expires_at)) {
@@ -396,7 +517,7 @@ async function confirmFreePreviewClaim(user: AuthPayloadUser, confirmationId: st
 
   try {
     if (!existingPreview) await saveUserProfile(profile)
-    const imported = await saveSklandImport(user.id, profile, decryptSklandCredential(pending.encrypted_cred))
+    const imported = await saveSklandImport(user.id, profile, decryptSklandCredential(pending.encrypted_cred), pending.uid)
     await deleteFreePreviewPendingClaim(user.id, confirmationId)
     return jsonResponse(await buildPayloadWithImport(user, profile.id, imported))
   } catch (error) {
@@ -442,7 +563,7 @@ async function saveDepotValueSklandBinding(
   profile: UserGameAccountRecord,
 ): Promise<AuthSuccessResponse> {
   const pending = profile.skland_pending_binding
-  if (!pending) throw new Error('森空岛绑定确认已失效，请重新登录森空岛。')
+  if (!isSklandConfirmationPending(pending)) throw new Error('森空岛绑定确认已失效，请重新登录森空岛。')
   const now = new Date().toISOString()
   const existingBinding = profile.skland_binding
   await saveUserProfile({
@@ -471,7 +592,93 @@ async function createPendingSklandBindingFromCred(
   cred: string,
   source?: CredentialSource,
 ): Promise<Response> {
-  const imported = await importSklandOperatorsByCred(cred)
+  const accounts = await listSklandArknightsBindingsByCred(cred)
+  const existingUid = profile.skland_binding?.uid
+  if (existingUid) {
+    const matchingAccount = accounts.find((account) => account.uid === existingUid)
+    if (matchingAccount) {
+      return createPendingSklandConfirmationFromCred(user, profile, cred, matchingAccount.uid, source)
+    }
+    const fallbackAccount = accounts.find((account) => account.is_default) ?? accounts[0]
+    const imported = await importSklandOperatorsByCred(cred, { uid: fallbackAccount.uid })
+    const operatorsCheck = validateOperators(imported.operators)
+    if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
+    return handleAccountMismatch(user, profile, toSklandPreview(imported.binding, operatorsCheck.operators.length))
+  }
+
+  const now = new Date()
+  const confirmationId = randomUUID()
+  const createdAt = now.toISOString()
+  const expiresAt = new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString()
+  if (accounts.length > 1) {
+    const pending: SklandPendingAccountSelectionRecord = {
+      stage: 'account_selection',
+      confirmation_id: confirmationId,
+      accounts,
+      encrypted_cred: encryptSklandCredential(cred),
+      ...(source && { source }),
+      created_at: createdAt,
+      expires_at: expiresAt,
+    }
+    await saveUserProfile({ ...profile, skland_pending_binding: pending, updated_at: createdAt })
+    return accountSelectionResponse(
+      confirmationId,
+      accounts,
+      source === 'bookmarklet'
+        ? '书签脚本已读取森空岛凭据。检测到多个明日方舟账号，请选择要导入的账号。'
+        : '检测到多个明日方舟账号，请选择要导入的账号。',
+    )
+  }
+
+  return createPendingSklandConfirmationFromCred(user, profile, cred, accounts[0].uid, source, {
+    confirmationId,
+    createdAt,
+    expiresAt,
+  })
+}
+
+async function selectSklandAccount(
+  user: AuthPayloadUser,
+  profile: UserGameAccountRecord,
+  selectionId: string,
+  uid: string,
+): Promise<Response> {
+  const pending = profile.skland_pending_binding
+  if (!isSklandAccountSelectionPending(pending) || pending.confirmation_id !== selectionId) {
+    return jsonResponse({ error: '森空岛账号选择已失效，请重新授权。' }, 400)
+  }
+  if (Date.now() > Date.parse(pending.expires_at)) {
+    await saveUserProfile({ ...profile, skland_pending_binding: null, updated_at: new Date().toISOString() })
+    return jsonResponse({ error: '森空岛账号选择已过期，请重新授权。' }, 400)
+  }
+  if (!pending.accounts.some((account) => account.uid === uid)) {
+    await saveUserProfile({ ...profile, skland_pending_binding: null, updated_at: new Date().toISOString() })
+    return jsonResponse({ error: '所选森空岛账号无效，请重新授权。' }, 400)
+  }
+
+  const cred = decryptSklandCredential(pending.encrypted_cred)
+  const currentAccounts = await listSklandArknightsBindingsByCred(cred)
+  if (!currentAccounts.some((account) => account.uid === uid)) {
+    await saveUserProfile({ ...profile, skland_pending_binding: null, updated_at: new Date().toISOString() })
+    return jsonResponse({ error: '所选账号已不在森空岛绑定列表中，请重新授权。' }, 400)
+  }
+
+  return createPendingSklandConfirmationFromCred(user, profile, cred, uid, pending.source, {
+    confirmationId: pending.confirmation_id,
+    createdAt: pending.created_at,
+    expiresAt: pending.expires_at,
+  })
+}
+
+async function createPendingSklandConfirmationFromCred(
+  user: AuthPayloadUser,
+  profile: UserGameAccountRecord,
+  cred: string,
+  uid: string,
+  source?: CredentialSource,
+  pendingOptions?: { confirmationId: string; createdAt: string; expiresAt: string },
+): Promise<Response> {
+  const imported = await importSklandOperatorsByCred(cred, { uid })
   const operatorsCheck = validateOperators(imported.operators)
   if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
   const preview = toSklandPreview(imported.binding, operatorsCheck.operators.length)
@@ -487,18 +694,21 @@ async function createPendingSklandBindingFromCred(
   }
 
   const now = new Date()
-  const confirmationId = randomUUID()
+  const confirmationId = pendingOptions?.confirmationId ?? randomUUID()
+  const createdAt = pendingOptions?.createdAt ?? now.toISOString()
+  const expiresAt = pendingOptions?.expiresAt ?? new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString()
   await saveUserProfile({
     ...profile,
     skland_pending_binding: {
+      stage: 'confirmation',
       confirmation_id: confirmationId,
       uid: imported.binding.uid,
       nickname: imported.binding.nickname,
       channel_name: imported.binding.channel_name,
       encrypted_cred: encryptSklandCredential(cred),
       operator_count: operatorsCheck.operators.length,
-      created_at: now.toISOString(),
-      expires_at: new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString(),
+      created_at: createdAt,
+      expires_at: expiresAt,
     },
     updated_at: now.toISOString(),
   })
@@ -554,8 +764,9 @@ async function saveSklandImport(
   userId: string,
   profile: UserGameAccountRecord,
   cred: string,
+  uid: string,
 ): Promise<SklandImportSummary> {
-  const imported = await importSklandOperatorsByCred(cred, { includeInventory: true })
+  const imported = await importSklandOperatorsByCred(cred, { uid, includeInventory: true })
   const operatorsCheck = validateOperators(imported.operators)
   if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
   if (profile.skland_binding?.uid && profile.skland_binding.uid !== imported.binding.uid) {
@@ -632,9 +843,9 @@ function resolveSklandImportConfig(
       lastMessage = configCheck.message
       continue
     }
-    const permissionCheck = isFreePreviewProfile(profile)
+    const permissionCheck = isFreePreviewProfile(profile) && !isFreePreviewTrialActive(profile)
       ? resolveFreePreviewConfig(configCheck.config)
-      : resolveConfigForPermission(profile.permission, configCheck.config)
+      : resolveConfigForPermission(getEffectiveProfilePermission(profile), configCheck.config)
     if (permissionCheck.ok) return { config: permissionCheck.config }
     lastMessage = permissionCheck.message
   }
@@ -746,6 +957,39 @@ function toSklandPreview(binding: SklandBindingSummary, operatorCount: number): 
     channel_name: binding.channel_name,
     operator_count: operatorCount,
   }
+}
+
+function accountSelectionResponse(selectionId: string, accounts: SklandAccountOption[], warning: string): Response {
+  return jsonResponse({
+    status: 'account_selection_required',
+    selection_id: selectionId,
+    skland_accounts: accounts,
+    warning,
+  })
+}
+
+function isSklandAccountSelectionPending(
+  pending: SklandPendingBindingRecord | null | undefined,
+): pending is SklandPendingAccountSelectionRecord {
+  return pending?.stage === 'account_selection'
+}
+
+function isSklandConfirmationPending(
+  pending: SklandPendingBindingRecord | null | undefined,
+): pending is SklandPendingConfirmationRecord {
+  return Boolean(pending && pending.stage !== 'account_selection' && pending.uid)
+}
+
+function isFreePreviewAccountSelectionPending(
+  pending: FreePreviewPendingClaimRecord | null | undefined,
+): pending is FreePreviewPendingAccountSelectionRecord {
+  return pending?.stage === 'account_selection'
+}
+
+function isFreePreviewConfirmationPending(
+  pending: FreePreviewPendingClaimRecord | null | undefined,
+): pending is FreePreviewPendingConfirmationRecord {
+  return Boolean(pending && pending.stage !== 'account_selection' && pending.uid)
 }
 
 function hashFreePreviewUid(uid: string): string {

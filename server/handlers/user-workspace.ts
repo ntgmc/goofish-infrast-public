@@ -12,6 +12,7 @@ import {
 } from '../storage/user-store'
 import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
+import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
 
 const WORKSPACE_SAVED_CONFIG_LIMIT = 20
 const FREE_SCHEDULE_REVISION_LIMIT = 3
@@ -57,13 +58,16 @@ export default async (req: Request): Promise<Response> => {
     if (profile.status !== 'active') return jsonResponse({ error: '账号档案状态不可用。' }, 403)
 
     const isPreviewProfile = isFreePreviewProfile(profile)
+    const isPreviewTrial = isFreePreviewTrialActive(profile)
+    const effectivePermission = getEffectiveProfilePermission(profile)
+    const isRestrictedPreview = isPreviewProfile && !isPreviewTrial
     if (isPreviewProfile && !profile.skland_binding) {
       return jsonResponse({ error: '免费个人排班档案必须先绑定森空岛后才能保存工作区数据。' }, 403)
     }
 
     if (url.pathname.endsWith('/free-schedule/confirm')) {
       if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
-      if (!isPreviewProfile) return jsonResponse({ error: '只有免费个人排班档案需要确认免费方案。' }, 403)
+      if (!isRestrictedPreview) return jsonResponse({ error: '当前档案不需要确认免费方案。' }, 403)
       const workspace = await getProfileWorkspace(profile.id) ?? emptyWorkspace(profile.id)
       const historyItem = typeof body.result_history_id === 'string' && body.result_history_id.trim()
         ? workspace.result_history.find((item) => item.id === body.result_history_id)
@@ -92,7 +96,7 @@ export default async (req: Request): Promise<Response> => {
     let operatorsPatched = false
 
     if ('operators' in body) {
-      if (isPreviewProfile) {
+      if (isRestrictedPreview) {
         return jsonResponse({ error: '免费个人排班档案的干员数据只能通过森空岛导入更新。' }, 403)
       }
       operatorsPatched = true
@@ -111,9 +115,9 @@ export default async (req: Request): Promise<Response> => {
       } else {
         const configCheck = validateConfig(body.config)
         if (!configCheck.ok) return jsonResponse({ error: configCheck.message }, 400)
-        const permissionCheck = isPreviewProfile
+        const permissionCheck = isRestrictedPreview
           ? resolveFreePreviewConfig(configCheck.config)
-          : resolveConfigForPermission(profile.permission, configCheck.config)
+          : resolveConfigForPermission(effectivePermission, configCheck.config)
         if (!permissionCheck.ok) return jsonResponse({ error: permissionCheck.message }, 403)
         next.config = permissionCheck.config
       }
@@ -128,7 +132,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if ('saved_config_action' in body) {
-      const savedConfigResult = applySavedConfigAction(next, body.saved_config_action, profile.permission, isPreviewProfile)
+      const savedConfigResult = applySavedConfigAction(next, body.saved_config_action, effectivePermission, isRestrictedPreview)
       if (!savedConfigResult.ok) return jsonResponse({ error: savedConfigResult.message }, savedConfigResult.status ?? 400)
     }
 
@@ -163,10 +167,16 @@ function applySavedConfigAction(
   workspace: UserWorkspaceRecord,
   rawAction: unknown,
   permission: PermissionMode,
-  isPreviewProfile = false,
+  isRestrictedPreview = false,
 ): SavedConfigActionResult {
   if (!isRecord(rawAction) || typeof rawAction.type !== 'string') {
     return { ok: false, message: '保存方案操作不正确。' }
+  }
+
+  const actionId = typeof rawAction.id === 'string' ? rawAction.id : null
+  const readOnlyTarget = actionId ? workspace.saved_configs.find((item) => item.id === actionId) : null
+  if (readOnlyTarget?.read_only) {
+    return { ok: false, message: '体验期保存的高级配置已只读，不能修改、删除或再次套用。', status: 403 }
   }
 
   if (rawAction.type === 'save') {
@@ -175,7 +185,7 @@ function applySavedConfigAction(
 
     const configCheck = validateConfig(rawAction.config)
     if (!configCheck.ok) return { ok: false, message: configCheck.message }
-    const permissionCheck = isPreviewProfile
+    const permissionCheck = isRestrictedPreview
       ? resolveFreePreviewConfig(configCheck.config)
       : resolveConfigForPermission(permission, configCheck.config)
     if (!permissionCheck.ok) return { ok: false, message: permissionCheck.message, status: 403 }
@@ -183,6 +193,7 @@ function applySavedConfigAction(
     const now = new Date().toISOString()
     const id = typeof rawAction.id === 'string' && rawAction.id ? rawAction.id : randomUUID()
     const existing = workspace.saved_configs.find((item) => item.id === id)
+    if (existing?.read_only) return { ok: false, message: '体验期保存的高级配置已只读，不能覆盖。', status: 403 }
     const duplicate = workspace.saved_configs.find((item) => item.id !== id && item.name === nameResult.name)
     if (duplicate) return { ok: false, message: '已存在同名方案。' }
     if (!existing && workspace.saved_configs.length >= WORKSPACE_SAVED_CONFIG_LIMIT) {

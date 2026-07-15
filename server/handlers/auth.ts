@@ -25,11 +25,11 @@ export default async (req: Request): Promise<Response> => {
   try {
     if (pathname.endsWith('/register')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      const body = await req.json() as { email?: unknown; password?: unknown; cdk?: unknown }
-      const registered = await registerUser(body.email, body.password, body.cdk, req.headers.get('Idempotency-Key'))
+      const body = await req.json() as { email?: unknown; password?: unknown; cdk?: unknown; invite_code?: unknown }
+      const registered = await registerUser(body.email, body.password, body.cdk, req.headers.get('Idempotency-Key'), body.invite_code)
       if (!registered.ok) {
         await recordRegister('failure', startedAt)
-        return jsonResponse({ error: registered.message }, registered.status)
+        return jsonResponse({ error: registered.message, ...(registered.code && { code: registered.code }) }, registered.status)
       }
       await recordRegister('success', startedAt)
       return jsonResponse(await buildAuthPayload(registered.user), 200, { 'Set-Cookie': registered.cookie })

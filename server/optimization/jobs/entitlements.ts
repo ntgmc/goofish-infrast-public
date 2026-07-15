@@ -86,6 +86,7 @@ export async function recordScheduleGenerate(
   cdkRecord: CdkRecord | null,
   context: ScheduleUsageContext,
   startedAt: number,
+  jobId?: string,
 ): Promise<void> {
   try {
     await recordUsageEvent("schedule_generate", {
@@ -99,7 +100,7 @@ export async function recordScheduleGenerate(
       schedule_mode: context.schedule_mode,
       fiammetta_enabled: context.fiammetta_enabled,
       estimate_bucket: context.estimate_bucket,
-    });
+    }, jobId ? `optimize-job/${jobId}/schedule-generate` : undefined);
   } catch (error) {
     console.warn("usage stats schedule generate skipped:", error);
   }
@@ -107,7 +108,7 @@ export async function recordScheduleGenerate(
   if (!cdkRecord || context.status !== "success" || context.source === "optimize_suggestions") return;
 
   try {
-    await incrementCdkScheduleGenerateCount(cdkRecord);
+    await incrementCdkScheduleGenerateCount(cdkRecord, jobId);
   } catch (error) {
     console.warn("license schedule generate count skipped:", error);
   }

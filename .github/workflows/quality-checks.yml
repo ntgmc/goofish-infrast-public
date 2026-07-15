@@ -149,6 +149,9 @@ jobs:
       - name: Generate data
         run: npm run generate:data
 
+      - name: Check production deployment contract
+        run: npm run check:deploy
+
       - name: Run API smoke check
         run: npm run check:api
 

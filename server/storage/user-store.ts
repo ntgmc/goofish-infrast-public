@@ -15,6 +15,7 @@ import type {
   UserWorkspace,
   WorkspaceResultHistoryItem,
   WorkspaceSavedConfig,
+  FreePreviewTrial,
 } from '../../src/lib/types'
 
 let schemaReady: Promise<void> | null = null
@@ -69,16 +70,37 @@ export interface SklandBindingRecord {
   credential_invalid_reason?: SklandCredentialInvalidReason | null
 }
 
-export interface SklandPendingBindingRecord {
-  confirmation_id: string
+export interface SklandPendingAccountOption {
   uid: string
   nickname: string
   channel_name: string
+  is_default: boolean
+}
+
+interface SklandPendingBindingBase {
+  confirmation_id: string
   encrypted_cred: string
-  operator_count: number
   created_at: string
   expires_at: string
 }
+
+export interface SklandPendingAccountSelectionRecord extends SklandPendingBindingBase {
+  stage: 'account_selection'
+  accounts: SklandPendingAccountOption[]
+  source?: 'manual' | 'bookmarklet'
+}
+
+export interface SklandPendingConfirmationRecord extends SklandPendingBindingBase {
+  stage?: 'confirmation'
+  uid: string
+  nickname: string
+  channel_name: string
+  operator_count: number
+}
+
+export type SklandPendingBindingRecord =
+  | SklandPendingAccountSelectionRecord
+  | SklandPendingConfirmationRecord
 
 export interface SklandRiskRecord {
   uid_mismatch_count: number
@@ -97,19 +119,33 @@ export interface FreePreviewClaimRecord {
   channel_name?: string
 }
 
-export interface FreePreviewPendingClaimRecord {
+interface FreePreviewPendingClaimBase {
   confirmation_id: string
   user_id: string
-  uid: string
-  nickname: string
-  channel_name: string
   encrypted_cred: string
-  operator_count: number
   display_name: string
   note: string
   created_at: string
   expires_at: string
 }
+
+export interface FreePreviewPendingAccountSelectionRecord extends FreePreviewPendingClaimBase {
+  stage: 'account_selection'
+  accounts: SklandPendingAccountOption[]
+  source?: 'manual' | 'bookmarklet'
+}
+
+export interface FreePreviewPendingConfirmationRecord extends FreePreviewPendingClaimBase {
+  stage?: 'confirmation'
+  uid: string
+  nickname: string
+  channel_name: string
+  operator_count: number
+}
+
+export type FreePreviewPendingClaimRecord =
+  | FreePreviewPendingAccountSelectionRecord
+  | FreePreviewPendingConfirmationRecord
 
 export interface UserSessionRecord {
   version: 1
@@ -810,12 +846,17 @@ export function toPublicWorkspace(workspace: UserWorkspaceRecord | null): UserWo
   }
 }
 
-export function toPublicProfile(profile: UserGameAccountRecord, workspace?: UserWorkspaceRecord | null): UserGameAccount {
+export function toPublicProfile(
+  profile: UserGameAccountRecord,
+  workspace?: UserWorkspaceRecord | null,
+  trial: FreePreviewTrial | null = null,
+): UserGameAccount {
   return {
     id: profile.id,
     user_id: profile.user_id,
     kind: normalizeProfileKind(profile),
     permission: profile.permission,
+    trial,
     status: profile.status,
     cdk_order_hash: profile.cdk_order_hash,
     display_name: profile.display_name,
@@ -899,6 +940,7 @@ function normalizeSavedConfigs(value: unknown): WorkspaceSavedConfig[] {
       created_at: createdAt,
       updated_at: updatedAt,
       last_used_at: typeof raw.last_used_at === 'string' ? raw.last_used_at : null,
+      read_only: raw.read_only === true,
     }]
   }).slice(0, WORKSPACE_SAVED_CONFIG_LIMIT)
 }

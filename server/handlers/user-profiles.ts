@@ -18,6 +18,7 @@ import {
   toPublicUser,
   upgradePreviewProfileWithCdk,
 } from './user-auth'
+import { getFreePreviewTrial } from '../free-preview-trial'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -49,7 +50,9 @@ export default async (req: Request): Promise<Response> => {
       const profiles = await listProfilesForUser(auth.user.id)
       return jsonResponse({
         user: toPublicUser(auth.user),
-        profiles: await Promise.all(profiles.map(async (profile) => toPublicProfile(profile, await getProfileWorkspace(profile.id)))),
+        profiles: await Promise.all(profiles.map(async (profile) => (
+          toPublicProfile(profile, await getProfileWorkspace(profile.id), getFreePreviewTrial(profile))
+        ))),
       })
     }
 

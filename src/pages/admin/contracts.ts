@@ -408,6 +408,7 @@ export const sectionLabels: Record<AdminSection, string> = {
   overview: '总览',
   cdk: 'CDK',
   risk: '风控',
+  invitation: '邀请设置',
   announcement: '公告管理',
   users: '用户维护',
 }

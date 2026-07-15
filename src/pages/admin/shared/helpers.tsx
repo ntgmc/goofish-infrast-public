@@ -8,7 +8,7 @@ return <div className="flex items-center justify-between gap-4 border-b border-s
 
 export function DetailItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg bg-surface-2 px-3 py-2">
+    <div className="tool-inset min-w-0 px-3 py-2">
       <dt className="text-xs font-medium text-ink-muted">{label}</dt>
       <dd className="mt-1 break-words text-sm font-medium text-ink-primary">{value}</dd>
     </div>
@@ -17,31 +17,31 @@ export function DetailItem({ label, value }: { label: string; value: string }) {
 
 export function StatusPill({ status }: { status: CdkStatus }) {
   const className = status === 'unused'
-    ? 'bg-success/10 text-success'
+    ? 'tool-status--success'
     : status === 'frozen'
-      ? 'bg-warning/10 text-warning'
+      ? 'tool-status--warning'
       : status === 'revoked'
-        ? 'bg-error/10 text-error'
-        : 'bg-surface-3 text-ink-secondary'
-  return <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${className}`}>{statusLabels[status]}</span>
+        ? 'tool-status--error'
+        : ''
+  return <span className={`tool-status ${className}`}>{statusLabels[status]}</span>
 }
 
 export function UserStatusPill({ status }: { status: AppUserStatus }) {
   const className = status === 'active'
-    ? 'bg-success/10 text-success'
+    ? 'tool-status--success'
     : status === 'frozen'
-      ? 'bg-warning/10 text-warning'
-      : 'bg-error/10 text-error'
-  return <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${className}`}>{appUserStatusLabels[status]}</span>
+      ? 'tool-status--warning'
+      : 'tool-status--error'
+  return <span className={`tool-status ${className}`}>{appUserStatusLabels[status]}</span>
 }
 
 export function SmallButton({ children, onClick, loading, tone = 'default', autoFocus = false }: { children: string; onClick: () => void; loading?: boolean; tone?: 'default' | 'success' | 'danger'; autoFocus?: boolean }) {
   const className = tone === 'danger'
-    ? 'bg-error/10 text-error hover:bg-error/20'
+    ? 'border-error/40 bg-error/10 text-error hover:border-error/60 hover:bg-error/20 hover:text-error'
     : tone === 'success'
-      ? 'bg-success/10 text-success hover:bg-success/20'
-      : 'bg-surface-2 text-ink-secondary hover:bg-surface-3 hover:text-ink-primary'
-  return <button type="button" onClick={onClick} disabled={loading} autoFocus={autoFocus} data-dialog-initial-focus={autoFocus ? '' : undefined} className={`rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1 disabled:bg-surface-3 disabled:text-ink-muted ${className}`}>{loading ? '处理中' : children}</button>
+      ? 'border-success/40 bg-success/10 text-success hover:border-success/60 hover:bg-success/20 hover:text-success'
+      : ''
+  return <button type="button" onClick={onClick} disabled={loading} data-dialog-initial-focus={autoFocus ? '' : undefined} className={`tool-secondary-action min-h-11 px-3 text-xs ${className}`}>{loading ? '处理中' : children}</button>
 }
 
 export function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0) {
@@ -455,10 +455,10 @@ export function omitFieldError(errors: FieldErrors, field: string): FieldErrors 
 }
 
 export function inputClassName(hasError: boolean): string {
-  const base = 'w-full rounded-lg border px-3 py-2 text-sm text-ink-primary outline-none transition-colors duration-150 focus:ring-2'
+  const base = 'tool-field'
   const state = hasError
     ? 'border-error/70 bg-error/10 focus:border-error focus:ring-error/20'
-    : 'border-surface-4 bg-surface-0 focus:border-brand-500 focus:ring-brand-500/20'
+    : ''
   return `${base} ${state}`
 }
 

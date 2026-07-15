@@ -35,12 +35,12 @@ export const EMPTY_ANNOUNCEMENT_STATS: UsageAnnouncementStats = {
 
 export function FunnelPanel({ steps }: { steps: UsageFunnelStep[] }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+    <section className="tool-panel p-5">
       <h2 className="text-base font-semibold text-ink-primary">运营漏斗</h2>
       <div className="mt-4 space-y-3">
-        {steps.length === 0 && <div className="rounded-lg bg-surface-2 px-4 py-6 text-center text-sm text-ink-muted">暂无漏斗数据</div>}
+        {steps.length === 0 && <div className="tool-inset px-4 py-6 text-center text-sm text-ink-muted">暂无漏斗数据</div>}
         {steps.map((step) => (
-          <div key={step.key} className="rounded-lg bg-surface-2 p-3">
+          <div key={step.key} className="tool-inset p-3">
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="font-medium text-ink-primary">{step.label}</span>
               <span className="font-semibold text-ink-primary">{step.count}</span>
@@ -61,15 +61,15 @@ export function FunnelPanel({ steps }: { steps: UsageFunnelStep[] }) {
 
 export function FailureReasonPanel({ reasons, samples }: { reasons: UsageFailureReason[]; samples: UsageFailureSample[] }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+    <section className="tool-panel p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-ink-primary">失败原因 Top</h2>
         <span className="text-xs text-ink-muted">稳定 reason_code</span>
       </div>
       <div className="mt-4 space-y-3">
-        {reasons.length === 0 && <div className="rounded-lg bg-surface-2 px-4 py-6 text-center text-sm text-ink-muted">暂无失败事件</div>}
+        {reasons.length === 0 && <div className="tool-inset px-4 py-6 text-center text-sm text-ink-muted">暂无失败事件</div>}
         {reasons.slice(0, 5).map((item) => (
-          <div key={item.reason_code} className="rounded-lg bg-surface-2 p-3">
+          <div key={item.reason_code} className="tool-inset p-3">
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="font-mono text-xs font-semibold text-ink-primary">{item.reason_code}</span>
               <span className="font-semibold text-ink-primary">{item.count}</span>
@@ -108,7 +108,7 @@ export function FailureReasonPanel({ reasons, samples }: { reasons: UsageFailure
 
 export function LatencyPanel({ stats }: { stats: UsageLatencyStats }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+    <section className="tool-panel p-5">
       <h2 className="text-base font-semibold text-ink-primary">优化耗时</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <DetailItem label="平均" value={formatDuration(stats.average_ms)} />
@@ -133,7 +133,7 @@ export function LatencyPanel({ stats }: { stats: UsageLatencyStats }) {
 
 export function OpsSummaryPanel({ summary }: { summary: ReturnType<typeof buildSummary> }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+    <section className="tool-panel p-5">
       <h2 className="text-base font-semibold text-ink-primary">运营摘要</h2>
       <dl className="mt-4 space-y-3 text-sm">
         <InfoRow label="独立访客" value={String(summary.uniqueVisitors)} />
@@ -147,7 +147,7 @@ export function OpsSummaryPanel({ summary }: { summary: ReturnType<typeof buildS
 
 export function SklandPanel({ stats }: { stats: UsageSklandStats }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+    <section className="tool-panel p-5">
       <h2 className="text-base font-semibold text-ink-primary">Skland 导入</h2>
       <dl className="mt-4 space-y-3 text-sm">
         <InfoRow label="尝试" value={String(stats.attempts)} />
@@ -162,7 +162,7 @@ export function SklandPanel({ stats }: { stats: UsageSklandStats }) {
 
 export function AnnouncementStatsPanel({ stats }: { stats: UsageAnnouncementStats }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+    <section className="tool-panel p-5">
       <h2 className="text-base font-semibold text-ink-primary">公告触达</h2>
       <dl className="mt-4 space-y-3 text-sm">
         <InfoRow label="触达" value={String(stats.impressions)} />
@@ -200,7 +200,7 @@ export function AnnouncementReachMetrics({ stats }: { stats: AnnouncementReachSt
 
 export function CdkDistributionPanel({ items }: { items: UsageCdkDistributionItem[] }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+    <section className="tool-panel p-5">
       <h2 className="text-base font-semibold text-ink-primary">CDK 兑换事件分布</h2>
       <div className="mt-4 overflow-x-auto">
         <table className="min-w-full text-left text-sm">
@@ -233,7 +233,7 @@ export function CdkDistributionPanel({ items }: { items: UsageCdkDistributionIte
 
 export function CdkRecordDistributionPanel({ summary }: { summary: CdkOpsSummary }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+    <section className="tool-panel p-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-base font-semibold text-ink-primary">CDK 权限与状态分布</h2>
         <span className="text-xs text-ink-muted">基于当前 CDK 记录</span>
@@ -267,7 +267,7 @@ export function CdkRecordDistributionPanel({ summary }: { summary: CdkOpsSummary
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
           {summary.status_distribution.map((item) => (
-            <div key={item.status} className="rounded-lg bg-surface-2 p-3">
+            <div key={item.status} className="tool-inset p-3">
               <div className="flex items-center justify-between gap-3">
                 <StatusPill status={item.status} />
                 <span className="text-lg font-semibold text-ink-primary">{item.total}</span>
@@ -295,10 +295,10 @@ export function RiskConsoleSummary({ summary }: { summary: CdkOpsSummary }) {
 export function RiskTrendPanel({ days }: { days: RiskTrendDay[] }) {
   const maxValue = Math.max(1, ...days.map((day) => day.total))
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+    <section className="tool-panel p-5">
       <h2 className="text-base font-semibold text-ink-primary">风控趋势</h2>
       <div className="mt-4 space-y-2">
-        {days.length === 0 && <div className="rounded-lg bg-surface-2 px-4 py-6 text-center text-sm text-ink-muted">暂无风控趋势数据</div>}
+        {days.length === 0 && <div className="tool-inset px-4 py-6 text-center text-sm text-ink-muted">暂无风控趋势数据</div>}
         {days.map((day) => (
           <div key={day.date} className="grid grid-cols-[72px_1fr_116px] items-center gap-3 text-xs">
             <span className="text-ink-muted">{day.date.slice(5)}</span>
@@ -316,12 +316,12 @@ export function RiskTrendPanel({ days }: { days: RiskTrendDay[] }) {
 
 export function RiskReasonPanel({ reasons, onOpenDetail }: { reasons: RiskReasonStats[]; onOpenDetail: (record: AdminCdkRecord) => Promise<void> }) {
   return (
-    <section className="rounded-xl border border-surface-3 bg-surface-1 p-5">
+    <section className="tool-panel p-5">
       <h2 className="text-base font-semibold text-ink-primary">风险原因分布</h2>
       <div className="mt-4 space-y-3">
-        {reasons.length === 0 && <div className="rounded-lg bg-surface-2 px-4 py-6 text-center text-sm text-ink-muted">暂无风险原因</div>}
+        {reasons.length === 0 && <div className="tool-inset px-4 py-6 text-center text-sm text-ink-muted">暂无风险原因</div>}
         {reasons.slice(0, 6).map((item) => (
-          <div key={`${item.type}:${item.reason}`} className="rounded-lg bg-surface-2 p-3">
+          <div key={`${item.type}:${item.reason}`} className="tool-inset p-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="font-medium text-ink-primary">{item.type}</div>
@@ -329,7 +329,7 @@ export function RiskReasonPanel({ reasons, onOpenDetail }: { reasons: RiskReason
                 <div className="mt-1 text-xs text-ink-muted">最近 {formatDate(item.last_seen_at)}</div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <span className="rounded-md bg-surface-1 px-2 py-1 text-sm font-semibold text-ink-primary">{item.count}</span>
+                <span className="tool-status">{item.count}</span>
                 {item.latest_record && <SmallButton onClick={() => void onOpenDetail(item.latest_record!)}>详情</SmallButton>}
               </div>
             </div>
@@ -362,7 +362,7 @@ export function UsageTrendChart({ days }: { days: UsageDay[] }) {
 
   if (days.length === 0) {
     return (
-      <div className="mt-5 flex h-64 w-full items-center justify-center rounded-lg bg-surface-2 text-sm text-ink-muted">
+      <div className="tool-inset mt-5 flex h-64 w-full items-center justify-center text-sm text-ink-muted">
         暂无趋势数据
       </div>
     )
@@ -391,10 +391,10 @@ export function UsageTrendChart({ days }: { days: UsageDay[] }) {
     : 50
 
   return (
-    <div className="relative mt-5 h-64 overflow-hidden rounded-lg bg-surface-2/80 p-3 sm:h-72">
+    <div className="tool-inset relative mt-5 h-64 overflow-hidden bg-surface-2/80 p-3 sm:h-72">
       <div className="absolute right-3 top-3 z-10 flex flex-wrap justify-end gap-2 text-xs text-ink-secondary">
         {trendMetrics.map((metric) => (
-          <span key={metric.key} className="inline-flex items-center gap-1.5 rounded-md bg-surface-1/90 px-2 py-1">
+          <span key={metric.key} className="tool-status bg-surface-1/90">
             <span
               aria-hidden="true"
               className="h-0.5 w-5 rounded-full"
@@ -474,7 +474,7 @@ export function UsageTrendChart({ days }: { days: UsageDay[] }) {
       </svg>
       {activePoint && (
         <div
-          className="pointer-events-none absolute z-20 min-w-36 -translate-x-1/2 rounded-lg border border-surface-3 bg-surface-1 px-3 py-2 text-xs shadow-lg"
+          className="tool-inset pointer-events-none absolute z-20 min-w-36 -translate-x-1/2 px-3 py-2 text-xs shadow-lg"
           style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }}
         >
           <div className="mb-1 font-semibold text-ink-primary">{activePoint.day.date}</div>

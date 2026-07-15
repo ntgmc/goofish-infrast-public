@@ -11,6 +11,13 @@ export type SklandPreview = {
   operator_count: number
 }
 
+export type SklandAccountOption = {
+  uid: string
+  nickname: string
+  channel_name: string
+  is_default: boolean
+}
+
 export type SklandRecoveryAction = 'rebind' | 'retry' | 'bind_first' | 'use_depot_analysis'
 
 export type SklandPayload = AuthSuccessResponse & {
@@ -31,18 +38,23 @@ export type SklandPayload = AuthSuccessResponse & {
   recovery_action?: SklandRecoveryAction
   confirmation_id?: string
   skland_preview?: SklandPreview
+  selection_id?: string
+  skland_accounts?: SklandAccountOption[]
   warning?: string
   status?: string
 }
 
 export type SklandImportMode = 'scan' | 'manual' | 'bookmarklet'
-export type SklandLoginStatus = 'idle' | 'starting' | 'waiting' | 'confirm_required' | 'account_mismatch' | 'importing' | 'imported' | 'frozen' | 'error'
+export type SklandLoginStatus = 'idle' | 'starting' | 'waiting' | 'account_selection_required' | 'confirm_required' | 'account_mismatch' | 'importing' | 'imported' | 'frozen' | 'error'
 
 export type SklandLoginState = {
   mode: SklandImportMode
   scanId: string | null
   qrDataUrl: string | null
   expiresAt: string | null
+  selectionId: string | null
+  accountOptions: SklandAccountOption[]
+  selectedUid: string | null
   confirmationId: string | null
   preview: SklandPreview | null
   status: SklandLoginStatus
@@ -98,10 +110,27 @@ export function useSklandBinding({
   }, [onCompleted, onPayload])
 
   const showPayloadState = useCallback((data: SklandPayload, fallback: string): boolean => {
+    if (data.status === 'account_selection_required' && data.selection_id && data.skland_accounts?.length) {
+      setSklandLogin((current) => ({
+        ...current,
+        qrDataUrl: null,
+        selectionId: data.selection_id ?? null,
+        accountOptions: data.skland_accounts ?? [],
+        selectedUid: null,
+        confirmationId: null,
+        preview: null,
+        status: 'account_selection_required',
+        message: data.warning || '检测到多个明日方舟账号，请选择要导入的账号。',
+      }))
+      return true
+    }
     if (data.status === 'confirm_required' && data.confirmation_id && data.skland_preview) {
       setSklandLogin((current) => ({
         ...current,
         qrDataUrl: null,
+        selectionId: null,
+        accountOptions: [],
+        selectedUid: null,
         confirmationId: data.confirmation_id ?? null,
         preview: data.skland_preview ?? null,
         status: 'confirm_required',
@@ -113,6 +142,9 @@ export function useSklandBinding({
       setSklandLogin((current) => ({
         ...current,
         qrDataUrl: null,
+        selectionId: null,
+        accountOptions: [],
+        selectedUid: null,
         confirmationId: null,
         preview: data.skland_preview ?? null,
         status: 'account_mismatch',
@@ -125,6 +157,9 @@ export function useSklandBinding({
       setSklandLogin((current) => ({
         ...current,
         qrDataUrl: null,
+        selectionId: null,
+        accountOptions: [],
+        selectedUid: null,
         confirmationId: null,
         preview: data.skland_preview ?? null,
         status: 'frozen',
@@ -189,6 +224,9 @@ export function useSklandBinding({
       scanId: null,
       qrDataUrl: null,
       expiresAt: null,
+      selectionId: null,
+      accountOptions: [],
+      selectedUid: null,
       confirmationId: null,
       preview: null,
       status: 'starting',
@@ -207,6 +245,9 @@ export function useSklandBinding({
         scanId: data.scan_id,
         qrDataUrl: data.qr_data_url,
         expiresAt: data.expires_at ?? null,
+        selectionId: null,
+        accountOptions: [],
+        selectedUid: null,
         confirmationId: null,
         preview: null,
         status: 'waiting',
@@ -267,6 +308,38 @@ export function useSklandBinding({
     }
   }, [endpointPrefix, isDepot, isFreePreviewClaim, profile, profilePayload, showPayloadState])
 
+  const selectAccount = useCallback((uid: string) => {
+    setSklandLogin((current) => ({ ...current, selectedUid: uid }))
+  }, [])
+
+  const previewSelectedAccount = useCallback(async () => {
+    if ((!profile && !isFreePreviewClaim) || !sklandLogin.selectionId || !sklandLogin.selectedUid || busy) return
+    setBusy(true)
+    setSklandLogin((current) => ({ ...current, message: '正在读取所选森空岛账号的干员数据。' }))
+    try {
+      const data = await apiJson<SklandPayload>(`${endpointPrefix}/account/select`, {
+        method: 'POST',
+        json: {
+          ...profilePayload(),
+          selection_id: sklandLogin.selectionId,
+          uid: sklandLogin.selectedUid,
+        },
+        fallbackMessage: '读取所选森空岛账号失败',
+      })
+      if (!showPayloadState(data, previewFallbackMessage(isDepot))) {
+        throw new Error(data.error || '所选森空岛账号未返回可确认预览。')
+      }
+    } catch (caught) {
+      setSklandLogin((current) => ({
+        ...current,
+        status: 'error',
+        message: errorWithRecovery(caught, '请重新授权后再选择账号。'),
+      }))
+    } finally {
+      setBusy(false)
+    }
+  }, [busy, endpointPrefix, isDepot, isFreePreviewClaim, profile, profilePayload, showPayloadState, sklandLogin.selectedUid, sklandLogin.selectionId])
+
   const confirmSklandLogin = useCallback(async () => {
     if ((!profile && !isFreePreviewClaim) || !sklandLogin.confirmationId) return
     setBusy(true)
@@ -285,6 +358,9 @@ export function useSklandBinding({
       applyCompletedPayload(data)
       setSklandLogin((current) => ({
         ...current,
+        selectionId: null,
+        accountOptions: [],
+        selectedUid: null,
         confirmationId: null,
         preview: null,
         status: 'imported',
@@ -317,6 +393,9 @@ export function useSklandBinding({
         scanId: keepWaitingScan ? current.scanId : null,
         qrDataUrl: keepWaitingScan ? current.qrDataUrl : null,
         expiresAt: keepWaitingScan ? current.expiresAt : null,
+        selectionId: null,
+        accountOptions: [],
+        selectedUid: null,
         confirmationId: null,
         preview: null,
         status: keepWaitingScan ? 'waiting' : 'idle',
@@ -376,6 +455,8 @@ export function useSklandBinding({
     completeSklandLogin,
     startSklandLogin,
     previewCredential,
+    selectAccount,
+    previewSelectedAccount,
     confirmSklandLogin,
     close,
     selectMode,
@@ -389,6 +470,9 @@ function createInitialState(): SklandLoginState {
     scanId: null,
     qrDataUrl: null,
     expiresAt: null,
+    selectionId: null,
+    accountOptions: [],
+    selectedUid: null,
     confirmationId: null,
     preview: null,
     status: 'idle',

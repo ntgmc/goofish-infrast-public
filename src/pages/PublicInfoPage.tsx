@@ -119,59 +119,61 @@ export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
   const meta = pageMeta[page]
 
   return (
-    <main className="landing-shell min-h-screen overflow-hidden bg-surface-0 text-white" tabIndex={-1} data-route-focus>
-      <div className="mx-auto w-full max-w-5xl px-5 py-6 sm:px-8 lg:px-10 lg:py-8">
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
-          <Link to="/" className="flex min-h-11 items-center gap-3 rounded-lg pr-3 text-left focus:outline-none focus:ring-2 focus:ring-brand-100">
+    <main className="tool-page" tabIndex={-1} data-route-focus>
+      <div className="tool-page-frame max-w-5xl">
+        <header className="tool-page-header flex flex-wrap items-center justify-between gap-4">
+          <Link to="/" className="tool-nav-link flex items-center gap-3 px-3 text-left">
             <BrandLogo size="md" />
             <span>
-              <span className="block text-sm font-semibold text-white">MAA 基建排班优化器</span>
-              <span className="block text-xs text-brand-100/64">MaaTool 官方</span>
+              <span className="block text-sm font-semibold text-ink-primary">MAA 基建排班优化器</span>
+              <span className="block text-xs text-ink-muted">MaaTool 官方</span>
             </span>
           </Link>
           <nav className="flex items-center gap-4 text-sm font-medium" aria-label="公开页面导航">
-            <Link to="/faq" className="rounded-sm text-white/74 transition hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-100">FAQ</Link>
-            <Link to="/support" className="rounded-sm text-white/74 transition hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-100">客服</Link>
-            <Link to="/" className="rounded-sm text-brand-100 transition hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-100">返回首页</Link>
+            <Link to="/faq" className="tool-nav-link inline-flex items-center px-3">FAQ</Link>
+            <Link to="/support" className="tool-nav-link inline-flex items-center px-3">客服</Link>
+            <Link to="/" className="tool-secondary-action">返回首页</Link>
           </nav>
         </header>
 
-        <section className="py-12 sm:py-16">
-          <p className="text-sm font-semibold text-brand-100">{meta.eyebrow}</p>
-          <h1 className="mt-3 text-3xl font-semibold leading-tight text-white sm:text-4xl">{meta.title}</h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-brand-50/72">{meta.intro}</p>
+        <section className="tool-panel mt-6 p-6 sm:mt-8 sm:p-8">
+          <p className="tool-eyebrow">{meta.eyebrow}</p>
+          <h1 className="mt-3 text-3xl font-semibold leading-tight text-ink-primary sm:text-4xl">{meta.title}</h1>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-ink-secondary">{meta.intro}</p>
           {(page === 'privacy' || page === 'terms' || page === 'disclaimer') && (
-            <p className="mt-4 text-sm text-brand-50/52">生效日期：{EFFECTIVE_DATE}</p>
+            <p className="tool-status mt-4">生效日期：{EFFECTIVE_DATE}</p>
           )}
         </section>
 
-        {page === 'faq' && <FaqContent />}
-        {page === 'support' && <SupportContent />}
-        {(page === 'privacy' || page === 'terms' || page === 'disclaimer') && <LegalContent sections={legalContent[page]} />}
+        <div className="mt-6">
+          {page === 'faq' && <FaqContent />}
+          {page === 'support' && <SupportContent />}
+          {(page === 'privacy' || page === 'terms' || page === 'disclaimer') && <LegalContent sections={legalContent[page]} />}
+        </div>
       </div>
-      <PublicFooter />
+      <PublicFooter variant="tool" className="mt-10" />
     </main>
   )
 }
 
 function FaqContent() {
   return (
-    <section className="pb-16" aria-label="FAQ 列表">
-      <div className="divide-y divide-white/10 border-y border-white/10">
+    <section className="tool-panel p-5 sm:p-6" aria-label="FAQ 列表">
+      <div className="space-y-3">
         {faqItems.map((item) => (
-          <details key={item.question} className="group py-5">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 rounded-lg text-base font-semibold text-white focus:outline-none focus:ring-2 focus:ring-brand-100">
+          <details key={item.question} className="tool-inset group px-4 py-2">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 rounded-lg text-base font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/45">
               {item.question}
-              <span className="text-xl leading-none text-brand-100/72 transition group-open:rotate-45" aria-hidden="true">+</span>
+              <span className="text-xl leading-none text-brand-300 transition group-open:rotate-45" aria-hidden="true">+</span>
             </summary>
-            <p className="max-w-3xl pb-2 pt-3 text-sm leading-7 text-brand-50/70">{item.answer}</p>
+            <p className="max-w-3xl pb-3 pt-2 text-sm leading-7 text-ink-secondary">{item.answer}</p>
           </details>
         ))}
       </div>
-      <div className="mt-10 border-l-2 border-brand-300 pl-5">
-        <h2 className="text-lg font-semibold text-white">仍未解决？</h2>
-        <p className="mt-2 text-sm leading-6 text-brand-50/70">请带上问题描述、复现步骤和不含敏感信息的截图到交流群反馈。</p>
-        <SupportGroupLink className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-brand-300 px-4 text-sm font-semibold text-brand-950 transition hover:bg-brand-200 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:ring-offset-2 focus:ring-offset-surface-0" />
+      <div className="tool-inset mt-6 p-5">
+        <h2 className="text-lg font-semibold text-ink-primary">仍未解决？</h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">请带上问题描述、复现步骤和不含敏感信息的截图到交流群反馈。</p>
+        <SupportGroupLink className="tool-primary-action mt-4" />
       </div>
     </section>
   )
@@ -179,26 +181,26 @@ function FaqContent() {
 
 function SupportContent() {
   return (
-    <section className="pb-16">
-      <div className="border-y border-white/10 py-8 sm:flex sm:items-center sm:justify-between sm:gap-8">
+    <section className="space-y-6">
+      <div className="tool-panel p-6 sm:flex sm:items-center sm:justify-between sm:gap-8">
         <div className="max-w-2xl">
-          <h2 className="text-xl font-semibold text-white">加入 MaaTool 交流群</h2>
-          <p className="mt-3 text-sm leading-7 text-brand-50/70">在群内可以反馈使用问题、查看公告或申请删除账号与工作台数据。请先阅读 FAQ，并尽量提供可复现的操作步骤。</p>
+          <h2 className="text-xl font-semibold text-ink-primary">加入 MaaTool 交流群</h2>
+          <p className="mt-3 text-sm leading-7 text-ink-secondary">在群内可以反馈使用问题、查看公告或申请删除账号与工作台数据。请先阅读 FAQ，并尽量提供可复现的操作步骤。</p>
         </div>
-        <SupportGroupLink className="mt-6 inline-flex min-h-12 items-center justify-center rounded-lg bg-brand-300 px-5 text-sm font-semibold text-brand-950 transition hover:bg-brand-200 focus:outline-none focus:ring-2 focus:ring-brand-100 focus:ring-offset-2 focus:ring-offset-surface-0 sm:mt-0" />
+        <SupportGroupLink className="tool-primary-action mt-6 sm:mt-0" />
       </div>
-      <div className="mt-10 grid gap-6 border-y border-white/10 py-8 sm:grid-cols-2">
-        <div>
-          <h2 className="text-base font-semibold text-white">反馈前请准备</h2>
-          <ul className="mt-3 space-y-2 text-sm leading-6 text-brand-50/70">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="tool-inset p-5">
+          <h2 className="text-base font-semibold text-ink-primary">反馈前请准备</h2>
+          <ul className="mt-3 space-y-2 text-sm leading-6 text-ink-secondary">
             <li>问题发生的页面和操作步骤</li>
             <li>不含个人信息的报错文字或截图</li>
             <li>浏览器、MAA 或游戏相关版本信息</li>
           </ul>
         </div>
-        <div>
-          <h2 className="text-base font-semibold text-white">不要在群内发送</h2>
-          <ul className="mt-3 space-y-2 text-sm leading-6 text-brand-50/70">
+        <div className="tool-alert tool-alert--warning p-5">
+          <h2 className="text-base font-semibold text-ink-primary">不要在群内发送</h2>
+          <ul className="mt-3 space-y-2 text-sm leading-6 text-ink-secondary">
             <li>登录密码、CDK 或订单完整信息</li>
             <li>森空岛二维码、授权凭据或 Cookie</li>
             <li>其他可直接登录账号的敏感内容</li>
@@ -211,21 +213,21 @@ function SupportContent() {
 
 function LegalContent({ sections }: { sections: Array<{ heading: string; paragraphs: string[] }> }) {
   return (
-    <article className="max-w-3xl pb-16">
+    <article className="max-w-3xl space-y-4">
       <div className="space-y-10">
         {sections.map((section) => (
-          <section key={section.heading}>
-            <h2 className="text-xl font-semibold text-white">{section.heading}</h2>
-            <div className="mt-4 space-y-4 text-sm leading-7 text-brand-50/70">
+          <section key={section.heading} className="tool-panel p-5 sm:p-6">
+            <h2 className="text-xl font-semibold text-ink-primary">{section.heading}</h2>
+            <div className="mt-4 space-y-4 text-sm leading-7 text-ink-secondary">
               {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
             </div>
           </section>
         ))}
       </div>
-      <section className="mt-10 border-t border-white/10 pt-6">
-        <h2 className="text-base font-semibold text-white">联系我们</h2>
-        <p className="mt-2 text-sm leading-6 text-brand-50/70">如对本页面内容或数据处理有疑问，请通过 MaaTool QQ 群联系官方。</p>
-        <SupportGroupLink className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-white/16 px-4 text-sm font-semibold text-white/86 transition hover:border-brand-200/42 hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-brand-100" />
+      <section className="tool-inset p-5">
+        <h2 className="text-base font-semibold text-ink-primary">联系我们</h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">如对本页面内容或数据处理有疑问，请通过 MaaTool QQ 群联系官方。</p>
+        <SupportGroupLink className="tool-secondary-action mt-4" />
       </section>
     </article>
   )

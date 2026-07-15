@@ -11,7 +11,7 @@ import { getProfileAccessLabel } from '../tool-utils'
 import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
 
 export default function OptimizeWorkflowPage(props: Props) {
-  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, operatorUploadStatus, licenseSyncing, licenseSyncStatus, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, operatorFileRef, isPreviewProfile, userCanReplaceOperators, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, handleReplaceOperators, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile } = useOptimizeWorkflow(props)
+  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, operatorUploadStatus, licenseSyncing, licenseSyncStatus, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, operatorFileRef, isRestrictedPreview, userCanReplaceOperators, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, handleReplaceOperators, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile } = useOptimizeWorkflow(props)
 
   return (
       <OptimizeShell
@@ -32,7 +32,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               {licenseSyncing && <LicenseSyncPanel />}
   
               {licenseSyncStatus && (
-                <div className="rounded-lg border border-brand-600/30 bg-brand-600/10 px-4 py-3 text-sm leading-6 text-brand-300">
+                <div className="tool-alert border-brand-600/30 bg-brand-600/10 text-brand-200" role="status" aria-live="polite">
                   {licenseSyncStatus}
                 </div>
               )}
@@ -40,7 +40,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               <AnnouncementBanner announcement={announcement} />
   
               {redeemedNotice && (
-                <div role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning">
+                <div role="status" aria-live="polite" className="tool-alert tool-alert--warning">
                   {redeemedNotice}
                 </div>
               )}
@@ -61,11 +61,12 @@ export default function OptimizeWorkflowPage(props: Props) {
               hasResult={hasResult}
               resultIsCurrent={resultIsCurrent}
               error={inlineError?.scope === 'generate' ? inlineError.message : null}
+              priorityCoupon={{ balance: priorityCouponBalance, selected: usePriorityCoupon, onChange: setUsePriorityCoupon }}
               savedConfigCount={savedConfigs.length}
               resultHistoryCount={resultHistory.length}
               latestResult={latestWorkspaceResult}
               freeSchedule={{
-                visible: isPreviewProfile,
+                visible: isRestrictedPreview,
                 entitlement: freeScheduleEntitlement,
                 generateBlockedReason: freeScheduleGenerateBlockedReason,
                 confirming: freeScheduleConfirming,
@@ -73,7 +74,7 @@ export default function OptimizeWorkflowPage(props: Props) {
                 onConfirm: handleConfirmFreeSchedule,
               }}
               reorderCheck={{
-                visible: isPreviewProfile,
+                visible: isRestrictedPreview,
                 disabledReason: reorderCheckDisabledReason,
                 loading: reorderCheckLoading,
                 error: reorderCheckError,
@@ -150,13 +151,13 @@ export default function OptimizeWorkflowPage(props: Props) {
               loading={loading}
               progress={progress}
               inlineError={inlineError}
-              previewProfile={isPreviewProfile}
+              previewProfile={isRestrictedPreview}
               upgradeCdk={upgradeCdk}
               upgradeLoading={upgradeLoading}
               upgradeError={upgradeError}
               onUpgradeCdkChange={setUpgradeCdk}
               onUpgradePreviewProfile={handleUpgradePreviewProfile}
-              onDownloadMAA={isPreviewProfile ? undefined : handleDownloadMAA}
+              onDownloadMAA={isRestrictedPreview ? undefined : handleDownloadMAA}
               onApplySuggestions={handleApplySuggestions}
               onReset={onReset}
             />
