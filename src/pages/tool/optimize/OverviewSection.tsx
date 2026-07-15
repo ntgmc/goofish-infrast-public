@@ -1,5 +1,6 @@
 import type { FreeScheduleEntitlement, LicenseConfig, ReorderCheckResult, RewardBalance, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
+import InfoTooltip from '../../../components/InfoTooltip'
 import { formatResultSummary, formatWorkspaceDate, isMaaJsonDownloadable } from '../../../lib/workspace-history'
 import GenerateControlBar, { DashboardMiniStat } from './GenerateControlBar'
 import { SmallActionButton } from './feedback'
@@ -191,10 +192,12 @@ function FreeScheduleEntitlementCard({ state }: { state: FreeScheduleViewState }
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-brand-400">免费完整排班权益</p>
-          <h2 className="mt-1 text-lg font-semibold text-ink-primary">{formatFreeScheduleTitle(entitlement, locked, Boolean(bonusAvailable))}</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
-            首次生成后 24 小时内最多可修正生成 3 次；确认或次数用完后，只保留重排检测和历史查看。
-          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-ink-primary">{formatFreeScheduleTitle(entitlement, locked, Boolean(bonusAvailable))}</h2>
+            <InfoTooltip label="查看免费完整排班权益说明" side="bottom">
+              首次生成后 24 小时内最多可修正生成 3 次；确认或次数用完后，只保留重排检测和历史查看。
+            </InfoTooltip>
+          </div>
         </div>
         {entitlement?.first_generated_at && !locked && !entitlement.confirmed_at && !entitlement.locked_at && (
           <SmallActionButton onClick={state.onConfirm} disabled={state.confirming}>
@@ -243,10 +246,12 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-brand-400">免费个人排班</p>
-          <h2 className="mt-1 text-lg font-semibold text-ink-primary">检测是否需要重排</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
-            只返回收益区间、影响设施和关键干员摘要，不展示完整新方案。
-          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-ink-primary">检测是否需要重排</h2>
+            <InfoTooltip label="查看重排检测说明" side="bottom">
+              只返回收益区间、影响设施和关键干员摘要，不展示完整新方案。
+            </InfoTooltip>
+          </div>
         </div>
         <button
           type="button"
