@@ -12,23 +12,29 @@ const buildRelevantFiles = new Set([
   'tsconfig.server.json',
   'tsconfig.json',
   'vite.config.ts',
+  '.github/workflows/deploy-production.yml',
+  'docs/production-deploy.md',
 ])
 
 const buildRelevantPrefixes = [
   'src/',
   'public/',
   'server/',
+  'deploy/nginx/',
+  'deploy/systemd/',
 ]
 
 const buildRelevantScripts = new Set([
   'scripts/build-server.mjs',
   'scripts/check-api-handlers.mjs',
   'scripts/check-build-relevance.mjs',
+  'scripts/check-production-deploy.mjs',
   'scripts/check-depot-profile.mjs',
   'scripts/check-server-routes.mjs',
   'scripts/check-skland-handler.mjs',
   'scripts/check-workspace-history.mjs',
   'scripts/generate-data.mjs',
+  'scripts/deploy-production-atomic.sh',
   'scripts/import-postgres.mjs',
   'scripts/verify-migrated-data.mjs',
 ])

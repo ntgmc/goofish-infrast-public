@@ -10,18 +10,13 @@ on:
       - completed
   workflow_dispatch:
     inputs:
-      branch:
-        description: Branch to deploy
+      commit_sha:
+        description: Full main commit SHA to redeploy (must have successful Quality Checks)
         required: true
-        default: main
         type: string
-      force_deploy:
-        description: Rebuild and restart even if the server already has the target commit
-        required: true
-        default: false
-        type: boolean
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -30,7 +25,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to self-hosted server
+    name: Deploy immutable release to blue/green production
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
@@ -39,7 +34,7 @@ jobs:
       )
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -47,13 +42,13 @@ jobs:
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
       DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
-      DEPLOY_APP_DIR: ${{ vars.DEPLOY_APP_DIR || '/opt/goofish-infrast-v1' }}
-      DEPLOY_SCRIPT: ${{ vars.DEPLOY_SCRIPT || '/opt/goofish-infrast-v1/scripts/deploy-production.sh' }}
+      DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT || '/opt/goofish-infrast-v1' }}
+      DEPLOY_REPO_DIR: ${{ vars.DEPLOY_REPO_DIR || '/opt/goofish-infrast-v1/repository' }}
+      DEPLOY_SCRIPT: ${{ vars.DEPLOY_SCRIPT || '/opt/goofish-infrast-v1/repository/scripts/deploy-production-atomic.sh' }}
       DEPLOY_SERVICE_NAME: ${{ vars.DEPLOY_SERVICE_NAME || 'goofish-infrast-v1' }}
-      DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://127.0.0.1:3000/api/health' }}
       DEPLOY_PUBLIC_BASE_URL: ${{ vars.DEPLOY_PUBLIC_BASE_URL || 'https://maatool.com' }}
-      DEPLOY_BRANCH: ${{ github.event.inputs.branch || 'main' }}
-      FORCE_DEPLOY: ${{ github.event.inputs.force_deploy || 'false' }}
+      DEPLOY_BLUE_PORT: ${{ vars.DEPLOY_BLUE_PORT || '3000' }}
+      DEPLOY_GREEN_PORT: ${{ vars.DEPLOY_GREEN_PORT || '3002' }}
 
     steps:
       - name: Validate deployment settings
@@ -62,16 +57,86 @@ jobs:
           set -euo pipefail
 
           missing=()
-          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY; do
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_ROOT DEPLOY_REPO_DIR DEPLOY_SCRIPT DEPLOY_SERVICE_NAME DEPLOY_PUBLIC_BASE_URL; do
             if [[ -z "${!name}" ]]; then
               missing+=("$name")
             fi
           done
 
           if (( ${#missing[@]} > 0 )); then
-            printf 'Missing required GitHub Secrets: %s\n' "${missing[*]}" >&2
+            printf 'Missing required production deployment settings: %s\n' "${missing[*]}" >&2
             exit 1
           fi
+
+          [[ "$DEPLOY_PORT" =~ ^[0-9]{1,5}$ ]] || { echo 'DEPLOY_PORT must be numeric' >&2; exit 1; }
+          [[ "$DEPLOY_BLUE_PORT" =~ ^[0-9]{1,5}$ ]] || { echo 'DEPLOY_BLUE_PORT must be numeric' >&2; exit 1; }
+          [[ "$DEPLOY_GREEN_PORT" =~ ^[0-9]{1,5}$ ]] || { echo 'DEPLOY_GREEN_PORT must be numeric' >&2; exit 1; }
+          (( DEPLOY_PORT >= 1 && DEPLOY_PORT <= 65535 )) || { echo 'DEPLOY_PORT is outside 1-65535' >&2; exit 1; }
+          (( DEPLOY_BLUE_PORT >= 1 && DEPLOY_BLUE_PORT <= 65535 )) || { echo 'DEPLOY_BLUE_PORT is outside 1-65535' >&2; exit 1; }
+          (( DEPLOY_GREEN_PORT >= 1 && DEPLOY_GREEN_PORT <= 65535 )) || { echo 'DEPLOY_GREEN_PORT is outside 1-65535' >&2; exit 1; }
+          [[ "$DEPLOY_SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]] || { echo 'DEPLOY_SERVICE_NAME contains unsafe characters' >&2; exit 1; }
+          for path in "$DEPLOY_ROOT" "$DEPLOY_REPO_DIR" "$DEPLOY_SCRIPT"; do
+            [[ "$path" == /* && "$path" != *$'\n'* ]] || { echo "unsafe absolute deployment path: $path" >&2; exit 1; }
+          done
+
+      - name: Resolve immutable target SHA
+        id: target
+        uses: actions/github-script@v7
+        env:
+          RAW_TARGET_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.commit_sha }}
+        with:
+          script: |
+            const automatic = context.eventName === 'workflow_run'
+            const sha = String(process.env.RAW_TARGET_SHA || '').trim().toLowerCase()
+
+            if (!/^[0-9a-f]{40}$/.test(sha)) {
+              core.setFailed('Production deployments require a full 40-character commit SHA.')
+              return
+            }
+
+            if (!automatic) {
+              const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'quality-checks.yml',
+                head_sha: sha,
+                status: 'completed',
+                per_page: 100,
+              })
+              const accepted = runs.find((run) =>
+                run.head_sha === sha &&
+                run.head_branch === 'main' &&
+                run.conclusion === 'success' &&
+                ['push', 'workflow_dispatch'].includes(run.event)
+              )
+              if (!accepted) {
+                core.setFailed(`No successful main Quality Checks run exists for ${sha}.`)
+                return
+              }
+              core.info(`Authorized by Quality Checks run ${accepted.html_url}`)
+            }
+
+            core.setOutput('sha', sha)
+            core.setOutput('allow_redeploy', automatic ? 'false' : 'true')
+
+      - name: Verify target belongs to main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate target ancestry
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          git cat-file -e "${TARGET_SHA}^{commit}"
+          git merge-base --is-ancestor "$TARGET_SHA" origin/main || {
+            echo "$TARGET_SHA is not an ancestor of origin/main" >&2
+            exit 1
+          }
 
       - name: Prepare SSH
         shell: bash
@@ -80,7 +145,6 @@ jobs:
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
@@ -89,15 +153,19 @@ jobs:
           else
             ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
           fi
-
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Run server deploy script
+      - name: Deploy verified release
         shell: bash
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+          ALLOW_REDEPLOY: ${{ steps.target.outputs.allow_redeploy }}
+          DEPLOY_RUN_ID: ${{ github.run_id }}
+          DEPLOY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
 
-          remote_command="APP_DIR=${DEPLOY_APP_DIR@Q} BRANCH=${DEPLOY_BRANCH@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} HEALTH_URL=${DEPLOY_HEALTH_URL@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} FORCE_DEPLOY=${FORCE_DEPLOY@Q} bash ${DEPLOY_SCRIPT@Q}"
+          remote_command="TARGET_SHA=${TARGET_SHA@Q} ALLOW_REDEPLOY=${ALLOW_REDEPLOY@Q} DEPLOY_ROOT=${DEPLOY_ROOT@Q} REPO_DIR=${DEPLOY_REPO_DIR@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} BLUE_PORT=${DEPLOY_BLUE_PORT@Q} GREEN_PORT=${DEPLOY_GREEN_PORT@Q} DEPLOY_RUN_ID=${DEPLOY_RUN_ID@Q} DEPLOY_RUN_URL=${DEPLOY_RUN_URL@Q} bash ${DEPLOY_SCRIPT@Q}"
 
           ssh \
             -i ~/.ssh/deploy_key \
