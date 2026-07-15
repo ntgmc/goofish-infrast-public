@@ -12,7 +12,7 @@ export const domainCopy = {
   // src/components/result-panel/Guides.tsx
   components_result_panel_Guides_001: "游戏内快速切换设置",
   // src/components/result-panel/Guides.tsx
-  components_result_panel_Guides_002: “游戏内轮换不生成排班 JSON。按下方预设队列逐个设施设置队列 1 / 队列 2，平时使用游戏内”队列轮换/快速切换”；同一设施由心情消耗最快的干员触发切换，触发时会切换该设施内所有干员。”,
+  components_result_panel_Guides_002: "游戏内轮换不生成排班 JSON。按下方预设队列逐个设施设置队列 1 / 队列 2，平时使用游戏内“队列轮换/快速切换”；同一设施由心情消耗最快的干员触发切换，触发时会切换该设施内所有干员。",
   // src/components/result-panel/Guides.tsx
   components_result_panel_Guides_003: "如何在 MAA 中使用排班 JSON",
   // src/components/result-panel/Guides.tsx
