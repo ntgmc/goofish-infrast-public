@@ -51,10 +51,10 @@ if (missing.length > 0) {
   throw new Error(`missing server API routes: ${missing.join(', ')}`)
 }
 
-const removedRoutes = ['/api/optimize', '/api/optimize/job', '/api/optimize/reorder-check']
+const removedRoutes = ['/api/optimize', '/api/optimize/job', '/api/optimize/reorder-check', '/api/user/data/skland/unlink']
 const stale = removedRoutes.filter((route) => actualRoutes.includes(route))
 if (stale.length > 0) {
-  throw new Error(`removed optimize routes are still registered: ${stale.join(', ')}`)
+  throw new Error(`removed API routes are still registered: ${stale.join(', ')}`)
 }
 
 console.log(`[check-server-routes] ${actualRoutes.length} API routes registered`)
