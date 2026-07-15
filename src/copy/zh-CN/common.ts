@@ -138,21 +138,23 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_051: "特殊策略",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_052: "搓玉预算",
+  components_ConfigEditor_052: "搓玉理智预算",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_053: "默认每日 ",
+  components_ConfigEditor_053: "每日基础理智预算为 ",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_054: " 理智；月卡额外 +",
+  components_ConfigEditor_054: "，月卡每日额外提供 ",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_055: " 理智，仅用于合成玉经济计算。",
+  components_ConfigEditor_055: " 理智。此设置仅用于测算合成玉产能与资源成本。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_056: "月卡",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_057: "每日固源岩理智预算",
+  components_ConfigEditor_057: "每日投入搓玉的理智",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_058: "当前长期预算 ",
+  components_ConfigEditor_058: "当前可用理智预算为 ",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_059: " 理智/日，用于判断搓玉产能、库存透支和机会成本。",
+  components_ConfigEditor_059: " 理智/日。预算越高，可持续搓玉产能越高，但会增加材料库存消耗与其他关卡的机会成本。",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_059_details_summary: "展开预算说明",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_060: "排班模式",
   // src/components/ConfigEditor.tsx

@@ -371,7 +371,7 @@ export default function ConfigEditor({
           </div>
         </div>
       ) : (
-      <div className="grid gap-5 pt-5 lg:grid-cols-[1fr_1fr_0.9fr]">
+      <div className="grid gap-5 pt-5 lg:grid-cols-2">
         <div className="tool-inset bg-surface-2/60 p-4">
           <div className="mb-4">
             <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_042}</h3>
@@ -428,44 +428,47 @@ export default function ConfigEditor({
           </div>
         </div>
 
-        <div className="tool-inset bg-surface-2/60 p-4">
-            <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_051}</h3>
-            <div className="mt-4 space-y-4">
-              {showOrundumPlanning && (
-                <div className="tool-inset px-3 py-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
+        <div className="tool-inset bg-surface-2/60 p-4 lg:col-span-2">
+          <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_051}</h3>
+          <div className="mt-4 space-y-4">
+            {showOrundumPlanning && (
+              <div className="tool-inset px-4 py-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm font-medium text-ink-primary">{copy.common.components_ConfigEditor_052}</p>
-                  <p className="mt-1 text-xs leading-5 text-ink-muted">
-                    {copy.common.components_ConfigEditor_053}{BASE_DAILY_SANITY_BUDGET} {copy.common.components_ConfigEditor_054}{MONTHLY_CARD_DAILY_SANITY_BONUS} {copy.common.components_ConfigEditor_055}</p>
+                  <label className="flex min-h-11 items-center justify-between gap-3 text-sm text-ink-secondary sm:min-w-36">
+                    <span>{copy.common.components_ConfigEditor_056}</span>
+                    <input
+                      type="checkbox"
+                      checked={orundumPlanning.monthly_card}
+                      disabled={!canEdit}
+                      onChange={(event) => setOrundumMonthlyCard(event.currentTarget.checked)}
+                      className="h-4 w-4 accent-brand-500"
+                    />
+                  </label>
                 </div>
-                <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary sm:min-w-36">
-                  <span>{copy.common.components_ConfigEditor_056}</span>
+                <label className="mt-2 flex min-h-11 items-center justify-between gap-3 text-sm text-ink-secondary">
+                  <span>{copy.common.components_ConfigEditor_057}</span>
                   <input
-                    type="checkbox"
-                    checked={orundumPlanning.monthly_card}
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={orundumPlanning.daily_sanity_budget}
                     disabled={!canEdit}
-                    onChange={(event) => setOrundumMonthlyCard(event.currentTarget.checked)}
-                    className="h-4 w-4 accent-brand-500"
+                    onChange={(event) => setOrundumDailySanityBudget(Number(event.currentTarget.value))}
+                    className="number-input-clean tool-field w-24 px-3 py-1 text-right disabled:text-ink-muted"
                   />
                 </label>
+                <details className="mt-2 border-t border-surface-3/60">
+                  <summary className="min-h-11 cursor-pointer py-3 text-xs font-medium leading-5 text-ink-secondary">
+                    {copy.common.components_ConfigEditor_059_details_summary}
+                  </summary>
+                  <div className="space-y-1 pb-3 text-xs leading-5 text-ink-muted">
+                    <p>{copy.common.components_ConfigEditor_053}{BASE_DAILY_SANITY_BUDGET}{copy.common.components_ConfigEditor_054}{MONTHLY_CARD_DAILY_SANITY_BONUS}{copy.common.components_ConfigEditor_055}</p>
+                    <p>{copy.common.components_ConfigEditor_058}{orundumPlanning.total_daily_sanity_budget}{copy.common.components_ConfigEditor_059}</p>
+                  </div>
+                </details>
               </div>
-              <label className="mt-3 flex items-center justify-between gap-3 text-sm text-ink-secondary">
-                <span>{copy.common.components_ConfigEditor_057}</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={orundumPlanning.daily_sanity_budget}
-                  disabled={!canEdit}
-                  onChange={(event) => setOrundumDailySanityBudget(Number(event.currentTarget.value))}
-                  className="number-input-clean tool-field w-24 px-3 py-1 text-right disabled:text-ink-muted"
-                />
-              </label>
-              <p className="mt-2 text-xs leading-5 text-ink-muted">
-                  {copy.common.components_ConfigEditor_058}{orundumPlanning.total_daily_sanity_budget} {copy.common.components_ConfigEditor_059}</p>
-                </div>
-              )}
+            )}
               <div>
               <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_060}</p>
               <div className="tool-inset grid grid-cols-2 gap-2 p-1" role="group" aria-label={copy.common.components_ConfigEditor_061}>

@@ -35,4 +35,28 @@ describe('ConfigEditor shift patterns', () => {
     expect(next.schedule_mode).toBe('maa')
     expect(next.variable_shift_schedule).toEqual(expect.objectContaining({ enable: false, enabled: false }))
   })
+
+  it('keeps the orundum budget explanation collapsed until requested', async () => {
+    const user = userEvent.setup()
+    const config = normalizeConfig(CONFIG_PRESETS['243-1'])
+
+    render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('搓玉理智预算')).toBeInTheDocument()
+    expect(screen.getByText('每日投入搓玉的理智')).toBeInTheDocument()
+
+    const summary = screen.getByText('展开预算说明')
+    const details = summary.closest('details')
+    expect(details).not.toHaveAttribute('open')
+    await user.click(summary)
+    expect(details).toHaveAttribute('open')
+    expect(screen.getByText(/当前可用理智预算为/)).toBeInTheDocument()
+  })
 })
