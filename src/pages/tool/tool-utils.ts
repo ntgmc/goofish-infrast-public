@@ -1,4 +1,6 @@
 import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, UserGameAccount } from '../../lib/types'
+import { copy, CURRENT_LOCALE } from '../../copy/index'
+
 
 export function createAccountLicense(profile: UserGameAccount, operators: LicenseOperator[], config: LicenseConfig): LicenseFile {
   return {
@@ -37,20 +39,20 @@ export function isSchedulableProfile(profile: UserGameAccount): boolean {
 }
 
 export function getProfileAccessLabel(profile: UserGameAccount): string {
-  if (isFreePreviewTrialActive(profile)) return '高级版限时体验'
-  if (isFreePreviewProfile(profile)) return '免费预览'
-  if (profile.permission === 'recommended') return '单次重置卡'
-  if (profile.permission === 'growth') return '练度提升卡'
-  if (profile.permission === 'advanced') return '单账号终身卡'
-  if (profile.permission === 'ultimate' || profile.permission === 'admin') return 'Admin卡'
-  return '练度提升卡'
+  if (isFreePreviewTrialActive(profile)) return copy.workspace.pages_tool_tool_utils_001
+  if (isFreePreviewProfile(profile)) return copy.workspace.pages_tool_tool_utils_002
+  if (profile.permission === 'recommended') return copy.workspace.pages_tool_tool_utils_003
+  if (profile.permission === 'growth') return copy.workspace.pages_tool_tool_utils_004
+  if (profile.permission === 'advanced') return copy.workspace.pages_tool_tool_utils_005
+  if (profile.permission === 'ultimate' || profile.permission === 'admin') return copy.workspace.pages_tool_tool_utils_006
+  return copy.workspace.pages_tool_tool_utils_007
 }
 
 export function sortOperatorsForPreview(operators: LicenseOperator[]): LicenseOperator[] {
   return [...operators].sort((left, right) => (
     numberValue(right.elite) - numberValue(left.elite)
     || numberValue(right.level) - numberValue(left.level)
-    || left.name.localeCompare(right.name, 'zh-CN')
+    || left.name.localeCompare(right.name, CURRENT_LOCALE)
     || left.id.localeCompare(right.id)
   ))
 }
@@ -62,12 +64,12 @@ export function formatPreviewEfficiency(value: number): string {
 
 export function parseOperatorsText(text: string): LicenseOperator[] {
   const data = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
-  if (!Array.isArray(data) || data.length === 0) throw new Error('干员数据不能为空。')
+  if (!Array.isArray(data) || data.length === 0) throw new Error(copy.workspace.pages_tool_tool_utils_008)
   const requiredKeys = ['id', 'name', 'own', 'elite', 'rarity']
   data.forEach((raw, index) => {
-    if (!raw || typeof raw !== 'object') throw new Error(`第 ${index + 1} 个干员不是对象。`)
+    if (!raw || typeof raw !== 'object') throw new Error(`${copy.workspace.pages_tool_tool_utils_009}${index + 1}${copy.workspace.pages_tool_tool_utils_010}`)
     for (const key of requiredKeys) {
-      if (!(key in raw)) throw new Error(`第 ${index + 1} 个干员缺少 ${key} 字段。`)
+      if (!(key in raw)) throw new Error(`${copy.workspace.pages_tool_tool_utils_011}${index + 1}${copy.workspace.pages_tool_tool_utils_012}${key}${copy.workspace.pages_tool_tool_utils_013}`)
     }
   })
   return data as LicenseOperator[]
@@ -75,14 +77,14 @@ export function parseOperatorsText(text: string): LicenseOperator[] {
 
 export function validateEmailInput(value: string): string | null {
   const email = value.trim()
-  if (!email) return '请输入邮箱'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return '请输入正确的邮箱地址'
+  if (!email) return copy.workspace.pages_tool_tool_utils_014
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return copy.workspace.pages_tool_tool_utils_015
   return null
 }
 
 export function validatePasswordInput(value: string): string | null {
-  if (!value) return '请输入密码'
-  if (value.length < 8) return '密码至少需要 8 位'
+  if (!value) return copy.workspace.pages_tool_tool_utils_016
+  if (value.length < 8) return copy.workspace.pages_tool_tool_utils_017
   return null
 }
 
@@ -98,7 +100,7 @@ export function formatDate(value: string | null | undefined): string {
   if (!value) return '-'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('zh-CN', { hour12: false })
+  return date.toLocaleString(CURRENT_LOCALE, { hour12: false })
 }
 
 function numberValue(value: unknown): number {

@@ -3,6 +3,8 @@ import { formatCompactNumber, type PreparedResult } from './formatters'
 import DroneSummary from './DroneSummary'
 import OperatorAvatarStrip from './OperatorAvatarStrip'
 import type { PreparedPlan, RoomRow } from './types'
+import { copy } from '../../copy/index'
+
 
 type RotationRoomGroup = {
   key: string;
@@ -31,10 +33,9 @@ export default function ResultDetail({
   return (
     <section className="tool-panel overflow-hidden">
       <div className="tool-panel-header flex items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-ink-primary sm:px-6">
-        <span>{isRotationMode ? '预设队列' : '排班详情'}</span>
+        <span>{isRotationMode ? copy.domain.components_result_panel_ResultDetail_001 : copy.domain.components_result_panel_ResultDetail_002}</span>
         <span className="text-xs font-medium text-ink-muted">
-          {planTimes ?? `${detailStats.planCount} 个${isRotationMode ? '队列' : '班次'}`}，{displayedRoomCount} 个房间
-        </span>
+          {planTimes ?? `${detailStats.planCount}${copy.domain.components_result_panel_ResultDetail_003}${isRotationMode ? copy.domain.components_result_panel_ResultDetail_004 : copy.domain.components_result_panel_ResultDetail_005}`}，{displayedRoomCount} {copy.domain.components_result_panel_ResultDetail_006}</span>
       </div>
       <div className="p-4 sm:p-5">
         {isRotationMode
@@ -53,7 +54,7 @@ function MaaPlanList({ plans }: { plans: PreparedPlan[] }) {
           <div className="flex flex-col gap-2 bg-surface-2/50 px-3 py-3 sm:px-4 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <span className="font-semibold text-ink-primary">
-                {plan.name || `班次 ${i + 1}`}
+                {plan.name || `${copy.domain.components_result_panel_ResultDetail_007}${i + 1}`}
               </span>
               {plan.shift_hours && (
                 <span className="ml-2 text-xs font-medium text-ink-muted">
@@ -63,17 +64,17 @@ function MaaPlanList({ plans }: { plans: PreparedPlan[] }) {
             </div>
             {plan.Fiammetta?.enable && plan.Fiammetta.target && (
               <span className="tool-status tool-status--warning w-fit">
-                菲亚梅塔 → {plan.Fiammetta.target}
+                {copy.domain.components_result_panel_ResultDetail_008}{plan.Fiammetta.target}
               </span>
             )}
           </div>
 
           <div className="px-3 py-2.5 sm:px-4 sm:py-3">
             <div className="hidden grid-cols-[minmax(116px,0.8fr)_minmax(92px,0.55fr)_minmax(0,2fr)_minmax(150px,0.9fr)] gap-4 border-b border-surface-3/60 pb-2 text-xs font-medium text-ink-muted md:grid">
-              <span>房间</span>
-              <span>产物</span>
-              <span>干员</span>
-              <span className="text-right">效率</span>
+              <span>{copy.domain.components_result_panel_ResultDetail_009}</span>
+              <span>{copy.domain.components_result_panel_ResultDetail_010}</span>
+              <span>{copy.domain.components_result_panel_ResultDetail_011}</span>
+              <span className="text-right">{copy.domain.components_result_panel_ResultDetail_012}</span>
             </div>
             <div className="divide-y divide-surface-3/50 md:divide-y-0">
               {plan.rows.map((row) => (
@@ -132,8 +133,7 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
   if (groups.length === 0) {
     return (
       <div className="tool-inset border-dashed px-4 py-8 text-center text-sm text-ink-muted">
-        暂无可展示的预设队列。
-      </div>
+        {copy.domain.components_result_panel_ResultDetail_013}</div>
     )
   }
 
@@ -150,8 +150,7 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
               <p className="mt-1 truncate text-xs text-ink-muted">{group.product}</p>
             </div>
             <span className="tool-status shrink-0">
-              {group.rows.length} 队列
-            </span>
+              {group.rows.length} {copy.domain.components_result_panel_ResultDetail_014}</span>
           </div>
           <div className="divide-y divide-surface-3/60">
             {group.rows.map((row) => (
@@ -160,7 +159,7 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
                   <span className="tool-status tool-status--current">
                     {row.queueLabel}
                   </span>
-                  <span className="text-xs font-medium text-ink-muted">快速切换</span>
+                  <span className="text-xs font-medium text-ink-muted">{copy.domain.components_result_panel_ResultDetail_015}</span>
                 </div>
                 <div className="mt-2">
                   <OperatorAvatarStrip operators={row.operators} fallbackText={row.operatorText} compact />
@@ -176,12 +175,12 @@ function RotationRoomGrid({ groups }: { groups: RotationRoomGroup[] }) {
 }
 
 function EfficiencyDisclosure({ row, compact = false }: { row: RoomRow; compact?: boolean }) {
-  const detailItems = row.detailItems.length > 0 ? row.detailItems : ['暂无额外效率数据']
+  const detailItems = row.detailItems.length > 0 ? row.detailItems : [copy.domain.components_result_panel_ResultDetail_016]
 
   return (
     <details className={`tool-inset group ${compact ? 'mt-3' : 'mt-2'} bg-surface-0/80 text-left`}>
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-2.5 py-1.5 text-xs font-semibold text-ink-secondary transition-colors duration-150 hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-brand-500/45 [&::-webkit-details-marker]:hidden">
-        <span>效率数据</span>
+        <span>{copy.domain.components_result_panel_ResultDetail_017}</span>
         <span className="inline-flex items-center gap-2 text-ink-muted">
           {row.efficiency}
           <svg
@@ -234,5 +233,5 @@ function formatGroupProduct(rows: RoomRow[]): string {
   const products = Array.from(new Set(rows.map((row) => row.product).filter((product) => product && product !== '-')))
   if (products.length === 0) return '-'
   if (products.length <= 2) return products.join(' / ')
-  return '多产物'
+  return copy.domain.components_result_panel_ResultDetail_018
 }

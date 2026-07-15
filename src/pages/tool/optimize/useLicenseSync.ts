@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiJson } from '../../../lib/api-client'
+import { copy } from '../../../copy/index'
+
 
 export function useLicenseSync(profileId: string, orderHash: string) {
   const [syncing, setSyncing] = useState(true)
@@ -10,7 +12,7 @@ export function useLicenseSync(profileId: string, orderHash: string) {
     setSyncing(true)
 
     apiJson(`/api/user/status?profile_id=${encodeURIComponent(profileId)}`, {
-      fallbackMessage: '账号授权状态同步失败',
+      fallbackMessage: copy.optimize.pages_tool_optimize_useLicenseSync_001,
     })
       .then(() => {
         if (!cancelled) setStatus(null)

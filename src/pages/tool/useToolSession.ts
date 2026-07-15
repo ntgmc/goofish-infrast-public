@@ -12,6 +12,8 @@ import type {
 } from '../../lib/types'
 import { apiJson, apiJsonOrNull, apiVoid } from '../../lib/api-client'
 import { createAccountLicense, isSchedulableProfile } from './tool-utils'
+import { copy } from '../../copy/index'
+
 
 export type WorkspacePatch = Partial<UserWorkspace> & { saved_config_action?: WorkspaceSavedConfigAction }
 export type ConfigSyncStatus = 'idle' | 'pending' | 'saving' | 'failed'
@@ -92,7 +94,7 @@ export function useToolSession() {
       })
       .catch(console.error)
 
-    void apiJson<Partial<AuthSuccessResponse> & { user: AuthUser | null }>('/api/auth/me', { fallbackMessage: '确认登录信息失败' })
+    void apiJson<Partial<AuthSuccessResponse> & { user: AuthUser | null }>('/api/auth/me', { fallbackMessage: copy.common.pages_tool_useToolSession_001 })
       .then((data) => {
         if (cancelled) return
         if (!data.user) {
@@ -124,11 +126,11 @@ export function useToolSession() {
     setWorkspaceLoadError(null)
     try {
       const data = await apiJson<AuthSuccessResponse>(`/api/user/workspace?profile_id=${encodeURIComponent(profile.id)}`, {
-        fallbackMessage: '加载账号资料失败',
+        fallbackMessage: copy.common.pages_tool_useToolSession_002,
       })
       applyAuthPayload(data)
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : '加载账号资料失败，请稍后重试。'
+      const message = caught instanceof Error ? caught.message : copy.common.pages_tool_useToolSession_003
       setWorkspaceLoadError(message)
       throw caught
     } finally {
@@ -137,12 +139,12 @@ export function useToolSession() {
   }, [applyAuthPayload, cancelPendingConfigSave])
 
   const persistWorkspacePatch = useCallback((patch: WorkspacePatch) => {
-    if (!activeProfile) return Promise.reject(new Error('请先选择游戏账号。'))
+    if (!activeProfile) return Promise.reject(new Error(copy.common.pages_tool_useToolSession_004))
     const runPatch = async () => {
       const data = await apiJson<AuthSuccessResponse>('/api/user/workspace', {
         method: 'PATCH',
         json: { ...patch, profile_id: activeProfile.id },
-        fallbackMessage: '保存失败',
+        fallbackMessage: copy.common.pages_tool_useToolSession_005,
       })
       applyAuthPayloadInternal(data, { preserveConfigDraft: true })
       return data
@@ -162,7 +164,7 @@ export function useToolSession() {
       const save = () => apiJson<AuthSuccessResponse>('/api/user/workspace', {
           method: 'PATCH',
           json: { config: pending.config, profile_id: pending.profileId },
-          fallbackMessage: '保存配置失败',
+          fallbackMessage: copy.common.pages_tool_useToolSession_006,
         })
       const request = workspacePatchQueueRef.current.then(save, save)
       workspacePatchQueueRef.current = request.then(() => undefined, () => undefined)

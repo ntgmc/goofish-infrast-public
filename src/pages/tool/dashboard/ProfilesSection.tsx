@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { AuthSuccessResponse, UserGameAccount } from '../../../lib/types'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import { formatDate, getProfileAccessLabel, isFreePreviewProfile } from '../tool-utils'
+import { copy } from '../../../copy/index'
+
 
 
 export default function ProfilesSection({
@@ -18,8 +20,8 @@ export default function ProfilesSection({
   if (profiles.length === 0) {
     return (
 <section className="tool-panel p-6">
-<h2 className="text-lg font-semibold text-ink-primary">还没有添加游戏账号</h2>
-<p className="mt-2 text-sm leading-6 text-ink-secondary">可以在“添加账号”里创建免费预览，或输入未使用的 CDK 添加正式游戏账号。</p>
+<h2 className="text-lg font-semibold text-ink-primary">{copy.dashboard.pages_tool_dashboard_ProfilesSection_001}</h2>
+<p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.dashboard.pages_tool_dashboard_ProfilesSection_002}</p>
 </section>
     )
   }
@@ -29,7 +31,7 @@ export default function ProfilesSection({
         <ProfileCard
           key={profile.id}
           profile={profile}
-          fallbackName={`账号 ${index + 1}`}
+          fallbackName={`${copy.dashboard.pages_tool_dashboard_ProfilesSection_003}${index + 1}`}
           opening={openingProfileId === profile.id}
           onOpen={() => onOpen(profile)}
           onSaved={onEdit}
@@ -64,10 +66,10 @@ function ProfileCard({
       data = await apiJson<AuthSuccessResponse>('/api/user/profiles', {
         method: 'PATCH',
         json: { profile_id: profile.id, display_name: displayName, note },
-        fallbackMessage: '保存失败',
+        fallbackMessage: copy.dashboard.pages_tool_dashboard_ProfilesSection_004,
       })
     } catch (caught) {
-      setError(getApiErrorMessage(caught, '保存失败'))
+      setError(getApiErrorMessage(caught, copy.dashboard.pages_tool_dashboard_ProfilesSection_005))
       return
     }
     onSaved(data)
@@ -82,8 +84,8 @@ function ProfileCard({
             <h2 className="truncate text-lg font-semibold text-ink-primary">{profile.display_name || fallbackName}</h2>
             <span className={`tool-status ${isFreePreviewProfile(profile) ? 'tool-status--warning' : 'tool-status--current'}`}>{getProfileAccessLabel(profile)}</span>
           </div>
-          <p className="mt-2 text-sm leading-6 text-ink-secondary">{profile.note || (isFreePreviewProfile(profile) ? '免费个人排班可查看完整游戏内轮换，但不提供导出和高级分析。' : '暂无备注')}</p>
-          <p className="mt-3 text-xs text-ink-muted">{profile.operator_count} 名干员 · 更新 {formatDate(profile.updated_at)}</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">{profile.note || (isFreePreviewProfile(profile) ? copy.dashboard.pages_tool_dashboard_ProfilesSection_006 : copy.dashboard.pages_tool_dashboard_ProfilesSection_007)}</p>
+          <p className="mt-3 text-xs text-ink-muted">{profile.operator_count} {copy.dashboard.pages_tool_dashboard_ProfilesSection_008}{formatDate(profile.updated_at)}</p>
         </div>
         <button
           type="button"
@@ -91,16 +93,16 @@ function ProfileCard({
           disabled={opening}
           className="tool-primary-action disabled:cursor-wait"
         >
-          {opening ? '正在准备...' : '准备这个账号'}
+          {opening ? copy.dashboard.pages_tool_dashboard_ProfilesSection_009 : copy.dashboard.pages_tool_dashboard_ProfilesSection_010}
         </button>
       </div>
-      <button type="button" onClick={() => setEditing((value) => !value)} className="tool-secondary-action mt-4 px-3 text-sm" aria-expanded={editing}>修改名称和备注</button>
+      <button type="button" onClick={() => setEditing((value) => !value)} className="tool-secondary-action mt-4 px-3 text-sm" aria-expanded={editing}>{copy.dashboard.pages_tool_dashboard_ProfilesSection_011}</button>
       {editing && (
         <div className="tool-inset mt-4 space-y-3 p-4">
           {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
-          <input aria-label="档案名称" value={displayName} maxLength={40} onChange={(event) => setDisplayName(event.currentTarget.value)} className="tool-field" />
-          <textarea aria-label="档案备注" value={note} maxLength={500} rows={3} onChange={(event) => setNote(event.currentTarget.value)} className="tool-field resize-y" placeholder="给这个账号写点备注" />
-          <button type="button" onClick={() => void save()} className="tool-primary-action">保存</button>
+          <input aria-label={copy.dashboard.pages_tool_dashboard_ProfilesSection_012} value={displayName} maxLength={40} onChange={(event) => setDisplayName(event.currentTarget.value)} className="tool-field" />
+          <textarea aria-label={copy.dashboard.pages_tool_dashboard_ProfilesSection_013} value={note} maxLength={500} rows={3} onChange={(event) => setNote(event.currentTarget.value)} className="tool-field resize-y" placeholder={copy.dashboard.pages_tool_dashboard_ProfilesSection_014} />
+          <button type="button" onClick={() => void save()} className="tool-primary-action">{copy.dashboard.pages_tool_dashboard_ProfilesSection_015}</button>
         </div>
       )}
     </article>

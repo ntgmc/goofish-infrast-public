@@ -2,6 +2,8 @@ import { lazy, Suspense } from 'react'
 import BrandLogo from '../../components/BrandLogo'
 import type { DashboardSection } from '../../lib/app-routes'
 import type { AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
+import { copy } from '../../copy/index'
+
 
 const ProfilesSection = lazy(() => import('./dashboard/ProfilesSection'))
 const ToolsSection = lazy(() => import('./dashboard/ToolsSection'))
@@ -38,12 +40,12 @@ export default function AccountDashboard({
   onOpenProfile: (profile: UserGameAccount) => void
 }) {
   const labels: Record<DashboardSection, string> = {
-    profiles: '游戏账号',
-    tools: '工具',
-    redeem: '添加账号',
-    invitations: '邀请有礼',
-    announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCount})` : ''}`,
-    settings: '账号设置',
+    profiles: copy.common.pages_tool_AccountDashboard_001,
+    tools: copy.common.pages_tool_AccountDashboard_002,
+    redeem: copy.common.pages_tool_AccountDashboard_003,
+    invitations: copy.common.pages_tool_AccountDashboard_004,
+    announcements: `${copy.common.pages_tool_AccountDashboard_005}${announcementUnreadCount > 0 ? ` (${announcementUnreadCount})` : ''}`,
+    settings: copy.common.pages_tool_AccountDashboard_006,
   }
   const sections = Object.keys(labels) as DashboardSection[]
 
@@ -54,13 +56,13 @@ export default function AccountDashboard({
           <div className="flex items-center gap-3">
             <BrandLogo size="sm" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink-primary">MAA 工作台</p>
+              <p className="text-sm font-semibold text-ink-primary">{copy.common.pages_tool_AccountDashboard_007}</p>
               <p className="mt-1 truncate text-xs text-ink-muted">{user.email}</p>
             </div>
           </div>
         </div>
 
-        <nav className="mt-5 space-y-1" aria-label="账号导航">
+        <nav className="mt-5 space-y-1" aria-label={copy.common.pages_tool_AccountDashboard_008}>
           {sections.map((key) => (
             <button
               key={key}
@@ -76,8 +78,7 @@ export default function AccountDashboard({
 
         <div className="absolute inset-x-4 bottom-5 border-t border-surface-3 pt-4">
           <button type="button" onClick={onLogout} className="tool-secondary-action w-full">
-            退出登录
-          </button>
+            {copy.common.pages_tool_AccountDashboard_009}</button>
         </div>
       </aside>
 
@@ -87,19 +88,18 @@ export default function AccountDashboard({
             <div className="flex min-w-0 items-start gap-3">
               <BrandLogo size="sm" className="lg:hidden" />
               <div className="min-w-0">
-                <p className="tool-eyebrow">账号工作台</p>
+                <p className="tool-eyebrow">{copy.common.pages_tool_AccountDashboard_010}</p>
                 <h1 className="mt-1 text-xl font-semibold text-ink-primary">{labels[section]}</h1>
                 <p className="mt-1 text-sm text-ink-muted">
-                  {activeProfile ? `正在查看：${activeProfile.display_name}` : '一个登录账号可以管理多个游戏账号。'}
+                  {activeProfile ? `${copy.common.pages_tool_AccountDashboard_011}${activeProfile.display_name}` : copy.common.pages_tool_AccountDashboard_012}
                 </p>
               </div>
             </div>
             <button type="button" onClick={onLogout} className="tool-secondary-action self-start lg:hidden">
-              退出登录
-            </button>
+              {copy.common.pages_tool_AccountDashboard_013}</button>
           </div>
 
-          <nav className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="移动端账号导航">
+          <nav className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.common.pages_tool_AccountDashboard_014}>
             {sections.map((key) => (
               <button
                 key={key}
@@ -145,5 +145,5 @@ export default function AccountDashboard({
 }
 
 function SectionFallback() {
-  return <div className="tool-panel p-6 text-sm text-ink-secondary">正在载入...</div>
+  return <div className="tool-panel p-6 text-sm text-ink-secondary">{copy.common.pages_tool_AccountDashboard_015}</div>
 }

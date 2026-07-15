@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { formatShiftHours, type ScenarioComparisonPoint, type ScenarioMetrics } from '../../../../lib/scenario-comparison'
+import { copy, CURRENT_LOCALE } from '../../../../copy/index'
+
 
 type SortKey = 'frontier' | 'operations' | 'sanity' | 'lmd' | 'battle' | 'orundum' | 'opportunity'
 
@@ -25,18 +27,18 @@ export default function ScenarioResultsTable({
         <table className="min-w-[1320px] border-collapse text-left text-xs">
           <thead className="bg-surface-2 text-ink-secondary">
             <tr>
-              <Header label="场景" sticky />
-              <SortableHeader label="换班" sortKey="operations" sort={sort} onSort={changeSort} />
-              <SortableHeader label="等效理智" sortKey="sanity" sort={sort} onSort={changeSort} />
-              <SortableHeader label="龙门币" sortKey="lmd" sort={sort} onSort={changeSort} />
-              <SortableHeader label="作战记录" sortKey="battle" sort={sort} onSort={changeSort} />
-              <SortableHeader label="合成玉 长期/短期" sortKey="orundum" sort={sort} onSort={changeSort} />
-              <Header label="赤金 产/耗/净" />
-              <Header label="碎片 产/耗/净" />
-              <SortableHeader label="搓玉成本 理智/龙门币" sortKey="opportunity" sort={sort} onSort={changeSort} />
-              <Header label="库存耗尽" />
-              <Header label="无人机 使用/丢弃" />
-              <SortableHeader label="状态" sortKey="frontier" sort={sort} onSort={changeSort} />
+              <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_001} sticky />
+              <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_002} sortKey="operations" sort={sort} onSort={changeSort} />
+              <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_003} sortKey="sanity" sort={sort} onSort={changeSort} />
+              <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_004} sortKey="lmd" sort={sort} onSort={changeSort} />
+              <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_005} sortKey="battle" sort={sort} onSort={changeSort} />
+              <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_006} sortKey="orundum" sort={sort} onSort={changeSort} />
+              <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_007} />
+              <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_008} />
+              <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_009} sortKey="opportunity" sort={sort} onSort={changeSort} />
+              <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_010} />
+              <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_011} />
+              <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_012} sortKey="frontier" sort={sort} onSort={changeSort} />
             </tr>
           </thead>
           <tbody className="divide-y divide-surface-3/70">
@@ -51,7 +53,7 @@ export default function ScenarioResultsTable({
                       <span className="mt-0.5 block text-[11px] font-normal text-ink-muted">{scheduleLabel(point)} · {droneLabel(point.droneStrategy)}</span>
                     </button>
                   </td>
-                  <Cell value={point.operationsPerDay > 0 ? `${point.operationsPerDay} 次` : '—'} />
+                  <Cell value={point.operationsPerDay > 0 ? `${point.operationsPerDay}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_013}` : '—'} />
                   <Cell value={value ? number(value.productionSanityPerDay) : '—'} strong />
                   <Cell value={value ? number(value.lmdPerDay) : '—'} />
                   <Cell value={value ? number(value.battleRecordPerDay) : '—'} />
@@ -59,7 +61,7 @@ export default function ScenarioResultsTable({
                   <Cell value={value ? resourceTriple(value.pureGoldProducedPerDay, value.pureGoldConsumedPerDay, value.pureGoldNetPerDay) : '—'} />
                   <Cell value={value ? resourceTriple(value.originiumShardProducedPerDay, value.originiumShardConsumedPerDay, value.originiumShardNetPerDay) : '—'} />
                   <Cell value={value?.orundumEconomy ? `${number(value.orundumEconomy.opportunityCostSanityPerDay)} / ${number(value.orundumEconomy.hardLmdCostPerDay)}` : '—'} />
-                  <Cell value={value?.orundumEconomy?.inventoryDepletionDays == null ? '—' : `${number(value.orundumEconomy.inventoryDepletionDays)} 天`} />
+                  <Cell value={value?.orundumEconomy?.inventoryDepletionDays == null ? '—' : `${number(value.orundumEconomy.inventoryDepletionDays)}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_014}`} />
                   <Cell value={value ? `${number(value.dronesUsedPerDay)} / ${number(value.dronesDiscardedPerDay)}` : '—'} />
                   <td className="px-3 py-2"><Status point={point} /></td>
                 </tr>
@@ -83,18 +85,18 @@ export default function ScenarioResultsTable({
               </div>
               {value ? (
                 <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                  <Stat label="等效理智/日" value={number(value.productionSanityPerDay)} />
-                  <Stat label="换班" value={`${point.operationsPerDay} 次/日`} />
-                  <Stat label="龙门币" value={number(value.lmdPerDay)} />
-                  <Stat label="作战记录" value={number(value.battleRecordPerDay)} />
-                  <Stat label="合成玉 长期/短期" value={value.orundumEconomy ? `${number(value.orundumEconomy.sustainablePerDay)} / ${number(value.orundumEconomy.shortTermPerDay)}` : '—'} />
-                  <Stat label="碎片 产/耗/净" value={resourceTriple(value.originiumShardProducedPerDay, value.originiumShardConsumedPerDay, value.originiumShardNetPerDay)} />
-                  <Stat label="机会成本理智" value={value.orundumEconomy ? number(value.orundumEconomy.opportunityCostSanityPerDay) : '—'} />
-                  <Stat label="库存耗尽" value={value.orundumEconomy?.inventoryDepletionDays == null ? '—' : `${number(value.orundumEconomy.inventoryDepletionDays)} 天`} />
-                  <Stat label="赤金净变动" value={signed(value.pureGoldNetPerDay)} />
-                  <Stat label="无人机使用" value={number(value.dronesUsedPerDay)} />
+                  <Stat label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_015} value={number(value.productionSanityPerDay)} />
+                  <Stat label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_016} value={`${point.operationsPerDay}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_017}`} />
+                  <Stat label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_018} value={number(value.lmdPerDay)} />
+                  <Stat label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_019} value={number(value.battleRecordPerDay)} />
+                  <Stat label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_020} value={value.orundumEconomy ? `${number(value.orundumEconomy.sustainablePerDay)} / ${number(value.orundumEconomy.shortTermPerDay)}` : '—'} />
+                  <Stat label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_021} value={resourceTriple(value.originiumShardProducedPerDay, value.originiumShardConsumedPerDay, value.originiumShardNetPerDay)} />
+                  <Stat label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_022} value={value.orundumEconomy ? number(value.orundumEconomy.opportunityCostSanityPerDay) : '—'} />
+                  <Stat label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_023} value={value.orundumEconomy?.inventoryDepletionDays == null ? '—' : `${number(value.orundumEconomy.inventoryDepletionDays)}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_024}`} />
+                  <Stat label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_025} value={signed(value.pureGoldNetPerDay)} />
+                  <Stat label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_026} value={number(value.dronesUsedPerDay)} />
                 </dl>
-              ) : <p className="mt-3 text-xs text-error" role="alert">{point.error ?? '场景计算失败'}</p>}
+              ) : <p className="mt-3 text-xs text-error" role="alert">{point.error ?? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_027}</p>}
             </button>
           )
         })}
@@ -124,7 +126,7 @@ function Cell({ value, strong = false }: { value: string; strong?: boolean }) {
 
 function Status({ point }: { point: ScenarioComparisonPoint }) {
   const className = point.isFrontier ? 'tool-status--success' : point.verified ? 'tool-status--current' : point.status === 'failed' ? 'tool-status--error' : ''
-  const label = point.isFrontier ? '前沿' : point.verified ? '精确' : point.status === 'failed' ? '失败' : '快速'
+  const label = point.isFrontier ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_028 : point.verified ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_029 : point.status === 'failed' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_030 : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_031
   return <span className={`tool-status whitespace-nowrap ${className}`}>{label}</span>
 }
 
@@ -158,25 +160,25 @@ function compare(left: ScenarioComparisonPoint, right: ScenarioComparisonPoint, 
 
 function productionPlanLabel(point: ScenarioComparisonPoint): string {
   const plan = point.productionPlan
-  return `${point.layout} · 贸币${plan.trading.lmd}/玉${plan.trading.orundum} · 制赤${plan.manufacturing.pureGold}/经${plan.manufacturing.battleRecord}/碎${plan.manufacturing.originiumShard}`
+  return `${point.layout}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_032}${plan.trading.lmd}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_033}${plan.trading.orundum}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_034}${plan.manufacturing.pureGold}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_035}${plan.manufacturing.battleRecord}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_036}${plan.manufacturing.originiumShard}`
 }
 
 function scheduleLabel(point: ScenarioComparisonPoint): string {
-  if (point.scheduleMode === 'rotation') return '游戏内轮换 12h×2'
-  const prefix = point.scheduleStrategy === 'variable' ? '自动非固定' : 'MAA'
-  const fallback = point.variableShiftFallback ? '（回退 8-8-8）' : ''
+  if (point.scheduleMode === 'rotation') return copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_037
+  const prefix = point.scheduleStrategy === 'variable' ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_038 : 'MAA'
+  const fallback = point.variableShiftFallback ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_039 : ''
   return `${prefix} ${formatShiftHours(point.shiftHours)}${fallback}`
 }
 
 function droneLabel(value: ScenarioComparisonPoint['droneStrategy']): string {
   return ({
-    off: '无人机关闭',
-    auto: '无人机自动',
-    lmd: '加速龙门币',
-    orundum: '加速合成玉',
-    pure_gold: '加速赤金',
-    battle_record: '加速经验',
-    originium_shard: '加速源石碎片',
+    off: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_040,
+    auto: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_041,
+    lmd: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_042,
+    orundum: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_043,
+    pure_gold: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_044,
+    battle_record: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_045,
+    originium_shard: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_046,
   })[value]
 }
 
@@ -185,7 +187,7 @@ function resourceTriple(produced: number, consumed: number, net: number): string
 }
 
 function number(value: number): string {
-  return value.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
+  return value.toLocaleString(CURRENT_LOCALE, { maximumFractionDigits: 1 })
 }
 
 function signed(value: number): string {

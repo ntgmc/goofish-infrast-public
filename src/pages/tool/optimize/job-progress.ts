@@ -3,6 +3,8 @@ import { isRetryableOptimizePollStatus } from '../../../lib/optimize-poll'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { fetchOptimizationJob } from './optimization-api'
+import { copy } from '../../../copy/index'
+
 export const OPTIMIZE_POLL_REQUEST_TIMEOUT_MS = 20_000
 export const OPTIMIZE_HIDDEN_POLL_MULTIPLIER = 3
 
@@ -72,15 +74,15 @@ export function getOptimizeEstimateAdjustment(
   current: ScheduleProgressState | null | undefined,
   next: OptimizeJobAccepted | OptimizeJobStatusResponse,
 ): string | undefined {
-  if (next.estimate_phase === 'overdue') return '已超过预估，后台仍在计算'
+  if (next.estimate_phase === 'overdue') return copy.optimize.pages_tool_optimize_job_progress_001
   if (!current) return undefined
 
   if (current.jobId === next.job_id && current.observedRunning && next.status === 'queued') {
-    return '后台正在确认任务状态，计算仍在继续'
+    return copy.optimize.pages_tool_optimize_job_progress_002
   }
 
   if (current.queueStatus === 'queued' && next.status === 'running') {
-    return '任务已开始，预计用时已重新校准'
+    return copy.optimize.pages_tool_optimize_job_progress_003
   }
 
   if (
@@ -89,8 +91,8 @@ export function getOptimizeEstimateAdjustment(
     && typeof current.queuePosition === 'number'
     && typeof next.queue_position === 'number'
   ) {
-    if (next.queue_position > current.queuePosition) return '队列发生变化，预计已延长'
-    if (next.queue_position < current.queuePosition) return '队列推进中，预计已缩短'
+    if (next.queue_position > current.queuePosition) return copy.optimize.pages_tool_optimize_job_progress_004
+    if (next.queue_position < current.queuePosition) return copy.optimize.pages_tool_optimize_job_progress_005
   }
 
   return undefined
@@ -116,7 +118,7 @@ export function prepareOptimizeContinuationProgress(
       Math.max(0, now - current.startedAt) + Math.max(0, next.estimated_remaining_ms ?? 0),
     ),
     estimatePhase: next.estimate_phase === 'overdue' ? 'overdue' : 'running',
-    estimateAdjustment: '排班已完成，正在整理练度建议',
+    estimateAdjustment: copy.optimize.pages_tool_optimize_job_progress_006,
     lastUpdatedAt: now,
   }
 }

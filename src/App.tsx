@@ -6,6 +6,8 @@ import RouteMetadata from './components/RouteMetadata'
 import LandingPage from './pages/LandingPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import CancelAccountDeletionPage from './pages/CancelAccountDeletionPage'
+import { copy } from './copy/index'
+
 
 const ToolPage = lazy(() => import('./pages/ToolPage'))
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'))
@@ -24,19 +26,19 @@ export default function App() {
       <RouteLifecycle />
       <Routes>
         <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
-        <Route path="/tool/*" element={<LazyPage fallback="正在载入工作台..."><ToolPage /></LazyPage>} />
+        <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/cancel-account-deletion" element={<CancelAccountDeletionPage />} />
-        <Route path="/announcements" element={<LazyPage fallback="正在载入公告..."><AnnouncementsPage /></LazyPage>} />
-        <Route path="/faq" element={<LazyPage fallback="正在载入常见问题..."><PublicInfoPage page="faq" /></LazyPage>} />
-        <Route path="/support" element={<LazyPage fallback="正在载入客服信息..."><PublicInfoPage page="support" /></LazyPage>} />
-        <Route path="/privacy" element={<LazyPage fallback="正在载入隐私政策..."><PublicInfoPage page="privacy" /></LazyPage>} />
-        <Route path="/terms" element={<LazyPage fallback="正在载入用户服务协议..."><PublicInfoPage page="terms" /></LazyPage>} />
-        <Route path="/disclaimer" element={<LazyPage fallback="正在载入免责声明..."><PublicInfoPage page="disclaimer" /></LazyPage>} />
-        <Route path="/tools/schedule-analysis" element={<LazyPage fallback="正在载入排班表分析..."><ScheduleAnalysisPage /></LazyPage>} />
-        <Route path="/tools/depot-value" element={<LazyPage fallback="正在载入仓库价值分析器..."><DepotValuePage /></LazyPage>} />
-        <Route path="/admin/setup" element={<LazyPage fallback="正在载入管理后台..."><AdminSetupPage /></LazyPage>} />
-        <Route path="/admin/*" element={<LazyPage fallback="正在载入管理后台..."><AdminPage /></LazyPage>} />
+        <Route path="/announcements" element={<LazyPage fallback={copy.common.App_002}><AnnouncementsPage /></LazyPage>} />
+        <Route path="/faq" element={<LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage>} />
+        <Route path="/support" element={<LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage>} />
+        <Route path="/privacy" element={<LazyPage fallback={copy.common.App_005}><PublicInfoPage page="privacy" /></LazyPage>} />
+        <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
+        <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
+        <Route path="/tools/schedule-analysis" element={<LazyPage fallback={copy.common.App_008}><ScheduleAnalysisPage /></LazyPage>} />
+        <Route path="/tools/depot-value" element={<LazyPage fallback={copy.common.App_009}><DepotValuePage /></LazyPage>} />
+        <Route path="/admin/setup" element={<LazyPage fallback={copy.common.App_010}><AdminSetupPage /></LazyPage>} />
+        <Route path="/admin/*" element={<LazyPage fallback={copy.common.App_011}><AdminPage /></LazyPage>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BuildMetaStrip placement="corner" />

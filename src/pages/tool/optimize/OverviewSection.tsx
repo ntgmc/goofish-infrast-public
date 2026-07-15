@@ -5,6 +5,8 @@ import { formatResultSummary, formatWorkspaceDate, isMaaJsonDownloadable } from 
 import GenerateControlBar, { DashboardMiniStat } from './GenerateControlBar'
 import { SmallActionButton } from './feedback'
 import type { ValidationState } from './types'
+import { copy } from '../../../copy/index'
+
 
 type ReorderCheckViewState = {
   visible: boolean;
@@ -111,12 +113,12 @@ export default function OverviewSection({
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <section className="tool-panel p-5 sm:p-6">
-          <p className="tool-eyebrow">工作台状态</p>
-          <h2 className="mt-1 text-lg font-semibold text-ink-primary">当前排班准备情况</h2>
+          <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_OverviewSection_001}</p>
+          <h2 className="mt-1 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_OverviewSection_002}</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-            <DashboardMiniStat label="已保存方案" value={`${savedConfigCount}/20`} />
-            <DashboardMiniStat label="历史结果" value={`${resultHistoryCount}/10`} />
-            <DashboardMiniStat label="结果状态" value={resultIsCurrent ? '最新' : hasResult ? '需检查' : '待生成'} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_003} value={`${savedConfigCount}/20`} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_004} value={`${resultHistoryCount}/10`} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_005} value={resultIsCurrent ? copy.optimize.pages_tool_optimize_OverviewSection_006 : hasResult ? copy.optimize.pages_tool_optimize_OverviewSection_007 : copy.optimize.pages_tool_optimize_OverviewSection_008} />
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
             <button
@@ -124,50 +126,47 @@ export default function OverviewSection({
               onClick={onOpenConfig}
               className="tool-secondary-action"
             >
-              调整配置
-            </button>
+              {copy.optimize.pages_tool_optimize_OverviewSection_009}</button>
             <button
               type="button"
               onClick={onOpenPlans}
               className="tool-secondary-action"
             >
-              管理方案
-            </button>
+              {copy.optimize.pages_tool_optimize_OverviewSection_010}</button>
             <button
               type="button"
               onClick={onOpenResult}
               disabled={!hasResult}
               className="tool-secondary-action"
             >
-              查看结果
-            </button>
+              {copy.optimize.pages_tool_optimize_OverviewSection_011}</button>
           </div>
         </section>
 
         <section className="tool-panel p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="tool-eyebrow">最近结果</p>
+              <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_OverviewSection_012}</p>
               <h2 className="mt-1 text-lg font-semibold text-ink-primary">
-                {latestResult ? latestResult.name : '还没有生成过排班结果'}
+                {latestResult ? latestResult.name : copy.optimize.pages_tool_optimize_OverviewSection_013}
               </h2>
               <p className="mt-1 text-sm leading-6 text-ink-secondary">
                 {latestResult
                   ? `${formatWorkspaceDate(latestResult.created_at)} · ${formatResultSummary(latestResult.result)}`
-                  : '生成后会自动写入历史结果，并在这里提供查看和下载入口。'}
+                  : copy.optimize.pages_tool_optimize_OverviewSection_014}
               </p>
             </div>
             {latestResult && (
               <span className="tool-status tool-status--current">
-                {latestResult.source === 'applied_suggestions' ? '建议后' : latestResult.source === 'legacy' ? '旧结果' : '生成'}
+                {latestResult.source === 'applied_suggestions' ? copy.optimize.pages_tool_optimize_OverviewSection_015 : latestResult.source === 'legacy' ? copy.optimize.pages_tool_optimize_OverviewSection_016 : copy.optimize.pages_tool_optimize_OverviewSection_017}
               </span>
             )}
           </div>
           {latestResult ? (
             <div className="mt-4 flex flex-wrap gap-2">
-              <SmallActionButton onClick={() => onViewHistory(latestResult)}>查看</SmallActionButton>
-              <SmallActionButton onClick={() => onDownloadHistory(latestResult)} disabled={!isMaaJsonDownloadable(latestResult.result)}>下载 JSON</SmallActionButton>
-              <SmallActionButton onClick={() => onUseHistoryConfig(latestResult)} disabled={!latestResult.config}>继续调配置</SmallActionButton>
+              <SmallActionButton onClick={() => onViewHistory(latestResult)}>{copy.optimize.pages_tool_optimize_OverviewSection_018}</SmallActionButton>
+              <SmallActionButton onClick={() => onDownloadHistory(latestResult)} disabled={!isMaaJsonDownloadable(latestResult.result)}>{copy.optimize.pages_tool_optimize_OverviewSection_019}</SmallActionButton>
+              <SmallActionButton onClick={() => onUseHistoryConfig(latestResult)} disabled={!latestResult.config}>{copy.optimize.pages_tool_optimize_OverviewSection_020}</SmallActionButton>
             </div>
           ) : null}
         </section>
@@ -191,25 +190,24 @@ function FreeScheduleEntitlementCard({ state }: { state: FreeScheduleViewState }
     <section className="tool-panel p-5 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-brand-400">免费完整排班权益</p>
+          <p className="text-sm font-semibold text-brand-400">{copy.optimize.pages_tool_optimize_OverviewSection_021}</p>
           <div className="mt-1 flex items-center gap-2">
             <h2 className="text-lg font-semibold text-ink-primary">{formatFreeScheduleTitle(entitlement, locked, Boolean(bonusAvailable))}</h2>
-            <InfoTooltip label="查看免费完整排班权益说明" side="bottom">
-              首次生成后 24 小时内最多可修正生成 3 次；确认或次数用完后，只保留重排检测和历史查看。
-            </InfoTooltip>
+            <InfoTooltip label={copy.optimize.pages_tool_optimize_OverviewSection_022} side="bottom">
+              {copy.optimize.pages_tool_optimize_OverviewSection_023}</InfoTooltip>
           </div>
         </div>
         {entitlement?.first_generated_at && !locked && !entitlement.confirmed_at && !entitlement.locked_at && (
           <SmallActionButton onClick={state.onConfirm} disabled={state.confirming}>
-            {state.confirming ? '确认中' : '确认使用此方案'}
+            {state.confirming ? copy.optimize.pages_tool_optimize_OverviewSection_024 : copy.optimize.pages_tool_optimize_OverviewSection_025}
           </SmallActionButton>
         )}
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <DashboardMiniStat label="剩余修正" value={entitlement?.first_generated_at ? `${remaining}/${entitlement.revision_limit}` : '3/3'} />
-        <DashboardMiniStat label="确认期截止" value={windowEndsAt ? formatWorkspaceDate(windowEndsAt) : '首次生成后 24 小时'} />
-        <DashboardMiniStat label="额外重排" value={bonusAvailable ? '本月可用 1 次' : '暂无'} />
+        <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_026} value={entitlement?.first_generated_at ? `${remaining}/${entitlement.revision_limit}` : '3/3'} />
+        <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_027} value={windowEndsAt ? formatWorkspaceDate(windowEndsAt) : copy.optimize.pages_tool_optimize_OverviewSection_028} />
+        <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_029} value={bonusAvailable ? copy.optimize.pages_tool_optimize_OverviewSection_030 : copy.optimize.pages_tool_optimize_OverviewSection_031} />
       </div>
 
       {state.generateBlockedReason && (
@@ -232,10 +230,10 @@ function formatFreeScheduleTitle(
   locked: boolean,
   bonusAvailable: boolean,
 ): string {
-  if (bonusAvailable) return '强烈建议重排，本月可额外生成 1 次完整免费方案'
-  if (!entitlement?.first_generated_at) return '可生成 1 套免费完整个人排班'
-  if (locked) return '免费完整排班权益已锁定'
-  return '确认期内可修正生成'
+  if (bonusAvailable) return copy.optimize.pages_tool_optimize_OverviewSection_032
+  if (!entitlement?.first_generated_at) return copy.optimize.pages_tool_optimize_OverviewSection_033
+  if (locked) return copy.optimize.pages_tool_optimize_OverviewSection_034
+  return copy.optimize.pages_tool_optimize_OverviewSection_035
 }
 
 function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
@@ -245,12 +243,11 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
     <section className="tool-panel border-brand-600/25 p-5 shadow-sm shadow-brand-950/10 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-brand-400">免费个人排班</p>
+          <p className="text-sm font-semibold text-brand-400">{copy.optimize.pages_tool_optimize_OverviewSection_036}</p>
           <div className="mt-1 flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-ink-primary">检测是否需要重排</h2>
-            <InfoTooltip label="查看重排检测说明" side="bottom">
-              只返回收益区间、影响设施和关键干员摘要，不展示完整新方案。
-            </InfoTooltip>
+            <h2 className="text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_OverviewSection_037}</h2>
+            <InfoTooltip label={copy.optimize.pages_tool_optimize_OverviewSection_038} side="bottom">
+              {copy.optimize.pages_tool_optimize_OverviewSection_039}</InfoTooltip>
           </div>
         </div>
         <button
@@ -259,7 +256,7 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
           disabled={disabled}
           className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted"
         >
-          {state.loading ? '检测中' : '检测是否需要重排'}
+          {state.loading ? copy.optimize.pages_tool_optimize_OverviewSection_040 : copy.optimize.pages_tool_optimize_OverviewSection_041}
         </button>
       </div>
 
@@ -290,24 +287,24 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <DashboardMiniStat label="收益区间" value={result.estimated_gain_range.label} />
-            <DashboardMiniStat label="变化房间" value={`${result.changed_room_count}`} />
-            <DashboardMiniStat label="当前方案" value={result.current_plan_usable ? '可继续用' : '不建议长期用'} />
-            <DashboardMiniStat label="本月剩余" value={`${result.quota.remaining}/${result.quota.limit}`} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_042} value={result.estimated_gain_range.label} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_043} value={`${result.changed_room_count}`} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_044} value={result.current_plan_usable ? copy.optimize.pages_tool_optimize_OverviewSection_045 : copy.optimize.pages_tool_optimize_OverviewSection_046} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_047} value={`${result.quota.remaining}/${result.quota.limit}`} />
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
             <SummaryBlock
-              label="影响设施"
+              label={copy.optimize.pages_tool_optimize_OverviewSection_048}
               value={result.affected_facility_types.length > 0
                 ? result.affected_facility_types.map(formatFacilityType).join(' / ')
-                : '无明显变化'}
+                : copy.optimize.pages_tool_optimize_OverviewSection_049}
             />
             <SummaryBlock
-              label="可能受益干员"
+              label={copy.optimize.pages_tool_optimize_OverviewSection_050}
               value={result.key_operators.length > 0
                 ? result.key_operators.map((operator) => `${operator.name} x${operator.occurrence_count}`).join(' / ')
-                : '无新增关键干员'}
+                : copy.optimize.pages_tool_optimize_OverviewSection_051}
             />
           </div>
 
@@ -319,7 +316,7 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
 
           {result.recommendation === 'strongly_recommended' && (
             <div>
-              <SmallActionButton onClick={state.onGenerate} tone="primary">生成完整个人排班</SmallActionButton>
+              <SmallActionButton onClick={state.onGenerate} tone="primary">{copy.optimize.pages_tool_optimize_OverviewSection_052}</SmallActionButton>
             </div>
           )}
         </div>
@@ -338,15 +335,15 @@ function SummaryBlock({ label, value }: { label: string; value: string }) {
 }
 
 function formatRecommendationTitle(recommendation: ReorderCheckResult['recommendation']): string {
-  if (recommendation === 'strongly_recommended') return '强烈建议重排'
-  if (recommendation === 'recommended') return '建议重排'
-  return '无需重排'
+  if (recommendation === 'strongly_recommended') return copy.optimize.pages_tool_optimize_OverviewSection_053
+  if (recommendation === 'recommended') return copy.optimize.pages_tool_optimize_OverviewSection_054
+  return copy.optimize.pages_tool_optimize_OverviewSection_055
 }
 
 function formatRecommendationSummary(recommendation: ReorderCheckResult['recommendation']): string {
-  if (recommendation === 'strongly_recommended') return '核心贸易/制造组合可能受影响，建议生成完整个人排班。'
-  if (recommendation === 'recommended') return '新干员或新练度可能改变部分房间，方便时可以重新生成。'
-  return '预计收益提升很小，继续用当前方案即可。'
+  if (recommendation === 'strongly_recommended') return copy.optimize.pages_tool_optimize_OverviewSection_056
+  if (recommendation === 'recommended') return copy.optimize.pages_tool_optimize_OverviewSection_057
+  return copy.optimize.pages_tool_optimize_OverviewSection_058
 }
 
 function getRecommendationTone(recommendation: ReorderCheckResult['recommendation']): string {
@@ -357,18 +354,18 @@ function getRecommendationTone(recommendation: ReorderCheckResult['recommendatio
 
 function formatFacilityType(type: string): string {
   const labels: Record<string, string> = {
-    trading: '贸易站',
-    manufacture: '制造站',
-    manufacturing: '制造站',
-    power: '发电站',
-    meeting: '会客室',
-    control: '控制中枢',
-    dormitory: '宿舍',
-    office: '办公室',
+    trading: copy.optimize.pages_tool_optimize_OverviewSection_059,
+    manufacture: copy.optimize.pages_tool_optimize_OverviewSection_060,
+    manufacturing: copy.optimize.pages_tool_optimize_OverviewSection_061,
+    power: copy.optimize.pages_tool_optimize_OverviewSection_062,
+    meeting: copy.optimize.pages_tool_optimize_OverviewSection_063,
+    control: copy.optimize.pages_tool_optimize_OverviewSection_064,
+    dormitory: copy.optimize.pages_tool_optimize_OverviewSection_065,
+    office: copy.optimize.pages_tool_optimize_OverviewSection_066,
   }
   return labels[type] ?? type
 }
 
 function formatReorderQuota(result: ReorderCheckResult): string {
-  return `本月剩余 ${result.quota.remaining}/${result.quota.limit} · ${formatWorkspaceDate(result.quota.reset_at)} 重置`
+  return `${copy.optimize.pages_tool_optimize_OverviewSection_067}${result.quota.remaining}/${result.quota.limit} · ${formatWorkspaceDate(result.quota.reset_at)}${copy.optimize.pages_tool_optimize_OverviewSection_068}`
 }

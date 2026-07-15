@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import type { Announcement, AnnouncementPublicResponse } from '../lib/types'
 import { apiJson } from '../lib/api-client'
 import AnnouncementMarkdown from '../components/AnnouncementMarkdown'
+import { copy, CURRENT_LOCALE } from '../copy/index'
+
 
 export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -12,7 +14,7 @@ export default function AnnouncementsPage() {
   useEffect(() => {
     let cancelled = false
 
-    apiJson<AnnouncementPublicResponse>('/api/announcement', { fallbackMessage: '加载公告失败' })
+    apiJson<AnnouncementPublicResponse>('/api/announcement', { fallbackMessage: copy.public.pages_AnnouncementsPage_001 })
       .then((data) => {
         if (cancelled) return
         setAnnouncements(Array.isArray(data.announcements) ? data.announcements : [])
@@ -35,24 +37,22 @@ export default function AnnouncementsPage() {
       <div className="tool-page-frame max-w-3xl">
         <div className="tool-page-header flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="tool-eyebrow">MaaTool 官方</p>
-            <h1 className="text-2xl font-semibold">公告</h1>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">这里会集中展示近期通知，方便你随时回看。</p>
+            <p className="tool-eyebrow">{copy.public.pages_AnnouncementsPage_002}</p>
+            <h1 className="text-2xl font-semibold">{copy.public.pages_AnnouncementsPage_003}</h1>
+            <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pages_AnnouncementsPage_004}</p>
           </div>
           <Link
             to="/tool/profiles"
             className="tool-secondary-action shrink-0"
           >
-            返回工具
-          </Link>
+            {copy.public.pages_AnnouncementsPage_005}</Link>
         </div>
 
-        {loading && <p className="tool-inset mt-6 px-4 py-3 text-sm text-ink-secondary" role="status">正在加载公告...</p>}
+        {loading && <p className="tool-inset mt-6 px-4 py-3 text-sm text-ink-secondary" role="status">{copy.public.pages_AnnouncementsPage_006}</p>}
         {error && <div className="tool-alert tool-alert--error mt-6" role="alert">{error}</div>}
         {!loading && !error && announcements.length === 0 && (
           <div className="tool-inset mt-6 px-4 py-5 text-sm leading-6 text-ink-secondary">
-            暂时没有新的公告。
-          </div>
+            {copy.public.pages_AnnouncementsPage_007}</div>
         )}
 
         <div className="mt-6 space-y-4">
@@ -60,7 +60,7 @@ export default function AnnouncementsPage() {
             <article key={announcement.id} className="tool-panel p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="tool-status">
-                  {announcement.kind === 'banner' ? '横幅' : '弹出式公告'}
+                  {announcement.kind === 'banner' ? copy.public.pages_AnnouncementsPage_008 : copy.public.pages_AnnouncementsPage_009}
                 </span>
                 <time className="text-xs text-ink-muted">{formatDate(announcement.updated_at)}</time>
               </div>
@@ -77,5 +77,5 @@ export default function AnnouncementsPage() {
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('zh-CN', { hour12: false })
+  return date.toLocaleString(CURRENT_LOCALE, { hour12: false })
 }
