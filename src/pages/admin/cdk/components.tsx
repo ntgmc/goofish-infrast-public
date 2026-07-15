@@ -25,7 +25,7 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
               type="button"
               aria-pressed={filters.status === item}
               onClick={() => onFilterChange({ status: item })}
-              className={`tool-secondary-action min-h-10 px-3 text-sm ${filters.status === item ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100' : ''}`}
+              className={`tool-secondary-action min-h-10 px-3 text-sm ${filters.status === item ? 'tool-option-selected' : ''}`}
             >
               {item === 'all' ? '全部' : statusLabels[item]}
             </button>

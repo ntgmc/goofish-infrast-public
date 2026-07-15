@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:watch": "vitest",
+    "check:copy": "node scripts/check-copy-architecture.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
     "check:dr": "node scripts/check-disaster-recovery.mjs",
     "check:deploy": "node scripts/check-production-deploy.mjs",
@@ -22,7 +23,7 @@
     "check:optimizer-dynamic-rules": "node scripts/check-optimizer-dynamic-rules.mjs",
     "check:public-http": "node scripts/check-public-http-smoke.mjs --self-test",
     "check:migration": "npm run build && node scripts/check-server-routes.mjs && node scripts/verify-migrated-data.mjs",
-    "check:local": "npm run build && npm test && npm run check:architecture && npm run check:dr && npm run check:deploy && npm run check:api && node scripts/check-server-routes.mjs",
+    "check:local": "npm run build && npm test && npm run check:architecture && npm run check:copy && npm run check:dr && npm run check:deploy && npm run check:api && node scripts/check-server-routes.mjs",
     "start:server": "node server/dist/index.js",
     "preview": "vite preview"
   },

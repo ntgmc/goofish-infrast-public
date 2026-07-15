@@ -1,6 +1,8 @@
 import type { DroneAssignment } from '../../lib/types'
 import { DRONE_REASON_LABELS, ROOM_LABELS } from './labels'
 import { formatPercent, formatProduct } from './formatters'
+import { copy } from '../../copy/index'
+
 
 export default function DroneSummary({ drones }: { drones: DroneAssignment }) {
   const roomLabel = ROOM_LABELS[drones.room] || drones.room
@@ -12,7 +14,7 @@ export default function DroneSummary({ drones }: { drones: DroneAssignment }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="tool-status tool-status--current">
-              {drones.mode === 'auto' ? '自动无人机' : '无人机'}
+              {drones.mode === 'auto' ? copy.domain.components_result_panel_DroneSummary_001 : copy.domain.components_result_panel_DroneSummary_002}
             </span>
             <span className="text-sm font-medium text-ink-primary">
               {roomLabel} {drones.index}
@@ -22,7 +24,7 @@ export default function DroneSummary({ drones }: { drones: DroneAssignment }) {
           {reason && (
             <p className="mt-1 text-xs text-ink-muted">
               {reason}
-              {drones.candidate_count ? `，从 ${drones.candidate_count} 个生产房间中选择` : ''}
+              {drones.candidate_count ? `${copy.domain.components_result_panel_DroneSummary_003}${drones.candidate_count}${copy.domain.components_result_panel_DroneSummary_004}` : ''}
             </p>
           )}
         </div>
@@ -33,7 +35,7 @@ export default function DroneSummary({ drones }: { drones: DroneAssignment }) {
           <p className="text-xs text-ink-muted">
             {drones.order}
             {typeof drones.efficiency === 'number' && drones.efficiency !== drones.display_efficiency
-              ? ` · 速度 ${formatPercent(drones.efficiency)}`
+              ? `${copy.domain.components_result_panel_DroneSummary_005}${formatPercent(drones.efficiency)}`
               : ''}
           </p>
         </div>

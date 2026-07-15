@@ -1,6 +1,8 @@
 import { lazy, Suspense, useRef, useState, type FormEvent } from 'react'
 import type { AnalyzeScheduleResult, LicenseOperator } from '../lib/types'
 import { apiJson } from '../lib/api-client'
+import { copy } from '../copy/index'
+
 
 const ResultPanel = lazy(() => import('./ResultPanel'))
 
@@ -56,11 +58,11 @@ export default function ScheduleAnalysisTool({ compact = false }: ScheduleAnalys
     setError(null)
 
     if (!operators) {
-      setError('请先上传 operators.json。')
+      setError(copy.tools.components_ScheduleAnalysisTool_001)
       return
     }
     if (!schedule) {
-      setError('请先上传排班表 JSON。')
+      setError(copy.tools.components_ScheduleAnalysisTool_002)
       return
     }
 
@@ -69,7 +71,7 @@ export default function ScheduleAnalysisTool({ compact = false }: ScheduleAnalys
       const data = await apiJson<AnalyzeScheduleResult>('/api/analyze-schedule', {
         method: 'POST',
         json: { operators, schedule },
-        fallbackMessage: '分析失败',
+        fallbackMessage: copy.tools.components_ScheduleAnalysisTool_003,
       })
       setResult(data)
     } catch (caught) {
@@ -85,14 +87,12 @@ export default function ScheduleAnalysisTool({ compact = false }: ScheduleAnalys
       <form onSubmit={handleAnalyze} className="tool-panel p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-ink-primary">分析导入排班表</h2>
+            <h2 className="text-lg font-semibold text-ink-primary">{copy.tools.components_ScheduleAnalysisTool_004}</h2>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
-              上传干员数据和已生成的排班 JSON，直接计算红脸风险、日产量和爆仓信息。
-            </p>
+              {copy.tools.components_ScheduleAnalysisTool_005}</p>
           </div>
           <span className="tool-status tool-status--current w-fit">
-            免授权
-          </span>
+            {copy.tools.components_ScheduleAnalysisTool_006}</span>
         </div>
 
         {error && (
@@ -103,17 +103,17 @@ export default function ScheduleAnalysisTool({ compact = false }: ScheduleAnalys
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <FilePickButton
-            label="干员数据"
+            label={copy.tools.components_ScheduleAnalysisTool_007}
             hint="operators.json / .txt"
             fileName={operatorsFileName}
-            loadedText={operators ? `已载入 ${operators.filter((operator) => operator.own !== false).length} 名干员` : ''}
+            loadedText={operators ? `${copy.tools.components_ScheduleAnalysisTool_008}${operators.filter((operator) => operator.own !== false).length}${copy.tools.components_ScheduleAnalysisTool_009}` : ''}
             onClick={() => operatorsRef.current?.click()}
           />
           <FilePickButton
-            label="排班表"
+            label={copy.tools.components_ScheduleAnalysisTool_010}
             hint="maa_schedule_optimized.json"
             fileName={scheduleFileName}
-            loadedText={schedule ? '已载入排班表' : ''}
+            loadedText={schedule ? copy.tools.components_ScheduleAnalysisTool_011 : ''}
             onClick={() => scheduleRef.current?.click()}
           />
         </div>
@@ -138,7 +138,7 @@ export default function ScheduleAnalysisTool({ compact = false }: ScheduleAnalys
           disabled={loading || !operators || !schedule}
           className="tool-primary-action mt-5 w-full"
         >
-          {loading ? '正在分析...' : result ? '重新分析排班表' : '开始分析排班表'}
+          {loading ? copy.tools.components_ScheduleAnalysisTool_012 : result ? copy.tools.components_ScheduleAnalysisTool_013 : copy.tools.components_ScheduleAnalysisTool_014}
         </button>
       </form>
 
@@ -176,7 +176,7 @@ function FilePickButton({
       <span className="block text-sm font-semibold text-ink-primary">{label}</span>
       <span className="mt-1 block text-xs text-ink-muted">{hint}</span>
       <span className="mt-4 block break-all text-sm font-medium text-ink-secondary">
-        {fileName ? `已选择：${fileName}` : '点击选择文件'}
+        {fileName ? `${copy.tools.components_ScheduleAnalysisTool_015}${fileName}` : copy.tools.components_ScheduleAnalysisTool_016}
       </span>
       {loadedText && <span className="mt-2 block text-xs font-semibold text-success">{loadedText}</span>}
     </button>
@@ -186,7 +186,7 @@ function FilePickButton({
 function parseOperatorsText(text: string): LicenseOperator[] {
   const data = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
   if (!Array.isArray(data)) {
-    throw new Error('operators.json 顶层必须是数组。')
+    throw new Error(copy.tools.components_ScheduleAnalysisTool_017)
   }
   return data as LicenseOperator[]
 }
@@ -194,7 +194,7 @@ function parseOperatorsText(text: string): LicenseOperator[] {
 function parseScheduleText(text: string): unknown {
   const data = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
   if (!Array.isArray(data) && (!data || typeof data !== 'object')) {
-    throw new Error('排班表 JSON 需要是对象或数组。')
+    throw new Error(copy.tools.components_ScheduleAnalysisTool_018)
   }
   return data
 }

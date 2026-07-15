@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { Announcement, AuthSuccessResponse, AuthUser, LicenseConfig, LicenseOperator, UserGameAccount, UserWorkspace } from '../../lib/types'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
+import ThemeSwitcher from '../../components/ThemeSwitcher'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import { ApiError, apiJson } from '../../lib/api-client'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
@@ -9,6 +10,8 @@ import { canonicalJson } from '../../lib/crypto'
 import { ACTIVE_PURCHASE_CHANNEL } from '../../lib/purchase'
 import type { WorkspaceSetupSection } from '../../lib/app-routes'
 import { countOwnedOperators, formatDate, getEffectiveProfilePermission, getProfileAccessLabel, isFreePreviewProfile, isFreePreviewTrialActive, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
+import { copy } from '../../copy/index'
+
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
 
@@ -73,9 +76,9 @@ export default function WorkspaceSetupPage({
     return keyword ? source.filter((operator) => operator.name.toLowerCase().includes(keyword)) : source
   }, [operatorSearch, operators])
   const setupSections: Array<{ id: WorkspaceSetupSection; label: string; ready?: boolean }> = [
-    { id: 'operators', label: '干员数据', ready: Boolean(operators) },
-    { id: 'config', label: '基建配置', ready: configValidation.ok },
-    { id: 'cdk', label: '档案与 CDK' },
+    { id: 'operators', label: copy.workspace.pages_tool_WorkspaceSetupPage_001, ready: Boolean(operators) },
+    { id: 'config', label: copy.workspace.pages_tool_WorkspaceSetupPage_002, ready: configValidation.ok },
+    { id: 'cdk', label: copy.workspace.pages_tool_WorkspaceSetupPage_003 },
   ]
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
@@ -92,7 +95,7 @@ export default function WorkspaceSetupPage({
     setSklandRefreshNotice(null)
     if (isPreviewProfile && !isPreviewTrial) {
       setOperatorFileName(null)
-      setError('免费个人排班档案的干员数据只能通过森空岛导入。')
+      setError(copy.workspace.pages_tool_WorkspaceSetupPage_004)
       event.currentTarget.value = ''
       return
     }
@@ -125,15 +128,15 @@ export default function WorkspaceSetupPage({
       const data = await apiJson<SklandPayload>('/api/user/skland/import/refresh', {
         method: 'POST',
         json: { profile_id: profile.id },
-        fallbackMessage: '森空岛刷新失败',
+        fallbackMessage: copy.workspace.pages_tool_WorkspaceSetupPage_005,
       })
-      if (!data.user) throw new Error('森空岛刷新失败')
+      if (!data.user) throw new Error(copy.workspace.pages_tool_WorkspaceSetupPage_006)
       applySklandPayload(data)
       setSklandRefreshNotice({
         kind: 'success',
         message: data.skland_import
-          ? formatSklandImportNotice(data.skland_import, '已刷新')
-          : '森空岛干员数据已刷新。',
+          ? formatSklandImportNotice(data.skland_import, copy.workspace.pages_tool_WorkspaceSetupPage_007)
+          : copy.workspace.pages_tool_WorkspaceSetupPage_008,
       })
     } catch (caught) {
       const payload = sklandPayloadFromError(caught)
@@ -151,11 +154,11 @@ export default function WorkspaceSetupPage({
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!operators) {
-      setError('请先上传干员识别文件。')
+      setError(copy.workspace.pages_tool_WorkspaceSetupPage_009)
       return
     }
     if (freePreviewNeedsBinding) {
-      setError('免费个人排班档案必须先绑定森空岛后才能保存工作区数据。')
+      setError(copy.workspace.pages_tool_WorkspaceSetupPage_010)
       return
     }
     if (!configValidation.ok) {
@@ -175,9 +178,9 @@ export default function WorkspaceSetupPage({
           config: normalizedConfig,
           elite_overrides: workspace?.elite_overrides ?? {},
         },
-        fallbackMessage: '保存失败',
+        fallbackMessage: copy.workspace.pages_tool_WorkspaceSetupPage_011,
       })
-      if (!data.user) throw new Error('保存失败')
+      if (!data.user) throw new Error(copy.workspace.pages_tool_WorkspaceSetupPage_012)
       onSaved(data)
     } catch (caught) {
       setError((caught as Error).message)
@@ -192,21 +195,23 @@ export default function WorkspaceSetupPage({
         <div className="flex items-start gap-3 px-2">
           <BrandLogo size="sm" />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-brand-500">MAA 工作台</p>
+            <p className="text-sm font-semibold text-brand-500">{copy.workspace.pages_tool_WorkspaceSetupPage_013}</p>
             <p className="mt-1 truncate text-xs text-ink-muted">{user.email}</p>
             <p className="mt-3 truncate text-sm font-medium text-ink-primary">{profile.display_name}</p>
           </div>
         </div>
-        <nav className="mt-5 space-y-1 border-t border-surface-3 pt-5" aria-label="工作区设置">
+        <nav className="mt-5 space-y-1 border-t border-surface-3 pt-5" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_014}>
           {setupSections.map((section) => (
             <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className="tool-nav-link flex w-full items-center justify-between px-3 text-left text-sm font-medium">
               <span>{section.label}</span>
-              {section.ready !== undefined && <span className={`text-xs font-medium ${section.ready ? 'text-success' : 'text-ink-muted'}`}>{section.ready ? '已就绪' : '待完成'}</span>}
+              {section.ready !== undefined && <span className={`text-xs font-medium ${section.ready ? 'text-success' : 'text-ink-muted'}`}>{section.ready ? copy.workspace.pages_tool_WorkspaceSetupPage_015 : copy.workspace.pages_tool_WorkspaceSetupPage_016}</span>}
             </button>
           ))}
         </nav>
-        <button type="button" onClick={onBack} className="tool-secondary-action absolute bottom-16 left-4 right-4">返回账号列表</button>
-        <button type="button" onClick={onLogout} className="tool-secondary-action absolute bottom-5 left-4 right-4">退出登录</button>
+        <nav className="absolute bottom-5 left-4 right-4 flex flex-col gap-3" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_018_account_actions}>
+          <button type="button" onClick={onBack} className="tool-secondary-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_017}</button>
+          <button type="button" onClick={onLogout} className="tool-secondary-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_018}</button>
+        </nav>
       </aside>
 
       <main className="lg:pl-64" tabIndex={-1} data-route-focus>
@@ -216,16 +221,17 @@ export default function WorkspaceSetupPage({
               <BrandLogo size="sm" className="lg:hidden" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-brand-400">{profile.display_name}</p>
-                <h1 className="mt-1 text-xl font-semibold text-ink-primary">准备账号工作区</h1>
-                <p className="mt-1 text-sm text-ink-muted">上传干员识别文件并确认基建配置，保存后进入排班优化。</p>
+                <h1 className="mt-1 text-xl font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_019}</h1>
+                <p className="mt-1 text-sm text-ink-muted">{copy.workspace.pages_tool_WorkspaceSetupPage_020}</p>
               </div>
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={onBack} className="tool-secondary-action">返回账号列表</button>
-              <button type="button" onClick={onLogout} className="tool-secondary-action lg:hidden">退出登录</button>
+              <ThemeSwitcher />
+              <button type="button" onClick={onBack} className="tool-secondary-action">{copy.workspace.pages_tool_WorkspaceSetupPage_021}</button>
+              <button type="button" onClick={onLogout} className="tool-secondary-action lg:hidden">{copy.workspace.pages_tool_WorkspaceSetupPage_022}</button>
             </div>
           </div>
-          <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="移动端工作区设置">
+          <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_023}>
             {setupSections.map((section) => (
               <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className="tool-nav-link shrink-0 whitespace-nowrap px-3 text-sm font-medium">{section.label}</button>
             ))}
@@ -248,18 +254,18 @@ export default function WorkspaceSetupPage({
                 <section className="tool-panel p-5 sm:p-6">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <h2 className="text-lg font-semibold text-ink-primary">干员数据</h2>
-                      <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">上传 MAA 导出的干员识别文件，或使用森空岛扫码导入后预览干员头像、精英化和等级。</p>
+                      <h2 className="text-lg font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_024}</h2>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_025}</p>
                     </div>
-                    {operators && <span className="tool-status tool-status--success">已就绪</span>}
+                    {operators && <span className="tool-status tool-status--success">{copy.workspace.pages_tool_WorkspaceSetupPage_026}</span>}
                   </div>
 
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                     <label className="tool-secondary-action inline-flex cursor-pointer items-center justify-center">
-                      {operatorFileName ? `已选择：${operatorFileName}` : operators ? `已载入 ${ownedOperatorCount} 名拥有干员` : '选择干员识别文件'}
+                      {operatorFileName ? `${copy.workspace.pages_tool_WorkspaceSetupPage_027}${operatorFileName}` : operators ? `${copy.workspace.pages_tool_WorkspaceSetupPage_028}${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_029}` : copy.workspace.pages_tool_WorkspaceSetupPage_030}
                       <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} disabled={!canManualEditOperators} className="hidden" />
                     </label>
-                    {operators && <span className="text-sm text-brand-400">拥有干员 {ownedOperatorCount} 名</span>}
+                    {operators && <span className="text-sm text-brand-400">{copy.workspace.pages_tool_WorkspaceSetupPage_031}{ownedOperatorCount} {copy.workspace.pages_tool_WorkspaceSetupPage_032}</span>}
                   </div>
 
                   <SklandStatusCard
@@ -273,7 +279,7 @@ export default function WorkspaceSetupPage({
 
                   {operators && (
                     <div className="mt-5">
-                      <input value={operatorSearch} onChange={(event) => setOperatorSearch(event.currentTarget.value)} className="tool-field mb-4" placeholder="搜索干员名称" aria-label="搜索干员名称" />
+                      <input value={operatorSearch} onChange={(event) => setOperatorSearch(event.currentTarget.value)} className="tool-field mb-4" placeholder={copy.workspace.pages_tool_WorkspaceSetupPage_033} aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_034} />
                       <div className="grid max-h-[560px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
                         {filteredOperators.map((operator) => <OperatorPreviewCard key={operator.id} operator={operator} />)}
                       </div>
@@ -300,19 +306,19 @@ export default function WorkspaceSetupPage({
 
             <aside className="space-y-5">
               <section className="tool-panel p-5">
-                <h2 className="text-base font-semibold text-ink-primary">准备情况</h2>
+                <h2 className="text-base font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_035}</h2>
                 <dl className="mt-4 space-y-3 text-sm">
-                  <InfoRow label="套餐" value={getProfileAccessLabel(profile)} />
-                  <InfoRow label="干员" value={operators ? `${ownedOperatorCount} 名` : '还未上传'} />
-                  <InfoRow label="已拥有" value={operators ? `${ownedOperatorCount} 名` : '-'} />
+                  <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_036} value={getProfileAccessLabel(profile)} />
+                  <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_037} value={operators ? `${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_038}` : copy.workspace.pages_tool_WorkspaceSetupPage_039} />
+                  <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_040} value={operators ? `${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_041}` : '-'} />
                   <div className="flex items-center justify-between gap-4">
-                    <dt className="text-ink-muted">基建配置</dt>
-                    <dd className={`font-medium ${configValidation.ok ? 'text-success' : 'text-error'}`}>{configValidation.ok ? (configChanged ? '已修改' : '已保存') : '请检查'}</dd>
+                    <dt className="text-ink-muted">{copy.workspace.pages_tool_WorkspaceSetupPage_042}</dt>
+                    <dd className={`font-medium ${configValidation.ok ? 'text-success' : 'text-error'}`}>{configValidation.ok ? (configChanged ? copy.workspace.pages_tool_WorkspaceSetupPage_043 : copy.workspace.pages_tool_WorkspaceSetupPage_044) : copy.workspace.pages_tool_WorkspaceSetupPage_045}</dd>
                   </div>
                 </dl>
               </section>
               <button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} className="tool-primary-action w-full">
-                {saving ? '正在保存...' : '保存工作区并开始排班'}
+                {saving ? copy.workspace.pages_tool_WorkspaceSetupPage_046 : copy.workspace.pages_tool_WorkspaceSetupPage_047}
               </button>
             </aside>
           </div>
@@ -354,7 +360,7 @@ function ProfileCdkPaths({
       const data = await apiJson<AuthSuccessResponse>('/api/user/profiles/redeem', {
         method: 'POST',
         json: { profile_id: profile.id, cdk: upgradeCdk },
-        fallbackMessage: '免费档案升级失败',
+        fallbackMessage: copy.workspace.pages_tool_WorkspaceSetupPage_048,
       })
       setUpgradeCdk('')
       onUpgraded(data)
@@ -368,20 +374,20 @@ function ProfileCdkPaths({
   return (
     <section className="tool-panel p-5 sm:p-6" aria-labelledby="profile-cdk-paths-title">
       <div>
-        <h2 id="profile-cdk-paths-title" className="text-lg font-semibold text-ink-primary">档案与 CDK</h2>
+        <h2 id="profile-cdk-paths-title" className="text-lg font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_049}</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
           {isPreviewProfile
-            ? '可以用 CDK 原地升级当前免费档案并保留工作区，也可以兑换为新的独立档案。'
-            : '当前档案已经使用正式授权；如需管理其他游戏账号，可以继续兑换新的独立档案。'}
+            ? copy.workspace.pages_tool_WorkspaceSetupPage_050
+            : copy.workspace.pages_tool_WorkspaceSetupPage_051}
         </p>
       </div>
 
       <div className={`mt-5 grid gap-4 ${isPreviewProfile ? 'lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
         {isPreviewProfile && (
           <form onSubmit={handleUpgrade} className="tool-inset border-brand-600/30 bg-brand-600/10 p-4">
-            <h3 className="text-sm font-semibold text-ink-primary">升级当前免费档案</h3>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">保留干员、森空岛绑定、基建配置与历史记录，直接解锁 CDK 权益。</p>
-            <label htmlFor="workspace-upgrade-cdk" className="mt-4 block text-sm font-medium text-ink-secondary">升级 CDK</label>
+            <h3 className="text-sm font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_052}</h3>
+            <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_053}</p>
+            <label htmlFor="workspace-upgrade-cdk" className="mt-4 block text-sm font-medium text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_054}</label>
             <input
               id="workspace-upgrade-cdk"
               value={upgradeCdk}
@@ -398,27 +404,26 @@ function ProfileCdkPaths({
               disabled={upgradeLoading}
               className="tool-primary-action mt-4 w-full disabled:cursor-wait"
             >
-              {upgradeLoading ? '正在升级...' : '升级当前免费档案'}
+              {upgradeLoading ? copy.workspace.pages_tool_WorkspaceSetupPage_055 : copy.workspace.pages_tool_WorkspaceSetupPage_056}
             </button>
           </form>
         )}
 
         <div className="tool-inset flex flex-col p-4">
-          <h3 className="text-sm font-semibold text-ink-primary">兑换新的 CDK 档案</h3>
-          <p className="mt-2 flex-1 text-sm leading-6 text-ink-secondary">前往“添加账号”输入未使用的 CDK，创建独立档案；当前工作区不会改变。</p>
+          <h3 className="text-sm font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_057}</h3>
+          <p className="mt-2 flex-1 text-sm leading-6 text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_058}</p>
           <button
             type="button"
             onClick={onRedeemNewProfile}
             className="tool-secondary-action mt-4"
           >
-            前往兑换新档案
-          </button>
+            {copy.workspace.pages_tool_WorkspaceSetupPage_059}</button>
         </div>
 
         {ACTIVE_PURCHASE_CHANNEL && (
           <div className="tool-inset flex flex-col p-4">
-            <h3 className="text-sm font-semibold text-ink-primary">还没有 CDK</h3>
-            <p className="mt-2 flex-1 text-sm leading-6 text-ink-secondary">通过当前可用的购买渠道获取 CDK，购买后返回此处升级或兑换。</p>
+            <h3 className="text-sm font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_060}</h3>
+            <p className="mt-2 flex-1 text-sm leading-6 text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_061}</p>
             <a
               href={ACTIVE_PURCHASE_CHANNEL.href ?? undefined}
               target="_blank"
@@ -457,34 +462,34 @@ function SklandStatusCard({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold text-ink-primary">森空岛导入</p>
+            <p className="text-sm font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_062}</p>
             {binding ? (
               <span className={'tool-status ' + (invalid ? 'tool-status--error' : 'tool-status--success')}>
-                {invalid ? '凭据已失效' : '已绑定'}
+                {invalid ? copy.workspace.pages_tool_WorkspaceSetupPage_063 : copy.workspace.pages_tool_WorkspaceSetupPage_064}
               </span>
             ) : (
-              <span className="tool-status">未绑定</span>
+              <span className="tool-status">{copy.workspace.pages_tool_WorkspaceSetupPage_065}</span>
             )}
           </div>
           {binding ? (
             <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-              <StatusInfo label="昵称" value={binding.nickname} />
+              <StatusInfo label={copy.workspace.pages_tool_WorkspaceSetupPage_066} value={binding.nickname} />
               <StatusInfo label="UID" value={binding.uid} />
-              <StatusInfo label="服务器" value={binding.channel_name} />
-              <StatusInfo label="绑定时间" value={formatDate(binding.bound_at)} />
-              <StatusInfo label="最近刷新" value={formatDate(binding.last_imported_at)} />
-              <StatusInfo label="凭据状态" value={invalid ? sklandCredentialInvalidLabel(binding.credential_invalid_reason) : '可用'} danger={invalid} />
+              <StatusInfo label={copy.workspace.pages_tool_WorkspaceSetupPage_067} value={binding.channel_name} />
+              <StatusInfo label={copy.workspace.pages_tool_WorkspaceSetupPage_068} value={formatDate(binding.bound_at)} />
+              <StatusInfo label={copy.workspace.pages_tool_WorkspaceSetupPage_069} value={formatDate(binding.last_imported_at)} />
+              <StatusInfo label={copy.workspace.pages_tool_WorkspaceSetupPage_070} value={invalid ? sklandCredentialInvalidLabel(binding.credential_invalid_reason) : copy.workspace.pages_tool_WorkspaceSetupPage_071} danger={invalid} />
             </dl>
           ) : (
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">扫码、粘贴凭据或书签脚本都会先预览昵称和 UID，确认后才保存绑定并导入。</p>
+            <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_072}</p>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onOpen} disabled={busy || dialogOpen} className="tool-primary-action">
-            {binding ? '重新绑定森空岛' : '绑定森空岛'}
+            {binding ? copy.workspace.pages_tool_WorkspaceSetupPage_073 : copy.workspace.pages_tool_WorkspaceSetupPage_074}
           </button>
           <button type="button" onClick={onRefresh} disabled={busy || dialogOpen || !canRefresh} className="tool-secondary-action">
-            {busy ? '正在刷新...' : '刷新森空岛数据'}
+            {busy ? copy.workspace.pages_tool_WorkspaceSetupPage_075 : copy.workspace.pages_tool_WorkspaceSetupPage_076}
           </button>
         </div>
       </div>
@@ -494,13 +499,11 @@ function SklandStatusCard({
           <div className="mt-2 flex flex-wrap gap-2">
             {(notice.recovery_action === 'rebind' || notice.recovery_action === 'bind_first') && (
               <button type="button" onClick={onOpen} disabled={busy || dialogOpen} className="tool-primary-action min-h-9 px-3 py-1.5 text-xs">
-                重新绑定森空岛
-              </button>
+                {copy.workspace.pages_tool_WorkspaceSetupPage_077}</button>
             )}
             {notice.recovery_action === 'retry' && (
               <button type="button" onClick={onRefresh} disabled={busy || dialogOpen || !binding} className="tool-secondary-action min-h-9 px-3 py-1.5 text-xs">
-                再次刷新
-              </button>
+                {copy.workspace.pages_tool_WorkspaceSetupPage_078}</button>
             )}
           </div>
         </div>
@@ -567,8 +570,8 @@ function OperatorPreviewCard({ operator }: { operator: LicenseOperator }) {
       </div>
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-ink-primary">{operator.name}</p>
-        <p className="mt-1 text-xs text-ink-muted">精 {operator.elite} / Lv {level}</p>
-        {!owned && <p className="mt-1 text-xs font-medium text-ink-muted">未拥有</p>}
+        <p className="mt-1 text-xs text-ink-muted">{copy.workspace.pages_tool_WorkspaceSetupPage_079}{operator.elite} / Lv {level}</p>
+        {!owned && <p className="mt-1 text-xs font-medium text-ink-muted">{copy.workspace.pages_tool_WorkspaceSetupPage_080}</p>}
       </div>
     </article>
   )
@@ -584,7 +587,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 function SectionFallback() {
-  return <div className="tool-panel p-6 text-sm text-ink-secondary">正在载入配置...</div>
+  return <div className="tool-panel p-6 text-sm text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_081}</div>
 }
 
 function sklandPayloadFromError(caught: unknown): Partial<SklandPayload> | null {
@@ -593,35 +596,35 @@ function sklandPayloadFromError(caught: unknown): Partial<SklandPayload> | null 
 }
 
 function formatSklandImportNotice(imported: NonNullable<SklandPayload['skland_import']>, verb: string): string {
-  const base = `${verb} ${imported.operator_count} 名干员：${imported.nickname}`
+  const base = `${verb} ${imported.operator_count}${copy.workspace.pages_tool_WorkspaceSetupPage_082}${imported.nickname}`
   if (imported.inventory_synced && imported.intermediate_inventory) {
-    return `${base}。已同步${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}到基建配置。`
+    return `${base}${copy.workspace.pages_tool_WorkspaceSetupPage_083}${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}${copy.workspace.pages_tool_WorkspaceSetupPage_084}`
   }
-  if (imported.inventory_warning) return `${base}。干员已导入，库存同步失败，可稍后刷新。`
+  if (imported.inventory_warning) return `${base}${copy.workspace.pages_tool_WorkspaceSetupPage_085}`
   return base
 }
 
 function formatInventoryAmount(product: IntermediateProduct, value: number | undefined): string {
-  const label = product === 'Pure Gold' ? '赤金' : '源石碎片'
+  const label = product === 'Pure Gold' ? copy.workspace.pages_tool_WorkspaceSetupPage_086 : copy.workspace.pages_tool_WorkspaceSetupPage_087
   const count = Number(value ?? 0)
   return `${label} ${Number.isFinite(count) ? count : 0}`
 }
 
 function formatSklandRefreshError(data: Partial<SklandPayload> | null, status: number): string {
   if (data?.code === 'skland_credential_invalid') {
-    return data.error || '森空岛凭据已失效。请重新绑定森空岛后再刷新。'
+    return data.error || copy.workspace.pages_tool_WorkspaceSetupPage_088
   }
   if (data?.code === 'skland_not_bound') {
-    return data.error || '当前账号尚未绑定森空岛。请先完成绑定。'
+    return data.error || copy.workspace.pages_tool_WorkspaceSetupPage_089
   }
   if (data?.code === 'skland_depot_refresh_forbidden') {
-    return data.error || '仓库分析档案不能刷新工作区，请到仓库价值分析页重新分析。'
+    return data.error || copy.workspace.pages_tool_WorkspaceSetupPage_090
   }
-  return data?.error || `森空岛刷新失败: ${status}。请稍后重试。`
+  return data?.error || `${copy.workspace.pages_tool_WorkspaceSetupPage_091}${status}${copy.workspace.pages_tool_WorkspaceSetupPage_092}`
 }
 
 function sklandCredentialInvalidLabel(reason: string | null | undefined): string {
-  if (reason === 'credential_format_invalid') return '凭据格式无效，请重新绑定'
-  if (reason === 'expired_or_revoked') return '凭据已失效，请重新绑定'
-  return '凭据不可用，请重新绑定'
+  if (reason === 'credential_format_invalid') return copy.workspace.pages_tool_WorkspaceSetupPage_093
+  if (reason === 'expired_or_revoked') return copy.workspace.pages_tool_WorkspaceSetupPage_094
+  return copy.workspace.pages_tool_WorkspaceSetupPage_095
 }

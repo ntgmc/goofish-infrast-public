@@ -43,7 +43,6 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/data/delete-request', accountDataHandler as unknown as ApiHandler],
   ['/api/user/data/cancel', accountDataHandler as unknown as ApiHandler],
   ['/api/user/data/credential/clear', accountDataHandler as unknown as ApiHandler],
-  ['/api/user/data/skland/unlink', accountDataHandler as unknown as ApiHandler],
   ['/api/user/data/depot-sample/revoke', accountDataHandler as unknown as ApiHandler],
   ['/api/announcement', announcementHandler as unknown as ApiHandler],
   ['/api/admin/announcement', announcementHandler as unknown as ApiHandler],

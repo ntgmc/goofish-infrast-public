@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import type { Announcement } from '../lib/types'
 import { apiVoid } from '../lib/api-client'
 import AnnouncementMarkdown from './AnnouncementMarkdown'
+import { copy } from '../copy/index'
+
 
 const READ_PREFIX = 'maa-announcement-read:'
 const FOCUSABLE_SELECTOR = [
@@ -97,7 +99,7 @@ export default function AnnouncementPopup({ announcements }: Props) {
       <section className="tool-panel w-full max-w-lg p-5 text-left shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="tool-eyebrow">站内公告</p>
+            <p className="tool-eyebrow">{copy.public.components_AnnouncementPopup_001}</p>
             <h2 id="announcement-popup-title" className="mt-1 text-lg font-semibold text-ink-primary">
               {current.title}
             </h2>
@@ -106,8 +108,7 @@ export default function AnnouncementPopup({ announcements }: Props) {
             to="/announcements"
             className="tool-secondary-action shrink-0 px-3 text-sm"
           >
-            历史
-          </Link>
+            {copy.public.components_AnnouncementPopup_002}</Link>
         </div>
         <AnnouncementMarkdown id="announcement-popup-body" className="mt-4">{current.body}</AnnouncementMarkdown>
         <div className="mt-6 flex justify-end">
@@ -117,8 +118,7 @@ export default function AnnouncementPopup({ announcements }: Props) {
             onClick={markCurrentRead}
             className="tool-primary-action"
           >
-            已读
-          </button>
+            {copy.public.components_AnnouncementPopup_003}</button>
         </div>
       </section>
     </dialog>

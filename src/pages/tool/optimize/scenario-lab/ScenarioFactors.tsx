@@ -6,6 +6,8 @@ import type {
   ScenarioMaaSchedule,
   ScenarioProductionPlan,
 } from '../../../../lib/scenario-comparison'
+import { copy } from '../../../../copy/index'
+
 
 const LAYOUTS: Array<{ id: ScenarioLayout; trading: number; manufacturing: number }> = [
   { id: '153', trading: 1, manufacturing: 5 },
@@ -14,19 +16,19 @@ const LAYOUTS: Array<{ id: ScenarioLayout; trading: number; manufacturing: numbe
 ]
 
 const SCHEDULES: Array<{ id: ScenarioMaaSchedule; label: string }> = [
-  { id: 'variable', label: 'MAA 自动非固定间隔（2–4 班）' },
-  { id: '8x3', label: 'MAA 8 小时 × 3' },
-  { id: '12x2', label: 'MAA 12 小时 × 2' },
+  { id: 'variable', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_001 },
+  { id: '8x3', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_002 },
+  { id: '12x2', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_003 },
 ]
 
 const DRONES: Array<{ id: ScenarioDroneStrategy; label: string }> = [
-  { id: 'off', label: '关闭' },
-  { id: 'auto', label: '自动选择' },
-  { id: 'lmd', label: '龙门币' },
-  { id: 'orundum', label: '合成玉' },
-  { id: 'pure_gold', label: '赤金' },
-  { id: 'battle_record', label: '作战记录' },
-  { id: 'originium_shard', label: '源石碎片' },
+  { id: 'off', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_004 },
+  { id: 'auto', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_005 },
+  { id: 'lmd', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_006 },
+  { id: 'orundum', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_007 },
+  { id: 'pure_gold', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_008 },
+  { id: 'battle_record', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_009 },
+  { id: 'originium_shard', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_010 },
 ]
 
 export default function ScenarioFactors({
@@ -66,10 +68,10 @@ export default function ScenarioFactors({
 
   return (
     <fieldset disabled={disabled} className="space-y-5">
-      <legend className="sr-only">场景组合因子</legend>
+      <legend className="sr-only">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_011}</legend>
       <div>
-        <h3 className="text-sm font-semibold text-ink-primary">布局与精确生产方案</h3>
-        <p className="mt-1 text-xs leading-5 text-ink-muted">选择合成玉、源石碎片和赤金线数，其余龙门币与经验线自动补足。</p>
+        <h3 className="text-sm font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_012}</h3>
+        <p className="mt-1 text-xs leading-5 text-ink-muted">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_013}</p>
         <div
           data-testid="scenario-layout-grid"
           className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3"
@@ -87,7 +89,7 @@ export default function ScenarioFactors({
 
       <div className="grid gap-5 xl:grid-cols-2">
         <div>
-          <h3 className="text-sm font-semibold text-ink-primary">排班模式</h3>
+          <h3 className="text-sm font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_014}</h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {SCHEDULES.map((schedule) => (
               <CheckOption
@@ -104,14 +106,13 @@ export default function ScenarioFactors({
               checked={factors.includeRotation}
               onChange={() => onChange({ ...factors, includeRotation: !factors.includeRotation })}
             >
-              游戏内轮换 12 小时 × 2
-            </CheckOption>
+              {copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_015}</CheckOption>
           </div>
-          <p className="mt-2 text-xs leading-5 text-ink-muted">自动模式先快速选择实际间隔，再冻结该数组精确复核；轮换不随无人机策略重复展开。</p>
+          <p className="mt-2 text-xs leading-5 text-ink-muted">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_016}</p>
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-ink-primary">MAA 无人机策略</h3>
+          <h3 className="text-sm font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_017}</h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {DRONES.map((drone) => (
               <CheckOption
@@ -124,7 +125,7 @@ export default function ScenarioFactors({
               </CheckOption>
             ))}
           </div>
-          <p className="mt-2 text-xs leading-5 text-ink-muted">指定目标不存在时自动跳过；启用策略统一在换班前执行。</p>
+          <p className="mt-2 text-xs leading-5 text-ink-muted">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_018}</p>
         </div>
       </div>
     </fieldset>
@@ -152,19 +153,19 @@ function LayoutPlanEditor({
     <section className="tool-inset min-w-0 p-3" aria-labelledby={`layout-${layout.id}-title`}>
       <div className="flex items-center justify-between gap-2">
         <h4 id={`layout-${layout.id}-title`} className="text-sm font-semibold text-ink-primary">{layout.id}</h4>
-        <span className="tool-status tabular-nums">已选 {plans.length}</span>
+        <span className="tool-status tabular-nums">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_019}{plans.length}</span>
       </div>
       <div className="mt-3 grid gap-3">
         <SelectField
           id={`layout-${layout.id}-orundum`}
-          label="合成玉贸易线"
+          label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_020}
           value={orundum}
           max={layout.trading}
           onChange={setOrundum}
         />
         <SelectField
           id={`layout-${layout.id}-shard`}
-          label="源石碎片制造线"
+          label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_021}
           value={originiumShard}
           max={layout.manufacturing}
           onChange={(value) => {
@@ -174,7 +175,7 @@ function LayoutPlanEditor({
         />
         <SelectField
           id={`layout-${layout.id}-gold`}
-          label="赤金制造线"
+          label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_022}
           value={boundedPureGold}
           max={maxPureGold}
           onChange={setPureGold}
@@ -187,21 +188,20 @@ function LayoutPlanEditor({
         onClick={() => onChange([...plans, draft])}
         className="tool-secondary-action mt-3 w-full"
       >
-        {duplicate ? '方案已添加' : '添加生产方案'}
+        {duplicate ? copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_023 : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_024}
       </button>
       {plans.length > 0 && (
-        <ul className="mt-3 space-y-2" aria-label={`${layout.id} 已选生产方案`}>
+        <ul className="mt-3 space-y-2" aria-label={`${layout.id}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_025}`}>
           {plans.map((plan) => (
             <li key={planKey(plan)} className="tool-inset flex min-h-11 items-center gap-2 px-3 py-2">
               <span className="min-w-0 flex-1 text-xs leading-5 text-ink-secondary">{planLabel(plan)}</span>
               <button
                 type="button"
                 onClick={() => onChange(plans.filter((item) => !samePlan(item, plan)))}
-                aria-label={`删除 ${layout.id} ${planLabel(plan)}`}
+                aria-label={`${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_026}${layout.id} ${planLabel(plan)}`}
                 className="tool-secondary-action min-h-11 shrink-0 border-error/40 bg-error/10 px-3 text-xs text-error hover:border-error/60 hover:bg-error/15 hover:text-error"
               >
-                删除
-              </button>
+                {copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_027}</button>
             </li>
           ))}
         </ul>
@@ -264,7 +264,7 @@ function buildPlan(
 }
 
 function planLabel(plan: ScenarioProductionPlan): string {
-  return `贸：币${plan.trading.lmd}/玉${plan.trading.orundum} · 制：赤${plan.manufacturing.pureGold}/经${plan.manufacturing.battleRecord}/碎${plan.manufacturing.originiumShard}`
+  return `${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_028}${plan.trading.lmd}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_029}${plan.trading.orundum}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_030}${plan.manufacturing.pureGold}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_031}${plan.manufacturing.battleRecord}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_032}${plan.manufacturing.originiumShard}`
 }
 
 function planKey(plan: ScenarioProductionPlan): string {

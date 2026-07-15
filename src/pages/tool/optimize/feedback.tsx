@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { copy } from '../../../copy/index'
+
 
 export function SmallActionButton({
   children,
@@ -43,13 +45,12 @@ export function LicenseSyncPanel() {
             </svg>
           </span>
           <div>
-            <p className="text-sm font-semibold text-ink-primary">正在同步授权状态</p>
+            <p className="text-sm font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_feedback_001}</p>
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
-              请稍候，正在检查 CDK 状态和权限变更，同步完成后即可生成排班。
-            </p>
+              {copy.optimize.pages_tool_optimize_feedback_002}</p>
           </div>
         </div>
-        <span className="text-xs font-medium text-ink-muted sm:flex-shrink-0">通常只需几秒</span>
+        <span className="text-xs font-medium text-ink-muted sm:flex-shrink-0">{copy.optimize.pages_tool_optimize_feedback_003}</span>
       </div>
       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
         <div className="schedule-progress-fill h-full w-1/2 rounded-full bg-brand-500" />
@@ -59,7 +60,7 @@ export function LicenseSyncPanel() {
 }
 
 export function ResultFallback() {
-  return <div className="tool-panel p-5 text-sm text-ink-secondary">正在载入...</div>
+  return <div className="tool-panel p-5 text-sm text-ink-secondary">{copy.optimize.pages_tool_optimize_feedback_004}</div>
 }
 
 export function ConfigValidationToast({ message }: { message: string }) {
@@ -70,7 +71,7 @@ export function ConfigValidationToast({ message }: { message: string }) {
       aria-live="assertive"
     >
       <div className="tool-alert tool-alert--error bg-surface-1/95 shadow-[0_4px_8px_rgba(15,23,42,0.08)] backdrop-blur-sm">
-        <p className="text-sm font-semibold text-error">处理失败</p>
+        <p className="text-sm font-semibold text-error">{copy.optimize.pages_tool_optimize_feedback_005}</p>
         <p className="mt-1 text-sm leading-6 text-ink-secondary">{message}</p>
       </div>
     </div>
@@ -88,7 +89,7 @@ export function InlineErrorPanel({
 }) {
   return (
     <div className="tool-alert tool-alert--error mt-4" role="alert">
-      <p className="text-sm font-semibold text-error">处理失败</p>
+      <p className="text-sm font-semibold text-error">{copy.optimize.pages_tool_optimize_feedback_006}</p>
       <p className="mt-1 text-sm leading-6 text-ink-secondary">{message}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button
@@ -96,15 +97,13 @@ export function InlineErrorPanel({
           onClick={onRetry}
           className="tool-primary-action"
         >
-          重试
-        </button>
+          {copy.optimize.pages_tool_optimize_feedback_007}</button>
         <button
           type="button"
           onClick={onReset}
           className="tool-secondary-action"
         >
-          重新选择文件
-        </button>
+          {copy.optimize.pages_tool_optimize_feedback_008}</button>
       </div>
     </div>
   )

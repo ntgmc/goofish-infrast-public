@@ -1,6 +1,8 @@
 import type { PreparedResult } from './formatters'
 import OperatorAvatarStrip from './OperatorAvatarStrip'
 import type { PreparedPlan, RoomRow } from './types'
+import { copy } from '../../copy/index'
+
 
 type BoardRoomGroup = {
   key: string;
@@ -40,8 +42,8 @@ export default function ResultBoard({
   planTimes?: string;
 }) {
   const groups = buildBoardRoomGroups(prepared.plans, isRotationMode)
-  const modeLabel = isRotationMode ? '游戏内轮换参考图' : 'MAA 排班参考图'
-  const queueLabel = planTimes ?? `${prepared.detailStats.planCount} 个${isRotationMode ? '队列' : '班次'}`
+  const modeLabel = isRotationMode ? copy.domain.components_result_panel_ResultBoard_001 : copy.domain.components_result_panel_ResultBoard_002
+  const queueLabel = planTimes ?? `${prepared.detailStats.planCount}${copy.domain.components_result_panel_ResultBoard_003}${isRotationMode ? copy.domain.components_result_panel_ResultBoard_004 : copy.domain.components_result_panel_ResultBoard_005}`
 
   return (
     <section className="tool-panel overflow-hidden">
@@ -50,12 +52,11 @@ export default function ResultBoard({
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-ink-primary">{modeLabel}</h2>
             <p className="mt-1 text-xs leading-5 text-ink-muted">
-              按房间聚合展示，头像为主、名称辅助；详细效率数据请在详情页展开查看。
-            </p>
+              {copy.domain.components_result_panel_ResultBoard_006}</p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             <span className="tool-status">{queueLabel}</span>
-            <span className="tool-status">{groups.length} 个房间</span>
+            <span className="tool-status">{groups.length} {copy.domain.components_result_panel_ResultBoard_007}</span>
           </div>
         </div>
       </div>
@@ -63,8 +64,7 @@ export default function ResultBoard({
       <div className="p-3 sm:p-4">
         {groups.length === 0 ? (
           <div className="tool-inset border-dashed px-4 py-8 text-center text-sm text-ink-muted">
-            暂无可展示的排班总览。
-          </div>
+            {copy.domain.components_result_panel_ResultBoard_008}</div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {groups.map((group) => (
@@ -95,8 +95,7 @@ export default function ResultBoard({
                         )
                       ) : (
                         <p className="tool-inset border-dashed bg-surface-0/55 px-2 py-1.5 text-xs leading-5 text-ink-muted">
-                          未安排
-                        </p>
+                          {copy.domain.components_result_panel_ResultBoard_009}</p>
                       )}
                       {slot.row && !slot.row.isAutofill && (
                         <span className="pt-1 font-mono text-[11px] font-semibold text-brand-300">{slot.row.efficiency}</span>
@@ -196,12 +195,12 @@ function getSlotNumberFromRowKey(key: string): number | undefined {
 }
 
 function formatSlotLabel(slotNumber: number, isRotationMode: boolean): string {
-  return isRotationMode ? `队列${slotNumber}` : `班${slotNumber}`
+  return isRotationMode ? `${copy.domain.components_result_panel_ResultBoard_010}${slotNumber}` : `${copy.domain.components_result_panel_ResultBoard_011}${slotNumber}`
 }
 
 function shortQueueLabel(label: string): string {
   const slotNumber = getQueueSlotNumber(label)
-  if (slotNumber) return label.includes('队列') ? `队列${slotNumber}` : `班${slotNumber}`
+  if (slotNumber) return label.includes(copy.domain.components_result_panel_ResultBoard_012) ? `${copy.domain.components_result_panel_ResultBoard_013}${slotNumber}` : `${copy.domain.components_result_panel_ResultBoard_014}${slotNumber}`
   return label.replace(/\s+/g, '')
 }
 
@@ -209,5 +208,5 @@ function formatGroupProduct(rows: RoomRow[]): string {
   const products = Array.from(new Set(rows.map((row) => row.product).filter((product) => product && product !== '-')))
   if (products.length === 0) return '-'
   if (products.length <= 2) return products.join(' / ')
-  return '多产物'
+  return copy.domain.components_result_panel_ResultBoard_015
 }

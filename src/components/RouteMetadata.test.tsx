@@ -15,13 +15,13 @@ describe('RouteMetadata', () => {
     render(<RouterProvider router={router} />)
 
     await waitFor(() => expect(document.title).toBe('MAA 基建排班优化器 | MaaTool'))
-    expect(metaByName('description')).toBe('使用森空岛数据和 MAA 配置生成明日方舟基建排班，查看日产出等效理智、练度建议与仓库资产估值。')
+    expect(metaByName('description')).toBe('基于森空岛或 MAA 数据，为明日方舟生成适配当前干员的基建排班，查看日产出、等效理智、练度建议与仓库估值。')
     expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe(currentUrl('/'))
 
     await act(async () => router.navigate('/tools/depot-value?source=homepage'))
 
     expect(document.title).toBe('仓库价值分析器 | MaaTool')
-    expect(metaByName('description')).toBe('上传 MAA 仓库 JSON，按等价理智估算明日方舟仓库资产并生成分享图。')
+    expect(metaByName('description')).toBe('上传 MAA 仓库 JSON，按等效理智估算明日方舟仓库资产并生成分享图。')
     expect(metaByProperty('og:url')).toBe(currentUrl('/tools/depot-value'))
     expect(metaByName('twitter:title')).toBe('仓库价值分析器 | MaaTool')
     expect(document.head.querySelectorAll('meta[name="description"]')).toHaveLength(1)

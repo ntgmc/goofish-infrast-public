@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { Link } from 'react-router-dom'
 import AuthForm from '../components/AuthForm'
 import BrandLogo from '../components/BrandLogo'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 import SklandBindingDialog, { type SklandPayload } from '../components/SklandBindingDialog'
 import { getCurrentSiteUrl } from '../lib/site-url'
 import { apiJson, apiJsonOrNull } from '../lib/api-client'
 import type { AuthMeResponse, DepotValueItem, DepotValueProfileResponse, DepotValueRequest, DepotValueResponse, UserGameAccount } from '../lib/types'
+import { copy, CURRENT_LOCALE } from '../copy/index'
+
 
 const LMD_ITEM_ID = '4001'
 
@@ -71,7 +74,7 @@ export default function DepotValuePage() {
       const data = await apiJson<DepotValueResponse>('/api/depot-value', {
         method: 'POST',
         json: payload,
-        fallbackMessage: '仓库分析失败',
+        fallbackMessage: copy.tools.pages_DepotValuePage_001,
       })
       setResult(data)
       window.setTimeout(() => document.getElementById('depot-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
@@ -89,10 +92,10 @@ export default function DepotValuePage() {
     try {
       const data = await apiJson<DepotValueProfileResponse>('/api/user/profiles/depot-value', {
         method: 'POST',
-        fallbackMessage: '创建仓库分析档案失败',
+        fallbackMessage: copy.tools.pages_DepotValuePage_002,
       })
       if (!data.user || !data.depot_profile) {
-        throw new Error('创建仓库分析档案失败')
+        throw new Error(copy.tools.pages_DepotValuePage_003)
       }
       applyAuthData(data)
       setDepotProfile(data.depot_profile)
@@ -121,13 +124,13 @@ export default function DepotValuePage() {
     setError(null)
     try {
       if (!navigator.clipboard?.readText) {
-        throw new Error('当前浏览器不允许直接读取剪贴板，请手动粘贴到输入框。')
+        throw new Error(copy.tools.pages_DepotValuePage_004)
       }
       const text = await navigator.clipboard.readText()
-      if (!text.trim()) throw new Error('剪贴板为空，请先复制 MAA 导出的仓库 JSON。')
+      if (!text.trim()) throw new Error(copy.tools.pages_DepotValuePage_005)
       setDepotText(text)
     } catch (caught) {
-      setError((caught as Error).message || '无法读取剪贴板，请手动粘贴 MAA 导出的仓库 JSON。')
+      setError((caught as Error).message || copy.tools.pages_DepotValuePage_006)
     }
   }
 
@@ -155,7 +158,7 @@ export default function DepotValuePage() {
       return
     }
     if (!auth?.user) {
-      setError('请先登录或注册，再使用森空岛库存。')
+      setError(copy.tools.pages_DepotValuePage_007)
       return
     }
     await openSklandBinding()
@@ -178,7 +181,7 @@ export default function DepotValuePage() {
       ? payload.active_profile
       : payload.profiles?.find((profile) => profile.kind === 'depot_value' && profile.skland_binding)
     if (!completedProfile?.skland_binding) {
-      setError('森空岛绑定已完成，但未找到可分析的绑定档案，请刷新后重试。')
+      setError(copy.tools.pages_DepotValuePage_008)
       return
     }
     setSklandDialogOpen(false)
@@ -202,26 +205,24 @@ export default function DepotValuePage() {
           <div className="flex min-w-0 items-start gap-3">
             <BrandLogo size="md" />
             <div className="min-w-0">
-              <p className="tool-eyebrow">MAA 小工具</p>
-              <h1 className="mt-2 text-2xl font-semibold text-ink-primary">仓库价值分析器</h1>
+              <p className="tool-eyebrow">{copy.tools.pages_DepotValuePage_009}</p>
+              <h1 className="mt-2 text-2xl font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_010}</h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
-                上传 MAA 仓库 JSON，按等价理智估算资产，并生成适合贴吧和 QQ 群分享的结果图。
-              </p>
+                {copy.tools.pages_DepotValuePage_011}</p>
             </div>
           </div>
           <nav className="flex flex-wrap gap-2">
+            <ThemeSwitcher />
             <Link
               to="/"
               className="tool-secondary-action"
             >
-              返回首页
-            </Link>
+              {copy.tools.pages_DepotValuePage_012}</Link>
             <Link
               to="/tool/profiles"
               className="tool-primary-action"
             >
-              进入工作区
-            </Link>
+              {copy.tools.pages_DepotValuePage_013}</Link>
           </nav>
         </header>
 
@@ -229,10 +230,9 @@ export default function DepotValuePage() {
           <section className="tool-panel p-5 sm:p-6">
             <div>
               <div>
-                <h2 className="text-lg font-semibold text-ink-primary">导入仓库</h2>
+                <h2 className="text-lg font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_014}</h2>
                 <p className="mt-1 text-sm leading-6 text-ink-secondary">
-                  在 MAA 的仓库识别里导出数据时，请选择“企鹅物流刷图规划”或“明日方舟工具箱”。
-                </p>
+                  {copy.tools.pages_DepotValuePage_015}</p>
               </div>
             </div>
 
@@ -246,19 +246,16 @@ export default function DepotValuePage() {
               <section className="tool-inset p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-ink-primary">粘贴仓库 JSON</h3>
+                    <h3 className="text-sm font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_016}</h3>
                     <p className="mt-1 text-sm leading-6 text-ink-secondary">
-                      从 MAA 选择“企鹅物流刷图规划”或“明日方舟工具箱”导出，复制内容后粘贴到这里。
-                      粘贴 JSON 只用于本次分析，不会进入样本池。
-                    </p>
+                      {copy.tools.pages_DepotValuePage_017}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => void readClipboard()}
                     className="tool-secondary-action"
                   >
-                    读取剪贴板
-                  </button>
+                    {copy.tools.pages_DepotValuePage_018}</button>
                 </div>
                 <textarea
                   value={depotText}
@@ -269,12 +266,11 @@ export default function DepotValuePage() {
                   }}
                   rows={9}
                   className="tool-field mt-4 resize-y font-mono"
-                  placeholder='粘贴 JSON，例如 {"2001":16000,"30011":982}'
+                  placeholder={copy.tools.pages_DepotValuePage_019}
                 />
                 {depotText.trim() && (
                   <span className="tool-status tool-status--success mt-3">
-                    已粘贴 {depotText.trim().length} 个字符
-                  </span>
+                    {copy.tools.pages_DepotValuePage_020}{depotText.trim().length} {copy.tools.pages_DepotValuePage_021}</span>
                 )}
               </section>
 
@@ -283,32 +279,30 @@ export default function DepotValuePage() {
                 disabled={loading !== null || !depotText.trim()}
                 className="tool-primary-action w-full"
               >
-                {loading === 'upload' ? '正在估算...' : '分析剪贴板仓库'}
+                {loading === 'upload' ? copy.tools.pages_DepotValuePage_022 : copy.tools.pages_DepotValuePage_023}
               </button>
             </form>
 
             <div className="mt-6 border-t border-surface-3 pt-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-ink-primary">森空岛快捷导入</h3>
+                  <h3 className="text-sm font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_024}</h3>
                   <p className="mt-1 text-sm leading-6 text-ink-secondary">
-                    使用森空岛导入会读取养成库存做本次估值，并匿名贡献聚合统计，用于改进击败百分比。
-                  </p>
+                    {copy.tools.pages_DepotValuePage_025}</p>
                 </div>
                 {auth?.user && (
                   <span className="tool-status tool-status--success whitespace-nowrap">
-                    已登录
-                  </span>
+                    {copy.tools.pages_DepotValuePage_026}</span>
                 )}
               </div>
               {authLoading ? (
-                <p className="tool-inset mt-4 p-3 text-sm text-ink-secondary">正在确认登录状态...</p>
+                <p className="tool-inset mt-4 p-3 text-sm text-ink-secondary">{copy.tools.pages_DepotValuePage_027}</p>
               ) : !auth?.user ? (
                 <div className="tool-inset mt-4 p-4">
                   <AuthForm
                     compact
                     allowCdk={false}
-                    intro="登录或注册后会自动创建一个仅用于仓库分析的免费档案，然后继续绑定森空岛。"
+                    intro={copy.tools.pages_DepotValuePage_028}
                     onAuthenticated={handleAuthenticated}
                   />
                 </div>
@@ -335,16 +329,15 @@ export default function DepotValuePage() {
                           className="tool-secondary-action"
                         >
                           {loading === 'skland'
-                            ? '正在读取...'
+                            ? copy.tools.pages_DepotValuePage_029
                             : selectedSklandProfile?.skland_binding?.credential_status === 'invalid'
-                              ? '重新绑定并分析'
-                              : '使用森空岛库存'}
+                              ? copy.tools.pages_DepotValuePage_030
+                              : copy.tools.pages_DepotValuePage_031}
                         </button>
                       </div>
                       {selectedSklandProfile?.skland_binding?.credential_status === 'invalid' && (
                         <p className="tool-alert tool-alert--error" role="alert">
-                          当前选择的森空岛凭据已失效。请重新绑定后再读取仓库库存。
-                        </p>
+                          {copy.tools.pages_DepotValuePage_032}</p>
                       )}
                     </div>
                   )}
@@ -355,24 +348,23 @@ export default function DepotValuePage() {
                       disabled={loading !== null || profilePreparing}
                       className="tool-primary-action w-full"
                     >
-                      {profilePreparing ? '正在准备账号...' : '绑定森空岛并分析仓库'}
+                      {profilePreparing ? copy.tools.pages_DepotValuePage_033 : copy.tools.pages_DepotValuePage_034}
                     </button>
                   )}
                 </div>
               )}
               <p className="tool-alert tool-alert--warning mt-4">
-                使用森空岛导入会默认匿名贡献本次统计结果；样本不包含仓库明细、干员明细、昵称、UID 明文或凭据。
-              </p>
+                {copy.tools.pages_DepotValuePage_035}</p>
             </div>
           </section>
 
           <section className="tool-panel p-5 sm:p-6">
-            <p className="tool-eyebrow">估值口径</p>
-            <h2 className="mt-2 text-lg font-semibold text-ink-primary">怎么算的</h2>
+            <p className="tool-eyebrow">{copy.tools.pages_DepotValuePage_036}</p>
+            <h2 className="mt-2 text-lg font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_037}</h2>
             <div className="mt-4 space-y-4 text-sm leading-6 text-ink-secondary">
-              <p>作战记录会先换算成经验，再折成大致理智；龙门币和材料也会尽量换算成同一个理智数。</p>
-              <p>材料价格优先参考一图流/企鹅物流的物品价值。模组数据块、数据增补仪、数据增补条、家具零件不会参与计算。</p>
-              <p>使用森空岛库存时会默认贡献匿名统计样本，样本越多，“击败 X% 博士”会越接近真实分布。</p>
+              <p>{copy.tools.pages_DepotValuePage_038}</p>
+              <p>{copy.tools.pages_DepotValuePage_039}</p>
+              <p>{copy.tools.pages_DepotValuePage_040}</p>
             </div>
           </section>
         </div>
@@ -400,17 +392,16 @@ export default function DepotValuePage() {
 function ResultSummary({ result }: { result: DepotValueResponse }) {
   return (
     <section className="tool-panel border-brand-600/25 p-5 sm:p-6">
-      <p className="tool-eyebrow">分析完成</p>
+      <p className="tool-eyebrow">{copy.tools.pages_DepotValuePage_041}</p>
       <h2 className="mt-2 text-2xl font-semibold text-ink-primary">
-        你的仓库资产击败了 {result.percentile}% 博士
-      </h2>
+        {copy.tools.pages_DepotValuePage_042}{result.percentile}{copy.tools.pages_DepotValuePage_043}</h2>
       <p className="tool-inset mt-3 px-3 py-2 text-sm leading-6 text-ink-secondary">
         {formatRankingNote(result)}
       </p>
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <Metric label="等价理智" value={formatNumber(result.total_equivalent_sanity)} />
-        <Metric label="已估价物品" value={`${result.priced_count} 类`} />
-        <Metric label="未估价物品" value={`${result.unpriced_count} 类`} />
+        <Metric label={copy.tools.pages_DepotValuePage_044} value={formatNumber(result.total_equivalent_sanity)} />
+        <Metric label={copy.tools.pages_DepotValuePage_045} value={`${result.priced_count}${copy.tools.pages_DepotValuePage_046}`} />
+        <Metric label={copy.tools.pages_DepotValuePage_047} value={`${result.unpriced_count}${copy.tools.pages_DepotValuePage_048}`} />
       </div>
 
       {result.warnings.length > 0 && (
@@ -424,7 +415,7 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
       )}
 
       <div className="mt-5">
-        <h3 className="text-sm font-semibold text-ink-primary">最值钱的库存</h3>
+        <h3 className="text-sm font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_049}</h3>
         <div className="tool-inset mt-3 divide-y divide-surface-3 overflow-hidden">
           {result.top_items.map((item, index) => (
             <div key={item.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 bg-surface-0 px-4 py-3">
@@ -433,7 +424,7 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
               </span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-ink-primary">{item.name}</p>
-                <p className="mt-1 text-xs text-ink-muted">数量 {formatNumber(item.count)} · {formatUnitSanityLabel(item)}</p>
+                <p className="mt-1 text-xs text-ink-muted">{copy.tools.pages_DepotValuePage_050}{formatNumber(item.count)} · {formatUnitSanityLabel(item)}</p>
               </div>
               <p className="text-sm font-semibold text-ink-primary">{formatNumber(item.equivalent_sanity)}</p>
             </div>
@@ -443,7 +434,7 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
 
       {result.unpriced_items.length > 0 && (
         <div className="mt-5">
-          <h3 className="text-sm font-semibold text-ink-primary">未计入估值</h3>
+          <h3 className="text-sm font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_051}</h3>
           <div className="mt-3 flex flex-wrap gap-2">
             {result.unpriced_items.map((item) => (
               <span key={item.id} className="tool-status">
@@ -470,18 +461,16 @@ function SharePanel({
     <section className="tool-panel p-5 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-ink-primary">分析截图</h2>
+          <h2 className="text-lg font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_052}</h2>
           <p className="mt-1 text-sm leading-6 text-ink-secondary">
-            下载 PNG 后可以直接发给朋友分析。
-          </p>
+            {copy.tools.pages_DepotValuePage_053}</p>
         </div>
         <button
           type="button"
           onClick={onDownload}
           className="tool-primary-action"
         >
-          下载 PNG
-        </button>
+          {copy.tools.pages_DepotValuePage_054}</button>
       </div>
       <div className="mt-5 flex justify-center">
         <canvas
@@ -489,7 +478,7 @@ function SharePanel({
           width={900}
           height={1600}
           className="tool-inset aspect-[9/16] w-full max-w-[24rem] shadow-sm"
-          aria-label={`你的仓库资产击败了 ${result.percentile}% 博士`}
+          aria-label={`${copy.tools.pages_DepotValuePage_055}${result.percentile}${copy.tools.pages_DepotValuePage_056}`}
         />
       </div>
     </section>
@@ -527,30 +516,30 @@ function drawShareCard(canvas: HTMLCanvasElement | null, result: DepotValueRespo
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.92)'
   ctx.font = '600 34px "Noto Sans SC", "Microsoft YaHei", sans-serif'
-  ctx.fillText('MAA 仓库价值分析器', 72, 96)
+  ctx.fillText(copy.tools.pages_DepotValuePage_057, 72, 96)
   ctx.font = '400 24px "Noto Sans SC", "Microsoft YaHei", sans-serif'
   ctx.fillStyle = 'rgba(255, 255, 255, 0.62)'
   ctx.fillText(result.ranking.mode === 'sample_adjusted'
-    ? `参考 ${formatNumber(result.ranking.sample_count)} 位森空岛样本修正`
-    : '样本积累中，当前结果以估算曲线为主', 72, 136)
+    ? `${copy.tools.pages_DepotValuePage_058}${formatNumber(result.ranking.sample_count)}${copy.tools.pages_DepotValuePage_059}`
+    : copy.tools.pages_DepotValuePage_060, 72, 136)
 
   ctx.fillStyle = '#ffffff'
   ctx.font = '700 60px "Noto Sans SC", "Microsoft YaHei", sans-serif'
-  ctx.fillText('你的仓库资产', 72, 260)
+  ctx.fillText(copy.tools.pages_DepotValuePage_061, 72, 260)
   ctx.font = '700 70px "Noto Sans SC", "Microsoft YaHei", sans-serif'
-  ctx.fillText(`击败了 ${result.percentile}% 博士`, 72, 350)
+  ctx.fillText(`${copy.tools.pages_DepotValuePage_062}${result.percentile}${copy.tools.pages_DepotValuePage_063}`, 72, 350)
 
   drawRoundedRect(ctx, 72, 430, 756, 220, 28, 'rgba(255, 255, 255, 0.1)')
   ctx.fillStyle = 'rgba(255, 255, 255, 0.64)'
   ctx.font = '500 28px "Noto Sans SC", "Microsoft YaHei", sans-serif'
-  ctx.fillText('等价理智', 112, 502)
+  ctx.fillText(copy.tools.pages_DepotValuePage_064, 112, 502)
   ctx.fillStyle = '#facc15'
   ctx.font = '700 82px "Segoe UI", "Noto Sans SC", sans-serif'
   ctx.fillText(formatNumber(result.total_equivalent_sanity), 112, 596)
 
   ctx.fillStyle = '#ffffff'
   ctx.font = '700 34px "Noto Sans SC", "Microsoft YaHei", sans-serif'
-  ctx.fillText('仓库资产榜', 72, 740)
+  ctx.fillText(copy.tools.pages_DepotValuePage_065, 72, 740)
 
   result.top_items.slice(0, 5).forEach((item, index) => {
     const y = 804 + index * 116
@@ -563,7 +552,7 @@ function drawShareCard(canvas: HTMLCanvasElement | null, result: DepotValueRespo
     ctx.fillText(truncateText(ctx, item.name, 380), 166, y + 40)
     ctx.fillStyle = 'rgba(255, 255, 255, 0.58)'
     ctx.font = '400 22px "Noto Sans SC", "Microsoft YaHei", sans-serif'
-    ctx.fillText(`数量 ${formatNumber(item.count)}`, 166, y + 70)
+    ctx.fillText(`${copy.tools.pages_DepotValuePage_066}${formatNumber(item.count)}`, 166, y + 70)
     ctx.fillStyle = '#facc15'
     ctx.font = '700 28px "Segoe UI", sans-serif'
     ctx.textAlign = 'right'
@@ -574,10 +563,10 @@ function drawShareCard(canvas: HTMLCanvasElement | null, result: DepotValueRespo
   drawRoundedRect(ctx, 72, 1400, 756, 104, 24, 'rgba(255, 255, 255, 0.1)')
   ctx.fillStyle = '#ffffff'
   ctx.font = '600 28px "Noto Sans SC", "Microsoft YaHei", sans-serif'
-  ctx.fillText('免费生成你的仓库资产分享图', 112, 1446)
+  ctx.fillText(copy.tools.pages_DepotValuePage_067, 112, 1446)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.62)'
   ctx.font = '400 22px "Noto Sans SC", "Microsoft YaHei", sans-serif'
-  ctx.fillText(`MAA 基建排班优化器 · ${getCurrentSiteUrl()}`, 112, 1484)
+  ctx.fillText(`${copy.tools.pages_DepotValuePage_068}${getCurrentSiteUrl()}`, 112, 1484)
 }
 
 function drawRoundedRect(
@@ -614,39 +603,39 @@ function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: num
 function formatProfileLabel(profile: UserGameAccount): string {
   const binding = profile.skland_binding
   return binding
-    ? `${profile.display_name} · ${binding.nickname} (${binding.uid})${binding.credential_status === 'invalid' ? ' · 凭据失效' : ''}`
+    ? `${profile.display_name} · ${binding.nickname} (${binding.uid})${binding.credential_status === 'invalid' ? copy.tools.pages_DepotValuePage_069 : ''}`
     : profile.display_name
 }
 
 function parseDepotText(text: string): unknown {
   const trimmed = text.replace(/^\uFEFF/, '').trim()
-  if (!trimmed) throw new Error('请先粘贴 MAA 仓库 JSON。')
+  if (!trimmed) throw new Error(copy.tools.pages_DepotValuePage_070)
   try {
     return JSON.parse(trimmed) as unknown
   } catch {
-    throw new Error('JSON 格式不正确。请在 MAA 导出方式中选择“企鹅物流刷图规划”或“明日方舟工具箱”。')
+    throw new Error(copy.tools.pages_DepotValuePage_071)
   }
 }
 
 function formatRankingNote(result: DepotValueResponse): string {
   if (result.ranking.mode === 'sample_adjusted') {
     const weightText = `${Math.round(result.ranking.sample_weight * 100)}%`
-    return `已参考 ${formatNumber(result.ranking.sample_count)} 位森空岛样本修正百分比，当前样本权重约 ${weightText}。`
+    return `${copy.tools.pages_DepotValuePage_072}${formatNumber(result.ranking.sample_count)}${copy.tools.pages_DepotValuePage_073}${weightText}。`
   }
   if (result.ranking.sample_count > 0) {
-    return `样本积累中，当前结果仍以估算曲线为主。`
+    return copy.tools.pages_DepotValuePage_074
   }
-  return `样本积累中，当前结果仍以估算曲线为主。`
+  return copy.tools.pages_DepotValuePage_075
 }
 
 function formatUnitSanityLabel(item: DepotValueItem): string {
-  if (item.id === LMD_ITEM_ID) return `万件 ${formatNumber(item.unit_sanity * 10000)} 理智`
-  return `单件 ${formatNumber(item.unit_sanity)} 理智`
+  if (item.id === LMD_ITEM_ID) return `${copy.tools.pages_DepotValuePage_076}${formatNumber(item.unit_sanity * 10000)}${copy.tools.pages_DepotValuePage_077}`
+  return `${copy.tools.pages_DepotValuePage_078}${formatNumber(item.unit_sanity)}${copy.tools.pages_DepotValuePage_079}`
 }
 
 function formatNumber(value: number): string {
   if (!Number.isFinite(value)) return '-'
-  return new Intl.NumberFormat('zh-CN', {
+  return new Intl.NumberFormat(CURRENT_LOCALE, {
     maximumFractionDigits: value >= 100 ? 0 : 2,
   }).format(value)
 }

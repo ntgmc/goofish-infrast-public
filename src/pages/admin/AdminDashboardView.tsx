@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
 import AnnouncementBodyEditor from '../../components/AnnouncementBodyEditor'
 import InvitationSettingsSection from './invitations/InvitationSettingsSection'
+import ThemeSwitcher from '../../components/ThemeSwitcher'
 
 import { GeneratedPermission, AdminSection, UsageRangeKey, AnnouncementSortKey, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, sectionLabels, announcementKindLabels, announcementSortLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, AnnouncementReachMetrics, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
 import { useAdminController } from './useAdminController'
@@ -38,7 +39,10 @@ export default function AdminDashboardView() {
               </div>
             </section>
           <form onSubmit={handleLogin} noValidate className="tool-panel p-6">
-            <h2 className="text-lg font-semibold text-ink-primary">账号登录</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-ink-primary">账号登录</h2>
+              <ThemeSwitcher />
+            </div>
             <label className="mt-5 block">
               <span className="mb-2 block text-sm font-medium text-ink-secondary">账号</span>
               <input
@@ -110,6 +114,7 @@ export default function AdminDashboardView() {
                 <p className="mt-1 text-sm text-ink-muted">最近同步 {loading ? '进行中' : formatDate(new Date().toISOString())}</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <ThemeSwitcher />
                 <button type="button" onClick={() => void loadDashboard()} className="tool-secondary-action">刷新数据</button>
                 <Link to="/admin/setup" className="tool-primary-action">账号设置</Link>
               </div>
