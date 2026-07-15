@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import BrandLogo from '../../../components/BrandLogo'
 import DeferredFeatureMenu from '../../../components/DeferredFeatureMenu'
+import ThemeSwitcher from '../../../components/ThemeSwitcher'
 import { OPTIMIZE_SECTIONS, type OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
 
@@ -73,6 +74,7 @@ export default function OptimizeShell({
               </div>
             </div>
             <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
+              <ThemeSwitcher />
               <DeferredFeatureMenu />
               <button type="button" onClick={onReset} className="tool-secondary-action lg:hidden">{copy.optimize.pages_tool_optimize_OptimizeShell_005}</button>
             </div>

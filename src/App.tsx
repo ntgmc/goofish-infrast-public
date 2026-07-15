@@ -7,6 +7,7 @@ import LandingPage from './pages/LandingPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import CancelAccountDeletionPage from './pages/CancelAccountDeletionPage'
 import { copy } from './copy/index'
+import { ThemeProvider } from './lib/theme'
 
 
 const ToolPage = lazy(() => import('./pages/ToolPage'))
@@ -18,6 +19,14 @@ const ScheduleAnalysisPage = lazy(() => import('./pages/ScheduleAnalysisPage'))
 const PublicInfoPage = lazy(() => import('./pages/PublicInfoPage'))
 
 export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  )
+}
+
+function AppContent() {
   const navigate = useNavigate()
 
   return (

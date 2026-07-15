@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { apiJson, apiVoid, getApiErrorMessage } from '../lib/api-client'
 import { adminApiJson, clearLegacyAdminCredentials } from '../lib/admin-api-client'
 import { copy } from '../copy/index'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 
 
 interface AdminUserSummary {
@@ -84,7 +85,10 @@ export default function AdminSetupPage() {
             <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">
               {copy.common.pages_AdminSetupPage_010}</p>
           </div>
-          <Link to="/admin/overview" className="tool-secondary-action">{copy.common.pages_AdminSetupPage_011}</Link>
+          <div className="flex flex-wrap gap-2">
+            <ThemeSwitcher />
+            <Link to="/admin/overview" className="tool-secondary-action">{copy.common.pages_AdminSetupPage_011}</Link>
+          </div>
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[380px_1fr]">

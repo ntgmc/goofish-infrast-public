@@ -1,5 +1,6 @@
 import BrandLogo from '../components/BrandLogo'
 import PublicFooter, { SupportGroupLink } from '../components/PublicFooter'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 import { Link } from 'react-router-dom'
 import { copy } from '../copy/index'
 
@@ -148,6 +149,7 @@ export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
             </span>
           </Link>
           <nav className="flex items-center gap-4 text-sm font-medium" aria-label={copy.public.pages_PublicInfoPage_060}>
+            <ThemeSwitcher />
             <Link to="/faq" className="tool-nav-link inline-flex items-center px-3">FAQ</Link>
             <Link to="/support" className="tool-nav-link inline-flex items-center px-3">{copy.public.pages_PublicInfoPage_061}</Link>
             <Link to="/" className="tool-secondary-action">{copy.public.pages_PublicInfoPage_062}</Link>

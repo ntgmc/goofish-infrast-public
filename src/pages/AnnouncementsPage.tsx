@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { Announcement, AnnouncementPublicResponse } from '../lib/types'
 import { apiJson } from '../lib/api-client'
 import AnnouncementMarkdown from '../components/AnnouncementMarkdown'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 
 
@@ -41,11 +42,11 @@ export default function AnnouncementsPage() {
             <h1 className="text-2xl font-semibold">{copy.public.pages_AnnouncementsPage_003}</h1>
             <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pages_AnnouncementsPage_004}</p>
           </div>
-          <Link
-            to="/tool/profiles"
-            className="tool-secondary-action shrink-0"
-          >
-            {copy.public.pages_AnnouncementsPage_005}</Link>
+          <div className="flex flex-wrap gap-2">
+            <ThemeSwitcher />
+            <Link to="/tool/profiles" className="tool-secondary-action shrink-0">
+              {copy.public.pages_AnnouncementsPage_005}</Link>
+          </div>
         </div>
 
         {loading && <p className="tool-inset mt-6 px-4 py-3 text-sm text-ink-secondary" role="status">{copy.public.pages_AnnouncementsPage_006}</p>}

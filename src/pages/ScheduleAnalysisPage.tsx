@@ -1,6 +1,7 @@
 import ScheduleAnalysisTool from '../components/ScheduleAnalysisTool'
 import { Link } from 'react-router-dom'
 import { copy } from '../copy/index'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 
 
 export default function ScheduleAnalysisPage() {
@@ -15,6 +16,7 @@ export default function ScheduleAnalysisPage() {
               {copy.tools.pages_ScheduleAnalysisPage_003}</p>
           </div>
           <nav className="flex flex-wrap gap-2">
+            <ThemeSwitcher />
             <Link
               to="/"
               className="tool-secondary-action"

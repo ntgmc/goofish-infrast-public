@@ -326,7 +326,7 @@ export default function ConfigEditor({
                       })}
                       className={`tool-secondary-action min-h-11 px-3 text-sm ${
                         scheduleMode === mode
-                          ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100'
+                          ? 'tool-option-selected'
                           : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
                       }`}
                     >
@@ -350,7 +350,7 @@ export default function ConfigEditor({
                       })}
                       className={`tool-secondary-action min-h-11 px-3 text-sm disabled:cursor-not-allowed ${
                         normalizeDormitoryRule(config.dormitory_rule) === rule
-                          ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100'
+                          ? 'tool-option-selected'
                           : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
                       }`}
                     >
@@ -484,7 +484,7 @@ export default function ConfigEditor({
                     })}
                     className={`tool-secondary-action min-h-11 px-3 text-sm ${
                       scheduleMode === mode
-                        ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100'
+                        ? 'tool-option-selected'
                         : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
                     }`}
                   >
@@ -526,7 +526,7 @@ export default function ConfigEditor({
                     })}
                     className={`tool-secondary-action min-h-11 px-3 text-sm disabled:cursor-not-allowed ${
                       normalizeDormitoryRule(config.dormitory_rule) === rule
-                        ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100'
+                        ? 'tool-option-selected'
                         : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary disabled:text-ink-muted'
                     }`}
                   >
