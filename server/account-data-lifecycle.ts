@@ -45,8 +45,20 @@ export async function requestAccountDeletion(user: UserAccountRecord): Promise<{
       [user.id, updatedAt],
     )
     await client.query(
+      `update optimize_job_attempts
+       set status = 'failed', failure_kind = 'application_error', error_message = '账号已请求注销，任务已取消。',
+           finished_at = now(), heartbeat_at = now()
+       where status = 'running' and job_id in (
+         select id from optimize_jobs
+         where profile_id in (select id from user_game_accounts where user_id = $1)
+            or owner_key in (select 'profile:' || id from user_game_accounts where user_id = $1)
+       )`,
+      [user.id],
+    )
+    await client.query(
       `update optimize_jobs set status = 'failed', error_message = '账号已请求注销，任务已取消。',
-         payload_json = payload_json - 'activeProfile', lock_token = null, lock_expires_at = null,
+         payload_json = payload_json - 'activeProfile', worker_id = null, heartbeat_at = null,
+         lock_token = null, lock_expires_at = null,
          finished_at = now(), updated_at = now()
        where profile_id in (select id from user_game_accounts where user_id = $1)
           or owner_key in (select 'profile:' || id from user_game_accounts where user_id = $1)`,
@@ -104,11 +116,36 @@ export async function processDueAccountDeletions(now = new Date()): Promise<numb
   return due.rows.length
 }
 
-export function startAccountDeletionWorker(): void {
-  const run = () => void processDueAccountDeletions().catch((error) => console.warn('account deletion worker skipped:', error))
+export type AccountDeletionWorkerController = {
+  stop: () => void
+  waitForIdle: () => Promise<void>
+}
+
+export function startAccountDeletionWorker(): AccountDeletionWorkerController {
+  let stopped = false
+  let running: Promise<void> | null = null
+  const run = () => {
+    if (stopped || running) return
+    running = processDueAccountDeletions()
+      .then(() => undefined)
+      .catch((error) => console.warn('account deletion worker skipped:', error))
+      .finally(() => {
+        running = null
+      })
+  }
   run()
   const timer = setInterval(run, 60_000)
   timer.unref?.()
+  return {
+    stop: () => {
+      if (stopped) return
+      stopped = true
+      clearInterval(timer)
+    },
+    waitForIdle: async () => {
+      if (running) await running
+    },
+  }
 }
 
 function hashToken(token: string): string {

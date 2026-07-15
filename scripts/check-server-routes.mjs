@@ -17,6 +17,8 @@ const expectedRoutes = [
   '/api/data',
   '/api/depot-value',
   '/api/health',
+  '/api/health/live',
+  '/api/health/ready',
   '/api/license-status',
   '/api/optimization/jobs',
   '/api/optimization/jobs/:jobId',

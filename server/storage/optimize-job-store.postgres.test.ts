@@ -94,12 +94,29 @@ describe('PostgreSQL optimization job admission', () => {
       use_priority_coupon: true,
     }))
     expect((await getRewardBalances(userId))[0].available).toBe(0)
-    const claimed = await store.claimNextJob('coupon-lock', new Date(Date.now() + 60_000).toISOString(), 2)
+    const claimed = await store.claimNextJob('test-worker', 'coupon-lock', new Date(Date.now() + 60_000).toISOString(), 2)
     expect(claimed?.id).toBe(admitted.job.id)
-    await store.markFailed(admitted.job.id, 'coupon-lock', 'system failure')
-    await store.markFailed(admitted.job.id, 'coupon-lock', 'duplicate failure')
+    await store.failAttempt(admitted.job.id, claimed!.attempt_count, 'test-worker', 'coupon-lock', 'system failure')
+    await store.failAttempt(admitted.job.id, claimed!.attempt_count, 'test-worker', 'coupon-lock', 'duplicate failure')
     expect((await getRewardBalances(userId))[0].available).toBe(1)
     expect((await query<{ status: string }>('select status from reward_consumptions where optimization_job_id = $1', [admitted.job.id])).rows[0]?.status).toBe('refunded')
+  })
+
+  it('records attempt heartbeats and releases deployment interruptions without failure budget', async () => {
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({ priority: 1_000 }))
+    const claimed = await store.claimNextJob('worker-a', 'attempt-lock', new Date(Date.now() + 60_000).toISOString(), 2)
+    expect(claimed?.id).toBe(admitted.job.id)
+
+    await expect(store.heartbeatAttempt(admitted.job.id, claimed!.attempt_count, 'worker-b', 'attempt-lock', new Date(Date.now() + 60_000).toISOString())).resolves.toBe(false)
+    await expect(store.heartbeatAttempt(admitted.job.id, claimed!.attempt_count, 'worker-a', 'attempt-lock', new Date(Date.now() + 60_000).toISOString())).resolves.toBe(true)
+    await expect(store.releaseInterruptedAttempt(admitted.job.id, claimed!.attempt_count, 'worker-a', 'attempt-lock')).resolves.toBe(true)
+
+    expect(await store.getJob(admitted.job.id)).toMatchObject({ status: 'queued', failure_count: 0, attempt_count: 1 })
+    expect((await query<{ status: string }>(
+      'select status from optimize_job_attempts where job_id = $1 and attempt_no = $2',
+      [admitted.job.id, claimed!.attempt_count],
+    )).rows[0]?.status).toBe('interrupted')
   })
 })
 

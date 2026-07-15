@@ -127,6 +127,28 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     expect(result?.risk_events?.some((event) => event.type === 'concurrent_risk')).toBe(true)
     expect((await query<{ record_revision: number }>('select record_revision from cdk_records where key = $1', [key])).rows[0]?.record_revision).toBeGreaterThan(0)
   })
+
+  it('increments a schedule completion only once for the same optimization job', async () => {
+    const store = createPostgresCdkRecordStore()
+    const key = await seedUsedCdk({ schedule_generate_count: 0 })
+    const jobId = randomUUID()
+    await query(
+      `insert into optimize_jobs
+        (id, status, priority, owner_key, permission, source, payload_json, created_at, updated_at)
+       values ($1, 'running', 10, $2, 'growth', 'license_file', '{}'::jsonb, now(), now())`,
+      [jobId, `license:${randomUUID()}`],
+    )
+
+    const results = await Promise.all(Array.from({ length: 8 }, () => store.incrementScheduleGenerateCount(key, jobId)))
+
+    expect(results.every(Boolean)).toBe(true)
+    expect(await store.get(key)).toMatchObject({ schedule_generate_count: 1 })
+    expect((await query<{ count: string }>(
+      `select count(*)::text as count from optimization_job_effects
+       where job_id = $1 and effect_type = 'cdk_schedule_generate'`,
+      [jobId],
+    )).rows[0]?.count).toBe('1')
+  })
 })
 
 async function seedCdk(): Promise<string> {
