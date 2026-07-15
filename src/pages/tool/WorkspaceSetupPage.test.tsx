@@ -28,6 +28,15 @@ afterEach(() => {
 })
 
 describe('WorkspaceSetupPage CDK paths', () => {
+  it('separates the desktop account actions in one bottom navigation group', () => {
+    renderWorkspace()
+
+    const accountActions = screen.getByRole('navigation', { name: '账号操作' })
+    expect(accountActions).toHaveClass('flex-col', 'gap-3')
+    expect(within(accountActions).getByRole('button', { name: '返回账号列表' })).toBeInTheDocument()
+    expect(within(accountActions).getByRole('button', { name: '退出登录' })).toBeInTheDocument()
+  })
+
   it('upgrades the current free profile in place and preserves the profile id', async () => {
     const user = userEvent.setup()
     const onSynced = vi.fn()

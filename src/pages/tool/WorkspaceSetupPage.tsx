@@ -207,8 +207,10 @@ export default function WorkspaceSetupPage({
             </button>
           ))}
         </nav>
-        <button type="button" onClick={onBack} className="tool-secondary-action absolute bottom-16 left-4 right-4">{copy.workspace.pages_tool_WorkspaceSetupPage_017}</button>
-        <button type="button" onClick={onLogout} className="tool-secondary-action absolute bottom-5 left-4 right-4">{copy.workspace.pages_tool_WorkspaceSetupPage_018}</button>
+        <nav className="absolute bottom-5 left-4 right-4 flex flex-col gap-3" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_018_account_actions}>
+          <button type="button" onClick={onBack} className="tool-secondary-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_017}</button>
+          <button type="button" onClick={onLogout} className="tool-secondary-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_018}</button>
+        </nav>
       </aside>
 
       <main className="lg:pl-64" tabIndex={-1} data-route-focus>
