@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 
 const workflow = await readFile('.github/workflows/deploy-production.yml', 'utf8')
+const qualityChecksWorkflow = await readFile('.github/workflows/quality-checks.yml', 'utf8')
 const deployScript = await readFile('scripts/deploy-production-atomic.sh', 'utf8')
 const apiNginx = await readFile('deploy/nginx/goofish-api-production.conf', 'utf8')
 const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', 'utf8')
@@ -12,6 +13,7 @@ const buildRelevance = await readFile('scripts/check-build-relevance.mjs', 'utf8
 const productionDocs = await readFile('docs/production-deploy.md', 'utf8')
 
 assertWorkflowProvenance()
+assertQualityChecksImmutability()
 assertDeploymentScript()
 assertNginxBlueGreenConfig()
 assertSystemdTemplate()
@@ -41,6 +43,13 @@ function assertWorkflowProvenance() {
   }
 }
 
+function assertQualityChecksImmutability() {
+  assert.match(qualityChecksWorkflow, /^permissions:\s*\n\s+contents: read$/m, 'Quality Checks should only read repository contents')
+  assert.doesNotMatch(qualityChecksWorkflow, /refresh-build-metadata/, 'Quality Checks must not refresh committed build metadata')
+  assert.doesNotMatch(qualityChecksWorkflow, /--refresh-metadata/, 'Quality Checks must not generate metadata for a repository commit')
+  assert.doesNotMatch(qualityChecksWorkflow, /\bgit push\b/, 'Quality Checks must not advance a checked branch')
+}
+
 function assertDeploymentScript() {
   const syntax = spawnSync('bash', ['-n', 'scripts/deploy-production-atomic.sh'], { encoding: 'utf8' })
   if (syntax.error?.code !== 'ENOENT') {
@@ -66,6 +75,7 @@ function assertDeploymentScript() {
     /check_readiness "\$CANDIDATE_SLOT"/,
     /CANDIDATE_ONLY/,
     /run_systemctl reload nginx/,
+    /run_systemctl enable "\$\(service_unit "\$CANDIDATE_SLOT"\)"/,
     /rollback\(\)/,
     /flock -n 9/,
   ]) {
@@ -81,7 +91,8 @@ function assertDeploymentScript() {
     'atomic_link "slots/$CANDIDATE_SLOT" "$CURRENT_LINK"',
     'run_systemctl reload nginx',
     'check_public_smoke || fail',
-    'run_systemctl stop "$(service_unit "$OLD_ACTIVE_SLOT")"',
+    'run_systemctl enable "$(service_unit "$CANDIDATE_SLOT")"',
+    'run_systemctl disable --now "$(service_unit "$OLD_ACTIVE_SLOT")"',
   ])
 
   const rollbackBody = extractFunction(deployScript, 'rollback')
@@ -101,6 +112,8 @@ function assertNginxBlueGreenConfig() {
 }
 
 function assertSystemdTemplate() {
+  assert.match(systemdUnit, /^User=ntgmc$/m)
+  assert.match(systemdUnit, /^Group=ntgmc$/m)
   assert.match(systemdUnit, /WorkingDirectory=\/opt\/goofish-infrast-v1\/slots\/%i/)
   assert.match(systemdUnit, /EnvironmentFile=\/etc\/goofish-infrast-v1\/%i\.env/)
   assert.match(systemdUnit, /Environment=HOST=127\.0\.0\.1/)

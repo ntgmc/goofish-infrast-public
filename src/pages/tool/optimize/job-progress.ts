@@ -3,17 +3,25 @@ import { isRetryableOptimizePollStatus } from '../../../lib/optimize-poll'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { fetchOptimizationJob } from './optimization-api'
-export const OPTIMIZE_POLL_REQUEST_TIMEOUT_MS = 10_000
+export const OPTIMIZE_POLL_REQUEST_TIMEOUT_MS = 20_000
+export const OPTIMIZE_HIDDEN_POLL_MULTIPLIER = 3
 
 export function waitForOptimizePoll(ms: number, isCancelled?: () => boolean): Promise<void> {
   return new Promise((resolve, reject) => {
-    const delayMs = Math.max(500, ms)
+    const baseDelayMs = Math.max(500, ms)
     const startedAt = Date.now()
     const check = () => {
       if (isCancelled?.()) {
         reject(new OptimizeJobPollCancelledError())
         return
       }
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        window.setTimeout(check, 250)
+        return
+      }
+      const delayMs = document.visibilityState === 'hidden'
+        ? baseDelayMs * OPTIMIZE_HIDDEN_POLL_MULTIPLIER
+        : baseDelayMs
       const remainingMs = delayMs - (Date.now() - startedAt)
       if (remainingMs <= 0) {
         resolve()

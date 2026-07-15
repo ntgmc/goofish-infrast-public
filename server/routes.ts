@@ -80,7 +80,9 @@ const ROUTES = new Map<string, ApiHandler>([
 ])
 
 export async function routeRequest(req: Request): Promise<Response> {
+  const startedAt = performance.now()
   const response = await dispatchRequest(req)
+  response.headers.set('Server-Timing', `app;dur=${Math.max(0, performance.now() - startedAt).toFixed(1)}`)
   return applyHttpSecurityHeaders(response, isSecureWebRequest(req))
 }
 

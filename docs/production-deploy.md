@@ -91,6 +91,9 @@ ready and Nginx has switched successfully.
    Preserve the existing secrets in
    `/etc/goofish-infrast-v1/backend.env`. It must not define `PORT` or a
    non-loopback `HOST`, because the slot files and unit own those settings.
+   The managed template runs both slots as the unprivileged `ntgmc` user and
+   group; adjust both fields before installation if the production application
+   account differs.
 
 3. Seed the runtime upstream files and active pointer while legacy port 3000 is
    still serving production:
@@ -192,8 +195,9 @@ ready and Nginx has switched successfully.
    `/api/health/ready` for `ok=true` and `storage.type=postgres`.
 5. Validate Nginx, atomically update `current`, `previous`, the active upstream
    and active-slot state, validate again, then reload Nginx.
-6. Run the public HTTPS smoke test. Only after it passes is the old slot stopped
-   through its 75-second graceful-drain policy.
+6. Run the public HTTPS smoke test. Only after it passes is the candidate slot
+   enabled for boot and the old slot disabled/stopped through its 75-second
+   graceful-drain policy.
 7. Keep every referenced release plus the five most recent releases; remove
    only unreferenced older worktrees after a successful deployment.
 
@@ -246,6 +250,12 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart goofish-infrast-v1@blue.s
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart goofish-infrast-v1@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl stop goofish-infrast-v1@blue.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl stop goofish-infrast-v1@green.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl enable goofish-infrast-v1@blue.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl enable goofish-infrast-v1@green.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl enable --now goofish-infrast-v1@blue.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl enable --now goofish-infrast-v1@green.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl disable --now goofish-infrast-v1@blue.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl disable --now goofish-infrast-v1@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-infrast-v1@blue.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-infrast-v1@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-infrast-v1@blue.service --no-pager --lines=80
