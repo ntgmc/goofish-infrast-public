@@ -83,7 +83,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
                 aria-pressed={sortMode === option.id}
                 className={`tool-secondary-action min-h-11 flex-1 whitespace-nowrap px-3 text-sm lg:flex-none ${
                   sortMode === option.id
-                    ? 'border-brand-500/50 bg-brand-500/15 text-brand-200 hover:border-brand-400/70 hover:bg-brand-500/20 hover:text-brand-100'
+                    ? 'tool-option-selected'
                     : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
                 }`}
               >

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { Link } from 'react-router-dom'
 import AuthForm from '../components/AuthForm'
 import BrandLogo from '../components/BrandLogo'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 import SklandBindingDialog, { type SklandPayload } from '../components/SklandBindingDialog'
 import { getCurrentSiteUrl } from '../lib/site-url'
 import { apiJson, apiJsonOrNull } from '../lib/api-client'
@@ -211,6 +212,7 @@ export default function DepotValuePage() {
             </div>
           </div>
           <nav className="flex flex-wrap gap-2">
+            <ThemeSwitcher />
             <Link
               to="/"
               className="tool-secondary-action"

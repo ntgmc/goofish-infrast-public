@@ -1,4 +1,14 @@
 export const commonCopy = {
+  // src/components/ThemeSwitcher.tsx
+  components_ThemeSwitcher_001: "选择主题",
+  // src/components/ThemeSwitcher.tsx
+  components_ThemeSwitcher_002: "主题选项",
+  // src/components/ThemeSwitcher.tsx
+  components_ThemeSwitcher_003: "跟随系统",
+  // src/components/ThemeSwitcher.tsx
+  components_ThemeSwitcher_004: "浅色",
+  // src/components/ThemeSwitcher.tsx
+  components_ThemeSwitcher_005: "深色",
   // src/App.tsx
   App_001: "正在载入工作台...",
   // src/App.tsx

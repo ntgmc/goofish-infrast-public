@@ -6,6 +6,7 @@ import App from '../App'
 import LandingPage from './LandingPage'
 import { type PublicInfoPageKind } from './PublicInfoPage'
 import { SUPPORT_QQ_GROUP_URL } from '../components/PublicFooter'
+import { ThemeProvider } from '../lib/theme'
 
 afterEach(() => cleanup())
 
@@ -28,7 +29,7 @@ describe('public information pages', () => {
   })
 
   it('exposes all public information links from the landing page footer', () => {
-    render(<MemoryRouter><LandingPage onStart={() => undefined} /></MemoryRouter>)
+    render(<ThemeProvider><MemoryRouter><LandingPage onStart={() => undefined} /></MemoryRouter></ThemeProvider>)
 
     expect(screen.getByRole('link', { name: '常见问题' })).toHaveAttribute('href', '/faq')
     expect(screen.getByRole('link', { name: '用户服务协议' })).toHaveAttribute('href', '/terms')

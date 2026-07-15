@@ -2,6 +2,7 @@ import AnnouncementBanner from '../../components/AnnouncementBanner'
 import AuthForm from '../../components/AuthForm'
 import BrandLogo from '../../components/BrandLogo'
 import DeferredFeatureMenu from '../../components/DeferredFeatureMenu'
+import ThemeSwitcher from '../../components/ThemeSwitcher'
 import type { Announcement, AuthSuccessResponse } from '../../lib/types'
 import { copy } from '../../copy/index'
 
@@ -19,7 +20,10 @@ export default function AuthPage({
         <section className="max-w-xl py-4 sm:py-8">
           <div className="flex items-start justify-between gap-4">
             <BrandLogo size="lg" />
-            <DeferredFeatureMenu />
+            <div className="flex flex-wrap justify-end gap-2">
+              <ThemeSwitcher />
+              <DeferredFeatureMenu />
+            </div>
           </div>
           <p className="tool-eyebrow mt-12">{copy.auth.pages_tool_AuthPage_001}</p>
           <h1 className="sr-only">{copy.auth.pages_tool_AuthPage_002}</h1>

@@ -2,6 +2,7 @@ import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction }
 import { Link } from 'react-router-dom'
 import { apiVoid } from '../lib/api-client'
 import { copy } from '../copy/index'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 
 
 type FieldErrors = Record<string, string>
@@ -51,7 +52,10 @@ export default function ResetPasswordPage() {
   return (
     <main className="tool-shell flex min-h-dvh items-center justify-center px-4 py-6 sm:px-6 sm:py-10" tabIndex={-1} data-route-focus>
       <form onSubmit={handleSubmit} noValidate className="tool-panel w-full max-w-md p-6 sm:p-8">
-        <p className="tool-eyebrow">{copy.auth.pages_ResetPasswordPage_006}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="tool-eyebrow">{copy.auth.pages_ResetPasswordPage_006}</p>
+          <ThemeSwitcher />
+        </div>
         <h1 className="mt-2 text-2xl font-semibold text-ink-primary">{copy.auth.pages_ResetPasswordPage_007}</h1>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.auth.pages_ResetPasswordPage_008}</p>
 

@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { Announcement, AuthSuccessResponse, AuthUser, LicenseConfig, LicenseOperator, UserGameAccount, UserWorkspace } from '../../lib/types'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
+import ThemeSwitcher from '../../components/ThemeSwitcher'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import { ApiError, apiJson } from '../../lib/api-client'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
@@ -225,6 +226,7 @@ export default function WorkspaceSetupPage({
               </div>
             </div>
             <div className="flex gap-2">
+              <ThemeSwitcher />
               <button type="button" onClick={onBack} className="tool-secondary-action">{copy.workspace.pages_tool_WorkspaceSetupPage_021}</button>
               <button type="button" onClick={onLogout} className="tool-secondary-action lg:hidden">{copy.workspace.pages_tool_WorkspaceSetupPage_022}</button>
             </div>

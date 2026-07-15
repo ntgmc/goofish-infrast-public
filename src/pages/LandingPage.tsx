@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import PublicFooter from '../components/PublicFooter'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 import { copy } from '../copy/index'
+import { useTheme } from '../lib/theme'
 
 
 interface Props {
@@ -36,6 +38,7 @@ const metrics = [
 
 export default function LandingPage({ onStart }: Props) {
   const purchaseHref = ACTIVE_PURCHASE_CHANNEL?.href
+  const { resolvedTheme } = useTheme()
 
   return (
     <main className="landing-shell min-h-screen" tabIndex={-1} data-route-focus>
@@ -49,6 +52,7 @@ export default function LandingPage({ onStart }: Props) {
             </span>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
+            <ThemeSwitcher />
             <Link to="/announcements" className="hidden min-h-11 items-center px-3 text-sm font-medium text-ink-secondary transition-colors hover:text-ink-primary sm:inline-flex">
               {copy.public.pages_LandingPage_020}</Link>
             <button type="button" onClick={onStart} className="tool-primary-action inline-flex items-center justify-center">
@@ -106,9 +110,8 @@ export default function LandingPage({ onStart }: Props) {
       <section className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:px-10 lg:py-24">
         <figure className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
           <picture>
-            <source srcSet="/assets/previews/optimize-result-dark.png" media="(prefers-color-scheme: dark)" />
             <img
-              src="/assets/previews/optimize-result-light.png"
+              src={`/assets/previews/optimize-result-${resolvedTheme}.png`}
               alt={copy.public.pages_LandingPage_038}
               className="block aspect-[16/10] w-full object-cover object-top"
               loading="lazy"
@@ -150,6 +153,8 @@ export default function LandingPage({ onStart }: Props) {
 }
 
 function ProductPreview() {
+  const { resolvedTheme } = useTheme()
+
   return (
     <section className="landing-preview overflow-hidden" aria-label={copy.public.pages_LandingPage_047}>
       <div className="landing-preview-window flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
@@ -162,9 +167,8 @@ function ProductPreview() {
       <div className="grid gap-4 p-4 sm:p-5">
         <div className="tool-inset overflow-hidden">
           <picture>
-            <source srcSet="/assets/previews/upload-entry-dark.png" media="(prefers-color-scheme: dark)" />
             <img
-              src="/assets/previews/upload-entry-light.png"
+              src={`/assets/previews/upload-entry-${resolvedTheme}.png`}
               alt={copy.public.pages_LandingPage_051}
               className="block aspect-[16/9] w-full object-cover object-top"
             />

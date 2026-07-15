@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import BrandLogo from '../../components/BrandLogo'
+import ThemeSwitcher from '../../components/ThemeSwitcher'
 import type { DashboardSection } from '../../lib/app-routes'
 import type { AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import { copy } from '../../copy/index'
@@ -95,8 +96,11 @@ export default function AccountDashboard({
                 </p>
               </div>
             </div>
-            <button type="button" onClick={onLogout} className="tool-secondary-action self-start lg:hidden">
-              {copy.common.pages_tool_AccountDashboard_013}</button>
+            <div className="flex flex-wrap gap-2 self-start">
+              <ThemeSwitcher />
+              <button type="button" onClick={onLogout} className="tool-secondary-action lg:hidden">
+                {copy.common.pages_tool_AccountDashboard_013}</button>
+            </div>
           </div>
 
           <nav className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.common.pages_tool_AccountDashboard_014}>

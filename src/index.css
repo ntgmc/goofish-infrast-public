@@ -33,7 +33,72 @@
   --color-warning: var(--theme-warning);
 }
 
-:root {
+:root,
+.light {
+  color-scheme: light;
+
+  /* The light palette mirrors the blue-violet brand on cool neutral surfaces. */
+  --theme-brand-50: oklch(97% 0.014 285);
+  --theme-brand-100: oklch(93% 0.030 285);
+  --theme-brand-200: oklch(86% 0.058 285);
+  --theme-brand-300: oklch(77% 0.096 285);
+  --theme-brand-400: oklch(66% 0.139 285);
+  --theme-brand-500: oklch(54% 0.166 285);
+  --theme-brand-600: oklch(46% 0.157 285);
+  --theme-brand-700: oklch(39% 0.135 285);
+  --theme-brand-800: oklch(32% 0.104 285);
+  --theme-brand-900: oklch(25% 0.073 285);
+  --theme-brand-950: oklch(18% 0.045 285);
+
+  --theme-surface-0: oklch(98.5% 0.004 280);
+  --theme-surface-1: oklch(100% 0 0);
+  --theme-surface-2: oklch(96% 0.007 280);
+  --theme-surface-3: oklch(91% 0.011 280);
+  --theme-surface-4: oklch(84% 0.016 280);
+
+  --theme-ink-primary: oklch(20% 0.018 280);
+  --theme-ink-secondary: oklch(39% 0.022 280);
+  --theme-ink-muted: oklch(49% 0.023 280);
+
+  --theme-success: oklch(48% 0.125 153);
+  --theme-error: oklch(52% 0.185 27);
+  --theme-warning: oklch(52% 0.125 78);
+
+  --background: var(--theme-surface-0);
+  --foreground: var(--theme-ink-primary);
+  --card: var(--theme-surface-1);
+  --card-foreground: var(--theme-ink-primary);
+  --popover: var(--theme-surface-1);
+  --popover-foreground: var(--theme-ink-primary);
+  --primary: var(--theme-brand-600);
+  --primary-foreground: oklch(98% 0.004 280);
+  --secondary: var(--theme-surface-2);
+  --secondary-foreground: var(--theme-ink-primary);
+  --muted: var(--theme-surface-2);
+  --muted-foreground: var(--theme-ink-muted);
+  --accent: var(--theme-surface-3);
+  --accent-foreground: var(--theme-ink-primary);
+  --destructive: var(--theme-error);
+  --border: color-mix(in oklch, var(--theme-ink-primary) 14%, transparent);
+  --input: color-mix(in oklch, var(--theme-ink-primary) 18%, transparent);
+  --ring: var(--theme-brand-500);
+  --chart-1: var(--theme-brand-600);
+  --chart-2: var(--theme-success);
+  --chart-3: var(--theme-warning);
+  --chart-4: var(--theme-ink-secondary);
+  --chart-5: var(--theme-ink-muted);
+  --radius: 0.75rem;
+  --sidebar: var(--theme-surface-1);
+  --sidebar-foreground: var(--theme-ink-primary);
+  --sidebar-primary: var(--theme-brand-600);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--theme-surface-2);
+  --sidebar-accent-foreground: var(--theme-ink-primary);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
+.dark {
   color-scheme: dark;
 
   /* A restrained blue-violet accent on a near-black, four-step surface ladder. */
@@ -278,7 +343,7 @@ body {
   }
 
   .tool-eyebrow {
-    color: var(--theme-brand-300);
+    color: var(--theme-brand-700);
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.08em;
@@ -304,7 +369,7 @@ body {
   .tool-status--current {
     border-color: color-mix(in oklch, var(--theme-brand-500) 36%, var(--border));
     background: color-mix(in oklch, var(--theme-brand-500) 12%, var(--theme-surface-2));
-    color: var(--theme-brand-200);
+    color: var(--theme-brand-700);
   }
 
   .tool-status--success {
@@ -323,6 +388,11 @@ body {
     border-color: color-mix(in oklch, var(--theme-error) 38%, var(--border));
     background: color-mix(in oklch, var(--theme-error) 10%, var(--theme-surface-2));
     color: var(--theme-error);
+  }
+
+  .dark .tool-eyebrow,
+  .dark .tool-status--current {
+    color: var(--theme-brand-200);
   }
 
   .tool-primary-action,
@@ -367,6 +437,26 @@ body {
     border-color: color-mix(in oklch, var(--theme-ink-primary) 20%, var(--border));
     background: var(--theme-surface-3);
     color: var(--theme-ink-primary);
+  }
+
+  .tool-option-selected {
+    border-color: color-mix(in oklch, var(--theme-brand-500) 50%, var(--border));
+    background: color-mix(in oklch, var(--theme-brand-500) 15%, var(--theme-surface-2));
+    color: var(--theme-brand-700);
+  }
+
+  .tool-option-selected:hover:not(:disabled) {
+    border-color: color-mix(in oklch, var(--theme-brand-400) 70%, var(--border));
+    background: color-mix(in oklch, var(--theme-brand-500) 20%, var(--theme-surface-2));
+    color: var(--theme-brand-800);
+  }
+
+  .dark .tool-option-selected {
+    color: var(--theme-brand-200);
+  }
+
+  .dark .tool-option-selected:hover:not(:disabled) {
+    color: var(--theme-brand-100);
   }
 
   .tool-secondary-action:disabled {
