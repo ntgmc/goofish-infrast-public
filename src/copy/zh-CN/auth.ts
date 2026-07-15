@@ -1,8 +1,8 @@
 export const authCopy = {
   // src/components/AuthForm.tsx
-  components_AuthForm_001: "发送重置邮件失败",
+  components_AuthForm_001: "发送重置邮件失败，请稍后重试",
   // src/components/AuthForm.tsx
-  components_AuthForm_002: "如果该邮箱已注册，我们会发送重置密码邮件。",
+  components_AuthForm_002: "如果该邮箱已注册，重置密码邮件已发送，请检查收件箱。",
   // src/components/AuthForm.tsx
   components_AuthForm_003: "登录失败",
   // src/components/AuthForm.tsx
@@ -26,15 +26,15 @@ export const authCopy = {
   // src/components/AuthForm.tsx
   components_AuthForm_013: "CDK（可选）",
   // src/components/AuthForm.tsx
-  components_AuthForm_014: "可注册后再兑换",
+  components_AuthForm_014: "稍后在账号页兑换",
   // src/components/AuthForm.tsx
   components_AuthForm_015: "邀请码（可选）",
   // src/components/AuthForm.tsx
   components_AuthForm_016: "10 位邀请码",
   // src/components/AuthForm.tsx
-  components_AuthForm_017: "\n          忘记密码？\r\n        ",
+  components_AuthForm_017: "忘记密码？",
   // src/components/AuthForm.tsx
-  components_AuthForm_018: "\n          返回登录\r\n        ",
+  components_AuthForm_018: "返回登录",
   // src/components/AuthForm.tsx
   components_AuthForm_019: "处理中...",
   // src/components/AuthForm.tsx
@@ -68,11 +68,11 @@ export const authCopy = {
   // src/pages/CancelAccountDeletionPage.tsx
   pages_CancelAccountDeletionPage_007: "撤销注销",
   // src/pages/CancelAccountDeletionPage.tsx
-  pages_CancelAccountDeletionPage_008: "\n          返回登录\n        ",
+  pages_CancelAccountDeletionPage_008: "返回登录",
   // src/pages/ResetPasswordPage.tsx
   pages_ResetPasswordPage_001: "重置链接无效或已过期。",
   // src/pages/ResetPasswordPage.tsx
-  pages_ResetPasswordPage_002: "请再次输入新密码",
+  pages_ResetPasswordPage_002: "请确认新密码",
   // src/pages/ResetPasswordPage.tsx
   pages_ResetPasswordPage_003: "两次输入的密码不一致",
   // src/pages/ResetPasswordPage.tsx
@@ -94,7 +94,7 @@ export const authCopy = {
   // src/pages/ResetPasswordPage.tsx
   pages_ResetPasswordPage_012: "重置密码",
   // src/pages/ResetPasswordPage.tsx
-  pages_ResetPasswordPage_013: "\n          返回登录\r\n        ",
+  pages_ResetPasswordPage_013: "返回登录",
   // src/pages/ResetPasswordPage.tsx
   pages_ResetPasswordPage_014: "请输入密码",
   // src/pages/ResetPasswordPage.tsx
@@ -104,9 +104,9 @@ export const authCopy = {
   // src/pages/tool/AuthPage.tsx
   pages_tool_AuthPage_002: "MAA 基建排班工作台",
   // src/pages/tool/AuthPage.tsx
-  pages_tool_AuthPage_003: "\n            准备数据，生成下一份排班。\n          ",
+  pages_tool_AuthPage_003: "准备数据，生成下一份排班。",
   // src/pages/tool/AuthPage.tsx
-  pages_tool_AuthPage_004: "\n            登录后添加游戏账号，确认森空岛或 MAA 数据来源，再按当前干员池生成可导入的基建排班 JSON。\n          ",
+  pages_tool_AuthPage_004: "登录后添加游戏账号，确认森空岛或 MAA 数据来源，再按当前干员池生成可导入的基建排班 JSON。",
   // src/pages/tool/AuthPage.tsx
   pages_tool_AuthPage_005: "数据确认",
   // src/pages/tool/AuthPage.tsx
@@ -124,5 +124,5 @@ export const authCopy = {
   // src/pages/tool/AuthPage.tsx
   pages_tool_AuthPage_012: "登录或创建账号",
   // src/pages/tool/AuthPage.tsx
-  pages_tool_AuthPage_013: "注册时 CDK 可选；也可以先创建账号，再在账号页添加或兑换游戏档案。",
+  pages_tool_AuthPage_013: "CDK 用于开通游戏档案，可稍后在账号页兑换，不影响注册。",
 } as const

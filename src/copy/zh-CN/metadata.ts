@@ -1,6 +1,6 @@
 export const metadataCopy = {
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_001: "使用森空岛数据和 MAA 配置生成明日方舟基建排班，查看日产出等效理智、练度建议与仓库资产估值。",
+  components_RouteMetadata_001: "基于森空岛或 MAA 数据，为明日方舟生成适配当前干员的基建排班，查看日产出、等效理智、练度建议与仓库估值。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_002: "MAA 基建排班优化器 | MaaTool",
   // src/components/RouteMetadata.tsx
@@ -34,9 +34,9 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_017: "仓库价值分析器 | MaaTool",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_018: "上传 MAA 仓库 JSON，按等价理智估算明日方舟仓库资产并生成分享图。",
+  components_RouteMetadata_018: "上传 MAA 仓库 JSON，按等效理智估算明日方舟仓库资产并生成分享图。",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_019: "MaaTool 工作台",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_020: "MaaTool 工作台。",
+  components_RouteMetadata_020: "管理游戏账号、配置基建规则、生成排班方案并查看收益与练度建议。",
 } as const

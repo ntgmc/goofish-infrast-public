@@ -1,6 +1,6 @@
 export const dashboardCopy = {
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
-  pages_tool_dashboard_AnnouncementsSection_001: "加载公告失败",
+  pages_tool_dashboard_AnnouncementsSection_001: "加载公告失败，请稍后重试",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_002: "标记公告失败",
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
@@ -22,7 +22,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/AnnouncementsSection.tsx
   pages_tool_dashboard_AnnouncementsSection_011: "标为已读",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_001: "生成邀请码失败",
+  pages_tool_dashboard_InvitationsSection_001: "生成邀请码失败，请稍后重试",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_002: "邀请链接已生成。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
@@ -36,13 +36,13 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_007: "邀请好友完成账号激活",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_008: "\n          好友注册时填写你的邀请码，并首次兑换 CDK 或完成森空岛免费档案确认后，奖励会自动结算。\n        ",
+  pages_tool_dashboard_InvitationsSection_008: "好友注册时填写你的邀请码，首次兑换 CDK 或完成森空岛免费档案确认后，奖励会自动结算。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_009: "优先计算券是什么？",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_010: "\n            每张券可用于一次账号档案的主排班计算。提交前手动勾选后，该任务会进入最高优先队列，排在普通付费和免费任务之前；券只提升排队顺序，不会改变计算结果。\n          ",
+  pages_tool_dashboard_InvitationsSection_010: "每张券可用于一次账号档案的主排班计算。提交前手动勾选后，该任务会进入最高优先队列，排在普通付费和免费任务之前；券只提升排队顺序，不会改变计算结果。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
-  pages_tool_dashboard_InvitationsSection_011: "\n            入队失败不会扣券；服务端执行失败或最终超时会自动退回一张等效券。不适用于升级建议、情景实验或调序检查。\n          ",
+  pages_tool_dashboard_InvitationsSection_011: "入队失败不会扣券；服务端执行失败或最终超时会自动退回一张等效券。不适用于升级建议、情景实验或调序检查。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
   pages_tool_dashboard_InvitationsSection_012: "邀请活动当前暂停。",
   // src/pages/tool/dashboard/InvitationsSection.tsx
@@ -104,9 +104,9 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_003: "账号 ",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_004: "保存失败",
+  pages_tool_dashboard_ProfilesSection_004: "保存失败，请稍后重试",
   // src/pages/tool/dashboard/ProfilesSection.tsx
-  pages_tool_dashboard_ProfilesSection_005: "保存失败",
+  pages_tool_dashboard_ProfilesSection_005: "保存失败，请稍后重试",
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_006: "免费个人排班可查看完整游戏内轮换，但不提供导出和高级分析。",
   // src/pages/tool/dashboard/ProfilesSection.tsx
@@ -128,19 +128,19 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_015: "保存",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_001: "CDK 兑换失败",
+  pages_tool_dashboard_RedeemSection_001: "CDK 兑换失败，请稍后重试",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_002: "新增账号档案",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_003: "\r\n          CDK 用于解锁正式档案；免费个人排班需要通过森空岛确认游戏 UID 后领取。\r\n        ",
+  pages_tool_dashboard_RedeemSection_003: "CDK 用于解锁正式档案；免费档案需通过森空岛确认游戏 UID 后领取。",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_004: "新增档案方式",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_005: "\r\n            CDK 解锁\r\n          ",
+  pages_tool_dashboard_RedeemSection_005: "CDK 解锁",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_006: "\r\n            免费个人排班\r\n          ",
+  pages_tool_dashboard_RedeemSection_006: "免费个人排班",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_007: "\n            免费个人排班会展示完整游戏内轮换队列，但不提供 MAA JSON 下载、原始数据、高级分析、批量导出或商用授权。\r\n          ",
+  pages_tool_dashboard_RedeemSection_007: "免费个人排班会展示完整游戏内轮换队列，但不提供 MAA JSON 下载、原始数据、高级分析、批量导出或商用授权。",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_008: "档案名称",
   // src/pages/tool/dashboard/RedeemSection.tsx
@@ -158,17 +158,17 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_015: "兑换 CDK",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_001: "请再次输入新密码",
+  pages_tool_dashboard_SettingsSection_001: "请确认新密码",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_002: "两次输入的新密码不一致",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_003: "两次输入的新密码不一致。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_004: "修改失败",
+  pages_tool_dashboard_SettingsSection_004: "修改失败，请稍后重试",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_005: "密码已更新。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_006: "导出失败",
+  pages_tool_dashboard_SettingsSection_006: "导出失败，请稍后重试",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_007: "导出个人数据失败，请稍后重试。",
   // src/pages/tool/dashboard/SettingsSection.tsx
@@ -202,7 +202,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_022: "数据与隐私",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_023: "我们保存登录资料、游戏档案、工作区、使用记录和你主动贡献的仓库样本。注销后进入 7 天冷静期，期满会删除所有可关联数据；仅保留无法关联的汇总统计。",
+  pages_tool_dashboard_SettingsSection_023: "服务保存登录资料、游戏档案、工作区、使用记录和你主动贡献的仓库样本。注销后进入 7 天冷静期，期满会删除所有可关联数据；仅保留无法关联的汇总统计。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_024: "正在导出...",
   // src/pages/tool/dashboard/SettingsSection.tsx
@@ -228,13 +228,13 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/ToolsSection.tsx
   pages_tool_dashboard_ToolsSection_001: "仓库价值分析器",
   // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_002: "\r\n              粘贴 MAA 仓库识别导出的 JSON，生成仓库资产估值和可下载截图；不会读取或覆盖当前账号保存的数据。\r\n            ",
+  pages_tool_dashboard_ToolsSection_002: "粘贴 MAA 仓库识别导出的 JSON，生成仓库资产估值和可下载截图；不会读取或覆盖当前账号保存的数据。",
   // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_003: "\r\n            打开独立页面\r\n          ",
+  pages_tool_dashboard_ToolsSection_003: "打开独立页面",
   // src/pages/tool/dashboard/ToolsSection.tsx
   pages_tool_dashboard_ToolsSection_004: "排班表分析",
   // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_005: "\r\n              这里和公开工具页使用同一套分析能力；不会读取或覆盖当前账号保存的干员数据。\r\n            ",
+  pages_tool_dashboard_ToolsSection_005: "这里和公开工具页使用同一套分析能力；不会读取或覆盖当前账号保存的干员数据。",
   // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_006: "\r\n            打开独立页面\r\n          ",
+  pages_tool_dashboard_ToolsSection_006: "打开独立页面",
 } as const

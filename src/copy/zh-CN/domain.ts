@@ -10,9 +10,9 @@ export const domainCopy = {
   // src/components/result-panel/DroneSummary.tsx
   components_result_panel_DroneSummary_005: " · 速度 ",
   // src/components/result-panel/Guides.tsx
-  components_result_panel_Guides_001: "\r\n          游戏内快速切换设置\r\n        ",
+  components_result_panel_Guides_001: "游戏内快速切换设置",
   // src/components/result-panel/Guides.tsx
-  components_result_panel_Guides_002: "\r\n          游戏内轮换不生成排班 JSON。按下方预设队列逐个设施设置队列 1 / 队列 2，平时使用游戏内“队列轮换/快速切换”；同一设施由心情消耗最快的干员触发切换，触发时会切换该设施内所有干员。\r\n        ",
+  components_result_panel_Guides_002: “游戏内轮换不生成排班 JSON。按下方预设队列逐个设施设置队列 1 / 队列 2，平时使用游戏内”队列轮换/快速切换”；同一设施由心情消耗最快的干员触发切换，触发时会切换该设施内所有干员。”,
   // src/components/result-panel/Guides.tsx
   components_result_panel_Guides_003: "如何在 MAA 中使用排班 JSON",
   // src/components/result-panel/Guides.tsx
@@ -56,7 +56,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultBoard.tsx
   components_result_panel_ResultBoard_005: "班次",
   // src/components/result-panel/ResultBoard.tsx
-  components_result_panel_ResultBoard_006: "\r\n              按房间聚合展示，头像为主、名称辅助；详细效率数据请在详情页展开查看。\r\n            ",
+  components_result_panel_ResultBoard_006: "按房间聚合展示，头像为主、名称辅助；详细效率数据请在详情页展开查看。",
   // src/components/result-panel/ResultBoard.tsx
   components_result_panel_ResultBoard_007: " 个房间",
   // src/components/result-panel/ResultBoard.tsx
