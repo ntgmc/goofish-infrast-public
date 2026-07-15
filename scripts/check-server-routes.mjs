@@ -1,6 +1,7 @@
 const expectedRoutes = [
   '/api/admin/cdk',
   '/api/admin/risk-settings',
+  '/api/admin/invitation-settings',
   '/api/admin/users',
   '/api/admin/announcement',
   '/api/admin/usage-stats',
@@ -22,6 +23,9 @@ const expectedRoutes = [
   '/api/optimization/reorder-checks',
   '/api/redeem-cdk',
   '/api/user/announcements',
+  '/api/user/invitations',
+  '/api/user/invitations/code',
+  '/api/user/rewards',
   '/api/user/profiles',
   '/api/user/profiles/depot-value',
   '/api/user/profiles/preview',

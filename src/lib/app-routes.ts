@@ -1,4 +1,4 @@
-export const DASHBOARD_SECTIONS = ['profiles', 'tools', 'redeem', 'announcements', 'settings'] as const
+export const DASHBOARD_SECTIONS = ['profiles', 'tools', 'redeem', 'invitations', 'announcements', 'settings'] as const
 export type DashboardSection = typeof DASHBOARD_SECTIONS[number]
 
 export const WORKSPACE_SETUP_SECTIONS = ['operators', 'config', 'cdk'] as const
@@ -7,7 +7,7 @@ export type WorkspaceSetupSection = typeof WORKSPACE_SETUP_SECTIONS[number]
 export const OPTIMIZE_ROUTE_SECTIONS = ['overview', 'plans', 'config', 'result', 'lab'] as const
 export type OptimizeSection = typeof OPTIMIZE_ROUTE_SECTIONS[number]
 
-export const ADMIN_SECTIONS = ['overview', 'cdk', 'risk', 'announcement', 'users'] as const
+export const ADMIN_SECTIONS = ['overview', 'cdk', 'risk', 'invitation', 'announcement', 'users'] as const
 export type AdminSection = typeof ADMIN_SECTIONS[number]
 
 export type ToolRoute =
@@ -19,6 +19,7 @@ const dashboardPaths: Record<DashboardSection, string> = {
   profiles: '/tool/profiles',
   tools: '/tool/tools',
   redeem: '/tool/redeem',
+  invitations: '/tool/invitations',
   announcements: '/tool/announcements',
   settings: '/tool/settings',
 }
@@ -41,6 +42,7 @@ const adminPaths: Record<AdminSection, string> = {
   overview: '/admin/overview',
   cdk: '/admin/cdk',
   risk: '/admin/risk',
+  invitation: '/admin/invitations',
   announcement: '/admin/announcements',
   users: '/admin/users',
 }

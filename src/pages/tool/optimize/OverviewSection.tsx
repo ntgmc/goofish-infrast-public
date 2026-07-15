@@ -1,4 +1,4 @@
-import type { FreeScheduleEntitlement, LicenseConfig, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { FreeScheduleEntitlement, LicenseConfig, ReorderCheckResult, RewardBalance, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { formatResultSummary, formatWorkspaceDate, isMaaJsonDownloadable } from '../../../lib/workspace-history'
 import GenerateControlBar, { DashboardMiniStat } from './GenerateControlBar'
@@ -37,6 +37,7 @@ export default function OverviewSection({
   hasResult,
   resultIsCurrent,
   error,
+  priorityCoupon,
   savedConfigCount,
   resultHistoryCount,
   latestResult,
@@ -63,6 +64,7 @@ export default function OverviewSection({
   hasResult: boolean;
   resultIsCurrent: boolean;
   error: string | null;
+  priorityCoupon: { balance: RewardBalance | null; selected: boolean; onChange: (selected: boolean) => void };
   savedConfigCount: number;
   resultHistoryCount: number;
   latestResult: WorkspaceResultHistoryItem | null;
@@ -92,6 +94,7 @@ export default function OverviewSection({
         hasResult={hasResult}
         resultIsCurrent={resultIsCurrent}
         error={error}
+        priorityCoupon={priorityCoupon}
         extraDisabledReason={freeSchedule?.generateBlockedReason ?? null}
         onGenerate={onGenerate}
         onReset={onReset}

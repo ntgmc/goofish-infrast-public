@@ -54,6 +54,14 @@ import {
   saveProfileInTransaction,
   saveWorkspaceInTransaction,
 } from '../storage/cdk-redemption'
+import {
+  InvitationCodeError,
+  saveInvitationInTransaction,
+  saveRegistrationWithInvitation,
+  settleInvitationForActivatedUser,
+  validateInvitationCode,
+  type ValidatedInvitationCode,
+} from '../storage/invitation-store'
 
 const SESSION_COOKIE = 'maa_session'
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
@@ -102,9 +110,10 @@ export async function registerUser(
   passwordValue: unknown,
   cdkValue?: unknown,
   idempotencyKey?: string | null,
+  inviteCodeValue?: unknown,
 ): Promise<
   | { ok: true; user: UserAccountRecord; cookie: string }
-  | { ok: false; status: number; message: string }
+  | { ok: false; status: number; message: string; code?: string }
 > {
   const email = normalizeEmail(emailValue)
   if (!email) return { ok: false, status: 400, message: 'Invalid email format.' }
@@ -112,8 +121,9 @@ export async function registerUser(
   if (!passwordCheck.ok) return { ok: false, status: 400, message: passwordCheck.message }
   const existing = await getUserByEmail(email)
   const normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey)
+  const normalizedInviteCode = typeof inviteCodeValue === 'string' ? inviteCodeValue.trim().toUpperCase() : null
   const registrationRequestHash = typeof cdkValue === 'string' && cdkValue.trim()
-    ? createRequestHash({ code: normalizeCode(cdkValue), email, password: passwordCheck.password })
+    ? createRequestHash({ code: normalizeCode(cdkValue), email, password: passwordCheck.password, invite_code: normalizedInviteCode })
     : null
   if (existing) {
     if (!normalizedIdempotencyKey || !registrationRequestHash) return { ok: false, status: 409, message: 'Email is already registered.' }
@@ -128,6 +138,14 @@ export async function registerUser(
       if (error instanceof IdempotencyConflictError) return { ok: false, status: 409, message: error.message }
       throw error
     }
+  }
+
+  let invitation: ValidatedInvitationCode | null
+  try {
+    invitation = await validateInvitationCode(inviteCodeValue)
+  } catch (error) {
+    if (error instanceof InvitationCodeError) return { ok: false, status: 400, message: error.message, code: error.code }
+    throw error
   }
 
   const now = new Date().toISOString()
@@ -149,7 +167,7 @@ export async function registerUser(
     updated_at: now,
   }
   if (typeof cdkValue === 'string' && cdkValue.trim()) {
-    const redeemed = await redeemRegistrationCdk(user, cdkValue, normalizedIdempotencyKey, registrationRequestHash!)
+    const redeemed = await redeemRegistrationCdk(user, cdkValue, normalizedIdempotencyKey, registrationRequestHash!, invitation)
     if (!redeemed.ok) {
       return redeemed
     }
@@ -167,6 +185,8 @@ export async function registerUser(
     user.cdk_code_hash = primary.cdk_code_hash
     user.cdk_order_hash = primary.cdk_order_hash
     user.updated_at = primary.updated_at
+  } else if (invitation) {
+    await saveRegistrationWithInvitation(user, invitation)
   } else {
     await saveUserAccount(user)
   }
@@ -461,6 +481,7 @@ async function redeemRegistrationCdk(
   codeValue: string,
   idempotencyKey?: string | null,
   requestHash?: string,
+  invitation?: ValidatedInvitationCode | null,
 ): Promise<{ ok: true; profile: UserGameAccountRecord } | { ok: false; status: number; message: string }> {
   const cdkMatch = await findCdkRecordByCode(normalizeCode(codeValue))
   if (!cdkMatch) return { ok: false, status: 404, message: 'CDK does not exist.' }
@@ -484,6 +505,7 @@ async function redeemRegistrationCdk(
           cdk_order_hash: cdkOrderHash, permission, status: 'active', display_name: '账号 1', note: '', created_at: now, updated_at: now,
         }
         await saveUserAccountInTransaction(client, boundUser)
+        if (invitation) await saveInvitationInTransaction(client, user.id, invitation)
         await saveProfileInTransaction(client, profile)
         await saveWorkspaceInTransaction(client, emptyWorkspace(profile.id))
         return {
@@ -549,6 +571,7 @@ export async function logoutRequest(req: Request): Promise<void> {
 }
 
 export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?: string | null): Promise<AuthSuccessResponse> {
+  await settleInvitationForActivatedUser(user.id)
   const records = await migrateLegacyUserIfNeeded(user)
   const [workspaces, announcementUnreadCount] = await Promise.all([
     listProfileWorkspaces(records.map((profile) => profile.id)),

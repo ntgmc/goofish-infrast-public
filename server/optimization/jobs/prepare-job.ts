@@ -28,6 +28,10 @@ export async function prepareOptimizeJob(
   try {
     const body = await req.json() as CreateOptimizationJobRequest;
     isScenarioComparison = body.kind === 'scenario_comparison';
+    const rawBody = body as unknown as Record<string, unknown>;
+    if ('use_priority_coupon' in rawBody && typeof rawBody.use_priority_coupon !== 'boolean') {
+      return fail({ error: 'use_priority_coupon 必须是布尔值。', code: 'priority_coupon_not_applicable' }, 400);
+    }
     const operators = body.operators;
     const config = body.config;
     const license = body.identity?.type === 'license' ? body.identity.license : undefined;
@@ -38,6 +42,11 @@ export async function prepareOptimizeJob(
     const suggestions_only = body.kind === 'upgrade_suggestions';
     const upgrade_task_payload = body.kind === 'upgrade_suggestions' ? body.upgradeTaskPayload : undefined;
     const history_source = body.kind === 'schedule' ? body.historySource : undefined;
+    const usePriorityCoupon = rawBody.use_priority_coupon === true;
+
+    if (usePriorityCoupon && (body.kind !== 'schedule' || body.identity?.type !== 'profile')) {
+      return fail({ error: '优先计算券仅适用于已登录账号档案的主排班计算。', code: 'priority_coupon_not_applicable' }, 400);
+    }
 
     if (isScenarioComparison && body.identity?.type !== 'profile') {
       return fail({ error: '场景对比实验室必须使用已登录的账号档案。' }, 403);
@@ -200,6 +209,8 @@ export async function prepareOptimizeJob(
           priorityValue: 5,
           permission: optimizePermission,
           source: 'scenario_comparison',
+          rewardUserId: null,
+          usePriorityCoupon: false,
           payload: {
             version: 3,
             kind: 'scenario_comparison',
@@ -245,7 +256,7 @@ export async function prepareOptimizeJob(
     const source: OptimizeJobSource = suggestions_only
       ? 'optimize_suggestions'
       : isPreviewProfile ? 'free_preview' : auth ? 'account_profile' : 'license_file';
-    const priority: OptimizeJobPriority = isPreviewProfile ? 'standard' : 'paid';
+    const priority: OptimizeJobPriority = usePriorityCoupon ? 'priority_coupon' : isPreviewProfile ? 'standard' : 'paid';
     const ownerKey = activeProfileId ? 'profile:' + activeProfileId : 'license:' + effectiveLicense.order_hash;
     const estimate = await resolveOptimizeDurationEstimate(estimateBucket);
 
@@ -254,9 +265,11 @@ export async function prepareOptimizeJob(
       prepared: {
         ownerKey,
         priority,
-        priorityValue: priority === 'paid' ? 10 : 0,
+        priorityValue: priority === 'priority_coupon' ? 20 : priority === 'paid' ? 10 : 0,
         permission: scheduleUsageBase.permission ?? null,
         source,
+        rewardUserId: usePriorityCoupon ? auth?.user.id ?? null : null,
+        usePriorityCoupon,
         payload: {
           version: 2,
           submittedAt,

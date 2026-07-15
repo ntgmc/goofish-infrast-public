@@ -1,9 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import {
+  consumePriorityCouponInTransaction,
+  PriorityCouponUnavailableError,
+  refundPriorityCouponInTransaction,
+} from './invitation-store'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
-export type OptimizeJobPriority = 'paid' | 'analysis' | 'standard'
+export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
 
 export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
   id: string
@@ -39,11 +44,13 @@ export interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimiz
   idempotency_key: string
   request_hash: string
   free_profile_id?: string | null
+  reward_user_id?: string | null
+  use_priority_coupon?: boolean
 }
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'submission_rate_exceeded' | 'free_revision_limit_exceeded',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable',
     readonly status: 409 | 429,
     message: string,
   ) {
@@ -172,6 +179,18 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           )
         }
 
+        if (input.use_priority_coupon) {
+          if (!input.reward_user_id) throw new OptimizeJobAdmissionError('priority_coupon_unavailable', 409, '没有可用的优先计算券。')
+          try {
+            await consumePriorityCouponInTransaction(client, input.reward_user_id, input.id, now)
+          } catch (error) {
+            if (error instanceof PriorityCouponUnavailableError) {
+              throw new OptimizeJobAdmissionError('priority_coupon_unavailable', 409, error.message)
+            }
+            throw error
+          }
+        }
+
         const inserted = await client.query<OptimizeJobRow>([
           'insert into optimize_jobs',
           '  (id, status, priority, owner_key, profile_id, permission, source, payload_json, result_json, error_message, attempt_count, lock_token, lock_expires_at, created_at, started_at, finished_at, updated_at)',
@@ -262,12 +281,16 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
     markFailed: async (id, lockToken, errorMessage) => {
       await ensureSchema()
       const now = new Date().toISOString()
-      await query([
-        'update optimize_jobs',
-        'set status = $5, error_message = $3, lock_token = null, lock_expires_at = null,',
-        '    finished_at = $4, updated_at = $4',
-        'where id = $1 and lock_token = $2',
-      ].join(' '), [id, lockToken, errorMessage, now, 'failed'])
+      await withTransaction(async (client) => {
+        const failed = await client.query([
+          'update optimize_jobs',
+          'set status = $5, error_message = $3, lock_token = null, lock_expires_at = null,',
+          '    finished_at = $4, updated_at = $4',
+          'where id = $1 and lock_token = $2',
+          'returning id',
+        ].join(' '), [id, lockToken, errorMessage, now, 'failed'])
+        if (failed.rowCount) await refundPriorityCouponInTransaction(client, id, now)
+      })
     },
     heartbeat: async (id, lockToken, lockExpiresAt) => {
       await ensureSchema()
@@ -275,15 +298,21 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
     },
     resetExpiredRunningJobs: async (nowIso, maxAttempts) => {
       await ensureSchema()
-      await query([
-        'update optimize_jobs',
-        'set status = case when attempt_count >= $2 then $3 else $4 end,',
-        '    error_message = case when attempt_count >= $2 then coalesce(error_message, $5) else error_message end,',
-        '    lock_token = null, lock_expires_at = null,',
-        '    finished_at = case when attempt_count >= $2 then $1 else finished_at end,',
-        '    updated_at = $1',
-        'where status = $6 and lock_expires_at is not null and lock_expires_at < $1',
-      ].join(' '), [nowIso, maxAttempts, 'failed', 'queued', '任务执行超时，请重试。', 'running'])
+      await withTransaction(async (client) => {
+        const reset = await client.query<{ id: string; status: OptimizeJobStatus }>([
+          'update optimize_jobs',
+          'set status = case when attempt_count >= $2 then $3 else $4 end,',
+          '    error_message = case when attempt_count >= $2 then coalesce(error_message, $5) else error_message end,',
+          '    lock_token = null, lock_expires_at = null,',
+          '    finished_at = case when attempt_count >= $2 then $1 else finished_at end,',
+          '    updated_at = $1',
+          'where status = $6 and lock_expires_at is not null and lock_expires_at < $1',
+          'returning id, status',
+        ].join(' '), [nowIso, maxAttempts, 'failed', 'queued', '任务执行超时，请重试。', 'running'])
+        for (const job of reset.rows) {
+          if (job.status === 'failed') await refundPriorityCouponInTransaction(client, job.id, nowIso)
+        }
+      })
     },
     cleanupOldJobs: async (beforeIso) => {
       await ensureSchema()

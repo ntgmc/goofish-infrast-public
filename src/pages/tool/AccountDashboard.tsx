@@ -6,6 +6,7 @@ import type { AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/t
 const ProfilesSection = lazy(() => import('./dashboard/ProfilesSection'))
 const ToolsSection = lazy(() => import('./dashboard/ToolsSection'))
 const RedeemSection = lazy(() => import('./dashboard/RedeemSection'))
+const InvitationsSection = lazy(() => import('./dashboard/InvitationsSection'))
 const AnnouncementsSection = lazy(() => import('./dashboard/AnnouncementsSection'))
 const SettingsSection = lazy(() => import('./dashboard/SettingsSection'))
 
@@ -40,6 +41,7 @@ export default function AccountDashboard({
     profiles: '游戏账号',
     tools: '工具',
     redeem: '添加账号',
+    invitations: '邀请有礼',
     announcements: `公告${announcementUnreadCount > 0 ? ` (${announcementUnreadCount})` : ''}`,
     settings: '账号设置',
   }
@@ -126,6 +128,9 @@ export default function AccountDashboard({
           </Suspense>
           <Suspense fallback={<SectionFallback />}>
             {section === 'redeem' && <RedeemSection onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}
+          </Suspense>
+          <Suspense fallback={<SectionFallback />}>
+            {section === 'invitations' && <InvitationsSection />}
           </Suspense>
           <Suspense fallback={<SectionFallback />}>
             {section === 'announcements' && <AnnouncementsSection />}
