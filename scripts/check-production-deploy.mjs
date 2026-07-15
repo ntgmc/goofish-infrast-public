@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 
 const workflow = await readFile('.github/workflows/deploy-production.yml', 'utf8')
+const qualityChecksWorkflow = await readFile('.github/workflows/quality-checks.yml', 'utf8')
 const deployScript = await readFile('scripts/deploy-production-atomic.sh', 'utf8')
 const apiNginx = await readFile('deploy/nginx/goofish-api-production.conf', 'utf8')
 const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', 'utf8')
@@ -12,6 +13,7 @@ const buildRelevance = await readFile('scripts/check-build-relevance.mjs', 'utf8
 const productionDocs = await readFile('docs/production-deploy.md', 'utf8')
 
 assertWorkflowProvenance()
+assertQualityChecksImmutability()
 assertDeploymentScript()
 assertNginxBlueGreenConfig()
 assertSystemdTemplate()
@@ -39,6 +41,13 @@ function assertWorkflowProvenance() {
   ]) {
     assert.ok(buildRelevance.includes(deploymentPath), `build relevance should include ${deploymentPath}`)
   }
+}
+
+function assertQualityChecksImmutability() {
+  assert.match(qualityChecksWorkflow, /^permissions:\s*\n\s+contents: read$/m, 'Quality Checks should only read repository contents')
+  assert.doesNotMatch(qualityChecksWorkflow, /refresh-build-metadata/, 'Quality Checks must not refresh committed build metadata')
+  assert.doesNotMatch(qualityChecksWorkflow, /--refresh-metadata/, 'Quality Checks must not generate metadata for a repository commit')
+  assert.doesNotMatch(qualityChecksWorkflow, /\bgit push\b/, 'Quality Checks must not advance a checked branch')
 }
 
 function assertDeploymentScript() {
