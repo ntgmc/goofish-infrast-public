@@ -4,6 +4,8 @@ import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config
 import type { LicenseConfig, RewardBalance } from '../../../lib/types'
 import { InlineErrorPanel } from './feedback'
 import type { ValidationState } from './types'
+import { copy, CURRENT_LOCALE } from '../../../copy/index'
+
 
 export default function GenerateControlBar({
   config,
@@ -41,14 +43,14 @@ export default function GenerateControlBar({
   onReset: () => void
 }) {
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
-  const readyLabel = resultIsCurrent ? '方案已是最新' : hasResult ? '已有历史结果' : '待生成'
+  const readyLabel = resultIsCurrent ? copy.optimize.pages_tool_optimize_GenerateControlBar_001 : hasResult ? copy.optimize.pages_tool_optimize_GenerateControlBar_002 : copy.optimize.pages_tool_optimize_GenerateControlBar_003
   const busyLabel = syncing
-    ? '正在同步授权…'
+    ? copy.optimize.pages_tool_optimize_GenerateControlBar_004
     : progress?.queueStatus === 'queued'
-      ? '正在排队…'
+      ? copy.optimize.pages_tool_optimize_GenerateControlBar_005
       : progress?.completedAt
-        ? '正在整理结果…'
-        : '正在计算…'
+        ? copy.optimize.pages_tool_optimize_GenerateControlBar_006
+        : copy.optimize.pages_tool_optimize_GenerateControlBar_007
   const configLabel = showConfigDetails
     ? `${SCHEDULE_MODE_LABELS[scheduleMode]} · ${config.layout} · ${config.desc}`
     : `${SCHEDULE_MODE_LABELS[scheduleMode]} · ${configPresetLabel}`
@@ -63,22 +65,21 @@ export default function GenerateControlBar({
       <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-end">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="tool-eyebrow">排班计算</p>
+            <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_GenerateControlBar_008}</p>
             <span className={`tool-status ${readinessClass}`}>{readyLabel}</span>
-            {configChanged && <span className="tool-status tool-status--warning">配置已调整</span>}
+            {configChanged && <span className="tool-status tool-status--warning">{copy.optimize.pages_tool_optimize_GenerateControlBar_009}</span>}
           </div>
           <div className="mt-2 flex items-center gap-2">
             <h2 id="generate-control-title" className="text-lg font-semibold text-ink-primary">
-              {resultIsCurrent ? '当前结果已匹配工作区' : '准备生成排班方案'}
+              {resultIsCurrent ? copy.optimize.pages_tool_optimize_GenerateControlBar_010 : copy.optimize.pages_tool_optimize_GenerateControlBar_011}
             </h2>
-            <InfoTooltip label="查看排班计算说明" side="bottom">
-              计算会使用当前干员数据和基建配置。生成完成后可直接下载 MAA JSON，并按需查看效率明细。
-            </InfoTooltip>
+            <InfoTooltip label={copy.optimize.pages_tool_optimize_GenerateControlBar_012} side="bottom">
+              {copy.optimize.pages_tool_optimize_GenerateControlBar_013}</InfoTooltip>
           </div>
-          <div className="mt-5 grid gap-3 border-y border-surface-3 py-4 sm:grid-cols-[minmax(7rem,0.5fr)_minmax(0,1fr)_minmax(7rem,0.5fr)]" role="group" aria-label="当前生成输入">
-            <DashboardMiniStat label="干员数据" value={`${operatorCount} 名`} />
-            <DashboardMiniStat label="当前配置" value={configLabel} />
-            <DashboardMiniStat label="配置状态" value={configChanged ? '已调整' : '未改动'} />
+          <div className="mt-5 grid gap-3 border-y border-surface-3 py-4 sm:grid-cols-[minmax(7rem,0.5fr)_minmax(0,1fr)_minmax(7rem,0.5fr)]" role="group" aria-label={copy.optimize.pages_tool_optimize_GenerateControlBar_014}>
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_GenerateControlBar_015} value={`${operatorCount}${copy.optimize.pages_tool_optimize_GenerateControlBar_016}`} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_GenerateControlBar_017} value={configLabel} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_GenerateControlBar_018} value={configChanged ? copy.optimize.pages_tool_optimize_GenerateControlBar_019 : copy.optimize.pages_tool_optimize_GenerateControlBar_020} />
           </div>
         </div>
 
@@ -94,15 +95,14 @@ export default function GenerateControlBar({
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <label htmlFor="use-priority-coupon" className="font-semibold text-ink-primary">使用 1 张优先计算券</label>
-                <InfoTooltip label="查看优先计算券说明">
+                <label htmlFor="use-priority-coupon" className="font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_GenerateControlBar_021}</label>
+                <InfoTooltip label={copy.optimize.pages_tool_optimize_GenerateControlBar_022}>
                   <span className="block">
-                    本次主排班任务将进入最高优先队列，排在普通付费和免费任务之前。券只影响排队顺序；入队失败不扣券，服务端执行失败或最终超时会自动退回。
-                  </span>
+                    {copy.optimize.pages_tool_optimize_GenerateControlBar_023}</span>
                 </InfoTooltip>
               </div>
               <span className="mt-1 block text-xs leading-5 text-ink-secondary">
-                当前可用 {priorityCoupon.balance?.available ?? 0} 张{priorityCoupon.balance?.next_expiry_at ? ` · 最近 ${new Date(priorityCoupon.balance.next_expiry_at).toLocaleDateString('zh-CN')} 到期` : ''}
+                {copy.optimize.pages_tool_optimize_GenerateControlBar_024}{priorityCoupon.balance?.available ?? 0} {copy.optimize.pages_tool_optimize_GenerateControlBar_025}{priorityCoupon.balance?.next_expiry_at ? `${copy.optimize.pages_tool_optimize_GenerateControlBar_026}${new Date(priorityCoupon.balance.next_expiry_at).toLocaleDateString(CURRENT_LOCALE)}${copy.optimize.pages_tool_optimize_GenerateControlBar_027}` : ''}
               </span>
             </div>
           </div>
@@ -120,9 +120,9 @@ export default function GenerateControlBar({
                 </svg>
                 {busyLabel}
               </span>
-            ) : resultIsCurrent ? '方案已是最新' : hasResult ? '重新计算排班' : '生成排班方案'}
+            ) : resultIsCurrent ? copy.optimize.pages_tool_optimize_GenerateControlBar_028 : hasResult ? copy.optimize.pages_tool_optimize_GenerateControlBar_029 : copy.optimize.pages_tool_optimize_GenerateControlBar_030}
           </button>
-          {resultIsCurrent && <p className="text-xs leading-5 text-ink-muted">修改配置或干员数据后，才需要重新计算。</p>}
+          {resultIsCurrent && <p className="text-xs leading-5 text-ink-muted">{copy.optimize.pages_tool_optimize_GenerateControlBar_031}</p>}
           {!validation.ok && <p className="tool-alert tool-alert--warning px-3 py-2 text-xs leading-5" role="alert">{validation.message}</p>}
           {extraDisabledReason && <p className="tool-alert tool-alert--warning px-3 py-2 text-xs leading-5" role="status" aria-live="polite">{extraDisabledReason}</p>}
         </div>

@@ -1,6 +1,8 @@
 import type { Announcement } from '../lib/types'
 import { Link } from 'react-router-dom'
 import AnnouncementMarkdown from './AnnouncementMarkdown'
+import { copy } from '../copy/index'
+
 
 interface Props {
   announcement: Announcement | null;
@@ -13,7 +15,7 @@ export default function AnnouncementBanner({ announcement, className = '' }: Pro
   return (
     <section
       className={`tool-alert border-brand-500/25 bg-brand-500/10 text-left ${className}`}
-      aria-label="站内横幅"
+      aria-label={copy.public.components_AnnouncementBanner_001}
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -24,8 +26,7 @@ export default function AnnouncementBanner({ announcement, className = '' }: Pro
           to="/announcements"
           className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-brand-600 underline-offset-4 hover:underline"
         >
-          查看公告
-        </Link>
+          {copy.public.components_AnnouncementBanner_002}</Link>
       </div>
     </section>
   )

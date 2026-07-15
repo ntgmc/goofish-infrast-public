@@ -28,6 +28,15 @@ afterEach(() => {
 })
 
 describe('WorkspaceSetupPage CDK paths', () => {
+  it('separates the desktop account actions in one bottom navigation group', () => {
+    renderWorkspace()
+
+    const accountActions = screen.getByRole('navigation', { name: '账号操作' })
+    expect(accountActions).toHaveClass('flex-col', 'gap-3')
+    expect(within(accountActions).getByRole('button', { name: '返回账号列表' })).toBeInTheDocument()
+    expect(within(accountActions).getByRole('button', { name: '退出登录' })).toBeInTheDocument()
+  })
+
   it('upgrades the current free profile in place and preserves the profile id', async () => {
     const user = userEvent.setup()
     const onSynced = vi.fn()
@@ -44,7 +53,7 @@ describe('WorkspaceSetupPage CDK paths', () => {
     await waitFor(() => expect(apiJsonMock).toHaveBeenCalledWith('/api/user/profiles/redeem', {
       method: 'POST',
       json: { profile_id: 'preview-profile', cdk: 'test-cdk' },
-      fallbackMessage: '免费档案升级失败',
+      fallbackMessage: '免费档案升级失败，请稍后重试',
     }))
     expect(onSynced).toHaveBeenCalledWith(payload)
   })

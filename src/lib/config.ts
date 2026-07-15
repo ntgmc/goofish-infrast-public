@@ -1,4 +1,6 @@
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from './types'
+import { copy } from '../copy/index'
+
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
 
@@ -6,39 +8,39 @@ export const TRADING_PRODUCTS = ['LMD', 'Orundum']
 export const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
 
 export const PRODUCT_LABELS: Record<string, string> = {
-  LMD: '龙门币',
-  Orundum: '合成玉',
-  'Pure Gold': '赤金',
-  'Battle Record': '作战记录',
-  'Originium Shard': '源石碎片',
+  LMD: copy.domain.lib_config_001,
+  Orundum: copy.domain.lib_config_002,
+  'Pure Gold': copy.domain.lib_config_003,
+  'Battle Record': copy.domain.lib_config_004,
+  'Originium Shard': copy.domain.lib_config_005,
 }
 
 export const SCHEDULE_MODE_LABELS: Record<string, string> = {
-  maa: 'MAA 排班表',
-  rotation: '游戏内轮换',
-  variable: 'MAA 自动非固定',
+  maa: copy.domain.lib_config_006,
+  rotation: copy.domain.lib_config_007,
+  variable: copy.domain.lib_config_008,
 }
 
 export const DORMITORY_RULE_LABELS: Record<string, string> = {
-  fixed: '排班表写死',
-  maa_autofill: 'MAA 自动填满',
+  fixed: copy.domain.lib_config_009,
+  maa_autofill: copy.domain.lib_config_010,
 }
 
 const DEFAULT_SHIFT_HOURS = [8, 8, 8]
 
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
-  recommended: '单次重置卡',
-  growth: '练度提升卡',
-  advanced: '单账号终身卡',
-  ultimate: 'Admin卡',
-  admin: 'Admin卡',
+  recommended: copy.domain.lib_config_011,
+  growth: copy.domain.lib_config_012,
+  advanced: copy.domain.lib_config_013,
+  ultimate: copy.domain.lib_config_014,
+  admin: copy.domain.lib_config_015,
 }
 
 export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   '243': {
     layout: '2-4-3',
-    desc: '243 均衡流 (2赤金/2经验)',
+    desc: copy.domain.lib_config_016,
     schedule_mode: 'maa',
     dormitory_rule: 'fixed',
     trading_stations_count: 2,
@@ -52,7 +54,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   },
   '243-1': {
     layout: '2-4-3',
-    desc: '243 搓玉 (2赤金/2源石)',
+    desc: copy.domain.lib_config_017,
     schedule_mode: 'maa',
     dormitory_rule: 'fixed',
     trading_stations_count: 2,
@@ -66,7 +68,7 @@ export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   },
   '333': {
     layout: '3-3-3',
-    desc: '333 搓玉流',
+    desc: copy.domain.lib_config_018,
     schedule_mode: 'maa',
     dormitory_rule: 'fixed',
     trading_stations_count: 3,
@@ -86,10 +88,10 @@ export function cloneConfig(config: LicenseConfig): LicenseConfig {
 
 export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' | 'variable' {
   const modeText = String(mode ?? 'maa').trim().toLowerCase()
-  if (['rotation', 'rotate', 'game_rotation', 'in_game_rotation', '轮换', '轮换模式', '游戏内轮换'].includes(modeText)) {
+  if (['rotation', 'rotate', 'game_rotation', 'in_game_rotation', copy.domain.lib_config_019, copy.domain.lib_config_020, copy.domain.lib_config_021].includes(modeText)) {
     return 'rotation'
   }
-  if (['variable', 'variable_shift', 'variable-shift', 'variable_shift_schedule', '一天n换', '一天 n 换', '非固定间隔'].includes(modeText)) {
+  if (['variable', 'variable_shift', 'variable-shift', 'variable_shift_schedule', copy.domain.lib_config_022, copy.domain.lib_config_023, copy.domain.lib_config_024].includes(modeText)) {
     return 'variable'
   }
   return 'maa'
@@ -97,7 +99,7 @@ export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' | 'vari
 
 export function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' {
   const ruleText = String(rule ?? 'fixed').trim().toLowerCase()
-  return ['maa_autofill', 'maa-autofill', 'autofill', 'auto', 'maa自动填满', '自动填满'].includes(ruleText)
+  return ['maa_autofill', 'maa-autofill', 'autofill', 'auto', copy.domain.lib_config_025, copy.domain.lib_config_026].includes(ruleText)
     ? 'maa_autofill'
     : 'fixed'
 }
@@ -139,7 +141,7 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
     ? parsedShiftHours
     : [...DEFAULT_SHIFT_HOURS]
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
-  next.desc = next.desc || `${next.layout} 基建配置`
+  next.desc = next.desc || `${next.layout}${copy.domain.lib_config_027}`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
   next.drones = {
     enable: next.drones?.enable ?? false,
@@ -155,7 +157,7 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
 
 function applyCounts(config: LicenseConfig): LicenseConfig {
   config.layout = `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`
-  config.desc = `${config.layout} 自定义配置`
+  config.desc = `${config.layout}${copy.domain.lib_config_028}`
   return config
 }
 
@@ -164,25 +166,25 @@ export function validateConfig(config: LicenseConfig): { ok: true } | { ok: fals
   const tradingCount = config.trading_stations_count
   const manufacturingCount = config.manufacturing_stations_count
   if (!Number.isInteger(tradingCount) || !Number.isInteger(manufacturingCount)) {
-    return { ok: false, message: '贸易站和制造站数量必须是整数。' }
+    return { ok: false, message: copy.domain.lib_config_029 }
   }
   if (tradingCount < 1 || manufacturingCount < 1 || tradingCount + manufacturingCount !== 6) {
-    return { ok: false, message: '当前版本固定 3 个发电站，贸易站 + 制造站需要等于 6。' }
+    return { ok: false, message: copy.domain.lib_config_030 }
   }
   const tradingTotal = sumCounts(config.product_requirements.trading_stations)
   if (tradingTotal !== tradingCount) {
-    return { ok: false, message: `贸易产物数量合计为 ${tradingTotal}，需要等于 ${tradingCount}。` }
+    return { ok: false, message: `${copy.domain.lib_config_031}${tradingTotal}${copy.domain.lib_config_032}${tradingCount}。` }
   }
   const manufacturingTotal = sumCounts(config.product_requirements.manufacturing_stations)
   if (manufacturingTotal !== manufacturingCount) {
-    return { ok: false, message: `制造产物数量合计为 ${manufacturingTotal}，需要等于 ${manufacturingCount}。` }
+    return { ok: false, message: `${copy.domain.lib_config_033}${manufacturingTotal}${copy.domain.lib_config_034}${manufacturingCount}。` }
   }
   const shiftHours = parseShiftHours(config.shift_hours)
   if (!rotationMode && (!shiftHours || !isValidShiftHours(shiftHours))) {
-    return { ok: false, message: 'MAA 换班间隔需要由 1–6 个正数构成，并覆盖完整 24 小时。' }
+    return { ok: false, message: copy.domain.lib_config_035 }
   }
   if (!rotationMode && config.drones?.enable && !config.drones.auto && (!Array.isArray(config.drones.targets) || config.drones.targets.length === 0)) {
-    return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
+    return { ok: false, message: copy.domain.lib_config_036 }
   }
   return { ok: true }
 }

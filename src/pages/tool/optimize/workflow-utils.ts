@@ -1,6 +1,8 @@
 import type { FreeScheduleEntitlement, LicenseConfig, LicenseOperator } from '../../../lib/types'
 import { canonicalJson } from '../../../lib/crypto'
 import { SCHEDULE_PROGRESS_COMPLETION_DURATION_MS } from '../../../components/ScheduleProgress'
+import { copy } from '../../../copy/index'
+
 
 export function buildOptimizeSignature(operators: LicenseOperator[], config: LicenseConfig): string {
   return canonicalJson({ operators, config })
@@ -11,7 +13,7 @@ export function formatConfigPresetLabel(config: LicenseConfig): string {
   const compactLayout = layout.replace(/-/g, '')
   const presetLayout = compactLayout === '243' || compactLayout === '333' ? compactLayout : layout
   const trading = config.product_requirements?.trading_stations ?? {}
-  const suffix = (trading.Orundum ?? 0) > 0 ? '搓玉' : '均衡'
+  const suffix = (trading.Orundum ?? 0) > 0 ? copy.optimize.pages_tool_optimize_workflow_utils_001 : copy.optimize.pages_tool_optimize_workflow_utils_002
   return `${presetLayout} ${suffix}`
 }
 
@@ -20,9 +22,9 @@ export function waitForProgressCompletion(): Promise<void> {
 }
 
 export function formatOptimizeError(message: string): string {
-  return message.includes('冻结') || message.includes('被冻结') || message.includes('已拦截')
+  return message.includes(copy.optimize.pages_tool_optimize_workflow_utils_003) || message.includes(copy.optimize.pages_tool_optimize_workflow_utils_004) || message.includes(copy.optimize.pages_tool_optimize_workflow_utils_005)
     ? message
-    : `优化失败: ${message}`
+    : `${copy.optimize.pages_tool_optimize_workflow_utils_006}${message}`
 }
 
 export function getFreeScheduleGenerateBlockedReason(
@@ -33,16 +35,16 @@ export function getFreeScheduleGenerateBlockedReason(
   if (hasUnusedStrongReorderBonus(entitlement)) return null
   if (!entitlement.first_generated_at) return null
   if (entitlement.confirmed_at || entitlement.locked_at) {
-    return '免费完整排班权益已锁定。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。'
+    return copy.optimize.pages_tool_optimize_workflow_utils_007
   }
   const firstGeneratedAt = Date.parse(entitlement.first_generated_at)
   if (!Number.isFinite(firstGeneratedAt)) return null
   const windowMs = entitlement.revision_window_hours * 60 * 60 * 1000
   if (Date.now() - firstGeneratedAt >= windowMs) {
-    return '免费完整排班确认期已结束。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。'
+    return copy.optimize.pages_tool_optimize_workflow_utils_008
   }
   if (entitlement.revision_count >= entitlement.revision_limit) {
-    return '免费完整排班修正次数已用完。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。'
+    return copy.optimize.pages_tool_optimize_workflow_utils_009
   }
   return null
 }
@@ -60,23 +62,23 @@ export function getShanghaiMonthKey(date = new Date()): string {
 export function parseOperatorsFile(text: string): LicenseOperator[] {
   const data = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
   if (!Array.isArray(data) || data.length === 0) {
-    throw new Error('干员数据不能为空。')
+    throw new Error(copy.optimize.pages_tool_optimize_workflow_utils_010)
   }
   const requiredKeys = ['id', 'name', 'own', 'elite', 'rarity'] as const
   for (const [index, raw] of data.entries()) {
     if (!raw || typeof raw !== 'object') {
-      throw new Error(`第 ${index + 1} 个干员不是对象。`)
+      throw new Error(`${copy.optimize.pages_tool_optimize_workflow_utils_011}${index + 1}${copy.optimize.pages_tool_optimize_workflow_utils_012}`)
     }
     const op = raw as Record<string, unknown>
     const missing = requiredKeys.filter((key) => !(key in op))
     if (missing.length > 0) {
-      throw new Error(`干员 ${String(op.name ?? index + 1)} 缺少字段: ${missing.join(', ')}。`)
+      throw new Error(`${copy.optimize.pages_tool_optimize_workflow_utils_013}${String(op.name ?? index + 1)}${copy.optimize.pages_tool_optimize_workflow_utils_014}${missing.join(', ')}。`)
     }
     if (typeof op.id !== 'string' || typeof op.name !== 'string' || typeof op.own !== 'boolean') {
-      throw new Error(`干员 ${String(op.name ?? index + 1)} 的 id/name/own 格式不正确。`)
+      throw new Error(`${copy.optimize.pages_tool_optimize_workflow_utils_015}${String(op.name ?? index + 1)}${copy.optimize.pages_tool_optimize_workflow_utils_016}`)
     }
     if (!Number.isFinite(op.elite) || !Number.isFinite(op.rarity)) {
-      throw new Error(`干员 ${String(op.name)} 的 elite/rarity 必须是数字。`)
+      throw new Error(`${copy.optimize.pages_tool_optimize_workflow_utils_017}${String(op.name)}${copy.optimize.pages_tool_optimize_workflow_utils_018}`)
     }
   }
   return data as LicenseOperator[]

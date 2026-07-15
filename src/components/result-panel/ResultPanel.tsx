@@ -5,6 +5,8 @@ import ResultBoard from './ResultBoard'
 import ResultDetail from './ResultDetail'
 import ResultMetrics from './ResultMetrics'
 import type { ResultPanelProps, ResultTabId } from './types'
+import { copy } from '../../copy/index'
+
 
 export default function ResultPanel({
   result,
@@ -31,27 +33,27 @@ export default function ResultPanel({
   const totalScheduleHours = result.total_schedule_hours ?? result.daily_production?.hours
   const fiammettaSlots = result.fiammetta_target_slots ?? []
   const contextItems = [
-    { label: '排班模式', value: result.schedule_mode_name ?? (isRotationMode ? '游戏内轮换' : 'MAA排班表') },
-    { label: isRotationMode ? '队列数量' : '换班节奏', value: isRotationMode ? result.planTimes ?? `${detailStats.planCount} 组` : shiftPattern },
+    { label: copy.domain.components_result_panel_ResultPanel_001, value: result.schedule_mode_name ?? (isRotationMode ? copy.domain.components_result_panel_ResultPanel_002 : copy.domain.components_result_panel_ResultPanel_003) },
+    { label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_004 : copy.domain.components_result_panel_ResultPanel_005, value: isRotationMode ? result.planTimes ?? `${detailStats.planCount}${copy.domain.components_result_panel_ResultPanel_006}` : shiftPattern },
     {
-      label: isRotationMode ? '统计方式' : '统计周期',
+      label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_007 : copy.domain.components_result_panel_ResultPanel_008,
       value: isRotationMode
-        ? `每队列 ${result.rotation_mode?.shift_hours_per_queue ?? 12}h · 日产量折算 ${result.rotation_mode?.daily_production_normalized_hours ?? 24}h`
+        ? `${copy.domain.components_result_panel_ResultPanel_009}${result.rotation_mode?.shift_hours_per_queue ?? 12}${copy.domain.components_result_panel_ResultPanel_010}${result.rotation_mode?.daily_production_normalized_hours ?? 24}h`
         : totalScheduleHours
-        ? `${formatCompactNumber(totalScheduleHours)} 小时`
-        : '按班次配置',
+        ? `${formatCompactNumber(totalScheduleHours)}${copy.domain.components_result_panel_ResultPanel_011}`
+        : copy.domain.components_result_panel_ResultPanel_012,
     },
     {
-      label: '宿舍规则',
-      value: isRotationMode ? '轮换模式不导出宿舍' : result.dormitory_rule_name ?? (isMaaDormitoryAutofill ? 'MAA 自动填满' : '排班表写死'),
+      label: copy.domain.components_result_panel_ResultPanel_013,
+      value: isRotationMode ? copy.domain.components_result_panel_ResultPanel_014 : result.dormitory_rule_name ?? (isMaaDormitoryAutofill ? copy.domain.components_result_panel_ResultPanel_015 : copy.domain.components_result_panel_ResultPanel_016),
     },
   ]
   const tabs: Array<{ id: ResultTabId; label: string }> = [
-    { id: 'board', label: '总览图' },
-    { id: 'detail', label: isRotationMode ? '预设队列' : '详情' },
-    ...(!isPreview ? [{ id: 'data' as const, label: '数据' }] : []),
-    ...(!isPreview ? [{ id: 'import' as const, label: isRotationMode ? '设置' : '导入' }] : []),
-    ...(!isPreview && suggestionsSlot ? [{ id: 'suggestions' as const, label: '建议' }] : []),
+    { id: 'board', label: copy.domain.components_result_panel_ResultPanel_017 },
+    { id: 'detail', label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_018 : copy.domain.components_result_panel_ResultPanel_019 },
+    ...(!isPreview ? [{ id: 'data' as const, label: copy.domain.components_result_panel_ResultPanel_020 }] : []),
+    ...(!isPreview ? [{ id: 'import' as const, label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_021 : copy.domain.components_result_panel_ResultPanel_022 }] : []),
+    ...(!isPreview && suggestionsSlot ? [{ id: 'suggestions' as const, label: copy.domain.components_result_panel_ResultPanel_023 }] : []),
   ] as const
   const [activeTab, setActiveTab] = useState<ResultTabId>(
     detailDefaultOpen ? 'detail' : isAnalysis ? 'data' : 'board',
@@ -67,18 +69,18 @@ export default function ResultPanel({
       <div className="tool-panel overflow-hidden">
         <div className="tool-panel-header flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <p className="tool-eyebrow">生成结果</p>
+            <p className="tool-eyebrow">{copy.domain.components_result_panel_ResultPanel_024}</p>
             <h2 className="text-lg font-semibold text-ink-primary">
-              {isPreview ? '免费个人排班已就绪' : isAnalysis ? '排班表分析完成' : '排班方案已就绪'}
+              {isPreview ? copy.domain.components_result_panel_ResultPanel_025 : isAnalysis ? copy.domain.components_result_panel_ResultPanel_026 : copy.domain.components_result_panel_ResultPanel_027}
             </h2>
             <p className="mt-1 text-sm text-ink-secondary">
               {isPreview
-                ? '这是按正常流程生成的免费个人排班结果，可照着设置完整游戏内轮换，但不包含导出和高级分析。'
+                ? copy.domain.components_result_panel_ResultPanel_028
                 : isAnalysis
-                ? '已根据导入排班表计算红脸风险、日产量和爆仓信息。'
+                ? copy.domain.components_result_panel_ResultPanel_029
                 : isRotationMode
-                  ? '按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。'
-                  : '排班 JSON 用于导入或交给 MAA 使用；账号空间接入后会自动保存当前练度和配置。'}
+                  ? copy.domain.components_result_panel_ResultPanel_030
+                  : copy.domain.components_result_panel_ResultPanel_031}
             </p>
           </div>
           {(onDownload || onSaveWorkfile) && (
@@ -89,8 +91,7 @@ export default function ResultPanel({
                   onClick={onDownload}
                   className="tool-primary-action"
                 >
-                  下载排班 JSON
-                </button>
+                  {copy.domain.components_result_panel_ResultPanel_032}</button>
               )}
               {!isAnalysis && onSaveWorkfile && (
                 <button
@@ -98,8 +99,7 @@ export default function ResultPanel({
                   onClick={onSaveWorkfile}
                   className="tool-secondary-action"
                 >
-                  导出本地备份
-                </button>
+                  {copy.domain.components_result_panel_ResultPanel_033}</button>
               )}
             </div>
           )}
@@ -107,7 +107,7 @@ export default function ResultPanel({
         {previewLimit && (
           <div className="tool-alert tool-alert--warning mx-5 mb-3 mt-5 text-sm sm:mx-6">
             {previewLimit.notice}
-            {previewLimit.hidden_room_count > 0 ? ` 另有 ${previewLimit.hidden_room_count} 个房间已隐藏。` : ''}
+            {previewLimit.hidden_room_count > 0 ? `${copy.domain.components_result_panel_ResultPanel_034}${previewLimit.hidden_room_count}${copy.domain.components_result_panel_ResultPanel_035}` : ''}
           </div>
         )}
         <div className="border-b border-surface-3/60 px-5 py-3 sm:px-6">
@@ -119,16 +119,16 @@ export default function ResultPanel({
               </span>
             ))}
             <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-              <span>菲亚梅塔</span>
+              <span>{copy.domain.components_result_panel_ResultPanel_036}</span>
               <span className="font-semibold text-ink-primary">
-                {fiammettaSlots.length > 0 ? fiammettaSlots.join('、') : '未启用'}
+                {fiammettaSlots.length > 0 ? fiammettaSlots.join('、') : copy.domain.components_result_panel_ResultPanel_037}
               </span>
             </span>
           </div>
         </div>
 
         <div className="border-b border-surface-3/60 px-5 pt-3 sm:px-6">
-          <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="排班结果视图">
+          <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label={copy.domain.components_result_panel_ResultPanel_038}>
             {tabs.map((tab) => (
               <button
                 key={tab.id}

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import AnnouncementMarkdown from './AnnouncementMarkdown'
+import { copy, CURRENT_LOCALE } from '../copy/index'
+
 
 export const MAX_ANNOUNCEMENT_BODY_LENGTH = 5000
 
@@ -18,8 +20,8 @@ export default function AnnouncementBodyEditor({ id, value, onChange }: Props) {
   return (
     <div className="mt-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm font-medium text-ink-secondary">正文</span>
-        <div role="tablist" aria-label="公告正文模式" className="tool-inset inline-flex p-1">
+        <span className="text-sm font-medium text-ink-secondary">{copy.public.components_AnnouncementBodyEditor_001}</span>
+        <div role="tablist" aria-label={copy.public.components_AnnouncementBodyEditor_002} className="tool-inset inline-flex p-1">
           <button
             id={`${id}-edit-tab`}
             type="button"
@@ -29,8 +31,7 @@ export default function AnnouncementBodyEditor({ id, value, onChange }: Props) {
             onClick={() => setMode('edit')}
             className={`tool-secondary-action min-h-11 border-transparent bg-transparent px-3 text-sm ${mode === 'edit' ? 'border-surface-3 bg-surface-0 text-ink-primary shadow-sm' : 'text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'}`}
           >
-            编辑
-          </button>
+            {copy.public.components_AnnouncementBodyEditor_003}</button>
           <button
             id={`${id}-preview-tab`}
             type="button"
@@ -40,8 +41,7 @@ export default function AnnouncementBodyEditor({ id, value, onChange }: Props) {
             onClick={() => setMode('preview')}
             className={`tool-secondary-action min-h-11 border-transparent bg-transparent px-3 text-sm ${mode === 'preview' ? 'border-surface-3 bg-surface-0 text-ink-primary shadow-sm' : 'text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'}`}
           >
-            预览
-          </button>
+            {copy.public.components_AnnouncementBodyEditor_004}</button>
         </div>
       </div>
 
@@ -59,13 +59,12 @@ export default function AnnouncementBodyEditor({ id, value, onChange }: Props) {
         </div>
       ) : (
         <div id={previewId} role="tabpanel" aria-labelledby={`${id}-preview-tab`} className="tool-inset mt-2 max-h-[50dvh] overflow-y-auto p-3 sm:max-h-96">
-          {value ? <AnnouncementMarkdown>{value}</AnnouncementMarkdown> : <p className="text-sm text-ink-muted">暂无正文可预览。</p>}
+          {value ? <AnnouncementMarkdown>{value}</AnnouncementMarkdown> : <p className="text-sm text-ink-muted">{copy.public.components_AnnouncementBodyEditor_005}</p>}
         </div>
       )}
 
       <p id={countId} className="mt-2 text-xs text-ink-muted" aria-live="polite">
-        {value.length} / {MAX_ANNOUNCEMENT_BODY_LENGTH.toLocaleString('zh-CN')} 字符
-      </p>
+        {value.length} / {MAX_ANNOUNCEMENT_BODY_LENGTH.toLocaleString(CURRENT_LOCALE)} {copy.public.components_AnnouncementBodyEditor_006}</p>
     </div>
   )
 }

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { OptimizeJobPriority } from '../lib/types'
+import { copy } from '../copy/index'
+
 
 export type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed'
 
@@ -75,7 +77,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
       className={`tool-panel ${compact ? 'p-4' : 'p-5 sm:p-6'} ${className}`}
       data-status={task.status}
       aria-live="polite"
-      aria-label={progress.mode === 'generate' ? '排班生成任务状态' : progress.mode === 'scenario' ? '场景对比任务状态' : '练度建议任务状态'}
+      aria-label={progress.mode === 'generate' ? copy.common.components_ScheduleProgress_001 : progress.mode === 'scenario' ? copy.common.components_ScheduleProgress_002 : copy.common.components_ScheduleProgress_003}
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -106,7 +108,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
           <div className="schedule-progress-fill h-full rounded-full bg-brand-500" style={{ width: `${percent}%` }} />
         </div>
 
-        <ol className="grid gap-2 sm:grid-cols-4" aria-label="任务步骤">
+        <ol className="grid gap-2 sm:grid-cols-4" aria-label={copy.common.components_ScheduleProgress_004}>
           {task.steps.map((step, index) => (
             <li key={step.label}>
               <TaskStep label={step.label} detail={step.detail} state={getStepState(task.status, index)} />
@@ -115,9 +117,9 @@ export default function ScheduleProgress({ progress, className = '', variant = '
         </ol>
 
         <div className="grid grid-cols-3 gap-2">
-          <TaskMiniStat label="预计还需" value={task.remainingLabel} emphasis={task.status === 'overdue'} />
-          <TaskMiniStat label="已等待" value={task.elapsedLabel} />
-          <TaskMiniStat label="同步" value={task.syncLabel} />
+          <TaskMiniStat label={copy.common.components_ScheduleProgress_005} value={task.remainingLabel} emphasis={task.status === 'overdue'} />
+          <TaskMiniStat label={copy.common.components_ScheduleProgress_006} value={task.elapsedLabel} />
+          <TaskMiniStat label={copy.common.components_ScheduleProgress_007} value={task.syncLabel} />
         </div>
 
         {!compact && (
@@ -168,22 +170,22 @@ const MAX_WAITING_PERCENT = 96
 
 const TASK_STEPS: Record<ScheduleProgressState['mode'], Array<{ label: string; detail: string }>> = {
   generate: [
-    { label: '提交请求', detail: '校验授权、配置和风控结果。' },
-    { label: '进入队列', detail: '按优先级等待 worker 领取。' },
-    { label: '开始计算', detail: '搜索当前基建的最优排班。' },
-    { label: '整理结果', detail: '汇总方案、效率和练度建议。' },
+    { label: copy.common.components_ScheduleProgress_008, detail: copy.common.components_ScheduleProgress_009 },
+    { label: copy.common.components_ScheduleProgress_010, detail: copy.common.components_ScheduleProgress_011 },
+    { label: copy.common.components_ScheduleProgress_012, detail: copy.common.components_ScheduleProgress_013 },
+    { label: copy.common.components_ScheduleProgress_014, detail: copy.common.components_ScheduleProgress_015 },
   ],
   apply: [
-    { label: '提交建议', detail: '确认练度任务和当前配置。' },
-    { label: '进入队列', detail: '等待后台领取重新计算。' },
-    { label: '重新计算', detail: '应用练度变化并生成最终方案。' },
-    { label: '生成最终方案', detail: '整理可下载结果和效率对比。' },
+    { label: copy.common.components_ScheduleProgress_016, detail: copy.common.components_ScheduleProgress_017 },
+    { label: copy.common.components_ScheduleProgress_018, detail: copy.common.components_ScheduleProgress_019 },
+    { label: copy.common.components_ScheduleProgress_020, detail: copy.common.components_ScheduleProgress_021 },
+    { label: copy.common.components_ScheduleProgress_022, detail: copy.common.components_ScheduleProgress_023 },
   ],
   scenario: [
-    { label: '校验组合', detail: '检查账号权限、场景因子和运行上限。' },
-    { label: '进入队列', detail: '等待高级分析 worker 领取任务。' },
-    { label: '快速筛选', detail: '计算全部场景；自动非固定模式同时选择班次数组。' },
-    { label: '精确复核', detail: '按实际操作成本分组，冻结候选班次后生成 Pareto 前沿。' },
+    { label: copy.common.components_ScheduleProgress_024, detail: copy.common.components_ScheduleProgress_025 },
+    { label: copy.common.components_ScheduleProgress_026, detail: copy.common.components_ScheduleProgress_027 },
+    { label: copy.common.components_ScheduleProgress_028, detail: copy.common.components_ScheduleProgress_029 },
+    { label: copy.common.components_ScheduleProgress_030, detail: copy.common.components_ScheduleProgress_031 },
   ],
 }
 
@@ -221,35 +223,35 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
   const reconnecting = progress.connectionStatus === 'reconnecting'
   const aheadCount = typeof progress.queuePosition === 'number' ? Math.max(0, progress.queuePosition - 1) : null
   const queueLabel = getQueueLabel(progress, aheadCount)
-  const priorityLabel = progress.priority === 'priority_coupon' ? '优先计算券' : progress.priority === 'paid' ? '付费优先' : progress.priority === 'analysis' ? '高级分析' : '普通队列'
+  const priorityLabel = progress.priority === 'priority_coupon' ? copy.common.components_ScheduleProgress_032 : progress.priority === 'paid' ? copy.common.components_ScheduleProgress_033 : progress.priority === 'analysis' ? copy.common.components_ScheduleProgress_034 : copy.common.components_ScheduleProgress_035
   const priorityClass = progress.priority === 'priority_coupon' || progress.priority === 'paid' || progress.priority === 'analysis'
     ? 'bg-brand-600/15 text-brand-300 ring-1 ring-brand-500/25'
     : 'bg-surface-2 text-ink-secondary ring-1 ring-surface-3'
-  const jobLabel = progress.jobId ? `任务 #${progress.jobId.slice(0, 8)}` : null
-  const title = reconnecting ? '连接恢复中' : getStatusTitle(progress.mode, status)
+  const jobLabel = progress.jobId ? `${copy.common.components_ScheduleProgress_036}${progress.jobId.slice(0, 8)}` : null
+  const title = reconnecting ? copy.common.components_ScheduleProgress_037 : getStatusTitle(progress.mode, status)
   const remainingLabel = getRemainingLabel(progress, status, now)
   const estimateContext = getEstimateContext(progress, aheadCount)
   const detail = reconnecting
-    ? '暂时无法同步最新状态，任务仍在后台执行，连接恢复后会自动继续。'
+    ? copy.common.components_ScheduleProgress_038
     : getStatusDetail(progress, status, queueLabel, remainingLabel, estimateContext)
   const adjustmentLabel = reconnecting
-    ? `正在进行第 ${Math.max(1, progress.consecutivePollFailures ?? 1)} 次重连`
+    ? `${copy.common.components_ScheduleProgress_039}${Math.max(1, progress.consecutivePollFailures ?? 1)}${copy.common.components_ScheduleProgress_040}`
     : getAdjustmentLabel(progress, status)
   const syncAt = reconnecting ? progress.lastSuccessfulSyncAt : progress.lastUpdatedAt
-  const syncLabel = syncAt ? formatSyncAge(now - syncAt) : '等待同步'
+  const syncLabel = syncAt ? formatSyncAge(now - syncAt) : copy.common.components_ScheduleProgress_041
   const elapsedLabel = formatElapsed(now - progress.startedAt)
   const footer = reconnecting
-    ? '不会重复提交任务；当前任务完成后仍会自动展示结果。'
+    ? copy.common.components_ScheduleProgress_042
     : adjustmentLabel
       ?? ((progress.priority === 'paid' || progress.priority === 'priority_coupon') && status === 'queued'
-        ? `${progress.priority === 'priority_coupon' ? '优先计算券' : '优先队列'}已生效；不会中断正在运行的任务。`
-        : '页面可保持打开，结果完成后会自动展示。')
+        ? `${progress.priority === 'priority_coupon' ? copy.common.components_ScheduleProgress_044 : copy.common.components_ScheduleProgress_045}${copy.common.components_ScheduleProgress_043}`
+        : copy.common.components_ScheduleProgress_046)
   return {
     status,
     title,
     detail,
     adjustmentLabel,
-    eyebrow: progress.mode === 'generate' ? '排班优化任务' : progress.mode === 'scenario' ? '场景对比任务' : '练度建议任务',
+    eyebrow: progress.mode === 'generate' ? copy.common.components_ScheduleProgress_047 : progress.mode === 'scenario' ? copy.common.components_ScheduleProgress_048 : copy.common.components_ScheduleProgress_049,
     meterLabel: getMeterLabel(status),
     priorityLabel,
     priorityClass,
@@ -276,12 +278,12 @@ function getTaskStatus(progress: ScheduleProgressState, percent: number, now: nu
 }
 
 function getStatusTitle(mode: ScheduleProgressState['mode'], status: TaskStatus): string {
-  if (status === 'completed') return mode === 'generate' ? '排班方案已就绪' : mode === 'scenario' ? '场景前沿已就绪' : '最终方案已就绪'
-  if (status === 'overdue') return '正在校准预估'
-  if (status === 'finishing') return '即将完成'
-  if (status === 'running') return mode === 'generate' ? '正在计算排班' : mode === 'scenario' ? '正在比较场景' : '正在重新计算'
-  if (status === 'queued') return '已加入队列'
-  return '正在提交任务'
+  if (status === 'completed') return mode === 'generate' ? copy.common.components_ScheduleProgress_050 : mode === 'scenario' ? copy.common.components_ScheduleProgress_051 : copy.common.components_ScheduleProgress_052
+  if (status === 'overdue') return copy.common.components_ScheduleProgress_053
+  if (status === 'finishing') return copy.common.components_ScheduleProgress_054
+  if (status === 'running') return mode === 'generate' ? copy.common.components_ScheduleProgress_055 : mode === 'scenario' ? copy.common.components_ScheduleProgress_056 : copy.common.components_ScheduleProgress_057
+  if (status === 'queued') return copy.common.components_ScheduleProgress_058
+  return copy.common.components_ScheduleProgress_059
 }
 
 function getStatusDetail(
@@ -291,45 +293,45 @@ function getStatusDetail(
   remainingLabel: string,
   estimateContext: string,
 ): string {
-  if (status === 'completed') return '正在展示结果。'
-  if (status === 'overdue') return '已超过当前预估，后台仍在计算，完成后会自动展示。'
-  if (status === 'finishing') return '后台计算已进入收尾阶段，结果完成后会自动展示。'
-  if (status === 'running') return `任务已开始执行，预计还需 ${remainingLabel}，会随实际耗时自动校准。`
+  if (status === 'completed') return copy.common.components_ScheduleProgress_060
+  if (status === 'overdue') return copy.common.components_ScheduleProgress_061
+  if (status === 'finishing') return copy.common.components_ScheduleProgress_062
+  if (status === 'running') return `${copy.common.components_ScheduleProgress_063}${remainingLabel}${copy.common.components_ScheduleProgress_064}`
   if (status === 'queued') {
-    const priorityText = progress.priority === 'priority_coupon' ? '优先计算券队列' : progress.priority === 'paid' ? '付费优先队列' : progress.priority === 'analysis' ? '高级分析队列' : '普通队列'
-    return `${priorityText}，${queueLabel}，预计还需 ${remainingLabel}${estimateContext ? `，${estimateContext}` : ''}。`
+    const priorityText = progress.priority === 'priority_coupon' ? copy.common.components_ScheduleProgress_065 : progress.priority === 'paid' ? copy.common.components_ScheduleProgress_066 : progress.priority === 'analysis' ? copy.common.components_ScheduleProgress_067 : copy.common.components_ScheduleProgress_068
+    return `${priorityText}，${queueLabel}${copy.common.components_ScheduleProgress_069}${remainingLabel}${estimateContext ? `，${estimateContext}` : ''}。`
   }
-  return '正在提交优化请求，完成校验后会进入后台队列。'
+  return copy.common.components_ScheduleProgress_070
 }
 
 function getQueueLabel(progress: ScheduleProgressState, aheadCount: number | null): string {
-  if (progress.observedRunning || progress.queueStatus === 'running') return '任务已开始执行'
-  if (progress.completedAt || progress.estimatePhase === 'completed') return '结果已返回'
-  if (aheadCount === null) return progress.queueStatus === 'queued' ? '等待队列同步' : '等待提交'
-  if (aheadCount <= 0) return '即将开始'
-  return `前方还有 ${aheadCount} 个任务`
+  if (progress.observedRunning || progress.queueStatus === 'running') return copy.common.components_ScheduleProgress_071
+  if (progress.completedAt || progress.estimatePhase === 'completed') return copy.common.components_ScheduleProgress_072
+  if (aheadCount === null) return progress.queueStatus === 'queued' ? copy.common.components_ScheduleProgress_073 : copy.common.components_ScheduleProgress_074
+  if (aheadCount <= 0) return copy.common.components_ScheduleProgress_075
+  return `${copy.common.components_ScheduleProgress_076}${aheadCount}${copy.common.components_ScheduleProgress_077}`
 }
 
 function getEstimateContext(progress: ScheduleProgressState, aheadCount: number | null): string {
   if (progress.queueStatus !== 'queued') return ''
   if (aheadCount === null) return ''
   if (aheadCount <= 0) return ''
-  return `含前方 ${aheadCount} 个任务`
+  return `${copy.common.components_ScheduleProgress_078}${aheadCount}${copy.common.components_ScheduleProgress_079}`
 }
 
 function getAdjustmentLabel(progress: ScheduleProgressState, status: TaskStatus): string | undefined {
-  if (status === 'overdue') return '已超过预估，后台仍在计算'
+  if (status === 'overdue') return copy.common.components_ScheduleProgress_080
   return progress.estimateAdjustment
 }
 
 function getRemainingLabel(progress: ScheduleProgressState, status: TaskStatus, now: number): string {
-  if (progress.completedAt || progress.estimatePhase === 'completed') return '约 0 秒'
-  if (status === 'overdue' || progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return '正在校准'
-  if (status === 'finishing') return '即将完成'
+  if (progress.completedAt || progress.estimatePhase === 'completed') return copy.common.components_ScheduleProgress_081
+  if (status === 'overdue' || progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return copy.common.components_ScheduleProgress_082
+  if (status === 'finishing') return copy.common.components_ScheduleProgress_083
   const currentRemainingMs = getCurrentRemainingMs(progress, now)
-  if (currentRemainingMs !== null) return `约 ${formatDuration(currentRemainingMs, 'ceil')}`
+  if (currentRemainingMs !== null) return `${copy.common.components_ScheduleProgress_084}${formatDuration(currentRemainingMs, 'ceil')}`
   const fallbackRemainingMs = Math.max(0, (progress.estimatedDurationMs ?? ESTIMATED_DURATION_MS) - Math.max(0, now - progress.startedAt))
-  return `约 ${formatDuration(fallbackRemainingMs, 'ceil')}`
+  return `${copy.common.components_ScheduleProgress_085}${formatDuration(fallbackRemainingMs, 'ceil')}`
 }
 
 function getCurrentRemainingMs(progress: ScheduleProgressState, now: number): number | null {
@@ -351,9 +353,9 @@ function parseEstimateUpdatedAt(progress: ScheduleProgressState): number | null 
 }
 
 function getRemainingAriaLabel(progress: ScheduleProgressState, remainingLabel: string): string {
-  if (remainingLabel === '正在校准' || progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return '预计耗时正在校准'
-  if (remainingLabel === '即将完成') return '预计即将完成'
-  return `预计还需${remainingLabel}`
+  if (remainingLabel === copy.common.components_ScheduleProgress_086 || progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return copy.common.components_ScheduleProgress_087
+  if (remainingLabel === copy.common.components_ScheduleProgress_088) return copy.common.components_ScheduleProgress_089
+  return `${copy.common.components_ScheduleProgress_090}${remainingLabel}`
 }
 
 function getMeterLabel(status: TaskStatus): string {
@@ -392,18 +394,18 @@ function formatElapsed(ms: number): string {
 function formatDuration(ms: number, rounding: 'ceil' | 'floor'): string {
   const rawSeconds = Math.max(0, ms / 1000)
   const seconds = rounding === 'ceil' ? Math.ceil(rawSeconds) : Math.floor(rawSeconds)
-  if (seconds < 60) return `${seconds} 秒`
+  if (seconds < 60) return `${seconds}${copy.common.components_ScheduleProgress_091}`
   const minutes = Math.floor(seconds / 60)
   const rest = seconds % 60
-  if (minutes < 60) return rest > 0 ? `${minutes} 分 ${rest} 秒` : `${minutes} 分`
+  if (minutes < 60) return rest > 0 ? `${minutes}${copy.common.components_ScheduleProgress_092}${rest}${copy.common.components_ScheduleProgress_093}` : `${minutes}${copy.common.components_ScheduleProgress_094}`
   const hours = Math.floor(minutes / 60)
   const minuteRest = minutes % 60
-  return minuteRest > 0 ? `${hours} 小时 ${minuteRest} 分` : `${hours} 小时`
+  return minuteRest > 0 ? `${hours}${copy.common.components_ScheduleProgress_095}${minuteRest}${copy.common.components_ScheduleProgress_096}` : `${hours}${copy.common.components_ScheduleProgress_097}`
 }
 
 function formatSyncAge(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000))
-  if (seconds <= 2) return '刚刚同步'
-  if (seconds < 60) return `${seconds} 秒前`
-  return `${Math.floor(seconds / 60)} 分钟前`
+  if (seconds <= 2) return copy.common.components_ScheduleProgress_098
+  if (seconds < 60) return `${seconds}${copy.common.components_ScheduleProgress_099}`
+  return `${Math.floor(seconds / 60)}${copy.common.components_ScheduleProgress_100}`
 }

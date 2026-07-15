@@ -1,25 +1,26 @@
+import { copy } from '../../copy/index'
 export const ROOM_LABELS: Record<string, string> = {
-  trading: '贸易站',
-  manufacture: '制造站',
-  control: '控制中枢',
-  meeting: '会客室',
-  power: '发电站',
-  dormitory: '宿舍',
-  processing: '加工站',
-  hire: '办公室',
+  trading: copy.domain.components_result_panel_labels_001,
+  manufacture: copy.domain.components_result_panel_labels_002,
+  control: copy.domain.components_result_panel_labels_003,
+  meeting: copy.domain.components_result_panel_labels_004,
+  power: copy.domain.components_result_panel_labels_005,
+  dormitory: copy.domain.components_result_panel_labels_006,
+  processing: copy.domain.components_result_panel_labels_007,
+  hire: copy.domain.components_result_panel_labels_008,
 }
 
 export const PRODUCT_LABELS: Record<string, string> = {
-  LMD: '龙门币',
-  Orundum: '合成玉',
-  'Pure Gold': '赤金',
-  'Battle Record': '作战记录',
-  'Originium Shard': '源石碎片',
+  LMD: copy.domain.components_result_panel_labels_009,
+  Orundum: copy.domain.components_result_panel_labels_010,
+  'Pure Gold': copy.domain.components_result_panel_labels_011,
+  'Battle Record': copy.domain.components_result_panel_labels_012,
+  'Originium Shard': copy.domain.components_result_panel_labels_013,
 }
 
 export const DRONE_REASON_LABELS: Record<string, string> = {
-  'manual target': '按配置目标匹配',
-  'tequila priority': '优先加速龙舌兰订单',
-  'proviso priority': '优先加速但书体系',
-  'highest efficiency': '选择当前最高有效效率',
+  'manual target': copy.domain.components_result_panel_labels_014,
+  'tequila priority': copy.domain.components_result_panel_labels_015,
+  'proviso priority': copy.domain.components_result_panel_labels_016,
+  'highest efficiency': copy.domain.components_result_panel_labels_017,
 }

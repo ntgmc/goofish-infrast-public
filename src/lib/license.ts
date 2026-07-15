@@ -1,5 +1,7 @@
 import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, RawPermissionMode, WorkFile } from "./types";
 import { decryptPayload } from "./crypto";
+import { copy } from '../copy/index'
+
 
 const LICENSE_PREFIX = "MAA-V1:";
 const WORKFILE_PREFIX = "MAA-W1:";
@@ -36,7 +38,7 @@ export async function parseFileContent(
       if (check.ok === false) return { ok: false, error: check.error };
       return { ok: true, data: { kind: "license", data } };
     } catch {
-      return { ok: false, error: { code: "DECRYPT_FAILED", message: "授权文件无法读取，文件可能已损坏。" } };
+      return { ok: false, error: { code: "DECRYPT_FAILED", message: copy.domain.lib_license_001 } };
     }
   }
 
@@ -49,7 +51,7 @@ export async function parseFileContent(
       if (check.ok === false) return { ok: false, error: check.error };
       return { ok: true, data: { kind: "workfile", data } };
     } catch {
-      return { ok: false, error: { code: "DECRYPT_FAILED", message: "保存进度文件无法读取，文件可能已损坏。" } };
+      return { ok: false, error: { code: "DECRYPT_FAILED", message: copy.domain.lib_license_002 } };
     }
   }
 
@@ -57,7 +59,7 @@ export async function parseFileContent(
     ok: false,
     error: {
       code: "INVALID_PREFIX",
-      message: "无法识别这个文件。请上传本站生成的授权文件，或本工具保存的进度文件。",
+      message: copy.domain.lib_license_003,
     },
   };
 }
@@ -66,16 +68,16 @@ function validateLicenseStructure(
   license: LicenseFile
 ): { ok: true } | { ok: false; error: ValidateError } {
   if (!license.order_hash || !license.operators || !license.config || !license.sig) {
-    return { ok: false, error: { code: "MISSING_FIELDS", message: "授权文件缺少必要信息。" } };
+    return { ok: false, error: { code: "MISSING_FIELDS", message: copy.domain.lib_license_004 } };
   }
   if (license.version !== 1) {
-    return { ok: false, error: { code: "VERSION_MISMATCH", message: "不支持这个授权文件版本。" } };
+    return { ok: false, error: { code: "VERSION_MISMATCH", message: copy.domain.lib_license_005 } };
   }
   if (!Array.isArray(license.operators) || license.operators.length === 0) {
-    return { ok: false, error: { code: "INVALID_DATA", message: "授权文件中的干员列表为空。" } };
+    return { ok: false, error: { code: "INVALID_DATA", message: copy.domain.lib_license_006 } };
   }
   if (license.permission && !isRawPermissionMode(license.permission)) {
-    return { ok: false, error: { code: "INVALID_PERMISSION", message: "授权文件包含未知权限类型。" } };
+    return { ok: false, error: { code: "INVALID_PERMISSION", message: copy.domain.lib_license_007 } };
   }
   const configCheck = validateConfigStructure(license.config);
   if (!configCheck.ok) return configCheck;
@@ -86,13 +88,13 @@ function validateConfigStructure(
   config: LicenseConfig
 ): { ok: true } | { ok: false; error: ValidateError } {
   if (!config.layout || !config.product_requirements) {
-    return { ok: false, error: { code: "INVALID_CONFIG", message: "基建配置缺少必要信息。" } };
+    return { ok: false, error: { code: "INVALID_CONFIG", message: copy.domain.lib_license_008 } };
   }
   if (
     typeof config.trading_stations_count !== "number" ||
     typeof config.manufacturing_stations_count !== "number"
   ) {
-    return { ok: false, error: { code: "INVALID_CONFIG", message: "基建配置中的建筑数量不正确。" } };
+    return { ok: false, error: { code: "INVALID_CONFIG", message: copy.domain.lib_license_009 } };
   }
   return { ok: true };
 }
@@ -101,19 +103,19 @@ function validateWorkFileStructure(
   workfile: WorkFile
 ): { ok: true } | { ok: false; error: ValidateError } {
   if (!workfile.license || !workfile.client_state) {
-    return { ok: false, error: { code: "MISSING_FIELDS", message: "保存进度文件缺少必要信息。" } };
+    return { ok: false, error: { code: "MISSING_FIELDS", message: copy.domain.lib_license_010 } };
   }
 
   const licenseCheck = validateLicenseStructure(workfile.license);
   if (!licenseCheck.ok) return licenseCheck;
 
   if (!workfile.client_state.operator_elite_overrides || !workfile.client_state.client_sig) {
-    return { ok: false, error: { code: "MISSING_FIELDS", message: "保存进度文件缺少上次保存的调整信息。" } };
+    return { ok: false, error: { code: "MISSING_FIELDS", message: copy.domain.lib_license_011 } };
   }
 
   if (workfile.client_state.config_override) {
     if (!canEditConfig(workfile.license) && !canUseLimitedConfigOverride(workfile.license, workfile.client_state.config_override)) {
-      return { ok: false, error: { code: "PERMISSION_DENIED", message: "当前授权不允许修改基建配置。" } };
+      return { ok: false, error: { code: "PERMISSION_DENIED", message: copy.domain.lib_license_012 } };
     }
     const configCheck = validateConfigStructure(workfile.client_state.config_override);
     if (!configCheck.ok) return configCheck;
@@ -124,7 +126,7 @@ function validateWorkFileStructure(
 
   for (const id of Object.keys(overrides)) {
     if (!licenseIds.has(id)) {
-      return { ok: false, error: { code: "UNKNOWN_OPERATOR", message: `保存进度文件包含未知干员: ${id}` } };
+      return { ok: false, error: { code: "UNKNOWN_OPERATOR", message: `${copy.domain.lib_license_013}${id}` } };
     }
   }
 

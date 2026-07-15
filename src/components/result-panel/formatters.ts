@@ -2,6 +2,8 @@ import type { DailyProduction, LicenseOperator, OptimizeResult, OrundumEconomy, 
 import { calculateProductionSanity } from '../../lib/production-sanity'
 import { PRODUCT_LABELS, ROOM_LABELS } from './labels'
 import type { PreparedPlan, RoomOperator } from './types'
+import { copy, CURRENT_LOCALE } from '../../copy/index'
+
 
 const MAX_MOOD_FALLBACK = 24
 const ROOM_DISPLAY_ORDER = ['trading', 'manufacture', 'power', 'control', 'meeting', 'dormitory'] as const
@@ -85,7 +87,7 @@ export function prepareResult(
   const totalEff = result.total_efficiency ?? rawTotalEff
   const hasDailyProduction = Boolean(result.daily_production)
   const rotationStatsNote = isRotationMode
-    ? `按每队列 ${result.rotation_mode?.shift_hours_per_queue ?? 12}h 计算，日产量折算 ${result.rotation_mode?.daily_production_normalized_hours ?? 24}h`
+    ? `${copy.domain.components_result_panel_formatters_001}${result.rotation_mode?.shift_hours_per_queue ?? 12}${copy.domain.components_result_panel_formatters_002}${result.rotation_mode?.daily_production_normalized_hours ?? 24}h`
     : undefined
   const plans: PreparedPlan[] = result.plans.map((plan, planIndex) => ({
     ...plan,
@@ -93,7 +95,7 @@ export function prepareResult(
       if (!Array.isArray(rooms)) return []
       if (isRotationMode && roomType === 'dormitory') return []
       return rooms.flatMap((room, index) => {
-        const queueLabel = isRotationMode ? plan.name || `队列 ${planIndex + 1}` : plan.name || `班次 ${planIndex + 1}`
+        const queueLabel = isRotationMode ? plan.name || `${copy.domain.components_result_panel_formatters_003}${planIndex + 1}` : plan.name || `${copy.domain.components_result_panel_formatters_004}${planIndex + 1}`
         if (roomType === 'dormitory' && isMaaDormitoryAutofill) {
           if (index > 0) return []
           return [{
@@ -105,11 +107,11 @@ export function prepareResult(
             queueLabel,
             product: '-',
             operators: [],
-            operatorText: '宿舍由 MAA 自动填满',
+            operatorText: copy.domain.components_result_panel_formatters_005,
             efficiency: '-',
             speedEfficiency: '-',
-            detail: '导出的 MAA JSON 不写死宿舍干员',
-            detailItems: ['导出的 MAA JSON 不写死宿舍干员'],
+            detail: copy.domain.components_result_panel_formatters_006,
+            detailItems: [copy.domain.components_result_panel_formatters_007],
             hasAdjustedSpeed: false,
             isAutofill: true,
           }]
@@ -120,8 +122,8 @@ export function prepareResult(
         const speedEfficiency = getEffectiveEfficiency(roomType, room)
         const hasAdjustedSpeed = Math.abs(speedEfficiency - efficiency) >= 0.05
         const detailItems = [
-          `${isRotationMode ? '房间效率' : '显示效率'} ${formatPercent(efficiency)}`,
-          `速度效率 ${formatPercent(speedEfficiency)}`,
+          `${isRotationMode ? copy.domain.components_result_panel_formatters_008 : copy.domain.components_result_panel_formatters_009} ${formatPercent(efficiency)}`,
+          `${copy.domain.components_result_panel_formatters_010}${formatPercent(speedEfficiency)}`,
           getEfficiencyDetail(roomType, room),
           getMoodDetail(room, isRotationMode),
         ].filter(Boolean)
@@ -182,7 +184,7 @@ export function prepareResult(
         const sanityDelta = calculateProductionSanity(deltaDaily)
         return {
           sanityDelta: sanityDelta.value,
-          sanityDeltaNote: `相对 MAA 默认 ${formatSigned(sanityDelta.value)} 理智/日（${sanityDelta.note}）`,
+          sanityDeltaNote: `${copy.domain.components_result_panel_formatters_011}${formatSigned(sanityDelta.value)}${copy.domain.components_result_panel_formatters_012}${sanityDelta.note}）`,
           baselineSanity: baselineSanity.value,
           totalEfficiencyDelta: comparison.delta.total_efficiency,
           rawTotalEfficiencyDelta: comparison.delta.raw_total_efficiency,
@@ -246,7 +248,7 @@ export function formatPercent(value: number): string {
 
 export function formatAmount(value: number): string {
   if (!Number.isFinite(value)) return '0'
-  if (Math.abs(value) >= 1000) return Math.round(value).toLocaleString('zh-CN')
+  if (Math.abs(value) >= 1000) return Math.round(value).toLocaleString(CURRENT_LOCALE)
   return value.toFixed(value % 1 === 0 ? 0 : 1)
 }
 
@@ -263,16 +265,16 @@ export function formatSigned(value: number): string {
 export function formatIntermediateDepletionSummary(items: PreparedIntermediateDepletion[]): string {
   if (items.length === 0) return ''
   const consuming = items.filter((item) => item.daysRemaining !== null)
-  if (consuming.length === 0) return '当前排班不会耗尽赤金/源石碎片'
+  if (consuming.length === 0) return copy.domain.components_result_panel_formatters_013
   return consuming
     .map((item) => `${item.label}${formatDaysRemaining(item.daysRemaining ?? 0)}`)
     .join('，')
 }
 
 function formatDaysRemaining(days: number): string {
-  if (!Number.isFinite(days) || days <= 0) return '不足 1 天后耗完'
-  if (days < 1) return '不足 1 天后耗完'
-  return `约 ${formatAmount(days)} 天后耗完`
+  if (!Number.isFinite(days) || days <= 0) return copy.domain.components_result_panel_formatters_014
+  if (days < 1) return copy.domain.components_result_panel_formatters_015
+  return `${copy.domain.components_result_panel_formatters_016}${formatAmount(days)}${copy.domain.components_result_panel_formatters_017}`
 }
 
 export function formatProductionBreakdown(manufacturing: Record<string, number>): string {
@@ -282,16 +284,16 @@ export function formatProductionBreakdown(manufacturing: Record<string, number>)
       return amount > 0 ? `${formatProduct(product)} ${formatAmount(amount)}` : ''
     })
     .filter(Boolean)
-  return parts.length > 0 ? parts.join('，') : '暂无制造站产出'
+  return parts.length > 0 ? parts.join('，') : copy.domain.components_result_panel_formatters_018
 }
 
 export function formatOverflowSummary(overflow: NonNullable<OptimizeResult['analysis_summary']>['overflow'] | undefined): string {
-  if (!overflow) return '暂无爆仓信息'
+  if (!overflow) return copy.domain.components_result_panel_formatters_019
   const parts = [
-    overflow.earliest_trading_full_time ? `贸易最短 ${overflow.earliest_trading_full_time}` : '',
-    overflow.earliest_manufacturing_full_time ? `制造最短 ${overflow.earliest_manufacturing_full_time}` : '',
+    overflow.earliest_trading_full_time ? `${copy.domain.components_result_panel_formatters_020}${overflow.earliest_trading_full_time}` : '',
+    overflow.earliest_manufacturing_full_time ? `${copy.domain.components_result_panel_formatters_021}${overflow.earliest_manufacturing_full_time}` : '',
   ].filter(Boolean)
-  return parts.length > 0 ? parts.join('，') : '暂无爆仓信息'
+  return parts.length > 0 ? parts.join('，') : copy.domain.components_result_panel_formatters_022
 }
 
 function getDisplayEfficiency(room: ShiftRoom): number {
@@ -315,13 +317,13 @@ function getEfficiencyDetail(roomType: string, room: ShiftRoom): string {
   const overflow = room.overflow
   if (!overflow) return ''
   if (roomType === 'trading' && typeof overflow.time === 'string') {
-    return `满单 ${overflow.time}`
+    return `${copy.domain.components_result_panel_formatters_023}${overflow.time}`
   }
   if (roomType === 'trading' && typeof overflow.expected_order_time === 'string') {
-    return `单均 ${overflow.expected_order_time}`
+    return `${copy.domain.components_result_panel_formatters_024}${overflow.expected_order_time}`
   }
   if (roomType === 'manufacture' && typeof overflow.time === 'string') {
-    return `满仓 ${overflow.time}`
+    return `${copy.domain.components_result_panel_formatters_025}${overflow.time}`
   }
   return ''
 }
@@ -330,7 +332,7 @@ function getMoodDetail(room: ShiftRoom, isRotationMode = false): string {
   if (isRotationMode) {
     const workHoursToZero = room.rotation?.work_hours_to_zero
     return workHoursToZero !== undefined && workHoursToZero !== null
-      ? `预计 ${formatCompactNumber(workHoursToZero)}h 后整设施切换`
+      ? `${copy.domain.components_result_panel_formatters_026}${formatCompactNumber(workHoursToZero)}${copy.domain.components_result_panel_formatters_027}`
       : ''
   }
 
@@ -342,11 +344,11 @@ function getMoodDetail(room: ShiftRoom, isRotationMode = false): string {
   const redOps = Object.entries(mood)
     .filter(([, item]) => item.red_face)
     .map(([name]) => name)
-  const parts = [`心情≥${formatCompactNumber(minEnd)}`, `最高消耗/时 ${formatCompactNumber(maxCost)}`]
+  const parts = [`${copy.domain.components_result_panel_formatters_028}${formatCompactNumber(minEnd)}`, `${copy.domain.components_result_panel_formatters_029}${formatCompactNumber(maxCost)}`]
   if (room.rotation?.work_hours_to_zero !== undefined && room.rotation.work_hours_to_zero !== null) {
-    parts.push(`最快耗心 ${formatCompactNumber(room.rotation.work_hours_to_zero)}h 触发整设施切换`)
+    parts.push(`${copy.domain.components_result_panel_formatters_030}${formatCompactNumber(room.rotation.work_hours_to_zero)}${copy.domain.components_result_panel_formatters_031}`)
   }
-  if (redOps.length > 0) parts.push(`红脸风险 ${redOps.join(', ')}`)
+  if (redOps.length > 0) parts.push(`${copy.domain.components_result_panel_formatters_032}${redOps.join(', ')}`)
   return parts.join('，')
 }
 
@@ -379,8 +381,8 @@ function summarizeDroneGains(details: NonNullable<DailyProduction['details']>): 
   if (!primaryProduct) {
     return {
       value: '0',
-      suffix: '收益',
-      note: '未产生无人机加速收益',
+      suffix: copy.domain.components_result_panel_formatters_033,
+      note: copy.domain.components_result_panel_formatters_034,
     }
   }
 
@@ -388,8 +390,8 @@ function summarizeDroneGains(details: NonNullable<DailyProduction['details']>): 
     value: `+${formatAmount(produced[primaryProduct])}`,
     suffix: formatProduct(primaryProduct),
     note: [
-      producedParts.length > 0 ? `额外产出 ${producedParts.join('，')}` : '',
-      consumedParts.length > 0 ? `消耗 ${consumedParts.join('，')}` : '',
+      producedParts.length > 0 ? `${copy.domain.components_result_panel_formatters_035}${producedParts.join('，')}` : '',
+      consumedParts.length > 0 ? `${copy.domain.components_result_panel_formatters_036}${consumedParts.join('，')}` : '',
     ].filter(Boolean).join('；'),
   }
 }

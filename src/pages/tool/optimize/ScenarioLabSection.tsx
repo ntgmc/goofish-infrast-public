@@ -6,6 +6,8 @@ import ScenarioFactors from './scenario-lab/ScenarioFactors'
 import ScenarioParetoChart from './scenario-lab/ScenarioParetoChart'
 import ScenarioResultsTable from './scenario-lab/ScenarioResultsTable'
 import { useScenarioComparison } from './scenario-lab/useScenarioComparison'
+import { copy, CURRENT_LOCALE } from '../../../copy/index'
+
 
 export default function ScenarioLabSection({
   profileId,
@@ -43,9 +45,9 @@ export default function ScenarioLabSection({
     <section aria-labelledby="scenario-lab-title" className="grid min-w-0 gap-4">
       <div className="tool-panel min-w-0 p-5 sm:p-6">
         <div>
-          <p className="tool-eyebrow">组合网格</p>
-          <h2 id="scenario-lab-title" className="mt-1 text-lg font-semibold text-ink-primary">定义比较场景</h2>
-          <p className="mt-2 text-sm leading-6 text-ink-secondary">使用当前账号干员、搓玉预算和库存；结果不会写入排班历史。</p>
+          <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_ScenarioLabSection_001}</p>
+          <h2 id="scenario-lab-title" className="mt-1 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_002}</h2>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_003}</p>
         </div>
         <div className="mt-5">
           <ScenarioFactors factors={factors} disabled={loading} onChange={setFactors} />
@@ -54,13 +56,12 @@ export default function ScenarioLabSection({
           {expansion.value ? (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-ink-secondary">
-                原始 {expansion.value.rawCombinationCount} 组 · 跳过 {expansion.value.skipped.reduce((sum, item) => sum + item.count, 0)} 组
-              </span>
-              <span className="font-semibold tabular-nums text-ink-primary">有效 {expansion.value.scenarios.length}/24 组</span>
+                {copy.optimize.pages_tool_optimize_ScenarioLabSection_004}{expansion.value.rawCombinationCount} {copy.optimize.pages_tool_optimize_ScenarioLabSection_005}{expansion.value.skipped.reduce((sum, item) => sum + item.count, 0)} {copy.optimize.pages_tool_optimize_ScenarioLabSection_006}</span>
+              <span className="font-semibold tabular-nums text-ink-primary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_007}{expansion.value.scenarios.length}{copy.optimize.pages_tool_optimize_ScenarioLabSection_008}</span>
             </div>
           ) : <p role="alert" className="text-error">{expansion.error}</p>}
           {expansion.value?.skipped.map((item) => (
-            <p key={item.code} className="mt-1 text-xs leading-5 text-ink-muted">{item.message}（{item.count} 组）</p>
+            <p key={item.code} className="mt-1 text-xs leading-5 text-ink-muted">{item.message}（{item.count} {copy.optimize.pages_tool_optimize_ScenarioLabSection_009}</p>
           ))}
         </div>
         {error && <div role="alert" className="tool-alert tool-alert--error mt-4">{error}</div>}
@@ -70,7 +71,7 @@ export default function ScenarioLabSection({
           onClick={() => void run()}
           className="tool-primary-action mt-4 w-full"
         >
-          {loading ? '场景比较进行中...' : `运行 ${expansion.value?.scenarios.length ?? 0} 个场景`}
+          {loading ? copy.optimize.pages_tool_optimize_ScenarioLabSection_010 : `${copy.optimize.pages_tool_optimize_ScenarioLabSection_011}${expansion.value?.scenarios.length ?? 0}${copy.optimize.pages_tool_optimize_ScenarioLabSection_012}`}
         </button>
       </div>
 
@@ -78,21 +79,21 @@ export default function ScenarioLabSection({
         {progress && <ScheduleProgress progress={progress} variant="focus" />}
         {!result && !progress && (
           <div className="tool-panel border-dashed px-5 py-12 text-center">
-            <p className="text-base font-semibold text-ink-primary">配置组合后运行实验</p>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">自动非固定模式先选择班次数组，再精确复核每个实际操作成本档位的前三名。</p>
+            <p className="text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_013}</p>
+            <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_014}</p>
           </div>
         )}
         {result && (
           <>
             <div className="grid gap-3 sm:grid-cols-3">
-              <SummaryStat label="有效场景" value={String(result.scenarioCount)} note={`快速成功 ${result.screeningCount}`} />
-              <SummaryStat label="精确复核" value={String(result.verifiedCount)} note="每档最多 3 个" />
-              <SummaryStat label="Pareto 前沿" value={String(result.frontierScenarioIds.length)} note={result.failedCount > 0 ? `失败 ${result.failedCount} 个` : '无整体失败'} />
+              <SummaryStat label={copy.optimize.pages_tool_optimize_ScenarioLabSection_015} value={String(result.scenarioCount)} note={`${copy.optimize.pages_tool_optimize_ScenarioLabSection_016}${result.screeningCount}`} />
+              <SummaryStat label={copy.optimize.pages_tool_optimize_ScenarioLabSection_017} value={String(result.verifiedCount)} note={copy.optimize.pages_tool_optimize_ScenarioLabSection_018} />
+              <SummaryStat label={copy.optimize.pages_tool_optimize_ScenarioLabSection_019} value={String(result.frontierScenarioIds.length)} note={result.failedCount > 0 ? `${copy.optimize.pages_tool_optimize_ScenarioLabSection_020}${result.failedCount}${copy.optimize.pages_tool_optimize_ScenarioLabSection_021}` : copy.optimize.pages_tool_optimize_ScenarioLabSection_022} />
             </div>
             <div className="tool-panel p-4 sm:p-5">
               <div className="mb-3">
-                <h2 className="text-base font-semibold text-ink-primary">产量与操作成本</h2>
-                <p className="mt-1 text-xs leading-5 text-ink-muted">横轴使用实际班次数；自动模式在快速阶段选型并冻结后精确复核。前沿仅使用精确结果。</p>
+                <h2 className="text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_023}</h2>
+                <p className="mt-1 text-xs leading-5 text-ink-muted">{copy.optimize.pages_tool_optimize_ScenarioLabSection_024}</p>
               </div>
               <ScenarioParetoChart points={result.points} selectedId={selectedId} onSelect={setSelectedId} />
             </div>
@@ -100,8 +101,8 @@ export default function ScenarioLabSection({
             {result.warnings.map((warning) => <div key={warning} className="tool-alert tool-alert--warning" role="status">{warning}</div>)}
             <div className="tool-panel p-4 sm:p-5">
               <div className="mb-3">
-                <h2 className="text-base font-semibold text-ink-primary">全部场景</h2>
-                <p className="mt-1 text-xs leading-5 text-ink-muted">默认优先显示已验证前沿；点击列头排序或选择场景。</p>
+                <h2 className="text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_025}</h2>
+                <p className="mt-1 text-xs leading-5 text-ink-muted">{copy.optimize.pages_tool_optimize_ScenarioLabSection_026}</p>
               </div>
               <ScenarioResultsTable points={result.points} selectedId={selectedId} onSelect={setSelectedId} />
             </div>
@@ -122,26 +123,25 @@ function SelectedScenario({ point, onApply }: { point: ScenarioComparisonPoint; 
   return (
     <div className="tool-panel flex flex-col gap-4 border-brand-500/25 bg-brand-600/10 p-4 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
-        <p className="tool-eyebrow">已选择场景</p>
+        <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_ScenarioLabSection_027}</p>
         <h3 className="mt-1 text-sm font-semibold text-ink-primary">{point.label}</h3>
         <p className="mt-1 text-xs leading-5 text-ink-secondary">
-          {value ? `${value.productionSanityPerDay.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 理智/日 · ${point.shiftHours.join('-')} 小时 · ${point.operationsPerDay} 次换班/日 · ${point.verified ? '精确结果' : '快速结果'}` : point.error}
+          {value ? `${value.productionSanityPerDay.toLocaleString(CURRENT_LOCALE, { maximumFractionDigits: 1 })}${copy.optimize.pages_tool_optimize_ScenarioLabSection_028}${point.shiftHours.join('-')}${copy.optimize.pages_tool_optimize_ScenarioLabSection_029}${point.operationsPerDay}${copy.optimize.pages_tool_optimize_ScenarioLabSection_030}${point.verified ? copy.optimize.pages_tool_optimize_ScenarioLabSection_031 : copy.optimize.pages_tool_optimize_ScenarioLabSection_032}` : point.error}
         </p>
         {value && point.scheduleStrategy === 'variable' && (
-          <p className="mt-1 text-xs leading-5 text-ink-muted">{point.variableShiftFallback ? '自动搜索未发现可靠提升，已回退到 8-8-8。' : '应用后会冻结当前班次数组，不会在普通生成时重新搜索。'}</p>
+          <p className="mt-1 text-xs leading-5 text-ink-muted">{point.variableShiftFallback ? copy.optimize.pages_tool_optimize_ScenarioLabSection_033 : copy.optimize.pages_tool_optimize_ScenarioLabSection_034}</p>
         )}
         {economy && (
           <dl className="mt-3 grid gap-x-5 gap-y-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
-            <Detail label="合成玉 长期/短期" value={`${formatNumber(economy.sustainablePerDay)} / ${formatNumber(economy.shortTermPerDay)}`} />
-            <Detail label="机会成本" value={`${formatNumber(economy.opportunityCostSanityPerDay)} 理智/日`} />
-            <Detail label="库存耗尽" value={economy.inventoryDepletionDays == null ? '—' : `${formatNumber(economy.inventoryDepletionDays)} 天`} />
-            <Detail label="经济口径" value={`${economyCaseLabel(economy.case)} · ${bottleneckLabel(economy.bottleneck)} · 预算 ${formatNumber(economy.dailySanityBudget)}${economy.monthlyCard ? ' + 月卡' : ''}`} />
+            <Detail label={copy.optimize.pages_tool_optimize_ScenarioLabSection_035} value={`${formatNumber(economy.sustainablePerDay)} / ${formatNumber(economy.shortTermPerDay)}`} />
+            <Detail label={copy.optimize.pages_tool_optimize_ScenarioLabSection_036} value={`${formatNumber(economy.opportunityCostSanityPerDay)}${copy.optimize.pages_tool_optimize_ScenarioLabSection_037}`} />
+            <Detail label={copy.optimize.pages_tool_optimize_ScenarioLabSection_038} value={economy.inventoryDepletionDays == null ? '—' : `${formatNumber(economy.inventoryDepletionDays)}${copy.optimize.pages_tool_optimize_ScenarioLabSection_039}`} />
+            <Detail label={copy.optimize.pages_tool_optimize_ScenarioLabSection_040} value={`${economyCaseLabel(economy.case)} · ${bottleneckLabel(economy.bottleneck)}${copy.optimize.pages_tool_optimize_ScenarioLabSection_041}${formatNumber(economy.dailySanityBudget)}${economy.monthlyCard ? copy.optimize.pages_tool_optimize_ScenarioLabSection_042 : ''}`} />
           </dl>
         )}
       </div>
       <button type="button" onClick={onApply} disabled={!value} className="tool-primary-action shrink-0">
-        应用到当前配置
-      </button>
+        {copy.optimize.pages_tool_optimize_ScenarioLabSection_043}</button>
     </div>
   )
 }
@@ -151,13 +151,13 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function formatNumber(value: number): string {
-  return value.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
+  return value.toLocaleString(CURRENT_LOCALE, { maximumFractionDigits: 1 })
 }
 
 function economyCaseLabel(value: NonNullable<NonNullable<ScenarioComparisonPoint['screening']>['orundumEconomy']>['case']): string {
-  return ({ capacity_limited: '产能受限', budget_limited: '预算受限', inventory_burst: '库存爆发' })[value]
+  return ({ capacity_limited: copy.optimize.pages_tool_optimize_ScenarioLabSection_044, budget_limited: copy.optimize.pages_tool_optimize_ScenarioLabSection_045, inventory_burst: copy.optimize.pages_tool_optimize_ScenarioLabSection_046 })[value]
 }
 
 function bottleneckLabel(value: NonNullable<NonNullable<ScenarioComparisonPoint['screening']>['orundumEconomy']>['bottleneck']): string {
-  return ({ orirock_budget: '固源岩', manufacture: '制造', trading: '贸易', inventory: '库存' })[value]
+  return ({ orirock_budget: copy.optimize.pages_tool_optimize_ScenarioLabSection_047, manufacture: copy.optimize.pages_tool_optimize_ScenarioLabSection_048, trading: copy.optimize.pages_tool_optimize_ScenarioLabSection_049, inventory: copy.optimize.pages_tool_optimize_ScenarioLabSection_050 })[value]
 }

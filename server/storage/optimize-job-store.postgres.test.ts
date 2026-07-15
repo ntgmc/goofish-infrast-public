@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { closePool, query } from './postgres'
+import { closePool, getPool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { createPostgresOptimizeJobStore, OptimizeJobAdmissionError } from './optimize-job-store'
 import {
@@ -25,6 +25,10 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL optimization job admission', () => {
+  it('handles unexpected errors from idle pool clients', () => {
+    expect(getPool().listenerCount('error')).toBeGreaterThan(0)
+  })
+
   it('allows exactly one concurrent free job and reserves its entitlement once', async () => {
     const profileId = await seedProfile()
     const store = createPostgresOptimizeJobStore()

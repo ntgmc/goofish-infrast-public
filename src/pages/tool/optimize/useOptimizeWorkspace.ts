@@ -3,6 +3,8 @@ import type { AuthSuccessResponse, LicenseConfig, OptimizeResult, UpgradeSuggest
 import { downloadOptimizeResult, isMaaJsonDownloadable } from '../../../lib/workspace-history'
 import type { WorkspacePatch } from '../useToolSession'
 import type { OptimizePhase, OptimizeSection } from './types'
+import { copy } from '../../../copy/index'
+
 
 type Setter<T> = Dispatch<SetStateAction<T>>
 
@@ -61,18 +63,18 @@ export function useOptimizeWorkspace({
   const handleSaveCurrentConfig = useCallback(async (name: string) => {
     const trimmed = name.trim()
     if (!trimmed) {
-      setWorkspaceError('请填写方案名称。')
+      setWorkspaceError(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_001)
       return
     }
     await runSavedConfigAction('save-current', {
       type: 'save',
       name: trimmed,
       config: activeConfig,
-    }, `已保存方案“${trimmed}”。`)
+    }, `${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_002}${trimmed}”。`)
   }, [activeConfig, runSavedConfigAction, setWorkspaceError])
 
   const handleRenameSavedConfig = useCallback(async (config: WorkspaceSavedConfig) => {
-    const nextName = window.prompt('新的方案名称', config.name)
+    const nextName = window.prompt(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_003, config.name)
     if (nextName === null) return
     const trimmed = nextName.trim()
     if (!trimmed || trimmed === config.name) return
@@ -80,15 +82,15 @@ export function useOptimizeWorkspace({
       type: 'rename',
       id: config.id,
       name: trimmed,
-    }, `已重命名为“${trimmed}”。`)
+    }, `${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_004}${trimmed}”。`)
   }, [runSavedConfigAction])
 
   const handleDeleteSavedConfig = useCallback(async (config: WorkspaceSavedConfig) => {
-    if (!window.confirm(`删除方案“${config.name}”？`)) return
+    if (!window.confirm(`${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_005}${config.name}”？`)) return
     await runSavedConfigAction(`delete:${config.id}`, {
       type: 'delete',
       id: config.id,
-    }, `已删除方案“${config.name}”。`)
+    }, `${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_006}${config.name}”。`)
   }, [runSavedConfigAction])
 
   const handleUseSavedConfig = useCallback((config: WorkspaceSavedConfig) => {
@@ -100,12 +102,12 @@ export function useOptimizeWorkspace({
     setPhase('idle')
     setLastGeneratedSignature(null)
     setInlineError(null)
-    setWorkspaceNotice(`已载入方案“${config.name}”，可以继续调整或重新生成。`)
+    setWorkspaceNotice(`${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_007}${config.name}${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_008}`)
     setSection('config')
     void runSavedConfigAction(`touch:${config.id}`, {
       type: 'touch',
       id: config.id,
-    }, `已载入方案“${config.name}”。`)
+    }, `${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_009}${config.name}”。`)
   }, [normalizeAllowedConfigOverride, runSavedConfigAction, setConfigOverride, setCurrentResult, setFinalResult, setHistoryItem, setInlineError, setLastGeneratedSignature, setPhase, setSection, setSuggestions, setWorkspaceNotice])
 
   const handleViewHistory = useCallback((item: WorkspaceResultHistoryItem) => {
@@ -122,17 +124,17 @@ export function useOptimizeWorkspace({
   const handleUseHistoryConfig = useCallback((item: WorkspaceResultHistoryItem) => {
     handleViewHistory(item)
     if (!item.config) {
-      setWorkspaceError('这条旧结果没有保存配置快照，只能查看或下载。')
+      setWorkspaceError(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_010)
       return
     }
     setConfigOverride(normalizeAllowedConfigOverride(item.config))
-    setWorkspaceNotice(`已载入历史配置“${item.name}”，可继续调整后重新生成。`)
+    setWorkspaceNotice(`${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_011}${item.name}${copy.workspace.pages_tool_optimize_useOptimizeWorkspace_012}`)
     setSection('config')
   }, [handleViewHistory, normalizeAllowedConfigOverride, setConfigOverride, setSection, setWorkspaceError, setWorkspaceNotice])
 
   const handleDownloadHistory = useCallback((item: WorkspaceResultHistoryItem) => {
     if (!isMaaJsonDownloadable(item.result)) {
-      setWorkspaceError('游戏内轮换模式不生成 MAA JSON。')
+      setWorkspaceError(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_013)
       return
     }
     downloadOptimizeResult(item.result, `maa-schedule-${item.id.slice(0, 8) || 'history'}`)

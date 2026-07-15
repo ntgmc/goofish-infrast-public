@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react'
 import BrandLogo from '../../../components/BrandLogo'
 import DeferredFeatureMenu from '../../../components/DeferredFeatureMenu'
+import ThemeSwitcher from '../../../components/ThemeSwitcher'
 import { OPTIMIZE_SECTIONS, type OptimizeSection } from './types'
+import { copy } from '../../../copy/index'
+
 
 export default function OptimizeShell({
   section,
@@ -30,13 +33,13 @@ export default function OptimizeShell({
           <div className="flex items-center gap-3">
             <BrandLogo size="sm" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink-primary">排班工作台</p>
+              <p className="text-sm font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_OptimizeShell_001}</p>
               <p className="mt-1 truncate text-xs text-ink-muted">{permissionLabel}</p>
             </div>
           </div>
         </div>
 
-        <nav className="mt-5 space-y-1" aria-label="排班工作台分区">
+        <nav className="mt-5 space-y-1" aria-label={copy.optimize.pages_tool_optimize_OptimizeShell_002}>
           {sections.map((item) => (
             <button
               key={item.id}
@@ -52,7 +55,7 @@ export default function OptimizeShell({
         </nav>
 
         <div className="absolute inset-x-4 bottom-5 border-t border-surface-3 pt-4">
-          <button type="button" onClick={onReset} className="tool-secondary-action w-full">返回数据空间</button>
+          <button type="button" onClick={onReset} className="tool-secondary-action w-full">{copy.optimize.pages_tool_optimize_OptimizeShell_003}</button>
         </div>
       </aside>
 
@@ -63,7 +66,7 @@ export default function OptimizeShell({
               <BrandLogo size="sm" className="lg:hidden" />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="tool-eyebrow">排班工作区</p>
+                  <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_OptimizeShell_004}</p>
                   <span className="tool-status tool-status--current">{permissionLabel}</span>
                 </div>
                 <h1 className="mt-1 text-xl font-semibold text-ink-primary">{current.label}</h1>
@@ -71,12 +74,13 @@ export default function OptimizeShell({
               </div>
             </div>
             <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
+              <ThemeSwitcher />
               <DeferredFeatureMenu />
-              <button type="button" onClick={onReset} className="tool-secondary-action lg:hidden">返回数据空间</button>
+              <button type="button" onClick={onReset} className="tool-secondary-action lg:hidden">{copy.optimize.pages_tool_optimize_OptimizeShell_005}</button>
             </div>
           </div>
 
-          <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="移动端排班工作台分区">
+          <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.optimize.pages_tool_optimize_OptimizeShell_006}>
             {sections.map((item) => (
               <button
                 key={item.id}

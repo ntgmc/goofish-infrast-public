@@ -17,11 +17,17 @@ export function getPool(): Pool {
   }
 
   if (!pool) {
-    pool = new Pool({
+    const nextPool = new Pool({
       connectionString,
       max: Number(process.env.POSTGRES_POOL_MAX || 10),
       application_name: 'goofish-infrast-v1',
     })
+    nextPool.on('error', (error) => {
+      if (pool === nextPool) {
+        console.error('[postgres] unexpected error on idle client', error)
+      }
+    })
+    pool = nextPool
   }
 
   return pool

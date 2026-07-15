@@ -1,5 +1,7 @@
 import { APP_BUILD_META } from '../lib/build-meta'
 import type { AppBuildMeta } from '../lib/types'
+import { copy } from '../copy/index'
+
 
 interface Props {
   meta?: AppBuildMeta;
@@ -18,28 +20,27 @@ export default function BuildMetaStrip({ meta = APP_BUILD_META, className = '', 
   return (
     <div className={rootClassName}>
       <span className="tool-status bg-surface-1/95 shadow-sm">
-        当前规则数据更新于 {formatDate(meta.generated_at)}
+        {copy.common.components_BuildMetaStrip_001}{formatDate(meta.generated_at)}
       </span>
       <details className="group relative">
         <summary className="tool-secondary-action min-h-8 list-none bg-surface-1/95 px-2.5 py-1 text-xs text-ink-muted shadow-sm [&::-webkit-details-marker]:hidden">
-          版本
-        </summary>
+          {copy.common.components_BuildMetaStrip_002}</summary>
         <div className={detailPanelClassName}>
           <dl className="space-y-2">
             <div>
-              <dt className="font-medium text-ink-secondary">数据</dt>
+              <dt className="font-medium text-ink-secondary">{copy.common.components_BuildMetaStrip_003}</dt>
               <dd className="mt-0.5 break-all font-mono text-[11px] text-ink-muted">{meta.data_version}</dd>
             </div>
             <div>
-              <dt className="font-medium text-ink-secondary">前端</dt>
+              <dt className="font-medium text-ink-secondary">{copy.common.components_BuildMetaStrip_004}</dt>
               <dd className="mt-0.5 break-all font-mono text-[11px] text-ink-muted">{meta.frontend_version}</dd>
             </div>
             <div>
-              <dt className="font-medium text-ink-secondary">服务</dt>
+              <dt className="font-medium text-ink-secondary">{copy.common.components_BuildMetaStrip_005}</dt>
               <dd className="mt-0.5 break-all font-mono text-[11px] text-ink-muted">{meta.backend_version}</dd>
             </div>
             <div>
-              <dt className="font-medium text-ink-secondary">来源摘要</dt>
+              <dt className="font-medium text-ink-secondary">{copy.common.components_BuildMetaStrip_006}</dt>
               <dd className="mt-0.5 break-all text-[11px] leading-5 text-ink-muted">{meta.source_summary}</dd>
             </div>
           </dl>

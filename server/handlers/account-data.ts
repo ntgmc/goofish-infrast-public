@@ -13,7 +13,6 @@ export default async function accountDataHandler(req: Request): Promise<Response
   if (pathname.endsWith('/export')) return exportData(auth.user.id)
   if (pathname.endsWith('/delete-request')) return requestDeletion(req, auth)
   if (pathname.endsWith('/credential/clear')) return clearCredential(req, auth.user.id)
-  if (pathname.endsWith('/skland/unlink')) return unlinkSkland(req, auth.user.id)
   if (pathname.endsWith('/depot-sample/revoke')) return revokeDepotSample(req, auth.user.id)
   return jsonResponse({ error: 'API route not found' }, 404)
 }
@@ -59,15 +58,6 @@ async function clearCredential(req: Request, userId: string): Promise<Response> 
   const profile = typeof body.profile_id === 'string' ? await getProfileForUser(userId, body.profile_id) : null
   if (!profile?.skland_binding) return jsonResponse({ error: '森空岛绑定不存在。' }, 404)
   await saveUserProfile({ ...profile, skland_binding: { ...profile.skland_binding, encrypted_cred: '', credential_status: 'invalid', credential_invalid_at: new Date().toISOString() }, updated_at: new Date().toISOString() })
-  return jsonResponse({ ok: true })
-}
-
-async function unlinkSkland(req: Request, userId: string): Promise<Response> {
-  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-  const body = await req.json() as { profile_id?: unknown }
-  const profile = typeof body.profile_id === 'string' ? await getProfileForUser(userId, body.profile_id) : null
-  if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
-  await saveUserProfile({ ...profile, skland_binding: null, skland_pending_binding: null, updated_at: new Date().toISOString() })
   return jsonResponse({ ok: true })
 }
 
