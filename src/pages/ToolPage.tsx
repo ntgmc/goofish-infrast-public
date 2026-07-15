@@ -65,11 +65,14 @@ export default function ToolPage() {
     )
   }
 
-  const navigateDashboard = (section: DashboardSection, options?: { replace?: boolean }) => {
-    navigate(dashboardPath(section), { replace: options?.replace })
+  const navigateToToolPath = (path: string, options?: { replace?: boolean }) => {
+    navigate(path, { replace: options?.replace, flushSync: true })
   }
-  const navigateSetup = (section: WorkspaceSetupSection) => navigate(workspaceSetupPath(section))
-  const navigateOptimize = (section: OptimizeSection) => navigate(optimizePath(section))
+  const navigateDashboard = (section: DashboardSection, options?: { replace?: boolean }) => {
+    navigateToToolPath(dashboardPath(section), options)
+  }
+  const navigateSetup = (section: WorkspaceSetupSection) => navigateToToolPath(workspaceSetupPath(section))
+  const navigateOptimize = (section: OptimizeSection) => navigateToToolPath(optimizePath(section))
 
   if (route.kind === 'dashboard') {
     return (
