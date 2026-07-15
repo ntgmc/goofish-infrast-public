@@ -258,6 +258,8 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_018: "退出登录",
   // src/pages/tool/WorkspaceSetupPage.tsx
+  pages_tool_WorkspaceSetupPage_018_account_actions: "账号操作",
+  // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_019: "准备账号工作区",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_020: "上传干员识别文件并确认基建配置，保存后进入排班优化。",
