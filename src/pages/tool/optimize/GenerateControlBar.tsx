@@ -1,4 +1,5 @@
 import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
+import InfoTooltip from '../../../components/InfoTooltip'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
 import type { LicenseConfig, RewardBalance } from '../../../lib/types'
 import { InlineErrorPanel } from './feedback'
@@ -66,12 +67,14 @@ export default function GenerateControlBar({
             <span className={`tool-status ${readinessClass}`}>{readyLabel}</span>
             {configChanged && <span className="tool-status tool-status--warning">配置已调整</span>}
           </div>
-          <h2 id="generate-control-title" className="mt-2 text-lg font-semibold text-ink-primary">
-            {resultIsCurrent ? '当前结果已匹配工作区' : '准备生成排班方案'}
-          </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-secondary">
-            计算会使用当前干员数据和基建配置。生成完成后可直接下载 MAA JSON，并按需查看效率明细。
-          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <h2 id="generate-control-title" className="text-lg font-semibold text-ink-primary">
+              {resultIsCurrent ? '当前结果已匹配工作区' : '准备生成排班方案'}
+            </h2>
+            <InfoTooltip label="查看排班计算说明" side="bottom">
+              计算会使用当前干员数据和基建配置。生成完成后可直接下载 MAA JSON，并按需查看效率明细。
+            </InfoTooltip>
+          </div>
           <div className="mt-5 grid gap-3 border-y border-surface-3 py-4 sm:grid-cols-[minmax(7rem,0.5fr)_minmax(0,1fr)_minmax(7rem,0.5fr)]" role="group" aria-label="当前生成输入">
             <DashboardMiniStat label="干员数据" value={`${operatorCount} 名`} />
             <DashboardMiniStat label="当前配置" value={configLabel} />
@@ -80,7 +83,7 @@ export default function GenerateControlBar({
         </div>
 
         <div className="flex min-w-0 flex-col gap-2">
-          <label className="tool-inset flex items-start gap-3 px-3 py-3 text-sm text-ink-secondary" htmlFor="use-priority-coupon">
+          <div className="tool-inset flex items-start gap-3 px-3 py-3 text-sm text-ink-secondary">
             <input
               id="use-priority-coupon"
               type="checkbox"
@@ -88,18 +91,21 @@ export default function GenerateControlBar({
               disabled={(priorityCoupon.balance?.available ?? 0) < 1 || loading || syncing}
               onChange={(event) => priorityCoupon.onChange(event.currentTarget.checked)}
               className="mt-0.5 h-4 w-4 accent-brand-600"
-              aria-describedby="priority-coupon-description"
             />
-            <span>
-              <span className="block font-semibold text-ink-primary">使用 1 张优先计算券</span>
-              <span id="priority-coupon-description" className="mt-1 block text-xs leading-5 text-ink-muted">
-                本次主排班任务将进入最高优先队列，排在普通付费和免费任务之前。券只影响排队顺序；入队失败不扣券，服务端执行失败或最终超时会自动退回。
-                <span className="mt-1 block text-ink-secondary">
-                  当前可用 {priorityCoupon.balance?.available ?? 0} 张{priorityCoupon.balance?.next_expiry_at ? ` · 最近 ${new Date(priorityCoupon.balance.next_expiry_at).toLocaleDateString('zh-CN')} 到期` : ''}
-                </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <label htmlFor="use-priority-coupon" className="font-semibold text-ink-primary">使用 1 张优先计算券</label>
+                <InfoTooltip label="查看优先计算券说明">
+                  <span className="block">
+                    本次主排班任务将进入最高优先队列，排在普通付费和免费任务之前。券只影响排队顺序；入队失败不扣券，服务端执行失败或最终超时会自动退回。
+                  </span>
+                </InfoTooltip>
+              </div>
+              <span className="mt-1 block text-xs leading-5 text-ink-secondary">
+                当前可用 {priorityCoupon.balance?.available ?? 0} 张{priorityCoupon.balance?.next_expiry_at ? ` · 最近 ${new Date(priorityCoupon.balance.next_expiry_at).toLocaleDateString('zh-CN')} 到期` : ''}
               </span>
-            </span>
-          </label>
+            </div>
+          </div>
           <button
             type="button"
             onClick={onGenerate}
