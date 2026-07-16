@@ -1,0 +1,114 @@
+rules:
+  - id: javascript.security.no-dynamic-code-execution
+    message: Dynamic code execution can allow arbitrary JavaScript execution.
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: CWE-95
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+
+  - id: javascript.security.no-shell-command-execution
+    message: Shell command execution must not receive application-controlled input; use argument-array process APIs instead.
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: CWE-78
+    patterns:
+      - pattern-either:
+          - pattern: exec(...)
+          - pattern: execSync(...)
+      - pattern-not: $OBJECT.exec(...)
+      - pattern-not: $OBJECT.execSync(...)
+
+  - id: javascript.security.no-process-shell-mode
+    message: Process execution with shell mode enabled can introduce command injection.
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: CWE-78
+    pattern-either:
+      - pattern: "$PROCESS.spawn($COMMAND, $ARGS, { ..., shell: true, ... })"
+      - pattern: "$PROCESS.spawnSync($COMMAND, $ARGS, { ..., shell: true, ... })"
+      - pattern: "spawn($COMMAND, $ARGS, { ..., shell: true, ... })"
+      - pattern: "spawnSync($COMMAND, $ARGS, { ..., shell: true, ... })"
+
+  - id: javascript.security.no-interpolated-sql
+    message: Interpolated SQL can introduce SQL injection; use parameterized queries.
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: CWE-89
+    pattern-either:
+      - pattern: $DATABASE.query(`...${$VALUE}...`, ...)
+      - pattern: $DATABASE.execute(`...${$VALUE}...`, ...)
+
+  - id: react.security.no-dangerously-set-inner-html
+    message: dangerouslySetInnerHTML bypasses React escaping and can introduce cross-site scripting.
+    severity: ERROR
+    languages:
+      - typescript
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: CWE-79
+    pattern: "<$ELEMENT dangerouslySetInnerHTML={{ __html: $HTML }} ... />"
+
+  - id: javascript.security.no-disabled-tls-verification
+    message: Disabling TLS certificate verification permits machine-in-the-middle attacks.
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: CWE-295
+    pattern: "{ ..., rejectUnauthorized: false, ... }"
+
+  - id: javascript.security.no-weak-cryptographic-hash
+    message: MD5 and SHA-1 are not suitable for security-sensitive hashing.
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: CWE-328
+    pattern-either:
+      - pattern: $CRYPTO.createHash("md5")
+      - pattern: $CRYPTO.createHash("sha1")
+      - pattern: createHash("md5")
+      - pattern: createHash("sha1")
+
+  - id: javascript.security.no-wildcard-post-message
+    message: postMessage with a wildcard target origin can disclose data to untrusted origins.
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      category: security
+      confidence: HIGH
+      cwe: CWE-346
+    pattern-either:
+      - pattern: $WINDOW.postMessage($DATA, "*")
+      - pattern: postMessage($DATA, "*")
