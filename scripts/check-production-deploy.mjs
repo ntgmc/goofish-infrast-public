@@ -55,12 +55,27 @@ function assertQualityChecksImmutability() {
 }
 
 function assertSecurityAnalysisGate() {
+  const qualityConcurrencyGroup = qualityChecksWorkflow.match(/^concurrency:\s*\n\s+group:\s+(.+)$/m)?.[1]
+  const securityConcurrencyGroup = securityAnalysisWorkflow.match(/^concurrency:\s*\n\s+group:\s+(.+)$/m)?.[1]
+
   assert.match(
     qualityChecksWorkflow,
     /uses: \.\/\.github\/workflows\/security-analysis\.yml/,
     'Quality Checks should require the reusable security analysis workflow',
   )
   assert.match(securityAnalysisWorkflow, /^\s+workflow_call:$/m, 'security analysis should support reusable invocation')
+  assert.ok(qualityConcurrencyGroup, 'Quality Checks should define a concurrency group')
+  assert.ok(securityConcurrencyGroup, 'security analysis should define a concurrency group')
+  assert.notEqual(
+    securityConcurrencyGroup,
+    qualityConcurrencyGroup,
+    'reusable security analysis must not deadlock on the parent workflow concurrency group',
+  )
+  assert.match(
+    securityConcurrencyGroup,
+    /^security-analysis-/,
+    'security analysis concurrency should use its own namespace',
+  )
   assert.match(
     securityAnalysisWorkflow,
     /semgrep scan --config \.semgrep\.yml --error --metrics=off \./,
