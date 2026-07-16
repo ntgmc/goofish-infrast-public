@@ -11,6 +11,7 @@ import { ACTIVE_PURCHASE_CHANNEL } from '../../lib/purchase'
 import type { WorkspaceSetupSection } from '../../lib/app-routes'
 import { countOwnedOperators, formatDate, getEffectiveProfilePermission, getProfileAccessLabel, isFreePreviewProfile, isFreePreviewTrialActive, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
 import { copy } from '../../copy/index'
+import { hasCapability } from '../../lib/product-catalog'
 
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
@@ -64,8 +65,8 @@ export default function WorkspaceSetupPage({
   const isPreviewProfile = isFreePreviewProfile(profile)
   const isPreviewTrial = isFreePreviewTrialActive(profile)
   const effectivePermission = getEffectiveProfilePermission(profile)
-  const canEditConfig = effectivePermission === 'advanced' || effectivePermission === 'ultimate' || effectivePermission === 'admin'
-  const canEditLimitedConfig = !canEditConfig && (isPreviewProfile || effectivePermission === 'recommended' || effectivePermission === 'growth')
+  const canEditConfig = hasCapability({ permission: effectivePermission }, 'edit_full_config')
+  const canEditLimitedConfig = !canEditConfig && (isPreviewProfile || hasCapability({ permission: effectivePermission }, 'edit_limited_config'))
   const freePreviewNeedsBinding = isPreviewProfile && !profile.skland_binding
   const canManualEditOperators = !isPreviewProfile || isPreviewTrial
   const ownedOperatorCount = useMemo(() => countOwnedOperators(operators), [operators])

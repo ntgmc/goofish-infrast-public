@@ -16,6 +16,7 @@ await checkGlob('server/optimization/engine/**/*.ts', 300)
 const typeProgram = createArchitectureTypeProgram()
 checkNewPageModuleUnusedSymbols(typeProgram)
 checkOptimizationUnusedImports(typeProgram)
+await checkProductCatalogOwnership()
 
 const engineFiles = []
 for await (const filename of glob('server/optimization/**/*.ts')) engineFiles.push(filename)
@@ -117,6 +118,25 @@ function checkOptimizationUnusedImports(program) {
         if (symbol && referencedSymbols.has(symbol)) continue
         const position = sourceFile.getLineAndCharacterOfPosition(binding.getStart(sourceFile))
         failures.push(`${filename}:${position.line + 1}:${position.character + 1} unused import ${binding.text}`)
+      }
+    }
+  }
+}
+
+async function checkProductCatalogOwnership() {
+  const duplicatePatterns = [
+    [/\[['"]recommended['"],\s*['"]growth['"],\s*['"]advanced['"],\s*['"]ultimate['"]\]/, 'product permission array'],
+    [/recommended\s*:\s*['"]单次重置卡['"]/, 'product permission label map'],
+    [/ADVANCED_UPDATE_WINDOW_MS\s*=\s*7\s*\*/, 'lifetime update window'],
+    [/ADVANCED_UPDATE_MAX_COUNT\s*=\s*2\b/, 'lifetime update count'],
+  ]
+  for (const root of ['src', 'server']) {
+    for await (const filename of glob(`${root}/**/*.{ts,tsx}`)) {
+      const normalized = filename.replaceAll('\\', '/')
+      if (normalized === 'src/lib/product-catalog.ts' || normalized.includes('.test.')) continue
+      const source = await readFile(filename, 'utf8')
+      for (const [pattern, label] of duplicatePatterns) {
+        if (pattern.test(source)) failures.push(`${filename}: ${label} must come from product/catalog.json`)
       }
     }
   }

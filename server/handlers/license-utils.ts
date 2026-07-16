@@ -10,6 +10,13 @@ import type {
   ProductPermissionMode,
   RawPermissionMode,
 } from '../../src/lib/types'
+import {
+  getPermissionProfile,
+  hasCapability,
+  listAdminIssuablePermissions,
+  normalizeRuntimePermission,
+  productPolicies,
+} from '../../src/lib/product-catalog'
 import { createPostgresCdkRecordStore } from '../storage/cdk-store'
 import {
   createPostgresRiskControlSettingsStore,
@@ -31,7 +38,7 @@ const VALID_PERMISSION_MODES: RawPermissionMode[] = [
   'premium',
   'admin',
 ]
-export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = ['recommended', 'growth', 'advanced', 'ultimate']
+export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = listAdminIssuablePermissions()
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
 
 export interface OperatorFingerprint {
@@ -360,19 +367,7 @@ export function validateLicenseForRequest(license: unknown): { ok: true; license
 }
 
 export function normalizePermissionMode(permission?: RawPermissionMode): PermissionMode {
-  switch (permission) {
-    case 'recommended':
-    case 'growth':
-    case 'advanced':
-    case 'ultimate':
-    case 'admin':
-      return permission
-    case 'premium':
-      return 'advanced'
-    case 'basic':
-    default:
-      return 'growth'
-  }
+  return normalizeRuntimePermission(permission)
 }
 
 export function getPermissionMode(license: LicenseFile): PermissionMode {
@@ -380,7 +375,7 @@ export function getPermissionMode(license: LicenseFile): PermissionMode {
 }
 
 export function canUseUpgradeFeatures(license: LicenseFile): boolean {
-  return getPermissionMode(license) !== 'recommended'
+  return hasCapability({ permission: license.permission }, 'view_upgrade_suggestions')
 }
 
 export function canEditConfig(license: LicenseFile): boolean {
@@ -388,7 +383,7 @@ export function canEditConfig(license: LicenseFile): boolean {
 }
 
 export function canEditConfigForPermission(permission: PermissionMode): boolean {
-  return permission === 'advanced' || permission === 'ultimate' || permission === 'admin'
+  return hasCapability({ permission }, 'edit_full_config')
 }
 
 export function isIntermediateAutoConfig(config: LicenseConfig | null | undefined): boolean {
@@ -399,8 +394,7 @@ export function canUseIntermediateAutoConfig(
   license: LicenseFile,
   config: LicenseConfig | null | undefined,
 ): boolean {
-  const permission = getPermissionMode(license)
-  return (permission === 'recommended' || permission === 'growth') && isIntermediateAutoConfig(config)
+  return hasCapability({ permission: license.permission }, 'use_intermediate_auto_config') && isIntermediateAutoConfig(config)
 }
 
 export function resolveConfigForPermission(
@@ -602,11 +596,11 @@ export async function consumeOperatorUpdateGrant(record: CdkRecord, operatorCoun
   }), { allowedStatuses: ['used'] })) ?? record
 }
 
-const ADVANCED_UPDATE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
-const ADVANCED_UPDATE_MAX_COUNT = 2
-const CLIENT_SIGNAL_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
-const SOFT_BLOCK_WINDOW_MS = 24 * 60 * 60 * 1000
-const SOFT_BLOCK_FREEZE_COUNT = 3
+const ADVANCED_UPDATE_WINDOW_MS = productPolicies.lifetime_operator_updates.window_days * 24 * 60 * 60 * 1000
+const ADVANCED_UPDATE_MAX_COUNT = productPolicies.lifetime_operator_updates.max_updates
+const CLIENT_SIGNAL_WINDOW_MS = productPolicies.risk.client_signal_window_days * 24 * 60 * 60 * 1000
+const SOFT_BLOCK_WINDOW_MS = productPolicies.risk.soft_block_window_hours * 60 * 60 * 1000
+const SOFT_BLOCK_FREEZE_COUNT = productPolicies.risk.soft_blocks_before_freeze
 
 export function buildOperatorFingerprint(operators: LicenseOperator[]): OperatorFingerprint {
   const normalized = operators
@@ -645,7 +639,7 @@ export function checkAdvancedOperatorUpdateLimit(
     .filter((event) => Date.parse(event.at) > cutoff)
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
   const limit: OperatorUpdateLimit = {
-    window_days: 7,
+    window_days: productPolicies.lifetime_operator_updates.window_days,
     max_updates: ADVANCED_UPDATE_MAX_COUNT,
     used: recentEvents.length,
   }
@@ -821,7 +815,7 @@ export function evaluateClientBindingRisk(
   if (userAgentHash) {
     if (!next.bound_user_agent_hash) next.bound_user_agent_hash = userAgentHash
     next.user_agent_events = appendTimedHashEvent(next.user_agent_events, userAgentHash, now, CLIENT_SIGNAL_WINDOW_MS)
-    if (countUniqueRecentHashes(next.user_agent_events, now, CLIENT_SIGNAL_WINDOW_MS) > 2) {
+    if (countUniqueRecentHashes(next.user_agent_events, now, CLIENT_SIGNAL_WINDOW_MS) > productPolicies.risk.max_user_agents) {
       return {
         ok: false,
         record: next,
@@ -833,7 +827,7 @@ export function evaluateClientBindingRisk(
   const ipPrefixHash = hashIpPrefix(req)
   if (ipPrefixHash) {
     next.ip_prefix_events = appendTimedHashEvent(next.ip_prefix_events, ipPrefixHash, now, CLIENT_SIGNAL_WINDOW_MS)
-    if (countUniqueRecentHashes(next.ip_prefix_events, now, CLIENT_SIGNAL_WINDOW_MS) > 3) {
+    if (countUniqueRecentHashes(next.ip_prefix_events, now, CLIENT_SIGNAL_WINDOW_MS) > productPolicies.risk.max_ip_prefixes) {
       return {
         ok: false,
         record: next,
@@ -946,8 +940,8 @@ export async function recordAdvancedOperatorUpdate(
       ok: false,
       status: 429,
       message: limitCheck.limit.next_available_at
-? `单账号终身卡每 7 天最多更新 2 次干员数据，请在 ${limitCheck.limit.next_available_at} 后再试。`
-: '单账号终身卡每 7 天最多更新 2 次干员数据，请稍后再试。',
+        ? `${getPermissionProfile('advanced').label}每 ${productPolicies.lifetime_operator_updates.window_days} 天最多更新 ${productPolicies.lifetime_operator_updates.max_updates} 次干员数据，请在 ${limitCheck.limit.next_available_at} 后再试。`
+        : `${getPermissionProfile('advanced').label}每 ${productPolicies.lifetime_operator_updates.window_days} 天最多更新 ${productPolicies.lifetime_operator_updates.max_updates} 次干员数据，请稍后再试。`,
       record: bindingRecord,
       limit: limitCheck.limit,
     }
@@ -997,6 +991,49 @@ export async function unfreezeCdkRecord(record: CdkRecord): Promise<CdkRecord> {
     frozen_at: null,
     freeze_reason: null,
   }), { allowedStatuses: ['frozen'] })) ?? record
+}
+
+export async function resetDeviceBindingAndUnfreeze(record: CdkRecord, reason: string): Promise<CdkRecord> {
+  const at = new Date().toISOString()
+  const store = await getCdkRecordStore()
+  return (await store.mutate(`cdk/${record.code_hash}.json`, (current) => ({
+    ...current,
+    status: 'used',
+    frozen_at: null,
+    freeze_reason: null,
+    activation_token_hash: null,
+    bound_user_agent_hash: null,
+    user_agent_events: [],
+    ip_prefix_events: [],
+    risk_events: [...(current.risk_events ?? []), {
+      at,
+      type: 'admin_device_binding_reset',
+      reason,
+      detail: { reviewed: true },
+    }].slice(-20),
+  }), { allowedStatuses: ['used', 'frozen'] })) ?? record
+}
+
+export async function acceptLatestOperatorBaselineAndUnfreeze(record: CdkRecord, reason: string): Promise<CdkRecord | null> {
+  if (!record.latest_operator_fingerprint) return null
+  const at = new Date().toISOString()
+  const store = await getCdkRecordStore()
+  return (await store.mutate(`cdk/${record.code_hash}.json`, (current) => {
+    if (!current.latest_operator_fingerprint) return current
+    return {
+      ...current,
+      status: 'used',
+      frozen_at: null,
+      freeze_reason: null,
+      baseline_operator_fingerprint: current.latest_operator_fingerprint,
+      risk_events: [...(current.risk_events ?? []), {
+        at,
+        type: 'admin_operator_baseline_accepted',
+        reason,
+        detail: { reviewed: true, fingerprint_hash: current.latest_operator_fingerprint.hash },
+      }].slice(-20),
+    }
+  }, { allowedStatuses: ['used', 'frozen'] })) ?? record
 }
 
 function hashActivationToken(value: unknown): string | null {

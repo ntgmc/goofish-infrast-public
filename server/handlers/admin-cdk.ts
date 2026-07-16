@@ -1,4 +1,5 @@
 import type { ProductPermissionMode } from '../../src/lib/types'
+import { getPermissionRank, normalizeRuntimePermission } from '../../src/lib/product-catalog'
 import { authenticateAdminRequest } from './admin-auth'
 import {
   CDK_PRODUCT_PERMISSIONS,
@@ -7,7 +8,9 @@ import {
   getCdkRecordStore,
   hashCdk,
   jsonResponse,
+  acceptLatestOperatorBaselineAndUnfreeze,
   requireEnv,
+  resetDeviceBindingAndUnfreeze,
   unfreezeCdkRecord,
   type CdkRecord,
   type CdkStatus,
@@ -17,13 +20,6 @@ type CdkStatusFilter = CdkStatus | 'all'
 
 const MAX_BATCH_CREATE_COUNT = 100
 const MAX_CDK_GENERATION_ATTEMPTS = 10
-
-const PRODUCT_PERMISSION_RANK: Record<ProductPermissionMode, number> = {
-  recommended: 0,
-  growth: 1,
-  advanced: 2,
-  ultimate: 3,
-}
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -197,8 +193,9 @@ async function handlePatch(req: Request): Promise<Response> {
       action?: string;
       permission?: string;
       order_note?: string;
+      reason?: string;
     }
-    const { code_hash, action, permission, order_note } = body
+    const { code_hash, action, permission, order_note, reason } = body
 
     const authentication = await authenticateAdminRequest(req)
     if (!authentication.ok) return authentication.response
@@ -209,6 +206,8 @@ async function handlePatch(req: Request): Promise<Response> {
       && action !== 'unfreeze'
       && action !== 'update_note'
       && action !== 'set_permission'
+      && action !== 'reset_device_binding_and_unfreeze'
+      && action !== 'accept_operator_baseline_and_unfreeze'
     ) {
       return jsonResponse({ error: 'Unsupported action.' }, 400)
     }
@@ -222,6 +221,26 @@ async function handlePatch(req: Request): Promise<Response> {
 
     if (!existing) {
       return jsonResponse({ error: 'CDK not found.' }, 404)
+    }
+
+    if (action === 'reset_device_binding_and_unfreeze' || action === 'accept_operator_baseline_and_unfreeze') {
+      const reviewReason = typeof reason === 'string' ? reason.trim().slice(0, 500) : ''
+      if (!reviewReason) return jsonResponse({ error: '售后核验备注不能为空。' }, 400)
+      if (existing.status === 'revoked') return jsonResponse({ error: '已撤销授权不能恢复。' }, 409)
+      if (existing.status !== 'used' && existing.status !== 'frozen') {
+        return jsonResponse({ error: '只有已使用或已冻结授权可以执行售后恢复。' }, 409)
+      }
+      const updated = action === 'reset_device_binding_and_unfreeze'
+        ? await resetDeviceBindingAndUnfreeze(existing, reviewReason)
+        : await acceptLatestOperatorBaselineAndUnfreeze(existing, reviewReason)
+      if (!updated) return jsonResponse({ error: '授权没有可接受的最新干员快照。' }, 409)
+      return jsonResponse({
+        recovered: true,
+        action,
+        cdk_id: existing.code_hash.slice(0, 12),
+        status: updated.status,
+        cdk: toAdminCdkDetail(updated),
+      })
     }
 
     if (action === 'update_note') {
@@ -281,7 +300,7 @@ async function handlePatch(req: Request): Promise<Response> {
         return jsonResponse({ error: '当前授权类型不支持后台升级。' }, 409)
       }
       const nextPermission = permission as ProductPermissionMode
-      if (PRODUCT_PERMISSION_RANK[nextPermission] <= PRODUCT_PERMISSION_RANK[currentPermission]) {
+      if (getPermissionRank(nextPermission) <= getPermissionRank(currentPermission)) {
         return jsonResponse({ error: '只能升级到更高等级的授权。' }, 409)
       }
 
@@ -495,8 +514,7 @@ function isSensitiveRiskDetailKey(key: string): boolean {
 }
 
 function normalizeProductPermission(permission: CdkRecord['permission']): ProductPermissionMode | null {
-  if (permission === 'basic') return 'growth'
-  if (permission === 'premium') return 'advanced'
-  if ((CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) return permission as ProductPermissionMode
+  const normalized = normalizeRuntimePermission(permission)
+  if ((CDK_PRODUCT_PERMISSIONS as string[]).includes(normalized)) return normalized as ProductPermissionMode
   return null
 }

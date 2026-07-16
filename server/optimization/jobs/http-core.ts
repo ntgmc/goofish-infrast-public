@@ -1,5 +1,6 @@
 import type { LicenseConfig } from "../../../src/lib/types";
 import type { OptimizeConfigPermission } from './shared';
+import { hasCapability } from '../../../src/lib/product-catalog';
 
 export function asConfigRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -13,13 +14,13 @@ export function sanitizeConfigForPublicOptimize(
 ): LicenseConfig {
   const next = structuredClone(config);
 
-  if (permission === "free_preview" || permission === "recommended" || permission === "growth") {
+  if (permission === "free_preview" || !hasCapability({ permission }, 'edit_full_config')) {
     delete next.optimizer_search;
     delete next.variable_shift_schedule;
     return next;
   }
 
-  if (permission === "ultimate" || permission === "admin") return next;
+  if (hasCapability({ permission }, 'use_trusted_optimizer_options')) return next;
 
   if (next.optimization_mode !== "fast" && next.optimization_mode !== "exact") {
     delete next.optimization_mode;

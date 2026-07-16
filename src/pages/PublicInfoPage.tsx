@@ -3,6 +3,7 @@ import PublicFooter, { SupportGroupLink } from '../components/PublicFooter'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { Link } from 'react-router-dom'
 import { copy } from '../copy/index'
+import { productPolicies } from '../lib/product-catalog'
 
 
 export type PublicInfoPageKind = 'faq' | 'support' | 'privacy' | 'terms' | 'disclaimer'
@@ -226,6 +227,15 @@ function SupportContent() {
             <li>{copy.public.pages_PublicInfoPage_076}</li>
           </ul>
         </div>
+      </div>
+      <div className="tool-panel p-5 sm:p-6">
+        <h2 className="text-xl font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_079}</h2>
+        <p className="mt-3 text-sm leading-7 text-ink-secondary">{copy.public.pages_PublicInfoPage_080}</p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="tool-inset p-4"><ul className="space-y-2 text-sm leading-6 text-ink-secondary">{productPolicies.support.required_information.map((item) => <li key={item}>{item}</li>)}</ul></div>
+          <div className="tool-alert tool-alert--warning p-4"><ul className="space-y-2 text-sm leading-6 text-ink-secondary">{productPolicies.support.forbidden_information.map((item) => <li key={item}>{item}</li>)}</ul></div>
+        </div>
+        <p className="mt-4 text-sm leading-7 text-ink-secondary">{productPolicies.support.sla_statement}</p>
       </div>
     </section>
   )

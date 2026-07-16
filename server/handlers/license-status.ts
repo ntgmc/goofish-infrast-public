@@ -4,7 +4,6 @@ import {
   findCdkRecordByLicenseOrderHash,
   formatRiskFreezeMessage,
   getOperatorUpdateGrant,
-  hasOperatorUpdateGrant,
   jsonResponse,
   normalizePermissionMode,
   recordAdvancedOperatorUpdate,
@@ -18,14 +17,7 @@ import {
 } from './license-utils'
 import type { OperatorUpdateGrant } from '../../src/lib/types'
 import { getProfileForUser, saveUserProfile, type UserGameAccountRecord } from '../storage/user-store'
-
-const PERMISSION_LABELS: Record<string, string> = {
-recommended: '单次重置卡',
-growth: '练度提升卡',
-advanced: '单账号终身卡',
-ultimate: 'Admin卡',
-admin: 'Admin卡',
-}
+import { getPermissionProfile, hasCapability } from '../../src/lib/product-catalog'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -79,9 +71,11 @@ export default async (req: Request): Promise<Response> => {
       if (!operatorsCheck.ok) {
         return jsonResponse({ error: operatorsCheck.message }, 400)
       }
-      const canUpdateOperators = (effectivePermission === 'advanced' && Boolean(effectiveCdkRecord))
-        || effectivePermission === 'admin'
-        || hasOperatorUpdateGrant(effectiveCdkRecord)
+      const canUpdateOperators = hasCapability({
+        permission: effectivePermission,
+        hasActiveCdkRecord: Boolean(effectiveCdkRecord),
+        operatorUpdateGrantRemaining: getOperatorUpdateGrant(effectiveCdkRecord)?.remaining,
+      }, 'replace_operator_data')
       if (!canUpdateOperators) {
         return jsonResponse({ error: '当前授权没有可用的干员数据更新权限。' }, 403)
       }
@@ -114,7 +108,7 @@ export default async (req: Request): Promise<Response> => {
 
       return jsonResponse({
         permission: effectivePermission,
-        permission_label: PERMISSION_LABELS[effectivePermission] ?? effectivePermission,
+        permission_label: getPermissionProfile(effectivePermission).label,
         status: effectiveCdkRecord?.status ?? null,
         risk_status: 'ok',
         operator_update_available: effectivePermission === 'advanced' ? Boolean(effectiveCdkRecord) : Boolean(nextOperatorUpdateGrant),
@@ -137,7 +131,7 @@ export default async (req: Request): Promise<Response> => {
 
     return jsonResponse({
       permission: effectivePermission,
-      permission_label: PERMISSION_LABELS[effectivePermission] ?? effectivePermission,
+      permission_label: getPermissionProfile(effectivePermission).label,
       status: effectiveCdkRecord?.status ?? null,
       risk_status: 'ok',
       operator_update_available: effectivePermission === 'advanced' ? Boolean(effectiveCdkRecord) : Boolean(operatorUpdateGrant),

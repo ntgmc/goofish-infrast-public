@@ -31,6 +31,8 @@ export const commonCopy = {
   App_010: "正在载入管理后台...",
   // src/App.tsx
   App_011: "正在载入管理后台...",
+  // src/App.tsx
+  App_012: "正在载入价格与权益...",
   // src/components/BrandLogo.tsx
   components_BrandLogo_001: "MAA 基建排班优化器",
   // src/components/BuildMetaStrip.tsx

@@ -846,7 +846,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_004: "确认替换当前授权内的干员数据？\n\n新文件识别到 ",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_005: " 名干员。继续后会清空当前练度调整。单账号终身卡每 7 天最多更新 2 次，并会校验账号与设备绑定。",
+  pages_tool_optimize_useOptimizeWorkflow_005: " 名干员。继续后会清空当前练度调整。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_006: "干员数据更新失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
