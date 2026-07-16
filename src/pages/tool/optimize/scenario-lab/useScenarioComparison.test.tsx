@@ -41,7 +41,7 @@ describe('useScenarioComparison', () => {
     expect(result.current.factors.maaSchedules).toEqual(['variable', '8x3', '12x2'])
   })
 
-  it('clears the previous account session and restores the next account factors', async () => {
+  it('preserves the previous account session and restores the next account factors', async () => {
     window.sessionStorage.setItem('maa:scenario-lab:v2:profile-a', JSON.stringify({ factors: PROFILE_A_FACTORS }))
     window.sessionStorage.setItem('maa:scenario-lab:v2:profile-b', JSON.stringify({ factors: PROFILE_B_FACTORS }))
 
@@ -58,7 +58,7 @@ describe('useScenarioComparison', () => {
     rerender({ profileId: 'profile-b' })
 
     await waitFor(() => expect(result.current.factors).toEqual(PROFILE_B_FACTORS))
-    expect(window.sessionStorage.getItem('maa:scenario-lab:v2:profile-a')).toBeNull()
+    expect(window.sessionStorage.getItem('maa:scenario-lab:v2:profile-a')).toContain('"layout":"153"')
   })
 
   it('reuses the pending idempotency key after an unknown submission outcome', async () => {

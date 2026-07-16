@@ -190,10 +190,10 @@ export interface OptimizeRequest {
 }
 
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard';
-export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered';
 export type OptimizeEstimateBucket = 'maa_fiammetta' | 'maa_plain' | 'rotation' | 'scenario_comparison';
 export type OptimizeEstimateSource = 'history_p95' | 'fallback_p95';
-export type OptimizeRuntimeEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed';
+export type OptimizeRuntimeEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled';
 
 export interface OptimizeJobAccepted {
   job_id: string;
@@ -235,6 +235,20 @@ export interface OptimizeJobStatusResponse {
   estimate_updated_at: string;
   result?: OptimizeResult;
   error?: string;
+  error_code?: string;
+  error_retryable?: boolean;
+  recovery_action?: 'retry' | 'review_input' | 'reauthorize' | 'contact_support' | 'none';
+  support_reference?: string;
+  failure_kind?: string;
+  job_kind?: 'schedule' | 'upgrade_suggestions' | 'scenario_comparison';
+  source?: string;
+  execution_phase?: 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal';
+  attempt_count?: number;
+  failure_count?: number;
+  next_attempt_at?: string | null;
+  cancellation_requested?: boolean;
+  can_cancel?: boolean;
+  can_retry?: boolean;
 }
 
 export interface AnalyzeScheduleRequest {

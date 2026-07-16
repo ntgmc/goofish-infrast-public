@@ -59,12 +59,13 @@ describe('optimization dispatcher startup recovery', () => {
 
     const startedAt = Date.now()
     kickOptimizeJobProcessing()
-    await waitFor(async () => (await store.getJob(job.id))?.status === 'failed')
+    await waitFor(async () => (await store.getJob(job.id))?.status === 'dead_lettered')
 
     expect(Date.now() - startedAt).toBeLessThan(750)
     await expect(store.getJob(job.id)).resolves.toMatchObject({
-      status: 'failed',
+      status: 'dead_lettered',
       failure_count: 1,
+      public_error_code: 'execution_retries_exhausted',
     })
 
     delete process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING

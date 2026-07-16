@@ -637,4 +637,14 @@ export const commonCopy = {
   pages_tool_useToolSession_005: "保存失败，请稍后重试",
   // src/pages/tool/useToolSession.ts
   pages_tool_useToolSession_006: "保存配置失败",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_101: "正在取消任务",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_102: "自动重试等待中",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_103: "已收到取消请求，正在等待执行器安全停止并结算。",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_104: "任务执行异常，系统将在退避后自动开始第 ",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_105: " 次尝试。",
 } as const

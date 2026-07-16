@@ -250,6 +250,26 @@ export interface AdminUserSummary {
   updated_at: string;
 }
 
+export interface AdminOptimizationDeadLetter {
+  id: string;
+  job_id: string;
+  profile_id: string | null;
+  source: string;
+  failure_kind: string;
+  public_error_code: string;
+  internal_error_message: string;
+  diagnostic_json: Record<string, unknown>;
+  attempt_count: number;
+  status: 'pending_review' | 'replayed' | 'discarded' | 'resolved';
+  replay_count: number;
+  replayed_job_id: string | null;
+  replayed_by: string | null;
+  replayed_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AppUserSummary {
   id: string;
   email: string;
