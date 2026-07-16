@@ -83,7 +83,7 @@ export async function validateRequestLicense(license: unknown): Promise<
 }
 
 export async function recordScheduleGenerate(
-  cdkRecord: CdkRecord | null,
+  cdkRecord: Pick<CdkRecord, 'code_hash'> & Partial<Pick<CdkRecord, 'permission' | 'status'>> | null,
   context: ScheduleUsageContext,
   startedAt: number,
   jobId?: string,

@@ -47,7 +47,9 @@ describe('optimization job attempt lifecycle', () => {
 
     await expect(store.recoverExpiredAttempts(new Date().toISOString(), 2)).resolves.toBe(1)
     await expect(store.getJob(job.id)).resolves.toMatchObject({ status: 'queued', failure_count: 1 })
+    await expect(store.claimNextJob('worker-b', 'lock-b', past(), 2)).resolves.toBeNull()
 
+    store.records.get(job.id)!.next_attempt_at = past()
     await store.claimNextJob('worker-b', 'lock-b', past(), 2)
     await expect(store.recoverExpiredAttempts(new Date().toISOString(), 2)).resolves.toBe(1)
     await expect(store.getJob(job.id)).resolves.toMatchObject({

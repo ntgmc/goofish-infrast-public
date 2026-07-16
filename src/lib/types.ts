@@ -211,6 +211,7 @@ export interface OptimizeJobAccepted {
   estimated_total_ms: number | null;
   estimate_phase: OptimizeRuntimeEstimatePhase;
   estimate_updated_at: string;
+  poll_token?: string;
 }
 
 export interface OptimizeJobStatusResponse {
@@ -222,6 +223,7 @@ export interface OptimizeJobStatusResponse {
   submitted_at: string;
   started_at?: string | null;
   finished_at?: string | null;
+  poll_token?: string;
   poll_after_ms: number;
   estimated_duration_ms: number;
   estimate_bucket: OptimizeEstimateBucket;

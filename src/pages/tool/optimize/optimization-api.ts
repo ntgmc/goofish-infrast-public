@@ -5,7 +5,7 @@ import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../li
 export async function submitOptimizationJob(
   request: CreateOptimizationJobRequest,
   fallbackMessage: string,
-  idempotencyKey = crypto.randomUUID(),
+  idempotencyKey: string = crypto.randomUUID(),
 ): Promise<OptimizeJobAccepted> {
   const response = await apiJson<CreateOptimizationJobResponse>('/api/optimization/jobs', {
     method: 'POST',
@@ -13,17 +13,18 @@ export async function submitOptimizationJob(
     json: request,
     fallbackMessage,
   })
-  return toLegacyJobView(response.job) as OptimizeJobAccepted
+  return toLegacyJobView(response.job, response.pollToken) as OptimizeJobAccepted
 }
 
 export async function fetchOptimizationJob(
   jobId: string,
   fallbackMessage: string,
+  pollToken?: string,
   signal?: AbortSignal,
 ): Promise<OptimizeJobStatusResponse> {
   const job = await apiJson<OptimizationJobSnapshot>(
     '/api/optimization/jobs/' + encodeURIComponent(jobId),
-    { signal, fallbackMessage },
+    { signal, fallbackMessage, ...(pollToken && { headers: { 'X-Optimize-Job-Token': pollToken } }) },
   )
   return toLegacyJobView(job)
 }
@@ -42,7 +43,7 @@ export async function requestReorderCheck(
   return response.result
 }
 
-function toLegacyJobView(job: OptimizationJobSnapshot): OptimizeJobStatusResponse {
+function toLegacyJobView(job: OptimizationJobSnapshot, pollToken?: string): OptimizeJobStatusResponse {
   const common = {
     job_id: job.id,
     status: job.status,
@@ -61,6 +62,7 @@ function toLegacyJobView(job: OptimizationJobSnapshot): OptimizeJobStatusRespons
     estimated_total_ms: job.estimate.totalMs,
     estimate_phase: job.estimate.phase,
     estimate_updated_at: job.estimate.updatedAt,
+    ...(pollToken && { poll_token: pollToken }),
   }
   if (job.status === 'succeeded') return { ...common, status: job.status, result: job.result }
   if (job.status === 'failed') return { ...common, status: job.status, error: job.error.message }

@@ -92,6 +92,7 @@ export type OptimizationJobSnapshot<TResult = OptimizeResult> =
 
 export interface CreateOptimizationJobResponse<TResult = OptimizeResult> {
   job: OptimizationJobSnapshot<TResult>;
+  pollToken?: string;
 }
 
 export type ScenarioComparisonJobSnapshot = OptimizationJobSnapshot<ScenarioComparisonResult>
