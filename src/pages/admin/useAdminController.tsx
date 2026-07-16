@@ -30,6 +30,8 @@ export function useAdminController() {
 
   const [appUsers, setAppUsers] = useState<AppUserSummary[]>([])
 
+  const deadLetters: never[] = []
+
   const [usageRange, setUsageRange] = useState<UsageRangeMode>('7d')
 
   const [usageRangeFrom, setUsageRangeFrom] = useState(() => getDateOffsetString(6))
@@ -718,5 +720,28 @@ export function useAdminController() {
       await patchAppUser(user, 'delete_account', '已删除账号', { confirm_email: confirmedEmail.trim() })
     }
 
-  return { permission, announcementSort, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setBoundFilter, setRiskFilter, setGeneratedFilter, records, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, announcements, announcementStats, setAnnouncementSort, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, summary, cdkOpsSummary, cdkFilters, visibleRecords, sortedAnnouncements, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleSaveRiskSettings, addAnnouncement, updateAnnouncement, deleteAnnouncement, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser }
+  const handleOptimizationDeadLetter = async (id: string, action: 'replay' | 'discard') => {
+      const reason = action === 'replay'
+        ? window.prompt('管理员重放会绕过用户额度扣减。请输入本次重放原因。')
+        : window.prompt('请输入丢弃原因。')
+      if (!reason?.trim()) return
+      setBusyAction(`dead-letter:${id}`)
+      setError(null)
+      setNotice(null)
+      try {
+        await apiJson('/api/admin/optimization', {
+          method: 'POST',
+          json: { action, id, reason: reason.trim() },
+          fallbackMessage: action === 'replay' ? '重放死信任务失败' : '丢弃死信任务失败',
+        })
+        setNotice(action === 'replay' ? '已提交死信任务重放' : '已丢弃死信任务')
+        await loadDashboard()
+      } catch (caught) {
+        setError((caught as Error).message)
+      } finally {
+        setBusyAction(null)
+      }
+    }
+
+  return { permission, announcementSort, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setBoundFilter, setRiskFilter, setGeneratedFilter, records, appUsers, deadLetters, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, announcements, announcementStats, setAnnouncementSort, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, summary, cdkOpsSummary, cdkFilters, visibleRecords, sortedAnnouncements, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleSaveRiskSettings, addAnnouncement, updateAnnouncement, deleteAnnouncement, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser, handleOptimizationDeadLetter }
 }

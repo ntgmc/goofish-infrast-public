@@ -40,7 +40,7 @@ describe('optimization job attempt lifecycle', () => {
     expect(retried).toMatchObject({ status: 'running', attempt_count: 2, failure_count: 0 })
   })
 
-  it('recovers expired attempts and fails after the configured failure budget', async () => {
+  it('recovers expired attempts and dead-letters after the configured failure budget', async () => {
     const store = createMemoryOptimizeJobStore()
     const job = await store.createJob(input())
     await store.claimNextJob('worker-a', 'lock-a', past(), 2)
@@ -53,9 +53,10 @@ describe('optimization job attempt lifecycle', () => {
     await store.claimNextJob('worker-b', 'lock-b', past(), 2)
     await expect(store.recoverExpiredAttempts(new Date().toISOString(), 2)).resolves.toBe(1)
     await expect(store.getJob(job.id)).resolves.toMatchObject({
-      status: 'failed',
+      status: 'dead_lettered',
       failure_count: 2,
       error_message: '任务执行租约已过期，请重试。',
+      public_error_code: 'execution_retries_exhausted',
     })
   })
 

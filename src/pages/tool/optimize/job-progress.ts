@@ -1,8 +1,9 @@
 import { ApiError } from '../../../lib/api-client'
 import { isRetryableOptimizePollStatus } from '../../../lib/optimize-poll'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
+import type { OptimizationJobSnapshot } from '../../../lib/optimization-contracts'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
-import { fetchOptimizationJob } from './optimization-api'
+import { fetchOptimizationJob, fetchOptimizationJobSnapshot } from './optimization-api'
 import { copy } from '../../../copy/index'
 
 export const OPTIMIZE_POLL_REQUEST_TIMEOUT_MS = 20_000
@@ -161,6 +162,10 @@ export function mergeOptimizeJobProgress(
     estimateUpdatedAt: next.estimate_updated_at,
     estimateAdjustment: getOptimizeEstimateAdjustment(current, next),
     lastUpdatedAt: now,
+    executionPhase: 'execution_phase' in next ? next.execution_phase : undefined,
+    attemptCount: 'attempt_count' in next ? next.attempt_count : undefined,
+    nextAttemptAt: 'next_attempt_at' in next ? next.next_attempt_at : undefined,
+    cancellationRequested: 'cancellation_requested' in next ? next.cancellation_requested : false,
   }
 }
 
@@ -169,6 +174,7 @@ export function getStableOptimizeQueueStatus(
   next: OptimizeJobAccepted | OptimizeJobStatusResponse,
   observedRunning: boolean,
 ): ScheduleProgressState['queueStatus'] {
+  if ('execution_phase' in next && next.execution_phase === 'retry_wait') return 'queued'
   if (next.status === 'running') return 'running'
   if (next.status === 'queued') return observedRunning ? 'running' : 'queued'
   return current?.queueStatus
@@ -350,6 +356,32 @@ export function clearLegacyOptimizeJobStorage(
 export interface ActiveOptimizeJobStorageEntry {
   job: OptimizeJobAccepted | OptimizeJobStatusResponse;
   progress?: ScheduleProgressState;
+}
+
+export async function fetchOptimizeJobSnapshotStatus<TResult>(
+  jobId: string,
+  fallbackMessage: string,
+  pollToken?: string,
+  isCancelled?: () => boolean,
+): Promise<OptimizationJobSnapshot<TResult>> {
+  const controller = new AbortController()
+  let cancellationRequested = false
+  const timeout = window.setTimeout(() => controller.abort(), OPTIMIZE_POLL_REQUEST_TIMEOUT_MS)
+  const cancellationCheck = window.setInterval(() => {
+    if (isCancelled?.()) {
+      cancellationRequested = true
+      controller.abort()
+    }
+  }, 100)
+  try {
+    return await fetchOptimizationJobSnapshot<TResult>(jobId, fallbackMessage, pollToken, controller.signal)
+  } catch (error) {
+    if (cancellationRequested || isCancelled?.()) throw new OptimizeJobPollCancelledError()
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+    window.clearInterval(cancellationCheck)
+  }
 }
 
 interface PendingOptimizeSubmission {

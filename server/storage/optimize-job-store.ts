@@ -8,9 +8,9 @@ import {
   refundPriorityCouponInTransaction,
 } from './invitation-store'
 
-export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
+export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
-export type OptimizeJobAttemptStatus = 'running' | 'succeeded' | 'failed' | 'timed_out' | 'interrupted' | 'lease_lost'
+export type OptimizeJobAttemptStatus = 'running' | 'succeeded' | 'failed' | 'timed_out' | 'interrupted' | 'lease_lost' | 'cancelled'
 export type OptimizeJobFailureKind = 'application_error' | 'worker_crash' | 'timed_out' | 'lease_lost'
 
 export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
@@ -18,11 +18,14 @@ export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
   status: OptimizeJobStatus
   priority: number
   owner_key: string
+  profile_id: string | null
   permission: string | null
   source: string
   payload_json: TPayload
   result_json: TResult | null
   error_message: string | null
+  failure_kind: string | null
+  public_error_code: string | null
   attempt_count: number
   failure_count: number
   worker_id: string | null
@@ -31,6 +34,7 @@ export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
   lock_expires_at: string | null
   next_attempt_at: string | null
   expires_at: string | null
+  cancel_requested_at: string | null
   created_at: string
   started_at: string | null
   finished_at: string | null
@@ -71,6 +75,7 @@ export interface OptimizeJobStore {
   createJob: (input: CreateOptimizeJobInput) => Promise<OptimizeJobRecord>
   admitJob: (input: AdmitOptimizeJobInput) => Promise<{ job: OptimizeJobRecord; replayed: boolean }>
   getJob: (id: string) => Promise<OptimizeJobRecord | null>
+  listJobsByProfile: (profileId: string, limit?: number, before?: string | null) => Promise<OptimizeJobRecord[]>
   findActiveByOwnerKey: (ownerKey: string) => Promise<OptimizeJobRecord | null>
   getQueuePosition: (id: string) => Promise<number | null>
   claimNextJob: (workerId: string, lockToken: string, lockExpiresAt: string, maxFailures: number, maxGlobalRunning?: number) => Promise<OptimizeJobRecord | null>
@@ -80,9 +85,32 @@ export interface OptimizeJobStore {
   failAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string, errorMessage: string) => Promise<boolean>
   retryFailedAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string, failureKind: OptimizeJobFailureKind, errorMessage: string, maxFailures: number) => Promise<OptimizeJobStatus | null>
   releaseInterruptedAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string) => Promise<boolean>
+  requestCancel: (id: string) => Promise<OptimizeJobRecord | null>
+  cancelAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string) => Promise<boolean>
   recoverExpiredAttempts: (nowIso: string, maxFailures: number) => Promise<number>
   expireQueuedJobs: (nowIso: string) => Promise<number>
   cleanupOldJobs: (beforeIso: string) => Promise<void>
+}
+
+export interface OptimizationDeadLetterRecord {
+  id: string
+  job_id: string
+  owner_key: string
+  profile_id: string | null
+  source: string
+  failure_kind: string
+  public_error_code: string
+  internal_error_message: string
+  diagnostic_json: Record<string, unknown>
+  attempt_count: number
+  status: 'pending_review' | 'replayed' | 'discarded' | 'resolved'
+  replay_count: number
+  replayed_job_id: string | null
+  replayed_by: string | null
+  replayed_at: string | null
+  resolved_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 declare global {
@@ -234,6 +262,16 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       const result = await query<OptimizeJobRow>('select * from optimize_jobs where id = $1', [id])
       return result.rows[0] ? fromRow(result.rows[0]) : null
     },
+    listJobsByProfile: async (profileId, limit = 50, before = null) => {
+      await ensureSchema()
+      const result = await query<OptimizeJobRow>(
+        `select * from optimize_jobs
+         where profile_id = $1 and ($2::timestamptz is null or created_at < $2::timestamptz)
+         order by created_at desc, id desc limit $3`,
+        [profileId, before, Math.max(1, Math.min(100, Math.floor(limit)))],
+      )
+      return result.rows.map(fromRow)
+    },
     findActiveByOwnerKey: async (ownerKey) => {
       await ensureSchema()
       const result = await query<OptimizeJobRow>([
@@ -268,7 +306,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       const result = await client.query<OptimizeJobRow>([
         'with next_job as (',
         '  select id from optimize_jobs',
-        '  where status = $6 and failure_count < $4 and (next_attempt_at is null or next_attempt_at <= $5)',
+        '  where status = $6 and cancel_requested_at is null and failure_count < $4 and (next_attempt_at is null or next_attempt_at <= $5)',
         "  and not exists (select 1 from optimize_jobs running where running.owner_key = optimize_jobs.owner_key and running.status = 'running')",
         forceStandard ? '  and priority < 10' : '',
         '  order by priority desc, created_at asc',
@@ -311,7 +349,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       return withTransaction(async (client) => {
         const owned = await client.query(
           `update optimize_jobs set heartbeat_at = $6, lock_expires_at = $5, updated_at = $6
-           where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running'
+           where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running' and cancel_requested_at is null
            returning id`,
           [id, attemptNo, workerId, lockToken, lockExpiresAt, now],
         )
@@ -328,7 +366,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       await ensureSchema()
       const owned = await query(
         `select id from optimize_jobs
-         where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running'`,
+         where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running' and cancel_requested_at is null`,
         [id, attemptNo, workerId, lockToken],
       )
       return Boolean(owned.rowCount)
@@ -339,9 +377,9 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       return withTransaction(async (client) => {
         const completed = await client.query([
           'update optimize_jobs',
-          'set status = $7, result_json = $5, error_message = null, worker_id = null, heartbeat_at = null,',
+          'set status = $7, result_json = $5, error_message = null, failure_kind = null, public_error_code = null, worker_id = null, heartbeat_at = null,',
           '    lock_token = null, lock_expires_at = null, finished_at = $6, updated_at = $6',
-          'where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = $8',
+          'where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = $8 and cancel_requested_at is null',
           'returning id',
         ].join(' '), [id, attemptNo, workerId, lockToken, resultJson, now, 'succeeded', 'running'])
         if (!completed.rowCount) return false
@@ -360,10 +398,11 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         const failed = await client.query(
           `update optimize_jobs
            set status = 'failed', failure_count = failure_count + 1, error_message = $5,
+               failure_kind = 'application_error', public_error_code = 'application_error',
                worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
                next_attempt_at = null,
                finished_at = $6, updated_at = $6
-           where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running'
+           where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running' and cancel_requested_at is null
            returning id`,
           [id, attemptNo, workerId, lockToken, errorMessage, now],
         )
@@ -382,21 +421,24 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       await ensureSchema()
       const now = new Date().toISOString()
       return withTransaction(async (client) => {
-        const updated = await client.query<{ status: OptimizeJobStatus }>(
+        const updated = await client.query<OptimizeJobRow>(
           `update optimize_jobs
            set failure_count = failure_count + 1,
-               status = case when failure_count + 1 >= $6 then 'failed' else 'queued' end,
+               status = case when failure_count + 1 >= $6 then 'dead_lettered' else 'queued' end,
                error_message = case when failure_count + 1 >= $6 then $5 else null end,
+               failure_kind = case when failure_count + 1 >= $6 then $9 else null end,
+               public_error_code = case when failure_count + 1 >= $6 then 'execution_retries_exhausted' else null end,
                worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
                next_attempt_at = case when failure_count + 1 >= $6 then null else $8::timestamptz end,
                finished_at = case when failure_count + 1 >= $6 then $7::timestamptz else null end,
                updated_at = $7
-           where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running'
-           returning status`,
-          [id, attemptNo, workerId, lockToken, errorMessage, maxFailures, now, retryAt(attemptNo)],
+           where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running' and cancel_requested_at is null
+           returning *`,
+          [id, attemptNo, workerId, lockToken, errorMessage, maxFailures, now, retryAt(attemptNo), failureKind],
         )
-        const status = updated.rows[0]?.status ?? null
-        if (!status) return null
+        const updatedJob = updated.rows[0] ? fromRow(updated.rows[0]) : null
+        const status = updatedJob?.status ?? null
+        if (!status || !updatedJob) return null
         const attemptStatus: OptimizeJobAttemptStatus = failureKind === 'timed_out'
           ? 'timed_out'
           : failureKind === 'lease_lost' ? 'lease_lost' : 'failed'
@@ -406,7 +448,11 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
            where job_id = $1 and attempt_no = $2 and worker_id = $3 and lock_token = $4`,
           [id, attemptNo, workerId, lockToken, attemptStatus, failureKind, errorMessage, now],
         )
-        if (status === 'failed') await refundPriorityCouponInTransaction(client, id, now)
+        if (status === 'dead_lettered') {
+          await refundPriorityCouponInTransaction(client, id, now)
+          await releaseQueuedEntitlementInTransaction(client, id, updatedJob.payload_json, now)
+          await createDeadLetterInTransaction(client, updatedJob, failureKind, errorMessage, now)
+        }
         return status
       })
     },
@@ -433,23 +479,80 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         return true
       })
     },
+    requestCancel: async (id) => {
+      await ensureSchema()
+      return withTransaction(async (client) => {
+        const selected = await client.query<OptimizeJobRow>('select * from optimize_jobs where id = $1 for update', [id])
+        const current = selected.rows[0] ? fromRow(selected.rows[0]) : null
+        if (!current) return null
+        if (current.status === 'queued') {
+          const now = new Date().toISOString()
+          const cancelled = await client.query<OptimizeJobRow>(
+            `update optimize_jobs set status = 'cancelled', error_message = '任务已由用户取消。',
+               public_error_code = 'cancelled_by_user', failure_kind = null, cancel_requested_at = $2,
+               next_attempt_at = null, expires_at = null, finished_at = $2, updated_at = $2
+             where id = $1 and status = 'queued' returning *`, [id, now],
+          )
+          await refundPriorityCouponInTransaction(client, id, now)
+          await releaseQueuedEntitlementInTransaction(client, id, current.payload_json, now)
+          return cancelled.rows[0] ? fromRow(cancelled.rows[0]) : current
+        }
+        if (current.status === 'running' && !current.cancel_requested_at) {
+          const now = new Date().toISOString()
+          const requested = await client.query<OptimizeJobRow>(
+            `update optimize_jobs set cancel_requested_at = $2, updated_at = $2
+             where id = $1 and status = 'running' returning *`, [id, now],
+          )
+          return requested.rows[0] ? fromRow(requested.rows[0]) : current
+        }
+        return current
+      })
+    },
+    cancelAttempt: async (id, attemptNo, workerId, lockToken) => {
+      await ensureSchema()
+      const now = new Date().toISOString()
+      return withTransaction(async (client) => {
+        const cancelled = await client.query<{ payload_json: unknown }>(
+          `update optimize_jobs set status = 'cancelled', error_message = '任务已由用户取消。',
+             public_error_code = 'cancelled_by_user', failure_kind = null,
+             worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
+             next_attempt_at = null, expires_at = null, finished_at = $5, updated_at = $5
+           where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4
+             and status = 'running' and cancel_requested_at is not null returning payload_json`,
+          [id, attemptNo, workerId, lockToken, now],
+        )
+        if (!cancelled.rowCount) return false
+        await client.query(
+          `update optimize_job_attempts set status = 'cancelled', failure_kind = null,
+             error_message = '任务已由用户取消。', finished_at = $5, heartbeat_at = $5
+           where job_id = $1 and attempt_no = $2 and worker_id = $3 and lock_token = $4`,
+          [id, attemptNo, workerId, lockToken, now],
+        )
+        await refundPriorityCouponInTransaction(client, id, now)
+        await releaseQueuedEntitlementInTransaction(client, id, cancelled.rows[0]?.payload_json, now)
+        return true
+      })
+    },
     recoverExpiredAttempts: async (nowIso, maxFailures) => {
       await ensureSchema()
       return withTransaction(async (client) => {
-        const recovered = await client.query<{ id: string; status: OptimizeJobStatus; attempt_count: number }>(
+        const recovered = await client.query<OptimizeJobRow>(
           `update optimize_jobs
            set failure_count = failure_count + 1,
-               status = case when failure_count + 1 >= $2 then 'failed' else 'queued' end,
+               status = case when failure_count + 1 >= $2 then 'dead_lettered' else 'queued' end,
                error_message = case when failure_count + 1 >= $2 then coalesce(error_message, '任务执行租约已过期，请重试。') else null end,
+               failure_kind = case when failure_count + 1 >= $2 then 'lease_lost' else null end,
+               public_error_code = case when failure_count + 1 >= $2 then 'execution_retries_exhausted' else null end,
                worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
                next_attempt_at = case when failure_count + 1 >= $2 then null else $3::timestamptz end,
                finished_at = case when failure_count + 1 >= $2 then $1::timestamptz else null end,
                updated_at = $1
            where status = 'running' and lock_expires_at is not null and lock_expires_at < $1
-           returning id, status, attempt_count`,
+           returning *`,
           [nowIso, maxFailures, retryAtForNow(nowIso, 1)],
         )
-        for (const job of recovered.rows) {
+        for (const row of recovered.rows) {
+          const job = fromRow(row)
           await client.query(
             `update optimize_job_attempts
              set status = 'lease_lost', failure_kind = 'lease_lost', error_message = '任务执行租约已过期。',
@@ -457,7 +560,11 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
              where job_id = $1 and attempt_no = $2 and status = 'running'`,
             [job.id, job.attempt_count, nowIso],
           )
-          if (job.status === 'failed') await refundPriorityCouponInTransaction(client, job.id, nowIso)
+          if (job.status === 'dead_lettered') {
+            await refundPriorityCouponInTransaction(client, job.id, nowIso)
+            await releaseQueuedEntitlementInTransaction(client, job.id, job.payload_json, nowIso)
+            await createDeadLetterInTransaction(client, job, 'lease_lost', job.error_message || '任务执行租约已过期。', nowIso)
+          }
         }
         return recovered.rowCount ?? recovered.rows.length
       })
@@ -468,6 +575,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         const expired = await client.query<{ id: string; payload_json: unknown }>(
           `update optimize_jobs
            set status = 'failed', error_message = '任务排队超时，已释放预留权益，请重新提交。',
+               failure_kind = 'queue_expired', public_error_code = 'queue_expired',
                next_attempt_at = null, expires_at = null, finished_at = $1, updated_at = $1
            where status = 'queued' and attempt_count = 0 and expires_at is not null and expires_at < $1
            returning id, payload_json`,
@@ -485,7 +593,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       await withTransaction(async (client) => {
         await client.query('delete from optimization_submissions where created_at < $1', [beforeIso])
         await client.query('delete from optimization_idempotency where updated_at < $1', [beforeIso])
-        await client.query('delete from optimize_jobs where status = any($2) and updated_at < $1', [beforeIso, ['succeeded', 'failed']])
+        await client.query('delete from optimize_jobs where status = any($2) and updated_at < $1', [beforeIso, ['succeeded', 'failed', 'cancelled']])
       })
     },
   }
@@ -507,11 +615,14 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         status: 'queued',
         priority: input.priority,
         owner_key: input.owner_key,
+        profile_id: input.profile_id ?? null,
         permission: input.permission,
         source: input.source,
         payload_json: clone(input.payload_json),
         result_json: null,
         error_message: null,
+        failure_kind: null,
+        public_error_code: null,
         attempt_count: 0,
         failure_count: 0,
         worker_id: null,
@@ -520,6 +631,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         lock_expires_at: null,
         next_attempt_at: now,
         expires_at: queueExpiresAt(now),
+        cancel_requested_at: null,
         created_at: now,
         started_at: null,
         finished_at: null,
@@ -555,7 +667,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       submissions.set(input.owner_key, recent)
       const job = await (async () => {
         const value = await Promise.resolve({ ...input, created_at: input.created_at ?? new Date(now).toISOString() })
-        const record: OptimizeJobRecord = { id: value.id, status: 'queued', priority: value.priority, owner_key: value.owner_key, permission: value.permission, source: value.source, payload_json: clone(value.payload_json), result_json: null, error_message: null, attempt_count: 0, failure_count: 0, worker_id: null, heartbeat_at: null, lock_token: null, lock_expires_at: null, next_attempt_at: value.created_at!, expires_at: queueExpiresAt(value.created_at!), created_at: value.created_at!, started_at: null, finished_at: null, updated_at: value.created_at! }
+        const record: OptimizeJobRecord = { id: value.id, status: 'queued', priority: value.priority, owner_key: value.owner_key, profile_id: value.profile_id ?? null, permission: value.permission, source: value.source, payload_json: clone(value.payload_json), result_json: null, error_message: null, failure_kind: null, public_error_code: null, attempt_count: 0, failure_count: 0, worker_id: null, heartbeat_at: null, lock_token: null, lock_expires_at: null, next_attempt_at: value.created_at!, expires_at: queueExpiresAt(value.created_at!), cancel_requested_at: null, created_at: value.created_at!, started_at: null, finished_at: null, updated_at: value.created_at! }
         records.set(record.id, record)
         return record
       })()
@@ -563,6 +675,11 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       return { job: clone(job), replayed: false }
     },
     getJob: async (id) => records.has(id) ? clone(records.get(id)!) : null,
+    listJobsByProfile: async (profileId, limit = 50, before = null) => [...records.values()]
+      .filter((job) => job.profile_id === profileId && (!before || Date.parse(job.created_at) < Date.parse(before)))
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .slice(0, Math.max(1, Math.min(100, Math.floor(limit))))
+      .map(clone),
     findActiveByOwnerKey: async (ownerKey) => [...records.values()]
       .filter((job) => job.owner_key === ownerKey && activeStatuses.has(job.status))
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] ?? null,
@@ -578,7 +695,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       const runningOwners = new Set([...records.values()].filter((job) => job.status === 'running').map((job) => job.owner_key))
       if (runningOwners.size >= maxGlobalRunning) return null
       const next = [...records.values()]
-        .filter((job) => job.status === 'queued' && job.failure_count < maxFailures
+        .filter((job) => job.status === 'queued' && !job.cancel_requested_at && job.failure_count < maxFailures
           && !runningOwners.has(job.owner_key) && (!job.next_attempt_at || Date.parse(job.next_attempt_at) <= nowMs))
         .sort((a, b) => b.priority - a.priority || Date.parse(a.created_at) - Date.parse(b.created_at))[0]
       if (!next) return null
@@ -599,7 +716,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
     },
     heartbeatAttempt: async (id, attemptNo, workerId, lockToken, lockExpiresAt) => {
       const job = records.get(id)
-      if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken)) return false
+      if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || job.cancel_requested_at) return false
       const now = new Date().toISOString()
       job.heartbeat_at = now
       job.lock_expires_at = lockExpiresAt
@@ -608,14 +725,19 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       if (attempt) attempt.heartbeat_at = now
       return true
     },
-    ownsAttempt: async (id, attemptNo, workerId, lockToken) => ownsMemoryAttempt(records.get(id), attemptNo, workerId, lockToken),
+    ownsAttempt: async (id, attemptNo, workerId, lockToken) => {
+      const job = records.get(id)
+      return ownsMemoryAttempt(job, attemptNo, workerId, lockToken) && !job.cancel_requested_at
+    },
     completeAttempt: async (id, attemptNo, workerId, lockToken, resultJson) => {
       const job = records.get(id)
-      if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken)) return false
+      if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || job.cancel_requested_at) return false
       const now = new Date().toISOString()
       job.status = 'succeeded'
       job.result_json = clone(resultJson)
       job.error_message = null
+      job.failure_kind = null
+      job.public_error_code = null
       job.worker_id = null
       job.heartbeat_at = null
       job.lock_token = null
@@ -631,11 +753,13 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
     },
     failAttempt: async (id, attemptNo, workerId, lockToken, errorMessage) => {
       const job = records.get(id)
-      if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken)) return false
+      if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || job.cancel_requested_at) return false
       const now = new Date().toISOString()
       job.status = 'failed'
       job.failure_count += 1
       job.error_message = errorMessage
+      job.failure_kind = 'application_error'
+      job.public_error_code = 'application_error'
       job.worker_id = null
       job.heartbeat_at = null
       job.lock_token = null
@@ -652,17 +776,19 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
     },
     retryFailedAttempt: async (id, attemptNo, workerId, lockToken, failureKind, errorMessage, maxFailures) => {
       const job = records.get(id)
-      if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken)) return null
+      if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || job.cancel_requested_at) return null
       const now = new Date().toISOString()
       job.failure_count += 1
-      job.status = job.failure_count >= maxFailures ? 'failed' : 'queued'
-      job.error_message = job.status === 'failed' ? errorMessage : null
+      job.status = job.failure_count >= maxFailures ? 'dead_lettered' : 'queued'
+      job.error_message = job.status === 'dead_lettered' ? errorMessage : null
+      job.failure_kind = job.status === 'dead_lettered' ? failureKind : null
+      job.public_error_code = job.status === 'dead_lettered' ? 'execution_retries_exhausted' : null
       job.worker_id = null
       job.heartbeat_at = null
       job.lock_token = null
       job.lock_expires_at = null
-      job.next_attempt_at = job.status === 'failed' ? null : retryAt(attemptNo)
-      job.finished_at = job.status === 'failed' ? now : null
+      job.next_attempt_at = job.status === 'dead_lettered' ? null : retryAt(attemptNo)
+      job.finished_at = job.status === 'dead_lettered' ? now : null
       job.updated_at = now
       const attempt = attempts.get(`${id}:${attemptNo}`)
       if (attempt) {
@@ -693,6 +819,49 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       }
       return true
     },
+    requestCancel: async (id) => {
+      const job = records.get(id)
+      if (!job) return null
+      const now = new Date().toISOString()
+      if (job.status === 'queued') {
+        job.status = 'cancelled'
+        job.error_message = '任务已由用户取消。'
+        job.public_error_code = 'cancelled_by_user'
+        job.failure_kind = null
+        job.cancel_requested_at = now
+        job.next_attempt_at = null
+        job.expires_at = null
+        job.finished_at = now
+        job.updated_at = now
+      } else if (job.status === 'running' && !job.cancel_requested_at) {
+        job.cancel_requested_at = now
+        job.updated_at = now
+      }
+      return clone(job)
+    },
+    cancelAttempt: async (id, attemptNo, workerId, lockToken) => {
+      const job = records.get(id)
+      if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || !job.cancel_requested_at) return false
+      const now = new Date().toISOString()
+      job.status = 'cancelled'
+      job.error_message = '任务已由用户取消。'
+      job.failure_kind = null
+      job.public_error_code = 'cancelled_by_user'
+      job.worker_id = null
+      job.heartbeat_at = null
+      job.lock_token = null
+      job.lock_expires_at = null
+      job.next_attempt_at = null
+      job.finished_at = now
+      job.updated_at = now
+      const attempt = attempts.get(`${id}:${attemptNo}`)
+      if (attempt) {
+        attempt.status = 'cancelled'
+        attempt.failure_kind = null
+        attempt.heartbeat_at = now
+      }
+      return true
+    },
     recoverExpiredAttempts: async (nowIso, maxFailures) => {
       let recovered = 0
       for (const job of records.values()) {
@@ -712,8 +881,10 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
           job.next_attempt_at = job.failure_count >= maxFailures ? null : retryAtForNow(nowIso, 1)
         job.updated_at = nowIso
         if (job.failure_count >= maxFailures) {
-          job.status = 'failed'
+          job.status = 'dead_lettered'
           job.error_message ||= '任务执行租约已过期，请重试。'
+          job.failure_kind = 'lease_lost'
+          job.public_error_code = 'execution_retries_exhausted'
           job.finished_at = nowIso
         } else {
           job.status = 'queued'
@@ -730,6 +901,8 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         expired += 1
         job.status = 'failed'
         job.error_message = '任务排队超时，已释放预留权益，请重新提交。'
+        job.failure_kind = 'queue_expired'
+        job.public_error_code = 'queue_expired'
         job.next_attempt_at = null
         job.expires_at = null
         job.finished_at = nowIso
@@ -740,17 +913,18 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
     cleanupOldJobs: async (beforeIso) => {
       const before = Date.parse(beforeIso)
       for (const [id, job] of records.entries()) {
-        if ((job.status === 'succeeded' || job.status === 'failed') && Date.parse(job.updated_at) < before) records.delete(id)
+        if ((job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled') && Date.parse(job.updated_at) < before) records.delete(id)
       }
     },
   }
 }
 
-type OptimizeJobRow = Omit<OptimizeJobRecord, 'heartbeat_at' | 'lock_expires_at' | 'next_attempt_at' | 'expires_at' | 'created_at' | 'started_at' | 'finished_at' | 'updated_at'> & {
+type OptimizeJobRow = Omit<OptimizeJobRecord, 'heartbeat_at' | 'lock_expires_at' | 'next_attempt_at' | 'expires_at' | 'cancel_requested_at' | 'created_at' | 'started_at' | 'finished_at' | 'updated_at'> & {
   heartbeat_at: string | Date | null
   lock_expires_at: string | Date | null
   next_attempt_at: string | Date | null
   expires_at: string | Date | null
+  cancel_requested_at: string | Date | null
   created_at: string | Date
   started_at: string | Date | null
   finished_at: string | Date | null
@@ -767,6 +941,7 @@ function fromRow(row: OptimizeJobRow): OptimizeJobRecord {
     lock_expires_at: normalizeTimestamp(row.lock_expires_at),
     next_attempt_at: normalizeTimestamp(row.next_attempt_at),
     expires_at: normalizeTimestamp(row.expires_at),
+    cancel_requested_at: normalizeTimestamp(row.cancel_requested_at),
     created_at: normalizeTimestamp(row.created_at) ?? new Date().toISOString(),
     started_at: normalizeTimestamp(row.started_at),
     finished_at: normalizeTimestamp(row.finished_at),
@@ -804,6 +979,143 @@ function retryAtForNow(nowIso: string, attemptNo: number): string {
 function positiveInteger(value: string | undefined, fallback: number, minimum: number): number {
   const parsed = Number(value ?? fallback)
   return Number.isFinite(parsed) ? Math.max(minimum, Math.floor(parsed)) : fallback
+}
+
+async function createDeadLetterInTransaction(
+  client: PoolClient,
+  job: OptimizeJobRecord,
+  failureKind: OptimizeJobFailureKind,
+  errorMessage: string,
+  nowIso: string,
+): Promise<void> {
+  await client.query(
+    `insert into optimization_dead_letters
+      (id, job_id, owner_key, profile_id, source, failure_kind, public_error_code,
+       internal_error_message, diagnostic_json, attempt_count, status, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, 'execution_retries_exhausted', $7, $8::jsonb, $9, 'pending_review', $10, $10)
+     on conflict (job_id) do update set
+       failure_kind = excluded.failure_kind,
+       internal_error_message = excluded.internal_error_message,
+       diagnostic_json = excluded.diagnostic_json,
+       attempt_count = excluded.attempt_count,
+       updated_at = excluded.updated_at`,
+    [
+      randomUUID(),
+      job.id,
+      job.owner_key,
+      job.profile_id,
+      job.source,
+      failureKind,
+      errorMessage,
+      JSON.stringify(buildDeadLetterDiagnostic(job)),
+      job.attempt_count,
+      nowIso,
+    ],
+  )
+}
+
+function buildDeadLetterDiagnostic(job: OptimizeJobRecord): Record<string, unknown> {
+  const payload = job.payload_json && typeof job.payload_json === 'object'
+    ? job.payload_json as Record<string, unknown>
+    : {}
+  const request = payload.request && typeof payload.request === 'object'
+    ? payload.request as Record<string, unknown>
+    : {}
+  const estimate = payload.estimate && typeof payload.estimate === 'object'
+    ? payload.estimate as Record<string, unknown>
+    : null
+  return {
+    payload_version: typeof payload.version === 'number' ? payload.version : null,
+    job_kind: typeof payload.kind === 'string'
+      ? payload.kind
+      : request.suggestions_only === true ? 'upgrade_suggestions' : 'schedule',
+    profile_id: job.profile_id,
+    source: job.source,
+    permission: job.permission,
+    estimate,
+  }
+}
+
+export async function listOptimizationDeadLetters(
+  limit = 50,
+  status: OptimizationDeadLetterRecord['status'] | null = null,
+): Promise<OptimizationDeadLetterRecord[]> {
+  await ensureSchema()
+  const result = await query<OptimizationDeadLetterRow>(
+    `select * from optimization_dead_letters
+     where ($1::text is null or status = $1)
+     order by created_at desc limit $2`,
+    [status, Math.max(1, Math.min(100, Math.floor(limit)))],
+  )
+  return result.rows.map(fromDeadLetterRow)
+}
+
+export async function replayOptimizationDeadLetter(id: string, replayedBy: string): Promise<OptimizeJobRecord | null> {
+  await ensureSchema()
+  return withTransaction(async (client) => {
+    const deadLetter = await client.query<OptimizationDeadLetterRow>(
+      `select * from optimization_dead_letters where id = $1 for update`, [id],
+    )
+    const letter = deadLetter.rows[0] ? fromDeadLetterRow(deadLetter.rows[0]) : null
+    if (!letter || letter.status !== 'pending_review') return null
+    const originalResult = await client.query<OptimizeJobRow>('select * from optimize_jobs where id = $1 for update', [letter.job_id])
+    const original = originalResult.rows[0] ? fromRow(originalResult.rows[0]) : null
+    if (!original || original.status !== 'dead_lettered') return null
+    const now = new Date().toISOString()
+    const replayedId = randomUUID()
+    const inserted = await client.query<OptimizeJobRow>(
+      `insert into optimize_jobs
+        (id, status, priority, owner_key, profile_id, permission, source, payload_json,
+         result_json, error_message, failure_kind, public_error_code, attempt_count, failure_count,
+         worker_id, heartbeat_at, lock_token, lock_expires_at, next_attempt_at, expires_at,
+         cancel_requested_at, created_at, started_at, finished_at, updated_at)
+       values ($1, 'queued', $2, $3, $4, $5, $6, $7::jsonb,
+         null, null, null, null, 0, 0, null, null, null, null, $8, $9, null, $8, null, null, $8)
+       returning *`,
+      [replayedId, original.priority, original.owner_key, original.profile_id, original.permission, original.source,
+        JSON.stringify(original.payload_json), now, queueExpiresAt(now)],
+    )
+    await client.query(
+      `update optimization_dead_letters set status = 'replayed', replay_count = replay_count + 1,
+         replayed_job_id = $2, replayed_by = $3, replayed_at = $4, resolved_at = $4, updated_at = $4
+       where id = $1`,
+      [id, replayedId, replayedBy, now],
+    )
+    return inserted.rows[0] ? fromRow(inserted.rows[0]) : null
+  })
+}
+
+export async function discardOptimizationDeadLetter(id: string): Promise<boolean> {
+  await ensureSchema()
+  const now = new Date().toISOString()
+  const result = await query(
+    `update optimization_dead_letters set status = 'discarded', resolved_at = $2, updated_at = $2
+     where id = $1 and status = 'pending_review'`,
+    [id, now],
+  )
+  return Boolean(result.rowCount)
+}
+
+type OptimizationDeadLetterRow = Omit<OptimizationDeadLetterRecord,
+  'attempt_count' | 'replay_count' | 'replayed_at' | 'resolved_at' | 'created_at' | 'updated_at'> & {
+  attempt_count: number | string
+  replay_count: number | string
+  replayed_at: string | Date | null
+  resolved_at: string | Date | null
+  created_at: string | Date
+  updated_at: string | Date
+}
+
+function fromDeadLetterRow(row: OptimizationDeadLetterRow): OptimizationDeadLetterRecord {
+  return {
+    ...row,
+    attempt_count: Number(row.attempt_count),
+    replay_count: Number(row.replay_count),
+    replayed_at: normalizeTimestamp(row.replayed_at),
+    resolved_at: normalizeTimestamp(row.resolved_at),
+    created_at: normalizeTimestamp(row.created_at) ?? new Date().toISOString(),
+    updated_at: normalizeTimestamp(row.updated_at) ?? new Date().toISOString(),
+  }
 }
 
 async function releaseQueuedEntitlementInTransaction(client: PoolClient, jobId: string, payload: unknown, nowIso: string): Promise<void> {

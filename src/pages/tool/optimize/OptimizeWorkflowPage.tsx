@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import AnnouncementBanner from '../../../components/AnnouncementBanner'
 import AdminOperatorPanel from './AdminOperatorPanel'
 import ConfigSection from './ConfigSection'
@@ -7,13 +8,23 @@ import OverviewSection from './OverviewSection'
 import PlansSection from './PlansSection'
 import ResultSection from './ResultSection'
 import ScenarioLabSection from './ScenarioLabSection'
+import OptimizationTaskCenterDialog, { OptimizationTaskCenterButton } from './OptimizationTaskCenter'
+import { useOptimizationTaskCenter } from './useOptimizationTaskCenter'
 import { getProfileAccessLabel } from '../tool-utils'
 import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
 import { copy } from '../../../copy/index'
 
 
 export default function OptimizeWorkflowPage(props: Props) {
+  const [taskCenterOpen, setTaskCenterOpen] = useState(false)
+  const taskCenterButtonRef = useRef<HTMLButtonElement>(null)
+  const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
   const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, operatorUploadStatus, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, operatorFileRef, isRestrictedPreview, userCanReplaceOperators, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, handleReplaceOperators, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile } = useOptimizeWorkflow(props)
+
+  const closeTaskCenter = () => {
+    setTaskCenterOpen(false)
+    window.setTimeout(() => taskCenterButtonRef.current?.focus(), 0)
+  }
 
   return (
       <OptimizeShell
@@ -24,6 +35,14 @@ export default function OptimizeWorkflowPage(props: Props) {
           plans: `${savedConfigs.length}/${resultHistory.length}`,
           result: hasResult ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_001 : undefined,
         }}
+        headerActions={(
+          <OptimizationTaskCenterButton
+            controller={taskCenter}
+            open={taskCenterOpen}
+            onOpen={() => setTaskCenterOpen(true)}
+            buttonRef={taskCenterButtonRef}
+          />
+        )}
         onSectionChange={setSection}
         onReset={onReset}
       >
@@ -48,6 +67,21 @@ export default function OptimizeWorkflowPage(props: Props) {
               )}
             </div>
           )}
+
+          <OptimizationTaskCenterDialog
+            open={taskCenterOpen}
+            controller={taskCenter}
+            onClose={closeTaskCenter}
+            onRetrySchedule={() => {
+              closeTaskCenter()
+              setSection('overview')
+              void handleGenerate()
+            }}
+            onOpenScenario={() => {
+              closeTaskCenter()
+              setSection('lab')
+            }}
+          />
   
           {section === 'overview' && (
             <OverviewSection
