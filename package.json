@@ -4,6 +4,8 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
+    "generate:catalog": "node scripts/product-catalog.mjs",
+    "check:catalog": "node scripts/product-catalog.mjs --check",
     "generate:data": "node scripts/generate-data.mjs",
     "sync:operator-avatars": "node scripts/sync-operator-avatars.mjs",
     "predev": "npm run generate:data",
@@ -23,7 +25,7 @@
     "check:optimizer-dynamic-rules": "node scripts/check-optimizer-dynamic-rules.mjs",
     "check:public-http": "node scripts/check-public-http-smoke.mjs --self-test",
     "check:migration": "npm run build && node scripts/check-server-routes.mjs && node scripts/verify-migrated-data.mjs",
-    "check:local": "npm run build && npm test && npm run check:architecture && npm run check:copy && npm run check:dr && npm run check:deploy && npm run check:api && node scripts/check-server-routes.mjs",
+    "check:local": "npm run check:catalog && npm run build && npm test && npm run check:architecture && npm run check:copy && npm run check:dr && npm run check:deploy && npm run check:api && node scripts/check-server-routes.mjs",
     "start:server": "node server/dist/index.js",
     "preview": "vite preview"
   },

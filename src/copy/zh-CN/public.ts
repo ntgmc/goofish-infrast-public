@@ -240,7 +240,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_029: "MaaTool 是用于生成《明日方舟》基建排班建议和 MAA 配置文件的辅助工具。你使用本服务，即表示同意遵守本协议、隐私政策及页面展示的相关规则。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_030: "服务的功能、规则数据和可用性可能随版本更新而调整。已开通的 CDK 功能以工作台实际展示的权限和状态为准。",
+  pages_PublicInfoPage_030: "当前公开 SKU、价格、权益与限制以价格与权益页为准。服务可依法或因必要的产品调整更新规则；已开通授权的实时可用状态仍以工作台显示为准。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_031: "用户义务",
   // src/pages/PublicInfoPage.tsx
@@ -337,4 +337,32 @@ export const publicCopy = {
   pages_PublicInfoPage_077: "联系我们",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_078: "如对本页面内容或数据处理有疑问，请通过 MaaTool QQ 群联系官方。",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_001: "价格与权益",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_002: "公开 SKU",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_003: "先了解完整权益与限制，再选择适合自己的版本。公开产品只有免费预览与 49 元单账号终身版。",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_004: "一次性付费",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_005: "免费",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_006: "账号与更新规则",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_007: "功能对比",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_008: "功能",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_009: "售后与申诉",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_010: "联系客服",
+  // src/pages/PricingPage.tsx
+  pages_PricingPage_011: "返回首页",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_079: "换设备、误拦截与解冻",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_080: "材料齐全后，我们将在规定工作日内首次响应；核验与解冻完成时间取决于问题复杂度。",
+  // src/components/PublicFooter.tsx
+  components_PublicFooter_012: "价格与权益",
 } as const

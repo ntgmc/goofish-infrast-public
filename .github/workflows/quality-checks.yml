@@ -72,6 +72,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check product catalog and generated pricing
+        run: npm run check:catalog
+
       - name: Build web app
         run: npm run build
 

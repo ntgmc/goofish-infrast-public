@@ -1,6 +1,7 @@
 import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, RawPermissionMode, WorkFile } from "./types";
 import { decryptPayload } from "./crypto";
 import { copy } from '../copy/index'
+import { hasCapability, normalizeRuntimePermission } from './product-catalog'
 
 
 const LICENSE_PREFIX = "MAA-V1:";
@@ -162,33 +163,19 @@ export function extractConfigOverride(parsed: ParsedFile): LicenseConfig | null 
 }
 
 export function getPermissionMode(license: LicenseFile): PermissionMode {
-  switch (license.permission) {
-    case "recommended":
-    case "growth":
-    case "advanced":
-    case "ultimate":
-    case "admin":
-      return license.permission;
-    case "premium":
-      return "advanced";
-    case "basic":
-    default:
-      return "growth";
-  }
+  return normalizeRuntimePermission(license.permission)
 }
 
 export function canUseUpgradeFeatures(license: LicenseFile): boolean {
-  return getPermissionMode(license) !== "recommended";
+  return hasCapability({ permission: license.permission }, 'view_upgrade_suggestions')
 }
 
 export function canEditConfig(license: LicenseFile): boolean {
-  const permission = getPermissionMode(license);
-  return permission === "advanced" || permission === "ultimate" || permission === "admin";
+  return hasCapability({ permission: license.permission }, 'edit_full_config')
 }
 
 export function canUseScenarioComparison(license: LicenseFile): boolean {
-  const permission = getPermissionMode(license)
-  return permission === 'advanced' || permission === 'ultimate' || permission === 'admin'
+  return hasCapability({ permission: license.permission }, 'run_scenario_comparison')
 }
 
 export function isIntermediateAutoConfig(config: LicenseConfig | null | undefined): boolean {
@@ -199,8 +186,7 @@ export function canUseIntermediateAutoConfig(
   license: LicenseFile,
   config: LicenseConfig | null | undefined
 ): boolean {
-  const permission = getPermissionMode(license);
-  return (permission === "recommended" || permission === "growth") && isIntermediateAutoConfig(config);
+  return hasCapability({ permission: license.permission }, 'use_intermediate_auto_config') && isIntermediateAutoConfig(config)
 }
 
 function canUseLimitedConfigOverride(
@@ -208,8 +194,7 @@ function canUseLimitedConfigOverride(
   config: LicenseConfig | null | undefined
 ): boolean {
   if (!config) return false;
-  const permission = getPermissionMode(license);
-  if (permission !== "recommended" && permission !== "growth") return false;
+  if (!hasCapability({ permission: license.permission }, 'edit_limited_config')) return false;
   return hasSameStationPlan(license.config, config);
 }
 
@@ -235,8 +220,7 @@ function countRecordsEqual(
 }
 
 export function canReplaceOperators(license: LicenseFile): boolean {
-  const permission = getPermissionMode(license);
-  return permission === "advanced" || permission === "admin" || (license.operator_update_grant?.remaining ?? 0) > 0;
+  return hasCapability({ permission: license.permission, operatorUpdateGrantRemaining: license.operator_update_grant?.remaining }, 'replace_operator_data')
 }
 
 function isRawPermissionMode(value: string): value is RawPermissionMode {

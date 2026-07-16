@@ -39,4 +39,8 @@ export const metadataCopy = {
   components_RouteMetadata_019: "MaaTool 工作台",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_020: "管理游戏账号、配置基建规则、生成排班方案并查看收益与练度建议。",
+  // src/components/RouteMetadata.tsx
+  components_RouteMetadata_021: "价格与权益 | MaaTool",
+  // src/components/RouteMetadata.tsx
+  components_RouteMetadata_022: "查看 MaaTool 免费预览与单账号终身版的价格、能力、干员更新限制、风控规则和售后说明。",
 } as const

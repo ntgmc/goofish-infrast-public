@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "legacy_aliases": {
+    "basic": "growth",
+    "premium": "advanced"
+  },
+  "capabilities": {
+    "generate_full_schedule": {},
+    "export_maa_json": {},
+    "view_upgrade_suggestions": {},
+    "view_upgrade_roi": {},
+    "view_full_data": {},
+    "view_raw_results": {},
+    "edit_full_config": {},
+    "edit_limited_config": {},
+    "run_scenario_comparison": {},
+    "use_intermediate_auto_config": {},
+    "replace_operator_data": {},
+    "use_trusted_optimizer_options": {}
+  },
+  "runtime_permissions": {
+    "recommended": {
+      "label": "单次重置卡",
+      "admin_rank": 0,
+      "admin_issuable": true,
+      "public": false,
+      "capabilities": ["generate_full_schedule", "edit_limited_config", "use_intermediate_auto_config"]
+    },
+    "growth": {
+      "label": "练度提升卡",
+      "admin_rank": 1,
+      "admin_issuable": true,
+      "public": false,
+      "capabilities": ["generate_full_schedule", "view_upgrade_suggestions", "view_upgrade_roi", "edit_limited_config", "use_intermediate_auto_config"]
+    },
+    "advanced": {
+      "label": "单账号终身卡",
+      "admin_rank": 2,
+      "admin_issuable": true,
+      "public": false,
+      "capabilities": ["generate_full_schedule", "export_maa_json", "view_upgrade_suggestions", "view_upgrade_roi", "view_full_data", "view_raw_results", "edit_full_config", "run_scenario_comparison"]
+    },
+    "ultimate": {
+      "label": "Admin卡",
+      "admin_rank": 3,
+      "admin_issuable": true,
+      "public": false,
+      "capabilities": ["generate_full_schedule", "export_maa_json", "view_upgrade_suggestions", "view_upgrade_roi", "view_full_data", "view_raw_results", "edit_full_config", "run_scenario_comparison", "use_trusted_optimizer_options"]
+    },
+    "admin": {
+      "label": "Admin卡",
+      "admin_rank": 4,
+      "admin_issuable": false,
+      "public": false,
+      "capabilities": ["generate_full_schedule", "export_maa_json", "view_upgrade_suggestions", "view_upgrade_roi", "view_full_data", "view_raw_results", "edit_full_config", "run_scenario_comparison", "use_trusted_optimizer_options"]
+    }
+  },
+  "skus": {
+    "free_preview": {
+      "label": "免费预览",
+      "public": true,
+      "price": { "amount": 0, "currency": "CNY", "billing": "free" },
+      "display_price": "0 元",
+      "account_scope": "绑定森空岛 UID，一个游戏 UID 全站只能领取一次",
+      "runtime_permission": "growth",
+      "summary": "领取 1 次免费完整个人排班权益，确认期内可修正，锁定后仍可按规则检测是否值得重排。",
+      "audience": "想先试用、低频使用、不想研究复杂配置的普通玩家"
+    },
+    "single_account_lifetime": {
+      "label": "单账号终身版 CDK",
+      "public": true,
+      "price": { "amount": 49, "currency": "CNY", "billing": "one_time" },
+      "display_price": "49 元",
+      "account_scope": "仅限长期维护同一个游戏 UID，不支持自行更换游戏账号",
+      "runtime_permission": "advanced",
+      "summary": "免费预览全部能力，加上长期完整重新生成、MAA JSON 导出、完整数据、高级分析、练度建议和自定义配置。",
+      "audience": "想长期维护同一账号基建方案、需要导出或深度自定义的玩家"
+    },
+    "recommended_internal": { "label": "单次重置卡", "public": false, "price": null, "display_price": null, "account_scope": "内部发放", "runtime_permission": "recommended", "summary": "内部卡种", "audience": "内部使用" },
+    "growth_internal": { "label": "练度提升卡", "public": false, "price": null, "display_price": null, "account_scope": "内部发放", "runtime_permission": "growth", "summary": "内部卡种", "audience": "内部使用" },
+    "ultimate_internal": { "label": "Admin卡", "public": false, "price": null, "display_price": null, "account_scope": "内部发放", "runtime_permission": "ultimate", "summary": "内部卡种", "audience": "内部使用" }
+  },
+  "policies": {
+    "free_preview": {
+      "revision_window_hours": 24,
+      "revision_limit": 3,
+      "monthly_reorder_checks": 2,
+      "strong_reorder_bonus": 1
+    },
+    "lifetime_operator_updates": {
+      "window_days": 7,
+      "max_updates": 2,
+      "confirmation_suffix": "单账号终身卡采用滚动 7 天窗口，最多成功更新 2 次，并会校验账号绑定与启用中的风控规则。"
+    },
+    "risk": {
+      "operator_data_enabled_by_default": true,
+      "device_enabled_by_default": false,
+      "client_signal_window_days": 14,
+      "max_user_agents": 2,
+      "max_ip_prefixes": 3,
+      "soft_block_window_hours": 24,
+      "soft_blocks_before_freeze": 3
+    },
+    "support": {
+      "channel": "MaaTool 官方 QQ 群",
+      "first_response_business_days": 2,
+      "business_day_definition": "中国大陆法定工作日",
+      "sla_statement": "材料齐全后 2 个工作日内首次响应；工作日按中国大陆法定工作日计算，核验和解冻完成时间视复杂度而定，不承诺固定完成时限。",
+      "required_information": ["账号标识", "订单或 CDK 的安全标识", "报错时间", "不含敏感信息的错误描述和操作步骤"],
+      "forbidden_information": ["密码", "完整 CDK", "二维码", "Cookie", "森空岛凭据"]
+    },
+    "public_disclosures": [
+      "单账号终身版仅绑定一个游戏 UID，不支持自行更换游戏账号。",
+      "干员数据更新采用滚动 7 天窗口，最多成功更新 2 次。",
+      "长期更新指在服务持续提供且授权正常的前提下，按上述频率更新同一账号，不表示无限频次或任意换号。",
+      "干员归属、练度或干员池出现异常变化时可能先拦截；重复异常可能冻结档案。",
+      "设备风控启用时，设备 Token、浏览器 User-Agent 和网络 IP 前缀变化可能触发拦截或冻结。",
+      "正常换设备或误拦截需要通过 MaaTool 官方 QQ 群人工核验。"
+    ],
+    "public_feature_comparison": [
+      { "feature": "森空岛导入干员数据", "free_preview": "支持，必须绑定 UID", "single_account_lifetime": "支持，同一账号每 7 天最多成功更新 2 次" },
+      { "feature": "MAA 干员识别文件导入", "free_preview": "不支持手动上传干员", "single_account_lifetime": "支持，受同一更新频率和风控规则约束" },
+      { "feature": "完整个人游戏内轮换队列", "free_preview": "支持，受免费完整排班权益限制", "single_account_lifetime": "支持，可长期重新生成" },
+      { "feature": "MAA JSON 下载", "free_preview": "不支持", "single_account_lifetime": "支持" },
+      { "feature": "243 均衡 / 243 搓玉 / 333 搓玉预设", "free_preview": "支持", "single_account_lifetime": "支持" },
+      { "feature": "检测是否值得重排", "free_preview": "每月 2 次；强烈建议时当月额外 1 次完整免费生成", "single_account_lifetime": "可直接重新生成并查看完整结果" },
+      { "feature": "练度提升建议与 ROI", "free_preview": "不支持", "single_account_lifetime": "支持" },
+      { "feature": "完整数据与原始结果", "free_preview": "不支持", "single_account_lifetime": "支持" },
+      { "feature": "自定义配置", "free_preview": "不支持", "single_account_lifetime": "支持" },
+      { "feature": "场景对比实验室 / Pareto 高级分析", "free_preview": "不支持", "single_account_lifetime": "支持，最多比较 24 个场景" },
+      { "feature": "批量报告导出 / 商用授权", "free_preview": "不支持", "single_account_lifetime": "不支持" },
+      { "feature": "更换游戏账号", "free_preview": "不支持", "single_account_lifetime": "不支持自行更换；需人工核验" }
+    ]
+  }
+}
