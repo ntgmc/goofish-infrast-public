@@ -7108,14 +7108,12 @@
         },
         {
           "combo": [
-            "烈夏/2",
-            "谬因/2"
+            "烈夏/2"
           ],
           "product": [
             "Battle Record"
           ],
           "efficiency": 0,
-          "apply_each": true,
           "dynamic_effects": {
             "type": "operator_presence_count",
             "base": 0,
@@ -7132,10 +7130,6 @@
           "priority": 3150,
           "note": "动态：患难拍档，进驻制造站时，若古米在贸易站，则作战记录类配方的生产力+35%。",
           "skill_rule_refs": [
-            {
-              "id": "PRTS-MFG-0223",
-              "hash": "sha256:b3cd7965640b6d9cd1cffa7674fc9c0edfdb99dcf33bdb1895794125d2b5c432"
-            },
             {
               "id": "PRTS-MFG-0224",
               "hash": "sha256:b51c9f134860c6381c07e7d36066c38ce4c4125a7846eb1fa36ea8def23b6ebd"
