@@ -1,8 +1,8 @@
 {
   "source": "https://prts.wiki/w/%E5%90%8E%E5%8B%A4%E6%8A%80%E8%83%BD%E4%B8%80%E8%A7%88",
-  "fetched_at": "2026-06-09T13:42:13.959167+00:00",
-  "skill_count": 693,
-  "holder_count": 899,
+  "fetched_at": "2026-07-16T03:15:34.797381+00:00",
+  "skill_count": 695,
+  "holder_count": 903,
   "unresolved_elite_count": 0,
   "unresolved_elites": [],
   "skills": [
@@ -2892,6 +2892,18 @@
     },
     {
       "facility": "制造站",
+      "skill": "源岩解析",
+      "description": "进驻制造站时，源石类配方的生产力+35%",
+      "icon": "https://torappu.prts.wiki/assets/build_skill_icon/bskill_man_originium2.png",
+      "holders": [
+        {
+          "name": "谬因",
+          "elite": 0
+        }
+      ]
+    },
+    {
+      "facility": "制造站",
       "skill": "患难拍档",
       "description": "进驻制造站时，若古米在贸易站，则作战记录类配方的生产力+35%",
       "icon": "https://torappu.prts.wiki/assets/build_skill_icon/bskill_formula_spd_sunbr.png",
@@ -5414,6 +5426,10 @@
       "holders": [
         {
           "name": "泥岩",
+          "elite": 2
+        },
+        {
+          "name": "谬因",
           "elite": 2
         }
       ]
@@ -8116,10 +8132,26 @@
     },
     {
       "facility": "训练室",
+      "skill": "实战技巧：游击手",
+      "description": "进驻训练室协助位时，辅助干员的专精技能训练速度+30%，如果训练位干员分支为游击手，则训练速度额外+45%",
+      "icon": "https://torappu.prts.wiki/assets/build_skill_icon/bskill_train_supportiveranger.png",
+      "holders": [
+        {
+          "name": "佩德洛",
+          "elite": 2
+        }
+      ]
+    },
+    {
+      "facility": "训练室",
       "skill": "辅助专精·α",
       "description": "进驻训练室协助位时，辅助干员的专精技能训练速度+30%",
       "icon": "https://torappu.prts.wiki/assets/build_skill_icon/bskill_train_supporter1.png",
       "holders": [
+        {
+          "name": "佩德洛",
+          "elite": 0
+        },
         {
           "name": "浊心斯卡蒂",
           "elite": 0
@@ -9018,7 +9050,7 @@
       "facility": "会客室",
       "skill": "线索搜集·β",
       "description": "进驻会客室时，线索搜集速度提升20%",
-      "icon": "https://torappu.prts.wiki/assets/build_skill_icon/bskill_meet_spd3.png",
+      "icon": "https://torappu.prts.wiki/assets/build_skill_icon/bskill_meet_spd2.png",
       "holders": [
         {
           "name": "行箸",
