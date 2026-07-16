@@ -11,6 +11,7 @@ import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammetta
 import { buildScenarioComparisonEstimate } from './job-status';
 import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../../free-preview-trial';
+import { hasCapability } from '../../../src/lib/product-catalog';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -130,7 +131,7 @@ export async function prepareOptimizeJob(
     };
     scheduleUsage = scheduleFailure('optimizer_runtime_error', scheduleUsageBase);
 
-    if (isScenarioComparison && !['advanced', 'ultimate', 'admin'].includes(optimizePermission)) {
+    if (isScenarioComparison && (optimizePermission === 'free_preview' || !hasCapability({ permission: optimizePermission }, 'run_scenario_comparison'))) {
       return fail({ error: '当前套餐不包含场景对比实验室。' }, 403);
     }
 

@@ -141,6 +141,11 @@ export function CdkDetailPanel({
 }: CdkDetailPanelProps) {
   const nextPermission = getNextProductPermission(detail.permission)
   const canGrantOperatorUpdate = detail.status === 'used' && Boolean(detail.license_order_hash)
+  const runReviewedAction = (action: 'reset_device_binding_and_unfreeze' | 'accept_operator_baseline_and_unfreeze', prompt: string) => {
+    const reason = window.prompt(prompt)
+    if (!reason?.trim()) return
+    void onPatch(detail, action, undefined, { reason: reason.trim() })
+  }
   return (
     <section className="tool-panel overflow-hidden">
       <div className="tool-panel-header flex flex-col gap-3 p-4 lg:flex-row lg:items-start lg:justify-between">
@@ -158,6 +163,8 @@ export function CdkDetailPanel({
           {nextPermission && detail.status !== 'frozen' && detail.status !== 'revoked' && <SmallButton onClick={() => void onPatch(detail, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${detail.code_hash}`}>升级</SmallButton>}
           {canGrantOperatorUpdate && <SmallButton onClick={() => void onPatch(detail, 'grant_operator_update')} loading={busyAction === `grant_operator_update:${detail.code_hash}`}>发放更新</SmallButton>}
           {detail.status === 'frozen' && <SmallButton onClick={() => void onPatch(detail, 'unfreeze')} loading={busyAction === `unfreeze:${detail.code_hash}`} tone="success">解冻</SmallButton>}
+          {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => runReviewedAction('reset_device_binding_and_unfreeze', '请输入换设备核验备注。该操作会清除设备绑定并解冻授权。')} loading={busyAction === `reset_device_binding_and_unfreeze:${detail.code_hash}`} tone="success">重置设备并解冻</SmallButton>}
+          {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => runReviewedAction('accept_operator_baseline_and_unfreeze', '请输入干员数据误拦截核验备注。该操作会接受最新快照为新基线并解冻。')} loading={busyAction === `accept_operator_baseline_and_unfreeze:${detail.code_hash}`} tone="success">接受干员基线</SmallButton>}
           {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => void onPatch(detail, 'revoke')} loading={busyAction === `revoke:${detail.code_hash}`} tone="danger">撤销</SmallButton>}
           <SmallButton onClick={onClose} autoFocus>关闭</SmallButton>
         </div>

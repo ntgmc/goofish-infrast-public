@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
 
           missing=()
-          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_ROOT DEPLOY_REPO_DIR DEPLOY_SCRIPT DEPLOY_SERVICE_NAME DEPLOY_PUBLIC_BASE_URL; do
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS DEPLOY_ROOT DEPLOY_REPO_DIR DEPLOY_SCRIPT DEPLOY_SERVICE_NAME DEPLOY_PUBLIC_BASE_URL; do
             if [[ -z "${!name}" ]]; then
               missing+=("$name")
             fi
@@ -81,7 +81,7 @@ jobs:
 
       - name: Resolve immutable target SHA
         id: target
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           RAW_TARGET_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.commit_sha }}
         with:
@@ -120,7 +120,7 @@ jobs:
             core.setOutput('allow_redeploy', automatic ? 'false' : 'true')
 
       - name: Verify target belongs to main
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: main
           fetch-depth: 0
@@ -148,11 +148,7 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          if [[ -n "$DEPLOY_KNOWN_HOSTS" ]]; then
-            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          else
-            ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
-          fi
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
       - name: Deploy verified release

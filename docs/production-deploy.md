@@ -159,9 +159,9 @@ ready and Nginx has switched successfully.
    | `DEPLOY_BLUE_PORT` | `3000` |
    | `DEPLOY_GREEN_PORT` | `3002` |
 
-   Required secrets remain `DEPLOY_HOST`, `DEPLOY_USER`, and `DEPLOY_SSH_KEY`.
-   `DEPLOY_KNOWN_HOSTS` should contain pinned host-key lines; do not rely on
-   opportunistic `ssh-keyscan` in a mature production setup.
+   Required secrets are `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, and
+   `DEPLOY_KNOWN_HOSTS`. The latter must contain pinned host-key lines; the
+   workflow rejects deployments instead of trusting opportunistic `ssh-keyscan` output.
 
 6. Run a manual deployment for a successful main `commit_sha`. On an initial
    migration the script deliberately chooses green:3002 to avoid the legacy

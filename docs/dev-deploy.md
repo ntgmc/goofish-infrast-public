@@ -202,7 +202,7 @@ Create a `development` environment in GitHub and configure these secrets:
 | `DEPLOY_HOST` | Yes | Server hostname or IP address. |
 | `DEPLOY_USER` | Yes | SSH user that can run the deploy script. |
 | `DEPLOY_SSH_KEY` | Yes | Private SSH key for the deploy user. |
-| `DEPLOY_KNOWN_HOSTS` | Recommended | Pinned SSH host key lines for the server. |
+| `DEPLOY_KNOWN_HOSTS` | Yes | Pinned SSH host key lines for the server; deployment fails when omitted. |
 
 Optional `development` environment variables:
 

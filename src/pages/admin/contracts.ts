@@ -1,5 +1,6 @@
 import type { Announcement, AnnouncementKind, AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../../lib/types'
 import type { AdminSection } from '../../lib/app-routes'
+import { getPermissionProfile, getPermissionRank, listAdminIssuablePermissions, productPolicies } from '../../lib/product-catalog'
 
 export type { AdminSection } from '../../lib/app-routes'
 export type Permission = RawPermissionMode
@@ -376,20 +377,14 @@ export const EMPTY_ANNOUNCEMENT_REACH_STATS: AnnouncementReachStats = {
 }
 
 export const DEFAULT_RISK_SETTINGS: RiskControlSettings = {
-  operator_data_risk_enabled: true,
-  device_risk_enabled: false,
+  operator_data_risk_enabled: productPolicies.risk.operator_data_enabled_by_default,
+  device_risk_enabled: productPolicies.risk.device_enabled_by_default,
   updated_at: null,
 }
 
-export const permissionLabels: Record<Permission, string> = {
-recommended: '单次重置卡',
-growth: '练度提升卡',
-advanced: '单账号终身卡',
-ultimate: 'Admin卡',
-basic: '练度提升卡',
-premium: '单账号终身卡',
-admin: 'Admin卡',
-}
+export const permissionLabels = new Proxy({} as Record<Permission, string>, {
+  get: (_target, permission: string) => getPermissionProfile(permission as Permission).label,
+})
 
 export const statusLabels: Record<CdkStatus, string> = {
   unused: '未使用',
@@ -425,13 +420,10 @@ export const announcementSortLabels: Record<AnnouncementSortKey, string> = {
   active: '启用状态',
 }
 
-export const cdkProductPermissions: GeneratedPermission[] = ['recommended', 'growth', 'advanced', 'ultimate']
+export const cdkProductPermissions: GeneratedPermission[] = listAdminIssuablePermissions()
 
 export const MAX_CDK_BATCH_COUNT = 100
 
-export const cdkProductPermissionRank: Record<GeneratedPermission, number> = {
-  recommended: 0,
-  growth: 1,
-  advanced: 2,
-  ultimate: 3,
-}
+export const cdkProductPermissionRank = Object.fromEntries(
+  cdkProductPermissions.map((permission) => [permission, getPermissionRank(permission)]),
+) as Record<GeneratedPermission, number>

@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process'
 
 const workflow = await readFile('.github/workflows/deploy-production.yml', 'utf8')
 const qualityChecksWorkflow = await readFile('.github/workflows/quality-checks.yml', 'utf8')
+const securityAnalysisWorkflow = await readFile('.github/workflows/security-analysis.yml', 'utf8')
 const deployScript = await readFile('scripts/deploy-production-atomic.sh', 'utf8')
 const apiNginx = await readFile('deploy/nginx/goofish-api-production.conf', 'utf8')
 const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', 'utf8')
@@ -14,6 +15,7 @@ const productionDocs = await readFile('docs/production-deploy.md', 'utf8')
 
 assertWorkflowProvenance()
 assertQualityChecksImmutability()
+assertSecurityAnalysisGate()
 assertDeploymentScript()
 assertNginxBlueGreenConfig()
 assertSystemdTemplate()
@@ -30,6 +32,8 @@ function assertWorkflowProvenance() {
   assert.match(workflow, /run\.conclusion === 'success'/, 'manual deploy should require successful Quality Checks')
   assert.match(workflow, /git merge-base --is-ancestor "\$TARGET_SHA" origin\/main/, 'workflow should verify main ancestry')
   assert.match(workflow, /TARGET_SHA=\$\{TARGET_SHA@Q\}/, 'SSH command should pass a shell-quoted target SHA')
+  assert.match(workflow, /for name in[^\n]*DEPLOY_KNOWN_HOSTS/, 'production deploy should require pinned SSH host keys')
+  assert.doesNotMatch(workflow, /ssh-keyscan/, 'production deploy must not trust host keys discovered at runtime')
   assert.doesNotMatch(workflow, /DEPLOY_BRANCH/, 'production workflow must not pass a mutable branch')
   for (const deploymentPath of [
     "'.github/workflows/deploy-production.yml'",
@@ -48,6 +52,21 @@ function assertQualityChecksImmutability() {
   assert.doesNotMatch(qualityChecksWorkflow, /refresh-build-metadata/, 'Quality Checks must not refresh committed build metadata')
   assert.doesNotMatch(qualityChecksWorkflow, /--refresh-metadata/, 'Quality Checks must not generate metadata for a repository commit')
   assert.doesNotMatch(qualityChecksWorkflow, /\bgit push\b/, 'Quality Checks must not advance a checked branch')
+}
+
+function assertSecurityAnalysisGate() {
+  assert.match(
+    qualityChecksWorkflow,
+    /uses: \.\/\.github\/workflows\/security-analysis\.yml/,
+    'Quality Checks should require the reusable security analysis workflow',
+  )
+  assert.match(securityAnalysisWorkflow, /^\s+workflow_call:$/m, 'security analysis should support reusable invocation')
+  assert.match(
+    securityAnalysisWorkflow,
+    /semgrep scan --config \.semgrep\.yml --error --metrics=off \./,
+    'security analysis should block on findings from repository-pinned rules',
+  )
+  assert.doesNotMatch(securityAnalysisWorkflow, /codeql-action/, 'private-repository security analysis must not require CodeQL')
 }
 
 function assertDeploymentScript() {

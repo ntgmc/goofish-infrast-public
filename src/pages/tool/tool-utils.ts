@@ -1,5 +1,6 @@
 import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, UserGameAccount } from '../../lib/types'
 import { copy, CURRENT_LOCALE } from '../../copy/index'
+import { getPermissionProfile, normalizeRuntimePermission } from '../../lib/product-catalog'
 
 
 export function createAccountLicense(profile: UserGameAccount, operators: LicenseOperator[], config: LicenseConfig): LicenseFile {
@@ -41,11 +42,7 @@ export function isSchedulableProfile(profile: UserGameAccount): boolean {
 export function getProfileAccessLabel(profile: UserGameAccount): string {
   if (isFreePreviewTrialActive(profile)) return copy.workspace.pages_tool_tool_utils_001
   if (isFreePreviewProfile(profile)) return copy.workspace.pages_tool_tool_utils_002
-  if (profile.permission === 'recommended') return copy.workspace.pages_tool_tool_utils_003
-  if (profile.permission === 'growth') return copy.workspace.pages_tool_tool_utils_004
-  if (profile.permission === 'advanced') return copy.workspace.pages_tool_tool_utils_005
-  if (profile.permission === 'ultimate' || profile.permission === 'admin') return copy.workspace.pages_tool_tool_utils_006
-  return copy.workspace.pages_tool_tool_utils_007
+  return getPermissionProfile(profile.permission).label
 }
 
 export function sortOperatorsForPreview(operators: LicenseOperator[]): LicenseOperator[] {
@@ -113,6 +110,5 @@ function numberValue(value: unknown): number {
 }
 
 function normalizePermission(permission: PermissionMode): PermissionMode {
-  if (permission === 'recommended' || permission === 'growth' || permission === 'advanced' || permission === 'ultimate' || permission === 'admin') return permission
-  return 'growth'
+  return normalizeRuntimePermission(permission)
 }

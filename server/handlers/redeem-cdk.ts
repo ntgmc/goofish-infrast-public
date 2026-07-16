@@ -13,14 +13,7 @@ import {
 import { recordUsageEvent } from './usage-stats'
 import type { UsageReasonCode } from '../storage/usage-store'
 import { CdkAlreadyRedeemedError, IdempotencyConflictError, createRequestHash, redeemCdkAtomically } from '../storage/cdk-redemption'
-
-const PERMISSION_LABELS: Record<string, string> = {
-recommended: '单次重置卡',
-growth: '练度提升卡',
-advanced: '单账号终身卡',
-ultimate: 'Admin卡',
-admin: 'Admin卡',
-}
+import { getPermissionProfile } from '../../src/lib/product-catalog'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -170,7 +163,7 @@ async function validateCdkCode(code: string): Promise<Response> {
     return jsonResponse({
       ok: true,
       permission,
-      permission_label: PERMISSION_LABELS[permission] ?? permission,
+      permission_label: getPermissionProfile(permission).label,
     })
   } catch (error) {
     console.error('validate cdk error:', error)
