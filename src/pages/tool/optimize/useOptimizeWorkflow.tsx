@@ -21,6 +21,7 @@ import { useOptimizeWorkspace } from './useOptimizeWorkspace'
 import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, parseOperatorsFile } from './workflow-utils'
 import { usePriorityCoupon as usePriorityCouponState } from './usePriorityCoupon'
 import { copy } from '../../../copy/index'
+import { hasCapability, productPolicies } from '../../../lib/product-catalog'
 
 
 export interface Props {
@@ -155,11 +156,11 @@ export function useOptimizeWorkflow(props: Props) {
 
   const permission = getPermissionMode(license)
 
-  const userCanReplaceOperators = isPreviewTrial
+  const userCanReplaceOperators = isPreviewTrial || hasCapability({ permission: license.permission, operatorUpdateGrantRemaining: license.operator_update_grant?.remaining }, 'replace_operator_data')
 
   const userCanEditConfig = canEditConfig(license)
 
-  const userCanUseIntermediateAutoConfig = isPreviewProfile || permission === 'recommended' || permission === 'growth'
+  const userCanUseIntermediateAutoConfig = isPreviewProfile || hasCapability({ permission }, 'use_intermediate_auto_config')
 
   const userCanApplyConfigOverride = true
 
@@ -319,7 +320,7 @@ export function useOptimizeWorkflow(props: Props) {
       try {
         const nextOperators = parseOperatorsFile(await file.text())
         const confirmed = window.confirm(
-  `${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_004}${nextOperators.length}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_005}`
+          `${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_004}${nextOperators.length}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_005}${productPolicies.lifetime_operator_updates.confirmation_suffix}`
         )
         if (!confirmed) {
           if (operatorFileRef.current) {

@@ -94,6 +94,26 @@ if (enabledDeviceRiskRecord.status !== 'frozen') {
   throw new Error('enabled user-agent churn risk should freeze cdk record')
 }
 
+const resetRecord = await licenseUtils.resetDeviceBindingAndUnfreeze(enabledDeviceRiskRecord, 'verified device replacement')
+if (resetRecord.status !== 'used' || resetRecord.activation_token_hash || (resetRecord.user_agent_events?.length ?? 0) !== 0 || (resetRecord.ip_prefix_events?.length ?? 0) !== 0) {
+  throw new Error('reviewed device reset should clear binding signals and unfreeze the record')
+}
+if (resetRecord.risk_events?.at(-1)?.type !== 'admin_device_binding_reset') {
+  throw new Error('reviewed device reset should append an audit event')
+}
+
+let baselineRecoveryRecord = createRecord('operator-baseline-recovery')
+baselineRecoveryRecord.status = 'frozen'
+baselineRecoveryRecord.latest_operator_fingerprint = licenseUtils.buildOperatorFingerprint(regressedOperators)
+await store.create(`cdk/${baselineRecoveryRecord.code_hash}.json`, baselineRecoveryRecord)
+baselineRecoveryRecord = await licenseUtils.acceptLatestOperatorBaselineAndUnfreeze(baselineRecoveryRecord, 'verified operator snapshot')
+if (!baselineRecoveryRecord || baselineRecoveryRecord.status !== 'used' || baselineRecoveryRecord.baseline_operator_fingerprint?.hash !== baselineRecoveryRecord.latest_operator_fingerprint?.hash) {
+  throw new Error('reviewed operator recovery should accept the latest snapshot and unfreeze the record')
+}
+if (baselineRecoveryRecord.risk_events?.at(-1)?.type !== 'admin_operator_baseline_accepted') {
+  throw new Error('reviewed operator recovery should append an audit event')
+}
+
 console.log('license risk smoke check ok')
 
 function createRecord(codeHash) {

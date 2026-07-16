@@ -13,6 +13,12 @@ if (!databaseUrl) {
 const exportPath = process.argv[2] || process.env.MIGRATION_EXPORT_PATH || ''
 const expected = exportPath ? JSON.parse(await readFile(resolve(exportPath), 'utf8')) : null
 const pool = new Pool({ connectionString: databaseUrl, application_name: 'goofish-infrast-v1-verify' })
+const countQueries = Object.freeze({
+  cdk_records: 'select count(*)::int as count from cdk_records',
+  announcements: 'select count(*)::int as count from announcements',
+  usage_events: 'select count(*)::int as count from usage_events',
+  admin_users: 'select count(*)::int as count from admin_users',
+})
 
 try {
   const counts = {
@@ -38,7 +44,9 @@ try {
 }
 
 async function countRows(table) {
-  const result = await pool.query(`select count(*)::int as count from ${table}`)
+  const query = countQueries[table]
+  if (!query) throw new Error(`unsupported migration table: ${table}`)
+  const result = await pool.query(query)
   return result.rows[0].count
 }
 

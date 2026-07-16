@@ -5,6 +5,7 @@ import { copy } from '../copy/index'
 export const SUPPORT_QQ_GROUP_URL = 'http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=Hx_aCfNq_KOuGJ2w0KiRdvzIo33PlkQ6'
 
 const footerLinks = [
+  { to: '/pricing', label: copy.public.components_PublicFooter_012 },
   { to: '/faq', label: copy.public.components_PublicFooter_001 },
   { to: '/terms', label: copy.public.components_PublicFooter_002 },
   { to: '/privacy', label: copy.public.components_PublicFooter_003 },
@@ -37,7 +38,7 @@ export default function PublicFooter({ className = '', variant = 'landing' }: Pu
             rel="noopener noreferrer"
           >
             {copy.public.components_PublicFooter_010}</a>
-          {footerLinks.slice(1).map((link) => (
+          {footerLinks.filter((link) => link.to !== '/faq').map((link) => (
             <Link key={link.to} className={linkClassName} to={link.to}>
               {link.label}
             </Link>

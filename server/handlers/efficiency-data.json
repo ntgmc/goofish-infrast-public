@@ -3465,7 +3465,8 @@
             "地灵/1",
             "炎熔/1",
             "艾雅法拉",
-            "锡兰/2"
+            "锡兰/2",
+            "谬因"
           ],
           "efficiency": 35,
           "apply_each": true,
@@ -3899,12 +3900,14 @@
         },
         {
           "combo": [
-            "烈夏/2"
+            "烈夏/2",
+            "谬因/2"
           ],
           "product": [
             "Battle Record"
           ],
           "efficiency": 0,
+          "apply_each": true,
           "dynamic_effects": {
             "type": "operator_presence_count",
             "base": 0,

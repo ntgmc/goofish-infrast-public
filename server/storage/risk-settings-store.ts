@@ -1,5 +1,6 @@
 import { query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import { productPolicies } from '../../src/lib/product-catalog'
 
 const RISK_SETTINGS_KEY = 'global'
 
@@ -17,8 +18,8 @@ export interface RiskControlSettingsStore {
 }
 
 export const DEFAULT_RISK_CONTROL_SETTINGS: RiskControlSettings = {
-  operator_data_risk_enabled: true,
-  device_risk_enabled: false,
+  operator_data_risk_enabled: productPolicies.risk.operator_data_enabled_by_default,
+  device_risk_enabled: productPolicies.risk.device_enabled_by_default,
   updated_at: null,
 }
 
@@ -27,8 +28,8 @@ let schemaReady: Promise<void> | null = null
 export function normalizeRiskControlSettings(value: unknown): RiskControlSettings {
   const source = value && typeof value === 'object' ? value as Partial<RiskControlSettings> : {}
   return {
-    operator_data_risk_enabled: source.operator_data_risk_enabled !== false,
-    device_risk_enabled: source.device_risk_enabled === true,
+    operator_data_risk_enabled: source.operator_data_risk_enabled ?? productPolicies.risk.operator_data_enabled_by_default,
+    device_risk_enabled: source.device_risk_enabled ?? productPolicies.risk.device_enabled_by_default,
     updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
   }
 }

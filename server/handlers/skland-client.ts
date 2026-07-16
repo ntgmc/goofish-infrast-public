@@ -313,7 +313,8 @@ export function generateSklandSign(token: string, path: string, queryOrBody: str
   }
   const source = path + queryOrBody + timestamp + JSON.stringify(headerForSign)
   const hmac = createHmac('sha256', token).update(source, 'utf8').digest('hex')
-  return createHash('md5').update(hmac, 'utf8').digest('hex')
+  // MD5 is mandated by the upstream signing protocol and only wraps an HMAC-SHA256 result.
+  return createHash('md5').update(hmac, 'utf8').digest('hex') // nosemgrep: javascript.security.no-weak-cryptographic-hash
 }
 
 export class SklandClient {
