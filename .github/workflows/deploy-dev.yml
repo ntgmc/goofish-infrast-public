@@ -58,7 +58,7 @@ jobs:
           set -euo pipefail
 
           missing=()
-          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY; do
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
             if [[ -z "${!name}" ]]; then
               missing+=("$name")
             fi
@@ -80,12 +80,7 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          if [[ -n "$DEPLOY_KNOWN_HOSTS" ]]; then
-            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          else
-            ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
-          fi
-
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
       - name: Run dev deploy script
