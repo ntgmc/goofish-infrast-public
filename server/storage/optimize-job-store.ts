@@ -388,8 +388,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
                status = case when failure_count + 1 >= $6 then 'failed' else 'queued' end,
                error_message = case when failure_count + 1 >= $6 then $5 else null end,
                worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
-               next_attempt_at = case when failure_count + 1 >= $6 then null else $8 end,
-               finished_at = case when failure_count + 1 >= $6 then $7 else null end,
+               next_attempt_at = case when failure_count + 1 >= $6 then null else $8::timestamptz end,
+               finished_at = case when failure_count + 1 >= $6 then $7::timestamptz else null end,
                updated_at = $7
            where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running'
            returning status`,
@@ -442,8 +442,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
                status = case when failure_count + 1 >= $2 then 'failed' else 'queued' end,
                error_message = case when failure_count + 1 >= $2 then coalesce(error_message, '任务执行租约已过期，请重试。') else null end,
                worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
-               next_attempt_at = case when failure_count + 1 >= $2 then null else $3 end,
-               finished_at = case when failure_count + 1 >= $2 then $1 else null end,
+               next_attempt_at = case when failure_count + 1 >= $2 then null else $3::timestamptz end,
+               finished_at = case when failure_count + 1 >= $2 then $1::timestamptz else null end,
                updated_at = $1
            where status = 'running' and lock_expires_at is not null and lock_expires_at < $1
            returning id, status, attempt_count`,

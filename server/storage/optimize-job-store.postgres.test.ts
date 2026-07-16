@@ -196,6 +196,41 @@ describe('PostgreSQL optimization job admission', () => {
     )).rows[0]?.status).toBe('interrupted')
   })
 
+  it('recovers expired attempts and schedules worker retries with timestamp parameters', async () => {
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({ priority: 150_000 }))
+    await query('update optimize_dispatch_state set prioritized_streak = 0 where id = true')
+    const first = await store.claimNextJob('recovery-worker', 'recovery-lock', '2020-01-01T00:00:00.000Z', 3, 10)
+    expect(first?.id).toBe(admitted.job.id)
+
+    await expect(store.recoverExpiredAttempts(new Date().toISOString(), 3)).resolves.toBeGreaterThanOrEqual(1)
+    await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({
+      status: 'queued',
+      failure_count: 1,
+      attempt_count: 1,
+    })
+
+    await query('update optimize_jobs set next_attempt_at = $2 where id = $1', [admitted.job.id, '2020-01-01T00:00:00.000Z'])
+    await query('update optimize_dispatch_state set prioritized_streak = 0 where id = true')
+    const second = await store.claimNextJob('retry-worker', 'retry-lock', '2020-01-01T00:00:00.000Z', 3, 10)
+    expect(second?.id).toBe(admitted.job.id)
+    await expect(store.retryFailedAttempt(
+      admitted.job.id,
+      second!.attempt_count,
+      'retry-worker',
+      'retry-lock',
+      'worker_crash',
+      'retry regression test',
+      3,
+    )).resolves.toBe('queued')
+    await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({
+      status: 'queued',
+      failure_count: 2,
+      attempt_count: 2,
+    })
+    await query("update optimize_jobs set status = 'failed', next_attempt_at = null, finished_at = now(), updated_at = now() where id = $1", [admitted.job.id])
+  })
+
   it('expires never-started jobs and releases their reserved free entitlement', async () => {
     const profileId = await seedProfile()
     const store = createPostgresOptimizeJobStore()
