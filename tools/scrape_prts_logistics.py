@@ -1,7 +1,9 @@
 import argparse
 import datetime as dt
+import hashlib
 import html
 import json
+import os
 import re
 import urllib.parse
 import urllib.request
@@ -15,6 +17,19 @@ VOID_TAGS = {
     "meta", "param", "source", "track", "wbr",
 }
 ELITE_RE = re.compile(r"(?:%E7%B2%BE%E8%8B%B1|精英)_([0-2])_", re.IGNORECASE)
+RULE_ID_RE = re.compile(r"^PRTS-([A-Z]+)-(\d{4,})$")
+CONTENT_HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+FACILITY_PREFIXES = {
+    "控制中枢": "CC",
+    "贸易站": "TRD",
+    "制造站": "MFG",
+    "发电站": "PWR",
+    "宿舍": "DORM",
+    "会客室": "MEET",
+    "办公室": "HR",
+    "加工站": "PROC",
+    "训练室": "TRAIN",
+}
 
 
 class Node:
@@ -214,7 +229,184 @@ def parse_skill_rows(page_html):
     return rows
 
 
-def build_payload(source_url, rows):
+def merge_duplicate_rows(rows):
+    """Merge semantically identical source rows while preserving source order."""
+    merged = []
+    by_content = {}
+    holder_keys = {}
+    for row in rows:
+        content_key = (
+            row["facility"],
+            row["skill"],
+            row["description"],
+            row["icon"],
+        )
+        if content_key not in by_content:
+            copied = {
+                "facility": row["facility"],
+                "skill": row["skill"],
+                "description": row["description"],
+                "icon": row["icon"],
+                "holders": [],
+            }
+            by_content[content_key] = copied
+            holder_keys[content_key] = set()
+            merged.append(copied)
+
+        target = by_content[content_key]
+        seen = holder_keys[content_key]
+        for holder in row["holders"]:
+            holder_key = (holder["name"], holder["elite"])
+            if holder_key in seen:
+                continue
+            seen.add(holder_key)
+            target["holders"].append({
+                "name": holder["name"],
+                "elite": holder["elite"],
+            })
+    return merged
+
+
+def icon_filename(icon_url):
+    path = urllib.parse.urlsplit(icon_url).path
+    return urllib.parse.unquote(path.rsplit("/", 1)[-1])
+
+
+def rule_identity(row):
+    elites = [holder["elite"] for holder in row.get("holders", []) if holder["elite"] is not None]
+    minimum_elite = min(elites) if elites else None
+    return (row["facility"], row["skill"], icon_filename(row["icon"]), minimum_elite)
+
+
+def base_rule_identity(row):
+    return rule_identity(row)[:3]
+
+
+def canonical_rule_content(row):
+    return {
+        "facility": row["facility"],
+        "skill": row["skill"],
+        "description": row["description"],
+        "icon": row["icon"],
+        "holders": [
+            {"name": holder["name"], "elite": holder["elite"]}
+            for holder in row["holders"]
+        ],
+    }
+
+
+def calculate_content_hash(row):
+    canonical = json.dumps(
+        canonical_rule_content(row),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def validate_existing_payload(payload):
+    if payload is None:
+        return {}, 0
+    if not isinstance(payload, dict):
+        raise ValueError("Existing output must be a JSON object.")
+
+    last_rule_number = payload.get("last_rule_number", 0)
+    if isinstance(last_rule_number, bool) or not isinstance(last_rule_number, int):
+        raise ValueError("Existing last_rule_number must be a non-negative integer.")
+    if last_rule_number < 0:
+        raise ValueError("Existing last_rule_number must be a non-negative integer.")
+
+    skills = payload.get("skills", [])
+    with_ids = ["rule_id" in row or "content_hash" in row for row in skills]
+    if any(with_ids) and not all(with_ids):
+        raise ValueError("Existing skills must either all have audit fields or all be legacy rows.")
+    if not any(with_ids):
+        return {}, last_rule_number
+
+    by_identity = {}
+    used_ids = set()
+    maximum = 0
+    for row in skills:
+        facility = row.get("facility")
+        expected_prefix = FACILITY_PREFIXES.get(facility)
+        if expected_prefix is None:
+            raise ValueError(f"Unknown facility in existing output: {facility!r}")
+
+        rule_id = row.get("rule_id")
+        match = RULE_ID_RE.fullmatch(rule_id or "")
+        if not match or match.group(1) != expected_prefix:
+            raise ValueError(f"Invalid rule_id for {facility}/{row.get('skill')}: {rule_id!r}")
+        number = int(match.group(2))
+        maximum = max(maximum, number)
+        if rule_id in used_ids:
+            raise ValueError(f"Duplicate rule_id in existing output: {rule_id}")
+        used_ids.add(rule_id)
+
+        content_hash = row.get("content_hash")
+        if not CONTENT_HASH_RE.fullmatch(content_hash or ""):
+            raise ValueError(f"Invalid content_hash for {rule_id}")
+        if content_hash != calculate_content_hash(row):
+            raise ValueError(f"Stale content_hash in existing output: {rule_id}")
+
+        identity = rule_identity(row)
+        if identity in by_identity:
+            raise ValueError(
+                "Duplicate skill identity in existing output: "
+                f"{identity[0]}/{identity[1]}/{identity[2]}"
+            )
+        by_identity[identity] = rule_id
+
+    if last_rule_number < maximum:
+        raise ValueError(
+            f"last_rule_number {last_rule_number} is below assigned maximum {maximum}."
+        )
+    return by_identity, last_rule_number
+
+
+def assign_rule_audit_fields(rows, existing_payload=None):
+    existing_ids, last_rule_number = validate_existing_payload(existing_payload)
+    existing_by_base = {}
+    for identity, rule_id in existing_ids.items():
+        existing_by_base.setdefault(identity[:3], []).append(rule_id)
+    assigned = []
+    seen_identities = set()
+    for row in merge_duplicate_rows(rows):
+        facility = row["facility"]
+        prefix = FACILITY_PREFIXES.get(facility)
+        if prefix is None:
+            raise ValueError(f"Unknown facility in scraped data: {facility!r}")
+
+        identity = rule_identity(row)
+        if identity in seen_identities:
+            raise ValueError(
+                "Duplicate skill identity after exact-row merging: "
+                f"{identity[0]}/{identity[1]}/{identity[2]}"
+            )
+        seen_identities.add(identity)
+
+        rule_id = existing_ids.get(identity)
+        if rule_id is None:
+            base_candidates = existing_by_base.get(base_rule_identity(row), [])
+            if len(base_candidates) == 1:
+                rule_id = base_candidates[0]
+        if rule_id is None:
+            last_rule_number += 1
+            rule_id = f"PRTS-{prefix}-{last_rule_number:04d}"
+
+        audited = {"rule_id": rule_id, **canonical_rule_content(row)}
+        audited["content_hash"] = calculate_content_hash(audited)
+        # Keep audit fields together at the start of each rule in the JSON output.
+        audited = {
+            "rule_id": audited["rule_id"],
+            "content_hash": audited["content_hash"],
+            **canonical_rule_content(audited),
+        }
+        assigned.append(audited)
+    return assigned, last_rule_number
+
+
+def build_payload(source_url, rows, existing_payload=None):
+    rows, last_rule_number = assign_rule_audit_fields(rows, existing_payload)
     holder_count = sum(len(row["holders"]) for row in rows)
     unresolved_elites = [
         {"facility": row["facility"], "skill": row["skill"], "name": holder["name"]}
@@ -225,6 +417,7 @@ def build_payload(source_url, rows):
     return {
         "source": source_url,
         "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "last_rule_number": last_rule_number,
         "skill_count": len(rows),
         "holder_count": holder_count,
         "unresolved_elite_count": len(unresolved_elites),
@@ -239,11 +432,30 @@ def main(argv=None):
     )
     arg_parser.add_argument("--url", default=DEFAULT_URL)
     arg_parser.add_argument("--output", default=DEFAULT_OUTPUT)
+    arg_parser.add_argument(
+        "--migrate-existing",
+        action="store_true",
+        help="Add or validate audit fields in the existing output without fetching PRTS.",
+    )
     args = arg_parser.parse_args(argv)
 
-    page_html = fetch_html(args.url)
-    rows = parse_skill_rows(page_html)
-    payload = build_payload(args.url, rows)
+    existing_payload = None
+    if os.path.exists(args.output):
+        with open(args.output, "r", encoding="utf-8-sig") as file:
+            existing_payload = json.load(file)
+
+    if args.migrate_existing:
+        if existing_payload is None:
+            arg_parser.error("--migrate-existing requires an existing --output file")
+        source_url = existing_payload.get("source") or args.url
+        rows = existing_payload.get("skills", [])
+        payload = build_payload(source_url, rows, existing_payload)
+        if existing_payload.get("fetched_at"):
+            payload["fetched_at"] = existing_payload["fetched_at"]
+    else:
+        page_html = fetch_html(args.url)
+        rows = parse_skill_rows(page_html)
+        payload = build_payload(args.url, rows, existing_payload)
 
     with open(args.output, "w", encoding="utf-8") as file:
         json.dump(payload, file, ensure_ascii=False, indent=2)

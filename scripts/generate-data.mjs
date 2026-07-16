@@ -3,9 +3,11 @@ import { spawnSync } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { validateEfficiencySkillReferences } from './validate-efficiency-skill-refs.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const sourcePath = resolve(root, 'server/handlers/efficiency-data.json')
+const skillSourcePath = resolve(root, 'tools/prts_logistics_skills.json')
 const targetPath = resolve(root, 'server/handlers/data.ts')
 const buildMetaPath = resolve(root, 'src/lib/build-meta.ts')
 const packagePath = resolve(root, 'package.json')
@@ -13,6 +15,8 @@ const LINE_ENDING = '\n'
 
 const source = await readFile(sourcePath, 'utf8')
 const data = JSON.parse(source.replace(/^\uFEFF/, ''))
+const skillData = JSON.parse((await readFile(skillSourcePath, 'utf8')).replace(/^\uFEFF/, ''))
+validateEfficiencySkillReferences(skillData, data)
 const packageJson = JSON.parse(await readFile(packagePath, 'utf8'))
 const sourceHash = createHash('sha256').update(source).digest('hex')
 const baseVersion = String(packageJson.version || '0.0.0')
