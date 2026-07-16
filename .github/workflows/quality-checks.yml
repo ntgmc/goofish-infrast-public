@@ -21,6 +21,12 @@ env:
   NODE_VERSION: "22"
 
 jobs:
+  static-security:
+    name: Static Security Analysis
+    permissions:
+      contents: read
+    uses: ./.github/workflows/security-analysis.yml
+
   build-relevance:
     name: Build Relevance
     runs-on: ubuntu-latest

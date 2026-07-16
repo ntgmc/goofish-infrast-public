@@ -1,0 +1,14 @@
+node_modules/
+dist/
+server/dist/
+coverage/
+graphify-out/
+public/
+**/*.test.js
+**/*.test.jsx
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.js
+**/*.spec.jsx
+**/*.spec.ts
+**/*.spec.tsx
