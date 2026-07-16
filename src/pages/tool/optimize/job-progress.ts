@@ -38,6 +38,7 @@ export function waitForOptimizePoll(ms: number, isCancelled?: () => boolean): Pr
 export async function fetchOptimizeJobStatus(
   jobId: string,
   fallbackMessage: string,
+  pollToken?: string,
   isCancelled?: () => boolean,
 ): Promise<OptimizeJobStatusResponse> {
   const controller = new AbortController()
@@ -51,7 +52,7 @@ export async function fetchOptimizeJobStatus(
   }, 100)
 
   try {
-    return await fetchOptimizationJob(jobId, fallbackMessage, controller.signal)
+    return await fetchOptimizationJob(jobId, fallbackMessage, pollToken, controller.signal)
   } catch (error) {
     if (cancellationRequested || isCancelled?.()) {
       throw new OptimizeJobPollCancelledError()
@@ -351,6 +352,38 @@ export interface ActiveOptimizeJobStorageEntry {
   progress?: ScheduleProgressState;
 }
 
+interface PendingOptimizeSubmission {
+  version: 1;
+  idempotencyKey: string;
+  requestJson: string;
+  createdAt: number;
+}
+
+export function getOrCreateOptimizeSubmissionKey(storageKey: string, request: unknown): string {
+  const requestJson = JSON.stringify(request)
+  const key = `${storageKey}:pending-submission`
+  try {
+    const raw = window.sessionStorage.getItem(key)
+    const current = raw ? JSON.parse(raw) as Partial<PendingOptimizeSubmission> : null
+    if (current?.version === 1 && current.requestJson === requestJson && typeof current.idempotencyKey === 'string') {
+      return current.idempotencyKey
+    }
+    const idempotencyKey = crypto.randomUUID()
+    window.sessionStorage.setItem(key, JSON.stringify({ version: 1, idempotencyKey, requestJson, createdAt: Date.now() }))
+    return idempotencyKey
+  } catch {
+    return crypto.randomUUID()
+  }
+}
+
+export function clearOptimizeSubmissionKey(storageKey: string): void {
+  try {
+    window.sessionStorage.removeItem(`${storageKey}:pending-submission`)
+  } catch {
+    // Session storage is best-effort only.
+  }
+}
+
 export function writeActiveOptimizeJob(
   key: string,
   job: OptimizeJobAccepted | OptimizeJobStatusResponse,
@@ -391,7 +424,7 @@ export function isStoredOptimizeJob(value: unknown): value is OptimizeJobAccepte
   if (!isObjectRecord(value)) return false
   return typeof value.job_id === 'string'
     && (value.status === 'queued' || value.status === 'running' || value.status === 'succeeded' || value.status === 'failed')
-    && (value.priority === 'paid' || value.priority === 'standard')
+    && (value.priority === 'priority_coupon' || value.priority === 'paid' || value.priority === 'analysis' || value.priority === 'standard')
     && typeof value.submitted_at === 'string'
 }
 

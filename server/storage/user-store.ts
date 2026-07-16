@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto'
-import { getPool, query } from './postgres'
+import type { PoolClient } from 'pg'
+import { getPool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import type { PasswordAlgorithm, PasswordHashRecord } from '../security/password'
 import type {
@@ -684,7 +685,36 @@ export async function saveWorkspace(workspace: UserWorkspaceRecord): Promise<voi
 export async function saveProfileWorkspace(workspace: UserWorkspaceRecord): Promise<void> {
   await ensureSchema()
   const normalized = normalizeWorkspaceRecord(workspace) ?? workspace
-  await query(
+  await withTransaction(async (client) => {
+    await lockWorkspaceForUpdate(client, normalized.profile_id)
+    await saveProfileWorkspaceWithClient(client, normalized)
+  })
+}
+
+export async function updateProfileWorkspaceAtomically(
+  profileId: string,
+  updater: (workspace: UserWorkspaceRecord | null) => UserWorkspaceRecord,
+): Promise<UserWorkspaceRecord> {
+  await ensureSchema()
+  return withTransaction(async (client) => {
+    await lockWorkspaceForUpdate(client, profileId)
+    const current = await client.query<{ record_json: UserWorkspaceRecord }>(
+      'select record_json from user_profile_workspaces where profile_id = $1',
+      [profileId],
+    )
+    const next = normalizeWorkspaceRecord(updater(normalizeWorkspaceRecord(current.rows[0]?.record_json ?? null)))
+    if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
+    await saveProfileWorkspaceWithClient(client, next)
+    return next
+  })
+}
+
+async function lockWorkspaceForUpdate(client: PoolClient, profileId: string): Promise<void> {
+  await client.query("select pg_advisory_xact_lock(hashtextextended('workspace:' || $1, 0))", [profileId])
+}
+
+async function saveProfileWorkspaceWithClient(client: PoolClient, normalized: UserWorkspaceRecord): Promise<void> {
+  await client.query(
     `insert into user_profile_workspaces
       (profile_id, operators_json, config_json, elite_overrides_json, last_result_json, record_json, updated_at)
      values ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7)

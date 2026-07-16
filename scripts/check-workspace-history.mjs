@@ -1160,6 +1160,12 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
     export async function saveWorkspace(workspace) {
       store.workspaces.set(workspace.profile_id, normalizeWorkspace(workspace))
     }
+    export async function updateProfileWorkspaceAtomically(profileId, updater) {
+      const next = normalizeWorkspace(updater(store.workspaces.get(profileId) ?? null))
+      if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
+      store.workspaces.set(profileId, next)
+      return next
+    }
     export function toPublicWorkspace(workspace) {
       const normalized = workspace ? normalizeWorkspace(workspace) : null
       return {
@@ -1306,6 +1312,7 @@ function memoryLicenseUtilsModule() {
     export function formatRiskFreezeMessage(message) { return message }
     export async function freezeCdkRecord(record) { return record }
     export function getPermissionMode(license) { return license?.permission ?? 'advanced' }
+    export function getSecretKeyring() { return ['workspace-history-test-secret'] }
     export async function getCdkRecordStore() { return { get: async () => null, mutate: async () => null } }
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, device_risk_enabled: false, updated_at: null } }
     export async function findCdkRecordByLicenseOrderHash() { return null }

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { LicenseConfig, OptimizeEstimateBucket, OptimizeResult } from "../../../src/lib/types";
 import { SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT } from '../../../src/lib/scenario-comparison';
 import type { OptimizationJobSnapshot } from "../../../src/lib/optimization-contracts";
@@ -13,6 +13,7 @@ import { OPTIMIZE_ANALYSIS_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIM
 import { jsonResponse } from './http-core';
 import { prepareOptimizeJob } from './prepare-job';
 import { getServiceLifecycleState } from '../../lifecycle';
+import { getSecretKeyring } from '../../handlers/license-utils';
 
 export async function submitOptimizationJob(req: Request): Promise<Response> {
   const lifecycleState = getServiceLifecycleState();
@@ -53,7 +54,10 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       : { job: await store.createJob(admissionInput), replayed: false };
 
     kickOptimizeJobProcessing();
-    return jsonResponse({ job: await buildOptimizeJobAccepted(admitted.job) }, 202);
+    return jsonResponse({
+      job: await buildOptimizeJobAccepted(admitted.job),
+      ...(!admitted.job.owner_key.startsWith('profile:') && { pollToken: createOptimizeJobPollToken(admitted.job) }),
+    }, 202);
   } catch (error) {
     if (error instanceof OptimizeJobAdmissionError) {
       return jsonResponse({ error: error.message, code: error.code }, error.status);
@@ -86,7 +90,12 @@ export async function canReadOptimizeJob(
   req: Request,
   job: OptimizeJobRecord,
 ): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
-  if (!job.owner_key.startsWith('profile:')) return { ok: true };
+  if (!job.owner_key.startsWith('profile:')) {
+    const token = req.headers.get('X-Optimize-Job-Token')?.trim() ?? '';
+    return verifyOptimizeJobPollToken(job, token)
+      ? { ok: true }
+      : { ok: false, status: 403, message: '缺少或无效的任务查询凭据。' };
+  }
   const auth = await requireUserSession(req);
   if (!auth) return { ok: false, status: 401, message: '请先登录后查看任务状态。' };
   const profileId = job.owner_key.slice('profile:'.length);
@@ -120,7 +129,7 @@ export function formatOptimizationJobSnapshot(
     status: job.status === 'running' ? 'running' : 'queued',
     priority: { kind: formatJobPriority(job), label: formatJobPriorityLabel(job) },
     queuePosition,
-    pollAfterMs: getOptimizePollAfterMs(job.status),
+    pollAfterMs: getOptimizePollAfterMs(job.status, queuePosition),
     timestamps: {
       submittedAt: job.created_at,
       ...(job.started_at !== undefined && { startedAt: job.started_at }),
@@ -152,6 +161,23 @@ export function formatOptimizationJobSnapshot(
 
 export function formatJobPriority(job: Pick<OptimizeJobRecord, 'priority'>): OptimizeJobPriority {
   return job.priority >= 20 ? 'priority_coupon' : job.priority >= 10 ? 'paid' : job.priority > 0 ? 'analysis' : 'standard';
+}
+
+export function createOptimizeJobPollToken(job: Pick<OptimizeJobRecord, 'id' | 'owner_key'>): string {
+  return signOptimizeJobPollToken(job, getSecretKeyring('MAA_ADMIN_SECRET')[0]);
+}
+
+export function verifyOptimizeJobPollToken(job: Pick<OptimizeJobRecord, 'id' | 'owner_key'>, token: string): boolean {
+  if (!/^[a-f0-9]{64}$/.test(token)) return false;
+  const actual = Buffer.from(token, 'hex');
+  return getSecretKeyring('MAA_ADMIN_SECRET').some((secret) => {
+    const expected = Buffer.from(signOptimizeJobPollToken(job, secret), 'hex');
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
+  });
+}
+
+function signOptimizeJobPollToken(job: Pick<OptimizeJobRecord, 'id' | 'owner_key'>, secret: string): string {
+  return createHmac('sha256', secret).update(`optimize-job:${job.id}:${job.owner_key}`).digest('hex');
 }
 
 export function formatJobPriorityLabel(job: Pick<OptimizeJobRecord, 'priority'>): string {

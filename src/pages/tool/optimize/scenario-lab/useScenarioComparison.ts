@@ -28,6 +28,7 @@ interface StoredScenarioSession {
   factors: ScenarioComparisonFactors;
   activeJobId?: string;
   result?: ScenarioComparisonResult;
+  pendingSubmission?: { requestJson: string; idempotencyKey: string };
 }
 
 export function useScenarioComparison({
@@ -80,7 +81,7 @@ export function useScenarioComparison({
           writeSession(profileId, { factors: sessionFactors })
           return
         }
-        await delay(snapshot.pollAfterMs || (snapshot.status === 'queued' ? 1200 : 900))
+        await delay(snapshot.pollAfterMs || (snapshot.status === 'queued' ? 3_000 : 1_500))
       } catch (caught) {
         failures += 1
         if (failures >= 6) {
@@ -109,10 +110,16 @@ export function useScenarioComparison({
       config,
       factors,
     }
+    const requestJson = JSON.stringify(request)
+    const previousPending = readSession(profileId)?.pendingSubmission
+    const pendingSubmission = previousPending?.requestJson === requestJson
+      ? previousPending
+      : { requestJson, idempotencyKey: crypto.randomUUID() }
+    writeSession(profileId, { factors, pendingSubmission })
     try {
       const response = await apiJson<CreateScenarioComparisonJobResponse>('/api/optimization/jobs', {
         method: 'POST',
-        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        headers: { 'Idempotency-Key': pendingSubmission.idempotencyKey },
         json: request,
         fallbackMessage: copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_003,
       })
@@ -124,7 +131,7 @@ export function useScenarioComparison({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_004)
       setLoading(false)
-      writeSession(profileId, { factors })
+      writeSession(profileId, { factors, pendingSubmission })
     }
   }, [config, factors, operators, pollJob, profileId])
 

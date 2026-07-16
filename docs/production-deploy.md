@@ -271,6 +271,21 @@ systemd `EnvironmentFile`; they are not deployment workflow secrets. Backup,
 recovery, key rotation and restore drills remain documented in
 [disaster-recovery.md](disaster-recovery.md).
 
+The same `EnvironmentFile` should set explicit optimization queue limits:
+
+```text
+OPTIMIZE_GLOBAL_QUEUE_LIMIT=200
+OPTIMIZE_ANALYSIS_QUEUE_LIMIT=40
+OPTIMIZE_QUEUE_MAX_AGE_MS=1800000
+OPTIMIZE_GLOBAL_WORKER_CONCURRENCY=2
+OPTIMIZE_RETRY_BASE_MS=2000
+```
+
+`OPTIMIZE_GLOBAL_WORKER_CONCURRENCY` is enforced through PostgreSQL across all
+API replicas. Keep it within the CPU and database capacity of the whole
+deployment, rather than multiplying it by the number of systemd instances.
+Never remove the queue limits during an incident; lower them to shed load.
+
 ## Pre-production acceptance
 
 Before enabling automatic deployment:

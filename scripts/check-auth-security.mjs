@@ -1489,6 +1489,7 @@ function adminSessionStoreMock() {
 
 function userStoreMigrationMock() {
   return `
+    export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
     export async function getUserByEmail(email) {
       return globalThis.__authSecurityUsers.get(email) ?? null
     }
@@ -1547,6 +1548,7 @@ function userStoreMigrationMock() {
 
 function userRegistrationCdkStoreMock() {
   return `
+    export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
     export async function getUserByEmail() { return null }
     export async function saveUserAccount(user) {
       globalThis.__authSecurityRegistrationAccountSyncs.push(structuredClone(user))
@@ -1653,6 +1655,7 @@ function userRegistrationCdkRedemptionMock() {
 
 function userSessionAuthStoreMock() {
   return `
+    export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
     export async function getSessionByTokenHash() {
       return globalThis.__authSecurityUserSession ?? null
     }
@@ -1709,6 +1712,7 @@ function userSessionAuthStoreMock() {
 function userSessionPostgresMock() {
   return `
     export function getPool() { throw new Error('getPool should not be used by these checks') }
+    export async function withTransaction(callback) { return callback({ query }) }
     export async function query(text, values = []) {
       globalThis.__authSecurityStorageQueries.push({ text, values })
       if (/update user_sessions/i.test(text)) {
@@ -1737,6 +1741,7 @@ function userSessionPostgresMock() {
 
 function passwordResetAuthStoreMock() {
   return `
+    export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
     export async function getPasswordResetTokenByHash() {
       globalThis.__authSecurityResetSequence.push('token-preflight')
       return globalThis.__authSecurityResetToken
@@ -1800,6 +1805,20 @@ function passwordResetPasswordMock() {
 
 function passwordResetPostgresMock() {
   return `
+    export async function withTransaction(callback) {
+      const client = await getPool().connect()
+      try {
+        await client.query('BEGIN')
+        const result = await callback(client)
+        await client.query('COMMIT')
+        return result
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      } finally {
+        client.release()
+      }
+    }
     export function getPool() {
       return {
         connect: async () => {

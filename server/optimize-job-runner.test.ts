@@ -16,6 +16,7 @@ afterAll(async () => {
 
 describe('optimization dispatcher startup recovery', () => {
   it('recovers an expired attempt and consumes queued jobs without an HTTP kick', async () => {
+    process.env.OPTIMIZE_RETRY_BASE_MS = '100'
     const store = createMemoryOptimizeJobStore()
     globalThis.__maaOptimizeJobStoreForTesting = store
     registerOptimizeJobExecutor(async (job) => ({ completedJobId: job.id }))
@@ -31,6 +32,8 @@ describe('optimization dispatcher startup recovery', () => {
 
     await initializeOptimizeJobProcessing()
 
+    await waitFor(async () => (await store.getJob(expired.id))?.status === 'succeeded')
+
     await expect(store.getJob(expired.id)).resolves.toMatchObject({
       status: 'succeeded',
       attempt_count: 2,
@@ -43,6 +46,7 @@ describe('optimization dispatcher startup recovery', () => {
       failure_count: 0,
       result_json: { completedJobId: queued.id },
     })
+    delete process.env.OPTIMIZE_RETRY_BASE_MS
   })
 
   it('terminates a CPU-blocked worker at the parent wall-clock deadline', async () => {

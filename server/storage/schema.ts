@@ -75,6 +75,8 @@ CREATE TABLE IF NOT EXISTS optimize_jobs (
   heartbeat_at TIMESTAMPTZ,
   lock_token TEXT,
   lock_expires_at TIMESTAMPTZ,
+  next_attempt_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   started_at TIMESTAMPTZ,
   finished_at TIMESTAMPTZ,
@@ -83,6 +85,8 @@ CREATE TABLE IF NOT EXISTS optimize_jobs (
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_status_priority_created_at ON optimize_jobs(status, priority DESC, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_owner_status_created_at ON optimize_jobs(owner_key, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_lock_expires_at ON optimize_jobs(lock_expires_at);
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_dispatch_ready ON optimize_jobs(status, next_attempt_at, priority DESC, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_queue_expires_at ON optimize_jobs(expires_at) WHERE status = 'queued';
 
 CREATE TABLE IF NOT EXISTS optimization_submissions (
   id TEXT PRIMARY KEY,
@@ -491,6 +495,12 @@ ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS profile_id TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS failure_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS worker_id TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+UPDATE optimize_jobs SET next_attempt_at = created_at WHERE status = 'queued' AND next_attempt_at IS NULL;
+UPDATE optimize_jobs
+SET expires_at = created_at + interval '30 minutes'
+WHERE status = 'queued' AND attempt_count = 0 AND expires_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_profile_id ON optimize_jobs(profile_id);
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_worker_status ON optimize_jobs(worker_id, status);
 INSERT INTO optimize_job_attempts
@@ -510,6 +520,18 @@ UPDATE optimize_jobs SET profile_id = substring(owner_key from '^profile:(.*)$')
 UPDATE optimize_jobs
 SET payload_json = payload_json - 'activeProfile' - 'previewWorkspaceForGeneration'
 WHERE payload_json ? 'activeProfile' OR payload_json ? 'previewWorkspaceForGeneration';
+UPDATE optimize_jobs
+SET payload_json = (payload_json - 'effectiveLicense' - 'checkedCdkRecord') || jsonb_build_object(
+  'version', 3,
+  'configPermission', to_jsonb(coalesce(nullif(payload_json->'scheduleUsageBase'->>'permission', ''), 'growth')),
+  'cdkUsageRef', CASE
+    WHEN nullif(payload_json->'checkedCdkRecord'->>'code_hash', '') IS NULL THEN 'null'::jsonb
+    ELSE jsonb_build_object('code_hash', payload_json->'checkedCdkRecord'->>'code_hash')
+  END
+)
+WHERE payload_json->>'version' = '2'
+  AND NOT (payload_json ? 'kind')
+  AND (payload_json ? 'effectiveLicense' OR payload_json ? 'checkedCdkRecord');
 
 ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS contributor_profile_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_depot_value_samples_contributor_profile_id ON depot_value_samples(contributor_profile_id);
