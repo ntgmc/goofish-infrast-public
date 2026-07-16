@@ -13,10 +13,41 @@ import {
 } from './invitation-store'
 
 let container: PostgreSqlContainer
+const legacyJobId = randomUUID()
+const legacyJobCreatedAt = '2026-01-01T00:00:00.000Z'
 
 beforeAll(async () => {
   container = await new PostgreSqlContainer('postgres:16-alpine').start()
   process.env.DATABASE_URL = container.getConnectionUri()
+  await query(`
+    create table optimize_jobs (
+      id text primary key,
+      status text not null,
+      priority integer not null,
+      owner_key text not null,
+      permission text,
+      source text not null,
+      payload_json jsonb not null,
+      result_json jsonb,
+      error_message text,
+      attempt_count integer not null default 0,
+      failure_count integer not null default 0,
+      worker_id text,
+      heartbeat_at timestamptz,
+      lock_token text,
+      lock_expires_at timestamptz,
+      created_at timestamptz not null,
+      started_at timestamptz,
+      finished_at timestamptz,
+      updated_at timestamptz not null
+    )
+  `)
+  await query(
+    `insert into optimize_jobs
+      (id, status, priority, owner_key, source, payload_json, created_at, updated_at)
+     values ($1, 'queued', -1000000, $2, 'legacy_migration_test', '{}'::jsonb, $3, $3)`,
+    [legacyJobId, `legacy:${legacyJobId}`, legacyJobCreatedAt],
+  )
   await ensureDatabaseSchema()
 })
 
@@ -26,6 +57,47 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL optimization job admission', () => {
+  it('upgrades queued jobs created before retry and expiry columns were added', async () => {
+    const columns = await query<{ column_name: string }>(
+      `select column_name
+       from information_schema.columns
+       where table_schema = 'public'
+         and table_name = 'optimize_jobs'
+         and column_name = any($1::text[])
+       order by column_name`,
+      [['expires_at', 'next_attempt_at']],
+    )
+    expect(columns.rows.map((row) => row.column_name)).toEqual(['expires_at', 'next_attempt_at'])
+
+    const backfill = await query<{ expires_at_backfilled: boolean; next_attempt_at_backfilled: boolean }>(
+      `select
+         next_attempt_at = created_at as next_attempt_at_backfilled,
+         expires_at = created_at + interval '30 minutes' as expires_at_backfilled
+       from optimize_jobs
+       where id = $1`,
+      [legacyJobId],
+    )
+    expect(backfill.rows[0]).toEqual({
+      expires_at_backfilled: true,
+      next_attempt_at_backfilled: true,
+    })
+
+    const indexes = await query<{ indexname: string }>(
+      `select indexname
+       from pg_indexes
+       where schemaname = 'public'
+         and tablename = 'optimize_jobs'
+         and indexname = any($1::text[])
+       order by indexname`,
+      [['idx_optimize_jobs_dispatch_ready', 'idx_optimize_jobs_queue_expires_at']],
+    )
+    expect(indexes.rows.map((row) => row.indexname)).toEqual([
+      'idx_optimize_jobs_dispatch_ready',
+      'idx_optimize_jobs_queue_expires_at',
+    ])
+    await expect(ensureDatabaseSchema()).resolves.toBeUndefined()
+  })
+
   it('handles unexpected errors from idle pool clients', () => {
     expect(getPool().listenerCount('error')).toBeGreaterThan(0)
   })

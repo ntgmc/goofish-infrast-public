@@ -85,8 +85,6 @@ CREATE TABLE IF NOT EXISTS optimize_jobs (
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_status_priority_created_at ON optimize_jobs(status, priority DESC, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_owner_status_created_at ON optimize_jobs(owner_key, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_lock_expires_at ON optimize_jobs(lock_expires_at);
-CREATE INDEX IF NOT EXISTS idx_optimize_jobs_dispatch_ready ON optimize_jobs(status, next_attempt_at, priority DESC, created_at ASC);
-CREATE INDEX IF NOT EXISTS idx_optimize_jobs_queue_expires_at ON optimize_jobs(expires_at) WHERE status = 'queued';
 
 CREATE TABLE IF NOT EXISTS optimization_submissions (
   id TEXT PRIMARY KEY,
@@ -501,6 +499,8 @@ UPDATE optimize_jobs SET next_attempt_at = created_at WHERE status = 'queued' AN
 UPDATE optimize_jobs
 SET expires_at = created_at + interval '30 minutes'
 WHERE status = 'queued' AND attempt_count = 0 AND expires_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_dispatch_ready ON optimize_jobs(status, next_attempt_at, priority DESC, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_queue_expires_at ON optimize_jobs(expires_at) WHERE status = 'queued';
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_profile_id ON optimize_jobs(profile_id);
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_worker_status ON optimize_jobs(worker_id, status);
 INSERT INTO optimize_job_attempts
