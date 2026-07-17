@@ -314,7 +314,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_029: "计算全部场景；自动非固定模式同时选择班次数组。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_030: "精确复核",
+  components_ScheduleProgress_030: "场景复核",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_031: "按实际操作成本分组，冻结候选班次后生成 Pareto 前沿。",
   // src/components/ScheduleProgress.tsx
