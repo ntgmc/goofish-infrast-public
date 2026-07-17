@@ -52,7 +52,6 @@ export function useOptimizeWorkflow(props: Props) {
   profile,
   license,
   workspace,
-  setLicense,
   eliteOverrides,
   setEliteOverrides,
   configOverride,
@@ -280,17 +279,6 @@ export function useOptimizeWorkflow(props: Props) {
   const hasResult = Boolean(finalResult || currentResult || historyItem)
 
   const resultIsCurrent = hasResult && lastGeneratedSignature === optimizeSignature
-
-  const clearGeneratedResult = useCallback(() => {
-      setSuggestions([])
-      setCurrentResult(null)
-      setFinalResult(null)
-      setHistoryItem(null)
-      setProgress(null)
-      setPhase('idle')
-      setInlineError(null)
-      setLastGeneratedSignature(null)
-    }, [])
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
       if (!userCanApplyConfigOverride) return
