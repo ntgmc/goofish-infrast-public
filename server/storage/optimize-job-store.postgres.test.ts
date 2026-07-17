@@ -129,6 +129,29 @@ describe('PostgreSQL optimization job admission', () => {
     await expect(store.admitJob(input({ owner_key: owner }))).rejects.toMatchObject({ code: 'queue_capacity_exceeded', status: 429 })
   })
 
+  it('counts upgrade suggestion continuations separately from paid submissions', async () => {
+    const store = createPostgresOptimizeJobStore()
+    const owner = `license:${randomUUID()}`
+
+    for (let index = 0; index < 12; index += 1) {
+      const schedule = await store.admitJob(input({ owner_key: owner }))
+      await query("update optimize_jobs set status = 'succeeded', updated_at = now() where id = $1", [schedule.job.id])
+
+      const suggestions = await store.admitJob(input({ owner_key: owner, source: 'optimize_suggestions' }))
+      await query("update optimize_jobs set status = 'succeeded', updated_at = now() where id = $1", [suggestions.job.id])
+    }
+
+    await expect(query<{ count: string }>(
+      'select count(*)::text as count from optimization_submissions where owner_key = $1',
+      [owner],
+    )).resolves.toMatchObject({ rows: [{ count: '12' }] })
+    await expect(store.admitJob(input({ owner_key: owner }))).rejects.toMatchObject({
+      code: 'submission_rate_exceeded',
+      status: 429,
+      message: '当前账号的优化提交次数已达小时上限。请1小时后再试。',
+    })
+  })
+
   it('settles an activated invitation once using the current settings', async () => {
     const inviterProfileId = await seedProfile()
     const inviter = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviterProfileId])).rows[0]!.user_id
