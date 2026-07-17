@@ -28,6 +28,12 @@ afterEach(() => {
 })
 
 describe('WorkspaceSetupPage CDK paths', () => {
+  it('keeps manual operator import disabled for free profiles during the advanced trial', () => {
+    const { container } = renderWorkspace()
+
+    expect(container.querySelector<HTMLInputElement>('input[type="file"]')).toBeDisabled()
+  })
+
   it('separates the desktop account actions in one bottom navigation group', () => {
     renderWorkspace()
 

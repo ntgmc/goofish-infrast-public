@@ -58,28 +58,3 @@ export function getShanghaiMonthKey(date = new Date()): string {
   const shanghai = new Date(date.getTime() + 8 * 60 * 60 * 1000)
   return `${shanghai.getUTCFullYear()}-${String(shanghai.getUTCMonth() + 1).padStart(2, '0')}`
 }
-
-export function parseOperatorsFile(text: string): LicenseOperator[] {
-  const data = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
-  if (!Array.isArray(data) || data.length === 0) {
-    throw new Error(copy.optimize.pages_tool_optimize_workflow_utils_010)
-  }
-  const requiredKeys = ['id', 'name', 'own', 'elite', 'rarity'] as const
-  for (const [index, raw] of data.entries()) {
-    if (!raw || typeof raw !== 'object') {
-      throw new Error(`${copy.optimize.pages_tool_optimize_workflow_utils_011}${index + 1}${copy.optimize.pages_tool_optimize_workflow_utils_012}`)
-    }
-    const op = raw as Record<string, unknown>
-    const missing = requiredKeys.filter((key) => !(key in op))
-    if (missing.length > 0) {
-      throw new Error(`${copy.optimize.pages_tool_optimize_workflow_utils_013}${String(op.name ?? index + 1)}${copy.optimize.pages_tool_optimize_workflow_utils_014}${missing.join(', ')}。`)
-    }
-    if (typeof op.id !== 'string' || typeof op.name !== 'string' || typeof op.own !== 'boolean') {
-      throw new Error(`${copy.optimize.pages_tool_optimize_workflow_utils_015}${String(op.name ?? index + 1)}${copy.optimize.pages_tool_optimize_workflow_utils_016}`)
-    }
-    if (!Number.isFinite(op.elite) || !Number.isFinite(op.rarity)) {
-      throw new Error(`${copy.optimize.pages_tool_optimize_workflow_utils_017}${String(op.name)}${copy.optimize.pages_tool_optimize_workflow_utils_018}`)
-    }
-  }
-  return data as LicenseOperator[]
-}
