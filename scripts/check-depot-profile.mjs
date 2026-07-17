@@ -202,6 +202,12 @@ function memoryUserStoreModule() {
     export async function saveWorkspace(workspace) {
       store.workspaces.set(workspace.profile_id, workspace)
     }
+    export async function updateProfileWorkspaceAtomically(profileId, updater) {
+      const next = updater(store.workspaces.get(profileId) ?? null)
+      if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
+      store.workspaces.set(profileId, next)
+      return next
+    }
     export async function saveUserProfile(profile) {
       store.profiles.set(profile.id, profile)
     }
@@ -254,6 +260,7 @@ export async function getScheduleGenerateDurationStatsByBucket() { return { p95_
 function memoryLicenseUtilsModule() {
   return `
     export function canUseUpgradeFeatures() { return true }
+    export function getSecretKeyring() { return ['depot-profile-test-secret'] }
     export function canonicalJson(obj) {
       if (obj === null || typeof obj !== 'object') return JSON.stringify(obj)
       if (Array.isArray(obj)) return '[' + obj.map(canonicalJson).join(',') + ']'

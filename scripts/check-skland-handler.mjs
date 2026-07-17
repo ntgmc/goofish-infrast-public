@@ -232,7 +232,7 @@ async function assertMultiAccountSelection() {
     confirmation_id: preview.body.confirmation_id,
   })
   if (confirm.status !== 200 || confirm.body.active_profile?.skland_binding?.uid !== '87654321') {
-    throw new Error(`multi-account selection: final binding did not preserve selected uid ${confirm.status}`)
+    throw new Error(`multi-account selection: final binding did not preserve selected uid ${confirm.status}: ${JSON.stringify(confirm.body)}`)
   }
 
   setFetchMode('multi-account')
@@ -1204,6 +1204,12 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
     }
     export async function saveProfileWorkspace(workspace) {
       store.workspaces.set(workspace.profile_id, normalizeWorkspace(workspace))
+    }
+    export async function updateProfileWorkspaceAtomically(profileId, updater) {
+      const current = store.workspaces.get(profileId) ?? null
+      const next = normalizeWorkspace(await updater(current ? normalizeWorkspace(current) : null))
+      store.workspaces.set(profileId, next)
+      return next
     }
     export async function saveUserProfile(profile) {
       store.profiles.set(profile.id, profile)

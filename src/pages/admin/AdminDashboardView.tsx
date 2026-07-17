@@ -4,6 +4,7 @@ import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app
 import AnnouncementBodyEditor from '../../components/AnnouncementBodyEditor'
 import InvitationSettingsSection from './invitations/InvitationSettingsSection'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
+import DeadLetterPanel from './optimization/DeadLetterPanel'
 
 import { GeneratedPermission, AdminSection, UsageRangeKey, AnnouncementSortKey, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, sectionLabels, announcementKindLabels, announcementSortLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, AnnouncementReachMetrics, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
 import { useAdminController } from './useAdminController'
@@ -220,6 +221,7 @@ export default function AdminDashboardView() {
                   <AnnouncementStatsPanel stats={usageStats?.announcement ?? EMPTY_ANNOUNCEMENT_STATS} />
                 </div>
                 <CdkDistributionPanel items={usageStats?.cdk_distribution ?? []} />
+                <DeadLetterPanel />
               </section>
             )}
   

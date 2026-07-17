@@ -3,7 +3,7 @@ import type { OptimizeJobPriority } from '../lib/types'
 import { copy } from '../copy/index'
 
 
-export type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed'
+export type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
 
 export interface ScheduleProgressState {
   mode: 'generate' | 'apply' | 'scenario';
@@ -25,6 +25,10 @@ export interface ScheduleProgressState {
   connectionStatus?: 'connected' | 'reconnecting';
   consecutivePollFailures?: number;
   lastSuccessfulSyncAt?: number;
+  executionPhase?: 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal';
+  attemptCount?: number;
+  nextAttemptAt?: string | null;
+  cancellationRequested?: boolean;
 }
 
 interface Props {
@@ -33,7 +37,7 @@ interface Props {
   variant?: 'embedded' | 'focus';
 }
 
-type TaskStatus = 'preparing' | 'queued' | 'running' | 'overdue' | 'finishing' | 'completed'
+type TaskStatus = 'preparing' | 'queued' | 'retrying' | 'cancelling' | 'running' | 'overdue' | 'finishing' | 'completed'
 type StepVisualState = 'done' | 'active' | 'pending'
 
 export default function ScheduleProgress({ progress, className = '', variant = 'embedded' }: Props) {
@@ -267,6 +271,8 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
 }
 
 function getTaskStatus(progress: ScheduleProgressState, percent: number, now: number): TaskStatus {
+  if (progress.cancellationRequested) return 'cancelling'
+  if (progress.executionPhase === 'retry_wait') return 'retrying'
   if (!progress.completedAt && progress.observedRunning && getCurrentRemainingMs(progress, now) === 0) return 'overdue'
   if (progress.completedAt || percent >= 100 || progress.estimatePhase === 'completed') return 'completed'
   if (progress.estimatePhase === 'overdue') return 'overdue'
@@ -278,6 +284,8 @@ function getTaskStatus(progress: ScheduleProgressState, percent: number, now: nu
 }
 
 function getStatusTitle(mode: ScheduleProgressState['mode'], status: TaskStatus): string {
+  if (status === 'cancelling') return copy.common.components_ScheduleProgress_101
+  if (status === 'retrying') return copy.common.components_ScheduleProgress_102
   if (status === 'completed') return mode === 'generate' ? copy.common.components_ScheduleProgress_050 : mode === 'scenario' ? copy.common.components_ScheduleProgress_051 : copy.common.components_ScheduleProgress_052
   if (status === 'overdue') return copy.common.components_ScheduleProgress_053
   if (status === 'finishing') return copy.common.components_ScheduleProgress_054
@@ -293,6 +301,11 @@ function getStatusDetail(
   remainingLabel: string,
   estimateContext: string,
 ): string {
+  if (status === 'cancelling') return copy.common.components_ScheduleProgress_103
+  if (status === 'retrying') {
+    const attempt = Math.max(1, progress.attemptCount ?? 1)
+    return `${copy.common.components_ScheduleProgress_104}${attempt}${copy.common.components_ScheduleProgress_105}`
+  }
   if (status === 'completed') return copy.common.components_ScheduleProgress_060
   if (status === 'overdue') return copy.common.components_ScheduleProgress_061
   if (status === 'finishing') return copy.common.components_ScheduleProgress_062
@@ -359,6 +372,8 @@ function getRemainingAriaLabel(progress: ScheduleProgressState, remainingLabel: 
 }
 
 function getMeterLabel(status: TaskStatus): string {
+  if (status === 'retrying') return 'Retry'
+  if (status === 'cancelling') return 'Cancel'
   if (status === 'queued') return 'Queued'
   if (status === 'running') return 'Running'
   if (status === 'overdue') return 'Calibrate'
@@ -368,7 +383,7 @@ function getMeterLabel(status: TaskStatus): string {
 }
 
 function getStepState(status: TaskStatus, index: number): StepVisualState {
-  const activeIndex = status === 'preparing' ? 0 : status === 'queued' ? 1 : status === 'running' || status === 'overdue' ? 2 : 3
+  const activeIndex = status === 'preparing' ? 0 : status === 'queued' || status === 'retrying' ? 1 : status === 'running' || status === 'overdue' || status === 'cancelling' ? 2 : 3
   if (status === 'completed') return 'done'
   if (index < activeIndex) return 'done'
   if (index === activeIndex) return 'active'

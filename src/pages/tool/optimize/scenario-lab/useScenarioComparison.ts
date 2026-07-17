@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ScheduleProgressState } from '../../../../components/ScheduleProgress'
 import { apiJson } from '../../../../lib/api-client'
+import { getOptimizePollRetryDelayMs } from '../../../../lib/optimize-poll'
 import type {
   CreateOptimizationJobRequest,
   CreateScenarioComparisonJobResponse,
@@ -9,6 +10,9 @@ import type {
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from '../../../../lib/scenario-comparison'
 import type { LicenseConfig, LicenseOperator } from '../../../../lib/types'
 import { copy } from '../../../../copy/index'
+import { fetchOptimizeJobSnapshotStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, waitForOptimizePoll } from '../job-progress'
+import { OPTIMIZE_SUBMIT_TIMEOUT_MS } from '../optimization-api'
+import { publishOptimizationJobUpdate, withOptimizationSubmissionLock } from '../optimization-job-events'
 
 
 const DEFAULT_FACTORS: ScenarioComparisonFactors = {
@@ -28,6 +32,7 @@ interface StoredScenarioSession {
   factors: ScenarioComparisonFactors;
   activeJobId?: string;
   result?: ScenarioComparisonResult;
+  pendingSubmission?: { requestJson: string; idempotencyKey: string };
 }
 
 export function useScenarioComparison({
@@ -45,8 +50,9 @@ export function useScenarioComparison({
   const [job, setJob] = useState<ScenarioComparisonJobSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(Boolean(initial?.activeJobId))
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected')
+  const [consecutivePollFailures, setConsecutivePollFailures] = useState(0)
   const pollRunRef = useRef(0)
-  const previousProfileIdRef = useRef(profileId)
 
   const setFactors = useCallback((next: ScenarioComparisonFactors) => {
     setFactorsState(next)
@@ -61,34 +67,44 @@ export function useScenarioComparison({
     let failures = 0
     while (pollRunRef.current === runId) {
       try {
-        const snapshot = await apiJson<ScenarioComparisonJobSnapshot>(
-          `/api/optimization/jobs/${encodeURIComponent(jobId)}`,
-          { fallbackMessage: copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_001 },
-        )
+        const snapshot = await fetchOptimizeJobSnapshotStatus<ScenarioComparisonResult>(
+          jobId,
+          copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_001,
+          undefined,
+          () => pollRunRef.current !== runId,
+        ) as ScenarioComparisonJobSnapshot
         if (pollRunRef.current !== runId) return
         failures = 0
+        setConnectionStatus('connected')
+        setConsecutivePollFailures(0)
         setJob(snapshot)
+        publishOptimizationJobUpdate(profileId, snapshot)
         if (snapshot.status === 'succeeded') {
           setResult(snapshot.result)
           setLoading(false)
           writeSession(profileId, { factors: sessionFactors, result: snapshot.result })
           return
         }
-        if (snapshot.status === 'failed') {
-          setError(snapshot.error.message)
+        if (snapshot.status === 'failed' || snapshot.status === 'cancelled' || snapshot.status === 'dead_lettered') {
+          const supportSuffix = snapshot.error.supportReference ? ` (${snapshot.error.supportReference})` : ''
+          setError(`${snapshot.error.message}${supportSuffix}`)
           setLoading(false)
           writeSession(profileId, { factors: sessionFactors })
           return
         }
-        await delay(snapshot.pollAfterMs || (snapshot.status === 'queued' ? 1200 : 900))
+        await delay(snapshot.pollAfterMs || (snapshot.status === 'queued' ? 3_000 : 1_500))
       } catch (caught) {
-        failures += 1
-        if (failures >= 6) {
+        if (isOptimizeJobPollCancelled(caught) || pollRunRef.current !== runId) return
+        if (!isRetryableOptimizePollError(caught)) {
           setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_002)
           setLoading(false)
+          writeSession(profileId, { factors: sessionFactors })
           return
         }
-        await delay(Math.min(8_000, 800 * 2 ** failures))
+        failures += 1
+        setConnectionStatus('reconnecting')
+        setConsecutivePollFailures(failures)
+        await waitForOptimizePoll(getOptimizePollRetryDelayMs(failures), () => pollRunRef.current !== runId)
       }
     }
   }, [profileId])
@@ -109,29 +125,36 @@ export function useScenarioComparison({
       config,
       factors,
     }
+    const requestJson = JSON.stringify(request)
+    const previousPending = readSession(profileId)?.pendingSubmission
+    const pendingSubmission = previousPending?.requestJson === requestJson
+      ? previousPending
+      : { requestJson, idempotencyKey: crypto.randomUUID() }
+    writeSession(profileId, { factors, pendingSubmission })
     try {
-      const response = await apiJson<CreateScenarioComparisonJobResponse>('/api/optimization/jobs', {
-        method: 'POST',
-        headers: { 'Idempotency-Key': crypto.randomUUID() },
-        json: request,
-        fallbackMessage: copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_003,
-      })
+      const response = await withOptimizationSubmissionLock(profileId, async () => (
+        await apiJson<CreateScenarioComparisonJobResponse>('/api/optimization/jobs', {
+          method: 'POST',
+          headers: { 'Idempotency-Key': pendingSubmission.idempotencyKey },
+          json: request,
+          signal: AbortSignal.timeout(OPTIMIZE_SUBMIT_TIMEOUT_MS),
+          fallbackMessage: copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_003,
+        })
+      ))
       const nextJob = response.job
       setJob(nextJob)
+      publishOptimizationJobUpdate(profileId, nextJob)
       writeSession(profileId, { factors, activeJobId: nextJob.id })
       pollRunRef.current += 1
       await pollJob(nextJob.id, pollRunRef.current, factors)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_004)
       setLoading(false)
-      writeSession(profileId, { factors })
+      writeSession(profileId, { factors, pendingSubmission })
     }
   }, [config, factors, operators, pollJob, profileId])
 
   useEffect(() => {
-    const previousProfileId = previousProfileIdRef.current
-    if (previousProfileId !== profileId) removeSession(previousProfileId)
-    previousProfileIdRef.current = profileId
     const restored = readSession(profileId)
     const restoredFactors = restored?.factors ?? DEFAULT_FACTORS
     setFactorsState(restoredFactors)
@@ -139,6 +162,8 @@ export function useScenarioComparison({
     setError(null)
     setJob(null)
     setLoading(Boolean(restored?.activeJobId))
+    setConnectionStatus('connected')
+    setConsecutivePollFailures(0)
     pollRunRef.current += 1
     const runId = pollRunRef.current
     if (restored?.activeJobId) void pollJobRef.current(restored.activeJobId, runId, restoredFactors)
@@ -161,8 +186,13 @@ export function useScenarioComparison({
     estimatePhase: job.estimate.phase,
     estimateUpdatedAt: job.estimate.updatedAt,
     lastUpdatedAt: Date.now(),
-    connectionStatus: 'connected',
-  } : null, [job, loading])
+    connectionStatus,
+    consecutivePollFailures,
+    executionPhase: job.executionPhase,
+    attemptCount: job.attemptCount,
+    nextAttemptAt: job.timestamps.nextAttemptAt,
+    cancellationRequested: job.cancellationRequested,
+  } : null, [connectionStatus, consecutivePollFailures, job, loading])
 
   return { factors, setFactors, result, error, loading, progress, run }
 }
@@ -185,14 +215,6 @@ function writeSession(profileId: string, value: StoredScenarioSession): void {
     window.sessionStorage.setItem(sessionKey(profileId), JSON.stringify(value))
   } catch {
     // Session persistence is best-effort; the in-memory result remains usable.
-  }
-}
-
-function removeSession(profileId: string): void {
-  try {
-    window.sessionStorage.removeItem(sessionKey(profileId))
-  } catch {
-    // Session persistence is best-effort; switching profiles still resets React state.
   }
 }
 

@@ -1,8 +1,9 @@
 import { ApiError } from '../../../lib/api-client'
 import { isRetryableOptimizePollStatus } from '../../../lib/optimize-poll'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
+import type { OptimizationJobSnapshot } from '../../../lib/optimization-contracts'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
-import { fetchOptimizationJob } from './optimization-api'
+import { fetchOptimizationJob, fetchOptimizationJobSnapshot } from './optimization-api'
 import { copy } from '../../../copy/index'
 
 export const OPTIMIZE_POLL_REQUEST_TIMEOUT_MS = 20_000
@@ -38,6 +39,7 @@ export function waitForOptimizePoll(ms: number, isCancelled?: () => boolean): Pr
 export async function fetchOptimizeJobStatus(
   jobId: string,
   fallbackMessage: string,
+  pollToken?: string,
   isCancelled?: () => boolean,
 ): Promise<OptimizeJobStatusResponse> {
   const controller = new AbortController()
@@ -51,7 +53,7 @@ export async function fetchOptimizeJobStatus(
   }, 100)
 
   try {
-    return await fetchOptimizationJob(jobId, fallbackMessage, controller.signal)
+    return await fetchOptimizationJob(jobId, fallbackMessage, pollToken, controller.signal)
   } catch (error) {
     if (cancellationRequested || isCancelled?.()) {
       throw new OptimizeJobPollCancelledError()
@@ -160,6 +162,10 @@ export function mergeOptimizeJobProgress(
     estimateUpdatedAt: next.estimate_updated_at,
     estimateAdjustment: getOptimizeEstimateAdjustment(current, next),
     lastUpdatedAt: now,
+    executionPhase: 'execution_phase' in next ? next.execution_phase : undefined,
+    attemptCount: 'attempt_count' in next ? next.attempt_count : undefined,
+    nextAttemptAt: 'next_attempt_at' in next ? next.next_attempt_at : undefined,
+    cancellationRequested: 'cancellation_requested' in next ? next.cancellation_requested : false,
   }
 }
 
@@ -168,6 +174,7 @@ export function getStableOptimizeQueueStatus(
   next: OptimizeJobAccepted | OptimizeJobStatusResponse,
   observedRunning: boolean,
 ): ScheduleProgressState['queueStatus'] {
+  if ('execution_phase' in next && next.execution_phase === 'retry_wait') return 'queued'
   if (next.status === 'running') return 'running'
   if (next.status === 'queued') return observedRunning ? 'running' : 'queued'
   return current?.queueStatus
@@ -351,6 +358,64 @@ export interface ActiveOptimizeJobStorageEntry {
   progress?: ScheduleProgressState;
 }
 
+export async function fetchOptimizeJobSnapshotStatus<TResult>(
+  jobId: string,
+  fallbackMessage: string,
+  pollToken?: string,
+  isCancelled?: () => boolean,
+): Promise<OptimizationJobSnapshot<TResult>> {
+  const controller = new AbortController()
+  let cancellationRequested = false
+  const timeout = window.setTimeout(() => controller.abort(), OPTIMIZE_POLL_REQUEST_TIMEOUT_MS)
+  const cancellationCheck = window.setInterval(() => {
+    if (isCancelled?.()) {
+      cancellationRequested = true
+      controller.abort()
+    }
+  }, 100)
+  try {
+    return await fetchOptimizationJobSnapshot<TResult>(jobId, fallbackMessage, pollToken, controller.signal)
+  } catch (error) {
+    if (cancellationRequested || isCancelled?.()) throw new OptimizeJobPollCancelledError()
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+    window.clearInterval(cancellationCheck)
+  }
+}
+
+interface PendingOptimizeSubmission {
+  version: 1;
+  idempotencyKey: string;
+  requestJson: string;
+  createdAt: number;
+}
+
+export function getOrCreateOptimizeSubmissionKey(storageKey: string, request: unknown): string {
+  const requestJson = JSON.stringify(request)
+  const key = `${storageKey}:pending-submission`
+  try {
+    const raw = window.sessionStorage.getItem(key)
+    const current = raw ? JSON.parse(raw) as Partial<PendingOptimizeSubmission> : null
+    if (current?.version === 1 && current.requestJson === requestJson && typeof current.idempotencyKey === 'string') {
+      return current.idempotencyKey
+    }
+    const idempotencyKey = crypto.randomUUID()
+    window.sessionStorage.setItem(key, JSON.stringify({ version: 1, idempotencyKey, requestJson, createdAt: Date.now() }))
+    return idempotencyKey
+  } catch {
+    return crypto.randomUUID()
+  }
+}
+
+export function clearOptimizeSubmissionKey(storageKey: string): void {
+  try {
+    window.sessionStorage.removeItem(`${storageKey}:pending-submission`)
+  } catch {
+    // Session storage is best-effort only.
+  }
+}
+
 export function writeActiveOptimizeJob(
   key: string,
   job: OptimizeJobAccepted | OptimizeJobStatusResponse,
@@ -391,7 +456,7 @@ export function isStoredOptimizeJob(value: unknown): value is OptimizeJobAccepte
   if (!isObjectRecord(value)) return false
   return typeof value.job_id === 'string'
     && (value.status === 'queued' || value.status === 'running' || value.status === 'succeeded' || value.status === 'failed')
-    && (value.priority === 'paid' || value.priority === 'standard')
+    && (value.priority === 'priority_coupon' || value.priority === 'paid' || value.priority === 'analysis' || value.priority === 'standard')
     && typeof value.submitted_at === 'string'
 }
 

@@ -10,6 +10,7 @@ export default function OptimizeShell({
   section,
   permissionLabel,
   badges,
+  headerActions,
   showScenarioLab,
   onSectionChange,
   onReset,
@@ -18,6 +19,7 @@ export default function OptimizeShell({
   section: OptimizeSection
   permissionLabel: string
   badges?: Partial<Record<OptimizeSection, string>>
+  headerActions?: ReactNode
   showScenarioLab: boolean
   onSectionChange: (section: OptimizeSection) => void
   onReset: () => void
@@ -74,6 +76,7 @@ export default function OptimizeShell({
               </div>
             </div>
             <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
+              {headerActions}
               <ThemeSwitcher />
               <DeferredFeatureMenu />
               <button type="button" onClick={onReset} className="tool-secondary-action lg:hidden">{copy.optimize.pages_tool_optimize_OptimizeShell_005}</button>
