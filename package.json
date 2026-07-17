@@ -14,6 +14,8 @@
     "build:server": "node scripts/build-server.mjs",
     "build": "npm run generate:data && npm run build:web && npm run build:server",
     "test": "vitest run",
+    "test:optimizer-benchmark-report": "node --test scripts/optimizer-benchmark-report.test.mjs",
+    "benchmark:optimizer:report": "node scripts/optimizer-benchmark-report.mjs",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:watch": "vitest",
     "check:copy": "node scripts/check-copy-architecture.mjs",
