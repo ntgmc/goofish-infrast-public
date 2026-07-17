@@ -2,7 +2,7 @@ import type { FreePreviewTrial, PermissionMode, UserGameAccountKind } from '../s
 
 export const FREE_PREVIEW_ADVANCED_TRIAL = {
   id: 'free-preview-advanced-trial-2026',
-  startsAt: '2026-07-18T16:00:00.000Z',
+  startsAt: '2026-07-17T04:00:00.000Z',
   endsAt: '2026-08-19T16:00:00.000Z',
   effectivePermission: 'advanced' as const,
 }
