@@ -496,13 +496,13 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_013: "配置组合后运行实验",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_014: "自动非固定模式先选择班次数组，再精确复核每个实际操作成本档位的前三名。",
+  pages_tool_optimize_ScenarioLabSection_014: "自动非固定模式先选择班次数组，再复核每个实际操作成本档位的前三名；243/333 使用精确模式，其他布局使用快速模式。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_015: "有效场景",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_016: "快速成功 ",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_017: "精确复核",
+  pages_tool_optimize_ScenarioLabSection_017: "场景复核",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_018: "每档最多 3 个",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -516,7 +516,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_023: "产量与操作成本",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_024: "横轴使用实际班次数；自动模式在快速阶段选型并冻结后精确复核。前沿仅使用精确结果。",
+  pages_tool_optimize_ScenarioLabSection_024: "横轴使用实际班次数；自动模式在快速阶段选型并冻结后按布局复核。前沿仅使用复核结果。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_025: "全部场景",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -530,7 +530,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_030: " 次换班/日 · ",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_031: "精确结果",
+  pages_tool_optimize_ScenarioLabSection_031: "复核结果",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_032: "快速结果",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -628,7 +628,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_015: "游戏内轮换 12 小时 × 2",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
-  pages_tool_optimize_scenario_lab_ScenarioFactors_016: "自动模式先快速选择实际间隔，再冻结该数组精确复核；轮换不随无人机策略重复展开。",
+  pages_tool_optimize_scenario_lab_ScenarioFactors_016: "自动模式先快速选择实际间隔，再冻结该数组按布局复核；243/333 使用精确模式，其他布局使用快速模式。轮换不随无人机策略重复展开。",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_017: "MAA 无人机策略",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
@@ -692,7 +692,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
   pages_tool_optimize_scenario_lab_ScenarioParetoChart_015: "MAA 快速筛选",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
-  pages_tool_optimize_scenario_lab_ScenarioParetoChart_016: "精确复核",
+  pages_tool_optimize_scenario_lab_ScenarioParetoChart_016: "复核结果",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
   pages_tool_optimize_scenario_lab_ScenarioParetoChart_017: "已验证前沿",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
@@ -756,7 +756,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_028: "前沿",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
-  pages_tool_optimize_scenario_lab_ScenarioResultsTable_029: "精确",
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_029: "复核",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_030: "失败",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
