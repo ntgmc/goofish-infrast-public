@@ -119,7 +119,7 @@ export interface ScenarioComparisonResult {
   skipped: ScenarioSkipSummary[];
   points: ScenarioComparisonPoint[];
   frontierScenarioIds: string[];
-  frontierBasis: 'fast_top_3_per_actual_operation_cost_then_exact_selected_shift_pattern';
+  frontierBasis: 'fast_top_3_per_actual_operation_cost_then_layout_aware_verification';
   warnings: string[];
   buildMeta: AppBuildMeta;
 }

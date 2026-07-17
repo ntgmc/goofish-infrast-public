@@ -1,6 +1,7 @@
 import type { LicenseConfig } from "../../../src/lib/types";
 import type { OptimizeConfigPermission } from './shared';
 import { hasCapability } from '../../../src/lib/product-catalog';
+import { enforceLayoutOptimizationMode } from '../layout-policy';
 
 export function asConfigRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -13,9 +14,14 @@ export function sanitizeConfigForPublicOptimize(
   permission: OptimizeConfigPermission,
 ): LicenseConfig {
   const next = structuredClone(config);
+  const layoutCostConstrained = enforceLayoutOptimizationMode(next);
 
   if (permission === "free_preview" || !hasCapability({ permission }, 'edit_full_config')) {
-    delete next.optimizer_search;
+    if (layoutCostConstrained) {
+      next.optimizer_search = { optimization_mode: 'fast', beam: true };
+    } else {
+      delete next.optimizer_search;
+    }
     delete next.variable_shift_schedule;
     return next;
   }
