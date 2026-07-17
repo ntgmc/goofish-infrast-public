@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import BuildMetaStrip from './components/BuildMetaStrip'
 import RouteLifecycle from './components/RouteLifecycle'
 import RouteMetadata from './components/RouteMetadata'
+import SessionLoader from './components/SessionLoader'
 import LandingPage from './pages/LandingPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import CancelAccountDeletionPage from './pages/CancelAccountDeletionPage'
@@ -59,11 +60,7 @@ function AppContent() {
 
 function LazyPage({ fallback, children }: { fallback: string; children: React.ReactNode }) {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">
-        {fallback}
-      </div>
-    }>
+    <Suspense fallback={<SessionLoader label={fallback} />}>
       {children}
     </Suspense>
   )

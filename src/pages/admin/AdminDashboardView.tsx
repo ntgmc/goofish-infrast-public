@@ -2,6 +2,7 @@ import type { AnnouncementKind } from '../../lib/types'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
 import AnnouncementBodyEditor from '../../components/AnnouncementBodyEditor'
+import SessionLoader from '../../components/SessionLoader'
 import InvitationSettingsSection from './invitations/InvitationSettingsSection'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import DeadLetterPanel from './optimization/DeadLetterPanel'
@@ -19,12 +20,8 @@ export default function AdminDashboardView() {
   if (!activeSection) return <Navigate to={fallbackAdminPath()} replace />
 
   if (sessionChecking) {
-      return (
-        <main className="grid min-h-screen place-items-center bg-surface-0 px-6 text-ink-secondary" tabIndex={-1} data-route-focus>
-          <p className="text-sm">正在检查管理员会话...</p>
-        </main>
-      )
-    }
+    return <SessionLoader label="正在检查管理员会话..." />
+  }
 
   if (!authenticated) {
       return (

@@ -13,6 +13,7 @@ describe('free preview advanced trial', () => {
     const startsAt = new Date(FREE_PREVIEW_ADVANCED_TRIAL.startsAt)
     const endsAt = new Date(FREE_PREVIEW_ADVANCED_TRIAL.endsAt)
 
+    expect(FREE_PREVIEW_ADVANCED_TRIAL.startsAt).toBe('2026-07-17T04:00:00.000Z')
     expect(getFreePreviewTrial(previewProfile, new Date(startsAt.getTime() - 1))?.active).toBe(false)
     expect(getFreePreviewTrial(previewProfile, startsAt)?.effective_permission).toBe('advanced')
     expect(getFreePreviewTrial(previewProfile, new Date(endsAt.getTime() - 1))?.active).toBe(true)

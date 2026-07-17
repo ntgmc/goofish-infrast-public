@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import AnnouncementPopup from '../components/AnnouncementPopup'
+import SessionLoader from '../components/SessionLoader'
 import { canUseScenarioComparison } from '../lib/license'
 import {
   dashboardPath,
@@ -58,7 +59,7 @@ export default function ToolPage() {
   if (!route) return <Navigate to={fallbackToolPath(location.pathname)} replace />
 
   if (authLoading) {
-    return <div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">{copy.common.pages_ToolPage_001}</div>
+    return <SessionLoader label={copy.common.pages_ToolPage_001} />
   }
 
   if (!user) {
@@ -143,7 +144,7 @@ export default function ToolPage() {
   return (
     <>
       <AnnouncementPopup announcements={popups} />
-      <Suspense fallback={<div className="flex min-h-screen items-center justify-center px-6 text-ink-secondary">{copy.common.pages_ToolPage_002}</div>}>
+      <Suspense fallback={<SessionLoader label={copy.common.pages_ToolPage_002} />}>
         <OptimizePage
           profileId={activeProfile.id}
           profile={activeProfile}
