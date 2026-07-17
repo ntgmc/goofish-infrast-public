@@ -149,16 +149,6 @@ export const optimizeCopy = {
   components_UpgradeSuggestions_074: "暂不可算",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_075: " 理智",
-  // src/pages/tool/optimize/AdminOperatorPanel.tsx
-  pages_tool_optimize_AdminOperatorPanel_001: "干员数据",
-  // src/pages/tool/optimize/AdminOperatorPanel.tsx
-  pages_tool_optimize_AdminOperatorPanel_002: " 名干员",
-  // src/pages/tool/optimize/AdminOperatorPanel.tsx
-  pages_tool_optimize_AdminOperatorPanel_003: "管理员",
-  // src/pages/tool/optimize/AdminOperatorPanel.tsx
-  pages_tool_optimize_AdminOperatorPanel_004: "管理员可以替换当前授权内的干员数据。普通用户数据由账号空间同步。",
-  // src/pages/tool/optimize/AdminOperatorPanel.tsx
-  pages_tool_optimize_AdminOperatorPanel_005: "替换干员 JSON",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_001: "工作区输入",
   // src/pages/tool/optimize/ConfigSection.tsx
@@ -844,18 +834,6 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_003: "干员数据同步中，稍后再检测。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_004: "确认替换当前授权内的干员数据？\n\n新文件识别到 ",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_005: " 名干员。继续后会清空当前练度调整。",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_006: "干员数据更新失败，请稍后重试",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_007: "干员数据更新失败，请稍后重试",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_008: "已更新授权内的干员数据，共 ",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
-  pages_tool_optimize_useOptimizeWorkflow_009: " 名。",
-  // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_010: "已应用实验场景，请确认配置后再生成排班。",
   // src/pages/tool/optimize/useOptimizeWorkflow.tsx
   pages_tool_optimize_useOptimizeWorkflow_011: "优化失败，请稍后重试",
@@ -901,24 +879,6 @@ export const optimizeCopy = {
   pages_tool_optimize_workflow_utils_008: "免费完整排班确认期已结束。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。",
   // src/pages/tool/optimize/workflow-utils.ts
   pages_tool_optimize_workflow_utils_009: "免费完整排班修正次数已用完。可继续查看已生成方案，或使用每月 2 次重排检测；需要重新生成完整方案请升级单账号终身版 CDK。",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_010: "干员数据不能为空。",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_011: "第 ",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_012: " 个干员不是对象。",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_013: "干员 ",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_014: " 缺少字段: ",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_015: "干员 ",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_016: " 的 id/name/own 格式不正确。",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_017: "干员 ",
-  // src/pages/tool/optimize/workflow-utils.ts
-  pages_tool_optimize_workflow_utils_018: " 的 elite/rarity 必须是数字。",
   // src/pages/tool/optimize/optimization-job-events.ts
   pages_tool_optimize_optimization_job_events_001: "另一个页面正在提交同一账号的优化任务，请稍后重试。",
   pages_tool_optimize_optimization_job_events_002: "排班优化已完成",
