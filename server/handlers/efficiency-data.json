@@ -337,6 +337,16 @@
         "野鬃",
         "蚀清"
       ]
+    },
+    "a1_team": {
+      "name": "A1小队",
+      "operators": [
+        "芬",
+        "米格鲁",
+        "克洛丝",
+        "芙蓉",
+        "炎熔"
+      ]
     }
   },
   "combination_rules": {
@@ -4824,6 +4834,281 @@
             }
           ]
         }
+      ],
+      "PRTS补全": [
+        {
+          "combo": [
+            "深巡"
+          ],
+          "efficiency": 25,
+          "priority": 100,
+          "note": "PRTS补全：对陆接洽代表·α：进驻贸易站时，订单获取效率+25%；当乌尔比安在基建内时（不包含副手及活动室使用者），订单获取效率额外+5%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0238",
+              "hash": "sha256:5f215ddbe0c9d434ffa12e2da36b415f3c3ddb035907bbf55b77a6b2ae4f01c4"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 25,
+            "per_operator": 5,
+            "operators": [
+              "乌尔比安"
+            ],
+            "dependency_scope": "facility",
+            "cap": 1,
+            "scope": "trading_station",
+            "detail": "进驻贸易站时，订单获取效率+25%；当乌尔比安在基建内时（不包含副手及活动室使用者），订单获取效率额外+5%"
+          }
+        },
+        {
+          "combo": [
+            "赫德雷"
+          ],
+          "efficiency": 25,
+          "priority": 100,
+          "note": "PRTS补全：白手起家·α：进驻贸易站时，订单获取效率+25%；当伊内丝入驻工作场所时（不包含副手），订单获取效率额外+5%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0240",
+              "hash": "sha256:c2809284298ef5eed8d843245579a870f40353e7b3e9ceeea73c7a2acc537b0e"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 25,
+            "per_operator": 5,
+            "operators": [
+              "伊内丝"
+            ],
+            "dependency_scope": "workplace",
+            "cap": 1,
+            "scope": "trading_station",
+            "detail": "进驻贸易站时，订单获取效率+25%；当伊内丝入驻工作场所时（不包含副手），订单获取效率额外+5%"
+          }
+        },
+        {
+          "combo": [
+            "德克萨斯/2"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：默契：当与能天使在同一个贸易站时，心情每小时消耗-0.3",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0246",
+              "hash": "sha256:71f7b816f6b9a37e95a938e633633ba195e467b39c6ae8201cbce6e33ef121d9"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "当与能天使在同一个贸易站时，心情每小时消耗-0.3"
+          ]
+        },
+        {
+          "combo": [
+            "吉星"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：勤俭经营·α：进驻贸易站时，贸易站内除自身以外每名处于工作状态的干员+10%订单获取效率",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0259",
+              "hash": "sha256:a1035e571f3aeebd44f779dd62d8664550414c0ea96b5e04a0eea13dd730c812"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "room_operator_count",
+            "base": -10,
+            "per_operator": 10,
+            "cap": 3,
+            "scope": "trading_station",
+            "detail": "进驻贸易站时，贸易站内除自身以外每名处于工作状态的干员+10%订单获取效率"
+          }
+        },
+        {
+          "combo": [
+            "雪雉"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：天道酬勤·α：进驻贸易站时，当前贸易站内干员提供的每5%订单获取效率，额外提供5%效率，最多提供25%效率",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0271",
+              "hash": "sha256:33f38176772922f175ae12f6587c6d832b7511e6877bf0fe2cf52656ff98daa8"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻贸易站时，当前贸易站内干员提供的每5%订单获取效率，额外提供5%效率，最多提供25%效率"
+          ]
+        },
+        {
+          "combo": [
+            "锏"
+          ],
+          "efficiency": 20,
+          "priority": 100,
+          "note": "PRTS补全：威压：进驻贸易站时，订单获取效率+20%，且订单上限-2（订单最少为1）",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0277",
+              "hash": "sha256:e79d12dc9fd188ce2a8d1a2e409bb76b5595f16561bd3b4e9f86ab1a9f557f42"
+            }
+          ],
+          "order_limit_delta": -2
+        },
+        {
+          "combo": [
+            "黑键"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：徘徊旋律：进驻贸易站时，每4点无声共鸣+1%订单效率",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0303",
+              "hash": "sha256:7962113e89ccdee316d92e83eecae71ade8dfc3fdf1fc09b7c52624c69a00bb5"
+            }
+          ],
+          "dynamic_resource_effects": {
+            "resource": "silent_resonance",
+            "type": "efficiency_per_step",
+            "step_size": 4,
+            "per_step": 1,
+            "scope": "trading_station",
+            "detail": "进驻贸易站时，每4点无声共鸣+1%订单效率"
+          }
+        },
+        {
+          "combo": [
+            "风絮/2"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：“孺子可教！”：进驻贸易站时，基建内（不包含副手及活动室）每有一间进驻岁干员的设施，订单获取效率+4%（最多5间）",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0306",
+              "hash": "sha256:c616e30b302203bd1786636945cf698a658a8ef5905f8a0665404b09152aeb55"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "operator_group_room_count",
+            "base": 0,
+            "per_room": 4,
+            "group": "sui",
+            "cap": 5,
+            "exclude_assigned_operators": true,
+            "scope": "trading_station",
+            "detail": "进驻贸易站时，基建内（不包含副手及活动室）每有一间进驻岁干员的设施，订单获取效率+4%（最多5间）"
+          }
+        },
+        {
+          "combo": [
+            "真言/2"
+          ],
+          "efficiency": 25,
+          "priority": 100,
+          "note": "PRTS补全：精英小队：进驻贸易站时，订单获取效率+25%，基建内（不包含副手及活动室）每有一间进驻精英干员的设施，订单获取效率额外+2%（最多10间）",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0307",
+              "hash": "sha256:81f83336446d2fdf4364ee632612f4f555eacc92b4a352e644c930c87f218b2e"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "operator_group_room_count",
+            "base": 25,
+            "per_room": 2,
+            "group": "elite_operators",
+            "cap": 10,
+            "exclude_assigned_operators": true,
+            "scope": "trading_station",
+            "detail": "进驻贸易站时，订单获取效率+25%，基建内（不包含副手及活动室）每有一间进驻精英干员的设施，订单获取效率额外+2%（最多10间）"
+          }
+        },
+        {
+          "combo": [
+            "但书"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：违约索赔·α：进驻贸易站时，如果下笔赤金订单是违约订单，则赤金交付数额外+1",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0312",
+              "hash": "sha256:9b9d1a3595d31474ed419008a63edcc795f876a1259160137407a3de92493728"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻贸易站时，如果下笔赤金订单是违约订单，则赤金交付数额外+1"
+          ]
+        },
+        {
+          "combo": [
+            "卡夫卡"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：手工艺品·α：进驻贸易站时，小幅提升当前贸易站高品质贵金属订单的出现概率（工作时长影响概率），心情每小时消耗-0.25",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0315",
+              "hash": "sha256:d775828808ef9c5049c946ea6cbcefc464321ea9e83632006c6837a17b24be5a"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻贸易站时，小幅提升当前贸易站高品质贵金属订单的出现概率（工作时长影响概率），心情每小时消耗-0.25"
+          ]
+        },
+        {
+          "combo": [
+            "折光"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：鉴定师的眼光：进驻贸易站时，小幅提升当前贸易站高品质贵金属订单的出现概率（工作时长影响概率），心情每小时消耗-0.25",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0316",
+              "hash": "sha256:fa5eca7bb7d7c635fcd6b0d2d9310b42548fc675a4ac46ba9042e6183baaf102"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻贸易站时，小幅提升当前贸易站高品质贵金属订单的出现概率（工作时长影响概率），心情每小时消耗-0.25"
+          ]
+        },
+        {
+          "combo": [
+            "龙舌兰"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：投资·α：进驻贸易站后，如果下笔赤金订单交付数大于3（违约订单不视作赤金订单），则其龙门币收益+250，心情每小时消耗-0.25",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0319",
+              "hash": "sha256:af0638331829da5ffcfd171feff91403eb89bc54b80ee75fd911a1cca320a274"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻贸易站后，如果下笔赤金订单交付数大于3（违约订单不视作赤金订单），则其龙门币收益+250，心情每小时消耗-0.25"
+          ]
+        }
       ]
     },
     "manufacturing_station": {
@@ -7340,6 +7625,240 @@
             }
           ]
         }
+      ],
+      "PRTS补全": [
+        {
+          "combo": [
+            "冬时"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：科学改造：进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站仓库容量上限+5",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0141",
+              "hash": "sha256:555f05e3cc6a9ebcf01b66018af61b2631f2ae79bcc26ba05a051528481e8368"
+            }
+          ],
+          "storage_capacity_delta": 5,
+          "dynamic_effects": {
+            "type": "room_operator_count",
+            "base": 0,
+            "per_operator": 0,
+            "cap": 3,
+            "fill_room": true,
+            "scope": "manufacturing_station",
+            "detail": "进驻制造站时，当前制造站内其他干员提供的生产力全部归零（不包含根据设施数量提供加成的生产力），每个当前制造站内干员为当前制造站仓库容量上限+5"
+          },
+          "unmodeled_effects": [
+            "他人生产力归零和动态仓库容量"
+          ]
+        },
+        {
+          "combo": [
+            "阿兰娜"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：机械精通·α：进驻制造站时，每有1台作业平台进驻发电站，贵金属类配方的生产力+5%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0144",
+              "hash": "sha256:83be5cd275114070de3de6c8d34b6c08a7f072ad7a0ceeba36788038adaf16bd"
+            }
+          ],
+          "product": [
+            "Pure Gold"
+          ],
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 0,
+            "per_operator": 5,
+            "operators": [
+              "Lancet-2",
+              "Castle-3",
+              "THRM-EX",
+              "正义骑士号",
+              "Friston-3",
+              "PhonoR-0",
+              "CONFESS-47",
+              "GALLUS²"
+            ],
+            "dependency_scope": "power",
+            "cap": 3,
+            "product": "Pure Gold",
+            "scope": "manufacturing_station",
+            "detail": "进驻制造站时，每有1台作业平台进驻发电站，贵金属类配方的生产力+5%"
+          }
+        },
+        {
+          "combo": [
+            "至简"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：机械辅助·α：进驻制造站时，每16个工程机器人+5%生产力",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0150",
+              "hash": "sha256:6c8283667caea34343f5625f02efb4a6c87f975e6834d7c1fc92f3576bf2276d"
+            }
+          ],
+          "dynamic_resource_contributions": {
+            "resource": "engineering_robot",
+            "amount": 64,
+            "key": "minimalist_e0_max_facility_levels",
+            "detail": "至简E0按满级布局上限64点工程机器人建模。"
+          },
+          "dynamic_resource_effects": {
+            "resource": "engineering_robot",
+            "type": "efficiency_per_step",
+            "step_size": 16,
+            "per_step": 5,
+            "scope": "manufacturing_station",
+            "detail": "进驻制造站时，每16个工程机器人+5%生产力"
+          }
+        },
+        {
+          "combo": [
+            "娜斯提/2"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：造价高昂：进驻制造站时，基建内（不包含副手及活动室使用者）每有1名莱茵生命干员（最多5名），贵金属类配方的生产力+3%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0152",
+              "hash": "sha256:410eea646e20043e1402838463d8c877fbfae0de16c3f03a6c5141c55997004f"
+            }
+          ],
+          "product": [
+            "Pure Gold"
+          ],
+          "dynamic_effects": {
+            "type": "operator_group_presence_count",
+            "base": 0,
+            "per_operator": 3,
+            "group": "rhine_lab",
+            "dependency_scope": "facility",
+            "cap": 5,
+            "product": "Pure Gold",
+            "scope": "manufacturing_station",
+            "detail": "进驻制造站时，基建内（不包含副手及活动室使用者）每有1名莱茵生命干员（最多5名），贵金属类配方的生产力+3%"
+          }
+        },
+        {
+          "combo": [
+            "迷迭香"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：念力：进驻制造站时，每2点思维链环+1%生产力",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0169",
+              "hash": "sha256:80f62789d9675a2e13bc4e2ecc00e43d696d2ede54ac5c611bb3e6f7931131bd"
+            }
+          ],
+          "dynamic_resource_effects": {
+            "resource": "thinking_chain",
+            "type": "efficiency_per_step",
+            "step_size": 2,
+            "per_step": 1,
+            "scope": "manufacturing_station",
+            "detail": "进驻制造站时，每2点思维链环+1%生产力"
+          }
+        },
+        {
+          "combo": [
+            "历阵锐枪芬/2"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：重聚时光：进驻制造站时，当前制造站内每个A1小队干员为自身+10%的生产力",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0200",
+              "hash": "sha256:b22f567e0e4bb2d04d938efaef8acaa7994241db06eb354a4216cc4e4af16497"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "operator_group_presence_count",
+            "base": 0,
+            "per_operator": 10,
+            "group": "a1_team",
+            "dependency_scope": "room",
+            "cap": 3,
+            "scope": "manufacturing_station",
+            "detail": "进驻制造站时，当前制造站内每个A1小队干员为自身+10%的生产力"
+          }
+        },
+        {
+          "combo": [
+            "火神"
+          ],
+          "efficiency": -5,
+          "priority": 100,
+          "note": "PRTS补全：工匠精神·α：进驻制造站时，生产力-5%，仓库容量上限+16，心情每小时消耗-0.15",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0203",
+              "hash": "sha256:926de003aaad5e5c639086ccd5c59c86a24734253e663436b99770a40bece1a0"
+            }
+          ],
+          "storage_capacity_delta": 16,
+          "mood_consumption_delta": {
+            "火神": -0.15
+          }
+        },
+        {
+          "combo": [
+            "铅踝/1"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：窗外雪啸：进驻制造站时，当自身心情落差大于12时，生产力+10%，仓库容量+6",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0209",
+              "hash": "sha256:c91e061a760b034b1b4479ad996e7f18c865a7ffc97aa5a9d211d7479d2063b5"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻制造站时，当自身心情落差大于12时，生产力+10%，仓库容量+6"
+          ]
+        },
+        {
+          "combo": [
+            "怒潮凛冬/2"
+          ],
+          "efficiency": 30,
+          "priority": 100,
+          "note": "PRTS补全：情同手足：进驻制造站时，作战记录类配方的生产力+30%，当与乌萨斯学生自治团干员在同一个制造站时，作战记录类配方的生产力额外+10%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0222",
+              "hash": "sha256:91337055638d62d62826c170e6e7da40c765ab015027a4abdd3b6b532ec88f44"
+            }
+          ],
+          "product": [
+            "Battle Record"
+          ],
+          "dynamic_effects": {
+            "type": "operator_group_presence_count",
+            "base": 30,
+            "per_operator": 10,
+            "group": "ursus_student_self_governing_group",
+            "dependency_scope": "room",
+            "exclude_assigned_operators": true,
+            "cap": 1,
+            "product": "Battle Record",
+            "scope": "manufacturing_station",
+            "detail": "进驻制造站时，作战记录类配方的生产力+30%，当与乌萨斯学生自治团干员在同一个制造站时，作战记录类配方的生产力额外+10%"
+          }
+        }
       ]
     },
     "power_station": {
@@ -8339,6 +8858,228 @@
             }
           ]
         }
+      ],
+      "PRTS补全": [
+        {
+          "combo": [
+            "松桐/2"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：见微知著：进驻会客室时，更容易获得线索板上尚未拥有的线索",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0637",
+              "hash": "sha256:85c9455e23c84f42afd928d0872e22ad68c5b078179e757437b242172ffd99f1"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻会客室时，更容易获得线索板上尚未拥有的线索"
+          ]
+        },
+        {
+          "combo": [
+            "晓歌"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：不容遗漏·α：进驻会客室时，更容易获得线索板上尚未拥有的线索",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0640",
+              "hash": "sha256:9418d6c511d0a2e4fe2693981077da65fb9e994728cc07c5e98c97c3720d1b47"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻会客室时，更容易获得线索板上尚未拥有的线索"
+          ]
+        },
+        {
+          "combo": [
+            "安洁莉娜/2"
+          ],
+          "efficiency": 10,
+          "priority": 100,
+          "note": "PRTS补全：信使·罗德岛制药：进驻会客室时，线索搜集速度提升10%，且更容易获得罗德岛制药线索（工作时长影响概率）",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0641",
+              "hash": "sha256:a7a03f7bd2f9d87ad6e6281c2ef891d98c8f67c2491805ad757247b1fa605196"
+            }
+          ],
+          "unmodeled_effects": [
+            "罗德岛制药线索倾向概率"
+          ]
+        },
+        {
+          "combo": [
+            "莫斯提马/2"
+          ],
+          "efficiency": 10,
+          "priority": 100,
+          "note": "PRTS补全：信使·企鹅物流：进驻会客室时，线索搜集速度提升10%，且更容易获得企鹅物流线索（工作时长影响概率）",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0656",
+              "hash": "sha256:a9110e85cf9f2f64e7fa68114c7e2de31d7157d100cde6935f3351751aa077ed"
+            }
+          ],
+          "unmodeled_effects": [
+            "企鹅物流线索倾向概率"
+          ]
+        },
+        {
+          "combo": [
+            "哈洛德/2"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：交个朋友：进驻会客室时，提升会客室内另一干员所属派系的线索倾向效果（如会客室没有另一干员则不提升）",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0657",
+              "hash": "sha256:22bc922549546dca479bd62f64394eab0bfbde2d00c34579dd5d182ae5efbadf"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻会客室时，提升会客室内另一干员所属派系的线索倾向效果（如会客室没有另一干员则不提升）"
+          ]
+        },
+        {
+          "combo": [
+            "梅/1"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：皇家探员（自称）：进驻会客室时，更容易获得企鹅物流线索（工作时长影响概率）",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0658",
+              "hash": "sha256:bfbd739c5abd53c6af5ba4b9a1dd1947babb8aab242c62208fea42ba1fa29c84"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻会客室时，更容易获得企鹅物流线索（工作时长影响概率）"
+          ]
+        },
+        {
+          "combo": [
+            "塞雷娅/2"
+          ],
+          "efficiency": 10,
+          "priority": 100,
+          "note": "PRTS补全：守望者：进驻会客室时，线索搜集速度提升10%，且更容易获得莱茵生命线索（工作时长影响概率）",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0659",
+              "hash": "sha256:bd5c110e7f7a9b0dc1b6bcd380fe34f81630f65e6de02a0b3174dd8b7ccd42f2"
+            }
+          ],
+          "unmodeled_effects": [
+            "莱茵生命线索倾向概率"
+          ]
+        },
+        {
+          "combo": [
+            "骋风/1"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：眼观六路：进驻会客室时，处于线索交流时更容易获得线索板上尚未拥有的线索",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0660",
+              "hash": "sha256:f7211ecf56556fd9b59b91f03b78ec5a06877f68d9d4161d14341b91597730ea"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻会客室时，处于线索交流时更容易获得线索板上尚未拥有的线索"
+          ]
+        },
+        {
+          "combo": [
+            "寻澜/2"
+          ],
+          "efficiency": 10,
+          "priority": 100,
+          "note": "PRTS补全：情报探查：进驻会客室时，线索搜集速度提升10%，与其他黑钢国际干员进驻会客室一起工作时，线索搜集速度额外提升20%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0680",
+              "hash": "sha256:f918e957a0417bfdc1000b1b85823fe3e3ea7f5c3888c119bf9b8e72a1e49d4d"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 10,
+            "per_operator": 20,
+            "operators": [
+              "雷蛇",
+              "芙兰卡",
+              "杰西卡",
+              "涤火杰西卡",
+              "香草"
+            ],
+            "dependency_scope": "room",
+            "cap": 1,
+            "scope": "meeting_room",
+            "detail": "进驻会客室时，线索搜集速度提升10%，与其他黑钢国际干员进驻会客室一起工作时，线索搜集速度额外提升20%"
+          }
+        },
+        {
+          "combo": [
+            "莱欧斯/2"
+          ],
+          "efficiency": 20,
+          "priority": 100,
+          "note": "PRTS补全：好奇心提供20%线索搜集速度；饱餐的干劲每拥有1点魔物料理额外提升2%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0690",
+              "hash": "sha256:aaa5c2f42ad25e244a839c015664132e839dcc0730595825568e5e7aef6844f6"
+            },
+            {
+              "id": "PRTS-MEET-0682",
+              "hash": "sha256:e9c23f769c066e6f8888b19a07639169d0813c73dbcec593aa6122963e42d58a"
+            }
+          ],
+          "dynamic_resource_effects": {
+            "resource": "monster_cuisine",
+            "type": "efficiency_per_resource",
+            "per_resource": 2,
+            "scope": "meeting_room",
+            "detail": "进驻会客室时，每拥有1点魔物料理，线索搜集速度额外提升2%"
+          }
+        },
+        {
+          "combo": [
+            "风丸/2"
+          ],
+          "efficiency": 0,
+          "priority": 10,
+          "note": "PRTS补全：得心应手：进驻会客室时，如果会客室内只有自身处于工作状态时，线索搜集速度提升35%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MEET-0694",
+              "hash": "sha256:0ffc7b140949be4367773b4ab98454512b822e648a07b1e96fff5fd8de87d1cd"
+            }
+          ],
+          "modeled_placeholder": true,
+          "unmodeled_reason": "current_optimizer_model_unsupported",
+          "unmodeled_effects": [
+            "进驻会客室时，如果会客室内只有自身处于工作状态时，线索搜集速度提升35%"
+          ]
+        }
       ]
     },
     "hire": {
@@ -8717,6 +9458,88 @@
               "hash": "sha256:97b231d8b68a375f4b4a32de8794ca7d3c26cf37205296f93772842176ee5ec1"
             }
           ]
+        }
+      ],
+      "PRTS补全": [
+        {
+          "combo": [
+            "月禾/2"
+          ],
+          "efficiency": 35,
+          "priority": 100,
+          "note": "PRTS补全：洞悉人心：进驻人力办公室时，人脉资源的联络速度+35%，同时每个招募位（不包含初始招募位）额外+5%会客室线索搜集速度",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-HR-0520",
+              "hash": "sha256:95ad344857972dbd8bf01f726516783e50347816577d91cbe1017900d499e856"
+            }
+          ],
+          "unmodeled_effects": [
+            "额外招募位对会客室的跨设施加成"
+          ]
+        },
+        {
+          "combo": [
+            "圣聆初雪/2"
+          ],
+          "efficiency": 35,
+          "priority": 100,
+          "note": "PRTS补全：雪境归心：进驻人力办公室时，人脉资源的联络速度+35%，心情每小时消耗-0.25，如果凛御银灰进驻在控制中枢，则人脉资源的联络速度额外+10%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-HR-0530",
+              "hash": "sha256:d3fc0dc9651751c4f2fc9b558105aa97c16bbbab69051178eaa585a0b04ed2a8"
+            }
+          ],
+          "control_center": [
+            "凛御银灰"
+          ],
+          "mood_consumption_delta": {
+            "圣聆初雪": -0.25
+          },
+          "dynamic_effects": {
+            "type": "operator_presence_count",
+            "base": 35,
+            "per_operator": 10,
+            "operators": [
+              "凛御银灰"
+            ],
+            "dependency_scope": "control_center",
+            "cap": 1,
+            "scope": "hire",
+            "detail": "进驻人力办公室时，人脉资源的联络速度+35%，心情每小时消耗-0.25，如果凛御银灰进驻在控制中枢，则人脉资源的联络速度额外+10%"
+          }
+        },
+        {
+          "combo": [
+            "林/2"
+          ],
+          "efficiency": 30,
+          "priority": 100,
+          "note": "PRTS补全：用人唯才，按满级办公室的3个额外招募位计算+30%。",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-HR-0531",
+              "hash": "sha256:ffe87be72ee18cf44f30774cd4f143c102e6a596ac195800befda4fb69b0f8a9"
+            }
+          ]
+        },
+        {
+          "combo": [
+            "雪绒/2"
+          ],
+          "efficiency": 35,
+          "priority": 100,
+          "note": "PRTS补全：救援队·保证体力，按满级办公室的3个额外招募位计算心情消耗-0.3。",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-HR-0534",
+              "hash": "sha256:5098c9dab3e82d8c9774d74fa268ce004c7d1f4dac73592dc4d9f7895508dccd"
+            }
+          ],
+          "mood_consumption_delta": {
+            "雪绒": -0.3
+          }
         }
       ]
     },
@@ -9112,12 +9935,8 @@
       ],
       "skill_rule_refs": [
         {
-          "id": "PRTS-CC-0002",
-          "hash": "sha256:2a8216e77c97fccddacab33a3ffc0728b0b853f74caff662b3de413431339ab0"
-        },
-        {
-          "id": "PRTS-CC-0004",
-          "hash": "sha256:af3c364dfbb89c6da9ae2afc722b1dda3f3cfe09a24fda7ba6396a23be57bb8a"
+          "id": "PRTS-CC-0001",
+          "hash": "sha256:3081206b62ce8e935951d82e3dd16031a843ed4c0e4fb76370d89434d9beac2c"
         }
       ]
     },
@@ -9635,6 +10454,512 @@
       ],
       "skill_rule_refs": [],
       "skill_rule_exemption": "non_skill_condition"
+    },
+    {
+      "operator": "凛御银灰",
+      "description": "未建模：商业版图：进驻控制中枢时，每个存在3名谢拉格干员的贸易站，订单获取效率+10%",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0003",
+          "hash": "sha256:14f0aa4cfced98e9414ad800f14ad7754416a25162fe54ed6acdc55a6f2b07a4"
+        }
+      ]
+    },
+    {
+      "operator": "三角初华/2",
+      "description": "未建模：羁绊相生：进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高）；当与丰川祥子一起进驻控制中枢时，丰川祥子的心情每小时恢复+0.1",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0008",
+          "hash": "sha256:e493890aed2d03b9883636511a997244355d36e847de0457070b75e3dd3f35d0"
+        }
+      ]
+    },
+    {
+      "operator": "祈天寺若麦/2",
+      "description": "当与丰川祥子一起进驻控制中枢时，丰川祥子心情每小时消耗+0.05，会客室线索搜集速度额外提升+5%（同种效果取最高）",
+      "priority": 1110,
+      "effects": [
+        {
+          "target": "meeting",
+          "efficiency": 5,
+          "exclusive": true,
+          "group": "meeting_global_buff"
+        }
+      ],
+      "unmodeled_effects": [
+        "丰川祥子心情消耗+0.05"
+      ],
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0010",
+          "hash": "sha256:70a22b6c26a7e0abab9cbe206843528466d3679b3015762edee6c148e4e3f579"
+        }
+      ]
+    },
+    {
+      "operator": "若叶睦/2",
+      "description": "未建模：互为半身：当与丰川祥子一起进驻控制中枢时，消除自身心情消耗的影响",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0012",
+          "hash": "sha256:de35194371b0d91a9e2e5b5e890d758df82030ee6610e6af0a1f0426749ed641"
+        }
+      ]
+    },
+    {
+      "operator": "怒潮凛冬/2",
+      "description": "未建模：“是，团长！”：进驻控制中枢时，自身心情每小时消耗+0.5，每个进驻在会客室的乌萨斯学生自治团干员，线索搜集速度+10%",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0026",
+          "hash": "sha256:429208cff9aa991864a20e04af7a27e2cc2938dfffc5022600a567bcbf00305f"
+        }
+      ]
+    },
+    {
+      "operator": "摆渡人",
+      "description": "未建模：英雄的骄傲·α：进驻控制中枢时，基建内（不包含副手及活动室使用者）每有1名米诺斯干员，会客室线索搜集速度+4%（最多+20%，同种效果取最高）；当与萨尔贡干员进驻控制中枢一起工作时，自身心情每小时消耗+0.02",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0027",
+          "hash": "sha256:2f109f8e8091a1f72854d96338d3e8e55c7adcd606b55b8b3df2c35d6364d5c4"
+        }
+      ]
+    },
+    {
+      "operator": "维什戴尔/2",
+      "description": "未建模：同谋·β：进驻控制中枢时，当伊内丝入驻会客室时，会客室线索搜集速度+5%；当赫德雷入驻贸易站时，赫德雷所在贸易站订单上限+2",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0030",
+          "hash": "sha256:0745f07f510616a7e72dd9eb1d55bdd8bc148f64fb8d8603887a4a64da8cfe5d"
+        }
+      ]
+    },
+    {
+      "operator": "维什戴尔",
+      "description": "未建模：同谋·α：进驻控制中枢时，当伊内丝入驻会客室时，会客室线索搜集速度+5%；当赫德雷入驻贸易站时，赫德雷所在贸易站订单上限+1",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0031",
+          "hash": "sha256:76d032ad7eafc1389f14ce3003cb0790202a573b7c042856cad016f1c81f841a"
+        }
+      ]
+    },
+    {
+      "operator": "烛煌",
+      "description": "未建模：断金之交：进驻控制中枢时，如训练室有干员在进行技能专精，则该干员的专精技能训练速度+5%（同种效果取最高）",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "training_room_out_of_scope",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0032",
+          "hash": "sha256:9acf00478a068ea0446e6ff9f9f213740d5131f6c3717467ce6e43a17189472e"
+        }
+      ]
+    },
+    {
+      "operator": "电弧/2",
+      "description": "未建模：无言的慈爱：进驻控制中枢时，所有宿舍内精英干员的心情每小时恢复+0.1（同种效果取最高）",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0037",
+          "hash": "sha256:1f3c99b641d279f2dc484597ef16fd7b05352702a5a4b30134114d654cfda9a6"
+        }
+      ]
+    },
+    {
+      "operator": "焰影苇草/1",
+      "description": "未建模：领袖：进驻控制中枢时，所有宿舍内所有干员的心情每小时恢复+0.05（同种效果取最高）",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0038",
+          "hash": "sha256:181571153c6b9e8deced99bd5f8d2f05ef28310c4d4bdd57cbcb12ca846ad925"
+        }
+      ]
+    },
+    {
+      "operator": "歌蕾蒂娅",
+      "description": "未建模：集群狩猎·α：进驻控制中枢时，控制中枢内所有干员的心情每小时恢复+0.05；基建内（不包含副手及活动室使用者）深海猎人干员获得特殊加成（与部分技能有特殊叠加规则）",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0044",
+          "hash": "sha256:f091c49a39834bd7b4ed615383a8b267fca644ae9ce0769874e1b0feeb1bc49f"
+        }
+      ]
+    },
+    {
+      "operator": "玛恩纳/2",
+      "description": "未建模：公事公办：进驻控制中枢时，部分设施内处于工作状态的干员心情每小时恢复+0.1；同时控制中枢内部分技能可以为其他设施内处于工作状态的干员额外提供心情恢复",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0048",
+          "hash": "sha256:5834a2c92642a61ba1244fef1c01e0cffebf1364cdb7ad0c23afcefdb85308e2"
+        }
+      ]
+    },
+    {
+      "operator": "艾拉/2",
+      "description": "未建模：反抗者：进驻控制中枢时，更容易获得线索板上尚未拥有的线索，但控制中枢内除自身以外的其余干员心情每小时消耗+0.25",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0080",
+          "hash": "sha256:b2eac350dca250d3ca802fa468f3448059281124d3dd6e6c637d5961b40c4fab"
+        }
+      ]
+    },
+    {
+      "operator": "维什戴尔/2",
+      "description": "未建模：巴别塔之帜：进驻控制中枢时，其他设施内处于工作状态的干员心情每小时恢复+0.1，当魔王进驻中枢时额外+0.1（与控制中枢加成有特殊比较规则）",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0083",
+          "hash": "sha256:a03686ea718670fdd6c3643ca22b9bf2f7b828e855c6bc8db177d5edc7fb74f7"
+        }
+      ]
+    },
+    {
+      "operator": "惊蛰",
+      "description": "未建模：至察：进驻控制中枢时，小幅提升会客室内干员所属派系的线索倾向效果，但控制中枢内所有干员的心情每小时消耗+0.5",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0086",
+          "hash": "sha256:8cbde34e82ca84ae71dff1f14671f82cc8e945ed3fd61bc40e948d1e9ee3721a"
+        }
+      ]
+    },
+    {
+      "operator": "魔王",
+      "description": "未建模：魔王传承：当与阿米娅一起进驻控制中枢时，自身和阿米娅心情每小时恢复+0.05",
+      "priority": 10,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_completion_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "current_optimizer_model_unsupported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0087",
+          "hash": "sha256:0f63a12826b02147f768529f608ab24a1d8c43894556f0233bc922e46f00cc07"
+        }
+      ]
+    },
+    {
+      "operator": "丰川祥子",
+      "description": "部分未建模：生活的重压：进驻控制中枢时，热情值处于40点及以上时，自身心情每小时消耗+0.05",
+      "priority": 9,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_partial_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "partially_implemented_elsewhere",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0004",
+          "hash": "sha256:af3c364dfbb89c6da9ae2afc722b1dda3f3cfe09a24fda7ba6396a23be57bb8a"
+        }
+      ]
+    },
+    {
+      "operator": "望",
+      "description": "部分未建模：权变：进驻控制中枢时，若外势大于等于实地，所有贸易站订单效率+7%；若实地大于外势，所有制造站生产力+2%（同种效果取最高）",
+      "priority": 9,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_partial_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "partially_implemented_elsewhere",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0005",
+          "hash": "sha256:821cc0fece9ef5e1cbcccf72fc51342a89d848c3127b0c131e946e667f2fd77e"
+        }
+      ]
+    },
+    {
+      "operator": "若叶睦",
+      "description": "部分未建模：演技的怪物：进驻控制中枢时，热情值+20；每有8点热情值，自身心情每小时消耗+0.01，所有贸易站订单效率+1%（同种效果取最高）",
+      "priority": 9,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_partial_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "partially_implemented_elsewhere",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0013",
+          "hash": "sha256:f10fb82167063b6beb1c67a688f18a99fc8c9ccf4badc536bc0cca19cd569052"
+        }
+      ]
+    },
+    {
+      "operator": "老鲤",
+      "description": "部分未建模：浮生得闲：当与阿进驻控制中枢一起工作时，控制中枢内所有干员心情每小时恢复+0.25",
+      "priority": 9,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_partial_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "partially_implemented_elsewhere",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0049",
+          "hash": "sha256:1e922cdea7b1ea3afaeb37872119c3ef7f611d3c38588910ad5c6baa76018ca4"
+        }
+      ]
+    },
+    {
+      "operator": "麒麟R夜刀",
+      "description": "部分未建模：耐力回复：进驻控制中枢时，自身心情每小时消耗+0.5，木天蓼+8",
+      "priority": 9,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_partial_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "partially_implemented_elsewhere",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0071",
+          "hash": "sha256:343a209b8da507d09d203ee4ce60890b7d89a55db1e31b9835df962da2906b4b"
+        }
+      ]
+    },
+    {
+      "operator": "魔王/2",
+      "description": "部分未建模：“未完的故事”：当与阿米娅一起进驻控制中枢时，自身和阿米娅心情每小时恢复+0.1",
+      "priority": 9,
+      "category": "modeled_placeholder",
+      "effects": [
+        {
+          "target": "modeled_placeholder",
+          "efficiency": 0,
+          "exclusive": false,
+          "group": "control_prts_partial_placeholder"
+        }
+      ],
+      "modeled_placeholder": true,
+      "unmodeled_reason": "partially_implemented_elsewhere",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-CC-0088",
+          "hash": "sha256:fcf0ed88781292bb15ce4144559b63de38f105820a442b3301098795215f1a32"
+        }
+      ]
     }
   ],
   "dormitory_mood_recovery_rules": [
@@ -11670,6 +12995,36 @@
         {
           "id": "PRTS-DORM-0403",
           "hash": "sha256:c7ae3c76286ddacf6b1160b117893a6581e882e90a3c8fb52d38e842beac51eb"
+        }
+      ]
+    },
+    {
+      "holder": "撷英调香师",
+      "elite": 2,
+      "skill": "净化呼吸",
+      "all_recovery": null,
+      "others_recovery": null,
+      "single_recovery": null,
+      "self_recovery": null,
+      "power_station_bonus_per_room": 0,
+      "dormitory_level_bonus_per_level": 0,
+      "target_bonuses": [
+        {
+          "condition": "心情20以下",
+          "bonus": 0.1,
+          "exact_target": null
+        }
+      ],
+      "ignored_dynamic_rules": [
+        "进驻宿舍时，该宿舍内心情20以下的干员恢复效果额外+0.1（同种效果取最高）"
+      ],
+      "description": "进驻宿舍时，该宿舍内心情20以下的干员恢复效果额外+0.1（同种效果取最高）",
+      "modeled_placeholder": true,
+      "unmodeled_reason": "conditional_mood_threshold_not_supported",
+      "skill_rule_refs": [
+        {
+          "id": "PRTS-DORM-0353",
+          "hash": "sha256:1bf3e2bf3848fa31e724c90f363d56907efc432188c79196631c939a6eb774c3"
         }
       ]
     }

@@ -46,6 +46,14 @@ const NON_SKILL_EXEMPT_DESCRIPTIONS = new Set([
 ])
 const RULE_ID_RE = /^PRTS-([A-Z]+)-(\d{4,})$/
 const CONTENT_HASH_RE = /^sha256:[0-9a-f]{64}$/
+const REQUIRED_COVERAGE_FACILITIES = new Set([
+  '办公室',
+  '会客室',
+  '控制中枢',
+  '贸易站',
+  '宿舍',
+  '制造站',
+])
 
 function canonicalRuleContent(rule) {
   return {
@@ -195,6 +203,7 @@ function collectScopedFacilities(value, facilities) {
 export function validateEfficiencySkillReferences(skillPayload, efficiencyData) {
   const skillsById = validateSkills(skillPayload)
   const leaves = enumerateEfficiencyRules(efficiencyData)
+  const referencedSkillIds = new Set()
 
   for (const { rule, path, facilities } of leaves) {
     assertCondition(
@@ -231,6 +240,7 @@ export function validateEfficiencySkillReferences(skillPayload, efficiencyData) 
 
       const skill = skillsById.get(ref.id)
       assertCondition(skill, `${refPath} references unknown skill ${ref.id}.`)
+      referencedSkillIds.add(ref.id)
       assertCondition(ref.hash === skill.content_hash, `${refPath} has a stale hash for ${ref.id}.`)
       assertCondition(
         facilities.has(skill.facility),
@@ -247,6 +257,13 @@ export function validateEfficiencySkillReferences(skillPayload, efficiencyData) 
         )
       }
     }
+  }
+  for (const skill of skillsById.values()) {
+    if (!REQUIRED_COVERAGE_FACILITIES.has(skill.facility)) continue
+    assertCondition(
+      referencedSkillIds.has(skill.rule_id),
+      `${skill.rule_id} (${skill.facility}/${skill.skill}) has no efficiency rule or explicit placeholder.`,
+    )
   }
   return { skillCount: skillsById.size, efficiencyRuleCount: leaves.length }
 }
@@ -303,6 +320,19 @@ export function runSelfTests() {
   expectFailure(
     ({ efficiency }) => delete efficiency.combination_rules.trading_station['通用单人'][0].skill_rule_refs,
     /must define skill_rule_refs/,
+  )
+  expectFailure(
+    ({ skills }) => {
+      const uncovered = makeSkill({
+        rule_id: 'PRTS-MEET-0002',
+        facility: '会客室',
+        skill: '未覆盖技能',
+        icon: 'https://example.test/uncovered.png',
+      })
+      skills.last_rule_number = 2
+      skills.skills.push(uncovered)
+    },
+    /has no efficiency rule or explicit placeholder/,
   )
   expectFailure(
     ({ efficiency }) => { efficiency.combination_rules.trading_station['通用单人'][0].skill_rule_refs[0].id = 'PRTS-TRD-9999' },
@@ -368,11 +398,15 @@ export function runSelfTests() {
   )
 
   const exempt = makeFixture()
+  const coveredRule = structuredClone(
+    exempt.efficiency.combination_rules.trading_station['通用单人'][0],
+  )
   exempt.efficiency.combination_rules.trading_station['通用单人'][0] = {
     description: '异格人数贡献（不触发叠加规则）',
     skill_rule_refs: [],
     skill_rule_exemption: 'non_skill_condition',
   }
+  exempt.efficiency.combination_rules.trading_station['通用单人'].push(coveredRule)
   validateEfficiencySkillReferences(exempt.skills, exempt.efficiency)
 }
 
