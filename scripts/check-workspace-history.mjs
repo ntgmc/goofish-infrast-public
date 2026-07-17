@@ -15,6 +15,19 @@ globalThis.__maaOptimizeJobStoreForTesting = createMemoryOptimizeJobStore()
 const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts')
 const optimizeHandler = await bundleHandler('server/handlers/optimization.ts')
 const profilesHandler = await bundleHandler('server/handlers/user-profiles.ts')
+const { FREE_PREVIEW_ADVANCED_TRIAL } = await bundleHandler('server/free-preview-trial.ts')
+
+const NativeDate = Date
+let smokeNow = NativeDate.parse(FREE_PREVIEW_ADVANCED_TRIAL.startsAt) - 24 * 60 * 60 * 1000
+globalThis.Date = class SmokeDate extends NativeDate {
+  constructor(...args) {
+    super(...(args.length === 0 ? [smokeNow] : args))
+  }
+
+  static now() {
+    return smokeNow
+  }
+}
 
 const sampleConfig = {
   layout: '3-3-3',
@@ -92,6 +105,7 @@ await assertOrirockInventoryPersistence()
 await assertSavedConfigLimitAndPermission()
 await assertOptimizeHistory()
 await assertFreePreviewWorkspaceAndOptimizeLimits()
+await assertFreePreviewTrialWorkspaceLimits()
 await assertFreeScheduleEntitlementLifecycle()
 await assertOperatorsPatchKeepsHistory()
 
@@ -485,6 +499,37 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
   }
   if (!previewEvents.some((event) => event.event === 'free_preview' && event.status === 'success')) {
     throw new Error('免费档案生成：缺少 free_preview 统计事件')
+  }
+}
+
+async function assertFreePreviewTrialWorkspaceLimits() {
+  const previousNow = smokeNow
+  smokeNow = NativeDate.parse(FREE_PREVIEW_ADVANCED_TRIAL.startsAt)
+  try {
+    const preview = seedFreePreviewProfile('preview-trial-bound', { bound: true })
+    store.workspaces.set(preview.id, {
+      ...emptyWorkspace(preview.id),
+      operators: sampleOperators,
+      config: free333OrundumConfig,
+    })
+
+    const operatorsPatch = await call(workspaceHandler, '/api/user/workspace', {
+      profile_id: preview.id,
+      operators: sampleOperators,
+    }, { method: 'PATCH' })
+    if (operatorsPatch.status !== 403) {
+      throw new Error(`体验期免费档案手动修改干员：预期 403，实际 ${operatorsPatch.status}`)
+    }
+
+    const advancedConfigPatch = await call(workspaceHandler, '/api/user/workspace', {
+      profile_id: preview.id,
+      config: { ...free333OrundumConfig, trading_stations_count: 4 },
+    }, { method: 'PATCH' })
+    if (advancedConfigPatch.status !== 200) {
+      throw new Error(`体验期免费档案高级配置：预期 200，实际 ${advancedConfigPatch.status}`)
+    }
+  } finally {
+    smokeNow = previousNow
   }
 }
 
