@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
-import { buildOptimizeJobStorageKey, isActiveOptimizeJob, mergeOptimizeJobProgress, OPTIMIZE_POLL_REQUEST_TIMEOUT_MS, readActiveOptimizeJob, writeActiveOptimizeJob } from './job-progress'
+import { buildOptimizeJobStorageKey, clearOptimizeSubmissionKey, getOrCreateOptimizeSubmissionKey, isActiveOptimizeJob, mergeOptimizeJobProgress, OPTIMIZE_POLL_REQUEST_TIMEOUT_MS, readActiveOptimizeJob, writeActiveOptimizeJob } from './job-progress'
 import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
 
 const accepted: OptimizeJobAccepted = {
@@ -54,6 +54,24 @@ describe('optimization progress mapping', () => {
     expect(getOptimizePollRetryDelayMs(1, () => 0)).toBe(800)
     expect(getOptimizePollRetryDelayMs(1, () => 1)).toBe(1_200)
     expect(getOptimizePollRetryDelayMs(99, () => 0.5)).toBe(10_000)
+  })
+
+  it('preserves license poll credentials and every queue priority', () => {
+    const key = buildOptimizeJobStorageKey('', 'order', 'signature', 'generate')
+    for (const priority of ['priority_coupon', 'paid', 'analysis', 'standard'] as const) {
+      writeActiveOptimizeJob(key, { ...accepted, priority, poll_token: 'poll-secret' })
+      expect(readActiveOptimizeJob(key)?.job).toMatchObject({ priority, poll_token: 'poll-secret' })
+    }
+  })
+
+  it('reuses an unknown-outcome submission key until acceptance or request change', () => {
+    const key = buildOptimizeJobStorageKey('', 'order', 'signature', 'generate')
+    const first = getOrCreateOptimizeSubmissionKey(key, { config: 1 })
+    expect(getOrCreateOptimizeSubmissionKey(key, { config: 1 })).toBe(first)
+    expect(getOrCreateOptimizeSubmissionKey(key, { config: 2 })).not.toBe(first)
+    const changed = getOrCreateOptimizeSubmissionKey(key, { config: 2 })
+    clearOptimizeSubmissionKey(key)
+    expect(getOrCreateOptimizeSubmissionKey(key, { config: 2 })).not.toBe(changed)
   })
 
   it('keeps active state and maps server estimates', () => {

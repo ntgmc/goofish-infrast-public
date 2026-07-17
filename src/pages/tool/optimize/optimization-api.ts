@@ -1,31 +1,64 @@
 import { apiJson } from '../../../lib/api-client'
-import type { CreateOptimizationJobRequest, CreateOptimizationJobResponse, CreateReorderCheckRequest, OptimizationJobSnapshot, ReorderCheckResponse } from '../../../lib/optimization-contracts'
+import type { CreateOptimizationJobRequest, CreateOptimizationJobResponse, CreateReorderCheckRequest, OptimizationJobListResponse, OptimizationJobMutationResponse, OptimizationJobSnapshot, ReorderCheckResponse } from '../../../lib/optimization-contracts'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
+import { copy } from '../../../copy/index'
+
+export const OPTIMIZE_SUBMIT_TIMEOUT_MS = 30_000
 
 export async function submitOptimizationJob(
   request: CreateOptimizationJobRequest,
   fallbackMessage: string,
-  idempotencyKey = crypto.randomUUID(),
+  idempotencyKey: string = crypto.randomUUID(),
 ): Promise<OptimizeJobAccepted> {
   const response = await apiJson<CreateOptimizationJobResponse>('/api/optimization/jobs', {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
     json: request,
+    signal: AbortSignal.timeout(OPTIMIZE_SUBMIT_TIMEOUT_MS),
     fallbackMessage,
   })
-  return toLegacyJobView(response.job) as OptimizeJobAccepted
+  return toLegacyJobView(response.job, response.pollToken) as OptimizeJobAccepted
 }
 
 export async function fetchOptimizationJob(
   jobId: string,
   fallbackMessage: string,
+  pollToken?: string,
   signal?: AbortSignal,
 ): Promise<OptimizeJobStatusResponse> {
   const job = await apiJson<OptimizationJobSnapshot>(
     '/api/optimization/jobs/' + encodeURIComponent(jobId),
-    { signal, fallbackMessage },
+    { signal, fallbackMessage, ...(pollToken && { headers: { 'X-Optimize-Job-Token': pollToken } }) },
   )
   return toLegacyJobView(job)
+}
+
+export async function fetchOptimizationJobSnapshot<TResult = import('../../../lib/types').OptimizeResult>(
+  jobId: string,
+  fallbackMessage: string,
+  pollToken?: string,
+  signal?: AbortSignal,
+): Promise<OptimizationJobSnapshot<TResult>> {
+  return await apiJson<OptimizationJobSnapshot<TResult>>(
+    '/api/optimization/jobs/' + encodeURIComponent(jobId),
+    { signal, fallbackMessage, ...(pollToken && { headers: { 'X-Optimize-Job-Token': pollToken } }) },
+  )
+}
+
+export async function listOptimizationJobs(profileId: string, before?: string): Promise<OptimizationJobListResponse> {
+  const params = new URLSearchParams({ profile_id: profileId, limit: '50' })
+  if (before) params.set('before', before)
+  return await apiJson<OptimizationJobListResponse>(`/api/optimization/jobs?${params.toString()}`, {
+    fallbackMessage: copy.optimize.pages_tool_optimize_optimization_api_001,
+  })
+}
+
+export async function cancelOptimizationJob(jobId: string): Promise<OptimizationJobSnapshot> {
+  const response = await apiJson<OptimizationJobMutationResponse>(
+    `/api/optimization/jobs/${encodeURIComponent(jobId)}/cancel`,
+    { method: 'POST', fallbackMessage: copy.optimize.pages_tool_optimize_optimization_api_002 },
+  )
+  return response.job
 }
 
 export async function requestReorderCheck(
@@ -42,7 +75,7 @@ export async function requestReorderCheck(
   return response.result
 }
 
-function toLegacyJobView(job: OptimizationJobSnapshot): OptimizeJobStatusResponse {
+export function toLegacyJobView(job: OptimizationJobSnapshot, pollToken?: string): OptimizeJobStatusResponse {
   const common = {
     job_id: job.id,
     status: job.status,
@@ -61,8 +94,29 @@ function toLegacyJobView(job: OptimizationJobSnapshot): OptimizeJobStatusRespons
     estimated_total_ms: job.estimate.totalMs,
     estimate_phase: job.estimate.phase,
     estimate_updated_at: job.estimate.updatedAt,
+    job_kind: job.kind,
+    source: job.source,
+    execution_phase: job.executionPhase,
+    attempt_count: job.attemptCount,
+    failure_count: job.failureCount,
+    next_attempt_at: job.timestamps.nextAttemptAt,
+    cancellation_requested: job.cancellationRequested,
+    can_cancel: job.canCancel,
+    can_retry: job.canRetry,
+    ...(pollToken && { poll_token: pollToken }),
   }
   if (job.status === 'succeeded') return { ...common, status: job.status, result: job.result }
-  if (job.status === 'failed') return { ...common, status: job.status, error: job.error.message }
+  if (job.status === 'failed' || job.status === 'cancelled' || job.status === 'dead_lettered') {
+    return {
+      ...common,
+      status: job.status,
+      error: job.error.message,
+      error_code: job.error.code,
+      error_retryable: job.error.retryable,
+      recovery_action: job.error.recoveryAction,
+      support_reference: job.error.supportReference,
+      failure_kind: job.error.failureKind,
+    }
+  }
   return common
 }

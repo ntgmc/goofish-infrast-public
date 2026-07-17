@@ -18,7 +18,7 @@ import {
   migrateLegacyUserIfNeeded,
   resetUserPasswordWithToken,
   savePasswordResetToken,
-  saveProfileWorkspace,
+  updateProfileWorkspaceAtomically,
   saveUserAccount,
   saveUserProfile,
   saveUserSession,
@@ -580,10 +580,12 @@ export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?
   ])
   for (const profile of records) {
     const workspace = workspaces.get(profile.id) ?? null
-    const downgraded = normalizeExpiredFreePreviewWorkspace(profile, workspace)
-    if (!downgraded) continue
-    await saveProfileWorkspace(downgraded)
-    workspaces.set(profile.id, downgraded)
+    if (!workspace || !hasFreePreviewTrialEnded(profile)) continue
+    const current = await updateProfileWorkspaceAtomically(profile.id, (latestWorkspace) => {
+      const latest = latestWorkspace ?? emptyWorkspace(profile.id)
+      return normalizeExpiredFreePreviewWorkspace(profile, latest) ?? latest
+    })
+    workspaces.set(profile.id, current)
   }
   const publicProfiles: UserGameAccount[] = records.map((profile) => (
     toPublicProfile(profile, workspaces.get(profile.id) ?? null, getFreePreviewTrial(profile))

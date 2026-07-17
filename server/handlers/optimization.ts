@@ -1,5 +1,7 @@
 import {
+  cancelOptimizationJob,
   getOptimizationJob,
+  listOptimizationJobs,
   runReorderCheck,
   submitOptimizationJob,
 } from '../optimization/jobs/service'
@@ -13,18 +15,23 @@ export default async function optimizationHandler(req: Request): Promise<Respons
 
   const pathname = new URL(req.url).pathname
   if (pathname === JOBS_PATH) {
-    if (req.method !== 'POST') return methodNotAllowed()
-    return submitOptimizationJob(req)
+    if (req.method === 'POST') return submitOptimizationJob(req)
+    if (req.method === 'GET') return noStoreResponse(await listOptimizationJobs(req))
+    return methodNotAllowed()
   }
   if (pathname === REORDER_CHECKS_PATH) {
     if (req.method !== 'POST') return methodNotAllowed()
     return runReorderCheck(req)
   }
 
-  const jobId = matchJobId(pathname)
-  if (jobId !== null) {
+  const jobRoute = matchJobRoute(pathname)
+  if (jobRoute !== null) {
+    if (jobRoute.action === 'cancel') {
+      if (req.method !== 'POST') return methodNotAllowed()
+      return noStoreResponse(await cancelOptimizationJob(req, jobRoute.jobId))
+    }
     if (req.method !== 'GET') return methodNotAllowed()
-    return noStoreResponse(await getOptimizationJob(req, jobId))
+    return noStoreResponse(await getOptimizationJob(req, jobRoute.jobId))
   }
 
   return jsonError('not_found', 'API route not found', 404)
@@ -35,12 +42,12 @@ export function noStoreResponse(response: Response): Response {
   return response
 }
 
-function matchJobId(pathname: string): string | null {
+function matchJobRoute(pathname: string): { jobId: string; action: 'cancel' | null } | null {
   if (!pathname.startsWith(JOBS_PATH + '/')) return null
-  const rawJobId = pathname.slice(JOBS_PATH.length + 1)
-  if (!rawJobId || rawJobId.includes('/')) return null
+  const segments = pathname.slice(JOBS_PATH.length + 1).split('/')
+  if (!segments[0] || segments.length > 2 || (segments[1] && segments[1] !== 'cancel')) return null
   try {
-    return decodeURIComponent(rawJobId)
+    return { jobId: decodeURIComponent(segments[0]), action: segments[1] === 'cancel' ? 'cancel' : null }
   } catch {
     return null
   }

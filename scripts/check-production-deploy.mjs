@@ -71,10 +71,10 @@ function assertSecurityAnalysisGate() {
     qualityConcurrencyGroup,
     'reusable security analysis must not deadlock on the parent workflow concurrency group',
   )
-  assert.match(
+  assert.equal(
     securityConcurrencyGroup,
-    /^security-analysis-/,
-    'security analysis concurrency should use its own namespace',
+    'security-analysis-${{ github.ref }}',
+    'direct and reusable security analysis should share one ref-scoped concurrency group',
   )
   assert.match(
     securityAnalysisWorkflow,

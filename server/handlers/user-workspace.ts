@@ -6,8 +6,8 @@ import {
   getProfileWorkspace,
   isDepotValueProfile,
   isFreePreviewProfile,
-  saveProfileWorkspace,
   toPublicWorkspace,
+  updateProfileWorkspaceAtomically,
   type UserWorkspaceRecord,
 } from '../storage/user-store'
 import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
@@ -68,50 +68,49 @@ export default async (req: Request): Promise<Response> => {
     if (url.pathname.endsWith('/free-schedule/confirm')) {
       if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
       if (!isRestrictedPreview) return jsonResponse({ error: '当前档案不需要确认免费方案。' }, 403)
-      const workspace = await getProfileWorkspace(profile.id) ?? emptyWorkspace(profile.id)
-      const historyItem = typeof body.result_history_id === 'string' && body.result_history_id.trim()
-        ? workspace.result_history.find((item) => item.id === body.result_history_id)
-        : workspace.result_history[0]
-      if (!historyItem) return jsonResponse({ error: '暂无可确认的免费排班方案。' }, 409)
       const now = new Date().toISOString()
-      const current = normalizeFreeScheduleEntitlementForConfirm(workspace.free_schedule_entitlement)
-      const next: UserWorkspaceRecord = {
-        ...workspace,
-        free_schedule_entitlement: {
-          ...current,
-          first_generated_at: current.first_generated_at ?? historyItem.created_at,
-          revision_count: Math.max(1, current.revision_count),
-          confirmed_at: now,
-          locked_at: now,
-          lock_reason: 'confirmed',
-        },
-        updated_at: now,
-      }
-      await saveProfileWorkspace(next)
+      const next = await updateProfileWorkspaceAtomically(profile.id, (currentWorkspace) => {
+        const workspace = currentWorkspace ?? emptyWorkspace(profile.id)
+        const historyItem = typeof body.result_history_id === 'string' && body.result_history_id.trim()
+          ? workspace.result_history.find((item) => item.id === body.result_history_id)
+          : workspace.result_history[0]
+        if (!historyItem) throw new WorkspaceMutationError('暂无可确认的免费排班方案。', 409)
+        const current = normalizeFreeScheduleEntitlementForConfirm(workspace.free_schedule_entitlement)
+        return {
+          ...workspace,
+          free_schedule_entitlement: {
+            ...current,
+            first_generated_at: current.first_generated_at ?? historyItem.created_at,
+            revision_count: Math.max(1, current.revision_count),
+            confirmed_at: now,
+            locked_at: now,
+            lock_reason: 'confirmed',
+          },
+          updated_at: now,
+        }
+      })
       return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(next) })
     }
 
-    const existing = await getProfileWorkspace(profile.id)
-    const next: UserWorkspaceRecord = existing ?? emptyWorkspace(profile.id)
-    let operatorsPatched = false
+    let operatorsValue: UserWorkspaceRecord['operators'] | undefined
 
     if ('operators' in body) {
       if (isRestrictedPreview) {
         return jsonResponse({ error: '免费个人排班档案的干员数据只能通过森空岛导入更新。' }, 403)
       }
-      operatorsPatched = true
       if (body.operators === null) {
-        next.operators = null
+        operatorsValue = null
       } else {
         const operatorsCheck = validateOperators(body.operators)
         if (!operatorsCheck.ok) return jsonResponse({ error: operatorsCheck.message }, 400)
-        next.operators = operatorsCheck.operators
+        operatorsValue = operatorsCheck.operators
       }
     }
 
+    let configValue: UserWorkspaceRecord['config'] | undefined
     if ('config' in body) {
       if (body.config === null) {
-        next.config = null
+        configValue = null
       } else {
         const configCheck = validateConfig(body.config)
         if (!configCheck.ok) return jsonResponse({ error: configCheck.message }, 400)
@@ -119,34 +118,39 @@ export default async (req: Request): Promise<Response> => {
           ? resolveFreePreviewConfig(configCheck.config)
           : resolveConfigForPermission(effectivePermission, configCheck.config)
         if (!permissionCheck.ok) return jsonResponse({ error: permissionCheck.message }, 403)
-        next.config = permissionCheck.config
+        configValue = permissionCheck.config
       }
     }
 
-    if ('elite_overrides' in body) {
-      next.elite_overrides = normalizeEliteOverrides(body.elite_overrides)
-    }
-
-    if ('last_result' in body) {
-      next.last_result = body.last_result && typeof body.last_result === 'object' ? body.last_result as OptimizeResult : null
-    }
-
-    if ('saved_config_action' in body) {
-      const savedConfigResult = applySavedConfigAction(next, body.saved_config_action, effectivePermission, isRestrictedPreview)
-      if (!savedConfigResult.ok) return jsonResponse({ error: savedConfigResult.message }, savedConfigResult.status ?? 400)
-    }
-
-    if (operatorsPatched) {
-      next.last_result = null
-    }
-
-    next.updated_at = new Date().toISOString()
-    await saveProfileWorkspace(next)
+    await updateProfileWorkspaceAtomically(profile.id, (currentWorkspace) => {
+      const workspace: UserWorkspaceRecord = { ...(currentWorkspace ?? emptyWorkspace(profile.id)) }
+      if ('operators' in body) workspace.operators = operatorsValue ?? null
+      if ('config' in body) workspace.config = configValue ?? null
+      if ('elite_overrides' in body) workspace.elite_overrides = normalizeEliteOverrides(body.elite_overrides)
+      if ('last_result' in body) {
+        workspace.last_result = body.last_result && typeof body.last_result === 'object' ? body.last_result as OptimizeResult : null
+      }
+      if ('saved_config_action' in body) {
+        const savedConfigResult = applySavedConfigAction(workspace, body.saved_config_action, effectivePermission, isRestrictedPreview)
+        if (!savedConfigResult.ok) throw new WorkspaceMutationError(savedConfigResult.message, savedConfigResult.status ?? 400)
+      }
+      if ('operators' in body) workspace.last_result = null
+      workspace.updated_at = new Date().toISOString()
+      return workspace
+    })
     return jsonResponse(await buildAuthPayload(auth.user, profile.id))
   } catch (error) {
+    if (error instanceof WorkspaceMutationError) return jsonResponse({ error: error.message }, error.status)
     console.error('user workspace error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
+  }
+}
+
+class WorkspaceMutationError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = 'WorkspaceMutationError'
   }
 }
 

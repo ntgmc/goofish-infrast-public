@@ -1,10 +1,11 @@
 import type { LicenseFile } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
 import { canUseUpgradeFeatures, evaluateClientBindingRisk, evaluateOperatorRisk, formatBindingBlockMessage, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, freezeCdkRecord, recordSoftBlockedRiskEvent, shouldFreezeBindingRisk, getPermissionMode, getCdkRecordStore, getRiskControlSettings, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
-import { saveWorkspace, getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, type UserGameAccountRecord } from "../../storage/user-store";
+import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, updateProfileWorkspaceAtomically, type UserGameAccountRecord } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
 import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, OptimizeConfigPermission, FreeScheduleGenerateDecision } from './shared';
+import { createPersistedOptimizeJobPayload } from './shared';
 import { sanitizeConfigForPublicOptimize, jsonResponse } from './http-core';
 import { validateRequestLicense, recordScheduleGenerate, scheduleFailure, resolveFreeScheduleGenerateDecision } from './entitlements';
 import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammettaEnabled, resolveOptimizeDurationEstimate } from './job-status';
@@ -242,12 +243,11 @@ export async function prepareOptimizeJob(
         scheduleUsage = scheduleFailure('permission_denied', scheduleUsageBase);
         if (decision.entitlement.locked_at !== previewWorkspaceForGeneration.free_schedule_entitlement?.locked_at
           || decision.entitlement.lock_reason !== previewWorkspaceForGeneration.free_schedule_entitlement?.lock_reason) {
-          previewWorkspaceForGeneration = {
-            ...previewWorkspaceForGeneration,
+          previewWorkspaceForGeneration = await updateProfileWorkspaceAtomically(activeProfileId, (currentWorkspace) => ({
+            ...(currentWorkspace ?? emptyWorkspace(activeProfileId)),
             free_schedule_entitlement: decision.entitlement,
             updated_at: new Date().toISOString(),
-          };
-          await saveWorkspace(previewWorkspaceForGeneration);
+          }));
         }
         return fail({ error: decision.message, free_schedule_entitlement: decision.entitlement }, decision.status);
       }
@@ -271,13 +271,12 @@ export async function prepareOptimizeJob(
         source,
         rewardUserId: usePriorityCoupon ? auth?.user.id ?? null : null,
         usePriorityCoupon,
-        payload: {
-          version: 2,
+        payload: createPersistedOptimizeJobPayload({
           submittedAt,
           operators,
           effectiveConfig,
-          effectiveLicense: { ...effectiveLicense, config: effectiveConfig },
-          checkedCdkRecord,
+          configPermission: optimizePermission,
+          cdkUsageRef: checkedCdkRecord ? { code_hash: checkedCdkRecord.code_hash } : null,
           scheduleUsageBase,
           activeProfileId,
           isPreviewProfile,
@@ -285,7 +284,7 @@ export async function prepareOptimizeJob(
           freeScheduleDecision,
           estimate,
           request: { ignore_elite, include_current, suggestions_only, upgrade_task_payload, history_source },
-        },
+        }),
       },
     };
   } catch (err: unknown) {

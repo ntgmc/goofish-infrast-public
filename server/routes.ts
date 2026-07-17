@@ -1,6 +1,7 @@
 import adminCdkHandler from './handlers/admin-cdk'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
 import adminInvitationSettingsHandler from './handlers/admin-invitation-settings'
+import adminOptimizationHandler from './handlers/admin-optimization'
 import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
 import analyzeScheduleHandler from './handlers/analyze-schedule'
@@ -30,6 +31,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/cdk', adminCdkHandler as unknown as ApiHandler],
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
   ['/api/admin/invitation-settings', adminInvitationSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/optimization', adminOptimizationHandler as unknown as ApiHandler],
   ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
   ['/api/auth/register', authHandler as unknown as ApiHandler],
@@ -107,7 +109,7 @@ async function dispatchRequest(req: Request): Promise<Response> {
 }
 
 export function getRegisteredApiRoutes(): string[] {
-  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/optimization/jobs/:jobId', ...ROUTES.keys()].sort()
+  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/optimization/jobs/:jobId', '/api/optimization/jobs/:jobId/cancel', ...ROUTES.keys()].sort()
 }
 
 function handleLiveness(): Response {

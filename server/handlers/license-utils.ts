@@ -562,7 +562,7 @@ export async function findCdkRecordByCode(code: string, hashSecrets = getCdkHash
   return null
 }
 
-export async function incrementCdkScheduleGenerateCount(record: CdkRecord, jobId?: string): Promise<void> {
+export async function incrementCdkScheduleGenerateCount(record: Pick<CdkRecord, 'code_hash'>, jobId?: string): Promise<void> {
   const store = await getCdkRecordStore()
   await store.incrementScheduleGenerateCount(`cdk/${record.code_hash}.json`, jobId)
 }

@@ -69,12 +69,17 @@ CREATE TABLE IF NOT EXISTS optimize_jobs (
   payload_json JSONB NOT NULL,
   result_json JSONB,
   error_message TEXT,
+  failure_kind TEXT,
+  public_error_code TEXT,
   attempt_count INTEGER NOT NULL DEFAULT 0,
   failure_count INTEGER NOT NULL DEFAULT 0,
   worker_id TEXT,
   heartbeat_at TIMESTAMPTZ,
   lock_token TEXT,
   lock_expires_at TIMESTAMPTZ,
+  next_attempt_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
+  cancel_requested_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   started_at TIMESTAMPTZ,
   finished_at TIMESTAMPTZ,
@@ -130,6 +135,32 @@ CREATE INDEX IF NOT EXISTS idx_optimize_job_attempts_worker_status
   ON optimize_job_attempts(worker_id, status);
 CREATE INDEX IF NOT EXISTS idx_optimize_job_attempts_heartbeat
   ON optimize_job_attempts(heartbeat_at) WHERE status = 'running';
+
+CREATE TABLE IF NOT EXISTS optimization_dead_letters (
+  id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL REFERENCES optimize_jobs(id) ON DELETE RESTRICT,
+  owner_key TEXT NOT NULL,
+  profile_id TEXT,
+  source TEXT NOT NULL,
+  failure_kind TEXT NOT NULL,
+  public_error_code TEXT NOT NULL,
+  internal_error_message TEXT NOT NULL,
+  diagnostic_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  attempt_count INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending_review',
+  replay_count INTEGER NOT NULL DEFAULT 0,
+  replayed_job_id TEXT,
+  replayed_by TEXT,
+  replayed_at TIMESTAMPTZ,
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (job_id)
+);
+CREATE INDEX IF NOT EXISTS idx_optimization_dead_letters_status_created_at
+  ON optimization_dead_letters(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_optimization_dead_letters_profile_created_at
+  ON optimization_dead_letters(profile_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS optimization_job_effects (
   job_id TEXT NOT NULL REFERENCES optimize_jobs(id) ON DELETE CASCADE,
@@ -491,6 +522,17 @@ ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS profile_id TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS failure_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS worker_id TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS failure_kind TEXT;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS public_error_code TEXT;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS cancel_requested_at TIMESTAMPTZ;
+UPDATE optimize_jobs SET next_attempt_at = created_at WHERE status = 'queued' AND next_attempt_at IS NULL;
+UPDATE optimize_jobs
+SET expires_at = created_at + interval '30 minutes'
+WHERE status = 'queued' AND attempt_count = 0 AND expires_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_dispatch_ready ON optimize_jobs(status, next_attempt_at, priority DESC, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_queue_expires_at ON optimize_jobs(expires_at) WHERE status = 'queued';
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_profile_id ON optimize_jobs(profile_id);
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_worker_status ON optimize_jobs(worker_id, status);
 INSERT INTO optimize_job_attempts
@@ -510,6 +552,18 @@ UPDATE optimize_jobs SET profile_id = substring(owner_key from '^profile:(.*)$')
 UPDATE optimize_jobs
 SET payload_json = payload_json - 'activeProfile' - 'previewWorkspaceForGeneration'
 WHERE payload_json ? 'activeProfile' OR payload_json ? 'previewWorkspaceForGeneration';
+UPDATE optimize_jobs
+SET payload_json = (payload_json - 'effectiveLicense' - 'checkedCdkRecord') || jsonb_build_object(
+  'version', 3,
+  'configPermission', to_jsonb(coalesce(nullif(payload_json->'scheduleUsageBase'->>'permission', ''), 'growth')),
+  'cdkUsageRef', CASE
+    WHEN nullif(payload_json->'checkedCdkRecord'->>'code_hash', '') IS NULL THEN 'null'::jsonb
+    ELSE jsonb_build_object('code_hash', payload_json->'checkedCdkRecord'->>'code_hash')
+  END
+)
+WHERE payload_json->>'version' = '2'
+  AND NOT (payload_json ? 'kind')
+  AND (payload_json ? 'effectiveLicense' OR payload_json ? 'checkedCdkRecord');
 
 ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS contributor_profile_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_depot_value_samples_contributor_profile_id ON depot_value_samples(contributor_profile_id);

@@ -9,11 +9,10 @@ import {
   getFreePreviewClaim,
   getFreePreviewPendingClaim,
   getProfileForUser,
-  getProfileWorkspace,
   isDepotValueProfile,
   isFreePreviewProfile,
   listProfilesForUser,
-  saveProfileWorkspace,
+  updateProfileWorkspaceAtomically,
   saveFreePreviewPendingClaim,
   saveUserProfile,
   type FreePreviewClaimRecord,
@@ -25,7 +24,6 @@ import {
   type SklandPendingBindingRecord,
   type SklandPendingConfirmationRecord,
   type UserGameAccountRecord,
-  type UserWorkspaceRecord,
 } from '../storage/user-store'
 import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
@@ -777,17 +775,18 @@ async function saveSklandImport(
     if (!claim.ok) throw new Error(claim.message)
   }
 
-  const existingWorkspace = await getProfileWorkspace(profile.id)
-  const configResult = resolveSklandImportConfig(profile, existingWorkspace?.config ?? null, imported.intermediateInventory)
-  const nextWorkspace: UserWorkspaceRecord = {
-    ...(existingWorkspace ?? emptyWorkspace(profile.id)),
-    operators: operatorsCheck.operators,
-    config: configResult.config ?? existingWorkspace?.config ?? null,
-    elite_overrides: {},
-    last_result: null,
-    updated_at: imported.importedAt,
-  }
-  await saveProfileWorkspace(nextWorkspace)
+  let configResult: ReturnType<typeof resolveSklandImportConfig> = { config: null }
+  await updateProfileWorkspaceAtomically(profile.id, (existingWorkspace) => {
+    configResult = resolveSklandImportConfig(profile, existingWorkspace?.config ?? null, imported.intermediateInventory)
+    return {
+      ...(existingWorkspace ?? emptyWorkspace(profile.id)),
+      operators: operatorsCheck.operators,
+      config: configResult.config ?? existingWorkspace?.config ?? null,
+      elite_overrides: {},
+      last_result: null,
+      updated_at: imported.importedAt,
+    }
+  })
 
   const existingBinding = profile.skland_binding
   await saveUserProfile({

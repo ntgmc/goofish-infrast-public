@@ -3,8 +3,9 @@ import type { CreateOptimizationJobRequest } from '../../../lib/optimization-con
 import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse, OptimizeResult } from '../../../lib/types'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
-import { buildOptimizeJobStorageKey, clearActiveOptimizeJob, fetchOptimizeJobStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, mergeOptimizeJobProgress, OptimizeJobPollCancelledError, prepareOptimizeContinuationProgress, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
+import { buildOptimizeJobStorageKey, clearActiveOptimizeJob, clearOptimizeSubmissionKey, fetchOptimizeJobStatus, getOrCreateOptimizeSubmissionKey, isOptimizeJobPollCancelled, isRetryableOptimizePollError, mergeOptimizeJobProgress, OptimizeJobPollCancelledError, prepareOptimizeContinuationProgress, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
 import { submitOptimizationJob } from './optimization-api'
+import { publishLegacyOptimizationJobUpdate, withOptimizationSubmissionLock } from './optimization-job-events'
 import { copy } from '../../../copy/index'
 
 
@@ -14,6 +15,25 @@ interface UseOptimizationJobOptions {
   signature: string;
   progressRef: MutableRefObject<ScheduleProgressState | null>;
   setProgress: Dispatch<SetStateAction<ScheduleProgressState | null>>;
+}
+
+export class OptimizationJobTerminalError extends Error {
+  readonly code?: string
+  readonly retryable: boolean
+  readonly recoveryAction?: OptimizeJobStatusResponse['recovery_action']
+  readonly supportReference?: string
+  readonly status: Extract<OptimizeJobStatusResponse['status'], 'failed' | 'cancelled' | 'dead_lettered'>
+
+  constructor(job: OptimizeJobStatusResponse, fallbackMessage: string) {
+    const supportSuffix = job.support_reference ? ` (${job.support_reference})` : ''
+    super(`${job.error || fallbackMessage}${supportSuffix}`)
+    this.name = 'OptimizationJobTerminalError'
+    this.code = job.error_code
+    this.retryable = job.error_retryable ?? false
+    this.recoveryAction = job.recovery_action
+    this.supportReference = job.support_reference
+    this.status = job.status as OptimizationJobTerminalError['status']
+  }
 }
 
 export function useOptimizationJob({
@@ -58,6 +78,7 @@ export function useOptimizationJob({
       progressRef.current = nextProgress
       setProgress(nextProgress)
       writeActiveOptimizeJob(storageKey, next, nextProgress)
+      publishLegacyOptimizationJobUpdate(profileId, next)
       return nextProgress
     }
 
@@ -69,7 +90,7 @@ export function useOptimizationJob({
       ? { connectionStatus: 'reconnecting', consecutivePollFailures: initialFailures }
       : undefined)
     let consecutivePollFailures = initialFailures
-    let pollAfterMs = job.poll_after_ms || (job.status === 'queued' ? 1200 : 900)
+    let pollAfterMs = job.poll_after_ms || (job.status === 'queued' ? 3_000 : 1_500)
 
     while (true) {
       throwIfCancelled()
@@ -78,7 +99,8 @@ export function useOptimizationJob({
 
       let status: OptimizeJobStatusResponse
       try {
-        status = await fetchOptimizeJobStatus(job.job_id, fallbackMessage, isCancelled)
+        status = await fetchOptimizeJobStatus(job.job_id, fallbackMessage, latestJob.poll_token, isCancelled)
+        if (latestJob.poll_token) status.poll_token = latestJob.poll_token
       } catch (error) {
         throwIfCancelled()
         if (!isRetryableOptimizePollError(error)) throw error
@@ -95,14 +117,14 @@ export function useOptimizationJob({
         clearActiveOptimizeJob(storageKey)
         return status.result
       }
-      if (status.status === 'failed') {
+      if (status.status === 'failed' || status.status === 'cancelled' || status.status === 'dead_lettered') {
         clearActiveOptimizeJob(storageKey)
-        throw new Error(status.error || copy.optimize.pages_tool_optimize_useOptimizationJob_003)
+        throw new OptimizationJobTerminalError(status, copy.optimize.pages_tool_optimize_useOptimizationJob_003)
       }
       updateProgress(status)
-      pollAfterMs = status.poll_after_ms || (status.status === 'queued' ? 1200 : 900)
+      pollAfterMs = status.poll_after_ms || (status.status === 'queued' ? 3_000 : 1_500)
     }
-  }, [progressRef, setProgress])
+  }, [profileId, progressRef, setProgress])
 
   const runOptimizationJob = useCallback(async (
     payload: CreateOptimizationJobRequest,
@@ -110,8 +132,13 @@ export function useOptimizationJob({
     fallbackMessage: string,
     continueProgress = false,
   ): Promise<OptimizeResult> => {
-    const accepted = await submitOptimizationJob(payload, fallbackMessage)
     const storageKey = buildOptimizeJobStorageKey(profileId, orderHash, signature, progressMode)
+    const idempotencyKey = getOrCreateOptimizeSubmissionKey(storageKey, payload)
+    const accepted = await withOptimizationSubmissionLock(profileId || orderHash, async () => (
+      await submitOptimizationJob(payload, fallbackMessage, idempotencyKey)
+    ))
+    writeActiveOptimizeJob(storageKey, accepted)
+    clearOptimizeSubmissionKey(storageKey)
     try {
       return await pollOptimizationJob(accepted, storageKey, progressMode, fallbackMessage, undefined, continueProgress)
     } catch (error) {
