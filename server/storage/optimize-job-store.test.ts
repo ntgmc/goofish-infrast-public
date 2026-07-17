@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { createMemoryOptimizeJobStore } from './optimize-job-store'
+import { createMemoryOptimizeJobStore, OptimizeJobAdmissionError } from './optimize-job-store'
 
 describe('optimization job attempt lifecycle', () => {
   it('fences heartbeats and completes only the current attempt owner', async () => {
@@ -88,6 +88,45 @@ describe('optimization job attempt lifecycle', () => {
   })
 })
 
+describe('optimization job submission admission', () => {
+  it('counts a generated schedule once when upgrade suggestions run as a continuation', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const ownerKey = `license:${randomUUID()}`
+
+    for (let index = 0; index < 12; index += 1) {
+      const schedule = await store.admitJob(admissionInput(ownerKey, 'license_file'))
+      store.records.get(schedule.job.id)!.status = 'succeeded'
+
+      const suggestions = await store.admitJob(admissionInput(ownerKey, 'optimize_suggestions'))
+      store.records.get(suggestions.job.id)!.status = 'succeeded'
+    }
+
+    await expect(store.admitJob(admissionInput(ownerKey, 'license_file'))).rejects.toEqual(
+      new OptimizeJobAdmissionError(
+        'submission_rate_exceeded',
+        429,
+        '当前账号的优化提交次数已达小时上限。请1小时后再试。',
+      ),
+    )
+  })
+
+  it('keeps an independent hourly limit for upgrade suggestion continuations', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const ownerKey = `license:${randomUUID()}`
+
+    for (let index = 0; index < 12; index += 1) {
+      const suggestions = await store.admitJob(admissionInput(ownerKey, 'optimize_suggestions'))
+      store.records.get(suggestions.job.id)!.status = 'succeeded'
+    }
+
+    await expect(store.admitJob(admissionInput(ownerKey, 'optimize_suggestions'))).rejects.toMatchObject({
+      code: 'submission_rate_exceeded',
+      status: 429,
+      message: '当前账号的优化提交次数已达小时上限。请1小时后再试。',
+    })
+  })
+})
+
 function input() {
   return {
     id: randomUUID(),
@@ -96,6 +135,16 @@ function input() {
     permission: 'growth',
     source: 'license_file',
     payload_json: { test: true },
+  }
+}
+
+function admissionInput(ownerKey: string, source: string) {
+  return {
+    ...input(),
+    owner_key: ownerKey,
+    source,
+    idempotency_key: randomUUID(),
+    request_hash: randomUUID(),
   }
 }
 
