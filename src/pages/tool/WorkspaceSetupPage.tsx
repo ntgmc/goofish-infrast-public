@@ -9,7 +9,7 @@ import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '..
 import { canonicalJson } from '../../lib/crypto'
 import { ACTIVE_PURCHASE_CHANNEL } from '../../lib/purchase'
 import type { WorkspaceSetupSection } from '../../lib/app-routes'
-import { countOwnedOperators, formatDate, getEffectiveProfilePermission, getProfileAccessLabel, isFreePreviewProfile, isFreePreviewTrialActive, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
+import { countOwnedOperators, formatDate, getEffectiveProfilePermission, getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
 import { copy } from '../../copy/index'
 import { hasCapability } from '../../lib/product-catalog'
 
@@ -63,12 +63,11 @@ export default function WorkspaceSetupPage({
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config])
   const configValidation = useMemo(() => validateConfig(normalizedConfig), [normalizedConfig])
   const isPreviewProfile = isFreePreviewProfile(profile)
-  const isPreviewTrial = isFreePreviewTrialActive(profile)
   const effectivePermission = getEffectiveProfilePermission(profile)
   const canEditConfig = hasCapability({ permission: effectivePermission }, 'edit_full_config')
   const canEditLimitedConfig = !canEditConfig && (isPreviewProfile || hasCapability({ permission: effectivePermission }, 'edit_limited_config'))
   const freePreviewNeedsBinding = isPreviewProfile && !profile.skland_binding
-  const canManualEditOperators = !isPreviewProfile || isPreviewTrial
+  const canManualEditOperators = !isPreviewProfile
   const ownedOperatorCount = useMemo(() => countOwnedOperators(operators), [operators])
   const configChanged = workspace?.config ? canonicalJson(normalizedConfig) !== canonicalJson(workspace.config) : true
   const filteredOperators = useMemo(() => {
@@ -94,7 +93,7 @@ export default function WorkspaceSetupPage({
     setError(null)
     setStatus(null)
     setSklandRefreshNotice(null)
-    if (isPreviewProfile && !isPreviewTrial) {
+    if (isPreviewProfile) {
       setOperatorFileName(null)
       setError(copy.workspace.pages_tool_WorkspaceSetupPage_004)
       event.currentTarget.value = ''
@@ -175,7 +174,7 @@ export default function WorkspaceSetupPage({
         method: 'PATCH',
         json: {
           profile_id: profile.id,
-          ...((isPreviewProfile && !isPreviewTrial) ? {} : { operators }),
+          ...(!isPreviewProfile ? { operators } : {}),
           config: normalizedConfig,
           elite_overrides: workspace?.elite_overrides ?? {},
         },

@@ -95,7 +95,7 @@ export default async (req: Request): Promise<Response> => {
     let operatorsValue: UserWorkspaceRecord['operators'] | undefined
 
     if ('operators' in body) {
-      if (isRestrictedPreview) {
+      if (isPreviewProfile) {
         return jsonResponse({ error: '免费个人排班档案的干员数据只能通过森空岛导入更新。' }, 403)
       }
       if (body.operators === null) {
