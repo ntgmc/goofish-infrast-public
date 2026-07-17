@@ -22,7 +22,7 @@ export function enforceLayoutOptimizationMode(config: LicenseConfig): boolean {
   config.optimizer_search = {
     ...optimizerSearch,
     optimization_mode: 'fast',
-    beam: true,
+    beam: optimizerSearch.beam !== false,
   }
   if (config.Fiammetta) config.Fiammetta = { ...config.Fiammetta, candidate_mode: 'fast' }
   return true
