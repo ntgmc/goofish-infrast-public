@@ -1,5 +1,5 @@
-import type { FreeScheduleEntitlement, LicenseOperator, LicenseConfig, LicenseFile, OptimizeResult } from "../../../src/lib/types";
-import { canonicalJson, formatRiskFreezeMessage, type CdkRecord, findCdkRecordByLicenseOrderHash, incrementCdkScheduleGenerateCount, normalizePermissionMode, validateLicenseForRequest, verifyLicenseSignatureWithKeyring } from "../../handlers/license-utils";
+import type { FreeScheduleEntitlement, LicenseOperator, LicenseConfig, OptimizeResult } from "../../../src/lib/types";
+import { canonicalJson, type CdkRecord, incrementCdkScheduleGenerateCount } from "../../handlers/license-utils";
 import { countSuccessfulUsageEventsForProfileInRange, recordUsageEvent } from "../../handlers/usage-stats";
 import type { UsageReasonCode } from "../../storage/usage-store";
 import type { ReorderCheckQuota, ScheduleUsageContext, FreeScheduleGenerateDecision } from './shared';
@@ -49,37 +49,6 @@ export function sameConfig(left: LicenseConfig, right: LicenseConfig): boolean {
 
 export function countOwnedOperators(operators: LicenseOperator[]): number {
   return operators.filter((operator) => operator.own !== false).length;
-}
-
-export async function validateRequestLicense(license: unknown): Promise<
-  | { ok: true; license: LicenseFile; cdkRecord: CdkRecord | null }
-  | { ok: false; status: number; message: string; reason_code?: UsageReasonCode; cdk_status?: string }
-> {
-  const structure = validateLicenseForRequest(license);
-  if (structure.ok === false) {
-    return { ok: false, status: 400, message: structure.message };
-  }
-
-  if (!verifyLicenseSignatureWithKeyring(structure.license)) {
-    return { ok: false, status: 401, message: "Invalid license signature." };
-  }
-
-  const cdkRecord = await findCdkRecordByLicenseOrderHash(structure.license.order_hash);
-  if (structure.license.version === 2 && (!cdkRecord || cdkRecord.status !== "used")) {
-    return { ok: false, status: 403, message: "License is not linked to an active CDK record." };
-  }
-  if (cdkRecord?.status === "revoked") {
-    return { ok: false, status: 403, message: "License has been revoked." };
-  }
-  if (cdkRecord?.status === "frozen") {
-    return { ok: false, status: 403, message: formatRiskFreezeMessage(cdkRecord.freeze_reason || "License is frozen.") };
-  }
-
-  const effectiveLicense = cdkRecord
-    ? { ...structure.license, permission: normalizePermissionMode(cdkRecord.permission) }
-    : structure.license;
-
-  return { ok: true, license: effectiveLicense, cdkRecord };
 }
 
 export async function recordScheduleGenerate(

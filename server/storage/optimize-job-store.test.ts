@@ -94,14 +94,14 @@ describe('optimization job submission admission', () => {
     const ownerKey = `license:${randomUUID()}`
 
     for (let index = 0; index < 12; index += 1) {
-      const schedule = await store.admitJob(admissionInput(ownerKey, 'license_file'))
+      const schedule = await store.admitJob(admissionInput(ownerKey, 'account_profile'))
       store.records.get(schedule.job.id)!.status = 'succeeded'
 
       const suggestions = await store.admitJob(admissionInput(ownerKey, 'optimize_suggestions'))
       store.records.get(suggestions.job.id)!.status = 'succeeded'
     }
 
-    await expect(store.admitJob(admissionInput(ownerKey, 'license_file'))).rejects.toEqual(
+    await expect(store.admitJob(admissionInput(ownerKey, 'account_profile'))).rejects.toEqual(
       new OptimizeJobAdmissionError(
         'submission_rate_exceeded',
         429,
@@ -133,7 +133,7 @@ function input() {
     priority: 10,
     owner_key: `license:${randomUUID()}`,
     permission: 'growth',
-    source: 'license_file',
+    source: 'account_profile',
     payload_json: { test: true },
   }
 }

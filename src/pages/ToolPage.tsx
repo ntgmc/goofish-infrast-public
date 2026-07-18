@@ -164,7 +164,6 @@ export default function ToolPage() {
           onReset={() => navigate(workspaceSetupPath('operators'))}
           announcement={banner}
           redeemedNotice={null}
-          onRedownloadLicense={null}
           onProfileUpgraded={applyAuthPayload}
         />
       </Suspense>

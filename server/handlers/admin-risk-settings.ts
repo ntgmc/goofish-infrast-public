@@ -40,12 +40,6 @@ async function handleSave(req: Request): Promise<Response> {
       }
       patch.operator_data_risk_enabled = body.operator_data_risk_enabled
     }
-    if ('device_risk_enabled' in body) {
-      if (typeof body.device_risk_enabled !== 'boolean') {
-        return jsonResponse({ error: '设备风控开关必须是布尔值。' }, 400)
-      }
-      patch.device_risk_enabled = body.device_risk_enabled
-    }
     if (Object.keys(patch).length === 0) {
       return jsonResponse({ error: '没有需要保存的风控设置。' }, 400)
     }

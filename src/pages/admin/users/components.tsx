@@ -184,7 +184,6 @@ export function ProfileDetailCard({
           <div className="mt-2 grid gap-2 text-xs text-ink-muted sm:grid-cols-3">
             <span>备注：{profile.cdk.order_note || '-'}</span>
             <span>风险：{profile.cdk.risk_event_count}</span>
-            <span>更新：{profile.cdk.operator_update_event_count}</span>
           </div>
         </div>
       )}

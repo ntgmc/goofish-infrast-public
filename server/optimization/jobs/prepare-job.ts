@@ -1,13 +1,13 @@
 import type { LicenseFile } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
-import { canUseUpgradeFeatures, evaluateClientBindingRisk, evaluateOperatorRisk, formatBindingBlockMessage, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, freezeCdkRecord, recordSoftBlockedRiskEvent, shouldFreezeBindingRisk, getPermissionMode, getCdkRecordStore, getRiskControlSettings, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
+import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, recordSoftBlockedRiskEvent, getPermissionMode, getCdkRecordStore, getRiskControlSettings, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
 import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, updateProfileWorkspaceAtomically, type UserGameAccountRecord } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
 import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, OptimizeConfigPermission, FreeScheduleGenerateDecision } from './shared';
 import { createPersistedOptimizeJobPayload } from './shared';
 import { sanitizeConfigForPublicOptimize, jsonResponse } from './http-core';
-import { validateRequestLicense, recordScheduleGenerate, scheduleFailure, resolveFreeScheduleGenerateDecision } from './entitlements';
+import { recordScheduleGenerate, scheduleFailure, resolveFreeScheduleGenerateDecision } from './entitlements';
 import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammettaEnabled, resolveOptimizeDurationEstimate } from './job-status';
 import { buildScenarioComparisonEstimate } from './job-status';
 import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
@@ -34,11 +34,13 @@ export async function prepareOptimizeJob(
     if ('use_priority_coupon' in rawBody && typeof rawBody.use_priority_coupon !== 'boolean') {
       return fail({ error: 'use_priority_coupon 必须是布尔值。', code: 'priority_coupon_not_applicable' }, 400);
     }
+    if (!body.identity || body.identity.type !== 'profile' || typeof body.identity.profileId !== 'string' || !body.identity.profileId) {
+      scheduleUsage = scheduleFailure('validation_failed', { source: 'account_profile' });
+      return fail({ error: '优化任务必须使用已登录的账号档案。' }, 400);
+    }
     const operators = body.operators;
     const config = body.config;
-    const license = body.identity?.type === 'license' ? body.identity.license : undefined;
-    const activation_token = body.identity?.type === 'license' ? body.identity.activationToken : undefined;
-    const profile_id = body.identity?.type === 'profile' ? body.identity.profileId : undefined;
+    const profile_id = body.identity.profileId;
     const ignore_elite = body.kind === 'schedule' ? body.ignoreElite : true;
     const include_current = body.kind === 'schedule' ? body.includeCurrent : false;
     const suggestions_only = body.kind === 'upgrade_suggestions';
@@ -46,12 +48,8 @@ export async function prepareOptimizeJob(
     const history_source = body.kind === 'schedule' ? body.historySource : undefined;
     const usePriorityCoupon = rawBody.use_priority_coupon === true;
 
-    if (usePriorityCoupon && (body.kind !== 'schedule' || body.identity?.type !== 'profile')) {
+    if (usePriorityCoupon && body.kind !== 'schedule') {
       return fail({ error: '优先计算券仅适用于已登录账号档案的主排班计算。', code: 'priority_coupon_not_applicable' }, 400);
-    }
-
-    if (isScenarioComparison && body.identity?.type !== 'profile') {
-      return fail({ error: '场景对比实验室必须使用已登录的账号档案。' }, 403);
     }
 
     if (!operators || !config) {
@@ -59,8 +57,8 @@ export async function prepareOptimizeJob(
       return fail({ error: 'Missing operators or config' }, 400);
     }
 
-    const auth = body.identity?.type === 'profile' ? await requireUserSession(req) : null;
-    if (body.identity?.type === 'profile' && !auth) {
+    const auth = await requireUserSession(req);
+    if (!auth) {
       scheduleUsage = scheduleFailure('auth_required', { source: 'account_profile' });
       return fail({ error: '请先登录后再提交优化任务。' }, 401);
     }
@@ -70,8 +68,8 @@ export async function prepareOptimizeJob(
     let isPreviewProfile = false;
     let isPreviewTrial = false;
 
-    if (auth) {
-      activeProfileId = typeof profile_id === 'string' && profile_id ? profile_id : auth.activeProfile?.id ?? null;
+    {
+      activeProfileId = profile_id;
       if (!activeProfileId) {
         scheduleUsage = scheduleFailure('auth_profile_missing', { source: 'account_profile' });
         return fail({ error: 'Please select a CDK profile first.' }, 400);
@@ -111,14 +109,6 @@ export async function prepareOptimizeJob(
         issued_at: profile.created_at,
         sig: 'account-' + profile.id,
       };
-    } else {
-      const licenseCheck = await validateRequestLicense(license);
-      if (licenseCheck.ok === false) {
-        scheduleUsage = scheduleFailure(licenseCheck.reason_code ?? 'validation_failed', { cdk_status: licenseCheck.cdk_status, source: 'license_file' });
-        return fail({ error: licenseCheck.message }, licenseCheck.status);
-      }
-      checkedCdkRecord = licenseCheck.cdkRecord;
-      effectiveLicense = licenseCheck.license;
     }
 
     const optimizePermission: OptimizeConfigPermission = isPreviewProfile && !isPreviewTrial
@@ -128,7 +118,7 @@ export async function prepareOptimizeJob(
       permission: optimizePermission,
       profile_id: activeProfileId ?? undefined,
       cdk_status: checkedCdkRecord?.status,
-      source: isPreviewProfile ? 'free_preview' : auth ? 'account_profile' : 'license_file',
+      source: isPreviewProfile ? 'free_preview' : 'account_profile',
     };
     scheduleUsage = scheduleFailure('optimizer_runtime_error', scheduleUsageBase);
 
@@ -138,41 +128,13 @@ export async function prepareOptimizeJob(
 
     if (checkedCdkRecord && normalizePermissionMode(checkedCdkRecord.permission) === 'advanced') {
       const riskSettings = await getRiskControlSettings();
-      let riskCheckedRecord = checkedCdkRecord;
-
-      if (riskSettings.device_risk_enabled) {
-        const binding = evaluateClientBindingRisk(riskCheckedRecord, activation_token, req);
-        if (!binding.ok) {
-          if (!shouldFreezeBindingRisk(binding.event)) {
-            const blocked = await recordSoftBlockedRiskEvent(binding.record, binding.event, formatBindingBlockMessage(binding.event));
-            scheduleUsage = scheduleFailure('risk_soft_blocked', { ...scheduleUsageBase, cdk_status: blocked.record.status });
-            return fail({ error: blocked.message }, 403);
-          }
-          const frozen = await freezeCdkRecord(binding.record, binding.event.reason, binding.event);
-          scheduleUsage = scheduleFailure('risk_frozen', { ...scheduleUsageBase, cdk_status: frozen.status });
-          return fail({ error: frozen.freeze_reason || formatRiskFreezeMessage(binding.event.reason) }, 403);
-        }
-        riskCheckedRecord = binding.record;
-      }
-
       if (riskSettings.operator_data_risk_enabled) {
-        const operatorRisk = evaluateOperatorRisk(riskCheckedRecord, operators);
+        const operatorRisk = evaluateOperatorRisk(checkedCdkRecord, operators);
         if (!operatorRisk.ok) {
-          const blocked = await recordSoftBlockedRiskEvent(riskCheckedRecord, operatorRisk.event, formatOperatorRiskBlockMessage(operatorRisk.event.reason));
+          const blocked = await recordSoftBlockedRiskEvent(checkedCdkRecord, operatorRisk.event, formatOperatorRiskBlockMessage(operatorRisk.event.reason));
           scheduleUsage = scheduleFailure(blocked.frozen ? 'risk_frozen' : 'risk_soft_blocked', { ...scheduleUsageBase, cdk_status: blocked.record.status });
           return fail({ error: blocked.message }, blocked.frozen ? 403 : 409);
         }
-      }
-
-      if (riskCheckedRecord !== checkedCdkRecord) {
-        const store = await getCdkRecordStore();
-        checkedCdkRecord = await store.mutate('cdk/' + riskCheckedRecord.code_hash + '.json', (current) => ({
-          ...current,
-          activation_token_hash: riskCheckedRecord.activation_token_hash,
-          bound_user_agent_hash: riskCheckedRecord.bound_user_agent_hash,
-          user_agent_events: riskCheckedRecord.user_agent_events,
-          ip_prefix_events: riskCheckedRecord.ip_prefix_events,
-        })) ?? checkedCdkRecord;
       }
     }
 
@@ -256,9 +218,9 @@ export async function prepareOptimizeJob(
 
     const source: OptimizeJobSource = suggestions_only
       ? 'optimize_suggestions'
-      : isPreviewProfile ? 'free_preview' : auth ? 'account_profile' : 'license_file';
+      : isPreviewProfile ? 'free_preview' : 'account_profile';
     const priority: OptimizeJobPriority = usePriorityCoupon ? 'priority_coupon' : isPreviewProfile ? 'standard' : 'paid';
-    const ownerKey = activeProfileId ? 'profile:' + activeProfileId : 'license:' + effectiveLicense.order_hash;
+    const ownerKey = 'profile:' + activeProfileId;
     const estimate = await resolveOptimizeDurationEstimate(estimateBucket);
 
     return {
@@ -269,7 +231,7 @@ export async function prepareOptimizeJob(
         priorityValue: priority === 'priority_coupon' ? 20 : priority === 'paid' ? 10 : 0,
         permission: scheduleUsageBase.permission ?? null,
         source,
-        rewardUserId: usePriorityCoupon ? auth?.user.id ?? null : null,
+        rewardUserId: usePriorityCoupon ? auth.user.id : null,
         usePriorityCoupon,
         payload: createPersistedOptimizeJobPayload({
           submittedAt,

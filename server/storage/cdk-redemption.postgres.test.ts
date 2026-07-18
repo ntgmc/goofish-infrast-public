@@ -50,11 +50,11 @@ describe('CDK redemption PostgreSQL concurrency', () => {
       requestHash,
       complete: async (_client, record) => ({
         record: { ...record, status: 'used' as const, used_at: new Date().toISOString(), license_order_hash: 'order-replay' },
-        response: { license_file_content: 'original-content' },
+        response: { profile_id: 'profile-a' },
       }),
     })
     expect((await run('request-a')).replayed).toBe(false)
-    expect(await run('request-a')).toEqual({ response: { license_file_content: 'original-content' }, replayed: true })
+    expect(await run('request-a')).toEqual({ response: { profile_id: 'profile-a' }, replayed: true })
     await expect(run('request-b')).rejects.toMatchObject({ name: 'IdempotencyConflictError' })
   })
 
@@ -135,7 +135,7 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     await query(
       `insert into optimize_jobs
         (id, status, priority, owner_key, permission, source, payload_json, created_at, updated_at)
-       values ($1, 'running', 10, $2, 'growth', 'license_file', '{}'::jsonb, now(), now())`,
+       values ($1, 'running', 10, $2, 'growth', 'account_profile', '{}'::jsonb, now(), now())`,
       [jobId, `license:${randomUUID()}`],
     )
 

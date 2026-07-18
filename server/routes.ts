@@ -9,9 +9,7 @@ import announcementHandler from './handlers/announcement'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
 import depotValueHandler from './handlers/depot-value'
-import licenseStatusHandler from './handlers/license-status'
 import optimizationHandler from './handlers/optimization'
-import redeemCdkHandler from './handlers/redeem-cdk'
 import userAnnouncementsHandler from './handlers/user-announcements'
 import userProfilesHandler from './handlers/user-profiles'
 import userSklandHandler from './handlers/user-skland'
@@ -52,8 +50,6 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/analyze-schedule', analyzeScheduleHandler as unknown as ApiHandler],
   ['/api/depot-value', depotValueHandler as unknown as ApiHandler],
-  ['/api/redeem-cdk', redeemCdkHandler as unknown as ApiHandler],
-  ['/api/license-status', licenseStatusHandler as unknown as ApiHandler],
   ['/api/user/announcements', userAnnouncementsHandler as unknown as ApiHandler],
   ['/api/user/profiles', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/depot-value', userProfilesHandler as unknown as ApiHandler],
