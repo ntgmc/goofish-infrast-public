@@ -13,6 +13,8 @@ const buildRelevantFiles = new Set([
   'tsconfig.json',
   'vite.config.ts',
   '.github/workflows/deploy-production.yml',
+  '.github/workflows/deploy-dev.yml',
+  'docs/dev-deploy.md',
   'docs/production-deploy.md',
 ])
 
@@ -35,13 +37,10 @@ const buildRelevantScripts = new Set([
   'scripts/check-workspace-history.mjs',
   'scripts/generate-data.mjs',
   'scripts/deploy-production-atomic.sh',
+  'scripts/deploy-production.sh',
+  'scripts/release-artifact.mjs',
   'scripts/import-postgres.mjs',
   'scripts/verify-migrated-data.mjs',
-])
-
-const generatedMetadataFiles = new Set([
-  'src/lib/build-meta.ts',
-  'server/handlers/data.ts',
 ])
 
 const baseRef = process.env.CACHED_COMMIT_REF
@@ -68,11 +67,7 @@ if (changedFiles.length === 0) {
   skipBuild('no changed files since last build')
 }
 
-const meaningfulChanges = filterGeneratedMetadataOnly(changedFiles)
-
-if (meaningfulChanges.length === 0) {
-  skipBuild('only generated metadata changed')
-}
+const meaningfulChanges = changedFiles
 
 const relevant = meaningfulChanges.filter(isBuildRelevant)
 
@@ -86,11 +81,6 @@ if (fallbackChanges && fallbackChanges.some(isBuildRelevant)) {
 }
 
 skipBuild(`no build-relevant files changed: ${meaningfulChanges.join(', ')}`)
-
-function filterGeneratedMetadataOnly(files) {
-  const nonGenerated = files.filter((file) => !generatedMetadataFiles.has(file))
-  return nonGenerated.length > 0 ? nonGenerated : []
-}
 
 function isBuildRelevant(file) {
   if (buildRelevantFiles.has(file)) return true

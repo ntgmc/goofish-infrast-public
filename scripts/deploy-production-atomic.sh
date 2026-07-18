@@ -27,8 +27,9 @@ HEALTH_DELAY_SECONDS="${HEALTH_DELAY_SECONDS:-3}"
 PUBLIC_SMOKE_RETRIES="${PUBLIC_SMOKE_RETRIES:-20}"
 PUBLIC_SMOKE_DELAY_SECONDS="${PUBLIC_SMOKE_DELAY_SECONDS:-3}"
 RETAIN_RELEASES="${RETAIN_RELEASES:-5}"
-INSTALL_COMMAND="${INSTALL_COMMAND:-npm ci}"
-BUILD_COMMAND="${BUILD_COMMAND:-npm run build}"
+INSTALL_COMMAND="${INSTALL_COMMAND:-npm ci --omit=dev}"
+ARTIFACT_PATH="${ARTIFACT_PATH:-}"
+ARTIFACT_SHA256="${ARTIFACT_SHA256:-}"
 DEPLOY_RUN_ID="${DEPLOY_RUN_ID:-unknown}"
 DEPLOY_RUN_URL="${DEPLOY_RUN_URL:-unknown}"
 
@@ -145,10 +146,10 @@ verify_release() {
   local release_dir="$1"
   [[ -s "$release_dir/dist/index.html" ]] || return 1
   [[ -s "$release_dir/server/dist/index.js" ]] || return 1
+  [[ -s "$release_dir/build-manifest.json" ]] || return 1
   [[ -s "$release_dir/release.json" ]] || return 1
-  grep -Fq "\"git_sha\": \"$TARGET_SHA\"" "$release_dir/src/lib/build-meta.ts" || return 1
+  RELEASE_ROOT="$release_dir" node "$release_dir/scripts/release-artifact.mjs" verify --sha "$TARGET_SHA" || return 1
   RELEASE_DIR_TO_VERIFY="$release_dir" EXPECTED_SHA="$TARGET_SHA" node --input-type=module <<'NODE'
-import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -157,38 +158,25 @@ const manifest = JSON.parse(await readFile(join(root, 'release.json'), 'utf8'))
 if (manifest.target_sha !== process.env.EXPECTED_SHA) {
   throw new Error(`release manifest SHA mismatch: ${manifest.target_sha}`)
 }
-for (const relativePath of ['dist/index.html', 'server/dist/index.js']) {
-  const actual = createHash('sha256').update(await readFile(join(root, relativePath))).digest('hex')
-  if (manifest.artifacts?.[relativePath] !== actual) {
-    throw new Error(`release artifact hash mismatch: ${relativePath}`)
-  }
-}
+if (!/^[0-9a-f]{64}$/.test(manifest.artifact_sha256 || '')) throw new Error('release archive checksum is invalid')
 NODE
 }
 
 write_release_manifest() {
-  RELEASE_BUILD_DIR="$BUILD_DIR" RELEASE_TARGET_SHA="$TARGET_SHA" RELEASE_RUN_ID="$DEPLOY_RUN_ID" RELEASE_RUN_URL="$DEPLOY_RUN_URL" node --input-type=module <<'NODE'
-import { createHash } from 'node:crypto'
+  RELEASE_BUILD_DIR="$BUILD_DIR" RELEASE_TARGET_SHA="$TARGET_SHA" RELEASE_RUN_ID="$DEPLOY_RUN_ID" RELEASE_RUN_URL="$DEPLOY_RUN_URL" RELEASE_ARTIFACT_SHA="$ARTIFACT_SHA256" node --input-type=module <<'NODE'
 import { readFile, writeFile } from 'node:fs/promises'
-import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 
 const root = process.env.RELEASE_BUILD_DIR
-const hash = async (relativePath) => createHash('sha256')
-  .update(await readFile(join(root, relativePath)))
-  .digest('hex')
-const commandVersion = (command) => execFileSync(command, ['--version'], { encoding: 'utf8' }).trim()
+const build = JSON.parse(await readFile(join(root, 'build-manifest.json'), 'utf8'))
 const manifest = {
   target_sha: process.env.RELEASE_TARGET_SHA,
-  built_at: new Date().toISOString(),
-  build_context: 'production-deploy',
-  github_run_id: process.env.RELEASE_RUN_ID,
-  github_run_url: process.env.RELEASE_RUN_URL,
-  node_version: commandVersion('node'),
-  npm_version: commandVersion('npm'),
-  artifacts: {
-    'dist/index.html': await hash('dist/index.html'),
-    'server/dist/index.js': await hash('server/dist/index.js'),
+  artifact_sha256: process.env.RELEASE_ARTIFACT_SHA,
+  build,
+  deployment: {
+    github_run_id: process.env.RELEASE_RUN_ID,
+    github_run_url: process.env.RELEASE_RUN_URL,
+    deployed_at: new Date().toISOString(),
   },
 }
 await writeFile(join(root, 'release.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
@@ -213,16 +201,11 @@ build_release() {
     cd "$BUILD_DIR"
     log "installing dependencies: $INSTALL_COMMAND"
     bash -lc "$INSTALL_COMMAND"
-    log "building immutable production artifacts: $BUILD_COMMAND"
-    REFRESH_BUILD_METADATA=true \
-      VERSION_SOURCE_SHA="$TARGET_SHA" \
-      BUILD_CONTEXT=production-deploy \
-      DEPLOY_RUN_ID="$DEPLOY_RUN_ID" \
-      DEPLOY_RUN_URL="$DEPLOY_RUN_URL" \
-      bash -lc "$BUILD_COMMAND"
+    log "extracting verified Quality Checks artifact"
+    tar -xzf "$ARTIFACT_PATH" -C "$BUILD_DIR"
     [[ -s dist/index.html ]] || fail "missing frontend artifact: dist/index.html"
     [[ -s server/dist/index.js ]] || fail "missing backend artifact: server/dist/index.js"
-    grep -Fq "\"git_sha\": \"$TARGET_SHA\"" src/lib/build-meta.ts || fail "build metadata does not contain target SHA"
+    RELEASE_ROOT="$BUILD_DIR" node scripts/release-artifact.mjs verify --sha "$TARGET_SHA"
     node --check server/dist/index.js
     npm ls --omit=dev >/dev/null
   )
@@ -325,6 +308,7 @@ on_error() {
   trap - ERR
   set +e
   cleanup_failed_build
+  rm -f -- "$ARTIFACT_PATH"
   if [[ "$DEPLOY_COMPLETE" == "true" ]]; then
     log "post-cutover cleanup failed; the verified candidate remains active"
   elif [[ "$CUTOVER_STARTED" == "true" ]]; then
@@ -351,8 +335,10 @@ TARGET_SHA="${TARGET_SHA,,}"
 [[ "$RETAIN_RELEASES" =~ ^[0-9]+$ ]] || fail "RETAIN_RELEASES must be a non-negative integer"
 [[ "$SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]] || fail "SERVICE_NAME contains unsafe characters"
 [[ -n "$PUBLIC_BASE_URL" ]] || fail "PUBLIC_BASE_URL is required"
+[[ -f "$ARTIFACT_PATH" ]] || fail "verified release artifact is required"
+[[ "$ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] || fail "ARTIFACT_SHA256 must be a SHA-256 digest"
 
-for command in git npm node curl grep systemctl nginx realpath find sort cut; do
+for command in git npm node curl grep systemctl nginx realpath find sort cut sha256sum tar; do
   require_command "$command"
 done
 if [[ "$(id -u)" != "0" ]]; then
@@ -365,6 +351,9 @@ exec 9>"$LOCK_FILE"
 require_command flock
 flock -n 9 || fail "another production deployment is already running"
 
+actual_artifact_sha="$(sha256sum "$ARTIFACT_PATH" | cut -d ' ' -f1)"
+[[ "$actual_artifact_sha" == "$ARTIFACT_SHA256" ]] || fail "release artifact checksum mismatch"
+
 PHASE="fetch"
 log "fetching immutable production source $TARGET_SHA"
 git -C "$REPO_DIR" fetch --prune --no-tags "$REMOTE" "+refs/heads/$BLUE_GREEN_BRANCH:refs/remotes/$REMOTE/$BLUE_GREEN_BRANCH"
@@ -376,6 +365,7 @@ if [[ -e "$CURRENT_LINK" ]]; then
   current_release="$(realpath -e "$CURRENT_LINK")"
   if [[ "$(basename "$current_release")" == "$TARGET_SHA" && "$ALLOW_REDEPLOY" != "true" ]]; then
     log "release $TARGET_SHA is already active"
+    rm -f -- "$ARTIFACT_PATH"
     exit 0
   fi
 fi
@@ -426,6 +416,7 @@ if [[ "$CANDIDATE_ONLY" == "true" ]]; then
   CANDIDATE_STARTED=false
   restore_link "$OLD_CANDIDATE_TARGET" "$SLOTS_DIR/$CANDIDATE_SLOT"
   log "candidate-only verification complete for $TARGET_SHA"
+  rm -f -- "$ARTIFACT_PATH"
   exit 0
 fi
 
@@ -463,4 +454,5 @@ fi
 DEPLOY_COMPLETE=true
 PHASE="release-cleanup"
 cleanup_old_releases
+rm -f -- "$ARTIFACT_PATH"
 log "deployment complete: ${OLD_CURRENT_TARGET:-legacy} -> $TARGET_SHA on $CANDIDATE_SLOT"
