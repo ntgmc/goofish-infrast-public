@@ -20,12 +20,10 @@ const expectedRoutes = [
   '/api/health',
   '/api/health/live',
   '/api/health/ready',
-  '/api/license-status',
   '/api/optimization/jobs',
   '/api/optimization/jobs/:jobId',
   '/api/optimization/jobs/:jobId/cancel',
   '/api/optimization/reorder-checks',
-  '/api/redeem-cdk',
   '/api/user/announcements',
   '/api/user/invitations',
   '/api/user/invitations/code',
@@ -46,17 +44,22 @@ const expectedRoutes = [
   '/api/usage-stats',
 ]
 
-const { getRegisteredApiRoutes } = await import('../server/dist/routes.js')
+const { getRegisteredApiRoutes, routeRequest } = await import('../server/dist/routes.js')
 const actualRoutes = getRegisteredApiRoutes()
 const missing = expectedRoutes.filter((route) => !actualRoutes.includes(route))
 if (missing.length > 0) {
   throw new Error(`missing server API routes: ${missing.join(', ')}`)
 }
 
-const removedRoutes = ['/api/optimize', '/api/optimize/job', '/api/optimize/reorder-check', '/api/user/data/skland/unlink']
+const removedRoutes = ['/api/optimize', '/api/optimize/job', '/api/optimize/reorder-check', '/api/user/data/skland/unlink', '/api/redeem-cdk', '/api/license-status']
 const stale = removedRoutes.filter((route) => actualRoutes.includes(route))
 if (stale.length > 0) {
   throw new Error(`removed API routes are still registered: ${stale.join(', ')}`)
+}
+
+for (const route of ['/api/redeem-cdk', '/api/license-status']) {
+  const response = await routeRequest(new Request(`http://local${route}`, { method: 'POST' }))
+  if (response.status !== 404) throw new Error(`removed API route ${route} returned ${response.status} instead of 404`)
 }
 
 console.log(`[check-server-routes] ${actualRoutes.length} API routes registered`)

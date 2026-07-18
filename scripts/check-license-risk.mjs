@@ -7,9 +7,7 @@ const bundleDir = resolve('.cache/check-license-risk')
 await mkdir(bundleDir, { recursive: true })
 
 const store = createMemoryCdkRecordStore()
-const riskSettingsStore = createMemoryRiskControlSettingsStore()
 globalThis.__maaCdkRecordStoreForTesting = store
-globalThis.__maaRiskControlSettingsStoreForTesting = riskSettingsStore
 
 const modulePath = await bundleModule('server/handlers/license-utils.ts')
 const licenseUtils = await import(`${pathToFileURL(modulePath).href}?t=${Date.now()}`)
@@ -23,95 +21,32 @@ const regressedOperators = [
   { id: 'char_002', name: '普通干员', own: true, elite: 1, rarity: 3 },
 ]
 
-let operatorRiskRecord = createRecord('operator-risk')
-operatorRiskRecord.baseline_operator_fingerprint = licenseUtils.buildOperatorFingerprint(baselineOperators)
-operatorRiskRecord.latest_operator_fingerprint = operatorRiskRecord.baseline_operator_fingerprint
-await store.create(`cdk/${operatorRiskRecord.code_hash}.json`, operatorRiskRecord)
+let record = createRecord('operator-risk')
+record.baseline_operator_fingerprint = licenseUtils.buildOperatorFingerprint(baselineOperators)
+record.latest_operator_fingerprint = record.baseline_operator_fingerprint
+await store.create(`cdk/${record.code_hash}.json`, record)
+
+const risk = licenseUtils.evaluateOperatorRisk(record, regressedOperators)
+if (risk.ok || risk.event.type !== 'operator_ownership_regression') {
+  throw new Error('operator risk should reject a missing owned high-rarity operator')
+}
+
 for (let index = 0; index < 3; index += 1) {
-  const result = await licenseUtils.recordAdvancedOperatorUpdate(
-    operatorRiskRecord,
-    regressedOperators,
-    requestWithUserAgent('operator-risk-agent'),
-    'activation-token-operator-risk',
-  )
-  if (index < 2 && (result.ok || result.profile_freeze_required || result.record.status === 'frozen')) {
-    throw new Error('operator risk should soft-block before threshold without freezing cdk')
-  }
-  if (index === 2) {
-    if (result.ok || !result.profile_freeze_required) {
-      throw new Error('operator risk threshold should request profile freeze')
-    }
-    if (result.record.status === 'frozen') {
-      throw new Error('operator risk threshold must not freeze cdk record')
-    }
-  }
-  operatorRiskRecord = result.record
+  const blocked = await licenseUtils.recordSoftBlockedRiskEvent(record, risk.event, licenseUtils.formatOperatorRiskBlockMessage(risk.event.reason))
+  if (index < 2 && blocked.frozen) throw new Error('operator risk should soft-block before the threshold')
+  if (index === 2 && !blocked.frozen) throw new Error('operator risk should escalate at the threshold')
+  record = blocked.record
 }
 
-let defaultDeviceRiskRecord = createRecord('device-risk-default-off')
-await store.create(`cdk/${defaultDeviceRiskRecord.code_hash}.json`, defaultDeviceRiskRecord)
-for (const userAgent of ['agent-a', 'agent-b', 'agent-c']) {
-  const result = await licenseUtils.recordAdvancedOperatorUpdate(
-    defaultDeviceRiskRecord,
-    baselineOperators,
-    requestWithUserAgent(userAgent),
-    'activation-token-device-risk-default-off',
-  )
-  defaultDeviceRiskRecord = result.record
+record.status = 'frozen'
+record.latest_operator_fingerprint = licenseUtils.buildOperatorFingerprint(regressedOperators)
+await store.set(`cdk/${record.code_hash}.json`, record)
+const recovered = await licenseUtils.acceptLatestOperatorBaselineAndUnfreeze(record, 'verified operator snapshot')
+if (!recovered || recovered.status !== 'used' || recovered.baseline_operator_fingerprint?.hash !== recovered.latest_operator_fingerprint?.hash) {
+  throw new Error('reviewed recovery should accept the latest operator snapshot and unfreeze the record')
 }
-if (defaultDeviceRiskRecord.status === 'frozen') {
-  throw new Error('device risk should be disabled by default')
-}
-
-await riskSettingsStore.set({ operator_data_risk_enabled: false, device_risk_enabled: false, updated_at: null })
-let disabledOperatorRiskRecord = createRecord('operator-risk-disabled')
-disabledOperatorRiskRecord.baseline_operator_fingerprint = licenseUtils.buildOperatorFingerprint(baselineOperators)
-disabledOperatorRiskRecord.latest_operator_fingerprint = disabledOperatorRiskRecord.baseline_operator_fingerprint
-await store.create(`cdk/${disabledOperatorRiskRecord.code_hash}.json`, disabledOperatorRiskRecord)
-const disabledOperatorResult = await licenseUtils.recordAdvancedOperatorUpdate(
-  disabledOperatorRiskRecord,
-  regressedOperators,
-  requestWithUserAgent('operator-risk-disabled-agent'),
-  'activation-token-operator-risk-disabled',
-)
-if (!disabledOperatorResult.ok || disabledOperatorResult.profile_freeze_required || disabledOperatorResult.record.status === 'frozen') {
-  throw new Error('disabled operator risk should allow regressed operator data')
-}
-
-await riskSettingsStore.set({ operator_data_risk_enabled: true, device_risk_enabled: true, updated_at: null })
-let enabledDeviceRiskRecord = createRecord('device-risk-enabled')
-await store.create(`cdk/${enabledDeviceRiskRecord.code_hash}.json`, enabledDeviceRiskRecord)
-for (const userAgent of ['agent-a', 'agent-b', 'agent-c']) {
-  const result = await licenseUtils.recordAdvancedOperatorUpdate(
-    enabledDeviceRiskRecord,
-    baselineOperators,
-    requestWithUserAgent(userAgent),
-    'activation-token-device-risk-enabled',
-  )
-  enabledDeviceRiskRecord = result.record
-}
-if (enabledDeviceRiskRecord.status !== 'frozen') {
-  throw new Error('enabled user-agent churn risk should freeze cdk record')
-}
-
-const resetRecord = await licenseUtils.resetDeviceBindingAndUnfreeze(enabledDeviceRiskRecord, 'verified device replacement')
-if (resetRecord.status !== 'used' || resetRecord.activation_token_hash || (resetRecord.user_agent_events?.length ?? 0) !== 0 || (resetRecord.ip_prefix_events?.length ?? 0) !== 0) {
-  throw new Error('reviewed device reset should clear binding signals and unfreeze the record')
-}
-if (resetRecord.risk_events?.at(-1)?.type !== 'admin_device_binding_reset') {
-  throw new Error('reviewed device reset should append an audit event')
-}
-
-let baselineRecoveryRecord = createRecord('operator-baseline-recovery')
-baselineRecoveryRecord.status = 'frozen'
-baselineRecoveryRecord.latest_operator_fingerprint = licenseUtils.buildOperatorFingerprint(regressedOperators)
-await store.create(`cdk/${baselineRecoveryRecord.code_hash}.json`, baselineRecoveryRecord)
-baselineRecoveryRecord = await licenseUtils.acceptLatestOperatorBaselineAndUnfreeze(baselineRecoveryRecord, 'verified operator snapshot')
-if (!baselineRecoveryRecord || baselineRecoveryRecord.status !== 'used' || baselineRecoveryRecord.baseline_operator_fingerprint?.hash !== baselineRecoveryRecord.latest_operator_fingerprint?.hash) {
-  throw new Error('reviewed operator recovery should accept the latest snapshot and unfreeze the record')
-}
-if (baselineRecoveryRecord.risk_events?.at(-1)?.type !== 'admin_operator_baseline_accepted') {
-  throw new Error('reviewed operator recovery should append an audit event')
+if (recovered.risk_events?.at(-1)?.type !== 'admin_operator_baseline_accepted') {
+  throw new Error('reviewed recovery should append an audit event')
 }
 
 console.log('license risk smoke check ok')
@@ -133,21 +68,13 @@ function createRecord(codeHash) {
   }
 }
 
-function requestWithUserAgent(userAgent) {
-  return new Request('http://local/api/license-status', {
-    method: 'POST',
-    headers: { 'User-Agent': userAgent },
-  })
-}
-
 function createMemoryCdkRecordStore() {
   const records = new Map()
   return {
     get: async (key) => records.get(key) ?? null,
-    getByLicenseOrderHash: async (orderHash) => [...records.values()].find((record) => record.license_order_hash === orderHash) ?? null,
-    create: async (key, record) => {
+    create: async (key, value) => {
       if (records.has(key)) throw new Error('CDK record already exists')
-      records.set(key, record)
+      records.set(key, value)
     },
     mutate: async (key, mutate, options) => {
       const current = records.get(key) ?? null
@@ -156,36 +83,10 @@ function createMemoryCdkRecordStore() {
       if (next) records.set(key, next)
       return records.get(key)
     },
-    incrementScheduleGenerateCount: async (key) => {
-      const current = records.get(key)
-      if (!current || current.status !== 'used') return false
-      records.set(key, { ...current, schedule_generate_count: (current.schedule_generate_count ?? 0) + 1 })
-      return true
-    },
-    set: async (key, record) => {
-      records.set(key, record)
-    },
-    delete: async (key) => {
-      records.delete(key)
-    },
-    list: async (prefix) => [...records.entries()]
-      .filter(([key]) => key.startsWith(prefix))
-      .map(([, record]) => record),
-  }
-}
-
-function createMemoryRiskControlSettingsStore() {
-  let settings = null
-  return {
-    get: async () => settings,
-    set: async (next) => {
-      settings = {
-        operator_data_risk_enabled: next.operator_data_risk_enabled !== false,
-        device_risk_enabled: next.device_risk_enabled === true,
-        updated_at: new Date().toISOString(),
-      }
-      return settings
-    },
+    incrementScheduleGenerateCount: async () => true,
+    set: async (key, value) => records.set(key, value),
+    delete: async (key) => records.delete(key),
+    list: async (prefix) => [...records.entries()].filter(([key]) => key.startsWith(prefix)).map(([, value]) => value),
   }
 }
 

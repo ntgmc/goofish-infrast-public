@@ -105,33 +105,14 @@ export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | I
 export type PermissionMode = ProductPermissionMode | InternalPermissionMode;
 export type UserGameAccountKind = 'cdk' | 'free_preview' | 'depot_value';
 
-export interface OperatorUpdateGrant {
-  remaining: number;
-  granted_at: string | null;
-}
-
 export interface LicenseFile {
   version: 1 | 2;
   order_hash: string;
   operators: LicenseOperator[];
   config: LicenseConfig;
   permission?: RawPermissionMode;
-  activation_token?: string | null;
-  operator_update_grant?: OperatorUpdateGrant | null;
   issued_at: string;
   sig: string;
-}
-
-export interface ClientState {
-  operator_elite_overrides: Record<string, number>;
-  config_override?: LicenseConfig;
-  updated_at: string;
-  client_sig: string;
-}
-
-export interface WorkFile {
-  license: LicenseFile;
-  client_state: ClientState;
 }
 
 export interface AppBuildMeta {
@@ -182,7 +163,6 @@ export interface OptimizeRequest {
   config: LicenseConfig;
   ignore_elite: boolean;
   profile_id?: string;
-  activation_token?: string;
   history_source?: 'generated' | 'applied_suggestions';
   include_current?: boolean;
   suggestions_only?: boolean;

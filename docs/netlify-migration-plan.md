@@ -84,7 +84,7 @@ NETLIFY_BLOBS_CONTEXT
 
 兼容底线：
 
-- `MAA_ADMIN_SECRET` 必须与迁移前生产环境一致，否则旧授权文件签名校验会失败。
+- `MAA_ADMIN_SECRET` 必须与迁移前生产环境一致，以保证迁移期间已签发的优化任务轮询令牌仍可校验。
 - `CDK_HASH_SECRET` 必须与迁移前生产环境一致，否则已生成 CDK 的 hash 查找会失败。
 - `DATABASE_URL` 必须指向当前生产 PostgreSQL。
 
@@ -206,8 +206,6 @@ WantedBy=multi-user.target
 - `POST /api/usage-stats`
 - `POST /api/analyze-schedule`
 - `POST /api/free-preview`
-- `POST /api/redeem-cdk`
-- `POST /api/license-status`
 - `POST /api/optimize`
 
 后台 API：
@@ -226,7 +224,7 @@ WantedBy=multi-user.target
 数据：
 
 - 历史 CDK 可查询。
-- 历史授权文件可校验。
+- 历史账号档案及工作区可正常读取。
 - 公告数据存在。
 - 使用统计可写入。
 - 管理员账号可登录。

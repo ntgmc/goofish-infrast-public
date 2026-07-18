@@ -418,7 +418,6 @@ function summarizeCdkForProfile(record: CdkRecord | null) {
     frozen_at: record.frozen_at ?? null,
     freeze_reason: record.freeze_reason ?? null,
     risk_event_count: record.risk_events?.length ?? 0,
-    operator_update_event_count: record.operator_update_events?.length ?? 0,
   }
 }
 

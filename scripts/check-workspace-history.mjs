@@ -1045,9 +1045,7 @@ async function waitForOptimizeJob(handler, jobId) {
 }
 
 function toOptimizationRequest(body) {
-  const identity = body.profile_id
-    ? { type: 'profile', profileId: body.profile_id }
-    : { type: 'license', license: body.license, activationToken: body.activation_token }
+  const identity = { type: 'profile', profileId: body.profile_id }
   if (body.suggestions_only) {
     return {
       kind: 'upgrade_suggestions', identity, operators: body.operators, config: body.config,
@@ -1350,17 +1348,13 @@ function memoryLicenseUtilsModule() {
       if (Array.isArray(obj)) return '[' + obj.map(canonicalJson).join(',') + ']'
       return '{' + Object.keys(obj).sort().map((key) => JSON.stringify(key) + ':' + canonicalJson(obj[key])).join(',') + '}'
     }
-    export function evaluateClientBindingRisk() { return { ok: true } }
     export function evaluateOperatorRisk() { return { ok: true } }
-    export function formatBindingBlockMessage() { return 'blocked' }
     export function formatOperatorRiskBlockMessage() { return 'blocked' }
     export function formatRiskFreezeMessage(message) { return message }
-    export async function freezeCdkRecord(record) { return record }
     export function getPermissionMode(license) { return license?.permission ?? 'advanced' }
     export function getSecretKeyring() { return ['workspace-history-test-secret'] }
     export async function getCdkRecordStore() { return { get: async () => null, mutate: async () => null } }
-    export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, device_risk_enabled: false, updated_at: null } }
-    export async function findCdkRecordByLicenseOrderHash() { return null }
+    export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, updated_at: null } }
     export async function incrementCdkScheduleGenerateCount() {}
     export function normalizePermissionMode(permission) { return permission ?? 'advanced' }
     export async function recordSoftBlockedRiskEvent() { return { message: 'blocked', frozen: false } }
@@ -1378,16 +1372,12 @@ function memoryLicenseUtilsModule() {
       return { ok: true, config: { ...config, optimizer_search: undefined } }
     }
     export function requireEnv() { return 'secret' }
-    export function shouldFreezeBindingRisk() { return false }
     export function validateConfig(config) {
       if (!config || typeof config !== 'object') return { ok: false, message: 'invalid config' }
       if (!Number.isInteger(config.trading_stations_count) || !Number.isInteger(config.manufacturing_stations_count)) return { ok: false, message: 'invalid station counts' }
       return { ok: true, config }
     }
-    export function validateLicenseForRequest(license) { return license ? { ok: true, license } : { ok: false, message: 'invalid license' } }
     export function validateOperators(operators) { return Array.isArray(operators) ? { ok: true, operators } : { ok: false, message: 'invalid operators' } }
-    export function verifyLicenseSignature() { return true }
-    export function verifyLicenseSignatureWithKeyring() { return true }
     function matchesFreePreset(config) {
       return matchesPreset(config, {
         layout: '2-4-3',

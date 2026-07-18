@@ -19,7 +19,6 @@ const detail: AdminCdkDetail = {
   operator_count: 12,
   config_desc: '测试配置',
   risk_events: [],
-  operator_update_events: [],
 }
 
 beforeEach(() => {

@@ -6,11 +6,10 @@ const RISK_SETTINGS_KEY = 'global'
 
 export interface RiskControlSettings {
   operator_data_risk_enabled: boolean;
-  device_risk_enabled: boolean;
   updated_at: string | null;
 }
 
-export type RiskControlSettingsPatch = Partial<Pick<RiskControlSettings, 'operator_data_risk_enabled' | 'device_risk_enabled'>>
+export type RiskControlSettingsPatch = Partial<Pick<RiskControlSettings, 'operator_data_risk_enabled'>>
 
 export interface RiskControlSettingsStore {
   get: () => Promise<RiskControlSettings | null>;
@@ -19,7 +18,6 @@ export interface RiskControlSettingsStore {
 
 export const DEFAULT_RISK_CONTROL_SETTINGS: RiskControlSettings = {
   operator_data_risk_enabled: productPolicies.risk.operator_data_enabled_by_default,
-  device_risk_enabled: productPolicies.risk.device_enabled_by_default,
   updated_at: null,
 }
 
@@ -29,7 +27,6 @@ export function normalizeRiskControlSettings(value: unknown): RiskControlSetting
   const source = value && typeof value === 'object' ? value as Partial<RiskControlSettings> : {}
   return {
     operator_data_risk_enabled: source.operator_data_risk_enabled ?? productPolicies.risk.operator_data_enabled_by_default,
-    device_risk_enabled: source.device_risk_enabled ?? productPolicies.risk.device_enabled_by_default,
     updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
   }
 }
