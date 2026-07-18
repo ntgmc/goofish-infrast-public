@@ -23,8 +23,10 @@ does not create per-PR preview URLs.
 4. The workflow SSHs into the server using the `development` GitHub environment.
 5. The server runs `/opt/goofish-infrast-v1-dev/scripts/deploy-production.sh`
    with dev-specific parameters.
-6. The script fetches `origin/dev`, fast-forwards the server checkout, runs
-   `npm ci`, runs `npm run build`, restarts systemd, and checks
+6. The workflow downloads the SHA-bound release artifact produced by the
+   successful `Quality Checks` run and verifies its SHA-256 before upload.
+7. The script checks out the immutable target SHA, runs `npm ci --omit=dev`,
+   verifies and installs the prebuilt `dist` and `server/dist`, restarts systemd, and checks
    `http://127.0.0.1:3001/api/health`.
 
 Manual deployment is also available from the GitHub Actions UI through
@@ -64,10 +66,13 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-infrast
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-infrast-v1-dev --no-pager --lines=50
 ```
 
-The deploy script keeps the server checkout clean. It still rejects unexpected
-local changes, but it automatically discards local changes to
-`src/lib/build-meta.ts` and `server/handlers/data.ts` because `npm run build`
-can regenerate those tracked files during deployment.
+The deploy script keeps the server checkout clean and rejects all unexpected
+tracked changes. Generated data and build metadata live in ignored `.generated`
+directories, while deployment consumes the already-verified Quality Checks
+artifact, so the server never runs `npm run build` or `git restore`.
+
+If the artifact is missing or has expired, rerun `Quality Checks` for the exact
+dev commit. Deployment deliberately has no server-side build fallback.
 
 ## PostgreSQL
 

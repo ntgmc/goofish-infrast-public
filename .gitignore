@@ -1,6 +1,8 @@
 node_modules/
 dist/
 server/dist/
+server/handlers/.generated/
+src/lib/.generated/
 .cache/
 .idea/
 *.pyc

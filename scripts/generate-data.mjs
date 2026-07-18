@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { validateEfficiencySkillReferences } from './validate-efficiency-skill-refs.mjs'
@@ -8,8 +8,8 @@ import { validateEfficiencySkillReferences } from './validate-efficiency-skill-r
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const sourcePath = resolve(root, 'server/handlers/efficiency-data.json')
 const skillSourcePath = resolve(root, 'tools/prts_logistics_skills.json')
-const targetPath = resolve(root, 'server/handlers/data.ts')
-const buildMetaPath = resolve(root, 'src/lib/build-meta.ts')
+const targetPath = resolve(root, 'server/handlers/.generated/data.ts')
+const buildMetaPath = resolve(root, 'src/lib/.generated/build-meta.ts')
 const packagePath = resolve(root, 'package.json')
 const LINE_ENDING = '\n'
 
@@ -32,11 +32,13 @@ const defaultBuildVersion = normalizeBaseVersion(baseVersion)
 const gitSha = resolveGitSha(existingGitSha, refreshMetadata)
 const buildNumber = refreshMetadata ? resolveBuildNumber() : null
 const generatedBuildVersion = resolveGeneratedBuildVersion(baseVersion, buildNumber)
-const dataVersion = process.env.DATA_VERSION ||
-  (refreshMetadata && buildNumber ? resolveGeneratedDataVersion(sourceHash, buildNumber, gitSha) : existingDataVersion) ||
-  resolveGeneratedDataVersion(sourceHash, null, gitSha)
+const dataVersion = process.env.DATA_VERSION || resolveGeneratedDataVersion(
+  sourceHash,
+  refreshMetadata ? buildNumber : null,
+  refreshMetadata ? gitSha : null,
+)
 const sourceSummary = buildSourceSummary(data, sourceHash)
-const canReuseGeneratedAt = existingDataVersion === dataVersion && existingSourceSummary === sourceSummary
+const canReuseGeneratedAt = !refreshMetadata && existingDataVersion === dataVersion && existingSourceSummary === sourceSummary
 const generatedAt = process.env.GENERATED_AT ||
   (canReuseGeneratedAt ? existingGeneratedAt : null) ||
   new Date().toISOString()
@@ -123,13 +125,11 @@ function readPositiveIntegerEnv(key) {
 }
 
 function resolveGitSha(existingGitSha, refreshMetadata) {
-  if (refreshMetadata) {
-    for (const key of ['VERSION_SOURCE_SHA', 'GIT_SHA', 'COMMIT_REF']) {
-      const sha = normalizeGitSha(process.env[key])
-      if (sha) return sha
-    }
+  for (const key of ['VERSION_SOURCE_SHA', 'GIT_SHA', 'COMMIT_REF']) {
+    const sha = normalizeGitSha(process.env[key])
+    if (sha) return sha
   }
-  if (!refreshMetadata || process.env.CI) return normalizeGitSha(existingGitSha)
+  if (refreshMetadata && process.env.CI) return normalizeGitSha(existingGitSha)
   return readGitSha() || normalizeGitSha(existingGitSha)
 }
 
@@ -165,7 +165,14 @@ async function writeFileIfChanged(filePath, content) {
     // First generation should write the generated file.
   }
 
-  await writeFile(filePath, content, 'utf8')
+  await mkdir(dirname(filePath), { recursive: true })
+  const temporaryPath = `${filePath}.tmp-${process.pid}`
+  try {
+    await writeFile(temporaryPath, content, 'utf8')
+    await rename(temporaryPath, filePath)
+  } finally {
+    await rm(temporaryPath, { force: true })
+  }
 }
 
 async function readExistingBuildMetaField(fieldName) {
