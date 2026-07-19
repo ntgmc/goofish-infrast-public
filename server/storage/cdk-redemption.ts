@@ -4,7 +4,6 @@ import type { UserAccountRecord, UserGameAccountRecord, UserWorkspaceRecord } fr
 import { emptyWorkspace } from './user-store'
 import { claimCdkRecord, completeCdkRedemption } from './cdk-store'
 import { withTransaction } from './postgres'
-import { query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import type { CdkRecord } from '../handlers/license-utils'
 
@@ -18,18 +17,6 @@ export class IdempotencyConflictError extends Error {
 
 export function createRequestHash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
-}
-
-export async function hasCompletedIdempotentRedemption(scope: string, idempotencyKey: string, requestHash: string): Promise<boolean> {
-  await ensureDatabaseSchema()
-  const result = await query<{ request_hash: string; status: string }>(
-    `select request_hash, status from cdk_redemption_idempotency where scope = $1 and idempotency_key = $2`,
-    [scope, idempotencyKey],
-  )
-  const row = result.rows[0]
-  if (!row) return false
-  if (row.request_hash !== requestHash) throw new IdempotencyConflictError('Idempotency-Key is already used for a different request.')
-  return row.status === 'completed'
 }
 
 export async function redeemCdkAtomically<T>(options: {
