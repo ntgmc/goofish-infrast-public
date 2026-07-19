@@ -266,28 +266,20 @@ function memoryLicenseUtilsModule() {
       if (Array.isArray(obj)) return '[' + obj.map(canonicalJson).join(',') + ']'
       return '{' + Object.keys(obj).sort().map((key) => JSON.stringify(key) + ':' + canonicalJson(obj[key])).join(',') + '}'
     }
-    export function evaluateClientBindingRisk() { return { ok: true } }
     export function evaluateOperatorRisk() { return { ok: true } }
-    export function formatBindingBlockMessage() { return 'blocked' }
     export function formatOperatorRiskBlockMessage() { return 'blocked' }
     export function formatRiskFreezeMessage(message) { return message }
-    export async function freezeCdkRecord(record) { return record }
     export function getPermissionMode(license) { return license?.permission ?? 'growth' }
     export async function getCdkRecordStore() { return { get: async () => null, mutate: async () => null } }
-    export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, device_risk_enabled: false, updated_at: null } }
-    export async function findCdkRecordByLicenseOrderHash() { return null }
+    export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, updated_at: null } }
     export async function incrementCdkScheduleGenerateCount() {}
     export function normalizePermissionMode(permission) { return permission ?? 'growth' }
     export async function recordSoftBlockedRiskEvent() { return { message: 'blocked', frozen: false } }
     export function resolveConfigForPermission(_permission, config) { return { ok: true, config } }
     export function resolveFreePreviewConfig(config) { return { ok: true, config } }
     export function requireEnv() { return 'secret' }
-    export function shouldFreezeBindingRisk() { return false }
     export function validateConfig(config) { return { ok: true, config } }
-    export function validateLicenseForRequest() { return { ok: false, status: 400, message: 'license not needed in depot guard' } }
     export function validateOperators(operators) { return { ok: true, operators: Array.isArray(operators) ? operators : [] } }
-    export function verifyLicenseSignature() { return true }
-    export function verifyLicenseSignatureWithKeyring() { return true }
   `
 }
 

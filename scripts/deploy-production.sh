@@ -3,8 +3,12 @@
 set -Eeuo pipefail
 
 APP_DIR="${APP_DIR:-/opt/goofish-infrast-v1}"
-BRANCH="${BRANCH:-main}"
+BRANCH="${BRANCH:-dev}"
 REMOTE="${REMOTE:-origin}"
+TARGET_SHA="${TARGET_SHA:-}"
+ARTIFACT_PATH="${ARTIFACT_PATH:-}"
+ARTIFACT_SHA256="${ARTIFACT_SHA256:-}"
+ARTIFACT_DIR=""
 SERVICE_NAME="${SERVICE_NAME:-goofish-infrast-v1}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
@@ -13,12 +17,10 @@ HEALTH_DELAY_SECONDS="${HEALTH_DELAY_SECONDS:-3}"
 PUBLIC_SMOKE_RETRIES="${PUBLIC_SMOKE_RETRIES:-$HEALTH_RETRIES}"
 PUBLIC_SMOKE_DELAY_SECONDS="${PUBLIC_SMOKE_DELAY_SECONDS:-$HEALTH_DELAY_SECONDS}"
 LOCK_FILE="${LOCK_FILE:-/tmp/goofish-infrast-v1.deploy.lock}"
-INSTALL_COMMAND="${INSTALL_COMMAND:-npm ci}"
-BUILD_COMMAND="${BUILD_COMMAND:-npm run build}"
+INSTALL_COMMAND="${INSTALL_COMMAND:-npm ci --omit=dev}"
 SKIP_INSTALL="${SKIP_INSTALL:-false}"
 FORCE_DEPLOY="${FORCE_DEPLOY:-false}"
 EXPECT_STORAGE_TYPE="${EXPECT_STORAGE_TYPE:-postgres}"
-GENERATED_DEPLOY_DIRTY_FILES="${GENERATED_DEPLOY_DIRTY_FILES:-src/lib/build-meta.ts server/handlers/data.ts}"
 
 log() {
   printf '[deploy] %s\n' "$*"
@@ -59,47 +61,10 @@ check_worktree_clean() {
   git diff --cached --quiet || fail "working tree has staged changes"
 }
 
-is_generated_deploy_dirty_file() {
-  local changed_file allowed_file
-
-  changed_file="$1"
-  for allowed_file in $GENERATED_DEPLOY_DIRTY_FILES; do
-    if [[ "$changed_file" == "$allowed_file" ]]; then
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-restore_generated_deploy_changes() {
-  local changed_files staged_files changed_file has_generated_changes=false
-
-  changed_files="$(git diff --name-only)"
-  staged_files="$(git diff --cached --name-only)"
-  if [[ -z "$changed_files" && -z "$staged_files" ]]; then
-    return 0
-  fi
-
-  while IFS= read -r changed_file; do
-    [[ -z "$changed_file" ]] && continue
-    if ! is_generated_deploy_dirty_file "$changed_file"; then
-      return 0
-    fi
-    has_generated_changes=true
-  done <<<"$changed_files"
-
-  while IFS= read -r changed_file; do
-    [[ -z "$changed_file" ]] && continue
-    if ! is_generated_deploy_dirty_file "$changed_file"; then
-      return 0
-    fi
-    has_generated_changes=true
-  done <<<"$staged_files"
-
-  if [[ "$has_generated_changes" == "true" ]]; then
-    log "discarding generated deploy changes: $GENERATED_DEPLOY_DIRTY_FILES"
-    git restore --staged --worktree -- $GENERATED_DEPLOY_DIRTY_FILES
+cleanup_artifact() {
+  rm -f -- "$ARTIFACT_PATH"
+  if [[ -n "$ARTIFACT_DIR" ]]; then
+    rm -rf -- "$ARTIFACT_DIR"
   fi
 }
 
@@ -146,6 +111,8 @@ require_command curl
 require_command grep
 require_command node
 require_command systemctl
+require_command sha256sum
+require_command tar
 
 if [[ "$(id -u)" != "0" ]]; then
   require_command sudo
@@ -154,6 +121,10 @@ fi
 check_systemctl_access
 
 [[ -n "$PUBLIC_BASE_URL" ]] || fail "PUBLIC_BASE_URL is required for the public HTTPS smoke test"
+[[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "TARGET_SHA must be a full 40-character commit SHA"
+[[ -f "$ARTIFACT_PATH" ]] || fail "verified release artifact is required"
+[[ "$ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] || fail "ARTIFACT_SHA256 must be a SHA-256 digest"
+trap cleanup_artifact EXIT
 
 mkdir -p "$(dirname "$LOCK_FILE")"
 exec 9>"$LOCK_FILE"
@@ -167,30 +138,20 @@ fi
 
 cd "$APP_DIR"
 
-log "deploying $REMOTE/$BRANCH from $APP_DIR"
-restore_generated_deploy_changes
+log "deploying verified artifact for $TARGET_SHA from $APP_DIR"
 check_worktree_clean
 
 git fetch --prune "$REMOTE" "+refs/heads/$BRANCH:refs/remotes/$REMOTE/$BRANCH"
-
-if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
-  git switch "$BRANCH"
-else
-  git switch --track -c "$BRANCH" "$REMOTE/$BRANCH"
-fi
-
-restore_generated_deploy_changes
-check_worktree_clean
-
 before_sha="$(git rev-parse HEAD)"
-target_sha="$(git rev-parse "$REMOTE/$BRANCH")"
+git cat-file -e "${TARGET_SHA}^{commit}" || fail "target commit is unavailable: $TARGET_SHA"
+git merge-base --is-ancestor "$TARGET_SHA" "$REMOTE/$BRANCH" || fail "$TARGET_SHA is not an ancestor of $REMOTE/$BRANCH"
 
-if [[ "$before_sha" == "$target_sha" && "$FORCE_DEPLOY" != "true" ]]; then
-  log "already at $target_sha; set FORCE_DEPLOY=true to rebuild and restart anyway"
+if [[ "$before_sha" == "$TARGET_SHA" && "$FORCE_DEPLOY" != "true" ]]; then
+  log "already at $TARGET_SHA; set FORCE_DEPLOY=true to redeploy the verified artifact"
   exit 0
 fi
 
-git pull --ff-only "$REMOTE" "$BRANCH"
+git switch --detach "$TARGET_SHA"
 after_sha="$(git rev-parse HEAD)"
 
 log "checked out $after_sha"
@@ -202,9 +163,20 @@ else
   bash -lc "$INSTALL_COMMAND"
 fi
 
-log "building production artifacts: $BUILD_COMMAND"
-bash -lc "$BUILD_COMMAND"
-restore_generated_deploy_changes
+actual_artifact_sha="$(sha256sum "$ARTIFACT_PATH" | awk '{print $1}')"
+[[ "$actual_artifact_sha" == "$ARTIFACT_SHA256" ]] || fail "release artifact checksum mismatch"
+
+ARTIFACT_DIR="$APP_DIR/.artifact-$TARGET_SHA-$$"
+rm -rf -- "$ARTIFACT_DIR"
+mkdir -p "$ARTIFACT_DIR"
+tar -xzf "$ARTIFACT_PATH" -C "$ARTIFACT_DIR"
+RELEASE_ROOT="$ARTIFACT_DIR" node scripts/release-artifact.mjs verify --sha "$TARGET_SHA"
+
+rm -rf -- dist server/dist
+mv "$ARTIFACT_DIR/dist" dist
+mv "$ARTIFACT_DIR/server/dist" server/dist
+rm -rf -- "$ARTIFACT_DIR"
+ARTIFACT_DIR=""
 
 [[ -f "$APP_DIR/dist/index.html" ]] || fail "missing frontend artifact: dist/index.html"
 [[ -f "$APP_DIR/server/dist/index.js" ]] || fail "missing backend artifact: server/dist/index.js"

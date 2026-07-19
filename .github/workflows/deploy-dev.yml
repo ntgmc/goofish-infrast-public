@@ -2,21 +2,19 @@ name: Deploy Dev
 
 on:
   workflow_run:
-    workflows:
-      - Quality Checks
-    branches:
-      - dev
-    types:
-      - completed
+    workflows: [Quality Checks]
+    branches: [dev]
+    types: [completed]
   workflow_dispatch:
     inputs:
       force_deploy:
-        description: Rebuild and restart even if the server already has the target commit
+        description: Redeploy the current dev SHA using its verified artifact
         required: true
         default: false
         type: boolean
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -25,17 +23,13 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy dev preview to self-hosted server
+    name: Deploy verified dev artifact
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.actor.login != 'github-actions[bot]'
-      )
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.actor.login != 'github-actions[bot]')
     runs-on: ubuntu-latest
     environment: development
     timeout-minutes: 20
-
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -48,51 +42,94 @@ jobs:
       DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://127.0.0.1:3001/api/health' }}
       DEPLOY_PUBLIC_BASE_URL: ${{ vars.DEPLOY_PUBLIC_BASE_URL || 'https://dev.maatool.com' }}
       DEPLOY_LOCK_FILE: ${{ vars.DEPLOY_LOCK_FILE || '/tmp/goofish-infrast-v1-dev.deploy.lock' }}
-      DEPLOY_BRANCH: dev
       FORCE_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_deploy || 'false' }}
 
     steps:
-      - name: Validate deployment settings
-        shell: bash
+      - name: Resolve verified Quality Checks run
+        id: target
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            if (context.eventName === 'workflow_run') {
+              core.setOutput('sha', context.payload.workflow_run.head_sha)
+              core.setOutput('run_id', String(context.payload.workflow_run.id))
+              return
+            }
+            const ref = await github.rest.git.getRef({ owner: context.repo.owner, repo: context.repo.repo, ref: 'heads/dev' })
+            const sha = ref.data.object.sha
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner: context.repo.owner, repo: context.repo.repo, workflow_id: 'quality-checks.yml',
+              branch: 'dev', head_sha: sha, status: 'completed', per_page: 100,
+            })
+            const accepted = runs.find((run) => run.head_sha === sha && run.conclusion === 'success')
+            if (!accepted) return core.setFailed(`No successful Quality Checks run exists for dev SHA ${sha}.`)
+            core.setOutput('sha', sha)
+            core.setOutput('run_id', String(accepted.id))
+
+      - name: Download verified release decision
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: goofish-release-${{ steps.target.outputs.sha }}
+          path: release-package
+          run-id: ${{ steps.target.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Validate deployment decision and archive
+        id: artifact
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
         run: |
           set -euo pipefail
-
-          missing=()
-          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
-            if [[ -z "${!name}" ]]; then
-              missing+=("$name")
-            fi
-          done
-
-          if (( ${#missing[@]} > 0 )); then
-            printf 'Missing required GitHub Secrets in the development environment: %s\n' "${missing[*]}" >&2
-            exit 1
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const decision = JSON.parse(readFileSync('release-package/deployment-decision.json', 'utf8'))
+          if (decision.target_sha !== process.env.TARGET_SHA) throw new Error('deployment decision SHA mismatch')
+          process.stdout.write(`deployable=${decision.deployable ? 'true' : 'false'}\n`)
+          NODE
+          deployable="$(node -p "JSON.parse(require('fs').readFileSync('release-package/deployment-decision.json')).deployable")"
+          echo "deployable=$deployable" >> "$GITHUB_OUTPUT"
+          if [[ "$deployable" == "true" ]]; then
+            (cd release-package && sha256sum -c release.tgz.sha256)
+            archive_sha="$(cut -d ' ' -f1 release-package/release.tgz.sha256)"
+            echo "archive_sha=$archive_sha" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Prepare SSH
-        shell: bash
+      - name: Skip non-build deployment
+        if: steps.artifact.outputs.deployable != 'true'
+        run: echo 'Quality Checks marked this commit as not requiring deployment.'
+
+      - name: Validate deployment settings
+        if: steps.artifact.outputs.deployable == 'true'
         run: |
           set -euo pipefail
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            [[ -n "${!name}" ]] || { echo "Missing required development setting: $name" >&2; exit 1; }
+          done
 
+      - name: Prepare SSH and upload artifact
+        if: steps.artifact.outputs.deployable == 'true'
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          remote_artifact="/tmp/goofish-release-${TARGET_SHA}-${GITHUB_RUN_ID}.tgz"
+          scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o IdentitiesOnly=yes \
+            release-package/release.tgz "$DEPLOY_USER@$DEPLOY_HOST:$remote_artifact"
+          echo "REMOTE_ARTIFACT=$remote_artifact" >> "$GITHUB_ENV"
 
-      - name: Run dev deploy script
-        shell: bash
+      - name: Deploy verified artifact
+        if: steps.artifact.outputs.deployable == 'true'
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+          ARTIFACT_SHA256: ${{ steps.artifact.outputs.archive_sha }}
         run: |
           set -euo pipefail
-
-          remote_command="APP_DIR=${DEPLOY_APP_DIR@Q} BRANCH=${DEPLOY_BRANCH@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} HEALTH_URL=${DEPLOY_HEALTH_URL@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} LOCK_FILE=${DEPLOY_LOCK_FILE@Q} FORCE_DEPLOY=${FORCE_DEPLOY@Q} bash ${DEPLOY_SCRIPT@Q}"
-
-          ssh \
-            -i ~/.ssh/deploy_key \
-            -p "$DEPLOY_PORT" \
-            -o IdentitiesOnly=yes \
-            "$DEPLOY_USER@$DEPLOY_HOST" \
-            "$remote_command"
+          remote_command="APP_DIR=${DEPLOY_APP_DIR@Q} TARGET_SHA=${TARGET_SHA@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} HEALTH_URL=${DEPLOY_HEALTH_URL@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} LOCK_FILE=${DEPLOY_LOCK_FILE@Q} FORCE_DEPLOY=${FORCE_DEPLOY@Q} ARTIFACT_PATH=${REMOTE_ARTIFACT@Q} ARTIFACT_SHA256=${ARTIFACT_SHA256@Q} bash ${DEPLOY_SCRIPT@Q}"
+          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o IdentitiesOnly=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "$remote_command"

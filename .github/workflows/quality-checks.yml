@@ -82,7 +82,67 @@ jobs:
         run: npm run check:catalog
 
       - name: Build web app
-        run: npm run build
+        env:
+          REFRESH_BUILD_METADATA: "true"
+          VERSION_SOURCE_SHA: ${{ github.sha }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          BUILD_CONTEXT: quality-checks
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          npm run build
+          node scripts/release-artifact.mjs create \
+            --sha "$GITHUB_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-url "$GITHUB_RUN_URL"
+
+      - name: Package deployable release
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p release-package
+          tar -czf release-package/release.tgz dist server/dist build-manifest.json
+          (cd release-package && sha256sum release.tgz > release.tgz.sha256)
+          cp deployment-decision.json release-package/deployment-decision.json
+
+      - name: Upload deployable release
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: goofish-release-${{ github.sha }}
+          path: release-package/
+          if-no-files-found: error
+          retention-days: 30
+
+  deployment-decision:
+    name: Deployment Decision
+    needs: build-relevance
+    if: github.event_name != 'pull_request' && needs.build-relevance.outputs.build_required != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Record skipped deployment
+        env:
+          DECISION_REASON: ${{ needs.build-relevance.outputs.reason }}
+        run: |
+          mkdir -p release-package
+          RELEASE_ROOT="$PWD/release-package" node scripts/release-artifact.mjs decision \
+            --sha "$GITHUB_SHA" \
+            --reason "$DECISION_REASON"
+
+      - name: Upload deployment decision
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: goofish-release-${{ github.sha }}
+          path: release-package/
+          if-no-files-found: error
+          retention-days: 30
 
   test-and-architecture:
     name: Unit Tests and Architecture

@@ -282,12 +282,11 @@ export function CdkRecordDistributionPanel({ summary }: { summary: CdkOpsSummary
 
 export function RiskConsoleSummary({ summary }: { summary: CdkOpsSummary }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="风险 CDK" value={summary.risk_records} tone={summary.risk_records > 0 ? 'warning' : 'default'} />
       <Metric label="软拦截" value={summary.soft_blocks} tone={summary.soft_blocks > 0 ? 'warning' : 'default'} />
       <Metric label="冻结事件" value={summary.freezes} tone={summary.freezes > 0 ? 'warning' : 'default'} />
       <Metric label="升级冻结" value={summary.escalations} tone={summary.escalations > 0 ? 'warning' : 'default'} />
-      <Metric label="设备绑定" value={summary.bound_records} />
     </div>
   )
 }

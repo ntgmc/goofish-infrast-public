@@ -451,32 +451,6 @@ export const domainCopy = {
   lib_config_035: "MAA 换班间隔需要由 1–6 个正数构成，并覆盖完整 24 小时。",
   // src/lib/config.ts
   lib_config_036: "启用无人机时至少需要一个加速目标。",
-  // src/lib/license.ts
-  lib_license_001: "授权文件无法读取，文件可能已损坏。",
-  // src/lib/license.ts
-  lib_license_002: "保存进度文件无法读取，文件可能已损坏。",
-  // src/lib/license.ts
-  lib_license_003: "无法识别这个文件。请上传本站生成的授权文件，或本工具保存的进度文件。",
-  // src/lib/license.ts
-  lib_license_004: "授权文件缺少必要信息。",
-  // src/lib/license.ts
-  lib_license_005: "不支持这个授权文件版本。",
-  // src/lib/license.ts
-  lib_license_006: "授权文件中的干员列表为空。",
-  // src/lib/license.ts
-  lib_license_007: "授权文件包含未知权限类型。",
-  // src/lib/license.ts
-  lib_license_008: "基建配置缺少必要信息。",
-  // src/lib/license.ts
-  lib_license_009: "基建配置中的建筑数量不正确。",
-  // src/lib/license.ts
-  lib_license_010: "保存进度文件缺少必要信息。",
-  // src/lib/license.ts
-  lib_license_011: "保存进度文件缺少上次保存的调整信息。",
-  // src/lib/license.ts
-  lib_license_012: "当前授权不允许修改基建配置。",
-  // src/lib/license.ts
-  lib_license_013: "保存进度文件包含未知干员: ",
   // src/lib/production-sanity.ts
   lib_production_sanity_001: "制造 ",
   // src/lib/production-sanity.ts

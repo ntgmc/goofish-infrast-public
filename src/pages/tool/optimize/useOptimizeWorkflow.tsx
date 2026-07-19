@@ -42,7 +42,6 @@ export interface Props {
   onReset: () => void;
   announcement: Announcement | null;
   redeemedNotice: string | null;
-  onRedownloadLicense: (() => void) | null;
   onProfileUpgraded: (payload: AuthSuccessResponse) => void;
 }
 

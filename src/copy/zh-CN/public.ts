@@ -134,7 +134,7 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_036: "聚焦核心流程，不设多余步骤。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_037: "工具不设每日任务或挽留弹窗。生成结果后，你可以直接下载、保存工作文件或结束会话。",
+  pages_LandingPage_037: "工具不设每日任务或挽留弹窗。生成结果后，你可以直接下载排班方案或结束会话。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_038: "排班结果页，展示 JSON 下载、等效理智、效率指标和练度成本。",
   // src/pages/LandingPage.tsx
@@ -150,7 +150,7 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_044: "用当前账号数据，生成下一份可执行的排班。",
   // src/pages/LandingPage.tsx
-  pages_LandingPage_045: "可随时返回账号列表、保存工作文件或退出登录。每一步操作和数据去向都保持透明。",
+  pages_LandingPage_045: "工作区会自动保存；你可以随时返回账号列表、下载结果或退出登录。每一步操作和数据去向都保持透明。",
   // src/pages/LandingPage.tsx
   pages_LandingPage_046: "打开工作台",
   // src/pages/LandingPage.tsx

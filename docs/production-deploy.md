@@ -187,23 +187,33 @@ ready and Nginx has switched successfully.
 `flock` lock:
 
 1. Verify the full target SHA exists and is an ancestor of `origin/main`.
-2. Create a detached temporary worktree, run `npm ci` and `npm run build`, and
-   validate both artifacts and generated build metadata.
-3. Write `release.json`, validate it, and atomically move the worktree to
+2. Download the SHA-bound artifact from the successful `Quality Checks` run,
+   verify its archive SHA-256, and upload it to a temporary server path.
+3. Create a detached temporary worktree, run `npm ci --omit=dev`, extract the
+   prebuilt frontend/backend artifacts, and verify every file against
+   `build-manifest.json` before a candidate service can start.
+4. Write `release.json`, preserving both CI build provenance and deployment run
+   provenance, then atomically move the worktree to
    `releases/<sha>`.
-4. Point the inactive slot at the release, restart only that slot, and poll
+5. Point the inactive slot at the release, restart only that slot, and poll
    `/api/health/ready` for `ok=true` and `storage.type=postgres`.
-5. Validate Nginx, atomically update `current`, `previous`, the active upstream
+6. Validate Nginx, atomically update `current`, `previous`, the active upstream
    and active-slot state, validate again, then reload Nginx.
-6. Run the public HTTPS smoke test. Only after it passes is the candidate slot
+7. Run the public HTTPS smoke test. Only after it passes is the candidate slot
    enabled for boot and the old slot disabled/stopped through its 75-second
    graceful-drain policy.
-7. Keep every referenced release plus the five most recent releases; remove
+8. Keep every referenced release plus the five most recent releases; remove
    only unreferenced older worktrees after a successful deployment.
 
 The candidate and active backend overlap briefly. PostgreSQL-backed job locking
 must remain safe with two processes. Any future singleton background task must
 gain a database-level lock before it is enabled in production.
+
+GitHub Actions artifacts are the only trusted build source. The production host
+never regenerates `data.ts` or `build-meta.ts` and never runs `npm run build`.
+If an artifact is missing or has expired, rerun `Quality Checks` for that exact
+SHA; there is intentionally no server-side build fallback. An existing immutable
+release may be reused only after its manifest and file hashes validate.
 
 Normal deployments never run `systemctl daemon-reload` and never restart Nginx.
 Unit installation uses `daemon-reload` once; traffic changes use

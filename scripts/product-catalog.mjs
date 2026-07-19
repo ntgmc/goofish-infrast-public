@@ -43,8 +43,8 @@ function validateCatalog(value) {
   const lifetime = value.skus.single_account_lifetime
   if (lifetime?.price?.amount !== 49 || lifetime.runtime_permission !== 'advanced') throw new Error('终身版必须为 49 元并映射 advanced。')
   if (value.runtime_permissions.ultimate.public || value.runtime_permissions.admin.public) throw new Error('ultimate/admin 不得公开。')
-  for (const number of [value.policies.lifetime_operator_updates.window_days, value.policies.lifetime_operator_updates.max_updates, value.policies.support.first_response_business_days]) {
-    if (!Number.isInteger(number) || number <= 0) throw new Error('更新窗口、次数和 SLA 必须为正整数。')
+  if (!Number.isInteger(value.policies.support.first_response_business_days) || value.policies.support.first_response_business_days <= 0) {
+    throw new Error('客服 SLA 必须为正整数。')
   }
 }
 
@@ -52,7 +52,6 @@ function renderPrice(value) {
   const free = value.skus.free_preview
   const lifetime = value.skus.single_account_lifetime
   const freePolicy = value.policies.free_preview
-  const update = value.policies.lifetime_operator_updates
   const support = value.policies.support
   return `<!-- 此文件由 product/catalog.json 生成，请勿手工编辑。运行 npm run generate:catalog 更新。 -->
 # 价格与权益说明
@@ -71,7 +70,7 @@ function renderPrice(value) {
 - 权益锁定后仍可刷新同 UID 的森空岛干员数据、查看历史方案，并且每月可检测是否值得重排 ${freePolicy.monthly_reorder_checks} 次。
 - 检测结果为“强烈建议重排”时，当月额外允许 ${freePolicy.strong_reorder_bonus} 次完整免费生成；该生成不再开启新的确认期。
 
-## 单账号终身版账号与更新规则
+## 单账号终身版账号规则
 
 ${value.policies.public_disclosures.map((line) => `- ${line}`).join('\n')}
 - 人工核验材料齐全后，客服将在 ${support.first_response_business_days} 个工作日内首次响应；工作日按${support.business_day_definition}计算，最终核验与解冻时间视复杂度而定。

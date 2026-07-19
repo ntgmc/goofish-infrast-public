@@ -104,7 +104,7 @@ function input() {
     priority: 10,
     owner_key: `license:${randomUUID()}`,
     permission: 'growth',
-    source: 'license_file',
+    source: 'account_profile',
     payload_json: { test: true },
   }
 }

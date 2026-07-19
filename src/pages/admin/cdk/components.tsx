@@ -49,7 +49,6 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
             {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
           </select>
         </label>
-        <BinaryFilterSelect label="设备绑定" value={filters.bound} onChange={(value) => onFilterChange({ bound: value })} />
         <BinaryFilterSelect label="风险事件" value={filters.risk} onChange={(value) => onFilterChange({ risk: value })} />
         <BinaryFilterSelect label="生成过排班" value={filters.generated} onChange={(value) => onFilterChange({ generated: value })} />
       </div>
@@ -78,7 +77,7 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
                     <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{permissionLabels[record.permission]}</div></td>
                     <td className="px-4 py-4 align-top text-ink-secondary">
                       <div>{record.operator_count ?? '-'} 干员 / 生成 {record.schedule_generate_count ?? 0}</div>
-                      <div className="mt-1 text-xs text-ink-muted">终身更新 {record.operator_update_event_count ?? 0} / 风险 {record.risk_event_count ?? 0}</div>
+                      <div className="mt-1 text-xs text-ink-muted">风险 {record.risk_event_count ?? 0}</div>
                     </td>
                     <td className="px-4 py-4 align-top text-xs text-ink-secondary"><div>创建 {formatDate(record.created_at)}</div><div className="mt-1">使用 {formatDate(record.used_at)}</div></td>
                     <td className="px-4 py-4 align-top text-ink-secondary"><div className="truncate" title={record.order_note || undefined}>{record.order_note || '-'}</div></td>
@@ -140,8 +139,7 @@ export function CdkDetailPanel({
   onSetPermission,
 }: CdkDetailPanelProps) {
   const nextPermission = getNextProductPermission(detail.permission)
-  const canGrantOperatorUpdate = detail.status === 'used' && Boolean(detail.license_order_hash)
-  const runReviewedAction = (action: 'reset_device_binding_and_unfreeze' | 'accept_operator_baseline_and_unfreeze', prompt: string) => {
+  const runReviewedAction = (action: 'accept_operator_baseline_and_unfreeze', prompt: string) => {
     const reason = window.prompt(prompt)
     if (!reason?.trim()) return
     void onPatch(detail, action, undefined, { reason: reason.trim() })
@@ -161,9 +159,7 @@ export function CdkDetailPanel({
           <SmallButton onClick={() => void onUpdateNote(detail)} loading={busyAction === `update_note:${detail.code_hash}`}>改备注</SmallButton>
           {detail.status !== 'revoked' && <SmallButton onClick={() => void onSetPermission(detail)} loading={busyAction === `set_permission:${detail.code_hash}`}>改授权</SmallButton>}
           {nextPermission && detail.status !== 'frozen' && detail.status !== 'revoked' && <SmallButton onClick={() => void onPatch(detail, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${detail.code_hash}`}>升级</SmallButton>}
-          {canGrantOperatorUpdate && <SmallButton onClick={() => void onPatch(detail, 'grant_operator_update')} loading={busyAction === `grant_operator_update:${detail.code_hash}`}>发放更新</SmallButton>}
           {detail.status === 'frozen' && <SmallButton onClick={() => void onPatch(detail, 'unfreeze')} loading={busyAction === `unfreeze:${detail.code_hash}`} tone="success">解冻</SmallButton>}
-          {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => runReviewedAction('reset_device_binding_and_unfreeze', '请输入换设备核验备注。该操作会清除设备绑定并解冻授权。')} loading={busyAction === `reset_device_binding_and_unfreeze:${detail.code_hash}`} tone="success">重置设备并解冻</SmallButton>}
           {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => runReviewedAction('accept_operator_baseline_and_unfreeze', '请输入干员数据误拦截核验备注。该操作会接受最新快照为新基线并解冻。')} loading={busyAction === `accept_operator_baseline_and_unfreeze:${detail.code_hash}`} tone="success">接受干员基线</SmallButton>}
           {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => void onPatch(detail, 'revoke')} loading={busyAction === `revoke:${detail.code_hash}`} tone="danger">撤销</SmallButton>}
           <SmallButton onClick={onClose} autoFocus>关闭</SmallButton>
@@ -188,17 +184,7 @@ export function CdkDetailPanel({
         </section>
 
         <section className="tool-inset p-4">
-          <h3 className="text-sm font-semibold text-ink-primary">设备和更新</h3>
-          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <DetailItem label="设备绑定" value={(detail.device_signals?.activation_bound ?? detail.activation_bound) ? '已绑定' : '未绑定'} />
-            <DetailItem label="UA 摘要数" value={String(detail.device_signals?.user_agent_count ?? detail.user_agent_count ?? 0)} />
-            <DetailItem label="IP 段摘要数" value={String(detail.device_signals?.ip_prefix_count ?? detail.ip_prefix_count ?? 0)} />
-            <DetailItem label="更新权限剩余" value={String(detail.operator_update_grant_remaining ?? 0)} />
-            <DetailItem label="更新权限发放" value={String(detail.operator_update_grant_count ?? 0)} />
-            <DetailItem label="更新权限使用" value={String(detail.operator_update_used_count ?? 0)} />
-            <DetailItem label="发放时间" value={formatDate(detail.operator_update_granted_at ?? null)} />
-            <DetailItem label="使用时间" value={formatDate(detail.operator_update_consumed_at ?? null)} />
-          </dl>
+          <h3 className="text-sm font-semibold text-ink-primary">账号关联</h3>
           {detail.linked_account && (
             <p className="tool-inset mt-4 break-all px-3 py-2 text-xs text-ink-secondary">
               关联用户：{detail.linked_account.account_id} / 档案 {detail.linked_account.profile_id}
@@ -227,22 +213,6 @@ export function CdkDetailPanel({
           </div>
         </section>
 
-        <section className="tool-inset p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-ink-primary">干员更新事件</h3>
-            <span className="text-xs text-ink-muted">{detail.operator_update_events?.length ?? 0} 条</span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {(detail.operator_update_events ?? []).length === 0 ? (
-              <p className="text-sm text-ink-muted">暂无干员更新事件。</p>
-            ) : (detail.operator_update_events ?? []).slice().reverse().slice(0, 8).map((event, index) => (
-              <article key={`${event.at}-${index}`} className="tool-inset px-3 py-2 text-sm">
-                <div className="font-medium text-ink-primary">{event.operator_count} 名干员</div>
-                <div className="mt-1 text-xs text-ink-muted">{formatDate(event.at)}</div>
-              </article>
-            ))}
-          </div>
-        </section>
       </div>
     </section>
   )
@@ -262,24 +232,17 @@ export function RiskSettingsPanel({
       <div className="tool-panel-header flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <h2 className="text-base font-semibold text-ink-primary">风控开关</h2>
-          <p className="mt-1 text-sm text-ink-muted">设备风控默认关闭，避免浏览器或网络变化造成误触发。</p>
+          <p className="mt-1 text-sm text-ink-muted">控制账号档案的干员数据异常检测。</p>
         </div>
         <span className="text-xs text-ink-muted" role="status" aria-live="polite">{saving ? '保存中...' : `更新 ${formatDate(settings.updated_at)}`}</span>
       </div>
-      <div className="grid gap-3 p-4 md:grid-cols-2">
+      <div className="grid gap-3 p-4">
         <RiskToggle
           label="干员数据风控"
           description="校验干员消失、练度回退和拥有数异常下降。"
           checked={settings.operator_data_risk_enabled}
           disabled={saving}
           onChange={(checked) => onChange({ operator_data_risk_enabled: checked })}
-        />
-        <RiskToggle
-          label="设备风控"
-          description="校验设备 Token、浏览器环境和网络位置。"
-          checked={settings.device_risk_enabled}
-          disabled={saving}
-          onChange={(checked) => onChange({ device_risk_enabled: checked })}
         />
       </div>
     </section>
@@ -332,7 +295,7 @@ export function RiskTable({ records, busyAction, onPatch, onOpenDetail }: { reco
             <div><div className="font-mono text-sm text-ink-primary">{record.cdk_id}</div><StatusPill status={record.status} /></div>
             <div className="text-sm text-ink-secondary">
               <div>{record.freeze_reason || record.latest_risk_event?.reason || '记录了风控事件'}</div>
-              <div className="mt-1 text-xs text-ink-muted">风险 {record.risk_event_count ?? 0} / UA {record.user_agent_count ?? 0} / IP {record.ip_prefix_count ?? 0} / 冻结 {formatDate(record.frozen_at ?? null)}</div>
+              <div className="mt-1 text-xs text-ink-muted">风险 {record.risk_event_count ?? 0} / 冻结 {formatDate(record.frozen_at ?? null)}</div>
             </div>
             <div className="flex flex-wrap gap-2">
               <SmallButton onClick={() => void onOpenDetail(record)} loading={busyAction === `cdk-detail:${record.code_hash}`}>详情</SmallButton>

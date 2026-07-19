@@ -3,9 +3,11 @@ import { readFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 
 const workflow = await readFile('.github/workflows/deploy-production.yml', 'utf8')
+const devWorkflow = await readFile('.github/workflows/deploy-dev.yml', 'utf8')
 const qualityChecksWorkflow = await readFile('.github/workflows/quality-checks.yml', 'utf8')
 const securityAnalysisWorkflow = await readFile('.github/workflows/security-analysis.yml', 'utf8')
 const deployScript = await readFile('scripts/deploy-production-atomic.sh', 'utf8')
+const devDeployScript = await readFile('scripts/deploy-production.sh', 'utf8')
 const apiNginx = await readFile('deploy/nginx/goofish-api-production.conf', 'utf8')
 const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', 'utf8')
 const greenUpstream = await readFile('deploy/nginx/goofish-upstream-green.conf', 'utf8')
@@ -32,9 +34,13 @@ function assertWorkflowProvenance() {
   assert.match(workflow, /run\.conclusion === 'success'/, 'manual deploy should require successful Quality Checks')
   assert.match(workflow, /git merge-base --is-ancestor "\$TARGET_SHA" origin\/main/, 'workflow should verify main ancestry')
   assert.match(workflow, /TARGET_SHA=\$\{TARGET_SHA@Q\}/, 'SSH command should pass a shell-quoted target SHA')
+  assert.match(workflow, /actions\/download-artifact@/, 'production deploy should download the Quality Checks artifact')
+  assert.match(workflow, /ARTIFACT_SHA256=\$\{ARTIFACT_SHA256@Q\}/, 'SSH command should pass the verified artifact checksum')
   assert.match(workflow, /for name in[^\n]*DEPLOY_KNOWN_HOSTS/, 'production deploy should require pinned SSH host keys')
   assert.doesNotMatch(workflow, /ssh-keyscan/, 'production deploy must not trust host keys discovered at runtime')
   assert.doesNotMatch(workflow, /DEPLOY_BRANCH/, 'production workflow must not pass a mutable branch')
+  assert.match(devWorkflow, /actions\/download-artifact@/, 'dev deploy should download the Quality Checks artifact')
+  assert.match(devWorkflow, /run-id: \$\{\{ steps\.target\.outputs\.run_id \}\}/, 'dev deploy should bind the artifact to a Quality Checks run')
   for (const deploymentPath of [
     "'.github/workflows/deploy-production.yml'",
     "'docs/production-deploy.md'",
@@ -52,6 +58,8 @@ function assertQualityChecksImmutability() {
   assert.doesNotMatch(qualityChecksWorkflow, /refresh-build-metadata/, 'Quality Checks must not refresh committed build metadata')
   assert.doesNotMatch(qualityChecksWorkflow, /--refresh-metadata/, 'Quality Checks must not generate metadata for a repository commit')
   assert.doesNotMatch(qualityChecksWorkflow, /\bgit push\b/, 'Quality Checks must not advance a checked branch')
+  assert.match(qualityChecksWorkflow, /actions\/upload-artifact@/, 'Quality Checks should publish an immutable release artifact')
+  assert.match(qualityChecksWorkflow, /release-artifact\.mjs create/, 'Quality Checks should create a release manifest')
 }
 
 function assertSecurityAnalysisGate() {
@@ -89,6 +97,10 @@ function assertDeploymentScript() {
   if (syntax.error?.code !== 'ENOENT') {
     assert.equal(syntax.status, 0, syntax.stderr || 'production deploy script should pass bash -n')
   }
+  const devSyntax = spawnSync('bash', ['-n', 'scripts/deploy-production.sh'], { encoding: 'utf8' })
+  if (devSyntax.error?.code !== 'ENOENT') {
+    assert.equal(devSyntax.status, 0, devSyntax.stderr || 'dev deploy script should pass bash -n')
+  }
 
   const invalidSha = spawnSync('bash', ['scripts/deploy-production-atomic.sh'], {
     encoding: 'utf8',
@@ -103,8 +115,9 @@ function assertDeploymentScript() {
     /git -C "\$REPO_DIR" cat-file -e "\$\{TARGET_SHA\}\^\{commit\}"/,
     /git -C "\$REPO_DIR" merge-base --is-ancestor "\$TARGET_SHA"/,
     /worktree add --detach "\$BUILD_DIR" "\$TARGET_SHA"/,
-    /REFRESH_BUILD_METADATA=true/,
-    /VERSION_SOURCE_SHA="\$TARGET_SHA"/,
+    /sha256sum "\$ARTIFACT_PATH"/,
+    /release-artifact\.mjs verify --sha "\$TARGET_SHA"/,
+    /tar -xzf "\$ARTIFACT_PATH"/,
     /release\.json/,
     /check_readiness "\$CANDIDATE_SLOT"/,
     /CANDIDATE_ONLY/,
@@ -115,6 +128,15 @@ function assertDeploymentScript() {
   ]) {
     assert.match(deployScript, contract)
   }
+  assert.doesNotMatch(deployScript, /npm run build/, 'production deploy must not build on the server')
+  assert.doesNotMatch(deployScript, /git restore/, 'production deploy must not restore generated source files')
+  assert.doesNotMatch(devDeployScript, /npm run build/, 'dev deploy must not build on the server')
+  assert.doesNotMatch(devDeployScript, /git restore/, 'dev deploy must not restore generated source files')
+  assertOrdered(devDeployScript, [
+    'sha256sum "$ARTIFACT_PATH"',
+    'release-artifact.mjs verify --sha "$TARGET_SHA"',
+    'run_systemctl restart "$SERVICE_NAME"',
+  ])
 
   const mainFlow = deployScript.slice(deployScript.indexOf('RELEASE_DIR="$RELEASES_DIR/$TARGET_SHA"'))
   assertOrdered(mainFlow, [
