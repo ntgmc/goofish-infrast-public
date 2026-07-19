@@ -15,6 +15,7 @@ import {
   saveInvitationSettings,
   settleInvitationForActivatedUser,
 } from './invitation-store'
+import { getFreeScheduleEntitlement } from './reorder-admission'
 
 let container: PostgreSqlContainer
 const legacyJobId = randomUUID()
@@ -344,6 +345,77 @@ describe('PostgreSQL optimization job admission', () => {
       'select free_revision_count from profile_entitlements where profile_id = $1',
       [profileId],
     )).rows[0]?.free_revision_count).toBe(0)
+  })
+
+  it('reads the authoritative free entitlement instead of a stale workspace snapshot', async () => {
+    const profileId = await seedProfile()
+    const lockedAt = new Date().toISOString()
+    await query(
+      `insert into profile_entitlements
+        (profile_id, first_generated_at, free_revision_count, locked_at, lock_reason, updated_at)
+       values ($1, $2, 3, $2, 'revision_limit', $2)`,
+      [profileId, lockedAt],
+    )
+
+    await expect(getFreeScheduleEntitlement(profileId, null)).resolves.toMatchObject({
+      first_generated_at: lockedAt,
+      revision_count: 3,
+      locked_at: lockedAt,
+      lock_reason: 'revision_limit',
+    })
+  })
+
+  it('releases a reserved free entitlement when a started job fails', async () => {
+    const profileId = await seedProfile()
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      owner_key: `profile:${profileId}`,
+      source: 'free_preview',
+      free_profile_id: profileId,
+      payload_json: { freeScheduleDecision: { ok: true, mode: 'revision' } },
+    }))
+    const workerId = 'failed-free-worker'
+    const lockToken = randomUUID()
+    await query(
+      `update optimize_jobs
+       set status = 'running', attempt_count = 1, worker_id = $2, lock_token = $3,
+           started_at = now(), updated_at = now()
+       where id = $1`,
+      [admitted.job.id, workerId, lockToken],
+    )
+
+    await expect(store.failAttempt(admitted.job.id, 1, workerId, lockToken, 'optimizer failed')).resolves.toBe(true)
+    expect((await query<{ free_revision_count: number }>(
+      'select free_revision_count from profile_entitlements where profile_id = $1',
+      [profileId],
+    )).rows[0]?.free_revision_count).toBe(0)
+    expect((await query<{ status: string }>(
+      "select status from entitlement_ledger where reference_type = 'optimization_job' and reference_id = $1",
+      [admitted.job.id],
+    )).rows[0]?.status).toBe('released')
+  })
+
+  it('reconciles a free entitlement reserved by a legacy failed job', async () => {
+    const profileId = await seedProfile()
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      owner_key: `profile:${profileId}`,
+      source: 'free_preview',
+      free_profile_id: profileId,
+      payload_json: { freeScheduleDecision: { ok: true, mode: 'revision' } },
+    }))
+    await query("update optimize_jobs set status = 'failed', finished_at = now(), updated_at = now() where id = $1", [admitted.job.id])
+
+    await expect(getFreeScheduleEntitlement(profileId, null)).resolves.toMatchObject({
+      first_generated_at: null,
+      revision_count: 0,
+      locked_at: null,
+      lock_reason: null,
+    })
+    expect((await query<{ status: string }>(
+      "select status from entitlement_ledger where reference_type = 'optimization_job' and reference_id = $1",
+      [admitted.job.id],
+    )).rows[0]?.status).toBe('released')
   })
 
   it('refunds a priority coupon when its queued job expires before starting', async () => {

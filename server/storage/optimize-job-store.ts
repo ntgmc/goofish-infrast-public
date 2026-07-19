@@ -454,7 +454,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       await ensureSchema()
       const now = new Date().toISOString()
       return withTransaction(async (client) => {
-        const failed = await client.query(
+        const failed = await client.query<{ payload_json: unknown }>(
           `update optimize_jobs
            set status = 'failed', failure_count = failure_count + 1, error_message = $5,
                failure_kind = 'application_error', public_error_code = 'application_error',
@@ -462,7 +462,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
                next_attempt_at = null,
                finished_at = $6, updated_at = $6
            where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running' and cancel_requested_at is null
-           returning id`,
+           returning payload_json`,
           [id, attemptNo, workerId, lockToken, errorMessage, now],
         )
         if (!failed.rowCount) return false
@@ -473,6 +473,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           [id, attemptNo, workerId, lockToken, errorMessage, now],
         )
         await refundPriorityCouponInTransaction(client, id, now)
+        await releaseQueuedEntitlementInTransaction(client, id, failed.rows[0]?.payload_json, now)
         return true
       })
     },
