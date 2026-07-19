@@ -4,6 +4,12 @@ interface SendPasswordResetEmailInput {
   expiresMinutes: number
 }
 
+interface SendEmailVerificationEmailInput {
+  email: string
+  verificationUrl: string
+  expiresHours: number
+}
+
 interface SendLifecycleEmailInput {
   email: string
   templateId: number
@@ -15,6 +21,14 @@ export async function sendPasswordResetEmail(input: SendPasswordResetEmailInput)
     email: input.email,
     templateId: requiredTemplateId('BREVO_RESET_TEMPLATE_ID'),
     params: { reset_url: input.resetUrl, expires_minutes: input.expiresMinutes },
+  })
+}
+
+export async function sendEmailVerificationEmail(input: SendEmailVerificationEmailInput): Promise<void> {
+  await sendLifecycleEmail({
+    email: input.email,
+    templateId: requiredTemplateId('BREVO_VERIFY_EMAIL_TEMPLATE_ID'),
+    params: { verification_url: input.verificationUrl, expires_hours: input.expiresHours },
   })
 }
 

@@ -8,6 +8,7 @@ import RouteMetadata from './components/RouteMetadata'
 import SessionLoader from './components/SessionLoader'
 import LandingPage from './pages/LandingPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
 import CancelAccountDeletionPage from './pages/CancelAccountDeletionPage'
 import { copy } from './copy/index'
 import { ThemeProvider } from './lib/theme'
@@ -46,6 +47,7 @@ function AppContent() {
           <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
           <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/cancel-account-deletion" element={<CancelAccountDeletionPage />} />
           <Route path="/announcements" element={<LazyPage fallback={copy.common.App_002}><AnnouncementsPage /></LazyPage>} />
           <Route path="/faq" element={<LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage>} />

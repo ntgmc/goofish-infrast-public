@@ -53,6 +53,30 @@ export const authCopy = {
   components_AuthForm_026: "密码至少需要 8 位",
   // src/components/AuthForm.tsx
   components_AuthForm_027: "请输入有效的 10 位邀请码",
+  // src/components/AuthForm.tsx
+  components_AuthForm_028: "验证邮件已发送，请检查收件箱并点击链接完成注册。",
+  // src/components/AuthForm.tsx
+  components_AuthForm_029: "重新发送验证邮件失败，请稍后重试",
+  // src/components/AuthForm.tsx
+  components_AuthForm_030: "如果该账号仍需验证，验证邮件已发送，请检查收件箱。",
+  // src/components/AuthForm.tsx
+  components_AuthForm_031: "重新发送验证邮件",
+  // src/pages/VerifyEmailPage.tsx
+  pages_VerifyEmailPage_001: "验证链接无效或已过期。",
+  // src/pages/VerifyEmailPage.tsx
+  pages_VerifyEmailPage_002: "正在验证邮箱...",
+  // src/pages/VerifyEmailPage.tsx
+  pages_VerifyEmailPage_003: "邮箱验证成功，正在进入工作台。",
+  // src/pages/VerifyEmailPage.tsx
+  pages_VerifyEmailPage_004: "账号安全",
+  // src/pages/VerifyEmailPage.tsx
+  pages_VerifyEmailPage_005: "验证邮箱",
+  // src/pages/VerifyEmailPage.tsx
+  pages_VerifyEmailPage_006: "完成验证后将自动登录，并进入你的账号工作台。",
+  // src/pages/VerifyEmailPage.tsx
+  pages_VerifyEmailPage_007: "重试验证",
+  // src/pages/VerifyEmailPage.tsx
+  pages_VerifyEmailPage_008: "返回登录并重新发送邮件",
   // src/pages/CancelAccountDeletionPage.tsx
   pages_CancelAccountDeletionPage_001: "撤销链接无效或已过期。",
   // src/pages/CancelAccountDeletionPage.tsx
