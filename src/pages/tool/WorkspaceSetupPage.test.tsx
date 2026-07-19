@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import AccountDashboard from './AccountDashboard'
 import WorkspaceSetupPage from './WorkspaceSetupPage'
+import { tourStorageKey } from '../../components/GuidedTour'
 
 const { apiJsonMock } = vi.hoisted(() => ({
   apiJsonMock: vi.fn(),
@@ -28,6 +29,27 @@ afterEach(() => {
 })
 
 describe('WorkspaceSetupPage CDK paths', () => {
+  it('moves the setup guide to configuration without saving workspace data', async () => {
+    window.localStorage.removeItem(tourStorageKey('workspace-setup', 1))
+    const user = userEvent.setup()
+    renderWorkspace()
+
+    expect(await screen.findByRole('heading', { name: '完成排班准备' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    expect(await screen.findByRole('heading', { name: '先选择基建配置' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: '基建配置', hidden: true }).some((button) => button.getAttribute('aria-current') === 'page')).toBe(true)
+    })
+
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    await user.click(screen.getByRole('button', { name: '完成' }))
+
+    expect(apiJsonMock).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem(tourStorageKey('workspace-setup', 1))).toBe('done')
+    expect(screen.getAllByRole('button', { name: '基建配置' }).some((button) => button.getAttribute('aria-current') === 'page')).toBe(true)
+  })
+
   it('keeps manual operator import disabled for free profiles during the advanced trial', () => {
     const { container } = renderWorkspace()
 

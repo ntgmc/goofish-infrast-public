@@ -15,6 +15,7 @@ export default function OptimizeShell({
   headerActions,
   showScenarioLab,
   onSectionChange,
+  onOpenTour,
   onReset,
   children,
 }: {
@@ -24,6 +25,7 @@ export default function OptimizeShell({
   headerActions?: ReactNode
   showScenarioLab: boolean
   onSectionChange: (section: OptimizeSection) => void
+  onOpenTour: () => void
   onReset: () => void
   children: ReactNode
 }) {
@@ -50,6 +52,7 @@ export default function OptimizeShell({
                 key={item.id}
                 type="button"
                 onClick={() => onSectionChange(item.id)}
+                data-tour-target={`optimize-nav-${item.id}`}
                 aria-current={section === item.id ? 'page' : undefined}
                 className="tool-nav-link flex w-full items-center justify-between gap-3 px-3 text-left text-sm font-medium"
               >
@@ -81,6 +84,9 @@ export default function OptimizeShell({
               </div>
             </div>
             <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
+              <button type="button" onClick={onOpenTour} className="tool-secondary-action">
+                {copy.optimize.pages_tool_optimize_tour_001}
+              </button>
               {headerActions}
               <ThemeSwitcher />
               <DeferredFeatureMenu />
@@ -95,6 +101,7 @@ export default function OptimizeShell({
                   key={item.id}
                   type="button"
                   onClick={() => onSectionChange(item.id)}
+                  data-tour-target={`optimize-nav-${item.id}`}
                   aria-current={section === item.id ? 'page' : undefined}
                   className="tool-nav-link inline-flex shrink-0 items-center gap-2 px-3 text-sm font-medium"
                 >
