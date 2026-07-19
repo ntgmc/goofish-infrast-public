@@ -703,6 +703,64 @@ export async function saveProfileWorkspace(workspace: UserWorkspaceRecord): Prom
   })
 }
 
+export interface AdminUserAccountPage {
+  users: UserAccountRecord[]
+  profiles: UserGameAccountRecord[]
+  total: number
+  page: number
+  totalPages: number
+}
+
+export async function listAdminUserAccountsPage(options: {
+  page: number
+  pageSize: number
+  search: string
+}): Promise<AdminUserAccountPage> {
+  await ensureSchema()
+  const values: unknown[] = []
+  let where = ''
+  if (options.search) {
+    values.push(`%${options.search.toLowerCase()}%`)
+    where = `where lower(user_accounts.email) like $1
+      or lower(user_accounts.id) like $1
+      or exists (
+        select 1 from user_game_accounts profile
+        where profile.user_id = user_accounts.id
+          and (
+            lower(profile.display_name) like $1
+            or lower(profile.id) like $1
+            or lower(coalesce(profile.cdk_order_hash, '')) like $1
+          )
+      )`
+  }
+  const countResult = await query<{ total: string }>(
+    `select count(*)::text as total from user_accounts ${where}`,
+    values,
+  )
+  const total = Number(countResult.rows[0]?.total ?? 0)
+  const totalPages = total === 0 ? 0 : Math.ceil(total / options.pageSize)
+  const page = totalPages === 0 ? 1 : Math.min(options.page, totalPages)
+  values.push(options.pageSize, (page - 1) * options.pageSize)
+  const usersResult = await query<{ record_json: UserAccountRecord }>(
+    `select record_json from user_accounts ${where}
+     order by created_at desc, id asc limit $${values.length - 1} offset $${values.length}`,
+    values,
+  )
+  const users = usersResult.rows.map((row) => row.record_json)
+  if (users.length === 0) return { users, profiles: [], total, page, totalPages }
+  const profilesResult = await query<{ record_json: UserGameAccountRecord }>(
+    'select record_json from user_game_accounts where user_id = any($1::text[]) order by created_at asc',
+    [users.map((user) => user.id)],
+  )
+  return {
+    users,
+    profiles: profilesResult.rows.map((row) => row.record_json),
+    total,
+    page,
+    totalPages,
+  }
+}
+
 export async function updateProfileWorkspaceAtomically(
   profileId: string,
   updater: (workspace: UserWorkspaceRecord | null) => UserWorkspaceRecord,

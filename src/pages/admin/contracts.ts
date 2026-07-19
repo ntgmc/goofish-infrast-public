@@ -20,6 +20,15 @@ export type BinaryFilter = 'all' | 'yes' | 'no'
 
 export type FieldErrors = Record<string, string>
 
+export interface PaginationMeta {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+}
+
+export const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: 25, total: 0, total_pages: 0 }
+
 export interface CdkTableFilters {
   status: StatusFilter;
   permission: PermissionFilter;

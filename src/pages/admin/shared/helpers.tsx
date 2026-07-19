@@ -44,11 +44,11 @@ export function SmallButton({ children, onClick, loading, tone = 'default', auto
   return <button type="button" onClick={onClick} disabled={loading} data-dialog-initial-focus={autoFocus ? '' : undefined} className={`tool-secondary-action min-h-11 px-3 text-xs ${className}`}>{loading ? '处理中' : children}</button>
 }
 
-export function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0) {
-const totalCdks = records.length
-const usedCdks = records.filter((record) => record.status === 'used').length
-const frozenCdks = records.filter((record) => record.status === 'frozen').length
-const riskEvents = records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
+export function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0, ops?: CdkOpsSummary) {
+const totalCdks = ops?.status_distribution.reduce((sum, item) => sum + item.total, 0) ?? records.length
+const usedCdks = ops?.status_distribution.find((item) => item.status === 'used')?.total ?? records.filter((record) => record.status === 'used').length
+const frozenCdks = ops?.freezes ?? records.filter((record) => record.status === 'frozen').length
+const riskEvents = ops ? ops.risk_reasons.reduce((sum, item) => sum + item.count, 0) : records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
 const scheduleGenerates = usage?.schedule_generates ?? 0
 const scheduleFailures = usage?.schedule_failures ?? 0
 const scheduleAttempts = scheduleGenerates + scheduleFailures

@@ -22,7 +22,7 @@ import {
   getProfileWorkspace,
   isFreePreviewProfile,
   listProfilesForUser,
-  listUserAccounts,
+  listAdminUserAccountsPage,
   normalizeProfileKind,
   saveProfileWorkspace,
   saveUserProfile,
@@ -32,6 +32,7 @@ import {
   type UserGameAccountRecord,
   type UserWorkspaceRecord,
 } from '../storage/user-store'
+import { AdminPaginationError, buildAdminPagination, parseAdminPageRequest } from './admin-pagination'
 import { resetUserPasswordByAdmin } from './user-auth'
 import type { ProductPermissionMode } from '../../src/lib/types'
 
@@ -72,14 +73,23 @@ export default async (req: Request): Promise<Response> => {
         if (!user) return jsonResponse({ error: '用户不存在。' }, 404)
         return jsonResponse({ detail: await buildAdminUserDetail(user) })
       }
-      const appUsers = await Promise.all((await listUserAccounts()).map(async (user) => {
-        const profiles = await listProfilesForUser(user.id)
-        return {
-          ...toAdminAppUser(user, profiles),
-          profile_count: profiles.length,
-        }
-      }))
-      return jsonResponse({ users: await listAdminUsers(), app_users: appUsers })
+      const request = parseAdminPageRequest(url)
+      const result = await listAdminUserAccountsPage(request)
+      const profilesByUser = new Map<string, UserGameAccountRecord[]>()
+      for (const profile of result.profiles) {
+        const profiles = profilesByUser.get(profile.user_id) ?? []
+        profiles.push(profile)
+        profilesByUser.set(profile.user_id, profiles)
+      }
+      const appUsers = result.users.map((user) => {
+        const profiles = profilesByUser.get(user.id) ?? []
+        return { ...toAdminAppUser(user, profiles), profile_count: profiles.length }
+      })
+      return jsonResponse({
+        users: await listAdminUsers(),
+        app_users: appUsers,
+        pagination: buildAdminPagination(result.page, request.pageSize, result.total),
+      })
     }
 
     if (req.method === 'PATCH') {
@@ -215,6 +225,7 @@ export default async (req: Request): Promise<Response> => {
 
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
+    if (error instanceof AdminPaginationError) return jsonResponse({ error: error.message }, 400)
     if (error instanceof PasswordWorkCapacityError) {
       return jsonResponse(
         { error: '认证服务繁忙，请稍后重试。' },

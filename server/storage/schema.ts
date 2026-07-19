@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS cdk_records (
   updated_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_cdk_records_status ON cdk_records(status);
+CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_created ON cdk_records(created_at DESC, key ASC);
+CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_status_created ON cdk_records(status, created_at DESC, key ASC);
+CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_permission_created ON cdk_records(permission, created_at DESC, key ASC);
 CREATE INDEX IF NOT EXISTS idx_cdk_records_license_order_hash ON cdk_records(license_order_hash);
 ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS record_revision INTEGER NOT NULL DEFAULT 0;
 DO $$
@@ -216,6 +219,7 @@ CREATE TABLE IF NOT EXISTS user_accounts (
   updated_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_user_accounts_email ON user_accounts(email);
+CREATE INDEX IF NOT EXISTS idx_user_accounts_admin_created ON user_accounts(created_at DESC, id ASC);
 CREATE INDEX IF NOT EXISTS idx_user_accounts_cdk_code_hash ON user_accounts(cdk_code_hash);
 DO $$
 BEGIN
