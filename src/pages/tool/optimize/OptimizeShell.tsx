@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
+import { LayoutGroup } from 'motion/react'
 import BrandLogo from '../../../components/BrandLogo'
 import DeferredFeatureMenu from '../../../components/DeferredFeatureMenu'
+import { AnimatedPresenceRegion, MotionNavIndicator } from '../../../components/MotionPrimitives'
 import ThemeSwitcher from '../../../components/ThemeSwitcher'
 import { OPTIMIZE_SECTIONS, type OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
@@ -41,20 +43,23 @@ export default function OptimizeShell({
           </div>
         </div>
 
-        <nav className="mt-5 space-y-1" aria-label={copy.optimize.pages_tool_optimize_OptimizeShell_002}>
-          {sections.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSectionChange(item.id)}
-              aria-current={section === item.id ? 'page' : undefined}
-              className="tool-nav-link flex w-full items-center justify-between gap-3 px-3 text-left text-sm font-medium"
-            >
-              <span>{item.label}</span>
-              {badges?.[item.id] && <span className="text-xs font-medium text-ink-muted">{badges[item.id]}</span>}
-            </button>
-          ))}
-        </nav>
+        <LayoutGroup id="optimize-desktop">
+          <nav className="mt-5 space-y-1" aria-label={copy.optimize.pages_tool_optimize_OptimizeShell_002}>
+            {sections.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onSectionChange(item.id)}
+                aria-current={section === item.id ? 'page' : undefined}
+                className="tool-nav-link flex w-full items-center justify-between gap-3 px-3 text-left text-sm font-medium"
+              >
+                {section === item.id && <MotionNavIndicator layoutId="optimize-active" />}
+                <span className="relative z-10">{item.label}</span>
+                {badges?.[item.id] && <span className="relative z-10 text-xs font-medium text-ink-muted">{badges[item.id]}</span>}
+              </button>
+            ))}
+          </nav>
+        </LayoutGroup>
 
         <div className="absolute inset-x-4 bottom-5 border-t border-surface-3 pt-4">
           <button type="button" onClick={onReset} className="tool-secondary-action w-full">{copy.optimize.pages_tool_optimize_OptimizeShell_003}</button>
@@ -83,22 +88,27 @@ export default function OptimizeShell({
             </div>
           </div>
 
-          <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.optimize.pages_tool_optimize_OptimizeShell_006}>
-            {sections.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onSectionChange(item.id)}
-                aria-current={section === item.id ? 'page' : undefined}
-                className="tool-nav-link inline-flex shrink-0 items-center gap-2 px-3 text-sm font-medium"
-              >
-                <span>{item.label}</span>
-                {badges?.[item.id] && <span className="text-xs text-ink-muted">{badges[item.id]}</span>}
-              </button>
-            ))}
-          </nav>
+          <LayoutGroup id="optimize-mobile">
+            <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.optimize.pages_tool_optimize_OptimizeShell_006}>
+              {sections.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSectionChange(item.id)}
+                  aria-current={section === item.id ? 'page' : undefined}
+                  className="tool-nav-link inline-flex shrink-0 items-center gap-2 px-3 text-sm font-medium"
+                >
+                  {section === item.id && <MotionNavIndicator layoutId="optimize-active" />}
+                  <span className="relative z-10">{item.label}</span>
+                  {badges?.[item.id] && <span className="relative z-10 text-xs text-ink-muted">{badges[item.id]}</span>}
+                </button>
+              ))}
+            </nav>
+          </LayoutGroup>
         </header>
-        <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">{children}</div>
+        <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
+          <AnimatedPresenceRegion motionKey={section}>{children}</AnimatedPresenceRegion>
+        </div>
       </main>
     </div>
   )
