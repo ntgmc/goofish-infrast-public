@@ -182,8 +182,8 @@ function FaqContent() {
     <section className="tool-panel p-5 sm:p-6" aria-label={copy.public.pages_PublicInfoPage_064}>
       <div className="space-y-3">
         {faqItems.map((item) => (
-          <details key={item.id} className="tool-inset group px-4 py-2">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 rounded-lg text-base font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/45">
+          <details key={item.id} className="tool-inset group px-4 py-2 transition-colors has-[summary:focus-visible]:border-brand-500/55 has-[summary:focus-visible]:bg-surface-1">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 rounded-lg text-base font-semibold text-ink-primary focus-visible:outline-none">
               {item.question}
               <span className="text-xl leading-none text-brand-300 transition group-open:rotate-45" aria-hidden="true">+</span>
             </summary>
