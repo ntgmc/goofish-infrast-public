@@ -30,6 +30,7 @@ function assertWorkflowProvenance() {
   assert.match(workflow, /commit_sha:/, 'manual production deploy should accept an immutable SHA')
   assert.doesNotMatch(workflow, /^\s+branch:/m, 'manual production deploy must not accept a branch')
   assert.match(workflow, /github\.event\.workflow_run\.head_sha/, 'automatic deploy should use workflow_run.head_sha')
+  assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/, 'automatic production deploy should only accept push runs')
   assert.match(workflow, /workflow_id: 'quality-checks\.yml'/, 'manual deploy should query Quality Checks')
   assert.match(workflow, /run\.head_branch === 'main'/, 'manual deploy should require a main Quality Checks run')
   assert.match(workflow, /run\.conclusion === 'success'/, 'manual deploy should require successful Quality Checks')
@@ -64,6 +65,7 @@ function assertQualityChecksImmutability() {
   assert.doesNotMatch(qualityChecksWorkflow, /\bgit push\b/, 'Quality Checks must not advance a checked branch')
   assert.match(qualityChecksWorkflow, /actions\/upload-artifact@/, 'Quality Checks should publish an immutable release artifact')
   assert.match(qualityChecksWorkflow, /release-artifact\.mjs create/, 'Quality Checks should create a release manifest')
+  assert.match(qualityChecksWorkflow, /if: github\.event_name != 'pull_request'/, 'pull request checks should not publish deployment artifacts')
 }
 
 function assertSecurityAnalysisGate() {
