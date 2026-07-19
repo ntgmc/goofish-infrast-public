@@ -8,7 +8,7 @@ type RateLimitBucketRow = {
   attempt_count: number
 }
 
-export type PersistentRateLimitAttempt = {
+type PersistentRateLimitAttempt = {
   retain: () => void
   refund: () => Promise<void>
 }

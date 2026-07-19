@@ -9,7 +9,6 @@ import type {
   LicenseOperator,
 } from '../../src/lib/types'
 import { APP_BUILD_META } from '../../src/lib/build-meta'
-import { DEPOT_VALUE_REQUEST_BODY_LIMIT_BYTES } from '../request-body-limits'
 import { getValidatedJsonValue } from '../security/request-validation'
 import { requireUserSession } from './user-auth'
 import { convertSklandCharactersToOperators, decryptSklandCredential, SklandClient } from './skland-client'
