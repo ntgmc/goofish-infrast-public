@@ -8,9 +8,9 @@ const YITULIU_CACHE_FILE_VERSION = 1
 const PURE_GOLD_ITEM_ID = '3003'
 const TRADE_PURE_GOLD_PER_LMD = 2 / 1000
 
-export const FIXED_SANITY_PER_LMD_GROSS = 36 / 10000
-export const FIXED_SANITY_PER_EXP = 36 / 10000
-export const EXP_ITEM_VALUES: Record<string, number> = {
+const FIXED_SANITY_PER_LMD_GROSS = 36 / 10000
+const FIXED_SANITY_PER_EXP = 36 / 10000
+const EXP_ITEM_VALUES: Record<string, number> = {
   '2001': 200,
   '2002': 400,
   '2003': 1000,
@@ -68,10 +68,6 @@ export async function getYituliuPricing(): Promise<PricingState> {
   const state = { status: 'unavailable' as const, prices: new Map<string, number>() }
   yituliuCache = { expiresAt: Date.now() + YITULIU_RETRY_AFTER_FAILURE_MS, state }
   return state
-}
-
-export function resetYituliuPricingMemoryCacheForTest(): void {
-  yituliuCache = null
 }
 
 async function fetchYituliuPricing(): Promise<{ fetchedAt: number; expiresAt: number; state: PricingState } | null> {
@@ -190,7 +186,7 @@ function getYituliuCachePath(): string {
   return configured || join(process.cwd(), '.cache', 'material-value', 'yituliu-item-value-v1.json')
 }
 
-export function buildYituliuPriceMap(data: unknown): Map<string, number> {
+function buildYituliuPriceMap(data: unknown): Map<string, number> {
   const prices = new Map<string, number>()
   const itemValueRows = readYituliuItemValueRows(data)
   for (const item of itemValueRows) {

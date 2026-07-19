@@ -10,7 +10,7 @@ import {
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
-export type OptimizeJobAttemptStatus = 'running' | 'succeeded' | 'failed' | 'timed_out' | 'interrupted' | 'lease_lost' | 'cancelled'
+type OptimizeJobAttemptStatus = 'running' | 'succeeded' | 'failed' | 'timed_out' | 'interrupted' | 'lease_lost' | 'cancelled'
 export type OptimizeJobFailureKind = 'application_error' | 'worker_crash' | 'timed_out' | 'lease_lost'
 
 export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
@@ -41,7 +41,7 @@ export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
   updated_at: string
 }
 
-export interface CreateOptimizeJobInput<TPayload = unknown> {
+interface CreateOptimizeJobInput<TPayload = unknown> {
   id: string
   priority: number
   owner_key: string
@@ -52,7 +52,7 @@ export interface CreateOptimizeJobInput<TPayload = unknown> {
   created_at?: string
 }
 
-export interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInput<TPayload> {
+interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInput<TPayload> {
   idempotency_key: string
   request_hash: string
   free_profile_id?: string | null
@@ -113,7 +113,7 @@ export interface OptimizationDeadLetterRecord {
   updated_at: string
 }
 
-export interface AdminOptimizationQueueJob {
+interface AdminOptimizationQueueJob {
   id: string
   status: OptimizeJobStatus
   queue_position: number | null
@@ -1026,7 +1026,7 @@ function normalizeTimestamp(value: string | Date | null): string | null {
   return value instanceof Date ? value.toISOString() : value
 }
 
-export function getOptimizeGlobalQueueLimit(): number {
+function getOptimizeGlobalQueueLimit(): number {
   return positiveInteger(process.env.OPTIMIZE_GLOBAL_QUEUE_LIMIT, 200, 1)
 }
 

@@ -3,7 +3,7 @@ import type { OptimizeJobPriority } from '../lib/types'
 import { copy } from '../copy/index'
 
 
-export type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
+type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
 
 export interface ScheduleProgressState {
   mode: 'generate' | 'apply' | 'scenario';

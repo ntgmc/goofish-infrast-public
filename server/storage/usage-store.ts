@@ -63,7 +63,7 @@ export interface UsageEventRecord {
   announcement_kind?: string
 }
 
-export interface UsageDayStats {
+interface UsageDayStats {
   date: string
   unique_visitors: number
   visits: number
@@ -80,13 +80,13 @@ export interface UsageDayStats {
   announcement_reads: number
 }
 
-export interface UsageRange {
+interface UsageRange {
   from: string
   to: string
   days: number
 }
 
-export interface UsageFunnelStep {
+interface UsageFunnelStep {
   key: 'free_preview' | 'register' | 'cdk_redeem' | 'schedule_generate'
   label: string
   count: number
@@ -94,7 +94,7 @@ export interface UsageFunnelStep {
   dropoff: number
 }
 
-export interface UsageFailureReasonStats {
+interface UsageFailureReasonStats {
   reason_code: UsageReasonCode
   count: number
   percentage: number
@@ -102,7 +102,7 @@ export interface UsageFailureReasonStats {
   events: Partial<Record<UsageEventName, number>>
 }
 
-export interface UsageFailureSample {
+interface UsageFailureSample {
   created_at: string
   event: UsageEventName
   reason_code: UsageReasonCode
@@ -113,14 +113,14 @@ export interface UsageFailureSample {
   has_profile: boolean
 }
 
-export interface UsageLatencyDayStats {
+interface UsageLatencyDayStats {
   date: string
   average_ms: number
   p95_ms: number
   sample_count: number
 }
 
-export interface UsageLatencyStats {
+interface UsageLatencyStats {
   average_ms: number
   p50_ms: number
   p95_ms: number
@@ -129,7 +129,7 @@ export interface UsageLatencyStats {
   days: UsageLatencyDayStats[]
 }
 
-export interface UsageSklandDayStats {
+interface UsageSklandDayStats {
   date: string
   attempts: number
   success: number
@@ -137,7 +137,7 @@ export interface UsageSklandDayStats {
   success_rate: number
 }
 
-export interface UsageSklandStats {
+interface UsageSklandStats {
   attempts: number
   success: number
   failed: number
@@ -149,14 +149,14 @@ export interface UsageSklandStats {
   days: UsageSklandDayStats[]
 }
 
-export interface UsageAnnouncementStats {
+interface UsageAnnouncementStats {
   impressions: number
   reads: number
   unread: number
   read_rate: number
 }
 
-export interface UsageCdkDistributionItem {
+interface UsageCdkDistributionItem {
   permission: string
   total: number
   success: number

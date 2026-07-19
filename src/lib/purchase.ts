@@ -1,7 +1,7 @@
 import { copy } from '../copy/index'
-export type PurchaseChannelId = 'xianyu' | 'cardNetwork'
+type PurchaseChannelId = 'xianyu' | 'cardNetwork'
 
-export interface PurchaseChannel {
+interface PurchaseChannel {
   id: PurchaseChannelId;
   label: string;
   actionLabel: string;
@@ -9,7 +9,7 @@ export interface PurchaseChannel {
   enabled: boolean;
 }
 
-export const PURCHASE_CHANNELS: PurchaseChannel[] = [
+const PURCHASE_CHANNELS: PurchaseChannel[] = [
   {
     id: 'xianyu',
     label: copy.common.lib_purchase_001,

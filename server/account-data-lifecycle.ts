@@ -6,7 +6,7 @@ import { sendAccountDeletionCancellationEmail, sendAccountDeletionReceiptEmail }
 
 const DELETION_DELAY_MS = 7 * 24 * 60 * 60 * 1000
 
-export type AccountDeletionRequest = {
+type AccountDeletionRequest = {
   id: string
   user_id: string
   cancel_token_hash: string
@@ -97,7 +97,7 @@ export async function cancelAccountDeletion(token: string): Promise<boolean> {
   }
 }
 
-export async function processDueAccountDeletions(now = new Date()): Promise<number> {
+async function processDueAccountDeletions(now = new Date()): Promise<number> {
   await ensureDatabaseSchema()
   const due = await query<AccountDeletionRequest & { email: string }>(
     `select request.*, account.email from account_deletion_requests request

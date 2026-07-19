@@ -13,7 +13,7 @@ const ROOM_DISPLAY_RANK: Record<string, number> = ROOM_DISPLAY_ORDER.reduce(
   {},
 )
 
-export type DroneGainSummary = {
+type DroneGainSummary = {
   value: string;
   suffix: string;
   note: string;

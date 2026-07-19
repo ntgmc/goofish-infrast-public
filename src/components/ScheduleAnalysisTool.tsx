@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState, type FormEvent } from 'react'
+import { lazy, useRef, useState, type FormEvent } from 'react'
 import type { AnalyzeScheduleResult, LicenseOperator } from '../lib/types'
 import { apiJson } from '../lib/api-client'
 import { copy } from '../copy/index'

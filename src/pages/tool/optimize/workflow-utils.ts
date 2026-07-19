@@ -49,12 +49,12 @@ export function getFreeScheduleGenerateBlockedReason(
   return null
 }
 
-export function hasUnusedStrongReorderBonus(entitlement: FreeScheduleEntitlement): boolean {
+function hasUnusedStrongReorderBonus(entitlement: FreeScheduleEntitlement): boolean {
   const bonus = entitlement.strong_reorder_bonus
   return Boolean(bonus && bonus.month === getShanghaiMonthKey() && !bonus.used_at)
 }
 
-export function getShanghaiMonthKey(date = new Date()): string {
+function getShanghaiMonthKey(date = new Date()): string {
   const shanghai = new Date(date.getTime() + 8 * 60 * 60 * 1000)
   return `${shanghai.getUTCFullYear()}-${String(shanghai.getUTCMonth() + 1).padStart(2, '0')}`
 }

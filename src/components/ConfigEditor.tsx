@@ -129,15 +129,6 @@ function setAutoDroneTradingPriority(config: LicenseConfig): void {
   }
 }
 
-function setAutoDroneManufacturing(config: LicenseConfig, product: IntermediateProduct): void {
-  bindAutoDrones(config)
-  config.drones = {
-    ...config.drones!,
-    auto_strategy: 'manufacture_product',
-    auto_target_product: product,
-  }
-}
-
 function markIntermediateInventoryForOptimizer(config: LicenseConfig): void {
   config.auto_balance_source = 'intermediate_inventory'
   setAutoDroneTradingPriority(config)

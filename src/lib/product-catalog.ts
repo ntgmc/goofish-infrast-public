@@ -2,7 +2,6 @@ import catalogJson from '../../product/catalog.json'
 import type { RawPermissionMode, UserGameAccountKind } from './types'
 
 export type CapabilityId = keyof typeof catalogJson.capabilities
-export const capabilityIds = Object.keys(catalogJson.capabilities) as CapabilityId[]
 export type RuntimePermission = keyof typeof catalogJson.runtime_permissions
 export type ProductPermission = Exclude<RuntimePermission, 'admin'>
 export type SkuId = keyof typeof catalogJson.skus
@@ -13,7 +12,6 @@ export interface CapabilitySubject {
   permission?: RawPermissionMode | null
 }
 
-export const productCatalog = catalogJson
 export const productPolicies: ProductPolicy = catalogJson.policies
 
 export function normalizeRuntimePermission(permission: RawPermissionMode | null | undefined): RuntimePermission {

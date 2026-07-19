@@ -7,7 +7,7 @@ import { fetchOptimizationJob, fetchOptimizationJobSnapshot } from './optimizati
 import { copy } from '../../../copy/index'
 
 export const OPTIMIZE_POLL_REQUEST_TIMEOUT_MS = 20_000
-export const OPTIMIZE_HIDDEN_POLL_MULTIPLIER = 3
+const OPTIMIZE_HIDDEN_POLL_MULTIPLIER = 3
 
 export function waitForOptimizePoll(ms: number, isCancelled?: () => boolean): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -72,7 +72,7 @@ export function isRetryableOptimizePollError(error: unknown): boolean {
   return error instanceof TypeError || (error instanceof DOMException && error.name === 'AbortError')
 }
 
-export function getOptimizeEstimateAdjustment(
+function getOptimizeEstimateAdjustment(
   current: ScheduleProgressState | null | undefined,
   next: OptimizeJobAccepted | OptimizeJobStatusResponse,
 ): string | undefined {
@@ -169,7 +169,7 @@ export function mergeOptimizeJobProgress(
   }
 }
 
-export function getStableOptimizeQueueStatus(
+function getStableOptimizeQueueStatus(
   current: ScheduleProgressState | null | undefined,
   next: OptimizeJobAccepted | OptimizeJobStatusResponse,
   observedRunning: boolean,
@@ -180,7 +180,7 @@ export function getStableOptimizeQueueStatus(
   return current?.queueStatus
 }
 
-export function getStableOptimizeEstimatePhase(
+function getStableOptimizeEstimatePhase(
   current: ScheduleProgressState | null | undefined,
   next: OptimizeJobAccepted | OptimizeJobStatusResponse,
   observedRunning: boolean,
@@ -199,7 +199,7 @@ export function getStableOptimizeEstimatePhase(
   return next.estimate_phase
 }
 
-export function getStableOptimizeRemainingMs(
+function getStableOptimizeRemainingMs(
   current: ScheduleProgressState | null | undefined,
   next: OptimizeJobAccepted | OptimizeJobStatusResponse,
   now: number,
@@ -236,7 +236,7 @@ export function getStableOptimizeRemainingMs(
   return incoming
 }
 
-export function getStableOptimizeTotalMs(
+function getStableOptimizeTotalMs(
   current: ScheduleProgressState | null | undefined,
   next: OptimizeJobAccepted | OptimizeJobStatusResponse,
   remainingMs: number | null,
@@ -282,7 +282,7 @@ export function getStableOptimizeTotalMs(
   return localTotalMs
 }
 
-export function shouldAllowOptimizeEstimateExtension(
+function shouldAllowOptimizeEstimateExtension(
   current: ScheduleProgressState | null | undefined,
   next: OptimizeJobAccepted | OptimizeJobStatusResponse,
   observedRunning: boolean,
@@ -298,20 +298,20 @@ export function shouldAllowOptimizeEstimateExtension(
   )
 }
 
-export function getProjectedOptimizeRemainingMs(progress: ScheduleProgressState, now: number): number | null {
+function getProjectedOptimizeRemainingMs(progress: ScheduleProgressState, now: number): number | null {
   if (typeof progress.estimatedRemainingMs !== 'number' || !Number.isFinite(progress.estimatedRemainingMs)) return null
   const updatedAt = parseOptimizeEstimateUpdatedAt(progress)
   const elapsedSinceUpdate = updatedAt === null ? 0 : Math.max(0, now - updatedAt)
   return Math.max(0, progress.estimatedRemainingMs - elapsedSinceUpdate)
 }
 
-export function getOptimizeProgressPercent(progress: ScheduleProgressState, now: number): number {
+function getOptimizeProgressPercent(progress: ScheduleProgressState, now: number): number {
   const elapsed = Math.max(0, now - progress.startedAt)
   const estimatedTotalMs = getOptimizeProgressTotalMs(progress, now)
   return Math.min(96, (elapsed / estimatedTotalMs) * 96)
 }
 
-export function getOptimizeProgressTotalMs(progress: ScheduleProgressState, now: number): number {
+function getOptimizeProgressTotalMs(progress: ScheduleProgressState, now: number): number {
   if (typeof progress.estimatedTotalMs === 'number' && Number.isFinite(progress.estimatedTotalMs) && progress.estimatedTotalMs > 0) {
     return progress.estimatedTotalMs
   }
@@ -320,11 +320,11 @@ export function getOptimizeProgressTotalMs(progress: ScheduleProgressState, now:
   return Math.max(1_000, fallback)
 }
 
-export function getOptimizeJobStartedAt(job: OptimizeJobAccepted | OptimizeJobStatusResponse): string | null | undefined {
+function getOptimizeJobStartedAt(job: OptimizeJobAccepted | OptimizeJobStatusResponse): string | null | undefined {
   return 'started_at' in job ? job.started_at : undefined
 }
 
-export function parseOptimizeEstimateUpdatedAt(progress: ScheduleProgressState): number | null {
+function parseOptimizeEstimateUpdatedAt(progress: ScheduleProgressState): number | null {
   const parsed = Date.parse(progress.estimateUpdatedAt ?? '')
   if (Number.isFinite(parsed)) return parsed
   return typeof progress.lastUpdatedAt === 'number' && Number.isFinite(progress.lastUpdatedAt) ? progress.lastUpdatedAt : null
@@ -448,11 +448,11 @@ export function readActiveOptimizeJob(key: string): ActiveOptimizeJobStorageEntr
   return null
 }
 
-export function isObjectRecord(value: unknown): value is Record<string, unknown> {
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object')
 }
 
-export function isStoredOptimizeJob(value: unknown): value is OptimizeJobAccepted | OptimizeJobStatusResponse {
+function isStoredOptimizeJob(value: unknown): value is OptimizeJobAccepted | OptimizeJobStatusResponse {
   if (!isObjectRecord(value)) return false
   return typeof value.job_id === 'string'
     && (value.status === 'queued' || value.status === 'running' || value.status === 'succeeded' || value.status === 'failed')
@@ -460,7 +460,7 @@ export function isStoredOptimizeJob(value: unknown): value is OptimizeJobAccepte
     && typeof value.submitted_at === 'string'
 }
 
-export function isStoredScheduleProgress(value: unknown): value is ScheduleProgressState {
+function isStoredScheduleProgress(value: unknown): value is ScheduleProgressState {
   if (!isObjectRecord(value)) return false
   return (value.mode === 'generate' || value.mode === 'apply')
     && typeof value.startedAt === 'number'

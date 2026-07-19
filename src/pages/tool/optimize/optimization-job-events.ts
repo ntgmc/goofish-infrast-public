@@ -16,7 +16,7 @@ export interface OptimizationJobBroadcast {
   at: number;
 }
 
-export class OptimizationSubmissionLockedError extends Error {
+class OptimizationSubmissionLockedError extends Error {
   constructor() {
     super(copy.optimize.pages_tool_optimize_optimization_job_events_001)
     this.name = 'OptimizationSubmissionLockedError'

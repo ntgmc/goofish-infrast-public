@@ -136,7 +136,7 @@ export async function cancelOptimizationJob(req: Request, rawJobId: string): Pro
   )
 }
 
-export async function canReadOptimizeJob(
+async function canReadOptimizeJob(
   req: Request,
   job: OptimizeJobRecord,
 ): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
@@ -154,20 +154,20 @@ export async function canReadOptimizeJob(
   return { ok: true };
 }
 
-export async function buildOptimizeJobAccepted(job: OptimizeJobRecord): Promise<OptimizationJobSnapshot> {
+async function buildOptimizeJobAccepted(job: OptimizeJobRecord): Promise<OptimizationJobSnapshot> {
   const queuePosition = await getOptimizeJobStore().getQueuePosition(job.id);
   const estimate = getOptimizeJobEstimate(job);
   const runtimeEstimate = getOptimizeRuntimeEstimate(job, queuePosition, estimate);
   return formatOptimizationJobSnapshot(job, queuePosition, estimate, runtimeEstimate);
 }
 
-export function formatOptimizeJobStatus(job: OptimizeJobRecord, queuePosition: number | null): OptimizationJobSnapshot {
+function formatOptimizeJobStatus(job: OptimizeJobRecord, queuePosition: number | null): OptimizationJobSnapshot {
   const estimate = getOptimizeJobEstimate(job);
   const runtimeEstimate = getOptimizeRuntimeEstimate(job, queuePosition, estimate);
   return formatOptimizationJobSnapshot(job, queuePosition, estimate, runtimeEstimate);
 }
 
-export function formatOptimizationJobSnapshot(
+function formatOptimizationJobSnapshot(
   job: OptimizeJobRecord,
   queuePosition: number | null,
   estimate: OptimizeDurationEstimate,
@@ -257,7 +257,7 @@ function formatOptimizationFailure(
   }
 }
 
-export function formatJobPriority(job: Pick<OptimizeJobRecord, 'priority'>): OptimizeJobPriority {
+function formatJobPriority(job: Pick<OptimizeJobRecord, 'priority'>): OptimizeJobPriority {
   return job.priority >= 20 ? 'priority_coupon' : job.priority >= 10 ? 'paid' : job.priority > 0 ? 'analysis' : 'standard';
 }
 
@@ -278,18 +278,18 @@ function signOptimizeJobPollToken(job: Pick<OptimizeJobRecord, 'id' | 'owner_key
   return createHmac('sha256', secret).update(`optimize-job:${job.id}:${job.owner_key}`).digest('hex');
 }
 
-export function formatJobPriorityLabel(job: Pick<OptimizeJobRecord, 'priority'>): string {
+function formatJobPriorityLabel(job: Pick<OptimizeJobRecord, 'priority'>): string {
   return job.priority >= 20 ? '优先计算券' : job.priority >= 10 ? '付费优先' : job.priority > 0 ? '高级分析' : '普通队列';
 }
 
-export function getOptimizeJobEstimate(job: OptimizeJobRecord): OptimizeDurationEstimate {
+function getOptimizeJobEstimate(job: OptimizeJobRecord): OptimizeDurationEstimate {
   const payload = job.payload_json as Partial<OptimizationJobPayload> | null;
   if (isOptimizeDurationEstimate(payload?.estimate)) return payload.estimate;
   const bucket = payload?.effectiveConfig ? getOptimizeEstimateBucket(payload.effectiveConfig) : 'maa_plain';
   return buildFallbackOptimizeEstimate(bucket);
 }
 
-export function getOptimizeRuntimeEstimate(
+function getOptimizeRuntimeEstimate(
   job: OptimizeJobRecord,
   queuePosition: number | null,
   estimate: OptimizeDurationEstimate,
@@ -360,13 +360,13 @@ export function getOptimizeRuntimeEstimate(
   };
 }
 
-export function parseOptimizeJobTime(value: string | null | undefined, fallback: number): number {
+function parseOptimizeJobTime(value: string | null | undefined, fallback: number): number {
   if (!value) return fallback;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function isOptimizeDurationEstimate(value: unknown): value is OptimizeDurationEstimate {
+function isOptimizeDurationEstimate(value: unknown): value is OptimizeDurationEstimate {
   if (!value || typeof value !== 'object') return false;
   const estimate = value as Partial<OptimizeDurationEstimate>;
   return typeof estimate.estimated_duration_ms === 'number'
@@ -375,7 +375,7 @@ export function isOptimizeDurationEstimate(value: unknown): value is OptimizeDur
     && typeof estimate.estimate_sample_count === 'number';
 }
 
-export function isOptimizeEstimateBucket(value: unknown): value is OptimizeEstimateBucket {
+function isOptimizeEstimateBucket(value: unknown): value is OptimizeEstimateBucket {
   return value === 'maa_fiammetta' || value === 'maa_plain' || value === 'rotation' || value === 'scenario_comparison';
 }
 
@@ -431,7 +431,7 @@ export function buildScenarioComparisonEstimate(scenarioCount: number, variableS
   }
 }
 
-export function buildFallbackOptimizeEstimate(bucket: OptimizeEstimateBucket): OptimizeDurationEstimate {
+function buildFallbackOptimizeEstimate(bucket: OptimizeEstimateBucket): OptimizeDurationEstimate {
   return {
     estimated_duration_ms: clampOptimizeEstimateMs(OPTIMIZE_ESTIMATE_FALLBACK_MS[bucket]),
     estimate_bucket: bucket,
@@ -440,7 +440,7 @@ export function buildFallbackOptimizeEstimate(bucket: OptimizeEstimateBucket): O
   };
 }
 
-export function clampOptimizeEstimateMs(value: number, maxMs = OPTIMIZE_ESTIMATE_MAX_MS): number {
+function clampOptimizeEstimateMs(value: number, maxMs = OPTIMIZE_ESTIMATE_MAX_MS): number {
   if (!Number.isFinite(value)) return OPTIMIZE_ESTIMATE_FALLBACK_MS.maa_plain;
   return Math.max(OPTIMIZE_ESTIMATE_MIN_MS, Math.min(maxMs, Math.round(value)));
 }

@@ -21,7 +21,7 @@ export interface DepotValueSampleRecord {
   updated_at: string
 }
 
-export interface DepotValueSampleDistribution {
+interface DepotValueSampleDistribution {
   sample_count: number
   less_count: number
   equal_count: number
@@ -42,7 +42,7 @@ export function getDepotValueSampleStore(): DepotValueSampleStore | null {
   return createPostgresDepotValueSampleStore()
 }
 
-export function createPostgresDepotValueSampleStore(): DepotValueSampleStore {
+function createPostgresDepotValueSampleStore(): DepotValueSampleStore {
   return {
     save: async (record) => {
       await ensureSchema()
@@ -113,11 +113,6 @@ export function createPostgresDepotValueSampleStore(): DepotValueSampleStore {
       await query('delete from depot_value_samples where contributor_profile_id = $1', [profileId])
     },
   }
-}
-
-export function setDepotValueSampleStoreForTesting(store: DepotValueSampleStore | null): void {
-  ;(globalThis as unknown as { __maaDepotValueSampleStoreForTesting?: DepotValueSampleStore })
-    .__maaDepotValueSampleStoreForTesting = store ?? undefined
 }
 
 function getTestingDepotValueSampleStore(): DepotValueSampleStore | null {

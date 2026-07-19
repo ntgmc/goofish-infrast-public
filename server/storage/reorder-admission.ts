@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { FreeScheduleEntitlement } from '../../src/lib/types'
-import { hasDatabaseUrl, query, withTransaction } from './postgres'
+import { hasDatabaseUrl, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 
 export class ReorderAdmissionError extends Error {

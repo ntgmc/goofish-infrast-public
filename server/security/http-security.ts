@@ -1,6 +1,6 @@
 import type { IncomingMessage } from 'node:http'
 
-export const CONTENT_SECURITY_POLICY = [
+const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "base-uri 'none'",
   "object-src 'none'",
@@ -19,7 +19,7 @@ export const CONTENT_SECURITY_POLICY = [
   'upgrade-insecure-requests',
 ].join('; ')
 
-export const PERMISSIONS_POLICY = [
+const PERMISSIONS_POLICY = [
   'accelerometer=()',
   'bluetooth=()',
   'browsing-topics=()',
@@ -37,9 +37,9 @@ export const PERMISSIONS_POLICY = [
   'usb=()',
 ].join(', ')
 
-export const STRICT_TRANSPORT_SECURITY = 'max-age=31536000; includeSubDomains'
+const STRICT_TRANSPORT_SECURITY = 'max-age=31536000; includeSubDomains'
 
-export const HTTP_SECURITY_HEADERS: Readonly<Record<string, string>> = Object.freeze({
+const HTTP_SECURITY_HEADERS: Readonly<Record<string, string>> = Object.freeze({
   'Content-Security-Policy': CONTENT_SECURITY_POLICY,
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',

@@ -16,7 +16,7 @@ import {
   verifyPasswordHash,
 } from '../security/password'
 
-export const ADMIN_SESSION_COOKIE = 'maa_admin_session'
+const ADMIN_SESSION_COOKIE = 'maa_admin_session'
 export const ADMIN_SESSION_IDLE_MS = 30 * 60 * 1000
 export const ADMIN_SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000
 
@@ -179,7 +179,7 @@ export async function deleteAdminUser(usernameValue: unknown): Promise<{ ok: tru
   return { ok: true }
 }
 
-export function clearAdminSessionCookie(): string {
+function clearAdminSessionCookie(): string {
   return `${ADMIN_SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=0${secureCookieSuffix()}`
 }
 
