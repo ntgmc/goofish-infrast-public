@@ -1,6 +1,7 @@
 import { GeneratedPermission, StatusFilter, PermissionFilter, BinaryFilter, CdkTableFilters, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, SmallButton, formatDate, getNextProductPermission, formatNullableNumber, formatRiskDetail } from '../shared/helpers'
+import { AnimatedValue, RevealItem } from '../../../components/MotionPrimitives'
 
 export function CdkTable({ records, selected, filters, busyAction, onFilterChange, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
   records: AdminCdkRecord[];
@@ -309,8 +310,8 @@ export function RiskTable({ records, busyAction, onPatch, onOpenDetail }: { reco
 }
 
 export function Metric({ label, value, tone = 'default' }: { label: string; value: number | string; tone?: 'default' | 'warning' }) {
-return <div className={`tool-inset p-4 ${tone === 'warning' ? 'border-warning/30 bg-warning/10' : ''}`}>
-<div className="text-2xl font-semibold text-ink-primary">{value}</div>
+return <RevealItem className={`tool-inset p-4 ${tone === 'warning' ? 'border-warning/30 bg-warning/10' : ''}`}>
+<div className="text-2xl font-semibold tabular-nums text-ink-primary"><AnimatedValue value={String(value)} /></div>
 <div className="mt-1 text-sm text-ink-muted">{label}</div>
-</div>
+</RevealItem>
 }

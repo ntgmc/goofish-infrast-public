@@ -5,6 +5,7 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 import { copy } from '../copy/index'
 import { useTheme } from '../lib/theme'
+import { RevealItem, StaggeredReveal } from '../components/MotionPrimitives'
 
 
 interface Props {
@@ -60,8 +61,8 @@ export default function LandingPage({ onStart }: Props) {
           </div>
         </nav>
 
-        <div className="grid gap-12 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(28rem,1.05fr)] lg:items-center lg:py-24">
-          <div className="max-w-2xl">
+        <StaggeredReveal className="grid gap-12 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(28rem,1.05fr)] lg:items-center lg:py-24">
+          <RevealItem className="max-w-2xl">
             <p className="tool-eyebrow">{copy.public.pages_LandingPage_022}</p>
             <h1 className="mt-5 text-4xl font-semibold leading-[1.08] tracking-[-0.035em] text-ink-primary sm:text-5xl lg:text-6xl">
               {copy.public.pages_LandingPage_023}</h1>
@@ -86,10 +87,10 @@ export default function LandingPage({ onStart }: Props) {
               <Fact label={copy.public.pages_LandingPage_031} value={copy.public.pages_LandingPage_032} />
               <Fact label={copy.public.pages_LandingPage_033} value={copy.public.pages_LandingPage_034} />
             </dl>
-          </div>
+          </RevealItem>
 
-          <ProductPreview />
-        </div>
+          <RevealItem><ProductPreview /></RevealItem>
+        </StaggeredReveal>
       </section>
 
       <section className="border-y border-surface-3 bg-surface-1/55 px-5 py-16 sm:px-8 lg:px-10 lg:py-20">
@@ -127,9 +128,9 @@ export default function LandingPage({ onStart }: Props) {
             {copy.public.pages_LandingPage_041}</h2>
           <p className="mt-4 text-base leading-7 text-ink-secondary">
             {copy.public.pages_LandingPage_042}</p>
-          <div className="mt-8 grid gap-3 sm:grid-cols-2">
-            {metrics.map(({ id, ...metric }) => <MetricTile key={id} {...metric} />)}
-          </div>
+          <StaggeredReveal className="mt-8 grid gap-3 sm:grid-cols-2">
+            {metrics.map(({ id, ...metric }) => <RevealItem key={id}><MetricTile {...metric} /></RevealItem>)}
+          </StaggeredReveal>
         </div>
       </section>
 

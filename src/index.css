@@ -88,6 +88,12 @@
   --chart-4: var(--theme-ink-secondary);
   --chart-5: var(--theme-ink-muted);
   --radius: 0.75rem;
+  --motion-instant: 140ms;
+  --motion-exit: 120ms;
+  --motion-enter: 240ms;
+  --motion-page: 300ms;
+  --motion-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
   --sidebar: var(--theme-surface-1);
   --sidebar-foreground: var(--theme-ink-primary);
   --sidebar-primary: var(--theme-brand-600);
@@ -226,7 +232,7 @@ body {
     height: 3.125rem;
     border-radius: 999px;
     background: var(--theme-brand-500);
-    animation: session-loader-scale 900ms ease-in-out infinite;
+    animation: session-loader-scale 1100ms var(--motion-ease-enter) infinite;
     transform-origin: center;
   }
 
@@ -338,7 +344,9 @@ body {
     border: 1px solid transparent;
     border-radius: 0.5rem;
     color: var(--theme-ink-secondary);
-    transition: background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
+    isolation: isolate;
+    overflow: hidden;
+    transition: background-color var(--motion-instant) ease-out, border-color var(--motion-instant) ease-out, color var(--motion-instant) ease-out;
   }
 
   .tool-nav-link:hover {
@@ -367,6 +375,7 @@ body {
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--theme-surface-1);
+    transition: border-color var(--motion-enter) var(--motion-ease-enter), box-shadow var(--motion-enter) var(--motion-ease-enter), transform var(--motion-enter) var(--motion-ease-enter);
   }
 
   .tool-panel-header {
@@ -447,7 +456,13 @@ body {
     font-size: 0.875rem;
     font-weight: 600;
     touch-action: manipulation;
-    transition: background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out, opacity 160ms ease-out;
+    transition: background-color var(--motion-instant) ease-out, border-color var(--motion-instant) ease-out, color var(--motion-instant) ease-out, opacity var(--motion-instant) ease-out, transform var(--motion-instant) var(--motion-ease-enter), box-shadow var(--motion-instant) ease-out;
+  }
+
+  .tool-primary-action:active:not(:disabled),
+  .tool-secondary-action:active:not(:disabled),
+  .tool-danger-action:active:not(:disabled) {
+    transform: scale(0.985);
   }
 
   .tool-primary-action {
@@ -540,18 +555,97 @@ body {
   }
 }
 
+.motion-nav-indicator {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid color-mix(in oklch, var(--theme-brand-500) 34%, var(--border));
+  border-radius: 0.5rem;
+  background: color-mix(in oklch, var(--theme-brand-500) 12%, var(--theme-surface-2));
+  box-shadow: 0 8px 24px color-mix(in oklch, var(--theme-brand-950) 8%, transparent);
+}
+
+.motion-nav-indicator--underline {
+  inset: auto 0 0;
+  z-index: 0;
+  height: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--theme-brand-400);
+  box-shadow: none;
+}
+
+.motion-value {
+  display: inline-grid;
+  white-space: nowrap;
+}
+
+.motion-value > span {
+  grid-area: 1 / 1;
+}
+
+.motion-skeleton-line,
+.motion-skeleton-block {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--theme-surface-2);
+}
+
+.motion-skeleton-line::after,
+.motion-skeleton-block::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, color-mix(in oklch, var(--theme-surface-4) 55%, transparent) 50%, transparent 80%);
+  content: "";
+  transform: translateX(-100%);
+  animation: motion-skeleton-shimmer 1.6s var(--motion-ease-enter) infinite;
+}
+
+.tool-alert {
+  animation: motion-feedback-enter var(--motion-enter) var(--motion-ease-enter) both;
+}
+
+dialog[open]::backdrop {
+  animation: motion-backdrop-enter var(--motion-enter) ease-out both;
+}
+
+dialog[open] > * {
+  animation: motion-dialog-enter var(--motion-enter) var(--motion-ease-enter) both;
+  transform-origin: center top;
+}
+
+@keyframes motion-skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
+
+@keyframes motion-feedback-enter {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes motion-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes motion-dialog-enter {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @keyframes session-loader-scale {
   0%, 40%, 100% {
-    transform: scaleY(0.08);
+    transform: scaleY(0.32);
   }
 
   20% {
-    transform: scaleY(1);
+    transform: scaleY(0.9);
   }
 }
 
-.schedule-progress-fill {
-  transition: width 250ms ease-out;
+.motion-loader-enter {
+  animation: motion-feedback-enter var(--motion-page) var(--motion-ease-enter) both;
 }
 
 .config-validation-toast {
@@ -578,6 +672,11 @@ body {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+
+  .motion-skeleton-line::after,
+  .motion-skeleton-block::after {
+    display: none;
   }
 }
 
