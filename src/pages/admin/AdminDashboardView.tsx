@@ -12,13 +12,14 @@ import QueueMonitorPanel from './optimization/QueueMonitorPanel'
 
 import { GeneratedPermission, AdminSection, UsageRangeKey, AnnouncementSortKey, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, sectionLabels, announcementKindLabels, announcementSortLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, AnnouncementReachMetrics, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
 import { useAdminController } from './useAdminController'
+import { PaginationControls } from './shared/PaginationControls'
 
 export default function AdminDashboardView() {
   const location = useLocation()
   const navigate = useNavigate()
   const activeSection = resolveAdminSection(location.pathname)
   const setActiveSection = (section: AdminSection) => navigate(adminPath(section))
-  const { permission, announcementSort, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, announcements, announcementStats, setAnnouncementSort, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, summary, cdkOpsSummary, cdkFilters, visibleRecords, sortedAnnouncements, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleSaveRiskSettings, addAnnouncement, updateAnnouncement, deleteAnnouncement, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser } = useAdminController()
+  const { cdkSearchInput, setCdkSearchInput, setCdkPage, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, setUserPage, setUserPageSize, userPagination, usersLoading, setRiskPage, setRiskPageSize, riskPagination, riskLoading, permission, announcementSort, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, announcements, announcementStats, setAnnouncementSort, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, summary, cdkOpsSummary, cdkFilters, visibleRecords, sortedAnnouncements, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleSaveRiskSettings, addAnnouncement, updateAnnouncement, deleteAnnouncement, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser } = useAdminController()
 
   if (!activeSection) return <Navigate to={fallbackAdminPath()} replace />
 
@@ -281,12 +282,19 @@ export default function AdminDashboardView() {
                   records={visibleRecords}
                   selected={selectedCdkHashes}
                   filters={cdkFilters}
+                  search={cdkSearchInput}
+                  pagination={cdkPagination}
+                  loading={cdkLoading}
                   busyAction={busyAction}
+                  onSearchChange={setCdkSearchInput}
+                  onPageChange={setCdkPage}
+                  onPageSizeChange={(size) => { setCdkPageSize(size); setCdkPage(1) }}
                   onFilterChange={(patch) => {
                     if (patch.status) setStatusFilter(patch.status)
                     if (patch.permission) setPermissionFilter(patch.permission)
                     if (patch.risk) setRiskFilter(patch.risk)
                     if (patch.generated) setGeneratedFilter(patch.generated)
+                    setCdkPage(1)
                   }}
                   onSelect={setSelectedCdkHashes}
                   onBulkRevoke={handleBulkRevoke}
@@ -319,7 +327,7 @@ export default function AdminDashboardView() {
                   <RiskTrendPanel days={cdkOpsSummary.risk_trend} />
                   <RiskReasonPanel reasons={cdkOpsSummary.risk_reasons} onOpenDetail={loadCdkDetail} />
                 </div>
-                <RiskTable records={riskRecords} busyAction={busyAction} onPatch={patchCdk} onOpenDetail={loadCdkDetail} />
+                <RiskTable records={riskRecords} pagination={riskPagination} loading={riskLoading} busyAction={busyAction} onPageChange={setRiskPage} onPageSizeChange={(size) => { setRiskPageSize(size); setRiskPage(1) }} onPatch={patchCdk} onOpenDetail={loadCdkDetail} />
               </section>
             )}
   
@@ -466,8 +474,16 @@ export default function AdminDashboardView() {
                 <section className="tool-panel overflow-hidden">
                   <div className="border-b border-surface-3 p-4">
                     <h2 className="text-lg font-semibold text-ink-primary">注册用户</h2>
+                    <label className="mt-3 block">
+                      <span className="mb-1.5 block text-xs font-medium text-ink-muted">搜索</span>
+                      <div className="flex gap-2">
+                        <input type="search" value={userSearchInput} onChange={(event) => setUserSearchInput(event.currentTarget.value)} placeholder="搜索邮箱、用户 ID、档案或订单标识" className="tool-field" />
+                        {userSearchInput && <button type="button" onClick={() => setUserSearchInput('')} className="tool-secondary-action px-3 text-sm">清空</button>}
+                      </div>
+                    </label>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto" aria-busy={usersLoading}>
+                    {usersLoading && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在加载…</div>}
                     <table className="min-w-full text-left text-sm">
                       <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
                         <tr>
@@ -481,7 +497,7 @@ export default function AdminDashboardView() {
                       </thead>
                       <tbody className="divide-y divide-surface-3">
                         {appUsers.length === 0 ? (
-                          <tr><td colSpan={6} className="px-4 py-10 text-center text-ink-muted">暂无注册用户。</td></tr>
+                          <tr><td colSpan={6} className="px-4 py-10 text-center text-ink-muted">{userSearchInput ? '没有匹配的用户，请调整搜索条件。' : '暂无注册用户。'}</td></tr>
                         ) : appUsers.map((item) => (
                           <tr key={item.id} className="hover:bg-surface-2/50">
                             <td className="px-4 py-4 font-medium text-ink-primary">{item.email}</td>
@@ -502,6 +518,7 @@ export default function AdminDashboardView() {
                       </tbody>
                     </table>
                   </div>
+                  <PaginationControls pagination={userPagination} loading={usersLoading} onPageChange={setUserPage} onPageSizeChange={(size) => { setUserPageSize(size); setUserPage(1) }} />
                 </section>
                 {selectedUserDetail && (
                   <UserDetailDialog

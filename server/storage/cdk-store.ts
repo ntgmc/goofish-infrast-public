@@ -153,6 +153,44 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
       )
       return result.rows.map((row) => row.record_json)
     },
+    listAdminPage: async (options) => {
+      await ensureSchema()
+      const values: unknown[] = []
+      const conditions = ["key like 'cdk/%'"]
+      const add = (value: unknown) => {
+        values.push(value)
+        return `$${values.length}`
+      }
+      if (options.status !== 'all') conditions.push(`status = ${add(options.status)}`)
+      if (options.permission !== 'all') conditions.push(`permission = ${add(options.permission)}`)
+      if (options.search) {
+        const search = add(`%${options.search.toLowerCase()}%`)
+        conditions.push(`(
+          lower(code_hash) like ${search}
+          or lower(coalesce(license_order_hash, '')) like ${search}
+          or lower(coalesce(record_json->>'order_note', '')) like ${search}
+        )`)
+      }
+      const riskExpression = `(status = 'frozen' or jsonb_array_length(coalesce(record_json->'risk_events', '[]'::jsonb)) > 0)`
+      const generatedExpression = `coalesce(nullif(record_json->>'schedule_generate_count', '')::integer, 0) > 0`
+      if (options.riskOnly) conditions.push(riskExpression)
+      if (options.risk !== 'all') conditions.push(options.risk === 'yes' ? riskExpression : `not ${riskExpression}`)
+      if (options.generated !== 'all') conditions.push(options.generated === 'yes' ? generatedExpression : `not (${generatedExpression})`)
+
+      const where = conditions.join(' and ')
+      const countResult = await query<{ total: string }>(`select count(*)::text as total from cdk_records where ${where}`, values)
+      const total = Number(countResult.rows[0]?.total ?? 0)
+      const totalPages = total === 0 ? 0 : Math.ceil(total / options.pageSize)
+      const page = totalPages === 0 ? 1 : Math.min(options.page, totalPages)
+      const limit = add(options.pageSize)
+      const offset = add((page - 1) * options.pageSize)
+      const result = await query<{ record_json: CdkRecord }>(
+        `select record_json from cdk_records where ${where}
+         order by created_at desc nulls last, key asc limit ${limit} offset ${offset}`,
+        values,
+      )
+      return { records: result.rows.map((row) => row.record_json), total, page, totalPages }
+    },
   }
 }
 
