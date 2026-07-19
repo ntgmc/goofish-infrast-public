@@ -3,7 +3,7 @@ import type { OptimizeConfigPermission } from './shared';
 import { hasCapability } from '../../../src/lib/product-catalog';
 import { enforceLayoutOptimizationMode } from '../layout-policy';
 
-export function asConfigRecord(value: unknown): Record<string, unknown> | null {
+function asConfigRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
@@ -77,7 +77,7 @@ export function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-export function normalizeErrorBody(body: unknown, status: number): unknown {
+function normalizeErrorBody(body: unknown, status: number): unknown {
   if (!body || typeof body !== "object" || Array.isArray(body)) return body;
   const record = body as Record<string, unknown>;
   if (typeof record.error !== "string") return body;
@@ -91,7 +91,7 @@ export function normalizeErrorBody(body: unknown, status: number): unknown {
   };
 }
 
-export function errorCodeForStatus(status: number): string {
+function errorCodeForStatus(status: number): string {
   if (status === 400) return "invalid_request";
   if (status === 401) return "authentication_required";
   if (status === 403) return "permission_denied";

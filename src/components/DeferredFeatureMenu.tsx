@@ -20,21 +20,6 @@ const deferredFeatures: DeferredFeature[] = [
     status: copy.common.components_DeferredFeatureMenu_006,
     href: '/tools/schedule-analysis',
   },
-  {
-    title: copy.common.components_DeferredFeatureMenu_007,
-    description: copy.common.components_DeferredFeatureMenu_008,
-    status: copy.common.components_DeferredFeatureMenu_009,
-  },
-  {
-    title: copy.common.components_DeferredFeatureMenu_010,
-    description: copy.common.components_DeferredFeatureMenu_011,
-    status: copy.common.components_DeferredFeatureMenu_012,
-  },
-  {
-    title: copy.common.components_DeferredFeatureMenu_013,
-    description: copy.common.components_DeferredFeatureMenu_014,
-    status: copy.common.components_DeferredFeatureMenu_015,
-  },
 ]
 
 interface DeferredFeatureMenuProps {
@@ -44,7 +29,7 @@ interface DeferredFeatureMenuProps {
 export default function DeferredFeatureMenu({ className = '' }: DeferredFeatureMenuProps) {
   return (
     <details className={`group relative z-20 flex-shrink-0 ${className}`}>
-      <summary className="tool-secondary-action flex min-h-11 cursor-pointer list-none gap-2 px-3 text-sm [&::-webkit-details-marker]:hidden">
+      <summary className="tool-secondary-action flex h-11 cursor-pointer list-none gap-2 px-3 py-0 text-sm [&::-webkit-details-marker]:hidden">
         {copy.common.components_DeferredFeatureMenu_016}<svg
           className="h-4 w-4 transition-transform duration-150 group-open:rotate-180"
           fill="none"

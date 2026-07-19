@@ -2,11 +2,15 @@ import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
 import {
   discardOptimizationDeadLetter,
+  getAdminOptimizationQueueSnapshot,
   listOptimizationDeadLetters,
   replayOptimizationDeadLetter,
   type OptimizationDeadLetterRecord,
 } from '../storage/optimize-job-store'
-import { kickOptimizeJobProcessing } from '../optimize-job-runner'
+import {
+  getOptimizeGlobalWorkerConcurrency,
+  kickOptimizeJobProcessing,
+} from '../optimize-job-runner'
 
 export default async function adminOptimizationHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -16,6 +20,14 @@ export default async function adminOptimizationHandler(req: Request): Promise<Re
   try {
     if (req.method === 'GET') {
       const url = new URL(req.url)
+      const view = url.searchParams.get('view')
+      if (view === 'queue') {
+        return noStore(jsonResponse(await getAdminOptimizationQueueSnapshot(
+          getOptimizeGlobalWorkerConcurrency(),
+          20,
+        )))
+      }
+      if (view) return jsonResponse({ error: '不支持的异步任务视图。' }, 400)
       const rawStatus = url.searchParams.get('status')
       const status = isDeadLetterStatus(rawStatus) ? rawStatus : null
       const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') ?? 50) || 50))

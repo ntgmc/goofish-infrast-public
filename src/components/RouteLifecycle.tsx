@@ -49,7 +49,8 @@ export default function RouteLifecycle() {
 }
 
 function focusRouteTarget(): boolean {
-  const focusTarget = document.querySelector<HTMLElement>('[data-route-focus]')
+  const focusTargets = document.querySelectorAll<HTMLElement>('[data-route-focus]:not([inert] [data-route-focus])')
+  const focusTarget = focusTargets.item(focusTargets.length - 1)
   if (!focusTarget) return false
   focusTarget.focus({ preventScroll: true })
   return true

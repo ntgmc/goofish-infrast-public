@@ -35,7 +35,7 @@ describe('OptimizationTaskCenter', () => {
     render(<Harness controller={controller({ activeCount: 2, attentionCount: 1 })} />)
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '打开异步任务中心，2 个进行中，1 个任务需要关注' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '打开异步任务中心，2 个进行中，1 个任务需要关注' })).toHaveClass('h-11', 'py-0')
     expect(screen.getByText('2')).toBeInTheDocument()
     expect(screen.getByText('!')).toBeInTheDocument()
   })

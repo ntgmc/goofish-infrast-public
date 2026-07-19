@@ -8,6 +8,7 @@ import {
   type PreparedResult,
 } from './formatters'
 import MetricCard from './MetricCard'
+import { StaggeredReveal } from '../MotionPrimitives'
 import { copy } from '../../copy/index'
 
 
@@ -64,7 +65,7 @@ export default function ResultMetrics({
           </ul>
         </div>
       ) : null}
-      <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
+      <StaggeredReveal className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
         {isAnalysis ? (
           <MetricCard
             label={copy.domain.components_result_panel_ResultMetrics_010}
@@ -117,7 +118,7 @@ export default function ResultMetrics({
             )}
           </>
         )}
-      </div>
+      </StaggeredReveal>
       {intermediateDepletionSummary && (
         <div className="border-t border-surface-3/60 px-5 py-3 text-xs leading-5 text-ink-secondary sm:px-6">
           <span className="font-medium text-ink-primary">{copy.domain.components_result_panel_ResultMetrics_034}</span>{intermediateDepletionSummary}

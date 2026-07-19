@@ -1,4 +1,4 @@
-import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode } from "./types";
+import type { LicenseFile, LicenseOperator, PermissionMode } from "./types";
 import { hasCapability, normalizeRuntimePermission } from './product-catalog'
 
 
@@ -29,15 +29,4 @@ export function canEditConfig(license: LicenseFile): boolean {
 
 export function canUseScenarioComparison(license: LicenseFile): boolean {
   return hasCapability({ permission: license.permission }, 'run_scenario_comparison')
-}
-
-export function isIntermediateAutoConfig(config: LicenseConfig | null | undefined): boolean {
-  return config?.auto_balance_source === "intermediate_inventory" || config?.auto_balance_source === "limited_config";
-}
-
-export function canUseIntermediateAutoConfig(
-  license: LicenseFile,
-  config: LicenseConfig | null | undefined
-): boolean {
-  return hasCapability({ permission: license.permission }, 'use_intermediate_auto_config') && isIntermediateAutoConfig(config)
 }

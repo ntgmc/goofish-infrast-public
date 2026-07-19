@@ -164,6 +164,9 @@ jobs:
       - name: Generate data
         run: npm run generate:data
 
+      - name: Check dead code
+        run: npm run check:dead-code
+
       - name: Run unit tests
         run: npm test
 

@@ -1011,7 +1011,7 @@ function normalizeCredentialSource(value: unknown): CredentialSource {
   return value === 'bookmarklet' ? 'bookmarklet' : 'manual'
 }
 
-export function extractSklandCredential(value: unknown): string | null {
+function extractSklandCredential(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const input = value.trim()
   if (!input) return null

@@ -152,7 +152,7 @@ export function buildCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummary {
   }
 }
 
-export function buildRiskTrendDays(trendMap: Map<string, RiskTrendDay>): RiskTrendDay[] {
+function buildRiskTrendDays(trendMap: Map<string, RiskTrendDay>): RiskTrendDay[] {
   const dates: string[] = []
   const now = new Date()
   for (let offset = 13; offset >= 0; offset -= 1) {
@@ -174,11 +174,11 @@ export function getDateOffsetString(offset: number): string {
   return date.toISOString().slice(0, 10)
 }
 
-export function isDateInputString(value: string): boolean {
+function isDateInputString(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
-export function normalizeUsageTotals(value: Partial<UsageTotals> | undefined): UsageTotals {
+function normalizeUsageTotals(value: Partial<UsageTotals> | undefined): UsageTotals {
   return {
     unique_visitors: normalizeCount(value?.unique_visitors),
     visits: normalizeCount(value?.visits),
@@ -196,7 +196,7 @@ export function normalizeUsageTotals(value: Partial<UsageTotals> | undefined): U
   }
 }
 
-export function normalizeUsageDay(day: Partial<UsageDay>): UsageDay {
+function normalizeUsageDay(day: Partial<UsageDay>): UsageDay {
   return { date: typeof day.date === 'string' ? day.date : '', ...normalizeUsageTotals(day) }
 }
 
@@ -219,7 +219,7 @@ export function normalizeUsageStats(value: Partial<UsageStatsResponse>): UsageSt
   }
 }
 
-export function normalizeUsageRange(value: Partial<UsageRange> | undefined, days: UsageDay[]): UsageRange {
+function normalizeUsageRange(value: Partial<UsageRange> | undefined, days: UsageDay[]): UsageRange {
   return {
     from: typeof value?.from === 'string' ? value.from : days[0]?.date ?? '',
     to: typeof value?.to === 'string' ? value.to : days[days.length - 1]?.date ?? '',
@@ -227,7 +227,7 @@ export function normalizeUsageRange(value: Partial<UsageRange> | undefined, days
   }
 }
 
-export function normalizeFunnelStep(value: Partial<UsageFunnelStep>): UsageFunnelStep {
+function normalizeFunnelStep(value: Partial<UsageFunnelStep>): UsageFunnelStep {
   return {
     key: typeof value.key === 'string' ? value.key : '',
     label: typeof value.label === 'string' ? value.label : '',
@@ -237,7 +237,7 @@ export function normalizeFunnelStep(value: Partial<UsageFunnelStep>): UsageFunne
   }
 }
 
-export function normalizeFailureReason(value: Partial<UsageFailureReason>): UsageFailureReason {
+function normalizeFailureReason(value: Partial<UsageFailureReason>): UsageFailureReason {
   return {
     reason_code: typeof value.reason_code === 'string' ? value.reason_code : 'unknown_failure',
     count: normalizeCount(value.count),
@@ -247,7 +247,7 @@ export function normalizeFailureReason(value: Partial<UsageFailureReason>): Usag
   }
 }
 
-export function normalizeFailureSample(value: Partial<UsageFailureSample>): UsageFailureSample {
+function normalizeFailureSample(value: Partial<UsageFailureSample>): UsageFailureSample {
   return {
     created_at: typeof value.created_at === 'string' ? value.created_at : '',
     event: typeof value.event === 'string' ? value.event : '',
@@ -260,7 +260,7 @@ export function normalizeFailureSample(value: Partial<UsageFailureSample>): Usag
   }
 }
 
-export function normalizeLatencyStats(value: Partial<UsageLatencyStats> | undefined): UsageLatencyStats {
+function normalizeLatencyStats(value: Partial<UsageLatencyStats> | undefined): UsageLatencyStats {
   return {
     average_ms: normalizeCount(value?.average_ms),
     p50_ms: normalizeCount(value?.p50_ms),
@@ -278,7 +278,7 @@ export function normalizeLatencyStats(value: Partial<UsageLatencyStats> | undefi
   }
 }
 
-export function normalizeSklandStats(value: Partial<UsageSklandStats> | undefined): UsageSklandStats {
+function normalizeSklandStats(value: Partial<UsageSklandStats> | undefined): UsageSklandStats {
   return {
     attempts: normalizeCount(value?.attempts),
     success: normalizeCount(value?.success),
@@ -300,7 +300,7 @@ export function normalizeSklandStats(value: Partial<UsageSklandStats> | undefine
   }
 }
 
-export function normalizeAnnouncementStats(value: Partial<UsageAnnouncementStats> | undefined): UsageAnnouncementStats {
+function normalizeAnnouncementStats(value: Partial<UsageAnnouncementStats> | undefined): UsageAnnouncementStats {
   return {
     impressions: normalizeCount(value?.impressions),
     reads: normalizeCount(value?.reads),
@@ -309,7 +309,7 @@ export function normalizeAnnouncementStats(value: Partial<UsageAnnouncementStats
   }
 }
 
-export function normalizeCdkDistributionItem(value: Partial<UsageCdkDistributionItem>): UsageCdkDistributionItem {
+function normalizeCdkDistributionItem(value: Partial<UsageCdkDistributionItem>): UsageCdkDistributionItem {
   return {
     permission: typeof value.permission === 'string' ? value.permission : 'unknown',
     total: normalizeCount(value.total),
@@ -326,11 +326,11 @@ export function normalizeRiskSettings(value: Partial<RiskControlSettings> | null
   }
 }
 
-export function normalizeCount(value: unknown): number {
+function normalizeCount(value: unknown): number {
   return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : 0
 }
 
-export function normalizeNumber(value: unknown): number {
+function normalizeNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value * 10) / 10 : 0
 }
 
@@ -359,7 +359,7 @@ export function normalizeAnnouncementStatsMap(
   )
 }
 
-export function normalizeAnnouncementReachStats(value: Partial<AnnouncementReachStats> | undefined): AnnouncementReachStats {
+function normalizeAnnouncementReachStats(value: Partial<AnnouncementReachStats> | undefined): AnnouncementReachStats {
   return {
     impressions: normalizeCount(value?.impressions),
     reads: normalizeCount(value?.reads),
@@ -386,15 +386,15 @@ export function sortAnnouncements(items: Announcement[], sort: AnnouncementSortK
   })
 }
 
-export function compareAnnouncementUpdatedAt(left: Announcement, right: Announcement): number {
+function compareAnnouncementUpdatedAt(left: Announcement, right: Announcement): number {
   return (Date.parse(left.updated_at) || 0) - (Date.parse(right.updated_at) || 0)
 }
 
-export function compareAnnouncementUpdatedAtDesc(left: Announcement, right: Announcement): number {
+function compareAnnouncementUpdatedAtDesc(left: Announcement, right: Announcement): number {
   return compareAnnouncementUpdatedAt(right, left)
 }
 
-export function announcementKindRank(kind: AnnouncementKind): number {
+function announcementKindRank(kind: AnnouncementKind): number {
   return kind === 'banner' ? 0 : 1
 }
 
@@ -411,7 +411,7 @@ export function createDraftAnnouncement(kind: AnnouncementKind): Announcement {
   }
 }
 
-export function createDraftId(): string {
+function createDraftId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return `draft_${crypto.randomUUID()}`
   return `draft_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
@@ -603,7 +603,7 @@ export function buildGeneratedCdkCsv(cdks: GeneratedCdk[]): string {
   return rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
 }
 
-export function csvCell(value: string): string {
+function csvCell(value: string): string {
   if (!/[",\r\n]/.test(value)) return value
   return `"${value.replace(/"/g, '""')}"`
 }
@@ -622,7 +622,7 @@ export function downloadOperatorsJson(data: AdminProfileOperatorData): void {
   downloadBlob(blob, `skland-operators-${formatFileSegment(data.profile.id)}-${formatDownloadTimestamp()}.json`)
 }
 
-export function formatFileSegment(value: string): string {
+function formatFileSegment(value: string): string {
   return value.slice(0, 8).replace(/[^A-Za-z0-9_-]/g, '') || 'profile'
 }
 
@@ -659,7 +659,7 @@ export function formatRiskDetail(detail: Record<string, unknown>): string {
   return visible.length > 0 ? visible.join(' / ') : '已隐藏敏感详情'
 }
 
-export function formatRiskValue(value: unknown): string {
+function formatRiskValue(value: unknown): string {
   if (value === null || value === undefined) return '-'
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (Array.isArray(value)) return `${value.length} 项`

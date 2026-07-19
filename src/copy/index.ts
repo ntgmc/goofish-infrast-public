@@ -21,17 +21,3 @@ export const copy = {
   metadata: metadataCopy,
   domain: domainCopy,
 } as const
-
-export type CopyCatalog = typeof copy
-
-export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
-  return value.toLocaleString(CURRENT_LOCALE, options)
-}
-
-export function formatDate(value: Date | number | string, options?: Intl.DateTimeFormatOptions): string {
-  return new Date(value).toLocaleDateString(CURRENT_LOCALE, options)
-}
-
-export function formatDateTime(value: Date | number | string, options?: Intl.DateTimeFormatOptions): string {
-  return new Date(value).toLocaleString(CURRENT_LOCALE, { hour12: false, ...options })
-}

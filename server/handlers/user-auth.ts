@@ -1,9 +1,8 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import type { Announcement, AuthSuccessResponse, AuthUser, PermissionMode, UserGameAccount } from '../../src/lib/types'
+import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../src/lib/types'
 import {
   deleteSessionByTokenHash,
   deleteSessionsForUser,
-  deleteUserAccount,
   emptyWorkspace,
   getAnnouncementReads,
   getPasswordResetTokenByHash,
@@ -14,7 +13,6 @@ import {
   getUserById,
   listProfileWorkspaces,
   listProfilesForUser,
-  markAnnouncementRead,
   migrateLegacyUserIfNeeded,
   resetUserPasswordWithToken,
   savePasswordResetToken,
@@ -71,7 +69,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ANNOUNCEMENT_KEY = 'current.json'
 const PASSWORD_RESET_DEFAULT_TTL_MINUTES = 30
 const PASSWORD_RESET_RESEND_WINDOW_MS = 1000 * 60 * 5
-export const PASSWORD_RESET_REQUEST_MESSAGE = 'If the email exists, a reset link has been sent.'
+const PASSWORD_RESET_REQUEST_MESSAGE = 'If the email exists, a reset link has been sent.'
 const PASSWORD_RESET_INVALID_MESSAGE = 'The reset link is invalid or expired.'
 
 export interface AuthContext {
@@ -99,7 +97,7 @@ export function normalizeEmail(value: unknown): string | null {
   return EMAIL_PATTERN.test(email) && email.length <= 254 ? email : null
 }
 
-export function validatePassword(value: unknown): { ok: true; password: string } | { ok: false; message: string } {
+function validatePassword(value: unknown): { ok: true; password: string } | { ok: false; message: string } {
   if (typeof value !== 'string') return { ok: false, message: 'Password must be a string.' }
   if (value.length < 8) return { ok: false, message: 'Password must be at least 8 characters.' }
   if (value.length > 128) return { ok: false, message: 'Password must be at most 128 characters.' }
@@ -649,16 +647,10 @@ export function toPublicUser(user: UserAccountRecord): AuthUser {
   }
 }
 
-export async function getAnnouncementUnreadCount(userId: string): Promise<number> {
+async function getAnnouncementUnreadCount(userId: string): Promise<number> {
   const announcements = await getActiveAnnouncements()
   const readIds = new Set((await getAnnouncementReads(userId)).map((read) => read.announcement_id))
   return announcements.filter((announcement) => !readIds.has(announcement.id)).length
-}
-
-export async function markAnnouncementsRead(userId: string, announcementIds: string[]): Promise<void> {
-  for (const announcementId of announcementIds) {
-    await markAnnouncementRead(userId, announcementId)
-  }
 }
 
 export async function getActiveAnnouncements(): Promise<Announcement[]> {
