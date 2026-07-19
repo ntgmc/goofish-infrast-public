@@ -25,13 +25,12 @@ export default function AuthPage({
               <DeferredFeatureMenu />
             </div>
           </div>
-          <p className="tool-eyebrow mt-12">{copy.auth.pages_tool_AuthPage_001}</p>
-          <h1 className="sr-only">{copy.auth.pages_tool_AuthPage_002}</h1>
-          <p className="mt-4 text-4xl font-semibold leading-[1.08] tracking-[-0.035em] text-ink-primary sm:text-5xl">
-            {copy.auth.pages_tool_AuthPage_003}</p>
+          <p className="public-kicker mt-12">{copy.auth.pages_tool_AuthPage_001}</p>
+          <h1 aria-label={copy.auth.pages_tool_AuthPage_002} className="display-title mt-4 text-4xl leading-[1.08] text-ink-primary sm:text-5xl">
+            {copy.auth.pages_tool_AuthPage_003}</h1>
           <p className="mt-5 max-w-lg text-base leading-7 text-ink-secondary">
             {copy.auth.pages_tool_AuthPage_004}</p>
-          <dl className="mt-8 grid gap-px overflow-hidden rounded-xl border border-surface-3 bg-surface-3 sm:grid-cols-3">
+          <dl className="landing-fact-strip mt-8">
             <AuthFact label={copy.auth.pages_tool_AuthPage_005} value={copy.auth.pages_tool_AuthPage_006} />
             <AuthFact label={copy.auth.pages_tool_AuthPage_007} value={copy.auth.pages_tool_AuthPage_008} />
             <AuthFact label={copy.auth.pages_tool_AuthPage_009} value="MAA JSON" />
@@ -40,7 +39,7 @@ export default function AuthPage({
         </section>
 
         <section className="tool-panel p-5 sm:p-7" aria-label={copy.auth.pages_tool_AuthPage_010}>
-          <p className="tool-eyebrow">{copy.auth.pages_tool_AuthPage_011}</p>
+          <p className="section-index">{copy.auth.pages_tool_AuthPage_011}</p>
           <h2 className="mt-2 text-xl font-semibold text-ink-primary">{copy.auth.pages_tool_AuthPage_012}</h2>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.auth.pages_tool_AuthPage_013}</p>
           <div className="mt-6">
@@ -54,7 +53,7 @@ export default function AuthPage({
 
 function AuthFact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-surface-1 px-4 py-4">
+    <div className="px-4 py-4">
       <dt className="text-xs font-medium text-ink-muted">{label}</dt>
       <dd className="mt-2 text-sm font-semibold text-ink-primary">{value}</dd>
     </div>

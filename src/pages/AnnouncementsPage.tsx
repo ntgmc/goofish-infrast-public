@@ -35,11 +35,11 @@ export default function AnnouncementsPage() {
 
   return (
     <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="tool-page-frame max-w-3xl">
+      <div className="public-document">
         <div className="tool-page-header flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="tool-eyebrow">{copy.public.pages_AnnouncementsPage_002}</p>
-            <h1 className="text-2xl font-semibold">{copy.public.pages_AnnouncementsPage_003}</h1>
+            <p className="section-index">{copy.public.pages_AnnouncementsPage_002}</p>
+            <h1 className="display-title text-2xl">{copy.public.pages_AnnouncementsPage_003}</h1>
             <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pages_AnnouncementsPage_004}</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -56,9 +56,9 @@ export default function AnnouncementsPage() {
             {copy.public.pages_AnnouncementsPage_007}</div>
         )}
 
-        <div className="mt-6 space-y-4">
+        <div className="mt-6 border-t border-surface-4">
           {announcements.map((announcement) => (
-            <article key={announcement.id} className="tool-panel p-4">
+            <article key={announcement.id} className="border-b border-surface-3 py-6">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="tool-status">
                   {announcement.kind === 'banner' ? copy.public.pages_AnnouncementsPage_008 : copy.public.pages_AnnouncementsPage_009}

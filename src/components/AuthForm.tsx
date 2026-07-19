@@ -129,13 +129,15 @@ export default function AuthForm({
   return (
     <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'tool-panel space-y-5 p-6 sm:p-8'}>
       <div className="tool-inset grid grid-cols-2 p-1" role="group" aria-label={copy.auth.components_AuthForm_007}>
-        <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_008}</button>
-        <button type="button" aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_009}</button>
+        <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_008}</button>
+        <button type="button" aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_009}</button>
       </div>
 
       {intro && <p className="text-sm leading-6 text-ink-secondary">{intro}</p>}
-      {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
-      {notice && <div className="tool-alert tool-alert--success" role="status" aria-live="polite">{notice}</div>}
+      <div className="auth-feedback-slot" aria-live="polite">
+        {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
+        {notice && <div className="tool-alert tool-alert--success" role="status">{notice}</div>}
+      </div>
       {mode === 'forgot' && <h2 className="text-lg font-semibold text-ink-primary">{copy.auth.components_AuthForm_010}</h2>}
 
       <label className="block">
@@ -154,7 +156,7 @@ export default function AuthForm({
           aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
           autoComplete="email"
         />
-        {fieldErrors.email && <p id="auth-email-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.email}</p>}
+        <FieldMessage id="auth-email-error" message={fieldErrors.email} />
       </label>
 
       {mode !== 'forgot' && (
@@ -174,7 +176,7 @@ export default function AuthForm({
             aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
             autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
           />
-          {fieldErrors.password && <p id="auth-password-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.password}</p>}
+          <FieldMessage id="auth-password-error" message={fieldErrors.password} />
         </label>
       )}
 
@@ -203,7 +205,7 @@ export default function AuthForm({
             aria-invalid={Boolean(fieldErrors.inviteCode)}
             aria-describedby={fieldErrors.inviteCode ? 'auth-invite-code-error' : undefined}
           />
-          {fieldErrors.inviteCode && <p id="auth-invite-code-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.inviteCode}</p>}
+          <FieldMessage id="auth-invite-code-error" message={fieldErrors.inviteCode} />
         </label>
       )}
 
@@ -265,4 +267,12 @@ function inputClassName(hasError: boolean): string {
     ? 'border-error/70 bg-error/10 focus:border-error focus:ring-error/20'
     : ''
   return `${base} ${state}`
+}
+
+function FieldMessage({ id, message }: { id: string; message?: string }) {
+  return (
+    <p id={id} className={`auth-field-message ${message ? '' : 'invisible'}`} role={message ? 'alert' : undefined} aria-hidden={!message}>
+      {message ?? '\u00A0'}
+    </p>
+  )
 }

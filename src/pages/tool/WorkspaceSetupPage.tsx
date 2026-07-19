@@ -240,7 +240,7 @@ export default function WorkspaceSetupPage({
               <BrandLogo size="sm" className="lg:hidden" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-brand-400">{profile.display_name}</p>
-                <h1 className="mt-1 text-xl font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_019}</h1>
+                <h1 className="display-title mt-1 text-xl text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_019}</h1>
                 <p className="mt-1 text-sm text-ink-muted">{copy.workspace.pages_tool_WorkspaceSetupPage_020}</p>
               </div>
             </div>

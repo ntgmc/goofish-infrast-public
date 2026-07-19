@@ -53,10 +53,10 @@ export default function ResetPasswordPage() {
     <main className="tool-shell flex min-h-dvh items-center justify-center px-4 py-6 sm:px-6 sm:py-10" tabIndex={-1} data-route-focus>
       <form onSubmit={handleSubmit} noValidate className="tool-panel w-full max-w-md p-6 sm:p-8">
         <div className="flex items-center justify-between gap-3">
-          <p className="tool-eyebrow">{copy.auth.pages_ResetPasswordPage_006}</p>
+          <p className="section-index">{copy.auth.pages_ResetPasswordPage_006}</p>
           <ThemeSwitcher />
         </div>
-        <h1 className="mt-2 text-2xl font-semibold text-ink-primary">{copy.auth.pages_ResetPasswordPage_007}</h1>
+        <h1 className="display-title mt-2 text-2xl text-ink-primary">{copy.auth.pages_ResetPasswordPage_007}</h1>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.auth.pages_ResetPasswordPage_008}</p>
 
         {error && <div className="tool-alert tool-alert--error mt-5" role="alert">{error}</div>}
@@ -80,7 +80,7 @@ export default function ResetPasswordPage() {
                 aria-describedby={fieldErrors.password ? 'reset-password-error' : undefined}
                 autoComplete="new-password"
               />
-              {fieldErrors.password && <p id="reset-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.password}</p>}
+              <p id="reset-password-error" className={`auth-field-message ${fieldErrors.password ? '' : 'invisible'}`} aria-hidden={!fieldErrors.password}>{fieldErrors.password ?? '\u00A0'}</p>
             </label>
 
             <label className="mt-4 block">
@@ -99,7 +99,7 @@ export default function ResetPasswordPage() {
                 aria-describedby={fieldErrors.confirmPassword ? 'reset-confirm-password-error' : undefined}
                 autoComplete="new-password"
               />
-              {fieldErrors.confirmPassword && <p id="reset-confirm-password-error" className="mt-1.5 text-sm text-error">{fieldErrors.confirmPassword}</p>}
+              <p id="reset-confirm-password-error" className={`auth-field-message ${fieldErrors.confirmPassword ? '' : 'invisible'}`} aria-hidden={!fieldErrors.confirmPassword}>{fieldErrors.confirmPassword ?? '\u00A0'}</p>
             </label>
 
             <button type="submit" disabled={!token || loading} className="tool-primary-action mt-6 w-full">

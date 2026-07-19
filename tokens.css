@@ -1,0 +1,125 @@
+/* Hallmark · pre-emit critique: P5 H4 E4 S5 R5 V5
+ * scope: app · genre: modern-minimal
+ * macrostructures: marketing=Workbench · application=Workbench · content=Long Document
+ * theme: custom tuned · vibe: "technical, restrained, precise, trustworthy"
+ * axes: light / geometric-sans / cool-violet · enrichment: existing-product-captures
+ * nav: N9 public + existing side rail app · footer: Ft2 · studied: no
+ * contrast: pass (40–41) · slop: pass (42–49) · mobile: static-pass (34, 49–57)
+ */
+
+:root,
+.light {
+  --color-paper: oklch(0.985 0.008 285);
+  --color-paper-2: oklch(0.958 0.012 285);
+  --color-paper-3: oklch(0.925 0.014 285);
+  --color-paper-4: oklch(0.865 0.016 285);
+  --color-ink: oklch(0.205 0.018 285);
+  --color-ink-2: oklch(0.390 0.016 285);
+  --color-muted: oklch(0.455 0.018 285);
+  --color-rule: oklch(0.820 0.016 285);
+  --color-rule-2: oklch(0.885 0.014 285);
+  --color-accent: oklch(0.470 0.185 285);
+  --color-accent-hover: oklch(0.420 0.175 285);
+  --color-accent-ink: oklch(0.985 0.008 285);
+  --color-focus: oklch(0.550 0.220 285);
+
+  --palette-brand-50: oklch(0.965 0.018 285);
+  --palette-brand-100: oklch(0.925 0.034 285);
+  --palette-brand-200: oklch(0.840 0.070 285);
+  --palette-brand-300: oklch(0.535 0.155 285);
+  --palette-brand-400: oklch(0.495 0.175 285);
+  --palette-brand-500: var(--color-accent);
+  --palette-brand-600: oklch(0.425 0.175 285);
+  --palette-brand-700: oklch(0.365 0.150 285);
+  --palette-brand-800: oklch(0.305 0.115 285);
+  --palette-brand-900: oklch(0.245 0.080 285);
+  --palette-brand-950: oklch(0.180 0.045 285);
+
+  --color-positive: oklch(0.430 0.125 153);
+  --color-negative: oklch(0.470 0.185 27);
+  --color-caution: oklch(0.420 0.115 78);
+  --menu-shadow: oklch(0.205 0.018 285 / 0.14);
+  --tour-scrim: oklch(0.145 0.014 285 / 0.72);
+
+  --share-bg-start: oklch(0.270 0.055 235);
+  --share-bg-mid: oklch(0.230 0.050 265);
+  --share-bg-end: oklch(0.175 0.035 285);
+  --share-ink: oklch(0.965 0.010 285);
+  --share-muted: oklch(0.800 0.018 285);
+  --share-accent: oklch(0.790 0.145 285);
+  --share-accent-alt: oklch(0.790 0.130 78);
+  --share-orbit: oklch(0.790 0.145 285 / 0.18);
+  --share-orbit-alt: oklch(0.790 0.130 78 / 0.11);
+  --share-panel: oklch(0.965 0.010 285 / 0.10);
+  --share-panel-subtle: oklch(0.965 0.010 285 / 0.075);
+
+  --font-display: "Noto Sans SC Variable", "Microsoft YaHei", sans-serif;
+  --font-body: "Geist Variable", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 8rem;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.25rem;
+  --text-3xl: 3rem;
+  --text-display: clamp(2.75rem, 6vw, 5.5rem);
+
+  --page-gutter: clamp(1rem, 4vw, 2.5rem);
+  --content-max: 80rem;
+  --reading-measure: 65ch;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 160ms;
+  --dur-base: 220ms;
+  --dur-slow: 300ms;
+  --radius-card: 10px;
+  --radius-input: 7px;
+  --radius-pill: 999px;
+  --nav-height: 5rem;
+}
+
+.dark {
+  --color-paper: oklch(0.145 0.014 285);
+  --color-paper-2: oklch(0.180 0.016 285);
+  --color-paper-3: oklch(0.225 0.018 285);
+  --color-paper-4: oklch(0.300 0.020 285);
+  --color-ink: oklch(0.940 0.010 285);
+  --color-ink-2: oklch(0.760 0.016 285);
+  --color-muted: oklch(0.650 0.018 285);
+  --color-rule: oklch(0.340 0.020 285);
+  --color-rule-2: oklch(0.270 0.018 285);
+  --color-accent: oklch(0.740 0.155 285);
+  --color-accent-hover: oklch(0.790 0.145 285);
+  --color-accent-ink: oklch(0.180 0.025 285);
+  --color-focus: oklch(0.790 0.190 285);
+
+  --palette-brand-50: oklch(0.950 0.018 285);
+  --palette-brand-100: oklch(0.900 0.035 285);
+  --palette-brand-200: oklch(0.845 0.070 285);
+  --palette-brand-300: oklch(0.805 0.105 285);
+  --palette-brand-400: oklch(0.770 0.135 285);
+  --palette-brand-500: var(--color-accent);
+  --palette-brand-600: oklch(0.650 0.155 285);
+  --palette-brand-700: oklch(0.560 0.145 285);
+  --palette-brand-800: oklch(0.440 0.115 285);
+  --palette-brand-900: oklch(0.315 0.075 285);
+  --palette-brand-950: oklch(0.205 0.045 285);
+
+  --color-positive: oklch(0.720 0.130 153);
+  --color-negative: oklch(0.720 0.165 27);
+  --color-caution: oklch(0.790 0.130 78);
+  --menu-shadow: oklch(0.050 0.012 285 / 0.36);
+}

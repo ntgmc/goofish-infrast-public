@@ -10,9 +10,9 @@ export default function PricingPage() {
   const support = productPolicies.support
   return (
     <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="tool-page-frame max-w-6xl">
-        <header className="tool-page-header flex flex-wrap items-center justify-between gap-4">
-          <Link to="/" className="tool-nav-link flex items-center gap-3 px-3 text-left">
+      <div className="public-shell">
+        <header className="public-nav flex-wrap">
+          <Link to="/" className="flex min-w-0 items-center gap-3 text-left">
             <BrandLogo size="md" />
             <span className="text-sm font-semibold text-ink-primary">{copy.public.pages_PricingPage_001}</span>
           </Link>
@@ -23,18 +23,18 @@ export default function PricingPage() {
           </nav>
         </header>
 
-        <section className="tool-panel mt-6 overflow-hidden p-6 sm:mt-8 sm:p-8">
-          <p className="tool-eyebrow">{copy.public.pages_PricingPage_002}</p>
-          <h1 className="mt-3 text-3xl font-semibold text-ink-primary sm:text-4xl">{copy.public.pages_PricingPage_001}</h1>
+        <section className="border-b border-surface-4 py-12 sm:py-16">
+          <p className="public-kicker">{copy.public.pages_PricingPage_002}</p>
+          <h1 className="display-title mt-3 text-3xl text-ink-primary sm:text-4xl">{copy.public.pages_PricingPage_001}</h1>
           <p className="mt-4 max-w-3xl text-base leading-7 text-ink-secondary">{copy.public.pages_PricingPage_003}</p>
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <div className="mt-8 grid border-t border-surface-4 md:grid-cols-2">
             {skus.map((sku) => (
-              <article key={sku.id} className="tool-inset flex h-full flex-col p-5 sm:p-6">
+              <article key={sku.id} className="flex h-full flex-col border-b border-surface-3 py-6 md:border-r md:px-6 md:first:pl-0 md:last:border-r-0">
                 <div className="flex items-start justify-between gap-4">
                   <h2 className="text-xl font-semibold text-ink-primary">{sku.label}</h2>
                   <span className="tool-status tool-status--current">{sku.price?.billing === 'free' ? copy.public.pages_PricingPage_005 : copy.public.pages_PricingPage_004}</span>
                 </div>
-                <p className="mt-5 text-4xl font-semibold tracking-tight text-brand-300">{sku.display_price}</p>
+                <p className="mt-5 text-4xl font-semibold tracking-tight text-brand-400 tabular-nums">{sku.display_price}</p>
                 <p className="mt-4 text-sm leading-7 text-ink-secondary">{sku.summary}</p>
                 <p className="mt-4 border-t border-surface-3 pt-4 text-sm leading-6 text-ink-muted">{sku.account_scope}</p>
               </article>
@@ -42,14 +42,14 @@ export default function PricingPage() {
           </div>
         </section>
 
-        <section className="tool-alert tool-alert--warning mt-6 p-5 sm:p-6" aria-labelledby="pricing-policy-title">
+        <section className="border-b border-surface-4 py-8" aria-labelledby="pricing-policy-title">
           <h2 id="pricing-policy-title" className="text-xl font-semibold text-ink-primary">{copy.public.pages_PricingPage_006}</h2>
           <ul className="mt-4 grid gap-3 text-sm leading-7 text-ink-secondary md:grid-cols-2">
-            {productPolicies.public_disclosures.map((item) => <li key={item} className="rounded-lg bg-surface-1/65 px-4 py-3">{item}</li>)}
+            {productPolicies.public_disclosures.map((item) => <li key={item} className="border-l-2 border-warning/55 pl-4">{item}</li>)}
           </ul>
         </section>
 
-        <section className="tool-panel mt-6 overflow-hidden p-5 sm:p-6" aria-labelledby="pricing-comparison-title">
+        <section className="border-b border-surface-4 py-8" aria-labelledby="pricing-comparison-title">
           <h2 id="pricing-comparison-title" className="text-xl font-semibold text-ink-primary">{copy.public.pages_PricingPage_007}</h2>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
@@ -61,7 +61,7 @@ export default function PricingPage() {
           </div>
         </section>
 
-        <section className="tool-inset mt-6 p-5 sm:flex sm:items-center sm:justify-between sm:gap-8 sm:p-6">
+        <section className="py-8 sm:flex sm:items-center sm:justify-between sm:gap-8">
           <div><h2 className="text-lg font-semibold text-ink-primary">{copy.public.pages_PricingPage_009}</h2><p className="mt-2 text-sm leading-7 text-ink-secondary">{support.channel} · {support.sla_statement}</p></div>
           <SupportGroupLink className="tool-primary-action mt-5 inline-flex items-center justify-center sm:mt-0">{copy.public.pages_PricingPage_010}</SupportGroupLink>
         </section>

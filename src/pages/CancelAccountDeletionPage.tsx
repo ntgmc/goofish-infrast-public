@@ -25,10 +25,10 @@ export default function CancelAccountDeletionPage() {
     <main className="tool-shell flex min-h-dvh items-center justify-center px-4 py-6 sm:px-6" tabIndex={-1} data-route-focus>
       <section className="tool-panel w-full max-w-lg p-6 sm:p-8" aria-labelledby="cancel-account-deletion-title">
         <div className="flex items-center justify-between gap-3">
-          <p className="tool-eyebrow">{copy.auth.pages_CancelAccountDeletionPage_003}</p>
+          <p className="section-index">{copy.auth.pages_CancelAccountDeletionPage_003}</p>
           <ThemeSwitcher />
         </div>
-        <h1 id="cancel-account-deletion-title" className="mt-2 text-2xl font-semibold text-ink-primary">{copy.auth.pages_CancelAccountDeletionPage_004}</h1>
+        <h1 id="cancel-account-deletion-title" className="display-title mt-2 text-2xl text-ink-primary">{copy.auth.pages_CancelAccountDeletionPage_004}</h1>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.auth.pages_CancelAccountDeletionPage_005}</p>
         {error && <p className="tool-alert tool-alert--error mt-5" role="alert">{error}</p>}
         {status && <p className="tool-alert tool-alert--success mt-5" role="status" aria-live="polite">{status}</p>}

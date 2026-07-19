@@ -1,0 +1,32 @@
+{
+  "date": "2026-07-20",
+  "design_system": "design.md",
+  "font_stack": {
+    "display": "Noto Sans SC Variable",
+    "body": "Geist Variable",
+    "mono": "SFMono-Regular / Consolas"
+  },
+  "palette": "Custom OKLCH semantic properties in tokens.css; cool-violet anchor at 285 degrees",
+  "motion": "motion-on dependency; composed route and state transitions with reduced-motion fallback",
+  "spacing": "Tailwind v4 plus a canonical 4px token scale",
+  "framework": "React 18, React Router, Vite 6, Tailwind CSS 4, shadcn/ui",
+  "assets": [
+    "public/assets/logo.png",
+    "public/assets/logo-horizontal.png",
+    "public/assets/previews/* light and dark product captures"
+  ],
+  "preserve": [
+    "Routes and component ownership",
+    "Copy and product policies",
+    "Authentication and authorization",
+    "Forms, API calls, optimizer behavior, and data flow",
+    "Light and dark theme behavior"
+  ],
+  "introduced": [
+    "Workbench marketing and application composition",
+    "Long Document content composition",
+    "Semantic contrast-safe tokens",
+    "Stable input feedback slots",
+    "Hallmark 58-gate design discipline"
+  ]
+}
