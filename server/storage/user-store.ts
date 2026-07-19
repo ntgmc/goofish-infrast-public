@@ -36,6 +36,7 @@ export interface UserAccountRecord {
   cdk_key: string | null
   cdk_code_hash: string | null
   cdk_order_hash: string | null
+  email_verified_at: string | null
   created_at: string
   updated_at: string
 }
@@ -199,6 +200,15 @@ export interface PasswordResetTokenRecord {
   created_at: string
 }
 
+export interface EmailVerificationTokenRecord {
+  id: string
+  user_id: string
+  token_hash: string
+  expires_at: string
+  used_at: string | null
+  created_at: string
+}
+
 export async function getUserByEmail(email: string): Promise<UserAccountRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: UserAccountRecord }>(
@@ -229,8 +239,8 @@ export async function saveUserAccount(user: UserAccountRecord): Promise<void> {
   await ensureSchema()
   await query(
     `insert into user_accounts
-      (id, email, password_hash, salt, iterations, permission, status, cdk_key, cdk_code_hash, cdk_order_hash, record_json, created_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13)
+      (id, email, password_hash, salt, iterations, permission, status, cdk_key, cdk_code_hash, cdk_order_hash, email_verified_at, record_json, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14)
      on conflict (id) do update set
       email = excluded.email,
       password_hash = excluded.password_hash,
@@ -241,6 +251,7 @@ export async function saveUserAccount(user: UserAccountRecord): Promise<void> {
       cdk_key = excluded.cdk_key,
       cdk_code_hash = excluded.cdk_code_hash,
       cdk_order_hash = excluded.cdk_order_hash,
+      email_verified_at = excluded.email_verified_at,
       record_json = excluded.record_json,
       updated_at = excluded.updated_at`,
     [
@@ -254,6 +265,7 @@ export async function saveUserAccount(user: UserAccountRecord): Promise<void> {
       user.cdk_key,
       user.cdk_code_hash,
       user.cdk_order_hash,
+      user.email_verified_at,
       JSON.stringify(user),
       user.created_at,
       user.updated_at,
@@ -691,6 +703,64 @@ export async function saveProfileWorkspace(workspace: UserWorkspaceRecord): Prom
   })
 }
 
+export interface AdminUserAccountPage {
+  users: UserAccountRecord[]
+  profiles: UserGameAccountRecord[]
+  total: number
+  page: number
+  totalPages: number
+}
+
+export async function listAdminUserAccountsPage(options: {
+  page: number
+  pageSize: number
+  search: string
+}): Promise<AdminUserAccountPage> {
+  await ensureSchema()
+  const values: unknown[] = []
+  let where = ''
+  if (options.search) {
+    values.push(`%${options.search.toLowerCase()}%`)
+    where = `where lower(user_accounts.email) like $1
+      or lower(user_accounts.id) like $1
+      or exists (
+        select 1 from user_game_accounts profile
+        where profile.user_id = user_accounts.id
+          and (
+            lower(profile.display_name) like $1
+            or lower(profile.id) like $1
+            or lower(coalesce(profile.cdk_order_hash, '')) like $1
+          )
+      )`
+  }
+  const countResult = await query<{ total: string }>(
+    `select count(*)::text as total from user_accounts ${where}`,
+    values,
+  )
+  const total = Number(countResult.rows[0]?.total ?? 0)
+  const totalPages = total === 0 ? 0 : Math.ceil(total / options.pageSize)
+  const page = totalPages === 0 ? 1 : Math.min(options.page, totalPages)
+  values.push(options.pageSize, (page - 1) * options.pageSize)
+  const usersResult = await query<{ record_json: UserAccountRecord }>(
+    `select record_json from user_accounts ${where}
+     order by created_at desc, id asc limit $${values.length - 1} offset $${values.length}`,
+    values,
+  )
+  const users = usersResult.rows.map((row) => row.record_json)
+  if (users.length === 0) return { users, profiles: [], total, page, totalPages }
+  const profilesResult = await query<{ record_json: UserGameAccountRecord }>(
+    'select record_json from user_game_accounts where user_id = any($1::text[]) order by created_at asc',
+    [users.map((user) => user.id)],
+  )
+  return {
+    users,
+    profiles: profilesResult.rows.map((row) => row.record_json),
+    total,
+    page,
+    totalPages,
+  }
+}
+
 export async function updateProfileWorkspaceAtomically(
   profileId: string,
   updater: (workspace: UserWorkspaceRecord | null) => UserWorkspaceRecord,
@@ -735,6 +805,77 @@ async function saveProfileWorkspaceWithClient(client: PoolClient, normalized: Us
       normalized.updated_at,
     ],
   )
+}
+
+export async function saveEmailVerificationToken(token: EmailVerificationTokenRecord): Promise<void> {
+  await ensureSchema()
+  await query(
+    `insert into email_verification_tokens
+      (id, user_id, token_hash, expires_at, used_at, created_at)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [token.id, token.user_id, token.token_hash, token.expires_at, token.used_at, token.created_at],
+  )
+}
+
+export async function deleteEmailVerificationTokenByHash(tokenHash: string): Promise<void> {
+  await ensureSchema()
+  await query('delete from email_verification_tokens where token_hash = $1 and used_at is null', [tokenHash])
+}
+
+export async function getRecentEmailVerificationTokenForUser(
+  userId: string,
+  since: string,
+): Promise<EmailVerificationTokenRecord | null> {
+  await ensureSchema()
+  const result = await query<EmailVerificationTokenRecord>(
+    `select id, user_id, token_hash, expires_at, used_at, created_at
+       from email_verification_tokens
+      where user_id = $1 and created_at >= $2
+      order by created_at desc
+      limit 1`,
+    [userId, since],
+  )
+  return result.rows[0] ?? null
+}
+
+export async function verifyUserEmailWithToken(tokenHash: string, verifiedAt: Date): Promise<UserAccountRecord | null> {
+  await ensureSchema()
+  return withTransaction(async (client) => {
+    const verifiedAtIso = verifiedAt.toISOString()
+    const claimed = await client.query<{ user_id: string }>(
+      `update email_verification_tokens
+          set used_at = $2
+        where token_hash = $1
+          and used_at is null
+          and expires_at > $2
+      returning user_id`,
+      [tokenHash, verifiedAtIso],
+    )
+    const userId = claimed.rows[0]?.user_id
+    if (!userId) return null
+
+    const updated = await client.query<{ record_json: UserAccountRecord }>(
+      `update user_accounts
+          set email_verified_at = $2,
+              record_json = record_json || jsonb_build_object('email_verified_at', $2::timestamptz, 'updated_at', $2::timestamptz),
+              updated_at = $2
+        where id = $1
+          and status = 'active'
+          and email_verified_at is null
+      returning record_json`,
+      [userId, verifiedAtIso],
+    )
+    const user = updated.rows[0]?.record_json
+    if (!user) return null
+
+    await client.query(
+      `update email_verification_tokens
+          set used_at = $2
+        where user_id = $1 and used_at is null`,
+      [userId, verifiedAtIso],
+    )
+    return user
+  })
 }
 
 export async function migrateLegacyUserIfNeeded(user: UserAccountRecord): Promise<UserGameAccountRecord[]> {

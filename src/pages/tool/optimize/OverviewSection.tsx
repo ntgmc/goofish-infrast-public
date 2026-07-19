@@ -84,8 +84,9 @@ export default function OverviewSection({
 }) {
   return (
     <div className="space-y-4">
-      <GenerateControlBar
-        config={activeConfig}
+      <div data-tour-target="optimize-overview-status">
+        <GenerateControlBar
+          config={activeConfig}
         configChanged={configChanged}
         showConfigDetails={showConfigDetails}
         operatorCount={operatorCount}
@@ -100,8 +101,9 @@ export default function OverviewSection({
         priorityCoupon={priorityCoupon}
         extraDisabledReason={freeSchedule?.generateBlockedReason ?? null}
         onGenerate={onGenerate}
-        onReset={onReset}
-      />
+          onReset={onReset}
+        />
+      </div>
 
       {freeSchedule?.visible && (
         <FreeScheduleEntitlementCard state={freeSchedule} />
@@ -143,7 +145,7 @@ export default function OverviewSection({
           </div>
         </section>
 
-        <section className="tool-panel p-5 sm:p-6">
+        <section className="tool-panel p-5 sm:p-6" data-tour-target="optimize-overview-latest">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_OverviewSection_012}</p>

@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS cdk_records (
   updated_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_cdk_records_status ON cdk_records(status);
+CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_created ON cdk_records(created_at DESC, key ASC);
+CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_status_created ON cdk_records(status, created_at DESC, key ASC);
+CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_permission_created ON cdk_records(permission, created_at DESC, key ASC);
 CREATE INDEX IF NOT EXISTS idx_cdk_records_license_order_hash ON cdk_records(license_order_hash);
 ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS record_revision INTEGER NOT NULL DEFAULT 0;
 DO $$
@@ -43,6 +46,12 @@ CREATE TABLE IF NOT EXISTS risk_settings (
 );
 
 CREATE TABLE IF NOT EXISTS invitation_settings (
+  key TEXT PRIMARY KEY,
+  record_json JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS registration_settings (
   key TEXT PRIMARY KEY,
   record_json JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
@@ -204,12 +213,29 @@ CREATE TABLE IF NOT EXISTS user_accounts (
   cdk_key TEXT,
   cdk_code_hash TEXT,
   cdk_order_hash TEXT,
+  email_verified_at TIMESTAMPTZ,
   record_json JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_user_accounts_email ON user_accounts(email);
+CREATE INDEX IF NOT EXISTS idx_user_accounts_admin_created ON user_accounts(created_at DESC, id ASC);
 CREATE INDEX IF NOT EXISTS idx_user_accounts_cdk_code_hash ON user_accounts(cdk_code_hash);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'user_accounts'
+      AND column_name = 'email_verified_at'
+  ) THEN
+    ALTER TABLE user_accounts ADD COLUMN email_verified_at TIMESTAMPTZ;
+    UPDATE user_accounts
+    SET email_verified_at = created_at,
+        record_json = record_json || jsonb_build_object('email_verified_at', created_at),
+        updated_at = greatest(updated_at, created_at);
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS invitation_codes (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
@@ -303,6 +329,19 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_t
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_created_at ON password_reset_tokens(created_at);
+
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_token_hash ON email_verification_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_expires_at ON email_verification_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_created_at ON email_verification_tokens(created_at);
 
 CREATE TABLE IF NOT EXISTS user_game_accounts (
   id TEXT PRIMARY KEY,

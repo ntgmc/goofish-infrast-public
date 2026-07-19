@@ -12,7 +12,11 @@ import {
   unfreezeCdkRecord,
   type CdkRecord,
   type CdkStatus,
+  type AdminCdkPageOptions,
+  type AdminCdkPageResult,
 } from './license-utils'
+import { AdminPaginationError, buildAdminPagination, parseAdminPageRequest } from './admin-pagination'
+import { buildAdminCdkOpsSummary } from './admin-cdk-summary'
 
 type CdkStatusFilter = CdkStatus | 'all'
 
@@ -155,7 +159,8 @@ async function handleList(req: Request): Promise<Response> {
     const authentication = await authenticateAdminRequest(req)
     if (!authentication.ok) return authentication.response
 
-    const detailCodeHash = new URL(req.url).searchParams.get('code_hash')
+    const url = new URL(req.url)
+    const detailCodeHash = url.searchParams.get('code_hash')
     if (detailCodeHash) {
       if (!/^[a-f0-9]{64}$/i.test(detailCodeHash)) {
         return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)
@@ -166,18 +171,30 @@ async function handleList(req: Request): Promise<Response> {
       return jsonResponse({ cdk: toAdminCdkDetail(record) })
     }
 
+    if (url.searchParams.get('view') === 'summary') {
+      const store = await getCdkRecordStore()
+      const records = (await store.list('cdk/')).map(toAdminCdkRecord)
+      return jsonResponse({ summary: buildAdminCdkOpsSummary(records) })
+    }
+
+    const request = parseAdminPageRequest(url)
     const status = normalizeStatusFilter(req.headers.get('X-Cdk-Status'), req.url)
+    const permission = normalizePermissionFilter(url.searchParams.get('permission'))
+    const risk = normalizeBinaryFilter(url.searchParams.get('risk'), 'risk')
+    const generated = normalizeBinaryFilter(url.searchParams.get('generated'), 'generated')
+    const riskOnly = url.searchParams.get('view') === 'risk'
     const store = await getCdkRecordStore()
-    const records = (await store.list('cdk/'))
-      .filter((record) => status === 'all' || record.status === status)
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    const result = store.listAdminPage
+      ? await store.listAdminPage({ ...request, status, permission, risk, generated, riskOnly })
+      : paginateMemoryRecords(await store.list('cdk/'), { ...request, status, permission, risk, generated, riskOnly })
 
     return jsonResponse({
       status,
-      total: records.length,
-      cdks: records.map(toAdminCdkRecord),
+      cdks: result.records.map(toAdminCdkRecord),
+      pagination: buildAdminPagination(result.page, request.pageSize, result.total),
     })
   } catch (error) {
+    if (error instanceof AdminPaginationError) return jsonResponse({ error: error.message }, 400)
     console.error('admin cdk list error:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, 500)
@@ -377,6 +394,8 @@ function normalizeStatusFilter(headerValue: string | null, requestUrl: string): 
   if (headerValue === 'used' || headerValue === 'frozen' || headerValue === 'revoked' || headerValue === 'all') return headerValue
   const queryValue = new URL(requestUrl).searchParams.get('status')
   if (queryValue === 'used' || queryValue === 'frozen' || queryValue === 'revoked' || queryValue === 'all') return queryValue
+  if (queryValue === 'unused') return queryValue
+  if (queryValue) throw new AdminPaginationError('status 筛选值无效。')
   return 'unused'
 }
 
@@ -453,4 +472,39 @@ function normalizeProductPermission(permission: CdkRecord['permission']): Produc
   const normalized = normalizeRuntimePermission(permission)
   if ((CDK_PRODUCT_PERMISSIONS as string[]).includes(normalized)) return normalized as ProductPermissionMode
   return null
+}
+
+function normalizePermissionFilter(value: string | null): ProductPermissionMode | 'all' {
+  if (!value || value === 'all') return 'all'
+  if ((CDK_PRODUCT_PERMISSIONS as string[]).includes(value)) return value as ProductPermissionMode
+  throw new AdminPaginationError('permission 筛选值无效。')
+}
+
+function normalizeBinaryFilter(value: string | null, field: string): 'all' | 'yes' | 'no' {
+  if (!value || value === 'all') return 'all'
+  if (value === 'yes' || value === 'no') return value
+  throw new AdminPaginationError(`${field} 筛选值无效。`)
+}
+
+function paginateMemoryRecords(records: CdkRecord[], options: AdminCdkPageOptions): AdminCdkPageResult {
+  const term = options.search.toLowerCase()
+  const filtered = records.filter((record) => {
+    const hasRisk = record.status === 'frozen' || (record.risk_events?.length ?? 0) > 0
+    const generated = (record.schedule_generate_count ?? 0) > 0
+    if (options.status !== 'all' && record.status !== options.status) return false
+    if (options.permission !== 'all' && record.permission !== options.permission) return false
+    if (options.riskOnly && !hasRisk) return false
+    if (options.risk !== 'all' && hasRisk !== (options.risk === 'yes')) return false
+    if (options.generated !== 'all' && generated !== (options.generated === 'yes')) return false
+    if (term && ![record.code_hash, record.license_order_hash, record.order_note].some((value) => String(value ?? '').toLowerCase().includes(term))) return false
+    return true
+  }).sort((left, right) => right.created_at.localeCompare(left.created_at) || left.code_hash.localeCompare(right.code_hash))
+  const totalPages = filtered.length === 0 ? 0 : Math.ceil(filtered.length / options.pageSize)
+  const page = totalPages === 0 ? 1 : Math.min(options.page, totalPages)
+  return {
+    records: filtered.slice((page - 1) * options.pageSize, page * options.pageSize),
+    total: filtered.length,
+    page,
+    totalPages,
+  }
 }

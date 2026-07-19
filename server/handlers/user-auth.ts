@@ -2,12 +2,14 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../src/lib/types'
 import {
   deleteSessionByTokenHash,
+  deleteEmailVerificationTokenByHash,
   deleteSessionsForUser,
   emptyWorkspace,
   getAnnouncementReads,
   getPasswordResetTokenByHash,
   getProfileForUser,
   getRecentPasswordResetTokenForUser,
+  getRecentEmailVerificationTokenForUser,
   getSessionByTokenHash,
   getUserByEmail,
   getUserById,
@@ -16,6 +18,7 @@ import {
   migrateLegacyUserIfNeeded,
   resetUserPasswordWithToken,
   savePasswordResetToken,
+  saveEmailVerificationToken,
   updateProfileWorkspaceAtomically,
   saveUserAccount,
   saveUserProfile,
@@ -24,6 +27,7 @@ import {
   toPublicProfile,
   toPublicWorkspace,
   touchSession,
+  verifyUserEmailWithToken,
   upgradeUserPasswordHash,
   type UserAccountRecord,
   type UserGameAccountRecord,
@@ -33,7 +37,8 @@ import {
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
 import { getFreePreviewTrial, hasFreePreviewTrialEnded } from '../free-preview-trial'
 import { createPasswordHash, verifyPasswordHash } from '../security/password'
-import { sendPasswordResetEmail } from './email'
+import { sendEmailVerificationEmail, sendPasswordResetEmail } from './email'
+import { getRegistrationSettings } from '../storage/registration-settings-store'
 import {
   findCdkRecordByCode,
   getCdkRecordStore,
@@ -71,6 +76,11 @@ const PASSWORD_RESET_DEFAULT_TTL_MINUTES = 30
 const PASSWORD_RESET_RESEND_WINDOW_MS = 1000 * 60 * 5
 const PASSWORD_RESET_REQUEST_MESSAGE = 'If the email exists, a reset link has been sent.'
 const PASSWORD_RESET_INVALID_MESSAGE = 'The reset link is invalid or expired.'
+const EMAIL_VERIFICATION_DEFAULT_TTL_HOURS = 24
+const EMAIL_VERIFICATION_RESEND_WINDOW_MS = 1000 * 60 * 5
+const EMAIL_VERIFICATION_SENT_MESSAGE = '请检查邮箱并点击验证链接完成注册。'
+const EMAIL_VERIFICATION_RESEND_MESSAGE = '如果该账号仍需验证，验证邮件已发送，请检查收件箱。'
+const EMAIL_VERIFICATION_INVALID_MESSAGE = '验证链接无效或已过期。'
 
 export interface AuthContext {
   user: UserAccountRecord
@@ -111,7 +121,8 @@ export async function registerUser(
   idempotencyKey?: string | null,
   inviteCodeValue?: unknown,
 ): Promise<
-  | { ok: true; user: UserAccountRecord; cookie: string }
+  | { ok: true; user: UserAccountRecord; cookie: string; verificationRequired?: false }
+  | { ok: true; user: UserAccountRecord; verificationRequired: true; message: string; resendAfterSeconds: number }
   | { ok: false; status: number; message: string; code?: string }
 > {
   const email = normalizeEmail(emailValue)
@@ -131,6 +142,15 @@ export async function registerUser(
       if (!replayed) return { ok: false, status: 409, message: 'Email is already registered.' }
       const passwordVerification = await verifyPasswordHash(passwordCheck.password, existing)
       if (!passwordVerification.verified) return { ok: false, status: 401, message: 'Invalid email or password.' }
+      if (existing.email_verified_at === null) {
+        try {
+          await issueEmailVerification(existing)
+        } catch (error) {
+          console.error('registration verification email error:', error)
+          return { ok: false, status: 503, message: '验证邮件发送失败，请稍后重新发送。', code: 'verification_email_send_failed' }
+        }
+        return verificationRequiredResult(existing)
+      }
       const session = await createSession(existing.id)
       return { ok: true, user: existing, cookie: session.cookie }
     } catch (error) {
@@ -148,6 +168,7 @@ export async function registerUser(
   }
 
   const now = new Date().toISOString()
+  const registrationSettings = await getRegistrationSettings()
   const passwordHash = await createPasswordHash(passwordCheck.password)
   const user: UserAccountRecord = {
     version: 1,
@@ -162,6 +183,7 @@ export async function registerUser(
     cdk_key: null,
     cdk_code_hash: null,
     cdk_order_hash: null,
+    email_verified_at: registrationSettings.email_verification_required ? null : now,
     created_at: now,
     updated_at: now,
   }
@@ -190,6 +212,16 @@ export async function registerUser(
     await saveUserAccount(user)
   }
 
+  if (registrationSettings.email_verification_required) {
+    try {
+      await issueEmailVerification(user)
+    } catch (error) {
+      console.error('registration verification email error:', error)
+      return { ok: false, status: 503, message: '验证邮件发送失败，请稍后重新发送。', code: 'verification_email_send_failed' }
+    }
+    return verificationRequiredResult(user)
+  }
+
   const session = await createSession(user.id)
   return { ok: true, user, cookie: session.cookie }
 }
@@ -199,7 +231,7 @@ export async function loginUser(
   passwordValue: unknown,
 ): Promise<
   | { ok: true; user: UserAccountRecord; cookie: string }
-  | { ok: false; status: number; message: string }
+  | { ok: false; status: number; message: string; code?: string }
 > {
   const email = normalizeEmail(emailValue)
   if (!email) return { ok: false, status: 400, message: 'Invalid email format.' }
@@ -215,6 +247,9 @@ export async function loginUser(
   }
   if (user.status !== 'active') {
     return { ok: false, status: 403, message: 'Account is not active.' }
+  }
+  if (user.email_verified_at === null) {
+    return { ok: false, status: 403, message: '请先验证邮箱后再登录。', code: 'email_not_verified' }
   }
 
   if (passwordVerification.needsRehash) {
@@ -604,6 +639,37 @@ export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?
   }
 }
 
+export async function verifyEmailWithToken(
+  tokenValue: unknown,
+): Promise<
+  | { ok: true; user: UserAccountRecord; cookie: string }
+  | { ok: false; status: number; message: string; code?: string }
+> {
+  if (typeof tokenValue !== 'string' || !tokenValue.trim()) {
+    return { ok: false, status: 400, message: EMAIL_VERIFICATION_INVALID_MESSAGE }
+  }
+  const user = await verifyUserEmailWithToken(hashEmailVerificationToken(tokenValue.trim()), new Date())
+  if (!user) return { ok: false, status: 400, message: EMAIL_VERIFICATION_INVALID_MESSAGE }
+  const session = await createSession(user.id)
+  return { ok: true, user, cookie: session.cookie }
+}
+
+export async function resendEmailVerification(emailValue: unknown): Promise<{ ok: true; message: string }> {
+  const email = normalizeEmail(emailValue)
+  if (!email) return { ok: true, message: EMAIL_VERIFICATION_RESEND_MESSAGE }
+  try {
+    const user = await getUserByEmail(email)
+    if (!user || user.status !== 'active' || user.email_verified_at !== null) {
+      return { ok: true, message: EMAIL_VERIFICATION_RESEND_MESSAGE }
+    }
+    await issueEmailVerification(user)
+  } catch (error) {
+    console.error('resend verification email error:', error)
+    throw error
+  }
+  return { ok: true, message: EMAIL_VERIFICATION_RESEND_MESSAGE }
+}
+
 function normalizeExpiredFreePreviewWorkspace(
   profile: UserGameAccountRecord,
   workspace: UserWorkspaceRecord | null,
@@ -723,6 +789,60 @@ function hashSessionToken(token: string): string {
 
 function hashPasswordResetToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
+}
+
+function hashEmailVerificationToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+async function issueEmailVerification(user: UserAccountRecord): Promise<void> {
+  const resendSince = new Date(Date.now() - EMAIL_VERIFICATION_RESEND_WINDOW_MS).toISOString()
+  if (await getRecentEmailVerificationTokenForUser(user.id, resendSince)) return
+
+  const token = randomBytes(32).toString('base64url')
+  const now = new Date()
+  const expiresHours = getEmailVerificationTtlHours()
+  await saveEmailVerificationToken({
+    id: randomUUID(),
+    user_id: user.id,
+    token_hash: hashEmailVerificationToken(token),
+    expires_at: new Date(now.getTime() + expiresHours * 60 * 60 * 1000).toISOString(),
+    used_at: null,
+    created_at: now.toISOString(),
+  })
+  try {
+    await sendEmailVerificationEmail({
+      email: user.email,
+      verificationUrl: buildEmailVerificationUrl(token),
+      expiresHours,
+    })
+  } catch (error) {
+    await deleteEmailVerificationTokenByHash(hashEmailVerificationToken(token))
+    throw error
+  }
+}
+
+function verificationRequiredResult(user: UserAccountRecord) {
+  return {
+    ok: true as const,
+    user,
+    verificationRequired: true as const,
+    message: EMAIL_VERIFICATION_SENT_MESSAGE,
+    resendAfterSeconds: EMAIL_VERIFICATION_RESEND_WINDOW_MS / 1000,
+  }
+}
+
+function buildEmailVerificationUrl(token: string): string {
+  const baseUrl = process.env.PUBLIC_APP_URL?.trim()
+  if (!baseUrl) throw new Error('PUBLIC_APP_URL not configured')
+  const url = new URL('/verify-email', baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`)
+  url.searchParams.set('token', token)
+  return url.toString()
+}
+
+function getEmailVerificationTtlHours(): number {
+  const raw = Number(process.env.EMAIL_VERIFICATION_TTL_HOURS)
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : EMAIL_VERIFICATION_DEFAULT_TTL_HOURS
 }
 
 function buildPasswordResetUrl(token: string): string {

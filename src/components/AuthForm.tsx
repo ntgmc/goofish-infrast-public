@@ -6,6 +6,11 @@ import { copy } from '../copy/index'
 
 type AuthMode = 'login' | 'register' | 'forgot'
 type FieldErrors = Record<string, string>
+type VerificationRequiredResponse = {
+  verification_required: true
+  message: string
+  resend_after_seconds: number
+}
 
 type AuthFormProps = {
   onAuthenticated: (payload: AuthSuccessResponse) => void
@@ -31,6 +36,7 @@ export default function AuthForm({
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [showVerificationResend, setShowVerificationResend] = useState(false)
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -58,7 +64,7 @@ export default function AuthForm({
         return
       }
 
-      const data = await apiJson<AuthSuccessResponse>(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
+      const data = await apiJson<AuthSuccessResponse | VerificationRequiredResponse>(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
         method: 'POST',
         json: mode === 'login' ? { email, password } : {
           email,
@@ -68,12 +74,44 @@ export default function AuthForm({
         },
         fallbackMessage: mode === 'login' ? copy.auth.components_AuthForm_003 : copy.auth.components_AuthForm_004,
       })
+      if ('verification_required' in data) {
+        setNotice(data.message || copy.auth.components_AuthForm_028)
+        setShowVerificationResend(true)
+        return
+      }
       if (!data.user) throw new Error(mode === 'login' ? copy.auth.components_AuthForm_005 : copy.auth.components_AuthForm_006)
       onAuthenticated(data)
     } catch (caught) {
       if (mode === 'register' && caught instanceof ApiError && isInviteCodeError(caught.data)) {
         setFieldErrors((current) => ({ ...current, inviteCode: caught.message }))
       }
+      if (caught instanceof ApiError && (
+        isApiErrorCode(caught.data, 'email_not_verified')
+        || isApiErrorCode(caught.data, 'verification_email_send_failed')
+      )) setShowVerificationResend(true)
+      setError((caught as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resendVerification = async () => {
+    const emailError = validateEmailInput(email)
+    if (emailError) {
+      setFieldErrors((current) => ({ ...current, email: emailError }))
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const data = await apiJson<{ message?: string }>('/api/auth/resend-verification', {
+        method: 'POST',
+        json: { email },
+        fallbackMessage: copy.auth.components_AuthForm_029,
+      })
+      setNotice(data.message || copy.auth.components_AuthForm_030)
+    } catch (caught) {
       setError((caught as Error).message)
     } finally {
       setLoading(false)
@@ -92,8 +130,8 @@ export default function AuthForm({
   return (
     <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'tool-panel space-y-5 p-6 sm:p-8'}>
       <div className="tool-inset grid grid-cols-2 p-1" role="group" aria-label={copy.auth.components_AuthForm_007}>
-        <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_008}</button>
-        <button type="button" aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_009}</button>
+        <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_008}</button>
+        <button type="button" aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_009}</button>
       </div>
 
       {intro && <p className="text-sm leading-6 text-ink-secondary">{intro}</p>}
@@ -115,6 +153,7 @@ export default function AuthForm({
           className={inputClassName(Boolean(fieldErrors.email))}
           aria-invalid={Boolean(fieldErrors.email)}
           aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
+          autoComplete="email"
         />
         {fieldErrors.email && <p id="auth-email-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.email}</p>}
       </label>
@@ -134,6 +173,7 @@ export default function AuthForm({
             className={inputClassName(Boolean(fieldErrors.password))}
             aria-invalid={Boolean(fieldErrors.password)}
             aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
+            autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
           />
           {fieldErrors.password && <p id="auth-password-error" className="mt-1.5 text-sm text-error" role="alert">{fieldErrors.password}</p>}
         </label>
@@ -177,6 +217,12 @@ export default function AuthForm({
           {copy.auth.components_AuthForm_018}</button>
       )}
 
+      {showVerificationResend && mode !== 'forgot' && (
+        <button type="button" disabled={loading} onClick={() => void resendVerification()} className="tool-secondary-action min-h-11 w-full px-4 text-sm">
+          {loading ? copy.auth.components_AuthForm_019 : copy.auth.components_AuthForm_031}
+        </button>
+      )}
+
       <button type="submit" disabled={loading} className={`min-h-12 ${submitClassName ?? 'tool-primary-action w-full px-6 py-3'}`}>
         {loading ? copy.auth.components_AuthForm_019 : mode === 'login' ? copy.auth.components_AuthForm_020 : mode === 'register' ? copy.auth.components_AuthForm_021 : copy.auth.components_AuthForm_022}
       </button>
@@ -207,6 +253,11 @@ function isInviteCodeError(data: unknown): boolean {
   if (!data || typeof data !== 'object' || !('code' in data)) return false
   const code = (data as { code?: unknown }).code
   return code === 'invalid_invite_code' || code === 'invitation_campaign_paused'
+}
+
+function isApiErrorCode(data: unknown, expected: string): boolean {
+  if (!data || typeof data !== 'object' || !('code' in data)) return false
+  return (data as { code?: unknown }).code === expected
 }
 
 function inputClassName(hasError: boolean): string {

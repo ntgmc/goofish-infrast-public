@@ -124,6 +124,25 @@ export interface CdkRecordStore {
   incrementScheduleGenerateCount: (key: string, jobId?: string) => Promise<boolean>;
   delete: (key: string) => Promise<void>;
   list: (prefix: string) => Promise<CdkRecord[]>;
+  listAdminPage?: (options: AdminCdkPageOptions) => Promise<AdminCdkPageResult>;
+}
+
+export interface AdminCdkPageOptions {
+  page: number;
+  pageSize: number;
+  search: string;
+  status: CdkStatus | 'all';
+  permission: ProductPermissionMode | 'all';
+  risk: 'all' | 'yes' | 'no';
+  generated: 'all' | 'yes' | 'no';
+  riskOnly?: boolean;
+}
+
+export interface AdminCdkPageResult {
+  records: CdkRecord[];
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 function installUnhandledRejectionLogger(): void {

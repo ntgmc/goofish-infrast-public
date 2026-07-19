@@ -7,9 +7,11 @@ import {
   normalizeEmail,
   logoutRequest,
   requestPasswordReset,
+  resendEmailVerification,
   registerUser,
   requireUserSession,
   resetPasswordWithToken,
+  verifyEmailWithToken,
 } from './user-auth'
 import { recordUsageEvent } from './usage-stats'
 import { reserveUserLoginAttempt } from '../security/auth-rate-limit'
@@ -32,6 +34,13 @@ export default async (req: Request): Promise<Response> => {
         return jsonResponse({ error: registered.message, ...(registered.code && { code: registered.code }) }, registered.status)
       }
       await recordRegister('success', startedAt)
+      if (registered.verificationRequired) {
+        return jsonResponse({
+          verification_required: true,
+          message: registered.message,
+          resend_after_seconds: registered.resendAfterSeconds,
+        }, 202)
+      }
       return jsonResponse(await buildAuthPayload(registered.user), 200, { 'Set-Cookie': registered.cookie })
     }
 
@@ -53,7 +62,7 @@ export default async (req: Request): Promise<Response> => {
       }
       if (!loggedIn.ok) {
         rateLimit.attempt.retainFailure()
-        return jsonResponse({ error: loggedIn.message }, loggedIn.status)
+        return jsonResponse({ error: loggedIn.message, ...(loggedIn.code && { code: loggedIn.code }) }, loggedIn.status)
       }
       rateLimit.attempt.refund()
       return jsonResponse(await buildAuthPayload(loggedIn.user), 200, { 'Set-Cookie': loggedIn.cookie })
@@ -77,6 +86,24 @@ export default async (req: Request): Promise<Response> => {
       const reset = await resetPasswordWithToken(body.token, body.new_password)
       if (!reset.ok) return jsonResponse({ error: reset.message }, reset.status)
       return jsonResponse({ ok: true })
+    }
+
+    if (pathname.endsWith('/verify-email')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      const body = await req.json() as { token?: unknown }
+      const verified = await verifyEmailWithToken(body.token)
+      if (!verified.ok) return jsonResponse({ error: verified.message }, verified.status)
+      return jsonResponse(await buildAuthPayload(verified.user), 200, { 'Set-Cookie': verified.cookie })
+    }
+
+    if (pathname.endsWith('/resend-verification')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      const body = await req.json() as { email?: unknown }
+      try {
+        return jsonResponse(await resendEmailVerification(body.email))
+      } catch {
+        return jsonResponse({ error: '验证邮件发送失败，请稍后重试。', code: 'verification_email_send_failed' }, 503)
+      }
     }
 
     if (pathname.endsWith('/change-password')) {

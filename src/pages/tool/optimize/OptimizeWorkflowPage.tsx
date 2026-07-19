@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AnnouncementBanner from '../../../components/AnnouncementBanner'
+import GuidedTour, { hasCompletedTour, useFirstRunTour, type TourDefinition } from '../../../components/GuidedTour'
 import ConfigSection from './ConfigSection'
 import { ConfigValidationToast, LicenseSyncPanel } from './feedback'
 import OptimizeShell from './OptimizeShell'
@@ -19,6 +20,59 @@ export default function OptimizeWorkflowPage(props: Props) {
   const taskCenterButtonRef = useRef<HTMLButtonElement>(null)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
   const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile } = useOptimizeWorkflow(props)
+  const [mainTourSeenAtMount] = useState(() => hasCompletedTour('optimize-overview', 1))
+  const initialSectionRef = useRef(section)
+  const [sectionChangedAfterMainTour, setSectionChangedAfterMainTour] = useState(false)
+  const mainTour = useFirstRunTour({ id: 'optimize-overview', version: 1 })
+  const childAutoStartEnabled = mainTourSeenAtMount || sectionChangedAfterMainTour
+  const overviewTour = useFirstRunTour({ id: 'optimize-tab-overview', version: 1, autoStart: childAutoStartEnabled && section === 'overview' })
+  const plansTour = useFirstRunTour({ id: 'optimize-tab-plans', version: 1, autoStart: childAutoStartEnabled && section === 'plans' })
+  const configTour = useFirstRunTour({ id: 'optimize-tab-config', version: 1, autoStart: childAutoStartEnabled && section === 'config' })
+  const resultTour = useFirstRunTour({ id: 'optimize-tab-result', version: 1, autoStart: childAutoStartEnabled && section === 'result' && hasResult })
+  const labTour = useFirstRunTour({ id: 'optimize-tab-lab', version: 1, autoStart: childAutoStartEnabled && section === 'lab' && userCanUseScenarioLab })
+
+  useEffect(() => {
+    if (mainTour.completed && section !== initialSectionRef.current) setSectionChangedAfterMainTour(true)
+  }, [mainTour.completed, section])
+
+  const mainTourDefinition = useMemo<TourDefinition>(() => ({
+    id: 'optimize-overview',
+    version: 1,
+    steps: [
+      { target: 'optimize-nav-overview', title: copy.optimize.pages_tool_optimize_tour_002, body: copy.optimize.pages_tool_optimize_tour_003 },
+      { target: 'optimize-nav-plans', title: copy.optimize.pages_tool_optimize_tour_004, body: copy.optimize.pages_tool_optimize_tour_005 },
+      { target: 'optimize-nav-config', title: copy.optimize.pages_tool_optimize_tour_006, body: copy.optimize.pages_tool_optimize_tour_007 },
+      { target: 'optimize-nav-result', title: copy.optimize.pages_tool_optimize_tour_008, body: copy.optimize.pages_tool_optimize_tour_009 },
+      ...(userCanUseScenarioLab ? [{ target: 'optimize-nav-lab', title: copy.optimize.pages_tool_optimize_tour_010, body: copy.optimize.pages_tool_optimize_tour_011 }] : []),
+    ],
+  }), [userCanUseScenarioLab])
+  const overviewTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-overview', version: 1, steps: [
+    { target: 'optimize-overview-status', title: copy.optimize.pages_tool_optimize_tour_012, body: copy.optimize.pages_tool_optimize_tour_013 },
+    { target: 'optimize-overview-generate', title: copy.optimize.pages_tool_optimize_tour_014, body: copy.optimize.pages_tool_optimize_tour_015 },
+    { target: 'optimize-overview-latest', title: copy.optimize.pages_tool_optimize_tour_016, body: copy.optimize.pages_tool_optimize_tour_017 },
+  ] }), [])
+  const plansTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-plans', version: 1, steps: [
+    { target: 'optimize-plans-save', title: copy.optimize.pages_tool_optimize_tour_018, body: copy.optimize.pages_tool_optimize_tour_019 },
+    { target: 'optimize-plans-saved', title: copy.optimize.pages_tool_optimize_tour_020, body: copy.optimize.pages_tool_optimize_tour_021 },
+    { target: 'optimize-plans-history', title: copy.optimize.pages_tool_optimize_tour_022, body: copy.optimize.pages_tool_optimize_tour_023 },
+  ] }), [])
+  const configTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-config', version: 1, steps: [
+    { target: 'optimize-config-editor', title: copy.optimize.pages_tool_optimize_tour_024, body: copy.optimize.pages_tool_optimize_tour_025 },
+    { target: 'optimize-config-status', title: copy.optimize.pages_tool_optimize_tour_026, body: copy.optimize.pages_tool_optimize_tour_027 },
+  ] }), [])
+  const resultTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-result', version: 1, steps: [
+    { target: 'optimize-result-content', title: copy.optimize.pages_tool_optimize_tour_028, body: copy.optimize.pages_tool_optimize_tour_029 },
+    { target: 'optimize-result-actions', title: copy.optimize.pages_tool_optimize_tour_030, body: copy.optimize.pages_tool_optimize_tour_031 },
+  ] }), [])
+  const labTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-lab', version: 1, steps: [
+    { target: 'optimize-lab-factors', title: copy.optimize.pages_tool_optimize_tour_032, body: copy.optimize.pages_tool_optimize_tour_033 },
+    { target: 'optimize-lab-run', title: copy.optimize.pages_tool_optimize_tour_034, body: copy.optimize.pages_tool_optimize_tour_035 },
+    { target: 'optimize-lab-results', title: copy.optimize.pages_tool_optimize_tour_036, body: copy.optimize.pages_tool_optimize_tour_037 },
+  ] }), [])
+
+  const openCurrentTour = () => {
+    ({ overview: overviewTour, plans: plansTour, config: configTour, result: resultTour, lab: labTour } as const)[section].start()
+  }
 
   const closeTaskCenter = () => {
     setTaskCenterOpen(false)
@@ -43,6 +97,7 @@ export default function OptimizeWorkflowPage(props: Props) {
           />
         )}
         onSectionChange={setSection}
+        onOpenTour={openCurrentTour}
         onReset={onReset}
       >
         {configToast && <ConfigValidationToast key={configToast.id} message={configToast.message} />}
@@ -201,6 +256,12 @@ export default function OptimizeWorkflowPage(props: Props) {
             />
           )}
         </div>
+        <GuidedTour definition={mainTourDefinition} open={mainTour.open} onFinish={mainTour.finish} onSkip={mainTour.skip} />
+        <GuidedTour definition={overviewTourDefinition} open={overviewTour.open} onFinish={overviewTour.finish} onSkip={overviewTour.skip} />
+        <GuidedTour definition={plansTourDefinition} open={plansTour.open} onFinish={plansTour.finish} onSkip={plansTour.skip} />
+        <GuidedTour definition={configTourDefinition} open={configTour.open} onFinish={configTour.finish} onSkip={configTour.skip} />
+        <GuidedTour definition={resultTourDefinition} open={resultTour.open} onFinish={resultTour.finish} onSkip={resultTour.skip} />
+        {userCanUseScenarioLab && <GuidedTour definition={labTourDefinition} open={labTour.open} onFinish={labTour.finish} onSkip={labTour.skip} />}
       </OptimizeShell>
     )
 }

@@ -1,6 +1,7 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
 import BrandLogo from '../../components/BrandLogo'
+import GuidedTour, { hasCompletedTour, useFirstRunTour, type TourDefinition } from '../../components/GuidedTour'
 import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import type { DashboardSection } from '../../lib/app-routes'
@@ -42,6 +43,20 @@ export default function AccountDashboard({
   onPayload: (payload: AuthSuccessResponse) => void
   onOpenProfile: (profile: UserGameAccount) => void
 }) {
+  const [redeemTourReplayToken, setRedeemTourReplayToken] = useState(0)
+  const [suppressInitialRedeemTour] = useState(() => section === 'redeem' && !hasCompletedTour('dashboard-overview', 1))
+  const dashboardTour = useFirstRunTour({ id: 'dashboard-overview', version: 1 })
+  const dashboardTourDefinition = useMemo<TourDefinition>(() => ({
+    id: 'dashboard-overview',
+    version: 1,
+    steps: [
+      { target: 'dashboard-nav-profiles', title: copy.dashboard.pages_tool_AccountDashboard_tour_002, body: copy.dashboard.pages_tool_AccountDashboard_tour_003 },
+      { target: 'dashboard-nav-tools', title: copy.dashboard.pages_tool_AccountDashboard_tour_004, body: copy.dashboard.pages_tool_AccountDashboard_tour_005 },
+      { target: 'dashboard-nav-redeem', title: copy.dashboard.pages_tool_AccountDashboard_tour_006, body: copy.dashboard.pages_tool_AccountDashboard_tour_007 },
+      { target: 'dashboard-nav-invitations', title: copy.dashboard.pages_tool_AccountDashboard_tour_008, body: copy.dashboard.pages_tool_AccountDashboard_tour_009 },
+      { target: 'dashboard-nav-settings', title: copy.dashboard.pages_tool_AccountDashboard_tour_010, body: copy.dashboard.pages_tool_AccountDashboard_tour_011 },
+    ],
+  }), [])
   const labels: Record<DashboardSection, string> = {
     profiles: copy.common.pages_tool_AccountDashboard_001,
     tools: copy.common.pages_tool_AccountDashboard_002,
@@ -72,6 +87,7 @@ export default function AccountDashboard({
                 key={key}
                 type="button"
                 onClick={() => onSectionChange(key)}
+                data-tour-target={`dashboard-nav-${key}`}
                 aria-current={section === key ? 'page' : undefined}
                 className="tool-nav-link flex w-full items-center px-3 text-left text-sm font-medium"
               >
@@ -102,6 +118,16 @@ export default function AccountDashboard({
               </div>
             </div>
             <div className="flex flex-wrap gap-2 self-start">
+              <button
+                type="button"
+                onClick={() => {
+                  if (section === 'redeem') setRedeemTourReplayToken((token) => token + 1)
+                  else dashboardTour.start()
+                }}
+                className="tool-secondary-action"
+              >
+                {copy.dashboard.pages_tool_AccountDashboard_tour_001}
+              </button>
               <ThemeSwitcher />
               <button type="button" onClick={onLogout} className="tool-secondary-action lg:hidden">
                 {copy.common.pages_tool_AccountDashboard_013}</button>
@@ -115,6 +141,7 @@ export default function AccountDashboard({
                   key={key}
                   type="button"
                   onClick={() => onSectionChange(key)}
+                  data-tour-target={`dashboard-nav-${key}`}
                   aria-current={section === key ? 'page' : undefined}
                   className="tool-nav-link shrink-0 px-3 text-sm font-medium"
                 >
@@ -136,7 +163,7 @@ export default function AccountDashboard({
             <Suspense fallback={<SectionFallback />}>
               {section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} />}
               {section === 'tools' && <ToolsSection />}
-              {section === 'redeem' && <RedeemSection onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}
+              {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}
               {section === 'invitations' && <InvitationsSection />}
               {section === 'announcements' && <AnnouncementsSection />}
               {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} />}
@@ -144,6 +171,12 @@ export default function AccountDashboard({
           </AnimatedPresenceRegion>
         </div>
       </main>
+      <GuidedTour
+        definition={dashboardTourDefinition}
+        open={dashboardTour.open}
+        onFinish={dashboardTour.finish}
+        onSkip={dashboardTour.skip}
+      />
     </div>
   )
 }

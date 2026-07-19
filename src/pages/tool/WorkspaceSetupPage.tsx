@@ -3,6 +3,7 @@ import { LayoutGroup } from 'motion/react'
 import type { Announcement, AuthSuccessResponse, AuthUser, LicenseConfig, LicenseOperator, UserGameAccount, UserWorkspace } from '../../lib/types'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
+import GuidedTour, { useFirstRunTour, type TourDefinition } from '../../components/GuidedTour'
 import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
@@ -51,6 +52,19 @@ export default function WorkspaceSetupPage({
   onRedeemNewProfile: () => void
   onLogout: () => void
 }) {
+  const onSectionChangeRef = useRef(onSectionChange)
+  onSectionChangeRef.current = onSectionChange
+  const setupTour = useFirstRunTour({ id: 'workspace-setup', version: 1 })
+  const setupTourDefinition = useMemo<TourDefinition>(() => ({
+    id: 'workspace-setup',
+    version: 1,
+    steps: [
+      { target: 'workspace-setup-nav', title: copy.workspace.pages_tool_WorkspaceSetupPage_tour_002, body: copy.workspace.pages_tool_WorkspaceSetupPage_tour_003 },
+      { target: 'config-preset-actions', title: copy.workspace.pages_tool_WorkspaceSetupPage_tour_004, body: copy.workspace.pages_tool_WorkspaceSetupPage_tour_005, onEnter: () => onSectionChangeRef.current('config') },
+      { target: 'workspace-config-editor', title: copy.workspace.pages_tool_WorkspaceSetupPage_tour_006, body: copy.workspace.pages_tool_WorkspaceSetupPage_tour_007 },
+      { target: 'workspace-start-scheduling', title: copy.workspace.pages_tool_WorkspaceSetupPage_tour_008, body: copy.workspace.pages_tool_WorkspaceSetupPage_tour_009 },
+    ],
+  }), [])
   const [operators, setOperators] = useState<LicenseOperator[] | null>(workspace?.operators ?? null)
   const [operatorFileName, setOperatorFileName] = useState<string | null>(null)
   const [operatorSearch, setOperatorSearch] = useState('')
@@ -203,7 +217,7 @@ export default function WorkspaceSetupPage({
           </div>
         </div>
         <LayoutGroup id="workspace-desktop">
-          <nav className="mt-5 space-y-1 border-t border-surface-3 pt-5" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_014}>
+          <nav className="mt-5 space-y-1 border-t border-surface-3 pt-5" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_014} data-tour-target="workspace-setup-nav">
             {setupSections.map((section) => (
               <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className="tool-nav-link flex w-full items-center justify-between px-3 text-left text-sm font-medium">
                 {activeSection === section.id && <MotionNavIndicator layoutId="workspace-active" />}
@@ -231,13 +245,16 @@ export default function WorkspaceSetupPage({
               </div>
             </div>
             <div className="flex gap-2">
+              <button type="button" onClick={setupTour.start} className="tool-secondary-action">
+                {copy.workspace.pages_tool_WorkspaceSetupPage_tour_001}
+              </button>
               <ThemeSwitcher />
               <button type="button" onClick={onBack} className="tool-secondary-action">{copy.workspace.pages_tool_WorkspaceSetupPage_021}</button>
               <button type="button" onClick={onLogout} className="tool-secondary-action lg:hidden">{copy.workspace.pages_tool_WorkspaceSetupPage_022}</button>
             </div>
           </div>
           <LayoutGroup id="workspace-mobile">
-            <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_023}>
+            <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_023} data-tour-target="workspace-setup-nav">
               {setupSections.map((section) => (
                 <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className="tool-nav-link shrink-0 whitespace-nowrap px-3 text-sm font-medium">
                   {activeSection === section.id && <MotionNavIndicator layoutId="workspace-active" />}
@@ -300,18 +317,20 @@ export default function WorkspaceSetupPage({
               )}
 
               {activeSection === 'config' && (
-                <Suspense fallback={<SectionFallback />}>
-                  <WorkspaceConfigSection
-                    config={normalizedConfig}
-                    canEdit={canEditConfig}
-                    canEditIntermediateInventory={canEditLimitedConfig}
-                    canSelectPreset
-                    changed={configChanged}
-                    permission={profile.permission}
-                    validation={configValidation}
-                    onUpdate={updateConfig}
-                  />
-                </Suspense>
+                <div data-tour-target="workspace-config-editor">
+                  <Suspense fallback={<SectionFallback />}>
+                    <WorkspaceConfigSection
+                      config={normalizedConfig}
+                      canEdit={canEditConfig}
+                      canEditIntermediateInventory={canEditLimitedConfig}
+                      canSelectPreset
+                      changed={configChanged}
+                      permission={profile.permission}
+                      validation={configValidation}
+                      onUpdate={updateConfig}
+                    />
+                  </Suspense>
+                </div>
               )}
             </div>
 
@@ -328,7 +347,7 @@ export default function WorkspaceSetupPage({
                   </div>
                 </dl>
               </section>
-              <button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} className="tool-primary-action w-full">
+              <button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} className="tool-primary-action w-full" data-tour-target="workspace-start-scheduling">
                 {saving ? copy.workspace.pages_tool_WorkspaceSetupPage_046 : copy.workspace.pages_tool_WorkspaceSetupPage_047}
               </button>
             </aside>
@@ -345,6 +364,7 @@ export default function WorkspaceSetupPage({
         onOpenChange={setSklandDialogOpen}
         onPayload={applySklandPayload}
       />
+      <GuidedTour definition={setupTourDefinition} open={setupTour.open} onFinish={setupTour.finish} onSkip={setupTour.skip} />
     </div>
   )
 }

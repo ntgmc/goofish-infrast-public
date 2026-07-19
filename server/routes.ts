@@ -1,6 +1,7 @@
 import adminCdkHandler from './handlers/admin-cdk'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
 import adminInvitationSettingsHandler from './handlers/admin-invitation-settings'
+import adminRegistrationSettingsHandler from './handlers/admin-registration-settings'
 import adminOptimizationHandler from './handlers/admin-optimization'
 import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
@@ -29,6 +30,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/cdk', adminCdkHandler as unknown as ApiHandler],
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
   ['/api/admin/invitation-settings', adminInvitationSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/registration-settings', adminRegistrationSettingsHandler as unknown as ApiHandler],
   ['/api/admin/optimization', adminOptimizationHandler as unknown as ApiHandler],
   ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
@@ -37,6 +39,8 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/auth/logout', authHandler as unknown as ApiHandler],
   ['/api/auth/forgot-password', authHandler as unknown as ApiHandler],
   ['/api/auth/reset-password', authHandler as unknown as ApiHandler],
+  ['/api/auth/verify-email', authHandler as unknown as ApiHandler],
+  ['/api/auth/resend-verification', authHandler as unknown as ApiHandler],
   ['/api/auth/change-password', authHandler as unknown as ApiHandler],
   ['/api/auth/me', authHandler as unknown as ApiHandler],
   ['/api/user/data/export', accountDataHandler as unknown as ApiHandler],
