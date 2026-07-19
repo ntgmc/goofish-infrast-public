@@ -73,6 +73,11 @@ describe('SklandBindingDialog accessibility', () => {
     )
 
     await user.click(screen.getByRole('button', { name: '粘贴凭据' }))
+    const consoleGuide = screen.getByText('如何打开浏览器控制台').closest('details')
+    expect(consoleGuide).toHaveAttribute('open')
+    expect(screen.getByText(/Windows \/ Linux 按 F12 或 Ctrl \+ Shift \+ J/)).toBeInTheDocument()
+    expect(screen.getByText(/右键页面选择“检查”/)).toBeInTheDocument()
+    expect(screen.getByText(/allow pasting/)).toBeInTheDocument()
     await user.type(screen.getByPlaceholderText('粘贴森空岛凭据'), 'credential-value')
     await user.click(screen.getByRole('button', { name: '读取账号预览' }))
 
