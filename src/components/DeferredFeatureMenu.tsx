@@ -40,7 +40,7 @@ export default function DeferredFeatureMenu({ className = '' }: DeferredFeatureM
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 9l6 6 6-6" />
         </svg>
       </summary>
-      <div className="tool-panel absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden shadow-[0_18px_44px_rgba(15,23,42,0.18)]">
+      <div className="deferred-menu-panel tool-panel absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden">
         <div className="tool-panel-header px-4 py-3">
           <p className="text-sm font-semibold text-ink-primary">{copy.common.components_DeferredFeatureMenu_017}</p>
           <p className="mt-1 text-xs text-ink-muted">{copy.common.components_DeferredFeatureMenu_018}</p>

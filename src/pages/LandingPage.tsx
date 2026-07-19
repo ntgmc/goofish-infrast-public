@@ -5,7 +5,6 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 import { copy } from '../copy/index'
 import { useTheme } from '../lib/theme'
-import { RevealItem, StaggeredReveal } from '../components/MotionPrimitives'
 
 
 interface Props {
@@ -43,8 +42,8 @@ export default function LandingPage({ onStart }: Props) {
 
   return (
     <main className="landing-shell min-h-screen" tabIndex={-1} data-route-focus>
-      <section className="mx-auto w-full max-w-7xl px-5 pb-16 pt-5 sm:px-8 lg:px-10 lg:pb-24 lg:pt-7">
-        <nav className="flex min-h-12 items-center justify-between gap-4 border-b border-surface-3 pb-5">
+      <section className="public-shell">
+        <nav className="public-nav" aria-label={copy.public.pages_LandingPage_018}>
           <Link to="/" className="flex min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline-none">
             <BrandLogo size="md" />
             <span className="min-w-0">
@@ -54,17 +53,15 @@ export default function LandingPage({ onStart }: Props) {
           </Link>
           <div className="flex shrink-0 items-center gap-2">
             <ThemeSwitcher />
-            <Link to="/announcements" className="hidden min-h-11 items-center px-3 text-sm font-medium text-ink-secondary transition-colors hover:text-ink-primary sm:inline-flex">
-              {copy.public.pages_LandingPage_020}</Link>
             <button type="button" onClick={onStart} className="tool-primary-action inline-flex items-center justify-center">
               {copy.public.pages_LandingPage_021}</button>
           </div>
         </nav>
 
-        <StaggeredReveal className="grid gap-12 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(28rem,1.05fr)] lg:items-center lg:py-24">
-          <RevealItem className="max-w-2xl">
-            <p className="tool-eyebrow">{copy.public.pages_LandingPage_022}</p>
-            <h1 className="mt-5 text-4xl font-semibold leading-[1.08] tracking-[-0.035em] text-ink-primary sm:text-5xl lg:text-6xl">
+        <div className="landing-workbench-hero">
+          <div className="max-w-2xl">
+            <p className="public-kicker">{copy.public.pages_LandingPage_022}</p>
+            <h1 className="display-title mt-5 text-4xl leading-[1.08] text-ink-primary sm:text-5xl lg:text-6xl">
               {copy.public.pages_LandingPage_023}</h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-ink-secondary sm:text-lg sm:leading-8">
               {copy.public.pages_LandingPage_024}</p>
@@ -82,34 +79,37 @@ export default function LandingPage({ onStart }: Props) {
               )}
             </div>
 
-            <dl className="mt-10 grid gap-px overflow-hidden rounded-xl border border-surface-3 bg-surface-3 sm:grid-cols-3">
+            <Link to="/announcements" className="mt-6 inline-flex min-h-11 items-center text-sm font-medium text-ink-secondary underline decoration-surface-4 underline-offset-4 transition-colors hover:text-ink-primary">
+              {copy.public.pages_LandingPage_020}</Link>
+
+            <dl className="landing-fact-strip mt-10">
               <Fact label={copy.public.pages_LandingPage_029} value={copy.public.pages_LandingPage_030} />
               <Fact label={copy.public.pages_LandingPage_031} value={copy.public.pages_LandingPage_032} />
               <Fact label={copy.public.pages_LandingPage_033} value={copy.public.pages_LandingPage_034} />
             </dl>
-          </RevealItem>
+          </div>
 
-          <RevealItem><ProductPreview /></RevealItem>
-        </StaggeredReveal>
+          <ProductPreview />
+        </div>
       </section>
 
-      <section className="border-y border-surface-3 bg-surface-1/55 px-5 py-16 sm:px-8 lg:px-10 lg:py-20">
-        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[minmax(15rem,0.75fr)_minmax(0,1fr)]">
+      <section className="border-y border-surface-3 bg-surface-1/55 py-16 lg:py-20">
+        <div className="public-shell grid gap-10 lg:grid-cols-[minmax(15rem,0.75fr)_minmax(0,1fr)]">
           <div>
-            <p className="tool-eyebrow">{copy.public.pages_LandingPage_035}</p>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.025em] text-ink-primary sm:text-4xl">
+            <p className="section-index">01 / {copy.public.pages_LandingPage_035}</p>
+            <h2 className="display-title mt-4 text-3xl text-ink-primary sm:text-4xl">
               {copy.public.pages_LandingPage_036}</h2>
             <p className="mt-4 max-w-lg text-base leading-7 text-ink-secondary">
               {copy.public.pages_LandingPage_037}</p>
           </div>
-          <ol className="grid gap-px overflow-hidden rounded-xl border border-surface-3 bg-surface-3 md:grid-cols-3">
+          <ol className="landing-workflow">
             {workflow.map(({ id, ...item }, index) => <WorkflowStep key={id} index={index + 1} {...item} />)}
           </ol>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:px-10 lg:py-24">
-        <figure className="overflow-hidden rounded-xl border border-surface-3 bg-surface-1">
+      <section className="public-shell grid gap-10 py-16 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)] lg:py-24">
+        <figure className="overflow-hidden rounded-[var(--radius-card)] border border-surface-4 bg-surface-1">
           <picture>
             <img
               src={`/assets/previews/optimize-result-${resolvedTheme}.png`}
@@ -123,22 +123,22 @@ export default function LandingPage({ onStart }: Props) {
         </figure>
 
         <div className="lg:py-4">
-          <p className="tool-eyebrow">{copy.public.pages_LandingPage_040}</p>
-          <h2 className="mt-4 text-3xl font-semibold tracking-[-0.025em] text-ink-primary sm:text-4xl">
+          <p className="section-index">02 / {copy.public.pages_LandingPage_040}</p>
+          <h2 className="display-title mt-4 text-3xl text-ink-primary sm:text-4xl">
             {copy.public.pages_LandingPage_041}</h2>
           <p className="mt-4 text-base leading-7 text-ink-secondary">
             {copy.public.pages_LandingPage_042}</p>
-          <StaggeredReveal className="mt-8 grid gap-3 sm:grid-cols-2">
-            {metrics.map(({ id, ...metric }) => <RevealItem key={id}><MetricTile {...metric} /></RevealItem>)}
-          </StaggeredReveal>
+          <div className="landing-metric-list mt-8">
+            {metrics.map(({ id, ...metric }) => <MetricTile key={id} {...metric} />)}
+          </div>
         </div>
       </section>
 
-      <section className="px-5 pb-20 sm:px-8 lg:px-10 lg:pb-24">
-        <div className="mx-auto grid max-w-7xl gap-6 rounded-xl border border-surface-3 bg-surface-1 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+      <section className="public-shell pb-20 lg:pb-24">
+        <div className="grid gap-6 border-t border-surface-4 pt-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
-            <p className="tool-eyebrow">{copy.public.pages_LandingPage_043}</p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-ink-primary sm:text-3xl">
+            <p className="section-index">03 / {copy.public.pages_LandingPage_043}</p>
+            <h2 className="display-title mt-3 text-2xl text-ink-primary sm:text-3xl">
               {copy.public.pages_LandingPage_044}</h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-secondary">
               {copy.public.pages_LandingPage_045}</p>
@@ -166,7 +166,7 @@ function ProductPreview() {
         <span className="tool-status tool-status--success shrink-0">{copy.public.pages_LandingPage_050}</span>
       </div>
       <div className="grid gap-4 p-4 sm:p-5">
-        <div className="tool-inset overflow-hidden">
+        <div className="overflow-hidden border border-surface-4">
           <picture>
             <img
               src={`/assets/previews/upload-entry-${resolvedTheme}.png`}
@@ -175,8 +175,8 @@ function ProductPreview() {
             />
           </picture>
         </div>
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-          <div className="tool-inset p-4">
+        <div className="grid gap-3 border-t border-surface-3 pt-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="p-1">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-semibold text-ink-primary">{copy.public.pages_LandingPage_052}</p>
               <span className="text-xs font-semibold text-success">{copy.public.pages_LandingPage_053}</span>
@@ -187,7 +187,7 @@ function ProductPreview() {
               <PreviewStep label={copy.public.pages_LandingPage_056} current />
             </ol>
           </div>
-          <div className="tool-inset flex min-w-48 flex-col justify-between p-4">
+          <div className="flex min-w-48 flex-col justify-between border-l border-surface-3 p-4">
             <div>
               <p className="text-xs font-medium text-ink-muted">{copy.public.pages_LandingPage_057}</p>
               <p className="mt-2 text-sm font-semibold text-ink-primary">{copy.public.pages_LandingPage_058}</p>
@@ -203,7 +203,7 @@ function ProductPreview() {
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-surface-1 px-4 py-4">
+    <div className="px-4 py-4">
       <dt className="text-xs font-medium text-ink-muted">{label}</dt>
       <dd className="mt-2 text-sm font-semibold text-ink-primary">{value}</dd>
     </div>
@@ -212,22 +212,22 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 function WorkflowStep({ index, title, description }: { index: number; title: string; description: string }) {
   return (
-    <li className="bg-surface-1 p-5 sm:p-6">
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-brand-500/40 bg-brand-500/10 text-sm font-semibold text-brand-200">
-        {index}
-      </span>
-      <h3 className="mt-5 text-base font-semibold text-ink-primary">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-ink-secondary">{description}</p>
+    <li>
+      <span className="text-sm font-semibold tabular-nums text-brand-400">0{index}</span>
+      <div>
+        <h3 className="text-base font-semibold text-ink-primary">{title}</h3>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">{description}</p>
+      </div>
     </li>
   )
 }
 
 function MetricTile({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="landing-preview-metric p-4">
+    <div>
       <p className="text-xs font-medium text-ink-muted">{label}</p>
-      <p className="mt-2 font-mono text-xl font-semibold tracking-[-0.02em] text-ink-primary">{value}</p>
-      <p className="mt-2 text-xs leading-5 text-ink-muted">{detail}</p>
+      <p className="text-lg font-semibold tracking-[-0.02em] text-ink-primary tabular-nums">{value}</p>
+      <p className="text-xs leading-5 text-ink-muted">{detail}</p>
     </div>
   )
 }
