@@ -26,7 +26,9 @@ jobs:
     name: Deploy verified dev artifact
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.actor.login != 'github-actions[bot]')
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.actor.login != 'github-actions[bot]')
     runs-on: ubuntu-latest
     environment: development
     timeout-minutes: 20
@@ -59,10 +61,10 @@ jobs:
             const sha = ref.data.object.sha
             const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
               owner: context.repo.owner, repo: context.repo.repo, workflow_id: 'quality-checks.yml',
-              branch: 'dev', head_sha: sha, status: 'completed', per_page: 100,
+              branch: 'dev', head_sha: sha, event: 'push', status: 'completed', per_page: 100,
             })
-            const accepted = runs.find((run) => run.head_sha === sha && run.conclusion === 'success')
-            if (!accepted) return core.setFailed(`No successful Quality Checks run exists for dev SHA ${sha}.`)
+            const accepted = runs.find((run) => run.head_sha === sha && run.event === 'push' && run.conclusion === 'success')
+            if (!accepted) return core.setFailed(`No successful push Quality Checks run exists for dev SHA ${sha}.`)
             core.setOutput('sha', sha)
             core.setOutput('run_id', String(accepted.id))
 
