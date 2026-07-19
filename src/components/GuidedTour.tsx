@@ -5,7 +5,7 @@ import { copy } from '../copy/index'
 const STORAGE_PREFIX = 'maatool:guided-tour:'
 const fallbackCompletedTours = new Set<string>()
 
-export type TourStep = {
+type TourStep = {
   target: string
   title: string
   body: string
