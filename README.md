@@ -273,6 +273,13 @@ rm -f admin.cookies
 | `CDK_HASH_SECRET_PREVIOUS` | No | CDK 轮换期间的前代密钥 |
 | `MAA_ADMIN_SECRET_PREVIOUS` | No | 授权签名轮换期间的前代密钥 |
 | `SKLAND_CREDENTIAL_SECRET_PREVIOUS` | No | 森空岛凭据轮换期间的前代密钥 |
+| `PUBLIC_APP_URL` | Yes | 公开站点根地址，用于生成密码重置和邮箱验证链接 |
+| `BREVO_API_KEY` | Yes | Brevo 事务邮件 API 密钥 |
+| `BREVO_SENDER_EMAIL` | Yes | 事务邮件发件地址 |
+| `BREVO_SENDER_NAME` | No | 事务邮件发件名称，默认 `MAA Admin` |
+| `BREVO_RESET_TEMPLATE_ID` | Yes | 密码重置模板 ID；接收 `reset_url`、`expires_minutes` 参数 |
+| `BREVO_VERIFY_EMAIL_TEMPLATE_ID` | Yes | 注册邮箱验证模板 ID；接收 `verification_url`、`expires_hours` 参数 |
+| `EMAIL_VERIFICATION_TTL_HOURS` | No | 注册邮箱验证链接有效小时数，默认 `24` |
 | `PORT` | No | Node 后端监听端口，默认 `3000` |
 | `HOST` | No | Node 后端监听地址，默认 `127.0.0.1` |
 | `APP_VERSION` | No | 同时覆盖前端和后端版本号 |

@@ -63,7 +63,7 @@ export default function PlansSection({
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
               {copy.optimize.pages_tool_optimize_PlansSection_003}</p>
           </div>
-          <form onSubmit={submitSave} className="flex w-full min-w-0 flex-col gap-2 sm:flex-row lg:w-auto">
+          <form onSubmit={submitSave} className="flex w-full min-w-0 flex-col gap-2 sm:flex-row lg:w-auto" data-tour-target="optimize-plans-save">
             <label className="min-w-0 flex-1 lg:w-56">
               <span className="sr-only">{copy.optimize.pages_tool_optimize_PlansSection_004}</span>
               <input
@@ -142,7 +142,7 @@ export default function PlansSection({
       </div>
 
       <div className="grid border-t border-surface-3/60 lg:grid-cols-2">
-        <div className="border-b border-surface-3/60 p-5 sm:p-6 lg:border-b-0 lg:border-r">
+        <div className="border-b border-surface-3/60 p-5 sm:p-6 lg:border-b-0 lg:border-r" data-tour-target="optimize-plans-saved">
           <div className="flex items-center justify-between gap-4">
             <h3 className="text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_PlansSection_022}</h3>
             <span className="text-xs text-ink-muted">{savedConfigs.length}/20</span>
@@ -169,7 +169,7 @@ export default function PlansSection({
           </div>
         </div>
 
-        <div className="p-5 sm:p-6">
+        <div className="p-5 sm:p-6" data-tour-target="optimize-plans-history">
           <div className="flex items-center justify-between gap-4">
             <h3 className="text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_PlansSection_028}</h3>
             <span className="text-xs text-ink-muted">{resultHistory.length}/10</span>

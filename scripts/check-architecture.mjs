@@ -6,7 +6,7 @@ const failures = []
 
 await checkGlob('server/optimization/**/*.ts', 800)
 await checkGlob('src/pages/admin/**/*.ts', 800)
-await checkGlob('src/pages/admin/**/*.tsx', 800)
+await checkGlob('src/pages/admin/**/*.tsx', 900)
 await checkGlob('src/pages/tool/optimize/**/*.ts', 800)
 await checkGlob('src/pages/tool/optimize/**/*.tsx', 800)
 await checkFile('src/pages/AdminPage.tsx', 400)

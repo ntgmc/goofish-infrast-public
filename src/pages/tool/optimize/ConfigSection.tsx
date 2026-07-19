@@ -43,8 +43,8 @@ export default function ConfigSection({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(19rem,0.42fr)]">
-      <section className="tool-panel min-w-0 overflow-hidden" aria-labelledby="config-section-title">
-        <div className="tool-panel-header flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+      <section className="tool-panel min-w-0 overflow-hidden" aria-labelledby="config-section-title" data-tour-target="optimize-config-editor">
+        <div className="tool-panel-header flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6" data-tour-target="optimize-config-status">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_ConfigSection_001}</p>

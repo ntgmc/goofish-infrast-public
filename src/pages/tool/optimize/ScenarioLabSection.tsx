@@ -49,7 +49,7 @@ export default function ScenarioLabSection({
           <h2 id="scenario-lab-title" className="mt-1 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_002}</h2>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_003}</p>
         </div>
-        <div className="mt-5">
+        <div className="mt-5" data-tour-target="optimize-lab-factors">
           <ScenarioFactors factors={factors} disabled={loading} onChange={setFactors} />
         </div>
         <div className="tool-inset mt-5 px-4 py-3 text-sm">
@@ -70,12 +70,13 @@ export default function ScenarioLabSection({
           disabled={loading || !expansion.value}
           onClick={() => void run()}
           className="tool-primary-action mt-4 w-full"
+          data-tour-target="optimize-lab-run"
         >
           {loading ? copy.optimize.pages_tool_optimize_ScenarioLabSection_010 : `${copy.optimize.pages_tool_optimize_ScenarioLabSection_011}${expansion.value?.scenarios.length ?? 0}${copy.optimize.pages_tool_optimize_ScenarioLabSection_012}`}
         </button>
       </div>
 
-      <div className="min-w-0 space-y-4">
+      <div className="min-w-0 space-y-4" data-tour-target="optimize-lab-results">
         {progress && <ScheduleProgress progress={progress} variant="focus" />}
         {!result && !progress && (
           <div className="tool-panel border-dashed px-5 py-12 text-center">

@@ -629,4 +629,12 @@ export const commonCopy = {
   components_ScheduleProgress_104: "任务执行异常，系统将在退避后自动开始第 ",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_105: " 次尝试。",
+  // src/components/GuidedTour.tsx
+  components_GuidedTour_001: "跳过导览",
+  // src/components/GuidedTour.tsx
+  components_GuidedTour_002: "上一步",
+  // src/components/GuidedTour.tsx
+  components_GuidedTour_003: "下一步",
+  // src/components/GuidedTour.tsx
+  components_GuidedTour_004: "完成",
 } as const

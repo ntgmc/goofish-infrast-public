@@ -1,14 +1,21 @@
-import { GeneratedPermission, StatusFilter, PermissionFilter, BinaryFilter, CdkTableFilters, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
+import { GeneratedPermission, StatusFilter, PermissionFilter, BinaryFilter, CdkTableFilters, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, PaginationMeta, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, SmallButton, formatDate, getNextProductPermission, formatNullableNumber, formatRiskDetail } from '../shared/helpers'
 import { AnimatedValue, RevealItem } from '../../../components/MotionPrimitives'
+import { PaginationControls } from '../shared/PaginationControls'
 
-export function CdkTable({ records, selected, filters, busyAction, onFilterChange, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
+export function CdkTable({ records, selected, filters, search, pagination, loading, busyAction, onSearchChange, onPageChange, onPageSizeChange, onFilterChange, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
   records: AdminCdkRecord[];
   selected: string[];
   filters: CdkTableFilters;
+  search: string;
+  pagination: PaginationMeta;
+  loading: boolean;
   busyAction: string | null;
   onFilterChange: (patch: Partial<CdkTableFilters>) => void;
+  onSearchChange: (value: string) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   onSelect: (hashes: string[]) => void;
   onBulkRevoke: () => void;
   onPatch: (record: AdminCdkRecord, action: string, nextPermission?: GeneratedPermission, extraBody?: Record<string, unknown>) => Promise<void>;
@@ -43,6 +50,13 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
         </button>
       </div>
       <div className="grid gap-3 border-b border-surface-3 p-4 md:grid-cols-4">
+        <label className="block md:col-span-4">
+          <span className="mb-1.5 block text-xs font-medium text-ink-muted">搜索</span>
+          <div className="flex gap-2">
+            <input type="search" value={search} onChange={(event) => onSearchChange(event.currentTarget.value)} placeholder="搜索 CDK 标识、订单标识或备注" className="tool-field" />
+            {search && <button type="button" onClick={() => onSearchChange('')} className="tool-secondary-action px-3 text-sm">清空</button>}
+          </div>
+        </label>
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">权限</span>
           <select value={filters.permission} onChange={(event) => onFilterChange({ permission: event.currentTarget.value as PermissionFilter })} className="tool-field">
@@ -53,7 +67,8 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
         <BinaryFilterSelect label="风险事件" value={filters.risk} onChange={(value) => onFilterChange({ risk: value })} />
         <BinaryFilterSelect label="生成过排班" value={filters.generated} onChange={(value) => onFilterChange({ generated: value })} />
       </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" aria-busy={loading}>
+          {loading && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在加载…</div>}
           <table className="w-full min-w-[1120px] table-fixed text-left text-sm">
             <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
               <tr>
@@ -68,7 +83,7 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
             </thead>
             <tbody className="divide-y divide-surface-3">
             {records.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">当前筛选没有记录。</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">{search ? '没有匹配的 CDK，请调整搜索条件。' : '当前筛选没有记录。'}</td></tr>
             ) : records.map((record) => {
               const nextPermission = getNextProductPermission(record.permission)
               return (
@@ -97,6 +112,7 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
           </tbody>
         </table>
       </div>
+      <PaginationControls pagination={pagination} loading={loading} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
     </section>
   )
 }
@@ -284,13 +300,14 @@ function RiskToggle({
   )
 }
 
-export function RiskTable({ records, busyAction, onPatch, onOpenDetail }: { records: AdminCdkRecord[]; busyAction: string | null; onPatch: (record: AdminCdkRecord, action: string) => Promise<void>; onOpenDetail: (record: AdminCdkRecord) => Promise<void> }) {
+export function RiskTable({ records, pagination, loading, busyAction, onPageChange, onPageSizeChange, onPatch, onOpenDetail }: { records: AdminCdkRecord[]; pagination: PaginationMeta; loading: boolean; busyAction: string | null; onPageChange: (page: number) => void; onPageSizeChange: (pageSize: number) => void; onPatch: (record: AdminCdkRecord, action: string) => Promise<void>; onOpenDetail: (record: AdminCdkRecord) => Promise<void> }) {
   return (
     <section className="tool-panel">
       <div className="tool-panel-header p-4">
         <h2 className="text-base font-semibold text-ink-primary">风险记录</h2>
       </div>
-      <div className="divide-y divide-surface-3">
+      <div className="divide-y divide-surface-3" aria-busy={loading}>
+        {loading && <div className="p-3 text-sm text-ink-muted" role="status">正在加载…</div>}
         {records.length === 0 ? <div className="p-8 text-center text-sm text-ink-muted">暂无风险记录。</div> : records.map((record) => (
           <div key={record.code_hash} className="grid gap-3 p-4 lg:grid-cols-[180px_1fr_auto] lg:items-center">
             <div><div className="font-mono text-sm text-ink-primary">{record.cdk_id}</div><StatusPill status={record.status} /></div>
@@ -305,6 +322,7 @@ export function RiskTable({ records, busyAction, onPatch, onOpenDetail }: { reco
           </div>
         ))}
       </div>
+      <PaginationControls pagination={pagination} loading={loading} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
     </section>
   )
 }

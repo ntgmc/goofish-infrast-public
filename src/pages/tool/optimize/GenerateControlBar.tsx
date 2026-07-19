@@ -109,6 +109,7 @@ export default function GenerateControlBar({
           <button
             type="button"
             onClick={onGenerate}
+            data-tour-target="optimize-overview-generate"
             disabled={loading || syncing || !validation.ok || resultIsCurrent || Boolean(extraDisabledReason)}
             className="tool-primary-action w-full"
           >

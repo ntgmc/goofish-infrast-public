@@ -1,4 +1,5 @@
 import { authCopy } from './zh-CN/auth'
+import { adminCopy } from './zh-CN/admin'
 import { commonCopy } from './zh-CN/common'
 import { dashboardCopy } from './zh-CN/dashboard'
 import { domainCopy } from './zh-CN/domain'
@@ -11,6 +12,7 @@ import { workspaceCopy } from './zh-CN/workspace'
 export const CURRENT_LOCALE = 'zh-CN' as const
 
 export const copy = {
+  admin: adminCopy,
   common: commonCopy,
   public: publicCopy,
   auth: authCopy,

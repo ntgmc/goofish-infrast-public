@@ -1,6 +1,6 @@
 import type { Announcement, AnnouncementKind, AnnouncementStats as AnnouncementReachStats } from '../../../lib/types'
 
-import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, CdkTableFilters, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, UsageTotals, UsageDay, UsageRangeMode, AnnouncementSortKey, UsageRange, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, UsageStatsResponse, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
+import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, UsageTotals, UsageDay, UsageRangeMode, AnnouncementSortKey, UsageRange, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, UsageStatsResponse, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
 
 export function InfoRow({ label, value }: { label: string; value: string }) {
 return <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-2 last:border-0"><dt className="text-ink-muted">{label}</dt><dd className="font-medium text-ink-primary">{value}</dd></div>
@@ -44,11 +44,11 @@ export function SmallButton({ children, onClick, loading, tone = 'default', auto
   return <button type="button" onClick={onClick} disabled={loading} data-dialog-initial-focus={autoFocus ? '' : undefined} className={`tool-secondary-action min-h-11 px-3 text-xs ${className}`}>{loading ? '处理中' : children}</button>
 }
 
-export function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0) {
-const totalCdks = records.length
-const usedCdks = records.filter((record) => record.status === 'used').length
-const frozenCdks = records.filter((record) => record.status === 'frozen').length
-const riskEvents = records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
+export function buildSummary(records: AdminCdkRecord[], usage?: UsageTotals, adminUsers = 0, ops?: CdkOpsSummary) {
+const totalCdks = ops?.status_distribution.reduce((sum, item) => sum + item.total, 0) ?? records.length
+const usedCdks = ops?.status_distribution.find((item) => item.status === 'used')?.total ?? records.filter((record) => record.status === 'used').length
+const frozenCdks = ops?.freezes ?? records.filter((record) => record.status === 'frozen').length
+const riskEvents = ops ? ops.risk_reasons.reduce((sum, item) => sum + item.count, 0) : records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
 const scheduleGenerates = usage?.schedule_generates ?? 0
 const scheduleFailures = usage?.schedule_failures ?? 0
 const scheduleAttempts = scheduleGenerates + scheduleFailures
@@ -69,14 +69,6 @@ const scheduleAttempts = scheduleGenerates + scheduleFailures
     cdkRedeems: usage?.cdk_redeems ?? 0,
     redeemRate: usage?.visits ? Math.round(((usage?.cdk_redeems ?? 0) / usage.visits) * 1000) / 10 : 0,
   }
-}
-
-export function recordMatchesCdkFilters(record: AdminCdkRecord, filters: CdkTableFilters): boolean {
-  if (filters.status !== 'all' && record.status !== filters.status) return false
-  if (filters.permission !== 'all' && normalizeProductPermission(record.permission) !== filters.permission) return false
-  if (filters.risk !== 'all' && ((record.risk_event_count ?? 0) > 0) !== (filters.risk === 'yes')) return false
-  if (filters.generated !== 'all' && ((record.schedule_generate_count ?? 0) > 0) !== (filters.generated === 'yes')) return false
-  return true
 }
 
 export function buildCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummary {
