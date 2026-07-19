@@ -8,6 +8,7 @@ const qualityChecksWorkflow = await readFile('.github/workflows/quality-checks.y
 const securityAnalysisWorkflow = await readFile('.github/workflows/security-analysis.yml', 'utf8')
 const deployScript = await readFile('scripts/deploy-production-atomic.sh', 'utf8')
 const devDeployScript = await readFile('scripts/deploy-production.sh', 'utf8')
+const releaseArtifact = await readFile('scripts/release-artifact.mjs', 'utf8')
 const apiNginx = await readFile('deploy/nginx/goofish-api-production.conf', 'utf8')
 const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', 'utf8')
 const greenUpstream = await readFile('deploy/nginx/goofish-upstream-green.conf', 'utf8')
@@ -41,6 +42,9 @@ function assertWorkflowProvenance() {
   assert.doesNotMatch(workflow, /DEPLOY_BRANCH/, 'production workflow must not pass a mutable branch')
   assert.match(devWorkflow, /actions\/download-artifact@/, 'dev deploy should download the Quality Checks artifact')
   assert.match(devWorkflow, /run-id: \$\{\{ steps\.target\.outputs\.run_id \}\}/, 'dev deploy should bind the artifact to a Quality Checks run')
+  assert.match(devWorkflow, /github\.event\.workflow_run\.event == 'push'/, 'automatic dev deploy should only accept push runs')
+  assert.match(devWorkflow, /event: 'push'/, 'manual dev deploy should only query push runs')
+  assert.match(devWorkflow, /run\.event === 'push'/, 'manual dev deploy should verify the selected run event')
   for (const deploymentPath of [
     "'.github/workflows/deploy-production.yml'",
     "'docs/production-deploy.md'",
@@ -130,6 +134,8 @@ function assertDeploymentScript() {
   }
   assert.doesNotMatch(deployScript, /npm run build/, 'production deploy must not build on the server')
   assert.doesNotMatch(deployScript, /git restore/, 'production deploy must not restore generated source files')
+  assert.doesNotMatch(deployScript, /src\/lib\/build-meta\.ts/, 'production deploy must not inspect the build metadata re-export')
+  assert.match(releaseArtifact, /src\/lib\/\.generated\/build-meta\.ts/, 'release creation should read generated build metadata')
   assert.doesNotMatch(devDeployScript, /npm run build/, 'dev deploy must not build on the server')
   assert.doesNotMatch(devDeployScript, /git restore/, 'dev deploy must not restore generated source files')
   assertOrdered(devDeployScript, [
