@@ -3,7 +3,11 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, getPool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
-import { createPostgresOptimizeJobStore, OptimizeJobAdmissionError } from './optimize-job-store'
+import {
+  createPostgresOptimizeJobStore,
+  getAdminOptimizationQueueSnapshot,
+  OptimizeJobAdmissionError,
+} from './optimize-job-store'
 import { emptyWorkspace, getWorkspace, saveWorkspace, updateProfileWorkspaceAtomically } from './user-store'
 import {
   ensureInvitationCode,
@@ -100,6 +104,70 @@ describe('PostgreSQL optimization job admission', () => {
 
   it('handles unexpected errors from idle pool clients', () => {
     expect(getPool().listenerCount('error')).toBeGreaterThan(0)
+  })
+
+  it('reads an ordered safe admin queue snapshot with user and profile context', async () => {
+    const profileId = await seedProfile()
+    const queuedHighId = randomUUID()
+    const queuedRetryId = randomUUID()
+    const runningId = randomUUID()
+    const failedId = randomUUID()
+    const ids = [queuedHighId, queuedRetryId, runningId, failedId]
+    const now = new Date()
+    const createdAt = new Date(now.getTime() - 60_000).toISOString()
+    const finishedAt = new Date(now.getTime() - 5_000).toISOString()
+    try {
+      await query(
+        `insert into optimize_jobs
+          (id, status, priority, owner_key, profile_id, permission, source, payload_json,
+           result_json, error_message, failure_kind, public_error_code, attempt_count, failure_count,
+           worker_id, heartbeat_at, next_attempt_at, expires_at, created_at, started_at, finished_at, updated_at)
+         values
+          ($1, 'queued', 2000000000, $5, $6, 'growth', 'account_profile', '{"secret":"payload"}'::jsonb,
+           null, null, null, null, 0, 0, null, null, $9, $10, $9, null, null, $9),
+          ($2, 'queued', 1999999999, $7, null, 'free_preview', 'scenario_comparison', '{}'::jsonb,
+           null, 'internal retry detail', 'worker_crash', 'execution_retries_exhausted', 1, 1, null, null, $11, $10, $9, null, null, $9),
+          ($3, 'running', 10, $8, null, 'growth', 'account_profile', '{}'::jsonb,
+           null, null, null, null, 1, 0, 'worker-integration', $9, null, null, $9, $9, null, $9),
+          ($4, 'failed', 0, $12, null, 'free_preview', 'free_preview', '{}'::jsonb,
+           null, 'internal exception detail', 'timed_out', 'execution_retries_exhausted', 2, 2, null, null, null, null, $9, $9, $13, $13)`,
+        [
+          queuedHighId,
+          queuedRetryId,
+          runningId,
+          failedId,
+          `profile:${profileId}`,
+          profileId,
+          `snapshot-retry:${queuedRetryId}`,
+          `snapshot-running:${runningId}`,
+          createdAt,
+          new Date(now.getTime() + 30 * 60_000).toISOString(),
+          new Date(now.getTime() + 10_000).toISOString(),
+          `snapshot-failed:${failedId}`,
+          finishedAt,
+        ],
+      )
+
+      const snapshot = await getAdminOptimizationQueueSnapshot(4)
+      const highIndex = snapshot.queued_jobs.findIndex((job) => job.id === queuedHighId)
+      const retryIndex = snapshot.queued_jobs.findIndex((job) => job.id === queuedRetryId)
+      expect(highIndex).toBeGreaterThanOrEqual(0)
+      expect(retryIndex).toBe(highIndex + 1)
+      expect(snapshot.queued_jobs[highIndex]).toMatchObject({
+        profile: { id: profileId, display_name: 'Free' },
+        user: { email: expect.stringMatching(/@example\.test$/) },
+      })
+      expect(snapshot.running_jobs).toContainEqual(expect.objectContaining({ id: runningId, worker_id: 'worker-integration' }))
+      expect(snapshot.recent_jobs).toContainEqual(expect.objectContaining({
+        id: failedId,
+        error_summary: '任务执行重试次数已用尽。',
+      }))
+      expect(snapshot.counts.retry_waiting).toBeGreaterThanOrEqual(1)
+      expect(JSON.stringify(snapshot)).not.toContain('secret')
+      expect(JSON.stringify(snapshot)).not.toContain('internal exception detail')
+    } finally {
+      await query('delete from optimize_jobs where id = any($1::text[])', [ids])
+    }
   })
 
   it('allows exactly one concurrent free job and reserves its entitlement once', async () => {

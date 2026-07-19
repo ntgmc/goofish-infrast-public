@@ -252,6 +252,53 @@ export interface AdminOptimizationDeadLetter {
   updated_at: string;
 }
 
+export type AdminOptimizationQueueStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
+
+export interface AdminOptimizationQueueJob {
+  id: string;
+  status: AdminOptimizationQueueStatus;
+  queue_position: number | null;
+  source: string;
+  priority: {
+    value: number;
+    label: '优先券' | '付费任务' | '分析任务' | '标准任务';
+  };
+  permission: string | null;
+  user: { id: string; email: string } | null;
+  profile: { id: string; display_name: string } | null;
+  attempt_count: number;
+  failure_count: number;
+  worker_id: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  updated_at: string;
+  heartbeat_at: string | null;
+  next_attempt_at: string | null;
+  expires_at: string | null;
+  cancel_requested_at: string | null;
+  failure_kind: string | null;
+  public_error_code: string | null;
+  error_summary: string | null;
+}
+
+export interface AdminOptimizationQueueSnapshot {
+  snapshot_at: string;
+  capacity: {
+    queue_limit: number;
+    worker_concurrency: number;
+  };
+  counts: {
+    queued: number;
+    running: number;
+    retry_waiting: number;
+    recent_failed: number;
+  };
+  queued_jobs: AdminOptimizationQueueJob[];
+  running_jobs: AdminOptimizationQueueJob[];
+  recent_jobs: AdminOptimizationQueueJob[];
+}
+
 export interface AppUserSummary {
   id: string;
   email: string;
@@ -401,6 +448,7 @@ export const appUserStatusLabels: Record<AppUserStatus, string> = {
 
 export const sectionLabels: Record<AdminSection, string> = {
   overview: '总览',
+  queue: '异步队列',
   cdk: 'CDK',
   risk: '风控',
   invitation: '邀请设置',
