@@ -8,7 +8,7 @@ import { requireUserSession } from "../../handlers/user-auth";
 import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobRecord } from "../../storage/optimize-job-store";
 import { getOptimizePollAfterMs, kickOptimizeJobCancellation, kickOptimizeJobProcessing } from "../../optimize-job-runner";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
-import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload } from './shared';
+import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload, OptimizeJobSource } from './shared';
 import { OPTIMIZE_ANALYSIS_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
 import { jsonResponse } from './http-core';
 import { prepareOptimizeJob } from './prepare-job';
@@ -31,19 +31,22 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
 
   const store = getOptimizeJobStore();
   const prepared = preparedResult.prepared;
+  const preparedPayload = prepared.payload as { activeProfileId?: string | null; isPreviewTrial?: boolean };
 
   try {
     const admissionInput = {
       id: randomUUID(),
       priority: prepared.priorityValue,
       owner_key: prepared.ownerKey,
-      profile_id: (prepared.payload as { activeProfileId?: string | null }).activeProfileId ?? null,
+      profile_id: preparedPayload.activeProfileId ?? null,
       permission: prepared.permission,
       source: prepared.source,
       payload_json: prepared.payload,
       idempotency_key: idempotencyKey,
       request_hash: requestHash,
-      free_profile_id: prepared.source === 'free_preview' ? (prepared.payload as { activeProfileId?: string | null }).activeProfileId ?? null : null,
+      free_profile_id: shouldReserveFreeScheduleEntitlement(prepared.source, preparedPayload.isPreviewTrial)
+        ? preparedPayload.activeProfileId ?? null
+        : null,
       reward_user_id: prepared.rewardUserId ?? null,
       use_priority_coupon: prepared.usePriorityCoupon === true,
     };
@@ -64,6 +67,13 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
     }
     throw error;
   }
+}
+
+export function shouldReserveFreeScheduleEntitlement(
+  source: OptimizeJobSource,
+  isPreviewTrial: boolean | undefined,
+): boolean {
+  return source === 'free_preview' && isPreviewTrial !== true;
 }
 
 function normalizeIdempotencyKey(value: string | null): string | null {
