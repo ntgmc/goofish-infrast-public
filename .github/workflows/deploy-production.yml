@@ -45,7 +45,6 @@ jobs:
       DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT || '/opt/goofish-infrast-v1' }}
       DEPLOY_REPO_DIR: ${{ vars.DEPLOY_REPO_DIR || '/opt/goofish-infrast-v1/repository' }}
-      DEPLOY_SCRIPT: ${{ vars.DEPLOY_SCRIPT || '/opt/goofish-infrast-v1/repository/scripts/deploy-production-atomic.sh' }}
       DEPLOY_SERVICE_NAME: ${{ vars.DEPLOY_SERVICE_NAME || 'goofish-infrast-v1' }}
       DEPLOY_PUBLIC_BASE_URL: ${{ vars.DEPLOY_PUBLIC_BASE_URL || 'https://maatool.com' }}
       DEPLOY_BLUE_PORT: ${{ vars.DEPLOY_BLUE_PORT || '3000' }}
@@ -58,7 +57,7 @@ jobs:
           set -euo pipefail
 
           missing=()
-          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS DEPLOY_ROOT DEPLOY_REPO_DIR DEPLOY_SCRIPT DEPLOY_SERVICE_NAME DEPLOY_PUBLIC_BASE_URL; do
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS DEPLOY_ROOT DEPLOY_REPO_DIR DEPLOY_SERVICE_NAME DEPLOY_PUBLIC_BASE_URL; do
             if [[ -z "${!name}" ]]; then
               missing+=("$name")
             fi
@@ -76,7 +75,7 @@ jobs:
           (( DEPLOY_BLUE_PORT >= 1 && DEPLOY_BLUE_PORT <= 65535 )) || { echo 'DEPLOY_BLUE_PORT is outside 1-65535' >&2; exit 1; }
           (( DEPLOY_GREEN_PORT >= 1 && DEPLOY_GREEN_PORT <= 65535 )) || { echo 'DEPLOY_GREEN_PORT is outside 1-65535' >&2; exit 1; }
           [[ "$DEPLOY_SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]] || { echo 'DEPLOY_SERVICE_NAME contains unsafe characters' >&2; exit 1; }
-          for path in "$DEPLOY_ROOT" "$DEPLOY_REPO_DIR" "$DEPLOY_SCRIPT"; do
+          for path in "$DEPLOY_ROOT" "$DEPLOY_REPO_DIR"; do
             [[ "$path" == /* && "$path" != *$'\n'* ]] || { echo "unsafe absolute deployment path: $path" >&2; exit 1; }
           done
 
@@ -126,7 +125,7 @@ jobs:
       - name: Verify target belongs to main
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: main
+          ref: ${{ steps.target.outputs.sha }}
           fetch-depth: 0
 
       - name: Validate target ancestry
@@ -185,16 +184,20 @@ jobs:
         if: steps.artifact.outputs.deployable != 'true'
         run: echo 'Quality Checks marked this commit as not requiring deployment.'
 
-      - name: Upload verified artifact
+      - name: Upload verified artifact and deploy script
         if: steps.artifact.outputs.deployable == 'true'
         env:
           TARGET_SHA: ${{ steps.target.outputs.sha }}
         run: |
           set -euo pipefail
           remote_artifact="/tmp/goofish-release-${TARGET_SHA}-${GITHUB_RUN_ID}.tgz"
+          remote_deploy_script="/tmp/goofish-production-deploy-${TARGET_SHA}-${GITHUB_RUN_ID}.sh"
           scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o IdentitiesOnly=yes \
             release-package/release.tgz "$DEPLOY_USER@$DEPLOY_HOST:$remote_artifact"
+          scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o IdentitiesOnly=yes \
+            scripts/deploy-production-atomic.sh "$DEPLOY_USER@$DEPLOY_HOST:$remote_deploy_script"
           echo "REMOTE_ARTIFACT=$remote_artifact" >> "$GITHUB_ENV"
+          echo "REMOTE_DEPLOY_SCRIPT=$remote_deploy_script" >> "$GITHUB_ENV"
 
       - name: Deploy verified release
         if: steps.artifact.outputs.deployable == 'true'
@@ -208,7 +211,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          remote_command="TARGET_SHA=${TARGET_SHA@Q} ALLOW_REDEPLOY=${ALLOW_REDEPLOY@Q} DEPLOY_ROOT=${DEPLOY_ROOT@Q} REPO_DIR=${DEPLOY_REPO_DIR@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} BLUE_PORT=${DEPLOY_BLUE_PORT@Q} GREEN_PORT=${DEPLOY_GREEN_PORT@Q} DEPLOY_RUN_ID=${DEPLOY_RUN_ID@Q} DEPLOY_RUN_URL=${DEPLOY_RUN_URL@Q} ARTIFACT_PATH=${REMOTE_ARTIFACT@Q} ARTIFACT_SHA256=${ARTIFACT_SHA256@Q} bash ${DEPLOY_SCRIPT@Q}"
+          remote_command="TARGET_SHA=${TARGET_SHA@Q} ALLOW_REDEPLOY=${ALLOW_REDEPLOY@Q} DEPLOY_ROOT=${DEPLOY_ROOT@Q} REPO_DIR=${DEPLOY_REPO_DIR@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} BLUE_PORT=${DEPLOY_BLUE_PORT@Q} GREEN_PORT=${DEPLOY_GREEN_PORT@Q} DEPLOY_RUN_ID=${DEPLOY_RUN_ID@Q} DEPLOY_RUN_URL=${DEPLOY_RUN_URL@Q} ARTIFACT_PATH=${REMOTE_ARTIFACT@Q} ARTIFACT_SHA256=${ARTIFACT_SHA256@Q} bash ${REMOTE_DEPLOY_SCRIPT@Q}; status=\$?; rm -f -- ${REMOTE_DEPLOY_SCRIPT@Q} ${REMOTE_ARTIFACT@Q}; exit \$status"
 
           ssh \
             -i ~/.ssh/deploy_key \
