@@ -18,7 +18,7 @@ export default function PricingPage() {
           </Link>
           <nav className="flex items-center gap-3" aria-label={copy.public.pages_PricingPage_001}>
             <ThemeSwitcher />
-            <Link to="/support" className="tool-nav-link px-3">{copy.public.pages_PricingPage_010}</Link>
+            <Link to="/support" className="tool-nav-link inline-flex items-center px-3">{copy.public.pages_PricingPage_010}</Link>
             <Link to="/" className="tool-secondary-action">{copy.public.pages_PricingPage_011}</Link>
           </nav>
         </header>
