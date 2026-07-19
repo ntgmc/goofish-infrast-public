@@ -855,6 +855,12 @@ export interface InvitationSettings {
   updated_at: string | null;
 }
 
+export interface RegistrationSettings {
+  version: 1;
+  email_verification_required: boolean;
+  updated_at: string | null;
+}
+
 export interface InvitationSummary {
   can_invite: boolean;
   code: string | null;

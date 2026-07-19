@@ -1242,7 +1242,7 @@ function userAuthMigrationPlugin() {
   return {
     name: 'auth-security-user-migration-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'email']) {
+      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-migration',
@@ -1255,6 +1255,7 @@ function userAuthMigrationPlugin() {
           'license-utils': userLicenseUtilsMock(),
           'cdk-redemption': cdkRedemptionMock(),
           'invitation-store': invitationStoreMock(),
+          'registration-settings-store': registrationSettingsStoreMock(),
           email: emailMock(),
         }
         return { contents: mocks[args.path], loader: 'js' }
@@ -1267,7 +1268,7 @@ function userRegistrationCdkPlugin() {
   return {
     name: 'auth-security-user-registration-cdk-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'email']) {
+      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-registration-cdk',
@@ -1281,6 +1282,7 @@ function userRegistrationCdkPlugin() {
           'license-utils': userRegistrationLicenseUtilsMock(),
           'cdk-redemption': userRegistrationCdkRedemptionMock(),
           'invitation-store': invitationStoreMock(),
+          'registration-settings-store': registrationSettingsStoreMock(),
           email: emailMock(),
         }
         return { contents: mocks[args.path], loader: 'js' }
@@ -1293,7 +1295,7 @@ function userSessionAuthPlugin() {
   return {
     name: 'auth-security-user-session-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'email']) {
+      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-session',
@@ -1306,6 +1308,7 @@ function userSessionAuthPlugin() {
           'license-utils': userLicenseUtilsMock(),
           'cdk-redemption': cdkRedemptionMock(),
           'invitation-store': invitationStoreMock(),
+          'registration-settings-store': registrationSettingsStoreMock(),
           email: emailMock(),
         }
         return { contents: mocks[args.path], loader: 'js' }
@@ -1338,7 +1341,7 @@ function passwordResetAuthPlugin() {
   return {
     name: 'auth-security-password-reset-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'email']) {
+      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\/])${moduleName}(\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-password-reset',
@@ -1352,6 +1355,7 @@ function passwordResetAuthPlugin() {
           'license-utils': userLicenseUtilsMock(),
           'cdk-redemption': cdkRedemptionMock(),
           'invitation-store': invitationStoreMock(),
+          'registration-settings-store': registrationSettingsStoreMock(),
           email: emailMock(),
         }
         return { contents: mocks[args.path], loader: 'js' }
@@ -1402,7 +1406,9 @@ function userAuthMock() {
     export async function registerUser() { return { ok: false, status: 400, message: 'unused' } }
     export async function logoutRequest() {}
     export async function requestPasswordReset() { return { ok: true } }
+    export async function resendEmailVerification() { return { ok: true, message: 'ok' } }
     export async function resetPasswordWithToken() { return { ok: false, status: 400, message: 'unused' } }
+    export async function verifyEmailWithToken() { return { ok: false, status: 400, message: 'unused' } }
     export async function changeUserPassword() { return { ok: false, status: 400, message: 'unused' } }
     export async function requireUserSession() { return null }
     export function clearSessionCookie() { return '' }
@@ -1489,6 +1495,10 @@ function adminSessionStoreMock() {
 
 function userStoreMigrationMock() {
   return `
+    export async function deleteEmailVerificationTokenByHash() {}
+    export async function getRecentEmailVerificationTokenForUser() { return null }
+    export async function saveEmailVerificationToken() {}
+    export async function verifyUserEmailWithToken() { return null }
     export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
     export async function getUserByEmail(email) {
       return globalThis.__authSecurityUsers.get(email) ?? null
@@ -1548,6 +1558,10 @@ function userStoreMigrationMock() {
 
 function userRegistrationCdkStoreMock() {
   return `
+    export async function deleteEmailVerificationTokenByHash() {}
+    export async function getRecentEmailVerificationTokenForUser() { return null }
+    export async function saveEmailVerificationToken() {}
+    export async function verifyUserEmailWithToken() { return null }
     export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
     export async function getUserByEmail() { return null }
     export async function saveUserAccount(user) {
@@ -1655,6 +1669,10 @@ function userRegistrationCdkRedemptionMock() {
 
 function userSessionAuthStoreMock() {
   return `
+    export async function deleteEmailVerificationTokenByHash() {}
+    export async function getRecentEmailVerificationTokenForUser() { return null }
+    export async function saveEmailVerificationToken() {}
+    export async function verifyUserEmailWithToken() { return null }
     export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
     export async function getSessionByTokenHash() {
       return globalThis.__authSecurityUserSession ?? null
@@ -1741,6 +1759,10 @@ function userSessionPostgresMock() {
 
 function passwordResetAuthStoreMock() {
   return `
+    export async function deleteEmailVerificationTokenByHash() {}
+    export async function getRecentEmailVerificationTokenForUser() { return null }
+    export async function saveEmailVerificationToken() {}
+    export async function verifyUserEmailWithToken() { return null }
     export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
     export async function getPasswordResetTokenByHash() {
       globalThis.__authSecurityResetSequence.push('token-preflight')
@@ -1946,8 +1968,12 @@ function invitationStoreMock() {
   `
 }
 
+function registrationSettingsStoreMock() {
+  return 'export async function getRegistrationSettings() { return { email_verification_required: false } }'
+}
+
 function emailMock() {
-  return 'export async function sendPasswordResetEmail() {}'
+  return 'export async function sendPasswordResetEmail() {}\nexport async function sendEmailVerificationEmail() {}'
 }
 
 function licenseUtilsMock() {

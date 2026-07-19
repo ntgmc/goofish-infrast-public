@@ -81,12 +81,13 @@ export async function redeemCdkAtomically<T>(options: {
 export async function saveUserAccountInTransaction(client: PoolClient, user: UserAccountRecord): Promise<void> {
   await client.query(
     `insert into user_accounts
-      (id, email, password_hash, salt, iterations, permission, status, cdk_key, cdk_code_hash, cdk_order_hash, record_json, created_at, updated_at)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13)
+      (id, email, password_hash, salt, iterations, permission, status, cdk_key, cdk_code_hash, cdk_order_hash, email_verified_at, record_json, created_at, updated_at)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14)
      on conflict (id) do update set email=excluded.email, password_hash=excluded.password_hash, salt=excluded.salt,
        iterations=excluded.iterations, permission=excluded.permission, status=excluded.status, cdk_key=excluded.cdk_key,
-       cdk_code_hash=excluded.cdk_code_hash, cdk_order_hash=excluded.cdk_order_hash, record_json=excluded.record_json, updated_at=excluded.updated_at`,
-    [user.id, user.email, user.password_hash, user.salt, user.iterations, user.permission, user.status, user.cdk_key, user.cdk_code_hash, user.cdk_order_hash, JSON.stringify(user), user.created_at, user.updated_at],
+       cdk_code_hash=excluded.cdk_code_hash, cdk_order_hash=excluded.cdk_order_hash, email_verified_at=excluded.email_verified_at,
+       record_json=excluded.record_json, updated_at=excluded.updated_at`,
+    [user.id, user.email, user.password_hash, user.salt, user.iterations, user.permission, user.status, user.cdk_key, user.cdk_code_hash, user.cdk_order_hash, user.email_verified_at, JSON.stringify(user), user.created_at, user.updated_at],
   )
 }
 

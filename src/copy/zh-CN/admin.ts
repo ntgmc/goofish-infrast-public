@@ -1,0 +1,18 @@
+export const adminCopy = {
+  registration_nav: '注册设置',
+  registration_loading: '正在载入注册设置...',
+  registration_load_failed: '加载注册设置失败',
+  registration_save_failed: '保存注册设置失败',
+  registration_saved: '注册设置已保存；新配置只影响之后创建的账号。',
+  registration_eyebrow: '账号安全',
+  registration_title: '新用户注册',
+  registration_description: '控制新账号是否必须通过收到邮件的链接确认邮箱所有权。',
+  registration_toggle: '注册时要求验证邮箱',
+  registration_enabled_help: '开启后，新用户注册完成前不会获得登录会话；验证成功后将自动登录。',
+  registration_disabled_help: '关闭后，新用户会恢复为注册即登录。已有未验证账号不会被自动激活。',
+  registration_save: '保存注册设置',
+  registration_saving: '保存中...',
+  registration_reload: '重新载入',
+  registration_updated: '最近更新：',
+  registration_default: '使用默认配置',
+} as const

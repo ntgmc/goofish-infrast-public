@@ -1,5 +1,6 @@
 import type { Announcement, AnnouncementKind, AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../../lib/types'
 import type { AdminSection } from '../../lib/app-routes'
+import { copy } from '../../copy/index'
 import { getPermissionProfile, getPermissionRank, listAdminIssuablePermissions, productPolicies } from '../../lib/product-catalog'
 
 export type { AdminSection } from '../../lib/app-routes'
@@ -451,6 +452,7 @@ export const sectionLabels: Record<AdminSection, string> = {
   queue: '异步队列',
   cdk: 'CDK',
   risk: '风控',
+  registration: copy.admin.registration_nav,
   invitation: '邀请设置',
   announcement: '公告管理',
   users: '用户维护',

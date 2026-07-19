@@ -6,6 +6,7 @@ import AnnouncementBodyEditor from '../../components/AnnouncementBodyEditor'
 import { AnimatedPresenceRegion, MotionNavIndicator, StaggeredReveal } from '../../components/MotionPrimitives'
 import SessionLoader from '../../components/SessionLoader'
 import InvitationSettingsSection from './invitations/InvitationSettingsSection'
+import RegistrationSettingsSection from './registration/RegistrationSettingsSection'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import QueueMonitorPanel from './optimization/QueueMonitorPanel'
 
@@ -413,6 +414,7 @@ export default function AdminDashboardView() {
               </form>
             )}
 
+            {activeSection === 'registration' && <RegistrationSettingsSection />}
             {activeSection === 'invitation' && <InvitationSettingsSection />}
   
             {activeSection === 'users' && (
