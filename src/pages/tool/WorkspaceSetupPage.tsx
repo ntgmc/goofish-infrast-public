@@ -1,7 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { LayoutGroup } from 'motion/react'
 import type { Announcement, AuthSuccessResponse, AuthUser, LicenseConfig, LicenseOperator, UserGameAccount, UserWorkspace } from '../../lib/types'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
+import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import { ApiError, apiJson } from '../../lib/api-client'
@@ -200,14 +202,17 @@ export default function WorkspaceSetupPage({
             <p className="mt-3 truncate text-sm font-medium text-ink-primary">{profile.display_name}</p>
           </div>
         </div>
-        <nav className="mt-5 space-y-1 border-t border-surface-3 pt-5" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_014}>
-          {setupSections.map((section) => (
-            <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className="tool-nav-link flex w-full items-center justify-between px-3 text-left text-sm font-medium">
-              <span>{section.label}</span>
-              {section.ready !== undefined && <span className={`text-xs font-medium ${section.ready ? 'text-success' : 'text-ink-muted'}`}>{section.ready ? copy.workspace.pages_tool_WorkspaceSetupPage_015 : copy.workspace.pages_tool_WorkspaceSetupPage_016}</span>}
-            </button>
-          ))}
-        </nav>
+        <LayoutGroup id="workspace-desktop">
+          <nav className="mt-5 space-y-1 border-t border-surface-3 pt-5" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_014}>
+            {setupSections.map((section) => (
+              <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className="tool-nav-link flex w-full items-center justify-between px-3 text-left text-sm font-medium">
+                {activeSection === section.id && <MotionNavIndicator layoutId="workspace-active" />}
+                <span className="relative z-10">{section.label}</span>
+                {section.ready !== undefined && <span className={`relative z-10 text-xs font-medium ${section.ready ? 'text-success' : 'text-ink-muted'}`}>{section.ready ? copy.workspace.pages_tool_WorkspaceSetupPage_015 : copy.workspace.pages_tool_WorkspaceSetupPage_016}</span>}
+              </button>
+            ))}
+          </nav>
+        </LayoutGroup>
         <nav className="absolute bottom-5 left-4 right-4 flex flex-col gap-3" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_018_account_actions}>
           <button type="button" onClick={onBack} className="tool-secondary-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_017}</button>
           <button type="button" onClick={onLogout} className="tool-secondary-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_018}</button>
@@ -231,20 +236,26 @@ export default function WorkspaceSetupPage({
               <button type="button" onClick={onLogout} className="tool-secondary-action lg:hidden">{copy.workspace.pages_tool_WorkspaceSetupPage_022}</button>
             </div>
           </div>
-          <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_023}>
-            {setupSections.map((section) => (
-              <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className="tool-nav-link shrink-0 whitespace-nowrap px-3 text-sm font-medium">{section.label}</button>
-            ))}
-          </nav>
+          <LayoutGroup id="workspace-mobile">
+            <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_023}>
+              {setupSections.map((section) => (
+                <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className="tool-nav-link shrink-0 whitespace-nowrap px-3 text-sm font-medium">
+                  {activeSection === section.id && <MotionNavIndicator layoutId="workspace-active" />}
+                  <span className="relative z-10">{section.label}</span>
+                </button>
+              ))}
+            </nav>
+          </LayoutGroup>
           {announcement?.active && <AnnouncementBanner announcement={announcement} className="mt-4" />}
         </header>
 
-        {activeSection === 'cdk' ? (
-          <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
-            <ProfileCdkPaths profile={profile} onUpgraded={onSynced} onRedeemNewProfile={onRedeemNewProfile} />
-          </div>
-        ) : (
-          <form onSubmit={handleSave} className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
+        <AnimatedPresenceRegion motionKey={activeSection}>
+          {activeSection === 'cdk' ? (
+            <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
+              <ProfileCdkPaths profile={profile} onUpgraded={onSynced} onRedeemNewProfile={onRedeemNewProfile} />
+            </div>
+          ) : (
+            <form onSubmit={handleSave} className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
           <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
             <div className="space-y-5">
               {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
@@ -322,8 +333,9 @@ export default function WorkspaceSetupPage({
               </button>
             </aside>
           </div>
-          </form>
-        )}
+            </form>
+          )}
+        </AnimatedPresenceRegion>
       </main>
 
       <SklandBindingDialog
@@ -587,7 +599,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 function SectionFallback() {
-  return <div className="tool-panel p-6 text-sm text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_081}</div>
+  return <MotionSkeleton label={copy.workspace.pages_tool_WorkspaceSetupPage_081} rows={4} />
 }
 
 function sklandPayloadFromError(caught: unknown): Partial<SklandPayload> | null {

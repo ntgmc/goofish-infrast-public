@@ -1,11 +1,13 @@
 import type { AnnouncementKind } from '../../lib/types'
+import { LayoutGroup } from 'motion/react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
 import AnnouncementBodyEditor from '../../components/AnnouncementBodyEditor'
+import { AnimatedPresenceRegion, MotionNavIndicator, StaggeredReveal } from '../../components/MotionPrimitives'
 import SessionLoader from '../../components/SessionLoader'
 import InvitationSettingsSection from './invitations/InvitationSettingsSection'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
-import DeadLetterPanel from './optimization/DeadLetterPanel'
+import QueueMonitorPanel from './optimization/QueueMonitorPanel'
 
 import { GeneratedPermission, AdminSection, UsageRangeKey, AnnouncementSortKey, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, sectionLabels, announcementKindLabels, announcementSortLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, AnnouncementReachMetrics, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
 import { useAdminController } from './useAdminController'
@@ -94,13 +96,16 @@ export default function AdminDashboardView() {
             <p className="tool-eyebrow">MAA 管理后台</p>
             <p className="mt-1 truncate text-xs text-ink-muted">{adminUsername}</p>
           </div>
-          <nav className="mt-8 space-y-1">
-            {(Object.keys(sectionLabels) as AdminSection[]).map((section) => (
-              <button key={section} type="button" onClick={() => setActiveSection(section)} aria-current={activeSection === section ? 'page' : undefined} className={`tool-nav-link w-full px-3 text-left ${activeSection === section ? 'border-brand-500/40 bg-brand-500/10 text-ink-primary' : ''}`}>
-                {sectionLabels[section]}
-              </button>
-            ))}
-          </nav>
+          <LayoutGroup id="admin-desktop">
+            <nav className="mt-8 space-y-1">
+              {(Object.keys(sectionLabels) as AdminSection[]).map((section) => (
+                <button key={section} type="button" onClick={() => setActiveSection(section)} aria-current={activeSection === section ? 'page' : undefined} className="tool-nav-link w-full px-3 text-left">
+                  {activeSection === section && <MotionNavIndicator layoutId="admin-active" />}
+                  <span className="relative z-10">{sectionLabels[section]}</span>
+                </button>
+              ))}
+            </nav>
+          </LayoutGroup>
           <button type="button" onClick={handleLogout} className="tool-secondary-action absolute bottom-5 left-4 right-4">退出登录</button>
         </aside>
   
@@ -117,19 +122,23 @@ export default function AdminDashboardView() {
                 <Link to="/admin/setup" className="tool-primary-action">账号设置</Link>
               </div>
             </div>
-            <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
-              {(Object.keys(sectionLabels) as AdminSection[]).map((section) => (
-                <button key={section} type="button" onClick={() => setActiveSection(section)} aria-current={activeSection === section ? 'page' : undefined} className={`tool-nav-link shrink-0 px-3 ${activeSection === section ? 'border-brand-500/40 bg-brand-500/10 text-ink-primary' : ''}`}>
-                  {sectionLabels[section]}
-                </button>
-              ))}
-            </div>
+            <LayoutGroup id="admin-mobile">
+              <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
+                {(Object.keys(sectionLabels) as AdminSection[]).map((section) => (
+                  <button key={section} type="button" onClick={() => setActiveSection(section)} aria-current={activeSection === section ? 'page' : undefined} className="tool-nav-link shrink-0 px-3">
+                    {activeSection === section && <MotionNavIndicator layoutId="admin-active" />}
+                    <span className="relative z-10">{sectionLabels[section]}</span>
+                  </button>
+                ))}
+              </div>
+            </LayoutGroup>
           </header>
   
           <div className="px-5 py-6 sm:px-8">
             {error && <div className="tool-alert tool-alert--error mb-5" role="alert">{error}</div>}
             {notice && <div className="tool-alert tool-alert--success mb-5" role="status" aria-live="polite">{notice}</div>}
-  
+
+            <AnimatedPresenceRegion motionKey={activeSection}>
             {activeSection === 'overview' && (
               <section className="space-y-6">
                 <div className="tool-panel flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -188,7 +197,7 @@ export default function AdminDashboardView() {
                     </button>
                   </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <StaggeredReveal className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <Metric label="免费预览" value={summary.freePreviews} />
                   <Metric label="注册数" value={summary.registers} />
                   <Metric label="CDK 兑换" value={summary.cdkRedeems} />
@@ -197,7 +206,7 @@ export default function AdminDashboardView() {
                   <Metric label="平均耗时" value={formatDuration(usageStats?.latency.schedule_generate.average_ms ?? 0)} />
                   <Metric label="P95 耗时" value={formatDuration(usageStats?.latency.schedule_generate.p95_ms ?? 0)} tone={(usageStats?.latency.schedule_generate.p95_ms ?? 0) > 10000 ? 'warning' : 'default'} />
                   <Metric label="冻结/软拦截" value={summary.frozenCdks + summary.riskEvents} tone={summary.frozenCdks + summary.riskEvents > 0 ? 'warning' : 'default'} />
-                </div>
+                </StaggeredReveal>
                 <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
                   <section className="tool-panel p-5">
                     <div className="flex items-center justify-between">
@@ -218,9 +227,10 @@ export default function AdminDashboardView() {
                   <AnnouncementStatsPanel stats={usageStats?.announcement ?? EMPTY_ANNOUNCEMENT_STATS} />
                 </div>
                 <CdkDistributionPanel items={usageStats?.cdk_distribution ?? []} />
-                <DeadLetterPanel />
               </section>
             )}
+
+            {activeSection === 'queue' && <QueueMonitorPanel />}
   
         {activeSection === 'cdk' && (
           <section className="space-y-5">
@@ -517,6 +527,7 @@ export default function AdminDashboardView() {
                 )}
               </section>
             )}
+            </AnimatedPresenceRegion>
           </div>
         </main>
       </div>

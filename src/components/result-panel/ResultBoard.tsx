@@ -1,5 +1,6 @@
 import type { PreparedResult } from './formatters'
 import OperatorAvatarStrip from './OperatorAvatarStrip'
+import { RevealItem, StaggeredReveal } from '../MotionPrimitives'
 import type { PreparedPlan, RoomRow } from './types'
 import { copy } from '../../copy/index'
 
@@ -66,12 +67,10 @@ export default function ResultBoard({
           <div className="tool-inset border-dashed px-4 py-8 text-center text-sm text-ink-muted">
             {copy.domain.components_result_panel_ResultBoard_008}</div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <StaggeredReveal className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {groups.map((group) => (
-              <article
-                key={group.key}
-                className={`tool-inset overflow-hidden ${ROOM_TONE[group.roomType] ?? DEFAULT_ROOM_TONE}`}
-              >
+              <RevealItem key={group.key}>
+              <article className={`tool-inset h-full overflow-hidden ${ROOM_TONE[group.roomType] ?? DEFAULT_ROOM_TONE}`}>
                 <div className="border-b border-surface-3/50 px-3 py-2 text-center">
                   <h3 className="truncate text-sm font-semibold text-ink-primary">
                     {group.label}
@@ -104,8 +103,9 @@ export default function ResultBoard({
                   ))}
                 </div>
               </article>
+              </RevealItem>
             ))}
-          </div>
+          </StaggeredReveal>
         )}
       </div>
     </section>

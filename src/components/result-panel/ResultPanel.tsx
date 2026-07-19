@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { LayoutGroup } from 'motion/react'
+import { AnimatedPresenceRegion, MotionNavIndicator } from '../MotionPrimitives'
 import { formatCompactNumber, prepareResult } from './formatters'
 import { MaaImportGuide, RotationManualGuide } from './Guides'
 import ResultBoard from './ResultBoard'
@@ -128,63 +130,48 @@ export default function ResultPanel({
         </div>
 
         <div className="border-b border-surface-3/60 px-5 pt-3 sm:px-6">
-          <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label={copy.domain.components_result_panel_ResultPanel_038}>
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={selectedTab === tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex min-h-11 w-max shrink-0 border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${
-                  selectedTab === tab.id
-                    ? 'border-brand-400 text-ink-primary'
-                    : 'border-transparent text-ink-muted hover:border-surface-4 hover:text-ink-primary'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          <LayoutGroup id="result-tabs">
+            <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label={copy.domain.components_result_panel_ResultPanel_038}>
+              {tabs.map((tab) => (
+                <button
+                  id={`result-${tab.id}-tab`}
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedTab === tab.id}
+                  aria-controls={`result-${tab.id}-panel`}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`relative inline-flex min-h-11 w-max shrink-0 border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45 ${
+                    selectedTab === tab.id
+                      ? 'border-transparent text-ink-primary'
+                      : 'border-transparent text-ink-muted hover:border-surface-4 hover:text-ink-primary'
+                  }`}
+                >
+                  {selectedTab === tab.id && <MotionNavIndicator layoutId="result-tab-active" variant="underline" />}
+                  <span className="relative z-10">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          </LayoutGroup>
         </div>
       </div>
 
-      {selectedTab === 'board' && (
-        <ResultBoard
-          isRotationMode={isRotationMode}
-          prepared={prepared}
-          planTimes={result.planTimes}
-        />
-      )}
-
-      {selectedTab === 'data' && (
-        <ResultMetrics
-          isAnalysis={isAnalysis}
-          isRotationMode={isRotationMode}
-          analysisSummary={analysisSummary}
-          prepared={prepared}
-        />
-      )}
-
-      {selectedTab === 'detail' && (
-        <ResultDetail
-          isRotationMode={isRotationMode}
-          prepared={prepared}
-          planTimes={result.planTimes}
-        />
-      )}
-
-      {selectedTab === 'import' && (
-        <section className="tool-panel overflow-hidden p-5 sm:p-6">
-          {isRotationMode ? <RotationManualGuide compact /> : <MaaImportGuide compact />}
-        </section>
-      )}
-
-      {selectedTab === 'suggestions' && suggestionsSlot && (
-        <section className="tool-panel overflow-hidden p-5 sm:p-6">
-          {suggestionsSlot}
-        </section>
-      )}
+      <AnimatedPresenceRegion
+        motionKey={selectedTab}
+        id={`result-${selectedTab}-panel`}
+        role="tabpanel"
+        labelledBy={`result-${selectedTab}-tab`}
+      >
+        {selectedTab === 'board' && <ResultBoard isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
+        {selectedTab === 'data' && <ResultMetrics isAnalysis={isAnalysis} isRotationMode={isRotationMode} analysisSummary={analysisSummary} prepared={prepared} />}
+        {selectedTab === 'detail' && <ResultDetail isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
+        {selectedTab === 'import' && (
+          <section className="tool-panel overflow-hidden p-5 sm:p-6">
+            {isRotationMode ? <RotationManualGuide compact /> : <MaaImportGuide compact />}
+          </section>
+        )}
+        {selectedTab === 'suggestions' && suggestionsSlot && <section className="tool-panel overflow-hidden p-5 sm:p-6">{suggestionsSlot}</section>}
+      </AnimatedPresenceRegion>
     </div>
   )
 }

@@ -5,15 +5,15 @@ import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import type { UserAccountRecord } from './user-store'
 
-export const PRIORITY_COMPUTE_COUPON = 'priority_compute_coupon' as const
+const PRIORITY_COMPUTE_COUPON = 'priority_compute_coupon' as const
 const INVITATION_SETTINGS_KEY = 'global'
 const INVITE_CODE_LENGTH = 10
 const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 
-export type InvitationRewardType = typeof PRIORITY_COMPUTE_COUPON
-export type InvitationRewardRecipient = 'inviter' | 'invitee'
+type InvitationRewardType = typeof PRIORITY_COMPUTE_COUPON
+type InvitationRewardRecipient = 'inviter' | 'invitee'
 
-export interface InvitationRewardRule {
+interface InvitationRewardRule {
   recipient: InvitationRewardRecipient
   type: InvitationRewardType
   quantity: number
@@ -212,7 +212,7 @@ export async function saveInvitationInTransaction(client: PoolClient, inviteeUse
   )
 }
 
-export async function userCanInvite(userId: string): Promise<boolean> {
+async function userCanInvite(userId: string): Promise<boolean> {
   await ensureSchema()
   const result = await query<{ eligible: boolean }>(
     `select exists (

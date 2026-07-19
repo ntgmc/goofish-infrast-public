@@ -339,15 +339,15 @@ export function RiskReasonPanel({ reasons, onOpenDetail }: { reasons: RiskReason
   )
 }
 
-export type TrendMetricKey = 'visits' | 'schedule_generates' | 'cdk_redeems'
+type TrendMetricKey = 'visits' | 'schedule_generates' | 'cdk_redeems'
 
-export const trendMetrics: Array<{ key: TrendMetricKey; label: string; stroke: string; dasharray?: string }> = [
+const trendMetrics: Array<{ key: TrendMetricKey; label: string; stroke: string; dasharray?: string }> = [
   { key: 'visits', label: '访问', stroke: 'var(--color-brand-500)' },
   { key: 'schedule_generates', label: '生成', stroke: 'var(--color-warning)', dasharray: '8 5' },
   { key: 'cdk_redeems', label: '兑换', stroke: 'var(--color-success)', dasharray: '2 5' },
 ]
 
-export const trendChart = {
+const trendChart = {
   width: 640,
   height: 260,
   left: 44,
@@ -504,14 +504,14 @@ export function UsageTrendChart({ days }: { days: UsageDay[] }) {
   )
 }
 
-export function buildTrendTicks(maxValue: number) {
+function buildTrendTicks(maxValue: number) {
   if (maxValue <= 3) {
     return Array.from({ length: maxValue + 1 }, (_, index) => maxValue - index)
   }
   return Array.from(new Set([maxValue, Math.round(maxValue * 0.66), Math.round(maxValue * 0.33), 0]))
 }
 
-export function buildTrendPath(points: Array<{ x: number; y: number }>) {
+function buildTrendPath(points: Array<{ x: number; y: number }>) {
   if (points.length === 1) {
     const [point] = points
     return `M ${point.x - 12} ${point.y} L ${point.x + 12} ${point.y}`

@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest'
-import { buildScenarioComparisonEstimate, createOptimizeJobPollToken, verifyOptimizeJobPollToken } from './job-status'
+import { buildScenarioComparisonEstimate, createOptimizeJobPollToken, shouldReserveFreeScheduleEntitlement, verifyOptimizeJobPollToken } from './job-status'
 import { createPersistedOptimizeJobPayload } from './shared'
 
 const originalAdminSecret = process.env.MAA_ADMIN_SECRET
@@ -64,5 +64,14 @@ describe('persisted optimization payload', () => {
     expect(serialized).not.toContain('effectiveLicense')
     expect(serialized).not.toContain('checkedCdkRecord')
     expect(serialized).not.toContain('"sig"')
+  })
+})
+
+describe('free schedule admission during the preview trial', () => {
+  it('skips the full-schedule entitlement reservation only while the trial is active', () => {
+    expect(shouldReserveFreeScheduleEntitlement('free_preview', true)).toBe(false)
+    expect(shouldReserveFreeScheduleEntitlement('free_preview', false)).toBe(true)
+    expect(shouldReserveFreeScheduleEntitlement('free_preview', undefined)).toBe(true)
+    expect(shouldReserveFreeScheduleEntitlement('account_profile', true)).toBe(false)
   })
 })

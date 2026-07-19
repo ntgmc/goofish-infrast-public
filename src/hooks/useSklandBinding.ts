@@ -20,7 +20,7 @@ export type SklandAccountOption = {
   is_default: boolean
 }
 
-export type SklandRecoveryAction = 'rebind' | 'retry' | 'bind_first' | 'use_depot_analysis'
+type SklandRecoveryAction = 'rebind' | 'retry' | 'bind_first' | 'use_depot_analysis'
 
 export type SklandPayload = AuthSuccessResponse & {
   skland_import?: {
@@ -47,7 +47,7 @@ export type SklandPayload = AuthSuccessResponse & {
 }
 
 export type SklandImportMode = 'scan' | 'manual' | 'bookmarklet'
-export type SklandLoginStatus = 'idle' | 'starting' | 'waiting' | 'account_selection_required' | 'confirm_required' | 'account_mismatch' | 'importing' | 'imported' | 'frozen' | 'error'
+type SklandLoginStatus = 'idle' | 'starting' | 'waiting' | 'account_selection_required' | 'confirm_required' | 'account_mismatch' | 'importing' | 'imported' | 'frozen' | 'error'
 
 export type SklandLoginState = {
   mode: SklandImportMode

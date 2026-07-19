@@ -85,7 +85,7 @@ function ThemeSwitcherContent() {
           aria-expanded={open}
           aria-label={`${copy.common.components_ThemeSwitcher_001}：${selectedOption.label}`}
           onClick={() => setOpen((current) => !current)}
-          className="tool-secondary-action whitespace-nowrap px-3"
+          className="tool-secondary-action h-11 whitespace-nowrap px-3 py-0"
         >
           <SelectedIcon aria-hidden="true" className="size-4" />
         <span className="hidden sm:inline">{selectedOption.label}</span>

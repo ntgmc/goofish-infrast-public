@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { Announcement } from '../lib/types'
 import { apiVoid } from '../lib/api-client'
 import AnnouncementMarkdown from './AnnouncementMarkdown'
+import { AnimatedPresenceRegion } from './MotionPrimitives'
 import { copy } from '../copy/index'
 
 
@@ -97,6 +98,7 @@ export default function AnnouncementPopup({ announcements }: Props) {
       className="m-auto max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto border-0 bg-transparent p-0 text-left backdrop:bg-ink-primary/45"
     >
       <section className="tool-panel w-full max-w-lg p-5 text-left shadow-xl">
+        <AnimatedPresenceRegion motionKey={announcementVersionKey(current)}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="tool-eyebrow">{copy.public.components_AnnouncementPopup_001}</p>
@@ -120,6 +122,7 @@ export default function AnnouncementPopup({ announcements }: Props) {
           >
             {copy.public.components_AnnouncementPopup_003}</button>
         </div>
+        </AnimatedPresenceRegion>
       </section>
     </dialog>
   )

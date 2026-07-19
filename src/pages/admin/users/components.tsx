@@ -29,7 +29,7 @@ export function UserDetailDialog(props: UserDetailPanelProps) {
   )
 }
 
-export function UserDetailPanel({
+function UserDetailPanel({
   detail,
   busyAction,
   operatorDataByProfileId,
@@ -102,7 +102,7 @@ export function UserDetailPanel({
   )
 }
 
-export function ProfileDetailCard({
+function ProfileDetailCard({
   profile,
   busyAction,
   operatorData,
@@ -192,7 +192,7 @@ export function ProfileDetailCard({
   )
 }
 
-export function ProfileOperatorsPanel({ data }: { data: AdminProfileOperatorData }) {
+function ProfileOperatorsPanel({ data }: { data: AdminProfileOperatorData }) {
   const operators = data.operators
   const sklandSummary = data.profile.skland_binding
     ? `${data.profile.skland_binding.nickname || '-'} / ${data.profile.skland_binding.uid} / ${data.profile.skland_binding.channel_name || '-'}`

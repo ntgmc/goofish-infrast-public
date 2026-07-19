@@ -1,6 +1,6 @@
 import { query } from './postgres'
 
-export const CREATE_SCHEMA_SQL = `
+const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS cdk_records (
   key TEXT PRIMARY KEY,
   code_hash TEXT NOT NULL,

@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react'
+import { LayoutGroup } from 'motion/react'
 import BrandLogo from '../../components/BrandLogo'
+import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import type { DashboardSection } from '../../lib/app-routes'
 import type { AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
@@ -63,19 +65,22 @@ export default function AccountDashboard({
           </div>
         </div>
 
-        <nav className="mt-5 space-y-1" aria-label={copy.common.pages_tool_AccountDashboard_008}>
-          {sections.map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onSectionChange(key)}
-              aria-current={section === key ? 'page' : undefined}
-              className="tool-nav-link flex w-full items-center px-3 text-left text-sm font-medium"
-            >
-              {labels[key]}
-            </button>
-          ))}
-        </nav>
+        <LayoutGroup id="dashboard-desktop">
+          <nav className="mt-5 space-y-1" aria-label={copy.common.pages_tool_AccountDashboard_008}>
+            {sections.map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onSectionChange(key)}
+                aria-current={section === key ? 'page' : undefined}
+                className="tool-nav-link flex w-full items-center px-3 text-left text-sm font-medium"
+              >
+                {section === key && <MotionNavIndicator layoutId="dashboard-active" />}
+                <span className="relative z-10">{labels[key]}</span>
+              </button>
+            ))}
+          </nav>
+        </LayoutGroup>
 
         <div className="absolute inset-x-4 bottom-5 border-t border-surface-3 pt-4">
           <button type="button" onClick={onLogout} className="tool-secondary-action w-full">
@@ -103,19 +108,22 @@ export default function AccountDashboard({
             </div>
           </div>
 
-          <nav className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.common.pages_tool_AccountDashboard_014}>
-            {sections.map((key) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onSectionChange(key)}
-                aria-current={section === key ? 'page' : undefined}
-                className="tool-nav-link shrink-0 px-3 text-sm font-medium"
-              >
-                {labels[key]}
-              </button>
-            ))}
-          </nav>
+          <LayoutGroup id="dashboard-mobile">
+            <nav className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.common.pages_tool_AccountDashboard_014}>
+              {sections.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onSectionChange(key)}
+                  aria-current={section === key ? 'page' : undefined}
+                  className="tool-nav-link shrink-0 px-3 text-sm font-medium"
+                >
+                  {section === key && <MotionNavIndicator layoutId="dashboard-active" />}
+                  <span className="relative z-10">{labels[key]}</span>
+                </button>
+              ))}
+            </nav>
+          </LayoutGroup>
         </header>
 
         <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
@@ -124,24 +132,16 @@ export default function AccountDashboard({
               {workspaceLoadError}
             </div>
           )}
-          <Suspense fallback={<SectionFallback />}>
-            {section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} />}
-          </Suspense>
-          <Suspense fallback={<SectionFallback />}>
-            {section === 'tools' && <ToolsSection />}
-          </Suspense>
-          <Suspense fallback={<SectionFallback />}>
-            {section === 'redeem' && <RedeemSection onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}
-          </Suspense>
-          <Suspense fallback={<SectionFallback />}>
-            {section === 'invitations' && <InvitationsSection />}
-          </Suspense>
-          <Suspense fallback={<SectionFallback />}>
-            {section === 'announcements' && <AnnouncementsSection />}
-          </Suspense>
-          <Suspense fallback={<SectionFallback />}>
-            {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} />}
-          </Suspense>
+          <AnimatedPresenceRegion motionKey={section}>
+            <Suspense fallback={<SectionFallback />}>
+              {section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} />}
+              {section === 'tools' && <ToolsSection />}
+              {section === 'redeem' && <RedeemSection onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}
+              {section === 'invitations' && <InvitationsSection />}
+              {section === 'announcements' && <AnnouncementsSection />}
+              {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} />}
+            </Suspense>
+          </AnimatedPresenceRegion>
         </div>
       </main>
     </div>
@@ -149,5 +149,5 @@ export default function AccountDashboard({
 }
 
 function SectionFallback() {
-  return <div className="tool-panel p-6 text-sm text-ink-secondary">{copy.common.pages_tool_AccountDashboard_015}</div>
+  return <MotionSkeleton label={copy.common.pages_tool_AccountDashboard_015} rows={4} />
 }

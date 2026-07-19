@@ -8,7 +8,7 @@ export interface LicenseOperator {
 }
 
 export type IntermediateProduct = 'Originium Shard' | 'Pure Gold' | 'Orirock Cube';
-export type IntermediateInventory = Partial<Record<IntermediateProduct, number>>;
+type IntermediateInventory = Partial<Record<IntermediateProduct, number>>;
 
 export interface LicenseConfig {
   layout: string;
@@ -98,9 +98,9 @@ export interface OrundumRoi {
   inventory_depletion_days_delta: number | null;
 }
 
-export type LegacyPermissionMode = 'basic' | 'premium';
+type LegacyPermissionMode = 'basic' | 'premium';
 export type ProductPermissionMode = 'recommended' | 'growth' | 'advanced' | 'ultimate';
-export type InternalPermissionMode = 'admin';
+type InternalPermissionMode = 'admin';
 export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | InternalPermissionMode;
 export type PermissionMode = ProductPermissionMode | InternalPermissionMode;
 export type UserGameAccountKind = 'cdk' | 'free_preview' | 'depot_value';
@@ -157,23 +157,11 @@ export interface AnnouncementAdminResponse {
   stats?: Record<string, AnnouncementStats>;
 }
 
-export interface OptimizeRequest {
-  license: LicenseFile;
-  operators: LicenseOperator[];
-  config: LicenseConfig;
-  ignore_elite: boolean;
-  profile_id?: string;
-  history_source?: 'generated' | 'applied_suggestions';
-  include_current?: boolean;
-  suggestions_only?: boolean;
-  upgrade_task_payload?: UpgradeTaskPayload;
-}
-
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard';
-export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered';
+type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered';
 export type OptimizeEstimateBucket = 'maa_fiammetta' | 'maa_plain' | 'rotation' | 'scenario_comparison';
 export type OptimizeEstimateSource = 'history_p95' | 'fallback_p95';
-export type OptimizeRuntimeEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled';
+type OptimizeRuntimeEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled';
 
 export interface OptimizeJobAccepted {
   job_id: string;
@@ -264,7 +252,7 @@ export interface DepotValueUnpricedItem {
   count: number;
 }
 
-export type DepotValueRankingMode = 'curve' | 'sample_adjusted';
+type DepotValueRankingMode = 'curve' | 'sample_adjusted';
 export type DepotValueSampleContributionStatus = 'saved' | 'not_applicable' | 'unavailable';
 
 export interface DepotValueRanking {
@@ -306,7 +294,7 @@ export interface UpgradeTaskPayload {
   potentialFiammettaTargets?: string[];
 }
 
-export interface RawUpgradeTask {
+interface RawUpgradeTask {
   bundle: { id?: string; name: string; current: number; target: number }[];
   rule: unknown | null;
   roomName: string;
@@ -314,12 +302,12 @@ export interface RawUpgradeTask {
   impact_sources?: UpgradeImpactRoom[];
 }
 
-export interface AssignmentResult {
+interface AssignmentResult {
   total_efficiency: number;
   assignment_detail: AssignmentDetail[];
 }
 
-export interface AssignmentDetail {
+interface AssignmentDetail {
   rule: string;
   ops: string[];
   eff: number;
@@ -383,7 +371,7 @@ export interface OptimizeResult {
   build_meta?: AppBuildMeta;
 }
 
-export type FreeScheduleEntitlementLockReason = 'confirmed' | 'revision_limit' | 'window_expired';
+type FreeScheduleEntitlementLockReason = 'confirmed' | 'revision_limit' | 'window_expired';
 
 export interface FreeScheduleEntitlement {
   first_generated_at: string | null;
@@ -400,7 +388,7 @@ export interface FreeScheduleEntitlement {
   } | null;
 }
 
-export type ReorderCheckRecommendation = 'no_need' | 'recommended' | 'strongly_recommended';
+type ReorderCheckRecommendation = 'no_need' | 'recommended' | 'strongly_recommended';
 
 export interface ReorderCheckResult {
   recommendation: ReorderCheckRecommendation;
@@ -482,7 +470,7 @@ export interface UpgradeTrainingCostBucket {
   equivalent_sanity: number | null;
 }
 
-export interface UpgradeTrainingOperatorCost {
+interface UpgradeTrainingOperatorCost {
   id: string;
   name: string;
   current_elite: number;
@@ -548,7 +536,7 @@ export interface UpgradePartialOutcome {
   rooms: string;
 }
 
-export type RawUpgradeSuggestion = (
+type RawUpgradeSuggestion = (
   | {
       type: 'single';
       id?: string;
@@ -576,7 +564,7 @@ export type RawUpgradeSuggestion = (
   partial_outcomes_unavailable_reason?: string;
 };
 
-export interface RoomOverflow {
+interface RoomOverflow {
   equivalent?: {
     equivalent_efficiency?: number;
     equivalent_efficiency_delta?: number;
@@ -647,7 +635,7 @@ export interface DailyProduction {
   details?: Record<string, unknown>[];
 }
 
-export interface DailyProductionDelta {
+interface DailyProductionDelta {
   total_efficiency: number;
   raw_total_efficiency: number;
   manufacturing: Record<string, number>;
@@ -657,7 +645,7 @@ export interface DailyProductionDelta {
   drones: Record<string, number>;
 }
 
-export interface MaaDefaultComparison {
+interface MaaDefaultComparison {
   source: 'maa_default_simulation_v1';
   simulation: {
     algorithm: 'maa_default_room_local_greedy_v1' | string;
@@ -752,7 +740,7 @@ export interface AuthUser {
 export type SklandCredentialStatus = 'available' | 'invalid';
 export type SklandCredentialInvalidReason = 'expired_or_revoked' | 'credential_format_invalid';
 
-export interface SklandPublicBinding {
+interface SklandPublicBinding {
   uid: string;
   nickname: string;
   channel_name: string;
@@ -809,7 +797,7 @@ export interface WorkspaceSavedConfig {
   read_only?: boolean;
 }
 
-export type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legacy';
+type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legacy';
 
 export interface WorkspaceResultHistoryItem {
   id: string;
@@ -848,10 +836,10 @@ export interface AuthSuccessResponse {
   announcement_unread_count?: number;
 }
 
-export type InvitationRewardType = 'priority_compute_coupon';
+type InvitationRewardType = 'priority_compute_coupon';
 export type InvitationRewardRecipient = 'inviter' | 'invitee';
 
-export interface InvitationRewardRule {
+interface InvitationRewardRule {
   recipient: InvitationRewardRecipient;
   type: InvitationRewardType;
   quantity: number;
@@ -885,5 +873,3 @@ export interface RewardBalance {
 export type DepotValueProfileResponse = AuthSuccessResponse & {
   depot_profile: UserGameAccount;
 };
-
-export type AppStep = 'upload' | 'optimize';

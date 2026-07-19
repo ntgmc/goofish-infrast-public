@@ -1,7 +1,7 @@
 import type { LicenseFile } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
 import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, recordSoftBlockedRiskEvent, getPermissionMode, getCdkRecordStore, getRiskControlSettings, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
-import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, updateProfileWorkspaceAtomically, type UserGameAccountRecord } from "../../storage/user-store";
+import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, updateProfileWorkspaceAtomically } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
 import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, OptimizeConfigPermission, FreeScheduleGenerateDecision } from './shared';
@@ -13,6 +13,7 @@ import { buildScenarioComparisonEstimate } from './job-status';
 import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../../free-preview-trial';
 import { hasCapability } from '../../../src/lib/product-catalog';
+import { getFreeScheduleEntitlement } from '../../storage/reorder-admission';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -64,7 +65,6 @@ export async function prepareOptimizeJob(
     }
     let effectiveLicense: LicenseFile;
     let activeProfileId: string | null = null;
-    let activeProfile: UserGameAccountRecord | null = null;
     let isPreviewProfile = false;
     let isPreviewTrial = false;
 
@@ -83,7 +83,6 @@ export async function prepareOptimizeJob(
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
         return fail({ error: '仓库分析档案不能用于生成排班。' }, 403);
       }
-      activeProfile = profile;
       isPreviewProfile = isFreePreviewProfile(profile);
       isPreviewTrial = isFreePreviewTrialActive(profile);
       if (isPreviewProfile && !profile.skland_binding) {
@@ -200,7 +199,11 @@ export async function prepareOptimizeJob(
       : null;
     let freeScheduleDecision: Extract<FreeScheduleGenerateDecision, { ok: true }> | null = null;
     if (isPreviewProfile && !isPreviewTrial && activeProfileId && previewWorkspaceForGeneration) {
-      const decision = resolveFreeScheduleGenerateDecision(previewWorkspaceForGeneration.free_schedule_entitlement);
+      const entitlement = await getFreeScheduleEntitlement(
+        activeProfileId,
+        previewWorkspaceForGeneration.free_schedule_entitlement,
+      );
+      const decision = resolveFreeScheduleGenerateDecision(entitlement);
       if (!decision.ok) {
         scheduleUsage = scheduleFailure('permission_denied', scheduleUsageBase);
         if (decision.entitlement.locked_at !== previewWorkspaceForGeneration.free_schedule_entitlement?.locked_at

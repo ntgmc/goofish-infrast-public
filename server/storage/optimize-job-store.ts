@@ -10,7 +10,7 @@ import {
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
-export type OptimizeJobAttemptStatus = 'running' | 'succeeded' | 'failed' | 'timed_out' | 'interrupted' | 'lease_lost' | 'cancelled'
+type OptimizeJobAttemptStatus = 'running' | 'succeeded' | 'failed' | 'timed_out' | 'interrupted' | 'lease_lost' | 'cancelled'
 export type OptimizeJobFailureKind = 'application_error' | 'worker_crash' | 'timed_out' | 'lease_lost'
 
 export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
@@ -41,7 +41,7 @@ export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
   updated_at: string
 }
 
-export interface CreateOptimizeJobInput<TPayload = unknown> {
+interface CreateOptimizeJobInput<TPayload = unknown> {
   id: string
   priority: number
   owner_key: string
@@ -52,7 +52,7 @@ export interface CreateOptimizeJobInput<TPayload = unknown> {
   created_at?: string
 }
 
-export interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInput<TPayload> {
+interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInput<TPayload> {
   idempotency_key: string
   request_hash: string
   free_profile_id?: string | null
@@ -111,6 +111,51 @@ export interface OptimizationDeadLetterRecord {
   resolved_at: string | null
   created_at: string
   updated_at: string
+}
+
+interface AdminOptimizationQueueJob {
+  id: string
+  status: OptimizeJobStatus
+  queue_position: number | null
+  source: string
+  priority: {
+    value: number
+    label: '优先券' | '付费任务' | '分析任务' | '标准任务'
+  }
+  permission: string | null
+  user: { id: string; email: string } | null
+  profile: { id: string; display_name: string } | null
+  attempt_count: number
+  failure_count: number
+  worker_id: string | null
+  created_at: string
+  started_at: string | null
+  finished_at: string | null
+  updated_at: string
+  heartbeat_at: string | null
+  next_attempt_at: string | null
+  expires_at: string | null
+  cancel_requested_at: string | null
+  failure_kind: string | null
+  public_error_code: string | null
+  error_summary: string | null
+}
+
+export interface AdminOptimizationQueueSnapshot {
+  snapshot_at: string
+  capacity: {
+    queue_limit: number
+    worker_concurrency: number
+  }
+  counts: {
+    queued: number
+    running: number
+    retry_waiting: number
+    recent_failed: number
+  }
+  queued_jobs: AdminOptimizationQueueJob[]
+  running_jobs: AdminOptimizationQueueJob[]
+  recent_jobs: AdminOptimizationQueueJob[]
 }
 
 declare global {
@@ -172,7 +217,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         const running = Number(current.rows[0]?.running ?? 0)
         const queued = Number(current.rows[0]?.queued ?? 0)
         const globalQueued = await client.query<{ count: string }>("select count(*)::text as count from optimize_jobs where status = 'queued'")
-        if (Number(globalQueued.rows[0]?.count ?? 0) >= globalQueueLimit()) {
+        if (Number(globalQueued.rows[0]?.count ?? 0) >= getOptimizeGlobalQueueLimit()) {
           throw new OptimizeJobAdmissionError('global_queue_capacity_exceeded', 429, '优化服务全局队列已满，请稍后重试。')
         }
         if (input.source === 'scenario_comparison') {
@@ -409,7 +454,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       await ensureSchema()
       const now = new Date().toISOString()
       return withTransaction(async (client) => {
-        const failed = await client.query(
+        const failed = await client.query<{ payload_json: unknown }>(
           `update optimize_jobs
            set status = 'failed', failure_count = failure_count + 1, error_message = $5,
                failure_kind = 'application_error', public_error_code = 'application_error',
@@ -417,7 +462,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
                next_attempt_at = null,
                finished_at = $6, updated_at = $6
            where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running' and cancel_requested_at is null
-           returning id`,
+           returning payload_json`,
           [id, attemptNo, workerId, lockToken, errorMessage, now],
         )
         if (!failed.rowCount) return false
@@ -428,6 +473,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           [id, attemptNo, workerId, lockToken, errorMessage, now],
         )
         await refundPriorityCouponInTransaction(client, id, now)
+        await releaseQueuedEntitlementInTransaction(client, id, failed.rows[0]?.payload_json, now)
         return true
       })
     },
@@ -666,7 +712,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       const active = [...records.values()].filter((job) => job.owner_key === input.owner_key && activeStatuses.has(job.status))
       const free = input.source === 'free_preview'
       const globallyQueued = [...records.values()].filter((job) => job.status === 'queued')
-      if (globallyQueued.length >= globalQueueLimit()
+      if (globallyQueued.length >= getOptimizeGlobalQueueLimit()
         || (input.source === 'scenario_comparison' && globallyQueued.filter((job) => job.source === 'scenario_comparison').length >= analysisQueueLimit())) {
         throw new OptimizeJobAdmissionError('global_queue_capacity_exceeded', 429, '优化服务全局队列已满，请稍后重试。')
       }
@@ -981,7 +1027,7 @@ function normalizeTimestamp(value: string | Date | null): string | null {
   return value instanceof Date ? value.toISOString() : value
 }
 
-function globalQueueLimit(): number {
+function getOptimizeGlobalQueueLimit(): number {
   return positiveInteger(process.env.OPTIMIZE_GLOBAL_QUEUE_LIMIT, 200, 1)
 }
 
@@ -1061,6 +1107,148 @@ function buildDeadLetterDiagnostic(job: OptimizeJobRecord): Record<string, unkno
     permission: job.permission,
     estimate,
   }
+}
+
+export async function getAdminOptimizationQueueSnapshot(
+  workerConcurrency: number,
+  recentLimit = 20,
+): Promise<AdminOptimizationQueueSnapshot> {
+  await ensureSchema()
+  return withTransaction(async (client) => {
+    await client.query('set transaction isolation level repeatable read read only')
+    const snapshotResult = await client.query<{ snapshot_at: string | Date }>('select transaction_timestamp() as snapshot_at')
+    const active = await client.query<AdminOptimizationQueueRow>(
+      `${adminOptimizationQueueSelect()}
+       where job.status in ('queued', 'running')
+       order by
+         case when job.status = 'queued' then 0 else 1 end,
+         case when job.status = 'queued' then job.priority end desc,
+         case when job.status = 'queued' then job.created_at end asc,
+         case when job.status = 'running' then job.started_at end asc,
+         job.id asc`,
+    )
+    const recent = await client.query<AdminOptimizationQueueRow>(
+      `${adminOptimizationQueueSelect()}
+       where job.status in ('succeeded', 'failed', 'cancelled', 'dead_lettered')
+       order by coalesce(job.finished_at, job.updated_at) desc, job.id desc
+       limit $1`,
+      [Math.max(1, Math.min(100, Math.floor(recentLimit)))],
+    )
+
+    const queuedRows = active.rows.filter((row) => row.status === 'queued')
+    const runningRows = active.rows.filter((row) => row.status === 'running')
+    const queuedJobs = queuedRows.map((row, index) => toAdminOptimizationQueueJob(row, index + 1))
+    const runningJobs = runningRows.map((row) => toAdminOptimizationQueueJob(row, null))
+    const recentJobs = recent.rows.map((row) => toAdminOptimizationQueueJob(row, null))
+
+    return {
+      snapshot_at: normalizeTimestamp(snapshotResult.rows[0]?.snapshot_at ?? null) ?? new Date().toISOString(),
+      capacity: {
+        queue_limit: getOptimizeGlobalQueueLimit(),
+        worker_concurrency: Math.max(1, Math.floor(workerConcurrency)),
+      },
+      counts: {
+        queued: queuedJobs.length,
+        running: runningJobs.length,
+        retry_waiting: queuedJobs.filter((job) => job.attempt_count > 0 || job.failure_count > 0).length,
+        recent_failed: recentJobs.filter((job) => job.status === 'failed' || job.status === 'dead_lettered').length,
+      },
+      queued_jobs: queuedJobs,
+      running_jobs: runningJobs,
+      recent_jobs: recentJobs,
+    }
+  })
+}
+
+function adminOptimizationQueueSelect(): string {
+  return `select
+      job.id, job.status, job.priority, job.permission, job.source,
+      job.attempt_count, job.failure_count, job.worker_id, job.heartbeat_at,
+      job.next_attempt_at, job.expires_at, job.cancel_requested_at,
+      job.created_at, job.started_at, job.finished_at, job.updated_at,
+      job.failure_kind, job.public_error_code,
+      profile.id as profile_id, profile.display_name as profile_display_name,
+      account.id as user_id, account.email as user_email
+    from optimize_jobs job
+    left join user_game_accounts profile on profile.id = job.profile_id
+    left join user_accounts account on account.id = profile.user_id`
+}
+
+type AdminOptimizationQueueRow = {
+  id: string
+  status: OptimizeJobStatus
+  priority: number | string
+  permission: string | null
+  source: string
+  attempt_count: number | string
+  failure_count: number | string
+  worker_id: string | null
+  heartbeat_at: string | Date | null
+  next_attempt_at: string | Date | null
+  expires_at: string | Date | null
+  cancel_requested_at: string | Date | null
+  created_at: string | Date
+  started_at: string | Date | null
+  finished_at: string | Date | null
+  updated_at: string | Date
+  failure_kind: string | null
+  public_error_code: string | null
+  profile_id: string | null
+  profile_display_name: string | null
+  user_id: string | null
+  user_email: string | null
+}
+
+function toAdminOptimizationQueueJob(
+  row: AdminOptimizationQueueRow,
+  queuePosition: number | null,
+): AdminOptimizationQueueJob {
+  const priority = Number(row.priority)
+  return {
+    id: row.id,
+    status: row.status,
+    queue_position: queuePosition,
+    source: row.source,
+    priority: { value: priority, label: adminPriorityLabel(priority) },
+    permission: row.permission,
+    user: row.user_id && row.user_email ? { id: row.user_id, email: row.user_email } : null,
+    profile: row.profile_id && row.profile_display_name
+      ? { id: row.profile_id, display_name: row.profile_display_name }
+      : null,
+    attempt_count: Number(row.attempt_count),
+    failure_count: Number(row.failure_count),
+    worker_id: row.worker_id,
+    created_at: normalizeTimestamp(row.created_at) ?? new Date().toISOString(),
+    started_at: normalizeTimestamp(row.started_at),
+    finished_at: normalizeTimestamp(row.finished_at),
+    updated_at: normalizeTimestamp(row.updated_at) ?? new Date().toISOString(),
+    heartbeat_at: normalizeTimestamp(row.heartbeat_at),
+    next_attempt_at: normalizeTimestamp(row.next_attempt_at),
+    expires_at: normalizeTimestamp(row.expires_at),
+    cancel_requested_at: normalizeTimestamp(row.cancel_requested_at),
+    failure_kind: row.failure_kind,
+    public_error_code: row.public_error_code,
+    error_summary: safeOptimizationErrorSummary(row.public_error_code, row.failure_kind),
+  }
+}
+
+function adminPriorityLabel(priority: number): AdminOptimizationQueueJob['priority']['label'] {
+  if (priority >= 20) return '优先券'
+  if (priority >= 10) return '付费任务'
+  if (priority > 0) return '分析任务'
+  return '标准任务'
+}
+
+function safeOptimizationErrorSummary(publicErrorCode: string | null, failureKind: string | null): string | null {
+  if (publicErrorCode === 'queue_expired') return '任务等待时间超过队列上限。'
+  if (publicErrorCode === 'execution_retries_exhausted') return '任务执行重试次数已用尽。'
+  if (publicErrorCode === 'cancelled_by_user') return '任务已由用户取消。'
+  if (publicErrorCode === 'cancelled') return '任务已取消。'
+  if (failureKind === 'timed_out') return '任务执行超时。'
+  if (failureKind === 'worker_crash') return '任务 Worker 异常退出。'
+  if (failureKind === 'lease_lost') return '任务执行租约已失效。'
+  if (failureKind || publicErrorCode) return '任务执行失败，请结合公开错误码排查。'
+  return null
 }
 
 export async function listOptimizationDeadLetters(

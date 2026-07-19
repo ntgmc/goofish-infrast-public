@@ -32,6 +32,7 @@ describe('app route contract', () => {
       expect(resolveAdminSection(adminPath(section))).toBe(section)
     }
     expect(adminPath('announcement')).toBe('/admin/announcements')
+    expect(adminPath('queue')).toBe('/admin/queue')
   })
 
   it('normalizes legacy and invalid tool paths to the nearest group default', () => {

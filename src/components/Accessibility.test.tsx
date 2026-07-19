@@ -7,6 +7,8 @@ import type { Announcement } from '../lib/types'
 import AnnouncementPopup from './AnnouncementPopup'
 import AuthForm from './AuthForm'
 import BuildMetaStrip from './BuildMetaStrip'
+import DeferredFeatureMenu from './DeferredFeatureMenu'
+import ThemeSwitcher from './ThemeSwitcher'
 
 const { apiVoidMock } = vi.hoisted(() => ({
   apiVoidMock: vi.fn(),
@@ -108,6 +110,18 @@ describe('AnnouncementPopup accessibility', () => {
 })
 
 describe('mobile touch targets', () => {
+  it('keeps toolbar theme and more controls at the same 44px height', () => {
+    render(
+      <MemoryRouter>
+        <ThemeSwitcher />
+        <DeferredFeatureMenu />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('button', { name: /选择主题/ })).toHaveClass('h-11', 'py-0')
+    expect(screen.getByText('更多')).toHaveClass('h-11', 'py-0')
+  })
+
   it('keeps AuthForm controls at 44px and the submit action at 48px', async () => {
     const user = userEvent.setup()
     render(<AuthForm onAuthenticated={vi.fn()} />)
@@ -129,12 +143,15 @@ describe('mobile touch targets', () => {
   it('uses document flow on mobile, fixed desktop positioning, and a compact version badge', () => {
     render(<BuildMetaStrip placement="corner" />)
 
-    const strip = screen.getByText(/当前规则数据更新于/).parentElement
+    const status = screen.getByText(/当前规则数据更新于/)
+    const strip = status.parentElement
     const summary = screen.getByText('版本')
     expect(strip?.className).toContain('relative')
     expect(strip?.className).toContain('sm:fixed')
     expect(strip?.className).toContain('env(safe-area-inset-bottom)')
+    expect(status).toHaveClass('min-h-8')
     expect(summary).toHaveClass('px-2.5', 'py-1')
+    expect(summary).toHaveClass('min-h-8')
     expect(summary).not.toHaveClass('min-h-11', 'min-w-11')
   })
 })

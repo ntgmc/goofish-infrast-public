@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
+import { AnimatedValue, motionTokens } from './MotionPrimitives'
 import type { OptimizeJobPriority } from '../lib/types'
 import { copy } from '../copy/index'
 
 
-export type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
+type ScheduleEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
 
 export interface ScheduleProgressState {
   mode: 'generate' | 'apply' | 'scenario';
@@ -53,6 +55,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
   const percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
   const task = useMemo(() => getTaskView(progress, rawPercent, now), [progress, rawPercent, now])
   const compact = variant === 'embedded'
+  const reduceMotion = useReducedMotion()
 
   useEffect(() => {
     setPercentFloor((current) => {
@@ -97,7 +100,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
           </div>
           <div className="shrink-0 text-left sm:text-right">
             <p className="text-xs font-medium text-ink-muted">{task.meterLabel}</p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums tracking-[-0.03em] text-ink-primary">{percent}%</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums tracking-[-0.03em] text-ink-primary"><AnimatedValue value={`${percent}%`} /></p>
           </div>
         </div>
 
@@ -109,7 +112,12 @@ export default function ScheduleProgress({ progress, className = '', variant = '
           aria-valuenow={percent}
           aria-valuetext={task.ariaText}
         >
-          <div className="schedule-progress-fill h-full rounded-full bg-brand-500" style={{ width: `${percent}%` }} />
+          <motion.div
+            className="schedule-progress-fill h-full origin-left rounded-full bg-brand-500"
+            initial={false}
+            animate={{ scaleX: percent / 100 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: motionTokens.ease.enter }}
+          />
         </div>
 
         <ol className="grid gap-2 sm:grid-cols-4" aria-label={copy.common.components_ScheduleProgress_004}>
