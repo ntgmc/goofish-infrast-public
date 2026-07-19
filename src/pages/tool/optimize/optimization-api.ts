@@ -75,7 +75,7 @@ export async function requestReorderCheck(
   return response.result
 }
 
-export function toLegacyJobView(job: OptimizationJobSnapshot, pollToken?: string): OptimizeJobStatusResponse {
+function toLegacyJobView(job: OptimizationJobSnapshot, pollToken?: string): OptimizeJobStatusResponse {
   const common = {
     job_id: job.id,
     status: job.status,

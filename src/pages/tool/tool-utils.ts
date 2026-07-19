@@ -19,10 +19,6 @@ export function countOwnedOperators(operators: LicenseOperator[] | null | undefi
   return operators?.filter((operator) => operator.own !== false).length ?? 0
 }
 
-export function isCdkProfile(profile: UserGameAccount): boolean {
-  return profile.kind === 'cdk'
-}
-
 export function isFreePreviewProfile(profile: UserGameAccount): boolean {
   return profile.kind === 'free_preview'
 }
@@ -54,11 +50,6 @@ export function sortOperatorsForPreview(operators: LicenseOperator[]): LicenseOp
   ))
 }
 
-export function formatPreviewEfficiency(value: number): string {
-  if (!Number.isFinite(value)) return '-'
-  return `${value.toFixed(1)}%`
-}
-
 export function parseOperatorsText(text: string): LicenseOperator[] {
   const data = JSON.parse(text.replace(/^\uFEFF/, '')) as unknown
   if (!Array.isArray(data) || data.length === 0) throw new Error(copy.workspace.pages_tool_tool_utils_008)
@@ -70,13 +61,6 @@ export function parseOperatorsText(text: string): LicenseOperator[] {
     }
   })
   return data as LicenseOperator[]
-}
-
-export function validateEmailInput(value: string): string | null {
-  const email = value.trim()
-  if (!email) return copy.workspace.pages_tool_tool_utils_014
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return copy.workspace.pages_tool_tool_utils_015
-  return null
 }
 
 export function validatePasswordInput(value: string): string | null {

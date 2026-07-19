@@ -100,7 +100,7 @@ export function CdkTable({ records, selected, filters, busyAction, onFilterChang
   )
 }
 
-export function BinaryFilterSelect({ label, value, onChange }: { label: string; value: BinaryFilter; onChange: (value: BinaryFilter) => void }) {
+function BinaryFilterSelect({ label, value, onChange }: { label: string; value: BinaryFilter; onChange: (value: BinaryFilter) => void }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-xs font-medium text-ink-muted">{label}</span>
@@ -130,7 +130,7 @@ export function CdkDetailDialog(props: CdkDetailPanelProps) {
   )
 }
 
-export function CdkDetailPanel({
+function CdkDetailPanel({
   detail,
   busyAction,
   onClose,
@@ -249,7 +249,7 @@ export function RiskSettingsPanel({
   )
 }
 
-export function RiskToggle({
+function RiskToggle({
   label,
   description,
   checked,

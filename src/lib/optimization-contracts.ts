@@ -10,7 +10,7 @@ import type {
 } from './types'
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from './scenario-comparison'
 
-export type OptimizationIdentity = { type: 'profile'; profileId: string }
+type OptimizationIdentity = { type: 'profile'; profileId: string }
 
 interface OptimizationJobInput {
   identity: OptimizationIdentity;
@@ -42,18 +42,18 @@ export interface CreateReorderCheckRequest {
   baselineHistoryId: string;
 }
 
-export interface ApiContractError {
+interface ApiContractError {
   code: string;
   message: string;
   details?: unknown;
 }
 
-export interface OptimizationPrioritySnapshot {
+interface OptimizationPrioritySnapshot {
   kind: OptimizeJobPriority;
   label: string;
 }
 
-export interface OptimizationTimestamps {
+interface OptimizationTimestamps {
   submittedAt: string;
   startedAt?: string | null;
   finishedAt?: string | null;
@@ -61,10 +61,10 @@ export interface OptimizationTimestamps {
   cancelRequestedAt?: string | null;
 }
 
-export type OptimizationEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
+type OptimizationEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
 export type OptimizationJobKind = CreateOptimizationJobRequest['kind']
-export type OptimizationExecutionPhase = 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal'
-export type OptimizationRecoveryAction = 'retry' | 'review_input' | 'reauthorize' | 'contact_support' | 'none'
+type OptimizationExecutionPhase = 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal'
+type OptimizationRecoveryAction = 'retry' | 'review_input' | 'reauthorize' | 'contact_support' | 'none'
 
 export interface OptimizationFailureSnapshot extends ApiContractError {
   retryable: boolean;
@@ -74,7 +74,7 @@ export interface OptimizationFailureSnapshot extends ApiContractError {
   supportReference: string;
 }
 
-export interface OptimizationEstimateSnapshot {
+interface OptimizationEstimateSnapshot {
   durationMs: number;
   bucket: OptimizeEstimateBucket;
   source: OptimizeEstimateSource;
@@ -85,7 +85,7 @@ export interface OptimizationEstimateSnapshot {
   updatedAt: string;
 }
 
-export interface OptimizationJobSnapshotBase {
+interface OptimizationJobSnapshotBase {
   id: string;
   kind: OptimizationJobKind;
   source: string;

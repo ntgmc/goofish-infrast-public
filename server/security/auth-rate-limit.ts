@@ -25,7 +25,7 @@ type RateLimitEntry = {
   events: RateLimitEvent[]
 }
 
-export type AuthAttempt = {
+type AuthAttempt = {
   retainFailure: () => void
   refund: () => void
 }

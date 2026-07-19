@@ -71,7 +71,7 @@ export interface SklandBindingRecord {
   credential_invalid_reason?: SklandCredentialInvalidReason | null
 }
 
-export interface SklandPendingAccountOption {
+interface SklandPendingAccountOption {
   uid: string
   nickname: string
   channel_name: string
@@ -103,7 +103,7 @@ export type SklandPendingBindingRecord =
   | SklandPendingAccountSelectionRecord
   | SklandPendingConfirmationRecord
 
-export interface SklandRiskRecord {
+interface SklandRiskRecord {
   uid_mismatch_count: number
   last_mismatch_uid: string | null
   last_mismatch_nickname: string | null
@@ -669,7 +669,7 @@ export async function listProfileWorkspaces(profileIds: string[]): Promise<Map<s
   return workspaces
 }
 
-export async function getLegacyWorkspace(userId: string): Promise<LegacyUserWorkspaceRecord | null> {
+async function getLegacyWorkspace(userId: string): Promise<LegacyUserWorkspaceRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: LegacyUserWorkspaceRecord }>(
     'select record_json from user_workspaces where user_id = $1',
@@ -909,7 +909,7 @@ export function toPublicProfile(
   }
 }
 
-export function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null | undefined): UserWorkspaceRecord | null {
+function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null | undefined): UserWorkspaceRecord | null {
   if (!workspace) return null
   return {
     version: 1,
@@ -1025,10 +1025,6 @@ export function isDepotValueProfile(profile: Pick<UserGameAccountRecord, 'kind'>
 
 export function isFreePreviewProfile(profile: Pick<UserGameAccountRecord, 'kind'>): boolean {
   return normalizeProfileKind(profile) === 'free_preview'
-}
-
-export function isSchedulableProfile(profile: Pick<UserGameAccountRecord, 'kind'>): boolean {
-  return normalizeProfileKind(profile) !== 'depot_value'
 }
 
 function countOwnedOperators(operators: LicenseOperator[] | null | undefined): number {

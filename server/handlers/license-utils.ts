@@ -10,7 +10,6 @@ import type {
   RawPermissionMode,
 } from '../../src/lib/types'
 import {
-  getPermissionProfile,
   hasCapability,
   listAdminIssuablePermissions,
   normalizeRuntimePermission,
@@ -27,15 +26,6 @@ import {
 } from '../storage/risk-settings-store'
 
 const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const
-const VALID_PERMISSION_MODES: RawPermissionMode[] = [
-  'recommended',
-  'growth',
-  'advanced',
-  'ultimate',
-  'basic',
-  'premium',
-  'admin',
-]
 export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = listAdminIssuablePermissions()
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
 
@@ -188,16 +178,6 @@ export async function saveRiskControlSettings(patch: RiskControlSettingsPatch): 
   return store.set(next)
 }
 
-export function setCdkRecordStoreForTesting(store: CdkRecordStore | null): void {
-  ;(globalThis as unknown as { __maaCdkRecordStoreForTesting?: CdkRecordStore }).__maaCdkRecordStoreForTesting =
-    store ?? undefined
-}
-
-export function setRiskControlSettingsStoreForTesting(store: RiskControlSettingsStore | null): void {
-  ;(globalThis as unknown as { __maaRiskControlSettingsStoreForTesting?: RiskControlSettingsStore }).__maaRiskControlSettingsStoreForTesting =
-    store ?? undefined
-}
-
 function getTestingCdkRecordStore(): CdkRecordStore | null {
   if (process.env.NODE_ENV === 'production') return null
   return (
@@ -226,7 +206,7 @@ export function requireEnv(name: string): string {
   return value
 }
 
-export function readOptionalEnv(name: string): string | undefined {
+function readOptionalEnv(name: string): string | undefined {
   const value = process.env[name] || readLocalEnv(name)
   const normalized = value?.trim()
   return normalized || undefined
@@ -238,11 +218,7 @@ export function getSecretKeyring(name: string): string[] {
   return previous && previous !== active ? [active, previous] : [active]
 }
 
-export function getCurrentCdkHashSecret(): string {
-  return requireEnv('CDK_HASH_SECRET')
-}
-
-export function getCdkHashSecretKeyring(): string[] {
+function getCdkHashSecretKeyring(): string[] {
   return getSecretKeyring('CDK_HASH_SECRET')
 }
 
@@ -300,23 +276,12 @@ export function canUseUpgradeFeatures(license: LicenseFile): boolean {
   return hasCapability({ permission: license.permission }, 'view_upgrade_suggestions')
 }
 
-export function canEditConfig(license: LicenseFile): boolean {
-  return canEditConfigForPermission(getPermissionMode(license))
-}
-
-export function canEditConfigForPermission(permission: PermissionMode): boolean {
+function canEditConfigForPermission(permission: PermissionMode): boolean {
   return hasCapability({ permission }, 'edit_full_config')
 }
 
-export function isIntermediateAutoConfig(config: LicenseConfig | null | undefined): boolean {
+function isIntermediateAutoConfig(config: LicenseConfig | null | undefined): boolean {
   return config?.auto_balance_source === 'intermediate_inventory' || config?.auto_balance_source === 'limited_config'
-}
-
-export function canUseIntermediateAutoConfig(
-  license: LicenseFile,
-  config: LicenseConfig | null | undefined,
-): boolean {
-  return hasCapability({ permission: license.permission }, 'use_intermediate_auto_config') && isIntermediateAutoConfig(config)
 }
 
 export function resolveConfigForPermission(
@@ -349,10 +314,6 @@ export function resolveFreePreviewConfig(
     return { ok: false, message: '免费个人排班仅支持 243 均衡、243 搓玉和 333 搓玉预设。' }
   }
   return { ok: true, config: resolveFreePreviewPresetMode(config, preset) }
-}
-
-function isRawPermissionMode(value: string): value is RawPermissionMode {
-  return (VALID_PERMISSION_MODES as string[]).includes(value)
 }
 
 function cloneConfig(config: LicenseConfig): LicenseConfig {
@@ -635,19 +596,6 @@ export async function recordSoftBlockedRiskEvent(
     record: updated,
     message,
   }
-}
-
-export async function freezeCdkRecord(record: CdkRecord, reason: string, event: RiskEvent): Promise<CdkRecord> {
-  const frozenAt = event.at || new Date().toISOString()
-  const freezeReason = formatRiskFreezeMessage(reason)
-  const store = await getCdkRecordStore()
-  return (await store.mutate(`cdk/${record.code_hash}.json`, (current) => ({
-    ...current,
-    status: 'frozen',
-    frozen_at: frozenAt,
-    freeze_reason: freezeReason,
-    risk_events: [...(current.risk_events ?? []), event].slice(-20),
-  }), { allowedStatuses: ['used', 'frozen'] })) ?? record
 }
 
 export async function unfreezeCdkRecord(record: CdkRecord): Promise<CdkRecord> {

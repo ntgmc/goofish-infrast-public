@@ -185,13 +185,13 @@ export default async (req: Request): Promise<Response> => {
   }
 }
 
-export function normalizeDepotInventory(value: unknown): DepotInventoryItem[] {
+function normalizeDepotInventory(value: unknown): DepotInventoryItem[] {
   if (!isRecord(value)) throw createError('仓库 JSON 必须是对象。', 400)
   if (Array.isArray(value.items)) return mergeDepotItems(parsePenguinDepotItems(value.items))
   return mergeDepotItems(parseFlatDepotItems(value))
 }
 
-export async function buildDepotValueResponse(
+async function buildDepotValueResponse(
   items: DepotInventoryItem[],
   source: DepotValueSource,
   pricingState?: PricingState,

@@ -17,7 +17,7 @@ interface UseOptimizationJobOptions {
   setProgress: Dispatch<SetStateAction<ScheduleProgressState | null>>;
 }
 
-export class OptimizationJobTerminalError extends Error {
+class OptimizationJobTerminalError extends Error {
   readonly code?: string
   readonly retryable: boolean
   readonly recoveryAction?: OptimizeJobStatusResponse['recovery_action']

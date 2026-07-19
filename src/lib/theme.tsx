@@ -14,7 +14,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
-export function isThemePreference(value: unknown): value is ThemePreference {
+function isThemePreference(value: unknown): value is ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark'
 }
 
@@ -32,7 +32,7 @@ export function resolveTheme(preference: ThemePreference, systemPrefersDark: boo
   return preference === 'system' ? (systemPrefersDark ? 'dark' : 'light') : preference
 }
 
-export function applyTheme(theme: ResolvedTheme, root: HTMLElement = document.documentElement) {
+function applyTheme(theme: ResolvedTheme, root: HTMLElement = document.documentElement) {
   root.classList.toggle('dark', theme === 'dark')
   root.classList.toggle('light', theme === 'light')
   root.style.colorScheme = theme

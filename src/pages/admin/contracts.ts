@@ -316,7 +316,7 @@ export interface AdminProfileAccessSummary {
   permission: Permission;
 }
 
-export interface AdminWorkspaceSummary {
+interface AdminWorkspaceSummary {
   exists: boolean;
   operator_count: number;
   has_operators: boolean;
@@ -332,7 +332,7 @@ export interface AdminWorkspaceSummary {
   updated_at: string | null;
 }
 
-export interface AdminLinkedCdkSummary {
+interface AdminLinkedCdkSummary {
   cdk_id: string;
   permission: Permission;
   status: CdkStatus;

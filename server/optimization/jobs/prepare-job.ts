@@ -1,7 +1,7 @@
 import type { LicenseFile } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
 import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, recordSoftBlockedRiskEvent, getPermissionMode, getCdkRecordStore, getRiskControlSettings, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
-import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, updateProfileWorkspaceAtomically, type UserGameAccountRecord } from "../../storage/user-store";
+import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, updateProfileWorkspaceAtomically } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
 import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, OptimizeConfigPermission, FreeScheduleGenerateDecision } from './shared';
@@ -64,7 +64,6 @@ export async function prepareOptimizeJob(
     }
     let effectiveLicense: LicenseFile;
     let activeProfileId: string | null = null;
-    let activeProfile: UserGameAccountRecord | null = null;
     let isPreviewProfile = false;
     let isPreviewTrial = false;
 
@@ -83,7 +82,6 @@ export async function prepareOptimizeJob(
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
         return fail({ error: '仓库分析档案不能用于生成排班。' }, 403);
       }
-      activeProfile = profile;
       isPreviewProfile = isFreePreviewProfile(profile);
       isPreviewTrial = isFreePreviewTrialActive(profile);
       if (isPreviewProfile && !profile.skland_binding) {

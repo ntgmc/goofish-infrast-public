@@ -150,7 +150,6 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
           <SuggestionCard
             key={id}
             suggestion={suggestion}
-            id={id}
             rank={displayIndex + 1}
             selected={selected.has(id)}
             expanded={expanded.has(id)}
@@ -177,7 +176,6 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
 
 function SuggestionCard({
   suggestion,
-  id,
   rank,
   selected,
   expanded,
@@ -186,7 +184,6 @@ function SuggestionCard({
   embedded,
 }: {
   suggestion: UpgradeSuggestion;
-  id: string;
   rank: number;
   selected: boolean;
   expanded: boolean;

@@ -2,9 +2,9 @@ import type { AppBuildMeta, LicenseConfig, OrundumEconomy } from './types'
 import { copy } from '../copy/index'
 
 
-export const SCENARIO_COMPARISON_MAX_SCENARIOS = 24
-export const SCENARIO_COMPARISON_VERIFY_PER_COST = 3
-export const SCENARIO_PARETO_EPSILON = 0.01
+const SCENARIO_COMPARISON_MAX_SCENARIOS = 24
+const SCENARIO_COMPARISON_VERIFY_PER_COST = 3
+const SCENARIO_PARETO_EPSILON = 0.01
 export const SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT = 13
 
 export type ScenarioLayout = '153' | '243' | '333'
@@ -17,7 +17,7 @@ export type ScenarioDroneStrategy =
   | 'pure_gold'
   | 'battle_record'
   | 'originium_shard'
-export type ScenarioScheduleMode = 'maa' | 'rotation'
+type ScenarioScheduleMode = 'maa' | 'rotation'
 
 export interface ScenarioProductionPlan {
   trading: {
@@ -31,7 +31,7 @@ export interface ScenarioProductionPlan {
   };
 }
 
-export interface ScenarioLayoutFactor {
+interface ScenarioLayoutFactor {
   layout: ScenarioLayout;
   plans: ScenarioProductionPlan[];
 }
@@ -43,7 +43,7 @@ export interface ScenarioComparisonFactors {
   droneStrategies: ScenarioDroneStrategy[];
 }
 
-export interface ScenarioSkipSummary {
+interface ScenarioSkipSummary {
   code: 'duplicate' | 'missing_product';
   count: number;
   message: string;
@@ -71,7 +71,7 @@ export interface ScenarioExpansion {
   skipped: ScenarioSkipSummary[];
 }
 
-export interface ScenarioOrundumMetrics {
+interface ScenarioOrundumMetrics {
   sustainablePerDay: number;
   shortTermPerDay: number;
   hardLmdCostPerDay: number;

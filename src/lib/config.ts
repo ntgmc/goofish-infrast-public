@@ -1,19 +1,5 @@
-import type { IntermediateProduct, LicenseConfig, PermissionMode } from './types'
+import type { IntermediateProduct, LicenseConfig } from './types'
 import { copy } from '../copy/index'
-
-
-type ProductGroup = 'trading_stations' | 'manufacturing_stations'
-
-export const TRADING_PRODUCTS = ['LMD', 'Orundum']
-export const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
-
-export const PRODUCT_LABELS: Record<string, string> = {
-  LMD: copy.domain.lib_config_001,
-  Orundum: copy.domain.lib_config_002,
-  'Pure Gold': copy.domain.lib_config_003,
-  'Battle Record': copy.domain.lib_config_004,
-  'Originium Shard': copy.domain.lib_config_005,
-}
 
 export const SCHEDULE_MODE_LABELS: Record<string, string> = {
   maa: copy.domain.lib_config_006,
@@ -21,21 +7,7 @@ export const SCHEDULE_MODE_LABELS: Record<string, string> = {
   variable: copy.domain.lib_config_008,
 }
 
-export const DORMITORY_RULE_LABELS: Record<string, string> = {
-  fixed: copy.domain.lib_config_009,
-  maa_autofill: copy.domain.lib_config_010,
-}
-
 const DEFAULT_SHIFT_HOURS = [8, 8, 8]
-
-
-export const PERMISSION_LABELS: Record<PermissionMode, string> = {
-  recommended: copy.domain.lib_config_011,
-  growth: copy.domain.lib_config_012,
-  advanced: copy.domain.lib_config_013,
-  ultimate: copy.domain.lib_config_014,
-  admin: copy.domain.lib_config_015,
-}
 
 export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   '243': {
@@ -153,12 +125,6 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   }
   next.intermediate_inventory = normalizeIntermediateInventory(next.intermediate_inventory)
   return next
-}
-
-function applyCounts(config: LicenseConfig): LicenseConfig {
-  config.layout = `${config.trading_stations_count}-${config.manufacturing_stations_count}-3`
-  config.desc = `${config.layout}${copy.domain.lib_config_028}`
-  return config
 }
 
 export function validateConfig(config: LicenseConfig): { ok: true } | { ok: false; message: string } {

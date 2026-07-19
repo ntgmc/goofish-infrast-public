@@ -42,7 +42,6 @@ export function limitPreviewOptimizeResult(result: OptimizeResult, entitlement?:
     },
   };
 }
-
 export function sameConfig(left: LicenseConfig, right: LicenseConfig): boolean {
   return canonicalJson(left) === canonicalJson(right);
 }
@@ -101,7 +100,7 @@ export function scheduleSuccess(context: Partial<ScheduleUsageContext> = {}): Sc
   };
 }
 
-export function getShanghaiMonthWindow(now = new Date()): { start_at: string; end_at: string } {
+function getShanghaiMonthWindow(now = new Date()): { start_at: string; end_at: string } {
   const shanghaiNow = new Date(now.getTime() + SHANGHAI_UTC_OFFSET_MS);
   const year = shanghaiNow.getUTCFullYear();
   const month = shanghaiNow.getUTCMonth();
@@ -113,7 +112,7 @@ export function getShanghaiMonthWindow(now = new Date()): { start_at: string; en
   };
 }
 
-export function getShanghaiMonthKey(now = new Date()): string {
+function getShanghaiMonthKey(now = new Date()): string {
   const shanghaiNow = new Date(now.getTime() + SHANGHAI_UTC_OFFSET_MS);
   const year = shanghaiNow.getUTCFullYear();
   const month = String(shanghaiNow.getUTCMonth() + 1).padStart(2, "0");
@@ -142,7 +141,7 @@ export async function getReorderCheckQuota(profileId: string): Promise<ReorderCh
   return buildReorderCheckQuota(used, window.end_at);
 }
 
-export function createFreeScheduleEntitlement(): FreeScheduleEntitlement {
+function createFreeScheduleEntitlement(): FreeScheduleEntitlement {
   return {
     first_generated_at: null,
     revision_count: 0,
@@ -155,7 +154,7 @@ export function createFreeScheduleEntitlement(): FreeScheduleEntitlement {
   };
 }
 
-export function normalizeFreeScheduleEntitlement(entitlement: FreeScheduleEntitlement | null | undefined): FreeScheduleEntitlement {
+function normalizeFreeScheduleEntitlement(entitlement: FreeScheduleEntitlement | null | undefined): FreeScheduleEntitlement {
   return {
     ...createFreeScheduleEntitlement(),
     ...(entitlement ?? {}),
@@ -166,7 +165,7 @@ export function normalizeFreeScheduleEntitlement(entitlement: FreeScheduleEntitl
   };
 }
 
-export function hasUnusedStrongReorderBonus(entitlement: FreeScheduleEntitlement, now = new Date()): boolean {
+function hasUnusedStrongReorderBonus(entitlement: FreeScheduleEntitlement, now = new Date()): boolean {
   const bonus = entitlement.strong_reorder_bonus;
   return Boolean(bonus && bonus.month === getShanghaiMonthKey(now) && !bonus.used_at);
 }
@@ -249,23 +248,5 @@ export function applySuccessfulFreeScheduleGeneration(
       locked_at: nowIso,
       lock_reason: "revision_limit" as const,
     }),
-  };
-}
-
-export function grantStrongReorderBonusIfEligible(
-  entitlementValue: FreeScheduleEntitlement | null | undefined,
-  now = new Date(),
-): FreeScheduleEntitlement {
-  const entitlement = normalizeFreeScheduleEntitlement(entitlementValue);
-  const month = getShanghaiMonthKey(now);
-  const bonus = entitlement.strong_reorder_bonus;
-  if (bonus?.month === month) return entitlement;
-  return {
-    ...entitlement,
-    strong_reorder_bonus: {
-      month,
-      granted_at: now.toISOString(),
-      used_at: null,
-    },
   };
 }
