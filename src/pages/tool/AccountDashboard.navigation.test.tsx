@@ -5,11 +5,28 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 'react-router-dom'
 import type { AuthUser } from '../../lib/types'
 import { dashboardPath, resolveToolRoute, type DashboardSection } from '../../lib/app-routes'
+import { tourStorageKey } from '../../components/GuidedTour'
 import AccountDashboard from './AccountDashboard'
 
 afterEach(() => cleanup())
 
 describe('AccountDashboard route navigation', () => {
+  it('shows the first-run overview without changing the current dashboard route', async () => {
+    window.localStorage.removeItem(tourStorageKey('dashboard-overview', 1))
+    const user = userEvent.setup()
+    const router = createMemoryRouter([
+      { path: '/tool/*', element: <DashboardRouteHarness /> },
+    ], { initialEntries: ['/tool/profiles'] })
+
+    render(<RouterProvider router={router} />)
+    expect(await screen.findByRole('heading', { name: '管理游戏账号' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/tool/profiles')
+
+    await user.click(screen.getByRole('button', { name: '跳过导览' }))
+    expect(router.state.location.pathname).toBe('/tool/profiles')
+    expect(window.localStorage.getItem(tourStorageKey('dashboard-overview', 1))).toBe('done')
+  })
+
   it('pushes page navigation and restores the active page with back and forward', async () => {
     const user = userEvent.setup()
     const router = createMemoryRouter([

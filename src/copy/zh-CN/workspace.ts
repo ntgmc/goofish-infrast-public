@@ -475,4 +475,14 @@ export const workspaceCopy = {
   pages_tool_tool_utils_017: "密码至少需要 8 位",
   // src/pages/tool/workspace/WorkspaceConfigSection.tsx
   pages_tool_workspace_WorkspaceConfigSection_001: "保存后，下次打开这个账号会自动带上这套配置。",
+  // src/pages/tool/WorkspaceSetupPage.tsx
+  pages_tool_WorkspaceSetupPage_tour_001: "使用导览",
+  pages_tool_WorkspaceSetupPage_tour_002: "完成排班准备",
+  pages_tool_WorkspaceSetupPage_tour_003: "先准备干员数据，再选择基建配置；CDK 页面用于升级当前免费档案或添加新档案。",
+  pages_tool_WorkspaceSetupPage_tour_004: "先选择基建配置",
+  pages_tool_WorkspaceSetupPage_tour_005: "请选择与你游戏内基建布局一致的预设，再开始排班。导览只会切换到本页，不会替你更改配置。",
+  pages_tool_WorkspaceSetupPage_tour_006: "检查并调整配置",
+  pages_tool_WorkspaceSetupPage_tour_007: "权限允许时可继续调整房间、产物和库存；如果配置校验失败，需要先按页面提示修正。",
+  pages_tool_WorkspaceSetupPage_tour_008: "保存并开始排班",
+  pages_tool_WorkspaceSetupPage_tour_009: "准备摘要会显示干员和配置状态。按钮可用后，保存工作区并进入优化总览；导览不会替你提交。",
 } as const

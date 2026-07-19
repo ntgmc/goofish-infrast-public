@@ -270,7 +270,7 @@ export default function ConfigEditor({
           </p>
         </div>
           {!hidePresetActions && (canEdit || (canSelectPreset && !autoInventoryOnly)) && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" data-tour-target="config-preset-actions">
             <PresetButton label={copy.common.components_ConfigEditor_030} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
             <PresetButton label={copy.common.components_ConfigEditor_031} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
             <PresetButton label={copy.common.components_ConfigEditor_032} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />
@@ -296,7 +296,7 @@ export default function ConfigEditor({
             <p className="mt-1 text-sm leading-6 text-ink-secondary">
               {copy.common.components_ConfigEditor_034}</p>
             {!hidePresetActions && canSelectPreset && (
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap gap-2" data-tour-target="config-preset-actions">
                 <PresetButton label={copy.common.components_ConfigEditor_035} onClick={() => applyPreset(CONFIG_PRESETS['243'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_036} onClick={() => applyPreset(CONFIG_PRESETS['243-1'])} />
                 <PresetButton label={copy.common.components_ConfigEditor_037} onClick={() => applyPreset(CONFIG_PRESETS['333'])} />

@@ -50,7 +50,7 @@ export default function ResultSection({
   onReset: () => void;
 }) {
   return (
-    <section className="min-w-0">
+    <section className="min-w-0" data-tour-target="optimize-result-content">
       {phase === 'idle' && loading && progress && (
         <ScheduleProgress progress={progress} variant="focus" />
       )}
@@ -63,6 +63,7 @@ export default function ResultSection({
         </div>
       )}
 
+      <div data-tour-target="optimize-result-actions">
       {phase === 'history' && historyItem && (
         <Suspense fallback={<ResultFallback />}>
           <ResultPanel
@@ -111,6 +112,7 @@ export default function ResultSection({
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
         </Suspense>
       )}
+      </div>
     </section>
   )
 }
