@@ -302,6 +302,22 @@ function ManualModePanel({
         <button type="button" onClick={() => void navigator.clipboard?.writeText(SKLAND_CONSOLE_CODE)} className="tool-secondary-action">
           {copy.workspace.components_SklandBindingDialog_034}</button>
       </div>
+      <details className="tool-inset group overflow-hidden" open>
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 px-3 py-2 text-sm font-semibold text-ink-primary transition-colors duration-150 hover:bg-surface-2/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/55 [&::-webkit-details-marker]:hidden">
+          <span>{copy.workspace.components_SklandBindingDialog_066}</span>
+          <span className="text-lg leading-none text-brand-300 transition-transform duration-150 group-open:rotate-45" aria-hidden="true">+</span>
+        </summary>
+        <div className="space-y-3 border-t border-surface-3/60 px-3 py-3">
+          <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-ink-secondary">
+            <li>{copy.workspace.components_SklandBindingDialog_067}</li>
+            <li>{copy.workspace.components_SklandBindingDialog_068}</li>
+            <li>{copy.workspace.components_SklandBindingDialog_069}</li>
+          </ol>
+          <p className="tool-alert tool-alert--warning text-xs leading-5" role="note">
+            {copy.workspace.components_SklandBindingDialog_070}
+          </p>
+        </div>
+      </details>
       <label htmlFor="skland-manual-command" className="block text-xs font-semibold text-ink-muted">{copy.workspace.components_SklandBindingDialog_035}</label>
       <textarea id="skland-manual-command" readOnly value={SKLAND_CONSOLE_CODE} rows={3} className="tool-field resize-y font-mono text-xs text-ink-secondary" />
       <label htmlFor="skland-manual-credential" className="block text-xs font-semibold text-ink-muted">{copy.workspace.components_SklandBindingDialog_036}</label>

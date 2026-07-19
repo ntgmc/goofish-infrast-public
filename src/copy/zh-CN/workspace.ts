@@ -129,6 +129,16 @@ export const workspaceCopy = {
   components_SklandBindingDialog_064: "每个档案只能绑定一个 UID，请主动选择并核对后继续。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_065: "默认账号",
+  // src/components/SklandBindingDialog.tsx
+  components_SklandBindingDialog_066: "如何打开浏览器控制台",
+  // src/components/SklandBindingDialog.tsx
+  components_SklandBindingDialog_067: "点击上方“打开森空岛官网”，登录后停留在森空岛网页。",
+  // src/components/SklandBindingDialog.tsx
+  components_SklandBindingDialog_068: "打开控制台：Windows / Linux 按 F12 或 Ctrl + Shift + J；macOS 按 ⌘ + ⌥ + J。也可以右键页面选择“检查”，再点击 Console（控制台）。",
+  // src/components/SklandBindingDialog.tsx
+  components_SklandBindingDialog_069: "回到这里复制下方命令，粘贴到控制台后按 Enter。看到“已复制到粘贴板”后，将凭据粘贴到最下方输入框。",
+  // src/components/SklandBindingDialog.tsx
+  components_SklandBindingDialog_070: "若 Chrome / Edge 阻止粘贴，请按控制台提示手动输入 allow pasting 并按 Enter，再粘贴命令。只执行本站展示且由你确认过的命令。",
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_001: "检测到多个明日方舟账号，请选择要导入的账号。",
   // src/hooks/useSklandBinding.ts
