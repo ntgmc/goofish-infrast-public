@@ -29,7 +29,7 @@ interface DeferredFeatureMenuProps {
 export default function DeferredFeatureMenu({ className = '' }: DeferredFeatureMenuProps) {
   return (
     <details className={`group relative z-20 flex-shrink-0 ${className}`}>
-      <summary className="tool-secondary-action flex min-h-11 cursor-pointer list-none gap-2 px-3 text-sm [&::-webkit-details-marker]:hidden">
+      <summary className="tool-secondary-action flex h-11 cursor-pointer list-none gap-2 px-3 py-0 text-sm [&::-webkit-details-marker]:hidden">
         {copy.common.components_DeferredFeatureMenu_016}<svg
           className="h-4 w-4 transition-transform duration-150 group-open:rotate-180"
           fill="none"

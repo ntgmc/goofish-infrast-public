@@ -30,7 +30,7 @@ export function OptimizationTaskCenterButton({
       aria-expanded={open}
       aria-controls="optimization-task-center-dialog"
       aria-label={ariaLabel}
-      className="tool-secondary-action inline-flex items-center gap-2"
+      className="tool-secondary-action inline-flex h-11 items-center gap-2 py-0"
     >
       <span>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_032}</span>
       {activeCount > 0 && <span className="tool-status tool-status--current px-1.5 py-0.5 text-[11px]">{activeCount}</span>}

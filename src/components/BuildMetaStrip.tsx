@@ -19,7 +19,7 @@ export default function BuildMetaStrip({ meta = APP_BUILD_META, className = '', 
 
   return (
     <div className={rootClassName}>
-      <span className="tool-status bg-surface-1/95 shadow-sm">
+      <span className="tool-status min-h-8 bg-surface-1/95 shadow-sm">
         {copy.common.components_BuildMetaStrip_001}{formatDate(meta.generated_at)}
       </span>
       <details className="group relative">
