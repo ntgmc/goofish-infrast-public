@@ -1,6 +1,6 @@
 import type { Announcement, AnnouncementKind, AnnouncementStats as AnnouncementReachStats } from '../../../lib/types'
 
-import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, CdkTableFilters, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, UsageTotals, UsageDay, UsageRangeMode, AnnouncementSortKey, UsageRange, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, UsageStatsResponse, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
+import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, UsageTotals, UsageDay, UsageRangeMode, AnnouncementSortKey, UsageRange, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, UsageStatsResponse, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
 
 export function InfoRow({ label, value }: { label: string; value: string }) {
 return <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-2 last:border-0"><dt className="text-ink-muted">{label}</dt><dd className="font-medium text-ink-primary">{value}</dd></div>
@@ -69,14 +69,6 @@ const scheduleAttempts = scheduleGenerates + scheduleFailures
     cdkRedeems: usage?.cdk_redeems ?? 0,
     redeemRate: usage?.visits ? Math.round(((usage?.cdk_redeems ?? 0) / usage.visits) * 1000) / 10 : 0,
   }
-}
-
-export function recordMatchesCdkFilters(record: AdminCdkRecord, filters: CdkTableFilters): boolean {
-  if (filters.status !== 'all' && record.status !== filters.status) return false
-  if (filters.permission !== 'all' && normalizeProductPermission(record.permission) !== filters.permission) return false
-  if (filters.risk !== 'all' && ((record.risk_event_count ?? 0) > 0) !== (filters.risk === 'yes')) return false
-  if (filters.generated !== 'all' && ((record.schedule_generate_count ?? 0) > 0) !== (filters.generated === 'yes')) return false
-  return true
 }
 
 export function buildCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummary {
