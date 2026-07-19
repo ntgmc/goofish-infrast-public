@@ -13,6 +13,7 @@ import { buildScenarioComparisonEstimate } from './job-status';
 import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../../free-preview-trial';
 import { hasCapability } from '../../../src/lib/product-catalog';
+import { getFreeScheduleEntitlement } from '../../storage/reorder-admission';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -198,7 +199,11 @@ export async function prepareOptimizeJob(
       : null;
     let freeScheduleDecision: Extract<FreeScheduleGenerateDecision, { ok: true }> | null = null;
     if (isPreviewProfile && !isPreviewTrial && activeProfileId && previewWorkspaceForGeneration) {
-      const decision = resolveFreeScheduleGenerateDecision(previewWorkspaceForGeneration.free_schedule_entitlement);
+      const entitlement = await getFreeScheduleEntitlement(
+        activeProfileId,
+        previewWorkspaceForGeneration.free_schedule_entitlement,
+      );
+      const decision = resolveFreeScheduleGenerateDecision(entitlement);
       if (!decision.ok) {
         scheduleUsage = scheduleFailure('permission_denied', scheduleUsageBase);
         if (decision.entitlement.locked_at !== previewWorkspaceForGeneration.free_schedule_entitlement?.locked_at
