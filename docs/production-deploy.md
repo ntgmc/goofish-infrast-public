@@ -153,7 +153,6 @@ ready and Nginx has switched successfully.
    | `DEPLOY_PORT` | `22` |
    | `DEPLOY_ROOT` | `/opt/goofish-infrast-v1` |
    | `DEPLOY_REPO_DIR` | `/opt/goofish-infrast-v1/repository` |
-   | `DEPLOY_SCRIPT` | `/opt/goofish-infrast-v1/repository/scripts/deploy-production-atomic.sh` |
    | `DEPLOY_SERVICE_NAME` | `goofish-infrast-v1` |
    | `DEPLOY_PUBLIC_BASE_URL` | `https://maatool.com` |
    | `DEPLOY_BLUE_PORT` | `3000` |
@@ -187,8 +186,11 @@ ready and Nginx has switched successfully.
 `flock` lock:
 
 1. Verify the full target SHA exists and is an ancestor of `origin/main`.
-2. Download the SHA-bound artifact from the successful `Quality Checks` run,
-   verify its archive SHA-256, and upload it to a temporary server path.
+2. Check out the immutable target SHA, download its SHA-bound artifact from the
+   successful `Quality Checks` run, verify the archive SHA-256, and upload both
+   the artifact and that commit's deployment script to temporary server paths.
+   Running the uploaded script avoids bootstrapping through a stale repository
+   checkout; both temporary inputs are removed after the SSH command finishes.
 3. Create a detached temporary worktree, run `npm ci --omit=dev`, extract the
    prebuilt frontend/backend artifacts, and verify every file against
    `build-manifest.json` before a candidate service can start.
