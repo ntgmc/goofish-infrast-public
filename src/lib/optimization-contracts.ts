@@ -1,6 +1,5 @@
 import type {
   LicenseConfig,
-  LicenseFile,
   LicenseOperator,
   OptimizeEstimateBucket,
   OptimizeEstimateSource,
@@ -11,9 +10,7 @@ import type {
 } from './types'
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from './scenario-comparison'
 
-export type OptimizationIdentity =
-  | { type: 'profile'; profileId: string }
-  | { type: 'license'; license: LicenseFile; activationToken?: string }
+export type OptimizationIdentity = { type: 'profile'; profileId: string }
 
 interface OptimizationJobInput {
   identity: OptimizationIdentity;
@@ -35,7 +32,7 @@ export type CreateOptimizationJobRequest =
     })
   | (Omit<OptimizationJobInput, 'identity'> & {
       kind: 'scenario_comparison';
-      identity: Extract<OptimizationIdentity, { type: 'profile' }>;
+      identity: OptimizationIdentity;
       factors: ScenarioComparisonFactors;
     })
 

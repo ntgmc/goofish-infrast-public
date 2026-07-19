@@ -63,7 +63,6 @@ describe('persisted optimization payload', () => {
     expect(payload).toMatchObject({ version: 3, configPermission: 'growth', cdkUsageRef: { code_hash: 'hash-only' } })
     expect(serialized).not.toContain('effectiveLicense')
     expect(serialized).not.toContain('checkedCdkRecord')
-    expect(serialized).not.toContain('activation_token')
     expect(serialized).not.toContain('"sig"')
   })
 })

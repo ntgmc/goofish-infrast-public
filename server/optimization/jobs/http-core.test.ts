@@ -48,6 +48,20 @@ describe('sanitizeConfigForPublicOptimize layout cost policy', () => {
     expect(sanitized.optimization_mode).toBe('fast')
   })
 
+  it('preserves explicit beam false for non-243/333 layouts', () => {
+    const sanitized = sanitizeConfigForPublicOptimize({
+      ...CONFIG_PRESETS['243'],
+      layout: '1-5-3',
+      trading_stations_count: 1,
+      manufacturing_stations_count: 5,
+      optimization_mode: 'exact',
+      optimizer_search: { optimization_mode: 'exact', beam: false },
+    }, 'advanced')
+
+    expect(sanitized.optimization_mode).toBe('fast')
+    expect(sanitized.optimizer_search).toEqual({ optimization_mode: 'fast', beam: false })
+  })
+
   it('forces a 063 layout to fast beam mode', () => {
     const sanitized = sanitizeConfigForPublicOptimize({
       ...CONFIG_PRESETS['243'],

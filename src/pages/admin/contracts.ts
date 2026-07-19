@@ -22,7 +22,6 @@ export type FieldErrors = Record<string, string>
 export interface CdkTableFilters {
   status: StatusFilter;
   permission: PermissionFilter;
-  bound: BinaryFilter;
   risk: BinaryFilter;
   generated: BinaryFilter;
 }
@@ -56,15 +55,6 @@ export interface AdminCdkRecord {
   license_order_hash: string | null;
   operator_count: number | null;
   config_desc: string | null;
-  operator_update_grant_count?: number;
-  operator_update_used_count?: number;
-  operator_update_grant_remaining?: number;
-  operator_update_granted_at?: string | null;
-  operator_update_consumed_at?: string | null;
-  operator_update_event_count?: number;
-  activation_bound?: boolean;
-  user_agent_count?: number;
-  ip_prefix_count?: number;
   risk_event_count?: number;
   risk_events?: Array<{ at: string; type: string; reason: string; soft_block?: boolean; escalation?: boolean }>;
   latest_risk_event?: { at: string; type: string; reason: string; soft_block?: boolean; escalation?: boolean } | null;
@@ -74,12 +64,6 @@ export interface AdminCdkDetail extends AdminCdkRecord {
   baseline_operator_count?: number | null;
   latest_operator_count?: number | null;
   risk_events?: Array<{ at: string; type: string; reason: string; detail?: Record<string, unknown> | null }>;
-  operator_update_events?: Array<{ at: string; operator_count: number }>;
-  device_signals?: {
-    activation_bound: boolean;
-    user_agent_count: number;
-    ip_prefix_count: number;
-  };
   linked_account?: { account_id: string; profile_id: string } | null;
 }
 
@@ -233,16 +217,14 @@ export interface CdkOpsSummary {
   escalations: number;
   risk_records: number;
   generated_records: number;
-  bound_records: number;
 }
 
 export interface RiskControlSettings {
   operator_data_risk_enabled: boolean;
-  device_risk_enabled: boolean;
   updated_at: string | null;
 }
 
-export type RiskControlSettingsPatch = Partial<Pick<RiskControlSettings, 'operator_data_risk_enabled' | 'device_risk_enabled'>>
+export type RiskControlSettingsPatch = Partial<Pick<RiskControlSettings, 'operator_data_risk_enabled'>>
 
 export interface AdminUserSummary {
   username: string;
@@ -314,7 +296,6 @@ export interface AdminLinkedCdkSummary {
   frozen_at: string | null;
   freeze_reason: string | null;
   risk_event_count: number;
-  operator_update_event_count: number;
 }
 
 export interface AdminProfileSummary {
@@ -398,7 +379,6 @@ export const EMPTY_ANNOUNCEMENT_REACH_STATS: AnnouncementReachStats = {
 
 export const DEFAULT_RISK_SETTINGS: RiskControlSettings = {
   operator_data_risk_enabled: productPolicies.risk.operator_data_enabled_by_default,
-  device_risk_enabled: productPolicies.risk.device_enabled_by_default,
   updated_at: null,
 }
 

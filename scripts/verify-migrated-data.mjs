@@ -9,7 +9,6 @@ if (!databaseUrl) {
   console.log('[verify-migrated-data] DATABASE_URL not configured; skipping database verification')
   process.exit(0)
 }
-
 const exportPath = process.argv[2] || process.env.MIGRATION_EXPORT_PATH || ''
 const expected = exportPath ? JSON.parse(await readFile(resolve(exportPath), 'utf8')) : null
 const pool = new Pool({ connectionString: databaseUrl, application_name: 'goofish-infrast-v1-verify' })
@@ -37,7 +36,6 @@ try {
   }
 
   await assertIndexes()
-  await verifyLicenseStatusIfConfigured()
   console.log('[verify-migrated-data] ok')
 } finally {
   await pool.end()
@@ -77,20 +75,4 @@ async function assertIndexes() {
   }
   const idempotencyTable = await pool.query("select to_regclass('public.cdk_redemption_idempotency') as name")
   if (!idempotencyTable.rows[0]?.name) throw new Error('missing cdk_redemption_idempotency table')
-}
-
-async function verifyLicenseStatusIfConfigured() {
-  const licensePath = process.env.VERIFY_LICENSE_FILE
-  const apiBaseUrl = process.env.API_BASE_URL
-  if (!licensePath || !apiBaseUrl) return
-
-  const license = JSON.parse(await readFile(resolve(licensePath), 'utf8'))
-  const response = await fetch(new URL('/api/license-status', apiBaseUrl), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ license }),
-  })
-  if (!response.ok) {
-    throw new Error(`/api/license-status verification failed with ${response.status}: ${await response.text()}`)
-  }
 }

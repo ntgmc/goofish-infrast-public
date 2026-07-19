@@ -49,7 +49,6 @@ const totalCdks = records.length
 const usedCdks = records.filter((record) => record.status === 'used').length
 const frozenCdks = records.filter((record) => record.status === 'frozen').length
 const riskEvents = records.reduce((sum, record) => sum + (record.risk_event_count ?? 0), 0)
-const boundDevices = records.filter((record) => record.activation_bound).length
 const scheduleGenerates = usage?.schedule_generates ?? 0
 const scheduleFailures = usage?.schedule_failures ?? 0
 const scheduleAttempts = scheduleGenerates + scheduleFailures
@@ -58,7 +57,6 @@ const scheduleAttempts = scheduleGenerates + scheduleFailures
     usedCdks,
     frozenCdks,
     riskEvents,
-    boundDevices,
     adminUsers,
     uniqueVisitors: usage?.unique_visitors ?? 0,
     visits: usage?.visits ?? 0,
@@ -76,7 +74,6 @@ const scheduleAttempts = scheduleGenerates + scheduleFailures
 export function recordMatchesCdkFilters(record: AdminCdkRecord, filters: CdkTableFilters): boolean {
   if (filters.status !== 'all' && record.status !== filters.status) return false
   if (filters.permission !== 'all' && normalizeProductPermission(record.permission) !== filters.permission) return false
-  if (filters.bound !== 'all' && Boolean(record.activation_bound) !== (filters.bound === 'yes')) return false
   if (filters.risk !== 'all' && ((record.risk_event_count ?? 0) > 0) !== (filters.risk === 'yes')) return false
   if (filters.generated !== 'all' && ((record.schedule_generate_count ?? 0) > 0) !== (filters.generated === 'yes')) return false
   return true
@@ -152,7 +149,6 @@ export function buildCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummary {
     escalations,
     risk_records: records.filter((record) => (record.risk_event_count ?? 0) > 0 || record.status === 'frozen').length,
     generated_records: records.filter((record) => (record.schedule_generate_count ?? 0) > 0).length,
-    bound_records: records.filter((record) => record.activation_bound).length,
   }
 }
 
@@ -326,7 +322,6 @@ export function normalizeCdkDistributionItem(value: Partial<UsageCdkDistribution
 export function normalizeRiskSettings(value: Partial<RiskControlSettings> | null | undefined): RiskControlSettings {
   return {
     operator_data_risk_enabled: value?.operator_data_risk_enabled !== false,
-    device_risk_enabled: value?.device_risk_enabled === true,
     updated_at: typeof value?.updated_at === 'string' ? value.updated_at : null,
   }
 }

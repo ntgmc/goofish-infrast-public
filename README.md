@@ -2,7 +2,7 @@
 
 [![Quality Checks](https://github.com/ntgmc/goofish-infrast-v1/actions/workflows/quality-checks.yml/badge.svg)](https://github.com/ntgmc/goofish-infrast-v1/actions/workflows/quality-checks.yml)
 
-MAA 基建排班优化器是一个面向《明日方舟》玩家的 Web 工具。用户拿到 CDK 后在网站上传干员数据并生成授权文件；已有授权文件或工作文件时可直接上传继续使用。应用会根据干员、基建房间、产物需求和无人机策略计算可导入 MAA 的排班 JSON，并给出精英化升级建议。单账号终身版还提供场景对比实验室，可比较 153/243/333、龙门币/合成玉贸易、赤金/经验/源石碎片制造、自动非固定或固定换班以及无人机策略，并输出等效理智与实际每日换班次数的两阶段 Pareto 前沿。
+MAA 基建排班优化器是一个面向《明日方舟》玩家的 Web 工具。用户登录后可创建免费档案或使用 CDK 添加账号档案，并通过 MAA 干员识别文件或森空岛导入账号数据。应用会自动保存账号工作区，根据干员、基建房间、产物需求和无人机策略计算可导入 MAA 的排班 JSON，并给出精英化升级建议。单账号终身版还提供场景对比实验室，可比较 153/243/333、龙门币/合成玉贸易、赤金/经验/源石碎片制造、自动非固定或固定换班以及无人机策略，并输出等效理智与实际每日换班次数的两阶段 Pareto 前沿。
 
 ## 在线地址
 
@@ -138,8 +138,6 @@ npm run check:migration
 - `GET`/`POST`/`DELETE /api/admin/users`
 - `POST /api/analyze-schedule`
 - `POST /api/user/profiles/preview`
-- `POST /api/redeem-cdk`
-- `POST /api/license-status`
 - `POST /api/optimize`
 - `/api/auth/*`
 - `/api/user/*`
@@ -268,7 +266,7 @@ rm -f admin.cookies
 | `NODE_ENV` | Production | 生产环境必须设为 `production`，启用安全 Cookie 和生产保护 |
 | `MAA_ADMIN_PASSWORD` | Yes | 管理后台主口令 |
 | `CDK_HASH_SECRET` | Yes | CDK 哈希计算密钥 |
-| `MAA_ADMIN_SECRET` | Yes | 授权文件签名密钥 |
+| `MAA_ADMIN_SECRET` | Yes | 优化任务轮询令牌签名密钥 |
 | `DEPOT_SAMPLE_HASH_SECRET` | Yes | 仓库匿名样本哈希密钥，不得复用 CDK 密钥 |
 | `FREE_PREVIEW_UID_HASH_SECRET` | Yes | 免费领取 UID 哈希密钥，不得复用 CDK 密钥 |
 | `SKLAND_CREDENTIAL_SECRET` | Yes | 森空岛凭据加密密钥，长度至少 16 字符 |

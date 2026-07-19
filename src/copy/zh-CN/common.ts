@@ -92,7 +92,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_022: "已修改",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_023: "修改配置后重新生成，保存进度文件会保留这次配置。",
+  components_ConfigEditor_023: "修改后的配置会自动保存到当前账号工作区，并用于下次生成。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_024: "当前为 ",
   // src/components/ConfigEditor.tsx

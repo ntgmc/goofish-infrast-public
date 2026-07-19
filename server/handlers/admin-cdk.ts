@@ -4,13 +4,11 @@ import { authenticateAdminRequest } from './admin-auth'
 import {
   CDK_PRODUCT_PERMISSIONS,
   generateCdk,
-  getOperatorUpdateGrantRemaining,
   getCdkRecordStore,
   hashCdk,
   jsonResponse,
   acceptLatestOperatorBaselineAndUnfreeze,
   requireEnv,
-  resetDeviceBindingAndUnfreeze,
   unfreezeCdkRecord,
   type CdkRecord,
   type CdkStatus,
@@ -202,11 +200,9 @@ async function handlePatch(req: Request): Promise<Response> {
     if (
       action !== 'revoke'
       && action !== 'upgrade'
-      && action !== 'grant_operator_update'
       && action !== 'unfreeze'
       && action !== 'update_note'
       && action !== 'set_permission'
-      && action !== 'reset_device_binding_and_unfreeze'
       && action !== 'accept_operator_baseline_and_unfreeze'
     ) {
       return jsonResponse({ error: 'Unsupported action.' }, 400)
@@ -223,16 +219,14 @@ async function handlePatch(req: Request): Promise<Response> {
       return jsonResponse({ error: 'CDK not found.' }, 404)
     }
 
-    if (action === 'reset_device_binding_and_unfreeze' || action === 'accept_operator_baseline_and_unfreeze') {
+    if (action === 'accept_operator_baseline_and_unfreeze') {
       const reviewReason = typeof reason === 'string' ? reason.trim().slice(0, 500) : ''
       if (!reviewReason) return jsonResponse({ error: '售后核验备注不能为空。' }, 400)
       if (existing.status === 'revoked') return jsonResponse({ error: '已撤销授权不能恢复。' }, 409)
       if (existing.status !== 'used' && existing.status !== 'frozen') {
         return jsonResponse({ error: '只有已使用或已冻结授权可以执行售后恢复。' }, 409)
       }
-      const updated = action === 'reset_device_binding_and_unfreeze'
-        ? await resetDeviceBindingAndUnfreeze(existing, reviewReason)
-        : await acceptLatestOperatorBaselineAndUnfreeze(existing, reviewReason)
+      const updated = await acceptLatestOperatorBaselineAndUnfreeze(existing, reviewReason)
       if (!updated) return jsonResponse({ error: '授权没有可接受的最新干员快照。' }, 409)
       return jsonResponse({
         recovered: true,
@@ -311,44 +305,6 @@ async function handlePatch(req: Request): Promise<Response> {
         cdk_id: existing.code_hash.slice(0, 12),
         previous_permission: currentPermission,
         permission: nextPermission,
-      })
-    }
-
-    if (action === 'grant_operator_update') {
-      if (existing.status === 'revoked') {
-        return jsonResponse({ error: '已撤销授权不能发放干员更新权限。' }, 409)
-      }
-      if (existing.status !== 'used') {
-        return jsonResponse({ error: '只能给已使用 CDK 发放干员更新权限。' }, 409)
-      }
-      if (!existing.license_order_hash) {
-        return jsonResponse({ error: '授权记录缺少订单标识，无法发放干员更新权限。' }, 409)
-      }
-
-      const remaining = getOperatorUpdateGrantRemaining(existing)
-      if (remaining > 0) {
-        return jsonResponse({
-          granted: true,
-          already_granted: true,
-          cdk_id: existing.code_hash.slice(0, 12),
-          operator_update_grant_remaining: remaining,
-          operator_update_granted_at: existing.operator_update_granted_at ?? null,
-        })
-      }
-
-      const grantedAt = new Date().toISOString()
-      const updated = await store.mutate(key, (current) => ({
-        ...current,
-        operator_update_grant_count: (current.operator_update_grant_count ?? 0) + 1,
-        operator_update_granted_at: grantedAt,
-      }), { allowedStatuses: ['used'] }) ?? existing
-      if (updated.status !== 'used') return jsonResponse({ error: '只能给已使用 CDK 发放干员更新权限。' }, 409)
-      return jsonResponse({
-        granted: true,
-        already_granted: false,
-        cdk_id: existing.code_hash.slice(0, 12),
-        operator_update_grant_remaining: getOperatorUpdateGrantRemaining(updated),
-        operator_update_granted_at: grantedAt,
       })
     }
 
@@ -440,15 +396,6 @@ function toAdminCdkRecord(record: CdkRecord) {
     operator_count: record.operator_count,
     config_desc: record.config_desc,
     schedule_generate_count: record.schedule_generate_count ?? 0,
-    operator_update_grant_count: record.operator_update_grant_count ?? 0,
-    operator_update_used_count: record.operator_update_used_count ?? 0,
-    operator_update_grant_remaining: getOperatorUpdateGrantRemaining(record),
-    operator_update_granted_at: record.operator_update_granted_at ?? null,
-    operator_update_consumed_at: record.operator_update_consumed_at ?? null,
-    operator_update_event_count: record.operator_update_events?.length ?? 0,
-    activation_bound: Boolean(record.activation_token_hash),
-    user_agent_count: new Set((record.user_agent_events ?? []).map((event) => event.hash)).size,
-    ip_prefix_count: new Set((record.ip_prefix_events ?? []).map((event) => event.hash)).size,
     risk_event_count: record.risk_events?.length ?? 0,
     risk_events: (record.risk_events ?? []).map(summarizeRiskEvent).filter((event): event is NonNullable<ReturnType<typeof summarizeRiskEvent>> => Boolean(event)),
     latest_risk_event: summarizeRiskEvent(record.risk_events?.at(-1)),
@@ -470,8 +417,6 @@ function toAdminCdkDetail(record: CdkRecord) {
   return {
     ...toAdminCdkRecord(record),
     revoked_at: record.revoked_at ?? null,
-    operator_update_granted_at: record.operator_update_granted_at ?? null,
-    operator_update_consumed_at: record.operator_update_consumed_at ?? null,
     baseline_operator_count: record.baseline_operator_fingerprint?.owned_count ?? null,
     latest_operator_count: record.latest_operator_fingerprint?.owned_count ?? null,
     risk_events: (record.risk_events ?? []).map((event) => ({
@@ -480,15 +425,6 @@ function toAdminCdkDetail(record: CdkRecord) {
       reason: event.reason,
       detail: sanitizeRiskDetail(event.detail),
     })),
-    operator_update_events: (record.operator_update_events ?? []).map((event) => ({
-      at: event.at,
-      operator_count: event.operator_count,
-    })),
-    device_signals: {
-      activation_bound: Boolean(record.activation_token_hash),
-      user_agent_count: new Set((record.user_agent_events ?? []).map((event) => event.hash)).size,
-      ip_prefix_count: new Set((record.ip_prefix_events ?? []).map((event) => event.hash)).size,
-    },
     linked_account: record.account_id && record.profile_id
       ? { account_id: record.account_id, profile_id: record.profile_id }
       : null,

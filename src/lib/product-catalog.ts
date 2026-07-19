@@ -11,8 +11,6 @@ export type ProductPolicy = typeof catalogJson.policies
 export interface CapabilitySubject {
   kind?: UserGameAccountKind
   permission?: RawPermissionMode | null
-  operatorUpdateGrantRemaining?: number
-  hasActiveCdkRecord?: boolean
 }
 
 export const productCatalog = catalogJson
@@ -52,11 +50,6 @@ export function getPermissionRank(permission: RawPermissionMode | null | undefin
 export function hasCapability(subject: CapabilitySubject, capability: CapabilityId): boolean {
   const permission = normalizeRuntimePermission(subject.permission)
   const profile = catalogJson.runtime_permissions[permission]
-  if (capability === 'replace_operator_data') {
-    return permission === 'admin'
-      || (permission === 'advanced' && subject.hasActiveCdkRecord !== false)
-      || (subject.operatorUpdateGrantRemaining ?? 0) > 0
-  }
   if ((profile.capabilities as string[]).includes(capability)) return true
   if (subject.kind === 'free_preview') {
     return capability === 'generate_full_schedule'
