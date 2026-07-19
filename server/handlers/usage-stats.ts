@@ -8,6 +8,8 @@ import {
   type UsageEventStatus,
   type UsageEventStore,
 } from '../storage/usage-store'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 const EVENT_PREFIX = 'events/'
 const VALID_VISITOR_ID = /^[A-Za-z0-9_-]{8,128}$/
@@ -49,8 +51,7 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
     console.error('usage stats error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 
@@ -88,13 +89,7 @@ export async function recordUsageEvent(event: UsageEventName, input: UsageEventI
 }
 
 async function handlePublicPost(req: Request): Promise<Response> {
-  const body = await req.json() as {
-    event?: unknown;
-    visitor_id?: unknown;
-    announcement_id?: unknown;
-    announcement_kind?: unknown;
-    source?: unknown;
-  }
+  const body = await getValidatedJson(req, requestSchemas.usageStats)
   if (body.event === 'announcement_impression' || body.event === 'announcement_read') {
     const announcementId = normalizeNullableString(body.announcement_id, 120)
     if (!announcementId) {

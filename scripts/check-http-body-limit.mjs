@@ -5,7 +5,9 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import * as esbuild from 'esbuild'
 
-const DEFAULT_LIMIT_BYTES = 256 * 1024
+const AUTH_LIMIT_BYTES = 16 * 1024
+const STANDARD_LIMIT_BYTES = 64 * 1024
+const COMPUTE_LIMIT_BYTES = 256 * 1024
 const DEPOT_LIMIT_BYTES = 1024 * 1024
 const bundleDir = resolve('.cache/check-http-body-limit')
 const bundlePath = resolve(bundleDir, 'http-server.mjs')
@@ -39,41 +41,68 @@ try {
 
   const defaultBoundary = await sendRequest(port, {
     path: '/api/not-found',
-    body: Buffer.alloc(DEFAULT_LIMIT_BYTES, 'x'),
+    body: Buffer.alloc(COMPUTE_LIMIT_BYTES, 'x'),
   })
-  assert.equal(defaultBoundary.status, 404, 'default boundary request should reach routing')
+  assert.equal(defaultBoundary.status, 404, 'unknown routes should be rejected before reading their body')
 
   const declaredTooLarge = await sendRequest(port, {
-    path: '/api/not-found',
-    headers: { 'Content-Length': String(DEFAULT_LIMIT_BYTES + 1) },
+    path: '/api/auth/login',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': String(AUTH_LIMIT_BYTES + 1),
+    },
   })
-  assertPayloadTooLarge(declaredTooLarge, 'declared oversized request')
+  assertPayloadTooLarge(declaredTooLarge, 'declared oversized auth request')
 
   const chunkedTooLarge = await sendRequest(port, {
-    path: '/api/not-found',
+    path: '/api/auth/login',
+    headers: { 'Content-Type': 'application/json' },
     chunks: [
-      Buffer.alloc(DEFAULT_LIMIT_BYTES / 2, 'x'),
-      Buffer.alloc(DEFAULT_LIMIT_BYTES / 2, 'x'),
+      Buffer.alloc(AUTH_LIMIT_BYTES / 2, 'x'),
+      Buffer.alloc(AUTH_LIMIT_BYTES / 2, 'x'),
       Buffer.from('x'),
     ],
   })
-  assertPayloadTooLarge(chunkedTooLarge, 'chunked oversized request')
+  assertPayloadTooLarge(chunkedTooLarge, 'chunked oversized auth request')
+
+  const standardTooLarge = await sendRequest(port, {
+    path: '/api/usage-stats',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': String(STANDARD_LIMIT_BYTES + 1),
+    },
+  })
+  assertPayloadTooLarge(standardTooLarge, 'oversized standard request')
+
+  const computeTooLarge = await sendRequest(port, {
+    path: '/api/analyze-schedule',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': String(COMPUTE_LIMIT_BYTES + 1),
+    },
+  })
+  assertPayloadTooLarge(computeTooLarge, 'oversized compute request')
 
   const depotAboveDefault = await sendRequest(port, {
     path: '/api/depot-value',
-    body: Buffer.alloc(DEFAULT_LIMIT_BYTES + 1, 'x'),
+    headers: { 'Content-Type': 'application/json' },
+    body: Buffer.alloc(COMPUTE_LIMIT_BYTES + 1, 'x'),
   })
   assert.equal(depotAboveDefault.status, 400, 'depot request above the default limit should reach its handler')
 
   const depotBoundary = await sendRequest(port, {
     path: '/api/depot-value',
+    headers: { 'Content-Type': 'application/json' },
     body: Buffer.alloc(DEPOT_LIMIT_BYTES, 'x'),
   })
   assert.equal(depotBoundary.status, 400, 'depot request at 1 MiB should reach its handler')
 
   const depotTooLarge = await sendRequest(port, {
     path: '/api/depot-value',
-    headers: { 'Content-Length': String(DEPOT_LIMIT_BYTES + 1) },
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': String(DEPOT_LIMIT_BYTES + 1),
+    },
   })
   assertPayloadTooLarge(depotTooLarge, 'oversized depot request')
 
@@ -151,5 +180,9 @@ function assertPayloadTooLarge(response, label) {
   assert.equal(response.status, 413, `${label} should return 413`)
   assert.equal(response.headers.connection, 'close', `${label} should close the connection`)
   assert.match(String(response.headers['content-type']), /^application\/json\b/, `${label} should return JSON`)
-  assert.deepEqual(JSON.parse(response.body), { error: 'Request body too large' })
+  const body = JSON.parse(response.body)
+  assert.equal(body.error, 'Request body too large.')
+  assert.equal(body.code, 'payload_too_large')
+  assert.match(body.request_id, /^[0-9a-f-]{36}$/i)
+  assert.equal(response.headers['x-request-id'], body.request_id)
 }

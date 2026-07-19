@@ -11,6 +11,8 @@ import {
   getOptimizeGlobalWorkerConcurrency,
   kickOptimizeJobProcessing,
 } from '../optimize-job-runner'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 export default async function adminOptimizationHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -35,7 +37,7 @@ export default async function adminOptimizationHandler(req: Request): Promise<Re
     }
 
     if (req.method === 'POST') {
-      const body = await req.json() as { action?: unknown; id?: unknown; reason?: unknown }
+      const body = await getValidatedJson(req, requestSchemas.adminOptimization)
       const id = typeof body.id === 'string' ? body.id.trim() : ''
       const reason = typeof body.reason === 'string' ? body.reason.trim() : ''
       if (!id) return jsonResponse({ error: '缺少死信任务 ID。' }, 400)

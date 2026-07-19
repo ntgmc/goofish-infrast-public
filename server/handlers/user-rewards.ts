@@ -10,6 +10,6 @@ export default async function userRewardsHandler(req: Request): Promise<Response
     return jsonResponse({ balances: await getRewardBalances(auth.user.id) })
   } catch (error) {
     console.error('user rewards error:', error)
-    return jsonResponse({ error: error instanceof Error ? error.message : 'Internal server error' }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }

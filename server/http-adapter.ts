@@ -1,12 +1,12 @@
 import { Buffer } from 'node:buffer'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { getRequestBodyLimitBytes, RequestBodyTooLargeError } from './request-body-limits'
+import { RequestBodyTooLargeError } from './request-body-limits'
 import { INTERNAL_CLIENT_IP_HEADER, resolveIncomingClientIp } from './security/client-ip'
 
-export async function nodeRequestToWebRequest(req: IncomingMessage): Promise<Request> {
+export async function nodeRequestToWebRequest(req: IncomingMessage, bodyLimitBytes: number): Promise<Request> {
   const host = firstHeaderValue(req.headers.host) || '127.0.0.1'
-  const protocol = firstHeaderValue(req.headers['x-forwarded-proto']) || 'http'
-  const url = req.url?.startsWith('http') ? req.url : `${protocol}://${host}${req.url || '/'}`
+  const protocol = resolveIncomingProtocol(req)
+  const url = `${protocol}://${host}${req.url || '/'}`
   const headers = new Headers()
 
   for (const [key, value] of Object.entries(req.headers)) {
@@ -16,16 +16,31 @@ export async function nodeRequestToWebRequest(req: IncomingMessage): Promise<Req
       headers.set(key, value)
     }
   }
+  headers.delete(INTERNAL_CLIENT_IP_HEADER)
   headers.set(INTERNAL_CLIENT_IP_HEADER, resolveIncomingClientIp(req))
 
   const method = req.method || 'GET'
   const init: RequestInit = { method, headers }
   if (method !== 'GET' && method !== 'HEAD') {
-    const bodyLimitBytes = getRequestBodyLimitBytes(new URL(url).pathname)
-    init.body = new Uint8Array(await readRequestBody(req, bodyLimitBytes))
+    if (bodyLimitBytes > 0) init.body = new Uint8Array(await readRequestBody(req, bodyLimitBytes))
   }
 
   return new Request(url, init)
+}
+
+function resolveIncomingProtocol(req: IncomingMessage): 'http' | 'https' {
+  if (Boolean((req.socket as { encrypted?: boolean }).encrypted)) return 'https'
+  if (!isLoopbackAddress(req.socket.remoteAddress)) return 'http'
+  const forwarded = firstHeaderValue(req.headers['x-forwarded-proto'])
+  return forwarded?.split(',', 1)[0]?.trim().toLowerCase() === 'https' ? 'https' : 'http'
+}
+
+function isLoopbackAddress(value: string | undefined): boolean {
+  if (!value) return false
+  const normalized = value.toLowerCase()
+  return normalized === '::1'
+    || normalized.startsWith('127.')
+    || normalized.startsWith('::ffff:127.')
 }
 
 export async function writeWebResponse(res: ServerResponse, response: Response): Promise<void> {
