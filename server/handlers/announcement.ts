@@ -6,6 +6,8 @@ import { createPostgresAnnouncementStore } from '../storage/announcement-store'
 import { getAnnouncementReadCounts } from '../storage/user-store'
 import { listUsageEvents, recordUsageEvent } from './usage-stats'
 import type { AnnouncementStats } from '../../src/lib/types'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 const ANNOUNCEMENT_KEY = 'current.json'
 const MAX_TITLE_LENGTH = 80
@@ -46,8 +48,7 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
     console.error('announcement error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 
@@ -102,7 +103,7 @@ async function handleAdminPut(req: Request): Promise<Response> {
   const authentication = await authenticateAdminRequest(req)
   if (!authentication.ok) return authentication.response
 
-  const body = await req.json() as { announcements?: unknown }
+  const body = await getValidatedJson(req, requestSchemas.announcement)
   const current = await readAnnouncementData()
   const validation = validateAnnouncementList(body.announcements, current.announcements)
   if (!validation.ok) {

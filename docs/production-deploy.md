@@ -120,6 +120,8 @@ ready and Nginx has switched successfully.
 
    ```bash
    sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
+   sudo install -m 0644 deploy/nginx/goofish-proxy-common.conf /etc/nginx/snippets/goofish-proxy-common.conf
+   sudo install -m 0644 deploy/nginx/goofish-server-hardening.conf /etc/nginx/snippets/goofish-server-hardening.conf
    sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
    sudo install -m 0644 deploy/nginx/goofish-static-files.conf /etc/nginx/snippets/goofish-static-files.conf
    ```
@@ -132,6 +134,7 @@ ready and Nginx has switched successfully.
      root /opt/goofish-infrast-v1/current/dist;
      index index.html;
 
+     include /etc/nginx/snippets/goofish-server-hardening.conf;
      include /etc/nginx/snippets/goofish-security-headers.conf;
      include /etc/nginx/snippets/goofish-api-production.conf;
      include /etc/nginx/snippets/goofish-static-files.conf;

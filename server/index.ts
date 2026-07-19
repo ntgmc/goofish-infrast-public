@@ -19,6 +19,8 @@ import { closePool } from './storage/postgres'
 const port = Number(process.env.PORT || 3000)
 const host = process.env.HOST || '127.0.0.1'
 
+validateProductionBoundaryConfig(host)
+
 const server = createApiServer()
 let accountDeletionWorker: AccountDeletionWorkerController | null = null
 let shutdownPromise: Promise<void> | null = null
@@ -98,4 +100,23 @@ function closeServer(target: Server): Promise<void> {
   return new Promise((resolveClose, rejectClose) => {
     target.close((error) => error ? rejectClose(error) : resolveClose())
   })
+}
+
+function validateProductionBoundaryConfig(listenHost: string): void {
+  if (process.env.NODE_ENV !== 'production') return
+  const normalizedHost = listenHost.trim().toLowerCase()
+  if (normalizedHost !== '127.0.0.1' && normalizedHost !== '::1' && normalizedHost !== 'localhost') {
+    throw new Error('Production backend HOST must be loopback-only')
+  }
+  const publicAppUrl = process.env.PUBLIC_APP_URL?.trim()
+  if (!publicAppUrl) throw new Error('PUBLIC_APP_URL is required in production')
+  let parsed: URL
+  try {
+    parsed = new URL(publicAppUrl)
+  } catch {
+    throw new Error('PUBLIC_APP_URL must be a valid absolute URL')
+  }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    throw new Error('PUBLIC_APP_URL must be an HTTPS origin without credentials, path, query, or fragment')
+  }
 }

@@ -57,8 +57,12 @@ async function assertMissingSecret() {
   delete process.env.SKLAND_CREDENTIAL_SECRET
   const result = await callSkland('/api/user/skland/login/start', { profile_id: 'profile-1' })
   process.env.SKLAND_CREDENTIAL_SECRET = previous
-  if (result.status !== 500 || !result.body.error?.includes('SKLAND_CREDENTIAL_SECRET')) {
-    throw new Error(`missing secret: expected 500 config error, got ${result.status}`)
+  if (
+    result.status !== 500
+    || result.body.error !== 'Internal server error'
+    || JSON.stringify(result.body).includes('SKLAND_CREDENTIAL_SECRET')
+  ) {
+    throw new Error(`missing secret: expected sanitized 500 error, got ${result.status}`)
   }
 }
 
@@ -73,8 +77,8 @@ async function assertInvalidProfile() {
 async function assertFrozenProfile() {
   seedProfile({ id: 'frozen-profile', status: 'frozen' })
   const result = await callSkland('/api/user/skland/login/start', { profile_id: 'frozen-profile' })
-  if (result.status !== 400 || !result.body.error?.includes('状态不可用')) {
-    throw new Error(`frozen profile: expected unavailable profile error, got ${result.status}`)
+  if (result.status !== 400 || result.body.error !== '森空岛请求无效或服务暂不可用。') {
+    throw new Error(`frozen profile: expected sanitized unavailable-profile error, got ${result.status}`)
   }
 }
 
@@ -689,7 +693,7 @@ async function assertRepeatedMismatchFreezesProfile() {
     throw new Error(`repeated mismatch: expected frozen profile, got ${result.status}`)
   }
   const blocked = await callSkland('/api/user/skland/login/start', { profile_id: 'profile-1' })
-  if (blocked.status !== 400 || !blocked.body.error?.includes('状态不可用')) {
+  if (blocked.status !== 400 || blocked.body.error !== '森空岛请求无效或服务暂不可用。') {
     throw new Error('repeated mismatch: frozen profile should block future Skland operations')
   }
 }
@@ -704,7 +708,7 @@ async function assertSchemaChangeError() {
   })
   setFetchMode('bad-info')
   const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'schema-profile' })
-  if (result.status !== 400 || !result.body.error?.includes('干员数据')) {
+  if (result.status !== 400 || result.body.error !== '森空岛刷新失败，请稍后重试。') {
     throw new Error(`schema change: expected clear operator data error, got ${result.status}`)
   }
 }
@@ -1136,7 +1140,7 @@ async function bundleHandler() {
     platform: 'node',
     format: 'esm',
     write: false,
-    external: ['qrcode'],
+    external: ['pg', 'qrcode'],
     plugins: [memoryStorePlugin()],
   })
   await writeFile(outputPath, result.outputFiles[0].text, 'utf8')
@@ -1163,6 +1167,14 @@ function memoryStorePlugin() {
         path: 'memory-usage-stats',
         namespace: 'skland-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])layered-auth-rate-limit(\.ts)?$/ }, () => ({
+        path: 'memory-layered-auth-rate-limit',
+        namespace: 'skland-smoke',
+      }))
+      build.onResolve({ filter: /(^|[\\/])persistent-rate-limit(\.ts)?$/ }, () => ({
+        path: 'memory-persistent-rate-limit',
+        namespace: 'skland-smoke',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'skland-smoke' }, (args) => ({
         contents: args.path === 'memory-user-store'
           ? memoryUserStoreModule()
@@ -1170,6 +1182,10 @@ function memoryStorePlugin() {
             ? memoryUserAuthModule()
             : args.path === 'memory-usage-stats'
               ? memoryUsageStatsModule()
+              : args.path === 'memory-layered-auth-rate-limit'
+                ? `export async function reserveSklandAttemptLayered() { return { allowed: true, attempt: { retainFailure() {} } } }`
+                : args.path === 'memory-persistent-rate-limit'
+                  ? `export class RateLimitStoreError extends Error {}`
               : memoryLicenseUtilsModuleFixed(),
         loader: 'js',
       }))

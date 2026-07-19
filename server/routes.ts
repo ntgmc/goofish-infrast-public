@@ -81,16 +81,13 @@ const ROUTES = new Map<string, ApiHandler>([
 ])
 
 export async function routeRequest(req: Request): Promise<Response> {
-  const startedAt = performance.now()
   const response = await dispatchRequest(req)
-  response.headers.set('Server-Timing', `app;dur=${Math.max(0, performance.now() - startedAt).toFixed(1)}`)
   return applyHttpSecurityHeaders(response, isSecureWebRequest(req))
 }
 
 async function dispatchRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
 
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (url.pathname === '/api/health/live') return handleLiveness()
   if (url.pathname === '/api/health' || url.pathname === '/api/health/ready') return handleReadiness()
   if (url.pathname === '/api/data') {
@@ -116,7 +113,6 @@ function handleLiveness(): Response {
   return jsonResponse({
     ok: true,
     state: getServiceLifecycleState(),
-    version: process.env.BACKEND_VERSION || process.env.APP_VERSION || null,
   })
 }
 
@@ -126,12 +122,9 @@ async function handleReadiness(): Promise<Response> {
     return jsonResponse({
       ok: false,
       state,
-      version: process.env.BACKEND_VERSION || process.env.APP_VERSION || null,
       storage: {
         type: 'postgres',
-        configured: hasDatabaseUrl(),
         ok: false,
-        error: `service is ${state}`,
       },
     }, 503)
   }
@@ -141,12 +134,9 @@ async function handleReadiness(): Promise<Response> {
     {
       ok,
       state,
-      version: process.env.BACKEND_VERSION || process.env.APP_VERSION || null,
       storage: {
         type: 'postgres',
-        configured: hasDatabaseUrl(),
         ok: database.ok,
-        error: database.ok ? undefined : database.error,
       },
     },
     ok ? 200 : 503,

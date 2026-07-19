@@ -6,10 +6,9 @@ import { copy } from '../copy/index'
 
 type AuthMode = 'login' | 'register' | 'forgot'
 type FieldErrors = Record<string, string>
-type VerificationRequiredResponse = {
-  verification_required: true
+type RegistrationAcceptedResponse = {
+  accepted: true
   message: string
-  resend_after_seconds: number
 }
 
 type AuthFormProps = {
@@ -64,7 +63,7 @@ export default function AuthForm({
         return
       }
 
-      const data = await apiJson<AuthSuccessResponse | VerificationRequiredResponse>(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
+      const data = await apiJson<AuthSuccessResponse | RegistrationAcceptedResponse>(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
         method: 'POST',
         json: mode === 'login' ? { email, password } : {
           email,
@@ -74,7 +73,7 @@ export default function AuthForm({
         },
         fallbackMessage: mode === 'login' ? copy.auth.components_AuthForm_003 : copy.auth.components_AuthForm_004,
       })
-      if ('verification_required' in data) {
+      if ('accepted' in data) {
         setNotice(data.message || copy.auth.components_AuthForm_028)
         setShowVerificationResend(true)
         return

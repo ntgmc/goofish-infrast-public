@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto'
 
 const AUTH_WINDOW_MS = 15 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000
+const SKLAND_WINDOW_MS = 5 * 60 * 1000
 const CLEANUP_INTERVAL_MS = 60 * 1000
 const MAX_RATE_LIMIT_ENTRIES = 20_000
 const CAPACITY_RETRY_AFTER_SECONDS = 60
@@ -148,10 +150,30 @@ export function reserveAdminAuthenticationAttempt(clientIp: string, account: str
   ])
 }
 
-function authScope(namespace: string, identity: string, limit: number): RateLimitScope {
+export function reserveRegistrationAttempt(clientIp: string): AuthRateLimitDecision {
+  return authRateLimiter.reserve([authScope('register-ip', clientIp, 5, HOUR_MS)])
+}
+
+export function reserveRecoveryAttempt(clientIp: string): AuthRateLimitDecision {
+  return authRateLimiter.reserve([authScope('recovery-ip', clientIp, 5, AUTH_WINDOW_MS)])
+}
+
+export function reserveTokenAttempt(clientIp: string): AuthRateLimitDecision {
+  return authRateLimiter.reserve([authScope('token-ip', clientIp, 10, AUTH_WINDOW_MS)])
+}
+
+export function reservePasswordChangeAttempt(clientIp: string): AuthRateLimitDecision {
+  return authRateLimiter.reserve([authScope('password-change-ip', clientIp, 10, AUTH_WINDOW_MS)])
+}
+
+export function reserveSklandAttempt(clientIp: string): AuthRateLimitDecision {
+  return authRateLimiter.reserve([authScope('skland-ip', clientIp, 20, SKLAND_WINDOW_MS)])
+}
+
+function authScope(namespace: string, identity: string, limit: number, windowMs = AUTH_WINDOW_MS): RateLimitScope {
   return {
     key: createHash('sha256').update(`${namespace}\0${identity}`).digest('hex'),
     limit,
-    windowMs: AUTH_WINDOW_MS,
+    windowMs,
   }
 }

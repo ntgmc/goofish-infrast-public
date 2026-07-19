@@ -16,6 +16,6 @@ export default async function userInvitationsHandler(req: Request): Promise<Resp
   } catch (error) {
     if (error instanceof InvitationCodeError) return jsonResponse({ error: error.message, code: error.code }, 400)
     console.error('user invitations error:', error)
-    return jsonResponse({ error: error instanceof Error ? error.message : 'Internal server error' }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }

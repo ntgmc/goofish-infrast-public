@@ -5,7 +5,7 @@ import {
   createPostgresAdminSessionStore,
   type AdminSessionRecord,
 } from '../storage/admin-session-store'
-import { reserveAdminAuthenticationAttempt } from '../security/auth-rate-limit'
+import { reserveAdminAuthenticationAttemptLayered } from '../security/layered-auth-rate-limit'
 import { getRequestClientIp } from '../security/client-ip'
 import {
   constantTimeSecretEqual,
@@ -13,8 +13,9 @@ import {
   type PasswordAlgorithm,
   type PasswordHashRecord,
   PasswordWorkCapacityError,
-  verifyPasswordHash,
+  verifyPasswordHashOrDummy,
 } from '../security/password'
+import { RateLimitStoreError } from '../security/persistent-rate-limit'
 
 const ADMIN_SESSION_COOKIE = 'maa_admin_session'
 export const ADMIN_SESSION_IDLE_MS = 30 * 60 * 1000
@@ -67,15 +68,21 @@ export async function loginAdminRequest(
 
   const suppliedUsername = typeof usernameValue === 'string' ? usernameValue : ''
   const username = normalizeUsername(suppliedUsername)
-  const rateLimit = reserveAdminAuthenticationAttempt(
-    getRequestClientIp(req),
-    username ?? 'invalid',
-  )
+  let rateLimit
+  try {
+    rateLimit = await reserveAdminAuthenticationAttemptLayered(
+      getRequestClientIp(req),
+      username ?? 'invalid',
+    )
+  } catch (error) {
+    if (error instanceof RateLimitStoreError) return rateLimitStoreUnavailableResult()
+    throw error
+  }
   if (!rateLimit.allowed) return rateLimitedResult(rateLimit.retryAfterSeconds)
 
   try {
     const password = typeof passwordValue === 'string' ? passwordValue : ''
-    const authenticated = Boolean(username && password && await verifyAdminUser(username, password))
+    const authenticated = await verifyAdminUser(username, password)
     if (!authenticated || !username) {
       rateLimit.attempt.retainFailure()
       return unauthorizedResult('管理账号或密码错误。')
@@ -85,10 +92,10 @@ export async function loginAdminRequest(
     const sessionStore = createPostgresAdminSessionStore()
     await sessionStore.deleteExpired(now.toISOString(), idleCutoff(now).toISOString())
     await sessionStore.save(session.record)
-    rateLimit.attempt.refund()
+    await rateLimit.attempt.refund()
     return { ok: true, username, cookie: adminSessionCookie(session.token) }
   } catch (error) {
-    rateLimit.attempt.refund()
+    await rateLimit.attempt.refund()
     if (error instanceof PasswordWorkCapacityError) return passwordCapacityResult()
     throw error
   }
@@ -128,12 +135,18 @@ export async function requireRootAdminPassword(req: Request, value: unknown): Pr
   if (originFailure) return { ok: false, response: originFailure }
 
   const rootPassword = requireEnv('MAA_ADMIN_PASSWORD')
-  const rateLimit = reserveAdminAuthenticationAttempt(getRequestClientIp(req), 'root')
+  let rateLimit
+  try {
+    rateLimit = await reserveAdminAuthenticationAttemptLayered(getRequestClientIp(req), 'root')
+  } catch (error) {
+    if (error instanceof RateLimitStoreError) return rateLimitStoreUnavailableResult()
+    throw error
+  }
   if (!rateLimit.allowed) return rateLimitedResult(rateLimit.retryAfterSeconds)
 
   const authenticated = typeof value === 'string' && constantTimeSecretEqual(value, rootPassword)
   if (authenticated) {
-    rateLimit.attempt.refund()
+    await rateLimit.attempt.refund()
     return { ok: true, username: 'root' }
   }
   rateLimit.attempt.retainFailure()
@@ -183,12 +196,11 @@ function clearAdminSessionCookie(): string {
   return `${ADMIN_SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=0${secureCookieSuffix()}`
 }
 
-async function verifyAdminUser(username: string, password: string): Promise<boolean> {
+async function verifyAdminUser(username: string | null, password: string): Promise<boolean> {
   const store = await getAdminUserStore()
-  const user = await store.get(username)
-  if (!user) return false
-  const passwordVerification = await verifyPasswordHash(password, user)
-  if (!passwordVerification.verified) return false
+  const user = username ? await store.get(username) : null
+  const passwordVerification = await verifyPasswordHashOrDummy(password, user)
+  if (!user || !passwordVerification.verified) return false
   if (passwordVerification.needsRehash) {
     try {
       const replacement = await createPasswordHash(password)
@@ -198,6 +210,17 @@ async function verifyAdminUser(username: string, password: string): Promise<bool
     }
   }
   return true
+}
+
+function rateLimitStoreUnavailableResult(): AdminFailureResult {
+  return {
+    ok: false,
+    response: jsonResponse(
+      { error: 'Authentication service is temporarily unavailable.' },
+      503,
+      rateLimitHeaders(1),
+    ),
+  }
 }
 
 function createAdminSessionRecord(username: string, now: Date): { token: string; record: AdminSessionRecord } {

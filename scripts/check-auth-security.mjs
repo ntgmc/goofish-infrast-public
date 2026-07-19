@@ -258,7 +258,11 @@ async function assertRegistrationCdkTransaction() {
   assert.equal(profileWrite.value.cdk_key, 'cdk/valid')
   assert.equal(workspaceWrite.value.profile_id, profileWrite.value.id)
   assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 1)
-  assert.equal(globalThis.__authSecurityRegistrationSessions.length, 1)
+  assert.equal(
+    globalThis.__authSecurityRegistrationSessions.length,
+    0,
+    'registration must not create a browser session before the user signs in',
+  )
 }
 
 async function assertUserSessionTouchAndAuthPayload() {
@@ -268,8 +272,9 @@ async function assertUserSessionTouchAndAuthPayload() {
     [userSessionAuthPlugin()],
   )
   const now = new Date('2026-07-10T12:00:00.000Z')
+  const sessionToken = 'A'.repeat(43)
   const request = new Request('http://local/api/optimization/jobs/test', {
-    headers: { Cookie: 'maa_session=test-session-token' },
+    headers: { Cookie: `maa_session=${sessionToken}` },
   })
   const activeUser = {
     version: 1,
@@ -1226,8 +1231,19 @@ function adminAuthPlugin() {
         path: 'license-utils',
         namespace: 'auth-security',
       }))
+      build.onResolve({ filter: /(^|[\\/])persistent-rate-limit(\.ts)?$/ }, () => ({
+        path: 'persistent-rate-limit',
+        namespace: 'auth-security',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'auth-security' }, (args) => ({
-        contents: args.path === 'license-utils'
+        contents: args.path === 'persistent-rate-limit'
+          ? `
+              export class RateLimitStoreError extends Error {}
+              export async function reservePersistentRateLimit() {
+                return { allowed: true, attempt: { retain() {}, async refund() {} } }
+              }
+            `
+          : args.path === 'license-utils'
           ? licenseUtilsMock()
           : args.path === 'admin-session-store'
             ? adminSessionStoreMock()
@@ -1619,6 +1635,9 @@ function userRegistrationPasswordMock() {
     export async function verifyPasswordHash() {
       return { verified: false, needsRehash: false }
     }
+    export async function verifyPasswordHashOrDummy() {
+      return { verified: false, needsRehash: false }
+    }
   `
 }
 
@@ -1822,6 +1841,9 @@ function passwordResetPasswordMock() {
     export async function verifyPasswordHash() {
       return { verified: false, needsRehash: false }
     }
+    export async function verifyPasswordHashOrDummy() {
+      return { verified: false, needsRehash: false }
+    }
   `
 }
 
@@ -2001,7 +2023,7 @@ async function bundleModule(entryPoint, name, plugins = []) {
     target: 'node20',
     format: 'esm',
     write: false,
-    external: ['@node-rs/argon2'],
+    external: ['@node-rs/argon2', 'pg'],
     plugins,
     logLevel: 'silent',
   })
@@ -2025,7 +2047,7 @@ async function bundleInlineModule(contents, name, plugins = []) {
     target: 'node20',
     format: 'esm',
     write: false,
-    external: ['@node-rs/argon2'],
+    external: ['@node-rs/argon2', 'pg'],
     plugins,
     logLevel: 'silent',
   })
