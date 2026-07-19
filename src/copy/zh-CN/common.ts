@@ -232,24 +232,6 @@ export const commonCopy = {
   // src/components/DeferredFeatureMenu.tsx
   components_DeferredFeatureMenu_006: "已开放",
   // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_007: "账号同步",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_008: "登录后自动保存干员数据和排班记录。",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_009: "规划中",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_010: "邀请返现",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_011: "后续用于查看邀请链接和收益记录。",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_012: "未开放",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_013: "拼团购买",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_014: "后续用于创建或加入拼团订单。",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_015: "未开放",
-  // src/components/DeferredFeatureMenu.tsx
   components_DeferredFeatureMenu_016: "更多",
   // src/components/DeferredFeatureMenu.tsx
   components_DeferredFeatureMenu_017: "工具与扩展",

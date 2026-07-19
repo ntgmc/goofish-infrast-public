@@ -20,21 +20,6 @@ const deferredFeatures: DeferredFeature[] = [
     status: copy.common.components_DeferredFeatureMenu_006,
     href: '/tools/schedule-analysis',
   },
-  {
-    title: copy.common.components_DeferredFeatureMenu_007,
-    description: copy.common.components_DeferredFeatureMenu_008,
-    status: copy.common.components_DeferredFeatureMenu_009,
-  },
-  {
-    title: copy.common.components_DeferredFeatureMenu_010,
-    description: copy.common.components_DeferredFeatureMenu_011,
-    status: copy.common.components_DeferredFeatureMenu_012,
-  },
-  {
-    title: copy.common.components_DeferredFeatureMenu_013,
-    description: copy.common.components_DeferredFeatureMenu_014,
-    status: copy.common.components_DeferredFeatureMenu_015,
-  },
 ]
 
 interface DeferredFeatureMenuProps {
