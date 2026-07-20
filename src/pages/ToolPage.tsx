@@ -28,6 +28,7 @@ export default function ToolPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const route = resolveToolRoute(location.pathname)
+  const requestedProfileId = new URLSearchParams(location.search).get('profile_id')
   useToolVisitReporter(Boolean(route))
   const {
     authLoading,
@@ -54,9 +55,9 @@ export default function ToolPage() {
     refreshProfileWorkspace,
     persistWorkspacePatch,
     handleLogout,
-  } = useToolSession()
+  } = useToolSession(requestedProfileId)
 
-  if (!route) return <Navigate to={fallbackToolPath(location.pathname)} replace />
+  if (!route) return <Navigate to={profileScopedPath(fallbackToolPath(location.pathname), requestedProfileId)} replace />
 
   if (authLoading) {
     return <SessionLoader label={copy.common.pages_ToolPage_001} />
@@ -77,8 +78,8 @@ export default function ToolPage() {
   const navigateDashboard = (section: DashboardSection, options?: { replace?: boolean }) => {
     navigateToToolPath(dashboardPath(section), options)
   }
-  const navigateSetup = (section: WorkspaceSetupSection) => navigateToToolPath(workspaceSetupPath(section))
-  const navigateOptimize = (section: OptimizeSection) => navigateToToolPath(optimizePath(section))
+  const navigateSetup = (section: WorkspaceSetupSection) => navigateToToolPath(profileScopedPath(workspaceSetupPath(section), activeProfile?.id))
+  const navigateOptimize = (section: OptimizeSection) => navigateToToolPath(profileScopedPath(optimizePath(section), activeProfile?.id))
 
   if (route.kind === 'dashboard') {
     return (
@@ -97,7 +98,7 @@ export default function ToolPage() {
           onPayload={applyAuthPayload}
           onOpenProfile={(profile) => {
             void refreshProfileWorkspace(profile)
-              .then(() => navigate(workspaceSetupPath('operators')))
+              .then(() => navigate(profileScopedPath(workspaceSetupPath('operators'), profile.id)))
               .catch(console.error)
           }}
         />
@@ -122,7 +123,7 @@ export default function ToolPage() {
           onSectionChange={navigateSetup}
           onSaved={(payload) => {
             applyAuthPayload(payload)
-            navigate(optimizePath('overview'))
+            navigate(profileScopedPath(optimizePath('overview'), activeProfile.id))
           }}
           onSynced={applyAuthPayload}
           onBack={() => navigate(dashboardPath('profiles'))}
@@ -134,11 +135,11 @@ export default function ToolPage() {
   }
 
   if (!license) {
-    return <Navigate to={workspace?.operators ? workspaceSetupPath('config') : workspaceSetupPath('operators')} replace />
+    return <Navigate to={profileScopedPath(workspace?.operators ? workspaceSetupPath('config') : workspaceSetupPath('operators'), activeProfile.id)} replace />
   }
 
   if (route.section === 'lab' && !canUseScenarioComparison(license)) {
-    return <Navigate to={optimizePath('overview')} replace />
+    return <Navigate to={profileScopedPath(optimizePath('overview'), activeProfile.id)} replace />
   }
 
   return (
@@ -161,7 +162,7 @@ export default function ToolPage() {
           onWorkspacePatch={persistWorkspacePatch}
           section={route.section}
           onSectionChange={navigateOptimize}
-          onReset={() => navigate(workspaceSetupPath('operators'))}
+          onReset={() => navigate(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id))}
           announcement={banner}
           redeemedNotice={null}
           onProfileUpgraded={applyAuthPayload}
@@ -169,4 +170,9 @@ export default function ToolPage() {
       </Suspense>
     </>
   )
+}
+
+function profileScopedPath(path: string, profileId?: string | null): string {
+  if (!profileId) return path
+  return `${path}?${new URLSearchParams({ profile_id: profileId })}`
 }

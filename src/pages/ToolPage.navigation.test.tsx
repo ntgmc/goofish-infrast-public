@@ -37,6 +37,25 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('ToolPage route guards', () => {
+  it('keeps the opened profile in the URL so a refresh can restore it', async () => {
+    const user = userEvent.setup()
+    const firstProfile = createProfile()
+    const secondProfile = { ...createProfile(), id: 'profile-2', display_name: '第二个档案' }
+    const refreshProfileWorkspace = vi.fn().mockResolvedValue(undefined)
+    const router = renderToolRoute('/tool/profiles', {
+      activeProfile: firstProfile,
+      activeCdkProfile: firstProfile,
+      cdkProfiles: [firstProfile, secondProfile],
+      refreshProfileWorkspace,
+    })
+
+    await user.click((await screen.findAllByRole('button', { name: '准备这个账号' }))[1])
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/setup/operators'))
+    expect(router.state.location.search).toBe('?profile_id=profile-2')
+    expect(refreshProfileWorkspace).toHaveBeenCalledWith(secondProfile)
+  })
+
   it('updates the active dashboard tab immediately while its code is still loading', async () => {
     const user = userEvent.setup()
     const router = renderToolRoute('/tool/profiles')
