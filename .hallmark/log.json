@@ -1,0 +1,14 @@
+[
+  {
+    "date": "2026-07-20",
+    "scope": "app",
+    "macrostructure": "Marketing: Workbench; Application: Workbench; Content: Long Document",
+    "theme": "custom",
+    "theme_axes": "light / geometric-sans / cool-violet",
+    "vibe": "technical, restrained, precise, trustworthy",
+    "enrichment": "existing product captures",
+    "nav": "N9 public + side rail application",
+    "footer": "Ft2 inline rule",
+    "brief": "Full-site visual redesign preserving content and business logic"
+  }
+]

@@ -15,11 +15,10 @@ describe('AuthForm email verification', () => {
   it('keeps a newly registered user signed out and offers a resend action', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse({
-        verification_required: true,
-        message: '请检查邮箱并点击验证链接完成注册。',
-        resend_after_seconds: 300,
+        accepted: true,
+        message: '如果可以完成注册，请检查邮箱或直接登录。',
       }, 202))
-      .mockResolvedValueOnce(jsonResponse({ message: '验证邮件已重新发送。' }))
+      .mockResolvedValueOnce(jsonResponse({ accepted: true, message: '如果账号符合条件，请检查注册邮箱。' }, 202))
     vi.stubGlobal('fetch', fetchMock)
     const onAuthenticated = vi.fn()
     const user = userEvent.setup()
@@ -33,7 +32,7 @@ describe('AuthForm email verification', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('请检查邮箱')
     expect(onAuthenticated).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '重新发送验证邮件' }))
-    expect(await screen.findByText('验证邮件已重新发送。')).toBeInTheDocument()
+    expect(await screen.findByText('如果账号符合条件，请检查注册邮箱。')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenLastCalledWith('/api/auth/resend-verification', expect.objectContaining({ method: 'POST' }))
   })
 

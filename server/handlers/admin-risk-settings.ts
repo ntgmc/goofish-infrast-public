@@ -1,6 +1,8 @@
 import { authenticateAdminRequest } from './admin-auth'
 import { getRiskControlSettings, jsonResponse, saveRiskControlSettings } from './license-utils'
 import type { RiskControlSettingsPatch } from '../storage/risk-settings-store'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -22,14 +24,13 @@ async function handleGet(req: Request): Promise<Response> {
     return jsonResponse({ settings: await getRiskControlSettings() })
   } catch (error) {
     console.error('admin risk settings get error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 
 async function handleSave(req: Request): Promise<Response> {
   try {
-    const body = await req.json() as Record<string, unknown>
+    const body = await getValidatedJson(req, requestSchemas.adminRiskSettings)
     const authentication = await authenticateAdminRequest(req)
     if (!authentication.ok) return authentication.response
 
@@ -48,7 +49,6 @@ async function handleSave(req: Request): Promise<Response> {
     return jsonResponse({ settings })
   } catch (error) {
     console.error('admin risk settings save error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }

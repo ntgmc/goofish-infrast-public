@@ -80,8 +80,8 @@ export default function AdminSetupPage() {
       <div className="tool-page-frame max-w-5xl">
         <div className="tool-page-header flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="tool-eyebrow">{copy.common.pages_AdminSetupPage_008}</p>
-            <h1 className="mt-2 text-2xl font-semibold text-ink-primary">{copy.common.pages_AdminSetupPage_009}</h1>
+            <p className="section-index">{copy.common.pages_AdminSetupPage_008}</p>
+            <h1 className="display-title mt-2 text-2xl text-ink-primary">{copy.common.pages_AdminSetupPage_009}</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">
               {copy.common.pages_AdminSetupPage_010}</p>
           </div>

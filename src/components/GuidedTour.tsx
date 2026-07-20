@@ -169,11 +169,11 @@ export default function GuidedTour({
               left: paddedRect.left,
               width: paddedRect.width,
               height: paddedRect.height,
-              boxShadow: '0 0 0 9999px rgb(0 0 0 / 0.68)',
+              boxShadow: '0 0 0 9999px var(--tour-scrim)',
             }}
           />
         ) : (
-          <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[91] bg-black/68" />
+          <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[91]" style={{ background: 'var(--tour-scrim)' }} />
         )}
         <Dialog.Content
           ref={contentRef}

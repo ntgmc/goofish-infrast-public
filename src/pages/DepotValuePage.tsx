@@ -205,8 +205,8 @@ export default function DepotValuePage() {
           <div className="flex min-w-0 items-start gap-3">
             <BrandLogo size="md" />
             <div className="min-w-0">
-              <p className="tool-eyebrow">{copy.tools.pages_DepotValuePage_009}</p>
-              <h1 className="mt-2 text-2xl font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_010}</h1>
+              <p className="section-index">{copy.tools.pages_DepotValuePage_009}</p>
+              <h1 className="display-title mt-2 text-2xl text-ink-primary">{copy.tools.pages_DepotValuePage_010}</h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
                 {copy.tools.pages_DepotValuePage_011}</p>
             </div>
@@ -359,7 +359,7 @@ export default function DepotValuePage() {
           </section>
 
           <section className="tool-panel p-5 sm:p-6">
-            <p className="tool-eyebrow">{copy.tools.pages_DepotValuePage_036}</p>
+            <p className="section-index">{copy.tools.pages_DepotValuePage_036}</p>
             <h2 className="mt-2 text-lg font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_037}</h2>
             <div className="mt-4 space-y-4 text-sm leading-6 text-ink-secondary">
               <p>{copy.tools.pages_DepotValuePage_038}</p>
@@ -392,7 +392,7 @@ export default function DepotValuePage() {
 function ResultSummary({ result }: { result: DepotValueResponse }) {
   return (
     <section className="tool-panel border-brand-600/25 p-5 sm:p-6">
-      <p className="tool-eyebrow">{copy.tools.pages_DepotValuePage_041}</p>
+      <p className="section-index">{copy.tools.pages_DepotValuePage_041}</p>
       <h2 className="mt-2 text-2xl font-semibold text-ink-primary">
         {copy.tools.pages_DepotValuePage_042}{result.percentile}{copy.tools.pages_DepotValuePage_043}</h2>
       <p className="tool-inset mt-3 px-3 py-2 text-sm leading-6 text-ink-secondary">
@@ -503,69 +503,70 @@ function drawShareCard(canvas: HTMLCanvasElement | null, result: DepotValueRespo
   const height = 1600
   canvas.width = width
   canvas.height = height
+  const colors = getShareCardColors()
 
   const gradient = ctx.createLinearGradient(0, 0, width, height)
-  gradient.addColorStop(0, '#122f38')
-  gradient.addColorStop(0.52, '#17253b')
-  gradient.addColorStop(1, '#111827')
+  gradient.addColorStop(0, colors.backgroundStart)
+  gradient.addColorStop(0.52, colors.backgroundMid)
+  gradient.addColorStop(1, colors.backgroundEnd)
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, width, height)
 
-  drawCircle(ctx, 720, 170, 220, 'rgba(94, 234, 212, 0.18)')
-  drawCircle(ctx, 160, 1220, 260, 'rgba(250, 204, 21, 0.11)')
+  drawCircle(ctx, 720, 170, 220, colors.orbit)
+  drawCircle(ctx, 160, 1220, 260, colors.orbitAlt)
 
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.92)'
-  ctx.font = '600 34px "Noto Sans SC", "Microsoft YaHei", sans-serif'
+  ctx.fillStyle = colors.ink
+  ctx.font = `600 34px ${colors.displayFont}`
   ctx.fillText(copy.tools.pages_DepotValuePage_057, 72, 96)
-  ctx.font = '400 24px "Noto Sans SC", "Microsoft YaHei", sans-serif'
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.62)'
+  ctx.font = `400 24px ${colors.bodyFont}`
+  ctx.fillStyle = colors.muted
   ctx.fillText(result.ranking.mode === 'sample_adjusted'
     ? `${copy.tools.pages_DepotValuePage_058}${formatNumber(result.ranking.sample_count)}${copy.tools.pages_DepotValuePage_059}`
     : copy.tools.pages_DepotValuePage_060, 72, 136)
 
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '700 60px "Noto Sans SC", "Microsoft YaHei", sans-serif'
+  ctx.fillStyle = colors.ink
+  ctx.font = `700 60px ${colors.displayFont}`
   ctx.fillText(copy.tools.pages_DepotValuePage_061, 72, 260)
-  ctx.font = '700 70px "Noto Sans SC", "Microsoft YaHei", sans-serif'
+  ctx.font = `700 70px ${colors.displayFont}`
   ctx.fillText(`${copy.tools.pages_DepotValuePage_062}${result.percentile}${copy.tools.pages_DepotValuePage_063}`, 72, 350)
 
-  drawRoundedRect(ctx, 72, 430, 756, 220, 28, 'rgba(255, 255, 255, 0.1)')
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.64)'
-  ctx.font = '500 28px "Noto Sans SC", "Microsoft YaHei", sans-serif'
+  drawRoundedRect(ctx, 72, 430, 756, 220, 28, colors.panel)
+  ctx.fillStyle = colors.muted
+  ctx.font = `500 28px ${colors.bodyFont}`
   ctx.fillText(copy.tools.pages_DepotValuePage_064, 112, 502)
-  ctx.fillStyle = '#facc15'
-  ctx.font = '700 82px "Segoe UI", "Noto Sans SC", sans-serif'
+  ctx.fillStyle = colors.accentAlt
+  ctx.font = `700 82px ${colors.displayFont}`
   ctx.fillText(formatNumber(result.total_equivalent_sanity), 112, 596)
 
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '700 34px "Noto Sans SC", "Microsoft YaHei", sans-serif'
+  ctx.fillStyle = colors.ink
+  ctx.font = `700 34px ${colors.displayFont}`
   ctx.fillText(copy.tools.pages_DepotValuePage_065, 72, 740)
 
   result.top_items.slice(0, 5).forEach((item, index) => {
     const y = 804 + index * 116
-    drawRoundedRect(ctx, 72, y, 756, 88, 18, 'rgba(255, 255, 255, 0.075)')
-    ctx.fillStyle = '#7dd3fc'
-    ctx.font = '700 28px "Segoe UI", sans-serif'
+    drawRoundedRect(ctx, 72, y, 756, 88, 18, colors.panelSubtle)
+    ctx.fillStyle = colors.accent
+    ctx.font = `700 28px ${colors.bodyFont}`
     ctx.fillText(String(index + 1).padStart(2, '0'), 104, y + 54)
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '600 28px "Noto Sans SC", "Microsoft YaHei", sans-serif'
+    ctx.fillStyle = colors.ink
+    ctx.font = `600 28px ${colors.displayFont}`
     ctx.fillText(truncateText(ctx, item.name, 380), 166, y + 40)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.58)'
-    ctx.font = '400 22px "Noto Sans SC", "Microsoft YaHei", sans-serif'
+    ctx.fillStyle = colors.muted
+    ctx.font = `400 22px ${colors.bodyFont}`
     ctx.fillText(`${copy.tools.pages_DepotValuePage_066}${formatNumber(item.count)}`, 166, y + 70)
-    ctx.fillStyle = '#facc15'
-    ctx.font = '700 28px "Segoe UI", sans-serif'
+    ctx.fillStyle = colors.accentAlt
+    ctx.font = `700 28px ${colors.bodyFont}`
     ctx.textAlign = 'right'
     ctx.fillText(formatNumber(item.equivalent_sanity), 790, y + 54)
     ctx.textAlign = 'left'
   })
 
-  drawRoundedRect(ctx, 72, 1400, 756, 104, 24, 'rgba(255, 255, 255, 0.1)')
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '600 28px "Noto Sans SC", "Microsoft YaHei", sans-serif'
+  drawRoundedRect(ctx, 72, 1400, 756, 104, 24, colors.panel)
+  ctx.fillStyle = colors.ink
+  ctx.font = `600 28px ${colors.displayFont}`
   ctx.fillText(copy.tools.pages_DepotValuePage_067, 112, 1446)
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.62)'
-  ctx.font = '400 22px "Noto Sans SC", "Microsoft YaHei", sans-serif'
+  ctx.fillStyle = colors.muted
+  ctx.font = `400 22px ${colors.bodyFont}`
   ctx.fillText(`${copy.tools.pages_DepotValuePage_068}${getCurrentSiteUrl()}`, 112, 1484)
 }
 
@@ -594,10 +595,30 @@ function drawCircle(ctx: CanvasRenderingContext2D, x: number, y: number, radius:
 function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text
   let next = text
-  while (next.length > 1 && ctx.measureText(`${next}...`).width > maxWidth) {
+  while (next.length > 1 && ctx.measureText(`${next}…`).width > maxWidth) {
     next = next.slice(0, -1)
   }
-  return `${next}...`
+  return `${next}…`
+}
+
+function getShareCardColors() {
+  const styles = window.getComputedStyle(document.documentElement)
+  const read = (name: string) => styles.getPropertyValue(name).trim()
+  return {
+    backgroundStart: read('--share-bg-start'),
+    backgroundMid: read('--share-bg-mid'),
+    backgroundEnd: read('--share-bg-end'),
+    ink: read('--share-ink'),
+    muted: read('--share-muted'),
+    accent: read('--share-accent'),
+    accentAlt: read('--share-accent-alt'),
+    orbit: read('--share-orbit'),
+    orbitAlt: read('--share-orbit-alt'),
+    panel: read('--share-panel'),
+    panelSubtle: read('--share-panel-subtle'),
+    displayFont: read('--font-display'),
+    bodyFont: read('--font-body'),
+  }
 }
 
 function formatProfileLabel(profile: UserGameAccount): string {

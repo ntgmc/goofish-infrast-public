@@ -35,13 +35,15 @@ import {
 import { AdminPaginationError, buildAdminPagination, parseAdminPageRequest } from './admin-pagination'
 import { resetUserPasswordByAdmin } from './user-auth'
 import type { ProductPermissionMode } from '../../src/lib/types'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   try {
     if (req.method === 'POST') {
-      const body = await req.json() as { root_password?: unknown; username?: unknown; password?: unknown }
+      const body = await getValidatedJson(req, requestSchemas.adminUserCreate)
       const authentication = await requireRootAdminPassword(req, body.root_password)
       if (!authentication.ok) return authentication.response
       const created = await createAdminUser(body.username, body.password)
@@ -93,18 +95,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (req.method === 'PATCH') {
-      const body = await req.json() as {
-        action?: unknown
-        user_id?: unknown
-        email?: unknown
-        confirm_email?: unknown
-        new_password?: unknown
-        profile_id?: unknown
-        display_name?: unknown
-        note?: unknown
-        status?: unknown
-        permission?: unknown
-      }
+      const body = await getValidatedJson(req, requestSchemas.adminUserPatch)
       const authentication = await authenticateAdminRequest(req)
       if (!authentication.ok) return authentication.response
       if (
@@ -215,7 +206,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (req.method === 'DELETE') {
-      const body = await req.json() as { root_password?: unknown; username?: unknown }
+      const body = await getValidatedJson(req, requestSchemas.adminUserDelete)
       const authentication = await requireRootAdminPassword(req, body.root_password)
       if (!authentication.ok) return authentication.response
       const deleted = await deleteAdminUser(body.username)
@@ -238,8 +229,7 @@ export default async (req: Request): Promise<Response> => {
       )
     }
     console.error('admin users error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 

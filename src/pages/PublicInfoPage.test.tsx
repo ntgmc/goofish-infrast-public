@@ -41,4 +41,15 @@ describe('public information pages', () => {
     expect(supportLink).toHaveAttribute('target', '_blank')
     expect(supportLink).toHaveAttribute('rel', 'noopener noreferrer')
   })
+
+  it('highlights the complete FAQ card when its summary receives keyboard focus', async () => {
+    render(<MemoryRouter initialEntries={['/faq']}><App /></MemoryRouter>)
+
+    const question = await screen.findByText('使用 MaaTool 需要准备什么？')
+    const summary = question.closest('summary')
+    const faqCard = summary?.closest('details')
+    expect(summary).toHaveClass('focus-visible:outline-none')
+    expect(summary).not.toHaveClass('focus:ring-2', 'focus-visible:ring-1')
+    expect(faqCard).toHaveClass('has-[summary:focus-visible]:border-brand-500/55', 'has-[summary:focus-visible]:bg-surface-1')
+  })
 })

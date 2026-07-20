@@ -9,7 +9,7 @@ import type {
   LicenseOperator,
 } from '../../src/lib/types'
 import { APP_BUILD_META } from '../../src/lib/build-meta'
-import { DEPOT_VALUE_REQUEST_BODY_LIMIT_BYTES } from '../request-body-limits'
+import { getValidatedJsonValue } from '../security/request-validation'
 import { requireUserSession } from './user-auth'
 import { convertSklandCharactersToOperators, decryptSklandCredential, SklandClient } from './skland-client'
 import {
@@ -180,7 +180,7 @@ export default async (req: Request): Promise<Response> => {
   } catch (error) {
     console.error('depot value error:', error instanceof Error ? error.message : error)
     const status = isHandlerError(error) ? error.status ?? 500 : 500
-    const message = error instanceof Error ? error.message : 'Internal server error'
+    const message = isHandlerError(error) ? error.message : 'Internal server error'
     return jsonResponse({ error: message }, status)
   }
 }
@@ -603,20 +603,7 @@ function unwrapDataRecord(value: unknown): Record<string, unknown> {
 }
 
 function readLimitedJsonBody(req: Request): Promise<unknown> {
-  const contentLength = Number(req.headers.get('content-length') ?? 0)
-  if (Number.isFinite(contentLength) && contentLength > DEPOT_VALUE_REQUEST_BODY_LIMIT_BYTES) {
-    throw createError('仓库 JSON 不能超过 1 MB。', 413)
-  }
-  return req.text().then((text) => {
-    if (new TextEncoder().encode(text).length > DEPOT_VALUE_REQUEST_BODY_LIMIT_BYTES) {
-      throw createError('仓库 JSON 不能超过 1 MB。', 413)
-    }
-    try {
-      return JSON.parse(text.replace(/^\uFEFF/, ''))
-    } catch {
-      throw createError('JSON 格式不正确，请检查文件内容。', 400)
-    }
-  })
+  return getValidatedJsonValue(req)
 }
 
 function normalizeCount(value: unknown, label: string): number {

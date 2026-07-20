@@ -2,6 +2,8 @@ import type { UserAnnouncementRead } from '../../src/lib/types'
 import { getAnnouncementReads, markAnnouncementRead } from '../storage/user-store'
 import { getActiveAnnouncements, jsonResponse, requireUserSession } from './user-auth'
 import { recordUsageEvent } from './usage-stats'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -15,7 +17,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (req.method === 'PATCH') {
-      const body = await req.json() as { announcement_id?: unknown; all?: unknown }
+      const body = await getValidatedJson(req, requestSchemas.userAnnouncement)
       const announcements = await getActiveAnnouncements()
       const ids = body.all === true
         ? announcements.map((announcement) => announcement.id)
@@ -31,8 +33,7 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
     console.error('user announcements error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 

@@ -17,6 +17,8 @@ import {
 } from './license-utils'
 import { AdminPaginationError, buildAdminPagination, parseAdminPageRequest } from './admin-pagination'
 import { buildAdminCdkOpsSummary } from './admin-cdk-summary'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 type CdkStatusFilter = CdkStatus | 'all'
 
@@ -41,11 +43,7 @@ export default async (req: Request): Promise<Response> => {
   }
 
   try {
-    const body = await req.json() as {
-      permission?: string;
-      order_note?: string;
-      count?: unknown;
-    }
+    const body = await getValidatedJson(req, requestSchemas.adminCdkCreate)
     const { permission, order_note, count } = body
     const hashSecret = requireEnv('CDK_HASH_SECRET')
 
@@ -80,8 +78,7 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse(batchCount === 1 ? { code: createdCdks[0]?.code, ...response } : response)
   } catch (error) {
     console.error('admin cdk error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 
@@ -196,20 +193,13 @@ async function handleList(req: Request): Promise<Response> {
   } catch (error) {
     if (error instanceof AdminPaginationError) return jsonResponse({ error: error.message }, 400)
     console.error('admin cdk list error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 
 async function handlePatch(req: Request): Promise<Response> {
   try {
-    const body = await req.json() as {
-      code_hash?: string;
-      action?: string;
-      permission?: string;
-      order_note?: string;
-      reason?: string;
-    }
+    const body = await getValidatedJson(req, requestSchemas.adminCdkPatch)
     const { code_hash, action, permission, order_note, reason } = body
 
     const authentication = await authenticateAdminRequest(req)
@@ -352,16 +342,13 @@ async function handlePatch(req: Request): Promise<Response> {
     })
   } catch (error) {
     console.error('admin cdk revoke error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 
 async function handleDelete(req: Request): Promise<Response> {
   try {
-    const body = await req.json() as {
-      code_hash?: string;
-    }
+    const body = await getValidatedJson(req, requestSchemas.adminCdkDelete)
     const { code_hash } = body
 
     const authentication = await authenticateAdminRequest(req)
@@ -385,8 +372,7 @@ async function handleDelete(req: Request): Promise<Response> {
     return jsonResponse({ deleted: true, cdk_id: existing.code_hash.slice(0, 12) })
   } catch (error) {
     console.error('admin cdk delete error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 

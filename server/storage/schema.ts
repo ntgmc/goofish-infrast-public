@@ -551,6 +551,16 @@ CREATE INDEX IF NOT EXISTS idx_depot_value_samples_total_sanity ON depot_value_s
 CREATE INDEX IF NOT EXISTS idx_depot_value_samples_account_level ON depot_value_samples(account_level);
 CREATE INDEX IF NOT EXISTS idx_depot_value_samples_operator_power ON depot_value_samples(operator_power_score);
 
+CREATE TABLE IF NOT EXISTS security_rate_limit_buckets (
+  key_hash TEXT PRIMARY KEY,
+  window_started_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  attempt_count INTEGER NOT NULL CHECK (attempt_count >= 0),
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_rate_limit_buckets_expires_at
+  ON security_rate_limit_buckets(expires_at);
+
 ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS user_id TEXT;
 ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS profile_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_usage_events_user_id ON usage_events(user_id);
