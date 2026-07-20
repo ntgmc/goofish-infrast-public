@@ -869,15 +869,26 @@ export interface BrevoEmailDailyStat {
   reserved_count: number;
   uncertain_count: number;
   failed_count: number;
+  local_quota_used_count: number;
   quota_used_count: number;
   remaining_count: number;
   limit_reached: boolean;
   by_purpose: Record<BrevoEmailPurpose, number>;
 }
 
+export interface BrevoOfficialQuotaStatus {
+  status: 'fresh' | 'stale' | 'unavailable';
+  reported_remaining_count: number | null;
+  reported_used_count: number | null;
+  external_used_offset: number;
+  synced_at: string | null;
+  last_attempt_at: string | null;
+}
+
 export interface BrevoEmailStats {
   timezone: 'UTC';
   daily_limit: number;
+  official_quota: BrevoOfficialQuotaStatus;
   today: BrevoEmailDailyStat;
   days: BrevoEmailDailyStat[];
 }

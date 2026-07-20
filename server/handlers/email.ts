@@ -5,9 +5,9 @@ import {
   markBrevoEmailSent,
   markBrevoEmailUncertain,
   releaseBrevoEmailReservation,
-  reserveBrevoEmail,
   type BrevoEmailReservation,
 } from '../storage/brevo-email-store'
+import { reserveBrevoEmailWithOfficialQuota } from '../brevo-quota'
 
 export { BrevoDailyQuotaExceededError }
 export type { BrevoEmailReservation }
@@ -42,7 +42,7 @@ export async function sendPasswordResetEmail(input: SendPasswordResetEmailInput)
 }
 
 export async function reserveEmailVerificationDelivery(): Promise<BrevoEmailReservation> {
-  return reserveBrevoEmail('email_verification')
+  return reserveBrevoEmailWithOfficialQuota('email_verification')
 }
 
 export async function releaseEmailDeliveryReservation(reservation: BrevoEmailReservation): Promise<void> {
@@ -88,7 +88,7 @@ async function sendLifecycleEmail(input: SendLifecycleEmailInput): Promise<void>
   if (!apiKey) throw new Error('BREVO_API_KEY not configured')
   if (!senderEmail) throw new Error('BREVO_SENDER_EMAIL not configured')
 
-  const reservation = input.reservation ?? await reserveBrevoEmail(input.purpose)
+  const reservation = input.reservation ?? await reserveBrevoEmailWithOfficialQuota(input.purpose)
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

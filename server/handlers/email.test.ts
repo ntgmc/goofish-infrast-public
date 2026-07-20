@@ -1,17 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const store = vi.hoisted(() => ({
-  reserveBrevoEmail: vi.fn(),
   markBrevoEmailSent: vi.fn(),
   markBrevoEmailFailed: vi.fn(),
   markBrevoEmailUncertain: vi.fn(),
   releaseBrevoEmailReservation: vi.fn(),
 }))
 
+const quota = vi.hoisted(() => ({
+  reserveBrevoEmailWithOfficialQuota: vi.fn(),
+}))
+
 vi.mock('../storage/brevo-email-store', async (importOriginal) => ({
   ...await importOriginal<typeof import('../storage/brevo-email-store')>(),
   ...store,
 }))
+
+vi.mock('../brevo-quota', () => quota)
 
 import {
   sendAccountDeletionCancellationEmail,
@@ -29,7 +34,7 @@ describe('Brevo email delivery accounting', () => {
     process.env.BREVO_VERIFY_EMAIL_TEMPLATE_ID = '2'
     process.env.BREVO_ACCOUNT_DELETION_CANCEL_TEMPLATE_ID = '3'
     process.env.BREVO_ACCOUNT_DELETION_RECEIPT_TEMPLATE_ID = '4'
-    store.reserveBrevoEmail.mockImplementation(async (purpose) => ({ id: `reservation-${purpose}`, quotaDate: '2026-07-21', purpose }))
+    quota.reserveBrevoEmailWithOfficialQuota.mockImplementation(async (purpose) => ({ id: `reservation-${purpose}`, quotaDate: '2026-07-21', purpose }))
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 201 })))
   })
 
@@ -44,7 +49,7 @@ describe('Brevo email delivery accounting', () => {
     await sendAccountDeletionCancellationEmail('user@example.test', 'https://example.test/cancel')
     await sendAccountDeletionReceiptEmail('user@example.test', 'receipt-1')
 
-    expect(store.reserveBrevoEmail.mock.calls.map(([purpose]) => purpose)).toEqual([
+    expect(quota.reserveBrevoEmailWithOfficialQuota.mock.calls.map(([purpose]) => purpose)).toEqual([
       'email_verification',
       'password_reset',
       'account_deletion_cancellation',
@@ -82,7 +87,7 @@ describe('Brevo email delivery accounting', () => {
       verificationUrl: 'https://example.test/verify',
       expiresHours: 24,
     }, reservation)
-    expect(store.reserveBrevoEmail).not.toHaveBeenCalled()
+    expect(quota.reserveBrevoEmailWithOfficialQuota).not.toHaveBeenCalled()
     expect(store.markBrevoEmailSent).toHaveBeenCalledWith(reservation)
   })
 })
