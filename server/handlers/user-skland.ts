@@ -28,7 +28,6 @@ import {
 import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
 import { getValidatedJsonRecord } from '../security/request-validation'
-import { getRequestClientIp } from '../security/client-ip'
 import { reserveSklandAttemptLayered } from '../security/layered-auth-rate-limit'
 import { RateLimitStoreError } from '../security/persistent-rate-limit'
 import {
@@ -90,10 +89,10 @@ export default async (req: Request): Promise<Response> => {
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
-    const rateLimit = await reserveSklandAttemptLayered(getRequestClientIp(req), auth.user.id)
+    const rateLimit = await reserveSklandAttemptLayered(auth.user.id)
     if (!rateLimit.allowed) {
       return jsonResponse(
-        { error: 'Too many requests. Try again later.', code: 'rate_limited' },
+        { error: `森空岛请求过于频繁，请 ${rateLimit.retryAfterSeconds} 秒后重试。`, code: 'rate_limited' },
         429,
         { 'Retry-After': String(rateLimit.retryAfterSeconds), 'Cache-Control': 'no-store' },
       )

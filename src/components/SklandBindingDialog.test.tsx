@@ -4,10 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { UserGameAccount } from '../lib/types'
-import { apiJson } from '../lib/api-client'
+import { ApiError, apiJson } from '../lib/api-client'
 import SklandBindingDialog from './SklandBindingDialog'
 
-vi.mock('../lib/api-client', () => ({ apiJson: vi.fn() }))
+vi.mock('../lib/api-client', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../lib/api-client')>(),
+  apiJson: vi.fn(),
+}))
 
 afterEach(() => {
   cleanup()
@@ -105,6 +108,30 @@ describe('SklandBindingDialog accessibility', () => {
     expect(await screen.findByText('88 名')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '确认保存并导入' })).toBeEnabled()
     expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+  })
+
+  it('shows a rate-limit recovery message without appending a generic QR failure', async () => {
+    const user = userEvent.setup()
+    vi.mocked(apiJson).mockRejectedValueOnce(new ApiError(
+      '森空岛请求过于频繁，请 42 秒后重试。',
+      429,
+      { code: 'rate_limited' },
+      '/api/user/skland/login/start',
+    ))
+
+    render(
+      <SklandBindingDialog
+        open
+        profile={createProfile()}
+        onOpenChange={vi.fn()}
+        onPayload={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '生成扫码二维码' }))
+
+    expect(await screen.findByText('森空岛请求过于频繁，请 42 秒后重试。')).toBeInTheDocument()
+    expect(screen.queryByText(/二维码生成失败/)).not.toBeInTheDocument()
   })
 })
 
