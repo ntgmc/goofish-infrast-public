@@ -26,6 +26,7 @@ import { PasswordWorkCapacityError } from '../security/password'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import { RateLimitStoreError } from '../security/persistent-rate-limit'
+import { authCopy } from '../../src/copy/zh-CN/auth'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -35,7 +36,7 @@ export default async (req: Request): Promise<Response> => {
 
   try {
     if (pathname.endsWith('/register')) {
-      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      if (req.method !== 'POST') return methodNotAllowedResponse()
       const body = await getValidatedJson(req, requestSchemas.authRegister)
       const registrationLimit = await reserveRegistrationAttemptLayered(
         getRequestClientIp(req),
@@ -57,7 +58,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (pathname.endsWith('/login')) {
-      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      if (req.method !== 'POST') return methodNotAllowedResponse()
       const body = await getValidatedJson(req, requestSchemas.authLogin)
       const rateLimit = await reserveUserLoginAttemptLayered(
         getRequestClientIp(req),
@@ -81,13 +82,13 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (pathname.endsWith('/logout')) {
-      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      if (req.method !== 'POST') return methodNotAllowedResponse()
       await logoutRequest(req)
       return jsonResponse({ ok: true }, 200, { 'Set-Cookie': clearSessionCookie() })
     }
 
     if (pathname.endsWith('/forgot-password')) {
-      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      if (req.method !== 'POST') return methodNotAllowedResponse()
       const body = await getValidatedJson(req, requestSchemas.authEmail)
       const recoveryLimit = await reserveRecoveryAttemptLayered(
         getRequestClientIp(req),
@@ -100,7 +101,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (pathname.endsWith('/reset-password')) {
-      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      if (req.method !== 'POST') return methodNotAllowedResponse()
       const body = await getValidatedJson(req, requestSchemas.authReset)
       const tokenLimit = await reserveTokenAttemptLayered(getRequestClientIp(req), body.token, 'password-reset-token')
       if (!tokenLimit.allowed) return loginRateLimitResponse(tokenLimit.retryAfterSeconds)
@@ -114,7 +115,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (pathname.endsWith('/verify-email')) {
-      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      if (req.method !== 'POST') return methodNotAllowedResponse()
       const body = await getValidatedJson(req, requestSchemas.authToken)
       const tokenLimit = await reserveTokenAttemptLayered(getRequestClientIp(req), body.token, 'email-verification-token')
       if (!tokenLimit.allowed) return loginRateLimitResponse(tokenLimit.retryAfterSeconds)
@@ -128,7 +129,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (pathname.endsWith('/resend-verification')) {
-      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      if (req.method !== 'POST') return methodNotAllowedResponse()
       const body = await getValidatedJson(req, requestSchemas.authEmail)
       const recoveryLimit = await reserveRecoveryAttemptLayered(
         getRequestClientIp(req),
@@ -140,14 +141,14 @@ export default async (req: Request): Promise<Response> => {
         await resendEmailVerification(body.email)
         return recoveryAcceptedResponse()
       } catch {
-        return jsonResponse({ error: '验证邮件发送失败，请稍后重试。', code: 'verification_email_send_failed' }, 503)
+        return jsonResponse({ error: authCopy.api_verification_email_send_failed, code: 'verification_email_send_failed' }, 503)
       }
     }
 
     if (pathname.endsWith('/change-password')) {
-      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      if (req.method !== 'POST') return methodNotAllowedResponse()
       const auth = await requireUserSession(req)
-      if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
+      if (!auth) return jsonResponse({ error: authCopy.api_login_required }, 401)
       const body = await getValidatedJson(req, requestSchemas.authChangePassword)
       const passwordLimit = await reservePasswordChangeAttemptLayered(getRequestClientIp(req), auth.user.id)
       if (!passwordLimit.allowed) return loginRateLimitResponse(passwordLimit.retryAfterSeconds)
@@ -161,39 +162,43 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (pathname.endsWith('/me')) {
-      if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
+      if (req.method !== 'GET') return methodNotAllowedResponse()
       const auth = await requireUserSession(req)
       if (!auth) return jsonResponse({ user: null, profiles: [], active_profile: null, workspace: null, announcement_unread_count: 0 })
       return jsonResponse(await buildAuthPayload(auth.user))
     }
 
-    return jsonResponse({ error: 'API route not found' }, 404)
+    return jsonResponse({ error: authCopy.api_route_not_found }, 404)
   } catch (error) {
     if (error instanceof RateLimitStoreError) return rateLimitStoreUnavailableResponse()
     if (error instanceof PasswordWorkCapacityError) return passwordCapacityResponse()
     console.error('auth error:', error)
     if (pathname.endsWith('/register')) await recordRegister('failure', startedAt)
-    return jsonResponse({ error: 'Internal server error' }, 500)
+    return jsonResponse({ error: authCopy.api_internal_error }, 500)
   }
 }
 
 function registrationAcceptedResponse(): Response {
   return jsonResponse({
     accepted: true,
-    message: 'If registration can be completed, check your email or sign in.',
+    message: authCopy.api_registration_accepted,
   }, 202)
 }
 
 function recoveryAcceptedResponse(): Response {
   return jsonResponse({
     accepted: true,
-    message: 'If the account is eligible, follow the instructions sent to the registered email.',
+    message: authCopy.api_recovery_accepted,
   }, 202)
+}
+
+function methodNotAllowedResponse(): Response {
+  return jsonResponse({ error: authCopy.api_method_not_allowed }, 405)
 }
 
 function rateLimitStoreUnavailableResponse(): Response {
   return jsonResponse(
-    { error: 'Authentication service is temporarily unavailable.' },
+    { error: authCopy.api_service_unavailable },
     503,
     rateLimitHeaders(1),
   )
@@ -201,7 +206,7 @@ function rateLimitStoreUnavailableResponse(): Response {
 
 function loginRateLimitResponse(retryAfterSeconds: number): Response {
   return jsonResponse(
-    { error: 'Too many login attempts. Try again later.' },
+    { error: authCopy.api_too_many_attempts },
     429,
     rateLimitHeaders(retryAfterSeconds),
   )
@@ -209,7 +214,7 @@ function loginRateLimitResponse(retryAfterSeconds: number): Response {
 
 function passwordCapacityResponse(): Response {
   return jsonResponse(
-    { error: 'Authentication service is busy. Try again shortly.' },
+    { error: authCopy.api_password_service_busy },
     429,
     rateLimitHeaders(1),
   )

@@ -39,6 +39,7 @@ import { getFreePreviewTrial, hasFreePreviewTrialEnded } from '../free-preview-t
 import { createPasswordHash, verifyPasswordHash, verifyPasswordHashOrDummy } from '../security/password'
 import { sendEmailVerificationEmail, sendPasswordResetEmail } from './email'
 import { getRegistrationSettings } from '../storage/registration-settings-store'
+import { authCopy } from '../../src/copy/zh-CN/auth'
 import {
   findCdkRecordByCode,
   getCdkRecordStore,
@@ -74,13 +75,8 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ANNOUNCEMENT_KEY = 'current.json'
 const PASSWORD_RESET_DEFAULT_TTL_MINUTES = 30
 const PASSWORD_RESET_RESEND_WINDOW_MS = 1000 * 60 * 5
-const PASSWORD_RESET_REQUEST_MESSAGE = 'If the email exists, a reset link has been sent.'
-const PASSWORD_RESET_INVALID_MESSAGE = 'The reset link is invalid or expired.'
 const EMAIL_VERIFICATION_DEFAULT_TTL_HOURS = 24
 const EMAIL_VERIFICATION_RESEND_WINDOW_MS = 1000 * 60 * 5
-const EMAIL_VERIFICATION_SENT_MESSAGE = '请检查邮箱并点击验证链接完成注册。'
-const EMAIL_VERIFICATION_RESEND_MESSAGE = '如果该账号仍需验证，验证邮件已发送，请检查收件箱。'
-const EMAIL_VERIFICATION_INVALID_MESSAGE = '验证链接无效或已过期。'
 
 export interface AuthContext {
   user: UserAccountRecord
@@ -108,9 +104,9 @@ export function normalizeEmail(value: unknown): string | null {
 }
 
 function validatePassword(value: unknown): { ok: true; password: string } | { ok: false; message: string } {
-  if (typeof value !== 'string') return { ok: false, message: 'Password must be a string.' }
-  if (value.length < 8) return { ok: false, message: 'Password must be at least 8 characters.' }
-  if (value.length > 128) return { ok: false, message: 'Password must be at most 128 characters.' }
+  if (typeof value !== 'string') return { ok: false, message: authCopy.api_password_type_invalid }
+  if (value.length < 8) return { ok: false, message: authCopy.api_password_too_short }
+  if (value.length > 128) return { ok: false, message: authCopy.api_password_too_long }
   return { ok: true, password: value }
 }
 
@@ -126,7 +122,7 @@ export async function registerUser(
   | { ok: false; status: number; message: string; code?: string }
 > {
   const email = normalizeEmail(emailValue)
-  if (!email) return { ok: false, status: 400, message: 'Invalid email format.' }
+  if (!email) return { ok: false, status: 400, message: authCopy.api_email_invalid }
   const passwordCheck = validatePassword(passwordValue)
   if (!passwordCheck.ok) return { ok: false, status: 400, message: passwordCheck.message }
   const existing = await getUserByEmail(email)
@@ -137,7 +133,7 @@ export async function registerUser(
     : null
   if (existing) {
     await verifyPasswordHashOrDummy(passwordCheck.password, null)
-    return { ok: false, status: 202, message: 'Registration request accepted.', code: 'registration_accepted' }
+    return { ok: false, status: 202, message: authCopy.api_registration_accepted, code: 'registration_accepted' }
   }
 
   let invitation: ValidatedInvitationCode | null
@@ -198,7 +194,7 @@ export async function registerUser(
       await issueEmailVerification(user)
     } catch (error) {
       console.error('registration verification email error:', error)
-      return { ok: false, status: 503, message: '验证邮件发送失败，请稍后重新发送。', code: 'verification_email_send_failed' }
+      return { ok: false, status: 503, message: authCopy.api_verification_email_send_failed, code: 'verification_email_send_failed' }
     }
     return verificationRequiredResult(user)
   }
@@ -217,19 +213,19 @@ export async function loginUser(
   const password = typeof passwordValue === 'string' ? passwordValue : ''
   if (!email || typeof passwordValue !== 'string') {
     await verifyPasswordHashOrDummy(password, null)
-    return { ok: false, status: 401, message: 'Invalid email or password.' }
+    return { ok: false, status: 401, message: authCopy.api_credentials_invalid }
   }
 
   let user = await getUserByEmail(email)
   const passwordVerification = await verifyPasswordHashOrDummy(password, user)
   if (!user || !passwordVerification.verified) {
-    return { ok: false, status: 401, message: 'Invalid email or password.' }
+    return { ok: false, status: 401, message: authCopy.api_credentials_invalid }
   }
   if (user.status !== 'active') {
-    return { ok: false, status: 403, message: 'Account is not active.' }
+    return { ok: false, status: 403, message: authCopy.api_account_inactive }
   }
   if (user.email_verified_at === null) {
-    return { ok: false, status: 403, message: '请先验证邮箱后再登录。', code: 'email_not_verified' }
+    return { ok: false, status: 403, message: authCopy.api_email_not_verified, code: 'email_not_verified' }
   }
 
   if (passwordVerification.needsRehash) {
@@ -248,11 +244,11 @@ export async function changeUserPassword(
   keepTokenHash: string,
 ): Promise<{ ok: true; user: UserAccountRecord } | { ok: false; status: number; message: string }> {
   if (typeof oldPasswordValue !== 'string') {
-    return { ok: false, status: 401, message: "Invalid license signature." };
+    return { ok: false, status: 401, message: authCopy.api_current_password_invalid }
   }
   const passwordVerification = await verifyPasswordHash(oldPasswordValue, user)
   if (!passwordVerification.verified) {
-    return { ok: false, status: 401, message: "Invalid license signature." };
+    return { ok: false, status: 401, message: authCopy.api_current_password_invalid }
   }
   const nextPassword = validatePassword(newPasswordValue)
   if (!nextPassword.ok) return { ok: false, status: 400, message: nextPassword.message }
@@ -274,15 +270,15 @@ export async function resetUserPasswordByAdmin(
 
 export async function requestPasswordReset(emailValue: unknown): Promise<{ ok: true; message: string }> {
   const email = normalizeEmail(emailValue)
-  if (!email) return { ok: true, message: PASSWORD_RESET_REQUEST_MESSAGE }
+  if (!email) return { ok: true, message: authCopy.api_password_reset_requested }
 
   try {
     const user = await getUserByEmail(email)
-    if (!user || user.status !== 'active') return { ok: true, message: PASSWORD_RESET_REQUEST_MESSAGE }
+    if (!user || user.status !== 'active') return { ok: true, message: authCopy.api_password_reset_requested }
 
     const resendSince = new Date(Date.now() - PASSWORD_RESET_RESEND_WINDOW_MS).toISOString()
     const recent = await getRecentPasswordResetTokenForUser(user.id, resendSince)
-    if (recent) return { ok: true, message: PASSWORD_RESET_REQUEST_MESSAGE }
+    if (recent) return { ok: true, message: authCopy.api_password_reset_requested }
 
     const token = randomBytes(32).toString('base64url')
     const now = new Date()
@@ -306,7 +302,7 @@ export async function requestPasswordReset(emailValue: unknown): Promise<{ ok: t
     console.error('password reset request error:', error)
   }
 
-  return { ok: true, message: PASSWORD_RESET_REQUEST_MESSAGE }
+  return { ok: true, message: authCopy.api_password_reset_requested }
 }
 
 export async function resetPasswordWithToken(
@@ -314,18 +310,18 @@ export async function resetPasswordWithToken(
   newPasswordValue: unknown,
 ): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
   if (typeof tokenValue !== 'string' || !tokenValue.trim()) {
-    return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
+    return { ok: false, status: 400, message: authCopy.api_password_reset_invalid }
   }
 
   const tokenHash = hashPasswordResetToken(tokenValue.trim())
   const resetToken = await getPasswordResetTokenByHash(tokenHash)
   if (!resetToken || resetToken.used_at || Date.parse(resetToken.expires_at) <= Date.now()) {
-    return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
+    return { ok: false, status: 400, message: authCopy.api_password_reset_invalid }
   }
 
   const user = await getUserById(resetToken.user_id)
   if (!user || user.status !== 'active') {
-    return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
+    return { ok: false, status: 400, message: authCopy.api_password_reset_invalid }
   }
 
   const nextPassword = validatePassword(newPasswordValue)
@@ -333,7 +329,7 @@ export async function resetPasswordWithToken(
 
   const passwordHash = await createPasswordHash(nextPassword.password)
   const updated = await resetUserPasswordWithToken(tokenHash, passwordHash, new Date())
-  if (!updated) return { ok: false, status: 400, message: PASSWORD_RESET_INVALID_MESSAGE }
+  if (!updated) return { ok: false, status: 400, message: authCopy.api_password_reset_invalid }
   return { ok: true }
 }
 
@@ -348,15 +344,15 @@ export async function redeemProfileCdk(
   | { ok: false; status: number; message: string }
 > {
   if (typeof codeValue !== 'string' || !codeValue.trim()) {
-  if (typeof codeValue !== 'string' || !codeValue.trim()) return { ok: false, status: 400, message: 'Please enter a CDK.' }
+  if (typeof codeValue !== 'string' || !codeValue.trim()) return { ok: false, status: 400, message: authCopy.api_cdk_required }
   }
 
   const normalizedCode = normalizeCode(codeValue)
   const cdkMatch = await findCdkRecordByCode(normalizedCode)
-  if (!cdkMatch) return { ok: false, status: 404, message: 'CDK does not exist.' }
+  if (!cdkMatch) return { ok: false, status: 404, message: authCopy.api_cdk_not_found }
   const { codeHash, key: cdkKey, record: cdkRecord } = cdkMatch
-  if (!idempotencyKey && cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK is frozen.' }
-  if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK has been revoked.' }
+  if (!idempotencyKey && cdkRecord.status === 'frozen') return { ok: false, status: 409, message: authCopy.api_cdk_frozen }
+  if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: authCopy.api_cdk_revoked }
   const now = new Date().toISOString()
   const profileId = randomUUID()
   const displayName = normalizeProfileDisplayName(displayNameValue) || await nextDefaultProfileName(user.id)
@@ -418,7 +414,7 @@ export async function createOrReusePreviewProfile(
   return {
     ok: false,
     status: 400,
-    message: '免费个人排班档案必须通过森空岛登录领取。',
+    message: authCopy.api_free_profile_skland_required,
   }
 }
 
@@ -434,26 +430,26 @@ export async function upgradePreviewProfileWithCdk(
   | { ok: false; status: number; message: string }
 > {
   if (typeof profileIdValue !== 'string' || !profileIdValue.trim()) {
-    return { ok: false, status: 400, message: '缺少免费个人排班档案。' }
+    return { ok: false, status: 400, message: authCopy.api_free_profile_required }
   }
   const profile = await getProfileForUser(user.id, profileIdValue.trim())
-  if (!profile) return { ok: false, status: 404, message: '档案不存在。' }
+  if (!profile) return { ok: false, status: 404, message: authCopy.api_profile_not_found }
   if (!idempotencyKey && !isFreePreviewProfile(profile)) {
-    return { ok: false, status: 400, message: '只有免费个人排班档案可以原地升级。' }
+    return { ok: false, status: 400, message: authCopy.api_free_profile_upgrade_only }
   }
   if (!idempotencyKey && profile.status !== 'active') {
-    return { ok: false, status: 403, message: '档案当前不可用。' }
+    return { ok: false, status: 403, message: authCopy.api_profile_unavailable }
   }
   if (typeof codeValue !== 'string' || !codeValue.trim()) {
-    return { ok: false, status: 400, message: '缺少 CDK。' }
+    return { ok: false, status: 400, message: authCopy.api_cdk_required }
   }
 
   const normalizedCode = normalizeCode(codeValue)
   const cdkMatch = await findCdkRecordByCode(normalizedCode)
-  if (!cdkMatch) return { ok: false, status: 404, message: 'CDK 不存在。' }
+  if (!cdkMatch) return { ok: false, status: 404, message: authCopy.api_cdk_not_found }
   const { codeHash, key: cdkKey, record: cdkRecord } = cdkMatch
-  if (!idempotencyKey && cdkRecord.status === 'frozen') return { ok: false, status: 409, message: 'CDK 已被冻结。' }
-  if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: 'CDK 已被撤销。' }
+  if (!idempotencyKey && cdkRecord.status === 'frozen') return { ok: false, status: 409, message: authCopy.api_cdk_frozen }
+  if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: authCopy.api_cdk_revoked }
   const now = new Date().toISOString()
   const displayName = normalizeProfileDisplayName(displayNameValue)
   const note = normalizeProfileNote(noteValue)
@@ -498,7 +494,7 @@ async function redeemRegistrationCdk(
   invitation?: ValidatedInvitationCode | null,
 ): Promise<{ ok: true; profile: UserGameAccountRecord } | { ok: false; status: number; message: string }> {
   const cdkMatch = await findCdkRecordByCode(normalizeCode(codeValue))
-  if (!cdkMatch) return { ok: false, status: 404, message: 'CDK does not exist.' }
+  if (!cdkMatch) return { ok: false, status: 404, message: authCopy.api_cdk_not_found }
   const { codeHash, key: cdkKey } = cdkMatch
   const now = new Date().toISOString()
   const profileId = randomUUID()
@@ -544,9 +540,10 @@ function normalizeIdempotencyKey(value: string | null | undefined): string | nul
 }
 
 function redemptionFailure(error: unknown): { ok: false; status: number; message: string } {
-  if (error instanceof CdkAlreadyRedeemedError || error instanceof IdempotencyConflictError) return { ok: false, status: 409, message: error.message }
+  if (error instanceof CdkAlreadyRedeemedError) return { ok: false, status: 409, message: authCopy.api_cdk_already_redeemed }
+  if (error instanceof IdempotencyConflictError) return { ok: false, status: 409, message: authCopy.api_idempotency_conflict }
   console.error('CDK redemption failed:', error instanceof Error ? error.name : typeof error)
-  return { ok: false, status: 500, message: 'Internal server error' }
+  return { ok: false, status: 500, message: authCopy.api_internal_error }
 }
 
 export async function requireUserSession(req: Request, now = new Date()): Promise<AuthContext | null> {
@@ -627,28 +624,28 @@ export async function verifyEmailWithToken(
   | { ok: false; status: number; message: string; code?: string }
 > {
   if (typeof tokenValue !== 'string' || !tokenValue.trim()) {
-    return { ok: false, status: 400, message: EMAIL_VERIFICATION_INVALID_MESSAGE }
+    return { ok: false, status: 400, message: authCopy.api_email_verification_invalid }
   }
   const user = await verifyUserEmailWithToken(hashEmailVerificationToken(tokenValue.trim()), new Date())
-  if (!user) return { ok: false, status: 400, message: EMAIL_VERIFICATION_INVALID_MESSAGE }
+  if (!user) return { ok: false, status: 400, message: authCopy.api_email_verification_invalid }
   const session = await createSession(user.id)
   return { ok: true, user, cookie: session.cookie }
 }
 
 export async function resendEmailVerification(emailValue: unknown): Promise<{ ok: true; message: string }> {
   const email = normalizeEmail(emailValue)
-  if (!email) return { ok: true, message: EMAIL_VERIFICATION_RESEND_MESSAGE }
+  if (!email) return { ok: true, message: authCopy.api_email_verification_resend }
   try {
     const user = await getUserByEmail(email)
     if (!user || user.status !== 'active' || user.email_verified_at !== null) {
-      return { ok: true, message: EMAIL_VERIFICATION_RESEND_MESSAGE }
+      return { ok: true, message: authCopy.api_email_verification_resend }
     }
     await issueEmailVerification(user)
   } catch (error) {
     console.error('resend verification email error:', error)
     throw error
   }
-  return { ok: true, message: EMAIL_VERIFICATION_RESEND_MESSAGE }
+  return { ok: true, message: authCopy.api_email_verification_resend }
 }
 
 function normalizeExpiredFreePreviewWorkspace(
@@ -814,7 +811,7 @@ function verificationRequiredResult(user: UserAccountRecord) {
     ok: true as const,
     user,
     verificationRequired: true as const,
-    message: EMAIL_VERIFICATION_SENT_MESSAGE,
+    message: authCopy.api_email_verification_sent,
     resendAfterSeconds: EMAIL_VERIFICATION_RESEND_WINDOW_MS / 1000,
   }
 }
