@@ -48,8 +48,8 @@ export function reservePasswordChangeAttemptLayered(clientIp: string, userId: st
   return reserveLayered(reservePasswordChangeAttempt(clientIp), 'password-change-user', userId, 5, AUTH_WINDOW_MS)
 }
 
-export function reserveSklandAttemptLayered(clientIp: string, userId: string): Promise<LayeredRateLimitDecision> {
-  return reserveLayered(reserveSklandAttempt(clientIp), 'skland-user', userId, 10, SKLAND_WINDOW_MS)
+export function reserveSklandAttemptLayered(userId: string): Promise<LayeredRateLimitDecision> {
+  return reserveLayered(reserveSklandAttempt(userId), 'skland-user', userId, 30, SKLAND_WINDOW_MS)
 }
 
 async function reserveLayered(
@@ -89,4 +89,3 @@ async function reserveLayered(
     throw error
   }
 }
-
