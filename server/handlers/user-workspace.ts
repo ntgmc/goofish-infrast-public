@@ -13,6 +13,8 @@ import {
 import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 const WORKSPACE_SAVED_CONFIG_LIMIT = 20
 const FREE_SCHEDULE_REVISION_LIMIT = 3
@@ -40,15 +42,7 @@ export default async (req: Request): Promise<Response> => {
       return jsonResponse({ error: '方法不允许。' }, 405)
     }
 
-    const body = await req.json() as {
-      profile_id?: unknown
-      operators?: unknown
-      config?: unknown
-      elite_overrides?: unknown
-      last_result?: unknown
-      saved_config_action?: unknown
-      result_history_id?: unknown
-    }
+    const body = await getValidatedJson(req, requestSchemas.userWorkspace)
     if (typeof body.profile_id !== 'string' || !body.profile_id) {
       return jsonResponse({ error: '缺少 profile_id。' }, 400)
     }
@@ -142,8 +136,7 @@ export default async (req: Request): Promise<Response> => {
   } catch (error) {
     if (error instanceof WorkspaceMutationError) return jsonResponse({ error: error.message }, error.status)
     console.error('user workspace error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 

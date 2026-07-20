@@ -76,10 +76,10 @@ export default function OptimizeShell({
               <BrandLogo size="sm" className="lg:hidden" />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_OptimizeShell_004}</p>
+                  <p className="section-index">{copy.optimize.pages_tool_optimize_OptimizeShell_004}</p>
                   <span className="tool-status tool-status--current">{permissionLabel}</span>
                 </div>
-                <h1 className="mt-1 text-xl font-semibold text-ink-primary">{current.label}</h1>
+                <h1 className="display-title mt-1 text-xl text-ink-primary">{current.label}</h1>
                 <p className="mt-1 text-sm text-ink-muted">{current.description}</p>
               </div>
             </div>

@@ -40,8 +40,8 @@ export default function VerifyEmailPage() {
   return (
     <main className="mx-auto flex min-h-[70vh] w-full max-w-xl items-center px-5 py-12 sm:px-8" tabIndex={-1} data-route-focus>
       <section className="tool-panel w-full p-6 sm:p-8" aria-labelledby="verify-email-title">
-        <p className="tool-eyebrow">{copy.auth.pages_VerifyEmailPage_004}</p>
-        <h1 id="verify-email-title" className="mt-2 text-2xl font-semibold text-ink-primary">{copy.auth.pages_VerifyEmailPage_005}</h1>
+        <p className="section-index">{copy.auth.pages_VerifyEmailPage_004}</p>
+        <h1 id="verify-email-title" className="display-title mt-2 text-2xl text-ink-primary">{copy.auth.pages_VerifyEmailPage_005}</h1>
         <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.auth.pages_VerifyEmailPage_006}</p>
 
         {state === 'loading' && <div className="tool-alert mt-6" role="status" aria-live="polite">{copy.auth.pages_VerifyEmailPage_002}</div>}

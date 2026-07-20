@@ -4,13 +4,15 @@ import {
   logoutAdminRequest,
 } from './admin-auth'
 import { jsonResponse } from './license-utils'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   try {
     if (req.method === 'POST') {
-      const body = await req.json() as { username?: unknown; password?: unknown }
+      const body = await getValidatedJson(req, requestSchemas.adminSession)
       const login = await loginAdminRequest(req, body.username, body.password)
       if (!login.ok) return login.response
       return jsonResponse(

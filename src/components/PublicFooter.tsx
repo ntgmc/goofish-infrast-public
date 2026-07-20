@@ -18,16 +18,13 @@ interface PublicFooterProps {
 }
 
 export default function PublicFooter({ className = '', variant = 'landing' }: PublicFooterProps) {
-  const tool = variant === 'tool'
-  const linkClassName = tool
-    ? 'tool-nav-link inline-flex items-center px-2 text-sm'
-    : 'rounded-sm transition hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-100'
+  const linkClassName = 'inline-flex min-h-11 items-center text-sm text-ink-secondary underline-offset-4 transition-colors hover:text-ink-primary hover:underline'
   return (
-    <footer className={`border-t px-5 py-8 sm:px-8 lg:px-10 ${tool ? 'border-surface-3 bg-surface-1 text-ink-secondary' : 'border-white/10 text-brand-50/64'} ${className}`} aria-label={copy.public.components_PublicFooter_005}>
+    <footer className={`public-footer ${variant === 'tool' ? 'bg-surface-1/45' : ''} ${className}`} aria-label={copy.public.components_PublicFooter_005}>
       <div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className={`font-medium ${tool ? 'text-ink-primary' : 'text-white/82'}`}>{copy.public.components_PublicFooter_006}</p>
-          <p className={`mt-1 text-xs leading-5 ${tool ? 'text-ink-muted' : 'text-brand-50/52'}`}>{copy.public.components_PublicFooter_007}</p>
+          <p className="font-medium text-ink-primary">{copy.public.components_PublicFooter_006}</p>
+          <p className="mt-1 text-xs leading-5 text-ink-muted">{copy.public.components_PublicFooter_007}</p>
         </div>
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-3" aria-label={copy.public.components_PublicFooter_008}>
           <Link className={linkClassName} to="/faq">{copy.public.components_PublicFooter_009}</Link>

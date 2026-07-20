@@ -3,7 +3,7 @@ import { LayoutGroup } from 'motion/react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
 import AnnouncementBodyEditor from '../../components/AnnouncementBodyEditor'
-import { AnimatedPresenceRegion, MotionNavIndicator, StaggeredReveal } from '../../components/MotionPrimitives'
+import { AnimatedPresenceRegion, MotionNavIndicator } from '../../components/MotionPrimitives'
 import SessionLoader from '../../components/SessionLoader'
 import InvitationSettingsSection from './invitations/InvitationSettingsSection'
 import RegistrationSettingsSection from './registration/RegistrationSettingsSection'
@@ -24,7 +24,7 @@ export default function AdminDashboardView() {
   if (!activeSection) return <Navigate to={fallbackAdminPath()} replace />
 
   if (sessionChecking) {
-    return <SessionLoader label="正在检查管理员会话..." />
+    return <SessionLoader label="正在检查管理员会话…" />
   }
 
   if (!authenticated) {
@@ -33,8 +33,8 @@ export default function AdminDashboardView() {
           <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-8 lg:grid-cols-[1fr_380px]">
             <section>
               <div className="max-w-2xl">
-                <p className="tool-eyebrow">MAA 基建管理后台</p>
-                <h1 className="mt-3 text-3xl font-semibold text-ink-primary sm:text-4xl">管理工作台</h1>
+                <p className="section-index">MAA 基建管理后台</p>
+                <h1 className="display-title mt-3 text-3xl text-ink-primary sm:text-4xl">管理工作台</h1>
                 <p className="mt-4 max-w-xl text-sm leading-6 text-ink-secondary">
                   使用独立管理账号进入后台。Root 口令只用于创建和维护管理账号，日常操作不再需要反复输入。
                 </p>
@@ -82,7 +82,7 @@ export default function AdminDashboardView() {
             </label>
               {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
             <button type="submit" disabled={loading} className="tool-primary-action mt-5 w-full">
-                {loading ? '正在登录...' : '进入后台'}
+                {loading ? '正在登录…' : '进入后台'}
               </button>
               <Link to="/admin/setup" className="tool-secondary-action mt-4 w-full">添加管理账号</Link>
             </form>
@@ -95,7 +95,7 @@ export default function AdminDashboardView() {
       <div className="tool-shell">
         <aside className="tool-sidebar fixed inset-y-0 left-0 hidden w-64 px-4 py-5 lg:block">
           <div className="px-2">
-            <p className="tool-eyebrow">MAA 管理后台</p>
+            <p className="section-index">MAA 管理后台</p>
             <p className="mt-1 truncate text-xs text-ink-muted">{adminUsername}</p>
           </div>
           <LayoutGroup id="admin-desktop">
@@ -192,14 +192,14 @@ export default function AdminDashboardView() {
                       </div>
                     )}
                     <button type="button" onClick={() => void handleExportUsageReport('csv')} disabled={busyAction === 'report:csv'} className="tool-secondary-action px-3 text-sm">
-                      {busyAction === 'report:csv' ? '导出中...' : '导出 CSV'}
+                      {busyAction === 'report:csv' ? '导出中…' : '导出 CSV'}
                     </button>
                     <button type="button" onClick={() => void handleExportUsageReport('json')} disabled={busyAction === 'report:json'} className="tool-secondary-action px-3 text-sm">
-                      {busyAction === 'report:json' ? '导出中...' : '导出 JSON'}
+                      {busyAction === 'report:json' ? '导出中…' : '导出 JSON'}
                     </button>
                   </div>
                 </div>
-                <StaggeredReveal className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <Metric label="免费预览" value={summary.freePreviews} />
                   <Metric label="注册数" value={summary.registers} />
                   <Metric label="CDK 兑换" value={summary.cdkRedeems} />
@@ -208,7 +208,7 @@ export default function AdminDashboardView() {
                   <Metric label="平均耗时" value={formatDuration(usageStats?.latency.schedule_generate.average_ms ?? 0)} />
                   <Metric label="P95 耗时" value={formatDuration(usageStats?.latency.schedule_generate.p95_ms ?? 0)} tone={(usageStats?.latency.schedule_generate.p95_ms ?? 0) > 10000 ? 'warning' : 'default'} />
                   <Metric label="冻结/软拦截" value={summary.frozenCdks + summary.riskEvents} tone={summary.frozenCdks + summary.riskEvents > 0 ? 'warning' : 'default'} />
-                </StaggeredReveal>
+                </div>
                 <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
                   <section className="tool-panel p-5">
                     <div className="flex items-center justify-between">
@@ -252,7 +252,7 @@ export default function AdminDashboardView() {
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">订单备注</span>
                   <input value={orderNote} maxLength={120} onChange={(event) => setOrderNote(event.currentTarget.value)} className="tool-field" placeholder="闲鱼订单号、用户昵称或售后备注" />
                 </label>
-                <button type="submit" disabled={busyAction === 'generate'} className="tool-primary-action">{busyAction === 'generate' ? '生成中...' : '生成 CDK'}</button>
+                <button type="submit" disabled={busyAction === 'generate'} className="tool-primary-action">{busyAction === 'generate' ? '生成中…' : '生成 CDK'}</button>
               </div>
               {generatedCodes.length > 0 && (
                 <div className="mt-4 border-t border-surface-3 pt-4">
@@ -416,7 +416,7 @@ export default function AdminDashboardView() {
                 </div>
   
                 <button type="submit" disabled={busyAction === 'announcement'} className="tool-primary-action mt-5">
-                  {busyAction === 'announcement' ? '保存中...' : '保存公告'}
+                  {busyAction === 'announcement' ? '保存中…' : '保存公告'}
                 </button>
               </section>
               </form>
@@ -466,7 +466,7 @@ export default function AdminDashboardView() {
                     {resetFieldErrors.resetPassword && <p id="admin-reset-password-error" className="mt-1.5 text-sm text-error" role="alert">{resetFieldErrors.resetPassword}</p>}
                   </label>
                   <button type="submit" disabled={busyAction === 'reset-password'} className="tool-primary-action">
-                      {busyAction === 'reset-password' ? '重置中...' : '重置密码'}
+                      {busyAction === 'reset-password' ? '重置中…' : '重置密码'}
                     </button>
                   </div>
                 </form>

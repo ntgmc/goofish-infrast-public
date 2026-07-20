@@ -110,8 +110,8 @@ export default function AccountDashboard({
             <div className="flex min-w-0 items-start gap-3">
               <BrandLogo size="sm" className="lg:hidden" />
               <div className="min-w-0">
-                <p className="tool-eyebrow">{copy.common.pages_tool_AccountDashboard_010}</p>
-                <h1 className="mt-1 text-xl font-semibold text-ink-primary">{labels[section]}</h1>
+                <p className="section-index">{copy.common.pages_tool_AccountDashboard_010}</p>
+                <h1 className="display-title mt-1 text-xl text-ink-primary">{labels[section]}</h1>
                 <p className="mt-1 text-sm text-ink-muted">
                   {activeProfile ? `${copy.common.pages_tool_AccountDashboard_011}${activeProfile.display_name}` : copy.common.pages_tool_AccountDashboard_012}
                 </p>

@@ -38,7 +38,6 @@ export default async (req: Request): Promise<Response> => {
     })
   } catch (error) {
     console.error('user status error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }

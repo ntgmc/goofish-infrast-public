@@ -19,6 +19,8 @@ import {
   upgradePreviewProfileWithCdk,
 } from './user-auth'
 import { getFreePreviewTrial } from '../free-preview-trial'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -40,7 +42,7 @@ export default async (req: Request): Promise<Response> => {
 
     if (pathname.endsWith('/preview')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      const body = await req.json() as { display_name?: unknown; note?: unknown }
+      const body = await getValidatedJson(req, requestSchemas.profilePreview)
       const preview = await createOrReusePreviewProfile(auth.user, body.display_name, body.note)
       if (!preview.ok) return jsonResponse({ error: preview.message }, preview.status)
       return jsonResponse(await buildAuthPayload(auth.user, preview.profile.id))
@@ -58,7 +60,7 @@ export default async (req: Request): Promise<Response> => {
 
     if (pathname.endsWith('/redeem')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      const body = await req.json() as { cdk?: unknown; display_name?: unknown; note?: unknown; profile_id?: unknown }
+      const body = await getValidatedJson(req, requestSchemas.profileRedeem)
       const redeemed = typeof body.profile_id === 'string' && body.profile_id.trim()
         ? await upgradePreviewProfileWithCdk(auth.user, body.profile_id, body.cdk, body.display_name, body.note, req.headers.get('Idempotency-Key'))
         : await redeemProfileCdk(auth.user, body.cdk, body.display_name, body.note, req.headers.get('Idempotency-Key'))
@@ -67,7 +69,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (req.method === 'PATCH') {
-      const body = await req.json() as { profile_id?: unknown; display_name?: unknown; note?: unknown }
+      const body = await getValidatedJson(req, requestSchemas.profilePatch)
       if (typeof body.profile_id !== 'string' || !body.profile_id) {
         return jsonResponse({ error: '缺少 profile_id。' }, 400)
       }
@@ -91,8 +93,7 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
     console.error('user profiles error:', error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 }
 

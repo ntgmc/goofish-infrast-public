@@ -4,6 +4,8 @@ import { getProfileForUser, getProfileWorkspace, getUserById, listProfilesForUse
 import { query } from '../storage/postgres'
 import { clearSessionCookie, jsonResponse, normalizeEmail, requireUserSession, type AuthContext } from './user-auth'
 import { verifyPasswordHash } from '../security/password'
+import { requestSchemas } from '../security/request-policy'
+import { getValidatedJson } from '../security/request-validation'
 
 export default async function accountDataHandler(req: Request): Promise<Response> {
   const pathname = new URL(req.url).pathname
@@ -44,7 +46,7 @@ async function exportData(userId: string): Promise<Response> {
 
 async function requestDeletion(req: Request, auth: AuthContext) {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-  const body = await req.json() as { email?: unknown; password?: unknown }
+  const body = await getValidatedJson(req, requestSchemas.accountDelete)
   if (normalizeEmail(body.email) !== auth.user.email || typeof body.password !== 'string' || !(await verifyPasswordHash(body.password, auth.user)).verified) {
     return jsonResponse({ error: '邮箱或当前密码不正确。' }, 400)
   }
@@ -54,7 +56,7 @@ async function requestDeletion(req: Request, auth: AuthContext) {
 
 async function clearCredential(req: Request, userId: string): Promise<Response> {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-  const body = await req.json() as { profile_id?: unknown }
+  const body = await getValidatedJson(req, requestSchemas.profileId)
   const profile = typeof body.profile_id === 'string' ? await getProfileForUser(userId, body.profile_id) : null
   if (!profile?.skland_binding) return jsonResponse({ error: '森空岛绑定不存在。' }, 404)
   await saveUserProfile({ ...profile, skland_binding: { ...profile.skland_binding, encrypted_cred: '', credential_status: 'invalid', credential_invalid_at: new Date().toISOString() }, updated_at: new Date().toISOString() })
@@ -63,7 +65,7 @@ async function clearCredential(req: Request, userId: string): Promise<Response> 
 
 async function revokeDepotSample(req: Request, userId: string): Promise<Response> {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-  const body = await req.json() as { profile_id?: unknown }
+  const body = await getValidatedJson(req, requestSchemas.profileId)
   const profile = typeof body.profile_id === 'string' ? await getProfileForUser(userId, body.profile_id) : null
   if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
   const store = getDepotValueSampleStore()
@@ -74,7 +76,7 @@ async function revokeDepotSample(req: Request, userId: string): Promise<Response
 
 async function handleCancellation(req: Request): Promise<Response> {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-  const body = await req.json() as { token?: unknown }
+  const body = await getValidatedJson(req, requestSchemas.deletionToken)
   if (typeof body.token !== 'string' || !(await cancelAccountDeletion(body.token))) return jsonResponse({ error: '注销撤销链接无效或已过期。' }, 400)
   return jsonResponse({ ok: true })
 }

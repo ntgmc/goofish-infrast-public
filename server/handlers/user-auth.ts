@@ -36,7 +36,7 @@ import {
 } from '../storage/user-store'
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
 import { getFreePreviewTrial, hasFreePreviewTrialEnded } from '../free-preview-trial'
-import { createPasswordHash, verifyPasswordHash } from '../security/password'
+import { createPasswordHash, verifyPasswordHash, verifyPasswordHashOrDummy } from '../security/password'
 import { sendEmailVerificationEmail, sendPasswordResetEmail } from './email'
 import { getRegistrationSettings } from '../storage/registration-settings-store'
 import {
@@ -52,7 +52,6 @@ import {
   CdkAlreadyRedeemedError,
   IdempotencyConflictError,
   createRequestHash,
-  hasCompletedIdempotentRedemption,
   redeemCdkAtomically,
   saveUserAccountInTransaction,
   saveProfileInTransaction,
@@ -68,6 +67,7 @@ import {
 } from '../storage/invitation-store'
 
 const SESSION_COOKIE = 'maa_session'
+const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30
 export const USER_SESSION_TOUCH_INTERVAL_MS = 10 * 60 * 1000
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -121,7 +121,7 @@ export async function registerUser(
   idempotencyKey?: string | null,
   inviteCodeValue?: unknown,
 ): Promise<
-  | { ok: true; user: UserAccountRecord; cookie: string; verificationRequired?: false }
+  | { ok: true; user: UserAccountRecord; verificationRequired?: false }
   | { ok: true; user: UserAccountRecord; verificationRequired: true; message: string; resendAfterSeconds: number }
   | { ok: false; status: number; message: string; code?: string }
 > {
@@ -136,27 +136,8 @@ export async function registerUser(
     ? createRequestHash({ code: normalizeCode(cdkValue), email, password: passwordCheck.password, invite_code: normalizedInviteCode })
     : null
   if (existing) {
-    if (!normalizedIdempotencyKey || !registrationRequestHash) return { ok: false, status: 409, message: 'Email is already registered.' }
-    try {
-      const replayed = await hasCompletedIdempotentRedemption(`register:${email}`, normalizedIdempotencyKey, registrationRequestHash)
-      if (!replayed) return { ok: false, status: 409, message: 'Email is already registered.' }
-      const passwordVerification = await verifyPasswordHash(passwordCheck.password, existing)
-      if (!passwordVerification.verified) return { ok: false, status: 401, message: 'Invalid email or password.' }
-      if (existing.email_verified_at === null) {
-        try {
-          await issueEmailVerification(existing)
-        } catch (error) {
-          console.error('registration verification email error:', error)
-          return { ok: false, status: 503, message: '验证邮件发送失败，请稍后重新发送。', code: 'verification_email_send_failed' }
-        }
-        return verificationRequiredResult(existing)
-      }
-      const session = await createSession(existing.id)
-      return { ok: true, user: existing, cookie: session.cookie }
-    } catch (error) {
-      if (error instanceof IdempotencyConflictError) return { ok: false, status: 409, message: error.message }
-      throw error
-    }
+    await verifyPasswordHashOrDummy(passwordCheck.password, null)
+    return { ok: false, status: 202, message: 'Registration request accepted.', code: 'registration_accepted' }
   }
 
   let invitation: ValidatedInvitationCode | null
@@ -222,8 +203,7 @@ export async function registerUser(
     return verificationRequiredResult(user)
   }
 
-  const session = await createSession(user.id)
-  return { ok: true, user, cookie: session.cookie }
+  return { ok: true, user }
 }
 
 export async function loginUser(
@@ -234,15 +214,15 @@ export async function loginUser(
   | { ok: false; status: number; message: string; code?: string }
 > {
   const email = normalizeEmail(emailValue)
-  if (!email) return { ok: false, status: 400, message: 'Invalid email format.' }
-  if (typeof passwordValue !== 'string') return { ok: false, status: 400, message: 'Password must be a string.' }
-
-  let user = await getUserByEmail(email)
-  if (!user) {
+  const password = typeof passwordValue === 'string' ? passwordValue : ''
+  if (!email || typeof passwordValue !== 'string') {
+    await verifyPasswordHashOrDummy(password, null)
     return { ok: false, status: 401, message: 'Invalid email or password.' }
   }
-  const passwordVerification = await verifyPasswordHash(passwordValue, user)
-  if (!passwordVerification.verified) {
+
+  let user = await getUserByEmail(email)
+  const passwordVerification = await verifyPasswordHashOrDummy(password, user)
+  if (!user || !passwordVerification.verified) {
     return { ok: false, status: 401, message: 'Invalid email or password.' }
   }
   if (user.status !== 'active') {
@@ -253,7 +233,7 @@ export async function loginUser(
   }
 
   if (passwordVerification.needsRehash) {
-    user = await tryUpgradeUserPasswordHash(user, passwordValue)
+    user = await tryUpgradeUserPasswordHash(user, password)
   }
 
   await migrateLegacyUserIfNeeded(user)
@@ -406,7 +386,7 @@ export async function redeemProfileCdk(
     })
     return { ok: true, profile: redeemed.response }
   } catch (error) {
-    return redemptionFailure(error, 'CDK has already been used.')
+    return redemptionFailure(error)
   }
 }
 
@@ -506,7 +486,7 @@ export async function upgradePreviewProfileWithCdk(
     })
     return { ok: true, profile: redeemed.response }
   } catch (error) {
-    return redemptionFailure(error, 'CDK 已被使用。')
+    return redemptionFailure(error)
   }
 }
 
@@ -554,7 +534,7 @@ async function redeemRegistrationCdk(
     })
     return { ok: true, profile: redeemed.response }
   } catch (error) {
-    return redemptionFailure(error, 'CDK has already been used.')
+    return redemptionFailure(error)
   }
 }
 
@@ -563,9 +543,10 @@ function normalizeIdempotencyKey(value: string | null | undefined): string | nul
   return key && key.length <= 200 ? key : null
 }
 
-function redemptionFailure(error: unknown, defaultMessage: string): { ok: false; status: number; message: string } {
+function redemptionFailure(error: unknown): { ok: false; status: number; message: string } {
   if (error instanceof CdkAlreadyRedeemedError || error instanceof IdempotencyConflictError) return { ok: false, status: 409, message: error.message }
-  return { ok: false, status: 500, message: error instanceof Error ? error.message : defaultMessage }
+  console.error('CDK redemption failed:', error instanceof Error ? error.name : typeof error)
+  return { ok: false, status: 500, message: 'Internal server error' }
 }
 
 export async function requireUserSession(req: Request, now = new Date()): Promise<AuthContext | null> {
@@ -780,7 +761,13 @@ async function createSession(userId: string): Promise<{ cookie: string }> {
 function getSessionToken(req: Request): string | null {
   const cookie = req.headers.get('cookie') ?? ''
   const match = cookie.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))
-  return match?.[1] ? decodeURIComponent(match[1]) : null
+  if (!match?.[1]) return null
+  try {
+    const token = decodeURIComponent(match[1])
+    return SESSION_TOKEN_PATTERN.test(token) ? token : null
+  } catch {
+    return null
+  }
 }
 
 function hashSessionToken(token: string): string {

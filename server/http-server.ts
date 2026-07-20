@@ -1,45 +1,118 @@
+import { randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import { nodeRequestToWebRequest, writeWebResponse } from './http-adapter'
 import { RequestBodyTooLargeError } from './request-body-limits'
 import { routeRequest } from './routes'
 import { applyHttpSecurityHeaders, isSecureIncomingRequest } from './security/http-security'
+import { inspectIncomingRequest } from './security/http-boundary'
+import { RequestInputError, validateAndStoreJsonBody } from './security/request-validation'
 
 export function createApiServer(): Server {
-  return createServer(async (req, res) => {
+  const server = createServer({
+    maxHeaderSize: 16 * 1024,
+    requireHostHeader: true,
+    rejectNonStandardBodyWrites: true,
+  }, async (req, res) => {
+    const requestId = randomUUID()
     try {
-      const request = await nodeRequestToWebRequest(req)
+      const boundary = inspectIncomingRequest(req)
+      if (!boundary.allowed) {
+        await sendResponse(req, res, boundary.response, requestId)
+        return
+      }
+
+      const request = await nodeRequestToWebRequest(req, boundary.bodyLimitBytes)
+      if (boundary.methodPolicy.schema) {
+        await validateAndStoreJsonBody(
+          request,
+          boundary.methodPolicy.schema,
+          boundary.methodPolicy.bodyProfile,
+        )
+      }
       const response = await routeRequest(request)
-      await writeWebResponse(res, response)
+      await sendResponse(req, res, response, requestId)
     } catch (error) {
       if (error instanceof RequestBodyTooLargeError) {
         res.shouldKeepAlive = false
         res.setHeader('Connection', 'close')
         res.once('finish', () => req.destroy())
-        await writeWebResponse(
+        await sendResponse(
+          req,
           res,
-          applyHttpSecurityHeaders(
-            new Response(JSON.stringify({ error: 'Request body too large' }), {
-              status: 413,
-              statusText: 'Payload Too Large',
-              headers: { 'Content-Type': 'application/json' },
-            }),
-            isSecureIncomingRequest(req),
-          ),
+          errorResponse(413, 'payload_too_large', 'Request body too large.', requestId),
+          requestId,
         )
         return
       }
 
-      console.error('server request error:', error)
-      await writeWebResponse(
+      if (error instanceof RequestInputError) {
+        await sendResponse(
+          req,
+          res,
+          errorResponse(error.status, error.code, error.message, requestId, error.issues),
+          requestId,
+        )
+        return
+      }
+
+      console.error('server request error:', {
+        request_id: requestId,
+        error: error instanceof Error ? error.name : 'UnknownError',
+      })
+      await sendResponse(
+        req,
         res,
-        applyHttpSecurityHeaders(
-          new Response(JSON.stringify({ error: 'Internal server error' }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-          }),
-          isSecureIncomingRequest(req),
-        ),
+        errorResponse(500, 'internal_error', 'Internal server error.', requestId),
+        requestId,
       )
     }
+  })
+
+  server.headersTimeout = 10_000
+  server.requestTimeout = 30_000
+  server.keepAliveTimeout = 5_000
+  server.maxHeadersCount = 100
+  server.maxRequestsPerSocket = 100
+  server.on('clientError', (error, socket) => {
+    if (!socket.writable) return socket.destroy()
+    const status = 'code' in error && error.code === 'HPE_HEADER_OVERFLOW' ? 431 : 400
+    socket.end(`HTTP/1.1 ${status} ${status === 431 ? 'Request Header Fields Too Large' : 'Bad Request'}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`)
+  })
+  server.on('upgrade', (_req, socket) => socket.destroy())
+  return server
+}
+
+async function sendResponse(
+  req: import('node:http').IncomingMessage,
+  res: import('node:http').ServerResponse,
+  response: Response,
+  requestId: string,
+): Promise<void> {
+  response.headers.set('X-Request-ID', requestId)
+  const pathname = new URL(`http://request.invalid${req.url ?? '/'}`).pathname
+  if (
+    response.status >= 400
+    || ['/api/auth/', '/api/user/', '/api/admin/'].some((prefix) => pathname.startsWith(prefix))
+  ) {
+    response.headers.set('Cache-Control', 'no-store')
+  }
+  await writeWebResponse(res, applyHttpSecurityHeaders(response, isSecureIncomingRequest(req)))
+}
+
+function errorResponse(
+  status: number,
+  code: string,
+  message: string,
+  requestId: string,
+  issues: Array<{ path: string; code: string }> = [],
+): Response {
+  return new Response(JSON.stringify({
+    error: message,
+    code,
+    request_id: requestId,
+    ...(issues.length > 0 && { issues: issues.slice(0, 10) }),
+  }), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   })
 }

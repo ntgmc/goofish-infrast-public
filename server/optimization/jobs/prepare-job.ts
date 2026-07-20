@@ -14,6 +14,8 @@ import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../../free-preview-trial';
 import { hasCapability } from '../../../src/lib/product-catalog';
 import { getFreeScheduleEntitlement } from '../../storage/reorder-admission';
+import { requestSchemas } from '../../security/request-policy';
+import { getValidatedJson } from '../../security/request-validation';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -29,7 +31,7 @@ export async function prepareOptimizeJob(
   };
 
   try {
-    const body = await req.json() as CreateOptimizationJobRequest;
+    const body = await getValidatedJson(req, requestSchemas.optimizationJob) as unknown as CreateOptimizationJobRequest;
     isScenarioComparison = body.kind === 'scenario_comparison';
     const rawBody = body as unknown as Record<string, unknown>;
     if ('use_priority_coupon' in rawBody && typeof rawBody.use_priority_coupon !== 'boolean') {
@@ -254,7 +256,7 @@ export async function prepareOptimizeJob(
     };
   } catch (err: unknown) {
     console.error('optimize-schedule enqueue error:', err);
-    const message = err instanceof Error ? err.message : 'Internal server error';
+    const message = 'Internal server error';
     if (!isScenarioComparison) await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, submittedAt);
     return { ok: false, response: jsonResponse({ error: message }, 500) };
   }

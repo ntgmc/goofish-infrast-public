@@ -17,6 +17,12 @@ const ARGON2_PARALLELISM = 1
 const PASSWORD_HASH_BYTES = 32
 const PASSWORD_SALT_BYTES = 16
 const ARGON2_VERSION = 19
+const DUMMY_PASSWORD_RECORD: PasswordHashRecord = Object.freeze({
+  password_hash: '$argon2id$v=19$m=19456,t=2,p=1$QkJCQkJCQkJCQkJCQkJCQg$X/f/OL0vpqJp6AniVvWkTTuPcr/CwRnWrNqoQuPqlQo',
+  salt: '42424242424242424242424242424242',
+  iterations: ARGON2_TIME_COST,
+  password_algorithm: 'argon2id',
+})
 const passwordWorkQueue: Array<() => void> = []
 let activePasswordJobs = 0
 
@@ -88,6 +94,14 @@ export async function verifyPasswordHash(
   const expected = Buffer.from(record.password_hash, 'hex')
   const verified = actual.length === expected.length && timingSafeEqual(actual, expected)
   return { verified, needsRehash: verified }
+}
+
+export async function verifyPasswordHashOrDummy(
+  password: string,
+  record: PasswordHashRecord | null | undefined,
+): Promise<PasswordVerificationResult> {
+  const result = await verifyPasswordHash(password, record ?? DUMMY_PASSWORD_RECORD)
+  return record ? result : invalidPasswordResult()
 }
 
 export function constantTimeSecretEqual(left: string, right: string): boolean {

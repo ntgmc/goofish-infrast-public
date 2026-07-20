@@ -27,6 +27,10 @@ import {
 } from '../storage/user-store'
 import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
+import { getValidatedJsonRecord } from '../security/request-validation'
+import { getRequestClientIp } from '../security/client-ip'
+import { reserveSklandAttemptLayered } from '../security/layered-auth-rate-limit'
+import { RateLimitStoreError } from '../security/persistent-rate-limit'
 import {
   createHypergryphScan,
   decryptSklandCredential,
@@ -86,6 +90,15 @@ export default async (req: Request): Promise<Response> => {
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
+    const rateLimit = await reserveSklandAttemptLayered(getRequestClientIp(req), auth.user.id)
+    if (!rateLimit.allowed) {
+      return jsonResponse(
+        { error: 'Too many requests. Try again later.', code: 'rate_limited' },
+        429,
+        { 'Retry-After': String(rateLimit.retryAfterSeconds), 'Cache-Control': 'no-store' },
+      )
+    }
+    rateLimit.attempt.retainFailure()
 
     const pathname = new URL(req.url).pathname
     if (pathname.endsWith('/free-preview/login/start')) {
@@ -296,7 +309,7 @@ export default async (req: Request): Promise<Response> => {
         }
         await recordSklandImport('failure', 'skland_refresh_failed', startedAt, profile.id, 'refresh')
         return jsonResponse({
-          error: (caught as Error).message || '森空岛刷新失败，请稍后重试。',
+          error: '森空岛刷新失败，请稍后重试。',
           code: 'skland_refresh_failed',
           recovery_action: 'retry',
         }, 400)
@@ -305,10 +318,19 @@ export default async (req: Request): Promise<Response> => {
 
     return jsonResponse({ error: 'API route not found' }, 404)
   } catch (error) {
+    if (error instanceof RateLimitStoreError) {
+      return jsonResponse(
+        { error: 'Credential service is temporarily unavailable.' },
+        503,
+        { 'Retry-After': '1', 'Cache-Control': 'no-store' },
+      )
+    }
     console.error('user skland error:', error instanceof Error ? error.message : error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     const status = message.includes('SKLAND_CREDENTIAL_SECRET') ? 500 : 400
-    return jsonResponse({ error: message }, status)
+    return jsonResponse({
+      error: status === 500 ? 'Internal server error' : '森空岛请求无效或服务暂不可用。',
+    }, status)
   }
 }
 
@@ -941,12 +963,7 @@ async function requireProfile(userId: string, profileId: unknown): Promise<UserG
 }
 
 async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const body = await req.json()
-    return body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {}
-  } catch {
-    return {}
-  }
+  return await getValidatedJsonRecord(req)
 }
 
 function toSklandPreview(binding: SklandBindingSummary, operatorCount: number): SklandPreview {

@@ -139,6 +139,8 @@ repository-managed development API proxy snippet:
 ```bash
 sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-development.conf /etc/nginx/snippets/goofish-api-development.conf
+sudo install -m 0644 deploy/nginx/goofish-proxy-common.conf /etc/nginx/snippets/goofish-proxy-common.conf
+sudo install -m 0644 deploy/nginx/goofish-server-hardening.conf /etc/nginx/snippets/goofish-server-hardening.conf
 sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
 sudo install -m 0644 deploy/nginx/goofish-static-files.conf /etc/nginx/snippets/goofish-static-files.conf
 ```
@@ -171,6 +173,7 @@ Inside the resulting HTTPS `server {}` only, include the security baseline befor
 the API snippet:
 
 ```nginx
+include /etc/nginx/snippets/goofish-server-hardening.conf;
 include /etc/nginx/snippets/goofish-security-headers.conf;
 include /etc/nginx/snippets/goofish-api-development.conf;
 include /etc/nginx/snippets/goofish-static-files.conf;

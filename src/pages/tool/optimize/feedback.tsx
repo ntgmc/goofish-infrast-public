@@ -70,7 +70,7 @@ export function ConfigValidationToast({ message }: { message: string }) {
       role="alert"
       aria-live="assertive"
     >
-      <div className="tool-alert tool-alert--error bg-surface-1/95 shadow-[0_4px_8px_rgba(15,23,42,0.08)] backdrop-blur-sm">
+      <div className="tool-alert tool-alert--error bg-surface-1 shadow-sm">
         <p className="text-sm font-semibold text-error">{copy.optimize.pages_tool_optimize_feedback_005}</p>
         <p className="mt-1 text-sm leading-6 text-ink-secondary">{message}</p>
       </div>
