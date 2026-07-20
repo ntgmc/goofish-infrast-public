@@ -110,6 +110,112 @@ describe('SklandBindingDialog accessibility', () => {
     expect(screen.queryByRole('radio')).not.toBeInTheDocument()
   })
 
+  it('starts a free-preview QR login without a request body', async () => {
+    const user = userEvent.setup()
+    const mockedApiJson = vi.mocked(apiJson)
+    mockedApiJson.mockResolvedValueOnce({
+      scan_id: 'scan-1',
+      qr_data_url: 'data:image/png;base64,qr',
+      expires_at: '2026-07-21T01:00:00.000Z',
+    })
+
+    render(
+      <SklandBindingDialog
+        open
+        profile={null}
+        context="free_preview_claim"
+        claimProfileMeta={{ displayName: '免费档案', note: '新用户' }}
+        onOpenChange={vi.fn()}
+        onPayload={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '生成扫码二维码' }))
+
+    await waitFor(() => expect(mockedApiJson).toHaveBeenCalledWith(
+      '/api/user/skland/free-preview/login/start',
+      expect.objectContaining({ method: 'POST' }),
+    ))
+    expect(mockedApiJson.mock.calls[0]?.[1]).not.toHaveProperty('json')
+    expect(await screen.findByAltText('森空岛扫码授权二维码')).toHaveAttribute('src', 'data:image/png;base64,qr')
+  })
+
+  it('sends only endpoint-owned fields while confirming a free-preview credential import', async () => {
+    const user = userEvent.setup()
+    const mockedApiJson = vi.mocked(apiJson)
+    mockedApiJson
+      .mockResolvedValueOnce({
+        status: 'account_selection_required',
+        selection_id: 'selection-free',
+        skland_accounts: [
+          { uid: '12345678', nickname: '免费博士', channel_name: '官服', is_default: true },
+        ],
+      })
+      .mockResolvedValueOnce({
+        status: 'confirm_required',
+        confirmation_id: 'confirmation-free',
+        skland_preview: {
+          uid: '12345678',
+          nickname: '免费博士',
+          channel_name: '官服',
+          operator_count: 42,
+        },
+      })
+      .mockResolvedValueOnce({ user: { id: 'user-free' } })
+
+    render(
+      <SklandBindingDialog
+        open
+        profile={null}
+        context="free_preview_claim"
+        claimProfileMeta={{ displayName: '免费档案', note: '新用户' }}
+        onOpenChange={vi.fn()}
+        onPayload={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '粘贴凭据' }))
+    await user.type(screen.getByPlaceholderText('粘贴森空岛凭据'), 'credential-value')
+    await user.click(screen.getByRole('button', { name: '读取账号预览' }))
+
+    await waitFor(() => expect(mockedApiJson).toHaveBeenNthCalledWith(
+      1,
+      '/api/user/skland/free-preview/credential/preview',
+      expect.objectContaining({
+        method: 'POST',
+        json: {
+          display_name: '免费档案',
+          note: '新用户',
+          credential_text: 'credential-value',
+          source: 'manual',
+        },
+      }),
+    ))
+
+    await user.click(await screen.findByRole('radio', { name: /免费博士/ }))
+    await user.click(screen.getByRole('button', { name: '读取所选账号' }))
+
+    await waitFor(() => expect(mockedApiJson).toHaveBeenNthCalledWith(
+      2,
+      '/api/user/skland/free-preview/account/select',
+      expect.objectContaining({
+        method: 'POST',
+        json: { selection_id: 'selection-free', uid: '12345678' },
+      }),
+    ))
+
+    await user.click(await screen.findByRole('button', { name: '确认保存并导入' }))
+
+    await waitFor(() => expect(mockedApiJson).toHaveBeenNthCalledWith(
+      3,
+      '/api/user/skland/free-preview/login/confirm',
+      expect.objectContaining({
+        method: 'POST',
+        json: { confirmation_id: 'confirmation-free' },
+      }),
+    ))
+  })
+
   it('shows a rate-limit recovery message without appending a generic QR failure', async () => {
     const user = userEvent.setup()
     vi.mocked(apiJson).mockRejectedValueOnce(new ApiError(
