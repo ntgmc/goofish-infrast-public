@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AuthSuccessResponse, UserGameAccount } from '../lib/types'
-import { apiJson } from '../lib/api-client'
+import { ApiError, apiJson } from '../lib/api-client'
 import { copy } from '../copy/index'
 
 
@@ -496,6 +496,7 @@ function previewFallbackMessage(isDepot: boolean): string {
 
 function errorWithRecovery(caught: unknown, fallback: string): string {
   const message = caught instanceof Error ? caught.message : ''
+  if (caught instanceof ApiError && caught.status === 429) return message || fallback
   return message ? `${message} ${fallback}` : fallback
 }
 
