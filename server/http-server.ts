@@ -5,6 +5,7 @@ import { RequestBodyTooLargeError } from './request-body-limits'
 import { routeRequest } from './routes'
 import { applyHttpSecurityHeaders, isSecureIncomingRequest } from './security/http-security'
 import { inspectIncomingRequest } from './security/http-boundary'
+import { describeServerError } from './security/error-reporting'
 import { RequestInputError, validateAndStoreJsonBody } from './security/request-validation'
 
 export function createApiServer(): Server {
@@ -57,7 +58,9 @@ export function createApiServer(): Server {
 
       console.error('server request error:', {
         request_id: requestId,
-        error: error instanceof Error ? error.name : 'UnknownError',
+        method: req.method || 'UNKNOWN',
+        path: requestPathname(req.url),
+        error: describeServerError(error),
       })
       await sendResponse(
         req,
@@ -82,6 +85,14 @@ export function createApiServer(): Server {
   return server
 }
 
+function requestPathname(url: string | undefined): string {
+  try {
+    return new URL(`http://request.invalid${url ?? '/'}`).pathname
+  } catch {
+    return '/invalid-request-url'
+  }
+}
+
 async function sendResponse(
   req: import('node:http').IncomingMessage,
   res: import('node:http').ServerResponse,
@@ -89,7 +100,7 @@ async function sendResponse(
   requestId: string,
 ): Promise<void> {
   response.headers.set('X-Request-ID', requestId)
-  const pathname = new URL(`http://request.invalid${req.url ?? '/'}`).pathname
+  const pathname = requestPathname(req.url)
   if (
     response.status >= 400
     || ['/api/auth/', '/api/user/', '/api/admin/'].some((prefix) => pathname.startsWith(prefix))
