@@ -190,7 +190,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/auth/verify-email', route({ POST: json('auth', requestSchemas.authToken) })],
   ['/api/auth/resend-verification', route({ POST: json('auth', requestSchemas.authEmail) })],
   ['/api/auth/change-password', route({ POST: json('auth', requestSchemas.authChangePassword) })],
-  ['/api/auth/me', route({ GET: none() })],
+  ['/api/auth/me', route({ GET: none() }, ['profile_id'])],
   ['/api/user/data/export', route({ GET: none() })],
   ['/api/user/data/delete-request', route({ POST: json('auth', requestSchemas.accountDelete) })],
   ['/api/user/data/cancel', route({ POST: json('auth', requestSchemas.deletionToken) })],
