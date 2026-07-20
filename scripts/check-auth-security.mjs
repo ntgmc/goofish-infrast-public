@@ -785,6 +785,7 @@ function assertClientIpResolution(clientIpModule) {
 async function assertUserLoginRateLimits() {
   globalThis.__authSecurityLoginCalls = 0
   globalThis.__authSecurityRegisterResult = { ok: true, user: { id: 'user-registered' } }
+  globalThis.__authSecuritySession = null
   const authHandler = await bundleModule('server/handlers/auth.ts', 'auth-handler', [authHandlerPlugin()])
 
   const registrationAccepted = await authHandler.default(new Request('http://local/api/auth/register', {
@@ -797,6 +798,15 @@ async function assertUserLoginRateLimits() {
     accepted: true,
     message: '已发送注册验证邮件，请检查您的收件箱，并在邮件中确认。',
   })
+
+  globalThis.__authSecuritySession = { user: { id: 'user-1' } }
+  const restoredSession = await authHandler.default(new Request('http://local/api/auth/me?profile_id=profile-2'))
+  assert.equal(restoredSession.status, 200)
+  assert.deepEqual(await restoredSession.json(), {
+    user: { id: 'user-1' },
+    active_profile_id: 'profile-2',
+  })
+  globalThis.__authSecuritySession = null
 
   for (let index = 0; index < 5; index += 1) {
     const response = await callLogin(authHandler.default, 'blocked@example.com', 'wrong-password', `198.51.100.${index + 1}`)
@@ -1453,7 +1463,7 @@ function userAuthMock() {
       if (password !== 'correct-password') return { ok: false, status: 401, message: '邮箱或密码不正确。' }
       return { ok: true, user: { id: 'user-1', email }, cookie: 'maa_session=test' }
     }
-    export async function buildAuthPayload(user) { return { user } }
+    export async function buildAuthPayload(user, activeProfileId) { return { user, active_profile_id: activeProfileId } }
     export async function registerUser() { return globalThis.__authSecurityRegisterResult }
     export async function logoutRequest() {}
     export async function requestPasswordReset() { return { ok: true } }
@@ -1461,7 +1471,7 @@ function userAuthMock() {
     export async function resetPasswordWithToken() { return { ok: false, status: 400, message: 'unused' } }
     export async function verifyEmailWithToken() { return { ok: false, status: 400, message: 'unused' } }
     export async function changeUserPassword() { return { ok: false, status: 400, message: 'unused' } }
-    export async function requireUserSession() { return null }
+    export async function requireUserSession() { return globalThis.__authSecuritySession }
     export function clearSessionCookie() { return '' }
   `
 }

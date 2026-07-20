@@ -31,7 +31,8 @@ import { authCopy } from '../../src/copy/zh-CN/auth'
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
-  const pathname = new URL(req.url).pathname
+  const url = new URL(req.url)
+  const pathname = url.pathname
   const startedAt = Date.now()
 
   try {
@@ -165,7 +166,7 @@ export default async (req: Request): Promise<Response> => {
       if (req.method !== 'GET') return methodNotAllowedResponse()
       const auth = await requireUserSession(req)
       if (!auth) return jsonResponse({ user: null, profiles: [], active_profile: null, workspace: null, announcement_unread_count: 0 })
-      return jsonResponse(await buildAuthPayload(auth.user))
+      return jsonResponse(await buildAuthPayload(auth.user, url.searchParams.get('profile_id')))
     }
 
     return jsonResponse({ error: authCopy.api_route_not_found }, 404)
