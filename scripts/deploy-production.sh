@@ -43,6 +43,17 @@ run_systemctl() {
   fi
 }
 
+show_service_diagnostics() {
+  run_systemctl status "$SERVICE_NAME" --no-pager --full --lines=100 || true
+  if ! command -v journalctl >/dev/null 2>&1; then
+    log "journalctl is unavailable; systemctl status is the only service diagnostic"
+    return
+  fi
+  if ! journalctl --unit "$SERVICE_NAME" --no-pager --lines=80; then
+    log "service journal is not readable by the deploy user; grant systemd-journal access for fuller diagnostics"
+  fi
+}
+
 check_systemctl_access() {
   if [[ "$(id -u)" == "0" ]]; then
     return 0
@@ -187,7 +198,7 @@ run_systemctl restart "$SERVICE_NAME"
 if run_systemctl is-active --quiet "$SERVICE_NAME"; then
   log "systemd service is active"
 else
-  run_systemctl status "$SERVICE_NAME" --no-pager --lines=50 || true
+  show_service_diagnostics
   fail "systemd service is not active after restart"
 fi
 
@@ -198,6 +209,6 @@ if check_health; then
     fail "public HTTPS smoke test failed after deploying $after_sha; previous commit was $before_sha"
   fi
 else
-  run_systemctl status "$SERVICE_NAME" --no-pager --lines=50 || true
+  show_service_diagnostics
   fail "health check failed after deploying $after_sha; previous commit was $before_sha"
 fi
