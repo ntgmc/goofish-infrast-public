@@ -9,7 +9,7 @@ import { withTransaction, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 
 export const BREVO_DAILY_EMAIL_LIMIT = 300
-export const BREVO_QUOTA_TIMEZONE = 'UTC' as const
+const BREVO_QUOTA_TIMEZONE = 'UTC' as const
 
 const ACTIVE_STATUSES = ['reserved', 'sent', 'uncertain'] as const
 const PURPOSES: BrevoEmailPurpose[] = [
