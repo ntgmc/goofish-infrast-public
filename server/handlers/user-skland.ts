@@ -326,10 +326,16 @@ export default async (req: Request): Promise<Response> => {
     }
     console.error('user skland error:', error instanceof Error ? error.message : error)
     const message = error instanceof Error ? error.message : 'Internal server error'
-    const status = message.includes('SKLAND_CREDENTIAL_SECRET') ? 500 : 400
+    if (message.includes('SKLAND_CREDENTIAL_SECRET')) {
+      return jsonResponse({
+        error: '森空岛凭据服务尚未配置，请联系管理员。',
+        code: 'skland_service_not_configured',
+        recovery_action: 'contact_support',
+      }, 503, { 'Cache-Control': 'no-store' })
+    }
     return jsonResponse({
-      error: status === 500 ? 'Internal server error' : '森空岛请求无效或服务暂不可用。',
-    }, status)
+      error: '森空岛请求无效或服务暂不可用。',
+    }, 400)
   }
 }
 

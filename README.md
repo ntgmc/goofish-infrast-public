@@ -68,7 +68,16 @@ npm run build:server
 npm run start:server
 ```
 
-默认监听地址是 `http://127.0.0.1:3000`。可以通过 `PORT` 和 `HOST` 覆盖监听配置。
+`start:server` 会从仓库根目录的 `.env` 加载本地后端配置。本地 API 至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
+
+```text
+DATABASE_URL=postgresql://<本地用户>:<本地密码>@127.0.0.1:5432/<本地数据库>
+SKLAND_CREDENTIAL_SECRET=<至少 16 个字符的本地随机值>
+```
+
+推荐使用 `openssl rand -hex 32` 生成，并在本地数据库仍需读取既有森空岛绑定期间保持该值不变。修改 `.env` 后必须重新构建并重启 API 服务器；仅重启 Vite 不会刷新后端环境变量。不要提交 `.env` 或把本地密钥复用到 dev/production。
+
+默认监听地址是 `http://127.0.0.1:3000`，Vite 的 `/api` 请求会代理到该地址。可以通过 `PORT` 和 `HOST` 覆盖监听配置。
 
 ## 构建与检查
 

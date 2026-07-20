@@ -58,11 +58,13 @@ async function assertMissingSecret() {
   const result = await callSkland('/api/user/skland/login/start', { profile_id: 'profile-1' })
   process.env.SKLAND_CREDENTIAL_SECRET = previous
   if (
-    result.status !== 500
-    || result.body.error !== 'Internal server error'
+    result.status !== 503
+    || result.body.error !== '森空岛凭据服务尚未配置，请联系管理员。'
+    || result.body.code !== 'skland_service_not_configured'
+    || result.body.recovery_action !== 'contact_support'
     || JSON.stringify(result.body).includes('SKLAND_CREDENTIAL_SECRET')
   ) {
-    throw new Error(`missing secret: expected sanitized 500 error, got ${result.status}`)
+    throw new Error(`missing secret: expected sanitized 503 configuration error, got ${result.status}`)
   }
 }
 
