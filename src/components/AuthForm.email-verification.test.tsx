@@ -16,7 +16,7 @@ describe('AuthForm email verification', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse({
         accepted: true,
-        message: '如果可以完成注册，请检查邮箱或直接登录。',
+        message: '已发送注册验证邮件，请检查您的收件箱，并在邮件中确认。',
       }, 202))
       .mockResolvedValueOnce(jsonResponse({ accepted: true, message: '如果账号符合条件，请检查注册邮箱。' }, 202))
     vi.stubGlobal('fetch', fetchMock)
@@ -29,7 +29,7 @@ describe('AuthForm email verification', () => {
     await user.type(screen.getByLabelText('密码'), 'password123')
     await user.click(screen.getByRole('button', { name: '创建账号' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('请检查邮箱')
+    expect(await screen.findByRole('status')).toHaveTextContent('请检查您的收件箱')
     expect(onAuthenticated).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '重新发送验证邮件' }))
     expect(await screen.findByText('如果账号符合条件，请检查注册邮箱。')).toBeInTheDocument()

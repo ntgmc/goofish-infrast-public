@@ -13,7 +13,10 @@ try {
   const passwordModule = await bundleModule('server/security/password.ts', 'password')
   const rateLimitModule = await bundleModule('server/security/auth-rate-limit.ts', 'auth-rate-limit')
   const clientIpModule = await bundleModule('server/security/client-ip.ts', 'client-ip')
+  const authCopyModule = await bundleModule('src/copy/zh-CN/auth.ts', 'auth-copy')
 
+  assertAuthApiCopy(authCopyModule.authCopy)
+  await assertAuthResponseCopyCentralization()
   await assertPasswordSecurity(passwordModule)
   assertSlidingWindowRateLimits(rateLimitModule)
   assertClientIpResolution(clientIpModule)
@@ -30,6 +33,26 @@ try {
   console.log('[check-auth-security] async password work and authentication rate limits passed')
 } finally {
   await rm(bundleDir, { recursive: true, force: true })
+}
+
+function assertAuthApiCopy(authCopy) {
+  const apiEntries = Object.entries(authCopy).filter(([key]) => key.startsWith('api_'))
+  assert(apiEntries.length >= 30, 'authentication API copy should remain centralized')
+  for (const [key, value] of apiEntries) {
+    assert.equal(typeof value, 'string', `${key} should be a string`)
+    assert.match(value, /[\u3400-\u9fff]/u, `${key} should use Chinese user-facing copy`)
+  }
+}
+
+async function assertAuthResponseCopyCentralization() {
+  for (const filename of ['server/handlers/auth.ts', 'server/handlers/user-auth.ts']) {
+    const source = await readFile(filename, 'utf8')
+    assert.equal(
+      /(?:[{,]\s*)(?:message|error):\s*['"`]/u.test(source),
+      false,
+      `${filename} should reference src/copy instead of hardcoding response copy`,
+    )
+  }
 }
 
 async function assertPasswordSecurity(passwordModule) {
@@ -513,7 +536,7 @@ async function assertAtomicPasswordResetHandler() {
   assert.deepEqual(concurrentFailure, {
     ok: false,
     status: 400,
-    message: 'The reset link is invalid or expired.',
+    message: '重置链接无效或已过期。',
   })
   assert.equal(globalThis.__authSecurityResetCalls.length, 2)
 
@@ -547,7 +570,7 @@ async function assertAtomicPasswordResetHandler() {
   assert.deepEqual(expiredDuringHash, {
     ok: false,
     status: 400,
-    message: 'The reset link is invalid or expired.',
+    message: '重置链接无效或已过期。',
   })
   assert.deepEqual(globalThis.__authSecurityResetSequence, ['token-preflight', 'user-preflight', 'hash', 'transaction'])
 }
@@ -761,7 +784,19 @@ function assertClientIpResolution(clientIpModule) {
 
 async function assertUserLoginRateLimits() {
   globalThis.__authSecurityLoginCalls = 0
+  globalThis.__authSecurityRegisterResult = { ok: true, user: { id: 'user-registered' } }
   const authHandler = await bundleModule('server/handlers/auth.ts', 'auth-handler', [authHandlerPlugin()])
+
+  const registrationAccepted = await authHandler.default(new Request('http://local/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': '192.0.2.30' },
+    body: JSON.stringify({ email: 'new@example.com', password: 'correct-password' }),
+  }))
+  assert.equal(registrationAccepted.status, 202)
+  assert.deepEqual(await registrationAccepted.json(), {
+    accepted: true,
+    message: '已发送注册验证邮件，请检查您的收件箱，并在邮件中确认。',
+  })
 
   for (let index = 0; index < 5; index += 1) {
     const response = await callLogin(authHandler.default, 'blocked@example.com', 'wrong-password', `198.51.100.${index + 1}`)
@@ -1415,11 +1450,11 @@ function userAuthMock() {
     }
     export async function loginUser(email, password) {
       globalThis.__authSecurityLoginCalls += 1
-      if (password !== 'correct-password') return { ok: false, status: 401, message: 'Invalid email or password.' }
+      if (password !== 'correct-password') return { ok: false, status: 401, message: '邮箱或密码不正确。' }
       return { ok: true, user: { id: 'user-1', email }, cookie: 'maa_session=test' }
     }
     export async function buildAuthPayload(user) { return { user } }
-    export async function registerUser() { return { ok: false, status: 400, message: 'unused' } }
+    export async function registerUser() { return globalThis.__authSecurityRegisterResult }
     export async function logoutRequest() {}
     export async function requestPasswordReset() { return { ok: true } }
     export async function resendEmailVerification() { return { ok: true, message: 'ok' } }
