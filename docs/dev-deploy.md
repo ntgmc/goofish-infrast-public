@@ -117,6 +117,7 @@ WantedBy=multi-user.target
 The dev environment file should include only dev values:
 
 ```text
+PUBLIC_APP_URL=https://dev.maatool.com
 DATABASE_URL=postgresql://goofish_dev:...@127.0.0.1:5432/goofish_infrast_v1_dev
 MAA_ADMIN_PASSWORD=...
 OPTIMIZE_GLOBAL_QUEUE_LIMIT=50
@@ -126,6 +127,22 @@ OPTIMIZE_GLOBAL_WORKER_CONCURRENCY=1
 OPTIMIZE_RETRY_BASE_MS=2000
 MAA_ADMIN_SECRET=...
 CDK_HASH_SECRET=...
+```
+
+`PUBLIC_APP_URL` is required because the dev backend still runs with
+`NODE_ENV=production`. It must be the HTTPS origin only: do not include a path,
+query string, fragment, or credentials.
+
+If the service is already restarting with `PUBLIC_APP_URL is required in
+production`, repair the server configuration and verify it before rerunning the
+deployment workflow:
+
+```bash
+sudoedit /etc/goofish-infrast-v1/dev.env
+# Add: PUBLIC_APP_URL=https://dev.maatool.com
+sudo systemctl restart goofish-infrast-v1-dev
+sudo journalctl -u goofish-infrast-v1-dev --no-pager -n 80
+curl -fsS http://127.0.0.1:3001/api/health
 ```
 
 Use dev-specific secrets. Do not reuse production credentials unless explicitly

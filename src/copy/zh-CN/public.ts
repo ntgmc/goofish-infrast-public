@@ -186,35 +186,35 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_002: "使用 MaaTool 需要准备什么？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_003: "你可以先使用免费仓库估值。需要生成排班时，请注册账号并添加可用的 CDK 游戏账号，然后按工作台提示导入干员数据、确认基建配置并生成结果。",
+  pages_PublicInfoPage_003: "只想查看仓库估值时，可以直接使用免费工具。生成个人排班有两种方式：通过森空岛确认游戏 UID 后创建免费档案，或注册 MaaTool 账号并使用 CDK 开通正式游戏账号档案。随后按工作台提示导入干员数据、核对基建配置并生成结果。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_004: "CDK 和游戏账号有什么关系？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_005: "CDK 用于开通相应游戏账号的工作台能力。登录后可在工作台内添加和管理自己的游戏账号，请不要向其他人发送 CDK 或订单信息。",
+  pages_PublicInfoPage_005: "CDK 不是登录密码，也不代表游戏账号本身。它用于开通正式游戏账号档案及对应功能权限；兑换后仍需导入你有权处理的游戏数据。请勿向他人发送完整 CDK 或订单信息。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_006: "森空岛导入会读取什么数据？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_007: "在你确认授权后，服务会读取用于排班计算的游戏账号绑定信息、干员信息和养成库存。导入失败时可按页面提示重新授权，或使用 MAA 干员识别文件作为补充。",
+  pages_PublicInfoPage_007: "森空岛授权后，MaaTool 会先读取角色列表并展示账号预览。你确认角色后，才会保存绑定并导入排班所需的游戏 UID、昵称、干员、养成库存和基建配置等数据。免费档案的干员数据只能通过森空岛更新；正式 CDK 档案还可使用 MAA 干员识别文件。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_008: "生成的 JSON 应该如何使用？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_009: "下载生成的排班 JSON 后，在 MAA 的自定义基建配置中选择该文件。请先确认自己的 MAA 版本和实际游戏状态，导入前建议保留原有配置。",
+  pages_PublicInfoPage_009: "在支持导出的结果页下载 MAA JSON，然后在 MAA 的自定义基建配置中选择该文件。使用前请核对 MAA 版本、游戏内房间布局和当前干员状态，并保留原有配置以便恢复。游戏内轮换模式不会生成 MAA JSON。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_010: "为什么结果与实际收益不同？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_011: "结果是基于导入数据、基建配置和规则参数的测算建议。游戏版本、干员状态、订单、疲劳、实际换班执行和 MAA 配置都会影响最终结果。",
+  pages_PublicInfoPage_011: "结果是基于最近一次成功导入的数据、基建配置和规则参数得到的测算建议，不是收益保证。游戏版本、干员状态、订单波动、心情、实际换班时间和 MAA 配置都会造成偏差；等效理智也只是统一比较不同产出的参考口径，并非游戏实际发放的理智。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_012: "免费仓库估值和排班功能有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_013: "免费仓库估值用于查看仓库和账号数据的等效理智参考；排班功能会结合干员、房间和策略生成可导入 MAA 的基建排班与相关指标。",
+  pages_PublicInfoPage_013: "免费仓库估值只用于查看库存价值和等效理智参考，不会生成个人排班。排班功能会结合干员、房间、生产目标和策略计算排班及相关指标；免费档案可查看完整游戏内轮换，MAA JSON 下载、完整数据和高级分析则取决于档案权益。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_014: "授权或导入失败怎么办？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_015: "先确认网络、森空岛登录状态和账号绑定关系，再重新发起授权。若问题持续，请带上不含敏感信息的报错描述和操作步骤到 QQ 群反馈。",
+  pages_PublicInfoPage_015: "先记录报错时间和提示，再确认网络、森空岛登录状态及所选角色是否与当前档案的 UID 一致。授权过期或凭据失效时，请按页面提示重新授权同一账号；第三方服务暂时异常时可稍后重试。问题持续时，请携带操作步骤和不含敏感信息的报错截图到 QQ 群反馈。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_016: "如何删除我的账号和数据？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_017: "请通过 QQ 群联系 MaaTool 官方，说明需要删除账号。处理前请不要在群内发送密码、CDK、二维码或森空岛凭据；客服会告知必要的身份核验方式。",
+  pages_PublicInfoPage_017: "请通过 MaaTool 官方 QQ 群申请删除 MaaTool 账号及相关工作台数据。为防止他人冒用，处理前可能需要完成必要的身份核验；请勿在群内发送密码、完整 CDK、二维码、Cookie 或森空岛凭据。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_018: "我们处理的信息",
   // src/pages/PublicInfoPage.tsx
@@ -270,7 +270,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_044: "使用帮助",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_045: "从账号、CDK 到森空岛导入与 MAA JSON，这里整理了开始使用时最常见的问题。",
+  pages_PublicInfoPage_045: "集中解答账号与 CDK、森空岛授权、数据导入、排班结果、MAA JSON、隐私安全和售后处理等常见问题。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_046: "联系客服",
   // src/pages/PublicInfoPage.tsx
@@ -363,6 +363,46 @@ export const publicCopy = {
   pages_PublicInfoPage_079: "换设备、误拦截与解冻",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_080: "材料齐全后，我们将在规定工作日内首次响应；核验与解冻完成时间取决于问题复杂度。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_081: "MaaTool 账号、游戏账号档案和 CDK 分别是什么？",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_082: "MaaTool 账号用于登录本站；游戏账号档案是工作台中绑定某个《明日方舟》游戏 UID、保存数据和排班结果的工作区；CDK 用于开通正式档案及对应权益。三者用途不同，CDK 和档案都不是你的 MaaTool 登录密码或游戏密码。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_083: "使用森空岛导入需要提供《明日方舟》游戏密码吗？",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_084: "不需要。森空岛导入通过二维码或授权凭据确认可读取的角色，不会要求你提供《明日方舟》游戏密码。二维码和授权凭据具有敏感性，只应在 MaaTool 的授权界面中使用，不要发送到 QQ 群或其他公开渠道。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_085: "免费档案和单账号终身版有什么区别？",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，一个游戏 UID 全站只能领取一次，可生成并查看完整游戏内轮换，但不提供 MAA JSON 下载、原始数据和高级分析。单账号终身版同样绑定一个游戏 UID，增加长期重新生成、MAA JSON 导出、完整数据、练度建议、自定义配置和场景对比等能力。具体权益与限制以价格与权益页为准。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_087: "森空岛授权后会立即保存账号吗？",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_088: "不会在读取到授权后立即绑定。MaaTool 会先展示可用角色和账号预览，只有你确认所选角色后，才保存绑定并导入数据。用于持续导入的森空岛凭据会在服务端加密保存；你也可以在账号设置中清除凭据，但这不会解除已经确认的游戏 UID 绑定。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_089: "游戏数据变化后，排班会自动实时更新吗？",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_090: "不会把游戏中的每次变化自动同步为新排班。计算使用工作台最近一次成功导入的数据；干员练度、库存或基建配置变化后，请先重新导入或刷新森空岛数据，核对账号与更新时间，再重新计算。已有结果仍是生成时数据快照下的参考。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_091: "为什么结果页没有 MAA JSON 下载？",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_092: "MAA JSON 下载同时取决于档案权益和排班模式。免费档案不提供 JSON 下载；正式档案也只有具备导出权益并使用 MAA 排班模式时才会显示下载。游戏内轮换模式生成的是供游戏内队列轮换或快速切换使用的方案，不会生成 MAA JSON。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_093: "MAA 排班和游戏内轮换有什么区别？",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_094: "MAA 排班面向 MAA 的自定义基建执行流程，在档案具备导出权益时可生成 MAA JSON。游戏内轮换会生成两班设施预设队列，供你在游戏内使用队列轮换或快速切换，不依赖 MAA JSON。选择前请按自己的执行方式和换班频率判断。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_095: "绑定后可以自行更换游戏 UID 吗？",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_096: "不可以自行更换。免费档案和单账号终身版都绑定确认时选择的游戏 UID。预览阶段发现角色不对时请不要确认，返回后重新选择；已经绑定或被异常拦截时，请通过 MaaTool 官方 QQ 群申请人工核验，不要重复尝试绑定其他账号。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_097: "MaaTool 如何保护账号和授权数据？",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_098: "MaaTool 登录密码以哈希形式保存，不保存明文；用于持续导入的森空岛凭据会在服务端加密保存。服务不会出售个人信息，也不会将游戏数据用于与服务无关的广告投放。任何网络服务都无法保证绝对安全，请勿共享密码、完整 CDK、二维码、Cookie 或授权凭据。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_099: "联系客服时需要提供哪些信息？",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_100: "请提供账号标识、订单或 CDK 的安全标识、报错时间、不含敏感信息的错误描述、操作步骤，以及相关浏览器、MAA 或游戏版本。截图应先遮盖个人信息。不要发送密码、完整 CDK、二维码、Cookie 或森空岛凭据；材料齐全后，客服会按支持页说明的时限首次响应。",
   // src/components/PublicFooter.tsx
   components_PublicFooter_012: "价格与权益",
 } as const
