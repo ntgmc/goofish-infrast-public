@@ -106,6 +106,10 @@ export function useSklandBinding({
       : { profile_id: profile?.id }
   ), [claimProfileMeta?.displayName, claimProfileMeta?.note, isFreePreviewClaim, profile?.id])
 
+  const profileReferencePayload = useCallback(() => (
+    isFreePreviewClaim ? {} : { profile_id: profile?.id }
+  ), [isFreePreviewClaim, profile?.id])
+
   const applyCompletedPayload = useCallback((data: SklandPayload) => {
     onPayload(data)
     onCompleted?.(data)
@@ -235,11 +239,19 @@ export function useSklandBinding({
       message: copy.workspace.hooks_useSklandBinding_010,
     })
     try {
-      const data = await apiJson<{ scan_id?: string; qr_data_url?: string; expires_at?: string }>(`${endpointPrefix}/login/start`, {
-        method: 'POST',
-        json: profilePayload(),
-        fallbackMessage: copy.workspace.hooks_useSklandBinding_011,
-      })
+      const data = await apiJson<{ scan_id?: string; qr_data_url?: string; expires_at?: string }>(
+        `${endpointPrefix}/login/start`,
+        isFreePreviewClaim
+          ? {
+              method: 'POST',
+              fallbackMessage: copy.workspace.hooks_useSklandBinding_011,
+            }
+          : {
+              method: 'POST',
+              json: profileReferencePayload(),
+              fallbackMessage: copy.workspace.hooks_useSklandBinding_011,
+            },
+      )
       if (!data.scan_id || !data.qr_data_url) throw new Error(copy.workspace.hooks_useSklandBinding_012)
       if (startRequestRef.current !== requestId) return
       setSklandLogin({
@@ -266,7 +278,7 @@ export function useSklandBinding({
     } finally {
       if (startRequestRef.current === requestId) setBusy(false)
     }
-  }, [endpointPrefix, isFreePreviewClaim, profile, profilePayload])
+  }, [endpointPrefix, isFreePreviewClaim, profile, profileReferencePayload])
 
   const previewCredential = useCallback(async (source: 'manual' | 'bookmarklet') => {
     if (!profile && !isFreePreviewClaim) {
@@ -322,7 +334,7 @@ export function useSklandBinding({
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/account/select`, {
         method: 'POST',
         json: {
-          ...profilePayload(),
+          ...profileReferencePayload(),
           selection_id: sklandLogin.selectionId,
           uid: sklandLogin.selectedUid,
         },
@@ -340,7 +352,7 @@ export function useSklandBinding({
     } finally {
       setBusy(false)
     }
-  }, [busy, endpointPrefix, isDepot, isFreePreviewClaim, profile, profilePayload, showPayloadState, sklandLogin.selectedUid, sklandLogin.selectionId])
+  }, [busy, endpointPrefix, isDepot, isFreePreviewClaim, profile, profileReferencePayload, showPayloadState, sklandLogin.selectedUid, sklandLogin.selectionId])
 
   const confirmSklandLogin = useCallback(async () => {
     if ((!profile && !isFreePreviewClaim) || !sklandLogin.confirmationId) return
@@ -353,7 +365,7 @@ export function useSklandBinding({
     try {
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/login/confirm`, {
         method: 'POST',
-        json: { ...profilePayload(), confirmation_id: sklandLogin.confirmationId },
+        json: { ...profileReferencePayload(), confirmation_id: sklandLogin.confirmationId },
         fallbackMessage: copy.workspace.hooks_useSklandBinding_027,
       })
       if (!data.user) throw new Error(copy.workspace.hooks_useSklandBinding_028)
@@ -377,7 +389,7 @@ export function useSklandBinding({
     } finally {
       setBusy(false)
     }
-  }, [applyCompletedPayload, endpointPrefix, isDepot, isFreePreviewClaim, profile, profilePayload, sklandLogin.confirmationId])
+  }, [applyCompletedPayload, endpointPrefix, isDepot, isFreePreviewClaim, profile, profileReferencePayload, sklandLogin.confirmationId])
 
   const close = useCallback(() => {
     startRequestRef.current += 1
