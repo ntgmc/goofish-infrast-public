@@ -91,6 +91,14 @@ ready and Nginx has switched successfully.
    Preserve the existing secrets in
    `/etc/goofish-infrast-v1/backend.env`. It must not define `PORT` or a
    non-loopback `HOST`, because the slot files and unit own those settings.
+   It must define the canonical public HTTPS origin:
+
+   ```text
+   PUBLIC_APP_URL=https://maatool.com
+   ```
+
+   Do not include a path, query string, fragment, or credentials. The backend
+   validates this value before listening and uses it for browser-origin checks.
    The managed template runs both slots as the unprivileged `ntgmc` user and
    group; adjust both fields before installation if the production application
    account differs.

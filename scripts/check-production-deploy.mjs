@@ -15,6 +15,7 @@ const greenUpstream = await readFile('deploy/nginx/goofish-upstream-green.conf',
 const systemdUnit = await readFile('deploy/systemd/goofish-infrast-v1@.service', 'utf8')
 const buildRelevance = await readFile('scripts/check-build-relevance.mjs', 'utf8')
 const productionDocs = await readFile('docs/production-deploy.md', 'utf8')
+const developmentDocs = await readFile('docs/dev-deploy.md', 'utf8')
 
 assertWorkflowProvenance()
 assertQualityChecksImmutability()
@@ -145,6 +146,7 @@ function assertDeploymentScript() {
   assert.match(releaseArtifact, /src\/lib\/\.generated\/build-meta\.ts/, 'release creation should read generated build metadata')
   assert.doesNotMatch(devDeployScript, /npm run build/, 'dev deploy must not build on the server')
   assert.doesNotMatch(devDeployScript, /git restore/, 'dev deploy must not restore generated source files')
+  assert.match(devDeployScript, /journalctl --unit "\$SERVICE_NAME" --no-pager --lines=80/, 'dev deploy failures should include recent service logs')
   assertOrdered(devDeployScript, [
     'sha256sum "$ARTIFACT_PATH"',
     'release-artifact.mjs verify --sha "$TARGET_SHA"',
@@ -191,6 +193,8 @@ function assertSystemdTemplate() {
 }
 
 function assertDeploymentDocumentation() {
+  assert.ok(productionDocs.includes('PUBLIC_APP_URL=https://maatool.com'), 'production EnvironmentFile must declare the public origin')
+  assert.ok(developmentDocs.includes('PUBLIC_APP_URL=https://dev.maatool.com'), 'development EnvironmentFile must declare the public origin')
   for (const expected of [
     '/opt/goofish-infrast-v1/releases/',
     '/opt/goofish-infrast-v1/current/dist',

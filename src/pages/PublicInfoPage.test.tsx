@@ -52,4 +52,30 @@ describe('public information pages', () => {
     expect(summary).not.toHaveClass('focus:ring-2', 'focus-visible:ring-1')
     expect(faqCard).toHaveClass('has-[summary:focus-visible]:border-brand-500/55', 'has-[summary:focus-visible]:bg-surface-1')
   })
+
+  it('covers the core FAQ workflow and product boundaries', async () => {
+    render(<MemoryRouter initialEntries={['/faq']}><App /></MemoryRouter>)
+
+    expect(await screen.findByRole('heading', { name: '常见问题' })).toBeInTheDocument()
+    const faqList = screen.getByRole('region', { name: 'FAQ 列表' })
+    expect(faqList.querySelectorAll('details')).toHaveLength(18)
+
+    const expectedQuestions = [
+      'MaaTool 账号、游戏账号档案和 CDK 分别是什么？',
+      '使用森空岛导入需要提供《明日方舟》游戏密码吗？',
+      '免费档案和单账号终身版有什么区别？',
+      '游戏数据变化后，排班会自动实时更新吗？',
+      '为什么结果页没有 MAA JSON 下载？',
+      'MAA 排班和游戏内轮换有什么区别？',
+      '绑定后可以自行更换游戏 UID 吗？',
+      'MaaTool 如何保护账号和授权数据？',
+      '联系客服时需要提供哪些信息？',
+    ]
+
+    for (const question of expectedQuestions) {
+      expect(screen.getByText(question)).toBeInTheDocument()
+    }
+    expect(screen.getByText(/免费档案不提供 JSON 下载/)).toBeInTheDocument()
+    expect(screen.getByText(/游戏内轮换会生成两班设施预设队列/)).toBeInTheDocument()
+  })
 })

@@ -17,6 +17,21 @@ const faqItems = [
     answer: copy.public.pages_PublicInfoPage_003,
   },
   {
+    id: 'account-concepts',
+    question: copy.public.pages_PublicInfoPage_081,
+    answer: copy.public.pages_PublicInfoPage_082,
+  },
+  {
+    id: 'game-password',
+    question: copy.public.pages_PublicInfoPage_083,
+    answer: copy.public.pages_PublicInfoPage_084,
+  },
+  {
+    id: 'free-versus-lifetime',
+    question: copy.public.pages_PublicInfoPage_085,
+    answer: copy.public.pages_PublicInfoPage_086,
+  },
+  {
     id: 'cdk-account',
     question: copy.public.pages_PublicInfoPage_004,
     answer: copy.public.pages_PublicInfoPage_005,
@@ -27,9 +42,29 @@ const faqItems = [
     answer: copy.public.pages_PublicInfoPage_007,
   },
   {
+    id: 'skland-save',
+    question: copy.public.pages_PublicInfoPage_087,
+    answer: copy.public.pages_PublicInfoPage_088,
+  },
+  {
+    id: 'skland-refresh',
+    question: copy.public.pages_PublicInfoPage_089,
+    answer: copy.public.pages_PublicInfoPage_090,
+  },
+  {
     id: 'use-json',
     question: copy.public.pages_PublicInfoPage_008,
     answer: copy.public.pages_PublicInfoPage_009,
+  },
+  {
+    id: 'json-unavailable',
+    question: copy.public.pages_PublicInfoPage_091,
+    answer: copy.public.pages_PublicInfoPage_092,
+  },
+  {
+    id: 'schedule-modes',
+    question: copy.public.pages_PublicInfoPage_093,
+    answer: copy.public.pages_PublicInfoPage_094,
   },
   {
     id: 'result-differences',
@@ -47,9 +82,24 @@ const faqItems = [
     answer: copy.public.pages_PublicInfoPage_015,
   },
   {
+    id: 'change-bound-account',
+    question: copy.public.pages_PublicInfoPage_095,
+    answer: copy.public.pages_PublicInfoPage_096,
+  },
+  {
+    id: 'data-security',
+    question: copy.public.pages_PublicInfoPage_097,
+    answer: copy.public.pages_PublicInfoPage_098,
+  },
+  {
     id: 'delete-account',
     question: copy.public.pages_PublicInfoPage_016,
     answer: copy.public.pages_PublicInfoPage_017,
+  },
+  {
+    id: 'support-info',
+    question: copy.public.pages_PublicInfoPage_099,
+    answer: copy.public.pages_PublicInfoPage_100,
   },
 ]
 
