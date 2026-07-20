@@ -12,14 +12,18 @@ import RegistrationSettingsSection from './RegistrationSettingsSection'
 const emailStats = {
   timezone: 'UTC',
   daily_limit: 300,
+  official_quota: {
+    status: 'fresh', reported_remaining_count: 280, reported_used_count: 20,
+    external_used_offset: 7, synced_at: '2026-07-21T12:00:00.000Z', last_attempt_at: '2026-07-21T12:00:00.000Z',
+  },
   today: {
     date: '2026-07-21', sent_count: 12, reserved_count: 1, uncertain_count: 0, failed_count: 2,
-    quota_used_count: 13, remaining_count: 287, limit_reached: false,
+    local_quota_used_count: 13, quota_used_count: 20, remaining_count: 280, limit_reached: false,
     by_purpose: { email_verification: 8, password_reset: 2, account_deletion_cancellation: 1, account_deletion_receipt: 1 },
   },
   days: [{
     date: '2026-07-21', sent_count: 12, reserved_count: 1, uncertain_count: 0, failed_count: 2,
-    quota_used_count: 13, remaining_count: 287, limit_reached: false,
+    local_quota_used_count: 13, quota_used_count: 20, remaining_count: 280, limit_reached: false,
     by_purpose: { email_verification: 8, password_reset: 2, account_deletion_cancellation: 1, account_deletion_receipt: 1 },
   }],
 }
@@ -43,6 +47,8 @@ describe('RegistrationSettingsSection', () => {
     const toggle = await screen.findByRole('checkbox', { name: '注册时要求验证邮箱' })
     expect(toggle).toBeChecked()
     expect(screen.getByText('12 / 300')).toBeInTheDocument()
+    expect(screen.getByText('官方剩余额度')).toBeInTheDocument()
+    expect(screen.getByText(/官方同步状态/)).toHaveTextContent('已同步')
     expect(screen.getByText('2026-07-21')).toBeInTheDocument()
     await user.click(toggle)
     await user.click(screen.getByRole('button', { name: '保存注册设置' }))

@@ -13,12 +13,21 @@ const DEFAULT_SETTINGS: RegistrationSettings = {
 const EMPTY_EMAIL_STATS: BrevoEmailStats = {
   timezone: 'UTC',
   daily_limit: 300,
+  official_quota: {
+    status: 'unavailable',
+    reported_remaining_count: null,
+    reported_used_count: null,
+    external_used_offset: 0,
+    synced_at: null,
+    last_attempt_at: null,
+  },
   today: {
     date: '',
     sent_count: 0,
     reserved_count: 0,
     uncertain_count: 0,
     failed_count: 0,
+    local_quota_used_count: 0,
     quota_used_count: 0,
     remaining_count: 300,
     limit_reached: false,
@@ -112,6 +121,37 @@ export default function RegistrationSettingsSection() {
               {emailStats.today.limit_reached ? copy.admin.registration_brevo_reached : copy.admin.registration_brevo_available}
             </p>
           </div>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label={copy.admin.registration_brevo_official_title}>
+          <div className="tool-inset p-4">
+            <p className="text-xs text-ink-muted">{copy.admin.registration_brevo_official_remaining}</p>
+            <p className="mt-1 text-lg font-semibold text-ink-primary">
+              {emailStats.official_quota.reported_remaining_count ?? copy.admin.registration_brevo_unknown}
+            </p>
+          </div>
+          <div className="tool-inset p-4">
+            <p className="text-xs text-ink-muted">{copy.admin.registration_brevo_official_used}</p>
+            <p className="mt-1 text-lg font-semibold text-ink-primary">
+              {emailStats.official_quota.reported_used_count ?? copy.admin.registration_brevo_unknown}
+            </p>
+          </div>
+          <div className="tool-inset p-4">
+            <p className="text-xs text-ink-muted">{copy.admin.registration_brevo_local_used}</p>
+            <p className="mt-1 text-lg font-semibold text-ink-primary">{emailStats.today.local_quota_used_count}</p>
+          </div>
+          <div className="tool-inset p-4">
+            <p className="text-xs text-ink-muted">{copy.admin.registration_brevo_external_offset}</p>
+            <p className="mt-1 text-lg font-semibold text-ink-primary">{emailStats.official_quota.external_used_offset}</p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-ink-muted">
+          <span>{copy.admin.registration_brevo_sync_status}{officialQuotaStatusLabel(emailStats.official_quota.status)}</span>
+          <span>
+            {copy.admin.registration_brevo_synced_at}
+            {emailStats.official_quota.synced_at
+              ? new Date(emailStats.official_quota.synced_at).toLocaleString('zh-CN')
+              : copy.admin.registration_brevo_never_synced}
+          </span>
         </div>
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
@@ -210,4 +250,10 @@ export default function RegistrationSettingsSection() {
       </section>
     </form>
   )
+}
+
+function officialQuotaStatusLabel(status: BrevoEmailStats['official_quota']['status']): string {
+  if (status === 'fresh') return copy.admin.registration_brevo_sync_fresh
+  if (status === 'stale') return copy.admin.registration_brevo_sync_stale
+  return copy.admin.registration_brevo_sync_unavailable
 }

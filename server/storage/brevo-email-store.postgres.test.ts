@@ -9,6 +9,7 @@ import {
   markBrevoEmailSent,
   markBrevoEmailUncertain,
   reserveBrevoEmail,
+  saveBrevoOfficialQuotaSnapshot,
 } from './brevo-email-store'
 
 let container: PostgreSqlContainer
@@ -21,6 +22,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await query('delete from brevo_email_deliveries')
+  await query('delete from brevo_email_quota_snapshots')
 })
 
 afterAll(async () => {
@@ -55,6 +57,7 @@ describe('Brevo email quota PostgreSQL store', () => {
       reserved_count: 1,
       uncertain_count: 1,
       failed_count: 1,
+      local_quota_used_count: 2,
       quota_used_count: 2,
       remaining_count: 298,
     })
@@ -75,5 +78,54 @@ describe('Brevo email quota PostgreSQL store', () => {
     expect(stats.days[5]).toMatchObject({ sent_count: 1, by_purpose: { password_reset: 1 } })
     expect(stats.today).toMatchObject({ sent_count: 1, by_purpose: { email_verification: 1 } })
     expect(stats.days[0]?.quota_used_count).toBe(0)
+  })
+
+  it('combines official external usage with local reservations atomically', async () => {
+    const now = new Date('2026-07-21T04:00:00.000Z')
+    const snapshot = await saveBrevoOfficialQuotaSnapshot(2, now)
+    expect(snapshot).toMatchObject({
+      reportedRemainingCount: 2,
+      reportedUsedCount: 298,
+      externalUsedOffset: 298,
+    })
+
+    const results = await Promise.allSettled([
+      reserveBrevoEmail('email_verification', now),
+      reserveBrevoEmail('password_reset', now),
+      reserveBrevoEmail('account_deletion_receipt', now),
+    ])
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(2)
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1)
+
+    const stats = await getBrevoEmailStats(now)
+    expect(stats.today).toMatchObject({
+      local_quota_used_count: 2,
+      quota_used_count: 300,
+      remaining_count: 0,
+      limit_reached: true,
+    })
+    expect(stats.official_quota).toMatchObject({
+      status: 'fresh',
+      reported_remaining_count: 2,
+      external_used_offset: 298,
+    })
+  })
+
+  it('does not reduce an existing external offset when Brevo reporting lags', async () => {
+    const now = new Date('2026-07-21T04:00:00.000Z')
+    await saveBrevoOfficialQuotaSnapshot(250, now)
+    await reserveBrevoEmail('email_verification', now)
+    const refreshed = await saveBrevoOfficialQuotaSnapshot(250, new Date(now.getTime() + 60_000))
+
+    expect(refreshed).toMatchObject({
+      localUsedAtSync: 1,
+      reportedUsedCount: 50,
+      externalUsedOffset: 50,
+    })
+    expect((await getBrevoEmailStats(now)).today).toMatchObject({
+      local_quota_used_count: 1,
+      quota_used_count: 51,
+      remaining_count: 249,
+    })
   })
 })
