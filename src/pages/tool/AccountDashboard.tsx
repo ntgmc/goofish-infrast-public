@@ -1,11 +1,12 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
+import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import GuidedTour, { hasCompletedTour, useFirstRunTour, type TourDefinition } from '../../components/GuidedTour'
 import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import type { DashboardSection } from '../../lib/app-routes'
-import type { AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
+import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import { copy } from '../../copy/index'
 
 
@@ -22,6 +23,7 @@ export default function AccountDashboard({
   user,
   profiles,
   activeProfile,
+  announcement,
   announcementUnreadCount,
   openingProfileId,
   workspaceLoadError,
@@ -34,6 +36,7 @@ export default function AccountDashboard({
   user: AuthUser
   profiles: UserGameAccount[]
   activeProfile: UserGameAccount | null
+  announcement: Announcement | null
   announcementUnreadCount: number
   openingProfileId: string | null
   workspaceLoadError: string | null
@@ -151,6 +154,7 @@ export default function AccountDashboard({
               ))}
             </nav>
           </LayoutGroup>
+          <AnnouncementBanner announcement={announcement} className="mx-auto mt-4 max-w-7xl" />
         </header>
 
         <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
