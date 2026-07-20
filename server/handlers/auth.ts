@@ -27,6 +27,7 @@ import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import { RateLimitStoreError } from '../security/persistent-rate-limit'
 import { authCopy } from '../../src/copy/zh-CN/auth'
+import { BrevoDailyQuotaExceededError } from './email'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -48,14 +49,19 @@ export default async (req: Request): Promise<Response> => {
       const registered = await registerUser(body.email, body.password, body.cdk, req.headers.get('Idempotency-Key'), body.invite_code)
       if (!registered.ok && registered.code === 'registration_accepted') {
         await recordRegister('success', startedAt)
-        return registrationAcceptedResponse()
+        return registrationAcceptedResponse(true)
       }
       if (!registered.ok) {
         await recordRegister('failure', startedAt)
-        return jsonResponse({ error: registered.message, ...(registered.code && { code: registered.code }) }, registered.status)
+        const quotaLimited = registered.code === 'brevo_daily_limit_reached' && registered.retryAfterSeconds
+        return jsonResponse({
+          error: registered.message,
+          ...(registered.code && { code: registered.code }),
+          ...(quotaLimited && { retry_after_seconds: registered.retryAfterSeconds }),
+        }, registered.status, quotaLimited ? rateLimitHeaders(registered.retryAfterSeconds!) : {})
       }
       await recordRegister('success', startedAt)
-      return registrationAcceptedResponse()
+      return registrationAcceptedResponse(registered.verificationRequired)
     }
 
     if (pathname.endsWith('/login')) {
@@ -141,7 +147,14 @@ export default async (req: Request): Promise<Response> => {
       try {
         await resendEmailVerification(body.email)
         return recoveryAcceptedResponse()
-      } catch {
+      } catch (error) {
+        if (error instanceof BrevoDailyQuotaExceededError) {
+          return jsonResponse({
+            error: authCopy.api_brevo_limit_reached,
+            code: error.code,
+            retry_after_seconds: error.retryAfterSeconds,
+          }, 503, rateLimitHeaders(error.retryAfterSeconds))
+        }
         return jsonResponse({ error: authCopy.api_verification_email_send_failed, code: 'verification_email_send_failed' }, 503)
       }
     }
@@ -179,10 +192,11 @@ export default async (req: Request): Promise<Response> => {
   }
 }
 
-function registrationAcceptedResponse(): Response {
+function registrationAcceptedResponse(verificationRequired: boolean): Response {
   return jsonResponse({
     accepted: true,
-    message: authCopy.api_registration_accepted,
+    verification_required: verificationRequired,
+    message: verificationRequired ? authCopy.api_registration_accepted : authCopy.api_registration_completed,
   }, 202)
 }
 

@@ -64,7 +64,10 @@ export const requestSchemas = {
     daily_inviter_reward_limit: z.number().int().min(1).max(1000).optional(),
     rewards: z.array(z.unknown()).max(32).optional(),
   }),
-  adminRegistrationSettings: strict({ email_verification_required: z.boolean() }),
+  adminRegistrationSettings: strict({
+    email_verification_required: z.boolean(),
+    brevo_quota_action: z.enum(['pause_registration', 'allow_unverified_registration']),
+  }),
   adminRiskSettings: strict({ operator_data_risk_enabled: z.boolean().optional() }),
   adminUserCreate: strict({
     root_password: optionalUnknown,

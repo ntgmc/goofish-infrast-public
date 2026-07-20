@@ -37,7 +37,14 @@ import {
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
 import { getFreePreviewTrial, hasFreePreviewTrialEnded } from '../free-preview-trial'
 import { createPasswordHash, verifyPasswordHash, verifyPasswordHashOrDummy } from '../security/password'
-import { sendEmailVerificationEmail, sendPasswordResetEmail } from './email'
+import {
+  BrevoDailyQuotaExceededError,
+  releaseEmailDeliveryReservation,
+  reserveEmailVerificationDelivery,
+  sendEmailVerificationEmail,
+  sendPasswordResetEmail,
+  type BrevoEmailReservation,
+} from './email'
 import { getRegistrationSettings } from '../storage/registration-settings-store'
 import { authCopy } from '../../src/copy/zh-CN/auth'
 import {
@@ -117,89 +124,112 @@ export async function registerUser(
   idempotencyKey?: string | null,
   inviteCodeValue?: unknown,
 ): Promise<
-  | { ok: true; user: UserAccountRecord; verificationRequired?: false }
+  | { ok: true; user: UserAccountRecord; verificationRequired: false }
   | { ok: true; user: UserAccountRecord; verificationRequired: true; message: string; resendAfterSeconds: number }
-  | { ok: false; status: number; message: string; code?: string }
+  | { ok: false; status: number; message: string; code?: string; retryAfterSeconds?: number }
 > {
   const email = normalizeEmail(emailValue)
   if (!email) return { ok: false, status: 400, message: authCopy.api_email_invalid }
   const passwordCheck = validatePassword(passwordValue)
   if (!passwordCheck.ok) return { ok: false, status: 400, message: passwordCheck.message }
-  const existing = await getUserByEmail(email)
-  const normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey)
-  const normalizedInviteCode = typeof inviteCodeValue === 'string' ? inviteCodeValue.trim().toUpperCase() : null
-  const registrationRequestHash = typeof cdkValue === 'string' && cdkValue.trim()
-    ? createRequestHash({ code: normalizeCode(cdkValue), email, password: passwordCheck.password, invite_code: normalizedInviteCode })
-    : null
-  if (existing) {
-    await verifyPasswordHashOrDummy(passwordCheck.password, null)
-    return { ok: false, status: 202, message: authCopy.api_registration_accepted, code: 'registration_accepted' }
-  }
-
-  let invitation: ValidatedInvitationCode | null
-  try {
-    invitation = await validateInvitationCode(inviteCodeValue)
-  } catch (error) {
-    if (error instanceof InvitationCodeError) return { ok: false, status: 400, message: error.message, code: error.code }
-    throw error
-  }
-
-  const now = new Date().toISOString()
   const registrationSettings = await getRegistrationSettings()
-  const passwordHash = await createPasswordHash(passwordCheck.password)
-  const user: UserAccountRecord = {
-    version: 1,
-    id: randomUUID(),
-    email,
-    password_hash: passwordHash.password_hash,
-    salt: passwordHash.salt,
-    iterations: passwordHash.iterations,
-    password_algorithm: passwordHash.password_algorithm,
-    permission: 'growth',
-    status: 'active',
-    cdk_key: null,
-    cdk_code_hash: null,
-    cdk_order_hash: null,
-    email_verified_at: registrationSettings.email_verification_required ? null : now,
-    created_at: now,
-    updated_at: now,
-  }
-  if (typeof cdkValue === 'string' && cdkValue.trim()) {
-    const redeemed = await redeemRegistrationCdk(user, cdkValue, normalizedIdempotencyKey, registrationRequestHash!, invitation)
-    if (!redeemed.ok) {
-      return redeemed
-    }
-    const primary = {
-      ...user,
-      permission: redeemed.profile.permission,
-      cdk_key: redeemed.profile.cdk_key,
-      cdk_code_hash: redeemed.profile.cdk_code_hash,
-      cdk_order_hash: redeemed.profile.cdk_order_hash,
-      updated_at: new Date().toISOString(),
-    }
-    await saveUserAccount(primary)
-    user.permission = primary.permission
-    user.cdk_key = primary.cdk_key
-    user.cdk_code_hash = primary.cdk_code_hash
-    user.cdk_order_hash = primary.cdk_order_hash
-    user.updated_at = primary.updated_at
-  } else if (invitation) {
-    await saveRegistrationWithInvitation(user, invitation)
-  } else {
-    await saveUserAccount(user)
-  }
+  let verificationRequired = registrationSettings.email_verification_required
+  let emailReservation: BrevoEmailReservation | null = null
 
-  if (registrationSettings.email_verification_required) {
+  if (verificationRequired) {
     try {
-      await issueEmailVerification(user)
+      emailReservation = await reserveEmailVerificationDelivery()
     } catch (error) {
-      console.error('registration verification email error:', error)
-      return { ok: false, status: 503, message: authCopy.api_verification_email_send_failed, code: 'verification_email_send_failed' }
+      if (!(error instanceof BrevoDailyQuotaExceededError)) throw error
+      if (registrationSettings.brevo_quota_action === 'pause_registration') {
+        return {
+          ok: false,
+          status: 503,
+          message: authCopy.api_registration_brevo_limit_reached,
+          code: error.code,
+          retryAfterSeconds: error.retryAfterSeconds,
+        }
+      }
+      verificationRequired = false
     }
-    return verificationRequiredResult(user)
   }
 
-  return { ok: true, user }
+  try {
+    const existing = await getUserByEmail(email)
+    const normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey)
+    const normalizedInviteCode = typeof inviteCodeValue === 'string' ? inviteCodeValue.trim().toUpperCase() : null
+    const registrationRequestHash = typeof cdkValue === 'string' && cdkValue.trim()
+      ? createRequestHash({ code: normalizeCode(cdkValue), email, password: passwordCheck.password, invite_code: normalizedInviteCode })
+      : null
+    if (existing) {
+      await verifyPasswordHashOrDummy(passwordCheck.password, null)
+      return { ok: false, status: 202, message: authCopy.api_registration_accepted, code: 'registration_accepted' }
+    }
+
+    let invitation: ValidatedInvitationCode | null
+    try {
+      invitation = await validateInvitationCode(inviteCodeValue)
+    } catch (error) {
+      if (error instanceof InvitationCodeError) return { ok: false, status: 400, message: error.message, code: error.code }
+      throw error
+    }
+
+    const now = new Date().toISOString()
+    const passwordHash = await createPasswordHash(passwordCheck.password)
+    const user: UserAccountRecord = {
+      version: 1,
+      id: randomUUID(),
+      email,
+      password_hash: passwordHash.password_hash,
+      salt: passwordHash.salt,
+      iterations: passwordHash.iterations,
+      password_algorithm: passwordHash.password_algorithm,
+      permission: 'growth',
+      status: 'active',
+      cdk_key: null,
+      cdk_code_hash: null,
+      cdk_order_hash: null,
+      email_verified_at: verificationRequired ? null : now,
+      created_at: now,
+      updated_at: now,
+    }
+    if (typeof cdkValue === 'string' && cdkValue.trim()) {
+      const redeemed = await redeemRegistrationCdk(user, cdkValue, normalizedIdempotencyKey, registrationRequestHash!, invitation)
+      if (!redeemed.ok) return redeemed
+      const primary = {
+        ...user,
+        permission: redeemed.profile.permission,
+        cdk_key: redeemed.profile.cdk_key,
+        cdk_code_hash: redeemed.profile.cdk_code_hash,
+        cdk_order_hash: redeemed.profile.cdk_order_hash,
+        updated_at: new Date().toISOString(),
+      }
+      await saveUserAccount(primary)
+      user.permission = primary.permission
+      user.cdk_key = primary.cdk_key
+      user.cdk_code_hash = primary.cdk_code_hash
+      user.cdk_order_hash = primary.cdk_order_hash
+      user.updated_at = primary.updated_at
+    } else if (invitation) {
+      await saveRegistrationWithInvitation(user, invitation)
+    } else {
+      await saveUserAccount(user)
+    }
+
+    if (verificationRequired) {
+      try {
+        await issueEmailVerification(user, emailReservation ?? undefined)
+      } catch (error) {
+        console.error('registration verification email error:', error)
+        return { ok: false, status: 503, message: authCopy.api_verification_email_send_failed, code: 'verification_email_send_failed' }
+      }
+      return verificationRequiredResult(user)
+    }
+
+    return { ok: true, user, verificationRequired: false }
+  } finally {
+    if (emailReservation) await safelyReleaseEmailReservation(emailReservation)
+  }
 }
 
 export async function loginUser(
@@ -779,7 +809,10 @@ function hashEmailVerificationToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
-async function issueEmailVerification(user: UserAccountRecord): Promise<void> {
+async function issueEmailVerification(
+  user: UserAccountRecord,
+  reservation?: BrevoEmailReservation,
+): Promise<void> {
   const resendSince = new Date(Date.now() - EMAIL_VERIFICATION_RESEND_WINDOW_MS).toISOString()
   if (await getRecentEmailVerificationTokenForUser(user.id, resendSince)) return
 
@@ -799,10 +832,18 @@ async function issueEmailVerification(user: UserAccountRecord): Promise<void> {
       email: user.email,
       verificationUrl: buildEmailVerificationUrl(token),
       expiresHours,
-    })
+    }, reservation)
   } catch (error) {
     await deleteEmailVerificationTokenByHash(hashEmailVerificationToken(token))
     throw error
+  }
+}
+
+async function safelyReleaseEmailReservation(reservation: BrevoEmailReservation): Promise<void> {
+  try {
+    await releaseEmailDeliveryReservation(reservation)
+  } catch (error) {
+    console.error('registration email reservation release error:', error)
   }
 }
 
