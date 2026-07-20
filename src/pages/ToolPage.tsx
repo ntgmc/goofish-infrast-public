@@ -89,6 +89,7 @@ export default function ToolPage() {
           user={user}
           profiles={cdkProfiles}
           activeProfile={activeCdkProfile}
+          announcement={banner}
           announcementUnreadCount={announcementUnreadCount}
           openingProfileId={openingProfileId}
           workspaceLoadError={workspaceLoadError}

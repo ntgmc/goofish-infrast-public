@@ -68,6 +68,7 @@ function DashboardRouteHarness() {
       user={{ id: 'user-1', email: 'test@example.com' } as AuthUser}
       profiles={[]}
       activeProfile={null}
+      announcement={null}
       announcementUnreadCount={0}
       openingProfileId={null}
       workspaceLoadError={null}

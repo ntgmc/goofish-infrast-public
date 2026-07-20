@@ -108,6 +108,7 @@ describe('WorkspaceSetupPage CDK paths', () => {
         user={{ id: 'user-1', email: 'test@example.com' } as AuthUser}
         profiles={[createPreviewProfile()]}
         activeProfile={createPreviewProfile()}
+        announcement={null}
         announcementUnreadCount={0}
         openingProfileId={null}
         workspaceLoadError={null}

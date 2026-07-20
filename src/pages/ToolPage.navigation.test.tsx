@@ -37,6 +37,23 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('ToolPage route guards', () => {
+  it('shows the announcement banner after the /tool entry redirects to the dashboard', async () => {
+    const router = renderToolRoute('/tool', {
+      banner: {
+        id: 'banner-1',
+        kind: 'banner',
+        title: '维护公告',
+        body: '今晚进行例行维护。',
+        active: true,
+        updated_at: '2026-07-21T00:00:00.000Z',
+      },
+    })
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/profiles'))
+    expect(await screen.findByRole('region', { name: '站内横幅' })).toHaveTextContent('维护公告')
+    expect(screen.getByText('今晚进行例行维护。')).toBeInTheDocument()
+  })
+
   it('keeps the opened profile in the URL so a refresh can restore it', async () => {
     const user = userEvent.setup()
     const firstProfile = createProfile()
