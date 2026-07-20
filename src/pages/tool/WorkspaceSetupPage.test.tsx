@@ -2,8 +2,9 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
+import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import AccountDashboard from './AccountDashboard'
 import WorkspaceSetupPage from './WorkspaceSetupPage'
 import { tourStorageKey } from '../../components/GuidedTour'
@@ -29,6 +30,22 @@ afterEach(() => {
 })
 
 describe('WorkspaceSetupPage CDK paths', () => {
+  it('matches the dashboard content width for announcement banners', () => {
+    renderWorkspace({
+      announcement: {
+        id: 'banner-1',
+        kind: 'banner',
+        title: '维护公告',
+        body: '今晚进行例行维护。',
+        active: true,
+        created_at: '2026-07-21T00:00:00.000Z',
+        updated_at: '2026-07-21T00:00:00.000Z',
+      },
+    })
+
+    expect(screen.getByRole('region', { name: '站内横幅' })).toHaveClass('mx-auto', 'max-w-7xl')
+  })
+
   it('moves the setup guide to configuration without saving workspace data', async () => {
     window.localStorage.removeItem(tourStorageKey('workspace-setup', 1))
     const user = userEvent.setup()
@@ -134,14 +151,20 @@ async function openCdkTab(user: ReturnType<typeof userEvent.setup>) {
 }
 
 function renderWorkspace(overrides: {
+  announcement?: Announcement | null
   onSynced?: (payload: AuthSuccessResponse) => void
   onRedeemNewProfile?: () => void
 } = {}) {
-  return render(<WorkspaceSetupHarness overrides={overrides} />)
+  return render(
+    <MemoryRouter>
+      <WorkspaceSetupHarness overrides={overrides} />
+    </MemoryRouter>,
+  )
 }
 
 function WorkspaceSetupHarness({ overrides }: {
   overrides: {
+    announcement?: Announcement | null
     onSynced?: (payload: AuthSuccessResponse) => void
     onRedeemNewProfile?: () => void
   }
@@ -153,7 +176,7 @@ function WorkspaceSetupHarness({ overrides }: {
       user={{ id: 'user-1', email: 'test@example.com' } as AuthUser}
       profile={createPreviewProfile()}
       workspace={null}
-      announcement={null}
+      announcement={overrides.announcement ?? null}
       activeSection={activeSection}
       onSectionChange={setActiveSection}
       onSaved={vi.fn()}
