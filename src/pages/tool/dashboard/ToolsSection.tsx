@@ -1,11 +1,14 @@
 import ScheduleAnalysisTool from '../../../components/ScheduleAnalysisTool'
 import { Link } from 'react-router-dom'
 import { copy } from '../../../copy/index'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 
 export default function ToolsSection() {
+  const { features } = useSiteFeatures()
   return (
     <div className="space-y-6">
+      {features.depot_value && (
       <section className="tool-panel p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -20,6 +23,8 @@ export default function ToolsSection() {
             {copy.dashboard.pages_tool_dashboard_ToolsSection_003}</Link>
         </div>
       </section>
+      )}
+      {features.schedule_analysis && (
       <section className="tool-panel p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -34,7 +39,8 @@ export default function ToolsSection() {
             {copy.dashboard.pages_tool_dashboard_ToolsSection_006}</Link>
         </div>
       </section>
-      <ScheduleAnalysisTool compact />
+      )}
+      {features.schedule_analysis && <ScheduleAnalysisTool compact />}
     </div>
   )
 }

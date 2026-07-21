@@ -45,12 +45,14 @@ export default function OptimizationTaskCenterDialog({
   onClose,
   onRetrySchedule,
   onOpenScenario,
+  retryEnabled = true,
 }: {
   open: boolean;
   controller: OptimizationTaskCenterController;
   onClose: () => void;
   onRetrySchedule: () => void;
   onOpenScenario: () => void;
+  retryEnabled?: boolean;
 }) {
   const dialogRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -153,6 +155,7 @@ export default function OptimizationTaskCenterDialog({
                 onCancel={() => void controller.cancel(job)}
                 onRetrySchedule={onRetrySchedule}
                 onOpenScenario={onOpenScenario}
+                retryEnabled={retryEnabled}
               />
             ))}
           </div>
@@ -167,12 +170,13 @@ export default function OptimizationTaskCenterDialog({
   )
 }
 
-function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario }: {
+function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, retryEnabled }: {
   job: OptimizationJobListItem;
   busy: boolean;
   onCancel: () => void;
   onRetrySchedule: () => void;
   onOpenScenario: () => void;
+  retryEnabled: boolean;
 }) {
   const terminalFailure = job.status === 'failed' || job.status === 'cancelled' || job.status === 'dead_lettered'
   return (
@@ -195,8 +199,8 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario }: {
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {job.canCancel && <button type="button" disabled={busy} onClick={onCancel} className="tool-secondary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_020}</button>}
-          {job.canRetry && job.kind === 'schedule' && <button type="button" onClick={onRetrySchedule} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_022}</button>}
-          {job.canRetry && job.kind === 'scenario_comparison' && <button type="button" onClick={onOpenScenario} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_023}</button>}
+          {retryEnabled && job.canRetry && job.kind === 'schedule' && <button type="button" onClick={onRetrySchedule} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_022}</button>}
+          {retryEnabled && job.canRetry && job.kind === 'scenario_comparison' && <button type="button" onClick={onOpenScenario} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_023}</button>}
         </div>
       </div>
     </article>

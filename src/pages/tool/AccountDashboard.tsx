@@ -8,6 +8,7 @@ import ThemeSwitcher from '../../components/ThemeSwitcher'
 import type { DashboardSection } from '../../lib/app-routes'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import { copy } from '../../copy/index'
+import { DEFAULT_SITE_FEATURES, type SiteFeatures } from '../../lib/site-features'
 
 
 const ProfilesSection = lazy(() => import('./dashboard/ProfilesSection'))
@@ -32,6 +33,7 @@ export default function AccountDashboard({
   onLogout,
   onPayload,
   onOpenProfile,
+  features = DEFAULT_SITE_FEATURES,
 }: {
   user: AuthUser
   profiles: UserGameAccount[]
@@ -45,6 +47,7 @@ export default function AccountDashboard({
   onLogout: () => void
   onPayload: (payload: AuthSuccessResponse) => void
   onOpenProfile: (profile: UserGameAccount) => void
+  features?: SiteFeatures
 }) {
   const [redeemTourReplayToken, setRedeemTourReplayToken] = useState(0)
   const [suppressInitialRedeemTour] = useState(() => section === 'redeem' && !hasCompletedTour('dashboard-overview', 1))
@@ -68,7 +71,14 @@ export default function AccountDashboard({
     announcements: `${copy.common.pages_tool_AccountDashboard_005}${announcementUnreadCount > 0 ? ` (${announcementUnreadCount})` : ''}`,
     settings: copy.common.pages_tool_AccountDashboard_006,
   }
-  const sections = Object.keys(labels) as DashboardSection[]
+  const sections = (Object.keys(labels) as DashboardSection[]).filter((key) => {
+    if (key === 'profiles') return features.profiles
+    if (key === 'tools') return features.tools
+    if (key === 'redeem') return features.cdk_redemption || features.free_preview
+    if (key === 'invitations') return features.invitations
+    if (key === 'announcements') return features.announcements
+    return true
+  })
 
   return (
     <div className="tool-shell">

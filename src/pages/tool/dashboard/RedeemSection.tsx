@@ -4,12 +4,14 @@ import { apiJson } from '../../../lib/api-client'
 import GuidedTour, { useFirstRunTour, type TourDefinition } from '../../../components/GuidedTour'
 import SklandBindingDialog, { type SklandPayload } from '../../../components/SklandBindingDialog'
 import { copy } from '../../../copy/index'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 
 type AddAccountMode = 'cdk' | 'preview'
 
 export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoStartTour = true }: { onRedeemed: (payload: AuthSuccessResponse) => void; tourReplayToken?: number; autoStartTour?: boolean }) {
-  const [mode, setMode] = useState<AddAccountMode>('cdk')
+  const { features } = useSiteFeatures()
+  const [mode, setMode] = useState<AddAccountMode>(() => features.cdk_redemption ? 'cdk' : 'preview')
   const [cdk, setCdk] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [note, setNote] = useState('')
@@ -22,10 +24,15 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
     version: 1,
     steps: [
       { target: 'dashboard-redeem-mode', title: copy.dashboard.pages_tool_dashboard_RedeemSection_tour_001, body: copy.dashboard.pages_tool_dashboard_RedeemSection_tour_002 },
-      { target: 'dashboard-redeem-cdk', title: copy.dashboard.pages_tool_dashboard_RedeemSection_tour_003, body: copy.dashboard.pages_tool_dashboard_RedeemSection_tour_004, onEnter: () => setMode('cdk') },
-      { target: 'dashboard-redeem-preview', title: copy.dashboard.pages_tool_dashboard_RedeemSection_tour_005, body: copy.dashboard.pages_tool_dashboard_RedeemSection_tour_006, onEnter: () => setMode('preview') },
+      ...(features.cdk_redemption ? [{ target: 'dashboard-redeem-cdk', title: copy.dashboard.pages_tool_dashboard_RedeemSection_tour_003, body: copy.dashboard.pages_tool_dashboard_RedeemSection_tour_004, onEnter: () => setMode('cdk' as const) }] : []),
+      ...(features.free_preview ? [{ target: 'dashboard-redeem-preview', title: copy.dashboard.pages_tool_dashboard_RedeemSection_tour_005, body: copy.dashboard.pages_tool_dashboard_RedeemSection_tour_006, onEnter: () => setMode('preview' as const) }] : []),
     ],
-  }), [])
+  }), [features.cdk_redemption, features.free_preview])
+
+  useEffect(() => {
+    if (mode === 'cdk' && !features.cdk_redemption && features.free_preview) setMode('preview')
+    if (mode === 'preview' && !features.free_preview && features.cdk_redemption) setMode('cdk')
+  }, [features.cdk_redemption, features.free_preview, mode])
 
   useEffect(() => {
     if (tourReplayToken > 0) redeemTour.start()
@@ -33,6 +40,7 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if ((mode === 'cdk' && !features.cdk_redemption) || (mode === 'preview' && !features.free_preview)) return
     if (mode === 'preview') {
       setError(null)
       setClaimDialogOpen(true)
@@ -74,7 +82,7 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
           {copy.dashboard.pages_tool_dashboard_RedeemSection_003}</p>
 
         <div className="tool-inset mt-5 inline-flex p-1" role="group" aria-label={copy.dashboard.pages_tool_dashboard_RedeemSection_004} data-tour-target="dashboard-redeem-mode">
-          <button
+          {features.cdk_redemption && <button
             type="button"
             onClick={() => {
               setMode('cdk')
@@ -83,8 +91,8 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
             aria-pressed={mode === 'cdk'}
             className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${mode === 'cdk' ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
           >
-            {copy.dashboard.pages_tool_dashboard_RedeemSection_005}</button>
-          <button
+            {copy.dashboard.pages_tool_dashboard_RedeemSection_005}</button>}
+          {features.free_preview && <button
             type="button"
             onClick={() => {
               setMode('preview')
@@ -93,7 +101,7 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
             aria-pressed={mode === 'preview'}
             className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 ${mode === 'preview' ? 'bg-brand-600 text-white' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
           >
-            {copy.dashboard.pages_tool_dashboard_RedeemSection_006}</button>
+            {copy.dashboard.pages_tool_dashboard_RedeemSection_006}</button>}
         </div>
 
         {error && <div className="tool-alert tool-alert--error mt-5" role="alert">{error}</div>}
@@ -120,14 +128,14 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
           {loading ? copy.dashboard.pages_tool_dashboard_RedeemSection_013 : mode === 'preview' ? copy.dashboard.pages_tool_dashboard_RedeemSection_014 : copy.dashboard.pages_tool_dashboard_RedeemSection_015}
         </button>
       </form>
-      <SklandBindingDialog
+      {features.free_preview && <SklandBindingDialog
         open={claimDialogOpen}
         profile={null}
         context="free_preview_claim"
         claimProfileMeta={{ displayName, note }}
         onOpenChange={setClaimDialogOpen}
         onPayload={handleClaimPayload}
-      />
+      />}
       <GuidedTour definition={redeemTourDefinition} open={redeemTour.open} onFinish={redeemTour.finish} onSkip={redeemTour.skip} />
     </>
   )

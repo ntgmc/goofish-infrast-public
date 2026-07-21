@@ -371,16 +371,48 @@ function memorySklandPlugin() {
         path: 'memory-depot-value-sample-store',
         namespace: 'depot-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])feature-settings-store(\.ts)?$/ }, () => ({
+        path: 'memory-feature-settings-store',
+        namespace: 'depot-smoke',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'depot-smoke' }, (args) => ({
         contents: args.path === 'memory-user-auth'
           ? memoryUserAuthModule()
           : args.path === 'memory-depot-value-sample-store'
             ? memoryDepotValueSampleStoreModule()
+            : args.path === 'memory-feature-settings-store'
+              ? memoryFeatureSettingsStoreModule()
             : memorySklandClientModule(),
         loader: 'js',
       }))
     },
   }
+}
+
+function memoryFeatureSettingsStoreModule() {
+  return `
+    export async function getSiteFeatureSettings() {
+      return {
+        version: 1,
+        features: {
+          site: true,
+          registration: true,
+          login: true,
+          profiles: true,
+          tools: true,
+          cdk_redemption: true,
+          free_preview: true,
+          schedule_generation: true,
+          schedule_analysis: true,
+          depot_value: true,
+          skland: true,
+          invitations: true,
+          announcements: true,
+        },
+        updated_at: null,
+      }
+    }
+  `
 }
 
 function memoryUserAuthModule() {

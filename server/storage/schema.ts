@@ -58,6 +58,12 @@ CREATE TABLE IF NOT EXISTS registration_settings (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS feature_settings (
+  key TEXT PRIMARY KEY,
+  record_json JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS brevo_email_deliveries (
   id TEXT PRIMARY KEY,
   quota_date DATE NOT NULL,

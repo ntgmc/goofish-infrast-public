@@ -99,6 +99,8 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl enable --now goofish-optimize-wor
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl enable --now goofish-optimize-worker@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl disable goofish-optimize-worker@blue.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl disable goofish-optimize-worker@green.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl disable --now goofish-optimize-worker@blue.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl disable --now goofish-optimize-worker@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl --no-block stop goofish-optimize-worker@blue.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl --no-block stop goofish-optimize-worker@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-optimize-worker@blue.service
@@ -106,6 +108,11 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-optimiz
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-optimize-worker@blue.service --no-pager --lines=80
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-optimize-worker@green.service --no-pager --lines=80
 ```
+
+The worker deployment performs a read-only `sudo -n -l` preflight for every
+command above before it fetches or starts a candidate. Sudoers matches command
+arguments exactly, so omitting the plain `disable` form while allowing only
+`disable --now` still causes the cutover to fail.
 
 ## GitHub production environment
 

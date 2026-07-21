@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import type { AuthSuccessResponse } from '../lib/types'
 import { ApiError, apiJson } from '../lib/api-client'
 import { copy } from '../copy/index'
+import { useSiteFeatures } from '../lib/site-feature-context'
 
 
 type AuthMode = 'login' | 'register' | 'forgot'
@@ -27,7 +28,10 @@ export default function AuthForm({
   intro,
   submitClassName,
 }: AuthFormProps) {
-  const [mode, setMode] = useState<AuthMode>('login')
+  const { features } = useSiteFeatures()
+  const [mode, setMode] = useState<AuthMode>(() => new URLSearchParams(window.location.search).get('recovery') === '1'
+    ? 'forgot'
+    : features.login ? 'login' : features.registration ? 'register' : 'forgot')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [cdk, setCdk] = useState('')
@@ -50,6 +54,11 @@ export default function AuthForm({
       .catch(() => undefined)
     return () => controller.abort()
   }, [inviteCodeRequired, mode])
+
+  useEffect(() => {
+    if (mode === 'login' && !features.login) setMode(features.registration ? 'register' : 'forgot')
+    if (mode === 'register' && !features.registration) setMode(features.login ? 'login' : 'forgot')
+  }, [features.login, features.registration, mode])
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -77,6 +86,7 @@ export default function AuthForm({
         return
       }
 
+      if ((mode === 'login' && !features.login) || (mode === 'register' && !features.registration)) return
       const data = await apiJson<AuthSuccessResponse | RegistrationAcceptedResponse>(mode === 'login' ? '/api/auth/login' : '/api/auth/register', {
         method: 'POST',
         json: mode === 'login' ? { email, password } : {
@@ -144,8 +154,8 @@ export default function AuthForm({
     <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'tool-panel space-y-5 p-6 sm:p-8'}>
       <div>
         <div className="tool-inset grid grid-cols-2 p-1" role="group" aria-label={copy.auth.components_AuthForm_007}>
-          <button type="button" aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_008}</button>
-          <button type="button" aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{copy.auth.components_AuthForm_009}</button>
+          <button type="button" disabled={!features.login} aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${mode === 'login' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{features.login ? copy.auth.components_AuthForm_008 : `${copy.auth.components_AuthForm_008} · ${copy.features.paused}`}</button>
+          <button type="button" disabled={!features.registration} aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${mode === 'register' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{features.registration ? copy.auth.components_AuthForm_009 : `${copy.auth.components_AuthForm_009} · ${copy.features.paused}`}</button>
         </div>
 
         {intro && <p className="mt-4 text-sm leading-6 text-ink-secondary">{intro}</p>}
@@ -196,7 +206,7 @@ export default function AuthForm({
         </label>
       )}
 
-      {allowCdk && mode === 'register' && (
+      {allowCdk && features.cdk_redemption && mode === 'register' && (
         <label className="block">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.auth.components_AuthForm_013}</span>
           <input type="text" value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="tool-field min-h-11 font-mono uppercase tracking-wide" placeholder={copy.auth.components_AuthForm_014} />
@@ -235,6 +245,12 @@ export default function AuthForm({
       {mode === 'forgot' && (
         <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null); setFieldErrors({}) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
           {copy.auth.components_AuthForm_018}</button>
+      )}
+
+      {mode !== 'forgot' && !features.login && (
+        <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
+          {copy.features.recovery}
+        </button>
       )}
 
       {showVerificationResend && mode !== 'forgot' && (
