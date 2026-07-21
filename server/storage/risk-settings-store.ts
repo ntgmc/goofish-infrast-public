@@ -61,6 +61,9 @@ export function createPostgresRiskControlSettingsStore(): RiskControlSettingsSto
 }
 
 function ensureSchema(): Promise<void> {
-  schemaReady ??= ensureDatabaseSchema()
+  schemaReady ??= ensureDatabaseSchema().catch((error) => {
+    schemaReady = null
+    throw error
+  })
   return schemaReady
 }
