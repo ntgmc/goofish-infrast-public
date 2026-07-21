@@ -71,6 +71,7 @@ interface UsageDayStats {
   registers: number
   schedule_generates: number
   cdk_redeems: number
+  account_additions: number
   failures: number
   schedule_failures: number
   cdk_redeem_failures: number
@@ -179,6 +180,12 @@ export interface UsageStats {
   cdk_distribution: UsageCdkDistributionItem[]
 }
 
+export interface UsageAccountAdditionStats {
+  date: string
+  free_previews: number
+  cdk_redeems: number
+}
+
 export interface UsageEventStore {
   set: (key: string, record: UsageEventRecord) => Promise<void>
   getStats: (dates: string[]) => Promise<UsageStats>
@@ -205,6 +212,37 @@ export function createPostgresUsageEventStore(): UsageEventStore {
       [`${prefix}%`, startDate, endDate],
     )
     return result.rows.map((row) => row.record_json)
+  }
+
+  const listAccountAdditions = async (startDate: string, endDate: string): Promise<UsageAccountAdditionStats[]> => {
+    const result = await query<{ date: string; free_previews: string; cdk_redeems: string }>(
+      `with account_additions as (
+         select to_char((record_json->>'used_at')::timestamptz at time zone 'UTC', 'YYYY-MM-DD') as date,
+                0 as free_previews,
+                1 as cdk_redeems
+         from cdk_records
+         where record_json->>'used_at' is not null
+           and ((record_json->>'used_at')::timestamptz at time zone 'UTC')::date between $1::date and $2::date
+         union all
+         select to_char(claimed_at at time zone 'UTC', 'YYYY-MM-DD') as date,
+                1 as free_previews,
+                0 as cdk_redeems
+         from free_preview_claims
+         where (claimed_at at time zone 'UTC')::date between $1::date and $2::date
+       )
+       select date,
+              sum(free_previews)::text as free_previews,
+              sum(cdk_redeems)::text as cdk_redeems
+       from account_additions
+       group by date
+       order by date asc`,
+      [startDate, endDate],
+    )
+    return result.rows.map((row) => ({
+      date: row.date,
+      free_previews: Number(row.free_previews),
+      cdk_redeems: Number(row.cdk_redeems),
+    }))
   }
 
   const countSuccessfulByProfileInRange = async (event: UsageEventName, profileId: string, startAt: string, endAt: string) => {
@@ -269,8 +307,11 @@ export function createPostgresUsageEventStore(): UsageEventStore {
     getStats: async (dates) => {
       const startDate = dates[0] ?? ''
       const endDate = dates[dates.length - 1] ?? ''
-      const events = startDate && endDate ? await listRange('events/', startDate, endDate) : await list('events/')
-      return buildUsageStats(events, dates)
+      const [events, accountAdditions] = await Promise.all([
+        startDate && endDate ? listRange('events/', startDate, endDate) : list('events/'),
+        startDate && endDate ? listAccountAdditions(startDate, endDate) : Promise.resolve([]),
+      ])
+      return buildUsageStats(events, dates, accountAdditions)
     },
     list,
     countSuccessfulByProfileInRange,
@@ -278,7 +319,11 @@ export function createPostgresUsageEventStore(): UsageEventStore {
   }
 }
 
-export function buildUsageStats(events: UsageEventRecord[], dates: string[]): UsageStats {
+export function buildUsageStats(
+  events: UsageEventRecord[],
+  dates: string[],
+  accountAdditions?: UsageAccountAdditionStats[],
+): UsageStats {
   const normalizedDates = dates.filter(Boolean)
   const range: UsageRange = {
     from: normalizedDates[0] ?? '',
@@ -329,10 +374,15 @@ export function buildUsageStats(events: UsageEventRecord[], dates: string[]): Us
     }
   }
 
+  if (accountAdditions) {
+    applyAuthoritativeAccountAdditions(totals, daysByDate, accountAdditions)
+  }
   totals.unique_visitors = totalVisitors.size
+  totals.account_additions = totals.free_previews + totals.cdk_redeems
   const days = normalizedDates.map((date) => {
     const day = daysByDate.get(date) ?? createEmptyDayStats(date)
     day.unique_visitors = dayVisitors.get(date)?.size ?? 0
+    day.account_additions = day.free_previews + day.cdk_redeems
     return day
   })
 
@@ -386,6 +436,7 @@ function createEmptyDayStats(date: string): UsageDayStats {
     registers: 0,
     schedule_generates: 0,
     cdk_redeems: 0,
+    account_additions: 0,
     failures: 0,
     schedule_failures: 0,
     cdk_redeem_failures: 0,
@@ -424,6 +475,33 @@ function applyEventToStats(stats: UsageDayStats, event: UsageEventRecord, visito
   if (event.event === 'schedule_generate') stats.schedule_failures += 1
   if (event.event === 'cdk_redeem') stats.cdk_redeem_failures += 1
   if (event.event === 'skland_import') stats.skland_import_failures += 1
+}
+
+function applyAuthoritativeAccountAdditions(
+  totals: UsageDayStats,
+  daysByDate: Map<string, UsageDayStats>,
+  additions: UsageAccountAdditionStats[],
+): void {
+  totals.free_previews = 0
+  totals.cdk_redeems = 0
+  for (const day of daysByDate.values()) {
+    day.free_previews = 0
+    day.cdk_redeems = 0
+  }
+  for (const addition of additions) {
+    const day = daysByDate.get(addition.date)
+    if (!day) continue
+    const freePreviews = normalizeCount(addition.free_previews)
+    const cdkRedeems = normalizeCount(addition.cdk_redeems)
+    day.free_previews += freePreviews
+    day.cdk_redeems += cdkRedeems
+    totals.free_previews += freePreviews
+    totals.cdk_redeems += cdkRedeems
+  }
+}
+
+function normalizeCount(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
 }
 
 function applySklandEvent(stats: UsageSklandDayStats, event: UsageEventRecord): void {

@@ -84,6 +84,7 @@ export interface UsageTotals {
   registers: number;
   schedule_generates: number;
   cdk_redeems: number;
+  account_additions: number;
   failures: number;
   schedule_failures: number;
   cdk_redeem_failures: number;
