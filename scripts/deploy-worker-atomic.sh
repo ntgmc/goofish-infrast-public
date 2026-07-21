@@ -48,7 +48,7 @@ log() {
 
 fail() {
   printf '[worker-deploy] ERROR: %s\n' "$*" >&2
-  exit 1
+  return 1
 }
 
 require_command() {
