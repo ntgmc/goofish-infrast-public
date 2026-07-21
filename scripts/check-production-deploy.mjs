@@ -59,6 +59,11 @@ function assertWorkflowProvenance() {
   assert.match(devWorkflow, /github\.event\.workflow_run\.event == 'push'/, 'automatic dev deploy should only accept push runs')
   assert.match(devWorkflow, /event: 'push'/, 'manual dev deploy should only query push runs')
   assert.match(devWorkflow, /run\.event === 'push'/, 'manual dev deploy should verify the selected run event')
+  assert.match(devWorkflow, /ref: \$\{\{ steps\.target\.outputs\.sha \}\}/, 'dev deploy should checkout the immutable target SHA')
+  assert.match(devWorkflow, /scripts\/deploy-production\.sh "\$DEPLOY_USER@\$DEPLOY_HOST:\$remote_deploy_script"/, 'dev deploy should upload the target deployment script')
+  assert.match(devWorkflow, /bash \$\{REMOTE_DEPLOY_SCRIPT@Q\}/, 'dev deploy should run the uploaded deployment script')
+  assert.match(devWorkflow, /rm -f -- \$\{REMOTE_DEPLOY_SCRIPT@Q\} \$\{REMOTE_ARTIFACT@Q\}/, 'dev deploy should clean up temporary deployment inputs')
+  assert.doesNotMatch(devWorkflow, /DEPLOY_SCRIPT:/, 'dev deploy must not depend on a stale server-side script')
   for (const deploymentPath of [
     "'.github/workflows/deploy-production.yml'",
     "'docs/production-deploy.md'",
@@ -155,6 +160,12 @@ function assertDeploymentScript() {
   assert.doesNotMatch(devDeployScript, /npm run build/, 'dev deploy must not build on the server')
   assert.doesNotMatch(devDeployScript, /git restore/, 'dev deploy must not restore generated source files')
   assert.match(devDeployScript, /journalctl --unit "\$SERVICE_NAME" --no-pager --lines=80/, 'dev deploy failures should include recent service logs')
+  assert.match(devDeployScript, /sudo -n journalctl --unit "\$SERVICE_NAME" --no-pager --lines=80 2>\/dev\/null/, 'dev deploy journal fallback must never prompt for a password')
+  assert.match(devDeployScript, /run_systemctl status "\$SERVICE_NAME" --no-pager --lines=50/, 'dev deploy status diagnostics should match the documented sudoers command')
+  assert.doesNotMatch(devDeployScript, /run_systemctl status[^\n]*--full/, 'dev deploy must not request undocumented systemctl status arguments')
+  assert.match(devDeployScript, /--write-out \$'\\n%\{http_code\}'/, 'dev deploy health checks should capture the HTTP status')
+  assert.match(devDeployScript, /last health response: HTTP \$http_status; body:/, 'dev deploy should report the final unhealthy response')
+  assert.match(devDeployScript, /last health check transport error \(curl exit \$curl_exit\):/, 'dev deploy should distinguish transport failures')
   assertOrdered(devDeployScript, [
     'sha256sum "$ARTIFACT_PATH"',
     'release-artifact.mjs verify --sha "$TARGET_SHA"',
