@@ -11,6 +11,7 @@ import type {
 import { APP_BUILD_META } from '../../src/lib/build-meta'
 import { getValidatedJsonValue } from '../security/request-validation'
 import { requireUserSession } from './user-auth'
+import { requireSiteFeatures } from '../feature-gate'
 import { convertSklandCharactersToOperators, decryptSklandCredential, SklandClient } from './skland-client'
 import {
   getExpItemSanity,
@@ -170,6 +171,8 @@ export default async (req: Request): Promise<Response> => {
       return jsonResponse(await buildDepotValueResponse(normalizeDepotInventory(body.inventory), 'upload'))
     }
     if (body.source === 'skland') {
+      const gated = await requireSiteFeatures(['login', 'profiles', 'skland'])
+      if (gated) return gated
       const skland = await readSklandInventory(req, body.profile_id, true)
       return jsonResponse(await buildDepotValueResponse(skland.inventory, 'skland', undefined, {
       sample: skland.sample,

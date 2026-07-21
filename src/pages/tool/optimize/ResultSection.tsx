@@ -28,6 +28,7 @@ export default function ResultSection({
   onUpgradePreviewProfile,
   onDownloadMAA,
   onApplySuggestions,
+  suggestionsReadOnly = false,
   onReset,
 }: {
   phase: OptimizePhase;
@@ -47,6 +48,7 @@ export default function ResultSection({
   onUpgradePreviewProfile: (event: FormEvent) => void;
   onDownloadMAA?: () => void;
   onApplySuggestions: (selectedIds: string[]) => Promise<void>;
+  suggestionsReadOnly?: boolean;
   onReset: () => void;
 }) {
   return (
@@ -107,6 +109,7 @@ export default function ResultSection({
                   error={inlineError?.scope === 'apply' ? inlineError.message : null}
                   onReset={onReset}
                   embedded
+                  readOnly={suggestionsReadOnly}
                 />
               </Suspense>
             ) : null}

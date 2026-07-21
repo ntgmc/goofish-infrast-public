@@ -26,6 +26,22 @@ const optionalString = (max = 256) => z.string().max(max).optional()
 const optionalUnknown = z.unknown().optional()
 const strict = z.strictObject
 
+const siteFeaturesSchema = strict({
+  site: z.boolean(),
+  registration: z.boolean(),
+  login: z.boolean(),
+  profiles: z.boolean(),
+  tools: z.boolean(),
+  cdk_redemption: z.boolean(),
+  free_preview: z.boolean(),
+  schedule_generation: z.boolean(),
+  schedule_analysis: z.boolean(),
+  depot_value: z.boolean(),
+  skland: z.boolean(),
+  invitations: z.boolean(),
+  announcements: z.boolean(),
+})
+
 export const requestSchemas = {
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
   authRegister: strict({
@@ -71,6 +87,7 @@ export const requestSchemas = {
     admin_invite_email_reserve: z.number().int().min(0).max(300),
     password_reset_email_reserve: z.number().int().min(0).max(300),
   }),
+  adminFeatureSettings: strict({ features: siteFeaturesSchema }),
   adminRegistrationInvitationCreate: strict({}),
   adminRegistrationInvitationPatch: strict({
     invitation_id: shortString(128),
@@ -199,6 +216,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/risk-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRiskSettings), PATCH: json('admin', requestSchemas.adminRiskSettings) })],
   ['/api/admin/invitation-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminInvitationSettings), PATCH: json('admin', requestSchemas.adminInvitationSettings) })],
   ['/api/admin/registration-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRegistrationSettings) })],
+  ['/api/admin/feature-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminFeatureSettings) })],
   ['/api/admin/registration-invitations', route({
     GET: none(),
     POST: json('admin', requestSchemas.adminRegistrationInvitationCreate),
@@ -217,6 +235,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/auth/resend-verification', route({ POST: json('auth', requestSchemas.authEmail) })],
   ['/api/auth/change-password', route({ POST: json('auth', requestSchemas.authChangePassword) })],
   ['/api/auth/me', route({ GET: none() }, ['profile_id'])],
+  ['/api/site/features', route({ GET: none() })],
   ['/api/user/data/export', route({ GET: none() })],
   ['/api/user/data/delete-request', route({ POST: json('auth', requestSchemas.accountDelete) })],
   ['/api/user/data/cancel', route({ POST: json('auth', requestSchemas.deletionToken) })],

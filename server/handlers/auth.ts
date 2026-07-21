@@ -29,6 +29,7 @@ import { RateLimitStoreError } from '../security/persistent-rate-limit'
 import { authCopy } from '../../src/copy/zh-CN/auth'
 import { BrevoDailyQuotaExceededError } from './email'
 import { getRegistrationSettings } from '../storage/registration-settings-store'
+import { requireSiteFeatures } from '../feature-gate'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -51,6 +52,10 @@ export default async (req: Request): Promise<Response> => {
     if (pathname.endsWith('/register')) {
       if (req.method !== 'POST') return methodNotAllowedResponse()
       const body = await getValidatedJson(req, requestSchemas.authRegister)
+      if (typeof body.cdk === 'string' && body.cdk.trim()) {
+        const gated = await requireSiteFeatures(['cdk_redemption'])
+        if (gated) return gated
+      }
       const registrationLimit = await reserveRegistrationAttemptLayered(
         getRequestClientIp(req),
         normalizeEmail(body.email) ?? 'invalid',

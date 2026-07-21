@@ -1,11 +1,14 @@
 import { Link } from 'react-router-dom'
 import { copy } from '../copy/index'
+import { useSiteFeatures } from '../lib/site-feature-context'
+import type { SiteFeatureKey } from '../lib/site-features'
 
 interface DeferredFeature {
   title: string
   description: string
   status: string
   href?: string
+  feature: SiteFeatureKey
 }
 const deferredFeatures: DeferredFeature[] = [
   {
@@ -13,12 +16,14 @@ const deferredFeatures: DeferredFeature[] = [
     description: copy.common.components_DeferredFeatureMenu_002,
     status: copy.common.components_DeferredFeatureMenu_003,
     href: '/tools/depot-value',
+    feature: 'depot_value',
   },
   {
     title: copy.common.components_DeferredFeatureMenu_004,
     description: copy.common.components_DeferredFeatureMenu_005,
     status: copy.common.components_DeferredFeatureMenu_006,
     href: '/tools/schedule-analysis',
+    feature: 'schedule_analysis',
   },
 ]
 
@@ -27,6 +32,9 @@ interface DeferredFeatureMenuProps {
 }
 
 export default function DeferredFeatureMenu({ className = '' }: DeferredFeatureMenuProps) {
+  const { features } = useSiteFeatures()
+  const visibleFeatures = deferredFeatures.filter((feature) => features[feature.feature])
+  if (visibleFeatures.length === 0) return null
   return (
     <details className={`group relative z-20 flex-shrink-0 ${className}`}>
       <summary className="tool-secondary-action flex h-11 cursor-pointer list-none gap-2 px-3 py-0 text-sm [&::-webkit-details-marker]:hidden">
@@ -46,7 +54,7 @@ export default function DeferredFeatureMenu({ className = '' }: DeferredFeatureM
           <p className="mt-1 text-xs text-ink-muted">{copy.common.components_DeferredFeatureMenu_018}</p>
         </div>
         <div className="divide-y divide-surface-3/70">
-          {deferredFeatures.map((feature) => {
+          {visibleFeatures.map((feature) => {
             const content = (
               <>
                 <div className="flex items-start justify-between gap-3">
