@@ -9,13 +9,21 @@ import { copy } from '../../../copy/index'
 export const OPTIMIZE_POLL_REQUEST_TIMEOUT_MS = 20_000
 const OPTIMIZE_HIDDEN_POLL_MULTIPLIER = 3
 
-export function waitForOptimizePoll(ms: number, isCancelled?: () => boolean): Promise<void> {
+export function waitForOptimizePoll(
+  ms: number,
+  isCancelled?: () => boolean,
+  shouldRefresh?: () => boolean,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const baseDelayMs = Math.max(500, ms)
     const startedAt = Date.now()
     const check = () => {
       if (isCancelled?.()) {
         reject(new OptimizeJobPollCancelledError())
+        return
+      }
+      if (shouldRefresh?.()) {
+        resolve()
         return
       }
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -192,6 +200,7 @@ function getStableOptimizeEstimatePhase(
     && current.estimatePhase === 'overdue'
     && next.estimate_phase !== 'completed'
     && next.estimate_phase !== 'failed'
+    && next.estimate_phase !== 'cancelled'
   ) {
     return 'overdue'
   }
@@ -213,6 +222,7 @@ function getStableOptimizeRemainingMs(
     && current.estimatePhase === 'overdue'
     && next.estimate_phase !== 'completed'
     && next.estimate_phase !== 'failed'
+    && next.estimate_phase !== 'cancelled'
   ) {
     return null
   }
@@ -256,6 +266,7 @@ function getStableOptimizeTotalMs(
       && Number.isFinite(currentTotalMs)
       && next.estimate_phase !== 'completed'
       && next.estimate_phase !== 'failed'
+      && next.estimate_phase !== 'cancelled'
     ) {
       return currentTotalMs
     }

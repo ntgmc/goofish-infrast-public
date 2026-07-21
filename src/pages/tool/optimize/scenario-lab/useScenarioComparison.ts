@@ -12,7 +12,7 @@ import type { LicenseConfig, LicenseOperator } from '../../../../lib/types'
 import { copy } from '../../../../copy/index'
 import { fetchOptimizeJobSnapshotStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, waitForOptimizePoll } from '../job-progress'
 import { OPTIMIZE_SUBMIT_TIMEOUT_MS } from '../optimization-api'
-import { publishOptimizationJobUpdate, withOptimizationSubmissionLock } from '../optimization-job-events'
+import { publishOptimizationJobUpdate, subscribeOptimizationJobUpdates, withOptimizationSubmissionLock } from '../optimization-job-events'
 
 
 const DEFAULT_FACTORS: ScenarioComparisonFactors = {
@@ -65,47 +65,79 @@ export function useScenarioComparison({
     sessionFactors: ScenarioComparisonFactors,
   ) => {
     let failures = 0
-    while (pollRunRef.current === runId) {
-      try {
-        const snapshot = await fetchOptimizeJobSnapshotStatus<ScenarioComparisonResult>(
-          jobId,
-          copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_001,
-          undefined,
-          () => pollRunRef.current !== runId,
-        ) as ScenarioComparisonJobSnapshot
-        if (pollRunRef.current !== runId) return
-        failures = 0
-        setConnectionStatus('connected')
-        setConsecutivePollFailures(0)
-        setJob(snapshot)
-        publishOptimizationJobUpdate(profileId, snapshot)
-        if (snapshot.status === 'succeeded') {
-          setResult(snapshot.result)
-          setLoading(false)
-          writeSession(profileId, { factors: sessionFactors, result: snapshot.result })
-          return
-        }
-        if (snapshot.status === 'failed' || snapshot.status === 'cancelled' || snapshot.status === 'dead_lettered') {
-          const supportSuffix = snapshot.error.supportReference ? ` (${snapshot.error.supportReference})` : ''
-          setError(`${snapshot.error.message}${supportSuffix}`)
-          setLoading(false)
-          writeSession(profileId, { factors: sessionFactors })
-          return
-        }
-        await delay(snapshot.pollAfterMs || (snapshot.status === 'queued' ? 3_000 : 1_500))
-      } catch (caught) {
-        if (isOptimizeJobPollCancelled(caught) || pollRunRef.current !== runId) return
-        if (!isRetryableOptimizePollError(caught)) {
-          setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_002)
-          setLoading(false)
-          writeSession(profileId, { factors: sessionFactors })
-          return
-        }
-        failures += 1
-        setConnectionStatus('reconnecting')
-        setConsecutivePollFailures(failures)
-        await waitForOptimizePoll(getOptimizePollRetryDelayMs(failures), () => pollRunRef.current !== runId)
+    let terminalRefreshRequested = false
+    const unsubscribe = subscribeOptimizationJobUpdates((event) => {
+      if (
+        event.profileId === profileId
+        && event.jobId === jobId
+        && (event.status === 'succeeded' || event.status === 'failed' || event.status === 'cancelled' || event.status === 'dead_lettered')
+      ) {
+        terminalRefreshRequested = true
       }
+    })
+    const consumeTerminalRefresh = () => {
+      if (!terminalRefreshRequested) return false
+      terminalRefreshRequested = false
+      return true
+    }
+
+    try {
+      while (pollRunRef.current === runId) {
+        try {
+          const snapshot = await fetchOptimizeJobSnapshotStatus<ScenarioComparisonResult>(
+            jobId,
+            copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_001,
+            undefined,
+            () => pollRunRef.current !== runId,
+          ) as ScenarioComparisonJobSnapshot
+          if (pollRunRef.current !== runId) return
+          failures = 0
+          setConnectionStatus('connected')
+          setConsecutivePollFailures(0)
+          setJob(snapshot)
+          publishOptimizationJobUpdate(profileId, snapshot)
+          if (snapshot.status === 'succeeded') {
+            setResult(snapshot.result)
+            setLoading(false)
+            writeSession(profileId, { factors: sessionFactors, result: snapshot.result })
+            return
+          }
+          if (snapshot.status === 'failed' || snapshot.status === 'cancelled' || snapshot.status === 'dead_lettered') {
+            if (snapshot.status === 'cancelled') {
+              setError(null)
+            } else {
+              const supportSuffix = snapshot.error.supportReference ? ` (${snapshot.error.supportReference})` : ''
+              setError(`${snapshot.error.message}${supportSuffix}`)
+            }
+            setLoading(false)
+            writeSession(profileId, { factors: sessionFactors })
+            return
+          }
+          await waitForOptimizePoll(
+            snapshot.pollAfterMs || (snapshot.status === 'queued' ? 3_000 : 1_500),
+            () => pollRunRef.current !== runId,
+            consumeTerminalRefresh,
+          )
+        } catch (caught) {
+          if (isOptimizeJobPollCancelled(caught) || pollRunRef.current !== runId) return
+          if (!isRetryableOptimizePollError(caught)) {
+            setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_002)
+            setLoading(false)
+            writeSession(profileId, { factors: sessionFactors })
+            return
+          }
+          failures += 1
+          setConnectionStatus('reconnecting')
+          setConsecutivePollFailures(failures)
+          await waitForOptimizePoll(
+            getOptimizePollRetryDelayMs(failures),
+            () => pollRunRef.current !== runId,
+            consumeTerminalRefresh,
+          )
+        }
+      }
+    } finally {
+      unsubscribe()
     }
   }, [profileId])
   const pollJobRef = useRef(pollJob)
@@ -172,10 +204,10 @@ export function useScenarioComparison({
     }
   }, [profileId])
 
-  const progress = useMemo<ScheduleProgressState | null>(() => job && loading ? {
+  const progress = useMemo<ScheduleProgressState | null>(() => job && (loading || job.status === 'cancelled') ? {
     mode: 'scenario',
     startedAt: Date.parse(job.timestamps.submittedAt),
-    queueStatus: job.status === 'queued' ? 'queued' : 'running',
+    queueStatus: job.status === 'queued' ? 'queued' : job.status === 'running' ? 'running' : undefined,
     queuePosition: job.queuePosition,
     priority: job.priority.kind,
     jobId: job.id,
@@ -216,8 +248,4 @@ function writeSession(profileId: string, value: StoredScenarioSession): void {
   } catch {
     // Session persistence is best-effort; the in-memory result remains usable.
   }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
 }

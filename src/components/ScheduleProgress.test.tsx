@@ -29,6 +29,29 @@ describe('ScheduleProgress motion', () => {
     expect(progressbar.firstElementChild).toHaveClass('origin-left')
   })
 
+  it('shows a cancelled queued task as a terminal state', () => {
+    render(<ScheduleProgress progress={createProgress({
+      startedAt: NOW - 5_000,
+      jobId: 'cancelled-job',
+      queueStatus: 'queued',
+      queuePosition: null,
+      observedRunning: false,
+      estimatedRemainingMs: null,
+      estimatedTotalMs: null,
+      estimatePhase: 'cancelled',
+      cancellationRequested: true,
+      executionPhase: 'terminal',
+    })} />)
+
+    const panel = screen.getByLabelText('排班生成任务状态')
+    expect(panel).toHaveAttribute('data-status', 'cancelled')
+    expect(screen.getByText('任务已取消')).toBeInTheDocument()
+    expect(screen.getByText('任务已从等待队列中取消，不会继续执行。')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', expect.stringContaining('已离开队列'))
+    expect(screen.getByText('Cancelled')).toBeInTheDocument()
+    expect(screen.queryByText('正在取消任务')).not.toBeInTheDocument()
+  })
+
   it('shows a queued continuation without presenting aggregate 92% as final', () => {
     render(<ScheduleProgress progress={createProgress({
       startedAt: NOW - 5_000,
