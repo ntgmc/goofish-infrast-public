@@ -124,6 +124,9 @@ function getTestingDepotValueSampleStore(): DepotValueSampleStore | null {
 }
 
 function ensureSchema(): Promise<void> {
-  schemaReady ??= ensureDatabaseSchema()
+  schemaReady ??= ensureDatabaseSchema().catch((error) => {
+    schemaReady = null
+    throw error
+  })
   return schemaReady
 }

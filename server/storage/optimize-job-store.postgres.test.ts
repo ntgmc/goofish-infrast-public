@@ -118,6 +118,34 @@ describe('PostgreSQL optimization job admission', () => {
     expect(getPool().listenerCount('error')).toBeGreaterThan(0)
   })
 
+  it('validates the production API schema without waiting for a row-write lock', async () => {
+    const client = await getPool().connect()
+    const previousRole = process.env.APP_ROLE
+    const previousNodeEnv = process.env.NODE_ENV
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      await client.query('begin')
+      await client.query('lock table optimize_jobs in row exclusive mode')
+      process.env.APP_ROLE = 'api'
+      process.env.NODE_ENV = 'production'
+
+      await expect(Promise.race([
+        ensureDatabaseSchema().then(() => 'validated'),
+        new Promise<string>((resolve) => {
+          timeout = setTimeout(() => resolve('blocked'), 1_000)
+        }),
+      ])).resolves.toBe('validated')
+    } finally {
+      if (timeout) clearTimeout(timeout)
+      if (previousRole === undefined) delete process.env.APP_ROLE
+      else process.env.APP_ROLE = previousRole
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = previousNodeEnv
+      await client.query('rollback')
+      client.release()
+    }
+  })
+
   it('reads an ordered safe admin queue snapshot with user and profile context', async () => {
     const profileId = await seedProfile()
     const queuedHighId = randomUUID()

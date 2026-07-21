@@ -230,6 +230,24 @@ function assertWorkerDeploymentScript() {
     'worker deploy must not block on the previous slot drain',
   )
 
+  const failBody = extractFunction(workerDeployScript, 'fail')
+  assert.match(failBody, /return 1/, 'worker deployment failures must flow through the ERR cleanup trap')
+  assert.doesNotMatch(failBody, /exit 1/, 'worker deployment failures must not bypass candidate cleanup')
+  const cleanupProbe = spawnSync('bash', ['-c', [
+    'set -Eeuo pipefail',
+    failBody,
+    "trap 'printf cleanup-ran' ERR",
+    'fail probe',
+  ].join('\n')], { encoding: 'utf8' })
+  if (cleanupProbe.error?.code !== 'ENOENT') {
+    assert.notEqual(cleanupProbe.status, 0, 'worker failure probe should preserve the failure status')
+    assert.match(cleanupProbe.stdout, /cleanup-ran/, 'worker fail must trigger the ERR cleanup trap')
+  }
+
+  const errorBody = extractFunction(workerDeployScript, 'on_error')
+  assert.match(errorBody, /run_systemctl stop "\$\(service_unit "\$CANDIDATE_SLOT"\)"/, 'failed candidates must be stopped')
+  assert.match(errorBody, /restore_link "\$OLD_CANDIDATE_TARGET" "\$SLOTS_DIR\/\$CANDIDATE_SLOT"/, 'failed candidate slot links must be restored')
+
   const mainFlow = workerDeployScript.slice(workerDeployScript.indexOf('RELEASE_DIR="$RELEASES_DIR/$TARGET_SHA"'))
   assertOrdered(mainFlow, [
     'build_release',
