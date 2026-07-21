@@ -154,12 +154,12 @@ export default function AccountDashboard({
               ))}
             </nav>
           </LayoutGroup>
-          <AnnouncementBanner announcement={announcement} className="mx-auto mt-4 max-w-7xl" />
         </header>
 
-        <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
+        <div className="mx-auto max-w-7xl space-y-4 px-5 py-6 sm:px-8">
+          <AnnouncementBanner announcement={announcement} />
           {workspaceLoadError && (
-            <div className="tool-alert tool-alert--error mb-5" role="alert">
+            <div className="tool-alert tool-alert--error" role="alert">
               {workspaceLoadError}
             </div>
           )}
