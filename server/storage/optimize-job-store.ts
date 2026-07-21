@@ -113,6 +113,10 @@ export interface OptimizationDeadLetterRecord {
   updated_at: string
 }
 
+export interface OptimizationDeadLetterDetail extends OptimizationDeadLetterRecord {
+  payload_json: unknown
+}
+
 interface AdminOptimizationQueueJob {
   id: string
   status: OptimizeJobStatus
@@ -1265,6 +1269,21 @@ export async function listOptimizationDeadLetters(
   return result.rows.map(fromDeadLetterRow)
 }
 
+export async function getOptimizationDeadLetterDetail(id: string): Promise<OptimizationDeadLetterDetail | null> {
+  await ensureSchema()
+  const result = await query<OptimizationDeadLetterDetailRow>(
+    `select letter.*, job.payload_json
+     from optimization_dead_letters letter
+     inner join optimize_jobs job on job.id = letter.job_id
+     where letter.id = $1`,
+    [id],
+  )
+  const row = result.rows[0]
+  if (!row) return null
+  const { payload_json, ...letter } = row
+  return { ...fromDeadLetterRow(letter), payload_json }
+}
+
 export async function replayOptimizationDeadLetter(id: string, replayedBy: string): Promise<OptimizeJobRecord | null> {
   await ensureSchema()
   return withTransaction(async (client) => {
@@ -1319,6 +1338,10 @@ type OptimizationDeadLetterRow = Omit<OptimizationDeadLetterRecord,
   resolved_at: string | Date | null
   created_at: string | Date
   updated_at: string | Date
+}
+
+type OptimizationDeadLetterDetailRow = OptimizationDeadLetterRow & {
+  payload_json: unknown
 }
 
 function fromDeadLetterRow(row: OptimizationDeadLetterRow): OptimizationDeadLetterRecord {

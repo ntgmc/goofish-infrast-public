@@ -3,6 +3,7 @@ import { jsonResponse } from './license-utils'
 import {
   discardOptimizationDeadLetter,
   getAdminOptimizationQueueSnapshot,
+  getOptimizationDeadLetterDetail,
   listOptimizationDeadLetters,
   replayOptimizationDeadLetter,
   type OptimizationDeadLetterRecord,
@@ -28,6 +29,13 @@ export default async function adminOptimizationHandler(req: Request): Promise<Re
           getOptimizeGlobalWorkerConcurrency(),
           20,
         )))
+      }
+      if (view === 'dead_letter') {
+        const id = url.searchParams.get('id')?.trim() ?? ''
+        if (!id) return jsonResponse({ error: '缺少死信任务 ID。' }, 400)
+        const deadLetter = await getOptimizationDeadLetterDetail(id)
+        if (!deadLetter) return jsonResponse({ error: '死信任务不存在。' }, 404)
+        return noStore(jsonResponse({ dead_letter: deadLetter }))
       }
       if (view) return jsonResponse({ error: '不支持的异步任务视图。' }, 400)
       const rawStatus = url.searchParams.get('status')
