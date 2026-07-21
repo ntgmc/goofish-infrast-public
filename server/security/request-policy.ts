@@ -203,7 +203,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
     GET: none(),
     POST: json('admin', requestSchemas.adminRegistrationInvitationCreate),
     PATCH: json('admin', requestSchemas.adminRegistrationInvitationPatch),
-  })],
+  }, ['page', 'page_size', 'status'])],
   ['/api/admin/optimization', route({ GET: none(), POST: json('admin', requestSchemas.adminOptimization) }, ['view', 'status', 'limit', 'id'])],
   ['/api/admin/session', route({ GET: none(), POST: json('auth', requestSchemas.adminSession), DELETE: none() })],
   ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'search'])],
