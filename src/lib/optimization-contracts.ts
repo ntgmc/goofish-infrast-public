@@ -29,6 +29,7 @@ export type CreateOptimizationJobRequest =
   | (OptimizationJobInput & {
       kind: 'upgrade_suggestions';
       upgradeTaskPayload: UpgradeTaskPayload;
+      historyResultId?: string;
     })
   | (Omit<OptimizationJobInput, 'identity'> & {
       kind: 'scenario_comparison';

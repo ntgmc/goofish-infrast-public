@@ -150,6 +150,7 @@ export const requestSchemas = {
     includeCurrent: z.boolean().optional(),
     use_priority_coupon: z.boolean().optional(),
     upgradeTaskPayload: optionalUnknown,
+    historyResultId: optionalString(128),
     historySource: z.enum(['generated', 'applied_suggestions']).optional(),
     factors: optionalUnknown,
   }),

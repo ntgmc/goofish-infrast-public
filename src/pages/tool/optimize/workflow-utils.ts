@@ -1,4 +1,4 @@
-import type { FreeScheduleEntitlement, LicenseConfig, LicenseOperator } from '../../../lib/types'
+import type { FreeScheduleEntitlement, LicenseConfig, LicenseOperator, OptimizeResult, UpgradeSuggestion } from '../../../lib/types'
 import { canonicalJson } from '../../../lib/crypto'
 import { SCHEDULE_PROGRESS_COMPLETION_DURATION_MS } from '../../../components/ScheduleProgress'
 import { copy } from '../../../copy/index'
@@ -15,6 +15,59 @@ export function formatConfigPresetLabel(config: LicenseConfig): string {
   const trading = config.product_requirements?.trading_stations ?? {}
   const suffix = (trading.Orundum ?? 0) > 0 ? copy.optimize.pages_tool_optimize_workflow_utils_001 : copy.optimize.pages_tool_optimize_workflow_utils_002
   return `${presetLayout} ${suffix}`
+}
+
+export function normalizeUpgradeSuggestions(
+  suggestions: OptimizeResult['upgrade_suggestions'],
+): UpgradeSuggestion[] {
+  return (suggestions ?? [])
+    .map((suggestion, index): UpgradeSuggestion => {
+      if (suggestion.type === 'single') {
+        return {
+          type: 'single',
+          id: suggestion.id || suggestion.name || '',
+          name: suggestion.name,
+          current_elite: suggestion.current,
+          target_elite: suggestion.target,
+          gain: Math.round(suggestion.gain),
+          desc: `${suggestion.name}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_017}${suggestion.current}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_018}${suggestion.target}`,
+          training_cost: suggestion.training_cost,
+          rooms: suggestion.rooms,
+          specialType: suggestion.specialType,
+          roi: suggestion.roi,
+          orundum_roi: suggestion.orundum_roi,
+          impact: suggestion.impact,
+          partial_outcomes: suggestion.partial_outcomes,
+          partial_outcomes_truncated: suggestion.partial_outcomes_truncated,
+          partial_outcomes_unavailable_reason: suggestion.partial_outcomes_unavailable_reason,
+        }
+      }
+      return {
+        type: 'bundle',
+        id: `bundle-${index}`,
+        gain: Math.round(suggestion.gain),
+        desc: suggestion.ops.map((operator) => `${operator.name}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_019}${operator.current}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_020}${operator.target}`).join(', '),
+        ops: suggestion.ops.map((operator) => ({
+          id: operator.id || operator.name,
+          name: operator.name,
+          current: operator.current,
+          target: operator.target,
+          current_elite: operator.current,
+          target_elite: operator.target,
+        })),
+        training_cost: suggestion.training_cost,
+        rooms: suggestion.rooms,
+        specialType: suggestion.specialType,
+        roi: suggestion.roi,
+        orundum_roi: suggestion.orundum_roi,
+        impact: suggestion.impact,
+        partial_outcomes: suggestion.partial_outcomes,
+        partial_outcomes_truncated: suggestion.partial_outcomes_truncated,
+        partial_outcomes_unavailable_reason: suggestion.partial_outcomes_unavailable_reason,
+      }
+    })
+    .sort((left, right) => right.gain - left.gain)
+    .slice(0, 20)
 }
 
 export function waitForProgressCompletion(): Promise<void> {
