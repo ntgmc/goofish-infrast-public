@@ -14,6 +14,7 @@ RestartSec=5
 KillSignal=SIGTERM
 TimeoutStopSec=75s
 Environment=NODE_ENV=production
+Environment=APP_ROLE=api
 Environment=HOST=127.0.0.1
 EnvironmentFile=/etc/goofish-infrast-v1/backend.env
 EnvironmentFile=/etc/goofish-infrast-v1/%i.env

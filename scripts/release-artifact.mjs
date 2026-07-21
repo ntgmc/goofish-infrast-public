@@ -60,7 +60,12 @@ async function verifyReleaseManifest() {
 
   const expectedFiles = manifest.files
   if (!expectedFiles || typeof expectedFiles !== 'object') throw new Error('artifact file hashes are missing')
-  for (const required of ['dist/index.html', 'server/dist/index.js']) {
+  for (const required of [
+    'dist/index.html',
+    'server/dist/index.js',
+    'server/dist/worker.js',
+    'server/dist/optimize-worker.js',
+  ]) {
     if (!expectedFiles[required]) throw new Error(`required artifact entry is missing from manifest: ${required}`)
   }
 

@@ -7,20 +7,24 @@ const devWorkflow = await readFile('.github/workflows/deploy-dev.yml', 'utf8')
 const qualityChecksWorkflow = await readFile('.github/workflows/quality-checks.yml', 'utf8')
 const securityAnalysisWorkflow = await readFile('.github/workflows/security-analysis.yml', 'utf8')
 const deployScript = await readFile('scripts/deploy-production-atomic.sh', 'utf8')
+const workerDeployScript = await readFile('scripts/deploy-worker-atomic.sh', 'utf8')
 const devDeployScript = await readFile('scripts/deploy-production.sh', 'utf8')
 const releaseArtifact = await readFile('scripts/release-artifact.mjs', 'utf8')
 const apiNginx = await readFile('deploy/nginx/goofish-api-production.conf', 'utf8')
 const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', 'utf8')
 const greenUpstream = await readFile('deploy/nginx/goofish-upstream-green.conf', 'utf8')
 const systemdUnit = await readFile('deploy/systemd/goofish-infrast-v1@.service', 'utf8')
+const workerSystemdUnit = await readFile('deploy/systemd/goofish-optimize-worker@.service', 'utf8')
 const buildRelevance = await readFile('scripts/check-build-relevance.mjs', 'utf8')
 const productionDocs = await readFile('docs/production-deploy.md', 'utf8')
+const workerDocs = await readFile('docs/worker-deploy.md', 'utf8')
 const developmentDocs = await readFile('docs/dev-deploy.md', 'utf8')
 
 assertWorkflowProvenance()
 assertQualityChecksImmutability()
 assertSecurityAnalysisGate()
 assertDeploymentScript()
+assertWorkerDeploymentScript()
 assertNginxBlueGreenConfig()
 assertSystemdTemplate()
 assertDeploymentDocumentation()
@@ -41,11 +45,14 @@ function assertWorkflowProvenance() {
   assert.match(workflow, /ARTIFACT_SHA256=\$\{ARTIFACT_SHA256@Q\}/, 'SSH command should pass the verified artifact checksum')
   assert.match(workflow, /ref: \$\{\{ steps\.target\.outputs\.sha \}\}/, 'production deploy should checkout the immutable target SHA')
   assert.match(workflow, /scripts\/deploy-production-atomic\.sh "\$DEPLOY_USER@\$DEPLOY_HOST:\$remote_deploy_script"/, 'workflow should upload the target deployment script')
+  assert.match(workflow, /scripts\/deploy-worker-atomic\.sh "\$WORKER_DEPLOY_USER@\$WORKER_DEPLOY_HOST:\$remote_deploy_script"/, 'workflow should upload the target worker deployment script')
   assert.match(workflow, /bash \$\{REMOTE_DEPLOY_SCRIPT@Q\}/, 'SSH command should run the uploaded deployment script')
   assert.match(workflow, /rm -f -- \$\{REMOTE_DEPLOY_SCRIPT@Q\} \$\{REMOTE_ARTIFACT@Q\}/, 'SSH command should clean up temporary deployment inputs')
   assert.doesNotMatch(workflow, /DEPLOY_SCRIPT:/, 'production deploy must not depend on a stale server-side script')
   assert.match(workflow, /for name in[^\n]*DEPLOY_KNOWN_HOSTS/, 'production deploy should require pinned SSH host keys')
   assert.doesNotMatch(workflow, /ssh-keyscan/, 'production deploy must not trust host keys discovered at runtime')
+  assert.match(workflow, /WORKER_DEPLOY_KNOWN_HOSTS/, 'production deploy should require pinned worker host keys')
+  assertOrdered(workflow, ['Deploy verified worker release first', 'Deploy verified API release second'])
   assert.doesNotMatch(workflow, /DEPLOY_BRANCH/, 'production workflow must not pass a mutable branch')
   assert.match(devWorkflow, /actions\/download-artifact@/, 'dev deploy should download the Quality Checks artifact')
   assert.match(devWorkflow, /run-id: \$\{\{ steps\.target\.outputs\.run_id \}\}/, 'dev deploy should bind the artifact to a Quality Checks run')
@@ -59,6 +66,7 @@ function assertWorkflowProvenance() {
     "'deploy/systemd/'",
     "'scripts/check-production-deploy.mjs'",
     "'scripts/deploy-production-atomic.sh'",
+    "'scripts/deploy-worker-atomic.sh'",
   ]) {
     assert.ok(buildRelevance.includes(deploymentPath), `build relevance should include ${deploymentPath}`)
   }
@@ -172,6 +180,53 @@ function assertDeploymentScript() {
   assertOrdered(rollbackBody, ['run_systemctl reload nginx', 'check_readiness "$OLD_ACTIVE_SLOT"', 'check_public_smoke'])
 }
 
+function assertWorkerDeploymentScript() {
+  const syntax = spawnSync('bash', ['-n', 'scripts/deploy-worker-atomic.sh'], { encoding: 'utf8' })
+  if (syntax.error?.code !== 'ENOENT') {
+    assert.equal(syntax.status, 0, syntax.stderr || 'worker deploy script should pass bash -n')
+  }
+
+  const invalidSha = spawnSync('bash', ['scripts/deploy-worker-atomic.sh'], {
+    encoding: 'utf8',
+    env: { ...process.env, TARGET_SHA: 'main' },
+  })
+  if (invalidSha.error?.code !== 'ENOENT') {
+    assert.notEqual(invalidSha.status, 0, 'worker deploy must reject mutable refs')
+    assert.match(`${invalidSha.stdout}\n${invalidSha.stderr}`, /full 40-character commit SHA/)
+  }
+
+  for (const contract of [
+    /git -C "\$REPO_DIR" cat-file -e "\$\{TARGET_SHA\}\^\{commit\}"/,
+    /git -C "\$REPO_DIR" merge-base --is-ancestor "\$TARGET_SHA"/,
+    /worktree add --detach "\$BUILD_DIR" "\$TARGET_SHA"/,
+    /sha256sum "\$ARTIFACT_PATH"/,
+    /release-artifact\.mjs verify --sha "\$TARGET_SHA"/,
+    /node --check server\/dist\/worker\.js/,
+    /node --check server\/dist\/optimize-worker\.js/,
+    /check_readiness "\$CANDIDATE_SLOT"/,
+    /CANDIDATE_ONLY/,
+    /previous-slot-drain/,
+    /rollback\(\)/,
+    /flock -n 9/,
+  ]) {
+    assert.match(workerDeployScript, contract)
+  }
+  assert.doesNotMatch(workerDeployScript, /npm run build/, 'worker deploy must not build on the server')
+  assert.doesNotMatch(workerDeployScript, /git restore/, 'worker deploy must not restore generated files')
+
+  const mainFlow = workerDeployScript.slice(workerDeployScript.indexOf('RELEASE_DIR="$RELEASES_DIR/$TARGET_SHA"'))
+  assertOrdered(mainFlow, [
+    'build_release',
+    'run_systemctl restart "$(service_unit "$CANDIDATE_SLOT")"',
+    'check_readiness "$CANDIDATE_SLOT"',
+    'if [[ "$CANDIDATE_ONLY" == "true" ]]',
+    'atomic_link "slots/$CANDIDATE_SLOT" "$CURRENT_LINK"',
+    'run_systemctl enable "$(service_unit "$CANDIDATE_SLOT")"',
+    'run_systemctl disable --now "$(service_unit "$OLD_ACTIVE_SLOT")"',
+    'check_readiness "$CANDIDATE_SLOT"',
+  ])
+}
+
 function assertNginxBlueGreenConfig() {
   const namedUpstreams = apiNginx.match(/proxy_pass http:\/\/goofish_backend;/g) ?? []
   assert.equal(namedUpstreams.length, 4, 'all production API locations should use the named upstream')
@@ -187,14 +242,26 @@ function assertSystemdTemplate() {
   assert.match(systemdUnit, /^Group=ntgmc$/m)
   assert.match(systemdUnit, /WorkingDirectory=\/opt\/goofish-infrast-v1\/slots\/%i/)
   assert.match(systemdUnit, /EnvironmentFile=\/etc\/goofish-infrast-v1\/%i\.env/)
+  assert.match(systemdUnit, /Environment=APP_ROLE=api/)
   assert.match(systemdUnit, /Environment=HOST=127\.0\.0\.1/)
   assert.match(systemdUnit, /KillSignal=SIGTERM/)
   assert.match(systemdUnit, /TimeoutStopSec=75s/)
+
+  assert.match(workerSystemdUnit, /^User=ntgmc$/m)
+  assert.match(workerSystemdUnit, /^Group=ntgmc$/m)
+  assert.match(workerSystemdUnit, /WorkingDirectory=\/opt\/goofish-infrast-v1-worker\/slots\/%i/)
+  assert.match(workerSystemdUnit, /Environment=APP_ROLE=worker/)
+  assert.match(workerSystemdUnit, /Environment=WORKER_HEALTH_HOST=127\.0\.0\.1/)
+  assert.match(workerSystemdUnit, /Requires=wg-quick@wg0\.service/)
+  assert.match(workerSystemdUnit, /KillSignal=SIGTERM/)
+  assert.match(workerSystemdUnit, /TimeoutStopSec=930s/)
+  assert.doesNotMatch(workerSystemdUnit, /0\.0\.0\.0/)
 }
 
 function assertDeploymentDocumentation() {
   assert.ok(productionDocs.includes('PUBLIC_APP_URL=https://maatool.com'), 'production EnvironmentFile must declare the public origin')
   assert.ok(developmentDocs.includes('PUBLIC_APP_URL=https://dev.maatool.com'), 'development EnvironmentFile must declare the public origin')
+  assert.ok(productionDocs.includes('[worker-deploy.md](worker-deploy.md)'), 'production docs should link the worker runbook')
   for (const expected of [
     '/opt/goofish-infrast-v1/releases/',
     '/opt/goofish-infrast-v1/current/dist',
@@ -208,6 +275,16 @@ function assertDeploymentDocumentation() {
   ]) {
     assert.ok(productionDocs.includes(expected), `production documentation should include ${expected}`)
   }
+  for (const expected of [
+    'APP_ROLE=worker',
+    'wg-quick@wg0.service',
+    'hostssl goofish_infrast_v1 goofish_worker 10.66.0.2/32 scram-sha-256',
+    'WORKER_DEPLOY_KNOWN_HOSTS',
+    'Worker deployment accepts the same immutable artifact contract',
+  ]) {
+    assert.ok(workerDocs.includes(expected), `worker documentation should include ${expected}`)
+  }
+  assert.ok(workerDocs.includes('Do not expose PostgreSQL 5432 publicly'), 'worker docs must forbid public PostgreSQL')
 }
 
 function assertOrdered(source, fragments) {

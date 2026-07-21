@@ -16,6 +16,7 @@ const buildRelevantFiles = new Set([
   '.github/workflows/deploy-dev.yml',
   'docs/dev-deploy.md',
   'docs/production-deploy.md',
+  'docs/worker-deploy.md',
 ])
 
 const buildRelevantPrefixes = [
@@ -24,6 +25,7 @@ const buildRelevantPrefixes = [
   'server/',
   'deploy/nginx/',
   'deploy/systemd/',
+  'deploy/wireguard/',
 ]
 
 const buildRelevantScripts = new Set([
@@ -31,12 +33,14 @@ const buildRelevantScripts = new Set([
   'scripts/check-api-handlers.mjs',
   'scripts/check-build-relevance.mjs',
   'scripts/check-production-deploy.mjs',
+  'scripts/check-worker-link.mjs',
   'scripts/check-depot-profile.mjs',
   'scripts/check-server-routes.mjs',
   'scripts/check-skland-handler.mjs',
   'scripts/check-workspace-history.mjs',
   'scripts/generate-data.mjs',
   'scripts/deploy-production-atomic.sh',
+  'scripts/deploy-worker-atomic.sh',
   'scripts/deploy-production.sh',
   'scripts/release-artifact.mjs',
   'scripts/import-postgres.mjs',
