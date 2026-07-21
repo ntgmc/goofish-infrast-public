@@ -671,42 +671,32 @@ ALTER TABLE user_game_accounts ALTER COLUMN cdk_code_hash DROP NOT NULL;
 ALTER TABLE user_game_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
 `
 
-const WORKER_SCHEMA_REQUIREMENTS = {
-  cdk_records: ['key', 'code_hash', 'status', 'permission', 'record_json', 'record_revision', 'updated_at'],
-  entitlement_ledger: ['id', 'profile_id', 'entitlement_type', 'status', 'reference_type', 'reference_id', 'window_key', 'created_at', 'settled_at'],
-  optimization_dead_letters: ['id', 'job_id', 'owner_key', 'profile_id', 'source', 'failure_kind', 'public_error_code', 'internal_error_message', 'diagnostic_json', 'attempt_count', 'status', 'created_at', 'updated_at'],
-  optimization_job_effects: ['job_id', 'effect_type', 'metadata_json', 'applied_at'],
-  optimize_dispatch_state: ['id', 'prioritized_streak', 'updated_at'],
-  optimize_job_attempts: ['job_id', 'attempt_no', 'worker_id', 'lock_token', 'status', 'started_at', 'heartbeat_at', 'finished_at', 'failure_kind', 'error_message'],
-  optimize_jobs: ['id', 'status', 'priority', 'owner_key', 'profile_id', 'permission', 'source', 'payload_json', 'result_json', 'error_message', 'failure_kind', 'public_error_code', 'attempt_count', 'failure_count', 'worker_id', 'heartbeat_at', 'lock_token', 'lock_expires_at', 'next_attempt_at', 'expires_at', 'cancel_requested_at', 'created_at', 'started_at', 'finished_at', 'updated_at'],
-  profile_entitlements: ['profile_id', 'first_generated_at', 'free_revision_count', 'confirmed_at', 'locked_at', 'lock_reason', 'strong_reorder_bonus_month', 'strong_reorder_bonus_used_at', 'updated_at'],
-  reward_consumptions: ['id', 'user_id', 'reward_type', 'grant_id', 'optimization_job_id', 'status', 'consumed_at', 'refunded_at'],
-  reward_grants: ['id', 'user_id', 'reward_type', 'remaining_quantity', 'expires_at', 'created_at'],
-  usage_events: ['key', 'event', 'visitor_id', 'user_id', 'profile_id', 'date', 'created_at', 'record_json'],
-  user_game_accounts: ['id', 'user_id', 'permission', 'status', 'record_json', 'updated_at'],
-  user_profile_workspaces: ['profile_id', 'operators_json', 'config_json', 'elite_overrides_json', 'last_result_json', 'record_json', 'updated_at'],
-  user_workspaces: ['user_id', 'operators_json', 'config_json', 'elite_overrides_json', 'last_result_json', 'record_json', 'updated_at'],
-} as const
+const TABLE_CONSTRAINT_KEYWORDS = new Set(['check', 'constraint', 'foreign', 'primary', 'unique'])
 
-let workerSchemaReady: Promise<void> | null = null
+export type DatabaseSchemaMode = 'migrate' | 'validate'
+
+let runtimeSchemaReady: Promise<void> | null = null
+
+export function resolveDatabaseSchemaMode(environment: NodeJS.ProcessEnv = process.env): DatabaseSchemaMode {
+  const role = resolveAppRole(environment)
+  return environment.NODE_ENV === 'production' || role === 'worker' ? 'validate' : 'migrate'
+}
 
 export async function ensureDatabaseSchema(): Promise<void> {
-  if (resolveAppRole() !== 'worker') {
+  if (resolveDatabaseSchemaMode() === 'migrate') {
     await query(CREATE_SCHEMA_SQL)
     return
   }
 
-  workerSchemaReady ??= validateWorkerDatabaseSchema().catch((error) => {
-    workerSchemaReady = null
+  runtimeSchemaReady ??= validateRuntimeDatabaseSchema().catch((error) => {
+    runtimeSchemaReady = null
     throw error
   })
-  await workerSchemaReady
+  await runtimeSchemaReady
 }
 
-export async function validateWorkerDatabaseSchema(): Promise<void> {
-  const requiredColumns = Object.entries(WORKER_SCHEMA_REQUIREMENTS).flatMap(([tableName, columns]) =>
-    columns.map((columnName) => ({ table_name: tableName, column_name: columnName })),
-  )
+export async function validateRuntimeDatabaseSchema(): Promise<void> {
+  const requiredColumns = runtimeSchemaRequirements()
   const missing = await query<{ table_name: string; column_name: string }>(
     `with required as (
        select table_name, column_name
@@ -726,7 +716,32 @@ export async function validateWorkerDatabaseSchema(): Promise<void> {
   if (missing.rows.length === 0) return
   const missingNames = missing.rows.map((row) => `${row.table_name}.${row.column_name}`).join(', ')
   throw new Error(
-    `Worker database schema is incompatible; missing required columns: ${missingNames}. ` +
-    'Apply database migrations from an API release before starting the worker.',
+    `Runtime database schema is incompatible; missing required columns: ${missingNames}. ` +
+    'Apply database migrations before starting production API or Worker processes.',
+  )
+}
+
+function runtimeSchemaRequirements(): Array<{ table_name: string; column_name: string }> {
+  const requirements = new Map<string, Set<string>>()
+  const add = (tableName: string, columnName: string): void => {
+    const columns = requirements.get(tableName) ?? new Set<string>()
+    columns.add(columnName)
+    requirements.set(tableName, columns)
+  }
+
+  for (const match of CREATE_SCHEMA_SQL.matchAll(/CREATE TABLE IF NOT EXISTS\s+([a-z_][a-z0-9_]*)\s*\(([\s\S]*?)\);/gi)) {
+    const tableName = match[1].toLowerCase()
+    for (const line of match[2].split('\n')) {
+      const column = /^\s*([a-z_][a-z0-9_]*)\s+/i.exec(line)?.[1]?.toLowerCase()
+      if (column && !TABLE_CONSTRAINT_KEYWORDS.has(column)) add(tableName, column)
+    }
+  }
+
+  for (const match of CREATE_SCHEMA_SQL.matchAll(/ALTER TABLE\s+([a-z_][a-z0-9_]*)\s+ADD COLUMN IF NOT EXISTS\s+([a-z_][a-z0-9_]*)/gi)) {
+    add(match[1].toLowerCase(), match[2].toLowerCase())
+  }
+
+  return [...requirements.entries()].flatMap(([tableName, columns]) =>
+    [...columns].map((columnName) => ({ table_name: tableName, column_name: columnName })),
   )
 }
