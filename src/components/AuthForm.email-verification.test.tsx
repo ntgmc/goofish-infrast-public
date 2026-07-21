@@ -16,7 +16,8 @@ describe('AuthForm email verification', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse({
         accepted: true,
-        message: '如果可以完成注册，请检查邮箱或直接登录。',
+        verification_required: true,
+        message: '已发送注册验证邮件，请检查您的收件箱，并在邮件中确认。',
       }, 202))
       .mockResolvedValueOnce(jsonResponse({ accepted: true, message: '如果账号符合条件，请检查注册邮箱。' }, 202))
     vi.stubGlobal('fetch', fetchMock)
@@ -29,11 +30,29 @@ describe('AuthForm email verification', () => {
     await user.type(screen.getByLabelText('密码'), 'password123')
     await user.click(screen.getByRole('button', { name: '创建账号' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('请检查邮箱')
+    expect(await screen.findByRole('status')).toHaveTextContent('请检查您的收件箱')
     expect(onAuthenticated).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '重新发送验证邮件' }))
     expect(await screen.findByText('如果账号符合条件，请检查注册邮箱。')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenLastCalledWith('/api/auth/resend-verification', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('does not offer resend after a quota-bypassed registration', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      accepted: true,
+      verification_required: false,
+      message: '注册成功，请使用邮箱和密码登录。',
+    }, 202)))
+    const user = userEvent.setup()
+
+    render(<AuthForm onAuthenticated={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: '注册' }))
+    await user.type(screen.getByLabelText('邮箱'), 'bypassed@example.com')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '创建账号' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('注册成功')
+    expect(screen.queryByRole('button', { name: '重新发送验证邮件' })).not.toBeInTheDocument()
   })
 
   it('offers resend when login is rejected as unverified', async () => {

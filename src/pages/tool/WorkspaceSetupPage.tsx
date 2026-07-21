@@ -263,7 +263,7 @@ export default function WorkspaceSetupPage({
               ))}
             </nav>
           </LayoutGroup>
-          {announcement?.active && <AnnouncementBanner announcement={announcement} className="mt-4" />}
+          {announcement?.active && <AnnouncementBanner announcement={announcement} className="mx-auto mt-4 max-w-7xl" />}
         </header>
 
         <AnimatedPresenceRegion motionKey={activeSection}>

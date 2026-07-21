@@ -855,9 +855,48 @@ export interface InvitationSettings {
   updated_at: string | null;
 }
 
+export type BrevoQuotaAction = 'pause_registration' | 'allow_unverified_registration';
+
+export type BrevoEmailPurpose =
+  | 'email_verification'
+  | 'password_reset'
+  | 'account_deletion_cancellation'
+  | 'account_deletion_receipt';
+
+export interface BrevoEmailDailyStat {
+  date: string;
+  sent_count: number;
+  reserved_count: number;
+  uncertain_count: number;
+  failed_count: number;
+  local_quota_used_count: number;
+  quota_used_count: number;
+  remaining_count: number;
+  limit_reached: boolean;
+  by_purpose: Record<BrevoEmailPurpose, number>;
+}
+
+export interface BrevoOfficialQuotaStatus {
+  status: 'fresh' | 'stale' | 'unavailable';
+  reported_remaining_count: number | null;
+  reported_used_count: number | null;
+  external_used_offset: number;
+  synced_at: string | null;
+  last_attempt_at: string | null;
+}
+
+export interface BrevoEmailStats {
+  timezone: 'UTC';
+  daily_limit: number;
+  official_quota: BrevoOfficialQuotaStatus;
+  today: BrevoEmailDailyStat;
+  days: BrevoEmailDailyStat[];
+}
+
 export interface RegistrationSettings {
-  version: 1;
+  version: 2;
   email_verification_required: boolean;
+  brevo_quota_action: BrevoQuotaAction;
   updated_at: string | null;
 }
 

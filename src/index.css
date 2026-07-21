@@ -649,10 +649,6 @@ body {
     white-space: nowrap;
   }
 
-  .auth-feedback-slot {
-    min-height: 3.5rem;
-  }
-
   .auth-field-message {
     min-height: 1.25rem;
     margin-top: 0.375rem;

@@ -37,6 +37,44 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('ToolPage route guards', () => {
+  it('shows the announcement banner after the /tool entry redirects to the dashboard', async () => {
+    const router = renderToolRoute('/tool', {
+      banner: {
+        id: 'banner-1',
+        kind: 'banner',
+        title: '维护公告',
+        body: '今晚进行例行维护。',
+        active: true,
+        updated_at: '2026-07-21T00:00:00.000Z',
+      },
+    })
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/profiles'))
+    const banner = await screen.findByRole('region', { name: '站内横幅' })
+    expect(banner).toHaveClass('mx-auto', 'max-w-7xl')
+    expect(banner).toHaveTextContent('维护公告')
+    expect(screen.getByText('今晚进行例行维护。')).toBeInTheDocument()
+  })
+
+  it('keeps the opened profile in the URL so a refresh can restore it', async () => {
+    const user = userEvent.setup()
+    const firstProfile = createProfile()
+    const secondProfile = { ...createProfile(), id: 'profile-2', display_name: '第二个档案' }
+    const refreshProfileWorkspace = vi.fn().mockResolvedValue(undefined)
+    const router = renderToolRoute('/tool/profiles', {
+      activeProfile: firstProfile,
+      activeCdkProfile: firstProfile,
+      cdkProfiles: [firstProfile, secondProfile],
+      refreshProfileWorkspace,
+    })
+
+    await user.click((await screen.findAllByRole('button', { name: '准备这个账号' }))[1])
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/setup/operators'))
+    expect(router.state.location.search).toBe('?profile_id=profile-2')
+    expect(refreshProfileWorkspace).toHaveBeenCalledWith(secondProfile)
+  })
+
   it('updates the active dashboard tab immediately while its code is still loading', async () => {
     const user = userEvent.setup()
     const router = renderToolRoute('/tool/profiles')
