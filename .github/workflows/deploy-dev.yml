@@ -39,7 +39,6 @@ jobs:
       DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
       DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
       DEPLOY_APP_DIR: ${{ vars.DEPLOY_APP_DIR || '/opt/goofish-infrast-v1-dev' }}
-      DEPLOY_SCRIPT: ${{ vars.DEPLOY_SCRIPT || '/opt/goofish-infrast-v1-dev/scripts/deploy-production.sh' }}
       DEPLOY_SERVICE_NAME: ${{ vars.DEPLOY_SERVICE_NAME || 'goofish-infrast-v1-dev' }}
       DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://127.0.0.1:3001/api/health' }}
       DEPLOY_PUBLIC_BASE_URL: ${{ vars.DEPLOY_PUBLIC_BASE_URL || 'https://dev.maatool.com' }}
@@ -67,6 +66,11 @@ jobs:
             if (!accepted) return core.setFailed(`No successful push Quality Checks run exists for dev SHA ${sha}.`)
             core.setOutput('sha', sha)
             core.setOutput('run_id', String(accepted.id))
+
+      - name: Checkout target commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ steps.target.outputs.sha }}
 
       - name: Download verified release decision
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -108,7 +112,7 @@ jobs:
             [[ -n "${!name}" ]] || { echo "Missing required development setting: $name" >&2; exit 1; }
           done
 
-      - name: Prepare SSH and upload artifact
+      - name: Prepare SSH and upload deployment inputs
         if: steps.artifact.outputs.deployable == 'true'
         env:
           TARGET_SHA: ${{ steps.target.outputs.sha }}
@@ -121,9 +125,13 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
           remote_artifact="/tmp/goofish-release-${TARGET_SHA}-${GITHUB_RUN_ID}.tgz"
+          remote_deploy_script="/tmp/goofish-dev-deploy-${TARGET_SHA}-${GITHUB_RUN_ID}.sh"
           scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o IdentitiesOnly=yes \
             release-package/release.tgz "$DEPLOY_USER@$DEPLOY_HOST:$remote_artifact"
+          scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o IdentitiesOnly=yes \
+            scripts/deploy-production.sh "$DEPLOY_USER@$DEPLOY_HOST:$remote_deploy_script"
           echo "REMOTE_ARTIFACT=$remote_artifact" >> "$GITHUB_ENV"
+          echo "REMOTE_DEPLOY_SCRIPT=$remote_deploy_script" >> "$GITHUB_ENV"
 
       - name: Deploy verified artifact
         if: steps.artifact.outputs.deployable == 'true'
@@ -132,6 +140,6 @@ jobs:
           ARTIFACT_SHA256: ${{ steps.artifact.outputs.archive_sha }}
         run: |
           set -euo pipefail
-          remote_command="APP_DIR=${DEPLOY_APP_DIR@Q} TARGET_SHA=${TARGET_SHA@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} HEALTH_URL=${DEPLOY_HEALTH_URL@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} LOCK_FILE=${DEPLOY_LOCK_FILE@Q} FORCE_DEPLOY=${FORCE_DEPLOY@Q} ARTIFACT_PATH=${REMOTE_ARTIFACT@Q} ARTIFACT_SHA256=${ARTIFACT_SHA256@Q} bash ${DEPLOY_SCRIPT@Q}"
+          remote_command="APP_DIR=${DEPLOY_APP_DIR@Q} TARGET_SHA=${TARGET_SHA@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} HEALTH_URL=${DEPLOY_HEALTH_URL@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} LOCK_FILE=${DEPLOY_LOCK_FILE@Q} FORCE_DEPLOY=${FORCE_DEPLOY@Q} ARTIFACT_PATH=${REMOTE_ARTIFACT@Q} ARTIFACT_SHA256=${ARTIFACT_SHA256@Q} bash ${REMOTE_DEPLOY_SCRIPT@Q}; status=\$?; rm -f -- ${REMOTE_DEPLOY_SCRIPT@Q} ${REMOTE_ARTIFACT@Q}; exit \$status"
           ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o IdentitiesOnly=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" "$remote_command"

@@ -21,8 +21,8 @@ does not create per-PR preview URLs.
 2. `Quality Checks` runs for `dev`.
 3. `Deploy Dev` starts only after `Quality Checks` succeeds.
 4. The workflow SSHs into the server using the `development` GitHub environment.
-5. The server runs `/opt/goofish-infrast-v1-dev/scripts/deploy-production.sh`
-   with dev-specific parameters.
+5. The workflow uploads `scripts/deploy-production.sh` from the immutable target
+   commit and runs that temporary copy with dev-specific parameters.
 6. The workflow downloads the SHA-bound release artifact produced by the
    successful `Quality Checks` run and verifies its SHA-256 before upload.
 7. The script checks out the immutable target SHA, runs `npm ci --omit=dev`,
@@ -65,6 +65,19 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart goofish-infrast-v1-dev
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-infrast-v1-dev
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-infrast-v1-dev --no-pager --lines=50
 ```
+
+Grant the deploy user read-only access to the system journal so a failed health
+check includes the backend error that caused it:
+
+```bash
+sudo usermod -aG systemd-journal deploy
+```
+
+Disconnect and reconnect the deploy user's SSH session after changing group
+membership, then verify `journalctl --unit goofish-infrast-v1-dev --no-pager
+--lines=80` works without `sudo`. The deployment remains non-interactive when
+journal access is missing and prints the final health HTTP status and response
+body instead.
 
 The deploy script keeps the server checkout clean and rejects all unexpected
 tracked changes. Generated data and build metadata live in ignored `.generated`
@@ -240,7 +253,6 @@ Optional `development` environment variables:
 | --- | --- |
 | `DEPLOY_PORT` | `22` |
 | `DEPLOY_APP_DIR` | `/opt/goofish-infrast-v1-dev` |
-| `DEPLOY_SCRIPT` | `/opt/goofish-infrast-v1-dev/scripts/deploy-production.sh` |
 | `DEPLOY_SERVICE_NAME` | `goofish-infrast-v1-dev` |
 | `DEPLOY_HEALTH_URL` | `http://127.0.0.1:3001/api/health` |
 | `DEPLOY_PUBLIC_BASE_URL` | `https://dev.maatool.com` |
