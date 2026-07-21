@@ -309,7 +309,7 @@ async function assertOptimizeHistory() {
     license: null,
     operators: sampleOperators,
     config: sampleConfig,
-    ignore_elite: false,
+    include_upgrade_suggestions: true,
   })
   const workspace = store.workspaces.get('profile-1')
   if (generated.status !== 200 || !workspace?.last_result || workspace.result_history.length !== 1) {
@@ -321,21 +321,8 @@ async function assertOptimizeHistory() {
   if (!workspace.saved_configs[0].last_used_at) {
     throw new Error('optimize history: matching saved config should be touched')
   }
-
-  const suggestionsOnly = await call(optimizeHandler, '/api/optimize', {
-    profile_id: 'profile-1',
-    license: null,
-    operators: sampleOperators,
-    config: sampleConfig,
-    ignore_elite: true,
-    suggestions_only: true,
-    upgrade_task_payload: {
-      tasks: [],
-      baselineScore: 0,
-    },
-  })
-  if (suggestionsOnly.status !== 200 || store.workspaces.get('profile-1')?.result_history.length !== 1) {
-    throw new Error('optimize suggestions_only: should not append history')
+  if (workspace.last_result.upgrade_suggestions_status !== 'completed' || !Array.isArray(workspace.last_result.upgrade_suggestions)) {
+    throw new Error('optimize history: merged suggestions should be stored with the first result')
   }
 }
 
@@ -360,7 +347,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     license: null,
     operators: sampleOperators,
     config: free333OrundumConfig,
-    ignore_elite: false,
+    include_upgrade_suggestions: false,
   })
   if (unboundOptimize.status !== 403) {
     throw new Error(`免费档案未绑定生成：预期 403，实际 ${unboundOptimize.status}`)
@@ -399,21 +386,6 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
   await assertFreePreviewModeRoundTrip()
 
   const beforeHistoryCount = store.workspaces.get(preview.id)?.result_history.length ?? 0
-  const suggestionsOnly = await call(optimizeHandler, '/api/optimize', {
-    profile_id: preview.id,
-    license: null,
-    operators: sampleOperators,
-    config: free333OrundumConfig,
-    ignore_elite: true,
-    suggestions_only: true,
-    upgrade_task_payload: {
-      tasks: [],
-      baselineScore: 0,
-    },
-  })
-  if (suggestionsOnly.status !== 403 || store.workspaces.get(preview.id)?.result_history.length !== beforeHistoryCount) {
-    throw new Error(`免费档案 suggestions_only：预期 403 且不追加历史，实际 ${suggestionsOnly.status}`)
-  }
 
   const unboundReorder = await call(optimizeHandler, '/api/optimize/reorder-check', {
     profile_id: unboundPreview.id,
@@ -450,12 +422,15 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
     license: null,
     operators: sampleOperators,
     config: free333OrundumConfig,
-    ignore_elite: false,
+    include_upgrade_suggestions: true,
   })
   if (generated.status !== 200) {
     throw new Error(`免费档案生成排班：预期 200，实际 ${generated.status}`)
   }
   assertFreePreviewResult(generated.body, '免费档案生成响应')
+  if (generated.body.upgrade_suggestions_status !== 'not_allowed') {
+    throw new Error('免费档案生成：服务端应将优化建议降级为 not_allowed')
+  }
 
   const workspace = store.workspaces.get(preview.id)
   if (!workspace?.last_result || workspace.result_history.length !== beforeHistoryCount + 1) {
@@ -565,7 +540,7 @@ async function assertFreePreviewModeRoundTrip() {
     license: null,
     operators: sampleOperators,
     config: free333RoundTripConfig,
-    ignore_elite: false,
+    include_upgrade_suggestions: false,
   })
   if (generated.status !== 200) {
     throw new Error(`免费档案模式往返：切回 MAA 后生成失败，实际 ${generated.status}`)
@@ -783,7 +758,7 @@ async function generateFreeSchedule(profileId) {
     license: null,
     operators: sampleOperators,
     config: free333OrundumConfig,
-    ignore_elite: false,
+    include_upgrade_suggestions: false,
   })
 }
 
@@ -1046,16 +1021,9 @@ async function waitForOptimizeJob(handler, jobId) {
 
 function toOptimizationRequest(body) {
   const identity = { type: 'profile', profileId: body.profile_id }
-  if (body.suggestions_only) {
-    return {
-      kind: 'upgrade_suggestions', identity, operators: body.operators, config: body.config,
-      upgradeTaskPayload: body.upgrade_task_payload,
-    }
-  }
   return {
     kind: 'schedule', identity, operators: body.operators, config: body.config,
-    ignoreElite: body.ignore_elite ?? false,
-    includeCurrent: body.include_current,
+    includeUpgradeSuggestions: body.include_upgrade_suggestions ?? false,
     historySource: body.history_source,
   }
 }

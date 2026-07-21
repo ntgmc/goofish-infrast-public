@@ -6,7 +6,6 @@ import type {
   OptimizeJobPriority,
   OptimizeResult,
   ReorderCheckResult,
-  UpgradeTaskPayload,
 } from './types'
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from './scenario-comparison'
 
@@ -21,15 +20,9 @@ interface OptimizationJobInput {
 export type CreateOptimizationJobRequest =
   | (OptimizationJobInput & {
       kind: 'schedule';
-      ignoreElite: boolean;
-      includeCurrent?: boolean;
+      includeUpgradeSuggestions: boolean;
       historySource?: 'generated' | 'applied_suggestions';
       use_priority_coupon?: boolean;
-    })
-  | (OptimizationJobInput & {
-      kind: 'upgrade_suggestions';
-      upgradeTaskPayload: UpgradeTaskPayload;
-      historyResultId?: string;
     })
   | (Omit<OptimizationJobInput, 'identity'> & {
       kind: 'scenario_comparison';

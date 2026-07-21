@@ -51,6 +51,7 @@ export interface UsageEventRecord {
   date: string
   status?: UsageEventStatus
   duration_ms?: number
+  compute_duration_ms?: number
   reason_code?: UsageReasonCode
   permission?: string
   profile_id?: string
@@ -260,19 +261,19 @@ export function createPostgresUsageEventStore(): UsageEventStore {
   }
 
   const getScheduleGenerateDurationStatsByBucket = async (bucket: string, startAt: string, endAt: string) => {
-    const result = await query<{ duration_ms: string | number | null }>(
-      `select record_json->>'duration_ms' as duration_ms
+    const result = await query<{ compute_duration_ms: string | number | null }>(
+      `select record_json->>'compute_duration_ms' as compute_duration_ms
        from usage_events
        where event = $1
          and created_at >= $2
          and created_at < $3
          and coalesce(record_json->>'status', 'success') = 'success'
          and record_json->>'estimate_bucket' = $4
-         and record_json ? 'duration_ms'`,
+         and record_json ? 'compute_duration_ms'`,
       ['schedule_generate', startAt, endAt, bucket],
     )
     const durations = result.rows
-      .map((row) => Number(row.duration_ms))
+      .map((row) => Number(row.compute_duration_ms))
       .filter((value) => Number.isFinite(value) && value >= 0)
       .map((value) => Math.round(value))
     return {
@@ -361,8 +362,8 @@ export function buildUsageStats(
       }
     }
 
-    if (event.event === 'schedule_generate' && isSuccess(event) && isFiniteDuration(event.duration_ms)) {
-      const duration = Math.max(0, Math.round(event.duration_ms))
+    if (event.event === 'schedule_generate' && isSuccess(event) && isFiniteDuration(event.compute_duration_ms)) {
+      const duration = Math.max(0, Math.round(event.compute_duration_ms))
       scheduleDurations.push(duration)
       const durations = scheduleDurationsByDate.get(event.date) ?? []
       durations.push(duration)

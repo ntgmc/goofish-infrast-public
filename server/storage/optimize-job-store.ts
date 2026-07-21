@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
-import { getOptimizeGlobalWorkerConcurrency } from '../optimize-job-config'
+import { getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs } from '../optimize-job-config'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import {
@@ -242,24 +242,12 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         if (running >= limits.running || queued >= limits.queued + (input.source === 'free_preview' ? 1 : 0)) {
           throw new OptimizeJobAdmissionError('queue_capacity_exceeded', 429, '当前账号的优化队列已满，请稍后重试。')
         }
-        const isSuggestionContinuation = input.source === 'optimize_suggestions'
-        if (isSuggestionContinuation) {
-          const submittedSuggestions = await client.query<{ count: string }>(
-            `select count(*)::text as count from optimize_jobs
-             where owner_key = $1 and source = 'optimize_suggestions'
-               and created_at >= now() - interval '1 hour'`, [input.owner_key],
-          )
-          if (Number(submittedSuggestions.rows[0]?.count ?? 0) >= 12) {
-            throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
-          }
-        } else {
-          const submitted = await client.query<{ count: string }>(
-            `select count(*)::text as count from optimization_submissions
-             where owner_key = $1 and created_at >= now() - interval '1 hour'`, [input.owner_key],
-          )
-          if (Number(submitted.rows[0]?.count ?? 0) >= limits.perHour) {
-            throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
-          }
+        const submitted = await client.query<{ count: string }>(
+          `select count(*)::text as count from optimization_submissions
+           where owner_key = $1 and created_at >= now() - interval '1 hour'`, [input.owner_key],
+        )
+        if (Number(submitted.rows[0]?.count ?? 0) >= limits.perHour) {
+          throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
         }
 
         if (input.free_profile_id) {
@@ -315,9 +303,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           'values ($1, $2, $3, $4, $5, $6, $7, $8, null, null, 0, null, null, $9, $10, $9, null, null, $9)',
           'returning *',
         ].join(' '), [input.id, 'queued', input.priority, input.owner_key, input.profile_id ?? null, input.permission, input.source, input.payload_json, now, queueExpiresAt(now)])
-        if (!isSuggestionContinuation) {
-          await client.query('insert into optimization_submissions (id, owner_key, created_at) values ($1, $2, $3)', [randomUUID(), input.owner_key, now])
-        }
+        await client.query('insert into optimization_submissions (id, owner_key, created_at) values ($1, $2, $3)', [randomUUID(), input.owner_key, now])
         await client.query(
           `insert into optimization_idempotency (owner_key, idempotency_key, request_hash, status, job_id, created_at, updated_at)
            values ($1, $2, $3, 'accepted', $4, $5, $5)`,
@@ -736,23 +722,12 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         throw new OptimizeJobAdmissionError('queue_capacity_exceeded', 429, '当前账号的优化队列已满，请稍后重试。')
       }
       const now = Date.now()
-      if (input.source === 'optimize_suggestions') {
-        const recentSuggestions = [...records.values()].filter((job) => (
-          job.owner_key === input.owner_key
-          && job.source === 'optimize_suggestions'
-          && Date.parse(job.created_at) >= now - 60 * 60_000
-        ))
-        if (recentSuggestions.length >= 12) {
-          throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
-        }
-      } else {
-        const recent = (submissions.get(input.owner_key) ?? []).filter((time) => time >= now - 60 * 60_000)
-        if (recent.length >= (free ? 2 : 12)) {
-          throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
-        }
-        recent.push(now)
-        submissions.set(input.owner_key, recent)
+      const recent = (submissions.get(input.owner_key) ?? []).filter((time) => time >= now - 60 * 60_000)
+      if (recent.length >= (free ? 2 : 12)) {
+        throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
       }
+      recent.push(now)
+      submissions.set(input.owner_key, recent)
       const job = await (async () => {
         const value = await Promise.resolve({ ...input, created_at: input.created_at ?? new Date(now).toISOString() })
         const record: OptimizeJobRecord = { id: value.id, status: 'queued', priority: value.priority, owner_key: value.owner_key, profile_id: value.profile_id ?? null, permission: value.permission, source: value.source, payload_json: clone(value.payload_json), result_json: null, error_message: null, failure_kind: null, public_error_code: null, attempt_count: 0, failure_count: 0, worker_id: null, heartbeat_at: null, lock_token: null, lock_expires_at: null, next_attempt_at: value.created_at!, expires_at: queueExpiresAt(value.created_at!), cancel_requested_at: null, created_at: value.created_at!, started_at: null, finished_at: null, updated_at: value.created_at! }
@@ -1096,7 +1071,7 @@ function estimateOptimizeQueueWaitMs(
     const elapsedMs = Math.max(0, nowMs - parseQueueTimestamp(job.started_at, nowMs))
     const estimatedDurationMs = getQueueJobDurationMs(job.payload_json)
     const remainingMs = elapsedMs >= estimatedDurationMs
-      ? Math.max(1_000, optimizeJobHardTimeoutMs() - elapsedMs)
+      ? Math.max(1_000, getOptimizeJobHardTimeoutMs() - elapsedMs)
       : Math.max(1_000, estimatedDurationMs - elapsedMs)
     scheduleQueueWork(workerAvailableAt, ownerAvailableAt, job.owner_key, remainingMs)
   }
@@ -1149,10 +1124,6 @@ function getQueueJobDurationMs(payload: unknown): number {
 function parseQueueTimestamp(value: string | null, fallback: number): number {
   const parsed = value ? Date.parse(value) : Number.NaN
   return Number.isFinite(parsed) ? parsed : fallback
-}
-
-function optimizeJobHardTimeoutMs(): number {
-  return positiveInteger(process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS, 10 * 60_000, 1_000)
 }
 
 function getOptimizeGlobalQueueLimit(): number {
@@ -1226,17 +1197,12 @@ function buildDeadLetterDiagnostic(job: OptimizeJobRecord): Record<string, unkno
   const payload = job.payload_json && typeof job.payload_json === 'object'
     ? job.payload_json as Record<string, unknown>
     : {}
-  const request = payload.request && typeof payload.request === 'object'
-    ? payload.request as Record<string, unknown>
-    : {}
   const estimate = payload.estimate && typeof payload.estimate === 'object'
     ? payload.estimate as Record<string, unknown>
     : null
   return {
     payload_version: typeof payload.version === 'number' ? payload.version : null,
-    job_kind: typeof payload.kind === 'string'
-      ? payload.kind
-      : request.suggestions_only === true ? 'upgrade_suggestions' : 'schedule',
+    job_kind: typeof payload.kind === 'string' ? payload.kind : 'schedule',
     profile_id: job.profile_id,
     source: job.source,
     permission: job.permission,
@@ -1426,6 +1392,7 @@ export async function replayOptimizationDeadLetter(id: string, replayedBy: strin
     const originalResult = await client.query<OptimizeJobRow>('select * from optimize_jobs where id = $1 for update', [letter.job_id])
     const original = originalResult.rows[0] ? fromRow(originalResult.rows[0]) : null
     if (!original || original.status !== 'dead_lettered') return null
+    if (isLegacyStandaloneSuggestionJob(original.source, original.payload_json)) return null
     const now = new Date().toISOString()
     const replayedId = randomUUID()
     const inserted = await client.query<OptimizeJobRow>(
@@ -1448,6 +1415,14 @@ export async function replayOptimizationDeadLetter(id: string, replayedBy: strin
     )
     return inserted.rows[0] ? fromRow(inserted.rows[0]) : null
   })
+}
+
+function isLegacyStandaloneSuggestionJob(source: string, payload: unknown): boolean {
+  if (source === 'optimize_suggestions') return true
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false
+  const request = (payload as Record<string, unknown>).request
+  return Boolean(request && typeof request === 'object' && !Array.isArray(request)
+    && (request as Record<string, unknown>).suggestions_only === true)
 }
 
 export async function discardOptimizationDeadLetter(id: string): Promise<boolean> {
