@@ -263,98 +263,98 @@ export default function WorkspaceSetupPage({
               ))}
             </nav>
           </LayoutGroup>
-          {announcement?.active && <AnnouncementBanner announcement={announcement} className="mx-auto mt-4 max-w-7xl" />}
         </header>
 
-        <AnimatedPresenceRegion motionKey={activeSection}>
-          {activeSection === 'cdk' ? (
-            <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
+        <div className="mx-auto max-w-7xl space-y-4 px-5 py-6 sm:px-8">
+          <AnnouncementBanner announcement={announcement} />
+          <AnimatedPresenceRegion motionKey={activeSection}>
+            {activeSection === 'cdk' ? (
               <ProfileCdkPaths profile={profile} onUpgraded={onSynced} onRedeemNewProfile={onRedeemNewProfile} />
-            </div>
-          ) : (
-            <form onSubmit={handleSave} className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
-          <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
-            <div className="space-y-5">
-              {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
-              {status && <div className="tool-alert tool-alert--success" role="status" aria-live="polite">{status}</div>}
+            ) : (
+              <form onSubmit={handleSave}>
+                <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
+                  <div className="space-y-5">
+                    {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
+                    {status && <div className="tool-alert tool-alert--success" role="status" aria-live="polite">{status}</div>}
 
-              {activeSection === 'operators' && (
-                <section className="tool-panel p-5 sm:p-6">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h2 className="text-lg font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_024}</h2>
-                      <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_025}</p>
-                    </div>
-                    {operators && <span className="tool-status tool-status--success">{copy.workspace.pages_tool_WorkspaceSetupPage_026}</span>}
-                  </div>
+                    {activeSection === 'operators' && (
+                      <section className="tool-panel p-5 sm:p-6">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <h2 className="text-lg font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_024}</h2>
+                            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_025}</p>
+                          </div>
+                          {operators && <span className="tool-status tool-status--success">{copy.workspace.pages_tool_WorkspaceSetupPage_026}</span>}
+                        </div>
 
-                  <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <label className="tool-secondary-action inline-flex cursor-pointer items-center justify-center">
-                      {operatorFileName ? `${copy.workspace.pages_tool_WorkspaceSetupPage_027}${operatorFileName}` : operators ? `${copy.workspace.pages_tool_WorkspaceSetupPage_028}${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_029}` : copy.workspace.pages_tool_WorkspaceSetupPage_030}
-                      <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} disabled={!canManualEditOperators} className="hidden" />
-                    </label>
-                    {operators && <span className="text-sm text-brand-400">{copy.workspace.pages_tool_WorkspaceSetupPage_031}{ownedOperatorCount} {copy.workspace.pages_tool_WorkspaceSetupPage_032}</span>}
-                  </div>
+                        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <label className="tool-secondary-action inline-flex cursor-pointer items-center justify-center">
+                            {operatorFileName ? `${copy.workspace.pages_tool_WorkspaceSetupPage_027}${operatorFileName}` : operators ? `${copy.workspace.pages_tool_WorkspaceSetupPage_028}${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_029}` : copy.workspace.pages_tool_WorkspaceSetupPage_030}
+                            <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} disabled={!canManualEditOperators} className="hidden" />
+                          </label>
+                          {operators && <span className="text-sm text-brand-400">{copy.workspace.pages_tool_WorkspaceSetupPage_031}{ownedOperatorCount} {copy.workspace.pages_tool_WorkspaceSetupPage_032}</span>}
+                        </div>
 
-                  <SklandStatusCard
-                    profile={profile}
-                    busy={sklandRefreshing}
-                    dialogOpen={sklandDialogOpen}
-                    notice={sklandRefreshNotice}
-                    onOpen={() => setSklandDialogOpen(true)}
-                    onRefresh={handleRefreshSkland}
-                  />
+                        <SklandStatusCard
+                          profile={profile}
+                          busy={sklandRefreshing}
+                          dialogOpen={sklandDialogOpen}
+                          notice={sklandRefreshNotice}
+                          onOpen={() => setSklandDialogOpen(true)}
+                          onRefresh={handleRefreshSkland}
+                        />
 
-                  {operators && (
-                    <div className="mt-5">
-                      <input value={operatorSearch} onChange={(event) => setOperatorSearch(event.currentTarget.value)} className="tool-field mb-4" placeholder={copy.workspace.pages_tool_WorkspaceSetupPage_033} aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_034} />
-                      <div className="grid max-h-[560px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
-                        {filteredOperators.map((operator) => <OperatorPreviewCard key={operator.id} operator={operator} />)}
+                        {operators && (
+                          <div className="mt-5">
+                            <input value={operatorSearch} onChange={(event) => setOperatorSearch(event.currentTarget.value)} className="tool-field mb-4" placeholder={copy.workspace.pages_tool_WorkspaceSetupPage_033} aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_034} />
+                            <div className="grid max-h-[560px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
+                              {filteredOperators.map((operator) => <OperatorPreviewCard key={operator.id} operator={operator} />)}
+                            </div>
+                          </div>
+                        )}
+                      </section>
+                    )}
+
+                    {activeSection === 'config' && (
+                      <div data-tour-target="workspace-config-editor">
+                        <Suspense fallback={<SectionFallback />}>
+                          <WorkspaceConfigSection
+                            config={normalizedConfig}
+                            canEdit={canEditConfig}
+                            canEditIntermediateInventory={canEditLimitedConfig}
+                            canSelectPreset
+                            changed={configChanged}
+                            permission={profile.permission}
+                            validation={configValidation}
+                            onUpdate={updateConfig}
+                          />
+                        </Suspense>
                       </div>
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {activeSection === 'config' && (
-                <div data-tour-target="workspace-config-editor">
-                  <Suspense fallback={<SectionFallback />}>
-                    <WorkspaceConfigSection
-                      config={normalizedConfig}
-                      canEdit={canEditConfig}
-                      canEditIntermediateInventory={canEditLimitedConfig}
-                      canSelectPreset
-                      changed={configChanged}
-                      permission={profile.permission}
-                      validation={configValidation}
-                      onUpdate={updateConfig}
-                    />
-                  </Suspense>
-                </div>
-              )}
-            </div>
-
-            <aside className="space-y-5">
-              <section className="tool-panel p-5">
-                <h2 className="text-base font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_035}</h2>
-                <dl className="mt-4 space-y-3 text-sm">
-                  <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_036} value={getProfileAccessLabel(profile)} />
-                  <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_037} value={operators ? `${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_038}` : copy.workspace.pages_tool_WorkspaceSetupPage_039} />
-                  <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_040} value={operators ? `${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_041}` : '-'} />
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-ink-muted">{copy.workspace.pages_tool_WorkspaceSetupPage_042}</dt>
-                    <dd className={`font-medium ${configValidation.ok ? 'text-success' : 'text-error'}`}>{configValidation.ok ? (configChanged ? copy.workspace.pages_tool_WorkspaceSetupPage_043 : copy.workspace.pages_tool_WorkspaceSetupPage_044) : copy.workspace.pages_tool_WorkspaceSetupPage_045}</dd>
+                    )}
                   </div>
-                </dl>
-              </section>
-              <button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} className="tool-primary-action w-full" data-tour-target="workspace-start-scheduling">
-                {saving ? copy.workspace.pages_tool_WorkspaceSetupPage_046 : copy.workspace.pages_tool_WorkspaceSetupPage_047}
-              </button>
-            </aside>
-          </div>
-            </form>
-          )}
-        </AnimatedPresenceRegion>
+
+                  <aside className="space-y-5">
+                    <section className="tool-panel p-5">
+                      <h2 className="text-base font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_035}</h2>
+                      <dl className="mt-4 space-y-3 text-sm">
+                        <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_036} value={getProfileAccessLabel(profile)} />
+                        <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_037} value={operators ? `${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_038}` : copy.workspace.pages_tool_WorkspaceSetupPage_039} />
+                        <InfoRow label={copy.workspace.pages_tool_WorkspaceSetupPage_040} value={operators ? `${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_041}` : '-'} />
+                        <div className="flex items-center justify-between gap-4">
+                          <dt className="text-ink-muted">{copy.workspace.pages_tool_WorkspaceSetupPage_042}</dt>
+                          <dd className={`font-medium ${configValidation.ok ? 'text-success' : 'text-error'}`}>{configValidation.ok ? (configChanged ? copy.workspace.pages_tool_WorkspaceSetupPage_043 : copy.workspace.pages_tool_WorkspaceSetupPage_044) : copy.workspace.pages_tool_WorkspaceSetupPage_045}</dd>
+                        </div>
+                      </dl>
+                    </section>
+                    <button type="submit" disabled={saving || freePreviewNeedsBinding || !operators || !configValidation.ok} className="tool-primary-action w-full" data-tour-target="workspace-start-scheduling">
+                      {saving ? copy.workspace.pages_tool_WorkspaceSetupPage_046 : copy.workspace.pages_tool_WorkspaceSetupPage_047}
+                    </button>
+                  </aside>
+                </div>
+              </form>
+            )}
+          </AnimatedPresenceRegion>
+        </div>
       </main>
 
       <SklandBindingDialog

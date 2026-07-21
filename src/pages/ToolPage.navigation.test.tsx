@@ -51,7 +51,8 @@ describe('ToolPage route guards', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/profiles'))
     const banner = await screen.findByRole('region', { name: '站内横幅' })
-    expect(banner).toHaveClass('mx-auto', 'max-w-7xl')
+    expect(banner.closest('header')).toBeNull()
+    expect(banner.parentElement).toHaveClass('mx-auto', 'max-w-7xl', 'space-y-4')
     expect(banner).toHaveTextContent('维护公告')
     expect(screen.getByText('今晚进行例行维护。')).toBeInTheDocument()
   })
