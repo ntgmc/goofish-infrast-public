@@ -1,6 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
 import type { AuthSuccessResponse, LicenseConfig, OptimizeResult, UpgradeSuggestion, WorkspaceResultHistoryItem, WorkspaceSavedConfig, WorkspaceSavedConfigAction } from '../../../lib/types'
 import { downloadOptimizeResult, isMaaJsonDownloadable } from '../../../lib/workspace-history'
+import { normalizeUpgradeSuggestions } from './workflow-utils'
 import type { WorkspacePatch } from '../useToolSession'
 import type { OptimizePhase, OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
@@ -113,7 +114,7 @@ export function useOptimizeWorkspace({
   const handleViewHistory = useCallback((item: WorkspaceResultHistoryItem) => {
     setCurrentResult(null)
     setFinalResult(null)
-    setSuggestions([])
+    setSuggestions(normalizeUpgradeSuggestions(item.result.upgrade_suggestions))
     setHistoryItem(item)
     setPhase('history')
     setLastGeneratedSignature(null)

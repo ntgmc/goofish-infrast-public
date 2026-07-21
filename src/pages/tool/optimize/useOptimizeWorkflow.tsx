@@ -17,7 +17,7 @@ import { isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
 import type { ConfigSyncStatus, WorkspacePatch } from '../useToolSession'
 import { useLicenseSync } from './useLicenseSync'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
-import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason } from './workflow-utils'
+import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, normalizeUpgradeSuggestions } from './workflow-utils'
 import { usePriorityCoupon as usePriorityCouponState } from './usePriorityCoupon'
 import { copy } from '../../../copy/index'
 import { hasCapability } from '../../../lib/product-catalog'
@@ -67,8 +67,9 @@ export function useOptimizeWorkflow(props: Props) {
   onProfileUpgraded,
 } = props
   const initialHistoryItem = workspace?.result_history?.[0] ?? null
+  const initialSuggestions = normalizeUpgradeSuggestions(initialHistoryItem?.result.upgrade_suggestions)
 
-  const [suggestions, setSuggestions] = useState<UpgradeSuggestion[]>([])
+  const [suggestions, setSuggestions] = useState<UpgradeSuggestion[]>(initialSuggestions)
 
   const [currentResult, setCurrentResult] = useState<OptimizeResult | null>(null)
 
@@ -247,7 +248,7 @@ export function useOptimizeWorkflow(props: Props) {
 
   useEffect(() => {
       const nextHistoryItem = workspace?.result_history?.[0] ?? null
-      setSuggestions([])
+      setSuggestions(normalizeUpgradeSuggestions(nextHistoryItem?.result.upgrade_suggestions))
       setCurrentResult(null)
       setFinalResult(null)
       setHistoryItem(nextHistoryItem)
@@ -407,7 +408,7 @@ export function useOptimizeWorkflow(props: Props) {
             setCurrentResult(current)
             setFinalResult(null)
             setHistoryItem(null)
-            setSuggestions((result.upgrade_suggestions ?? []) as UpgradeSuggestion[])
+            setSuggestions(normalizeUpgradeSuggestions(result.upgrade_suggestions))
             if (current.preview_limit?.free_schedule_entitlement) {
               setFreeScheduleEntitlementOverride(current.preview_limit.free_schedule_entitlement)
             }
@@ -454,13 +455,14 @@ export function useOptimizeWorkflow(props: Props) {
       return await runOptimizeJob(payload, 'generate', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_013)
     }, [activeConfig, license, mergedOperators, profileId, runOptimizeJob])
 
-  const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload) => {
+  const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload, historyResultId?: string) => {
       const payload: CreateOptimizationJobRequest = {
         kind: 'upgrade_suggestions',
         identity: { type: 'profile', profileId },
         operators: mergedOperators,
         config: activeConfig,
         upgradeTaskPayload: taskPayload,
+        ...(historyResultId && { historyResultId }),
       }
       return await runOptimizeJob(payload, 'generate', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_014, true)
     }, [activeConfig, license, mergedOperators, profileId, runOptimizeJob])
@@ -546,56 +548,9 @@ export function useOptimizeWorkflow(props: Props) {
         }
         setCurrentResult(current)
         const suggestionResult = potential?.upgrade_task_payload
-          ? await runUpgradeSuggestions(potential.upgrade_task_payload)
+          ? await runUpgradeSuggestions(potential.upgrade_task_payload, potential.history_result_id)
           : potential
-        const serverSuggestions = suggestionResult?.upgrade_suggestions
-        const upgradeList: UpgradeSuggestion[] = serverSuggestions && serverSuggestions.length > 0
-              ? serverSuggestions.map((s, idx) => {
-                if (s.type === 'single') {
-                  return {
-                    type: 'single' as const,
-                    id: s.id || s.name || '',
-                    name: s.name,
-                    current_elite: s.current,
-                    target_elite: s.target,
-                    gain: Math.round(s.gain),
-                    desc: `${s.name}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_017}${s.current}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_018}${s.target}`,
-                    training_cost: s.training_cost,
-                    rooms: s.rooms,
-                    specialType: s.specialType,
-                    roi: s.roi,
-                    orundum_roi: s.orundum_roi,
-                    impact: s.impact,
-                    partial_outcomes: s.partial_outcomes,
-                    partial_outcomes_truncated: s.partial_outcomes_truncated,
-                    partial_outcomes_unavailable_reason: s.partial_outcomes_unavailable_reason,
-                  }
-                }
-                return {
-                  type: 'bundle' as const,
-                  id: `bundle-${idx}`,
-                  gain: Math.round(s.gain),
-                  desc: s.ops?.map(o => `${o.name}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_019}${o.current}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_020}${o.target}`).join(', ') || '',
-                  ops: s.ops?.map(o => ({
-                    id: o.id || o.name,
-                    name: o.name,
-                    current: o.current,
-                    target: o.target,
-                    current_elite: o.current,
-                    target_elite: o.target,
-                  })),
-                  training_cost: s.training_cost,
-                  rooms: s.rooms,
-                  specialType: s.specialType,
-                  roi: s.roi,
-                  orundum_roi: s.orundum_roi,
-                  impact: s.impact,
-                  partial_outcomes: s.partial_outcomes,
-                  partial_outcomes_truncated: s.partial_outcomes_truncated,
-                  partial_outcomes_unavailable_reason: s.partial_outcomes_unavailable_reason,
-                }
-              })
-          : []
+        const upgradeList = normalizeUpgradeSuggestions(suggestionResult?.upgrade_suggestions)
         completed = true
         setProgress((current) => ({
           ...current,
@@ -605,7 +560,7 @@ export function useOptimizeWorkflow(props: Props) {
           lastUpdatedAt: Date.now(),
         }))
         await waitForProgressCompletion()
-        setSuggestions(upgradeList.sort((a, b) => b.gain - a.gain).slice(0, 20))
+        setSuggestions(upgradeList)
         setPhase('suggestions')
         setSection('result')
         setLastGeneratedSignature(optimizeSignature)

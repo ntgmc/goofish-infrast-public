@@ -361,6 +361,7 @@ export interface OptimizeResult {
   upgrade_suggestions?: RawUpgradeSuggestion[];
   current_result?: OptimizeResult;
   upgrade_task_payload?: UpgradeTaskPayload;
+  history_result_id?: string;
   analysis_summary?: ScheduleAnalysisSummary;
   preview_limit?: {
     mode?: 'room_limited' | 'full_rotation_without_export';

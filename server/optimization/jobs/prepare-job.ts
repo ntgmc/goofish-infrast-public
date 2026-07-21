@@ -48,6 +48,7 @@ export async function prepareOptimizeJob(
     const include_current = body.kind === 'schedule' ? body.includeCurrent : false;
     const suggestions_only = body.kind === 'upgrade_suggestions';
     const upgrade_task_payload = body.kind === 'upgrade_suggestions' ? body.upgradeTaskPayload : undefined;
+    const history_result_id = body.kind === 'upgrade_suggestions' ? body.historyResultId : undefined;
     const history_source = body.kind === 'schedule' ? body.historySource : undefined;
     const usePriorityCoupon = rawBody.use_priority_coupon === true;
 
@@ -250,7 +251,7 @@ export async function prepareOptimizeJob(
           isPreviewTrial,
           freeScheduleDecision,
           estimate,
-          request: { ignore_elite, include_current, suggestions_only, upgrade_task_payload, history_source },
+          request: { ignore_elite, include_current, suggestions_only, upgrade_task_payload, history_result_id, history_source },
         }),
       },
     };
