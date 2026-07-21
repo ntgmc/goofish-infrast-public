@@ -184,7 +184,7 @@ export async function prepareOptimizeJob(
         },
       };
     }
-    const estimateBucket = getOptimizeEstimateBucket(effectiveConfig);
+    const estimateBucket = getOptimizeEstimateBucket(effectiveConfig, includeUpgradeSuggestions && canUseUpgrades);
     Object.assign(scheduleUsageBase, {
       schedule_mode: getEstimateScheduleMode(estimateBucket),
       fiammetta_enabled: isEstimateFiammettaEnabled(estimateBucket),

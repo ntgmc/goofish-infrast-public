@@ -138,6 +138,8 @@ CREATE TABLE IF NOT EXISTS optimize_jobs (
   next_attempt_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ,
   cancel_requested_at TIMESTAMPTZ,
+  execution_stage TEXT,
+  stage_updated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   started_at TIMESTAMPTZ,
   finished_at TIMESTAMPTZ,
@@ -640,6 +642,8 @@ ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS failure_kind TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS public_error_code TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS cancel_requested_at TIMESTAMPTZ;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS execution_stage TEXT;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS stage_updated_at TIMESTAMPTZ;
 UPDATE optimize_jobs SET next_attempt_at = created_at WHERE status = 'queued' AND next_attempt_at IS NULL;
 UPDATE optimize_jobs
 SET expires_at = created_at + interval '24 hours'

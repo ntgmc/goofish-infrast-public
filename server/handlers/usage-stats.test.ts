@@ -122,17 +122,29 @@ describe('usage stats handler', () => {
   })
 
   it('uses compute-attempt duration for bucketed ETA history', async () => {
-    const records: UsageEventRecord[] = [{
-      id: 'job-1',
-      event: 'schedule_generate',
-      visitor_id: null,
-      created_at: '2026-03-10T08:00:00.000Z',
-      date: '2026-03-10',
-      status: 'success',
-      duration_ms: 600_000,
-      compute_duration_ms: 3_000,
-      estimate_bucket: 'maa_plain',
-    }]
+    const records: UsageEventRecord[] = [
+      {
+        id: 'job-1',
+        event: 'schedule_generate',
+        visitor_id: null,
+        created_at: '2026-03-10T08:00:00.000Z',
+        date: '2026-03-10',
+        status: 'success',
+        duration_ms: 600_000,
+        compute_duration_ms: 3_000,
+        estimate_bucket: 'maa_plain',
+      },
+      {
+        id: 'job-2',
+        event: 'schedule_generate',
+        visitor_id: null,
+        created_at: '2026-03-10T09:00:00.000Z',
+        date: '2026-03-10',
+        status: 'success',
+        compute_duration_ms: 30_000,
+        estimate_bucket: 'maa_plain_with_suggestions',
+      },
+    ]
     setUsageEventStoreForTesting({
       set: async () => undefined,
       list: async () => records,
@@ -144,5 +156,10 @@ describe('usage stats handler', () => {
       '2026-03-10T00:00:00.000Z',
       '2026-03-11T00:00:00.000Z',
     )).resolves.toEqual({ p95_ms: 3_000, sample_count: 1 })
+    await expect(getScheduleGenerateDurationStatsByBucket(
+      'maa_plain_with_suggestions',
+      '2026-03-10T00:00:00.000Z',
+      '2026-03-11T00:00:00.000Z',
+    )).resolves.toEqual({ p95_ms: 30_000, sample_count: 1 })
   })
 })

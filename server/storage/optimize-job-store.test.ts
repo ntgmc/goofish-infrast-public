@@ -50,9 +50,12 @@ describe('optimization job attempt lifecycle', () => {
     })
     await expect(store.heartbeatAttempt(job.id, 1, 'worker-b', 'lock-a', future())).resolves.toBe(false)
     await expect(store.heartbeatAttempt(job.id, 1, 'worker-a', 'lock-a', future())).resolves.toBe(true)
+    await expect(store.updateAttemptStage(job.id, 1, 'worker-b', 'lock-a', 'simulating_upgrades')).resolves.toBe(false)
+    await expect(store.updateAttemptStage(job.id, 1, 'worker-a', 'lock-a', 'simulating_upgrades')).resolves.toBe(true)
+    await expect(store.getJob(job.id)).resolves.toMatchObject({ execution_stage: 'simulating_upgrades' })
     await expect(store.completeAttempt(job.id, 1, 'worker-b', 'lock-a', { stale: true })).resolves.toBe(false)
     await expect(store.completeAttempt(job.id, 1, 'worker-a', 'lock-a', { ok: true })).resolves.toBe(true)
-    await expect(store.getJob(job.id)).resolves.toMatchObject({ status: 'succeeded', result_json: { ok: true } })
+    await expect(store.getJob(job.id)).resolves.toMatchObject({ status: 'succeeded', execution_stage: 'completed', result_json: { ok: true } })
   })
 
   it('returns an interrupted deployment attempt to queued without consuming failure budget', async () => {

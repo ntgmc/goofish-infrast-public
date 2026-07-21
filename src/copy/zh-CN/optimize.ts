@@ -469,6 +469,16 @@ export const optimizeCopy = {
   pages_tool_optimize_ResultSection_006: "解锁中...",
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_007: "使用 CDK 解锁",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_008: "排班和优化建议均已完成。",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_009: "排班和优化建议均已完成，本次没有发现可推荐的升级项。",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_010: "排班已完成，但优化建议计算失败。主排班结果已保留，可重新生成后再试。",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_011: "排班已完成，当前权益不包含优化建议。",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_012: "排班已完成，本次未请求优化建议。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_001: "组合网格",
   // src/pages/tool/optimize/ScenarioLabSection.tsx

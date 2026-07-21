@@ -52,29 +52,58 @@ describe('ScheduleProgress motion', () => {
     expect(screen.queryByText('正在取消任务')).not.toBeInTheDocument()
   })
 
-  it('shows a queued continuation without presenting aggregate 92% as final', () => {
+  it('keeps the real suggestion stage visible even when the ETA percentage is above 92%', () => {
     render(<ScheduleProgress progress={createProgress({
-      startedAt: NOW - 5_000,
-      jobId: 'upgrade-job',
-      queueStatus: 'queued',
-      queuePosition: 3,
-      observedRunning: false,
-      percentFloor: 92,
-      estimatedRemainingMs: 20_000,
-      estimatedTotalMs: 100_000,
-      estimatePhase: 'queued',
+      startedAt: NOW - 20_000,
+      jobId: 'merged-job',
+      queueStatus: 'running',
+      observedRunning: true,
+      estimatedRemainingMs: 0,
+      estimatedTotalMs: 10_000,
+      estimatePhase: 'overdue',
       estimateUpdatedAt: new Date(NOW).toISOString(),
+      calculationStage: 'simulating_upgrades',
+      upgradeSuggestionsRequested: true,
+      upgradeSuggestionsAllowed: true,
     })} />)
 
-    const progressbar = screen.getByRole('progressbar')
-    expect(progressbar).toHaveAttribute('aria-valuenow', '92')
-    expect(progressbar).toHaveAttribute('aria-valuetext', expect.stringContaining('已加入队列'))
-    expect(screen.getByText('已加入队列')).toBeInTheDocument()
-    expect(screen.getByText('Queued')).toBeInTheDocument()
-    expect(screen.getByText(/前方还有 2 个任务/)).toBeInTheDocument()
-    expect(screen.queryByText('Final')).not.toBeInTheDocument()
+    expect(screen.getByText('正在模拟优化建议')).toBeInTheDocument()
+    expect(screen.getByText('计算优化建议')).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(5)
     expect(screen.queryByText('即将完成')).not.toBeInTheDocument()
-    expect(screen.queryByText('后台计算已进入收尾阶段，结果完成后会自动展示。')).not.toBeInTheDocument()
+  })
+
+  it('omits the suggestion step when the merged job only computes a schedule', () => {
+    render(<ScheduleProgress progress={createProgress({
+      startedAt: NOW - 5_000,
+      queueStatus: 'running',
+      observedRunning: true,
+      estimatePhase: 'running',
+      calculationStage: 'formatting_result',
+      upgradeSuggestionsRequested: false,
+      upgradeSuggestionsAllowed: false,
+    })} />)
+
+    expect(screen.getByText('正在整理计算结果')).toBeInTheDocument()
+    expect(screen.queryByText('计算优化建议')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+  })
+
+  it('marks only the suggestion step as failed when the main schedule still succeeds', () => {
+    render(<ScheduleProgress progress={createProgress({
+      startedAt: NOW - 10_000,
+      completedAt: NOW - 500,
+      estimatedDurationMs: 10_000,
+      estimatePhase: 'completed',
+      calculationStage: 'completed',
+      upgradeSuggestionsRequested: true,
+      upgradeSuggestionsAllowed: true,
+      upgradeSuggestionsStatus: 'failed',
+    })} />)
+
+    expect(screen.getByText('排班方案已就绪')).toBeInTheDocument()
+    expect(screen.getByText('计算优化建议').closest('[data-state]')).toHaveAttribute('data-state', 'failed')
+    expect(screen.getByText('持久化结果').closest('[data-state]')).toHaveAttribute('data-state', 'done')
   })
 })
 

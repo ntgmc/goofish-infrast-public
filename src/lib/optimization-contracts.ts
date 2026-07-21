@@ -2,6 +2,7 @@ import type {
   LicenseConfig,
   LicenseOperator,
   OptimizeEstimateBucket,
+  OptimizeCalculationStage,
   OptimizeEstimateSource,
   OptimizeJobPriority,
   OptimizeResult,
@@ -53,6 +54,7 @@ interface OptimizationTimestamps {
   finishedAt?: string | null;
   nextAttemptAt?: string | null;
   cancelRequestedAt?: string | null;
+  stageUpdatedAt?: string | null;
 }
 
 type OptimizationEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
@@ -89,6 +91,11 @@ interface OptimizationJobSnapshotBase {
   timestamps: OptimizationTimestamps;
   estimate: OptimizationEstimateSnapshot;
   executionPhase: OptimizationExecutionPhase;
+  calculationStage: OptimizeCalculationStage | null;
+  upgradeSuggestions: {
+    requested: boolean;
+    allowed: boolean;
+  };
   attemptCount: number;
   failureCount: number;
   cancellationRequested: boolean;

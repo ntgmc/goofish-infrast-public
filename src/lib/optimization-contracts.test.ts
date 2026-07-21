@@ -24,6 +24,8 @@ const base = {
     updatedAt: '2026-07-10T00:00:00.000Z',
   },
   executionPhase: 'initial_queue' as const,
+  calculationStage: null,
+  upgradeSuggestions: { requested: true, allowed: true },
   attemptCount: 0,
   failureCount: 0,
   cancellationRequested: false,

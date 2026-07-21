@@ -160,9 +160,25 @@ export interface AnnouncementAdminResponse {
 
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard';
 type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered';
-export type OptimizeEstimateBucket = 'maa_fiammetta' | 'maa_plain' | 'rotation' | 'scenario_comparison';
+export type OptimizeEstimateBucket =
+  | 'maa_fiammetta'
+  | 'maa_fiammetta_with_suggestions'
+  | 'maa_plain'
+  | 'maa_plain_with_suggestions'
+  | 'rotation'
+  | 'rotation_with_suggestions'
+  | 'scenario_comparison';
 export type OptimizeEstimateSource = 'history_p95' | 'fallback_p95';
 type OptimizeRuntimeEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled';
+export type OptimizeCalculationStage =
+  | 'starting'
+  | 'generating_schedule'
+  | 'generating_potential_schedule'
+  | 'simulating_upgrades'
+  | 'enriching_training_costs'
+  | 'formatting_result'
+  | 'persisting_result'
+  | 'completed';
 
 export interface OptimizeJobAccepted {
   job_id: string;
@@ -180,6 +196,10 @@ export interface OptimizeJobAccepted {
   estimated_total_ms: number | null;
   estimate_phase: OptimizeRuntimeEstimatePhase;
   estimate_updated_at: string;
+  calculation_stage: OptimizeCalculationStage | null;
+  calculation_stage_updated_at: string | null;
+  upgrade_suggestions_requested: boolean;
+  upgrade_suggestions_allowed: boolean;
   poll_token?: string;
 }
 
@@ -202,6 +222,10 @@ export interface OptimizeJobStatusResponse {
   estimated_total_ms: number | null;
   estimate_phase: OptimizeRuntimeEstimatePhase;
   estimate_updated_at: string;
+  calculation_stage: OptimizeCalculationStage | null;
+  calculation_stage_updated_at: string | null;
+  upgrade_suggestions_requested: boolean;
+  upgrade_suggestions_allowed: boolean;
   result?: OptimizeResult;
   error?: string;
   error_code?: string;

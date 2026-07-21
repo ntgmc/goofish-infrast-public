@@ -1,0 +1,21 @@
+// @vitest-environment jsdom
+
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { OptimizeResult } from '../../../lib/types'
+import { UpgradeSuggestionStatusNotice } from './ResultSection'
+
+afterEach(cleanup)
+
+describe('UpgradeSuggestionStatusNotice', () => {
+  it.each([
+    ['completed', '排班和优化建议均已完成，本次没有发现可推荐的升级项。', 'status'],
+    ['not_requested', '排班已完成，本次未请求优化建议。', 'status'],
+    ['not_allowed', '排班已完成，当前权益不包含优化建议。', 'status'],
+    ['failed', '排班已完成，但优化建议计算失败。主排班结果已保留，可重新生成后再试。', 'alert'],
+  ] as const)('renders the %s terminal state', (status, message, role) => {
+    render(<UpgradeSuggestionStatusNotice result={{ upgrade_suggestions_status: status } as OptimizeResult} />)
+
+    expect(screen.getByRole(role)).toHaveTextContent(message)
+  })
+})

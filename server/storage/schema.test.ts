@@ -40,6 +40,8 @@ describe('database schema ownership', () => {
     expect(statement).not.toMatch(/\b(?:alter|create|drop|truncate)\b/i)
     expect(JSON.parse(values[0])).toEqual(expect.arrayContaining([
       { table_name: 'optimize_jobs', column_name: 'cancel_requested_at' },
+      { table_name: 'optimize_jobs', column_name: 'execution_stage' },
+      { table_name: 'optimize_jobs', column_name: 'stage_updated_at' },
       { table_name: 'optimize_job_attempts', column_name: 'heartbeat_at' },
       { table_name: 'user_profile_workspaces', column_name: 'record_json' },
       { table_name: 'admin_sessions', column_name: 'token_hash' },

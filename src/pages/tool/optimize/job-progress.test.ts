@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
-import { buildOptimizeJobStorageKey, clearOptimizeSubmissionKey, getOrCreateOptimizeSubmissionKey, isActiveOptimizeJob, mergeOptimizeJobProgress, OPTIMIZE_POLL_REQUEST_TIMEOUT_MS, prepareOptimizeContinuationProgress, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
+import { buildOptimizeJobStorageKey, clearOptimizeSubmissionKey, getOrCreateOptimizeSubmissionKey, isActiveOptimizeJob, mergeOptimizeJobProgress, OPTIMIZE_POLL_REQUEST_TIMEOUT_MS, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
 import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
 
 const accepted: OptimizeJobAccepted = {
@@ -20,6 +20,10 @@ const accepted: OptimizeJobAccepted = {
   estimated_total_ms: 10_000,
   estimate_phase: 'queued',
   estimate_updated_at: '2026-07-10T00:00:00.000Z',
+  calculation_stage: null,
+  calculation_stage_updated_at: null,
+  upgrade_suggestions_requested: true,
+  upgrade_suggestions_allowed: true,
 }
 
 describe('optimization job persistence', () => {
@@ -125,55 +129,20 @@ describe('optimization progress mapping', () => {
     })
   })
 
-  it('keeps aggregate progress while a continuation job waits in its own queue', () => {
-    const now = Date.parse('2026-07-10T00:00:20.000Z')
-    const current = {
-      ...mergeOptimizeJobProgress(null, {
-        ...accepted,
-        status: 'running',
-        estimate_phase: 'running',
-      }, 'generate', now),
-      startedAt: now - 20_000,
-      observedRunning: true,
-      percentFloor: 92,
-    }
-    const continuation: OptimizeJobAccepted = {
+  it('maps the persisted calculation stage and suggestion intent', () => {
+    const progress = mergeOptimizeJobProgress(null, {
       ...accepted,
-      job_id: 'job-2',
-      queue_position: 3,
-      submitted_at: new Date(now).toISOString(),
-      estimated_remaining_ms: 15_000,
-      estimated_total_ms: 15_000,
-      estimate_updated_at: new Date(now).toISOString(),
-    }
-
-    const seed = prepareOptimizeContinuationProgress(current, continuation, now)
-    const queued = mergeOptimizeJobProgress(seed, continuation, 'generate', now)
-
-    expect(queued).toMatchObject({
-      jobId: 'job-2',
-      startedAt: current.startedAt,
-      queueStatus: 'queued',
-      queuePosition: 3,
-      observedRunning: false,
-      estimatePhase: 'queued',
-      estimatedRemainingMs: 15_000,
-    })
-    expect(queued.percentFloor).toBeGreaterThanOrEqual(92)
-
-    const running = mergeOptimizeJobProgress(queued, {
-      ...continuation,
       status: 'running',
-      queue_position: null,
       estimate_phase: 'running',
-      started_at: new Date(now + 1_000).toISOString(),
-    } as OptimizeJobStatusResponse, 'generate', now + 1_000)
+      calculation_stage: 'simulating_upgrades',
+      calculation_stage_updated_at: '2026-07-10T00:00:03.000Z',
+    } as OptimizeJobStatusResponse, 'generate', Date.parse('2026-07-10T00:00:03.000Z'))
 
-    expect(running).toMatchObject({
-      queueStatus: 'running',
-      queuePosition: null,
-      observedRunning: true,
-      estimatePhase: 'running',
+    expect(progress).toMatchObject({
+      calculationStage: 'simulating_upgrades',
+      calculationStageUpdatedAt: '2026-07-10T00:00:03.000Z',
+      upgradeSuggestionsRequested: true,
+      upgradeSuggestionsAllowed: true,
     })
   })
 })
