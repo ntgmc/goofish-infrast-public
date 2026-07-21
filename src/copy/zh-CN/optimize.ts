@@ -596,7 +596,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/job-progress.ts
   pages_tool_optimize_job_progress_005: "队列推进中，预计已缩短",
   // src/pages/tool/optimize/job-progress.ts
-  pages_tool_optimize_job_progress_006: "排班已完成，正在整理练度建议",
+  pages_tool_optimize_job_progress_006: "排班已完成，已进入练度建议阶段",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_001: "MAA 自动非固定间隔（2–4 班）",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
@@ -822,7 +822,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/useLicenseSync.ts
   pages_tool_optimize_useLicenseSync_001: "账号授权状态同步失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizationJob.ts
-  pages_tool_optimize_useOptimizationJob_001: "排班已完成，正在整理练度建议",
+  pages_tool_optimize_useOptimizationJob_001: "排班已完成，已进入练度建议阶段",
   // src/pages/tool/optimize/useOptimizationJob.ts
   pages_tool_optimize_useOptimizationJob_002: "优化任务缺少结果。",
   // src/pages/tool/optimize/useOptimizationJob.ts
