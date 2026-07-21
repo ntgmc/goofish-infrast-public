@@ -263,6 +263,10 @@ export interface AdminOptimizationDeadLetter {
   updated_at: string;
 }
 
+export interface AdminOptimizationDeadLetterDetail extends AdminOptimizationDeadLetter {
+  payload_json: unknown;
+}
+
 export type AdminOptimizationQueueStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 
 export interface AdminOptimizationQueueJob {

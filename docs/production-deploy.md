@@ -7,7 +7,10 @@ running until the public HTTPS smoke test succeeds and is restored automatically
 if cutover fails.
 
 Development continues to use the single-service workflow documented in
-[dev-deploy.md](dev-deploy.md).
+[dev-deploy.md](dev-deploy.md). Production optimization is consumed by the
+dedicated Hangzhou worker documented in [worker-deploy.md](worker-deploy.md);
+the Seoul backend runs with `APP_ROLE=api` and does not execute optimization
+jobs locally.
 
 ## Trusted release source
 
@@ -89,8 +92,8 @@ ready and Nginx has switched successfully.
    ```
 
    Preserve the existing secrets in
-   `/etc/goofish-infrast-v1/backend.env`. It must not define `PORT` or a
-   non-loopback `HOST`, because the slot files and unit own those settings.
+   `/etc/goofish-infrast-v1/backend.env`. It must not define `APP_ROLE`, `PORT`,
+   or a non-loopback `HOST`, because the unit and slot files own those settings.
    It must define the canonical public HTTPS origin:
 
    ```text
@@ -299,15 +302,21 @@ The same `EnvironmentFile` should set explicit optimization queue limits:
 ```text
 OPTIMIZE_GLOBAL_QUEUE_LIMIT=200
 OPTIMIZE_ANALYSIS_QUEUE_LIMIT=40
-OPTIMIZE_QUEUE_MAX_AGE_MS=1800000
-OPTIMIZE_GLOBAL_WORKER_CONCURRENCY=2
+OPTIMIZE_QUEUE_MAX_AGE_MS=86400000
+OPTIMIZE_GLOBAL_WORKER_CONCURRENCY=3
 OPTIMIZE_RETRY_BASE_MS=2000
 ```
 
+`OPTIMIZE_QUEUE_MAX_AGE_MS` is 24 hours. A job clears this queue-only expiry as
+soon as a worker claims it, so execution is governed by the separate worker
+hard timeout rather than the time already spent waiting.
+
 `OPTIMIZE_GLOBAL_WORKER_CONCURRENCY` is enforced through PostgreSQL across all
-API replicas. Keep it within the CPU and database capacity of the whole
-deployment, rather than multiplying it by the number of systemd instances.
-Never remove the queue limits during an incident; lower them to shed load.
+worker processes. Keep the same value on the Seoul API and every Hangzhou
+worker slot, and size it for the CPU and database capacity of the whole
+deployment rather than multiplying it by the number of systemd instances.
+Never remove the queue limits during an incident; lower the numeric queue limits
+to shed load.
 
 ## Pre-production acceptance
 

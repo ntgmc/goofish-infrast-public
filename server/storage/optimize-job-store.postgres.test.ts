@@ -77,7 +77,7 @@ describe('PostgreSQL optimization job admission', () => {
     const backfill = await query<{ expires_at_backfilled: boolean; next_attempt_at_backfilled: boolean }>(
       `select
          next_attempt_at = created_at as next_attempt_at_backfilled,
-         expires_at = created_at + interval '30 minutes' as expires_at_backfilled
+         expires_at = created_at + interval '24 hours' as expires_at_backfilled
        from optimize_jobs
        where id = $1`,
       [legacyJobId],
@@ -100,7 +100,18 @@ describe('PostgreSQL optimization job admission', () => {
       'idx_optimize_jobs_dispatch_ready',
       'idx_optimize_jobs_queue_expires_at',
     ])
+
+    await query(
+      "update optimize_jobs set expires_at = created_at + interval '30 minutes' where id = $1",
+      [legacyJobId],
+    )
     await expect(ensureDatabaseSchema()).resolves.toBeUndefined()
+    const extended = await query<{ expires_at_extended: boolean }>(
+      `select expires_at = created_at + interval '24 hours' as expires_at_extended
+       from optimize_jobs where id = $1`,
+      [legacyJobId],
+    )
+    expect(extended.rows[0]?.expires_at_extended).toBe(true)
   })
 
   it('handles unexpected errors from idle pool clients', () => {
@@ -275,7 +286,7 @@ describe('PostgreSQL optimization job admission', () => {
     const store = createPostgresOptimizeJobStore()
     const admitted = await store.admitJob(input({ priority: 1_000 }))
     const claimed = await store.claimNextJob('worker-a', 'attempt-lock', new Date(Date.now() + 60_000).toISOString(), 2)
-    expect(claimed?.id).toBe(admitted.job.id)
+    expect(claimed).toMatchObject({ id: admitted.job.id, status: 'running', expires_at: null })
 
     await expect(store.heartbeatAttempt(admitted.job.id, claimed!.attempt_count, 'worker-b', 'attempt-lock', new Date(Date.now() + 60_000).toISOString())).resolves.toBe(false)
     await expect(store.heartbeatAttempt(admitted.job.id, claimed!.attempt_count, 'worker-a', 'attempt-lock', new Date(Date.now() + 60_000).toISOString())).resolves.toBe(true)
@@ -326,7 +337,7 @@ describe('PostgreSQL optimization job admission', () => {
   it('expires never-started jobs and releases their reserved free entitlement', async () => {
     const profileId = await seedProfile()
     const store = createPostgresOptimizeJobStore()
-    const createdAt = new Date(Date.now() - 2 * 60 * 60_000).toISOString()
+    const createdAt = new Date(Date.now() - 25 * 60 * 60_000).toISOString()
     const admitted = await store.admitJob(input({
       owner_key: `profile:${profileId}`,
       source: 'free_preview',
@@ -435,7 +446,7 @@ describe('PostgreSQL optimization job admission', () => {
       source: 'account_profile',
       reward_user_id: userId,
       use_priority_coupon: true,
-      created_at: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
+      created_at: new Date(Date.now() - 25 * 60 * 60_000).toISOString(),
     }))
 
     expect((await getRewardBalances(userId))[0].available).toBe(0)
@@ -449,7 +460,7 @@ describe('PostgreSQL optimization job admission', () => {
 
   it('restores an unused strong reorder bonus when its queued job expires', async () => {
     const profileId = await seedProfile()
-    const createdAt = new Date(Date.now() - 2 * 60 * 60_000).toISOString()
+    const createdAt = new Date(Date.now() - 25 * 60 * 60_000).toISOString()
     await query(
       `insert into profile_entitlements (profile_id, free_revision_count, strong_reorder_bonus_month, updated_at)
        values ($1, 0, $2, now())`,

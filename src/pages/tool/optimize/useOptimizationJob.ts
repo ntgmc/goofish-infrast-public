@@ -5,7 +5,7 @@ import type { OptimizeJobAccepted, OptimizeJobStatusResponse, OptimizeResult } f
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { buildOptimizeJobStorageKey, clearActiveOptimizeJob, clearOptimizeSubmissionKey, fetchOptimizeJobStatus, getOrCreateOptimizeSubmissionKey, isOptimizeJobPollCancelled, isRetryableOptimizePollError, mergeOptimizeJobProgress, OptimizeJobPollCancelledError, prepareOptimizeContinuationProgress, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
 import { submitOptimizationJob } from './optimization-api'
-import { publishLegacyOptimizationJobUpdate, withOptimizationSubmissionLock } from './optimization-job-events'
+import { publishLegacyOptimizationJobUpdate, subscribeOptimizationJobUpdates, withOptimizationSubmissionLock } from './optimization-job-events'
 import { copy } from '../../../copy/index'
 
 
@@ -34,6 +34,10 @@ class OptimizationJobTerminalError extends Error {
     this.supportReference = job.support_reference
     this.status = job.status as OptimizationJobTerminalError['status']
   }
+}
+
+export function isOptimizationJobCancelledError(error: unknown): boolean {
+  return error instanceof OptimizationJobTerminalError && error.status === 'cancelled'
 }
 
 export function useOptimizationJob({
@@ -82,47 +86,67 @@ export function useOptimizationJob({
       return nextProgress
     }
 
-    const initialStoredProgress = readActiveOptimizeJob(storageKey)?.progress
-    const initialFailures = initialStoredProgress?.connectionStatus === 'reconnecting'
-      ? Math.max(1, initialStoredProgress.consecutivePollFailures ?? 1)
-      : 0
-    updateProgress(job, initialFailures > 0
-      ? { connectionStatus: 'reconnecting', consecutivePollFailures: initialFailures }
-      : undefined)
-    let consecutivePollFailures = initialFailures
-    let pollAfterMs = job.poll_after_ms || (job.status === 'queued' ? 3_000 : 1_500)
+    let terminalRefreshRequested = false
+    const unsubscribe = subscribeOptimizationJobUpdates((event) => {
+      if (
+        event.profileId === profileId
+        && event.jobId === job.job_id
+        && (event.status === 'succeeded' || event.status === 'failed' || event.status === 'cancelled' || event.status === 'dead_lettered')
+      ) {
+        terminalRefreshRequested = true
+      }
+    })
 
-    while (true) {
-      throwIfCancelled()
-      await waitForOptimizePoll(pollAfterMs, isCancelled)
-      throwIfCancelled()
+    try {
+      const initialStoredProgress = readActiveOptimizeJob(storageKey)?.progress
+      const initialFailures = initialStoredProgress?.connectionStatus === 'reconnecting'
+        ? Math.max(1, initialStoredProgress.consecutivePollFailures ?? 1)
+        : 0
+      updateProgress(job, initialFailures > 0
+        ? { connectionStatus: 'reconnecting', consecutivePollFailures: initialFailures }
+        : undefined)
+      let consecutivePollFailures = initialFailures
+      let pollAfterMs = job.poll_after_ms || (job.status === 'queued' ? 3_000 : 1_500)
 
-      let status: OptimizeJobStatusResponse
-      try {
-        status = await fetchOptimizeJobStatus(job.job_id, fallbackMessage, latestJob.poll_token, isCancelled)
-        if (latestJob.poll_token) status.poll_token = latestJob.poll_token
-      } catch (error) {
+      while (true) {
         throwIfCancelled()
-        if (!isRetryableOptimizePollError(error)) throw error
-        consecutivePollFailures += 1
-        updateProgress(latestJob, { connectionStatus: 'reconnecting', consecutivePollFailures })
-        pollAfterMs = getOptimizePollRetryDelayMs(consecutivePollFailures)
-        continue
-      }
+        await waitForOptimizePoll(pollAfterMs, isCancelled, () => {
+          if (!terminalRefreshRequested) return false
+          terminalRefreshRequested = false
+          return true
+        })
+        throwIfCancelled()
 
-      latestJob = status
-      consecutivePollFailures = 0
-      if (status.status === 'succeeded') {
-        if (!status.result) throw new Error(copy.optimize.pages_tool_optimize_useOptimizationJob_002)
-        clearActiveOptimizeJob(storageKey)
-        return status.result
+        let status: OptimizeJobStatusResponse
+        try {
+          status = await fetchOptimizeJobStatus(job.job_id, fallbackMessage, latestJob.poll_token, isCancelled)
+          if (latestJob.poll_token) status.poll_token = latestJob.poll_token
+        } catch (error) {
+          throwIfCancelled()
+          if (!isRetryableOptimizePollError(error)) throw error
+          consecutivePollFailures += 1
+          updateProgress(latestJob, { connectionStatus: 'reconnecting', consecutivePollFailures })
+          pollAfterMs = getOptimizePollRetryDelayMs(consecutivePollFailures)
+          continue
+        }
+
+        latestJob = status
+        consecutivePollFailures = 0
+        if (status.status === 'succeeded') {
+          if (!status.result) throw new Error(copy.optimize.pages_tool_optimize_useOptimizationJob_002)
+          clearActiveOptimizeJob(storageKey)
+          return status.result
+        }
+        if (status.status === 'failed' || status.status === 'cancelled' || status.status === 'dead_lettered') {
+          if (status.status === 'cancelled') updateProgress(status)
+          clearActiveOptimizeJob(storageKey)
+          throw new OptimizationJobTerminalError(status, copy.optimize.pages_tool_optimize_useOptimizationJob_003)
+        }
+        updateProgress(status)
+        pollAfterMs = status.poll_after_ms || (status.status === 'queued' ? 3_000 : 1_500)
       }
-      if (status.status === 'failed' || status.status === 'cancelled' || status.status === 'dead_lettered') {
-        clearActiveOptimizeJob(storageKey)
-        throw new OptimizationJobTerminalError(status, copy.optimize.pages_tool_optimize_useOptimizationJob_003)
-      }
-      updateProgress(status)
-      pollAfterMs = status.poll_after_ms || (status.status === 'queued' ? 3_000 : 1_500)
+    } finally {
+      unsubscribe()
     }
   }, [profileId, progressRef, setProgress])
 

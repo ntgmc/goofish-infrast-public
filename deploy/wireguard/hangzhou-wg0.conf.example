@@ -1,0 +1,11 @@
+# Install as /etc/wireguard/wg0.conf with mode 0600 on the Hangzhou worker host.
+# Replace every placeholder; never commit real private keys.
+[Interface]
+Address = 10.66.0.2/30
+PrivateKey = <HANGZHOU_PRIVATE_KEY>
+
+[Peer]
+PublicKey = <SEOUL_PUBLIC_KEY>
+Endpoint = <SEOUL_FIXED_PUBLIC_IP>:51820
+AllowedIPs = 10.66.0.1/32
+PersistentKeepalive = 25

@@ -21,18 +21,13 @@ env:
   NODE_VERSION: "22"
 
 jobs:
-  static-security:
-    name: Static Security Analysis
-    permissions:
-      contents: read
-    uses: ./.github/workflows/security-analysis.yml
-
   build-relevance:
     name: Build Relevance
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       build_required: ${{ steps.check.outputs.build_required }}
+      documentation_only: ${{ steps.check.outputs.documentation_only }}
       reason: ${{ steps.check.outputs.reason }}
     steps:
       - name: Checkout
@@ -55,7 +50,16 @@ jobs:
       - name: Write summary
         run: |
           echo "Build required: ${{ steps.check.outputs.build_required }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Documentation only: ${{ steps.check.outputs.documentation_only }}" >> "$GITHUB_STEP_SUMMARY"
           echo "Reason: ${{ steps.check.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+
+  static-security:
+    name: Static Security Analysis
+    needs: build-relevance
+    if: needs.build-relevance.outputs.documentation_only != 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/security-analysis.yml
 
   web-build:
     name: Web Build
@@ -146,6 +150,12 @@ jobs:
 
   test-and-architecture:
     name: Unit Tests and Architecture
+    needs: build-relevance
+    if: >-
+      needs.build-relevance.outputs.documentation_only != 'true' &&
+      (github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -166,6 +176,9 @@ jobs:
 
       - name: Check dead code
         run: npm run check:dead-code
+
+      - name: Test build relevance classification
+        run: npm run test:build-relevance
 
       - name: Run unit tests
         run: npm test

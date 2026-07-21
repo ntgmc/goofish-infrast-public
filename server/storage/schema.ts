@@ -607,8 +607,9 @@ ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS public_error_code TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS cancel_requested_at TIMESTAMPTZ;
 UPDATE optimize_jobs SET next_attempt_at = created_at WHERE status = 'queued' AND next_attempt_at IS NULL;
 UPDATE optimize_jobs
-SET expires_at = created_at + interval '30 minutes'
-WHERE status = 'queued' AND attempt_count = 0 AND expires_at IS NULL;
+SET expires_at = created_at + interval '24 hours'
+WHERE status = 'queued' AND attempt_count = 0
+  AND (expires_at IS NULL OR expires_at = created_at + interval '30 minutes');
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_dispatch_ready ON optimize_jobs(status, next_attempt_at, priority DESC, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_queue_expires_at ON optimize_jobs(expires_at) WHERE status = 'queued';
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_profile_id ON optimize_jobs(profile_id);

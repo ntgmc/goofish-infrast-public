@@ -35,6 +35,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
   ['/api/auth/register', authHandler as unknown as ApiHandler],
+  ['/api/auth/registration-settings', authHandler as unknown as ApiHandler],
   ['/api/auth/login', authHandler as unknown as ApiHandler],
   ['/api/auth/logout', authHandler as unknown as ApiHandler],
   ['/api/auth/forgot-password', authHandler as unknown as ApiHandler],

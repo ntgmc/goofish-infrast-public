@@ -133,6 +133,9 @@ export async function registerUser(
   const passwordCheck = validatePassword(passwordValue)
   if (!passwordCheck.ok) return { ok: false, status: 400, message: passwordCheck.message }
   const registrationSettings = await getRegistrationSettings()
+  if (registrationSettings.invite_code_required && (typeof inviteCodeValue !== 'string' || !inviteCodeValue.trim())) {
+    return { ok: false, status: 400, message: authCopy.api_invite_code_required, code: 'invite_code_required' }
+  }
   let verificationRequired = registrationSettings.email_verification_required
   let emailReservation: BrevoEmailReservation | null = null
 

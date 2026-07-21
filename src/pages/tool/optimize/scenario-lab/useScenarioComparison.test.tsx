@@ -61,6 +61,67 @@ describe('useScenarioComparison', () => {
     expect(window.sessionStorage.getItem('maa:scenario-lab:v2:profile-a')).toContain('"layout":"153"')
   })
 
+  it('keeps cancelled task progress visible without reporting it as an error', async () => {
+    window.sessionStorage.setItem('maa:scenario-lab:v2:profile-cancelled', JSON.stringify({
+      factors: PROFILE_A_FACTORS,
+      activeJobId: 'scenario-cancelled',
+    }))
+    vi.mocked(apiJson).mockResolvedValue({
+      id: 'scenario-cancelled',
+      kind: 'scenario_comparison',
+      source: 'scenario_comparison',
+      status: 'cancelled',
+      priority: { kind: 'analysis', label: '高级分析' },
+      queuePosition: null,
+      pollAfterMs: 1_500,
+      timestamps: {
+        submittedAt: '2026-07-10T00:00:00.000Z',
+        finishedAt: '2026-07-10T00:00:05.000Z',
+        nextAttemptAt: null,
+        cancelRequestedAt: '2026-07-10T00:00:05.000Z',
+      },
+      estimate: {
+        durationMs: 90_000,
+        bucket: 'scenario_comparison',
+        source: 'fallback_p95',
+        sampleCount: 0,
+        remainingMs: null,
+        totalMs: null,
+        phase: 'cancelled',
+        updatedAt: '2026-07-10T00:00:05.000Z',
+      },
+      executionPhase: 'terminal',
+      attemptCount: 0,
+      failureCount: 0,
+      cancellationRequested: true,
+      canCancel: false,
+      canRetry: true,
+      error: {
+        code: 'cancelled_by_user',
+        message: '任务已由用户取消。',
+        retryable: true,
+        recoveryAction: 'retry',
+        attemptCount: 0,
+        supportReference: 'OPT-CANCEL',
+      },
+    } as never)
+
+    const { result } = renderHook(() => useScenarioComparison({
+      profileId: 'profile-cancelled',
+      operators: [],
+      config: {} as LicenseConfig,
+    }))
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBeNull()
+    expect(result.current.progress).toMatchObject({
+      jobId: 'scenario-cancelled',
+      estimatePhase: 'cancelled',
+      executionPhase: 'terminal',
+      cancellationRequested: true,
+    })
+  })
+
   it('reuses the pending idempotency key after an unknown submission outcome', async () => {
     vi.mocked(apiJson).mockRejectedValue(new TypeError('network lost'))
     const { result } = renderHook(() => useScenarioComparison({

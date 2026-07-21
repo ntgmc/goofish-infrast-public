@@ -275,6 +275,7 @@ rm -f admin.cookies
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | PostgreSQL 连接字符串 |
 | `NODE_ENV` | Production | 生产环境必须设为 `production`，启用安全 Cookie 和生产保护 |
+| `APP_ROLE` | Production | 进程角色：首尔后端为 `api`，杭州计算节点为 `worker`；本地开发可用 `all` |
 | `MAA_ADMIN_PASSWORD` | Yes | 管理后台主口令 |
 | `CDK_HASH_SECRET` | Yes | CDK 哈希计算密钥 |
 | `MAA_ADMIN_SECRET` | Yes | 优化任务轮询令牌签名密钥 |

@@ -18,6 +18,7 @@ const expectedRoutes = [
   '/api/auth/change-password',
   '/api/auth/me',
   '/api/auth/register',
+  '/api/auth/registration-settings',
   '/api/data',
   '/api/depot-value',
   '/api/health',

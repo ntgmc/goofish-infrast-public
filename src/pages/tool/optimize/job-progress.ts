@@ -9,13 +9,21 @@ import { copy } from '../../../copy/index'
 export const OPTIMIZE_POLL_REQUEST_TIMEOUT_MS = 20_000
 const OPTIMIZE_HIDDEN_POLL_MULTIPLIER = 3
 
-export function waitForOptimizePoll(ms: number, isCancelled?: () => boolean): Promise<void> {
+export function waitForOptimizePoll(
+  ms: number,
+  isCancelled?: () => boolean,
+  shouldRefresh?: () => boolean,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const baseDelayMs = Math.max(500, ms)
     const startedAt = Date.now()
     const check = () => {
       if (isCancelled?.()) {
         reject(new OptimizeJobPollCancelledError())
+        return
+      }
+      if (shouldRefresh?.()) {
+        resolve()
         return
       }
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -106,20 +114,22 @@ export function prepareOptimizeContinuationProgress(
   now: number,
 ): ScheduleProgressState | null | undefined {
   if (!current || current.jobId === next.job_id) return current
+  const queued = next.status === 'queued'
   return {
     ...current,
     jobId: next.job_id,
     completedAt: undefined,
-    queueStatus: 'running',
-    queuePosition: null,
-    observedRunning: true,
+    queueStatus: queued ? 'queued' : 'running',
+    queuePosition: queued ? next.queue_position : null,
+    observedRunning: !queued,
     percentFloor: Math.max(92, current.percentFloor ?? 0, getOptimizeProgressPercent(current, now)),
     estimatedRemainingMs: next.estimated_remaining_ms,
     estimatedTotalMs: Math.max(
       current.estimatedTotalMs ?? 0,
       Math.max(0, now - current.startedAt) + Math.max(0, next.estimated_remaining_ms ?? 0),
     ),
-    estimatePhase: next.estimate_phase === 'overdue' ? 'overdue' : 'running',
+    estimatePhase: next.estimate_phase === 'overdue' ? 'overdue' : queued ? 'queued' : 'running',
+    estimateUpdatedAt: next.estimate_updated_at,
     estimateAdjustment: copy.optimize.pages_tool_optimize_job_progress_006,
     lastUpdatedAt: now,
   }
@@ -190,6 +200,7 @@ function getStableOptimizeEstimatePhase(
     && current.estimatePhase === 'overdue'
     && next.estimate_phase !== 'completed'
     && next.estimate_phase !== 'failed'
+    && next.estimate_phase !== 'cancelled'
   ) {
     return 'overdue'
   }
@@ -211,6 +222,7 @@ function getStableOptimizeRemainingMs(
     && current.estimatePhase === 'overdue'
     && next.estimate_phase !== 'completed'
     && next.estimate_phase !== 'failed'
+    && next.estimate_phase !== 'cancelled'
   ) {
     return null
   }
@@ -254,6 +266,7 @@ function getStableOptimizeTotalMs(
       && Number.isFinite(currentTotalMs)
       && next.estimate_phase !== 'completed'
       && next.estimate_phase !== 'failed'
+      && next.estimate_phase !== 'cancelled'
     ) {
       return currentTotalMs
     }
