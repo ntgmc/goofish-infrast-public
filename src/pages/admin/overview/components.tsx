@@ -339,12 +339,12 @@ export function RiskReasonPanel({ reasons, onOpenDetail }: { reasons: RiskReason
   )
 }
 
-type TrendMetricKey = 'visits' | 'schedule_generates' | 'cdk_redeems'
+type TrendMetricKey = 'visits' | 'schedule_generates' | 'account_additions'
 
 const trendMetrics: Array<{ key: TrendMetricKey; label: string; stroke: string; dasharray?: string }> = [
   { key: 'visits', label: '访问', stroke: 'var(--color-brand-500)' },
   { key: 'schedule_generates', label: '生成', stroke: 'var(--color-warning)', dasharray: '8 5' },
-  { key: 'cdk_redeems', label: '兑换', stroke: 'var(--color-success)', dasharray: '2 5' },
+  { key: 'account_additions', label: '兑换 / 新增', stroke: 'var(--color-success)', dasharray: '2 5' },
 ]
 
 const trendChart = {
@@ -414,7 +414,7 @@ export function UsageTrendChart({ days }: { days: UsageDay[] }) {
         onMouseLeave={() => setActiveIndex(null)}
       >
         <title id="usage-trend-title">7 日趋势</title>
-        <desc id="usage-trend-desc">最近 7 日访问、生成、兑换三项指标的趋势折线图。</desc>
+        <desc id="usage-trend-desc">所选范围内访问、生成、CDK 兑换与免费预览账号新增三项指标的趋势折线图。</desc>
         {yTicks.map((tick) => {
           const y = yFor(tick)
           return (
@@ -463,7 +463,7 @@ export function UsageTrendChart({ days }: { days: UsageDay[] }) {
               height={plotHeight}
               fill="transparent"
               tabIndex={0}
-              aria-label={`${point.day.date}，访问 ${point.day.visits}，生成 ${point.day.schedule_generates}，兑换 ${point.day.cdk_redeems}`}
+              aria-label={`${point.day.date}，访问 ${point.day.visits}，生成 ${point.day.schedule_generates}，CDK 兑换与免费预览账号新增 ${point.day.account_additions}`}
               onFocus={() => setActiveIndex(index)}
               onBlur={() => setActiveIndex(null)}
               onMouseEnter={() => setActiveIndex(index)}
@@ -495,7 +495,7 @@ export function UsageTrendChart({ days }: { days: UsageDay[] }) {
           <div key={day.date}>
             <dt>{day.date}</dt>
             <dd>
-              访问 {day.visits}，生成 {day.schedule_generates}，兑换 {day.cdk_redeems}
+              访问 {day.visits}，生成 {day.schedule_generates}，CDK 兑换与免费预览账号新增 {day.account_additions}
             </dd>
           </div>
         ))}

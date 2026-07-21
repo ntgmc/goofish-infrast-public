@@ -5,6 +5,7 @@ import { closePool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { CdkAlreadyRedeemedError, createRequestHash, redeemCdkAtomically, saveProfileInTransaction, saveWorkspaceInTransaction } from './cdk-redemption'
 import { createPostgresCdkRecordStore } from './cdk-store'
+import { createPostgresUsageEventStore } from './usage-store'
 import { emptyWorkspace, type UserGameAccountRecord } from './user-store'
 import type { CdkRecord } from '../handlers/license-utils'
 
@@ -39,6 +40,36 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     const row = await query<{ status: string; license_order_hash: string }>('select status, license_order_hash from cdk_records where key = $1', [key])
     expect(row.rows[0]).toMatchObject({ status: 'used' })
     expect(['order-a', 'order-b']).toContain(row.rows[0]?.license_order_hash)
+  })
+
+  it('builds dashboard account additions from CDK redemptions and free preview claims', async () => {
+    const date = new Date().toISOString().slice(0, 10)
+    const store = createPostgresUsageEventStore()
+    const before = await store.getStats([date])
+
+    await seedUsedCdk()
+    const claimedAt = new Date().toISOString()
+    const claim = {
+      uid_hash: randomUUID().replaceAll('-', ''),
+      user_id: randomUUID(),
+      profile_id: randomUUID(),
+      claimed_at: claimedAt,
+    }
+    await query(
+      `insert into free_preview_claims (uid_hash, user_id, profile_id, claimed_at, record_json)
+       values ($1, $2, $3, $4, $5::jsonb)`,
+      [claim.uid_hash, claim.user_id, claim.profile_id, claim.claimed_at, JSON.stringify(claim)],
+    )
+
+    const after = await store.getStats([date])
+    expect(after.totals.cdk_redeems - before.totals.cdk_redeems).toBe(1)
+    expect(after.totals.free_previews - before.totals.free_previews).toBe(1)
+    expect(after.totals.account_additions - before.totals.account_additions).toBe(2)
+    expect(after.days[0]).toMatchObject({
+      cdk_redeems: after.totals.cdk_redeems,
+      free_previews: after.totals.free_previews,
+      account_additions: after.totals.account_additions,
+    })
   })
 
   it('replays a completed idempotent request and rejects a mismatched key reuse', async () => {

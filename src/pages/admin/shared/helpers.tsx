@@ -171,13 +171,18 @@ function isDateInputString(value: string): boolean {
 }
 
 function normalizeUsageTotals(value: Partial<UsageTotals> | undefined): UsageTotals {
+  const freePreviews = normalizeCount(value?.free_previews)
+  const cdkRedeems = normalizeCount(value?.cdk_redeems)
   return {
     unique_visitors: normalizeCount(value?.unique_visitors),
     visits: normalizeCount(value?.visits),
-    free_previews: normalizeCount(value?.free_previews),
+    free_previews: freePreviews,
     registers: normalizeCount(value?.registers),
     schedule_generates: normalizeCount(value?.schedule_generates),
-    cdk_redeems: normalizeCount(value?.cdk_redeems),
+    cdk_redeems: cdkRedeems,
+    account_additions: value?.account_additions === undefined
+      ? freePreviews + cdkRedeems
+      : normalizeCount(value.account_additions),
     failures: normalizeCount(value?.failures),
     schedule_failures: normalizeCount(value?.schedule_failures),
     cdk_redeem_failures: normalizeCount(value?.cdk_redeem_failures),
