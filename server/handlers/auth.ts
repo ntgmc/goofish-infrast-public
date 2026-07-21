@@ -64,7 +64,10 @@ export default async (req: Request): Promise<Response> => {
       }
       if (!registered.ok) {
         await recordRegister('failure', startedAt)
-        const quotaLimited = registered.code === 'brevo_daily_limit_reached' && registered.retryAfterSeconds
+        const quotaLimited = (
+          registered.code === 'brevo_daily_limit_reached'
+          || registered.code === 'brevo_reserved_capacity_reached'
+        ) && registered.retryAfterSeconds
         return jsonResponse({
           error: registered.message,
           ...(registered.code && { code: registered.code }),

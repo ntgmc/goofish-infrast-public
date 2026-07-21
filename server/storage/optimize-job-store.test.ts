@@ -50,9 +50,12 @@ describe('optimization job attempt lifecycle', () => {
     })
     await expect(store.heartbeatAttempt(job.id, 1, 'worker-b', 'lock-a', future())).resolves.toBe(false)
     await expect(store.heartbeatAttempt(job.id, 1, 'worker-a', 'lock-a', future())).resolves.toBe(true)
+    await expect(store.updateAttemptStage(job.id, 1, 'worker-b', 'lock-a', 'simulating_upgrades')).resolves.toBe(false)
+    await expect(store.updateAttemptStage(job.id, 1, 'worker-a', 'lock-a', 'simulating_upgrades')).resolves.toBe(true)
+    await expect(store.getJob(job.id)).resolves.toMatchObject({ execution_stage: 'simulating_upgrades' })
     await expect(store.completeAttempt(job.id, 1, 'worker-b', 'lock-a', { stale: true })).resolves.toBe(false)
     await expect(store.completeAttempt(job.id, 1, 'worker-a', 'lock-a', { ok: true })).resolves.toBe(true)
-    await expect(store.getJob(job.id)).resolves.toMatchObject({ status: 'succeeded', result_json: { ok: true } })
+    await expect(store.getJob(job.id)).resolves.toMatchObject({ status: 'succeeded', execution_stage: 'completed', result_json: { ok: true } })
   })
 
   it('returns an interrupted deployment attempt to queued without consuming failure budget', async () => {
@@ -175,16 +178,13 @@ describe('optimization job submission admission', () => {
     ).rejects.toMatchObject({ code: 'queue_wait_capacity_exceeded', status: 429 })
   })
 
-  it('counts a generated schedule once when upgrade suggestions run as a continuation', async () => {
+  it('counts each merged schedule and suggestion request as one submission', async () => {
     const store = createMemoryOptimizeJobStore()
     const ownerKey = `license:${randomUUID()}`
 
     for (let index = 0; index < 12; index += 1) {
       const schedule = await store.admitJob(admissionInput(ownerKey, 'account_profile'))
       store.records.get(schedule.job.id)!.status = 'succeeded'
-
-      const suggestions = await store.admitJob(admissionInput(ownerKey, 'optimize_suggestions'))
-      store.records.get(suggestions.job.id)!.status = 'succeeded'
     }
 
     await expect(store.admitJob(admissionInput(ownerKey, 'account_profile'))).rejects.toEqual(
@@ -194,22 +194,6 @@ describe('optimization job submission admission', () => {
         '当前账号的优化提交次数已达小时上限。请1小时后再试。',
       ),
     )
-  })
-
-  it('keeps an independent hourly limit for upgrade suggestion continuations', async () => {
-    const store = createMemoryOptimizeJobStore()
-    const ownerKey = `license:${randomUUID()}`
-
-    for (let index = 0; index < 12; index += 1) {
-      const suggestions = await store.admitJob(admissionInput(ownerKey, 'optimize_suggestions'))
-      store.records.get(suggestions.job.id)!.status = 'succeeded'
-    }
-
-    await expect(store.admitJob(admissionInput(ownerKey, 'optimize_suggestions'))).rejects.toMatchObject({
-      code: 'submission_rate_exceeded',
-      status: 429,
-      message: '当前账号的优化提交次数已达小时上限。请1小时后再试。',
-    })
   })
 })
 

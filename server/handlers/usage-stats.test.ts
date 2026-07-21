@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import usageStatsHandler, { recordUsageEvent, setUsageEventStoreForTesting } from './usage-stats'
+import usageStatsHandler, { getScheduleGenerateDurationStatsByBucket, recordUsageEvent, setUsageEventStoreForTesting } from './usage-stats'
 import {
   buildUsageStats,
   type UsageEventRecord,
@@ -100,5 +100,66 @@ describe('usage stats handler', () => {
       expect.objectContaining({ date: '2026-03-10', free_previews: 2, cdk_redeems: 3, account_additions: 5 }),
       expect.objectContaining({ date: '2026-03-11', free_previews: 1, cdk_redeems: 4, account_additions: 5 }),
     ])
+  })
+
+  it('builds latency metrics only from successful compute-attempt durations', () => {
+    const date = '2026-03-10'
+    const base = { visitor_id: null, created_at: `${date}T08:00:00.000Z`, date, event: 'schedule_generate' as const }
+    const stats = buildUsageStats([
+      { ...base, id: 'legacy', status: 'success', duration_ms: 1_472_700 },
+      { ...base, id: 'fast', status: 'success', duration_ms: 600_000, compute_duration_ms: 2_000 },
+      { ...base, id: 'slow', status: 'success', duration_ms: 900_000, compute_duration_ms: 4_000 },
+      { ...base, id: 'failed', status: 'failure', duration_ms: 5_000, compute_duration_ms: 5_000 },
+    ], [date])
+
+    expect(stats.latency.schedule_generate).toMatchObject({
+      average_ms: 3_000,
+      p50_ms: 2_000,
+      p95_ms: 4_000,
+      max_ms: 4_000,
+      sample_count: 2,
+    })
+  })
+
+  it('uses compute-attempt duration for bucketed ETA history', async () => {
+    const records: UsageEventRecord[] = [
+      {
+        id: 'job-1',
+        event: 'schedule_generate',
+        visitor_id: null,
+        created_at: '2026-03-10T08:00:00.000Z',
+        date: '2026-03-10',
+        status: 'success',
+        duration_ms: 600_000,
+        compute_duration_ms: 3_000,
+        estimate_bucket: 'maa_plain',
+      },
+      {
+        id: 'job-2',
+        event: 'schedule_generate',
+        visitor_id: null,
+        created_at: '2026-03-10T09:00:00.000Z',
+        date: '2026-03-10',
+        status: 'success',
+        compute_duration_ms: 30_000,
+        estimate_bucket: 'maa_plain_with_suggestions',
+      },
+    ]
+    setUsageEventStoreForTesting({
+      set: async () => undefined,
+      list: async () => records,
+      getStats: async (dates) => buildUsageStats(records, dates),
+    })
+
+    await expect(getScheduleGenerateDurationStatsByBucket(
+      'maa_plain',
+      '2026-03-10T00:00:00.000Z',
+      '2026-03-11T00:00:00.000Z',
+    )).resolves.toEqual({ p95_ms: 3_000, sample_count: 1 })
+    await expect(getScheduleGenerateDurationStatsByBucket(
+      'maa_plain_with_suggestions',
+      '2026-03-10T00:00:00.000Z',
+      '2026-03-11T00:00:00.000Z',
+    )).resolves.toEqual({ p95_ms: 30_000, sample_count: 1 })
   })
 })

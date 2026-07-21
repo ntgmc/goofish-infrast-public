@@ -65,7 +65,7 @@ async function assertDepotProfileCannotOptimize() {
     identity: { type: 'profile', profileId },
     operators: [],
     config: {},
-    ignoreElite: false,
+    includeUpgradeSuggestions: false,
   })
   if (result.status !== 403 || !result.body.error?.message?.includes('仓库分析档案不能用于生成排班。')) {
     throw new Error(`depot optimize guard: expected 403 depot guard, got ${result.status}`)

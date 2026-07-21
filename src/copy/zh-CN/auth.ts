@@ -6,7 +6,8 @@ export const authCopy = {
   api_registration_accepted: "已发送注册验证邮件，请检查您的收件箱，并在邮件中确认。",
   api_registration_completed: "注册成功，请使用邮箱和密码登录。",
   api_registration_brevo_limit_reached: "今日邮件发送额度已用尽，注册已暂停，请明日再试。",
-  api_invite_code_required: "当前仅限受邀用户注册，请输入邀请码。",
+  api_registration_brevo_reserve_reached: "当前注册验证邮件已达到预留边界，注册已暂停，请明日再试。",
+  api_invite_code_required: "当前仅限管理员邀请注册，请输入管理员邀请码。",
   api_brevo_limit_reached: "今日邮件发送额度已用尽，请明日再试。",
   api_recovery_accepted: "如果账号符合条件，请按照发送至注册邮箱的说明操作。",
   api_service_unavailable: "认证服务暂时不可用，请稍后重试。",
@@ -69,7 +70,7 @@ export const authCopy = {
   // src/components/AuthForm.tsx
   components_AuthForm_015: "邀请码（可选）",
   // src/components/AuthForm.tsx
-  components_AuthForm_016: "10 位邀请码",
+  components_AuthForm_016: "10 位推荐码或 16 位管理员邀请码",
   // src/components/AuthForm.tsx
   components_AuthForm_017: "忘记密码？",
   // src/components/AuthForm.tsx
@@ -91,7 +92,7 @@ export const authCopy = {
   // src/components/AuthForm.tsx
   components_AuthForm_026: "密码至少需要 8 位",
   // src/components/AuthForm.tsx
-  components_AuthForm_027: "请输入有效的 10 位邀请码",
+  components_AuthForm_027: "请输入有效的 10 位推荐码或 16 位管理员邀请码",
   // src/components/AuthForm.tsx
   components_AuthForm_028: "验证邮件已发送，请检查收件箱并点击链接完成注册。",
   // src/components/AuthForm.tsx
@@ -101,9 +102,13 @@ export const authCopy = {
   // src/components/AuthForm.tsx
   components_AuthForm_031: "重新发送验证邮件",
   // src/components/AuthForm.tsx
-  components_AuthForm_032: "邀请码（必填）",
+  components_AuthForm_032: "管理员邀请码（必填）",
   // src/components/AuthForm.tsx
-  components_AuthForm_033: "请输入邀请码",
+  components_AuthForm_033: "请输入管理员邀请码",
+  // src/components/AuthForm.tsx
+  components_AuthForm_034: "16 位管理员邀请码",
+  // src/components/AuthForm.tsx
+  components_AuthForm_035: "请输入有效的 16 位管理员邀请码",
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_001: "验证链接无效或已过期。",
   // src/pages/VerifyEmailPage.tsx

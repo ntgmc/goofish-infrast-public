@@ -14,6 +14,7 @@ const BREVO_QUOTA_TIMEZONE = 'UTC' as const
 const ACTIVE_STATUSES = ['reserved', 'sent', 'uncertain'] as const
 const PURPOSES: BrevoEmailPurpose[] = [
   'email_verification',
+  'admin_invite_verification',
   'password_reset',
   'account_deletion_cancellation',
   'account_deletion_receipt',
@@ -23,6 +24,11 @@ export interface BrevoEmailReservation {
   id: string
   quotaDate: string
   purpose: BrevoEmailPurpose
+}
+
+export interface BrevoEmailQuotaPolicy {
+  adminInviteReserve: number
+  passwordResetReserve: number
 }
 
 export interface BrevoOfficialQuotaSnapshot {
@@ -43,6 +49,7 @@ interface BrevoEmailStatsRow {
   uncertain_count: string
   failed_count: string
   email_verification_count: string
+  admin_invite_verification_count: string
   password_reset_count: string
   account_deletion_cancellation_count: string
   account_deletion_receipt_count: string
@@ -60,14 +67,16 @@ interface BrevoOfficialQuotaSnapshotRow {
 }
 
 export class BrevoDailyQuotaExceededError extends Error {
-  readonly code = 'brevo_daily_limit_reached'
+  readonly code: 'brevo_daily_limit_reached' | 'brevo_reserved_capacity_reached'
 
   constructor(
     readonly quotaDate: string,
     readonly retryAfterSeconds: number,
+    readonly reason: 'daily_limit' | 'reserved_capacity' = 'daily_limit',
   ) {
-    super('Brevo daily email quota reached')
+    super(reason === 'daily_limit' ? 'Brevo daily email quota reached' : 'Brevo reserved email capacity reached')
     this.name = 'BrevoDailyQuotaExceededError'
+    this.code = reason === 'daily_limit' ? 'brevo_daily_limit_reached' : 'brevo_reserved_capacity_reached'
   }
 }
 
@@ -76,6 +85,7 @@ let schemaReady: Promise<void> | null = null
 export async function reserveBrevoEmail(
   purpose: BrevoEmailPurpose,
   now = new Date(),
+  policy: BrevoEmailQuotaPolicy = { adminInviteReserve: 0, passwordResetReserve: 0 },
 ): Promise<BrevoEmailReservation> {
   await ensureSchema()
   const quotaDate = getUtcDate(now)
@@ -89,8 +99,14 @@ export async function reserveBrevoEmail(
       [quotaDate],
     )
     const externalUsedOffset = numberValue(snapshot.rows[0]?.external_used_offset)
-    if (localUsedCount + externalUsedOffset >= BREVO_DAILY_EMAIL_LIMIT) {
-      throw new BrevoDailyQuotaExceededError(quotaDate, secondsUntilNextUtcDay(now))
+    const effectiveUsedCount = localUsedCount + externalUsedOffset
+    const effectiveLimit = purposeLimit(purpose, policy)
+    if (effectiveUsedCount >= effectiveLimit) {
+      throw new BrevoDailyQuotaExceededError(
+        quotaDate,
+        secondsUntilNextUtcDay(now),
+        effectiveUsedCount >= BREVO_DAILY_EMAIL_LIMIT ? 'daily_limit' : 'reserved_capacity',
+      )
     }
     await client.query(
       `insert into brevo_email_deliveries
@@ -207,6 +223,7 @@ export async function getBrevoEmailStats(now = new Date(), days = 7): Promise<Br
               count(*) filter (where status = 'uncertain')::text as uncertain_count,
               count(*) filter (where status = 'failed')::text as failed_count,
               count(*) filter (where status = 'sent' and purpose = 'email_verification')::text as email_verification_count,
+              count(*) filter (where status = 'sent' and purpose = 'admin_invite_verification')::text as admin_invite_verification_count,
               count(*) filter (where status = 'sent' and purpose = 'password_reset')::text as password_reset_count,
               count(*) filter (where status = 'sent' and purpose = 'account_deletion_cancellation')::text as account_deletion_cancellation_count,
               count(*) filter (where status = 'sent' and purpose = 'account_deletion_receipt')::text as account_deletion_receipt_count
@@ -304,6 +321,7 @@ function toDailyStat(date: string, row?: BrevoEmailStatsRow): BrevoEmailDailySta
   const localQuotaUsedCount = sentCount + reservedCount + uncertainCount
   const byPurpose = Object.fromEntries(PURPOSES.map((purpose) => [purpose, 0])) as Record<BrevoEmailPurpose, number>
   byPurpose.email_verification = numberValue(row?.email_verification_count)
+  byPurpose.admin_invite_verification = numberValue(row?.admin_invite_verification_count)
   byPurpose.password_reset = numberValue(row?.password_reset_count)
   byPurpose.account_deletion_cancellation = numberValue(row?.account_deletion_cancellation_count)
   byPurpose.account_deletion_receipt = numberValue(row?.account_deletion_receipt_count)
@@ -360,6 +378,18 @@ function numberValue(value: string | number | undefined): number {
 function clampInteger(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) throw new Error('Brevo remaining credits must be a finite number')
   return Math.max(min, Math.min(max, Math.trunc(value)))
+}
+
+function purposeLimit(purpose: BrevoEmailPurpose, policy: BrevoEmailQuotaPolicy): number {
+  const adminInviteReserve = clampReserve(policy.adminInviteReserve)
+  const passwordResetReserve = clampReserve(policy.passwordResetReserve)
+  if (purpose === 'password_reset') return BREVO_DAILY_EMAIL_LIMIT
+  if (purpose === 'admin_invite_verification') return BREVO_DAILY_EMAIL_LIMIT - passwordResetReserve
+  return Math.max(0, BREVO_DAILY_EMAIL_LIMIT - adminInviteReserve - passwordResetReserve)
+}
+
+function clampReserve(value: number): number {
+  return Number.isInteger(value) ? Math.max(0, Math.min(BREVO_DAILY_EMAIL_LIMIT, value)) : 0
 }
 
 async function ensureSchema(): Promise<void> {

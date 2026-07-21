@@ -32,17 +32,27 @@ interface SendLifecycleEmailInput {
   reservation?: BrevoEmailReservation
 }
 
-export async function sendPasswordResetEmail(input: SendPasswordResetEmailInput): Promise<void> {
+export async function sendPasswordResetEmail(
+  input: SendPasswordResetEmailInput,
+  reservation?: BrevoEmailReservation,
+): Promise<void> {
   await sendLifecycleEmail({
     email: input.email,
     templateId: requiredTemplateId('BREVO_RESET_TEMPLATE_ID'),
     params: { reset_url: input.resetUrl, expires_minutes: input.expiresMinutes },
     purpose: 'password_reset',
+    reservation,
   })
 }
 
-export async function reserveEmailVerificationDelivery(): Promise<BrevoEmailReservation> {
-  return reserveBrevoEmailWithOfficialQuota('email_verification')
+export async function reserveEmailVerificationDelivery(
+  purpose: 'email_verification' | 'admin_invite_verification' = 'email_verification',
+): Promise<BrevoEmailReservation> {
+  return reserveBrevoEmailWithOfficialQuota(purpose)
+}
+
+export async function reservePasswordResetDelivery(): Promise<BrevoEmailReservation> {
+  return reserveBrevoEmailWithOfficialQuota('password_reset')
 }
 
 export async function releaseEmailDeliveryReservation(reservation: BrevoEmailReservation): Promise<void> {
@@ -52,12 +62,15 @@ export async function releaseEmailDeliveryReservation(reservation: BrevoEmailRes
 export async function sendEmailVerificationEmail(
   input: SendEmailVerificationEmailInput,
   reservation?: BrevoEmailReservation,
+  purpose: 'email_verification' | 'admin_invite_verification' = reservation?.purpose === 'admin_invite_verification'
+    ? 'admin_invite_verification'
+    : 'email_verification',
 ): Promise<void> {
   await sendLifecycleEmail({
     email: input.email,
     templateId: requiredTemplateId('BREVO_VERIFY_EMAIL_TEMPLATE_ID'),
     params: { verification_url: input.verificationUrl, expires_hours: input.expiresHours },
-    purpose: 'email_verification',
+    purpose,
     reservation,
   })
 }

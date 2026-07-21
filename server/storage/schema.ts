@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS brevo_email_deliveries (
   quota_date DATE NOT NULL,
   purpose TEXT NOT NULL CHECK (purpose IN (
     'email_verification',
+    'admin_invite_verification',
     'password_reset',
     'account_deletion_cancellation',
     'account_deletion_receipt'
@@ -75,6 +76,24 @@ CREATE INDEX IF NOT EXISTS idx_brevo_email_deliveries_quota_date
   ON brevo_email_deliveries(quota_date);
 CREATE INDEX IF NOT EXISTS idx_brevo_email_deliveries_daily_breakdown
   ON brevo_email_deliveries(quota_date, purpose, status);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'brevo_email_deliveries_purpose_check'
+       AND conrelid = 'brevo_email_deliveries'::regclass
+       AND pg_get_constraintdef(oid) LIKE '%admin_invite_verification%'
+  ) THEN
+    ALTER TABLE brevo_email_deliveries DROP CONSTRAINT IF EXISTS brevo_email_deliveries_purpose_check;
+    ALTER TABLE brevo_email_deliveries ADD CONSTRAINT brevo_email_deliveries_purpose_check CHECK (purpose IN (
+      'email_verification',
+      'admin_invite_verification',
+      'password_reset',
+      'account_deletion_cancellation',
+      'account_deletion_receipt'
+    ));
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS brevo_email_quota_snapshots (
   quota_date DATE PRIMARY KEY,
@@ -119,6 +138,8 @@ CREATE TABLE IF NOT EXISTS optimize_jobs (
   next_attempt_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ,
   cancel_requested_at TIMESTAMPTZ,
+  execution_stage TEXT,
+  stage_updated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   started_at TIMESTAMPTZ,
   finished_at TIMESTAMPTZ,
@@ -291,6 +312,21 @@ CREATE TABLE IF NOT EXISTS invitations (
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_registered_at ON invitations(inviter_user_id, registered_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_settled_at ON invitations(inviter_user_id, settled_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_invitation_code ON invitations(invitation_code);
+
+CREATE TABLE IF NOT EXISTS admin_registration_invitations (
+  id TEXT PRIMARY KEY,
+  code_hash TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ,
+  consumed_by_user_id TEXT REFERENCES user_accounts(id) ON DELETE SET NULL,
+  revoked_at TIMESTAMPTZ,
+  CHECK (consumed_at IS NULL OR revoked_at IS NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_admin_registration_invitations_created
+  ON admin_registration_invitations(created_at DESC, id ASC);
+CREATE INDEX IF NOT EXISTS idx_admin_registration_invitations_status
+  ON admin_registration_invitations(consumed_at, revoked_at, expires_at, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS reward_grants (
   id TEXT PRIMARY KEY,
@@ -606,6 +642,8 @@ ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS failure_kind TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS public_error_code TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS cancel_requested_at TIMESTAMPTZ;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS execution_stage TEXT;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS stage_updated_at TIMESTAMPTZ;
 UPDATE optimize_jobs SET next_attempt_at = created_at WHERE status = 'queued' AND next_attempt_at IS NULL;
 UPDATE optimize_jobs
 SET expires_at = created_at + interval '24 hours'

@@ -384,8 +384,10 @@ CANDIDATE_ENABLED=true
 
 if [[ -n "$OLD_ACTIVE_SLOT" ]]; then
   PHASE="previous-slot-drain"
-  log "disabling and draining previous worker slot $OLD_ACTIVE_SLOT"
-  run_systemctl disable --now "$(service_unit "$OLD_ACTIVE_SLOT")"
+  log "disabling previous worker slot $OLD_ACTIVE_SLOT and handing its drain to systemd"
+  run_systemctl disable "$(service_unit "$OLD_ACTIVE_SLOT")"
+  run_systemctl --no-block stop "$(service_unit "$OLD_ACTIVE_SLOT")"
+  log "previous worker slot $OLD_ACTIVE_SLOT is draining asynchronously"
 fi
 
 PHASE="post-drain-readiness"

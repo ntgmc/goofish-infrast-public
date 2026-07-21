@@ -21,6 +21,7 @@ type UsageEventInput = string | null | Partial<Pick<
   | 'visitor_id'
   | 'status'
   | 'duration_ms'
+  | 'compute_duration_ms'
   | 'reason_code'
   | 'permission'
   | 'profile_id'
@@ -73,6 +74,7 @@ export async function recordUsageEvent(event: UsageEventName, input: UsageEventI
     date,
     ...(options.status && { status: options.status }),
     ...(options.duration_ms !== undefined && { duration_ms: options.duration_ms }),
+    ...(options.compute_duration_ms !== undefined && { compute_duration_ms: options.compute_duration_ms }),
     ...(options.reason_code && { reason_code: options.reason_code }),
     ...(options.permission && { permission: options.permission }),
     ...(options.profile_id && { profile_id: options.profile_id }),
@@ -191,6 +193,9 @@ function normalizeUsageEventInput(input: UsageEventInput): Required<Pick<UsageEv
     ...(typeof input.duration_ms === 'number' && Number.isFinite(input.duration_ms)
       ? { duration_ms: Math.max(0, Math.round(input.duration_ms)) }
       : {}),
+    ...(typeof input.compute_duration_ms === 'number' && Number.isFinite(input.compute_duration_ms)
+      ? { compute_duration_ms: Math.max(0, Math.round(input.compute_duration_ms)) }
+      : {}),
     ...(input.reason_code && { reason_code: input.reason_code }),
     ...(normalizeNullableString(input.permission, 40) && { permission: normalizeNullableString(input.permission, 40) as string }),
     ...(normalizeNullableString(input.profile_id, 80) && { profile_id: normalizeNullableString(input.profile_id, 80) as string }),
@@ -260,10 +265,10 @@ function toUsageStatsCsv(stats: Awaited<ReturnType<UsageEventStore['getStats']>>
     max_ms: latency.max_ms,
     sample_count: latency.sample_count,
   })) {
-    rows.push(['latency', key, key, '', String(value), ''])
+    rows.push(['latency', key, key, '', String(value), 'scope=compute_attempt'])
   }
   for (const day of latency.days) {
-    rows.push(['latency_days', 'schedule_generate', 'Generate schedule', day.date, String(day.average_ms), `p95=${day.p95_ms};samples=${day.sample_count}`])
+    rows.push(['latency_days', 'schedule_generate', 'Generate schedule', day.date, String(day.average_ms), `p95=${day.p95_ms};samples=${day.sample_count};scope=compute_attempt`])
   }
   for (const [key, value] of Object.entries({
     attempts: stats.skland.attempts,
@@ -340,10 +345,10 @@ export async function getScheduleGenerateDurationStatsByBucket(
       && record.estimate_bucket === bucket
       && record.created_at >= startAt
       && record.created_at < endAt
-      && typeof record.duration_ms === 'number'
-      && Number.isFinite(record.duration_ms)
+      && typeof record.compute_duration_ms === 'number'
+      && Number.isFinite(record.compute_duration_ms)
     )
-    .map((record) => Math.max(0, Math.round(record.duration_ms ?? 0)))
+    .map((record) => Math.max(0, Math.round(record.compute_duration_ms ?? 0)))
   return {
     p95_ms: percentile(durations, 95),
     sample_count: durations.length,

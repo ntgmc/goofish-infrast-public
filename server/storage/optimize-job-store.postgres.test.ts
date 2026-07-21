@@ -70,9 +70,14 @@ describe('PostgreSQL optimization job admission', () => {
          and table_name = 'optimize_jobs'
          and column_name = any($1::text[])
        order by column_name`,
-      [['expires_at', 'next_attempt_at']],
+      [['execution_stage', 'expires_at', 'next_attempt_at', 'stage_updated_at']],
     )
-    expect(columns.rows.map((row) => row.column_name)).toEqual(['expires_at', 'next_attempt_at'])
+    expect(columns.rows.map((row) => row.column_name)).toEqual([
+      'execution_stage',
+      'expires_at',
+      'next_attempt_at',
+      'stage_updated_at',
+    ])
 
     const backfill = await query<{ expires_at_backfilled: boolean; next_attempt_at_backfilled: boolean }>(
       `select
@@ -237,16 +242,13 @@ describe('PostgreSQL optimization job admission', () => {
     await expect(store.admitJob(input({ owner_key: owner }))).rejects.toMatchObject({ code: 'queue_capacity_exceeded', status: 429 })
   })
 
-  it('counts upgrade suggestion continuations separately from paid submissions', async () => {
+  it('counts each merged schedule request once', async () => {
     const store = createPostgresOptimizeJobStore()
     const owner = `license:${randomUUID()}`
 
     for (let index = 0; index < 12; index += 1) {
       const schedule = await store.admitJob(input({ owner_key: owner }))
       await query("update optimize_jobs set status = 'succeeded', updated_at = now() where id = $1", [schedule.job.id])
-
-      const suggestions = await store.admitJob(input({ owner_key: owner, source: 'optimize_suggestions' }))
-      await query("update optimize_jobs set status = 'succeeded', updated_at = now() where id = $1", [suggestions.job.id])
     }
 
     await expect(query<{ count: string }>(
@@ -314,13 +316,16 @@ describe('PostgreSQL optimization job admission', () => {
     const store = createPostgresOptimizeJobStore()
     const admitted = await store.admitJob(input({ priority: 1_000 }))
     const claimed = await store.claimNextJob('worker-a', 'attempt-lock', new Date(Date.now() + 60_000).toISOString(), 2)
-    expect(claimed).toMatchObject({ id: admitted.job.id, status: 'running', expires_at: null })
+    expect(claimed).toMatchObject({ id: admitted.job.id, status: 'running', expires_at: null, execution_stage: 'starting' })
 
     await expect(store.heartbeatAttempt(admitted.job.id, claimed!.attempt_count, 'worker-b', 'attempt-lock', new Date(Date.now() + 60_000).toISOString())).resolves.toBe(false)
     await expect(store.heartbeatAttempt(admitted.job.id, claimed!.attempt_count, 'worker-a', 'attempt-lock', new Date(Date.now() + 60_000).toISOString())).resolves.toBe(true)
+    await expect(store.updateAttemptStage(admitted.job.id, claimed!.attempt_count, 'worker-b', 'attempt-lock', 'simulating_upgrades')).resolves.toBe(false)
+    await expect(store.updateAttemptStage(admitted.job.id, claimed!.attempt_count, 'worker-a', 'attempt-lock', 'simulating_upgrades')).resolves.toBe(true)
+    await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({ execution_stage: 'simulating_upgrades' })
     await expect(store.releaseInterruptedAttempt(admitted.job.id, claimed!.attempt_count, 'worker-a', 'attempt-lock')).resolves.toBe(true)
 
-    expect(await store.getJob(admitted.job.id)).toMatchObject({ status: 'queued', failure_count: 0, attempt_count: 1 })
+    expect(await store.getJob(admitted.job.id)).toMatchObject({ status: 'queued', failure_count: 0, attempt_count: 1, execution_stage: null })
     expect((await query<{ status: string }>(
       'select status from optimize_job_attempts where job_id = $1 and attempt_no = $2',
       [admitted.job.id, claimed!.attempt_count],

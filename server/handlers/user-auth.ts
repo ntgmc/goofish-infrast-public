@@ -41,6 +41,7 @@ import {
   BrevoDailyQuotaExceededError,
   releaseEmailDeliveryReservation,
   reserveEmailVerificationDelivery,
+  reservePasswordResetDelivery,
   sendEmailVerificationEmail,
   sendPasswordResetEmail,
   type BrevoEmailReservation,
@@ -73,6 +74,15 @@ import {
   validateInvitationCode,
   type ValidatedInvitationCode,
 } from '../storage/invitation-store'
+import {
+  AdminRegistrationInvitationError,
+  consumeAdminRegistrationInvitationInTransaction,
+  normalizeAdminRegistrationInviteCode,
+  saveRegistrationWithAdminInvitation,
+  userRegisteredWithAdminInvitation,
+  validateAdminRegistrationInvitation,
+  type ValidatedAdminRegistrationInvitation,
+} from '../storage/admin-registration-invitation-store'
 
 const SESSION_COOKIE = 'maa_session'
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
@@ -136,19 +146,44 @@ export async function registerUser(
   if (registrationSettings.invite_code_required && (typeof inviteCodeValue !== 'string' || !inviteCodeValue.trim())) {
     return { ok: false, status: 400, message: authCopy.api_invite_code_required, code: 'invite_code_required' }
   }
+  const existing = await getUserByEmail(email)
+  if (existing) {
+    await verifyPasswordHashOrDummy(passwordCheck.password, null)
+    return { ok: false, status: 202, message: authCopy.api_registration_accepted, code: 'registration_accepted' }
+  }
+  const normalizedInviteCode = typeof inviteCodeValue === 'string' ? inviteCodeValue.trim().toUpperCase() : null
+  let invitation: ValidatedInvitationCode | null = null
+  let adminInvitation: ValidatedAdminRegistrationInvitation | null = null
+  try {
+    if (normalizeAdminRegistrationInviteCode(normalizedInviteCode)) {
+      adminInvitation = await validateAdminRegistrationInvitation(normalizedInviteCode)
+    } else if (normalizedInviteCode) {
+      if (registrationSettings.invite_code_required) throw new AdminRegistrationInvitationError()
+      invitation = await validateInvitationCode(normalizedInviteCode)
+    }
+  } catch (error) {
+    if (error instanceof InvitationCodeError || error instanceof AdminRegistrationInvitationError) {
+      return { ok: false, status: 400, message: error.message, code: error.code }
+    }
+    throw error
+  }
   let verificationRequired = registrationSettings.email_verification_required
   let emailReservation: BrevoEmailReservation | null = null
 
   if (verificationRequired) {
     try {
-      emailReservation = await reserveEmailVerificationDelivery()
+      emailReservation = await reserveEmailVerificationDelivery(
+        adminInvitation ? 'admin_invite_verification' : 'email_verification',
+      )
     } catch (error) {
       if (!(error instanceof BrevoDailyQuotaExceededError)) throw error
       if (registrationSettings.brevo_quota_action === 'pause_registration') {
         return {
           ok: false,
           status: 503,
-          message: authCopy.api_registration_brevo_limit_reached,
+          message: error.reason === 'reserved_capacity'
+            ? authCopy.api_registration_brevo_reserve_reached
+            : authCopy.api_registration_brevo_limit_reached,
           code: error.code,
           retryAfterSeconds: error.retryAfterSeconds,
         }
@@ -158,25 +193,10 @@ export async function registerUser(
   }
 
   try {
-    const existing = await getUserByEmail(email)
     const normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey)
-    const normalizedInviteCode = typeof inviteCodeValue === 'string' ? inviteCodeValue.trim().toUpperCase() : null
     const registrationRequestHash = typeof cdkValue === 'string' && cdkValue.trim()
       ? createRequestHash({ code: normalizeCode(cdkValue), email, password: passwordCheck.password, invite_code: normalizedInviteCode })
       : null
-    if (existing) {
-      await verifyPasswordHashOrDummy(passwordCheck.password, null)
-      return { ok: false, status: 202, message: authCopy.api_registration_accepted, code: 'registration_accepted' }
-    }
-
-    let invitation: ValidatedInvitationCode | null
-    try {
-      invitation = await validateInvitationCode(inviteCodeValue)
-    } catch (error) {
-      if (error instanceof InvitationCodeError) return { ok: false, status: 400, message: error.message, code: error.code }
-      throw error
-    }
-
     const now = new Date().toISOString()
     const passwordHash = await createPasswordHash(passwordCheck.password)
     const user: UserAccountRecord = {
@@ -197,7 +217,14 @@ export async function registerUser(
       updated_at: now,
     }
     if (typeof cdkValue === 'string' && cdkValue.trim()) {
-      const redeemed = await redeemRegistrationCdk(user, cdkValue, normalizedIdempotencyKey, registrationRequestHash!, invitation)
+      const redeemed = await redeemRegistrationCdk(
+        user,
+        cdkValue,
+        normalizedIdempotencyKey,
+        registrationRequestHash!,
+        invitation,
+        adminInvitation,
+      )
       if (!redeemed.ok) return redeemed
       const primary = {
         ...user,
@@ -213,10 +240,25 @@ export async function registerUser(
       user.cdk_code_hash = primary.cdk_code_hash
       user.cdk_order_hash = primary.cdk_order_hash
       user.updated_at = primary.updated_at
-    } else if (invitation) {
-      await saveRegistrationWithInvitation(user, invitation)
     } else {
-      await saveUserAccount(user)
+      try {
+        if (adminInvitation) {
+          await saveRegistrationWithAdminInvitation(
+            (client) => saveUserAccountInTransaction(client, user),
+            adminInvitation,
+            user.id,
+          )
+        } else if (invitation) {
+          await saveRegistrationWithInvitation(user, invitation)
+        } else {
+          await saveUserAccount(user)
+        }
+      } catch (error) {
+        if (error instanceof AdminRegistrationInvitationError) {
+          return { ok: false, status: 400, message: error.message, code: error.code }
+        }
+        throw error
+      }
     }
 
     if (verificationRequired) {
@@ -313,24 +355,29 @@ export async function requestPasswordReset(emailValue: unknown): Promise<{ ok: t
     const recent = await getRecentPasswordResetTokenForUser(user.id, resendSince)
     if (recent) return { ok: true, message: authCopy.api_password_reset_requested }
 
+    const reservation = await reservePasswordResetDelivery()
     const token = randomBytes(32).toString('base64url')
     const now = new Date()
     const expiresMinutes = getPasswordResetTtlMinutes()
     const expiresAt = new Date(now.getTime() + expiresMinutes * 60 * 1000).toISOString()
-    await savePasswordResetToken({
-      id: randomUUID(),
-      user_id: user.id,
-      token_hash: hashPasswordResetToken(token),
-      expires_at: expiresAt,
-      used_at: null,
-      created_at: now.toISOString(),
-    })
+    try {
+      await savePasswordResetToken({
+        id: randomUUID(),
+        user_id: user.id,
+        token_hash: hashPasswordResetToken(token),
+        expires_at: expiresAt,
+        used_at: null,
+        created_at: now.toISOString(),
+      })
 
-    await sendPasswordResetEmail({
-      email: user.email,
-      resetUrl: buildPasswordResetUrl(token),
-      expiresMinutes,
-    })
+      await sendPasswordResetEmail({
+        email: user.email,
+        resetUrl: buildPasswordResetUrl(token),
+        expiresMinutes,
+      }, reservation)
+    } finally {
+      await safelyReleaseEmailReservation(reservation)
+    }
   } catch (error) {
     console.error('password reset request error:', error)
   }
@@ -525,7 +572,8 @@ async function redeemRegistrationCdk(
   idempotencyKey?: string | null,
   requestHash?: string,
   invitation?: ValidatedInvitationCode | null,
-): Promise<{ ok: true; profile: UserGameAccountRecord } | { ok: false; status: number; message: string }> {
+  adminInvitation?: ValidatedAdminRegistrationInvitation | null,
+): Promise<{ ok: true; profile: UserGameAccountRecord } | { ok: false; status: number; message: string; code?: string }> {
   const cdkMatch = await findCdkRecordByCode(normalizeCode(codeValue))
   if (!cdkMatch) return { ok: false, status: 404, message: authCopy.api_cdk_not_found }
   const { codeHash, key: cdkKey } = cdkMatch
@@ -549,6 +597,7 @@ async function redeemRegistrationCdk(
         }
         await saveUserAccountInTransaction(client, boundUser)
         if (invitation) await saveInvitationInTransaction(client, user.id, invitation)
+        if (adminInvitation) await consumeAdminRegistrationInvitationInTransaction(client, adminInvitation, user.id)
         await saveProfileInTransaction(client, profile)
         await saveWorkspaceInTransaction(client, emptyWorkspace(profile.id))
         return {
@@ -572,9 +621,12 @@ function normalizeIdempotencyKey(value: string | null | undefined): string | nul
   return key && key.length <= 200 ? key : null
 }
 
-function redemptionFailure(error: unknown): { ok: false; status: number; message: string } {
+function redemptionFailure(error: unknown): { ok: false; status: number; message: string; code?: string } {
   if (error instanceof CdkAlreadyRedeemedError) return { ok: false, status: 409, message: authCopy.api_cdk_already_redeemed }
   if (error instanceof IdempotencyConflictError) return { ok: false, status: 409, message: authCopy.api_idempotency_conflict }
+  if (error instanceof AdminRegistrationInvitationError) {
+    return { ok: false, status: 400, message: error.message, code: error.code }
+  }
   console.error('CDK redemption failed:', error instanceof Error ? error.name : typeof error)
   return { ok: false, status: 500, message: authCopy.api_internal_error }
 }
@@ -822,6 +874,10 @@ async function issueEmailVerification(
   const token = randomBytes(32).toString('base64url')
   const now = new Date()
   const expiresHours = getEmailVerificationTtlHours()
+  const purpose = reservation?.purpose === 'admin_invite_verification'
+    || (!reservation && await userRegisteredWithAdminInvitation(user.id))
+    ? 'admin_invite_verification'
+    : 'email_verification'
   await saveEmailVerificationToken({
     id: randomUUID(),
     user_id: user.id,
@@ -835,7 +891,7 @@ async function issueEmailVerification(
       email: user.email,
       verificationUrl: buildEmailVerificationUrl(token),
       expiresHours,
-    }, reservation)
+    }, reservation, purpose)
   } catch (error) {
     await deleteEmailVerificationTokenByHash(hashEmailVerificationToken(token))
     throw error

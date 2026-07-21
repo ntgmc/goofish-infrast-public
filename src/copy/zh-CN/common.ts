@@ -260,13 +260,13 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_011: "按优先级等待 worker 领取。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_012: "开始计算",
+  components_ScheduleProgress_012: "计算当前排班",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_013: "搜索当前基建的最优排班。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_014: "整理结果",
+  components_ScheduleProgress_014: "持久化结果",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_015: "汇总方案、效率和练度建议。",
+  components_ScheduleProgress_015: "整理方案、效率和历史记录。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_016: "提交建议",
   // src/components/ScheduleProgress.tsx
@@ -639,6 +639,22 @@ export const commonCopy = {
   components_ScheduleProgress_109: "已离开队列",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_110: "任务已取消，可重新提交。",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_111: "计算优化建议",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_112: "生成潜力排班、模拟升级并补全训练成本。",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_113: "正在计算当前排班",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_114: "正在生成潜力排班",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_115: "正在模拟优化建议",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_116: "正在补全训练成本",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_117: "正在整理计算结果",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_118: "正在保存排班结果",
   // src/components/GuidedTour.tsx
   components_GuidedTour_001: "跳过导览",
   // src/components/GuidedTour.tsx

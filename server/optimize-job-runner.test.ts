@@ -103,6 +103,27 @@ describe('optimization dispatcher startup recovery', () => {
     delete process.env.OPTIMIZE_JOB_MAX_ATTEMPTS
   })
 
+  it('persists worker-thread progress messages before completing the attempt', async () => {
+    const store = createMemoryOptimizeJobStore()
+    globalThis.__maaOptimizeJobStoreForTesting = store
+    process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING = '1'
+    process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING = resolve('server/test-fixtures/optimize-progress-worker.mjs')
+    const job = await store.createJob(input())
+
+    kickOptimizeJobProcessing()
+    await waitFor(async () => (await store.getJob(job.id))?.execution_stage === 'simulating_upgrades')
+    await waitFor(async () => (await store.getJob(job.id))?.status === 'succeeded')
+
+    await expect(store.getJob(job.id)).resolves.toMatchObject({
+      status: 'succeeded',
+      execution_stage: 'completed',
+      result_json: { ok: true },
+    })
+
+    delete process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING
+    delete process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING
+  })
+
   it('terminates and requeues unfinished work after the shutdown grace period', async () => {
     const store = globalThis.__maaOptimizeJobStoreForTesting!
     process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING = '1'

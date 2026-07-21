@@ -160,9 +160,25 @@ export interface AnnouncementAdminResponse {
 
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard';
 type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered';
-export type OptimizeEstimateBucket = 'maa_fiammetta' | 'maa_plain' | 'rotation' | 'scenario_comparison';
+export type OptimizeEstimateBucket =
+  | 'maa_fiammetta'
+  | 'maa_fiammetta_with_suggestions'
+  | 'maa_plain'
+  | 'maa_plain_with_suggestions'
+  | 'rotation'
+  | 'rotation_with_suggestions'
+  | 'scenario_comparison';
 export type OptimizeEstimateSource = 'history_p95' | 'fallback_p95';
 type OptimizeRuntimeEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled';
+export type OptimizeCalculationStage =
+  | 'starting'
+  | 'generating_schedule'
+  | 'generating_potential_schedule'
+  | 'simulating_upgrades'
+  | 'enriching_training_costs'
+  | 'formatting_result'
+  | 'persisting_result'
+  | 'completed';
 
 export interface OptimizeJobAccepted {
   job_id: string;
@@ -180,6 +196,10 @@ export interface OptimizeJobAccepted {
   estimated_total_ms: number | null;
   estimate_phase: OptimizeRuntimeEstimatePhase;
   estimate_updated_at: string;
+  calculation_stage: OptimizeCalculationStage | null;
+  calculation_stage_updated_at: string | null;
+  upgrade_suggestions_requested: boolean;
+  upgrade_suggestions_allowed: boolean;
   poll_token?: string;
 }
 
@@ -202,6 +222,10 @@ export interface OptimizeJobStatusResponse {
   estimated_total_ms: number | null;
   estimate_phase: OptimizeRuntimeEstimatePhase;
   estimate_updated_at: string;
+  calculation_stage: OptimizeCalculationStage | null;
+  calculation_stage_updated_at: string | null;
+  upgrade_suggestions_requested: boolean;
+  upgrade_suggestions_allowed: boolean;
   result?: OptimizeResult;
   error?: string;
   error_code?: string;
@@ -209,7 +233,7 @@ export interface OptimizeJobStatusResponse {
   recovery_action?: 'retry' | 'review_input' | 'reauthorize' | 'contact_support' | 'none';
   support_reference?: string;
   failure_kind?: string;
-  job_kind?: 'schedule' | 'upgrade_suggestions' | 'scenario_comparison';
+  job_kind?: 'schedule' | 'scenario_comparison';
   source?: string;
   execution_phase?: 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal';
   attempt_count?: number;
@@ -286,23 +310,6 @@ export interface DepotValueResponse {
   build_meta: AppBuildMeta;
 }
 
-export interface UpgradeTaskPayload {
-  tasks: RawUpgradeTask[];
-  baselineScore: number;
-  baselineDailySanity?: number;
-  baselineOrundumEconomy?: OrundumEconomy;
-  currentFiammettaTargets?: string[];
-  potentialFiammettaTargets?: string[];
-}
-
-interface RawUpgradeTask {
-  bundle: { id?: string; name: string; current: number; target: number }[];
-  rule: unknown | null;
-  roomName: string;
-  estimatedGain: number;
-  impact_sources?: UpgradeImpactRoom[];
-}
-
 interface AssignmentResult {
   total_efficiency: number;
   assignment_detail: AssignmentDetail[];
@@ -359,9 +366,7 @@ export interface OptimizeResult {
   orundum_economy?: OrundumEconomy;
   intermediate_depletion?: IntermediateDepletion[];
   upgrade_suggestions?: RawUpgradeSuggestion[];
-  current_result?: OptimizeResult;
-  upgrade_task_payload?: UpgradeTaskPayload;
-  history_result_id?: string;
+  upgrade_suggestions_status?: 'completed' | 'not_requested' | 'not_allowed' | 'failed';
   analysis_summary?: ScheduleAnalysisSummary;
   preview_limit?: {
     mode?: 'room_limited' | 'full_rotation_without_export';
@@ -861,6 +866,7 @@ export type BrevoQuotaAction = 'pause_registration' | 'allow_unverified_registra
 
 export type BrevoEmailPurpose =
   | 'email_verification'
+  | 'admin_invite_verification'
   | 'password_reset'
   | 'account_deletion_cancellation'
   | 'account_deletion_receipt';
@@ -896,11 +902,26 @@ export interface BrevoEmailStats {
 }
 
 export interface RegistrationSettings {
-  version: 3;
+  version: 4;
   email_verification_required: boolean;
   invite_code_required: boolean;
   brevo_quota_action: BrevoQuotaAction;
+  admin_invite_email_reserve: number;
+  password_reset_email_reserve: number;
   updated_at: string | null;
+}
+
+export type AdminRegistrationInvitationStatus = 'active' | 'used' | 'revoked' | 'expired';
+
+export interface AdminRegistrationInvitation {
+  id: string;
+  status: AdminRegistrationInvitationStatus;
+  created_at: string;
+  expires_at: string;
+  consumed_at: string | null;
+  revoked_at: string | null;
+  consumed_by_user_id: string | null;
+  consumed_by_email: string | null;
 }
 
 export interface InvitationSummary {
