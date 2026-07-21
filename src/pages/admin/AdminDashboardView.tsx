@@ -200,7 +200,7 @@ export default function AdminDashboardView() {
                   </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <Metric label="免费预览" value={summary.freePreviews} />
+                  <Metric label="免费预览新增" value={summary.freePreviews} />
                   <Metric label="注册数" value={summary.registers} />
                   <Metric label="CDK 兑换" value={summary.cdkRedeems} />
                   <Metric label="排班生成" value={summary.scheduleGenerates} />
@@ -213,7 +213,7 @@ export default function AdminDashboardView() {
                   <section className="tool-panel p-5">
                     <div className="flex items-center justify-between">
                       <h2 className="text-base font-semibold text-ink-primary">趋势</h2>
-                      <span className="text-xs text-ink-muted">访问 / 生成 / 兑换</span>
+                      <span className="text-xs text-ink-muted">访问 / 生成 / CDK 兑换与免费预览新增</span>
                     </div>
                     <UsageTrendChart days={usageStats?.days ?? []} />
                   </section>

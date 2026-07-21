@@ -64,4 +64,41 @@ describe('usage stats handler', () => {
     expect(stats.days).toHaveLength(1)
     expect(stats.days[0]).toMatchObject({ visits: 1, unique_visitors: 1 })
   })
+
+  it('uses authoritative CDK redemptions and free preview account additions for dashboard trends', () => {
+    const dates = ['2026-03-10', '2026-03-11']
+    const legacyEvents: UsageEventRecord[] = [
+      {
+        id: 'legacy-free-preview-run',
+        event: 'free_preview',
+        visitor_id: null,
+        created_at: '2026-03-10T08:00:00.000Z',
+        date: '2026-03-10',
+        status: 'success',
+      },
+      {
+        id: 'legacy-cdk-event',
+        event: 'cdk_redeem',
+        visitor_id: null,
+        created_at: '2026-03-10T09:00:00.000Z',
+        date: '2026-03-10',
+        status: 'success',
+      },
+    ]
+
+    const stats = buildUsageStats(legacyEvents, dates, [
+      { date: '2026-03-10', free_previews: 2, cdk_redeems: 3 },
+      { date: '2026-03-11', free_previews: 1, cdk_redeems: 4 },
+    ])
+
+    expect(stats.totals).toMatchObject({
+      free_previews: 3,
+      cdk_redeems: 7,
+      account_additions: 10,
+    })
+    expect(stats.days).toEqual([
+      expect.objectContaining({ date: '2026-03-10', free_previews: 2, cdk_redeems: 3, account_additions: 5 }),
+      expect.objectContaining({ date: '2026-03-11', free_previews: 1, cdk_redeems: 4, account_additions: 5 }),
+    ])
+  })
 })
