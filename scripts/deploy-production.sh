@@ -44,14 +44,21 @@ run_systemctl() {
 }
 
 show_service_diagnostics() {
-  run_systemctl status "$SERVICE_NAME" --no-pager --full --lines=100 || true
+  run_systemctl status "$SERVICE_NAME" --no-pager --lines=50 || true
   if ! command -v journalctl >/dev/null 2>&1; then
     log "journalctl is unavailable; systemctl status is the only service diagnostic"
     return
   fi
-  if ! journalctl --unit "$SERVICE_NAME" --no-pager --lines=80; then
-    log "service journal is not readable by the deploy user; grant systemd-journal access for fuller diagnostics"
+
+  if journalctl --unit "$SERVICE_NAME" --no-pager --lines=80 2>/dev/null; then
+    return
   fi
+  if [[ "$(id -u)" != "0" ]] &&
+    sudo -n journalctl --unit "$SERVICE_NAME" --no-pager --lines=80 2>/dev/null; then
+    return
+  fi
+
+  log "service journal is not readable by the deploy user; add it to systemd-journal or grant passwordless access to this journalctl command"
 }
 
 check_systemctl_access() {
@@ -80,22 +87,59 @@ cleanup_artifact() {
 }
 
 check_health() {
-  local attempt body
+  local attempt body curl_error curl_exit error_file http_status response summary
+
+  error_file="$(mktemp "${TMPDIR:-/tmp}/goofish-health.XXXXXX")" || {
+    log "could not create a temporary file for health-check diagnostics"
+    return 1
+  }
 
   for attempt in $(seq 1 "$HEALTH_RETRIES"); do
-    body="$(curl -fsS "$HEALTH_URL" 2>/dev/null || true)"
+    body=""
+    curl_error=""
+    response=""
+    if response="$(curl --silent --show-error --output - --write-out $'\n%{http_code}' "$HEALTH_URL" 2>"$error_file")"; then
+      curl_exit=0
+    else
+      curl_exit=$?
+    fi
+    curl_error="$(<"$error_file")"
+    : >"$error_file"
+    http_status="${response##*$'\n'}"
+    body="${response%$'\n'*}"
 
-    if printf '%s' "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'; then
+    if ((curl_exit == 0)) && [[ "$http_status" == "200" ]] &&
+      printf '%s' "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'; then
       if [[ -z "$EXPECT_STORAGE_TYPE" ]] ||
         printf '%s' "$body" | grep -Eq "\"type\"[[:space:]]*:[[:space:]]*\"$EXPECT_STORAGE_TYPE\""; then
+        rm -f -- "$error_file"
         log "health check passed on attempt $attempt"
         return 0
       fi
     fi
 
-    log "health check attempt $attempt/$HEALTH_RETRIES failed"
+    if ((curl_exit != 0)); then
+      log "health check attempt $attempt/$HEALTH_RETRIES failed (curl exit $curl_exit)"
+    elif [[ "$http_status" != "200" ]]; then
+      log "health check attempt $attempt/$HEALTH_RETRIES failed (HTTP $http_status)"
+    else
+      log "health check attempt $attempt/$HEALTH_RETRIES failed (response is not ready)"
+    fi
     sleep "$HEALTH_DELAY_SECONDS"
   done
+
+  rm -f -- "$error_file"
+  if ((curl_exit != 0)); then
+    summary="${curl_error//$'\r'/ }"
+    summary="${summary//$'\n'/ }"
+    [[ -n "$summary" ]] || summary="no error details"
+    log "last health check transport error (curl exit $curl_exit): ${summary:0:1000}"
+  else
+    summary="${body//$'\r'/ }"
+    summary="${summary//$'\n'/ }"
+    [[ -n "$summary" ]] || summary="<empty>"
+    log "last health response: HTTP $http_status; body: ${summary:0:1000}"
+  fi
 
   return 1
 }
@@ -124,6 +168,7 @@ require_command node
 require_command systemctl
 require_command sha256sum
 require_command tar
+require_command mktemp
 
 if [[ "$(id -u)" != "0" ]]; then
   require_command sudo
