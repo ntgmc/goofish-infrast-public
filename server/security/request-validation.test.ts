@@ -1,5 +1,7 @@
+import type { IncomingMessage } from 'node:http'
 import { describe, expect, it } from 'vitest'
 import { getRegisteredApiRoutes } from '../routes'
+import { inspectIncomingRequest } from './http-boundary'
 import { getAllowedMethods, getRoutePolicy, requestSchemas } from './request-policy'
 import {
   getValidatedJson,
@@ -16,6 +18,15 @@ function jsonRequest(value: string): Request {
   })
 }
 
+function incomingGet(target: string): IncomingMessage {
+  return {
+    method: 'GET',
+    url: target,
+    headers: { host: 'local' },
+    rawHeaders: ['Host', 'local'],
+  } as IncomingMessage
+}
+
 describe('request validation boundary', () => {
   it('declares a fail-closed policy for every registered API route', () => {
     for (const registeredRoute of getRegisteredApiRoutes()) {
@@ -23,6 +34,18 @@ describe('request validation boundary', () => {
       const policy = getRoutePolicy(pathname)
       expect(policy, `missing request policy for ${registeredRoute}`).not.toBeNull()
       expect(getAllowedMethods(policy!)).not.toHaveLength(0)
+    }
+  })
+
+  it('allows profile selection when restoring an authenticated session', async () => {
+    const selectedProfile = inspectIncomingRequest(incomingGet('/api/auth/me?profile_id=profile-2'))
+    expect(selectedProfile.allowed).toBe(true)
+
+    const unknownQuery = inspectIncomingRequest(incomingGet('/api/auth/me?profile_id=profile-2&admin=1'))
+    expect(unknownQuery.allowed).toBe(false)
+    if (!unknownQuery.allowed) {
+      expect(unknownQuery.response.status).toBe(400)
+      await expect(unknownQuery.response.json()).resolves.toMatchObject({ code: 'invalid_request' })
     }
   })
 

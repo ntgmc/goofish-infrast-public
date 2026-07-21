@@ -57,6 +57,35 @@ CREATE TABLE IF NOT EXISTS registration_settings (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS brevo_email_deliveries (
+  id TEXT PRIMARY KEY,
+  quota_date DATE NOT NULL,
+  purpose TEXT NOT NULL CHECK (purpose IN (
+    'email_verification',
+    'password_reset',
+    'account_deletion_cancellation',
+    'account_deletion_receipt'
+  )),
+  status TEXT NOT NULL CHECK (status IN ('reserved', 'sent', 'failed', 'uncertain')),
+  reserved_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_brevo_email_deliveries_quota_date
+  ON brevo_email_deliveries(quota_date);
+CREATE INDEX IF NOT EXISTS idx_brevo_email_deliveries_daily_breakdown
+  ON brevo_email_deliveries(quota_date, purpose, status);
+
+CREATE TABLE IF NOT EXISTS brevo_email_quota_snapshots (
+  quota_date DATE PRIMARY KEY,
+  reported_remaining_count INTEGER CHECK (reported_remaining_count BETWEEN 0 AND 300),
+  reported_used_count INTEGER CHECK (reported_used_count BETWEEN 0 AND 300),
+  local_used_at_sync INTEGER NOT NULL DEFAULT 0 CHECK (local_used_at_sync >= 0),
+  external_used_offset INTEGER NOT NULL DEFAULT 0 CHECK (external_used_offset BETWEEN 0 AND 300),
+  sync_status TEXT NOT NULL CHECK (sync_status IN ('success', 'error')),
+  last_attempt_at TIMESTAMPTZ NOT NULL,
+  synced_at TIMESTAMPTZ
+);
+
 CREATE TABLE IF NOT EXISTS usage_events (
   key TEXT PRIMARY KEY,
   event TEXT NOT NULL,

@@ -20,7 +20,7 @@ export type ConfigSyncStatus = 'idle' | 'pending' | 'saving' | 'failed'
 
 const CONFIG_SAVE_DEBOUNCE_MS = 600
 
-export function useToolSession() {
+export function useToolSession(requestedProfileId?: string | null) {
   const [authLoading, setAuthLoading] = useState(true)
   const [user, setUser] = useState<AuthUser | null>(null)
   const [profiles, setProfiles] = useState<UserGameAccount[]>([])
@@ -94,7 +94,10 @@ export function useToolSession() {
       })
       .catch(console.error)
 
-    void apiJson<Partial<AuthSuccessResponse> & { user: AuthUser | null }>('/api/auth/me', { fallbackMessage: copy.common.pages_tool_useToolSession_001 })
+    const authUrl = requestedProfileId
+      ? `/api/auth/me?profile_id=${encodeURIComponent(requestedProfileId)}`
+      : '/api/auth/me'
+    void apiJson<Partial<AuthSuccessResponse> & { user: AuthUser | null }>(authUrl, { fallbackMessage: copy.common.pages_tool_useToolSession_001 })
       .then((data) => {
         if (cancelled) return
         if (!data.user) {
@@ -113,7 +116,7 @@ export function useToolSession() {
     return () => {
       cancelled = true
     }
-  }, [applyAuthPayload])
+  }, [applyAuthPayload, requestedProfileId])
 
   useEffect(() => () => {
     pendingConfigRef.current = null

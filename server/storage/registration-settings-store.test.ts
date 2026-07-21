@@ -16,16 +16,27 @@ describe('registration settings', () => {
       email_verification_required: false,
       updated_at: '2026-07-19T00:00:00.000Z',
     })).toEqual({
-      version: 1,
+      version: 2,
       email_verification_required: false,
+      brevo_quota_action: 'pause_registration',
       updated_at: '2026-07-19T00:00:00.000Z',
     })
   })
 
-  it('accepts only a boolean email verification patch', () => {
-    expect(validateRegistrationSettingsPatch({ email_verification_required: false })).toEqual({ email_verification_required: false })
+  it('accepts both quota actions and requires the complete patch', () => {
+    expect(validateRegistrationSettingsPatch({
+      email_verification_required: false,
+      brevo_quota_action: 'allow_unverified_registration',
+    })).toEqual({
+      email_verification_required: false,
+      brevo_quota_action: 'allow_unverified_registration',
+    })
     expect(() => validateRegistrationSettingsPatch({})).toThrow(/布尔值/)
-    expect(() => validateRegistrationSettingsPatch({ email_verification_required: 'false' })).toThrow(/布尔值/)
+    expect(() => validateRegistrationSettingsPatch({ email_verification_required: false })).toThrow(/处理方式/)
+    expect(() => validateRegistrationSettingsPatch({
+      email_verification_required: true,
+      brevo_quota_action: 'unknown',
+    })).toThrow(/处理方式/)
     expect(() => validateRegistrationSettingsPatch(null)).toThrow(/对象/)
   })
 })

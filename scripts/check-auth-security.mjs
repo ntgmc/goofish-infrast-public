@@ -13,12 +13,16 @@ try {
   const passwordModule = await bundleModule('server/security/password.ts', 'password')
   const rateLimitModule = await bundleModule('server/security/auth-rate-limit.ts', 'auth-rate-limit')
   const clientIpModule = await bundleModule('server/security/client-ip.ts', 'client-ip')
+  const authCopyModule = await bundleModule('src/copy/zh-CN/auth.ts', 'auth-copy')
 
+  assertAuthApiCopy(authCopyModule.authCopy)
+  await assertAuthResponseCopyCentralization()
   await assertPasswordSecurity(passwordModule)
   assertSlidingWindowRateLimits(rateLimitModule)
   assertClientIpResolution(clientIpModule)
   await assertUserPasswordMigration(passwordModule)
   await assertRegistrationCdkTransaction()
+  await assertRegistrationBrevoQuotaPolicies()
   await assertUserSessionTouchAndAuthPayload()
   await assertUserSessionStorage()
   await assertAtomicPasswordResetHandler()
@@ -30,6 +34,26 @@ try {
   console.log('[check-auth-security] async password work and authentication rate limits passed')
 } finally {
   await rm(bundleDir, { recursive: true, force: true })
+}
+
+function assertAuthApiCopy(authCopy) {
+  const apiEntries = Object.entries(authCopy).filter(([key]) => key.startsWith('api_'))
+  assert(apiEntries.length >= 30, 'authentication API copy should remain centralized')
+  for (const [key, value] of apiEntries) {
+    assert.equal(typeof value, 'string', `${key} should be a string`)
+    assert.match(value, /[\u3400-\u9fff]/u, `${key} should use Chinese user-facing copy`)
+  }
+}
+
+async function assertAuthResponseCopyCentralization() {
+  for (const filename of ['server/handlers/auth.ts', 'server/handlers/user-auth.ts']) {
+    const source = await readFile(filename, 'utf8')
+    assert.equal(
+      /(?:[{,]\s*)(?:message|error):\s*['"`]/u.test(source),
+      false,
+      `${filename} should reference src/copy instead of hardcoding response copy`,
+    )
+  }
 }
 
 async function assertPasswordSecurity(passwordModule) {
@@ -263,6 +287,66 @@ async function assertRegistrationCdkTransaction() {
     0,
     'registration must not create a browser session before the user signs in',
   )
+}
+
+async function assertRegistrationBrevoQuotaPolicies() {
+  const userAuth = await bundleInlineModule(
+    "export { registerUser } from './server/handlers/user-auth.ts'",
+    'user-registration-brevo-quota',
+    [userRegistrationCdkPlugin()],
+  )
+  process.env.PUBLIC_APP_URL = 'https://example.test'
+
+  const reset = (settings, quotaReached) => {
+    globalThis.__authSecurityRegistrationSettings = settings
+    globalThis.__authSecurityBrevoQuotaReached = quotaReached
+    globalThis.__authSecurityEmailReserveCalls = 0
+    globalThis.__authSecurityEmailReleaseCalls = 0
+    globalThis.__authSecurityEmailSendCalls = 0
+    globalThis.__authSecurityRegistrationTransactionTrace = []
+    globalThis.__authSecurityRegistrationAccountSyncs = []
+    globalThis.__authSecurityRegistrationSessions = []
+    globalThis.__authSecurityVerificationTokens = []
+  }
+
+  reset({ email_verification_required: true, brevo_quota_action: 'pause_registration' }, true)
+  const paused = await userAuth.registerUser('paused@example.com', 'valid-password')
+  assert.deepEqual(paused, {
+    ok: false,
+    status: 503,
+    message: '今日邮件发送额度已用尽，注册已暂停，请明日再试。',
+    code: 'brevo_daily_limit_reached',
+    retryAfterSeconds: 3_600,
+  })
+  assert.equal(globalThis.__authSecurityEmailReserveCalls, 1)
+  assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 0)
+  assert.equal(globalThis.__authSecurityRegistrationTransactionTrace.length, 0)
+  assert.equal(globalThis.__authSecurityVerificationTokens.length, 0)
+  assert.equal(globalThis.__authSecurityEmailSendCalls, 0)
+
+  reset({ email_verification_required: true, brevo_quota_action: 'allow_unverified_registration' }, true)
+  const bypassed = await userAuth.registerUser('bypassed@example.com', 'valid-password')
+  assert.equal(bypassed.ok, true)
+  assert.equal(bypassed.verificationRequired, false)
+  assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 1)
+  assert.equal(globalThis.__authSecurityRegistrationAccountSyncs[0].email_verified_at !== null, true)
+  assert.equal(globalThis.__authSecurityEmailSendCalls, 0)
+
+  reset({ email_verification_required: true, brevo_quota_action: 'allow_unverified_registration' }, false)
+  const verified = await userAuth.registerUser('verified@example.com', 'valid-password')
+  assert.equal(verified.ok, true)
+  assert.equal(verified.verificationRequired, true)
+  assert.equal(globalThis.__authSecurityVerificationTokens.length, 1)
+  assert.equal(globalThis.__authSecurityEmailSendCalls, 1)
+
+  reset({ email_verification_required: false, brevo_quota_action: 'pause_registration' }, true)
+  const verificationDisabled = await userAuth.registerUser('disabled@example.com', 'valid-password')
+  assert.equal(verificationDisabled.ok, true)
+  assert.equal(verificationDisabled.verificationRequired, false)
+  assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
+
+  delete globalThis.__authSecurityRegistrationSettings
+  delete globalThis.__authSecurityBrevoQuotaReached
 }
 
 async function assertUserSessionTouchAndAuthPayload() {
@@ -513,7 +597,7 @@ async function assertAtomicPasswordResetHandler() {
   assert.deepEqual(concurrentFailure, {
     ok: false,
     status: 400,
-    message: 'The reset link is invalid or expired.',
+    message: '重置链接无效或已过期。',
   })
   assert.equal(globalThis.__authSecurityResetCalls.length, 2)
 
@@ -547,7 +631,7 @@ async function assertAtomicPasswordResetHandler() {
   assert.deepEqual(expiredDuringHash, {
     ok: false,
     status: 400,
-    message: 'The reset link is invalid or expired.',
+    message: '重置链接无效或已过期。',
   })
   assert.deepEqual(globalThis.__authSecurityResetSequence, ['token-preflight', 'user-preflight', 'hash', 'transaction'])
 }
@@ -761,7 +845,50 @@ function assertClientIpResolution(clientIpModule) {
 
 async function assertUserLoginRateLimits() {
   globalThis.__authSecurityLoginCalls = 0
+  globalThis.__authSecurityRegisterResult = { ok: true, user: { id: 'user-registered' }, verificationRequired: true }
+  globalThis.__authSecuritySession = null
   const authHandler = await bundleModule('server/handlers/auth.ts', 'auth-handler', [authHandlerPlugin()])
+
+  const registrationAccepted = await authHandler.default(new Request('http://local/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': '192.0.2.30' },
+    body: JSON.stringify({ email: 'new@example.com', password: 'correct-password' }),
+  }))
+  assert.equal(registrationAccepted.status, 202)
+  assert.deepEqual(await registrationAccepted.json(), {
+    accepted: true,
+    verification_required: true,
+    message: '已发送注册验证邮件，请检查您的收件箱，并在邮件中确认。',
+  })
+
+  globalThis.__authSecurityRegisterResult = {
+    ok: false,
+    status: 503,
+    message: '今日邮件发送额度已用尽，注册已暂停，请明日再试。',
+    code: 'brevo_daily_limit_reached',
+    retryAfterSeconds: 7_200,
+  }
+  const registrationQuotaLimited = await authHandler.default(new Request('http://local/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': '192.0.2.31' },
+    body: JSON.stringify({ email: 'quota@example.com', password: 'correct-password' }),
+  }))
+  assert.equal(registrationQuotaLimited.status, 503)
+  assert.equal(registrationQuotaLimited.headers.get('Retry-After'), '7200')
+  assert.deepEqual(await registrationQuotaLimited.json(), {
+    error: '今日邮件发送额度已用尽，注册已暂停，请明日再试。',
+    code: 'brevo_daily_limit_reached',
+    retry_after_seconds: 7_200,
+  })
+
+  globalThis.__authSecuritySession = { user: { id: 'user-1' } }
+  const restoredSession = await authHandler.default(new Request('http://local/api/auth/me?profile_id=profile-2'))
+  assert.equal(restoredSession.status, 200)
+  assert.deepEqual(await restoredSession.json(), {
+    user: { id: 'user-1' },
+    active_profile_id: 'profile-2',
+  })
+  globalThis.__authSecuritySession = null
 
   for (let index = 0; index < 5; index += 1) {
     const response = await callLogin(authHandler.default, 'blocked@example.com', 'wrong-password', `198.51.100.${index + 1}`)
@@ -1415,18 +1542,18 @@ function userAuthMock() {
     }
     export async function loginUser(email, password) {
       globalThis.__authSecurityLoginCalls += 1
-      if (password !== 'correct-password') return { ok: false, status: 401, message: 'Invalid email or password.' }
+      if (password !== 'correct-password') return { ok: false, status: 401, message: '邮箱或密码不正确。' }
       return { ok: true, user: { id: 'user-1', email }, cookie: 'maa_session=test' }
     }
-    export async function buildAuthPayload(user) { return { user } }
-    export async function registerUser() { return { ok: false, status: 400, message: 'unused' } }
+    export async function buildAuthPayload(user, activeProfileId) { return { user, active_profile_id: activeProfileId } }
+    export async function registerUser() { return globalThis.__authSecurityRegisterResult }
     export async function logoutRequest() {}
     export async function requestPasswordReset() { return { ok: true } }
     export async function resendEmailVerification() { return { ok: true, message: 'ok' } }
     export async function resetPasswordWithToken() { return { ok: false, status: 400, message: 'unused' } }
     export async function verifyEmailWithToken() { return { ok: false, status: 400, message: 'unused' } }
     export async function changeUserPassword() { return { ok: false, status: 400, message: 'unused' } }
-    export async function requireUserSession() { return null }
+    export async function requireUserSession() { return globalThis.__authSecuritySession }
     export function clearSessionCookie() { return '' }
   `
 }
@@ -1576,7 +1703,9 @@ function userRegistrationCdkStoreMock() {
   return `
     export async function deleteEmailVerificationTokenByHash() {}
     export async function getRecentEmailVerificationTokenForUser() { return null }
-    export async function saveEmailVerificationToken() {}
+    export async function saveEmailVerificationToken(token) {
+      if (globalThis.__authSecurityVerificationTokens) globalThis.__authSecurityVerificationTokens.push(structuredClone(token))
+    }
     export async function verifyUserEmailWithToken() { return null }
     export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
     export async function getUserByEmail() { return null }
@@ -1991,11 +2120,39 @@ function invitationStoreMock() {
 }
 
 function registrationSettingsStoreMock() {
-  return 'export async function getRegistrationSettings() { return { email_verification_required: false } }'
+  return `
+    export async function getRegistrationSettings() {
+      return globalThis.__authSecurityRegistrationSettings ?? {
+        email_verification_required: false,
+        brevo_quota_action: 'pause_registration',
+      }
+    }
+  `
 }
 
 function emailMock() {
-  return 'export async function sendPasswordResetEmail() {}\nexport async function sendEmailVerificationEmail() {}'
+  return `
+    export class BrevoDailyQuotaExceededError extends Error {
+      constructor(quotaDate = '2026-07-21', retryAfterSeconds = 3600) {
+        super('quota reached')
+        this.code = 'brevo_daily_limit_reached'
+        this.quotaDate = quotaDate
+        this.retryAfterSeconds = retryAfterSeconds
+      }
+    }
+    export async function reserveEmailVerificationDelivery() {
+      globalThis.__authSecurityEmailReserveCalls = (globalThis.__authSecurityEmailReserveCalls ?? 0) + 1
+      if (globalThis.__authSecurityBrevoQuotaReached) throw new BrevoDailyQuotaExceededError()
+      return { id: 'reservation', quotaDate: '2026-07-21', purpose: 'email_verification' }
+    }
+    export async function releaseEmailDeliveryReservation() {
+      globalThis.__authSecurityEmailReleaseCalls = (globalThis.__authSecurityEmailReleaseCalls ?? 0) + 1
+    }
+    export async function sendPasswordResetEmail() {}
+    export async function sendEmailVerificationEmail() {
+      globalThis.__authSecurityEmailSendCalls = (globalThis.__authSecurityEmailSendCalls ?? 0) + 1
+    }
+  `
 }
 
 function licenseUtilsMock() {

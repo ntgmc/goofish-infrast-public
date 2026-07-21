@@ -64,7 +64,10 @@ export const requestSchemas = {
     daily_inviter_reward_limit: z.number().int().min(1).max(1000).optional(),
     rewards: z.array(z.unknown()).max(32).optional(),
   }),
-  adminRegistrationSettings: strict({ email_verification_required: z.boolean() }),
+  adminRegistrationSettings: strict({
+    email_verification_required: z.boolean(),
+    brevo_quota_action: z.enum(['pause_registration', 'allow_unverified_registration']),
+  }),
   adminRiskSettings: strict({ operator_data_risk_enabled: z.boolean().optional() }),
   adminUserCreate: strict({
     root_password: optionalUnknown,
@@ -190,7 +193,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/auth/verify-email', route({ POST: json('auth', requestSchemas.authToken) })],
   ['/api/auth/resend-verification', route({ POST: json('auth', requestSchemas.authEmail) })],
   ['/api/auth/change-password', route({ POST: json('auth', requestSchemas.authChangePassword) })],
-  ['/api/auth/me', route({ GET: none() })],
+  ['/api/auth/me', route({ GET: none() }, ['profile_id'])],
   ['/api/user/data/export', route({ GET: none() })],
   ['/api/user/data/delete-request', route({ POST: json('auth', requestSchemas.accountDelete) })],
   ['/api/user/data/cancel', route({ POST: json('auth', requestSchemas.deletionToken) })],
