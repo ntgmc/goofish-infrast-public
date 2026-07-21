@@ -26,6 +26,7 @@ describe('QueueMonitorPanel', () => {
     await act(async () => { await Promise.resolve() })
 
     expect(screen.getByText('2 / 200')).toBeInTheDocument()
+    expect(screen.getByText('1 / 3')).toBeInTheDocument()
     expect(screen.getAllByText('user@example.test').length).toBeGreaterThan(0)
     expect(screen.queryByText('secret payload')).not.toBeInTheDocument()
 
@@ -80,7 +81,7 @@ function snapshot(): AdminOptimizationQueueSnapshot {
   }
   return {
     snapshot_at: '2026-07-19T10:00:00.000Z',
-    capacity: { queue_limit: 200, worker_concurrency: 2 },
+    capacity: { queue_limit: 200, worker_concurrency: 3 },
     counts: { queued: 2, running: 1, retry_waiting: 1, recent_failed: 0 },
     queued_jobs: [{ ...base, id: 'queued-job', status: 'queued', queue_position: 1 }],
     running_jobs: [{ ...base, id: 'running-job', status: 'running', worker_id: 'worker-a', started_at: '2026-07-19T09:59:00.000Z', heartbeat_at: '2026-07-19T10:00:00.000Z' }],
