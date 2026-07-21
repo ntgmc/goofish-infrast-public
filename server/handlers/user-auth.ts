@@ -732,7 +732,7 @@ export async function getActiveAnnouncements(): Promise<Announcement[]> {
   const value = await store.get()
   if (!value || typeof value !== 'object' || !Array.isArray((value as { announcements?: unknown }).announcements)) return []
   return ((value as { announcements: unknown[] }).announcements)
-    .filter((item): item is Announcement => isAnnouncement(item) && item.active)
+    .filter((item): item is Announcement => isAnnouncement(item) && item.kind === 'popup' && item.active)
     .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
 }
 

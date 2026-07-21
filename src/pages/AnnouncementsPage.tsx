@@ -61,7 +61,7 @@ export default function AnnouncementsPage() {
             <article key={announcement.id} className="border-b border-surface-3 py-6">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="tool-status">
-                  {announcement.kind === 'banner' ? copy.public.pages_AnnouncementsPage_008 : copy.public.pages_AnnouncementsPage_009}
+                  {copy.public.pages_AnnouncementsPage_009}
                 </span>
                 <time className="text-xs text-ink-muted">{formatDate(announcement.updated_at)}</time>
               </div>

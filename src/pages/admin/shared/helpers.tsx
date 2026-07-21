@@ -1,4 +1,4 @@
-import type { Announcement, AnnouncementKind, AnnouncementStats as AnnouncementReachStats } from '../../../lib/types'
+import type { Announcement, AnnouncementStats as AnnouncementReachStats } from '../../../lib/types'
 
 import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, UsageTotals, UsageDay, UsageRangeMode, AnnouncementSortKey, UsageRange, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, UsageStatsResponse, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
 
@@ -331,19 +331,30 @@ function normalizeNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value * 10) / 10 : 0
 }
 
+export function normalizeAnnouncementBanner(value: Announcement | null | undefined): Announcement {
+  return normalizeAnnouncement(value, 'banner') ?? createDraftBanner()
+}
+
 export function normalizeAnnouncementList(value: Announcement[] | null | undefined): Announcement[] {
   if (!Array.isArray(value)) return []
   return value
-    .filter((item): item is Announcement => Boolean(item) && typeof item === 'object')
-    .map((item) => ({
-      id: typeof item.id === 'string' && item.id ? item.id : createDraftId(),
-      kind: item.kind === 'banner' || item.kind === 'popup' ? item.kind : 'popup',
-      active: item.active === true,
-      title: typeof item.title === 'string' ? item.title : '',
-      body: typeof item.body === 'string' ? item.body : '',
-      created_at: typeof item.created_at === 'string' ? item.created_at : new Date().toISOString(),
-      updated_at: typeof item.updated_at === 'string' ? item.updated_at : new Date().toISOString(),
-    }))
+    .filter((item): item is Announcement => Boolean(item) && typeof item === 'object' && item.kind !== 'banner')
+    .map((item) => normalizeAnnouncement(item, 'popup'))
+    .filter((item): item is Announcement => Boolean(item))
+}
+
+function normalizeAnnouncement(value: Announcement | null | undefined, kind: Announcement['kind']): Announcement | null {
+  if (!value || typeof value !== 'object') return null
+  const now = new Date().toISOString()
+  return {
+    id: typeof value.id === 'string' && value.id ? value.id : createDraftId(),
+    kind,
+    active: value.active === true,
+    title: typeof value.title === 'string' ? value.title : '',
+    body: typeof value.body === 'string' ? value.body : '',
+    created_at: typeof value.created_at === 'string' ? value.created_at : now,
+    updated_at: typeof value.updated_at === 'string' ? value.updated_at : now,
+  }
 }
 
 export function normalizeAnnouncementStatsMap(
@@ -371,10 +382,6 @@ export function sortAnnouncements(items: Announcement[], sort: AnnouncementSortK
   const next = [...items]
   return next.sort((left, right) => {
     if (sort === 'updated_asc') return compareAnnouncementUpdatedAt(left, right)
-    if (sort === 'kind') {
-      const kindCompare = announcementKindRank(left.kind) - announcementKindRank(right.kind)
-      return kindCompare || compareAnnouncementUpdatedAtDesc(left, right)
-    }
     if (sort === 'active') {
       const activeCompare = Number(right.active) - Number(left.active)
       return activeCompare || compareAnnouncementUpdatedAtDesc(left, right)
@@ -391,11 +398,15 @@ function compareAnnouncementUpdatedAtDesc(left: Announcement, right: Announcemen
   return compareAnnouncementUpdatedAt(right, left)
 }
 
-function announcementKindRank(kind: AnnouncementKind): number {
-  return kind === 'banner' ? 0 : 1
+export function createDraftBanner(): Announcement {
+  return createDraftAnnouncementItem('banner')
 }
 
-export function createDraftAnnouncement(kind: AnnouncementKind): Announcement {
+export function createDraftAnnouncement(): Announcement {
+  return createDraftAnnouncementItem('popup')
+}
+
+function createDraftAnnouncementItem(kind: Announcement['kind']): Announcement {
   const now = new Date().toISOString()
   return {
     id: createDraftId(),
@@ -508,6 +519,7 @@ export function formatNullableNumber(value: number | null | undefined): string {
 export function buildCurrentOpsReport(
   usage: UsageStatsResponse,
   cdk: CdkOpsSummary,
+  banner: Announcement,
   announcements: Announcement[],
   announcementStats: Record<string, AnnouncementReachStats>,
 ) {
@@ -521,6 +533,12 @@ export function buildCurrentOpsReport(
     latency: usage.latency,
     skland: usage.skland,
     announcement: usage.announcement,
+    banner_item: {
+      id: banner.id,
+      title: banner.title,
+      active: banner.active,
+      updated_at: banner.updated_at,
+    },
     announcement_items: announcements.map((announcement) => ({
       id: announcement.id,
       kind: announcement.kind,
@@ -583,6 +601,14 @@ export function buildCurrentOpsReportCsv(report: ReturnType<typeof buildCurrentO
   rows.push(['latency', 'max_ms', 'Max', '', String(latency.max_ms), ''])
   rows.push(['skland', 'success_rate', 'Success rate', '', String(report.skland.success_rate), `attempts=${report.skland.attempts};failed=${report.skland.failed}`])
   rows.push(['announcement', 'read_rate', 'Read rate', '', String(report.announcement.read_rate), `impressions=${report.announcement.impressions};reads=${report.announcement.reads}`])
+  rows.push([
+    'banner',
+    'active',
+    report.banner_item.title,
+    report.banner_item.updated_at,
+    String(report.banner_item.active),
+    `id=${report.banner_item.id}`,
+  ])
   for (const item of report.announcement_items) {
     const extra = `id=${item.id};kind=${item.kind};active=${item.active};server_reads=${item.stats.server_reads};local_reads=${item.stats.local_reads}`
     rows.push(['announcement_item', 'impressions', item.title, item.updated_at, String(item.stats.impressions), extra])
