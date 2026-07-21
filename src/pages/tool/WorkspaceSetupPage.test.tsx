@@ -30,7 +30,7 @@ afterEach(() => {
 })
 
 describe('WorkspaceSetupPage CDK paths', () => {
-  it('matches the dashboard content width for announcement banners', () => {
+  it('renders announcement banners in the main content flow', () => {
     renderWorkspace({
       announcement: {
         id: 'banner-1',
@@ -43,7 +43,9 @@ describe('WorkspaceSetupPage CDK paths', () => {
       },
     })
 
-    expect(screen.getByRole('region', { name: '站内横幅' })).toHaveClass('mx-auto', 'max-w-7xl')
+    const banner = screen.getByRole('region', { name: '站内横幅' })
+    expect(banner.closest('header')).toBeNull()
+    expect(banner.parentElement).toHaveClass('mx-auto', 'max-w-7xl', 'space-y-4')
   })
 
   it('moves the setup guide to configuration without saving workspace data', async () => {
