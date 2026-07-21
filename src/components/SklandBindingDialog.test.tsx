@@ -116,7 +116,6 @@ describe('SklandBindingDialog accessibility', () => {
     mockedApiJson.mockResolvedValueOnce({
       scan_id: 'scan-1',
       qr_data_url: 'data:image/png;base64,qr',
-      expires_at: '2026-07-21T01:00:00.000Z',
     })
 
     render(
