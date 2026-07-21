@@ -15,6 +15,7 @@ export const MAX_BODY_LENGTH = 5000
 const VALID_KINDS = new Set<AnnouncementKind>(['banner', 'popup'])
 
 interface AnnouncementData {
+  banner: Announcement | null;
   announcements: Announcement[];
 }
 
@@ -53,20 +54,19 @@ export default async (req: Request): Promise<Response> => {
 }
 
 async function handlePublicGet(): Promise<Response> {
-  const announcements = (await readAnnouncementData()).announcements
-  const activeAnnouncements = announcements
+  const data = await readAnnouncementData()
+  const banner = data.banner?.active ? data.banner : null
+  const announcements = data.announcements
     .filter((item) => item.active)
     .sort(compareNewestFirst)
-  const banner = activeAnnouncements.find((item) => item.kind === 'banner') ?? null
-  const popups = activeAnnouncements.filter((item) => item.kind === 'popup')
-  if (activeAnnouncements.length > 0) {
-    await Promise.all(activeAnnouncements.map((item) => recordAnnouncementEvent('announcement_impression', 'public_get', item)))
+  if (announcements.length > 0) {
+    await Promise.all(announcements.map((item) => recordAnnouncementEvent('announcement_impression', 'public_get', item)))
   }
 
   return jsonResponse({
     banner,
-    popups,
-    announcements: activeAnnouncements,
+    popups: announcements,
+    announcements,
   })
 }
 
@@ -105,13 +105,18 @@ async function handleAdminPut(req: Request): Promise<Response> {
 
   const body = await getValidatedJson(req, requestSchemas.announcement)
   const current = await readAnnouncementData()
-  const validation = validateAnnouncementList(body.announcements, current.announcements)
-  if (!validation.ok) {
-    return jsonResponse({ error: validation.message }, 400)
+  const bannerValidation = validateAnnouncementBanner(body.banner, current.banner)
+  if (!bannerValidation.ok) {
+    return jsonResponse({ error: bannerValidation.message }, 400)
+  }
+  const announcementValidation = validateAnnouncementList(body.announcements, current.announcements)
+  if (!announcementValidation.ok) {
+    return jsonResponse({ error: announcementValidation.message }, 400)
   }
 
   const data: AnnouncementData = {
-    announcements: validation.announcements,
+    banner: bannerValidation.banner,
+    announcements: announcementValidation.announcements,
   }
   const store = await getAnnouncementStore()
   await store.set(data)
@@ -155,6 +160,48 @@ async function buildAnnouncementStats(announcements: Announcement[]): Promise<Re
   }))
 }
 
+export function validateAnnouncementBanner(
+  value: unknown,
+  current: Announcement | null,
+): { ok: true; banner: Announcement | null } | { ok: false; message: string } {
+  if (value === null) return { ok: true, banner: null }
+  if (!isRecord(value)) return { ok: false, message: '横幅格式不正确。' }
+  if (value.kind !== 'banner') return { ok: false, message: '横幅类型不正确。' }
+
+  const title = typeof value.title === 'string' ? value.title.trim() : ''
+  const body = typeof value.body === 'string' ? value.body : ''
+  const active = value.active === true
+  if (title.length > MAX_TITLE_LENGTH) {
+    return { ok: false, message: `横幅标题不能超过 ${MAX_TITLE_LENGTH} 字。` }
+  }
+  if (body.length > MAX_BODY_LENGTH) {
+    return { ok: false, message: `横幅正文不能超过 ${MAX_BODY_LENGTH} 字。` }
+  }
+  if (active && (!title || !body.trim())) {
+    return { ok: false, message: '横幅启用时必须填写标题和正文。' }
+  }
+
+  const now = new Date().toISOString()
+  const id = typeof value.id === 'string' && value.id.trim() ? value.id.trim() : current?.id ?? createAnnouncementId()
+  const createdAt = normalizeIsoString(value.created_at) ?? current?.created_at ?? now
+  const updatedAt = hasAnnouncementChanged(current ?? undefined, { kind: 'banner', active, title, body })
+    ? now
+    : normalizeIsoString(value.updated_at) ?? current?.updated_at ?? now
+
+  return {
+    ok: true,
+    banner: {
+      id,
+      kind: 'banner',
+      active,
+      title,
+      body,
+      created_at: createdAt,
+      updated_at: updatedAt,
+    },
+  }
+}
+
 export function validateAnnouncementList(
   value: unknown,
   current: Announcement[],
@@ -175,7 +222,7 @@ export function validateAnnouncementList(
 
     const item = raw as Record<string, unknown>
     const kind = item.kind
-    if (kind !== 'banner' && kind !== 'popup') {
+    if (kind !== 'popup') {
       return { ok: false, message: `第 ${index + 1} 条公告类型不正确。` }
     }
 
@@ -237,17 +284,26 @@ async function getAnnouncementStore(): Promise<AnnouncementStore> {
   return createPostgresAnnouncementStore(ANNOUNCEMENT_KEY)
 }
 
-function normalizeAnnouncementData(value: unknown): AnnouncementData {
+export function normalizeAnnouncementData(value: unknown): AnnouncementData {
   if (isRecord(value) && Array.isArray(value.announcements)) {
+    const items = value.announcements
+      .map(normalizeAnnouncementItem)
+      .filter((item): item is Announcement => Boolean(item))
+    const hasExplicitBanner = Object.prototype.hasOwnProperty.call(value, 'banner')
+    const banner = hasExplicitBanner
+      ? normalizeBannerItem(value.banner)
+      : items.filter((item) => item.kind === 'banner').sort(compareNewestFirst)[0] ?? null
+
     return {
-      announcements: value.announcements
-        .map(normalizeAnnouncementItem)
-        .filter((item): item is Announcement => Boolean(item)),
+      banner,
+      announcements: items.filter((item) => item.kind === 'popup'),
     }
   }
 
-  const legacy = normalizeLegacyAnnouncement(value)
-  return { announcements: legacy ? [legacy] : [] }
+  return {
+    banner: normalizeLegacyAnnouncement(value),
+    announcements: [],
+  }
 }
 
 function normalizeAnnouncementItem(value: unknown): Announcement | null {
@@ -268,6 +324,11 @@ function normalizeAnnouncementItem(value: unknown): Announcement | null {
     created_at: normalizeIsoString(value.created_at) ?? normalizeIsoString(value.updated_at) ?? now,
     updated_at: normalizeIsoString(value.updated_at) ?? now,
   }
+}
+
+function normalizeBannerItem(value: unknown): Announcement | null {
+  const item = normalizeAnnouncementItem(value)
+  return item?.kind === 'banner' ? item : null
 }
 
 function normalizeLegacyAnnouncement(value: unknown): Announcement | null {

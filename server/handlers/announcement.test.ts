@@ -1,25 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_BODY_LENGTH, validateAnnouncementList } from './announcement'
+import {
+  MAX_BODY_LENGTH,
+  normalizeAnnouncementData,
+  validateAnnouncementBanner,
+  validateAnnouncementList,
+} from './announcement'
 
 describe('announcement validation', () => {
   it('accepts a 5,000-character Markdown body without changing it', () => {
     const prefix = '# 更新\n\n'
     const body = `${prefix}${'a'.repeat(MAX_BODY_LENGTH - prefix.length)}`
 
-    const result = validateAnnouncementList([{
-      id: 'announcement-one',
+    const result = validateAnnouncementBanner({
+      id: 'announcement-banner',
       kind: 'banner',
       active: true,
       title: '更新公告',
       body,
       created_at: '2026-07-14T00:00:00.000Z',
       updated_at: '2026-07-14T00:00:00.000Z',
-    }], [])
+    }, null)
 
     expect(result).toEqual(expect.objectContaining({ ok: true }))
     if (!result.ok) throw new Error(result.message)
-    expect(result.announcements[0].body).toBe(body)
-    expect(result.announcements[0].body).toHaveLength(MAX_BODY_LENGTH)
+    expect(result.banner?.body).toBe(body)
+    expect(result.banner?.body).toHaveLength(MAX_BODY_LENGTH)
   })
 
   it('rejects a body that exceeds 5,000 characters', () => {
@@ -46,4 +51,40 @@ describe('announcement validation', () => {
     if (!result.ok) throw new Error(result.message)
     expect(result.announcements[0].body).toBe(body)
   })
+
+  it('rejects a banner inside the ordinary announcement list', () => {
+    const result = validateAnnouncementList([{
+      kind: 'banner',
+      active: false,
+      title: '',
+      body: '',
+    }], [])
+
+    expect(result).toEqual({ ok: false, message: '第 1 条公告类型不正确。' })
+  })
+
+  it('migrates the newest legacy banner into the singleton field', () => {
+    const data = normalizeAnnouncementData({
+      announcements: [
+        createAnnouncement('old-banner', 'banner', '2026-07-13T00:00:00.000Z'),
+        createAnnouncement('popup-one', 'popup', '2026-07-15T00:00:00.000Z'),
+        createAnnouncement('new-banner', 'banner', '2026-07-14T00:00:00.000Z'),
+      ],
+    })
+
+    expect(data.banner?.id).toBe('new-banner')
+    expect(data.announcements.map((item) => item.id)).toEqual(['popup-one'])
+  })
 })
+
+function createAnnouncement(id: string, kind: 'banner' | 'popup', updatedAt: string) {
+  return {
+    id,
+    kind,
+    active: true,
+    title: id,
+    body: `${id} body`,
+    created_at: updatedAt,
+    updated_at: updatedAt,
+  }
+}
