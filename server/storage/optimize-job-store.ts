@@ -62,7 +62,7 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable',
     readonly status: 409 | 429,
     message: string,
   ) {
@@ -230,6 +230,11 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             throw new OptimizeJobAdmissionError('global_queue_capacity_exceeded', 429, '场景分析队列已满，请稍后重试。')
           }
         }
+        const activeQueue = await client.query<OptimizeQueueCapacityRow>(
+          `select status, priority, owner_key, payload_json, created_at, started_at
+           from optimize_jobs where status in ('queued', 'running')`,
+        )
+        assertOptimizeQueueWaitCapacity(activeQueue.rows.map(fromQueueCapacityRow), input.owner_key, now)
         if (input.source === 'free_preview' && running + queued > 0) {
           throw new OptimizeJobAdmissionError('active_job_exists', 429, '当前已有一个免费优化任务正在排队或执行。')
         }
@@ -720,6 +725,11 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         || (input.source === 'scenario_comparison' && globallyQueued.filter((job) => job.source === 'scenario_comparison').length >= analysisQueueLimit())) {
         throw new OptimizeJobAdmissionError('global_queue_capacity_exceeded', 429, '优化服务全局队列已满，请稍后重试。')
       }
+      assertOptimizeQueueWaitCapacity(
+        [...records.values()].filter((job) => activeStatuses.has(job.status)),
+        input.owner_key,
+        input.created_at ?? new Date().toISOString(),
+      )
       if (free && active.length) throw new OptimizeJobAdmissionError('active_job_exists', 429, '当前已有一个免费优化任务正在排队或执行。')
       if (!free && (active.filter((job) => job.status === 'running').length >= 1 || active.filter((job) => job.status === 'queued').length >= 3)) {
         throw new OptimizeJobAdmissionError('queue_capacity_exceeded', 429, '当前账号的优化队列已满，请稍后重试。')
@@ -996,6 +1006,15 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
   }
 }
 
+type OptimizeQueueCapacityJob = Pick<OptimizeJobRecord,
+  'status' | 'priority' | 'owner_key' | 'payload_json' | 'created_at' | 'started_at'>
+
+type OptimizeQueueCapacityRow = Omit<OptimizeQueueCapacityJob, 'priority' | 'created_at' | 'started_at'> & {
+  priority: number | string
+  created_at: string | Date
+  started_at: string | Date | null
+}
+
 type OptimizeJobRow = Omit<OptimizeJobRecord, 'heartbeat_at' | 'lock_expires_at' | 'next_attempt_at' | 'expires_at' | 'cancel_requested_at' | 'created_at' | 'started_at' | 'finished_at' | 'updated_at'> & {
   heartbeat_at: string | Date | null
   lock_expires_at: string | Date | null
@@ -1031,6 +1050,114 @@ function normalizeTimestamp(value: string | Date | null): string | null {
   return value instanceof Date ? value.toISOString() : value
 }
 
+function fromQueueCapacityRow(row: OptimizeQueueCapacityRow): OptimizeQueueCapacityJob {
+  return {
+    ...row,
+    priority: Number(row.priority),
+    created_at: normalizeTimestamp(row.created_at) ?? new Date().toISOString(),
+    started_at: normalizeTimestamp(row.started_at),
+  }
+}
+
+function assertOptimizeQueueWaitCapacity(
+  activeJobs: OptimizeQueueCapacityJob[],
+  ownerKey: string,
+  nowIso: string,
+): void {
+  const maximumAgeMs = queueMaxAgeMs()
+  const admissionHeadroomMs = Math.min(60_000, Math.floor(maximumAgeMs / 20))
+  const maximumWaitMs = maximumAgeMs - admissionHeadroomMs
+  const estimatedWaitMs = estimateOptimizeQueueWaitMs(activeJobs, ownerKey, Date.parse(nowIso))
+  if (estimatedWaitMs >= maximumWaitMs) {
+    throw new OptimizeJobAdmissionError(
+      'queue_wait_capacity_exceeded',
+      429,
+      '任务等待时间超过队列上限，请稍后重试。',
+    )
+  }
+}
+
+function estimateOptimizeQueueWaitMs(
+  activeJobs: OptimizeQueueCapacityJob[],
+  ownerKey: string,
+  nowMs: number,
+): number {
+  const workerAvailableAt = Array.from({ length: optimizeGlobalWorkerConcurrency() }, () => 0)
+  const ownerAvailableAt = new Map<string, number>()
+  const runningJobs = activeJobs.filter((job) => job.status === 'running')
+  // Count every existing queued job as potential work ahead. Future priority
+  // submissions must not push an already admitted job past its expiry time.
+  const queuedJobs = activeJobs
+    .filter((job) => job.status === 'queued')
+    .sort((left, right) => right.priority - left.priority || Date.parse(left.created_at) - Date.parse(right.created_at))
+
+  for (const job of runningJobs) {
+    const elapsedMs = Math.max(0, nowMs - parseQueueTimestamp(job.started_at, nowMs))
+    const estimatedDurationMs = getQueueJobDurationMs(job.payload_json)
+    const remainingMs = elapsedMs >= estimatedDurationMs
+      ? Math.max(1_000, optimizeJobHardTimeoutMs() - elapsedMs)
+      : Math.max(1_000, estimatedDurationMs - elapsedMs)
+    scheduleQueueWork(workerAvailableAt, ownerAvailableAt, job.owner_key, remainingMs)
+  }
+  for (const job of queuedJobs) {
+    scheduleQueueWork(workerAvailableAt, ownerAvailableAt, job.owner_key, getQueueJobDurationMs(job.payload_json))
+  }
+
+  return getEarliestQueueStart(workerAvailableAt, ownerAvailableAt.get(ownerKey) ?? 0)
+}
+
+function scheduleQueueWork(
+  workerAvailableAt: number[],
+  ownerAvailableAt: Map<string, number>,
+  ownerKey: string,
+  durationMs: number,
+): void {
+  const ownerReadyAt = ownerAvailableAt.get(ownerKey) ?? 0
+  let selectedWorker = 0
+  let selectedStart = Math.max(workerAvailableAt[0] ?? 0, ownerReadyAt)
+  for (let index = 1; index < workerAvailableAt.length; index += 1) {
+    const candidateStart = Math.max(workerAvailableAt[index], ownerReadyAt)
+    if (candidateStart < selectedStart) {
+      selectedWorker = index
+      selectedStart = candidateStart
+    }
+  }
+  const finishesAt = selectedStart + durationMs
+  workerAvailableAt[selectedWorker] = finishesAt
+  ownerAvailableAt.set(ownerKey, finishesAt)
+}
+
+function getEarliestQueueStart(workerAvailableAt: number[], ownerReadyAt: number): number {
+  return workerAvailableAt.reduce(
+    (earliest, workerReadyAt) => Math.min(earliest, Math.max(workerReadyAt, ownerReadyAt)),
+    Number.POSITIVE_INFINITY,
+  )
+}
+
+function getQueueJobDurationMs(payload: unknown): number {
+  const rawEstimate = payload && typeof payload === 'object'
+    && (payload as { estimate?: unknown }).estimate
+    && typeof (payload as { estimate: unknown }).estimate === 'object'
+    ? Number(((payload as { estimate: { estimated_duration_ms?: unknown } }).estimate).estimated_duration_ms)
+    : Number.NaN
+  return Number.isFinite(rawEstimate) && rawEstimate > 0
+    ? Math.max(1_000, Math.round(rawEstimate))
+    : 60_000
+}
+
+function parseQueueTimestamp(value: string | null, fallback: number): number {
+  const parsed = value ? Date.parse(value) : Number.NaN
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function optimizeGlobalWorkerConcurrency(): number {
+  return positiveInteger(process.env.OPTIMIZE_GLOBAL_WORKER_CONCURRENCY, 2, 1)
+}
+
+function optimizeJobHardTimeoutMs(): number {
+  return positiveInteger(process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS, 10 * 60_000, 1_000)
+}
+
 function getOptimizeGlobalQueueLimit(): number {
   return positiveInteger(process.env.OPTIMIZE_GLOBAL_QUEUE_LIMIT, 200, 1)
 }
@@ -1039,8 +1166,15 @@ function analysisQueueLimit(): number {
   return positiveInteger(process.env.OPTIMIZE_ANALYSIS_QUEUE_LIMIT, 40, 1)
 }
 
+function queueMaxAgeMs(): number {
+  const maximumAgeMs = positiveInteger(process.env.OPTIMIZE_QUEUE_MAX_AGE_MS, 24 * 60 * 60_000, 60_000)
+  // Upgrade the previously documented production value even if an existing
+  // EnvironmentFile has not yet been synchronized during deployment.
+  return maximumAgeMs === 30 * 60_000 ? 24 * 60 * 60_000 : maximumAgeMs
+}
+
 function queueExpiresAt(nowIso: string): string {
-  return new Date(Date.parse(nowIso) + positiveInteger(process.env.OPTIMIZE_QUEUE_MAX_AGE_MS, 30 * 60_000, 60_000)).toISOString()
+  return new Date(Date.parse(nowIso) + queueMaxAgeMs()).toISOString()
 }
 
 function retryAt(attemptNo: number): string {

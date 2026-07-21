@@ -1,8 +1,41 @@
 import { randomUUID } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryOptimizeJobStore, OptimizeJobAdmissionError } from './optimize-job-store'
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 describe('optimization job attempt lifecycle', () => {
+  it('upgrades the legacy 30-minute environment value to 24 hours', async () => {
+    vi.stubEnv('OPTIMIZE_QUEUE_MAX_AGE_MS', String(30 * 60_000))
+    const store = createMemoryOptimizeJobStore()
+    const job = await store.createJob(input())
+
+    expect(Date.parse(job.expires_at!) - Date.parse(job.created_at)).toBe(24 * 60 * 60_000)
+  })
+
+  it('keeps a never-started job queued within the 24-hour window', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const createdAt = new Date(Date.now() - 23 * 60 * 60_000).toISOString()
+    const job = await store.createJob({ ...input(), created_at: createdAt })
+
+    await expect(store.expireQueuedJobs(new Date().toISOString())).resolves.toBe(0)
+    await expect(store.getJob(job.id)).resolves.toMatchObject({ status: 'queued' })
+  })
+
+  it('clears the 24-hour queue expiry as soon as execution begins', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const job = await store.createJob(input())
+    expect(Date.parse(job.expires_at!) - Date.parse(job.created_at)).toBe(24 * 60 * 60_000)
+
+    const claimed = await store.claimNextJob('worker-a', 'lock-a', future(), 2)
+    expect(claimed).toMatchObject({ id: job.id, status: 'running', expires_at: null })
+
+    await expect(store.expireQueuedJobs(new Date(Date.now() + 48 * 60 * 60_000).toISOString())).resolves.toBe(0)
+    await expect(store.getJob(job.id)).resolves.toMatchObject({ status: 'running', expires_at: null })
+  })
+
   it('fences heartbeats and completes only the current attempt owner', async () => {
     const store = createMemoryOptimizeJobStore()
     const job = await store.createJob(input())
@@ -89,6 +122,59 @@ describe('optimization job attempt lifecycle', () => {
 })
 
 describe('optimization job submission admission', () => {
+  it('rejects a job before its estimated wait reaches the queue age limit', async () => {
+    vi.stubEnv('OPTIMIZE_QUEUE_MAX_AGE_MS', '60000')
+    vi.stubEnv('OPTIMIZE_GLOBAL_WORKER_CONCURRENCY', '2')
+    const store = createMemoryOptimizeJobStore()
+
+    await store.admitJob(admissionInput(`license:${randomUUID()}`, 'account_profile', 60_000))
+    await store.admitJob(admissionInput(`license:${randomUUID()}`, 'account_profile', 60_000))
+
+    await expect(
+      store.admitJob(admissionInput(`license:${randomUUID()}`, 'account_profile', 5_000)),
+    ).rejects.toEqual(new OptimizeJobAdmissionError(
+      'queue_wait_capacity_exceeded',
+      429,
+      '任务等待时间超过队列上限，请稍后重试。',
+    ))
+  })
+
+  it('accounts for per-owner serialization when estimating queue wait', async () => {
+    vi.stubEnv('OPTIMIZE_QUEUE_MAX_AGE_MS', '60000')
+    vi.stubEnv('OPTIMIZE_GLOBAL_WORKER_CONCURRENCY', '2')
+    const store = createMemoryOptimizeJobStore()
+    const ownerKey = `license:${randomUUID()}`
+
+    await store.admitJob(admissionInput(ownerKey, 'account_profile', 40_000))
+    await store.admitJob(admissionInput(ownerKey, 'account_profile', 40_000))
+
+    await expect(
+      store.admitJob(admissionInput(ownerKey, 'account_profile', 5_000)),
+    ).rejects.toMatchObject({
+      code: 'queue_wait_capacity_exceeded',
+      status: 429,
+      message: '任务等待时间超过队列上限，请稍后重试。',
+    })
+  })
+
+  it('reserves hard-timeout capacity for an overdue running job', async () => {
+    vi.stubEnv('OPTIMIZE_QUEUE_MAX_AGE_MS', '60000')
+    vi.stubEnv('OPTIMIZE_GLOBAL_WORKER_CONCURRENCY', '1')
+    vi.stubEnv('OPTIMIZE_JOB_HARD_TIMEOUT_MS', '120000')
+    const store = createMemoryOptimizeJobStore()
+    const running = await store.createJob({
+      ...input(),
+      payload_json: { estimate: { estimated_duration_ms: 10_000 } },
+    })
+    const runningRecord = store.records.get(running.id)!
+    runningRecord.status = 'running'
+    runningRecord.started_at = new Date(Date.now() - 20_000).toISOString()
+
+    await expect(
+      store.admitJob(admissionInput(`license:${randomUUID()}`, 'account_profile', 5_000)),
+    ).rejects.toMatchObject({ code: 'queue_wait_capacity_exceeded', status: 429 })
+  })
+
   it('counts a generated schedule once when upgrade suggestions run as a continuation', async () => {
     const store = createMemoryOptimizeJobStore()
     const ownerKey = `license:${randomUUID()}`
@@ -138,11 +224,15 @@ function input() {
   }
 }
 
-function admissionInput(ownerKey: string, source: string) {
+function admissionInput(ownerKey: string, source: string, estimatedDurationMs?: number) {
   return {
     ...input(),
     owner_key: ownerKey,
     source,
+    payload_json: {
+      test: true,
+      ...(estimatedDurationMs ? { estimate: { estimated_duration_ms: estimatedDurationMs } } : {}),
+    },
     idempotency_key: randomUUID(),
     request_hash: randomUUID(),
   }
