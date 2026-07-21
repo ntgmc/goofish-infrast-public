@@ -309,7 +309,7 @@ function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?
   const totalSanity = cost?.totals.equivalent_sanity ?? cost?.equivalent_sanity ?? null
   const missingSanity = cost?.missing.equivalent_sanity ?? null
   const metrics = [
-    { label: copy.optimize.components_UpgradeSuggestions_023, value: `+${formatCostNumber(roi?.efficiency_gain ?? suggestion.gain)}`, tone: 'brand' as const },
+    { label: copy.optimize.components_UpgradeSuggestions_023, value: formatSignedAmount(roi?.efficiency_gain ?? suggestion.gain), tone: 'brand' as const },
     orundumRoi
       ? { label: copy.optimize.components_UpgradeSuggestions_024, value: formatSignedAmount(orundumRoi.daily_orundum_gain), tone: 'success' as const }
       : { label: copy.optimize.components_UpgradeSuggestions_025, value: formatSignedSanity(roi?.daily_sanity_gain), tone: 'success' as const },
@@ -480,25 +480,27 @@ function PartialOutcomeRow({ outcome }: { outcome: UpgradePartialOutcome }) {
 
 function compareSuggestions(left: UpgradeSuggestion, right: UpgradeSuggestion, mode: SortMode, leftIndex: number, rightIndex: number): number {
   if (mode === 'gain') {
-    return compareNullableDesc(primaryDailyGain(left), primaryDailyGain(right))
-      || right.gain - left.gain
+    return compareEconomicGain(left, right)
       || leftIndex - rightIndex
   }
   if (mode === 'stock') {
     return Number(isStockEnough(right.training_cost)) - Number(isStockEnough(left.training_cost))
       || compareNullableAsc(left.training_cost?.missing.equivalent_sanity, right.training_cost?.missing.equivalent_sanity)
-    || compareNullableAsc(left.roi?.payback_days, right.roi?.payback_days)
-    || right.gain - left.gain
+      || compareNullableAsc(left.roi?.payback_days, right.roi?.payback_days)
       || leftIndex - rightIndex
   }
   return compareNullableAsc(left.roi?.payback_days, right.roi?.payback_days)
-    || compareNullableDesc(primaryDailyGain(left), primaryDailyGain(right))
-    || right.gain - left.gain
+    || compareEconomicGain(left, right)
     || leftIndex - rightIndex
 }
 
-function primaryDailyGain(suggestion: UpgradeSuggestion): number | null | undefined {
-  return suggestion.orundum_roi?.daily_orundum_gain ?? suggestion.roi?.daily_sanity_gain
+function compareEconomicGain(left: UpgradeSuggestion, right: UpgradeSuggestion): number {
+  if (left.orundum_roi || right.orundum_roi) {
+    return compareNullableDesc(left.orundum_roi?.daily_orundum_gain, right.orundum_roi?.daily_orundum_gain)
+      || compareNullableDesc(left.orundum_roi?.sustainable_orundum_gain, right.orundum_roi?.sustainable_orundum_gain)
+      || compareNullableDesc(left.orundum_roi?.opportunity_cost_delta, right.orundum_roi?.opportunity_cost_delta)
+  }
+  return compareNullableDesc(left.roi?.daily_sanity_gain, right.roi?.daily_sanity_gain)
 }
 
 function compareNullableAsc(left: number | null | undefined, right: number | null | undefined): number {
