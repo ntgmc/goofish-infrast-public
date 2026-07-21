@@ -107,6 +107,26 @@ try {
   assert.equal(authenticationFailure.status, 401)
   assertSecurityHeaders(authenticationFailure, true, 'HTTPS authentication failure')
 
+  const invitationListQuery = await sendRequest(port, {
+    method: 'GET',
+    path: '/api/admin/registration-invitations?page=1&page_size=20&status=all',
+  })
+  assert.equal(invitationListQuery.status, 401)
+
+  const unknownInvitationQuery = await sendRequest(port, {
+    method: 'GET',
+    path: '/api/admin/registration-invitations?page=1&unknown=value',
+  })
+  assert.equal(unknownInvitationQuery.status, 400)
+  assert.equal(JSON.parse(unknownInvitationQuery.body).code, 'invalid_request')
+
+  const duplicateInvitationQuery = await sendRequest(port, {
+    method: 'GET',
+    path: '/api/admin/registration-invitations?page=1&page=2',
+  })
+  assert.equal(duplicateInvitationQuery.status, 400)
+  assert.equal(JSON.parse(duplicateInvitationQuery.body).code, 'invalid_request')
+
   const unsupportedMediaType = await sendRequest(port, {
     method: 'POST',
     path: '/api/auth/login',
