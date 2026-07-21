@@ -215,6 +215,7 @@ function assertWorkerDeploymentScript() {
     /node --check server\/dist\/worker\.js/,
     /node --check server\/dist\/optimize-worker\.js/,
     /check_readiness "\$CANDIDATE_SLOT"/,
+    /check_systemctl_access/,
     /CANDIDATE_ONLY/,
     /previous-slot-drain/,
     /rollback\(\)/,
@@ -247,6 +248,29 @@ function assertWorkerDeploymentScript() {
   const errorBody = extractFunction(workerDeployScript, 'on_error')
   assert.match(errorBody, /run_systemctl stop "\$\(service_unit "\$CANDIDATE_SLOT"\)"/, 'failed candidates must be stopped')
   assert.match(errorBody, /restore_link "\$OLD_CANDIDATE_TARGET" "\$SLOTS_DIR\/\$CANDIDATE_SLOT"/, 'failed candidate slot links must be restored')
+
+  const privilegePreflightBody = extractFunction(workerDeployScript, 'check_systemctl_access')
+  for (const command of [
+    'restart "$unit"',
+    'stop "$unit"',
+    'enable "$unit"',
+    'enable --now "$unit"',
+    'disable "$unit"',
+    'disable --now "$unit"',
+    '--no-block stop "$unit"',
+    'is-active --quiet "$unit"',
+    'status "$unit" --no-pager --lines=80',
+  ]) {
+    assert.ok(privilegePreflightBody.includes(command), `worker sudo preflight should cover systemctl ${command}`)
+  }
+  assert.match(workerDeployScript, /sudo -n -l "\$command_path"/, 'worker sudo preflight must be read-only')
+
+  assertOrdered(workerDeployScript, [
+    'PHASE="privilege-preflight"',
+    'check_systemctl_access',
+    'PHASE="fetch"',
+    'build_release',
+  ])
 
   const mainFlow = workerDeployScript.slice(workerDeployScript.indexOf('RELEASE_DIR="$RELEASES_DIR/$TARGET_SHA"'))
   assertOrdered(mainFlow, [
@@ -316,6 +340,9 @@ function assertDeploymentDocumentation() {
     'hostssl goofish_infrast_v1 goofish_worker 10.66.0.2/32 scram-sha-256',
     'WORKER_DEPLOY_KNOWN_HOSTS',
     'Worker deployment accepts the same immutable artifact contract',
+    '/usr/bin/systemctl disable goofish-optimize-worker@blue.service',
+    '/usr/bin/systemctl disable --now goofish-optimize-worker@blue.service',
+    'sudo -n -l',
   ]) {
     assert.ok(workerDocs.includes(expected), `worker documentation should include ${expected}`)
   }

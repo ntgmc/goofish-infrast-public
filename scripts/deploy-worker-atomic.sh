@@ -67,6 +67,32 @@ run_systemctl() {
   run_privileged systemctl "$@"
 }
 
+check_passwordless_sudo() {
+  local command_path="$1"
+  shift
+  sudo -n -l "$command_path" "$@" >/dev/null 2>&1 ||
+    fail "deployment user lacks passwordless sudo permission for: $command_path $*"
+}
+
+check_systemctl_access() {
+  local slot unit systemctl_path
+  [[ "$(id -u)" == "0" ]] && return 0
+  systemctl_path="$(command -v systemctl)"
+
+  for slot in blue green; do
+    unit="$(service_unit "$slot")"
+    check_passwordless_sudo "$systemctl_path" restart "$unit"
+    check_passwordless_sudo "$systemctl_path" stop "$unit"
+    check_passwordless_sudo "$systemctl_path" enable "$unit"
+    check_passwordless_sudo "$systemctl_path" enable --now "$unit"
+    check_passwordless_sudo "$systemctl_path" disable "$unit"
+    check_passwordless_sudo "$systemctl_path" disable --now "$unit"
+    check_passwordless_sudo "$systemctl_path" --no-block stop "$unit"
+    check_passwordless_sudo "$systemctl_path" is-active --quiet "$unit"
+    check_passwordless_sudo "$systemctl_path" status "$unit" --no-pager --lines=80
+  done
+}
+
 service_unit() {
   printf '%s@%s.service' "$SERVICE_NAME" "$1"
 }
@@ -299,6 +325,9 @@ done
 if [[ "$(id -u)" != "0" ]]; then
   require_command sudo
 fi
+
+PHASE="privilege-preflight"
+check_systemctl_access
 
 [[ -d "$REPO_DIR/.git" ]] || fail "REPO_DIR is not a Git repository: $REPO_DIR"
 mkdir -p "$RELEASES_DIR" "$SLOTS_DIR" "$STATE_DIR" "$(dirname "$LOCK_FILE")"
