@@ -39,7 +39,7 @@ interface Props {
   variant?: 'embedded' | 'focus';
 }
 
-type TaskStatus = 'preparing' | 'queued' | 'retrying' | 'cancelling' | 'running' | 'overdue' | 'finishing' | 'completed'
+type TaskStatus = 'preparing' | 'queued' | 'retrying' | 'cancelling' | 'cancelled' | 'running' | 'overdue' | 'finishing' | 'completed'
 type StepVisualState = 'done' | 'active' | 'pending'
 
 export default function ScheduleProgress({ progress, className = '', variant = 'embedded' }: Props) {
@@ -71,7 +71,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
     const tick = () => {
       const nextNow = Date.now()
       setNow(nextNow)
-      if (getTimedPercent(progress, nextNow) < 100 || !progress.completedAt) {
+      if (progress.estimatePhase !== 'cancelled' && (getTimedPercent(progress, nextNow) < 100 || !progress.completedAt)) {
         timer = window.setTimeout(tick, progress.queueStatus === 'queued' ? 900 : 260)
       }
     }
@@ -113,7 +113,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
           aria-valuetext={task.ariaText}
         >
           <motion.div
-            className="schedule-progress-fill h-full origin-left rounded-full bg-brand-500"
+            className={`schedule-progress-fill h-full origin-left rounded-full ${task.status === 'cancelled' ? 'bg-surface-4' : 'bg-brand-500'}`}
             initial={false}
             animate={{ scaleX: percent / 100 }}
             transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: motionTokens.ease.enter }}
@@ -123,7 +123,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
         <ol className="grid gap-2 sm:grid-cols-4" aria-label={copy.common.components_ScheduleProgress_004}>
           {task.steps.map((step, index) => (
             <li key={step.label}>
-              <TaskStep label={step.label} detail={step.detail} state={getStepState(task.status, index)} />
+              <TaskStep label={step.label} detail={step.detail} state={getStepState(task.status, index, progress.observedRunning)} />
             </li>
           ))}
         </ol>
@@ -279,6 +279,7 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
 }
 
 function getTaskStatus(progress: ScheduleProgressState, percent: number, now: number): TaskStatus {
+  if (progress.estimatePhase === 'cancelled') return 'cancelled'
   if (progress.cancellationRequested) return 'cancelling'
   if (progress.executionPhase === 'retry_wait') return 'retrying'
   if (!progress.completedAt && progress.observedRunning && getCurrentRemainingMs(progress, now) === 0) return 'overdue'
@@ -292,6 +293,7 @@ function getTaskStatus(progress: ScheduleProgressState, percent: number, now: nu
 }
 
 function getStatusTitle(mode: ScheduleProgressState['mode'], status: TaskStatus): string {
+  if (status === 'cancelled') return copy.common.components_ScheduleProgress_106
   if (status === 'cancelling') return copy.common.components_ScheduleProgress_101
   if (status === 'retrying') return copy.common.components_ScheduleProgress_102
   if (status === 'completed') return mode === 'generate' ? copy.common.components_ScheduleProgress_050 : mode === 'scenario' ? copy.common.components_ScheduleProgress_051 : copy.common.components_ScheduleProgress_052
@@ -309,6 +311,7 @@ function getStatusDetail(
   remainingLabel: string,
   estimateContext: string,
 ): string {
+  if (status === 'cancelled') return copy.common.components_ScheduleProgress_107
   if (status === 'cancelling') return copy.common.components_ScheduleProgress_103
   if (status === 'retrying') {
     const attempt = Math.max(1, progress.attemptCount ?? 1)
@@ -326,6 +329,7 @@ function getStatusDetail(
 }
 
 function getQueueLabel(progress: ScheduleProgressState, aheadCount: number | null): string {
+  if (progress.estimatePhase === 'cancelled') return copy.common.components_ScheduleProgress_109
   if (progress.observedRunning || progress.queueStatus === 'running') return copy.common.components_ScheduleProgress_071
   if (progress.completedAt || progress.estimatePhase === 'completed') return copy.common.components_ScheduleProgress_072
   if (aheadCount === null) return progress.queueStatus === 'queued' ? copy.common.components_ScheduleProgress_073 : copy.common.components_ScheduleProgress_074
@@ -341,11 +345,13 @@ function getEstimateContext(progress: ScheduleProgressState, aheadCount: number 
 }
 
 function getAdjustmentLabel(progress: ScheduleProgressState, status: TaskStatus): string | undefined {
+  if (status === 'cancelled') return copy.common.components_ScheduleProgress_110
   if (status === 'overdue') return copy.common.components_ScheduleProgress_080
   return progress.estimateAdjustment
 }
 
 function getRemainingLabel(progress: ScheduleProgressState, status: TaskStatus, now: number): string {
+  if (status === 'cancelled' || progress.estimatePhase === 'cancelled') return copy.common.components_ScheduleProgress_108
   if (progress.completedAt || progress.estimatePhase === 'completed') return copy.common.components_ScheduleProgress_081
   if (status === 'overdue' || progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return copy.common.components_ScheduleProgress_082
   if (status === 'finishing') return copy.common.components_ScheduleProgress_083
@@ -374,12 +380,14 @@ function parseEstimateUpdatedAt(progress: ScheduleProgressState): number | null 
 }
 
 function getRemainingAriaLabel(progress: ScheduleProgressState, remainingLabel: string): string {
+  if (progress.estimatePhase === 'cancelled') return copy.common.components_ScheduleProgress_108
   if (remainingLabel === copy.common.components_ScheduleProgress_086 || progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return copy.common.components_ScheduleProgress_087
   if (remainingLabel === copy.common.components_ScheduleProgress_088) return copy.common.components_ScheduleProgress_089
   return `${copy.common.components_ScheduleProgress_090}${remainingLabel}`
 }
 
 function getMeterLabel(status: TaskStatus): string {
+  if (status === 'cancelled') return 'Cancelled'
   if (status === 'retrying') return 'Retry'
   if (status === 'cancelling') return 'Cancel'
   if (status === 'queued') return 'Queued'
@@ -390,8 +398,14 @@ function getMeterLabel(status: TaskStatus): string {
   return 'Init'
 }
 
-function getStepState(status: TaskStatus, index: number): StepVisualState {
-  const activeIndex = status === 'preparing' ? 0 : status === 'queued' || status === 'retrying' ? 1 : status === 'running' || status === 'overdue' || status === 'cancelling' ? 2 : 3
+function getStepState(status: TaskStatus, index: number, observedRunning = false): StepVisualState {
+  const activeIndex = status === 'preparing'
+    ? 0
+    : status === 'queued' || status === 'retrying' || (status === 'cancelled' && !observedRunning)
+      ? 1
+      : status === 'running' || status === 'overdue' || status === 'cancelling' || status === 'cancelled'
+        ? 2
+        : 3
   if (status === 'completed') return 'done'
   if (index < activeIndex) return 'done'
   if (index === activeIndex) return 'active'
