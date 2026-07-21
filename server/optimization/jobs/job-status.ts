@@ -9,11 +9,12 @@ import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriorit
 import { getOptimizePollAfterMs, kickOptimizeJobCancellation, kickOptimizeJobProcessing } from "../../optimize-job-runner";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
 import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload, OptimizeJobSource } from './shared';
-import { OPTIMIZE_ANALYSIS_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
+import { OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
 import { jsonResponse } from './http-core';
 import { prepareOptimizeJob } from './prepare-job';
 import { getServiceLifecycleState } from '../../lifecycle';
 import { getSecretKeyring } from '../../handlers/license-utils';
+import { getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
 
 export async function submitOptimizationJob(req: Request): Promise<Response> {
   const lifecycleState = getServiceLifecycleState();
@@ -232,11 +233,10 @@ function formatOptimizationJobSnapshot(
   return { ...base, status };
 }
 
-function getOptimizeJobKind(job: OptimizeJobRecord): 'schedule' | 'upgrade_suggestions' | 'scenario_comparison' {
+function getOptimizeJobKind(job: OptimizeJobRecord): 'schedule' | 'scenario_comparison' {
   const payload = job.payload_json && typeof job.payload_json === 'object' ? job.payload_json as Record<string, unknown> : {}
   if (payload.kind === 'scenario_comparison') return 'scenario_comparison'
-  const request = payload.request && typeof payload.request === 'object' ? payload.request as Record<string, unknown> : {}
-  return request.suggestions_only === true ? 'upgrade_suggestions' : 'schedule'
+  return 'schedule'
 }
 
 function getOptimizeExecutionPhase(job: OptimizeJobRecord): 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal' {
@@ -431,9 +431,9 @@ export function buildScenarioComparisonEstimate(scenarioCount: number, variableS
   const fixedCount = count - variableCount
   const estimatedVerifications = Math.min(9, count)
   return {
-    estimated_duration_ms: clampOptimizeEstimateMs(
-      fixedCount * 4_000 + variableCount * SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT * 4_000 + estimatedVerifications * 9_000,
-      OPTIMIZE_ANALYSIS_ESTIMATE_MAX_MS,
+    estimated_duration_ms: Math.max(
+      OPTIMIZE_ESTIMATE_MIN_MS,
+      Math.round(fixedCount * 4_000 + variableCount * SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT * 4_000 + estimatedVerifications * 9_000),
     ),
     estimate_bucket: 'scenario_comparison',
     estimate_source: 'fallback_p95',
@@ -450,7 +450,7 @@ function buildFallbackOptimizeEstimate(bucket: OptimizeEstimateBucket): Optimize
   };
 }
 
-function clampOptimizeEstimateMs(value: number, maxMs = OPTIMIZE_ESTIMATE_MAX_MS): number {
+function clampOptimizeEstimateMs(value: number, maxMs = getOptimizeJobHardTimeoutMs()): number {
   if (!Number.isFinite(value)) return OPTIMIZE_ESTIMATE_FALLBACK_MS.maa_plain;
   return Math.max(OPTIMIZE_ESTIMATE_MIN_MS, Math.min(maxMs, Math.round(value)));
 }

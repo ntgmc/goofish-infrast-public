@@ -1,6 +1,7 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { buildScenarioComparisonEstimate, createOptimizeJobPollToken, shouldReserveFreeScheduleEntitlement, verifyOptimizeJobPollToken } from './job-status'
 import { createPersistedOptimizeJobPayload } from './shared'
+import { DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS, formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config'
 
 const originalAdminSecret = process.env.MAA_ADMIN_SECRET
 const originalPreviousAdminSecret = process.env.MAA_ADMIN_SECRET_PREVIOUS
@@ -12,6 +13,10 @@ afterAll(() => {
   else process.env.MAA_ADMIN_SECRET_PREVIOUS = originalPreviousAdminSecret
 })
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 describe('scenario comparison estimates', () => {
   it('charges variable scenarios for their bounded fast-search candidates', () => {
     const fixed = buildScenarioComparisonEstimate(4, 0)
@@ -20,8 +25,20 @@ describe('scenario comparison estimates', () => {
     expect(oneVariable.estimated_duration_ms).toBe(100_000)
   })
 
-  it('allows the worst 24-variable workload beyond the ordinary ten-minute cap', () => {
+  it('keeps the raw worst-case estimate so admission can reject it above the ten-minute cap', () => {
     expect(buildScenarioComparisonEstimate(24, 24).estimated_duration_ms).toBe(1_329_000)
+  })
+})
+
+describe('optimization hard timeout configuration', () => {
+  it('defaults to ten minutes and supports the single test override', () => {
+    expect(DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS).toBe(600_000)
+    expect(getOptimizeJobHardTimeoutMs()).toBe(600_000)
+    expect(formatOptimizeJobHardTimeout()).toBe('10 分钟')
+
+    vi.stubEnv('OPTIMIZE_JOB_HARD_TIMEOUT_MS', '2500')
+    expect(getOptimizeJobHardTimeoutMs()).toBe(2_500)
+    expect(formatOptimizeJobHardTimeout()).toBe('3 秒')
   })
 })
 
@@ -56,7 +73,10 @@ describe('persisted optimization payload', () => {
       isPreviewTrial: false,
       freeScheduleDecision: null,
       estimate: { estimated_duration_ms: 2_000, estimate_bucket: 'maa_plain', estimate_source: 'fallback_p95', estimate_sample_count: 0 },
-      request: {},
+      request: {
+        include_upgrade_suggestions: true,
+        upgrade_suggestions_allowed: true,
+      },
     })
     const serialized = JSON.stringify(payload)
 

@@ -94,4 +94,29 @@ describe('request validation boundary', () => {
     expect(stableJsonStringify({ z: 1, nested: { b: 2, a: 1 }, items: [{ y: 2, x: 1 }] }))
       .toBe('{"items":[{"x":1,"y":2}],"nested":{"a":1,"b":2},"z":1}')
   })
+
+  it('accepts only the merged schedule request contract', () => {
+    const base = {
+      identity: { type: 'profile', profileId: 'profile-1' },
+      operators: [],
+      config: {},
+    }
+    expect(requestSchemas.optimizationJob.safeParse({
+      ...base,
+      kind: 'schedule',
+      includeUpgradeSuggestions: true,
+    }).success).toBe(true)
+    expect(requestSchemas.optimizationJob.safeParse({ ...base, kind: 'schedule' }).success).toBe(false)
+    expect(requestSchemas.optimizationJob.safeParse({
+      ...base,
+      kind: 'upgrade_suggestions',
+      upgradeTaskPayload: { tasks: [], baselineScore: 0 },
+    }).success).toBe(false)
+    expect(requestSchemas.optimizationJob.safeParse({
+      ...base,
+      kind: 'schedule',
+      includeUpgradeSuggestions: false,
+      historyResultId: 'legacy-history',
+    }).success).toBe(false)
+  })
 })

@@ -149,19 +149,24 @@ export const requestSchemas = {
   freePreviewScanComplete: strict({ scan_id: shortString(256), display_name: optionalString(40), note: optionalString(500) }),
   freePreviewSelection: strict({ selection_id: shortString(256), uid: shortString(128) }),
   freePreviewConfirmation: strict({ confirmation_id: shortString(256) }),
-  optimizationJob: strict({
-    kind: z.enum(['schedule', 'upgrade_suggestions', 'scenario_comparison']),
-    identity: strict({ type: z.literal('profile'), profileId: shortString(128) }),
-    operators: z.array(z.unknown()).max(2000),
-    config: z.unknown(),
-    ignoreElite: z.boolean().optional(),
-    includeCurrent: z.boolean().optional(),
-    use_priority_coupon: z.boolean().optional(),
-    upgradeTaskPayload: optionalUnknown,
-    historyResultId: optionalString(128),
-    historySource: z.enum(['generated', 'applied_suggestions']).optional(),
-    factors: optionalUnknown,
-  }),
+  optimizationJob: z.discriminatedUnion('kind', [
+    strict({
+      kind: z.literal('schedule'),
+      identity: strict({ type: z.literal('profile'), profileId: shortString(128) }),
+      operators: z.array(z.unknown()).max(2000),
+      config: z.unknown(),
+      includeUpgradeSuggestions: z.boolean(),
+      use_priority_coupon: z.boolean().optional(),
+      historySource: z.enum(['generated', 'applied_suggestions']).optional(),
+    }),
+    strict({
+      kind: z.literal('scenario_comparison'),
+      identity: strict({ type: z.literal('profile'), profileId: shortString(128) }),
+      operators: z.array(z.unknown()).max(2000),
+      config: z.unknown(),
+      factors: optionalUnknown,
+    }),
+  ]),
   reorderCheck: strict({ profileId: shortString(128), config: z.unknown(), baselineHistoryId: optionalString(128) }),
 } as const
 

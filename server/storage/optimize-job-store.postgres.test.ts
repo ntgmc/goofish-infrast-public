@@ -237,16 +237,13 @@ describe('PostgreSQL optimization job admission', () => {
     await expect(store.admitJob(input({ owner_key: owner }))).rejects.toMatchObject({ code: 'queue_capacity_exceeded', status: 429 })
   })
 
-  it('counts upgrade suggestion continuations separately from paid submissions', async () => {
+  it('counts each merged schedule request once', async () => {
     const store = createPostgresOptimizeJobStore()
     const owner = `license:${randomUUID()}`
 
     for (let index = 0; index < 12; index += 1) {
       const schedule = await store.admitJob(input({ owner_key: owner }))
       await query("update optimize_jobs set status = 'succeeded', updated_at = now() where id = $1", [schedule.job.id])
-
-      const suggestions = await store.admitJob(input({ owner_key: owner, source: 'optimize_suggestions' }))
-      await query("update optimize_jobs set status = 'succeeded', updated_at = now() where id = $1", [suggestions.job.id])
     }
 
     await expect(query<{ count: string }>(

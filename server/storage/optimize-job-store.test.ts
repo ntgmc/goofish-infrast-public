@@ -175,16 +175,13 @@ describe('optimization job submission admission', () => {
     ).rejects.toMatchObject({ code: 'queue_wait_capacity_exceeded', status: 429 })
   })
 
-  it('counts a generated schedule once when upgrade suggestions run as a continuation', async () => {
+  it('counts each merged schedule and suggestion request as one submission', async () => {
     const store = createMemoryOptimizeJobStore()
     const ownerKey = `license:${randomUUID()}`
 
     for (let index = 0; index < 12; index += 1) {
       const schedule = await store.admitJob(admissionInput(ownerKey, 'account_profile'))
       store.records.get(schedule.job.id)!.status = 'succeeded'
-
-      const suggestions = await store.admitJob(admissionInput(ownerKey, 'optimize_suggestions'))
-      store.records.get(suggestions.job.id)!.status = 'succeeded'
     }
 
     await expect(store.admitJob(admissionInput(ownerKey, 'account_profile'))).rejects.toEqual(
@@ -194,22 +191,6 @@ describe('optimization job submission admission', () => {
         '当前账号的优化提交次数已达小时上限。请1小时后再试。',
       ),
     )
-  })
-
-  it('keeps an independent hourly limit for upgrade suggestion continuations', async () => {
-    const store = createMemoryOptimizeJobStore()
-    const ownerKey = `license:${randomUUID()}`
-
-    for (let index = 0; index < 12; index += 1) {
-      const suggestions = await store.admitJob(admissionInput(ownerKey, 'optimize_suggestions'))
-      store.records.get(suggestions.job.id)!.status = 'succeeded'
-    }
-
-    await expect(store.admitJob(admissionInput(ownerKey, 'optimize_suggestions'))).rejects.toMatchObject({
-      code: 'submission_rate_exceeded',
-      status: 429,
-      message: '当前账号的优化提交次数已达小时上限。请1小时后再试。',
-    })
   })
 })
 

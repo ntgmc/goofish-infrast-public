@@ -6,29 +6,25 @@ import type { ReorderCheckQuota, ScheduleUsageContext, FreeScheduleGenerateDecis
 import { FREE_PREVIEW_MODE, REORDER_CHECK_MONTHLY_LIMIT, FREE_SCHEDULE_REVISION_LIMIT, FREE_SCHEDULE_REVISION_WINDOW_HOURS, SHANGHAI_TIMEZONE, SHANGHAI_UTC_OFFSET_MS } from './shared';
 
 export function getDownloadableHistoryResult(result: OptimizeResult): OptimizeResult {
-  return result.current_result ?? result;
+  return result;
 }
 
 export function limitPreviewOptimizeResult(result: OptimizeResult, entitlement?: FreeScheduleEntitlement | null): OptimizeResult {
   const {
-    current_result,
     daily_production,
     maa_default_comparison,
     raw_results,
     raw_total_efficiency,
     total_efficiency,
     upgrade_suggestions,
-    upgrade_task_payload,
     ...safeResult
   } = result;
-  void current_result;
   void daily_production;
   void maa_default_comparison;
   void raw_results;
   void raw_total_efficiency;
   void total_efficiency;
   void upgrade_suggestions;
-  void upgrade_task_payload;
 
   return {
     ...safeResult,
@@ -53,14 +49,15 @@ export function countOwnedOperators(operators: LicenseOperator[]): number {
 export async function recordScheduleGenerate(
   cdkRecord: Pick<CdkRecord, 'code_hash'> & Partial<Pick<CdkRecord, 'permission' | 'status'>> | null,
   context: ScheduleUsageContext,
-  startedAt: number,
+  timing: { submittedAt: number; attemptStartedAt?: number },
   jobId?: string,
 ): Promise<void> {
   try {
     await recordUsageEvent("schedule_generate", {
       status: context.status,
       reason_code: context.reason_code,
-      duration_ms: Date.now() - startedAt,
+      duration_ms: Date.now() - timing.submittedAt,
+      ...(timing.attemptStartedAt !== undefined && { compute_duration_ms: Date.now() - timing.attemptStartedAt }),
       permission: context.permission ?? cdkRecord?.permission,
       profile_id: context.profile_id,
       cdk_status: context.cdk_status ?? cdkRecord?.status,
@@ -73,7 +70,7 @@ export async function recordScheduleGenerate(
     console.warn("usage stats schedule generate skipped:", error);
   }
 
-  if (!cdkRecord || context.status !== "success" || context.source === "optimize_suggestions") return;
+  if (!cdkRecord || context.status !== "success") return;
 
   try {
     await incrementCdkScheduleGenerateCount(cdkRecord, jobId);

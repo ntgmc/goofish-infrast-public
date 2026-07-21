@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react'
-import type { Announcement, AuthSuccessResponse, FreeScheduleEntitlement, LicenseConfig, LicenseFile, OptimizeResult, ReorderCheckResult, UpgradeSuggestion, UpgradeTaskPayload, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { Announcement, AuthSuccessResponse, FreeScheduleEntitlement, LicenseConfig, LicenseFile, OptimizeResult, ReorderCheckResult, UpgradeSuggestion, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { CreateOptimizationJobRequest } from '../../../lib/optimization-contracts'
 import { canEditConfig, canUseScenarioComparison, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../../../lib/license'
 import { canonicalJson } from '../../../lib/crypto'
@@ -404,7 +404,7 @@ export function useOptimizeWorkflow(props: Props) {
             setFinalResult(result)
             setPhase('final')
           } else {
-            const current = result.current_result ?? result
+            const current = result
             setCurrentResult(current)
             setFinalResult(null)
             setHistoryItem(null)
@@ -445,29 +445,16 @@ export function useOptimizeWorkflow(props: Props) {
       }
     }, [flushPendingLicenseSync, license.order_hash, optimizeSignature, pollOptimizeJob, profileId])
 
-  const runOptimize = useCallback(async (ignoreElite: boolean, includeCurrent = false, useCoupon = false) => {
+  const runOptimize = useCallback(async (includeUpgradeSuggestions: boolean, useCoupon = false) => {
       const payload: CreateOptimizationJobRequest = {
         kind: 'schedule',
         identity: { type: 'profile', profileId },
         operators: mergedOperators,
         config: activeConfig,
-        ignoreElite,
-        ...(includeCurrent && { includeCurrent: true }),
+        includeUpgradeSuggestions,
         ...(useCoupon && { use_priority_coupon: true }),
       }
       return await runOptimizeJob(payload, 'generate', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_013)
-    }, [activeConfig, license, mergedOperators, profileId, runOptimizeJob])
-
-  const runUpgradeSuggestions = useCallback(async (taskPayload: UpgradeTaskPayload, historyResultId?: string) => {
-      const payload: CreateOptimizationJobRequest = {
-        kind: 'upgrade_suggestions',
-        identity: { type: 'profile', profileId },
-        operators: mergedOperators,
-        config: activeConfig,
-        upgradeTaskPayload: taskPayload,
-        ...(historyResultId && { historyResultId }),
-      }
-      return await runOptimizeJob(payload, 'generate', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_014, true)
     }, [activeConfig, license, mergedOperators, profileId, runOptimizeJob])
 
   const handleReorderCheck = useCallback(async () => {
@@ -546,16 +533,12 @@ export function useOptimizeWorkflow(props: Props) {
       let couponSubmitted = false
       try {
         couponSubmitted = useCoupon
-        const potential = userCanUseUpgradeFeatures ? await runOptimize(true, true, useCoupon) : null
-        const current = potential?.current_result ?? (await runOptimize(false, false, useCoupon && !potential))
+        const current = await runOptimize(userCanUseUpgradeFeatures, useCoupon)
         if (current.preview_limit?.free_schedule_entitlement) {
           setFreeScheduleEntitlementOverride(current.preview_limit.free_schedule_entitlement)
         }
         setCurrentResult(current)
-        const suggestionResult = potential?.upgrade_task_payload
-          ? await runUpgradeSuggestions(potential.upgrade_task_payload, potential.history_result_id)
-          : potential
-        const upgradeList = normalizeUpgradeSuggestions(suggestionResult?.upgrade_suggestions)
+        const upgradeList = normalizeUpgradeSuggestions(current.upgrade_suggestions)
         completed = true
         setProgress((current) => ({
           ...current,
@@ -586,7 +569,7 @@ export function useOptimizeWorkflow(props: Props) {
           setProgress(null)
         }
       }
-    }, [configValidationMessage, flushConfigSave, flushPendingLicenseSync, freeScheduleGenerateBlockedReason, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, refreshRewardBalance, runOptimize, runUpgradeSuggestions, showConfigValidationToast, usePriorityCoupon, userCanUseUpgradeFeatures])
+    }, [configValidationMessage, flushConfigSave, flushPendingLicenseSync, freeScheduleGenerateBlockedReason, hasResult, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, refreshRewardBalance, runOptimize, showConfigValidationToast, usePriorityCoupon, userCanUseUpgradeFeatures])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
       if (loading || optimizeInFlightRef.current) return
@@ -623,7 +606,7 @@ export function useOptimizeWorkflow(props: Props) {
           identity: { type: 'profile', profileId },
           operators: mergeOperators(license.operators, newOverrides),
           config: activeConfig,
-          ignoreElite: false,
+          includeUpgradeSuggestions: false,
           historySource: 'applied_suggestions',
         }
         const data = await runOptimizeJob(applyPayload, 'apply', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_022)

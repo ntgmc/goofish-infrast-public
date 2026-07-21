@@ -37,9 +37,20 @@ describe('DeadLetterPanel', () => {
       { fallbackMessage: '加载死信完整数据失败' },
     )
   })
+
+  it('shows historical standalone suggestion dead letters as read-only audit records', async () => {
+    adminApiJson.mockResolvedValue({ dead_letters: [record({ source: 'optimize_suggestions' })] })
+
+    render(<DeadLetterPanel />)
+
+    const readOnlyNotice = await screen.findByText('历史优化建议任务仅供审计，不可重放')
+    const legacyRecord = readOnlyNotice.closest('article')!
+    expect(within(legacyRecord).queryByRole('button', { name: '重放' })).not.toBeInTheDocument()
+    expect(within(legacyRecord).getByRole('button', { name: '丢弃' })).toBeInTheDocument()
+  })
 })
 
-function record(): AdminOptimizationDeadLetter {
+function record(overrides: Partial<AdminOptimizationDeadLetter> = {}): AdminOptimizationDeadLetter {
   return {
     id: 'letter-1',
     job_id: 'job-1',
@@ -58,6 +69,7 @@ function record(): AdminOptimizationDeadLetter {
     resolved_at: null,
     created_at: '2026-07-19T10:00:00.000Z',
     updated_at: '2026-07-19T10:00:00.000Z',
+    ...overrides,
   }
 }
 

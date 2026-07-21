@@ -209,7 +209,7 @@ export interface OptimizeJobStatusResponse {
   recovery_action?: 'retry' | 'review_input' | 'reauthorize' | 'contact_support' | 'none';
   support_reference?: string;
   failure_kind?: string;
-  job_kind?: 'schedule' | 'upgrade_suggestions' | 'scenario_comparison';
+  job_kind?: 'schedule' | 'scenario_comparison';
   source?: string;
   execution_phase?: 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal';
   attempt_count?: number;
@@ -286,23 +286,6 @@ export interface DepotValueResponse {
   build_meta: AppBuildMeta;
 }
 
-export interface UpgradeTaskPayload {
-  tasks: RawUpgradeTask[];
-  baselineScore: number;
-  baselineDailySanity?: number;
-  baselineOrundumEconomy?: OrundumEconomy;
-  currentFiammettaTargets?: string[];
-  potentialFiammettaTargets?: string[];
-}
-
-interface RawUpgradeTask {
-  bundle: { id?: string; name: string; current: number; target: number }[];
-  rule: unknown | null;
-  roomName: string;
-  estimatedGain: number;
-  impact_sources?: UpgradeImpactRoom[];
-}
-
 interface AssignmentResult {
   total_efficiency: number;
   assignment_detail: AssignmentDetail[];
@@ -359,9 +342,7 @@ export interface OptimizeResult {
   orundum_economy?: OrundumEconomy;
   intermediate_depletion?: IntermediateDepletion[];
   upgrade_suggestions?: RawUpgradeSuggestion[];
-  current_result?: OptimizeResult;
-  upgrade_task_payload?: UpgradeTaskPayload;
-  history_result_id?: string;
+  upgrade_suggestions_status?: 'completed' | 'not_requested' | 'not_allowed' | 'failed';
   analysis_summary?: ScheduleAnalysisSummary;
   preview_limit?: {
     mode?: 'room_limited' | 'full_rotation_without_export';
