@@ -9,6 +9,7 @@ import {
   type BrevoEmailReservation,
   type BrevoOfficialQuotaSnapshot,
 } from './storage/brevo-email-store'
+import { getRegistrationSettings } from './storage/registration-settings-store'
 
 const BREVO_ACCOUNT_URL = 'https://api.brevo.com/v3/account'
 const OFFICIAL_QUOTA_REFRESH_INTERVAL_MS = 60_000
@@ -20,8 +21,14 @@ export async function reserveBrevoEmailWithOfficialQuota(
   purpose: BrevoEmailPurpose,
   now = new Date(),
 ): Promise<BrevoEmailReservation> {
-  await refreshBrevoOfficialQuotaIfStale(now)
-  return reserveBrevoEmail(purpose, now)
+  const [, settings] = await Promise.all([
+    refreshBrevoOfficialQuotaIfStale(now),
+    getRegistrationSettings(),
+  ])
+  return reserveBrevoEmail(purpose, now, {
+    adminInviteReserve: settings.admin_invite_email_reserve,
+    passwordResetReserve: settings.password_reset_email_reserve,
+  })
 }
 
 export async function refreshBrevoOfficialQuotaIfStale(

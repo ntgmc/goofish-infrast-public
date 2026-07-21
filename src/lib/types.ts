@@ -861,6 +861,7 @@ export type BrevoQuotaAction = 'pause_registration' | 'allow_unverified_registra
 
 export type BrevoEmailPurpose =
   | 'email_verification'
+  | 'admin_invite_verification'
   | 'password_reset'
   | 'account_deletion_cancellation'
   | 'account_deletion_receipt';
@@ -896,11 +897,26 @@ export interface BrevoEmailStats {
 }
 
 export interface RegistrationSettings {
-  version: 3;
+  version: 4;
   email_verification_required: boolean;
   invite_code_required: boolean;
   brevo_quota_action: BrevoQuotaAction;
+  admin_invite_email_reserve: number;
+  password_reset_email_reserve: number;
   updated_at: string | null;
+}
+
+export type AdminRegistrationInvitationStatus = 'active' | 'used' | 'revoked' | 'expired';
+
+export interface AdminRegistrationInvitation {
+  id: string;
+  status: AdminRegistrationInvitationStatus;
+  created_at: string;
+  expires_at: string;
+  consumed_at: string | null;
+  revoked_at: string | null;
+  consumed_by_user_id: string | null;
+  consumed_by_email: string | null;
 }
 
 export interface InvitationSummary {

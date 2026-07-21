@@ -68,6 +68,13 @@ export const requestSchemas = {
     email_verification_required: z.boolean(),
     invite_code_required: z.boolean(),
     brevo_quota_action: z.enum(['pause_registration', 'allow_unverified_registration']),
+    admin_invite_email_reserve: z.number().int().min(0).max(300),
+    password_reset_email_reserve: z.number().int().min(0).max(300),
+  }),
+  adminRegistrationInvitationCreate: strict({}),
+  adminRegistrationInvitationPatch: strict({
+    invitation_id: shortString(128),
+    action: z.literal('revoke'),
   }),
   adminRiskSettings: strict({ operator_data_risk_enabled: z.boolean().optional() }),
   adminUserCreate: strict({
@@ -187,6 +194,11 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/risk-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRiskSettings), PATCH: json('admin', requestSchemas.adminRiskSettings) })],
   ['/api/admin/invitation-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminInvitationSettings), PATCH: json('admin', requestSchemas.adminInvitationSettings) })],
   ['/api/admin/registration-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRegistrationSettings) })],
+  ['/api/admin/registration-invitations', route({
+    GET: none(),
+    POST: json('admin', requestSchemas.adminRegistrationInvitationCreate),
+    PATCH: json('admin', requestSchemas.adminRegistrationInvitationPatch),
+  })],
   ['/api/admin/optimization', route({ GET: none(), POST: json('admin', requestSchemas.adminOptimization) }, ['view', 'status', 'limit', 'id'])],
   ['/api/admin/session', route({ GET: none(), POST: json('auth', requestSchemas.adminSession), DELETE: none() })],
   ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'search'])],

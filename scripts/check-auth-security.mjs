@@ -314,7 +314,7 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.deepEqual(inviteRequired, {
     ok: false,
     status: 400,
-    message: '当前仅限受邀用户注册，请输入邀请码。',
+    message: '当前仅限管理员邀请注册，请输入管理员邀请码。',
     code: 'invite_code_required',
   })
   assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
@@ -1396,7 +1396,7 @@ function userAuthMigrationPlugin() {
   return {
     name: 'auth-security-user-migration-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-migration',
@@ -1409,6 +1409,7 @@ function userAuthMigrationPlugin() {
           'license-utils': userLicenseUtilsMock(),
           'cdk-redemption': cdkRedemptionMock(),
           'invitation-store': invitationStoreMock(),
+          'admin-registration-invitation-store': adminRegistrationInvitationStoreMock(),
           'registration-settings-store': registrationSettingsStoreMock(),
           email: emailMock(),
         }
@@ -1422,7 +1423,7 @@ function userRegistrationCdkPlugin() {
   return {
     name: 'auth-security-user-registration-cdk-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-registration-cdk',
@@ -1436,6 +1437,7 @@ function userRegistrationCdkPlugin() {
           'license-utils': userRegistrationLicenseUtilsMock(),
           'cdk-redemption': userRegistrationCdkRedemptionMock(),
           'invitation-store': invitationStoreMock(),
+          'admin-registration-invitation-store': adminRegistrationInvitationStoreMock(),
           'registration-settings-store': registrationSettingsStoreMock(),
           email: emailMock(),
         }
@@ -1449,7 +1451,7 @@ function userSessionAuthPlugin() {
   return {
     name: 'auth-security-user-session-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-session',
@@ -1462,6 +1464,7 @@ function userSessionAuthPlugin() {
           'license-utils': userLicenseUtilsMock(),
           'cdk-redemption': cdkRedemptionMock(),
           'invitation-store': invitationStoreMock(),
+          'admin-registration-invitation-store': adminRegistrationInvitationStoreMock(),
           'registration-settings-store': registrationSettingsStoreMock(),
           email: emailMock(),
         }
@@ -1495,7 +1498,7 @@ function passwordResetAuthPlugin() {
   return {
     name: 'auth-security-password-reset-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\/])${moduleName}(\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-password-reset',
@@ -1509,6 +1512,7 @@ function passwordResetAuthPlugin() {
           'license-utils': userLicenseUtilsMock(),
           'cdk-redemption': cdkRedemptionMock(),
           'invitation-store': invitationStoreMock(),
+          'admin-registration-invitation-store': adminRegistrationInvitationStoreMock(),
           'registration-settings-store': registrationSettingsStoreMock(),
           email: emailMock(),
         }
@@ -2130,6 +2134,19 @@ function invitationStoreMock() {
   `
 }
 
+function adminRegistrationInvitationStoreMock() {
+  return `
+    export class AdminRegistrationInvitationError extends Error {
+      constructor() { super('管理员邀请码无效。'); this.code = 'invalid_invite_code' }
+    }
+    export function normalizeAdminRegistrationInviteCode() { return null }
+    export async function validateAdminRegistrationInvitation() { throw new AdminRegistrationInvitationError() }
+    export async function saveRegistrationWithAdminInvitation() {}
+    export async function consumeAdminRegistrationInvitationInTransaction() {}
+    export async function userRegisteredWithAdminInvitation() { return false }
+  `
+}
+
 function registrationSettingsStoreMock() {
   return `
     export async function getRegistrationSettings() {
@@ -2137,6 +2154,8 @@ function registrationSettingsStoreMock() {
         email_verification_required: false,
         invite_code_required: false,
         brevo_quota_action: 'pause_registration',
+        admin_invite_email_reserve: 0,
+        password_reset_email_reserve: 0,
       }
     }
   `
@@ -2145,17 +2164,23 @@ function registrationSettingsStoreMock() {
 function emailMock() {
   return `
     export class BrevoDailyQuotaExceededError extends Error {
-      constructor(quotaDate = '2026-07-21', retryAfterSeconds = 3600) {
+      constructor(quotaDate = '2026-07-21', retryAfterSeconds = 3600, reason = 'daily_limit') {
         super('quota reached')
         this.code = 'brevo_daily_limit_reached'
         this.quotaDate = quotaDate
         this.retryAfterSeconds = retryAfterSeconds
+        this.reason = reason
       }
     }
     export async function reserveEmailVerificationDelivery() {
       globalThis.__authSecurityEmailReserveCalls = (globalThis.__authSecurityEmailReserveCalls ?? 0) + 1
       if (globalThis.__authSecurityBrevoQuotaReached) throw new BrevoDailyQuotaExceededError()
       return { id: 'reservation', quotaDate: '2026-07-21', purpose: 'email_verification' }
+    }
+    export async function reservePasswordResetDelivery() {
+      globalThis.__authSecurityEmailReserveCalls = (globalThis.__authSecurityEmailReserveCalls ?? 0) + 1
+      if (globalThis.__authSecurityBrevoQuotaReached) throw new BrevoDailyQuotaExceededError()
+      return { id: 'password-reset-reservation', quotaDate: '2026-07-21', purpose: 'password_reset' }
     }
     export async function releaseEmailDeliveryReservation() {
       globalThis.__authSecurityEmailReleaseCalls = (globalThis.__authSecurityEmailReleaseCalls ?? 0) + 1

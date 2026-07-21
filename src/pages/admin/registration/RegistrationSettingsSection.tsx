@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import type { BrevoEmailStats, RegistrationSettings } from '../../../lib/types'
 import { copy } from '../../../copy/index'
+import AdminRegistrationInvitationsPanel from './AdminRegistrationInvitationsPanel'
 
 const DEFAULT_SETTINGS: RegistrationSettings = {
-  version: 3,
+  version: 4,
   email_verification_required: true,
   invite_code_required: false,
   brevo_quota_action: 'pause_registration',
+  admin_invite_email_reserve: 0,
+  password_reset_email_reserve: 0,
   updated_at: null,
 }
 
@@ -34,6 +37,7 @@ const EMPTY_EMAIL_STATS: BrevoEmailStats = {
     limit_reached: false,
     by_purpose: {
       email_verification: 0,
+      admin_invite_verification: 0,
       password_reset: 0,
       account_deletion_cancellation: 0,
       account_deletion_receipt: 0,
@@ -62,7 +66,7 @@ export default function RegistrationSettingsSection() {
       const data = await adminApiJson<RegistrationSettingsResponse>('/api/admin/registration-settings', {
         fallbackMessage: copy.admin.registration_load_failed,
       })
-      setSettings(data.settings ?? DEFAULT_SETTINGS)
+      setSettings({ ...DEFAULT_SETTINGS, ...data.settings })
       setEmailStats(data.email_stats ?? EMPTY_EMAIL_STATS)
     } catch (caught) {
       setError((caught as Error).message)
@@ -75,6 +79,14 @@ export default function RegistrationSettingsSection() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (!validReserve(settings.admin_invite_email_reserve) || !validReserve(settings.password_reset_email_reserve)) {
+      setError(null)
+      return
+    }
+    if (settings.admin_invite_email_reserve + settings.password_reset_email_reserve > emailStats.daily_limit) {
+      setError(null)
+      return
+    }
     setSaving(true)
     setError(null)
     setNotice(null)
@@ -85,10 +97,12 @@ export default function RegistrationSettingsSection() {
           email_verification_required: settings.email_verification_required,
           invite_code_required: settings.invite_code_required,
           brevo_quota_action: settings.brevo_quota_action,
+          admin_invite_email_reserve: settings.admin_invite_email_reserve,
+          password_reset_email_reserve: settings.password_reset_email_reserve,
         },
         fallbackMessage: copy.admin.registration_save_failed,
       })
-      setSettings(data.settings ?? settings)
+      setSettings({ ...DEFAULT_SETTINGS, ...(data.settings ?? settings) })
       setEmailStats(data.email_stats ?? emailStats)
       setNotice(copy.admin.registration_saved)
     } catch (caught) {
@@ -99,6 +113,12 @@ export default function RegistrationSettingsSection() {
   }
 
   if (loading) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.admin.registration_loading}</div>
+
+  const standardCapacity = Math.max(0, emailStats.today.remaining_count - settings.admin_invite_email_reserve - settings.password_reset_email_reserve)
+  const adminInviteCapacity = Math.max(0, emailStats.today.remaining_count - settings.password_reset_email_reserve)
+  const passwordResetCapacity = emailStats.today.remaining_count
+  const reservesInRange = validReserve(settings.admin_invite_email_reserve) && validReserve(settings.password_reset_email_reserve)
+  const reserveTotalValid = settings.admin_invite_email_reserve + settings.password_reset_email_reserve <= emailStats.daily_limit
 
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
@@ -155,13 +175,19 @@ export default function RegistrationSettingsSection() {
               : copy.admin.registration_brevo_never_synced}
           </span>
         </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3" aria-label={copy.admin.registration_reserve_title}>
+          <CapacityCard label={copy.admin.registration_capacity_standard} value={standardCapacity} />
+          <CapacityCard label={copy.admin.registration_capacity_admin_invite} value={adminInviteCapacity} />
+          <CapacityCard label={copy.admin.registration_capacity_password_reset} value={passwordResetCapacity} />
+        </div>
         <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[840px] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-ink-muted">
               <tr>
                 <th className="px-3 py-2">{copy.admin.registration_brevo_date}</th>
                 <th className="px-3 py-2">{copy.admin.registration_brevo_sent}</th>
                 <th className="px-3 py-2">{copy.admin.registration_brevo_verification}</th>
+                <th className="px-3 py-2">{copy.admin.registration_brevo_admin_invite_verification}</th>
                 <th className="px-3 py-2">{copy.admin.registration_brevo_reset}</th>
                 <th className="px-3 py-2">{copy.admin.registration_brevo_cancel}</th>
                 <th className="px-3 py-2">{copy.admin.registration_brevo_receipt}</th>
@@ -174,6 +200,7 @@ export default function RegistrationSettingsSection() {
                   <td className="px-3 py-3 font-mono text-ink-secondary">{day.date}</td>
                   <td className="px-3 py-3 font-semibold text-ink-primary">{day.sent_count}</td>
                   <td className="px-3 py-3 text-ink-secondary">{day.by_purpose.email_verification}</td>
+                  <td className="px-3 py-3 text-ink-secondary">{day.by_purpose.admin_invite_verification}</td>
                   <td className="px-3 py-3 text-ink-secondary">{day.by_purpose.password_reset}</td>
                   <td className="px-3 py-3 text-ink-secondary">{day.by_purpose.account_deletion_cancellation}</td>
                   <td className="px-3 py-3 text-ink-secondary">{day.by_purpose.account_deletion_receipt}</td>
@@ -229,6 +256,36 @@ export default function RegistrationSettingsSection() {
           <p className="mt-2">{copy.admin.registration_disabled_help}</p>
           <p className="mt-2">{copy.admin.registration_invite_help}</p>
         </div>
+        <fieldset className="mt-5">
+          <legend className="text-sm font-semibold text-ink-primary">{copy.admin.registration_reserve_title}</legend>
+          <p id="registration-reserve-help" className="mt-2 text-sm leading-6 text-ink-secondary">{copy.admin.registration_reserve_help}</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <ReserveInput
+              id="admin-invite-email-reserve"
+              label={copy.admin.registration_admin_invite_reserve}
+              value={settings.admin_invite_email_reserve}
+              describedBy="registration-reserve-help registration-reserve-error"
+              invalid={!validReserve(settings.admin_invite_email_reserve)}
+              onChange={(value) => setSettings((current) => ({ ...current, admin_invite_email_reserve: value }))}
+            />
+            <ReserveInput
+              id="password-reset-email-reserve"
+              label={copy.admin.registration_password_reset_reserve}
+              value={settings.password_reset_email_reserve}
+              describedBy="registration-reserve-help registration-reserve-error"
+              invalid={!validReserve(settings.password_reset_email_reserve)}
+              onChange={(value) => setSettings((current) => ({ ...current, password_reset_email_reserve: value }))}
+            />
+          </div>
+          <p className={`mt-3 text-sm ${!reservesInRange || !reserveTotalValid ? 'text-error' : 'text-ink-muted'}`} role="status" aria-live="polite">
+            已预留 {settings.admin_invite_email_reserve + settings.password_reset_email_reserve} / {emailStats.daily_limit} 封
+          </p>
+          {(!reservesInRange || !reserveTotalValid) && (
+            <p id="registration-reserve-error" className="mt-2 text-sm text-error" role="alert">
+              {!reservesInRange ? copy.admin.registration_reserve_range_error : copy.admin.registration_reserve_total_error}
+            </p>
+          )}
+        </fieldset>
         <fieldset className="mt-5 space-y-3">
           <legend className="text-sm font-semibold text-ink-primary">{copy.admin.registration_quota_action_title}</legend>
           <label className="tool-inset flex cursor-pointer gap-3 p-4 text-sm text-ink-secondary">
@@ -265,8 +322,49 @@ export default function RegistrationSettingsSection() {
           </span>
         </div>
       </section>
+      <AdminRegistrationInvitationsPanel />
     </form>
   )
+}
+
+function CapacityCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="tool-inset p-4">
+      <p className="text-xs text-ink-muted">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-ink-primary">{value}</p>
+    </div>
+  )
+}
+
+function ReserveInput({ id, label, value, describedBy, invalid, onChange }: {
+  id: string
+  label: string
+  value: number
+  describedBy: string
+  invalid: boolean
+  onChange: (value: number) => void
+}) {
+  return (
+    <label htmlFor={id} className="block">
+      <span className="mb-2 block text-sm font-medium text-ink-secondary">{label}</span>
+      <input
+        id={id}
+        type="number"
+        min={0}
+        max={300}
+        step={1}
+        value={value}
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
+        onChange={(event) => onChange(Number(event.currentTarget.value))}
+        className="tool-field"
+      />
+    </label>
+  )
+}
+
+function validReserve(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= 300
 }
 
 function officialQuotaStatusLabel(status: BrevoEmailStats['official_quota']['status']): string {
