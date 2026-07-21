@@ -87,7 +87,10 @@ export const requestSchemas = {
     status: optionalString(32),
     permission: optionalString(32),
   }),
-  announcement: strict({ announcements: z.array(z.unknown()).max(100) }),
+  announcement: strict({
+    banner: z.unknown().nullable(),
+    announcements: z.array(z.unknown()).max(100),
+  }),
   analyzeSchedule: strict({
     operators: z.array(z.unknown()).max(2000),
     schedule: z.unknown(),

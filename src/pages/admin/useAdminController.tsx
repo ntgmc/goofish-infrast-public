@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import type { Announcement, AnnouncementAdminResponse, AnnouncementKind, AnnouncementStats as AnnouncementReachStats } from '../../lib/types'
+import type { Announcement, AnnouncementAdminResponse, AnnouncementStats as AnnouncementReachStats } from '../../lib/types'
 import { ADMIN_SESSION_EXPIRED_EVENT, adminApiJson as apiJson, adminApiVoid as apiVoid, clearLegacyAdminCredentials } from '../../lib/admin-api-client'
-import { GeneratedPermission, StatusFilter, PermissionFilter, BinaryFilter, FieldErrors, CdkTableFilters, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, UsageRangeMode, AnnouncementSortKey, UsageStatsResponse, RiskControlSettings, RiskControlSettingsPatch, AdminUserSummary, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, PaginationMeta, CdkOpsSummary, EMPTY_PAGINATION, EMPTY_ANNOUNCEMENTS, DEFAULT_RISK_SETTINGS, permissionLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, buildSummary, buildCdkOpsSummary, buildUsageStatsQuery, getDateOffsetString, normalizeUsageStats, normalizeRiskSettings, normalizeAnnouncementList, normalizeAnnouncementStatsMap, sortAnnouncements, createDraftAnnouncement, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, isAppUserStatus, buildCurrentOpsReport, buildCurrentOpsReportCsv, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp, omitProfileOperatorData } from './modules'
+import { GeneratedPermission, StatusFilter, PermissionFilter, BinaryFilter, FieldErrors, CdkTableFilters, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, UsageRangeMode, AnnouncementSortKey, UsageStatsResponse, RiskControlSettings, RiskControlSettingsPatch, AdminUserSummary, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, PaginationMeta, CdkOpsSummary, EMPTY_PAGINATION, EMPTY_ANNOUNCEMENTS, DEFAULT_RISK_SETTINGS, permissionLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, buildSummary, buildCdkOpsSummary, buildUsageStatsQuery, getDateOffsetString, normalizeUsageStats, normalizeRiskSettings, normalizeAnnouncementBanner, normalizeAnnouncementList, normalizeAnnouncementStatsMap, sortAnnouncements, createDraftBanner, createDraftAnnouncement, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, isAppUserStatus, buildCurrentOpsReport, buildCurrentOpsReportCsv, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp, omitProfileOperatorData } from './modules'
 
 export function useAdminController() {
   const [adminUsername, setAdminUsername] = useState<string | null>(null)
@@ -56,6 +56,8 @@ export function useAdminController() {
   const [usageRangeTo, setUsageRangeTo] = useState(() => getDateOffsetString(0))
 
   const [usageStats, setUsageStats] = useState<UsageStatsResponse | null>(null)
+
+  const [banner, setBanner] = useState<Announcement>(() => createDraftBanner())
 
   const [announcements, setAnnouncements] = useState<Announcement[]>(EMPTY_ANNOUNCEMENTS)
 
@@ -139,6 +141,7 @@ export function useAdminController() {
       setAppUsers([])
       setRiskRecords([])
       setUsageStats(null)
+      setBanner(createDraftBanner())
       setAnnouncements([])
       setAnnouncementStats({})
       setRiskSettings(DEFAULT_RISK_SETTINGS)
@@ -206,8 +209,10 @@ export function useAdminController() {
           apiJson<{ settings?: Partial<RiskControlSettings> }>('/api/admin/risk-settings', { fallbackMessage: '加载风控设置失败' }),
           apiJson<{ summary?: CdkOpsSummary }>('/api/admin/cdk?view=summary', { fallbackMessage: '加载 CDK 汇总失败' }),
         ])
+        const nextBanner = normalizeAnnouncementBanner(announcementData.banner)
         const nextAnnouncements = normalizeAnnouncementList(announcementData.announcements)
         setUsageStats(normalizeUsageStats(usageData))
+        setBanner(nextBanner)
         setAnnouncements(nextAnnouncements)
         setAnnouncementStats(normalizeAnnouncementStatsMap(announcementData.stats, nextAnnouncements))
         setRiskSettings(normalizeRiskSettings(riskSettingsData.settings))
@@ -353,7 +358,7 @@ export function useAdminController() {
       try {
         const range = usageStats?.range
         const filenameRange = range?.from && range?.to ? `${range.from}_${range.to}` : usageRange
-        const report = buildCurrentOpsReport(usageStats, cdkOpsSummary, announcements, announcementStats)
+        const report = buildCurrentOpsReport(usageStats, cdkOpsSummary, banner, announcements, announcementStats)
         const blob = format === 'json'
           ? new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' })
           : new Blob([`\uFEFF${buildCurrentOpsReportCsv(report)}`], { type: 'text/csv;charset=utf-8' })
@@ -425,14 +430,17 @@ export function useAdminController() {
         const data = await apiJson<Partial<AnnouncementAdminResponse>>('/api/admin/announcement', {
           method: 'PUT',
           json: {
+            banner,
             announcements,
           },
           fallbackMessage: '保存公告失败',
         })
+        const nextBanner = normalizeAnnouncementBanner(data.banner)
         const nextAnnouncements = normalizeAnnouncementList(data.announcements)
+        setBanner(nextBanner)
         setAnnouncements(nextAnnouncements)
         setAnnouncementStats(normalizeAnnouncementStatsMap(data.stats, nextAnnouncements))
-        setNotice('公告已保存')
+        setNotice('横幅和公告已保存')
       } catch (caught) {
         setError((caught as Error).message)
       } finally {
@@ -461,12 +469,16 @@ export function useAdminController() {
       }
     }
 
-  const addAnnouncement = (kind: AnnouncementKind) => {
-      setAnnouncements((current) => [createDraftAnnouncement(kind), ...current])
+  const updateBanner = (patch: Partial<Pick<Announcement, 'active' | 'title' | 'body'>>) => {
+      setBanner((current) => ({ ...current, ...patch, kind: 'banner' }))
     }
 
-  const updateAnnouncement = (id: string, patch: Partial<Pick<Announcement, 'kind' | 'active' | 'title' | 'body'>>) => {
-      setAnnouncements((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item))
+  const addAnnouncement = () => {
+      setAnnouncements((current) => [createDraftAnnouncement(), ...current])
+    }
+
+  const updateAnnouncement = (id: string, patch: Partial<Pick<Announcement, 'active' | 'title' | 'body'>>) => {
+      setAnnouncements((current) => current.map((item) => item.id === id ? { ...item, ...patch, kind: 'popup' } : item))
     }
 
   const deleteAnnouncement = (id: string) => {
@@ -846,5 +858,5 @@ export function useAdminController() {
       }
     }
 
-  return { cdkSearchInput, setCdkSearchInput, cdkPage, setCdkPage, cdkPageSize, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, userPage, setUserPage, userPageSize, setUserPageSize, userPagination, usersLoading, riskPage, setRiskPage, riskPageSize, setRiskPageSize, riskPagination, riskLoading, permission, announcementSort, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, records, appUsers, deadLetters, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, announcements, announcementStats, setAnnouncementSort, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, summary, cdkOpsSummary, cdkFilters, visibleRecords, sortedAnnouncements, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleSaveRiskSettings, addAnnouncement, updateAnnouncement, deleteAnnouncement, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser, handleOptimizationDeadLetter }
+  return { cdkSearchInput, setCdkSearchInput, cdkPage, setCdkPage, cdkPageSize, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, userPage, setUserPage, userPageSize, setUserPageSize, userPagination, usersLoading, riskPage, setRiskPage, riskPageSize, setRiskPageSize, riskPagination, riskLoading, permission, announcementSort, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, records, appUsers, deadLetters, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, setAnnouncementSort, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, summary, cdkOpsSummary, cdkFilters, visibleRecords, sortedAnnouncements, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser, handleOptimizationDeadLetter }
 }

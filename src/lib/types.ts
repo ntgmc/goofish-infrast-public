@@ -153,6 +153,7 @@ export interface AnnouncementStats {
 }
 
 export interface AnnouncementAdminResponse {
+  banner: Announcement | null;
   announcements: Announcement[];
   stats?: Record<string, AnnouncementStats>;
 }
