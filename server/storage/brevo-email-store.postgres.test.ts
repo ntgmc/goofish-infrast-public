@@ -43,6 +43,42 @@ describe('Brevo email quota PostgreSQL store', () => {
     ))).toHaveLength(1)
   })
 
+  it('protects admin invitation and password reset capacity with hierarchical sharing', async () => {
+    const now = new Date('2026-07-21T04:00:00.000Z')
+    const policy = { adminInviteReserve: 20, passwordResetReserve: 10 }
+    const standard = await Promise.allSettled(
+      Array.from({ length: 271 }, () => reserveBrevoEmail('email_verification', now, policy)),
+    )
+    expect(standard.filter((result) => result.status === 'fulfilled')).toHaveLength(270)
+    expect(standard.filter((result) => (
+      result.status === 'rejected'
+      && result.reason instanceof BrevoDailyQuotaExceededError
+      && result.reason.reason === 'reserved_capacity'
+    ))).toHaveLength(1)
+
+    const adminInvites = await Promise.allSettled(
+      Array.from({ length: 21 }, () => reserveBrevoEmail('admin_invite_verification', now, policy)),
+    )
+    expect(adminInvites.filter((result) => result.status === 'fulfilled')).toHaveLength(20)
+    expect(adminInvites.filter((result) => result.status === 'rejected')).toHaveLength(1)
+
+    const passwordResets = await Promise.allSettled(
+      Array.from({ length: 11 }, () => reserveBrevoEmail('password_reset', now, policy)),
+    )
+    expect(passwordResets.filter((result) => result.status === 'fulfilled')).toHaveLength(10)
+    expect(passwordResets.filter((result) => (
+      result.status === 'rejected'
+      && result.reason instanceof BrevoDailyQuotaExceededError
+      && result.reason.reason === 'daily_limit'
+    ))).toHaveLength(1)
+
+    expect((await getBrevoEmailStats(now)).today).toMatchObject({
+      local_quota_used_count: 300,
+      remaining_count: 0,
+      limit_reached: true,
+    })
+  })
+
   it('releases definite failures and retains uncertain deliveries', async () => {
     const now = new Date('2026-07-21T04:00:00.000Z')
     const failed = await reserveBrevoEmail('password_reset', now)

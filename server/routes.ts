@@ -2,6 +2,7 @@ import adminCdkHandler from './handlers/admin-cdk'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
 import adminInvitationSettingsHandler from './handlers/admin-invitation-settings'
 import adminRegistrationSettingsHandler from './handlers/admin-registration-settings'
+import adminRegistrationInvitationsHandler from './handlers/admin-registration-invitations'
 import adminOptimizationHandler from './handlers/admin-optimization'
 import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
@@ -31,6 +32,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
   ['/api/admin/invitation-settings', adminInvitationSettingsHandler as unknown as ApiHandler],
   ['/api/admin/registration-settings', adminRegistrationSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/registration-invitations', adminRegistrationInvitationsHandler as unknown as ApiHandler],
   ['/api/admin/optimization', adminOptimizationHandler as unknown as ApiHandler],
   ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],

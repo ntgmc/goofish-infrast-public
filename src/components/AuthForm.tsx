@@ -212,14 +212,14 @@ export default function AuthForm({
             id={compact ? 'depot-auth-invite-code' : 'auth-invite-code'}
             type="text"
             value={inviteCode}
-            maxLength={10}
+            maxLength={16}
             onChange={(event) => {
               setInviteCode(event.currentTarget.value.toUpperCase())
               clearFieldError('inviteCode')
             }}
             onFocus={() => clearFieldError('inviteCode')}
             className={`${inputClassName(Boolean(fieldErrors.inviteCode))} font-mono uppercase tracking-wide`}
-            placeholder={copy.auth.components_AuthForm_016}
+            placeholder={inviteCodeRequired ? copy.auth.components_AuthForm_034 : copy.auth.components_AuthForm_016}
             required={inviteCodeRequired === true}
             aria-invalid={Boolean(fieldErrors.inviteCode)}
             aria-describedby={fieldErrors.inviteCode ? 'auth-invite-code-error' : undefined}
@@ -266,7 +266,8 @@ function validatePasswordInput(value: string): string | null {
 function validateInviteCodeInput(value: string, required: boolean): string | null {
   const code = value.trim().toUpperCase()
   if (!code) return required ? copy.auth.components_AuthForm_033 : null
-  return /^[0-9A-HJKMNP-TV-Z]{10}$/.test(code) ? null : copy.auth.components_AuthForm_027
+  if (required) return /^[0-9A-HJKMNP-TV-Z]{16}$/.test(code) ? null : copy.auth.components_AuthForm_035
+  return /^(?:[0-9A-HJKMNP-TV-Z]{10}|[0-9A-HJKMNP-TV-Z]{16})$/.test(code) ? null : copy.auth.components_AuthForm_027
 }
 
 function isInviteCodeError(data: unknown): boolean {
