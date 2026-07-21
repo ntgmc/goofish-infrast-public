@@ -6,6 +6,7 @@ export const authCopy = {
   api_registration_accepted: "已发送注册验证邮件，请检查您的收件箱，并在邮件中确认。",
   api_registration_completed: "注册成功，请使用邮箱和密码登录。",
   api_registration_brevo_limit_reached: "今日邮件发送额度已用尽，注册已暂停，请明日再试。",
+  api_invite_code_required: "当前仅限受邀用户注册，请输入邀请码。",
   api_brevo_limit_reached: "今日邮件发送额度已用尽，请明日再试。",
   api_recovery_accepted: "如果账号符合条件，请按照发送至注册邮箱的说明操作。",
   api_service_unavailable: "认证服务暂时不可用，请稍后重试。",
@@ -99,6 +100,10 @@ export const authCopy = {
   components_AuthForm_030: "如果该账号仍需验证，验证邮件已发送，请检查收件箱。",
   // src/components/AuthForm.tsx
   components_AuthForm_031: "重新发送验证邮件",
+  // src/components/AuthForm.tsx
+  components_AuthForm_032: "邀请码（必填）",
+  // src/components/AuthForm.tsx
+  components_AuthForm_033: "请输入邀请码",
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_001: "验证链接无效或已过期。",
   // src/pages/VerifyEmailPage.tsx

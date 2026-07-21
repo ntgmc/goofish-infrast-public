@@ -28,6 +28,7 @@ import { getValidatedJson } from '../security/request-validation'
 import { RateLimitStoreError } from '../security/persistent-rate-limit'
 import { authCopy } from '../../src/copy/zh-CN/auth'
 import { BrevoDailyQuotaExceededError } from './email'
+import { getRegistrationSettings } from '../storage/registration-settings-store'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -37,6 +38,16 @@ export default async (req: Request): Promise<Response> => {
   const startedAt = Date.now()
 
   try {
+    if (pathname.endsWith('/registration-settings')) {
+      if (req.method !== 'GET') return methodNotAllowedResponse()
+      const settings = await getRegistrationSettings()
+      return jsonResponse(
+        { invite_code_required: settings.invite_code_required },
+        200,
+        { 'Cache-Control': 'no-store' },
+      )
+    }
+
     if (pathname.endsWith('/register')) {
       if (req.method !== 'POST') return methodNotAllowedResponse()
       const body = await getValidatedJson(req, requestSchemas.authRegister)

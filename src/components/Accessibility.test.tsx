@@ -10,16 +10,18 @@ import BuildMetaStrip from './BuildMetaStrip'
 import DeferredFeatureMenu from './DeferredFeatureMenu'
 import ThemeSwitcher from './ThemeSwitcher'
 
-const { apiVoidMock } = vi.hoisted(() => ({
+const { apiJsonMock, apiVoidMock } = vi.hoisted(() => ({
+  apiJsonMock: vi.fn(),
   apiVoidMock: vi.fn(),
 }))
 
 vi.mock('../lib/api-client', () => ({
-  apiJson: vi.fn(),
+  apiJson: apiJsonMock,
   apiVoid: apiVoidMock,
 }))
 
 beforeEach(() => {
+  apiJsonMock.mockResolvedValue({ invite_code_required: false })
   apiVoidMock.mockResolvedValue(undefined)
   window.localStorage.clear()
   document.documentElement.style.overflow = ''

@@ -31,7 +31,7 @@ const emailStats = {
 describe('RegistrationSettingsSection', () => {
   beforeEach(() => {
     adminApiJson.mockResolvedValue({
-      settings: { version: 2, email_verification_required: true, brevo_quota_action: 'pause_registration', updated_at: null },
+      settings: { version: 3, email_verification_required: true, invite_code_required: false, brevo_quota_action: 'pause_registration', updated_at: null },
       email_stats: emailStats,
     })
   })
@@ -45,16 +45,19 @@ describe('RegistrationSettingsSection', () => {
     const user = userEvent.setup()
     render(<RegistrationSettingsSection />)
     const toggle = await screen.findByRole('checkbox', { name: '注册时要求验证邮箱' })
+    const inviteToggle = screen.getByRole('checkbox', { name: '仅邀请可注册' })
     expect(toggle).toBeChecked()
+    expect(inviteToggle).not.toBeChecked()
     expect(screen.getByText('12 / 300')).toBeInTheDocument()
     expect(screen.getByText('官方剩余额度')).toBeInTheDocument()
     expect(screen.getByText(/官方同步状态/)).toHaveTextContent('已同步')
     expect(screen.getByText('2026-07-21')).toBeInTheDocument()
     await user.click(toggle)
+    await user.click(inviteToggle)
     await user.click(screen.getByRole('button', { name: '保存注册设置' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/registration-settings', expect.objectContaining({
       method: 'PUT',
-      json: { email_verification_required: false, brevo_quota_action: 'pause_registration' },
+      json: { email_verification_required: false, invite_code_required: true, brevo_quota_action: 'pause_registration' },
     })))
     expect(await screen.findByRole('status')).toHaveTextContent('注册设置已保存')
   })
@@ -68,7 +71,7 @@ describe('RegistrationSettingsSection', () => {
     await user.click(screen.getByRole('button', { name: '保存注册设置' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/registration-settings', expect.objectContaining({
       method: 'PUT',
-      json: { email_verification_required: true, brevo_quota_action: 'allow_unverified_registration' },
+      json: { email_verification_required: true, invite_code_required: false, brevo_quota_action: 'allow_unverified_registration' },
     })))
   })
 })

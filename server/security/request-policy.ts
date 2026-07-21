@@ -66,6 +66,7 @@ export const requestSchemas = {
   }),
   adminRegistrationSettings: strict({
     email_verification_required: z.boolean(),
+    invite_code_required: z.boolean(),
     brevo_quota_action: z.enum(['pause_registration', 'allow_unverified_registration']),
   }),
   adminRiskSettings: strict({ operator_data_risk_enabled: z.boolean().optional() }),
@@ -190,6 +191,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/session', route({ GET: none(), POST: json('auth', requestSchemas.adminSession), DELETE: none() })],
   ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'search'])],
   ['/api/auth/register', route({ POST: json('auth', requestSchemas.authRegister) })],
+  ['/api/auth/registration-settings', route({ GET: none() })],
   ['/api/auth/login', route({ POST: json('auth', requestSchemas.authLogin) })],
   ['/api/auth/logout', route({ POST: none() })],
   ['/api/auth/forgot-password', route({ POST: json('auth', requestSchemas.authEmail) })],
