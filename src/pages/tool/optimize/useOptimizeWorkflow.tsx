@@ -10,7 +10,7 @@ import { normalizeConfig, validateConfig, normalizeScheduleMode, normalizeDormit
 import { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { describeConfigDiff, downloadOptimizeResult } from '../../../lib/workspace-history'
 import { mergeOptimizeJobProgress, buildOptimizeJobStorageKey, writeActiveOptimizeJob, readActiveOptimizeJob, isActiveOptimizeJob, clearActiveOptimizeJob, clearLegacyOptimizeJobStorage, isOptimizeJobPollCancelled } from './job-progress'
-import { useOptimizationJob } from './useOptimizationJob'
+import { isOptimizationJobCancelledError, useOptimizationJob } from './useOptimizationJob'
 import type { OptimizePhase, OptimizeSection } from './types'
 import { requestReorderCheck } from './optimization-api'
 import { isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
@@ -419,17 +419,20 @@ export function useOptimizeWorkflow(props: Props) {
         } catch (error) {
           if (!cancelled && !isOptimizeJobPollCancelled(error)) {
             clearActiveOptimizeJob(active.storageKey)
-            setInlineError({
-              scope: active.mode === 'apply' ? 'apply' : 'generate',
-              message: formatOptimizeError(error instanceof Error ? error.message : String(error)),
-            })
+            if (!isOptimizationJobCancelledError(error)) {
+              setInlineError({
+                scope: active.mode === 'apply' ? 'apply' : 'generate',
+                message: formatOptimizeError(error instanceof Error ? error.message : String(error)),
+              })
+            }
           }
         } finally {
           if (!cancelled) {
             optimizeInFlightRef.current = false
             setLoading(false)
             flushPendingLicenseSync()
-            if (!completed) {
+            if (!completed && progressRef.current?.estimatePhase !== 'cancelled') {
+              progressRef.current = null
               setProgress(null)
             }
           }
@@ -535,7 +538,9 @@ export function useOptimizeWorkflow(props: Props) {
       setPhase('idle')
       setLoading(true)
       const startedAt = Date.now()
-      setProgress({ mode: 'generate', startedAt, lastUpdatedAt: Date.now() })
+      const initialProgress: ScheduleProgressState = { mode: 'generate', startedAt, lastUpdatedAt: Date.now() }
+      progressRef.current = initialProgress
+      setProgress(initialProgress)
       let completed = false
       const useCoupon = usePriorityCoupon && (priorityCouponBalance?.available ?? 0) > 0
       let couponSubmitted = false
@@ -565,7 +570,9 @@ export function useOptimizeWorkflow(props: Props) {
         setSection('result')
         setLastGeneratedSignature(optimizeSignature)
       } catch (e) {
-        setInlineError({ scope: 'generate', message: formatOptimizeError((e as Error).message) })
+        if (!isOptimizationJobCancelledError(e)) {
+          setInlineError({ scope: 'generate', message: formatOptimizeError((e as Error).message) })
+        }
       } finally {
         if (couponSubmitted) {
           setUsePriorityCoupon(false)
@@ -574,7 +581,8 @@ export function useOptimizeWorkflow(props: Props) {
         optimizeInFlightRef.current = false
         setLoading(false)
         flushPendingLicenseSync()
-        if (!completed) {
+        if (!completed && progressRef.current?.estimatePhase !== 'cancelled') {
+          progressRef.current = null
           setProgress(null)
         }
       }
@@ -589,7 +597,9 @@ export function useOptimizeWorkflow(props: Props) {
       optimizeInFlightRef.current = true
       setInlineError(null)
       const startedAt = Date.now()
-      setProgress({ mode: 'apply', startedAt, lastUpdatedAt: Date.now() })
+      const initialProgress: ScheduleProgressState = { mode: 'apply', startedAt, lastUpdatedAt: Date.now() }
+      progressRef.current = initialProgress
+      setProgress(initialProgress)
       let completed = false
       const selectedSet = new Set(selectedIds)
       const newOverrides = { ...eliteOverrides }
@@ -634,11 +644,14 @@ export function useOptimizeWorkflow(props: Props) {
         setSection('result')
         setLastGeneratedSignature(buildOptimizeSignature(mergeOperators(license.operators, newOverrides), activeConfig))
       } catch (e) {
-        setInlineError({ scope: 'apply', message: formatOptimizeError((e as Error).message) })
+        if (!isOptimizationJobCancelledError(e)) {
+          setInlineError({ scope: 'apply', message: formatOptimizeError((e as Error).message) })
+        }
       } finally {
         optimizeInFlightRef.current = false
         setLoading(false)
-        if (!completed) {
+        if (!completed && progressRef.current?.estimatePhase !== 'cancelled') {
+          progressRef.current = null
           setProgress(null)
         }
       }

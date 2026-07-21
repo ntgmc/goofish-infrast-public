@@ -87,3 +87,31 @@ credential before removing the previous secret.
 required production secrets. Rotate them only with a dedicated data-migration
 and deletion-path verification procedure; they intentionally do not fall back
 to `CDK_HASH_SECRET`.
+
+## Hangzhou Worker or WireGuard Outage
+
+The Seoul API remains the queue authority when the Hangzhou worker or the
+WireGuard tunnel is unavailable. It continues to accept, query, cancel, expire,
+and recover PostgreSQL-backed jobs, but `APP_ROLE=api` prevents it from claiming
+CPU work. During a prolonged incident, lower the global and analysis queue
+limits or temporarily suspend submissions so admitted jobs do not accumulate
+beyond operational capacity.
+
+Do not expose PostgreSQL publicly as a recovery shortcut. Restore
+`wg-quick@wg0.service`, verify a recent handshake, run
+`scripts/check-worker-link.mjs` with the worker EnvironmentFile, and require the
+inactive worker slot readiness check to pass before resuming normal admission.
+Expired running leases are safely returned to the queue; ownership checks stop
+a stale worker from committing results after recovery.
+
+If Seoul must temporarily execute urgent work, install a separate standby
+worker unit that is disabled by default and uses concurrency one. Enabling it is
+a documented incident action, not an automatic fallback, because CPU-bound
+jobs can make the two-core API host unavailable. Disable the standby again as
+soon as Hangzhou readiness is restored.
+
+Worker rollback uses the same validated main SHA as API rollback. Keep the
+current and previous worker releases protected from cleanup and record any
+period in which API and worker SHAs differ. The current worker accepts persisted
+payload versions 2 and 3 so an API rollback does not strand already admitted
+jobs.

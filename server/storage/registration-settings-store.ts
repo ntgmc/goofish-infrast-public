@@ -4,31 +4,34 @@ import type { BrevoQuotaAction } from '../../src/lib/types'
 
 const REGISTRATION_SETTINGS_KEY = 'global'
 
-export interface RegistrationSettingsV2 {
-  version: 2
+export interface RegistrationSettingsV3 {
+  version: 3
   email_verification_required: boolean
+  invite_code_required: boolean
   brevo_quota_action: BrevoQuotaAction
   updated_at: string | null
 }
 
-export type RegistrationSettingsPatch = Pick<RegistrationSettingsV2, 'email_verification_required' | 'brevo_quota_action'>
+export type RegistrationSettingsPatch = Pick<RegistrationSettingsV3, 'email_verification_required' | 'invite_code_required' | 'brevo_quota_action'>
 
-export const DEFAULT_REGISTRATION_SETTINGS: RegistrationSettingsV2 = {
-  version: 2,
+export const DEFAULT_REGISTRATION_SETTINGS: RegistrationSettingsV3 = {
+  version: 3,
   email_verification_required: true,
+  invite_code_required: false,
   brevo_quota_action: 'pause_registration',
   updated_at: null,
 }
 
 let schemaReady: Promise<void> | null = null
 
-export function normalizeRegistrationSettings(value: unknown): RegistrationSettingsV2 {
-  const source = value && typeof value === 'object' ? value as Partial<RegistrationSettingsV2> : {}
+export function normalizeRegistrationSettings(value: unknown): RegistrationSettingsV3 {
+  const source = value && typeof value === 'object' ? value as Partial<RegistrationSettingsV3> : {}
   return {
-    version: 2,
+    version: 3,
     email_verification_required: typeof source.email_verification_required === 'boolean'
       ? source.email_verification_required
       : true,
+    invite_code_required: source.invite_code_required === true,
     brevo_quota_action: isBrevoQuotaAction(source.brevo_quota_action)
       ? source.brevo_quota_action
       : 'pause_registration',
@@ -40,23 +43,25 @@ export function validateRegistrationSettingsPatch(value: unknown): RegistrationS
   if (!value || typeof value !== 'object') throw new Error('注册设置必须是对象。')
   const source = value as Record<string, unknown>
   if (typeof source.email_verification_required !== 'boolean') throw new Error('邮箱验证设置必须是布尔值。')
+  if (typeof source.invite_code_required !== 'boolean') throw new Error('仅邀请注册设置必须是布尔值。')
   if (!isBrevoQuotaAction(source.brevo_quota_action)) throw new Error('Brevo 配额处理方式无效。')
   return {
     email_verification_required: source.email_verification_required,
+    invite_code_required: source.invite_code_required,
     brevo_quota_action: source.brevo_quota_action,
   }
 }
 
-export async function getRegistrationSettings(): Promise<RegistrationSettingsV2> {
+export async function getRegistrationSettings(): Promise<RegistrationSettingsV3> {
   await ensureSchema()
-  const result = await query<{ record_json: RegistrationSettingsV2 }>(
+  const result = await query<{ record_json: RegistrationSettingsV3 }>(
     'select record_json from registration_settings where key = $1',
     [REGISTRATION_SETTINGS_KEY],
   )
   return normalizeRegistrationSettings(result.rows[0]?.record_json)
 }
 
-export async function saveRegistrationSettings(patch: RegistrationSettingsPatch): Promise<RegistrationSettingsV2> {
+export async function saveRegistrationSettings(patch: RegistrationSettingsPatch): Promise<RegistrationSettingsV3> {
   await ensureSchema()
   const saved = normalizeRegistrationSettings({
     ...await getRegistrationSettings(),

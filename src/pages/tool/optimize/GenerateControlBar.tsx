@@ -129,7 +129,7 @@ export default function GenerateControlBar({
         </div>
       </div>
 
-      {loading && progress && (
+      {progress && (loading || progress.estimatePhase === 'cancelled') && (
         <div className="tool-panel-header px-5 py-5 sm:px-6">
           <ScheduleProgress progress={progress} variant="embedded" />
         </div>

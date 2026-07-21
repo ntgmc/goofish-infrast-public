@@ -1,0 +1,28 @@
+[Unit]
+Description=goofish-infrast-v1 optimize worker (%i slot)
+After=network-online.target wg-quick@wg0.service
+Wants=network-online.target
+Requires=wg-quick@wg0.service
+
+[Service]
+Type=simple
+User=ntgmc
+Group=ntgmc
+WorkingDirectory=/opt/goofish-infrast-v1-worker/slots/%i
+ExecStart=/usr/bin/node /opt/goofish-infrast-v1-worker/slots/%i/server/dist/worker.js
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=930s
+Environment=NODE_ENV=production
+Environment=APP_ROLE=worker
+Environment=WORKER_HEALTH_HOST=127.0.0.1
+EnvironmentFile=/etc/goofish-infrast-v1-worker/worker.env
+EnvironmentFile=/etc/goofish-infrast-v1-worker/%i.env
+MemoryHigh=6G
+MemoryMax=7G
+TasksMax=128
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
-import { buildOptimizeJobStorageKey, clearOptimizeSubmissionKey, getOrCreateOptimizeSubmissionKey, isActiveOptimizeJob, mergeOptimizeJobProgress, OPTIMIZE_POLL_REQUEST_TIMEOUT_MS, readActiveOptimizeJob, writeActiveOptimizeJob } from './job-progress'
+import { buildOptimizeJobStorageKey, clearOptimizeSubmissionKey, getOrCreateOptimizeSubmissionKey, isActiveOptimizeJob, mergeOptimizeJobProgress, OPTIMIZE_POLL_REQUEST_TIMEOUT_MS, prepareOptimizeContinuationProgress, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
 import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
 
 const accepted: OptimizeJobAccepted = {
@@ -80,5 +80,100 @@ describe('optimization progress mapping', () => {
     expect(progress.jobId).toBe('job-1')
     expect(progress.queueStatus).toBe('queued')
     expect(progress.estimatedRemainingMs).toBe(10_000)
+  })
+
+  it('wakes a long poll when an external terminal update arrives', async () => {
+    let shouldRefresh = true
+    await expect(waitForOptimizePoll(10_000, undefined, () => {
+      const current = shouldRefresh
+      shouldRefresh = false
+      return current
+    })).resolves.toBeUndefined()
+  })
+
+  it('maps cancellation over a previously overdue progress state', () => {
+    const now = Date.parse('2026-07-10T00:01:00.000Z')
+    const overdue = {
+      ...mergeOptimizeJobProgress(null, accepted, 'generate', now),
+      estimatePhase: 'overdue' as const,
+      estimatedRemainingMs: null,
+      observedRunning: true,
+      queueStatus: 'running' as const,
+    }
+    const cancelled = mergeOptimizeJobProgress(overdue, {
+      ...accepted,
+      status: 'cancelled',
+      queue_position: null,
+      estimated_remaining_ms: null,
+      estimated_total_ms: null,
+      estimate_phase: 'cancelled',
+      cancellation_requested: true,
+      execution_phase: 'terminal',
+      error: '任务已由用户取消。',
+      error_code: 'cancelled_by_user',
+      error_retryable: true,
+      recovery_action: 'retry',
+      support_reference: 'OPT-CANCEL',
+    } as OptimizeJobStatusResponse, 'generate', now)
+
+    expect(cancelled).toMatchObject({
+      jobId: 'job-1',
+      estimatePhase: 'cancelled',
+      estimatedRemainingMs: null,
+      cancellationRequested: true,
+      executionPhase: 'terminal',
+    })
+  })
+
+  it('keeps aggregate progress while a continuation job waits in its own queue', () => {
+    const now = Date.parse('2026-07-10T00:00:20.000Z')
+    const current = {
+      ...mergeOptimizeJobProgress(null, {
+        ...accepted,
+        status: 'running',
+        estimate_phase: 'running',
+      }, 'generate', now),
+      startedAt: now - 20_000,
+      observedRunning: true,
+      percentFloor: 92,
+    }
+    const continuation: OptimizeJobAccepted = {
+      ...accepted,
+      job_id: 'job-2',
+      queue_position: 3,
+      submitted_at: new Date(now).toISOString(),
+      estimated_remaining_ms: 15_000,
+      estimated_total_ms: 15_000,
+      estimate_updated_at: new Date(now).toISOString(),
+    }
+
+    const seed = prepareOptimizeContinuationProgress(current, continuation, now)
+    const queued = mergeOptimizeJobProgress(seed, continuation, 'generate', now)
+
+    expect(queued).toMatchObject({
+      jobId: 'job-2',
+      startedAt: current.startedAt,
+      queueStatus: 'queued',
+      queuePosition: 3,
+      observedRunning: false,
+      estimatePhase: 'queued',
+      estimatedRemainingMs: 15_000,
+    })
+    expect(queued.percentFloor).toBeGreaterThanOrEqual(92)
+
+    const running = mergeOptimizeJobProgress(queued, {
+      ...continuation,
+      status: 'running',
+      queue_position: null,
+      estimate_phase: 'running',
+      started_at: new Date(now + 1_000).toISOString(),
+    } as OptimizeJobStatusResponse, 'generate', now + 1_000)
+
+    expect(running).toMatchObject({
+      queueStatus: 'running',
+      queuePosition: null,
+      observedRunning: true,
+      estimatePhase: 'running',
+    })
   })
 })

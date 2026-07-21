@@ -629,6 +629,16 @@ export const commonCopy = {
   components_ScheduleProgress_104: "任务执行异常，系统将在退避后自动开始第 ",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_105: " 次尝试。",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_106: "任务已取消",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_107: "任务已从等待队列中取消，不会继续执行。",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_108: "已取消",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_109: "已离开队列",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_110: "任务已取消，可重新提交。",
   // src/components/GuidedTour.tsx
   components_GuidedTour_001: "跳过导览",
   // src/components/GuidedTour.tsx

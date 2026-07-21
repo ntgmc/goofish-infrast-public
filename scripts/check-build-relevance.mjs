@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 
+import { isDocumentationOnly } from './build-relevance-lib.mjs'
+
 const SKIP_BUILD = 0
 const CONTINUE_BUILD = 1
 const CHECK_ONLY = process.argv.includes('--check')
@@ -16,6 +18,7 @@ const buildRelevantFiles = new Set([
   '.github/workflows/deploy-dev.yml',
   'docs/dev-deploy.md',
   'docs/production-deploy.md',
+  'docs/worker-deploy.md',
 ])
 
 const buildRelevantPrefixes = [
@@ -24,6 +27,7 @@ const buildRelevantPrefixes = [
   'server/',
   'deploy/nginx/',
   'deploy/systemd/',
+  'deploy/wireguard/',
 ]
 
 const buildRelevantScripts = new Set([
@@ -31,12 +35,14 @@ const buildRelevantScripts = new Set([
   'scripts/check-api-handlers.mjs',
   'scripts/check-build-relevance.mjs',
   'scripts/check-production-deploy.mjs',
+  'scripts/check-worker-link.mjs',
   'scripts/check-depot-profile.mjs',
   'scripts/check-server-routes.mjs',
   'scripts/check-skland-handler.mjs',
   'scripts/check-workspace-history.mjs',
   'scripts/generate-data.mjs',
   'scripts/deploy-production-atomic.sh',
+  'scripts/deploy-worker-atomic.sh',
   'scripts/deploy-production.sh',
   'scripts/release-artifact.mjs',
   'scripts/import-postgres.mjs',
@@ -68,6 +74,10 @@ if (changedFiles.length === 0) {
 }
 
 const meaningfulChanges = changedFiles
+
+if (isDocumentationOnly(meaningfulChanges)) {
+  skipBuild(`documentation-only changes: ${meaningfulChanges.join(', ')}`, true)
+}
 
 const relevant = meaningfulChanges.filter(isBuildRelevant)
 
@@ -101,26 +111,27 @@ function readFallbackChangedFiles(headRef) {
     .filter(Boolean)
 }
 
-function skipBuild(reason) {
+function skipBuild(reason, documentationOnly = false) {
   console.log(`[check-build-relevance] Skipping build: ${reason}`)
-  writeGithubOutput(false, reason)
+  writeGithubOutput(false, reason, documentationOnly)
   if (CHECK_ONLY) process.exit(0)
   process.exit(SKIP_BUILD)
 }
 
 function continueBuild(reason) {
   console.log(`[check-build-relevance] Continuing build: ${reason}`)
-  writeGithubOutput(true, reason)
+  writeGithubOutput(true, reason, false)
   if (CHECK_ONLY) process.exit(0)
   process.exit(CONTINUE_BUILD)
 }
 
-function writeGithubOutput(buildRequired, reason) {
+function writeGithubOutput(buildRequired, reason, documentationOnly) {
   const outputPath = process.env.GITHUB_OUTPUT
   if (!outputPath) return
   const escapedReason = reason.replace(/\r?\n/g, ' ')
   const lines = [
     `build_required=${buildRequired ? 'true' : 'false'}`,
+    `documentation_only=${documentationOnly ? 'true' : 'false'}`,
     `reason=${escapedReason}`,
   ].join('\n') + '\n'
   appendFileSync(outputPath, lines, 'utf8')

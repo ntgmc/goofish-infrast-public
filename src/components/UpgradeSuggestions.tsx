@@ -122,7 +122,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
         </div>
       </div>
 
-      {loading && progress && (
+      {progress && (loading || progress.estimatePhase === 'cancelled') && (
         <ScheduleProgress progress={progress} />
       )}
 

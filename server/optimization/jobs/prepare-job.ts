@@ -167,12 +167,13 @@ export async function prepareOptimizeJob(
       if (estimate.estimated_duration_ms > 10 * 60_000) {
         return fail({ error: '场景组合预计计算时间超过十分钟上限，请减少场景或变量。', code: 'scenario_cost_exceeded' }, 429);
       }
+      const queuePriority = getScenarioComparisonQueuePriority(isPreviewProfile, isPreviewTrial);
       return {
         ok: true,
         prepared: {
           ownerKey: 'profile:' + activeProfileId,
-          priority: 'analysis',
-          priorityValue: 5,
+          priority: queuePriority.kind,
+          priorityValue: queuePriority.value,
           permission: optimizePermission,
           source: 'scenario_comparison',
           rewardUserId: null,
@@ -261,4 +262,13 @@ export async function prepareOptimizeJob(
     if (!isScenarioComparison) await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, submittedAt);
     return { ok: false, response: jsonResponse({ error: message }, 500) };
   }
+}
+
+export function getScenarioComparisonQueuePriority(
+  isPreviewProfile: boolean,
+  isPreviewTrial: boolean,
+): { kind: OptimizeJobPriority; value: number } {
+  return isPreviewProfile && isPreviewTrial
+    ? { kind: 'standard', value: 0 }
+    : { kind: 'analysis', value: 5 };
 }
