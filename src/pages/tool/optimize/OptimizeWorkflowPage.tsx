@@ -13,9 +13,12 @@ import { useOptimizationTaskCenter } from './useOptimizationTaskCenter'
 import { getProfileAccessLabel } from '../tool-utils'
 import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
 import { copy } from '../../../copy/index'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 
 export default function OptimizeWorkflowPage(props: Props) {
+  const { features } = useSiteFeatures()
+  const generationDisabledReason = features.schedule_generation ? null : copy.features.schedule_read_only
   const [taskCenterOpen, setTaskCenterOpen] = useState(false)
   const taskCenterButtonRef = useRef<HTMLButtonElement>(null)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
@@ -29,7 +32,7 @@ export default function OptimizeWorkflowPage(props: Props) {
   const plansTour = useFirstRunTour({ id: 'optimize-tab-plans', version: 1, autoStart: childAutoStartEnabled && section === 'plans' })
   const configTour = useFirstRunTour({ id: 'optimize-tab-config', version: 1, autoStart: childAutoStartEnabled && section === 'config' })
   const resultTour = useFirstRunTour({ id: 'optimize-tab-result', version: 1, autoStart: childAutoStartEnabled && section === 'result' && hasResult })
-  const labTour = useFirstRunTour({ id: 'optimize-tab-lab', version: 1, autoStart: childAutoStartEnabled && section === 'lab' && userCanUseScenarioLab })
+  const labTour = useFirstRunTour({ id: 'optimize-tab-lab', version: 1, autoStart: childAutoStartEnabled && section === 'lab' && userCanUseScenarioLab && features.schedule_generation })
 
   useEffect(() => {
     if (mainTour.completed && section !== initialSectionRef.current) setSectionChangedAfterMainTour(true)
@@ -43,9 +46,9 @@ export default function OptimizeWorkflowPage(props: Props) {
       { target: 'optimize-nav-plans', title: copy.optimize.pages_tool_optimize_tour_004, body: copy.optimize.pages_tool_optimize_tour_005 },
       { target: 'optimize-nav-config', title: copy.optimize.pages_tool_optimize_tour_006, body: copy.optimize.pages_tool_optimize_tour_007 },
       { target: 'optimize-nav-result', title: copy.optimize.pages_tool_optimize_tour_008, body: copy.optimize.pages_tool_optimize_tour_009 },
-      ...(userCanUseScenarioLab ? [{ target: 'optimize-nav-lab', title: copy.optimize.pages_tool_optimize_tour_010, body: copy.optimize.pages_tool_optimize_tour_011 }] : []),
+      ...(userCanUseScenarioLab && features.schedule_generation ? [{ target: 'optimize-nav-lab', title: copy.optimize.pages_tool_optimize_tour_010, body: copy.optimize.pages_tool_optimize_tour_011 }] : []),
     ],
-  }), [userCanUseScenarioLab])
+  }), [features.schedule_generation, userCanUseScenarioLab])
   const overviewTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-overview', version: 1, steps: [
     { target: 'optimize-overview-status', title: copy.optimize.pages_tool_optimize_tour_012, body: copy.optimize.pages_tool_optimize_tour_013 },
     { target: 'optimize-overview-generate', title: copy.optimize.pages_tool_optimize_tour_014, body: copy.optimize.pages_tool_optimize_tour_015 },
@@ -83,7 +86,7 @@ export default function OptimizeWorkflowPage(props: Props) {
       <OptimizeShell
         section={section}
         permissionLabel={getProfileAccessLabel(profile)}
-        showScenarioLab={userCanUseScenarioLab}
+        showScenarioLab={userCanUseScenarioLab && features.schedule_generation}
         badges={{
           plans: `${savedConfigs.length}/${resultHistory.length}`,
           result: hasResult ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_001 : undefined,
@@ -135,6 +138,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               closeTaskCenter()
               setSection('lab')
             }}
+            retryEnabled={features.schedule_generation}
           />
   
           {section === 'overview' && (
@@ -155,17 +159,18 @@ export default function OptimizeWorkflowPage(props: Props) {
               savedConfigCount={savedConfigs.length}
               resultHistoryCount={resultHistory.length}
               latestResult={latestWorkspaceResult}
+              generationDisabledReason={generationDisabledReason}
               freeSchedule={{
                 visible: isRestrictedPreview,
                 entitlement: freeScheduleEntitlement,
-                generateBlockedReason: freeScheduleGenerateBlockedReason,
+                generateBlockedReason: generationDisabledReason ?? freeScheduleGenerateBlockedReason,
                 confirming: freeScheduleConfirming,
                 confirmError: freeScheduleConfirmError,
                 onConfirm: handleConfirmFreeSchedule,
               }}
               reorderCheck={{
                 visible: isRestrictedPreview,
-                disabledReason: reorderCheckDisabledReason,
+                disabledReason: generationDisabledReason ?? reorderCheckDisabledReason,
                 loading: reorderCheckLoading,
                 error: reorderCheckError,
                 result: reorderCheckResult,
@@ -243,11 +248,12 @@ export default function OptimizeWorkflowPage(props: Props) {
               onUpgradePreviewProfile={handleUpgradePreviewProfile}
               onDownloadMAA={isRestrictedPreview ? undefined : handleDownloadMAA}
               onApplySuggestions={handleApplySuggestions}
+              suggestionsReadOnly={!features.schedule_generation}
               onReset={onReset}
             />
           )}
 
-          {section === 'lab' && userCanUseScenarioLab && (
+          {section === 'lab' && userCanUseScenarioLab && features.schedule_generation && (
             <ScenarioLabSection
               profileId={props.profileId}
               operators={mergedOperators}
@@ -261,7 +267,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         <GuidedTour definition={plansTourDefinition} open={plansTour.open} onFinish={plansTour.finish} onSkip={plansTour.skip} />
         <GuidedTour definition={configTourDefinition} open={configTour.open} onFinish={configTour.finish} onSkip={configTour.skip} />
         <GuidedTour definition={resultTourDefinition} open={resultTour.open} onFinish={resultTour.finish} onSkip={resultTour.skip} />
-        {userCanUseScenarioLab && <GuidedTour definition={labTourDefinition} open={labTour.open} onFinish={labTour.finish} onSkip={labTour.skip} />}
+        {userCanUseScenarioLab && features.schedule_generation && <GuidedTour definition={labTourDefinition} open={labTour.open} onFinish={labTour.finish} onSkip={labTour.skip} />}
       </OptimizeShell>
     )
 }

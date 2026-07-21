@@ -2,6 +2,7 @@ import adminCdkHandler from './handlers/admin-cdk'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
 import adminInvitationSettingsHandler from './handlers/admin-invitation-settings'
 import adminRegistrationSettingsHandler from './handlers/admin-registration-settings'
+import adminFeatureSettingsHandler from './handlers/admin-feature-settings'
 import adminRegistrationInvitationsHandler from './handlers/admin-registration-invitations'
 import adminOptimizationHandler from './handlers/admin-optimization'
 import adminSessionHandler from './handlers/admin-session'
@@ -21,6 +22,8 @@ import userInvitationsHandler from './handlers/user-invitations'
 import userRewardsHandler from './handlers/user-rewards'
 import accountDataHandler from './handlers/account-data'
 import usageStatsHandler from './handlers/usage-stats'
+import siteFeaturesHandler from './handlers/site-features'
+import { enforceFeatureGate } from './feature-gate'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
 import { getServiceLifecycleState, isServiceReady } from './lifecycle'
@@ -32,6 +35,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
   ['/api/admin/invitation-settings', adminInvitationSettingsHandler as unknown as ApiHandler],
   ['/api/admin/registration-settings', adminRegistrationSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/feature-settings', adminFeatureSettingsHandler as unknown as ApiHandler],
   ['/api/admin/registration-invitations', adminRegistrationInvitationsHandler as unknown as ApiHandler],
   ['/api/admin/optimization', adminOptimizationHandler as unknown as ApiHandler],
   ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
@@ -46,6 +50,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/auth/resend-verification', authHandler as unknown as ApiHandler],
   ['/api/auth/change-password', authHandler as unknown as ApiHandler],
   ['/api/auth/me', authHandler as unknown as ApiHandler],
+  ['/api/site/features', siteFeaturesHandler as unknown as ApiHandler],
   ['/api/user/data/export', accountDataHandler as unknown as ApiHandler],
   ['/api/user/data/delete-request', accountDataHandler as unknown as ApiHandler],
   ['/api/user/data/cancel', accountDataHandler as unknown as ApiHandler],
@@ -104,6 +109,11 @@ async function dispatchRequest(req: Request): Promise<Response> {
   if (!handler) {
     return jsonResponse({ error: 'API route not found' }, 404)
   }
+
+  if (!isServiceReady() && url.pathname.startsWith('/api/optimization/')) return handler(req)
+
+  const gated = await enforceFeatureGate(req)
+  if (gated) return gated
 
   return handler(req)
 }
