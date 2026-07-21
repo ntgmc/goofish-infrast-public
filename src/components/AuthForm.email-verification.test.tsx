@@ -14,6 +14,7 @@ afterEach(() => {
 describe('AuthForm email verification', () => {
   it('keeps a newly registered user signed out and offers a resend action', async () => {
     const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ invite_code_required: false }))
       .mockResolvedValueOnce(jsonResponse({
         accepted: true,
         verification_required: true,
@@ -38,11 +39,13 @@ describe('AuthForm email verification', () => {
   })
 
   it('does not offer resend after a quota-bypassed registration', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
-      accepted: true,
-      verification_required: false,
-      message: '注册成功，请使用邮箱和密码登录。',
-    }, 202)))
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ invite_code_required: false }))
+      .mockResolvedValueOnce(jsonResponse({
+        accepted: true,
+        verification_required: false,
+        message: '注册成功，请使用邮箱和密码登录。',
+      }, 202)))
     const user = userEvent.setup()
 
     render(<AuthForm onAuthenticated={vi.fn()} />)

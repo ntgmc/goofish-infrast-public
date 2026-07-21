@@ -174,7 +174,7 @@ export async function validateInvitationCode(value: unknown): Promise<ValidatedI
   const code = normalizeInvitationCode(value)
   if (!code) throw new InvitationCodeError('invalid_invite_code', '邀请码无效。')
   const settings = await getInvitationSettings()
-  if (!settings.enabled) throw new InvitationCodeError('invitation_campaign_paused', '邀请活动暂停，可移除邀请码继续注册。')
+  if (!settings.enabled) throw new InvitationCodeError('invitation_campaign_paused', '邀请活动已暂停，请稍后再试。')
   await ensureSchema()
   const result = await query<{ user_id: string }>(
     `select code.user_id

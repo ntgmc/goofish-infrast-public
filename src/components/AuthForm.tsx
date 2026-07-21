@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { AuthSuccessResponse } from '../lib/types'
 import { ApiError, apiJson } from '../lib/api-client'
 import { copy } from '../copy/index'
@@ -32,18 +32,31 @@ export default function AuthForm({
   const [password, setPassword] = useState('')
   const [cdk, setCdk] = useState('')
   const [inviteCode, setInviteCode] = useState(() => new URLSearchParams(window.location.search).get('invite')?.trim().toUpperCase() ?? '')
+  const [inviteCodeRequired, setInviteCodeRequired] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [showVerificationResend, setShowVerificationResend] = useState(false)
 
+  useEffect(() => {
+    if (mode !== 'register' || inviteCodeRequired !== null) return
+    const controller = new AbortController()
+    void apiJson<{ invite_code_required?: boolean }>('/api/auth/registration-settings', {
+      signal: controller.signal,
+      fallbackMessage: copy.auth.components_AuthForm_004,
+    })
+      .then((data) => setInviteCodeRequired(data.invite_code_required === true))
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [inviteCodeRequired, mode])
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     const nextErrors: FieldErrors = {}
     const emailError = validateEmailInput(email)
     const passwordError = mode === 'forgot' ? null : validatePasswordInput(password)
-    const inviteCodeError = mode === 'register' ? validateInviteCodeInput(inviteCode) : null
+    const inviteCodeError = mode === 'register' ? validateInviteCodeInput(inviteCode, inviteCodeRequired === true) : null
     if (emailError) nextErrors.email = emailError
     if (passwordError) nextErrors.password = passwordError
     if (inviteCodeError) nextErrors.inviteCode = inviteCodeError
@@ -192,7 +205,9 @@ export default function AuthForm({
 
       {mode === 'register' && (
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.auth.components_AuthForm_015}</span>
+          <span className="mb-2 block text-sm font-medium text-ink-secondary">
+            {inviteCodeRequired ? copy.auth.components_AuthForm_032 : copy.auth.components_AuthForm_015}
+          </span>
           <input
             id={compact ? 'depot-auth-invite-code' : 'auth-invite-code'}
             type="text"
@@ -205,6 +220,7 @@ export default function AuthForm({
             onFocus={() => clearFieldError('inviteCode')}
             className={`${inputClassName(Boolean(fieldErrors.inviteCode))} font-mono uppercase tracking-wide`}
             placeholder={copy.auth.components_AuthForm_016}
+            required={inviteCodeRequired === true}
             aria-invalid={Boolean(fieldErrors.inviteCode)}
             aria-describedby={fieldErrors.inviteCode ? 'auth-invite-code-error' : undefined}
           />
@@ -247,16 +263,16 @@ function validatePasswordInput(value: string): string | null {
   return null
 }
 
-function validateInviteCodeInput(value: string): string | null {
+function validateInviteCodeInput(value: string, required: boolean): string | null {
   const code = value.trim().toUpperCase()
-  if (!code) return null
+  if (!code) return required ? copy.auth.components_AuthForm_033 : null
   return /^[0-9A-HJKMNP-TV-Z]{10}$/.test(code) ? null : copy.auth.components_AuthForm_027
 }
 
 function isInviteCodeError(data: unknown): boolean {
   if (!data || typeof data !== 'object' || !('code' in data)) return false
   const code = (data as { code?: unknown }).code
-  return code === 'invalid_invite_code' || code === 'invitation_campaign_paused'
+  return code === 'invite_code_required' || code === 'invalid_invite_code' || code === 'invitation_campaign_paused'
 }
 
 function isApiErrorCode(data: unknown, expected: string): boolean {

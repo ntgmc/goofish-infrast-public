@@ -4,8 +4,9 @@ import type { BrevoEmailStats, RegistrationSettings } from '../../../lib/types'
 import { copy } from '../../../copy/index'
 
 const DEFAULT_SETTINGS: RegistrationSettings = {
-  version: 2,
+  version: 3,
   email_verification_required: true,
+  invite_code_required: false,
   brevo_quota_action: 'pause_registration',
   updated_at: null,
 }
@@ -82,6 +83,7 @@ export default function RegistrationSettingsSection() {
         method: 'PUT',
         json: {
           email_verification_required: settings.email_verification_required,
+          invite_code_required: settings.invite_code_required,
           brevo_quota_action: settings.brevo_quota_action,
         },
         fallbackMessage: copy.admin.registration_save_failed,
@@ -195,22 +197,37 @@ export default function RegistrationSettingsSection() {
             <h2 id="admin-registration-title" className="mt-2 text-lg font-semibold text-ink-primary">{copy.admin.registration_title}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.admin.registration_description}</p>
           </div>
-          <label className="tool-inset flex min-h-11 cursor-pointer items-center gap-3 px-4 text-sm font-semibold text-ink-secondary">
-            <input
-              type="checkbox"
-              checked={settings.email_verification_required}
-              onChange={(event) => {
-                const emailVerificationRequired = event.currentTarget.checked
-                setSettings((current) => ({ ...current, email_verification_required: emailVerificationRequired }))
-              }}
-              className="h-4 w-4 accent-brand-600"
-            />
-            {copy.admin.registration_toggle}
-          </label>
+          <div className="flex flex-col gap-3">
+            <label className="tool-inset flex min-h-11 cursor-pointer items-center gap-3 px-4 text-sm font-semibold text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={settings.email_verification_required}
+                onChange={(event) => {
+                  const emailVerificationRequired = event.currentTarget.checked
+                  setSettings((current) => ({ ...current, email_verification_required: emailVerificationRequired }))
+                }}
+                className="h-4 w-4 accent-brand-600"
+              />
+              {copy.admin.registration_toggle}
+            </label>
+            <label className="tool-inset flex min-h-11 cursor-pointer items-center gap-3 px-4 text-sm font-semibold text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={settings.invite_code_required}
+                onChange={(event) => {
+                  const inviteCodeRequired = event.currentTarget.checked
+                  setSettings((current) => ({ ...current, invite_code_required: inviteCodeRequired }))
+                }}
+                className="h-4 w-4 accent-brand-600"
+              />
+              {copy.admin.registration_invite_toggle}
+            </label>
+          </div>
         </div>
         <div className="tool-inset mt-5 p-4 text-sm leading-6 text-ink-secondary">
           <p>{copy.admin.registration_enabled_help}</p>
           <p className="mt-2">{copy.admin.registration_disabled_help}</p>
+          <p className="mt-2">{copy.admin.registration_invite_help}</p>
         </div>
         <fieldset className="mt-5 space-y-3">
           <legend className="text-sm font-semibold text-ink-primary">{copy.admin.registration_quota_action_title}</legend>

@@ -896,8 +896,9 @@ export interface BrevoEmailStats {
 }
 
 export interface RegistrationSettings {
-  version: 2;
+  version: 3;
   email_verification_required: boolean;
+  invite_code_required: boolean;
   brevo_quota_action: BrevoQuotaAction;
   updated_at: string | null;
 }

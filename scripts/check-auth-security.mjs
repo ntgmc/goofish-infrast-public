@@ -309,7 +309,18 @@ async function assertRegistrationBrevoQuotaPolicies() {
     globalThis.__authSecurityVerificationTokens = []
   }
 
-  reset({ email_verification_required: true, brevo_quota_action: 'pause_registration' }, true)
+  reset({ email_verification_required: true, invite_code_required: true, brevo_quota_action: 'pause_registration' }, false)
+  const inviteRequired = await userAuth.registerUser('invite-required@example.com', 'valid-password')
+  assert.deepEqual(inviteRequired, {
+    ok: false,
+    status: 400,
+    message: '当前仅限受邀用户注册，请输入邀请码。',
+    code: 'invite_code_required',
+  })
+  assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
+  assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 0)
+
+  reset({ email_verification_required: true, invite_code_required: false, brevo_quota_action: 'pause_registration' }, true)
   const paused = await userAuth.registerUser('paused@example.com', 'valid-password')
   assert.deepEqual(paused, {
     ok: false,
@@ -324,7 +335,7 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.equal(globalThis.__authSecurityVerificationTokens.length, 0)
   assert.equal(globalThis.__authSecurityEmailSendCalls, 0)
 
-  reset({ email_verification_required: true, brevo_quota_action: 'allow_unverified_registration' }, true)
+  reset({ email_verification_required: true, invite_code_required: false, brevo_quota_action: 'allow_unverified_registration' }, true)
   const bypassed = await userAuth.registerUser('bypassed@example.com', 'valid-password')
   assert.equal(bypassed.ok, true)
   assert.equal(bypassed.verificationRequired, false)
@@ -332,14 +343,14 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.equal(globalThis.__authSecurityRegistrationAccountSyncs[0].email_verified_at !== null, true)
   assert.equal(globalThis.__authSecurityEmailSendCalls, 0)
 
-  reset({ email_verification_required: true, brevo_quota_action: 'allow_unverified_registration' }, false)
+  reset({ email_verification_required: true, invite_code_required: false, brevo_quota_action: 'allow_unverified_registration' }, false)
   const verified = await userAuth.registerUser('verified@example.com', 'valid-password')
   assert.equal(verified.ok, true)
   assert.equal(verified.verificationRequired, true)
   assert.equal(globalThis.__authSecurityVerificationTokens.length, 1)
   assert.equal(globalThis.__authSecurityEmailSendCalls, 1)
 
-  reset({ email_verification_required: false, brevo_quota_action: 'pause_registration' }, true)
+  reset({ email_verification_required: false, invite_code_required: false, brevo_quota_action: 'pause_registration' }, true)
   const verificationDisabled = await userAuth.registerUser('disabled@example.com', 'valid-password')
   assert.equal(verificationDisabled.ok, true)
   assert.equal(verificationDisabled.verificationRequired, false)
@@ -2124,6 +2135,7 @@ function registrationSettingsStoreMock() {
     export async function getRegistrationSettings() {
       return globalThis.__authSecurityRegistrationSettings ?? {
         email_verification_required: false,
+        invite_code_required: false,
         brevo_quota_action: 'pause_registration',
       }
     }
