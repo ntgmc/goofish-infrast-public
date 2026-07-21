@@ -6,8 +6,11 @@ import {
 } from './account-data-lifecycle'
 import {
   initializeOptimizeJobProcessing,
+  initializeOptimizeQueueMaintenance,
   shutdownOptimizeJobProcessing,
+  shutdownOptimizeQueueMaintenance,
 } from './optimize-job-runner'
+import { canRunOptimizeWorker, canServeApi, resolveAppRole } from './process-role'
 import {
   beginServiceDrain,
   getServiceLifecycleState,
@@ -18,7 +21,12 @@ import { closePool } from './storage/postgres'
 
 const port = Number(process.env.PORT || 3000)
 const host = process.env.HOST || '127.0.0.1'
+const appRole = resolveAppRole()
 
+if (!canServeApi(appRole)) throw new Error(`APP_ROLE=${appRole} cannot start the API entry point`)
+if (process.env.NODE_ENV === 'production' && appRole !== 'api') {
+  throw new Error('The production API requires APP_ROLE=api')
+}
 validateProductionBoundaryConfig(host)
 
 const server = createApiServer()
@@ -39,7 +47,8 @@ void start().catch(async (error) => {
 })
 
 async function start(): Promise<void> {
-  await initializeOptimizeJobProcessing()
+  await initializeOptimizeQueueMaintenance()
+  if (canRunOptimizeWorker(appRole)) await initializeOptimizeJobProcessing()
   if (getServiceLifecycleState() !== 'starting') return
   accountDeletionWorker = startAccountDeletionWorker()
   if (getServiceLifecycleState() !== 'starting') {
@@ -56,7 +65,8 @@ function startShutdown(signal: NodeJS.Signals): void {
   if (shutdownPromise) {
     console.warn(`received ${signal} while already draining; forcing open HTTP connections closed`)
     server.closeAllConnections?.()
-    void shutdownOptimizeJobProcessing(0)
+    if (canRunOptimizeWorker(appRole)) void shutdownOptimizeJobProcessing(0)
+    shutdownOptimizeQueueMaintenance()
     process.exitCode = 1
     return
   }
@@ -75,7 +85,8 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   const httpClosed = closeServer(server)
   server.closeIdleConnections?.()
 
-  await shutdownOptimizeJobProcessing()
+  if (canRunOptimizeWorker(appRole)) await shutdownOptimizeJobProcessing()
+  shutdownOptimizeQueueMaintenance()
   server.closeAllConnections?.()
   await httpClosed
   await accountDeletionWorker?.waitForIdle()

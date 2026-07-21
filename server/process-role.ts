@@ -1,6 +1,6 @@
 export type AppRole = 'api' | 'worker' | 'all'
 
-export type AppCapability = 'serve-api' | 'run-optimize-worker' | 'maintain-optimize-queue'
+type AppCapability = 'serve-api' | 'run-optimize-worker' | 'maintain-optimize-queue'
 
 const CAPABILITIES: Record<AppRole, ReadonlySet<AppCapability>> = {
   api: new Set(['serve-api', 'maintain-optimize-queue']),
@@ -20,7 +20,7 @@ export function resolveAppRole(environment: NodeJS.ProcessEnv = process.env): Ap
   return 'all'
 }
 
-export function hasAppCapability(
+function hasAppCapability(
   capability: AppCapability,
   role: AppRole = resolveAppRole(),
 ): boolean {
