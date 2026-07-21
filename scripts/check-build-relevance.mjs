@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 
+import { isDocumentationOnly } from './build-relevance-lib.mjs'
+
 const SKIP_BUILD = 0
 const CONTINUE_BUILD = 1
 const CHECK_ONLY = process.argv.includes('--check')
@@ -73,6 +75,10 @@ if (changedFiles.length === 0) {
 
 const meaningfulChanges = changedFiles
 
+if (isDocumentationOnly(meaningfulChanges)) {
+  skipBuild(`documentation-only changes: ${meaningfulChanges.join(', ')}`, true)
+}
+
 const relevant = meaningfulChanges.filter(isBuildRelevant)
 
 if (relevant.length > 0) {
@@ -105,26 +111,27 @@ function readFallbackChangedFiles(headRef) {
     .filter(Boolean)
 }
 
-function skipBuild(reason) {
+function skipBuild(reason, documentationOnly = false) {
   console.log(`[check-build-relevance] Skipping build: ${reason}`)
-  writeGithubOutput(false, reason)
+  writeGithubOutput(false, reason, documentationOnly)
   if (CHECK_ONLY) process.exit(0)
   process.exit(SKIP_BUILD)
 }
 
 function continueBuild(reason) {
   console.log(`[check-build-relevance] Continuing build: ${reason}`)
-  writeGithubOutput(true, reason)
+  writeGithubOutput(true, reason, false)
   if (CHECK_ONLY) process.exit(0)
   process.exit(CONTINUE_BUILD)
 }
 
-function writeGithubOutput(buildRequired, reason) {
+function writeGithubOutput(buildRequired, reason, documentationOnly) {
   const outputPath = process.env.GITHUB_OUTPUT
   if (!outputPath) return
   const escapedReason = reason.replace(/\r?\n/g, ' ')
   const lines = [
     `build_required=${buildRequired ? 'true' : 'false'}`,
+    `documentation_only=${documentationOnly ? 'true' : 'false'}`,
     `reason=${escapedReason}`,
   ].join('\n') + '\n'
   appendFileSync(outputPath, lines, 'utf8')

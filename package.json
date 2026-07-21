@@ -20,6 +20,7 @@
     "test:optimizer-benchmark-report": "node --test scripts/optimizer-benchmark-report.test.mjs",
     "test:generate-data": "node --test scripts/generate-data.test.mjs",
     "test:release-artifact": "node --test scripts/release-artifact.test.mjs",
+    "test:build-relevance": "node --test scripts/build-relevance-lib.test.mjs",
     "benchmark:optimizer:report": "node scripts/optimizer-benchmark-report.mjs",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:watch": "vitest",
