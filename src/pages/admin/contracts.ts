@@ -1,4 +1,4 @@
-import type { Announcement, AnnouncementKind, AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../../lib/types'
+import type { Announcement, AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../../lib/types'
 import type { AdminSection } from '../../lib/app-routes'
 import { copy } from '../../copy/index'
 import { getPermissionProfile, getPermissionRank, listAdminIssuablePermissions, productPolicies } from '../../lib/product-catalog'
@@ -102,7 +102,7 @@ export type UsageRangeKey = '7d' | '14d' | '30d'
 
 export type UsageRangeMode = UsageRangeKey | 'custom'
 
-export type AnnouncementSortKey = 'updated_desc' | 'updated_asc' | 'kind' | 'active'
+export type AnnouncementSortKey = 'updated_desc' | 'updated_asc' | 'active'
 
 export interface UsageRange {
   from: string;
@@ -468,15 +468,9 @@ export const sectionLabels: Record<AdminSection, string> = {
   users: '用户维护',
 }
 
-export const announcementKindLabels: Record<AnnouncementKind, string> = {
-  banner: '横幅',
-  popup: '弹出式公告',
-}
-
 export const announcementSortLabels: Record<AnnouncementSortKey, string> = {
   updated_desc: '更新时间新到旧',
   updated_asc: '更新时间旧到新',
-  kind: '公告类型',
   active: '启用状态',
 }
 

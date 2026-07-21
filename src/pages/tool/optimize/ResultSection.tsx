@@ -71,6 +71,18 @@ export default function ResultSection({
             operators={operators}
             previewLimit={previewProfile ? historyItem.result.preview_limit : undefined}
             onDownload={!previewProfile && onDownloadMAA && isMaaJsonDownloadable(historyItem.result) ? onDownloadMAA : undefined}
+            suggestionsSlot={!previewProfile && suggestions.length > 0 ? (
+              <Suspense fallback={<ResultFallback />}>
+                <UpgradeSuggestions
+                  suggestions={suggestions}
+                  onApply={onApplySuggestions}
+                  loading={false}
+                  onReset={onReset}
+                  embedded
+                  readOnly
+                />
+              </Suspense>
+            ) : null}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
         </Suspense>

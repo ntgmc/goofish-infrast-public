@@ -87,7 +87,10 @@ export const requestSchemas = {
     status: optionalString(32),
     permission: optionalString(32),
   }),
-  announcement: strict({ announcements: z.array(z.unknown()).max(100) }),
+  announcement: strict({
+    banner: z.unknown().nullable(),
+    announcements: z.array(z.unknown()).max(100),
+  }),
   analyzeSchedule: strict({
     operators: z.array(z.unknown()).max(2000),
     schedule: z.unknown(),
@@ -147,6 +150,7 @@ export const requestSchemas = {
     includeCurrent: z.boolean().optional(),
     use_priority_coupon: z.boolean().optional(),
     upgradeTaskPayload: optionalUnknown,
+    historyResultId: optionalString(128),
     historySource: z.enum(['generated', 'applied_suggestions']).optional(),
     factors: optionalUnknown,
   }),

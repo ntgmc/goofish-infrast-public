@@ -19,6 +19,7 @@ interface Props {
   error?: string | null;
   onReset: () => void;
   embedded?: boolean;
+  readOnly?: boolean;
 }
 
 type SortMode = 'payback' | 'gain' | 'stock'
@@ -29,7 +30,7 @@ const SORT_OPTIONS: { id: SortMode; label: string }[] = [
   { id: 'stock', label: copy.optimize.components_UpgradeSuggestions_003 },
 ]
 
-export default function UpgradeSuggestions({ suggestions, onApply, loading, progress, error, onReset, embedded = false }: Props) {
+export default function UpgradeSuggestions({ suggestions, onApply, loading, progress, error, onReset, embedded = false, readOnly = false }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [sortMode, setSortMode] = useState<SortMode>('payback')
@@ -99,23 +100,25 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
               className="h-4 w-4 accent-brand-500"
             />
             {copy.optimize.components_UpgradeSuggestions_007}</label>
-          <button
-            onClick={() => onApply(selectedIds)}
-            disabled={loading || selected.size === 0}
-            aria-describedby="upgrade-selection-note"
-            className="tool-primary-action lg:flex-shrink-0"
-          >
-            {loading ? (
-              <span className="inline-flex items-center gap-3">
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                {copy.optimize.components_UpgradeSuggestions_008}</span>
-            ) : (
-              `${copy.optimize.components_UpgradeSuggestions_009}${selected.size})`
-            )}
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => onApply(selectedIds)}
+              disabled={loading || selected.size === 0}
+              aria-describedby="upgrade-selection-note"
+              className="tool-primary-action lg:flex-shrink-0"
+            >
+              {loading ? (
+                <span className="inline-flex items-center gap-3">
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {copy.optimize.components_UpgradeSuggestions_008}</span>
+              ) : (
+                `${copy.optimize.components_UpgradeSuggestions_009}${selected.size})`
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -156,6 +159,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
             onToggle={() => toggle(id)}
             onToggleExpanded={() => toggleExpanded(id)}
             embedded={embedded}
+            selectable={!readOnly}
           />
         ))}
       </div>
@@ -165,11 +169,13 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
           {copy.optimize.components_UpgradeSuggestions_013}</div>
       )}
 
-      <div id="upgrade-selection-note" className="tool-inset p-4 text-sm leading-6 text-ink-secondary" role="status" aria-live="polite">
-        {selected.size === 0
-          ? copy.optimize.components_UpgradeSuggestions_014
-          : `${copy.optimize.components_UpgradeSuggestions_015}${selected.size}${copy.optimize.components_UpgradeSuggestions_016}`}
-      </div>
+      {!readOnly && (
+        <div id="upgrade-selection-note" className="tool-inset p-4 text-sm leading-6 text-ink-secondary" role="status" aria-live="polite">
+          {selected.size === 0
+            ? copy.optimize.components_UpgradeSuggestions_014
+            : `${copy.optimize.components_UpgradeSuggestions_015}${selected.size}${copy.optimize.components_UpgradeSuggestions_016}`}
+        </div>
+      )}
     </div>
   )
 }
@@ -182,6 +188,7 @@ function SuggestionCard({
   onToggle,
   onToggleExpanded,
   embedded,
+  selectable,
 }: {
   suggestion: UpgradeSuggestion;
   rank: number;
@@ -190,6 +197,7 @@ function SuggestionCard({
   onToggle: () => void;
   onToggleExpanded: () => void;
   embedded: boolean;
+  selectable: boolean;
 }) {
   const title = suggestion.name || suggestion.ops?.map((op) => op.name).join(' + ') || copy.optimize.components_UpgradeSuggestions_017
   const cost = suggestion.training_cost
@@ -200,16 +208,18 @@ function SuggestionCard({
     <article className={`tool-panel transition-colors duration-150 ${selected ? 'border-brand-500/40 bg-brand-500/10' : `${embedded ? 'bg-surface-2/60' : ''} hover:border-surface-4`}`}>
       <div className="grid gap-4 p-4 lg:grid-cols-[auto_1fr] lg:items-start">
         <div className="flex items-start gap-3">
-          <label className="mt-1 inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md bg-surface-0">
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={onToggle}
-            className="h-5 w-5 accent-brand-500"
-            aria-label={`${copy.optimize.components_UpgradeSuggestions_018}${title}`}
-          />
-            <span className="sr-only">{copy.optimize.components_UpgradeSuggestions_019}{title}</span>
-          </label>
+          {selectable && (
+            <label className="mt-1 inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md bg-surface-0">
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={onToggle}
+                className="h-5 w-5 accent-brand-500"
+                aria-label={`${copy.optimize.components_UpgradeSuggestions_018}${title}`}
+              />
+              <span className="sr-only">{copy.optimize.components_UpgradeSuggestions_019}{title}</span>
+            </label>
+          )}
           <OperatorPortraits suggestion={suggestion} />
         </div>
 
