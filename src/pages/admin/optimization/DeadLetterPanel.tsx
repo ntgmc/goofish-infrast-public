@@ -87,6 +87,7 @@ export default function DeadLetterPanel() {
             const detail = details[record.id]
             const detailError = detailErrors[record.id]
             const detailPanelId = `dead-letter-detail-${record.id}`
+            const isReadOnlyLegacySuggestion = record.source === 'optimize_suggestions'
             return (
               <article key={record.id} className="tool-inset p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -108,8 +109,10 @@ export default function DeadLetterPanel() {
                       {loadingDetail ? '正在加载完整申请数据...' : expanded ? '收起完整申请数据' : '查看完整申请数据'}
                     </button>
                   </div>
-                  {record.status === 'pending_review' && <div className="flex shrink-0 gap-2">
-                    <button type="button" disabled={busy} onClick={() => onAction(record.id, 'replay')} className="tool-primary-action">{busy ? '处理中...' : '重放'}</button>
+                  {record.status === 'pending_review' && <div className="flex shrink-0 items-center gap-2">
+                    {isReadOnlyLegacySuggestion
+                      ? <span className="text-xs text-ink-muted">历史优化建议任务仅供审计，不可重放</span>
+                      : <button type="button" disabled={busy} onClick={() => onAction(record.id, 'replay')} className="tool-primary-action">{busy ? '处理中...' : '重放'}</button>}
                     <button type="button" disabled={busy} onClick={() => onAction(record.id, 'discard')} className="tool-secondary-action">丢弃</button>
                   </div>}
                 </div>
@@ -136,12 +139,9 @@ export default function DeadLetterPanel() {
 
 function DeadLetterPayloadDetails({ detail }: { detail: AdminOptimizationDeadLetterDetail }) {
   const payload = asRecord(detail.payload_json)
-  const request = asRecord(payload?.request)
   const effectiveConfig = payload?.effectiveConfig
   const operators = Array.isArray(payload?.operators) ? payload.operators : null
-  const jobKind = typeof payload?.kind === 'string'
-    ? payload.kind
-    : request?.suggestions_only === true ? 'upgrade_suggestions' : 'schedule'
+  const jobKind = typeof payload?.kind === 'string' ? payload.kind : 'schedule'
   const submittedAt = typeof payload?.submittedAt === 'number' && Number.isFinite(payload.submittedAt)
     ? new Date(payload.submittedAt).toLocaleString('zh-CN', { hour12: false })
     : '未知'

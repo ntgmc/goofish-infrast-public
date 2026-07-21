@@ -204,8 +204,8 @@ export default function AdminDashboardView() {
                   <Metric label="CDK 兑换" value={summary.cdkRedeems} />
                   <Metric label="排班生成" value={summary.scheduleGenerates} />
                   <Metric label="生成成功率" value={`${summary.scheduleSuccessRate}%`} tone={summary.scheduleSuccessRate < 80 && summary.scheduleAttempts > 0 ? 'warning' : 'default'} />
-                  <Metric label="平均耗时" value={formatDuration(usageStats?.latency.schedule_generate.average_ms ?? 0)} />
-                  <Metric label="P95 耗时" value={formatDuration(usageStats?.latency.schedule_generate.p95_ms ?? 0)} tone={(usageStats?.latency.schedule_generate.p95_ms ?? 0) > 10000 ? 'warning' : 'default'} />
+                  <Metric label="平均单次计算耗时" value={formatDuration(usageStats?.latency.schedule_generate.average_ms ?? 0)} />
+                  <Metric label="P95 单次计算耗时" value={formatDuration(usageStats?.latency.schedule_generate.p95_ms ?? 0)} tone={(usageStats?.latency.schedule_generate.p95_ms ?? 0) > 10000 ? 'warning' : 'default'} />
                   <Metric label="冻结/软拦截" value={summary.frozenCdks + summary.riskEvents} tone={summary.frozenCdks + summary.riskEvents > 0 ? 'warning' : 'default'} />
                 </div>
                 <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">

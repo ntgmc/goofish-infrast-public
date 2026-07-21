@@ -127,6 +127,8 @@ function failedScheduleJob(): OptimizationJobListItem {
     timestamps: { submittedAt: '2026-07-17T00:00:00.000Z', finishedAt: '2026-07-17T00:01:00.000Z' },
     estimate: { durationMs: 60_000, bucket: 'maa_plain', source: 'fallback_p95', sampleCount: 0, remainingMs: 0, totalMs: 60_000, phase: 'failed', updatedAt: '2026-07-17T00:01:00.000Z' },
     executionPhase: 'terminal',
+    calculationStage: 'generating_schedule',
+    upgradeSuggestions: { requested: false, allowed: false },
     attemptCount: 1,
     failureCount: 1,
     cancellationRequested: false,

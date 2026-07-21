@@ -2,11 +2,11 @@ import type {
   LicenseConfig,
   LicenseOperator,
   OptimizeEstimateBucket,
+  OptimizeCalculationStage,
   OptimizeEstimateSource,
   OptimizeJobPriority,
   OptimizeResult,
   ReorderCheckResult,
-  UpgradeTaskPayload,
 } from './types'
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from './scenario-comparison'
 
@@ -21,15 +21,9 @@ interface OptimizationJobInput {
 export type CreateOptimizationJobRequest =
   | (OptimizationJobInput & {
       kind: 'schedule';
-      ignoreElite: boolean;
-      includeCurrent?: boolean;
+      includeUpgradeSuggestions: boolean;
       historySource?: 'generated' | 'applied_suggestions';
       use_priority_coupon?: boolean;
-    })
-  | (OptimizationJobInput & {
-      kind: 'upgrade_suggestions';
-      upgradeTaskPayload: UpgradeTaskPayload;
-      historyResultId?: string;
     })
   | (Omit<OptimizationJobInput, 'identity'> & {
       kind: 'scenario_comparison';
@@ -60,6 +54,7 @@ interface OptimizationTimestamps {
   finishedAt?: string | null;
   nextAttemptAt?: string | null;
   cancelRequestedAt?: string | null;
+  stageUpdatedAt?: string | null;
 }
 
 type OptimizationEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
@@ -96,6 +91,11 @@ interface OptimizationJobSnapshotBase {
   timestamps: OptimizationTimestamps;
   estimate: OptimizationEstimateSnapshot;
   executionPhase: OptimizationExecutionPhase;
+  calculationStage: OptimizeCalculationStage | null;
+  upgradeSuggestions: {
+    requested: boolean;
+    allowed: boolean;
+  };
   attemptCount: number;
   failureCount: number;
   cancellationRequested: boolean;

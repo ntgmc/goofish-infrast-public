@@ -47,6 +47,10 @@ const accepted: OptimizeJobAccepted = {
   estimated_total_ms: 50_000,
   estimate_phase: 'queued',
   estimate_updated_at: '2026-07-10T00:00:00.000Z',
+  calculation_stage: null,
+  calculation_stage_updated_at: null,
+  upgrade_suggestions_requested: false,
+  upgrade_suggestions_allowed: false,
 }
 
 const cancelled = {

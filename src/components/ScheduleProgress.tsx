@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { AnimatedValue, motionTokens } from './MotionPrimitives'
-import type { OptimizeJobPriority } from '../lib/types'
+import type { OptimizeCalculationStage, OptimizeJobPriority, OptimizeResult } from '../lib/types'
 import { copy } from '../copy/index'
 
 
@@ -28,6 +28,11 @@ export interface ScheduleProgressState {
   consecutivePollFailures?: number;
   lastSuccessfulSyncAt?: number;
   executionPhase?: 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal';
+  calculationStage?: OptimizeCalculationStage | null;
+  calculationStageUpdatedAt?: string | null;
+  upgradeSuggestionsRequested?: boolean;
+  upgradeSuggestionsAllowed?: boolean;
+  upgradeSuggestionsStatus?: NonNullable<OptimizeResult['upgrade_suggestions_status']>;
   attemptCount?: number;
   nextAttemptAt?: string | null;
   cancellationRequested?: boolean;
@@ -40,7 +45,9 @@ interface Props {
 }
 
 type TaskStatus = 'preparing' | 'queued' | 'retrying' | 'cancelling' | 'cancelled' | 'running' | 'overdue' | 'finishing' | 'completed'
-type StepVisualState = 'done' | 'active' | 'pending'
+type StepVisualState = 'done' | 'active' | 'pending' | 'failed'
+type TaskStepRole = 'submit' | 'queue' | 'schedule' | 'suggestions' | 'persist'
+type TaskStepDefinition = { label: string; detail: string; role: TaskStepRole }
 
 export default function ScheduleProgress({ progress, className = '', variant = 'embedded' }: Props) {
   const [now, setNow] = useState(() => Date.now())
@@ -123,7 +130,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
         <ol className="grid gap-2 sm:grid-cols-4" aria-label={copy.common.components_ScheduleProgress_004}>
           {task.steps.map((step, index) => (
             <li key={step.label}>
-              <TaskStep label={step.label} detail={step.detail} state={getStepState(task.status, index, progress.observedRunning)} />
+              <TaskStep label={step.label} detail={step.detail} state={getStepState(progress, task.status, index, task.steps)} />
             </li>
           ))}
         </ol>
@@ -156,10 +163,10 @@ function TaskMiniStat({ label, value, emphasis = false }: { label: string; value
 
 function TaskStep({ label, detail, state }: { label: string; detail: string; state: StepVisualState }) {
   return (
-    <div className={`tool-inset h-full px-3 py-2.5 transition-colors duration-200 ${getStepClass(state)}`}>
+    <div data-state={state} className={`tool-inset h-full px-3 py-2.5 transition-colors duration-200 ${getStepClass(state)}`}>
       <div className="flex items-center gap-2">
         <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-semibold ${getStepDotClass(state)}`}>
-          {state === 'done' ? <CheckIcon /> : state === 'active' ? <span className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
+          {state === 'done' ? <CheckIcon /> : state === 'failed' ? '!' : state === 'active' ? <span className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
         </span>
         <span className="min-w-0 text-sm font-semibold text-ink-primary">{label}</span>
       </div>
@@ -180,25 +187,33 @@ const ESTIMATED_DURATION_MS = 10_000
 export const SCHEDULE_PROGRESS_COMPLETION_DURATION_MS = 420
 const MAX_WAITING_PERCENT = 96
 
-const TASK_STEPS: Record<ScheduleProgressState['mode'], Array<{ label: string; detail: string }>> = {
-  generate: [
-    { label: copy.common.components_ScheduleProgress_008, detail: copy.common.components_ScheduleProgress_009 },
-    { label: copy.common.components_ScheduleProgress_010, detail: copy.common.components_ScheduleProgress_011 },
-    { label: copy.common.components_ScheduleProgress_012, detail: copy.common.components_ScheduleProgress_013 },
-    { label: copy.common.components_ScheduleProgress_014, detail: copy.common.components_ScheduleProgress_015 },
-  ],
+const TASK_STEPS: Record<Exclude<ScheduleProgressState['mode'], 'generate'>, TaskStepDefinition[]> = {
   apply: [
-    { label: copy.common.components_ScheduleProgress_016, detail: copy.common.components_ScheduleProgress_017 },
-    { label: copy.common.components_ScheduleProgress_018, detail: copy.common.components_ScheduleProgress_019 },
-    { label: copy.common.components_ScheduleProgress_020, detail: copy.common.components_ScheduleProgress_021 },
-    { label: copy.common.components_ScheduleProgress_022, detail: copy.common.components_ScheduleProgress_023 },
+    { label: copy.common.components_ScheduleProgress_016, detail: copy.common.components_ScheduleProgress_017, role: 'submit' },
+    { label: copy.common.components_ScheduleProgress_018, detail: copy.common.components_ScheduleProgress_019, role: 'queue' },
+    { label: copy.common.components_ScheduleProgress_020, detail: copy.common.components_ScheduleProgress_021, role: 'schedule' },
+    { label: copy.common.components_ScheduleProgress_022, detail: copy.common.components_ScheduleProgress_023, role: 'persist' },
   ],
   scenario: [
-    { label: copy.common.components_ScheduleProgress_024, detail: copy.common.components_ScheduleProgress_025 },
-    { label: copy.common.components_ScheduleProgress_026, detail: copy.common.components_ScheduleProgress_027 },
-    { label: copy.common.components_ScheduleProgress_028, detail: copy.common.components_ScheduleProgress_029 },
-    { label: copy.common.components_ScheduleProgress_030, detail: copy.common.components_ScheduleProgress_031 },
+    { label: copy.common.components_ScheduleProgress_024, detail: copy.common.components_ScheduleProgress_025, role: 'submit' },
+    { label: copy.common.components_ScheduleProgress_026, detail: copy.common.components_ScheduleProgress_027, role: 'queue' },
+    { label: copy.common.components_ScheduleProgress_028, detail: copy.common.components_ScheduleProgress_029, role: 'schedule' },
+    { label: copy.common.components_ScheduleProgress_030, detail: copy.common.components_ScheduleProgress_031, role: 'persist' },
   ],
+}
+
+function getTaskSteps(progress: ScheduleProgressState): TaskStepDefinition[] {
+  if (progress.mode !== 'generate') return TASK_STEPS[progress.mode]
+  const steps: TaskStepDefinition[] = [
+    { label: copy.common.components_ScheduleProgress_008, detail: copy.common.components_ScheduleProgress_009, role: 'submit' },
+    { label: copy.common.components_ScheduleProgress_010, detail: copy.common.components_ScheduleProgress_011, role: 'queue' },
+    { label: copy.common.components_ScheduleProgress_012, detail: copy.common.components_ScheduleProgress_013, role: 'schedule' },
+  ]
+  if (progress.upgradeSuggestionsRequested && progress.upgradeSuggestionsAllowed) {
+    steps.push({ label: copy.common.components_ScheduleProgress_111, detail: copy.common.components_ScheduleProgress_112, role: 'suggestions' })
+  }
+  steps.push({ label: copy.common.components_ScheduleProgress_014, detail: copy.common.components_ScheduleProgress_015, role: 'persist' })
+  return steps
 }
 
 function getTimedPercent(progress: ScheduleProgressState, now: number): number {
@@ -240,7 +255,7 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
     ? 'bg-brand-600/15 text-brand-300 ring-1 ring-brand-500/25'
     : 'bg-surface-2 text-ink-secondary ring-1 ring-surface-3'
   const jobLabel = progress.jobId ? `${copy.common.components_ScheduleProgress_036}${progress.jobId.slice(0, 8)}` : null
-  const title = reconnecting ? copy.common.components_ScheduleProgress_037 : getStatusTitle(progress.mode, status)
+  const title = reconnecting ? copy.common.components_ScheduleProgress_037 : getStatusTitle(progress, status)
   const remainingLabel = getRemainingLabel(progress, status, now)
   const estimateContext = getEstimateContext(progress, aheadCount)
   const detail = reconnecting
@@ -273,7 +288,7 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
     elapsedLabel,
     remainingLabel,
     footer,
-    steps: TASK_STEPS[progress.mode],
+    steps: getTaskSteps(progress),
     ariaText: `${title}，${getRemainingAriaLabel(progress, remainingLabel)}，${priorityLabel}，${queueLabel}`,
   }
 }
@@ -286,22 +301,36 @@ function getTaskStatus(progress: ScheduleProgressState, percent: number, now: nu
   if (progress.completedAt || percent >= 100 || progress.estimatePhase === 'completed') return 'completed'
   if (progress.estimatePhase === 'overdue') return 'overdue'
   const isRunning = progress.observedRunning || progress.queueStatus === 'running' || progress.estimatePhase === 'running'
+  if (isRunning && (progress.calculationStage === 'formatting_result' || progress.calculationStage === 'persisting_result')) return 'finishing'
+  if (isRunning && progress.calculationStage) return 'running'
   if (isRunning && percent >= 92) return 'finishing'
   if (isRunning) return 'running'
   if (progress.queueStatus === 'queued' || progress.estimatePhase === 'queued') return 'queued'
   return 'preparing'
 }
 
-function getStatusTitle(mode: ScheduleProgressState['mode'], status: TaskStatus): string {
+function getStatusTitle(progress: ScheduleProgressState, status: TaskStatus): string {
   if (status === 'cancelled') return copy.common.components_ScheduleProgress_106
   if (status === 'cancelling') return copy.common.components_ScheduleProgress_101
   if (status === 'retrying') return copy.common.components_ScheduleProgress_102
-  if (status === 'completed') return mode === 'generate' ? copy.common.components_ScheduleProgress_050 : mode === 'scenario' ? copy.common.components_ScheduleProgress_051 : copy.common.components_ScheduleProgress_052
+  if (status === 'completed') return progress.mode === 'generate' ? copy.common.components_ScheduleProgress_050 : progress.mode === 'scenario' ? copy.common.components_ScheduleProgress_051 : copy.common.components_ScheduleProgress_052
+  const stageTitle = getCalculationStageTitle(progress.calculationStage)
+  if (stageTitle && (status === 'running' || status === 'overdue' || status === 'finishing')) return stageTitle
   if (status === 'overdue') return copy.common.components_ScheduleProgress_053
   if (status === 'finishing') return copy.common.components_ScheduleProgress_054
-  if (status === 'running') return mode === 'generate' ? copy.common.components_ScheduleProgress_055 : mode === 'scenario' ? copy.common.components_ScheduleProgress_056 : copy.common.components_ScheduleProgress_057
+  if (status === 'running') return progress.mode === 'generate' ? copy.common.components_ScheduleProgress_055 : progress.mode === 'scenario' ? copy.common.components_ScheduleProgress_056 : copy.common.components_ScheduleProgress_057
   if (status === 'queued') return copy.common.components_ScheduleProgress_058
   return copy.common.components_ScheduleProgress_059
+}
+
+function getCalculationStageTitle(stage: OptimizeCalculationStage | null | undefined): string | null {
+  if (stage === 'generating_schedule') return copy.common.components_ScheduleProgress_113
+  if (stage === 'generating_potential_schedule') return copy.common.components_ScheduleProgress_114
+  if (stage === 'simulating_upgrades') return copy.common.components_ScheduleProgress_115
+  if (stage === 'enriching_training_costs') return copy.common.components_ScheduleProgress_116
+  if (stage === 'formatting_result') return copy.common.components_ScheduleProgress_117
+  if (stage === 'persisting_result') return copy.common.components_ScheduleProgress_118
+  return null
 }
 
 function getStatusDetail(
@@ -398,28 +427,47 @@ function getMeterLabel(status: TaskStatus): string {
   return 'Init'
 }
 
-function getStepState(status: TaskStatus, index: number, observedRunning = false): StepVisualState {
+function getStepState(progress: ScheduleProgressState, status: TaskStatus, index: number, steps: TaskStepDefinition[]): StepVisualState {
+  if (status === 'completed') {
+    if (progress.upgradeSuggestionsStatus === 'failed' && steps[index]?.role === 'suggestions') return 'failed'
+    return 'done'
+  }
+  const stageRole = getCalculationStageRole(progress.calculationStage)
+  const stageIndex = stageRole ? steps.findIndex((step) => step.role === stageRole) : -1
+  if (stageIndex >= 0 && (status === 'running' || status === 'overdue' || status === 'finishing' || status === 'cancelling')) {
+    if (index < stageIndex) return 'done'
+    if (index === stageIndex) return 'active'
+    return 'pending'
+  }
   const activeIndex = status === 'preparing'
     ? 0
-    : status === 'queued' || status === 'retrying' || (status === 'cancelled' && !observedRunning)
+    : status === 'queued' || status === 'retrying' || (status === 'cancelled' && !progress.observedRunning)
       ? 1
       : status === 'running' || status === 'overdue' || status === 'cancelling' || status === 'cancelled'
         ? 2
-        : 3
-  if (status === 'completed') return 'done'
+        : steps.length - 1
   if (index < activeIndex) return 'done'
   if (index === activeIndex) return 'active'
   return 'pending'
 }
 
+function getCalculationStageRole(stage: OptimizeCalculationStage | null | undefined): TaskStepRole | null {
+  if (stage === 'starting' || stage === 'generating_schedule') return 'schedule'
+  if (stage === 'generating_potential_schedule' || stage === 'simulating_upgrades' || stage === 'enriching_training_costs') return 'suggestions'
+  if (stage === 'formatting_result' || stage === 'persisting_result' || stage === 'completed') return 'persist'
+  return null
+}
+
 function getStepClass(state: StepVisualState): string {
   if (state === 'done') return 'border-brand-500/25 bg-brand-600/10'
+  if (state === 'failed') return 'border-warning/40 bg-warning/10'
   if (state === 'active') return 'border-brand-500/40 bg-surface-2'
   return 'border-surface-3/70 bg-surface-2/35'
 }
 
 function getStepDotClass(state: StepVisualState): string {
   if (state === 'done') return 'border-brand-500 bg-brand-500 text-white'
+  if (state === 'failed') return 'border-warning text-warning'
   if (state === 'active') return 'border-brand-400 text-brand-400'
   return 'border-surface-4 text-ink-muted'
 }

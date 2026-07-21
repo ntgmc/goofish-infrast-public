@@ -43,19 +43,25 @@ describe('Brevo email delivery accounting', () => {
     vi.restoreAllMocks()
   })
 
-  it('maps all four email types to quota purposes and marks them sent', async () => {
+  it('maps all five email types to quota purposes and marks them sent', async () => {
     await sendEmailVerificationEmail({ email: 'user@example.test', verificationUrl: 'https://example.test/verify', expiresHours: 24 })
+    await sendEmailVerificationEmail(
+      { email: 'invited@example.test', verificationUrl: 'https://example.test/verify-admin', expiresHours: 24 },
+      undefined,
+      'admin_invite_verification',
+    )
     await sendPasswordResetEmail({ email: 'user@example.test', resetUrl: 'https://example.test/reset', expiresMinutes: 30 })
     await sendAccountDeletionCancellationEmail('user@example.test', 'https://example.test/cancel')
     await sendAccountDeletionReceiptEmail('user@example.test', 'receipt-1')
 
     expect(quota.reserveBrevoEmailWithOfficialQuota.mock.calls.map(([purpose]) => purpose)).toEqual([
       'email_verification',
+      'admin_invite_verification',
       'password_reset',
       'account_deletion_cancellation',
       'account_deletion_receipt',
     ])
-    expect(store.markBrevoEmailSent).toHaveBeenCalledTimes(4)
+    expect(store.markBrevoEmailSent).toHaveBeenCalledTimes(5)
   })
 
   it('releases a reservation after a definite Brevo rejection', async () => {
@@ -86,6 +92,21 @@ describe('Brevo email delivery accounting', () => {
       email: 'user@example.test',
       verificationUrl: 'https://example.test/verify',
       expiresHours: 24,
+    }, reservation)
+    expect(quota.reserveBrevoEmailWithOfficialQuota).not.toHaveBeenCalled()
+    expect(store.markBrevoEmailSent).toHaveBeenCalledWith(reservation)
+  })
+
+  it('reuses a password reset reservation without reserving twice', async () => {
+    const reservation: BrevoEmailReservation = {
+      id: 'password-reset-reservation',
+      quotaDate: '2026-07-21',
+      purpose: 'password_reset',
+    }
+    await sendPasswordResetEmail({
+      email: 'user@example.test',
+      resetUrl: 'https://example.test/reset',
+      expiresMinutes: 30,
     }, reservation)
     expect(quota.reserveBrevoEmailWithOfficialQuota).not.toHaveBeenCalled()
     expect(store.markBrevoEmailSent).toHaveBeenCalledWith(reservation)

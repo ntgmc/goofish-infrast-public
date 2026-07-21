@@ -221,6 +221,5 @@ function statusClass(status: OptimizationJobListItem['status']): string {
 
 function kindLabel(kind: OptimizationJobListItem['kind']): string {
   if (kind === 'scenario_comparison') return copy.optimize.pages_tool_optimize_OptimizationTaskCenter_019
-  if (kind === 'upgrade_suggestions') return copy.optimize.pages_tool_optimize_OptimizationTaskCenter_018
   return copy.optimize.pages_tool_optimize_OptimizationTaskCenter_017
 }

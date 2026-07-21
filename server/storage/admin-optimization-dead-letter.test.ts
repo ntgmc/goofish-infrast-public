@@ -1,17 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }))
+const { clientQueryMock, queryMock } = vi.hoisted(() => ({
+  clientQueryMock: vi.fn(),
+  queryMock: vi.fn(),
+}))
 
 vi.mock('./schema', () => ({ ensureDatabaseSchema: vi.fn(async () => undefined) }))
 vi.mock('./postgres', () => ({
   query: queryMock,
-  withTransaction: vi.fn(),
+  withTransaction: vi.fn(async (work: (client: { query: typeof clientQueryMock }) => Promise<unknown>) => work({ query: clientQueryMock })),
 }))
 
-import { getOptimizationDeadLetterDetail } from './optimize-job-store'
+import { getOptimizationDeadLetterDetail, replayOptimizationDeadLetter } from './optimize-job-store'
 
 describe('admin optimization dead-letter detail', () => {
   beforeEach(() => {
+    clientQueryMock.mockReset()
     queryMock.mockReset()
   })
 
@@ -37,6 +41,19 @@ describe('admin optimization dead-letter detail', () => {
     queryMock.mockResolvedValue({ rows: [] })
 
     await expect(getOptimizationDeadLetterDetail('missing')).resolves.toBeNull()
+  })
+
+  it.each([
+    ['the historical source', 'optimize_suggestions', { version: 3, request: {} }],
+    ['the legacy payload marker', 'account_profile', { version: 3, request: { suggestions_only: true } }],
+  ])('does not replay standalone suggestion jobs identified by %s', async (_case, source, payloadJson) => {
+    clientQueryMock
+      .mockResolvedValueOnce({ rows: [deadLetterDetailRow()] })
+      .mockResolvedValueOnce({ rows: [deadLetteredJobRow(source, payloadJson)] })
+
+    await expect(replayOptimizationDeadLetter('letter-1', 'ops')).resolves.toBeNull()
+    expect(clientQueryMock).toHaveBeenCalledTimes(2)
+    expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes('insert into optimize_jobs'))).toBe(false)
   })
 })
 
@@ -66,5 +83,35 @@ function deadLetterDetailRow() {
       effectiveConfig: { controlCenterLevel: 5 },
       operators: [{ name: '能天使', elite: 2 }],
     },
+  }
+}
+
+function deadLetteredJobRow(source: string, payloadJson: unknown) {
+  return {
+    id: 'job-1',
+    status: 'dead_lettered',
+    priority: 10,
+    owner_key: 'profile:profile-1',
+    profile_id: 'profile-1',
+    permission: 'advanced',
+    source,
+    payload_json: payloadJson,
+    result_json: null,
+    error_message: 'failed',
+    failure_kind: 'worker_crash',
+    public_error_code: 'execution_retries_exhausted',
+    attempt_count: 2,
+    failure_count: 2,
+    worker_id: null,
+    heartbeat_at: null,
+    lock_token: null,
+    lock_expires_at: null,
+    next_attempt_at: null,
+    expires_at: null,
+    cancel_requested_at: null,
+    created_at: '2026-07-19T10:00:00.000Z',
+    started_at: '2026-07-19T10:00:01.000Z',
+    finished_at: '2026-07-19T10:10:01.000Z',
+    updated_at: '2026-07-19T10:10:01.000Z',
   }
 }

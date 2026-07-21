@@ -12,6 +12,13 @@ vi.mock('./storage/brevo-email-store', async (importOriginal) => ({
   ...store,
 }))
 
+vi.mock('./storage/registration-settings-store', () => ({
+  getRegistrationSettings: vi.fn().mockResolvedValue({
+    admin_invite_email_reserve: 20,
+    password_reset_email_reserve: 10,
+  }),
+}))
+
 import {
   parseBrevoAccountRemainingCredits,
   refreshBrevoOfficialQuotaIfStale,
@@ -77,7 +84,11 @@ describe('Brevo official quota synchronization', () => {
     store.getBrevoOfficialQuotaSnapshot.mockResolvedValue(snapshot)
     await reserveBrevoEmailWithOfficialQuota('email_verification', new Date(now.getTime() + 30_000))
     expect(fetch).not.toHaveBeenCalled()
-    expect(store.reserveBrevoEmail).toHaveBeenCalledWith('email_verification', new Date(now.getTime() + 30_000))
+    expect(store.reserveBrevoEmail).toHaveBeenCalledWith(
+      'email_verification',
+      new Date(now.getTime() + 30_000),
+      { adminInviteReserve: 20, passwordResetReserve: 10 },
+    )
   })
 
   it('records sync failure and falls back to the previous snapshot', async () => {

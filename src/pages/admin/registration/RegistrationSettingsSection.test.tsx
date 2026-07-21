@@ -19,21 +19,31 @@ const emailStats = {
   today: {
     date: '2026-07-21', sent_count: 12, reserved_count: 1, uncertain_count: 0, failed_count: 2,
     local_quota_used_count: 13, quota_used_count: 20, remaining_count: 280, limit_reached: false,
-    by_purpose: { email_verification: 8, password_reset: 2, account_deletion_cancellation: 1, account_deletion_receipt: 1 },
+    by_purpose: { email_verification: 8, admin_invite_verification: 0, password_reset: 2, account_deletion_cancellation: 1, account_deletion_receipt: 1 },
   },
   days: [{
     date: '2026-07-21', sent_count: 12, reserved_count: 1, uncertain_count: 0, failed_count: 2,
     local_quota_used_count: 13, quota_used_count: 20, remaining_count: 280, limit_reached: false,
-    by_purpose: { email_verification: 8, password_reset: 2, account_deletion_cancellation: 1, account_deletion_receipt: 1 },
+    by_purpose: { email_verification: 8, admin_invite_verification: 0, password_reset: 2, account_deletion_cancellation: 1, account_deletion_receipt: 1 },
   }],
 }
 
 describe('RegistrationSettingsSection', () => {
   beforeEach(() => {
-    adminApiJson.mockResolvedValue({
-      settings: { version: 3, email_verification_required: true, invite_code_required: false, brevo_quota_action: 'pause_registration', updated_at: null },
-      email_stats: emailStats,
-    })
+    adminApiJson.mockImplementation(async (url: string) => url.startsWith('/api/admin/registration-invitations')
+      ? { invitations: [], pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 } }
+      : {
+          settings: {
+            version: 4,
+            email_verification_required: true,
+            invite_code_required: false,
+            brevo_quota_action: 'pause_registration',
+            admin_invite_email_reserve: 20,
+            password_reset_email_reserve: 10,
+            updated_at: null,
+          },
+          email_stats: emailStats,
+        })
   })
 
   afterEach(() => {
@@ -57,9 +67,15 @@ describe('RegistrationSettingsSection', () => {
     await user.click(screen.getByRole('button', { name: '保存注册设置' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/registration-settings', expect.objectContaining({
       method: 'PUT',
-      json: { email_verification_required: false, invite_code_required: true, brevo_quota_action: 'pause_registration' },
+      json: {
+        email_verification_required: false,
+        invite_code_required: true,
+        brevo_quota_action: 'pause_registration',
+        admin_invite_email_reserve: 20,
+        password_reset_email_reserve: 10,
+      },
     })))
-    expect(await screen.findByRole('status')).toHaveTextContent('注册设置已保存')
+    expect(await screen.findByText(/注册设置已保存/)).toBeInTheDocument()
   })
 
   it('saves the allow-unverified strategy and shows its security warning', async () => {
@@ -71,7 +87,24 @@ describe('RegistrationSettingsSection', () => {
     await user.click(screen.getByRole('button', { name: '保存注册设置' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/registration-settings', expect.objectContaining({
       method: 'PUT',
-      json: { email_verification_required: true, invite_code_required: false, brevo_quota_action: 'allow_unverified_registration' },
+      json: {
+        email_verification_required: true,
+        invite_code_required: false,
+        brevo_quota_action: 'allow_unverified_registration',
+        admin_invite_email_reserve: 20,
+        password_reset_email_reserve: 10,
+      },
     })))
+  })
+
+  it('blocks reserve totals above the daily limit before sending the update', async () => {
+    const user = userEvent.setup()
+    render(<RegistrationSettingsSection />)
+    const adminReserve = await screen.findByLabelText('管理员邀请验证预留')
+    await user.clear(adminReserve)
+    await user.type(adminReserve, '295')
+    await user.click(screen.getByRole('button', { name: '保存注册设置' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('两类邮件预留总和不能超过 300')
+    expect(adminApiJson.mock.calls.some(([, options]) => options?.method === 'PUT')).toBe(false)
   })
 })

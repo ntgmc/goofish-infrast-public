@@ -224,6 +224,11 @@ function assertWorkerDeploymentScript() {
   }
   assert.doesNotMatch(workerDeployScript, /npm run build/, 'worker deploy must not build on the server')
   assert.doesNotMatch(workerDeployScript, /git restore/, 'worker deploy must not restore generated files')
+  assert.doesNotMatch(
+    workerDeployScript,
+    /run_systemctl disable --now "\$\(service_unit "\$OLD_ACTIVE_SLOT"\)"/,
+    'worker deploy must not block on the previous slot drain',
+  )
 
   const failBody = extractFunction(workerDeployScript, 'fail')
   assert.match(failBody, /return 1/, 'worker deployment failures must flow through the ERR cleanup trap')
@@ -251,7 +256,8 @@ function assertWorkerDeploymentScript() {
     'if [[ "$CANDIDATE_ONLY" == "true" ]]',
     'atomic_link "slots/$CANDIDATE_SLOT" "$CURRENT_LINK"',
     'run_systemctl enable "$(service_unit "$CANDIDATE_SLOT")"',
-    'run_systemctl disable --now "$(service_unit "$OLD_ACTIVE_SLOT")"',
+    'run_systemctl disable "$(service_unit "$OLD_ACTIVE_SLOT")"',
+    'run_systemctl --no-block stop "$(service_unit "$OLD_ACTIVE_SLOT")"',
     'check_readiness "$CANDIDATE_SLOT"',
   ])
 }

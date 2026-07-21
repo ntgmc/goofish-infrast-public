@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
-import { getOptimizeGlobalWorkerConcurrency } from '../optimize-job-config'
+import type { OptimizeCalculationStage } from '../../src/lib/types'
+import { getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs } from '../optimize-job-config'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import {
@@ -36,6 +37,8 @@ export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
   next_attempt_at: string | null
   expires_at: string | null
   cancel_requested_at: string | null
+  execution_stage: OptimizeCalculationStage | null
+  stage_updated_at: string | null
   created_at: string
   started_at: string | null
   finished_at: string | null
@@ -82,6 +85,7 @@ export interface OptimizeJobStore {
   claimNextJob: (workerId: string, lockToken: string, lockExpiresAt: string, maxFailures: number, maxGlobalRunning?: number) => Promise<OptimizeJobRecord | null>
   heartbeatAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string, lockExpiresAt: string) => Promise<boolean>
   ownsAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string) => Promise<boolean>
+  updateAttemptStage: (id: string, attemptNo: number, workerId: string, lockToken: string, stage: OptimizeCalculationStage) => Promise<boolean>
   completeAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string, result: unknown) => Promise<boolean>
   failAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string, errorMessage: string) => Promise<boolean>
   retryFailedAttempt: (id: string, attemptNo: number, workerId: string, lockToken: string, failureKind: OptimizeJobFailureKind, errorMessage: string, maxFailures: number) => Promise<OptimizeJobStatus | null>
@@ -242,24 +246,12 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         if (running >= limits.running || queued >= limits.queued + (input.source === 'free_preview' ? 1 : 0)) {
           throw new OptimizeJobAdmissionError('queue_capacity_exceeded', 429, '当前账号的优化队列已满，请稍后重试。')
         }
-        const isSuggestionContinuation = input.source === 'optimize_suggestions'
-        if (isSuggestionContinuation) {
-          const submittedSuggestions = await client.query<{ count: string }>(
-            `select count(*)::text as count from optimize_jobs
-             where owner_key = $1 and source = 'optimize_suggestions'
-               and created_at >= now() - interval '1 hour'`, [input.owner_key],
-          )
-          if (Number(submittedSuggestions.rows[0]?.count ?? 0) >= 12) {
-            throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
-          }
-        } else {
-          const submitted = await client.query<{ count: string }>(
-            `select count(*)::text as count from optimization_submissions
-             where owner_key = $1 and created_at >= now() - interval '1 hour'`, [input.owner_key],
-          )
-          if (Number(submitted.rows[0]?.count ?? 0) >= limits.perHour) {
-            throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
-          }
+        const submitted = await client.query<{ count: string }>(
+          `select count(*)::text as count from optimization_submissions
+           where owner_key = $1 and created_at >= now() - interval '1 hour'`, [input.owner_key],
+        )
+        if (Number(submitted.rows[0]?.count ?? 0) >= limits.perHour) {
+          throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
         }
 
         if (input.free_profile_id) {
@@ -315,9 +307,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           'values ($1, $2, $3, $4, $5, $6, $7, $8, null, null, 0, null, null, $9, $10, $9, null, null, $9)',
           'returning *',
         ].join(' '), [input.id, 'queued', input.priority, input.owner_key, input.profile_id ?? null, input.permission, input.source, input.payload_json, now, queueExpiresAt(now)])
-        if (!isSuggestionContinuation) {
-          await client.query('insert into optimization_submissions (id, owner_key, created_at) values ($1, $2, $3)', [randomUUID(), input.owner_key, now])
-        }
+        await client.query('insert into optimization_submissions (id, owner_key, created_at) values ($1, $2, $3)', [randomUUID(), input.owner_key, now])
         await client.query(
           `insert into optimization_idempotency (owner_key, idempotency_key, request_hash, status, job_id, created_at, updated_at)
            values ($1, $2, $3, 'accepted', $4, $5, $5)`,
@@ -391,6 +381,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         '    lock_expires_at = $3,',
         '    next_attempt_at = null,',
         '    expires_at = null,',
+        "    execution_stage = 'starting',",
+        '    stage_updated_at = $5,',
         '    started_at = coalesce(job.started_at, $5),',
         '    finished_at = null,',
         '    updated_at = $5',
@@ -440,6 +432,17 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       )
       return Boolean(owned.rowCount)
     },
+    updateAttemptStage: async (id, attemptNo, workerId, lockToken, stage) => {
+      await ensureSchema()
+      const now = new Date().toISOString()
+      const updated = await query(
+        `update optimize_jobs set execution_stage = $5, stage_updated_at = $6, updated_at = $6
+         where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4
+           and status = 'running' and cancel_requested_at is null`,
+        [id, attemptNo, workerId, lockToken, stage, now],
+      )
+      return Boolean(updated.rowCount)
+    },
     completeAttempt: async (id, attemptNo, workerId, lockToken, resultJson) => {
       await ensureSchema()
       const now = new Date().toISOString()
@@ -447,7 +450,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         const completed = await client.query([
           'update optimize_jobs',
           'set status = $7, result_json = $5, error_message = null, failure_kind = null, public_error_code = null, worker_id = null, heartbeat_at = null,',
-          '    lock_token = null, lock_expires_at = null, finished_at = $6, updated_at = $6',
+          "    lock_token = null, lock_expires_at = null, execution_stage = 'completed', stage_updated_at = $6, finished_at = $6, updated_at = $6",
           'where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = $8 and cancel_requested_at is null',
           'returning id',
         ].join(' '), [id, attemptNo, workerId, lockToken, resultJson, now, 'succeeded', 'running'])
@@ -499,6 +502,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
                failure_kind = case when failure_count + 1 >= $6 then $9 else null end,
                public_error_code = case when failure_count + 1 >= $6 then 'execution_retries_exhausted' else null end,
                worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
+               execution_stage = case when failure_count + 1 >= $6 then execution_stage else null end,
+               stage_updated_at = case when failure_count + 1 >= $6 then stage_updated_at else null end,
                next_attempt_at = case when failure_count + 1 >= $6 then null else $8::timestamptz end,
                finished_at = case when failure_count + 1 >= $6 then $7::timestamptz else null end,
                updated_at = $7
@@ -534,7 +539,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           `update optimize_jobs
            set status = 'queued', error_message = null, worker_id = null, heartbeat_at = null,
                lock_token = null, lock_expires_at = null, next_attempt_at = $5,
-               expires_at = null, finished_at = null, updated_at = $5
+               expires_at = null, execution_stage = null, stage_updated_at = null,
+               finished_at = null, updated_at = $5
            where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running'
            returning id`,
           [id, attemptNo, workerId, lockToken, now],
@@ -614,6 +620,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
                failure_kind = case when failure_count + 1 >= $2 then 'lease_lost' else null end,
                public_error_code = case when failure_count + 1 >= $2 then 'execution_retries_exhausted' else null end,
                worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
+               execution_stage = case when failure_count + 1 >= $2 then execution_stage else null end,
+               stage_updated_at = case when failure_count + 1 >= $2 then stage_updated_at else null end,
                next_attempt_at = case when failure_count + 1 >= $2 then null else $3::timestamptz end,
                finished_at = case when failure_count + 1 >= $2 then $1::timestamptz else null end,
                updated_at = $1
@@ -702,6 +710,8 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         next_attempt_at: now,
         expires_at: queueExpiresAt(now),
         cancel_requested_at: null,
+        execution_stage: null,
+        stage_updated_at: null,
         created_at: now,
         started_at: null,
         finished_at: null,
@@ -736,26 +746,15 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         throw new OptimizeJobAdmissionError('queue_capacity_exceeded', 429, '当前账号的优化队列已满，请稍后重试。')
       }
       const now = Date.now()
-      if (input.source === 'optimize_suggestions') {
-        const recentSuggestions = [...records.values()].filter((job) => (
-          job.owner_key === input.owner_key
-          && job.source === 'optimize_suggestions'
-          && Date.parse(job.created_at) >= now - 60 * 60_000
-        ))
-        if (recentSuggestions.length >= 12) {
-          throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
-        }
-      } else {
-        const recent = (submissions.get(input.owner_key) ?? []).filter((time) => time >= now - 60 * 60_000)
-        if (recent.length >= (free ? 2 : 12)) {
-          throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
-        }
-        recent.push(now)
-        submissions.set(input.owner_key, recent)
+      const recent = (submissions.get(input.owner_key) ?? []).filter((time) => time >= now - 60 * 60_000)
+      if (recent.length >= (free ? 2 : 12)) {
+        throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
       }
+      recent.push(now)
+      submissions.set(input.owner_key, recent)
       const job = await (async () => {
         const value = await Promise.resolve({ ...input, created_at: input.created_at ?? new Date(now).toISOString() })
-        const record: OptimizeJobRecord = { id: value.id, status: 'queued', priority: value.priority, owner_key: value.owner_key, profile_id: value.profile_id ?? null, permission: value.permission, source: value.source, payload_json: clone(value.payload_json), result_json: null, error_message: null, failure_kind: null, public_error_code: null, attempt_count: 0, failure_count: 0, worker_id: null, heartbeat_at: null, lock_token: null, lock_expires_at: null, next_attempt_at: value.created_at!, expires_at: queueExpiresAt(value.created_at!), cancel_requested_at: null, created_at: value.created_at!, started_at: null, finished_at: null, updated_at: value.created_at! }
+        const record: OptimizeJobRecord = { id: value.id, status: 'queued', priority: value.priority, owner_key: value.owner_key, profile_id: value.profile_id ?? null, permission: value.permission, source: value.source, payload_json: clone(value.payload_json), result_json: null, error_message: null, failure_kind: null, public_error_code: null, attempt_count: 0, failure_count: 0, worker_id: null, heartbeat_at: null, lock_token: null, lock_expires_at: null, next_attempt_at: value.created_at!, expires_at: queueExpiresAt(value.created_at!), cancel_requested_at: null, execution_stage: null, stage_updated_at: null, created_at: value.created_at!, started_at: null, finished_at: null, updated_at: value.created_at! }
         records.set(record.id, record)
         return record
       })()
@@ -796,6 +795,8 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       next.lock_expires_at = lockExpiresAt
       next.next_attempt_at = null
       next.expires_at = null
+      next.execution_stage = 'starting'
+      next.stage_updated_at = now
       next.started_at ??= now
       next.finished_at = null
       next.updated_at = now
@@ -817,6 +818,15 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       const job = records.get(id)
       return ownsMemoryAttempt(job, attemptNo, workerId, lockToken) && !job.cancel_requested_at
     },
+    updateAttemptStage: async (id, attemptNo, workerId, lockToken, stage) => {
+      const job = records.get(id)
+      if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || job.cancel_requested_at) return false
+      const now = new Date().toISOString()
+      job.execution_stage = stage
+      job.stage_updated_at = now
+      job.updated_at = now
+      return true
+    },
     completeAttempt: async (id, attemptNo, workerId, lockToken, resultJson) => {
       const job = records.get(id)
       if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || job.cancel_requested_at) return false
@@ -830,6 +840,8 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       job.heartbeat_at = null
       job.lock_token = null
       job.lock_expires_at = null
+      job.execution_stage = 'completed'
+      job.stage_updated_at = now
       job.finished_at = now
       job.updated_at = now
       const attempt = attempts.get(`${id}:${attemptNo}`)
@@ -876,6 +888,10 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       job.lock_token = null
       job.lock_expires_at = null
       job.next_attempt_at = job.status === 'dead_lettered' ? null : retryAt(attemptNo)
+      if (job.status === 'queued') {
+        job.execution_stage = null
+        job.stage_updated_at = null
+      }
       job.finished_at = job.status === 'dead_lettered' ? now : null
       job.updated_at = now
       const attempt = attempts.get(`${id}:${attemptNo}`)
@@ -898,6 +914,8 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       job.lock_expires_at = null
       job.next_attempt_at = now
       job.expires_at = null
+      job.execution_stage = null
+      job.stage_updated_at = null
       job.finished_at = null
       job.updated_at = now
       const attempt = attempts.get(`${id}:${attemptNo}`)
@@ -977,6 +995,8 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         } else {
           job.status = 'queued'
           job.error_message = null
+          job.execution_stage = null
+          job.stage_updated_at = null
           job.finished_at = null
         }
       }
@@ -1016,12 +1036,13 @@ type OptimizeQueueCapacityRow = Omit<OptimizeQueueCapacityJob, 'priority' | 'cre
   started_at: string | Date | null
 }
 
-type OptimizeJobRow = Omit<OptimizeJobRecord, 'heartbeat_at' | 'lock_expires_at' | 'next_attempt_at' | 'expires_at' | 'cancel_requested_at' | 'created_at' | 'started_at' | 'finished_at' | 'updated_at'> & {
+type OptimizeJobRow = Omit<OptimizeJobRecord, 'heartbeat_at' | 'lock_expires_at' | 'next_attempt_at' | 'expires_at' | 'cancel_requested_at' | 'stage_updated_at' | 'created_at' | 'started_at' | 'finished_at' | 'updated_at'> & {
   heartbeat_at: string | Date | null
   lock_expires_at: string | Date | null
   next_attempt_at: string | Date | null
   expires_at: string | Date | null
   cancel_requested_at: string | Date | null
+  stage_updated_at: string | Date | null
   created_at: string | Date
   started_at: string | Date | null
   finished_at: string | Date | null
@@ -1039,6 +1060,7 @@ function fromRow(row: OptimizeJobRow): OptimizeJobRecord {
     next_attempt_at: normalizeTimestamp(row.next_attempt_at),
     expires_at: normalizeTimestamp(row.expires_at),
     cancel_requested_at: normalizeTimestamp(row.cancel_requested_at),
+    stage_updated_at: normalizeTimestamp(row.stage_updated_at),
     created_at: normalizeTimestamp(row.created_at) ?? new Date().toISOString(),
     started_at: normalizeTimestamp(row.started_at),
     finished_at: normalizeTimestamp(row.finished_at),
@@ -1096,7 +1118,7 @@ function estimateOptimizeQueueWaitMs(
     const elapsedMs = Math.max(0, nowMs - parseQueueTimestamp(job.started_at, nowMs))
     const estimatedDurationMs = getQueueJobDurationMs(job.payload_json)
     const remainingMs = elapsedMs >= estimatedDurationMs
-      ? Math.max(1_000, optimizeJobHardTimeoutMs() - elapsedMs)
+      ? Math.max(1_000, getOptimizeJobHardTimeoutMs() - elapsedMs)
       : Math.max(1_000, estimatedDurationMs - elapsedMs)
     scheduleQueueWork(workerAvailableAt, ownerAvailableAt, job.owner_key, remainingMs)
   }
@@ -1149,10 +1171,6 @@ function getQueueJobDurationMs(payload: unknown): number {
 function parseQueueTimestamp(value: string | null, fallback: number): number {
   const parsed = value ? Date.parse(value) : Number.NaN
   return Number.isFinite(parsed) ? parsed : fallback
-}
-
-function optimizeJobHardTimeoutMs(): number {
-  return positiveInteger(process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS, 10 * 60_000, 1_000)
 }
 
 function getOptimizeGlobalQueueLimit(): number {
@@ -1226,17 +1244,12 @@ function buildDeadLetterDiagnostic(job: OptimizeJobRecord): Record<string, unkno
   const payload = job.payload_json && typeof job.payload_json === 'object'
     ? job.payload_json as Record<string, unknown>
     : {}
-  const request = payload.request && typeof payload.request === 'object'
-    ? payload.request as Record<string, unknown>
-    : {}
   const estimate = payload.estimate && typeof payload.estimate === 'object'
     ? payload.estimate as Record<string, unknown>
     : null
   return {
     payload_version: typeof payload.version === 'number' ? payload.version : null,
-    job_kind: typeof payload.kind === 'string'
-      ? payload.kind
-      : request.suggestions_only === true ? 'upgrade_suggestions' : 'schedule',
+    job_kind: typeof payload.kind === 'string' ? payload.kind : 'schedule',
     profile_id: job.profile_id,
     source: job.source,
     permission: job.permission,
@@ -1426,6 +1439,7 @@ export async function replayOptimizationDeadLetter(id: string, replayedBy: strin
     const originalResult = await client.query<OptimizeJobRow>('select * from optimize_jobs where id = $1 for update', [letter.job_id])
     const original = originalResult.rows[0] ? fromRow(originalResult.rows[0]) : null
     if (!original || original.status !== 'dead_lettered') return null
+    if (isLegacyStandaloneSuggestionJob(original.source, original.payload_json)) return null
     const now = new Date().toISOString()
     const replayedId = randomUUID()
     const inserted = await client.query<OptimizeJobRow>(
@@ -1448,6 +1462,14 @@ export async function replayOptimizationDeadLetter(id: string, replayedBy: strin
     )
     return inserted.rows[0] ? fromRow(inserted.rows[0]) : null
   })
+}
+
+function isLegacyStandaloneSuggestionJob(source: string, payload: unknown): boolean {
+  if (source === 'optimize_suggestions') return true
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false
+  const request = (payload as Record<string, unknown>).request
+  return Boolean(request && typeof request === 'object' && !Array.isArray(request)
+    && (request as Record<string, unknown>).suggestions_only === true)
 }
 
 export async function discardOptimizationDeadLetter(id: string): Promise<boolean> {

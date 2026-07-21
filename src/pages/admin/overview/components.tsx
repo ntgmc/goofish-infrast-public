@@ -109,7 +109,7 @@ export function FailureReasonPanel({ reasons, samples }: { reasons: UsageFailure
 export function LatencyPanel({ stats }: { stats: UsageLatencyStats }) {
   return (
     <section className="tool-panel p-5">
-      <h2 className="text-base font-semibold text-ink-primary">优化耗时</h2>
+      <h2 className="text-base font-semibold text-ink-primary">单次计算耗时</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <DetailItem label="平均" value={formatDuration(stats.average_ms)} />
         <DetailItem label="P50" value={formatDuration(stats.p50_ms)} />

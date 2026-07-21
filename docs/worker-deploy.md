@@ -75,7 +75,7 @@ OPTIMIZE_GLOBAL_WORKER_CONCURRENCY=3
 OPTIMIZE_QUEUE_POLL_MS=2000
 OPTIMIZE_JOB_LOCK_TTL_MS=60000
 OPTIMIZE_JOB_HEARTBEAT_MS=15000
-OPTIMIZE_JOB_HARD_TIMEOUT_MS=900000
+OPTIMIZE_JOB_HARD_TIMEOUT_MS=600000
 OPTIMIZE_SHUTDOWN_GRACE_MS=900000
 POSTGRES_POOL_MAX=3
 ```
@@ -97,8 +97,10 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl enable goofish-optimize-worker@bl
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl enable goofish-optimize-worker@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl enable --now goofish-optimize-worker@blue.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl enable --now goofish-optimize-worker@green.service
-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl disable --now goofish-optimize-worker@blue.service
-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl disable --now goofish-optimize-worker@green.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl disable goofish-optimize-worker@blue.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl disable goofish-optimize-worker@green.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl --no-block stop goofish-optimize-worker@blue.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl --no-block stop goofish-optimize-worker@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-optimize-worker@blue.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-optimize-worker@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-optimize-worker@blue.service --no-pager --lines=80
@@ -130,10 +132,10 @@ Application and WireGuard secrets remain on the servers. They are not GitHub dep
 `Deploy Production` downloads one immutable Quality Checks artifact and deploys the exact SHA in this order:
 
 1. Start and verify the inactive Hangzhou worker slot.
-2. Switch the worker slot and gracefully drain the previous worker for up to 15 minutes.
+2. Switch the worker slot and ask systemd to gracefully drain the previous worker for up to 15 minutes without blocking the deployment.
 3. Deploy the Seoul API through its existing blue/green process.
 
-If the worker candidate fails readiness, the API is not deployed. If the worker succeeds and the API fails, the previous API remains active and the new worker continues to accept the previous persisted payload version. Re-run the workflow after repairing the API failure, or manually deploy the previous successful SHA to the worker.
+The previous worker release remains protected by its slot and `previous` links while systemd completes the asynchronous drain. If the worker candidate fails readiness, the API is not deployed. If the worker succeeds and the API fails, the previous API remains active and the new worker continues to accept the previous persisted payload version. Re-run the workflow after repairing the API failure, or manually deploy the previous successful SHA to the worker.
 
 Use `CANDIDATE_ONLY=true` with `scripts/deploy-worker-atomic.sh` to verify a worker release without switching slots.
 

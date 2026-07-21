@@ -9,11 +9,12 @@ import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriorit
 import { getOptimizePollAfterMs, kickOptimizeJobCancellation, kickOptimizeJobProcessing } from "../../optimize-job-runner";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
 import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload, OptimizeJobSource } from './shared';
-import { OPTIMIZE_ANALYSIS_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MAX_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
+import { OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
 import { jsonResponse } from './http-core';
 import { prepareOptimizeJob } from './prepare-job';
 import { getServiceLifecycleState } from '../../lifecycle';
 import { getSecretKeyring } from '../../handlers/license-utils';
+import { getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
 
 export async function submitOptimizationJob(req: Request): Promise<Response> {
   const lifecycleState = getServiceLifecycleState();
@@ -184,6 +185,7 @@ function formatOptimizationJobSnapshot(
   runtimeEstimate: OptimizeRuntimeEstimate,
 ): OptimizationJobSnapshot {
   const status = job.status === 'running' ? 'running' : job.status;
+  const upgradeSuggestions = getUpgradeSuggestionIntent(job);
   const base = {
     id: job.id,
     status: job.status === 'running' ? 'running' : 'queued',
@@ -198,6 +200,7 @@ function formatOptimizationJobSnapshot(
       ...(job.finished_at !== undefined && { finishedAt: job.finished_at }),
       nextAttemptAt: job.next_attempt_at,
       cancelRequestedAt: job.cancel_requested_at,
+      stageUpdatedAt: job.stage_updated_at,
     },
     estimate: {
       durationMs: estimate.estimated_duration_ms,
@@ -210,6 +213,8 @@ function formatOptimizationJobSnapshot(
       updatedAt: runtimeEstimate.estimate_updated_at,
     },
     executionPhase: getOptimizeExecutionPhase(job),
+    calculationStage: job.execution_stage,
+    upgradeSuggestions,
     attemptCount: job.attempt_count,
     failureCount: job.failure_count,
     cancellationRequested: Boolean(job.cancel_requested_at),
@@ -232,11 +237,23 @@ function formatOptimizationJobSnapshot(
   return { ...base, status };
 }
 
-function getOptimizeJobKind(job: OptimizeJobRecord): 'schedule' | 'upgrade_suggestions' | 'scenario_comparison' {
+function getUpgradeSuggestionIntent(job: OptimizeJobRecord): { requested: boolean; allowed: boolean } {
+  const payload = job.payload_json && typeof job.payload_json === 'object' && !Array.isArray(job.payload_json)
+    ? job.payload_json as Record<string, unknown>
+    : {}
+  const request = payload.request && typeof payload.request === 'object' && !Array.isArray(payload.request)
+    ? payload.request as Record<string, unknown>
+    : {}
+  return {
+    requested: request.include_upgrade_suggestions === true,
+    allowed: request.upgrade_suggestions_allowed === true,
+  }
+}
+
+function getOptimizeJobKind(job: OptimizeJobRecord): 'schedule' | 'scenario_comparison' {
   const payload = job.payload_json && typeof job.payload_json === 'object' ? job.payload_json as Record<string, unknown> : {}
   if (payload.kind === 'scenario_comparison') return 'scenario_comparison'
-  const request = payload.request && typeof payload.request === 'object' ? payload.request as Record<string, unknown> : {}
-  return request.suggestions_only === true ? 'upgrade_suggestions' : 'schedule'
+  return 'schedule'
 }
 
 function getOptimizeExecutionPhase(job: OptimizeJobRecord): 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal' {
@@ -295,7 +312,11 @@ function formatJobPriorityLabel(job: Pick<OptimizeJobRecord, 'priority'>): strin
 function getOptimizeJobEstimate(job: OptimizeJobRecord): OptimizeDurationEstimate {
   const payload = job.payload_json as Partial<OptimizationJobPayload> | null;
   if (isOptimizeDurationEstimate(payload?.estimate)) return payload.estimate;
-  const bucket = payload?.effectiveConfig ? getOptimizeEstimateBucket(payload.effectiveConfig) : 'maa_plain';
+  const withSuggestions = payload?.request?.include_upgrade_suggestions === true
+    && payload.request.upgrade_suggestions_allowed === true;
+  const bucket = payload?.effectiveConfig
+    ? getOptimizeEstimateBucket(payload.effectiveConfig, withSuggestions)
+    : withSuggestions ? 'maa_plain_with_suggestions' : 'maa_plain';
   return buildFallbackOptimizeEstimate(bucket);
 }
 
@@ -386,21 +407,30 @@ function isOptimizeDurationEstimate(value: unknown): value is OptimizeDurationEs
 }
 
 function isOptimizeEstimateBucket(value: unknown): value is OptimizeEstimateBucket {
-  return value === 'maa_fiammetta' || value === 'maa_plain' || value === 'rotation' || value === 'scenario_comparison';
+  return value === 'maa_fiammetta'
+    || value === 'maa_fiammetta_with_suggestions'
+    || value === 'maa_plain'
+    || value === 'maa_plain_with_suggestions'
+    || value === 'rotation'
+    || value === 'rotation_with_suggestions'
+    || value === 'scenario_comparison';
 }
 
-export function getOptimizeEstimateBucket(config: LicenseConfig): OptimizeEstimateBucket {
+export function getOptimizeEstimateBucket(config: LicenseConfig, includeUpgradeSuggestions = false): OptimizeEstimateBucket {
   const mode = String(config.schedule_mode ?? 'maa').toLowerCase();
-  if (mode === 'rotation') return 'rotation';
-  return config.Fiammetta?.enable === true ? 'maa_fiammetta' : 'maa_plain';
+  if (mode === 'rotation') return includeUpgradeSuggestions ? 'rotation_with_suggestions' : 'rotation';
+  if (config.Fiammetta?.enable === true) {
+    return includeUpgradeSuggestions ? 'maa_fiammetta_with_suggestions' : 'maa_fiammetta';
+  }
+  return includeUpgradeSuggestions ? 'maa_plain_with_suggestions' : 'maa_plain';
 }
 
 export function getEstimateScheduleMode(bucket: OptimizeEstimateBucket): 'maa' | 'rotation' {
-  return bucket === 'rotation' ? 'rotation' : 'maa';
+  return bucket === 'rotation' || bucket === 'rotation_with_suggestions' ? 'rotation' : 'maa';
 }
 
 export function isEstimateFiammettaEnabled(bucket: OptimizeEstimateBucket): boolean {
-  return bucket === 'maa_fiammetta';
+  return bucket === 'maa_fiammetta' || bucket === 'maa_fiammetta_with_suggestions';
 }
 
 export async function resolveOptimizeDurationEstimate(bucket: OptimizeEstimateBucket): Promise<OptimizeDurationEstimate> {
@@ -431,9 +461,9 @@ export function buildScenarioComparisonEstimate(scenarioCount: number, variableS
   const fixedCount = count - variableCount
   const estimatedVerifications = Math.min(9, count)
   return {
-    estimated_duration_ms: clampOptimizeEstimateMs(
-      fixedCount * 4_000 + variableCount * SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT * 4_000 + estimatedVerifications * 9_000,
-      OPTIMIZE_ANALYSIS_ESTIMATE_MAX_MS,
+    estimated_duration_ms: Math.max(
+      OPTIMIZE_ESTIMATE_MIN_MS,
+      Math.round(fixedCount * 4_000 + variableCount * SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT * 4_000 + estimatedVerifications * 9_000),
     ),
     estimate_bucket: 'scenario_comparison',
     estimate_source: 'fallback_p95',
@@ -450,7 +480,7 @@ function buildFallbackOptimizeEstimate(bucket: OptimizeEstimateBucket): Optimize
   };
 }
 
-function clampOptimizeEstimateMs(value: number, maxMs = OPTIMIZE_ESTIMATE_MAX_MS): number {
+function clampOptimizeEstimateMs(value: number, maxMs = getOptimizeJobHardTimeoutMs()): number {
   if (!Number.isFinite(value)) return OPTIMIZE_ESTIMATE_FALLBACK_MS.maa_plain;
   return Math.max(OPTIMIZE_ESTIMATE_MIN_MS, Math.min(maxMs, Math.round(value)));
 }

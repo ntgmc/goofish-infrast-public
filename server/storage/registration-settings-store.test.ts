@@ -16,11 +16,23 @@ describe('registration settings', () => {
       email_verification_required: false,
       updated_at: '2026-07-19T00:00:00.000Z',
     })).toEqual({
-      version: 3,
+      version: 4,
       email_verification_required: false,
       invite_code_required: false,
       brevo_quota_action: 'pause_registration',
+      admin_invite_email_reserve: 0,
+      password_reset_email_reserve: 0,
       updated_at: '2026-07-19T00:00:00.000Z',
+    })
+  })
+
+  it('normalizes invalid stored reserve totals without exceeding the daily limit', () => {
+    expect(normalizeRegistrationSettings({
+      admin_invite_email_reserve: 250,
+      password_reset_email_reserve: 100,
+    })).toMatchObject({
+      admin_invite_email_reserve: 250,
+      password_reset_email_reserve: 50,
     })
   })
 
@@ -29,25 +41,49 @@ describe('registration settings', () => {
       email_verification_required: false,
       invite_code_required: true,
       brevo_quota_action: 'allow_unverified_registration',
+      admin_invite_email_reserve: 20,
+      password_reset_email_reserve: 10,
     })).toEqual({
       email_verification_required: false,
       invite_code_required: true,
       brevo_quota_action: 'allow_unverified_registration',
+      admin_invite_email_reserve: 20,
+      password_reset_email_reserve: 10,
     })
     expect(() => validateRegistrationSettingsPatch({})).toThrow(/布尔值/)
     expect(() => validateRegistrationSettingsPatch({
       email_verification_required: false,
       brevo_quota_action: 'pause_registration',
+      admin_invite_email_reserve: 0,
+      password_reset_email_reserve: 0,
     })).toThrow(/仅邀请/)
     expect(() => validateRegistrationSettingsPatch({
       email_verification_required: false,
       invite_code_required: false,
+      admin_invite_email_reserve: 0,
+      password_reset_email_reserve: 0,
     })).toThrow(/处理方式/)
     expect(() => validateRegistrationSettingsPatch({
       email_verification_required: true,
       invite_code_required: false,
       brevo_quota_action: 'unknown',
+      admin_invite_email_reserve: 0,
+      password_reset_email_reserve: 0,
     })).toThrow(/处理方式/)
+    expect(() => validateRegistrationSettingsPatch({
+      email_verification_required: true,
+      invite_code_required: false,
+      brevo_quota_action: 'pause_registration',
+      admin_invite_email_reserve: 200,
+      password_reset_email_reserve: 101,
+    })).toThrow(/总和/)
+    expect(() => validateRegistrationSettingsPatch({
+      email_verification_required: true,
+      invite_code_required: false,
+      brevo_quota_action: 'pause_registration',
+      admin_invite_email_reserve: 1.5,
+      password_reset_email_reserve: 0,
+    })).toThrow(/整数/)
     expect(() => validateRegistrationSettingsPatch(null)).toThrow(/对象/)
   })
 })

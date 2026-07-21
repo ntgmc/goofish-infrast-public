@@ -16,6 +16,7 @@ import { hasCapability } from '../../../src/lib/product-catalog';
 import { getFreeScheduleEntitlement } from '../../storage/reorder-admission';
 import { requestSchemas } from '../../security/request-policy';
 import { getValidatedJson } from '../../security/request-validation';
+import { formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -26,7 +27,7 @@ export async function prepareOptimizeJob(
   let isScenarioComparison = false;
 
   const fail = async (body: Record<string, unknown>, status: number): Promise<{ ok: false; response: Response }> => {
-    if (!isScenarioComparison) await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, submittedAt);
+    if (!isScenarioComparison) await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, { submittedAt });
     return { ok: false, response: jsonResponse(body, status) };
   };
 
@@ -44,11 +45,7 @@ export async function prepareOptimizeJob(
     const operators = body.operators;
     const config = body.config;
     const profile_id = body.identity.profileId;
-    const ignore_elite = body.kind === 'schedule' ? body.ignoreElite : true;
-    const include_current = body.kind === 'schedule' ? body.includeCurrent : false;
-    const suggestions_only = body.kind === 'upgrade_suggestions';
-    const upgrade_task_payload = body.kind === 'upgrade_suggestions' ? body.upgradeTaskPayload : undefined;
-    const history_result_id = body.kind === 'upgrade_suggestions' ? body.historyResultId : undefined;
+    const includeUpgradeSuggestions = body.kind === 'schedule' && body.includeUpgradeSuggestions;
     const history_source = body.kind === 'schedule' ? body.historySource : undefined;
     const usePriorityCoupon = rawBody.use_priority_coupon === true;
 
@@ -141,10 +138,6 @@ export async function prepareOptimizeJob(
     }
 
     const canUseUpgrades = (!isPreviewProfile || isPreviewTrial) && canUseUpgradeFeatures(effectiveLicense);
-    if (!canUseUpgrades && (ignore_elite || include_current || suggestions_only)) {
-      scheduleUsage = scheduleFailure('permission_denied', scheduleUsageBase);
-      return fail({ error: '当前套餐不包含练度提升建议。' }, 403);
-    }
 
     const configForPermission = isPreviewProfile && !isPreviewTrial
       ? resolveFreePreviewConfig(config)
@@ -164,8 +157,8 @@ export async function prepareOptimizeJob(
         return fail({ error: error instanceof Error ? error.message : String(error) }, 400);
       }
       const estimate = buildScenarioComparisonEstimate(expansion.scenarios.length, expansion.variableScenarioCount);
-      if (estimate.estimated_duration_ms > 10 * 60_000) {
-        return fail({ error: '场景组合预计计算时间超过十分钟上限，请减少场景或变量。', code: 'scenario_cost_exceeded' }, 429);
+      if (estimate.estimated_duration_ms > getOptimizeJobHardTimeoutMs()) {
+        return fail({ error: `场景组合预计计算时间超过${formatOptimizeJobHardTimeout()}上限，请减少场景或变量。`, code: 'scenario_cost_exceeded' }, 429);
       }
       const queuePriority = getScenarioComparisonQueuePriority(isPreviewProfile, isPreviewTrial);
       return {
@@ -191,7 +184,7 @@ export async function prepareOptimizeJob(
         },
       };
     }
-    const estimateBucket = getOptimizeEstimateBucket(effectiveConfig);
+    const estimateBucket = getOptimizeEstimateBucket(effectiveConfig, includeUpgradeSuggestions && canUseUpgrades);
     Object.assign(scheduleUsageBase, {
       schedule_mode: getEstimateScheduleMode(estimateBucket),
       fiammetta_enabled: isEstimateFiammettaEnabled(estimateBucket),
@@ -223,9 +216,7 @@ export async function prepareOptimizeJob(
       freeScheduleDecision = decision;
     }
 
-    const source: OptimizeJobSource = suggestions_only
-      ? 'optimize_suggestions'
-      : isPreviewProfile ? 'free_preview' : 'account_profile';
+    const source: OptimizeJobSource = isPreviewProfile ? 'free_preview' : 'account_profile';
     const priority: OptimizeJobPriority = usePriorityCoupon ? 'priority_coupon' : isPreviewProfile ? 'standard' : 'paid';
     const ownerKey = 'profile:' + activeProfileId;
     const estimate = await resolveOptimizeDurationEstimate(estimateBucket);
@@ -252,14 +243,18 @@ export async function prepareOptimizeJob(
           isPreviewTrial,
           freeScheduleDecision,
           estimate,
-          request: { ignore_elite, include_current, suggestions_only, upgrade_task_payload, history_result_id, history_source },
+          request: {
+            include_upgrade_suggestions: includeUpgradeSuggestions,
+            upgrade_suggestions_allowed: canUseUpgrades,
+            history_source,
+          },
         }),
       },
     };
   } catch (err: unknown) {
     console.error('optimize-schedule enqueue error:', err);
     const message = 'Internal server error';
-    if (!isScenarioComparison) await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, submittedAt);
+    if (!isScenarioComparison) await recordScheduleGenerate(checkedCdkRecord, scheduleUsage, { submittedAt });
     return { ok: false, response: jsonResponse({ error: message }, 500) };
   }
 }

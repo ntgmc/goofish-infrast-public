@@ -66,6 +66,7 @@ export default function ResultSection({
       <div data-tour-target="optimize-result-actions">
       {phase === 'history' && historyItem && (
         <Suspense fallback={<ResultFallback />}>
+          <UpgradeSuggestionStatusNotice result={historyItem.result} />
           <ResultPanel
             result={historyItem.result}
             operators={operators}
@@ -90,6 +91,7 @@ export default function ResultSection({
 
       {phase === 'suggestions' && currentResult && (
         <Suspense fallback={<ResultFallback />}>
+          <UpgradeSuggestionStatusNotice result={currentResult} />
           <ResultPanel
             result={currentResult}
             operators={operators}
@@ -126,6 +128,32 @@ export default function ResultSection({
       )}
       </div>
     </section>
+  )
+}
+
+export function UpgradeSuggestionStatusNotice({ result }: { result: OptimizeResult }) {
+  const status = result.upgrade_suggestions_status
+  if (!status) return null
+  const message = status === 'completed'
+    ? result.upgrade_suggestions?.length
+      ? copy.optimize.pages_tool_optimize_ResultSection_008
+      : copy.optimize.pages_tool_optimize_ResultSection_009
+    : status === 'failed'
+      ? copy.optimize.pages_tool_optimize_ResultSection_010
+      : status === 'not_allowed'
+        ? copy.optimize.pages_tool_optimize_ResultSection_011
+        : copy.optimize.pages_tool_optimize_ResultSection_012
+  const className = status === 'completed'
+    ? 'tool-alert--success'
+    : status === 'failed' || status === 'not_allowed' ? 'tool-alert--warning' : ''
+  return (
+    <div
+      className={`tool-alert ${className} mb-4`}
+      role={status === 'failed' ? 'alert' : 'status'}
+      aria-live={status === 'failed' ? 'assertive' : 'polite'}
+    >
+      {message}
+    </div>
   )
 }
 

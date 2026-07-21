@@ -3,7 +3,7 @@ import type { CreateOptimizationJobRequest } from '../../../lib/optimization-con
 import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse, OptimizeResult } from '../../../lib/types'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
-import { buildOptimizeJobStorageKey, clearActiveOptimizeJob, clearOptimizeSubmissionKey, fetchOptimizeJobStatus, getOrCreateOptimizeSubmissionKey, isOptimizeJobPollCancelled, isRetryableOptimizePollError, mergeOptimizeJobProgress, OptimizeJobPollCancelledError, prepareOptimizeContinuationProgress, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
+import { buildOptimizeJobStorageKey, clearActiveOptimizeJob, clearOptimizeSubmissionKey, fetchOptimizeJobStatus, getOrCreateOptimizeSubmissionKey, isOptimizeJobPollCancelled, isRetryableOptimizePollError, mergeOptimizeJobProgress, OptimizeJobPollCancelledError, readActiveOptimizeJob, waitForOptimizePoll, writeActiveOptimizeJob } from './job-progress'
 import { submitOptimizationJob } from './optimization-api'
 import { publishLegacyOptimizationJobUpdate, subscribeOptimizationJobUpdates, withOptimizationSubmissionLock } from './optimization-job-events'
 import { copy } from '../../../copy/index'
@@ -53,7 +53,6 @@ export function useOptimizationJob({
     progressMode: ScheduleProgressState['mode'],
     fallbackMessage: string,
     isCancelled?: () => boolean,
-    continueProgress = false,
   ): Promise<OptimizeResult> => {
     const throwIfCancelled = () => {
       if (isCancelled?.()) throw new OptimizeJobPollCancelledError()
@@ -66,13 +65,8 @@ export function useOptimizationJob({
       const stored = readActiveOptimizeJob(storageKey)
       const storedProgress = stored?.job.job_id === next.job_id ? stored.progress : null
       const currentProgress = progressRef.current ?? storedProgress
-      const isContinuationStart = Boolean(continueProgress && currentProgress && currentProgress.jobId !== next.job_id)
-      const progressSeed = continueProgress
-        ? prepareOptimizeContinuationProgress(currentProgress, next, Date.now())
-        : currentProgress
       const nextProgress = {
-        ...mergeOptimizeJobProgress(progressSeed, next, progressMode, Date.now()),
-        ...(isContinuationStart && { estimateAdjustment: copy.optimize.pages_tool_optimize_useOptimizationJob_001 }),
+        ...mergeOptimizeJobProgress(currentProgress, next, progressMode, Date.now()),
         connectionStatus: connection?.connectionStatus ?? 'connected',
         consecutivePollFailures: connection?.consecutivePollFailures ?? 0,
         lastSuccessfulSyncAt: connection?.connectionStatus === 'reconnecting'
@@ -154,7 +148,6 @@ export function useOptimizationJob({
     payload: CreateOptimizationJobRequest,
     progressMode: ScheduleProgressState['mode'],
     fallbackMessage: string,
-    continueProgress = false,
   ): Promise<OptimizeResult> => {
     const storageKey = buildOptimizeJobStorageKey(profileId, orderHash, signature, progressMode)
     const idempotencyKey = getOrCreateOptimizeSubmissionKey(storageKey, payload)
@@ -164,7 +157,7 @@ export function useOptimizationJob({
     writeActiveOptimizeJob(storageKey, accepted)
     clearOptimizeSubmissionKey(storageKey)
     try {
-      return await pollOptimizationJob(accepted, storageKey, progressMode, fallbackMessage, undefined, continueProgress)
+      return await pollOptimizationJob(accepted, storageKey, progressMode, fallbackMessage)
     } catch (error) {
       if (!isOptimizeJobPollCancelled(error)) clearActiveOptimizeJob(storageKey)
       throw error

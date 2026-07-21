@@ -10,6 +10,14 @@ describe('persisted optimization payload compatibility', () => {
     expect(normalizePersistedOptimizationJobPayload(payload)).toBe(payload)
   })
 
+  it.each([2, 3])('rejects legacy standalone suggestion payloads at version %i', (version) => {
+    expect(() => normalizePersistedOptimizationJobPayload({
+      version,
+      submittedAt: 1,
+      request: { suggestions_only: true },
+    })).toThrow(UnsupportedOptimizationJobPayloadError)
+  })
+
   it('normalizes the previous version without retaining legacy secret-bearing records', () => {
     const normalized = normalizePersistedOptimizationJobPayload({
       version: 2,
