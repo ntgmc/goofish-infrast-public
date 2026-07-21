@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
+import { getOptimizeGlobalWorkerConcurrency } from '../optimize-job-config'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import {
@@ -1082,7 +1083,7 @@ function estimateOptimizeQueueWaitMs(
   ownerKey: string,
   nowMs: number,
 ): number {
-  const workerAvailableAt = Array.from({ length: optimizeGlobalWorkerConcurrency() }, () => 0)
+  const workerAvailableAt = Array.from({ length: getOptimizeGlobalWorkerConcurrency() }, () => 0)
   const ownerAvailableAt = new Map<string, number>()
   const runningJobs = activeJobs.filter((job) => job.status === 'running')
   // Count every existing queued job as potential work ahead. Future priority
@@ -1148,10 +1149,6 @@ function getQueueJobDurationMs(payload: unknown): number {
 function parseQueueTimestamp(value: string | null, fallback: number): number {
   const parsed = value ? Date.parse(value) : Number.NaN
   return Number.isFinite(parsed) ? parsed : fallback
-}
-
-function optimizeGlobalWorkerConcurrency(): number {
-  return positiveInteger(process.env.OPTIMIZE_GLOBAL_WORKER_CONCURRENCY, 2, 1)
 }
 
 function optimizeJobHardTimeoutMs(): number {
@@ -1543,6 +1540,9 @@ function shanghaiMonthKey(value: Date): string {
 }
 
 function ensureSchema(): Promise<void> {
-  schemaReady ??= ensureDatabaseSchema()
+  schemaReady ??= ensureDatabaseSchema().catch((error) => {
+    schemaReady = null
+    throw error
+  })
   return schemaReady
 }

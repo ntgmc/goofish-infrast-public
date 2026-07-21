@@ -32,7 +32,7 @@ Add a narrow `pg_hba.conf` rule using SCRAM and TLS:
 hostssl goofish_infrast_v1 goofish_worker 10.66.0.2/32 scram-sha-256
 ```
 
-Use a PostgreSQL server certificate trusted by the worker. The worker `DATABASE_URL` must target `10.66.0.1` and require TLS. Defense in depth is intentional: WireGuard protects the route, while PostgreSQL TLS authenticates and encrypts the database session.
+The worker `DATABASE_URL` must target `10.66.0.1` and require TLS. During the initial rollout with Ubuntu's self-signed PostgreSQL certificate, use `?uselibpqcompat=true&sslmode=require`: WireGuard authenticates the private route and PostgreSQL TLS encrypts the database session, but the certificate identity is not verified. Replace the self-signed certificate with a private-CA certificate and move to `sslmode=verify-full` as the hardened target; never use `NODE_TLS_REJECT_UNAUTHORIZED=0`.
 
 Enable the tunnel on both hosts:
 
@@ -70,7 +70,7 @@ The production worker environment starts with:
 
 ```text
 APP_ROLE=worker
-OPTIMIZE_WORKER_CONCURRENCY=3
+OPTIMIZE_WORKER_CONCURRENCY=1
 OPTIMIZE_GLOBAL_WORKER_CONCURRENCY=3
 OPTIMIZE_QUEUE_POLL_MS=2000
 OPTIMIZE_JOB_LOCK_TTL_MS=60000
@@ -81,6 +81,8 @@ POSTGRES_POOL_MAX=3
 ```
 
 The worker needs the current Skland credential decryption key and the previous key pair only during rotation. It does not need administrator passwords, administrator signing secrets, Brevo credentials, or public application credentials. Allow DNS and outbound HTTPS for Skland and Yituliu requests.
+
+Production `APP_ROLE=api` and `APP_ROLE=worker` processes never execute `CREATE`, `ALTER`, data backfills, or other database migrations. Their readiness paths share a cached read-only catalog compatibility check and fail with the missing table/column names when Seoul has not been migrated. Provision schema changes through a controlled database migration before starting an API or Worker release that requires them; do not grant runtime processes migration ownership as a startup workaround.
 
 ## Least-privilege deployment commands
 

@@ -1,3 +1,4 @@
+import { resolveAppRole } from '../process-role'
 import { query } from './postgres'
 
 const CREATE_SCHEMA_SQL = `
@@ -704,6 +705,77 @@ ALTER TABLE user_game_accounts ALTER COLUMN cdk_code_hash DROP NOT NULL;
 ALTER TABLE user_game_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
 `
 
+const TABLE_CONSTRAINT_KEYWORDS = new Set(['check', 'constraint', 'foreign', 'primary', 'unique'])
+
+export type DatabaseSchemaMode = 'migrate' | 'validate'
+
+let runtimeSchemaReady: Promise<void> | null = null
+
+export function resolveDatabaseSchemaMode(environment: NodeJS.ProcessEnv = process.env): DatabaseSchemaMode {
+  const role = resolveAppRole(environment)
+  return environment.NODE_ENV === 'production' || role === 'worker' ? 'validate' : 'migrate'
+}
+
 export async function ensureDatabaseSchema(): Promise<void> {
-  await query(CREATE_SCHEMA_SQL)
+  if (resolveDatabaseSchemaMode() === 'migrate') {
+    await query(CREATE_SCHEMA_SQL)
+    return
+  }
+
+  runtimeSchemaReady ??= validateRuntimeDatabaseSchema().catch((error) => {
+    runtimeSchemaReady = null
+    throw error
+  })
+  await runtimeSchemaReady
+}
+
+export async function validateRuntimeDatabaseSchema(): Promise<void> {
+  const requiredColumns = runtimeSchemaRequirements()
+  const missing = await query<{ table_name: string; column_name: string }>(
+    `with required as (
+       select table_name, column_name
+       from jsonb_to_recordset($1::jsonb) as item(table_name text, column_name text)
+     )
+     select required.table_name, required.column_name
+     from required
+     left join information_schema.columns actual
+       on actual.table_schema = current_schema()
+      and actual.table_name = required.table_name
+      and actual.column_name = required.column_name
+     where actual.column_name is null
+     order by required.table_name, required.column_name`,
+    [JSON.stringify(requiredColumns)],
+  )
+
+  if (missing.rows.length === 0) return
+  const missingNames = missing.rows.map((row) => `${row.table_name}.${row.column_name}`).join(', ')
+  throw new Error(
+    `Runtime database schema is incompatible; missing required columns: ${missingNames}. ` +
+    'Apply database migrations before starting production API or Worker processes.',
+  )
+}
+
+function runtimeSchemaRequirements(): Array<{ table_name: string; column_name: string }> {
+  const requirements = new Map<string, Set<string>>()
+  const add = (tableName: string, columnName: string): void => {
+    const columns = requirements.get(tableName) ?? new Set<string>()
+    columns.add(columnName)
+    requirements.set(tableName, columns)
+  }
+
+  for (const match of CREATE_SCHEMA_SQL.matchAll(/CREATE TABLE IF NOT EXISTS\s+([a-z_][a-z0-9_]*)\s*\(([\s\S]*?)\);/gi)) {
+    const tableName = match[1].toLowerCase()
+    for (const line of match[2].split('\n')) {
+      const column = /^\s*([a-z_][a-z0-9_]*)\s+/i.exec(line)?.[1]?.toLowerCase()
+      if (column && !TABLE_CONSTRAINT_KEYWORDS.has(column)) add(tableName, column)
+    }
+  }
+
+  for (const match of CREATE_SCHEMA_SQL.matchAll(/ALTER TABLE\s+([a-z_][a-z0-9_]*)\s+ADD COLUMN IF NOT EXISTS\s+([a-z_][a-z0-9_]*)/gi)) {
+    add(match[1].toLowerCase(), match[2].toLowerCase())
+  }
+
+  return [...requirements.entries()].flatMap(([tableName, columns]) =>
+    [...columns].map((columnName) => ({ table_name: tableName, column_name: columnName })),
+  )
 }
