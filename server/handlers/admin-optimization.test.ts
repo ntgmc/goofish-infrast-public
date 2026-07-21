@@ -16,7 +16,7 @@ vi.mock('../storage/optimize-job-store', () => ({
   replayOptimizationDeadLetter: vi.fn(),
 }))
 vi.mock('../optimize-job-runner', () => ({
-  getOptimizeGlobalWorkerConcurrency: () => 2,
+  getOptimizeGlobalWorkerConcurrency: () => 3,
   kickOptimizeJobProcessing: vi.fn(),
 }))
 
@@ -42,7 +42,7 @@ describe('admin optimization handler', () => {
     const response = await adminOptimizationHandler(new Request('http://localhost/api/admin/optimization?view=queue'))
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
-    expect(getQueueSnapshot).toHaveBeenCalledWith(2, 20)
+    expect(getQueueSnapshot).toHaveBeenCalledWith(3, 20)
     await expect(response.json()).resolves.toMatchObject({ queued_jobs: [], running_jobs: [], recent_jobs: [] })
   })
 
