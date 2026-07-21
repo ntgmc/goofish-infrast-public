@@ -44,6 +44,7 @@ export default function OverviewSection({
   savedConfigCount,
   resultHistoryCount,
   latestResult,
+  generationDisabledReason,
   freeSchedule,
   reorderCheck,
   onGenerate,
@@ -71,6 +72,7 @@ export default function OverviewSection({
   savedConfigCount: number;
   resultHistoryCount: number;
   latestResult: WorkspaceResultHistoryItem | null;
+  generationDisabledReason?: string | null;
   freeSchedule?: FreeScheduleViewState;
   reorderCheck?: ReorderCheckViewState;
   onGenerate: () => void;
@@ -99,7 +101,7 @@ export default function OverviewSection({
         resultIsCurrent={resultIsCurrent}
         error={error}
         priorityCoupon={priorityCoupon}
-        extraDisabledReason={freeSchedule?.generateBlockedReason ?? null}
+        extraDisabledReason={generationDisabledReason ?? freeSchedule?.generateBlockedReason ?? null}
         onGenerate={onGenerate}
           onReset={onReset}
         />

@@ -5,6 +5,7 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
 import { copy } from '../copy/index'
 import { useTheme } from '../lib/theme'
+import { useSiteFeatures } from '../lib/site-feature-context'
 
 
 interface Props {
@@ -39,6 +40,10 @@ const metrics = [
 export default function LandingPage({ onStart }: Props) {
   const purchaseHref = ACTIVE_PURCHASE_CHANNEL?.href
   const { resolvedTheme } = useTheme()
+  const featureState = useSiteFeatures()
+  const productAvailable = featureState.status === 'ready' && featureState.features.site
+  const depotAvailable = featureState.status === 'ready' && featureState.features.depot_value
+  const announcementsAvailable = featureState.status === 'ready' && featureState.features.announcements
 
   return (
     <main className="landing-shell min-h-screen" tabIndex={-1} data-route-focus>
@@ -53,8 +58,8 @@ export default function LandingPage({ onStart }: Props) {
           </Link>
           <div className="flex shrink-0 items-center gap-2">
             <ThemeSwitcher />
-            <button type="button" onClick={onStart} className="tool-primary-action inline-flex items-center justify-center">
-              {copy.public.pages_LandingPage_021}</button>
+            <button type="button" onClick={onStart} disabled={!productAvailable} className="tool-primary-action inline-flex items-center justify-center">
+              {productAvailable ? copy.public.pages_LandingPage_021 : copy.features.paused}</button>
           </div>
         </nav>
 
@@ -69,18 +74,19 @@ export default function LandingPage({ onStart }: Props) {
               {copy.public.pages_LandingPage_025}</p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <button type="button" onClick={onStart} className="tool-primary-action inline-flex items-center justify-center">
-                {copy.public.pages_LandingPage_026}</button>
-              <Link to="/tools/depot-value" className="tool-secondary-action inline-flex items-center justify-center">
-                {copy.public.pages_LandingPage_027}</Link>
+              <button type="button" onClick={onStart} disabled={!productAvailable} className="tool-primary-action inline-flex items-center justify-center">
+                {productAvailable ? copy.public.pages_LandingPage_026 : copy.features.paused}</button>
+              {depotAvailable ? (
+                <Link to="/tools/depot-value" className="tool-secondary-action inline-flex items-center justify-center">{copy.public.pages_LandingPage_027}</Link>
+              ) : <span className="tool-secondary-action inline-flex items-center justify-center opacity-60">{copy.features.paused}</span>}
               {purchaseHref && (
                 <a href={purchaseHref} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center px-3 text-sm font-medium text-ink-secondary transition-colors hover:text-ink-primary">
                   {copy.public.pages_LandingPage_028}</a>
               )}
             </div>
 
-            <Link to="/announcements" className="mt-6 inline-flex min-h-11 items-center text-sm font-medium text-ink-secondary underline decoration-surface-4 underline-offset-4 transition-colors hover:text-ink-primary">
-              {copy.public.pages_LandingPage_020}</Link>
+            {announcementsAvailable && <Link to="/announcements" className="mt-6 inline-flex min-h-11 items-center text-sm font-medium text-ink-secondary underline decoration-surface-4 underline-offset-4 transition-colors hover:text-ink-primary">
+              {copy.public.pages_LandingPage_020}</Link>}
 
             <dl className="landing-fact-strip mt-10">
               <Fact label={copy.public.pages_LandingPage_029} value={copy.public.pages_LandingPage_030} />
@@ -143,8 +149,8 @@ export default function LandingPage({ onStart }: Props) {
             <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-secondary">
               {copy.public.pages_LandingPage_045}</p>
           </div>
-          <button type="button" onClick={onStart} className="tool-primary-action inline-flex items-center justify-center whitespace-nowrap">
-            {copy.public.pages_LandingPage_046}</button>
+          <button type="button" onClick={onStart} disabled={!productAvailable} className="tool-primary-action inline-flex items-center justify-center whitespace-nowrap">
+            {productAvailable ? copy.public.pages_LandingPage_046 : copy.features.paused}</button>
         </div>
       </section>
 

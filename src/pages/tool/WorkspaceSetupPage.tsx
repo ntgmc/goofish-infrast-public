@@ -15,6 +15,7 @@ import type { WorkspaceSetupSection } from '../../lib/app-routes'
 import { countOwnedOperators, formatDate, getEffectiveProfilePermission, getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
 import { copy } from '../../copy/index'
 import { hasCapability } from '../../lib/product-catalog'
+import { useSiteFeatures } from '../../lib/site-feature-context'
 
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
@@ -52,6 +53,7 @@ export default function WorkspaceSetupPage({
   onRedeemNewProfile: () => void
   onLogout: () => void
 }) {
+  const { features } = useSiteFeatures()
   const onSectionChangeRef = useRef(onSectionChange)
   onSectionChangeRef.current = onSectionChange
   const setupTour = useFirstRunTour({ id: 'workspace-setup', version: 1 })
@@ -94,7 +96,7 @@ export default function WorkspaceSetupPage({
   const setupSections: Array<{ id: WorkspaceSetupSection; label: string; ready?: boolean }> = [
     { id: 'operators', label: copy.workspace.pages_tool_WorkspaceSetupPage_001, ready: Boolean(operators) },
     { id: 'config', label: copy.workspace.pages_tool_WorkspaceSetupPage_002, ready: configValidation.ok },
-    { id: 'cdk', label: copy.workspace.pages_tool_WorkspaceSetupPage_003 },
+    ...(features.cdk_redemption ? [{ id: 'cdk' as const, label: copy.workspace.pages_tool_WorkspaceSetupPage_003 }] : []),
   ]
 
   const updateConfig = useCallback((mutate: (config: LicenseConfig) => void) => {
@@ -295,14 +297,14 @@ export default function WorkspaceSetupPage({
                           {operators && <span className="text-sm text-brand-400">{copy.workspace.pages_tool_WorkspaceSetupPage_031}{ownedOperatorCount} {copy.workspace.pages_tool_WorkspaceSetupPage_032}</span>}
                         </div>
 
-                        <SklandStatusCard
+                        {features.skland && <SklandStatusCard
                           profile={profile}
                           busy={sklandRefreshing}
                           dialogOpen={sklandDialogOpen}
                           notice={sklandRefreshNotice}
                           onOpen={() => setSklandDialogOpen(true)}
                           onRefresh={handleRefreshSkland}
-                        />
+                        />}
 
                         {operators && (
                           <div className="mt-5">
@@ -357,13 +359,13 @@ export default function WorkspaceSetupPage({
         </div>
       </main>
 
-      <SklandBindingDialog
+      {features.skland && <SklandBindingDialog
         open={sklandDialogOpen}
         profile={profile}
         context="workspace"
         onOpenChange={setSklandDialogOpen}
         onPayload={applySklandPayload}
-      />
+      />}
       <GuidedTour definition={setupTourDefinition} open={setupTour.open} onFinish={setupTour.finish} onSkip={setupTour.skip} />
     </div>
   )
