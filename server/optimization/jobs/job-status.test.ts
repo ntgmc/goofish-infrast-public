@@ -1,5 +1,5 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
-import { buildScenarioComparisonEstimate, createOptimizeJobPollToken, shouldReserveFreeScheduleEntitlement, verifyOptimizeJobPollToken } from './job-status'
+import { buildScenarioComparisonEstimate, createOptimizeJobPollToken, getOptimizeEstimateBucket, shouldReserveFreeScheduleEntitlement, verifyOptimizeJobPollToken } from './job-status'
 import { createPersistedOptimizeJobPayload } from './shared'
 import { DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS, formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config'
 
@@ -27,6 +27,15 @@ describe('scenario comparison estimates', () => {
 
   it('keeps the raw worst-case estimate so admission can reject it above the ten-minute cap', () => {
     expect(buildScenarioComparisonEstimate(24, 24).estimated_duration_ms).toBe(1_329_000)
+  })
+})
+
+describe('schedule duration estimate buckets', () => {
+  it('separates schedule-only samples from merged suggestion samples', () => {
+    expect(getOptimizeEstimateBucket({ Fiammetta: { enable: false } }, false)).toBe('maa_plain')
+    expect(getOptimizeEstimateBucket({ Fiammetta: { enable: false } }, true)).toBe('maa_plain_with_suggestions')
+    expect(getOptimizeEstimateBucket({ Fiammetta: { enable: true } }, true)).toBe('maa_fiammetta_with_suggestions')
+    expect(getOptimizeEstimateBucket({ schedule_mode: 'rotation' }, true)).toBe('rotation_with_suggestions')
   })
 })
 

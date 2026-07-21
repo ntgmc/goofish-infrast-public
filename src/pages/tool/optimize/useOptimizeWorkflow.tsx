@@ -396,6 +396,8 @@ export function useOptimizeWorkflow(props: Props) {
             completedAt: Date.now(),
             estimatedRemainingMs: 0,
             estimatePhase: 'completed',
+            calculationStage: 'completed',
+            upgradeSuggestionsStatus: result.upgrade_suggestions_status,
             estimateAdjustment: undefined,
             lastUpdatedAt: Date.now(),
           }))
@@ -525,7 +527,13 @@ export function useOptimizeWorkflow(props: Props) {
       setPhase('idle')
       setLoading(true)
       const startedAt = Date.now()
-      const initialProgress: ScheduleProgressState = { mode: 'generate', startedAt, lastUpdatedAt: Date.now() }
+      const initialProgress: ScheduleProgressState = {
+        mode: 'generate',
+        startedAt,
+        lastUpdatedAt: Date.now(),
+        upgradeSuggestionsRequested: userCanUseUpgradeFeatures,
+        upgradeSuggestionsAllowed: userCanUseUpgradeFeatures,
+      }
       progressRef.current = initialProgress
       setProgress(initialProgress)
       let completed = false
@@ -540,11 +548,15 @@ export function useOptimizeWorkflow(props: Props) {
         setCurrentResult(current)
         const upgradeList = normalizeUpgradeSuggestions(current.upgrade_suggestions)
         completed = true
-        setProgress((current) => ({
-          ...current,
+        setProgress((progressState) => ({
+          ...progressState,
           mode: 'generate',
-          startedAt: current?.startedAt ?? startedAt,
+          startedAt: progressState?.startedAt ?? startedAt,
           completedAt: Date.now(),
+          estimatedRemainingMs: 0,
+          estimatePhase: 'completed',
+          calculationStage: 'completed',
+          upgradeSuggestionsStatus: current.upgrade_suggestions_status,
           lastUpdatedAt: Date.now(),
         }))
         await waitForProgressCompletion()
@@ -580,7 +592,13 @@ export function useOptimizeWorkflow(props: Props) {
       optimizeInFlightRef.current = true
       setInlineError(null)
       const startedAt = Date.now()
-      const initialProgress: ScheduleProgressState = { mode: 'apply', startedAt, lastUpdatedAt: Date.now() }
+      const initialProgress: ScheduleProgressState = {
+        mode: 'apply',
+        startedAt,
+        lastUpdatedAt: Date.now(),
+        upgradeSuggestionsRequested: false,
+        upgradeSuggestionsAllowed: false,
+      }
       progressRef.current = initialProgress
       setProgress(initialProgress)
       let completed = false
@@ -618,6 +636,8 @@ export function useOptimizeWorkflow(props: Props) {
           completedAt: Date.now(),
           estimatedRemainingMs: 0,
           estimatePhase: 'completed',
+          calculationStage: 'completed',
+          upgradeSuggestionsStatus: data.upgrade_suggestions_status,
           estimateAdjustment: undefined,
           lastUpdatedAt: Date.now(),
         }))
