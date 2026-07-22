@@ -676,19 +676,6 @@ UPDATE optimize_jobs SET profile_id = substring(owner_key from '^profile:(.*)$')
 UPDATE optimize_jobs
 SET payload_json = payload_json - 'activeProfile' - 'previewWorkspaceForGeneration'
 WHERE payload_json ? 'activeProfile' OR payload_json ? 'previewWorkspaceForGeneration';
-UPDATE optimize_jobs
-SET payload_json = (payload_json - 'effectiveLicense' - 'checkedCdkRecord') || jsonb_build_object(
-  'version', 3,
-  'configPermission', to_jsonb(coalesce(nullif(payload_json->'scheduleUsageBase'->>'permission', ''), 'growth')),
-  'cdkUsageRef', CASE
-    WHEN nullif(payload_json->'checkedCdkRecord'->>'code_hash', '') IS NULL THEN 'null'::jsonb
-    ELSE jsonb_build_object('code_hash', payload_json->'checkedCdkRecord'->>'code_hash')
-  END
-)
-WHERE payload_json->>'version' = '2'
-  AND NOT (payload_json ? 'kind')
-  AND (payload_json ? 'effectiveLicense' OR payload_json ? 'checkedCdkRecord');
-
 ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS contributor_profile_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_depot_value_samples_contributor_profile_id ON depot_value_samples(contributor_profile_id);
 DO $$
