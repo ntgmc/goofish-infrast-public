@@ -52,13 +52,15 @@ type TaskStepDefinition = { label: string; detail: string; role: TaskStepRole }
 export default function ScheduleProgress({ progress, className = '', variant = 'embedded' }: Props) {
   const [now, setNow] = useState(() => Date.now())
   const calculatedPercent = getTimedPercent(progress, now)
+  const boundedCalculatedPercent = getStageBoundedPercent(progress, calculatedPercent)
+  const boundedProgressFloor = getStageBoundedPercent(progress, progress.percentFloor ?? 0)
   const progressKey = `${progress.jobId ?? 'local'}:${progress.startedAt}`
   const [percentFloor, setPercentFloor] = useState<{ key: string; value: number }>(() => ({
     key: progressKey,
-    value: Math.max(calculatedPercent, progress.percentFloor ?? 0),
+    value: Math.max(boundedCalculatedPercent, boundedProgressFloor),
   }))
-  const floor = percentFloor.key === progressKey ? Math.max(percentFloor.value, progress.percentFloor ?? 0) : progress.percentFloor ?? 0
-  const rawPercent = Math.max(calculatedPercent, floor)
+  const floor = percentFloor.key === progressKey ? Math.max(percentFloor.value, boundedProgressFloor) : boundedProgressFloor
+  const rawPercent = Math.max(boundedCalculatedPercent, floor)
   const percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
   const task = useMemo(() => getTaskView(progress, rawPercent, now), [progress, rawPercent, now])
   const compact = variant === 'embedded'
@@ -66,12 +68,12 @@ export default function ScheduleProgress({ progress, className = '', variant = '
 
   useEffect(() => {
     setPercentFloor((current) => {
-    const nextCalculated = Math.max(calculatedPercent, progress.percentFloor ?? 0)
+    const nextCalculated = Math.max(boundedCalculatedPercent, boundedProgressFloor)
     if (current.key !== progressKey) return { key: progressKey, value: nextCalculated }
     const nextValue = Math.max(current.value, nextCalculated)
       return nextValue === current.value ? current : { key: progressKey, value: nextValue }
     })
-  }, [calculatedPercent, progress.completedAt, progressKey])
+  }, [boundedCalculatedPercent, boundedProgressFloor, progress.completedAt, progressKey])
 
   useEffect(() => {
     let timer = 0
@@ -245,6 +247,37 @@ function getWaitingPercent(startedAt: number, now: number, estimatedDurationMs: 
   return ratio * MAX_WAITING_PERCENT
 }
 
+function getStageBoundedPercent(progress: ScheduleProgressState, percent: number): number {
+  if (progress.completedAt || progress.estimatePhase === 'completed') return percent
+  const stage = progress.calculationStage
+  if (!stage || stage === 'completed') return percent
+
+  const includesSuggestions = Boolean(progress.upgradeSuggestionsRequested && progress.upgradeSuggestionsAllowed)
+  const bounds = includesSuggestions
+    ? {
+        starting: [8, 16],
+        generating_schedule: [16, 48],
+        generating_potential_schedule: [48, 62],
+        simulating_upgrades: [62, 78],
+        enriching_training_costs: [78, 86],
+        simulating_maa_baseline: [86, 91],
+        formatting_result: [91, 94],
+        persisting_result: [94, MAX_WAITING_PERCENT],
+      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, [number, number]>
+    : {
+        starting: [8, 18],
+        generating_schedule: [18, 68],
+        generating_potential_schedule: [68, 72],
+        simulating_upgrades: [72, 80],
+        enriching_training_costs: [80, 84],
+        simulating_maa_baseline: [68, 88],
+        formatting_result: [88, 93],
+        persisting_result: [93, MAX_WAITING_PERCENT],
+      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, [number, number]>
+  const [minimum, maximum] = bounds[stage]
+  return Math.max(minimum, Math.min(maximum, percent))
+}
+
 function getTaskView(progress: ScheduleProgressState, percent: number, now: number) {
   const status = getTaskStatus(progress, percent, now)
   const reconnecting = progress.connectionStatus === 'reconnecting'
@@ -328,6 +361,7 @@ function getCalculationStageTitle(stage: OptimizeCalculationStage | null | undef
   if (stage === 'generating_potential_schedule') return copy.common.components_ScheduleProgress_114
   if (stage === 'simulating_upgrades') return copy.common.components_ScheduleProgress_115
   if (stage === 'enriching_training_costs') return copy.common.components_ScheduleProgress_116
+  if (stage === 'simulating_maa_baseline') return copy.common.components_ScheduleProgress_119
   if (stage === 'formatting_result') return copy.common.components_ScheduleProgress_117
   if (stage === 'persisting_result') return copy.common.components_ScheduleProgress_118
   return null
@@ -432,7 +466,7 @@ function getStepState(progress: ScheduleProgressState, status: TaskStatus, index
     if (progress.upgradeSuggestionsStatus === 'failed' && steps[index]?.role === 'suggestions') return 'failed'
     return 'done'
   }
-  const stageRole = getCalculationStageRole(progress.calculationStage)
+  const stageRole = getCalculationStageRole(progress, progress.calculationStage)
   const stageIndex = stageRole ? steps.findIndex((step) => step.role === stageRole) : -1
   if (stageIndex >= 0 && (status === 'running' || status === 'overdue' || status === 'finishing' || status === 'cancelling')) {
     if (index < stageIndex) return 'done'
@@ -451,9 +485,15 @@ function getStepState(progress: ScheduleProgressState, status: TaskStatus, index
   return 'pending'
 }
 
-function getCalculationStageRole(stage: OptimizeCalculationStage | null | undefined): TaskStepRole | null {
+function getCalculationStageRole(
+  progress: ScheduleProgressState,
+  stage: OptimizeCalculationStage | null | undefined,
+): TaskStepRole | null {
   if (stage === 'starting' || stage === 'generating_schedule') return 'schedule'
   if (stage === 'generating_potential_schedule' || stage === 'simulating_upgrades' || stage === 'enriching_training_costs') return 'suggestions'
+  if (stage === 'simulating_maa_baseline') {
+    return progress.upgradeSuggestionsRequested && progress.upgradeSuggestionsAllowed ? 'suggestions' : 'schedule'
+  }
   if (stage === 'formatting_result' || stage === 'persisting_result' || stage === 'completed') return 'persist'
   return null
 }
