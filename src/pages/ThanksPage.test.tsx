@@ -19,6 +19,9 @@ describe('ThanksPage', () => {
       'src',
       'https://avatars.githubusercontent.com/u/74061867?v=4',
     )
-    expect(screen.getByText('所有参与开发、测试、反馈与验证的协助者')).toBeInTheDocument()
+    const helperCard = screen.getByText('DaKe.').closest('article')
+    expect(helperCard).not.toBeNull()
+    expect(helperCard?.querySelector('p')).toBeNull()
+    expect(screen.queryByText('所有参与开发、测试、反馈与验证的协助者')).not.toBeInTheDocument()
   })
 })

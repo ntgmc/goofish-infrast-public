@@ -73,6 +73,7 @@ describe('PublicContentSettingsSection', () => {
     const sections = within(panel).getByRole('list', { name: '致谢分组' })
     await user.click(within(sections).getByRole('button', { name: /开发者/, pressed: false }))
 
+    expect(within(panel).getByLabelText('说明')).not.toBeRequired()
     const avatarInput = within(panel).getByLabelText(/可选 HTTPS 头像地址/)
     await user.clear(avatarInput)
     await user.type(avatarInput, 'https://github.com/ntgmc.png')
