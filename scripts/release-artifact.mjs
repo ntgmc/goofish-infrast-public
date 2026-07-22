@@ -63,6 +63,7 @@ async function verifyReleaseManifest() {
   for (const required of [
     'dist/index.html',
     'server/dist/index.js',
+    'server/dist/migrate.js',
     'server/dist/worker.js',
     'server/dist/optimize-worker.js',
   ]) {

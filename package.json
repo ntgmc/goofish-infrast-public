@@ -37,7 +37,8 @@
     "check:public-http": "node scripts/check-public-http-smoke.mjs --self-test",
     "check:migration": "npm run build && node scripts/check-server-routes.mjs && node scripts/verify-migrated-data.mjs",
     "check:local": "npm run check:catalog && npm run build && npm run check:dead-code && npm test && npm run check:architecture && npm run check:copy && npm run check:dr && npm run check:deploy && npm run check:api && node scripts/check-server-routes.mjs",
-    "start:server": "node --env-file=.env server/dist/index.js",
+    "migrate:database": "node --env-file=.env server/dist/migrate.js",
+    "start:server": "node --env-file=.env server/dist/all.js",
     "start:api": "node --env-file=.env server/dist/index.js",
     "start:worker": "node --env-file=.env server/dist/worker.js",
     "preview": "vite preview"
