@@ -50,6 +50,7 @@ describe('database schema ownership', () => {
   })
 
   it('reports an actionable error when the worker schema is incompatible', async () => {
+    process.env.APP_ROLE = 'worker'
     queryMock.mockResolvedValue({
       rows: [
         { table_name: 'optimize_job_attempts', column_name: 'heartbeat_at' },
@@ -61,6 +62,32 @@ describe('database schema ownership', () => {
       'Runtime database schema is incompatible; missing required columns: ' +
       'optimize_job_attempts.heartbeat_at, optimize_jobs.cancel_requested_at',
     )
+  })
+
+  it('does not make dedicated workers depend on API-only tables', async () => {
+    process.env.APP_ROLE = 'worker'
+    queryMock.mockResolvedValue({ rows: [] })
+
+    await validateRuntimeDatabaseSchema()
+
+    const workerRequirements = JSON.parse(queryMock.mock.calls[0][1][0])
+    expect(workerRequirements).toEqual(expect.arrayContaining([
+      { table_name: 'optimize_jobs', column_name: 'execution_stage' },
+      { table_name: 'optimize_job_attempts', column_name: 'heartbeat_at' },
+    ]))
+    expect(workerRequirements).not.toEqual(expect.arrayContaining([
+      { table_name: 'feature_settings', column_name: 'key' },
+    ]))
+
+    queryMock.mockClear()
+    process.env.APP_ROLE = 'api'
+    await validateRuntimeDatabaseSchema()
+
+    const apiRequirements = JSON.parse(queryMock.mock.calls[0][1][0])
+    expect(apiRequirements).toEqual(expect.arrayContaining([
+      { table_name: 'feature_settings', column_name: 'key' },
+      { table_name: 'feature_settings', column_name: 'record_json' },
+    ]))
   })
 
   it('keeps DDL out of production roles and dedicated workers', () => {
