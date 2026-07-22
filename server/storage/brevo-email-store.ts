@@ -162,17 +162,30 @@ export async function saveBrevoOfficialQuotaSnapshot(
   return withTransaction(async (client) => {
     await lockQuotaDate(client, quotaDate)
     const localUsedAtSync = await countActiveDeliveries(client, quotaDate)
-    const previous = await client.query<{ external_used_offset: number }>(
-      'select external_used_offset from brevo_email_quota_snapshots where quota_date = $1::date',
+    const previous = await client.query<{
+      external_used_offset: number
+      reported_used_count: number | null
+    }>(
+      `select external_used_offset, reported_used_count
+         from brevo_email_quota_snapshots
+        where quota_date = $1::date`,
       [quotaDate],
     )
+    const previousSnapshot = previous.rows[0]
+    const previousExternalUsedOffset = numberValue(previousSnapshot?.external_used_offset)
+    const calculatedExternalUsedOffset = Math.max(reportedUsedCount - localUsedAtSync, 0)
+    const officialUsageResetOrCorrected = (previousSnapshot?.reported_used_count !== null
+      && previousSnapshot?.reported_used_count !== undefined
+      && reportedUsedCount < numberValue(previousSnapshot.reported_used_count))
+      || reportedUsedCount < previousExternalUsedOffset
     const externalUsedOffset = Math.min(
       BREVO_DAILY_EMAIL_LIMIT,
-      Math.max(
-        numberValue(previous.rows[0]?.external_used_offset),
-        reportedUsedCount - localUsedAtSync,
-        0,
-      ),
+      officialUsageResetOrCorrected
+        ? calculatedExternalUsedOffset
+        : Math.max(
+            previousExternalUsedOffset,
+            calculatedExternalUsedOffset,
+          ),
     )
     const result = await client.query<BrevoOfficialQuotaSnapshotRow>(
       `insert into brevo_email_quota_snapshots
