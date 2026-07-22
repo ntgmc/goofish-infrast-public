@@ -137,6 +137,7 @@ ready and Nginx has switched successfully.
 
    ```bash
    sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
+   sudo install -m 0644 deploy/nginx/goofish-canonical-redirect.conf /etc/nginx/snippets/goofish-canonical-redirect.conf
    sudo install -m 0644 deploy/nginx/goofish-proxy-common.conf /etc/nginx/snippets/goofish-proxy-common.conf
    sudo install -m 0644 deploy/nginx/goofish-server-hardening.conf /etc/nginx/snippets/goofish-server-hardening.conf
    sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
@@ -144,6 +145,24 @@ ready and Nginx has switched successfully.
    ```
 
    ```nginx
+   server {
+     listen 80;
+     server_name maatool.com www.maatool.com;
+
+     include /etc/nginx/snippets/goofish-canonical-redirect.conf;
+   }
+
+   server {
+     listen 443 ssl;
+     server_name www.maatool.com;
+
+     # Keep the existing TLS certificate directives here. The certificate must
+     # cover www.maatool.com as well as maatool.com.
+     include /etc/nginx/snippets/goofish-server-hardening.conf;
+     include /etc/nginx/snippets/goofish-security-headers.conf;
+     include /etc/nginx/snippets/goofish-canonical-redirect.conf;
+   }
+
    server {
      listen 443 ssl;
      server_name maatool.com;
@@ -158,8 +177,12 @@ ready and Nginx has switched successfully.
    }
    ```
 
-   The security header snippet belongs only in the HTTPS server, not the plain
-   HTTP redirect server. Validate without reloading:
+   The redirect snippet keeps the complete path and query string while sending
+   both HTTP hosts and the HTTPS `www` alias to the canonical HTTPS origin. The
+   security header snippet belongs only in HTTPS servers, not the plain HTTP
+   redirect server. Before enabling the HTTPS alias, ensure DNS points
+   `www.maatool.com` at this server and the installed certificate includes that
+   hostname. Validate without reloading:
 
    ```bash
    sudo nginx -t
@@ -192,7 +215,11 @@ ready and Nginx has switched successfully.
    cat /opt/goofish-infrast-v1/state/active-slot
    curl -fsS http://127.0.0.1:3002/api/health/ready
    curl -fsS https://maatool.com/api/health/ready
+   curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' 'https://www.maatool.com/tool?source=www-check'
    ```
+
+   The final command must report `308` and
+   `https://maatool.com/tool?source=www-check`.
 
    Only then disable the legacy unit. Do not disable the templated slot units:
 
