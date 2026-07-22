@@ -1,4 +1,4 @@
-import { resolveAppRole } from '../process-role'
+import { resolveAppRole, type AppRole } from '../process-role'
 import { query } from './postgres'
 
 const CREATE_SCHEMA_SQL = `
@@ -716,6 +716,7 @@ ALTER TABLE user_game_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
 `
 
 const TABLE_CONSTRAINT_KEYWORDS = new Set(['check', 'constraint', 'foreign', 'primary', 'unique'])
+const API_ONLY_RUNTIME_TABLES = new Set(['feature_settings'])
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'
 
@@ -740,7 +741,7 @@ export async function ensureDatabaseSchema(): Promise<void> {
 }
 
 export async function validateRuntimeDatabaseSchema(): Promise<void> {
-  const requiredColumns = runtimeSchemaRequirements()
+  const requiredColumns = runtimeSchemaRequirements(resolveAppRole())
   const missing = await query<{ table_name: string; column_name: string }>(
     `with required as (
        select table_name, column_name
@@ -765,7 +766,7 @@ export async function validateRuntimeDatabaseSchema(): Promise<void> {
   )
 }
 
-function runtimeSchemaRequirements(): Array<{ table_name: string; column_name: string }> {
+function runtimeSchemaRequirements(role: AppRole): Array<{ table_name: string; column_name: string }> {
   const requirements = new Map<string, Set<string>>()
   const add = (tableName: string, columnName: string): void => {
     const columns = requirements.get(tableName) ?? new Set<string>()
@@ -785,7 +786,8 @@ function runtimeSchemaRequirements(): Array<{ table_name: string; column_name: s
     add(match[1].toLowerCase(), match[2].toLowerCase())
   }
 
-  return [...requirements.entries()].flatMap(([tableName, columns]) =>
-    [...columns].map((columnName) => ({ table_name: tableName, column_name: columnName })),
-  )
+  return [...requirements.entries()].flatMap(([tableName, columns]) => {
+    if (role === 'worker' && API_ONLY_RUNTIME_TABLES.has(tableName)) return []
+    return [...columns].map((columnName) => ({ table_name: tableName, column_name: columnName }))
+  })
 }
