@@ -26,7 +26,8 @@ does not create per-PR preview URLs.
 6. The workflow downloads the SHA-bound release artifact produced by the
    successful `Quality Checks` run and verifies its SHA-256 before upload.
 7. The script checks out the immutable target SHA, runs `npm ci --omit=dev`,
-   verifies and installs the prebuilt `dist` and `server/dist`, restarts systemd, and checks
+   verifies and installs the prebuilt `dist` and `server/dist`, stops the API,
+   runs the controlled dev database migration, restarts systemd, and checks
    `http://127.0.0.1:3001/api/health`.
 
 Manual deployment is also available from the GitHub Actions UI through
@@ -45,12 +46,14 @@ cd /opt/goofish-infrast-v1-dev
 chmod +x scripts/deploy-production.sh
 ```
 
-Run one manual deployment before enabling automatic deploys:
+Complete the PostgreSQL and systemd provisioning below, then run one manual
+deployment before enabling automatic deploys:
 
 ```bash
 APP_DIR=/opt/goofish-infrast-v1-dev \
 BRANCH=dev \
 SERVICE_NAME=goofish-infrast-v1-dev \
+MIGRATION_SERVICE_NAME=goofish-infrast-v1-dev-migrate \
 HEALTH_URL=http://127.0.0.1:3001/api/health \
 PUBLIC_BASE_URL=https://dev.maatool.com \
 LOCK_FILE=/tmp/goofish-infrast-v1-dev.deploy.lock \
@@ -61,9 +64,12 @@ If the deploy user is not root, grant passwordless access only to the required
 systemd commands:
 
 ```sudoers
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl stop goofish-infrast-v1-dev
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart goofish-infrast-v1-dev
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-infrast-v1-dev
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-infrast-v1-dev --no-pager --lines=50
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl start goofish-infrast-v1-dev-migrate
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-infrast-v1-dev-migrate --no-pager --lines=50
 ```
 
 Grant the deploy user read-only access to the system journal so a failed health
@@ -95,13 +101,57 @@ and do not automatically import production data.
 Example baseline:
 
 ```sql
-CREATE DATABASE goofish_infrast_v1_dev;
 CREATE USER goofish_dev WITH PASSWORD 'replace-with-a-secret';
-GRANT ALL PRIVILEGES ON DATABASE goofish_infrast_v1_dev TO goofish_dev;
+CREATE DATABASE goofish_infrast_v1_dev OWNER goofish_dev;
 ```
 
 Keep the real dev `DATABASE_URL` in the server's systemd environment file, not
 in GitHub Actions secrets.
+
+The role used by `DATABASE_URL` must own the dev database or have explicit DML
+permissions on every application table. `GRANT ALL PRIVILEGES ON DATABASE` by
+itself is insufficient: PostgreSQL database privileges do not grant
+`INSERT`, `UPDATE`, or `DELETE` on tables created by another role.
+
+If administrator login returns `Authentication service is temporarily
+unavailable.`, inspect the authentication table ownership and grants without
+printing the connection string or password:
+
+```bash
+sudo -u postgres psql --dbname=goofish_infrast_v1_dev --set=ON_ERROR_STOP=1 <<'SQL'
+SELECT tablename, tableowner
+FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename IN ('security_rate_limit_buckets', 'admin_users', 'admin_sessions')
+ORDER BY tablename;
+
+SELECT table_name, grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public'
+  AND table_name IN ('security_rate_limit_buckets', 'admin_users', 'admin_sessions')
+  AND grantee = 'goofish_dev'
+ORDER BY table_name, privilege_type;
+SQL
+```
+
+For an existing database whose application tables were created by `postgres`,
+grant the dev runtime role the permissions required by authentication and
+administrator sessions:
+
+```bash
+sudo -u postgres psql --dbname=goofish_infrast_v1_dev --set=ON_ERROR_STOP=1 <<'SQL'
+GRANT USAGE ON SCHEMA public TO goofish_dev;
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE public.security_rate_limit_buckets,
+           public.admin_users,
+           public.admin_sessions
+  TO goofish_dev;
+SQL
+```
+
+Replace `goofish_dev` if `DATABASE_URL` uses a different runtime role. Apply
+future dev migrations as that database owner; do not run them as `postgres`
+without also granting the runtime role access to newly created objects.
 
 ## systemd
 
@@ -110,9 +160,36 @@ Install the repository-managed dev service after creating
 
 ```bash
 sudo install -m 0644 deploy/systemd/goofish-infrast-v1-dev.service /etc/systemd/system/goofish-infrast-v1-dev.service
+sudo install -m 0644 deploy/systemd/goofish-infrast-v1-dev-migrate.service /etc/systemd/system/goofish-infrast-v1-dev-migrate.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now goofish-infrast-v1-dev
+sudo systemctl enable goofish-infrast-v1-dev
 ```
+
+The migration unit is a non-enabled oneshot service. It requires the explicit
+`ALLOW_DATABASE_MIGRATION=true` guard, applies the idempotent schema migration,
+and exits before the production-mode API starts. The normal API service retains
+read-only schema validation and never executes DDL. Do not start either unit
+before the first verified artifact is installed; the manual deployment command
+above starts the migration and API in the required order.
+
+For an existing dev deployment whose runtime schema check reports missing
+columns, install the migration unit from the same checked-out release and run it
+during a short maintenance window:
+
+```bash
+cd /opt/goofish-infrast-v1-dev
+sudo install -m 0644 deploy/systemd/goofish-infrast-v1-dev-migrate.service /etc/systemd/system/goofish-infrast-v1-dev-migrate.service
+sudo systemctl daemon-reload
+sudo systemctl stop goofish-infrast-v1-dev
+sudo systemctl start goofish-infrast-v1-dev-migrate
+sudo systemctl restart goofish-infrast-v1-dev
+curl -fsS http://127.0.0.1:3001/api/health
+```
+
+`systemctl start goofish-infrast-v1-dev-migrate` blocks until the migration
+finishes and returns a failure status if any DDL or backfill fails. Inspect
+`journalctl -u goofish-infrast-v1-dev-migrate` before restarting the API after a
+failure.
 
 The service definition is:
 
@@ -280,6 +357,7 @@ Optional `development` environment variables:
 | `DEPLOY_PORT` | `22` |
 | `DEPLOY_APP_DIR` | `/opt/goofish-infrast-v1-dev` |
 | `DEPLOY_SERVICE_NAME` | `goofish-infrast-v1-dev` |
+| `DEPLOY_MIGRATION_SERVICE_NAME` | `goofish-infrast-v1-dev-migrate` |
 | `DEPLOY_HEALTH_URL` | `http://127.0.0.1:3001/api/health` |
 | `DEPLOY_PUBLIC_BASE_URL` | `https://dev.maatool.com` |
 | `DEPLOY_LOCK_FILE` | `/tmp/goofish-infrast-v1-dev.deploy.lock` |

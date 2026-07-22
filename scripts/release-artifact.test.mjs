@@ -19,6 +19,7 @@ test('creates and verifies an immutable release artifact', async () => {
     assert.equal(manifest.target_sha, sha)
     assert.ok(manifest.files['dist/index.html'])
     assert.ok(manifest.files['server/dist/index.js'])
+    assert.ok(manifest.files['server/dist/migrate.js'])
     assert.ok(manifest.files['server/dist/worker.js'])
     assert.ok(manifest.files['server/dist/optimize-worker.js'])
   } finally {
@@ -45,6 +46,7 @@ async function createFixture() {
   await mkdir(join(fixture, 'src/lib/.generated'), { recursive: true })
   await writeFile(join(fixture, 'dist/index.html'), '<!doctype html>', 'utf8')
   await writeFile(join(fixture, 'server/dist/index.js'), 'export {}', 'utf8')
+  await writeFile(join(fixture, 'server/dist/migrate.js'), 'export {}', 'utf8')
   await writeFile(join(fixture, 'server/dist/worker.js'), 'export {}', 'utf8')
   await writeFile(join(fixture, 'server/dist/optimize-worker.js'), 'export {}', 'utf8')
   await writeFile(join(fixture, 'src/lib/.generated/build-meta.ts'), `export const APP_BUILD_META = ${JSON.stringify({

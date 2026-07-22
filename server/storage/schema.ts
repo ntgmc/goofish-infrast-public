@@ -716,7 +716,7 @@ export function resolveDatabaseSchemaMode(environment: NodeJS.ProcessEnv = proce
 
 export async function ensureDatabaseSchema(): Promise<void> {
   if (resolveDatabaseSchemaMode() === 'migrate') {
-    await query(CREATE_SCHEMA_SQL)
+    await migrateDatabaseSchema()
     return
   }
 
@@ -725,6 +725,10 @@ export async function ensureDatabaseSchema(): Promise<void> {
     throw error
   })
   await runtimeSchemaReady
+}
+
+export async function migrateDatabaseSchema(): Promise<void> {
+  await query(CREATE_SCHEMA_SQL)
 }
 
 export async function validateRuntimeDatabaseSchema(): Promise<void> {

@@ -10,6 +10,7 @@ vi.mock('./postgres', () => ({
 
 import {
   ensureDatabaseSchema,
+  migrateDatabaseSchema,
   resolveDatabaseSchemaMode,
   validateRuntimeDatabaseSchema,
 } from './schema'
@@ -24,6 +25,15 @@ afterEach(() => {
 })
 
 describe('database schema ownership', () => {
+  it('runs schema DDL only through the explicit migration operation', async () => {
+    queryMock.mockResolvedValue({ rows: [] })
+
+    await migrateDatabaseSchema()
+
+    expect(queryMock).toHaveBeenCalledTimes(1)
+    expect(queryMock.mock.calls[0][0]).toMatch(/CREATE TABLE IF NOT EXISTS security_rate_limit_buckets/)
+  })
+
   it('retries a transient runtime validation error and then caches success without executing DDL', async () => {
     process.env.APP_ROLE = 'api'
     process.env.NODE_ENV = 'production'
