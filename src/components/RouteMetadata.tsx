@@ -38,6 +38,11 @@ const PUBLIC_METADATA: Record<string, Metadata> = {
     description: copy.metadata.components_RouteMetadata_022,
     indexable: true,
   },
+  '/thanks': {
+    title: copy.metadata.components_RouteMetadata_023,
+    description: copy.metadata.components_RouteMetadata_024,
+    indexable: true,
+  },
   '/privacy': {
     title: copy.metadata.components_RouteMetadata_009,
     description: copy.metadata.components_RouteMetadata_010,

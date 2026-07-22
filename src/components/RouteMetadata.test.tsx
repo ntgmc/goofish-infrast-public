@@ -36,6 +36,10 @@ describe('RouteMetadata', () => {
     await waitFor(() => expect(document.title).toBe('用户服务协议 | MaaTool'))
     expect(metaByName('robots')).toBe('index, follow')
 
+    await act(async () => router.navigate('/thanks'))
+    expect(document.title).toBe('致谢 | MaaTool')
+    expect(metaByName('robots')).toBe('index, follow')
+
     await act(async () => router.navigate('/tool/profiles'))
 
     expect(document.title).toBe('MaaTool 工作台')

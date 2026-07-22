@@ -27,6 +27,7 @@ describe('static SEO files', () => {
     expect(robots).toContain('Disallow: /tool/')
     expect(robots).toContain('Sitemap: https://maatool.com/sitemap.xml')
     expect(sitemap).toContain('https://maatool.com/tools/depot-value')
+    expect(sitemap).toContain('https://maatool.com/thanks')
     expect(sitemap).not.toContain('https://maatool.com/tool/')
     expect(sitemap).not.toContain('https://maatool.com/admin/')
   })

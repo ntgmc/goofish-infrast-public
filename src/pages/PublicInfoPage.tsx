@@ -4,104 +4,12 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import { Link } from 'react-router-dom'
 import { copy } from '../copy/index'
 import { productPolicies } from '../lib/product-catalog'
+import { usePublicContent } from '../lib/public-content-context'
 
 
 export type PublicInfoPageKind = 'faq' | 'support' | 'privacy' | 'terms' | 'disclaimer'
 
 const EFFECTIVE_DATE = copy.public.pages_PublicInfoPage_001
-
-const faqItems = [
-  {
-    id: 'requirements',
-    question: copy.public.pages_PublicInfoPage_002,
-    answer: copy.public.pages_PublicInfoPage_003,
-  },
-  {
-    id: 'account-concepts',
-    question: copy.public.pages_PublicInfoPage_081,
-    answer: copy.public.pages_PublicInfoPage_082,
-  },
-  {
-    id: 'game-password',
-    question: copy.public.pages_PublicInfoPage_083,
-    answer: copy.public.pages_PublicInfoPage_084,
-  },
-  {
-    id: 'free-versus-lifetime',
-    question: copy.public.pages_PublicInfoPage_085,
-    answer: copy.public.pages_PublicInfoPage_086,
-  },
-  {
-    id: 'cdk-account',
-    question: copy.public.pages_PublicInfoPage_004,
-    answer: copy.public.pages_PublicInfoPage_005,
-  },
-  {
-    id: 'skland-data',
-    question: copy.public.pages_PublicInfoPage_006,
-    answer: copy.public.pages_PublicInfoPage_007,
-  },
-  {
-    id: 'skland-save',
-    question: copy.public.pages_PublicInfoPage_087,
-    answer: copy.public.pages_PublicInfoPage_088,
-  },
-  {
-    id: 'skland-refresh',
-    question: copy.public.pages_PublicInfoPage_089,
-    answer: copy.public.pages_PublicInfoPage_090,
-  },
-  {
-    id: 'use-json',
-    question: copy.public.pages_PublicInfoPage_008,
-    answer: copy.public.pages_PublicInfoPage_009,
-  },
-  {
-    id: 'json-unavailable',
-    question: copy.public.pages_PublicInfoPage_091,
-    answer: copy.public.pages_PublicInfoPage_092,
-  },
-  {
-    id: 'schedule-modes',
-    question: copy.public.pages_PublicInfoPage_093,
-    answer: copy.public.pages_PublicInfoPage_094,
-  },
-  {
-    id: 'result-differences',
-    question: copy.public.pages_PublicInfoPage_010,
-    answer: copy.public.pages_PublicInfoPage_011,
-  },
-  {
-    id: 'depot-versus-schedule',
-    question: copy.public.pages_PublicInfoPage_012,
-    answer: copy.public.pages_PublicInfoPage_013,
-  },
-  {
-    id: 'import-failure',
-    question: copy.public.pages_PublicInfoPage_014,
-    answer: copy.public.pages_PublicInfoPage_015,
-  },
-  {
-    id: 'change-bound-account',
-    question: copy.public.pages_PublicInfoPage_095,
-    answer: copy.public.pages_PublicInfoPage_096,
-  },
-  {
-    id: 'data-security',
-    question: copy.public.pages_PublicInfoPage_097,
-    answer: copy.public.pages_PublicInfoPage_098,
-  },
-  {
-    id: 'delete-account',
-    question: copy.public.pages_PublicInfoPage_016,
-    answer: copy.public.pages_PublicInfoPage_017,
-  },
-  {
-    id: 'support-info',
-    question: copy.public.pages_PublicInfoPage_099,
-    answer: copy.public.pages_PublicInfoPage_100,
-  },
-]
 
 const legalContent: Record<Exclude<PublicInfoPageKind, 'faq' | 'support'>, Array<{ id: string; heading: string; paragraphs: string[] }>> = {
   privacy: [
@@ -186,7 +94,10 @@ const pageMeta: Record<PublicInfoPageKind, { title: string; eyebrow: string; int
 }
 
 export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
-  const meta = pageMeta[page]
+  const { content } = usePublicContent()
+  const meta = page === 'faq'
+    ? { title: content.faq.title, eyebrow: content.faq.eyebrow, intro: content.faq.intro }
+    : pageMeta[page]
 
   return (
     <main className="tool-page" tabIndex={-1} data-route-focus>
@@ -230,22 +141,26 @@ export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
 }
 
 function FaqContent() {
+  const { content } = usePublicContent()
   return (
     <section aria-label={copy.public.pages_PublicInfoPage_064}>
       <div>
-        {faqItems.map((item) => (
+        {content.faq.items.map((item) => (
           <details key={item.id} className="group border-b border-surface-3 py-3 transition-colors has-[summary:focus-visible]:border-brand-500/55 has-[summary:focus-visible]:bg-surface-1">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-5 rounded-lg text-base font-semibold text-ink-primary focus-visible:outline-none">
               {item.question}
               <span className="text-xl leading-none text-brand-300 transition group-open:rotate-45" aria-hidden="true">+</span>
             </summary>
-            <p className="max-w-3xl pb-3 pt-2 text-sm leading-7 text-ink-secondary">{item.answer}</p>
+            <div className="max-w-3xl pb-3 pt-2">
+              <p className="whitespace-pre-line text-sm leading-7 text-ink-secondary">{item.answer}</p>
+              {item.action === 'qq_group' && <SupportGroupLink className="tool-secondary-action mt-3" />}
+            </div>
           </details>
         ))}
       </div>
       <div className="public-prose-section">
-        <h2 className="text-lg font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_065}</h2>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pages_PublicInfoPage_066}</p>
+        <h2 className="text-lg font-semibold text-ink-primary">{content.faq.cta_heading}</h2>
+        <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink-secondary">{content.faq.cta_body}</p>
         <SupportGroupLink className="tool-primary-action mt-4" />
       </div>
     </section>

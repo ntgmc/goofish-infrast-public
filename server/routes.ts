@@ -3,6 +3,7 @@ import adminRiskSettingsHandler from './handlers/admin-risk-settings'
 import adminInvitationSettingsHandler from './handlers/admin-invitation-settings'
 import adminRegistrationSettingsHandler from './handlers/admin-registration-settings'
 import adminFeatureSettingsHandler from './handlers/admin-feature-settings'
+import adminPublicContentHandler from './handlers/admin-public-content'
 import adminRegistrationInvitationsHandler from './handlers/admin-registration-invitations'
 import adminOptimizationHandler from './handlers/admin-optimization'
 import adminSessionHandler from './handlers/admin-session'
@@ -22,6 +23,7 @@ import userRewardsHandler from './handlers/user-rewards'
 import accountDataHandler from './handlers/account-data'
 import usageStatsHandler from './handlers/usage-stats'
 import siteFeaturesHandler from './handlers/site-features'
+import sitePublicContentHandler from './handlers/site-public-content'
 import { enforceFeatureGate } from './feature-gate'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
@@ -35,6 +37,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/invitation-settings', adminInvitationSettingsHandler as unknown as ApiHandler],
   ['/api/admin/registration-settings', adminRegistrationSettingsHandler as unknown as ApiHandler],
   ['/api/admin/feature-settings', adminFeatureSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/public-content', adminPublicContentHandler as unknown as ApiHandler],
   ['/api/admin/registration-invitations', adminRegistrationInvitationsHandler as unknown as ApiHandler],
   ['/api/admin/optimization', adminOptimizationHandler as unknown as ApiHandler],
   ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
@@ -50,6 +53,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/auth/change-password', authHandler as unknown as ApiHandler],
   ['/api/auth/me', authHandler as unknown as ApiHandler],
   ['/api/site/features', siteFeaturesHandler as unknown as ApiHandler],
+  ['/api/site/public-content', sitePublicContentHandler as unknown as ApiHandler],
   ['/api/user/data/export', accountDataHandler as unknown as ApiHandler],
   ['/api/user/data/delete-request', accountDataHandler as unknown as ApiHandler],
   ['/api/user/data/cancel', accountDataHandler as unknown as ApiHandler],
