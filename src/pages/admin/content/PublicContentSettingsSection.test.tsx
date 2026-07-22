@@ -62,4 +62,36 @@ describe('PublicContentSettingsSection', () => {
     expect(screen.queryByRole('button', { name: '保存并发布' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument()
   })
+
+  it('edits the selected developer GitHub avatar before publishing', async () => {
+    const user = userEvent.setup()
+    render(<PublicContentSettingsSection />)
+    await screen.findByRole('heading', { name: '公开内容管理' })
+    await user.click(screen.getByRole('tab', { name: '致谢' }))
+
+    const panel = screen.getByRole('tabpanel')
+    const sections = within(panel).getByRole('list', { name: '致谢分组' })
+    await user.click(within(sections).getByRole('button', { name: /开发者/, pressed: false }))
+
+    const avatarInput = within(panel).getByLabelText(/可选 HTTPS 头像地址/)
+    await user.clear(avatarInput)
+    await user.type(avatarInput, 'https://github.com/ntgmc.png')
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({
+      method: 'PUT',
+      json: expect.objectContaining({
+        thanks: expect.objectContaining({
+          sections: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'developers',
+              entries: expect.arrayContaining([
+                expect.objectContaining({ id: 'ntgmc', avatar_url: 'https://github.com/ntgmc.png' }),
+              ]),
+            }),
+          ]),
+        }),
+      }),
+    })))
+  })
 })

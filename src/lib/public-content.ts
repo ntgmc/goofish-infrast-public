@@ -10,6 +10,12 @@ const text = (max: number) => z.string().trim().min(1).max(max)
 const optionalHttpsUrl = z.string().trim().max(2048).refine((value) => value === '' || isHttpsUrl(value), {
   message: copy.publicContent.validation_invalid,
 }).optional().default('')
+const defaultDeveloper = {
+  id: 'ntgmc',
+  name: copy.publicContent.thanks_developer_name,
+  url: 'https://github.com/ntgmc',
+  avatarUrl: 'https://avatars.githubusercontent.com/u/74061867?v=4',
+} as const
 
 const faqItemSchema = z.strictObject({
   id: identifier,
@@ -38,6 +44,7 @@ const thanksEntrySchema = z.strictObject({
   name: text(120),
   description: text(1000),
   url: optionalHttpsUrl,
+  avatar_url: optionalHttpsUrl,
 })
 
 const thanksSectionSchema = z.strictObject({
@@ -178,7 +185,13 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
         id: 'developers',
         heading: copy.publicContent.thanks_developer_heading,
         intro: copy.publicContent.thanks_developer_intro,
-        entries: [thanksEntry('lingyu', copy.publicContent.thanks_developer_name, copy.publicContent.thanks_developer_description)],
+        entries: [thanksEntry(
+          defaultDeveloper.id,
+          defaultDeveloper.name,
+          copy.publicContent.thanks_developer_description,
+          defaultDeveloper.url,
+          defaultDeveloper.avatarUrl,
+        )],
       },
       {
         id: 'helpers',
@@ -212,7 +225,7 @@ export function normalizePublicContentSettings(value: unknown): PublicContentSet
   if (!parsed.success || source.version !== PUBLIC_CONTENT_VERSION) return cloneDefaultPublicContentSettings()
   return {
     version: PUBLIC_CONTENT_VERSION,
-    ...parsed.data,
+    ...migrateLegacyDefaultDeveloper(parsed.data),
     updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
   }
 }
@@ -225,8 +238,24 @@ function faq(id: string, question: string, answer: string, action: 'none' | 'qq_
   return { id, question, answer, action }
 }
 
-function thanksEntry(id: string, name: string, description: string) {
-  return { id, name, description, url: '' }
+function thanksEntry(id: string, name: string, description: string, url = '', avatarUrl = '') {
+  return { id, name, description, url, avatar_url: avatarUrl }
+}
+
+function migrateLegacyDefaultDeveloper(draft: PublicContentDraftV1): PublicContentDraftV1 {
+  const section = draft.thanks.sections.find((item) => item.id === 'developers')
+  const entry = section?.entries.find((item) => item.id === 'lingyu')
+  if (!entry
+    || entry.name !== copy.publicContent.thanks_legacy_developer_name
+    || entry.description !== copy.publicContent.thanks_developer_description
+    || entry.url !== ''
+    || entry.avatar_url !== '') return draft
+
+  entry.id = defaultDeveloper.id
+  entry.name = defaultDeveloper.name
+  entry.url = defaultDeveloper.url
+  entry.avatar_url = defaultDeveloper.avatarUrl
+  return draft
 }
 
 function isHttpsUrl(value: string): boolean {
