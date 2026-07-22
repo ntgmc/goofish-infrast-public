@@ -1,0 +1,128 @@
+import { createServer, type Server } from 'node:http'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createApiProcess, type ApiProcessHooks } from './api-process'
+import {
+  getServiceLifecycleState,
+  setServiceLifecycleStateForTesting,
+} from './lifecycle'
+
+const servers: Server[] = []
+const originalExitCode = process.exitCode
+
+beforeEach(() => {
+  setServiceLifecycleStateForTesting('starting')
+  vi.spyOn(console, 'log').mockImplementation(() => undefined)
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+  vi.spyOn(console, 'error').mockImplementation(() => undefined)
+})
+
+afterEach(async () => {
+  await Promise.all(servers.splice(0).map(closeServer))
+  setServiceLifecycleStateForTesting('ready')
+  process.exitCode = originalExitCode
+  vi.restoreAllMocks()
+})
+
+describe('API process lifecycle', () => {
+  it('runs initialization before listening and drains shared resources in order', async () => {
+    const hooks = createHooks()
+    const dependencies = createDependencies()
+    const controller = createApiProcess(hooks, dependencies.values)
+
+    await controller.start()
+
+    expect(getServiceLifecycleState()).toBe('ready')
+    expect(controller.server.listening).toBe(true)
+    expect(hooks.initialize).toHaveBeenCalledOnce()
+    expect(dependencies.startAccountDeletion).toHaveBeenCalledOnce()
+    expect(hooks.initialize.mock.invocationCallOrder[0])
+      .toBeLessThan(dependencies.startAccountDeletion.mock.invocationCallOrder[0]!)
+
+    await controller.startShutdown('SIGTERM')
+
+    expect(hooks.drain).toHaveBeenCalledOnce()
+    expect(hooks.forceDrain).not.toHaveBeenCalled()
+    expect(dependencies.stopAccountDeletion).toHaveBeenCalledOnce()
+    expect(dependencies.waitForAccountDeletion).toHaveBeenCalledOnce()
+    expect(dependencies.closeDatabase).toHaveBeenCalledOnce()
+    expect(getServiceLifecycleState()).toBe('stopped')
+  })
+
+  it('uses forceDrain when a second signal arrives during graceful shutdown', async () => {
+    let finishDrain: (() => void) | null = null
+    const hooks = createHooks()
+    hooks.drain.mockImplementation(() => new Promise<void>((resolveDrain) => {
+      finishDrain = resolveDrain
+    }))
+    const dependencies = createDependencies()
+    const controller = createApiProcess(hooks, dependencies.values)
+    await controller.start()
+
+    const gracefulShutdown = controller.startShutdown('SIGTERM')
+    await vi.waitFor(() => expect(hooks.drain).toHaveBeenCalledOnce())
+    const forcedShutdown = controller.startShutdown('SIGINT')
+
+    expect(forcedShutdown).toBe(gracefulShutdown)
+    expect(hooks.forceDrain).toHaveBeenCalledOnce()
+    expect(process.exitCode).toBe(1)
+
+    finishDrain?.()
+    await gracefulShutdown
+  })
+
+  it('force-drains hooks and closes shared resources after startup failure', async () => {
+    const startupError = new Error('startup failed')
+    const hooks = createHooks()
+    hooks.initialize.mockRejectedValue(startupError)
+    const dependencies = createDependencies()
+    const controller = createApiProcess(hooks, dependencies.values)
+
+    await expect(controller.start()).rejects.toBe(startupError)
+    await controller.handleStartupFailure(startupError)
+
+    expect(hooks.forceDrain).toHaveBeenCalledOnce()
+    expect(dependencies.closeDatabase).toHaveBeenCalledOnce()
+    expect(getServiceLifecycleState()).toBe('stopped')
+    expect(process.exitCode).toBe(1)
+  })
+})
+
+function createHooks() {
+  return {
+    initialize: vi.fn<ApiProcessHooks['initialize']>(async () => undefined),
+    drain: vi.fn<ApiProcessHooks['drain']>(async () => undefined),
+    forceDrain: vi.fn<ApiProcessHooks['forceDrain']>(() => undefined),
+  }
+}
+
+function createDependencies() {
+  const server = createServer((_request, response) => response.end())
+  servers.push(server)
+  const stopAccountDeletion = vi.fn()
+  const waitForAccountDeletion = vi.fn(async () => undefined)
+  const startAccountDeletion = vi.fn(() => ({
+    stop: stopAccountDeletion,
+    waitForIdle: waitForAccountDeletion,
+  }))
+  const closeDatabase = vi.fn(async () => undefined)
+  return {
+    values: {
+      createServer: () => server,
+      startAccountDeletion,
+      closeDatabase,
+      host: '127.0.0.1',
+      port: 0,
+    },
+    startAccountDeletion,
+    stopAccountDeletion,
+    waitForAccountDeletion,
+    closeDatabase,
+  }
+}
+
+function closeServer(server: Server): Promise<void> {
+  if (!server.listening) return Promise.resolve()
+  return new Promise((resolveClose, rejectClose) => {
+    server.close((error) => error ? rejectClose(error) : resolveClose())
+  })
+}

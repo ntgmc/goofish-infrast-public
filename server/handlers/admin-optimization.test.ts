@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { authenticateAdminRequest, getDeadLetterDetail, getQueueSnapshot, listDeadLetters } = vi.hoisted(() => ({
+const { authenticateAdminRequest, getDeadLetterDetail, getQueueSnapshot, listDeadLetters, replayDeadLetter, requestProcessing } = vi.hoisted(() => ({
   authenticateAdminRequest: vi.fn(),
   getDeadLetterDetail: vi.fn(),
   getQueueSnapshot: vi.fn(),
   listDeadLetters: vi.fn(),
+  replayDeadLetter: vi.fn(),
+  requestProcessing: vi.fn(),
 }))
 
 vi.mock('./admin-auth', () => ({ authenticateAdminRequest }))
@@ -13,12 +15,10 @@ vi.mock('../storage/optimize-job-store', () => ({
   getAdminOptimizationQueueSnapshot: getQueueSnapshot,
   getOptimizationDeadLetterDetail: getDeadLetterDetail,
   listOptimizationDeadLetters: listDeadLetters,
-  replayOptimizationDeadLetter: vi.fn(),
+  replayOptimizationDeadLetter: replayDeadLetter,
 }))
-vi.mock('../optimize-job-runner', () => ({
-  getOptimizeGlobalWorkerConcurrency: () => 3,
-  kickOptimizeJobProcessing: vi.fn(),
-}))
+vi.mock('../optimize-job-config', () => ({ getOptimizeGlobalWorkerConcurrency: () => 3 }))
+vi.mock('../optimize-job-signals', () => ({ requestOptimizeJobProcessing: requestProcessing }))
 
 import adminOptimizationHandler from './admin-optimization'
 
@@ -29,6 +29,7 @@ describe('admin optimization handler', () => {
     getQueueSnapshot.mockResolvedValue({ snapshot_at: '2026-07-19T10:00:00.000Z', queued_jobs: [], running_jobs: [], recent_jobs: [] })
     getDeadLetterDetail.mockResolvedValue(null)
     listDeadLetters.mockResolvedValue([])
+    replayDeadLetter.mockResolvedValue(null)
   })
 
   it('requires an authenticated admin session', async () => {
@@ -78,6 +79,21 @@ describe('admin optimization handler', () => {
 
     const missingRecord = await adminOptimizationHandler(new Request('http://localhost/api/admin/optimization?view=dead_letter&id=missing'))
     expect(missingRecord.status).toBe(404)
+  })
+
+  it('requests worker processing after replaying a dead-letter job', async () => {
+    replayDeadLetter.mockResolvedValue({ id: 'job-replayed' })
+
+    const response = await adminOptimizationHandler(new Request('http://localhost/api/admin/optimization', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'replay', id: 'letter-1', reason: 'verified' }),
+    }))
+
+    expect(response.status).toBe(202)
+    expect(replayDeadLetter).toHaveBeenCalledWith('letter-1', 'ops')
+    expect(requestProcessing).toHaveBeenCalledOnce()
+    await expect(response.json()).resolves.toEqual({ ok: true, replayed_job_id: 'job-replayed' })
   })
 
   it('rejects unknown views and preserves the default dead-letter response', async () => {

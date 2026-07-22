@@ -647,6 +647,8 @@ export const commonCopy = {
   components_ScheduleProgress_117: "正在整理计算结果",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_118: "正在保存排班结果",
+  // src/components/ScheduleProgress.tsx
+  components_ScheduleProgress_119: "正在计算 MAA 对比基准",
   // src/components/GuidedTour.tsx
   components_GuidedTour_001: "跳过导览",
   // src/components/GuidedTour.tsx
