@@ -54,6 +54,15 @@ const REQUIRED_COVERAGE_FACILITIES = new Set([
   '宿舍',
   '制造站',
 ])
+const PRODUCTS_BY_WORKPLACE = new Map([
+  ['trading_station', new Set(['LMD', 'Orundum'])],
+  ['manufacturing_station', new Set(['Pure Gold', 'Originium Shard', 'Battle Record'])],
+])
+const MANUFACTURING_PRODUCT_SCOPES = [
+  [/作战记录类配方/u, 'Battle Record'],
+  [/贵金属类配方/u, 'Pure Gold'],
+  [/源石类配方/u, 'Originium Shard'],
+]
 
 function canonicalRuleContent(rule) {
   return {
@@ -149,6 +158,7 @@ function enumerateEfficiencyRules(data) {
     assertCondition(primaryFacility, `Unknown combination_rules workplace ${workplace}.`)
     for (const [systemName, systemData] of Object.entries(systems ?? {})) {
       const rules = Array.isArray(systemData) ? systemData : systemData?.rules
+      const inheritedProduct = Array.isArray(systemData) ? undefined : systemData?.product
       assertCondition(
         Array.isArray(rules),
         `combination_rules.${workplace}.${systemName} must be an array or contain rules.`,
@@ -163,6 +173,8 @@ function enumerateEfficiencyRules(data) {
           rule,
           path: `combination_rules.${workplace}.${systemName}[${index}]`,
           facilities,
+          workplace,
+          products: normalizeProductList(rule.product ?? inheritedProduct),
         })
       }
     }
@@ -185,6 +197,43 @@ function enumerateEfficiencyRules(data) {
   return leaves
 }
 
+function normalizeProductList(product) {
+  if (typeof product === 'string') return [product]
+  return Array.isArray(product) ? product : []
+}
+
+function validateProductScope(workplace, products, referencedSkills, path) {
+  const allowedProducts = PRODUCTS_BY_WORKPLACE.get(workplace)
+  if (!allowedProducts) return
+  for (const product of products) {
+    assertCondition(
+      allowedProducts.has(product),
+      `${path} has unsupported product ${JSON.stringify(product)} for ${workplace}.`,
+    )
+  }
+  if (workplace !== 'manufacturing_station') return
+
+  const referencedScopes = new Set()
+  for (const skill of referencedSkills) {
+    if (skill.facility !== '制造站') continue
+    for (const [pattern, product] of MANUFACTURING_PRODUCT_SCOPES) {
+      if (pattern.test(skill.description)) referencedScopes.add(product)
+    }
+  }
+  if (referencedScopes.size === 0) return
+  assertCondition(
+    products.length > 0,
+    `${path} references product-scoped manufacturing skills (${[...referencedScopes].join(', ')}) but has no product.`,
+  )
+  for (const product of products) {
+    assertCondition(
+      referencedScopes.has(product),
+      `${path} product ${JSON.stringify(product)} conflicts with referenced manufacturing skill scopes ` +
+        `(${[...referencedScopes].join(', ')}).`,
+    )
+  }
+}
+
 function collectScopedFacilities(value, facilities) {
   if (Array.isArray(value)) {
     for (const item of value) collectScopedFacilities(item, facilities)
@@ -205,7 +254,7 @@ export function validateEfficiencySkillReferences(skillPayload, efficiencyData) 
   const leaves = enumerateEfficiencyRules(efficiencyData)
   const referencedSkillIds = new Set()
 
-  for (const { rule, path, facilities } of leaves) {
+  for (const { rule, path, facilities, workplace, products } of leaves) {
     assertCondition(
       Object.hasOwn(rule, 'skill_rule_refs') && Array.isArray(rule.skill_rule_refs),
       `${path} must define skill_rule_refs as an array.`,
@@ -257,6 +306,7 @@ export function validateEfficiencySkillReferences(skillPayload, efficiencyData) 
         )
       }
     }
+    validateProductScope(workplace, products, referencedSkills, path)
   }
   for (const skill of skillsById.values()) {
     if (!REQUIRED_COVERAGE_FACILITIES.has(skill.facility)) continue
@@ -396,6 +446,38 @@ export function runSelfTests() {
     ({ efficiency }) => { efficiency.combination_rules.trading_station['通用单人'][0].skill_rule_exemption = 'non_skill_condition' },
     /cannot combine/,
   )
+  expectFailure(
+    ({ efficiency }) => { efficiency.combination_rules.trading_station['通用单人'][0].product = 'Unknown' },
+    /unsupported product/,
+  )
+
+  const scoped = makeFixture()
+  const scopedSkill = makeSkill({
+    rule_id: 'PRTS-MFG-0001',
+    facility: '制造站',
+    description: '进驻制造站时，贵金属类配方的生产力+25%',
+  })
+  scoped.skills.skills[0] = scopedSkill
+  scoped.efficiency.combination_rules = {
+    manufacturing_station: {
+      '通用单人': [{
+        combo: ['测试干员'],
+        efficiency: 25,
+        skill_rule_refs: [{ id: scopedSkill.rule_id, hash: scopedSkill.content_hash }],
+      }],
+    },
+  }
+  assert.throws(
+    () => validateEfficiencySkillReferences(scoped.skills, scoped.efficiency),
+    /product-scoped manufacturing skills.*but has no product/,
+  )
+  scoped.efficiency.combination_rules.manufacturing_station['通用单人'][0].product = 'Battle Record'
+  assert.throws(
+    () => validateEfficiencySkillReferences(scoped.skills, scoped.efficiency),
+    /conflicts with referenced manufacturing skill scopes/,
+  )
+  scoped.efficiency.combination_rules.manufacturing_station['通用单人'][0].product = 'Pure Gold'
+  validateEfficiencySkillReferences(scoped.skills, scoped.efficiency)
 
   const exempt = makeFixture()
   const coveredRule = structuredClone(
