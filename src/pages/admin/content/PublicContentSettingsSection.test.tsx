@@ -27,22 +27,32 @@ describe('PublicContentSettingsSection', () => {
     await user.click(screen.getByRole('tab', { name: '常见问题' }))
 
     const panel = screen.getByRole('tabpanel')
-    const firstQuestion = within(panel).getAllByLabelText(/问题/)[0]
-    await user.clear(firstQuestion)
-    await user.type(firstQuestion, '更新后的第一个问题')
-    await user.click(within(panel).getAllByRole('button', { name: '下移' })[0])
+    const list = within(panel).getByRole('list', { name: 'FAQ 条目' })
+    const itemButtons = within(list).getAllByRole('button', { pressed: false })
+    expect(itemButtons.length).toBeGreaterThan(1)
+    expect(within(panel).getAllByLabelText(/问题/)).toHaveLength(1)
+
+    await user.click(itemButtons[0])
+    const selectedQuestion = within(panel).getByLabelText(/问题/)
+    const originalQuestion = (selectedQuestion as HTMLInputElement).value
+    await user.clear(selectedQuestion)
+    await user.type(selectedQuestion, '更新后的第二个问题')
+    await user.click(within(panel).getByRole('button', { name: '上移' }))
     await user.click(screen.getByRole('button', { name: '保存并发布' }))
 
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({
       method: 'PUT',
       json: expect.objectContaining({
         faq: expect.objectContaining({
-          items: expect.arrayContaining([expect.objectContaining({ question: '更新后的第一个问题' })]),
+          items: expect.arrayContaining([expect.objectContaining({ question: '更新后的第二个问题' })]),
         }),
       }),
     })))
+    const savedDocument = adminApiJson.mock.calls[adminApiJson.mock.calls.length - 1]?.[1]?.json
+    expect(savedDocument.faq.items[0].question).toBe('更新后的第二个问题')
+    expect(savedDocument.faq.items[1].question).not.toBe(originalQuestion)
     expect(refresh).toHaveBeenCalled()
-    expect(screen.getByRole('status')).toHaveTextContent('公开内容已保存并发布。')
+    expect(screen.getByText('公开内容已保存并发布。')).toBeInTheDocument()
   })
 
   it('does not expose a save action when loading fails', async () => {

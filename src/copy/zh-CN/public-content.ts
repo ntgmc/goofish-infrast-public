@@ -87,5 +87,10 @@ export const publicContentCopy = {
   admin_move_down: '下移',
   admin_delete: '删除',
   admin_empty_list: '当前没有条目，可使用上方按钮新增。',
+  admin_drag_handle: '拖动排序',
+  admin_drag_instructions: '按空格键抓取条目，使用方向键调整位置，再按空格键放下；按 Escape 取消。',
+  admin_select_item: '请从左侧列表选择一个条目查看和编辑详细内容。',
+  admin_untitled: '未命名条目',
+  admin_list_order_help: '拖动手柄可改变展示顺序；点选条目后在右侧编辑详细内容。',
   validation_invalid: '公开内容配置无效。',
 } as const

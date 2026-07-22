@@ -1,6 +1,6 @@
 import type { Announcement, AnnouncementStats as AnnouncementReachStats } from '../../../lib/types'
 
-import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, UsageTotals, UsageDay, UsageRangeMode, AnnouncementSortKey, UsageRange, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, UsageStatsResponse, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
+import { Permission, GeneratedPermission, CdkStatus, AppUserStatus, FieldErrors, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, UsageTotals, UsageDay, UsageRangeMode, UsageRange, UsageFunnelStep, UsageFailureReason, UsageFailureSample, UsageLatencyStats, UsageSklandStats, UsageAnnouncementStats, UsageCdkDistributionItem, UsageStatsResponse, CdkPermissionDistribution, CdkStatusDistribution, RiskReasonStats, RiskTrendDay, CdkOpsSummary, RiskControlSettings, AdminProfileAccessSummary, AdminProfileOperatorData, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, statusLabels, appUserStatusLabels, cdkProductPermissions, cdkProductPermissionRank } from '../contracts'
 
 export function InfoRow({ label, value }: { label: string; value: string }) {
 return <div className="flex items-center justify-between gap-4 border-b border-surface-3 pb-2 last:border-0"><dt className="text-ink-muted">{label}</dt><dd className="font-medium text-ink-primary">{value}</dd></div>
@@ -376,26 +376,6 @@ function normalizeAnnouncementReachStats(value: Partial<AnnouncementReachStats> 
     unread: normalizeCount(value?.unread),
     read_rate: normalizeNumber(value?.read_rate),
   }
-}
-
-export function sortAnnouncements(items: Announcement[], sort: AnnouncementSortKey): Announcement[] {
-  const next = [...items]
-  return next.sort((left, right) => {
-    if (sort === 'updated_asc') return compareAnnouncementUpdatedAt(left, right)
-    if (sort === 'active') {
-      const activeCompare = Number(right.active) - Number(left.active)
-      return activeCompare || compareAnnouncementUpdatedAtDesc(left, right)
-    }
-    return compareAnnouncementUpdatedAtDesc(left, right)
-  })
-}
-
-function compareAnnouncementUpdatedAt(left: Announcement, right: Announcement): number {
-  return (Date.parse(left.updated_at) || 0) - (Date.parse(right.updated_at) || 0)
-}
-
-function compareAnnouncementUpdatedAtDesc(left: Announcement, right: Announcement): number {
-  return compareAnnouncementUpdatedAt(right, left)
 }
 
 export function createDraftBanner(): Announcement {

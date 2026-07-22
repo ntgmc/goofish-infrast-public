@@ -75,6 +75,30 @@ describe('announcement validation', () => {
     expect(data.banner?.id).toBe('new-banner')
     expect(data.announcements.map((item) => item.id)).toEqual(['popup-one'])
   })
+
+  it('preserves the manually configured popup order regardless of update time', () => {
+    const data = normalizeAnnouncementData({
+      banner: null,
+      announcements: [
+        createAnnouncement('manual-first', 'popup', '2026-01-01T00:00:00.000Z'),
+        createAnnouncement('newer-second', 'popup', '2026-07-01T00:00:00.000Z'),
+      ],
+    })
+
+    expect(data.announcements.map((item) => item.id)).toEqual(['manual-first', 'newer-second'])
+  })
+
+  it('preserves popup order while validating the complete save payload', () => {
+    const input = [
+      createAnnouncement('manual-first', 'popup', '2026-01-01T00:00:00.000Z'),
+      createAnnouncement('newer-second', 'popup', '2026-07-01T00:00:00.000Z'),
+    ]
+    const result = validateAnnouncementList(input, input)
+
+    expect(result).toEqual(expect.objectContaining({ ok: true }))
+    if (!result.ok) throw new Error(result.message)
+    expect(result.announcements.map((item) => item.id)).toEqual(['manual-first', 'newer-second'])
+  })
 })
 
 function createAnnouncement(id: string, kind: 'banner' | 'popup', updatedAt: string) {
