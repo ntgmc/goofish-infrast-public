@@ -10,6 +10,7 @@ import { toolsCopy } from './zh-CN/tools'
 import { workspaceCopy } from './zh-CN/workspace'
 import { featuresCopy } from './zh-CN/features'
 import { publicContentCopy } from './zh-CN/public-content'
+import { personalUseCopy } from './zh-CN/personal-use'
 
 export const CURRENT_LOCALE = 'zh-CN' as const
 
@@ -26,4 +27,5 @@ export const copy = {
   domain: domainCopy,
   features: featuresCopy,
   publicContent: publicContentCopy,
+  personalUse: personalUseCopy,
 } as const

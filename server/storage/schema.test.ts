@@ -30,8 +30,10 @@ describe('database schema ownership', () => {
 
     await migrateDatabaseSchema()
 
-    expect(queryMock).toHaveBeenCalledTimes(1)
+    expect(queryMock).toHaveBeenCalledTimes(2)
     expect(queryMock.mock.calls[0][0]).toMatch(/CREATE TABLE IF NOT EXISTS security_rate_limit_buckets/)
+    expect(queryMock.mock.calls[0][0]).toMatch(/CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances/)
+    expect(queryMock.mock.calls[1][0]).toMatch(/insert into personal_use_declaration_versions/i)
   })
 
   it('retries a transient runtime validation error and then caches success without executing DDL', async () => {

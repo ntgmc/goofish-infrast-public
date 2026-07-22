@@ -125,6 +125,10 @@ export const requestSchemas = {
     source: optionalString(120),
   }),
   userAnnouncement: strict({ announcement_id: optionalString(128), all: z.boolean().optional() }),
+  personalUseDeclarationConfirmation: strict({
+    action: z.enum(['free_preview_claim', 'generated_result_export']),
+    profile_id: optionalString(128),
+  }),
   profilePreview: strict({ display_name: optionalString(40), note: optionalString(500) }),
   profileRedeem: strict({
     cdk: shortString(256),
@@ -254,6 +258,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/invitations', route({ GET: none() })],
   ['/api/user/invitations/code', route({ POST: none() })],
   ['/api/user/rewards', route({ GET: none() })],
+  ['/api/user/personal-use-declaration', route({ GET: none(), POST: json('standard', requestSchemas.personalUseDeclarationConfirmation) }, ['profile_id'])],
   ['/api/optimization/jobs', route({ GET: none(), POST: json('compute', requestSchemas.optimizationJob) }, ['profile_id', 'limit', 'before'])],
   ['/api/optimization/reorder-checks', route({ POST: json('compute', requestSchemas.reorderCheck) })],
   ['/api/user/skland/free-preview/login/start', route({ POST: none() })],

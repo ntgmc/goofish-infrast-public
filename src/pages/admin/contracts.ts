@@ -398,6 +398,16 @@ export interface AdminProfileSummary {
 export interface AdminUserDetail {
   user: AppUserSummary;
   profiles: AdminProfileSummary[];
+  personal_use_declarations: Array<{
+    profile_id: string | null;
+    declaration_id: string;
+    declaration_version: string;
+    action: 'free_preview_claim' | 'generated_result_export';
+    client_ip: string;
+    accepted_at: string;
+    account_deleted_at: string | null;
+    retain_until: string | null;
+  }>;
 }
 
 export interface AdminProfileOperatorData {
