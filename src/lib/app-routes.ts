@@ -7,7 +7,7 @@ export type WorkspaceSetupSection = typeof WORKSPACE_SETUP_SECTIONS[number]
 export const OPTIMIZE_ROUTE_SECTIONS = ['overview', 'plans', 'config', 'result', 'lab'] as const
 export type OptimizeSection = typeof OPTIMIZE_ROUTE_SECTIONS[number]
 
-export const ADMIN_SECTIONS = ['overview', 'features', 'queue', 'cdk', 'risk', 'registration', 'invitation', 'announcement', 'users'] as const
+export const ADMIN_SECTIONS = ['overview', 'features', 'content', 'queue', 'cdk', 'risk', 'registration', 'invitation', 'announcement', 'users'] as const
 export type AdminSection = typeof ADMIN_SECTIONS[number]
 
 export type ToolRoute =
@@ -41,6 +41,7 @@ const optimizePaths: Record<OptimizeSection, string> = {
 const adminPaths: Record<AdminSection, string> = {
   overview: '/admin/overview',
   features: '/admin/features',
+  content: '/admin/content',
   queue: '/admin/queue',
   cdk: '/admin/cdk',
   risk: '/admin/risk',

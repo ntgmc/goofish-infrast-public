@@ -1,5 +1,6 @@
 import { resolveAppRole, type AppRole } from '../process-role'
 import { query } from './postgres'
+import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 
 const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS cdk_records (
@@ -59,6 +60,12 @@ CREATE TABLE IF NOT EXISTS registration_settings (
 );
 
 CREATE TABLE IF NOT EXISTS feature_settings (
+  key TEXT PRIMARY KEY,
+  record_json JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public_content_settings (
   key TEXT PRIMARY KEY,
   record_json JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
@@ -376,6 +383,33 @@ CREATE TABLE IF NOT EXISTS account_deletion_requests (
   created_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_scheduled_for ON account_deletion_requests(scheduled_for);
+
+CREATE TABLE IF NOT EXISTS personal_use_declaration_versions (
+  declaration_id TEXT PRIMARY KEY,
+  display_version TEXT NOT NULL,
+  effective_date DATE NOT NULL,
+  content_text TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  profile_id TEXT,
+  declaration_id TEXT NOT NULL REFERENCES personal_use_declaration_versions(declaration_id),
+  declaration_version TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('free_preview_claim', 'generated_result_export')),
+  client_ip TEXT NOT NULL,
+  accepted_at TIMESTAMPTZ NOT NULL,
+  account_deleted_at TIMESTAMPTZ,
+  retain_until TIMESTAMPTZ,
+  UNIQUE (user_id, declaration_id)
+);
+CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_user ON personal_use_declaration_acceptances(user_id, accepted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_profile ON personal_use_declaration_acceptances(profile_id, accepted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_retention ON personal_use_declaration_acceptances(retain_until) WHERE retain_until IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS user_sessions (
   id TEXT PRIMARY KEY,
@@ -703,7 +737,12 @@ ALTER TABLE user_game_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
 `
 
 const TABLE_CONSTRAINT_KEYWORDS = new Set(['check', 'constraint', 'foreign', 'primary', 'unique'])
-const API_ONLY_RUNTIME_TABLES = new Set(['feature_settings'])
+const API_ONLY_RUNTIME_TABLES = new Set([
+  'feature_settings',
+  'public_content_settings',
+  'personal_use_declaration_versions',
+  'personal_use_declaration_acceptances',
+])
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'
 
@@ -729,6 +768,19 @@ export async function ensureDatabaseSchema(): Promise<void> {
 
 export async function migrateDatabaseSchema(): Promise<void> {
   await query(CREATE_SCHEMA_SQL)
+  await query(
+    `insert into personal_use_declaration_versions
+      (declaration_id, display_version, effective_date, content_text, content_hash, created_at)
+     values ($1, $2, $3, $4, $5, now())
+     on conflict (declaration_id) do nothing`,
+    [
+      CURRENT_PERSONAL_USE_DECLARATION.id,
+      CURRENT_PERSONAL_USE_DECLARATION.version,
+      CURRENT_PERSONAL_USE_DECLARATION.effectiveDate,
+      CURRENT_PERSONAL_USE_DECLARATION.content,
+      CURRENT_PERSONAL_USE_DECLARATION.contentHash,
+    ],
+  )
 }
 
 export async function validateRuntimeDatabaseSchema(): Promise<void> {

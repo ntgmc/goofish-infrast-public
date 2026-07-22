@@ -745,6 +745,19 @@ async function assertFreePreviewScanClaim() {
     throw new Error('免费档案扫码完成：确认前不应创建档案')
   }
 
+  const personalUseAcceptance = store.personalUseAcceptance
+  store.personalUseAcceptance = null
+  const blocked = await callSkland('/api/user/skland/free-preview/login/confirm', {
+    confirmation_id: complete.body.confirmation_id,
+  })
+  if (blocked.status !== 428 || blocked.body.code !== 'personal_use_confirmation_required') {
+    throw new Error(`免费档案扫码确认：缺少个人使用确认时应被拒绝，实际 ${blocked.status}`)
+  }
+  if (store.profiles.size !== profileCountBefore) {
+    throw new Error('免费档案扫码确认：缺少个人使用确认时不应创建档案')
+  }
+  store.personalUseAcceptance = personalUseAcceptance
+
   const confirm = await callSkland('/api/user/skland/free-preview/login/confirm', {
     confirmation_id: complete.body.confirmation_id,
   })
@@ -1130,6 +1143,11 @@ function createMemoryStore() {
     workspaces: new Map(),
     freePreviewClaims: new Map(),
     freePreviewPendingClaims: new Map(),
+    personalUseAcceptance: {
+      declaration_id: 'personal_use_v1',
+      declaration_version: 'V1.0',
+      profile_id: null,
+    },
     fetchCalls: [],
   }
 }
@@ -1177,6 +1195,10 @@ function memoryStorePlugin() {
         path: 'memory-persistent-rate-limit',
         namespace: 'skland-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])personal-use-declaration-store(\.ts)?$/ }, () => ({
+        path: 'memory-personal-use-declaration-store',
+        namespace: 'skland-smoke',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'skland-smoke' }, (args) => ({
         contents: args.path === 'memory-user-store'
           ? memoryUserStoreModule()
@@ -1188,7 +1210,9 @@ function memoryStorePlugin() {
                 ? `export async function reserveSklandAttemptLayered() { return { allowed: true, attempt: { retainFailure() {} } } }`
                 : args.path === 'memory-persistent-rate-limit'
                   ? `export class RateLimitStoreError extends Error {}`
-              : memoryLicenseUtilsModuleFixed(),
+                  : args.path === 'memory-personal-use-declaration-store'
+                    ? memoryPersonalUseDeclarationStoreModule()
+                    : memoryLicenseUtilsModuleFixed(),
         loader: 'js',
       }))
     },
@@ -1200,6 +1224,18 @@ function memoryUsageStatsModule() {
     export async function recordUsageEvent() {}
     export async function countSuccessfulUsageEventsForProfileInRange() { return 0 }
     export async function getScheduleGenerateDurationStatsByBucket() { return { p95_ms: 0, sample_count: 0 } }
+  `
+}
+
+function memoryPersonalUseDeclarationStoreModule() {
+  return `
+    const store = globalThis.__sklandHandlerSmokeStore
+    export async function getPersonalUseDeclarationAcceptance() {
+      return store.personalUseAcceptance
+    }
+    export async function attachPersonalUseDeclarationAcceptanceToProfile(_userId, profileId) {
+      if (store.personalUseAcceptance) store.personalUseAcceptance.profile_id = profileId
+    }
   `
 }
 

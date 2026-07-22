@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { getPool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import { markPersonalUseDeclarationAcceptancesDeleted } from './personal-use-declaration-store'
 import type { PasswordAlgorithm, PasswordHashRecord } from '../security/password'
 import type {
   LicenseConfig,
@@ -300,6 +301,7 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     await client.query('delete from user_workspaces where user_id = $1', [userId])
     await client.query('delete from user_announcement_reads where user_id = $1', [userId])
     await client.query('delete from user_sessions where user_id = $1', [userId])
+    await markPersonalUseDeclarationAcceptancesDeleted(client, userId)
     await client.query('delete from user_game_accounts where user_id = $1', [userId])
     await client.query('delete from user_accounts where id = $1', [userId])
     await client.query('commit')

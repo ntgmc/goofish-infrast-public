@@ -5,6 +5,7 @@ import GuidedTour, { useFirstRunTour, type TourDefinition } from '../../../compo
 import SklandBindingDialog, { type SklandPayload } from '../../../components/SklandBindingDialog'
 import { copy } from '../../../copy/index'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
+import { usePersonalUseDeclaration } from '../../../hooks/usePersonalUseDeclaration'
 
 
 type AddAccountMode = 'cdk' | 'preview'
@@ -18,6 +19,10 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [claimDialogOpen, setClaimDialogOpen] = useState(false)
+  const { guard: guardPersonalUseDeclaration, declarationDialog } = usePersonalUseDeclaration({
+    enabled: true,
+    onError: setError,
+  })
   const redeemTour = useFirstRunTour({ id: 'dashboard-redeem', version: 1, autoStart: autoStartTour })
   const redeemTourDefinition = useMemo<TourDefinition>(() => ({
     id: 'dashboard-redeem',
@@ -42,8 +47,10 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
     event.preventDefault()
     if ((mode === 'cdk' && !features.cdk_redemption) || (mode === 'preview' && !features.free_preview)) return
     if (mode === 'preview') {
-      setError(null)
-      setClaimDialogOpen(true)
+      void guardPersonalUseDeclaration('free_preview_claim', () => {
+        setError(null)
+        setClaimDialogOpen(true)
+      })
       return
     }
     setLoading(true)
@@ -136,6 +143,7 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
         onOpenChange={setClaimDialogOpen}
         onPayload={handleClaimPayload}
       />}
+      {declarationDialog}
       <GuidedTour definition={redeemTourDefinition} open={redeemTour.open} onFinish={redeemTour.finish} onSkip={redeemTour.skip} />
     </>
   )

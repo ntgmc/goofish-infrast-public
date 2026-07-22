@@ -50,6 +50,11 @@ import {
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 import { recordUsageEvent } from './usage-stats'
 import type { UsageReasonCode } from '../storage/usage-store'
+import { CURRENT_PERSONAL_USE_DECLARATION, isCurrentPersonalUseDeclarationEffective } from '../personal-use-declaration'
+import {
+  attachPersonalUseDeclarationAcceptanceToProfile,
+  getPersonalUseDeclarationAcceptance,
+} from '../storage/personal-use-declaration-store'
 
 const PENDING_BINDING_TTL_MS = 10 * 60 * 1000
 const UID_MISMATCH_FREEZE_THRESHOLD = 3
@@ -505,6 +510,18 @@ async function confirmFreePreviewClaim(user: AuthPayloadUser, confirmationId: st
     return jsonResponse({ error: '免费个人排班确认已过期，请重新登录森空岛。' }, 400)
   }
 
+  const personalUseDeclarationEffective = isCurrentPersonalUseDeclarationEffective()
+  const personalUseAcceptance = personalUseDeclarationEffective
+    ? await getPersonalUseDeclarationAcceptance(user.id)
+    : null
+  if (personalUseDeclarationEffective && !personalUseAcceptance) {
+    return jsonResponse({
+      error: '请先完成个人使用声明确认，再领取免费个人排班档案。',
+      code: 'personal_use_confirmation_required',
+      declaration_id: CURRENT_PERSONAL_USE_DECLARATION.id,
+    }, 428)
+  }
+
   const profiles = await listProfilesForUser(user.id)
   const existingPreview = profiles.find((profile) => isFreePreviewProfile(profile))
   if (existingPreview?.skland_binding) {
@@ -542,6 +559,7 @@ async function confirmFreePreviewClaim(user: AuthPayloadUser, confirmationId: st
 
   try {
     if (!existingPreview) await saveUserProfile(profile)
+    await attachPersonalUseDeclarationAcceptanceToProfile(user.id, profile.id)
     const imported = await saveSklandImport(user.id, profile, decryptSklandCredential(pending.encrypted_cred), pending.uid)
     await deleteFreePreviewPendingClaim(user.id, confirmationId)
     return jsonResponse(await buildPayloadWithImport(user, profile.id, imported))

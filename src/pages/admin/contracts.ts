@@ -102,8 +102,6 @@ export type UsageRangeKey = '7d' | '14d' | '30d'
 
 export type UsageRangeMode = UsageRangeKey | 'custom'
 
-export type AnnouncementSortKey = 'updated_desc' | 'updated_asc' | 'active'
-
 export interface UsageRange {
   from: string;
   to: string;
@@ -400,6 +398,16 @@ export interface AdminProfileSummary {
 export interface AdminUserDetail {
   user: AppUserSummary;
   profiles: AdminProfileSummary[];
+  personal_use_declarations: Array<{
+    profile_id: string | null;
+    declaration_id: string;
+    declaration_version: string;
+    action: 'free_preview_claim' | 'generated_result_export';
+    client_ip: string;
+    accepted_at: string;
+    account_deleted_at: string | null;
+    retain_until: string | null;
+  }>;
 }
 
 export interface AdminProfileOperatorData {
@@ -464,6 +472,7 @@ export const appUserStatusLabels: Record<AppUserStatus, string> = {
 export const sectionLabels: Record<AdminSection, string> = {
   overview: '总览',
   features: copy.features.admin_nav,
+  content: copy.publicContent.admin_nav,
   queue: '异步队列',
   cdk: 'CDK',
   risk: '风控',
@@ -471,12 +480,6 @@ export const sectionLabels: Record<AdminSection, string> = {
   invitation: '邀请设置',
   announcement: '公告管理',
   users: '用户维护',
-}
-
-export const announcementSortLabels: Record<AnnouncementSortKey, string> = {
-  updated_desc: '更新时间新到旧',
-  updated_asc: '更新时间旧到新',
-  active: '启用状态',
 }
 
 export const cdkProductPermissions: GeneratedPermission[] = listAdminIssuablePermissions()
