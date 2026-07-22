@@ -55,7 +55,7 @@ export default function ThanksPage() {
                             <a href={entry.url} target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">{entry.name}</a>
                           ) : entry.name}
                         </h3>
-                        <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink-secondary">{entry.description}</p>
+                        {entry.description && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink-secondary">{entry.description}</p>}
                       </div>
                     </div>
                   </article>

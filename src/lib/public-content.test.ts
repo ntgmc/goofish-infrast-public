@@ -19,6 +19,13 @@ describe('public content settings', () => {
       url: 'https://github.com/ntgmc',
       avatar_url: 'https://avatars.githubusercontent.com/u/74061867?v=4',
     })
+    expect(parsed.thanks.sections[2].entries[0]).toEqual({
+      id: 'dake',
+      name: 'DaKe.',
+      description: '',
+      url: '',
+      avatar_url: '',
+    })
   })
 
   it('rejects unsafe links, invalid group numbers, duplicate ids, and unknown fields', () => {
@@ -68,6 +75,31 @@ describe('public content settings', () => {
     expect(normalizePublicContentSettings(legacy).thanks.sections[1].entries[0]).toMatchObject({
       id: 'lingyu',
       name: '铃语',
+      description: '管理员自定义说明',
+    })
+  })
+
+  it('migrates only the untouched generic helper credit to DaKe.', () => {
+    const legacy = cloneDefaultPublicContentSettings()
+    legacy.thanks.sections[2].entries[0] = {
+      id: 'all-helpers',
+      name: '所有参与开发、测试、反馈与验证的协助者',
+      description: '每一次复现、建议、测试和反馈都让 MaaTool 更可靠。',
+      url: '',
+      avatar_url: '',
+    }
+    expect(normalizePublicContentSettings(legacy).thanks.sections[2].entries[0]).toEqual({
+      id: 'dake',
+      name: 'DaKe.',
+      description: '',
+      url: '',
+      avatar_url: '',
+    })
+
+    legacy.thanks.sections[2].entries[0].description = '管理员自定义说明'
+    expect(normalizePublicContentSettings(legacy).thanks.sections[2].entries[0]).toMatchObject({
+      id: 'all-helpers',
+      name: '所有参与开发、测试、反馈与验证的协助者',
       description: '管理员自定义说明',
     })
   })

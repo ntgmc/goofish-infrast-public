@@ -438,7 +438,7 @@ function ThanksSectionDetail({ section, sectionIndex, sectionCount, edit, onMove
                 <TextField id={`thanks-url-${selectedEntry.id}`} label={copy.publicContent.admin_entry_url} value={selectedEntry.url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].url = value })} />
                 <TextField id={`thanks-avatar-url-${selectedEntry.id}`} label={copy.publicContent.admin_entry_avatar_url} value={selectedEntry.avatar_url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].avatar_url = value })} />
                 <div className="md:col-span-2">
-                  <TextareaField id={`thanks-description-${selectedEntry.id}`} label={copy.publicContent.admin_entry_description} value={selectedEntry.description} maxLength={1000} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].description = value })} />
+                  <TextareaField id={`thanks-description-${selectedEntry.id}`} label={copy.publicContent.admin_entry_description} value={selectedEntry.description} maxLength={1000} required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].description = value })} />
                 </div>
               </div>
             </div>
@@ -491,11 +491,11 @@ function TextField({ id, label, value, maxLength, onChange, type = 'text', input
   )
 }
 
-function TextareaField({ id, label, value, maxLength, onChange }: { id: string; label: string; value: string; maxLength: number; onChange: (value: string) => void }) {
+function TextareaField({ id, label, value, maxLength, required = true, onChange }: { id: string; label: string; value: string; maxLength: number; required?: boolean; onChange: (value: string) => void }) {
   return (
     <label htmlFor={id} className="block">
-      <span className="mb-2 block text-sm font-medium text-ink-secondary">{label}<RequiredMark /></span>
-      <textarea id={id} value={value} maxLength={maxLength} required rows={4} onChange={(event) => onChange(event.currentTarget.value)} className="tool-field min-h-28 resize-y" />
+      <span className="mb-2 block text-sm font-medium text-ink-secondary">{label}{required && <RequiredMark />}</span>
+      <textarea id={id} value={value} maxLength={maxLength} required={required} rows={4} onChange={(event) => onChange(event.currentTarget.value)} className="tool-field min-h-28 resize-y" />
     </label>
   )
 }

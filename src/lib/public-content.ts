@@ -42,7 +42,7 @@ const comparisonRowSchema = z.strictObject({
 const thanksEntrySchema = z.strictObject({
   id: identifier,
   name: text(120),
-  description: text(1000),
+  description: z.string().trim().max(1000),
   url: optionalHttpsUrl,
   avatar_url: optionalHttpsUrl,
 })
@@ -197,7 +197,7 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
         id: 'helpers',
         heading: copy.publicContent.thanks_helpers_heading,
         intro: copy.publicContent.thanks_helpers_intro,
-        entries: [thanksEntry('all-helpers', copy.publicContent.thanks_helpers_name, copy.publicContent.thanks_helpers_description)],
+        entries: [thanksEntry('dake', copy.publicContent.thanks_helpers_name, '')],
       },
     ],
   },
@@ -225,7 +225,7 @@ export function normalizePublicContentSettings(value: unknown): PublicContentSet
   if (!parsed.success || source.version !== PUBLIC_CONTENT_VERSION) return cloneDefaultPublicContentSettings()
   return {
     version: PUBLIC_CONTENT_VERSION,
-    ...migrateLegacyDefaultDeveloper(parsed.data),
+    ...migrateLegacyDefaultCredits(parsed.data),
     updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
   }
 }
@@ -242,19 +242,33 @@ function thanksEntry(id: string, name: string, description: string, url = '', av
   return { id, name, description, url, avatar_url: avatarUrl }
 }
 
-function migrateLegacyDefaultDeveloper(draft: PublicContentDraftV1): PublicContentDraftV1 {
-  const section = draft.thanks.sections.find((item) => item.id === 'developers')
-  const entry = section?.entries.find((item) => item.id === 'lingyu')
-  if (!entry
-    || entry.name !== copy.publicContent.thanks_legacy_developer_name
-    || entry.description !== copy.publicContent.thanks_developer_description
-    || entry.url !== ''
-    || entry.avatar_url !== '') return draft
+function migrateLegacyDefaultCredits(draft: PublicContentDraftV1): PublicContentDraftV1 {
+  const developerSection = draft.thanks.sections.find((item) => item.id === 'developers')
+  const developer = developerSection?.entries.find((item) => item.id === 'lingyu')
+  if (developer
+    && developer.name === copy.publicContent.thanks_legacy_developer_name
+    && developer.description === copy.publicContent.thanks_developer_description
+    && developer.url === ''
+    && developer.avatar_url === ''
+    && !developerSection?.entries.some((item) => item !== developer && item.id === defaultDeveloper.id)) {
+    developer.id = defaultDeveloper.id
+    developer.name = defaultDeveloper.name
+    developer.url = defaultDeveloper.url
+    developer.avatar_url = defaultDeveloper.avatarUrl
+  }
 
-  entry.id = defaultDeveloper.id
-  entry.name = defaultDeveloper.name
-  entry.url = defaultDeveloper.url
-  entry.avatar_url = defaultDeveloper.avatarUrl
+  const helperSection = draft.thanks.sections.find((item) => item.id === 'helpers')
+  const helper = helperSection?.entries.find((item) => item.id === 'all-helpers')
+  if (helper
+    && helper.name === copy.publicContent.thanks_legacy_helpers_name
+    && helper.description === copy.publicContent.thanks_legacy_helpers_description
+    && helper.url === ''
+    && helper.avatar_url === ''
+    && !helperSection?.entries.some((item) => item !== helper && item.id === 'dake')) {
+    helper.id = 'dake'
+    helper.name = copy.publicContent.thanks_helpers_name
+    helper.description = ''
+  }
   return draft
 }
 
