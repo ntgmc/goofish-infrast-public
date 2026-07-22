@@ -8,10 +8,8 @@ import {
   replayOptimizationDeadLetter,
   type OptimizationDeadLetterRecord,
 } from '../storage/optimize-job-store'
-import {
-  getOptimizeGlobalWorkerConcurrency,
-  kickOptimizeJobProcessing,
-} from '../optimize-job-runner'
+import { getOptimizeGlobalWorkerConcurrency } from '../optimize-job-config'
+import { requestOptimizeJobProcessing } from '../optimize-job-signals'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 
@@ -53,7 +51,7 @@ export default async function adminOptimizationHandler(req: Request): Promise<Re
       if (body.action === 'replay') {
         const job = await replayOptimizationDeadLetter(id, authentication.username)
         if (!job) return jsonResponse({ error: '死信任务不存在、已处理或原任务状态无效。' }, 409)
-        kickOptimizeJobProcessing()
+        requestOptimizeJobProcessing()
         return noStore(jsonResponse({ ok: true, replayed_job_id: job.id }, 202))
       }
       if (body.action === 'discard') {

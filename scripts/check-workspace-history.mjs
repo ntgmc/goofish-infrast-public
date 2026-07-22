@@ -16,7 +16,9 @@ optimizeJobStore.admitJob = async (input) => ({ job: await optimizeJobStore.crea
 globalThis.__maaOptimizeJobStoreForTesting = optimizeJobStore
 
 const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts')
-const optimizeHandler = await bundleHandler('server/handlers/optimization.ts')
+const optimizeHandler = await bundleHandler('server/handlers/optimization.ts', [
+  'server/optimization/jobs/executor.ts',
+])
 const profilesHandler = await bundleHandler('server/handlers/user-profiles.ts')
 const { FREE_PREVIEW_ADVANCED_TRIAL } = await bundleHandler('server/free-preview-trial.ts')
 
@@ -1030,10 +1032,24 @@ function toOptimizationRequest(body) {
     historySource: body.history_source,
   }
 }
-async function bundleHandler(entryPoint) {
+async function bundleHandler(entryPoint, setupEntryPoints = []) {
   const outputPath = resolve(bundleDir, `${entryPoint.replace(/[\\/.:]/g, '-')}.mjs`)
+  const entryConfig = setupEntryPoints.length > 0
+    ? {
+        stdin: {
+          contents: [
+            ...setupEntryPoints.map((setupEntryPoint) => `import ${JSON.stringify(`./${setupEntryPoint}`)};`),
+            `export { default } from ${JSON.stringify(`./${entryPoint}`)};`,
+            `export * from ${JSON.stringify(`./${entryPoint}`)};`,
+          ].join('\n'),
+          loader: 'ts',
+          resolveDir: resolve('.'),
+          sourcefile: 'check-workspace-history-entry.ts',
+        },
+      }
+    : { entryPoints: [entryPoint] }
   const result = await esbuild.build({
-    entryPoints: [entryPoint],
+    ...entryConfig,
     bundle: true,
     platform: 'node',
     format: 'esm',
