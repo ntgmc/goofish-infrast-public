@@ -81,7 +81,9 @@ check_worktree_clean() {
 }
 
 check_migration_prestart() {
-  [[ "$REQUIRE_MIGRATION_PRESTART" == "true" ]] || return
+  if [[ "$REQUIRE_MIGRATION_PRESTART" != "true" ]]; then
+    return 0
+  fi
   local unit_definition
   unit_definition="$(systemctl cat "$SERVICE_NAME")" ||
     fail "cannot inspect installed systemd service: $SERVICE_NAME"
