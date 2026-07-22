@@ -186,12 +186,15 @@ npm run check:migration
 提供统一的 CSP、HSTS、frame、MIME、referrer 和 Permissions Policy 基线。
 `deploy/nginx/goofish-static-files.conf` 将 `/assets/` 与 SPA 路由分开：哈希资源
 只允许命中真实文件并长期缓存，HTML 文档保持可重新验证。
+`deploy/nginx/goofish-canonical-redirect.conf` 用于独立的 HTTP 和 `www` HTTPS
+重定向 server，将别名域名永久跳转到 `https://maatool.com` 并保留完整路径与查询参数。
 
 先把 zone 配置安装到 Nginx 的 `http {}` 上下文，再安装 server 片段：
 
 ```bash
 sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
+sudo install -m 0644 deploy/nginx/goofish-canonical-redirect.conf /etc/nginx/snippets/goofish-canonical-redirect.conf
 sudo install -m 0644 deploy/nginx/goofish-proxy-common.conf /etc/nginx/snippets/goofish-proxy-common.conf
 sudo install -m 0644 deploy/nginx/goofish-server-hardening.conf /etc/nginx/snippets/goofish-server-hardening.conf
 sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
@@ -211,6 +214,11 @@ include /etc/nginx/snippets/goofish-api-production.conf;
 include /etc/nginx/snippets/goofish-static-files.conf;
 ```
 
+生产站点应为 `www.maatool.com` 配置独立的 HTTPS redirect server（证书必须覆盖该
+域名），并在该 server 与 HTTP redirect server 中包含
+`goofish-canonical-redirect.conf`。完整配置示例见
+`docs/production-deploy.md`。
+
 应用前必须检查配置，检查成功后再平滑重载：
 
 ```bash
@@ -224,7 +232,10 @@ sudo systemctl reload nginx
 ```bash
 node scripts/check-public-http-smoke.mjs https://maatool.com
 node scripts/check-public-http-smoke.mjs https://dev.maatool.com
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' 'https://www.maatool.com/tool?source=www-check'
 ```
+
+最后一条命令应输出 `308 https://maatool.com/tool?source=www-check`。
 
 超过请求体限额时由 Nginx 直接返回 413；登录或管理认证请求超过 IP 速率时
 返回 429。代理层响应正文可能使用 Nginx 默认格式，但仍会携带统一安全头。

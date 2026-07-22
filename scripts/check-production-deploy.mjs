@@ -11,6 +11,7 @@ const workerDeployScript = await readFile('scripts/deploy-worker-atomic.sh', 'ut
 const devDeployScript = await readFile('scripts/deploy-production.sh', 'utf8')
 const releaseArtifact = await readFile('scripts/release-artifact.mjs', 'utf8')
 const apiNginx = await readFile('deploy/nginx/goofish-api-production.conf', 'utf8')
+const canonicalRedirectNginx = await readFile('deploy/nginx/goofish-canonical-redirect.conf', 'utf8')
 const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', 'utf8')
 const greenUpstream = await readFile('deploy/nginx/goofish-upstream-green.conf', 'utf8')
 const systemdUnit = await readFile('deploy/systemd/goofish-infrast-v1@.service', 'utf8')
@@ -295,6 +296,12 @@ function assertNginxBlueGreenConfig() {
   const namedUpstreams = apiNginx.match(/proxy_pass http:\/\/goofish_backend;/g) ?? []
   assert.equal(namedUpstreams.length, 4, 'all production API locations should use the named upstream')
   assert.doesNotMatch(apiNginx, /127\.0\.0\.1:3000/)
+  assert.match(
+    canonicalRedirectNginx,
+    /^return 308 https:\/\/maatool\.com\$request_uri;$/m,
+    'the canonical redirect should preserve the complete request path and query string',
+  )
+  assert.doesNotMatch(canonicalRedirectNginx, /proxy_pass|try_files/, 'the www redirect must not serve the application')
   assert.match(blueUpstream, /upstream goofish_backend/)
   assert.match(blueUpstream, /127\.0\.0\.1:3000/)
   assert.match(greenUpstream, /upstream goofish_backend/)
@@ -337,6 +344,11 @@ function assertSystemdTemplate() {
 
 function assertDeploymentDocumentation() {
   assert.ok(productionDocs.includes('PUBLIC_APP_URL=https://maatool.com'), 'production EnvironmentFile must declare the public origin')
+  assert.ok(
+    productionDocs.includes('server_name www.maatool.com;') &&
+      productionDocs.includes('include /etc/nginx/snippets/goofish-canonical-redirect.conf;'),
+    'production documentation should redirect the www alias to the canonical origin',
+  )
   assert.ok(developmentDocs.includes('PUBLIC_APP_URL=https://dev.maatool.com'), 'development EnvironmentFile must declare the public origin')
   assert.ok(
     developmentDocs.includes('CREATE DATABASE goofish_infrast_v1_dev OWNER goofish_dev'),
