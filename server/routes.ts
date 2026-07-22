@@ -7,7 +7,6 @@ import adminRegistrationInvitationsHandler from './handlers/admin-registration-i
 import adminOptimizationHandler from './handlers/admin-optimization'
 import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
-import analyzeScheduleHandler from './handlers/analyze-schedule'
 import announcementHandler from './handlers/announcement'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
@@ -60,7 +59,6 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/announcement', announcementHandler as unknown as ApiHandler],
   ['/api/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],
-  ['/api/analyze-schedule', analyzeScheduleHandler as unknown as ApiHandler],
   ['/api/depot-value', depotValueHandler as unknown as ApiHandler],
   ['/api/user/announcements', userAnnouncementsHandler as unknown as ApiHandler],
   ['/api/user/profiles', userProfilesHandler as unknown as ApiHandler],

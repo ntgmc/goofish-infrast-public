@@ -128,18 +128,6 @@ export const domainCopy = {
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_008: "数据",
   // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_009: "分析提示",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_010: "红脸风险",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_011: "处",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_012: " 名干员：",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_013: "等",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_014: "未发现红脸风险",
-  // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_015: "预设队列",
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_016: "组",
@@ -165,10 +153,6 @@ export const domainCopy = {
   components_result_panel_ResultMetrics_026: "赤金净变动 ",
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_027: "，合成玉 ",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_028: "爆仓概览",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_029: "房间",
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_030: "搓玉经济",
   // src/components/result-panel/ResultMetrics.tsx
@@ -248,13 +232,9 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_025: "免费个人排班已就绪",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_026: "排班表分析完成",
-  // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_027: "排班方案已就绪",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_028: "这是按正常流程生成的免费个人排班结果，可照着设置完整游戏内轮换，但不包含导出和高级分析。",
-  // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_029: "已根据导入排班表计算红脸风险、日产量和爆仓信息。",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_030: "按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。",
   // src/components/result-panel/ResultPanel.tsx
@@ -309,14 +289,6 @@ export const domainCopy = {
   components_result_panel_formatters_017: " 天后耗完",
   // src/components/result-panel/formatters.ts
   components_result_panel_formatters_018: "暂无制造站产出",
-  // src/components/result-panel/formatters.ts
-  components_result_panel_formatters_019: "暂无爆仓信息",
-  // src/components/result-panel/formatters.ts
-  components_result_panel_formatters_020: "贸易最短 ",
-  // src/components/result-panel/formatters.ts
-  components_result_panel_formatters_021: "制造最短 ",
-  // src/components/result-panel/formatters.ts
-  components_result_panel_formatters_022: "暂无爆仓信息",
   // src/components/result-panel/formatters.ts
   components_result_panel_formatters_023: "满单 ",
   // src/components/result-panel/formatters.ts

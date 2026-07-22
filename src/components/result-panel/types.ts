@@ -7,7 +7,6 @@ export interface ResultPanelProps {
   onDownload?: () => void;
   onSaveWorkfile?: () => void;
   detailDefaultOpen?: boolean;
-  variant?: 'optimize' | 'analysis';
   suggestionsSlot?: ReactNode;
   previewLimit?: OptimizeResult['preview_limit'];
 }

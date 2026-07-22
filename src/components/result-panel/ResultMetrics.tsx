@@ -1,8 +1,6 @@
-import type { OptimizeResult } from '../../lib/types'
 import {
   formatAmount,
   formatIntermediateDepletionSummary,
-  formatOverflowSummary,
   formatProductionBreakdown,
   formatSigned,
   type PreparedResult,
@@ -13,14 +11,10 @@ import { copy } from '../../copy/index'
 
 
 export default function ResultMetrics({
-  isAnalysis,
   isRotationMode,
-  analysisSummary,
   prepared,
 }: {
-  isAnalysis: boolean;
   isRotationMode: boolean;
-  analysisSummary: OptimizeResult['analysis_summary'];
   prepared: PreparedResult;
 }) {
   const {
@@ -36,7 +30,7 @@ export default function ResultMetrics({
     detailStats,
   } = prepared
   const showProductionMetrics = !isRotationMode || hasDailyProduction
-  const showMaaDefaultComparison = Boolean(maaDefaultComparison) && !isAnalysis && !isRotationMode
+  const showMaaDefaultComparison = Boolean(maaDefaultComparison) && !isRotationMode
   const orundumEconomyNote = orundumEconomy
     ? `${copy.domain.components_result_panel_ResultMetrics_001}${formatAmount(orundumEconomy.sustainable_orundum)}${copy.domain.components_result_panel_ResultMetrics_002}${formatAmount(orundumEconomy.daily_orirock_supply)}${copy.domain.components_result_panel_ResultMetrics_003}${formatAmount(orundumEconomy.hard_lmd_cost)}${copy.domain.components_result_panel_ResultMetrics_004}${orundumEconomy.inventory_depletion_days !== null ? `${copy.domain.components_result_panel_ResultMetrics_005}${formatAmount(orundumEconomy.inventory_depletion_days)}${copy.domain.components_result_panel_ResultMetrics_006}` : ''}`
     : ''
@@ -45,7 +39,7 @@ export default function ResultMetrics({
     : isRotationMode && rotationStatsNote
       ? `${rotationStatsNote}；${productionSanity.note}`
       : productionSanity.note
-  const intermediateDepletionSummary = !isAnalysis && !isRotationMode
+  const intermediateDepletionSummary = !isRotationMode
     ? formatIntermediateDepletionSummary(intermediateDepletion)
     : ''
 
@@ -55,28 +49,8 @@ export default function ResultMetrics({
         <p className="tool-eyebrow">{copy.domain.components_result_panel_ResultMetrics_007}</p>
         <h3 className="text-base font-semibold text-ink-primary">{copy.domain.components_result_panel_ResultMetrics_008}</h3>
       </div>
-      {isAnalysis && analysisSummary?.warnings.length ? (
-        <div className="tool-alert tool-alert--warning mx-5 mt-5 sm:mx-6">
-          <p className="text-sm font-semibold text-warning">{copy.domain.components_result_panel_ResultMetrics_009}</p>
-          <ul className="mt-2 space-y-1 text-sm leading-6 text-ink-secondary">
-            {analysisSummary.warnings.slice(0, 5).map((warning, index) => (
-              <li key={`${warning}-${index}`}>{warning}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
       <StaggeredReveal className="grid gap-3 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
-        {isAnalysis ? (
-          <MetricCard
-            label={copy.domain.components_result_panel_ResultMetrics_010}
-            value={String(analysisSummary?.red_face_risk_count ?? 0)}
-            suffix={copy.domain.components_result_panel_ResultMetrics_011}
-            note={(analysisSummary?.red_face_operator_count ?? 0) > 0
-              ? `${analysisSummary?.red_face_operator_count ?? 0}${copy.domain.components_result_panel_ResultMetrics_012}${(analysisSummary?.red_face_operators ?? []).slice(0, 4).join('、')}${(analysisSummary?.red_face_operators?.length ?? 0) > 4 ? copy.domain.components_result_panel_ResultMetrics_013 : ''}`
-              : copy.domain.components_result_panel_ResultMetrics_014}
-            highlight={(analysisSummary?.red_face_risk_count ?? 0) > 0}
-          />
-        ) : isRotationMode && !showProductionMetrics ? (
+        {isRotationMode && !showProductionMetrics ? (
           <MetricCard label={copy.domain.components_result_panel_ResultMetrics_015} value={String(detailStats.planCount)} suffix={copy.domain.components_result_panel_ResultMetrics_016} highlight />
         ) : (
           <MetricCard
@@ -101,21 +75,12 @@ export default function ResultMetrics({
               suffix={copy.domain.components_result_panel_ResultMetrics_025}
               note={`${copy.domain.components_result_panel_ResultMetrics_026}${formatSigned(productionStats.goldNet)}${productionStats.orundum > 0 ? `${copy.domain.components_result_panel_ResultMetrics_027}${formatAmount(productionStats.orundum)}` : ''}`}
             />
-            {isAnalysis ? (
-              <MetricCard
-                label={copy.domain.components_result_panel_ResultMetrics_028}
-                value={String((analysisSummary?.overflow.trading_rooms ?? 0) + (analysisSummary?.overflow.manufacturing_rooms ?? 0))}
-                suffix={copy.domain.components_result_panel_ResultMetrics_029}
-                note={formatOverflowSummary(analysisSummary?.overflow)}
-              />
-            ) : (
-              <MetricCard
-                label={orundumEconomy ? copy.domain.components_result_panel_ResultMetrics_030 : copy.domain.components_result_panel_ResultMetrics_031}
-                value={formatAmount(orundumEconomy?.short_term_orundum ?? productionSanity.value)}
-                suffix={orundumEconomy ? copy.domain.components_result_panel_ResultMetrics_032 : copy.domain.components_result_panel_ResultMetrics_033}
-                note={orundumEconomy ? orundumEconomyNote : productionSanityNote}
-              />
-            )}
+            <MetricCard
+              label={orundumEconomy ? copy.domain.components_result_panel_ResultMetrics_030 : copy.domain.components_result_panel_ResultMetrics_031}
+              value={formatAmount(orundumEconomy?.short_term_orundum ?? productionSanity.value)}
+              suffix={orundumEconomy ? copy.domain.components_result_panel_ResultMetrics_032 : copy.domain.components_result_panel_ResultMetrics_033}
+              note={orundumEconomy ? orundumEconomyNote : productionSanityNote}
+            />
           </>
         )}
       </StaggeredReveal>

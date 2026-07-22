@@ -14,6 +14,7 @@ const apiNginx = await readFile('deploy/nginx/goofish-api-production.conf', 'utf
 const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', 'utf8')
 const greenUpstream = await readFile('deploy/nginx/goofish-upstream-green.conf', 'utf8')
 const systemdUnit = await readFile('deploy/systemd/goofish-infrast-v1@.service', 'utf8')
+const devSystemdUnit = await readFile('deploy/systemd/goofish-infrast-v1-dev.service', 'utf8')
 const workerSystemdUnit = await readFile('deploy/systemd/goofish-optimize-worker@.service', 'utf8')
 const buildRelevance = await readFile('scripts/check-build-relevance.mjs', 'utf8')
 const productionDocs = await readFile('docs/production-deploy.md', 'utf8')
@@ -305,6 +306,13 @@ function assertSystemdTemplate() {
   assert.match(systemdUnit, /Environment=HOST=127\.0\.0\.1/)
   assert.match(systemdUnit, /KillSignal=SIGTERM/)
   assert.match(systemdUnit, /TimeoutStopSec=75s/)
+
+  assert.match(devSystemdUnit, /WorkingDirectory=\/opt\/goofish-infrast-v1-dev/)
+  assert.match(devSystemdUnit, /Environment=NODE_ENV=production/)
+  assert.match(devSystemdUnit, /Environment=APP_ROLE=api/)
+  assert.match(devSystemdUnit, /Environment=PORT=3001/)
+  assert.match(devSystemdUnit, /Environment=HOST=127\.0\.0\.1/)
+  assert.match(devSystemdUnit, /EnvironmentFile=\/etc\/goofish-infrast-v1\/dev\.env/)
 
   assert.match(workerSystemdUnit, /^User=ntgmc$/m)
   assert.match(workerSystemdUnit, /^Group=ntgmc$/m)

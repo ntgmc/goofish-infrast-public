@@ -204,7 +204,6 @@ WantedBy=multi-user.target
 - `GET /api/data`
 - `GET /api/announcement`
 - `POST /api/usage-stats`
-- `POST /api/analyze-schedule`
 - `POST /api/free-preview`
 - `POST /api/optimize`
 

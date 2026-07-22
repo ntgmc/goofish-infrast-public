@@ -403,7 +403,6 @@ function memoryFeatureSettingsStoreModule() {
           cdk_redemption: true,
           free_preview: true,
           schedule_generation: true,
-          schedule_analysis: true,
           depot_value: true,
           skland: true,
           invitations: true,

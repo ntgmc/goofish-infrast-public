@@ -18,13 +18,6 @@ const deferredFeatures: DeferredFeature[] = [
     href: '/tools/depot-value',
     feature: 'depot_value',
   },
-  {
-    title: copy.common.components_DeferredFeatureMenu_004,
-    description: copy.common.components_DeferredFeatureMenu_005,
-    status: copy.common.components_DeferredFeatureMenu_006,
-    href: '/tools/schedule-analysis',
-    feature: 'schedule_analysis',
-  },
 ]
 
 interface DeferredFeatureMenuProps {
