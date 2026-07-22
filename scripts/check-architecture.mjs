@@ -37,6 +37,14 @@ for await (const filename of glob('server/handlers/**/*.ts')) {
   if (/from\s+['"][^'"]*\/optimization\/(?!jobs\/)/.test(source)) {
     failures.push(`${filename}: API handler imports optimization core directly`)
   }
+  if (source.includes('optimize-job-runner')) {
+    failures.push(`${filename}: API handler imports optimize job runner directly`)
+  }
+}
+
+const jobStatusSource = await readFile('server/optimization/jobs/job-status.ts', 'utf8')
+if (jobStatusSource.includes('optimize-job-runner')) {
+  failures.push('server/optimization/jobs/job-status.ts: job status imports optimize job runner directly')
 }
 
 if (failures.length > 0) {

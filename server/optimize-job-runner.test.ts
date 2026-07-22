@@ -4,11 +4,11 @@ import { afterAll, describe, expect, it } from 'vitest'
 import {
   initializeOptimizeJobProcessing,
   initializeOptimizeQueueMaintenance,
-  kickOptimizeJobProcessing,
   registerOptimizeJobExecutor,
   shutdownOptimizeJobProcessing,
   shutdownOptimizeQueueMaintenance,
 } from './optimize-job-runner'
+import { requestOptimizeJobProcessing } from './optimize-job-signals'
 import { createMemoryOptimizeJobStore } from './storage/optimize-job-store'
 
 afterAll(async () => {
@@ -35,7 +35,7 @@ describe('optimization dispatcher startup recovery', () => {
     )
 
     await initializeOptimizeQueueMaintenance()
-    kickOptimizeJobProcessing()
+    requestOptimizeJobProcessing()
     await new Promise((resolveWait) => setTimeout(resolveWait, 25))
 
     await expect(store.getJob(expired.id)).resolves.toMatchObject({ status: 'queued' })
@@ -87,7 +87,7 @@ describe('optimization dispatcher startup recovery', () => {
     const job = await store.createJob({ ...input(), payload_json: { busyMs: 1_000 } })
 
     const startedAt = Date.now()
-    kickOptimizeJobProcessing()
+    requestOptimizeJobProcessing()
     await waitFor(async () => (await store.getJob(job.id))?.status === 'dead_lettered')
 
     expect(Date.now() - startedAt).toBeLessThan(750)
@@ -110,7 +110,7 @@ describe('optimization dispatcher startup recovery', () => {
     process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING = resolve('server/test-fixtures/optimize-progress-worker.mjs')
     const job = await store.createJob(input())
 
-    kickOptimizeJobProcessing()
+    requestOptimizeJobProcessing()
     await waitFor(async () => (await store.getJob(job.id))?.execution_stage === 'simulating_upgrades')
     await waitFor(async () => (await store.getJob(job.id))?.status === 'succeeded')
 
@@ -131,7 +131,7 @@ describe('optimization dispatcher startup recovery', () => {
     process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS = '1000'
     const job = await store.createJob({ ...input(), payload_json: { busyMs: 1_000 } })
 
-    kickOptimizeJobProcessing()
+    requestOptimizeJobProcessing()
     await waitFor(async () => (await store.getJob(job.id))?.status === 'running')
     await shutdownOptimizeJobProcessing(25)
 
