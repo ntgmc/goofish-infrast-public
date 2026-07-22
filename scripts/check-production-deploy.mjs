@@ -16,7 +16,6 @@ const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', '
 const greenUpstream = await readFile('deploy/nginx/goofish-upstream-green.conf', 'utf8')
 const systemdUnit = await readFile('deploy/systemd/goofish-infrast-v1@.service', 'utf8')
 const devSystemdUnit = await readFile('deploy/systemd/goofish-infrast-v1-dev.service', 'utf8')
-const devMigrationSystemdUnit = await readFile('deploy/systemd/goofish-infrast-v1-dev-migrate.service', 'utf8')
 const workerSystemdUnit = await readFile('deploy/systemd/goofish-optimize-worker@.service', 'utf8')
 const buildRelevance = await readFile('scripts/check-build-relevance.mjs', 'utf8')
 const productionDocs = await readFile('docs/production-deploy.md', 'utf8')
@@ -64,7 +63,8 @@ function assertWorkflowProvenance() {
   assert.match(devWorkflow, /run\.event === 'push'/, 'manual dev deploy should verify the selected run event')
   assert.match(devWorkflow, /ref: \$\{\{ steps\.target\.outputs\.sha \}\}/, 'dev deploy should checkout the immutable target SHA')
   assert.match(devWorkflow, /scripts\/deploy-production\.sh "\$DEPLOY_USER@\$DEPLOY_HOST:\$remote_deploy_script"/, 'dev deploy should upload the target deployment script')
-  assert.match(devWorkflow, /MIGRATION_SERVICE_NAME=\$\{DEPLOY_MIGRATION_SERVICE_NAME@Q\}/, 'dev deploy should pass the controlled migration service')
+  assert.doesNotMatch(devWorkflow, /MIGRATION_SERVICE_NAME/, 'dev deploy should not require a separately privileged migration service')
+  assert.match(devWorkflow, /REQUIRE_MIGRATION_PRESTART=true/, 'dev deploy should require the installed pre-start migration hook')
   assert.match(devWorkflow, /bash \$\{REMOTE_DEPLOY_SCRIPT@Q\}/, 'dev deploy should run the uploaded deployment script')
   assert.match(devWorkflow, /rm -f -- \$\{REMOTE_DEPLOY_SCRIPT@Q\} \$\{REMOTE_ARTIFACT@Q\}/, 'dev deploy should clean up temporary deployment inputs')
   assert.doesNotMatch(devWorkflow, /DEPLOY_SCRIPT:/, 'dev deploy must not depend on a stale server-side script')
@@ -173,10 +173,25 @@ function assertDeploymentScript() {
   assertOrdered(devDeployScript, [
     'sha256sum "$ARTIFACT_PATH"',
     'release-artifact.mjs verify --sha "$TARGET_SHA"',
-    'run_systemctl stop "$SERVICE_NAME"',
-    'run_systemctl start "$MIGRATION_SERVICE_NAME"',
     'run_systemctl restart "$SERVICE_NAME"',
   ])
+  assert.doesNotMatch(devDeployScript, /MIGRATION_SERVICE_NAME/, 'dev deploy should preserve the existing systemctl sudoers contract')
+  assert.doesNotMatch(devDeployScript, /run_systemctl stop "\$SERVICE_NAME"/, 'dev deploy restart should let systemd stop the existing service')
+  assert.match(devDeployScript, /systemctl cat "\$SERVICE_NAME"/, 'dev deploy should inspect the installed unit without sudo')
+  assert.match(devDeployScript, /missing the migration ExecStartPre/, 'dev deploy should explain how to upgrade an older unit')
+  const migrationPrestartBody = extractFunction(devDeployScript, 'check_migration_prestart')
+  assert.match(migrationPrestartBody, /if \[\[ "\$REQUIRE_MIGRATION_PRESTART" != "true" \]\]; then\s+return 0\s+fi/, 'optional dev migration pre-start validation should skip successfully')
+  assert.doesNotMatch(migrationPrestartBody, /\]\] \|\| return(?:\s|$)/, 'dev migration pre-start validation must not inherit a failed condition status')
+  const migrationSkip = spawnSync('bash', ['-c', `set -Eeuo pipefail
+REQUIRE_MIGRATION_PRESTART=false
+${migrationPrestartBody}
+check_migration_prestart
+printf 'migration skip continued\\n'
+`], { encoding: 'utf8' })
+  if (migrationSkip.error?.code !== 'ENOENT') {
+    assert.equal(migrationSkip.status, 0, migrationSkip.stderr || 'optional migration pre-start validation should not terminate deployment')
+    assert.match(migrationSkip.stdout, /migration skip continued/, 'deployment should continue after optional migration pre-start validation is skipped')
+  }
 
   const mainFlow = deployScript.slice(deployScript.indexOf('RELEASE_DIR="$RELEASES_DIR/$TARGET_SHA"'))
   assertOrdered(mainFlow, [
@@ -324,12 +339,10 @@ function assertSystemdTemplate() {
   assert.match(devSystemdUnit, /Environment=PORT=3001/)
   assert.match(devSystemdUnit, /Environment=HOST=127\.0\.0\.1/)
   assert.match(devSystemdUnit, /EnvironmentFile=\/etc\/goofish-infrast-v1\/dev\.env/)
-
-  assert.match(devMigrationSystemdUnit, /^Type=oneshot$/m)
-  assert.match(devMigrationSystemdUnit, /server\/dist\/migrate\.js/)
-  assert.match(devMigrationSystemdUnit, /Environment=APP_ROLE=api/)
-  assert.match(devMigrationSystemdUnit, /Environment=ALLOW_DATABASE_MIGRATION=true/)
-  assert.match(devMigrationSystemdUnit, /EnvironmentFile=\/etc\/goofish-infrast-v1\/dev\.env/)
+  assert.match(
+    devSystemdUnit,
+    /^ExecStartPre=\/usr\/bin\/env ALLOW_DATABASE_MIGRATION=true \/usr\/bin\/node \/opt\/goofish-infrast-v1-dev\/server\/dist\/migrate\.js$/m,
+  )
 
   assert.match(workerSystemdUnit, /^User=ntgmc$/m)
   assert.match(workerSystemdUnit, /^Group=ntgmc$/m)
@@ -360,9 +373,10 @@ function assertDeploymentDocumentation() {
     'development recovery should grant the runtime role access to persistent authentication limits',
   )
   assert.ok(
-    developmentDocs.includes('goofish-infrast-v1-dev-migrate.service') &&
-      developmentDocs.includes('ALLOW_DATABASE_MIGRATION=true'),
-    'development deployment should provision the guarded migration service',
+    developmentDocs.includes('ExecStartPre') &&
+      developmentDocs.includes('ALLOW_DATABASE_MIGRATION=true') &&
+      developmentDocs.includes('needs no passwordless `stop`'),
+    'development deployment should run guarded migration through the existing service restart',
   )
   assert.ok(productionDocs.includes('[worker-deploy.md](worker-deploy.md)'), 'production docs should link the worker runbook')
   for (const expected of [

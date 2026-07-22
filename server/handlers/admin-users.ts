@@ -37,6 +37,7 @@ import { resetUserPasswordByAdmin } from './user-auth'
 import type { ProductPermissionMode } from '../../src/lib/types'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
+import { listPersonalUseDeclarationAcceptancesForUser } from '../storage/personal-use-declaration-store'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -293,10 +294,23 @@ async function syncLinkedCdkPermission(profile: UserGameAccountRecord, permissio
 }
 
 async function buildAdminUserDetail(user: UserAccountRecord) {
-  const profiles = await listProfilesForUser(user.id)
+  const [profiles, personalUseDeclarations] = await Promise.all([
+    listProfilesForUser(user.id),
+    listPersonalUseDeclarationAcceptancesForUser(user.id),
+  ])
   return {
     user: { ...toAdminAppUser(user, profiles), profile_count: profiles.length },
     profiles: await Promise.all(profiles.map((profile) => buildAdminProfileSummary(profile))),
+    personal_use_declarations: personalUseDeclarations.map((acceptance) => ({
+      profile_id: acceptance.profile_id,
+      declaration_id: acceptance.declaration_id,
+      declaration_version: acceptance.declaration_version,
+      action: acceptance.action,
+      client_ip: acceptance.client_ip,
+      accepted_at: acceptance.accepted_at,
+      account_deleted_at: acceptance.account_deleted_at,
+      retain_until: acceptance.retain_until,
+    })),
   }
 }
 

@@ -58,7 +58,6 @@ async function handlePublicGet(): Promise<Response> {
   const banner = data.banner?.active ? data.banner : null
   const announcements = data.announcements
     .filter((item) => item.active)
-    .sort(compareNewestFirst)
   if (announcements.length > 0) {
     await Promise.all(announcements.map((item) => recordAnnouncementEvent('announcement_impression', 'public_get', item)))
   }

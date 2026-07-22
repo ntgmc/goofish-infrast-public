@@ -39,4 +39,8 @@ export const metadataCopy = {
   components_RouteMetadata_021: "价格与权益 | MaaTool",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_022: "查看 MaaTool 免费预览与单账号终身版的价格、能力、干员更新限制、风控规则和售后说明。",
+  // src/components/RouteMetadata.tsx
+  components_RouteMetadata_023: "致谢 | MaaTool",
+  // src/components/RouteMetadata.tsx
+  components_RouteMetadata_024: "感谢为 MaaTool 提供数据参考、格式基础以及开发与测试协助的项目和参与者。",
 } as const

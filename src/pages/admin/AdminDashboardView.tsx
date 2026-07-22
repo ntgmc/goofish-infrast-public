@@ -1,7 +1,6 @@
 import { LayoutGroup } from 'motion/react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
-import AnnouncementBodyEditor from '../../components/AnnouncementBodyEditor'
 import { AnimatedPresenceRegion, MotionNavIndicator } from '../../components/MotionPrimitives'
 import SessionLoader from '../../components/SessionLoader'
 import InvitationSettingsSection from './invitations/InvitationSettingsSection'
@@ -9,8 +8,10 @@ import RegistrationSettingsSection from './registration/RegistrationSettingsSect
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import QueueMonitorPanel from './optimization/QueueMonitorPanel'
 import FeatureSettingsSection from './features/FeatureSettingsSection'
+import PublicContentSettingsSection from './content/PublicContentSettingsSection'
+import AnnouncementSettingsSection from './announcements/AnnouncementSettingsSection'
 
-import { GeneratedPermission, AdminSection, UsageRangeKey, AnnouncementSortKey, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, sectionLabels, announcementSortLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, AnnouncementReachMetrics, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
+import { GeneratedPermission, AdminSection, UsageRangeKey, permissionLabels, sectionLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
 import { useAdminController } from './useAdminController'
 import { PaginationControls } from './shared/PaginationControls'
 
@@ -19,7 +20,7 @@ export default function AdminDashboardView() {
   const navigate = useNavigate()
   const activeSection = resolveAdminSection(location.pathname)
   const setActiveSection = (section: AdminSection) => navigate(adminPath(section))
-  const { cdkSearchInput, setCdkSearchInput, setCdkPage, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, setUserPage, setUserPageSize, userPagination, usersLoading, setRiskPage, setRiskPageSize, riskPagination, riskLoading, permission, announcementSort, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, setAnnouncementSort, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, summary, cdkOpsSummary, cdkFilters, visibleRecords, sortedAnnouncements, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser } = useAdminController()
+  const { cdkSearchInput, setCdkSearchInput, setCdkPage, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, setUserPage, setUserPageSize, userPagination, usersLoading, setRiskPage, setRiskPageSize, riskPagination, riskLoading, permission, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, summary, cdkOpsSummary, cdkFilters, visibleRecords, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, reorderAnnouncements, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser } = useAdminController()
 
   if (!activeSection) return <Navigate to={fallbackAdminPath()} replace />
 
@@ -332,122 +333,22 @@ export default function AdminDashboardView() {
             )}
   
             {activeSection === 'announcement' && (
-              <form onSubmit={handleSaveAnnouncement} className="space-y-5">
-                <section className="tool-panel p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h2 className="text-base font-semibold text-ink-primary">全局横幅</h2>
-                      <p className="mt-1 text-sm text-ink-secondary">横幅全站只保留一个，独立显示，不进入普通公告列表和未读统计。</p>
-                    </div>
-                    <label className="tool-inset flex min-h-11 items-center gap-2 px-3 text-sm font-medium text-ink-secondary">
-                      <input
-                        type="checkbox"
-                        checked={banner.active}
-                        onChange={(event) => updateBanner({ active: event.currentTarget.checked })}
-                        className="h-4 w-4 accent-brand-600"
-                      />
-                      启用横幅
-                    </label>
-                  </div>
-
-                  <label className="mt-5 block">
-                    <span className="mb-2 block text-sm font-medium text-ink-secondary">横幅标题</span>
-                    <input
-                      value={banner.title}
-                      maxLength={80}
-                      onChange={(event) => updateBanner({ title: event.currentTarget.value })}
-                      className="tool-field"
-                    />
-                  </label>
-                  <AnnouncementBodyEditor
-                    id="announcement-banner"
-                    value={banner.body}
-                    onChange={(body) => updateBanner({ body })}
-                  />
-                  <p className="mt-3 text-xs text-ink-muted">更新时间：{formatDate(banner.updated_at)}</p>
-                </section>
-
-                <section className="tool-panel p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h2 className="text-base font-semibold text-ink-primary">弹出式公告</h2>
-                      <p className="mt-1 text-sm text-ink-secondary">普通公告会在用户首次未读时弹出，并显示在公告列表中。</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="tool-inset flex items-center gap-2 px-3 py-2 text-sm font-semibold text-ink-secondary">
-                        <span>排序</span>
-                        <select
-                          value={announcementSort}
-                          onChange={(event) => setAnnouncementSort(event.currentTarget.value as AnnouncementSortKey)}
-                          className="min-h-8 bg-transparent text-sm font-semibold text-ink-primary outline-none"
-                        >
-                          {Object.entries(announcementSortLabels).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <button type="button" onClick={addAnnouncement} className="tool-secondary-action px-3 text-sm">新增弹出式公告</button>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 space-y-4">
-                    {announcements.length === 0 && (
-                      <div className="tool-inset border-dashed px-4 py-6 text-sm text-ink-muted">
-                        还没有弹出式公告。新增后保存即可生效。
-                      </div>
-                    )}
-                    {sortedAnnouncements.map((item) => {
-                      const stats = announcementStats[item.id] ?? EMPTY_ANNOUNCEMENT_REACH_STATS
-                      return (
-                        <article key={item.id} className="tool-inset p-4">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="tool-status">弹出式公告</span>
-                              <label className="tool-inset flex min-h-11 items-center gap-2 px-3 text-sm font-medium text-ink-secondary">
-                                <input
-                                  type="checkbox"
-                                  checked={item.active}
-                                  onChange={(event) => updateAnnouncement(item.id, { active: event.currentTarget.checked })}
-                                  className="h-4 w-4 accent-brand-600"
-                                />
-                                启用
-                              </label>
-                            </div>
-                            <button type="button" onClick={() => deleteAnnouncement(item.id)} className="tool-secondary-action border-error/40 bg-error/10 px-3 text-sm text-error hover:border-error/60 hover:bg-error/20 hover:text-error">
-                              删除
-                            </button>
-                          </div>
-
-                          <AnnouncementReachMetrics stats={stats} />
-
-                          <label className="mt-4 block">
-                            <span className="mb-2 block text-sm font-medium text-ink-secondary">标题</span>
-                            <input
-                              value={item.title}
-                              maxLength={80}
-                              onChange={(event) => updateAnnouncement(item.id, { title: event.currentTarget.value })}
-                              className="tool-field"
-                            />
-                          </label>
-                          <AnnouncementBodyEditor
-                            id={`announcement-${item.id}`}
-                            value={item.body}
-                            onChange={(body) => updateAnnouncement(item.id, { body })}
-                          />
-                          <p className="mt-3 text-xs text-ink-muted">更新时间：{formatDate(item.updated_at)}</p>
-                        </article>
-                      )
-                    })}
-                  </div>
-
-                  <button type="submit" disabled={busyAction === 'announcement'} className="tool-primary-action mt-5">
-                    {busyAction === 'announcement' ? '保存中…' : '保存横幅和公告'}
-                  </button>
-                </section>
-              </form>
+              <AnnouncementSettingsSection
+                banner={banner}
+                announcements={announcements}
+                stats={announcementStats}
+                saving={busyAction === 'announcement'}
+                onSubmit={handleSaveAnnouncement}
+                onUpdateBanner={updateBanner}
+                onAdd={addAnnouncement}
+                onUpdate={updateAnnouncement}
+                onDelete={deleteAnnouncement}
+                onReorder={reorderAnnouncements}
+              />
             )}
 
             {activeSection === 'features' && <FeatureSettingsSection />}
+            {activeSection === 'content' && <PublicContentSettingsSection />}
             {activeSection === 'registration' && <RegistrationSettingsSection />}
             {activeSection === 'invitation' && <InvitationSettingsSection />}
   

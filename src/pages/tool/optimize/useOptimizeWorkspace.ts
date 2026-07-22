@@ -25,6 +25,7 @@ type UseOptimizeWorkspaceOptions = {
   setWorkspaceError: Setter<string | null>
   setWorkspaceBusyAction: Setter<string | null>
   setSection: (section: OptimizeSection) => void
+  guardGeneratedResultExport: (run: () => void | Promise<void>) => Promise<void>
 }
 
 export function useOptimizeWorkspace({
@@ -43,6 +44,7 @@ export function useOptimizeWorkspace({
   setWorkspaceError,
   setWorkspaceBusyAction,
   setSection,
+  guardGeneratedResultExport,
 }: UseOptimizeWorkspaceOptions) {
   const runSavedConfigAction = useCallback(async (
     busyKey: string,
@@ -138,8 +140,10 @@ export function useOptimizeWorkspace({
       setWorkspaceError(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_013)
       return
     }
-    downloadOptimizeResult(item.result, `maa-schedule-${item.id.slice(0, 8) || 'history'}`)
-  }, [setWorkspaceError])
+    void guardGeneratedResultExport(() => {
+      downloadOptimizeResult(item.result, `maa-schedule-${item.id.slice(0, 8) || 'history'}`)
+    })
+  }, [guardGeneratedResultExport, setWorkspaceError])
 
   return {
     handleSaveCurrentConfig,

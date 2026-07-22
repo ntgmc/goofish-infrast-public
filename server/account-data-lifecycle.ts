@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { ensureDatabaseSchema } from './storage/schema'
 import { getPool, query } from './storage/postgres'
 import { deleteUserAccount, getUserById, type UserAccountRecord } from './storage/user-store'
+import { purgeExpiredPersonalUseDeclarationAcceptances } from './storage/personal-use-declaration-store'
 import { sendAccountDeletionCancellationEmail, sendAccountDeletionReceiptEmail } from './handlers/email'
 
 const DELETION_DELAY_MS = 7 * 24 * 60 * 60 * 1000
@@ -113,6 +114,7 @@ async function processDueAccountDeletions(now = new Date()): Promise<number> {
       console.warn('account deletion receipt skipped:', error instanceof Error ? error.message : error)
     }
   }
+  await purgeExpiredPersonalUseDeclarationAcceptances(now)
   return due.rows.length
 }
 

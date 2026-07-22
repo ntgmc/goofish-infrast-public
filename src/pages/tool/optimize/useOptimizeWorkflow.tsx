@@ -21,6 +21,7 @@ import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressComplet
 import { usePriorityCoupon as usePriorityCouponState } from './usePriorityCoupon'
 import { copy } from '../../../copy/index'
 import { hasCapability } from '../../../lib/product-catalog'
+import { usePersonalUseDeclaration } from '../../../hooks/usePersonalUseDeclaration'
 
 
 export interface Props {
@@ -136,6 +137,14 @@ export function useOptimizeWorkflow(props: Props) {
   const isPreviewProfile = isFreePreviewProfile(profile)
   const isPreviewTrial = isFreePreviewTrialActive(profile)
   const isRestrictedPreview = isPreviewProfile && !isPreviewTrial
+  const { guard: guardPersonalUseDeclaration, declarationDialog } = usePersonalUseDeclaration({
+    enabled: isPreviewProfile,
+    profileId,
+    onError: setWorkspaceError,
+  })
+  const guardGeneratedResultExport = useCallback(async (run: () => void | Promise<void>) => {
+    await guardPersonalUseDeclaration('generated_result_export', run)
+  }, [guardPersonalUseDeclaration])
 
   const permission = getPermissionMode(license)
 
@@ -340,6 +349,7 @@ export function useOptimizeWorkflow(props: Props) {
     setWorkspaceError,
     setWorkspaceBusyAction,
     setSection,
+    guardGeneratedResultExport,
   })
 
   const {
@@ -663,8 +673,10 @@ export function useOptimizeWorkflow(props: Props) {
   const handleDownloadMAA = useCallback(() => {
       const data = finalResult || currentResult || historyItem?.result
       if (!data) return
-      downloadOptimizeResult(data, 'maa_schedule_optimized')
-    }, [finalResult, currentResult, historyItem])
+      void guardGeneratedResultExport(() => {
+        downloadOptimizeResult(data, 'maa_schedule_optimized')
+      })
+    }, [currentResult, finalResult, guardGeneratedResultExport, historyItem])
 
   const handleUpgradePreviewProfile = useCallback(async (event: FormEvent) => {
       event.preventDefault()
@@ -686,5 +698,5 @@ export function useOptimizeWorkflow(props: Props) {
       }
     }, [isPreviewProfile, onProfileUpgraded, profileId, upgradeCdk, upgradeLoading])
 
-  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, isPreviewProfile, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile }
+  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, isPreviewProfile, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile, declarationDialog }
 }

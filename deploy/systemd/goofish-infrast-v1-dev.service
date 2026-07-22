@@ -6,6 +6,7 @@ Wants=postgresql.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/goofish-infrast-v1-dev
+ExecStartPre=/usr/bin/env ALLOW_DATABASE_MIGRATION=true /usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/migrate.js
 ExecStart=/usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/index.js
 Restart=always
 RestartSec=5
