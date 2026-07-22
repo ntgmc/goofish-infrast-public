@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { apiJson, apiVoid, getApiErrorMessage } from '../lib/api-client'
-import { adminApiJson, clearLegacyAdminCredentials } from '../lib/admin-api-client'
+import { adminApiJson } from '../lib/admin-api-client'
 import { copy } from '../copy/index'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 
@@ -22,7 +22,6 @@ export default function AdminSetupPage() {
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
-    clearLegacyAdminCredentials()
     adminApiJson<{ users?: AdminUserSummary[] }>('/api/admin/users')
       .then((data) => {
         setUsers(data.users ?? [])
