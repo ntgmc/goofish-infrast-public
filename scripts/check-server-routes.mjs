@@ -7,7 +7,6 @@ const expectedRoutes = [
   '/api/admin/users',
   '/api/admin/announcement',
   '/api/admin/usage-stats',
-  '/api/analyze-schedule',
   '/api/announcement',
   '/api/auth/login',
   '/api/auth/logout',

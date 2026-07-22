@@ -75,7 +75,7 @@ try {
   assertPayloadTooLarge(standardTooLarge, 'oversized standard request')
 
   const computeTooLarge = await sendRequest(port, {
-    path: '/api/analyze-schedule',
+    path: '/api/optimization/jobs',
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': String(COMPUTE_LIMIT_BYTES + 1),

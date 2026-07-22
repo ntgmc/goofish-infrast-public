@@ -24,8 +24,6 @@ export const commonCopy = {
   // src/App.tsx
   App_007: "正在载入免责声明...",
   // src/App.tsx
-  App_008: "正在载入排班表分析...",
-  // src/App.tsx
   App_009: "正在载入仓库价值分析器...",
   // src/App.tsx
   App_010: "正在载入管理后台...",
@@ -225,12 +223,6 @@ export const commonCopy = {
   components_DeferredFeatureMenu_002: "上传 MAA 仓库 JSON，生成“击败 X% 博士”的免费分享图。",
   // src/components/DeferredFeatureMenu.tsx
   components_DeferredFeatureMenu_003: "已开放",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_004: "排班表分析",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_005: "上传干员数据和已有排班 JSON，查看红脸风险、日产量和爆仓信息。",
-  // src/components/DeferredFeatureMenu.tsx
-  components_DeferredFeatureMenu_006: "已开放",
   // src/components/DeferredFeatureMenu.tsx
   components_DeferredFeatureMenu_016: "更多",
   // src/components/DeferredFeatureMenu.tsx

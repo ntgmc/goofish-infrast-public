@@ -16,14 +16,11 @@ export default function ResultPanel({
   onDownload,
   onSaveWorkfile,
   detailDefaultOpen = false,
-  variant = 'optimize',
   suggestionsSlot,
   previewLimit,
 }: ResultPanelProps) {
   const isRotationMode = result.schedule_mode === 'rotation'
   const isMaaDormitoryAutofill = !isRotationMode && result.dormitory_rule === 'maa_autofill'
-  const isAnalysis = variant === 'analysis' || result.analysis_summary?.source === 'imported_schedule'
-  const analysisSummary = result.analysis_summary
   const prepared = useMemo(
     () => prepareResult(result, isRotationMode, isMaaDormitoryAutofill, operators),
     [result, isRotationMode, isMaaDormitoryAutofill, operators],
@@ -58,7 +55,7 @@ export default function ResultPanel({
     ...(!isPreview && suggestionsSlot ? [{ id: 'suggestions' as const, label: copy.domain.components_result_panel_ResultPanel_023 }] : []),
   ] as const
   const [activeTab, setActiveTab] = useState<ResultTabId>(
-    detailDefaultOpen ? 'detail' : isAnalysis ? 'data' : 'board',
+    detailDefaultOpen ? 'detail' : 'board',
   )
   const selectedTab = isPreview && (activeTab === 'data' || activeTab === 'import' || activeTab === 'suggestions')
     ? 'board'
@@ -73,13 +70,11 @@ export default function ResultPanel({
           <div className="min-w-0">
             <p className="tool-eyebrow">{copy.domain.components_result_panel_ResultPanel_024}</p>
             <h2 className="text-lg font-semibold text-ink-primary">
-              {isPreview ? copy.domain.components_result_panel_ResultPanel_025 : isAnalysis ? copy.domain.components_result_panel_ResultPanel_026 : copy.domain.components_result_panel_ResultPanel_027}
+              {isPreview ? copy.domain.components_result_panel_ResultPanel_025 : copy.domain.components_result_panel_ResultPanel_027}
             </h2>
             <p className="mt-1 text-sm text-ink-secondary">
               {isPreview
                 ? copy.domain.components_result_panel_ResultPanel_028
-                : isAnalysis
-                ? copy.domain.components_result_panel_ResultPanel_029
                 : isRotationMode
                   ? copy.domain.components_result_panel_ResultPanel_030
                   : copy.domain.components_result_panel_ResultPanel_031}
@@ -87,7 +82,7 @@ export default function ResultPanel({
           </div>
           {(onDownload || onSaveWorkfile) && (
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
-              {!isAnalysis && !isRotationMode && onDownload && (
+              {!isRotationMode && onDownload && (
                 <button
                   type="button"
                   onClick={onDownload}
@@ -95,7 +90,7 @@ export default function ResultPanel({
                 >
                   {copy.domain.components_result_panel_ResultPanel_032}</button>
               )}
-              {!isAnalysis && onSaveWorkfile && (
+              {onSaveWorkfile && (
                 <button
                   type="button"
                   onClick={onSaveWorkfile}
@@ -163,7 +158,7 @@ export default function ResultPanel({
         labelledBy={`result-${selectedTab}-tab`}
       >
         {selectedTab === 'board' && <ResultBoard isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
-        {selectedTab === 'data' && <ResultMetrics isAnalysis={isAnalysis} isRotationMode={isRotationMode} analysisSummary={analysisSummary} prepared={prepared} />}
+        {selectedTab === 'data' && <ResultMetrics isRotationMode={isRotationMode} prepared={prepared} />}
         {selectedTab === 'detail' && <ResultDetail isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
         {selectedTab === 'import' && (
           <section className="tool-panel overflow-hidden p-5 sm:p-6">

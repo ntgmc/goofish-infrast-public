@@ -22,7 +22,6 @@ const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage'))
 const DepotValuePage = lazy(() => import('./pages/DepotValuePage'))
-const ScheduleAnalysisPage = lazy(() => import('./pages/ScheduleAnalysisPage'))
 const PublicInfoPage = lazy(() => import('./pages/PublicInfoPage'))
 const PricingPage = lazy(() => import('./pages/PricingPage'))
 
@@ -62,7 +61,6 @@ function AppContent() {
           <Route path="/privacy" element={<LazyPage fallback={copy.common.App_005}><PublicInfoPage page="privacy" /></LazyPage>} />
           <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
           <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
-          <Route path="/tools/schedule-analysis" element={<FeatureRoute feature="schedule_analysis"><LazyPage fallback={copy.common.App_008}><ScheduleAnalysisPage /></LazyPage></FeatureRoute>} />
           <Route path="/tools/depot-value" element={<FeatureRoute feature="depot_value"><LazyPage fallback={copy.common.App_009}><DepotValuePage /></LazyPage></FeatureRoute>} />
           <Route path="/admin/setup" element={<LazyPage fallback={copy.common.App_010}><AdminSetupPage /></LazyPage>} />
           <Route path="/admin/*" element={<LazyPage fallback={copy.common.App_011}><AdminPage /></LazyPage>} />

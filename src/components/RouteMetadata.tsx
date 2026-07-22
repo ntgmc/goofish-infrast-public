@@ -53,11 +53,6 @@ const PUBLIC_METADATA: Record<string, Metadata> = {
     description: copy.metadata.components_RouteMetadata_014,
     indexable: true,
   },
-  '/tools/schedule-analysis': {
-    title: copy.metadata.components_RouteMetadata_015,
-    description: copy.metadata.components_RouteMetadata_016,
-    indexable: true,
-  },
   '/tools/depot-value': {
     title: copy.metadata.components_RouteMetadata_017,
     description: copy.metadata.components_RouteMetadata_018,
