@@ -22,7 +22,7 @@ describe('public content handlers', () => {
     const response = await siteHandler(new Request('http://localhost/api/site/public-content'))
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
-    expect(await response.json()).toMatchObject({ version: 1, qq_group: { number: '891655477' } })
+    expect(await response.json()).toMatchObject({ version: 1, defaults_revision: 2, qq_group: { number: '891655477' } })
     expect(auth.authenticateAdminRequest).not.toHaveBeenCalled()
   })
 

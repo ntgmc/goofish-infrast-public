@@ -17,7 +17,7 @@ describe('public content settings', () => {
       id: 'ntgmc',
       name: 'ntgmc',
       url: 'https://github.com/ntgmc',
-      avatar_url: 'https://avatars.githubusercontent.com/u/74061867?v=4',
+      avatar_url: '/assets/credits/ntgmc.jpg',
     })
     expect(parsed.thanks.sections[2].entries[0]).toEqual({
       id: 'dake',
@@ -45,6 +45,10 @@ describe('public content settings', () => {
     unsafeAvatar.thanks.sections[1].entries[0].avatar_url = 'data:image/png;base64,unsafe'
     expect(() => parsePublicContentDraft(unsafeAvatar)).toThrow()
 
+    const protocolRelativeAvatar = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    protocolRelativeAvatar.thanks.sections[1].entries[0].avatar_url = '//evil.example/avatar.jpg'
+    expect(() => parsePublicContentDraft(protocolRelativeAvatar)).toThrow()
+
     expect(() => parsePublicContentDraft({ ...DEFAULT_PUBLIC_CONTENT_DRAFT, unknown: true })).toThrow()
   })
 
@@ -58,6 +62,7 @@ describe('public content settings', () => {
 
   it('migrates only the untouched legacy default developer credit', () => {
     const legacy = cloneDefaultPublicContentSettings()
+    delete (legacy as unknown as { defaults_revision?: number }).defaults_revision
     legacy.thanks.sections[1].entries[0] = {
       id: 'lingyu',
       name: '铃语',
@@ -69,6 +74,7 @@ describe('public content settings', () => {
       id: 'ntgmc',
       name: 'ntgmc',
       url: 'https://github.com/ntgmc',
+      avatar_url: '/assets/credits/ntgmc.jpg',
     })
 
     legacy.thanks.sections[1].entries[0].description = '管理员自定义说明'
@@ -79,8 +85,26 @@ describe('public content settings', () => {
     })
   })
 
+  it('upgrades the intermediate GitHub-hosted default avatar once', () => {
+    const intermediate = cloneDefaultPublicContentSettings()
+    delete (intermediate as unknown as { defaults_revision?: number }).defaults_revision
+    intermediate.thanks.sections[1].entries[0].avatar_url = 'https://avatars.githubusercontent.com/u/74061867?v=4'
+    expect(normalizePublicContentSettings(intermediate)).toMatchObject({
+      defaults_revision: 2,
+      thanks: {
+        sections: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'developers',
+            entries: [expect.objectContaining({ avatar_url: '/assets/credits/ntgmc.jpg' })],
+          }),
+        ]),
+      },
+    })
+  })
+
   it('migrates only the untouched generic helper credit to DaKe.', () => {
     const legacy = cloneDefaultPublicContentSettings()
+    delete (legacy as unknown as { defaults_revision?: number }).defaults_revision
     legacy.thanks.sections[2].entries[0] = {
       id: 'all-helpers',
       name: '所有参与开发、测试、反馈与验证的协助者',

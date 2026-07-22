@@ -74,7 +74,7 @@ describe('PublicContentSettingsSection', () => {
     await user.click(within(sections).getByRole('button', { name: /开发者/, pressed: false }))
 
     expect(within(panel).getByLabelText('说明')).not.toBeRequired()
-    const avatarInput = within(panel).getByLabelText(/可选 HTTPS 头像地址/)
+    const avatarInput = within(panel).getByLabelText(/头像地址/)
     await user.clear(avatarInput)
     await user.type(avatarInput, 'https://github.com/ntgmc.png')
     await user.click(screen.getByRole('button', { name: '保存并发布' }))

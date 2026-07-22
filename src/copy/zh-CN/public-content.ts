@@ -86,7 +86,7 @@ export const publicContentCopy = {
   admin_entry_name: '名称',
   admin_entry_description: '说明',
   admin_entry_url: '可选 HTTPS 链接',
-  admin_entry_avatar_url: '可选 HTTPS 头像地址',
+  admin_entry_avatar_url: '头像地址（HTTPS 或 /assets/ 站内路径）',
   admin_move_up: '上移',
   admin_move_down: '下移',
   admin_delete: '删除',
