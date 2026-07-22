@@ -10,7 +10,6 @@ ARTIFACT_PATH="${ARTIFACT_PATH:-}"
 ARTIFACT_SHA256="${ARTIFACT_SHA256:-}"
 ARTIFACT_DIR=""
 SERVICE_NAME="${SERVICE_NAME:-goofish-infrast-v1}"
-MIGRATION_SERVICE_NAME="${MIGRATION_SERVICE_NAME:-}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 HEALTH_RETRIES="${HEALTH_RETRIES:-20}"
@@ -22,6 +21,7 @@ INSTALL_COMMAND="${INSTALL_COMMAND:-npm ci --omit=dev}"
 SKIP_INSTALL="${SKIP_INSTALL:-false}"
 FORCE_DEPLOY="${FORCE_DEPLOY:-false}"
 EXPECT_STORAGE_TYPE="${EXPECT_STORAGE_TYPE:-postgres}"
+REQUIRE_MIGRATION_PRESTART="${REQUIRE_MIGRATION_PRESTART:-false}"
 
 log() {
   printf '[deploy] %s\n' "$*"
@@ -62,14 +62,6 @@ show_service_diagnostics() {
   log "service journal is not readable by the deploy user; add it to systemd-journal or grant passwordless access to this journalctl command"
 }
 
-show_migration_diagnostics() {
-  [[ -n "$MIGRATION_SERVICE_NAME" ]] || return
-  run_systemctl status "$MIGRATION_SERVICE_NAME" --no-pager --lines=50 || true
-  if command -v journalctl >/dev/null 2>&1; then
-    journalctl --unit "$MIGRATION_SERVICE_NAME" --no-pager --lines=80 2>/dev/null || true
-  fi
-}
-
 check_systemctl_access() {
   if [[ "$(id -u)" == "0" ]]; then
     return 0
@@ -86,6 +78,17 @@ check_systemctl_access() {
 check_worktree_clean() {
   git diff --quiet || fail "working tree has unstaged changes"
   git diff --cached --quiet || fail "working tree has staged changes"
+}
+
+check_migration_prestart() {
+  [[ "$REQUIRE_MIGRATION_PRESTART" == "true" ]] || return
+  local unit_definition
+  unit_definition="$(systemctl cat "$SERVICE_NAME")" ||
+    fail "cannot inspect installed systemd service: $SERVICE_NAME"
+  if ! printf '%s\n' "$unit_definition" |
+    grep -Fq 'ExecStartPre=/usr/bin/env ALLOW_DATABASE_MIGRATION=true /usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/migrate.js'; then
+    fail "installed $SERVICE_NAME unit is missing the migration ExecStartPre; install deploy/systemd/goofish-infrast-v1-dev.service, run systemctl daemon-reload, and force redeploy"
+  fi
 }
 
 cleanup_artifact() {
@@ -245,22 +248,14 @@ ARTIFACT_DIR=""
 
 [[ -f "$APP_DIR/dist/index.html" ]] || fail "missing frontend artifact: dist/index.html"
 [[ -f "$APP_DIR/server/dist/index.js" ]] || fail "missing backend artifact: server/dist/index.js"
-
-if [[ -n "$MIGRATION_SERVICE_NAME" ]]; then
-  [[ -f "$APP_DIR/server/dist/migrate.js" ]] || fail "missing migration artifact: server/dist/migrate.js"
-  log "stopping systemd service before migration: $SERVICE_NAME"
-  run_systemctl stop "$SERVICE_NAME"
-  log "running database migration: $MIGRATION_SERVICE_NAME"
-  if run_systemctl start "$MIGRATION_SERVICE_NAME"; then
-    log "database migration completed"
-  else
-    show_migration_diagnostics
-    fail "database migration failed: $MIGRATION_SERVICE_NAME"
-  fi
-fi
+[[ -f "$APP_DIR/server/dist/migrate.js" ]] || fail "missing migration artifact: server/dist/migrate.js"
+check_migration_prestart
 
 log "restarting systemd service: $SERVICE_NAME"
-run_systemctl restart "$SERVICE_NAME"
+if ! run_systemctl restart "$SERVICE_NAME"; then
+  show_service_diagnostics
+  fail "systemd service restart failed"
+fi
 
 if run_systemctl is-active --quiet "$SERVICE_NAME"; then
   log "systemd service is active"
