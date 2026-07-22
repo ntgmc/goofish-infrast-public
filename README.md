@@ -68,7 +68,7 @@ npm run build:server
 npm run start:server
 ```
 
-`start:server` 会从仓库根目录的 `.env` 加载本地后端配置。本地 API 至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
+`start:server` 会从仓库根目录的 `.env` 加载本地后端配置，并通过非生产的 `APP_ROLE=all` 组合入口同时启动 API 和优化 worker。本地 API 至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
 
 ```text
 DATABASE_URL=postgresql://<本地用户>:<本地密码>@127.0.0.1:5432/<本地数据库>
@@ -78,6 +78,15 @@ SKLAND_CREDENTIAL_SECRET=<至少 16 个字符的本地随机值>
 推荐使用 `openssl rand -hex 32` 生成，并在本地数据库仍需读取既有森空岛绑定期间保持该值不变。修改 `.env` 后必须重新构建并重启 API 服务器；仅重启 Vite 不会刷新后端环境变量。不要提交 `.env` 或把本地密钥复用到 dev/production。
 
 默认监听地址是 `http://127.0.0.1:3000`，Vite 的 `/api` 请求会代理到该地址。可以通过 `PORT` 和 `HOST` 覆盖监听配置。
+
+如需像生产环境一样拆分进程，可分别运行：
+
+```bash
+npm run start:api
+npm run start:worker
+```
+
+`start:api` 使用 API-only 的 `server/dist/index.js`，`start:worker` 使用独立的 `server/dist/worker.js`。combined 的 `server/dist/all.js` 只用于本地开发，并会拒绝在 `NODE_ENV=production` 下启动。
 
 ## 构建与检查
 

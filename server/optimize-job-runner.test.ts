@@ -3,11 +3,10 @@ import { resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
   initializeOptimizeJobProcessing,
-  initializeOptimizeQueueMaintenance,
   registerOptimizeJobExecutor,
   shutdownOptimizeJobProcessing,
-  shutdownOptimizeQueueMaintenance,
 } from './optimize-job-runner'
+import { shutdownOptimizeQueueMaintenance } from './optimize-queue-maintenance'
 import { requestOptimizeJobProcessing } from './optimize-job-signals'
 import { createMemoryOptimizeJobStore } from './storage/optimize-job-store'
 
@@ -19,31 +18,6 @@ afterAll(async () => {
 })
 
 describe('optimization dispatcher startup recovery', () => {
-  it('maintains queue state without consuming jobs in the API role', async () => {
-    process.env.APP_ROLE = 'api'
-    const store = createMemoryOptimizeJobStore()
-    globalThis.__maaOptimizeJobStoreForTesting = store
-    registerOptimizeJobExecutor(async (job) => ({ completedJobId: job.id }))
-
-    const expired = await store.createJob(input())
-    const queued = await store.createJob(input())
-    await store.claimNextJob(
-      'old-worker',
-      'old-lock',
-      new Date(Date.now() - 1_000).toISOString(),
-      2,
-    )
-
-    await initializeOptimizeQueueMaintenance()
-    requestOptimizeJobProcessing()
-    await new Promise((resolveWait) => setTimeout(resolveWait, 25))
-
-    await expect(store.getJob(expired.id)).resolves.toMatchObject({ status: 'queued' })
-    await expect(store.getJob(queued.id)).resolves.toMatchObject({ status: 'queued' })
-    shutdownOptimizeQueueMaintenance()
-    delete process.env.APP_ROLE
-  })
-
   it('recovers an expired attempt and consumes queued jobs without an HTTP kick', async () => {
     process.env.OPTIMIZE_RETRY_BASE_MS = '100'
     const store = createMemoryOptimizeJobStore()
