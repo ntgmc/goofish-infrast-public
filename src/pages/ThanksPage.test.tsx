@@ -17,7 +17,7 @@ describe('ThanksPage', () => {
     expect(screen.getByRole('link', { name: 'ntgmc' })).toHaveAttribute('href', 'https://github.com/ntgmc')
     expect(screen.getByRole('img', { name: 'ntgmc 的 GitHub 头像' })).toHaveAttribute(
       'src',
-      'https://avatars.githubusercontent.com/u/74061867?v=4',
+      '/assets/credits/ntgmc.jpg',
     )
     const helperCard = screen.getByText('DaKe.').closest('article')
     expect(helperCard).not.toBeNull()

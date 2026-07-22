@@ -2,6 +2,7 @@ import {
   cloneDefaultPublicContentSettings,
   normalizePublicContentSettings,
   parsePublicContentDraft,
+  PUBLIC_CONTENT_DEFAULTS_REVISION,
   PUBLIC_CONTENT_VERSION,
   type PublicContentDraftV1,
   type PublicContentSettingsV1,
@@ -27,6 +28,7 @@ export async function savePublicContentSettings(input: PublicContentDraftV1): Pr
   const draft = parsePublicContentDraft(input)
   const saved: PublicContentSettingsV1 = {
     version: PUBLIC_CONTENT_VERSION,
+    defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
     ...draft,
     updated_at: new Date().toISOString(),
   }

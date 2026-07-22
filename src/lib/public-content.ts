@@ -3,6 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 2 as const
 export const PUBLIC_PRICING_PLAN_IDS = ['free_preview', 'single_account_lifetime'] as const
 
 const identifier = z.string().trim().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/)
@@ -10,11 +11,14 @@ const text = (max: number) => z.string().trim().min(1).max(max)
 const optionalHttpsUrl = z.string().trim().max(2048).refine((value) => value === '' || isHttpsUrl(value), {
   message: copy.publicContent.validation_invalid,
 }).optional().default('')
+const optionalAvatarUrl = z.string().trim().max(2048).refine((value) => value === '' || isHttpsUrl(value) || isSafeSiteAssetUrl(value), {
+  message: copy.publicContent.validation_invalid,
+}).optional().default('')
 const defaultDeveloper = {
   id: 'ntgmc',
   name: copy.publicContent.thanks_developer_name,
   url: 'https://github.com/ntgmc',
-  avatarUrl: 'https://avatars.githubusercontent.com/u/74061867?v=4',
+  avatarUrl: '/assets/credits/ntgmc.jpg',
 } as const
 
 const faqItemSchema = z.strictObject({
@@ -44,7 +48,7 @@ const thanksEntrySchema = z.strictObject({
   name: text(120),
   description: z.string().trim().max(1000),
   url: optionalHttpsUrl,
-  avatar_url: optionalHttpsUrl,
+  avatar_url: optionalAvatarUrl,
 })
 
 const thanksSectionSchema = z.strictObject({
@@ -95,6 +99,7 @@ export const publicContentDraftSchema = z.strictObject({
 export type PublicContentDraftV1 = z.infer<typeof publicContentDraftSchema>
 export type PublicContentSettingsV1 = PublicContentDraftV1 & {
   version: typeof PUBLIC_CONTENT_VERSION
+  defaults_revision: typeof PUBLIC_CONTENT_DEFAULTS_REVISION
   updated_at: string | null
 }
 const freePreview = getSku('free_preview')
@@ -205,6 +210,7 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
 
 export const DEFAULT_PUBLIC_CONTENT_SETTINGS: PublicContentSettingsV1 = {
   version: PUBLIC_CONTENT_VERSION,
+  defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
   ...DEFAULT_PUBLIC_CONTENT_DRAFT,
   updated_at: null,
 }
@@ -223,9 +229,11 @@ export function normalizePublicContentSettings(value: unknown): PublicContentSet
     thanks: source.thanks,
   })
   if (!parsed.success || source.version !== PUBLIC_CONTENT_VERSION) return cloneDefaultPublicContentSettings()
+  const storedDefaultsRevision = normalizeDefaultsRevision(source.defaults_revision)
   return {
     version: PUBLIC_CONTENT_VERSION,
-    ...migrateLegacyDefaultCredits(parsed.data),
+    defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
+    ...(storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION ? migrateLegacyDefaultCredits(parsed.data) : parsed.data),
     updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
   }
 }
@@ -257,6 +265,15 @@ function migrateLegacyDefaultCredits(draft: PublicContentDraftV1): PublicContent
     developer.avatar_url = defaultDeveloper.avatarUrl
   }
 
+  const intermediateDeveloper = developerSection?.entries.find((item) => item.id === defaultDeveloper.id)
+  if (intermediateDeveloper
+    && intermediateDeveloper.name === defaultDeveloper.name
+    && intermediateDeveloper.description === copy.publicContent.thanks_developer_description
+    && intermediateDeveloper.url === defaultDeveloper.url
+    && (intermediateDeveloper.avatar_url === '' || intermediateDeveloper.avatar_url === 'https://avatars.githubusercontent.com/u/74061867?v=4')) {
+    intermediateDeveloper.avatar_url = defaultDeveloper.avatarUrl
+  }
+
   const helperSection = draft.thanks.sections.find((item) => item.id === 'helpers')
   const helper = helperSection?.entries.find((item) => item.id === 'all-helpers')
   if (helper
@@ -272,9 +289,24 @@ function migrateLegacyDefaultCredits(draft: PublicContentDraftV1): PublicContent
   return draft
 }
 
+function normalizeDefaultsRevision(value: unknown): number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0
+}
+
 function isHttpsUrl(value: string): boolean {
   try {
     return new URL(value).protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function isSafeSiteAssetUrl(value: string): boolean {
+  if (!value.startsWith('/assets/') || value.startsWith('//') || value.includes('\\')) return false
+  try {
+    const base = new URL('https://maatool.invalid')
+    const parsed = new URL(value, base)
+    return parsed.origin === base.origin && parsed.pathname.startsWith('/assets/') && !parsed.search && !parsed.hash
   } catch {
     return false
   }
