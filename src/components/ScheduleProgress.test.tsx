@@ -70,7 +70,51 @@ describe('ScheduleProgress motion', () => {
     expect(screen.getByText('正在模拟优化建议')).toBeInTheDocument()
     expect(screen.getByText('计算优化建议')).toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(5)
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '78')
     expect(screen.queryByText('即将完成')).not.toBeInTheDocument()
+  })
+
+  it('keeps MAA baseline simulation in the calculation step before result formatting', () => {
+    render(<ScheduleProgress progress={createProgress({
+      startedAt: NOW - 60_000,
+      jobId: 'merged-job',
+      queueStatus: 'running',
+      observedRunning: true,
+      estimatedRemainingMs: 0,
+      estimatedTotalMs: 10_000,
+      estimatePhase: 'overdue',
+      estimateUpdatedAt: new Date(NOW).toISOString(),
+      calculationStage: 'simulating_maa_baseline',
+      upgradeSuggestionsRequested: true,
+      upgradeSuggestionsAllowed: true,
+    })} />)
+
+    expect(screen.getByText('正在计算 MAA 对比基准')).toBeInTheDocument()
+    expect(screen.getByText('计算优化建议').closest('[data-state]')).toHaveAttribute('data-state', 'active')
+    expect(screen.getByText('持久化结果').closest('[data-state]')).toHaveAttribute('data-state', 'pending')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '91')
+  })
+
+  it('does not move backwards when a running stage starts below queued progress', () => {
+    const queued = createProgress({
+      startedAt: NOW - 20_000,
+      jobId: 'queued-job',
+      queueStatus: 'queued',
+      estimatedTotalMs: 40_000,
+      estimatePhase: 'queued',
+    })
+    const { rerender } = render(<ScheduleProgress progress={queued} />)
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '48')
+
+    rerender(<ScheduleProgress progress={{
+      ...queued,
+      queueStatus: 'running',
+      observedRunning: true,
+      estimatePhase: 'running',
+      calculationStage: 'starting',
+    }} />)
+
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '48')
   })
 
   it('omits the suggestion step when the merged job only computes a schedule', () => {

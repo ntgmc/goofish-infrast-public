@@ -10,6 +10,7 @@ ARTIFACT_PATH="${ARTIFACT_PATH:-}"
 ARTIFACT_SHA256="${ARTIFACT_SHA256:-}"
 ARTIFACT_DIR=""
 SERVICE_NAME="${SERVICE_NAME:-goofish-infrast-v1}"
+MIGRATION_SERVICE_NAME="${MIGRATION_SERVICE_NAME:-}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/health}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 HEALTH_RETRIES="${HEALTH_RETRIES:-20}"
@@ -59,6 +60,14 @@ show_service_diagnostics() {
   fi
 
   log "service journal is not readable by the deploy user; add it to systemd-journal or grant passwordless access to this journalctl command"
+}
+
+show_migration_diagnostics() {
+  [[ -n "$MIGRATION_SERVICE_NAME" ]] || return
+  run_systemctl status "$MIGRATION_SERVICE_NAME" --no-pager --lines=50 || true
+  if command -v journalctl >/dev/null 2>&1; then
+    journalctl --unit "$MIGRATION_SERVICE_NAME" --no-pager --lines=80 2>/dev/null || true
+  fi
 }
 
 check_systemctl_access() {
@@ -236,6 +245,19 @@ ARTIFACT_DIR=""
 
 [[ -f "$APP_DIR/dist/index.html" ]] || fail "missing frontend artifact: dist/index.html"
 [[ -f "$APP_DIR/server/dist/index.js" ]] || fail "missing backend artifact: server/dist/index.js"
+
+if [[ -n "$MIGRATION_SERVICE_NAME" ]]; then
+  [[ -f "$APP_DIR/server/dist/migrate.js" ]] || fail "missing migration artifact: server/dist/migrate.js"
+  log "stopping systemd service before migration: $SERVICE_NAME"
+  run_systemctl stop "$SERVICE_NAME"
+  log "running database migration: $MIGRATION_SERVICE_NAME"
+  if run_systemctl start "$MIGRATION_SERVICE_NAME"; then
+    log "database migration completed"
+  else
+    show_migration_diagnostics
+    fail "database migration failed: $MIGRATION_SERVICE_NAME"
+  fi
+fi
 
 log "restarting systemd service: $SERVICE_NAME"
 run_systemctl restart "$SERVICE_NAME"

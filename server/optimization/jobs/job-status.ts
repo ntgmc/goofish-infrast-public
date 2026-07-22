@@ -6,7 +6,7 @@ import { getScheduleGenerateDurationStatsByBucket } from "../../handlers/usage-s
 import { getProfileForUser } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobRecord } from "../../storage/optimize-job-store";
-import { getOptimizePollAfterMs, kickOptimizeJobCancellation, kickOptimizeJobProcessing } from "../../optimize-job-runner";
+import { requestOptimizeJobCancellation, requestOptimizeJobProcessing } from "../../optimize-job-signals";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
 import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload, OptimizeJobSource } from './shared';
 import { OPTIMIZE_ESTIMATE_FALLBACK_MS, OPTIMIZE_ESTIMATE_MIN_MS, OPTIMIZE_ESTIMATE_MIN_SAMPLES, OPTIMIZE_ESTIMATE_HISTORY_DAYS } from './shared';
@@ -57,7 +57,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       ? await store.admitJob(admissionInput)
       : { job: await store.createJob(admissionInput), replayed: false };
 
-    kickOptimizeJobProcessing();
+    requestOptimizeJobProcessing();
     return jsonResponse({
       job: await buildOptimizeJobAccepted(admitted.job),
       ...(!admitted.job.owner_key.startsWith('profile:') && { pollToken: createOptimizeJobPollToken(admitted.job) }),
@@ -140,7 +140,7 @@ export async function cancelOptimizationJob(req: Request, rawJobId: string): Pro
   }
   const cancelled = await store.requestCancel(jobId)
   if (!cancelled) return jsonResponse({ error: '任务不存在。' }, 404)
-  kickOptimizeJobCancellation(jobId)
+  requestOptimizeJobCancellation(jobId)
   return jsonResponse(
     { job: formatOptimizeJobStatus(cancelled, await store.getQueuePosition(jobId)) },
     cancelled.status === 'cancelled' ? 200 : 202,
@@ -235,6 +235,12 @@ function formatOptimizationJobSnapshot(
     return { ...base, status, error: formatOptimizationFailure(job, status) }
   }
   return { ...base, status };
+}
+
+function getOptimizePollAfterMs(status: string, queuePosition?: number | null): number {
+  if (status !== 'queued') return 1_500
+  const position = Math.max(1, queuePosition ?? 1)
+  return Math.min(10_000, 2_000 + position * 250)
 }
 
 function getUpgradeSuggestionIntent(job: OptimizeJobRecord): { requested: boolean; allowed: boolean } {

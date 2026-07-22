@@ -68,7 +68,7 @@ npm run build:server
 npm run start:server
 ```
 
-`start:server` 会从仓库根目录的 `.env` 加载本地后端配置。本地 API 至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
+`start:server` 会从仓库根目录的 `.env` 加载本地后端配置，并通过非生产的 `APP_ROLE=all` 组合入口同时启动 API 和优化 worker。本地 API 至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
 
 ```text
 DATABASE_URL=postgresql://<本地用户>:<本地密码>@127.0.0.1:5432/<本地数据库>
@@ -78,6 +78,15 @@ SKLAND_CREDENTIAL_SECRET=<至少 16 个字符的本地随机值>
 推荐使用 `openssl rand -hex 32` 生成，并在本地数据库仍需读取既有森空岛绑定期间保持该值不变。修改 `.env` 后必须重新构建并重启 API 服务器；仅重启 Vite 不会刷新后端环境变量。不要提交 `.env` 或把本地密钥复用到 dev/production。
 
 默认监听地址是 `http://127.0.0.1:3000`，Vite 的 `/api` 请求会代理到该地址。可以通过 `PORT` 和 `HOST` 覆盖监听配置。
+
+如需像生产环境一样拆分进程，可分别运行：
+
+```bash
+npm run start:api
+npm run start:worker
+```
+
+`start:api` 使用 API-only 的 `server/dist/index.js`，`start:worker` 使用独立的 `server/dist/worker.js`。combined 的 `server/dist/all.js` 只用于本地开发，并会拒绝在 `NODE_ENV=production` 下启动。
 
 ## 构建与检查
 
@@ -177,12 +186,15 @@ npm run check:migration
 提供统一的 CSP、HSTS、frame、MIME、referrer 和 Permissions Policy 基线。
 `deploy/nginx/goofish-static-files.conf` 将 `/assets/` 与 SPA 路由分开：哈希资源
 只允许命中真实文件并长期缓存，HTML 文档保持可重新验证。
+`deploy/nginx/goofish-canonical-redirect.conf` 用于独立的 HTTP 和 `www` HTTPS
+重定向 server，将别名域名永久跳转到 `https://maatool.com` 并保留完整路径与查询参数。
 
 先把 zone 配置安装到 Nginx 的 `http {}` 上下文，再安装 server 片段：
 
 ```bash
 sudo install -m 0644 deploy/nginx/goofish-rate-limit-zones.conf /etc/nginx/conf.d/goofish-rate-limit-zones.conf
 sudo install -m 0644 deploy/nginx/goofish-api-production.conf /etc/nginx/snippets/goofish-api-production.conf
+sudo install -m 0644 deploy/nginx/goofish-canonical-redirect.conf /etc/nginx/snippets/goofish-canonical-redirect.conf
 sudo install -m 0644 deploy/nginx/goofish-proxy-common.conf /etc/nginx/snippets/goofish-proxy-common.conf
 sudo install -m 0644 deploy/nginx/goofish-server-hardening.conf /etc/nginx/snippets/goofish-server-hardening.conf
 sudo install -m 0644 deploy/nginx/goofish-security-headers.conf /etc/nginx/snippets/goofish-security-headers.conf
@@ -202,6 +214,11 @@ include /etc/nginx/snippets/goofish-api-production.conf;
 include /etc/nginx/snippets/goofish-static-files.conf;
 ```
 
+生产站点应为 `www.maatool.com` 配置独立的 HTTPS redirect server（证书必须覆盖该
+域名），并在该 server 与 HTTP redirect server 中包含
+`goofish-canonical-redirect.conf`。完整配置示例见
+`docs/production-deploy.md`。
+
 应用前必须检查配置，检查成功后再平滑重载：
 
 ```bash
@@ -215,7 +232,10 @@ sudo systemctl reload nginx
 ```bash
 node scripts/check-public-http-smoke.mjs https://maatool.com
 node scripts/check-public-http-smoke.mjs https://dev.maatool.com
+curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' 'https://www.maatool.com/tool?source=www-check'
 ```
+
+最后一条命令应输出 `308 https://maatool.com/tool?source=www-check`。
 
 超过请求体限额时由 Nginx 直接返回 413；登录或管理认证请求超过 IP 速率时
 返回 429。代理层响应正文可能使用 Nginx 默认格式，但仍会携带统一安全头。

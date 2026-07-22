@@ -40,6 +40,7 @@ jobs:
       DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
       DEPLOY_APP_DIR: ${{ vars.DEPLOY_APP_DIR || '/opt/goofish-infrast-v1-dev' }}
       DEPLOY_SERVICE_NAME: ${{ vars.DEPLOY_SERVICE_NAME || 'goofish-infrast-v1-dev' }}
+      DEPLOY_MIGRATION_SERVICE_NAME: ${{ vars.DEPLOY_MIGRATION_SERVICE_NAME || 'goofish-infrast-v1-dev-migrate' }}
       DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://127.0.0.1:3001/api/health' }}
       DEPLOY_PUBLIC_BASE_URL: ${{ vars.DEPLOY_PUBLIC_BASE_URL || 'https://dev.maatool.com' }}
       DEPLOY_LOCK_FILE: ${{ vars.DEPLOY_LOCK_FILE || '/tmp/goofish-infrast-v1-dev.deploy.lock' }}
@@ -140,6 +141,6 @@ jobs:
           ARTIFACT_SHA256: ${{ steps.artifact.outputs.archive_sha }}
         run: |
           set -euo pipefail
-          remote_command="APP_DIR=${DEPLOY_APP_DIR@Q} TARGET_SHA=${TARGET_SHA@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} HEALTH_URL=${DEPLOY_HEALTH_URL@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} LOCK_FILE=${DEPLOY_LOCK_FILE@Q} FORCE_DEPLOY=${FORCE_DEPLOY@Q} ARTIFACT_PATH=${REMOTE_ARTIFACT@Q} ARTIFACT_SHA256=${ARTIFACT_SHA256@Q} bash ${REMOTE_DEPLOY_SCRIPT@Q}; status=\$?; rm -f -- ${REMOTE_DEPLOY_SCRIPT@Q} ${REMOTE_ARTIFACT@Q}; exit \$status"
+          remote_command="APP_DIR=${DEPLOY_APP_DIR@Q} TARGET_SHA=${TARGET_SHA@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} MIGRATION_SERVICE_NAME=${DEPLOY_MIGRATION_SERVICE_NAME@Q} HEALTH_URL=${DEPLOY_HEALTH_URL@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} LOCK_FILE=${DEPLOY_LOCK_FILE@Q} FORCE_DEPLOY=${FORCE_DEPLOY@Q} ARTIFACT_PATH=${REMOTE_ARTIFACT@Q} ARTIFACT_SHA256=${ARTIFACT_SHA256@Q} bash ${REMOTE_DEPLOY_SCRIPT@Q}; status=\$?; rm -f -- ${REMOTE_DEPLOY_SCRIPT@Q} ${REMOTE_ARTIFACT@Q}; exit \$status"
           ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o IdentitiesOnly=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" "$remote_command"

@@ -37,6 +37,32 @@ for await (const filename of glob('server/handlers/**/*.ts')) {
   if (/from\s+['"][^'"]*\/optimization\/(?!jobs\/)/.test(source)) {
     failures.push(`${filename}: API handler imports optimization core directly`)
   }
+  if (source.includes('optimize-job-runner')) {
+    failures.push(`${filename}: API handler imports optimize job runner directly`)
+  }
+}
+
+const jobStatusSource = await readFile('server/optimization/jobs/job-status.ts', 'utf8')
+if (jobStatusSource.includes('optimize-job-runner')) {
+  failures.push('server/optimization/jobs/job-status.ts: job status imports optimize job runner directly')
+}
+
+for (const filename of [
+  'server/index.ts',
+  'server/api-process.ts',
+  'server/api-process-hooks.ts',
+  'server/optimize-queue-maintenance.ts',
+]) {
+  const source = await readFile(filename, 'utf8')
+  if (source.includes('optimize-job-runner')) {
+    failures.push(`${filename}: public API process boundary imports optimize job runner directly`)
+  }
+  if (source.includes('optimization/jobs/executor')) {
+    failures.push(`${filename}: public API process boundary imports optimize job executor directly`)
+  }
+  if (source.includes('optimization/engine/')) {
+    failures.push(`${filename}: public API process boundary imports optimizer engine directly`)
+  }
 }
 
 if (failures.length > 0) {

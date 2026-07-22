@@ -176,6 +176,7 @@ export type OptimizeCalculationStage =
   | 'generating_potential_schedule'
   | 'simulating_upgrades'
   | 'enriching_training_costs'
+  | 'simulating_maa_baseline'
   | 'formatting_result'
   | 'persisting_result'
   | 'completed';

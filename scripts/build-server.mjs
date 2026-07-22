@@ -6,6 +6,8 @@ await rm('server/dist', { recursive: true, force: true })
 await build({
   entryPoints: {
     index: 'server/index.ts',
+    all: 'server/all.ts',
+    migrate: 'server/migrate.ts',
     worker: 'server/worker.ts',
     routes: 'server/routes.ts',
     'optimize-worker': 'server/optimize-worker.ts',

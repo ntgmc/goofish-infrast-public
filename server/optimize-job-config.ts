@@ -1,5 +1,6 @@
 export const DEFAULT_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY = 3
 export const DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS = 10 * 60_000
+export const DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS = 2
 
 export function getOptimizeGlobalWorkerConcurrency(): number {
   const configured = Number(process.env.OPTIMIZE_GLOBAL_WORKER_CONCURRENCY ?? DEFAULT_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY)
@@ -14,6 +15,13 @@ export function getOptimizeJobHardTimeoutMs(): number {
   return Number.isFinite(configured)
     ? Math.max(minimum, Math.floor(configured))
     : DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS
+}
+
+export function getOptimizeJobMaxAttempts(): number {
+  const configured = Number(process.env.OPTIMIZE_JOB_MAX_ATTEMPTS ?? DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS)
+  return Number.isFinite(configured)
+    ? Math.max(1, Math.floor(configured))
+    : DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS
 }
 
 export function formatOptimizeJobHardTimeout(): string {

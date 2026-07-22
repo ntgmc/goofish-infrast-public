@@ -11,10 +11,12 @@ const workerDeployScript = await readFile('scripts/deploy-worker-atomic.sh', 'ut
 const devDeployScript = await readFile('scripts/deploy-production.sh', 'utf8')
 const releaseArtifact = await readFile('scripts/release-artifact.mjs', 'utf8')
 const apiNginx = await readFile('deploy/nginx/goofish-api-production.conf', 'utf8')
+const canonicalRedirectNginx = await readFile('deploy/nginx/goofish-canonical-redirect.conf', 'utf8')
 const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', 'utf8')
 const greenUpstream = await readFile('deploy/nginx/goofish-upstream-green.conf', 'utf8')
 const systemdUnit = await readFile('deploy/systemd/goofish-infrast-v1@.service', 'utf8')
 const devSystemdUnit = await readFile('deploy/systemd/goofish-infrast-v1-dev.service', 'utf8')
+const devMigrationSystemdUnit = await readFile('deploy/systemd/goofish-infrast-v1-dev-migrate.service', 'utf8')
 const workerSystemdUnit = await readFile('deploy/systemd/goofish-optimize-worker@.service', 'utf8')
 const buildRelevance = await readFile('scripts/check-build-relevance.mjs', 'utf8')
 const productionDocs = await readFile('docs/production-deploy.md', 'utf8')
@@ -62,6 +64,7 @@ function assertWorkflowProvenance() {
   assert.match(devWorkflow, /run\.event === 'push'/, 'manual dev deploy should verify the selected run event')
   assert.match(devWorkflow, /ref: \$\{\{ steps\.target\.outputs\.sha \}\}/, 'dev deploy should checkout the immutable target SHA')
   assert.match(devWorkflow, /scripts\/deploy-production\.sh "\$DEPLOY_USER@\$DEPLOY_HOST:\$remote_deploy_script"/, 'dev deploy should upload the target deployment script')
+  assert.match(devWorkflow, /MIGRATION_SERVICE_NAME=\$\{DEPLOY_MIGRATION_SERVICE_NAME@Q\}/, 'dev deploy should pass the controlled migration service')
   assert.match(devWorkflow, /bash \$\{REMOTE_DEPLOY_SCRIPT@Q\}/, 'dev deploy should run the uploaded deployment script')
   assert.match(devWorkflow, /rm -f -- \$\{REMOTE_DEPLOY_SCRIPT@Q\} \$\{REMOTE_ARTIFACT@Q\}/, 'dev deploy should clean up temporary deployment inputs')
   assert.doesNotMatch(devWorkflow, /DEPLOY_SCRIPT:/, 'dev deploy must not depend on a stale server-side script')
@@ -170,6 +173,8 @@ function assertDeploymentScript() {
   assertOrdered(devDeployScript, [
     'sha256sum "$ARTIFACT_PATH"',
     'release-artifact.mjs verify --sha "$TARGET_SHA"',
+    'run_systemctl stop "$SERVICE_NAME"',
+    'run_systemctl start "$MIGRATION_SERVICE_NAME"',
     'run_systemctl restart "$SERVICE_NAME"',
   ])
 
@@ -291,6 +296,12 @@ function assertNginxBlueGreenConfig() {
   const namedUpstreams = apiNginx.match(/proxy_pass http:\/\/goofish_backend;/g) ?? []
   assert.equal(namedUpstreams.length, 4, 'all production API locations should use the named upstream')
   assert.doesNotMatch(apiNginx, /127\.0\.0\.1:3000/)
+  assert.match(
+    canonicalRedirectNginx,
+    /^return 308 https:\/\/maatool\.com\$request_uri;$/m,
+    'the canonical redirect should preserve the complete request path and query string',
+  )
+  assert.doesNotMatch(canonicalRedirectNginx, /proxy_pass|try_files/, 'the www redirect must not serve the application')
   assert.match(blueUpstream, /upstream goofish_backend/)
   assert.match(blueUpstream, /127\.0\.0\.1:3000/)
   assert.match(greenUpstream, /upstream goofish_backend/)
@@ -314,6 +325,12 @@ function assertSystemdTemplate() {
   assert.match(devSystemdUnit, /Environment=HOST=127\.0\.0\.1/)
   assert.match(devSystemdUnit, /EnvironmentFile=\/etc\/goofish-infrast-v1\/dev\.env/)
 
+  assert.match(devMigrationSystemdUnit, /^Type=oneshot$/m)
+  assert.match(devMigrationSystemdUnit, /server\/dist\/migrate\.js/)
+  assert.match(devMigrationSystemdUnit, /Environment=APP_ROLE=api/)
+  assert.match(devMigrationSystemdUnit, /Environment=ALLOW_DATABASE_MIGRATION=true/)
+  assert.match(devMigrationSystemdUnit, /EnvironmentFile=\/etc\/goofish-infrast-v1\/dev\.env/)
+
   assert.match(workerSystemdUnit, /^User=ntgmc$/m)
   assert.match(workerSystemdUnit, /^Group=ntgmc$/m)
   assert.match(workerSystemdUnit, /WorkingDirectory=\/opt\/goofish-infrast-v1-worker\/slots\/%i/)
@@ -327,7 +344,26 @@ function assertSystemdTemplate() {
 
 function assertDeploymentDocumentation() {
   assert.ok(productionDocs.includes('PUBLIC_APP_URL=https://maatool.com'), 'production EnvironmentFile must declare the public origin')
+  assert.ok(
+    productionDocs.includes('server_name www.maatool.com;') &&
+      productionDocs.includes('include /etc/nginx/snippets/goofish-canonical-redirect.conf;'),
+    'production documentation should redirect the www alias to the canonical origin',
+  )
   assert.ok(developmentDocs.includes('PUBLIC_APP_URL=https://dev.maatool.com'), 'development EnvironmentFile must declare the public origin')
+  assert.ok(
+    developmentDocs.includes('CREATE DATABASE goofish_infrast_v1_dev OWNER goofish_dev'),
+    'development database should be owned by its runtime role',
+  )
+  assert.ok(
+    developmentDocs.includes('GRANT SELECT, INSERT, UPDATE, DELETE') &&
+      developmentDocs.includes('public.security_rate_limit_buckets'),
+    'development recovery should grant the runtime role access to persistent authentication limits',
+  )
+  assert.ok(
+    developmentDocs.includes('goofish-infrast-v1-dev-migrate.service') &&
+      developmentDocs.includes('ALLOW_DATABASE_MIGRATION=true'),
+    'development deployment should provision the guarded migration service',
+  )
   assert.ok(productionDocs.includes('[worker-deploy.md](worker-deploy.md)'), 'production docs should link the worker runbook')
   for (const expected of [
     '/opt/goofish-infrast-v1/releases/',
