@@ -179,6 +179,19 @@ function assertDeploymentScript() {
   assert.doesNotMatch(devDeployScript, /run_systemctl stop "\$SERVICE_NAME"/, 'dev deploy restart should let systemd stop the existing service')
   assert.match(devDeployScript, /systemctl cat "\$SERVICE_NAME"/, 'dev deploy should inspect the installed unit without sudo')
   assert.match(devDeployScript, /missing the migration ExecStartPre/, 'dev deploy should explain how to upgrade an older unit')
+  const migrationPrestartBody = extractFunction(devDeployScript, 'check_migration_prestart')
+  assert.match(migrationPrestartBody, /if \[\[ "\$REQUIRE_MIGRATION_PRESTART" != "true" \]\]; then\s+return 0\s+fi/, 'optional dev migration pre-start validation should skip successfully')
+  assert.doesNotMatch(migrationPrestartBody, /\]\] \|\| return(?:\s|$)/, 'dev migration pre-start validation must not inherit a failed condition status')
+  const migrationSkip = spawnSync('bash', ['-c', `set -Eeuo pipefail
+REQUIRE_MIGRATION_PRESTART=false
+${migrationPrestartBody}
+check_migration_prestart
+printf 'migration skip continued\\n'
+`], { encoding: 'utf8' })
+  if (migrationSkip.error?.code !== 'ENOENT') {
+    assert.equal(migrationSkip.status, 0, migrationSkip.stderr || 'optional migration pre-start validation should not terminate deployment')
+    assert.match(migrationSkip.stdout, /migration skip continued/, 'deployment should continue after optional migration pre-start validation is skipped')
+  }
 
   const mainFlow = deployScript.slice(deployScript.indexOf('RELEASE_DIR="$RELEASES_DIR/$TARGET_SHA"'))
   assertOrdered(mainFlow, [
