@@ -20,14 +20,6 @@ export async function adminApiVoid(url: string, init: ApiRequestInit = {}): Prom
   }
 }
 
-export function clearLegacyAdminCredentials(): void {
-  try {
-    window.sessionStorage.removeItem(['maa', 'admin', 'credentials'].join('-'))
-  } catch {
-    // Storage may be unavailable; no credentials are written by the current client.
-  }
-}
-
 function notifyIfSessionExpired(error: unknown): void {
   if (error instanceof ApiError && error.status === 401) {
     window.dispatchEvent(new Event(ADMIN_SESSION_EXPIRED_EVENT))

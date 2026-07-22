@@ -10,7 +10,10 @@ process.env.NODE_ENV = 'test'
 
 const store = createMemoryStore()
 globalThis.__workspaceHistorySmokeStore = store
-globalThis.__maaOptimizeJobStoreForTesting = createMemoryOptimizeJobStore()
+const optimizeJobStoreModule = await bundleHandler('server/storage/optimize-job-store.ts')
+const optimizeJobStore = optimizeJobStoreModule.createMemoryOptimizeJobStore()
+optimizeJobStore.admitJob = async (input) => ({ job: await optimizeJobStore.createJob(input), replayed: false })
+globalThis.__maaOptimizeJobStoreForTesting = optimizeJobStore
 
 const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts')
 const optimizeHandler = await bundleHandler('server/handlers/optimization.ts')
@@ -1517,64 +1520,6 @@ function seedFreePreviewProfile(id, { bound }) {
   return profile
 }
 
-function createMemoryOptimizeJobStore() {
-  const records = new Map()
-  const clone = (value) => JSON.parse(JSON.stringify(value))
-  const activeStatuses = new Set(['queued', 'running'])
-  return {
-    records,
-    createJob: async (input) => {
-      const now = input.created_at || new Date().toISOString()
-      const record = { id: input.id, status: 'queued', priority: input.priority, owner_key: input.owner_key, permission: input.permission, source: input.source, payload_json: clone(input.payload_json), result_json: null, error_message: null, attempt_count: 0, lock_token: null, lock_expires_at: null, created_at: now, started_at: null, finished_at: null, updated_at: now }
-      records.set(record.id, record)
-      return clone(record)
-    },
-    getJob: async (id) => records.has(id) ? clone(records.get(id)) : null,
-    findActiveByOwnerKey: async (ownerKey) => [...records.values()].filter((job) => job.owner_key === ownerKey && activeStatuses.has(job.status)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] || null,
-    getQueuePosition: async (id) => {
-      const job = records.get(id)
-      if (!job || job.status !== 'queued') return null
-      return [...records.values()].filter((candidate) => candidate.status === 'queued' && (candidate.priority > job.priority || (candidate.priority === job.priority && Date.parse(candidate.created_at) < Date.parse(job.created_at)))).length + 1
-    },
-    claimNextJob: async (lockToken, lockExpiresAt, maxAttempts) => {
-      const next = [...records.values()].filter((job) => job.status === 'queued' && job.attempt_count < maxAttempts).sort((a, b) => b.priority - a.priority || Date.parse(a.created_at) - Date.parse(b.created_at))[0]
-      if (!next) return null
-      const now = new Date().toISOString()
-      next.status = 'running'
-      next.attempt_count += 1
-      next.lock_token = lockToken
-      next.lock_expires_at = lockExpiresAt
-      next.started_at ||= now
-      next.updated_at = now
-      return clone(next)
-    },
-    markSucceeded: async (id, lockToken, result) => {
-      const job = records.get(id)
-      if (!job || job.lock_token !== lockToken) return
-      const now = new Date().toISOString()
-      job.status = 'succeeded'
-      job.result_json = clone(result)
-      job.lock_token = null
-      job.lock_expires_at = null
-      job.finished_at = now
-      job.updated_at = now
-    },
-    markFailed: async (id, lockToken, message) => {
-      const job = records.get(id)
-      if (!job || job.lock_token !== lockToken) return
-      const now = new Date().toISOString()
-      job.status = 'failed'
-      job.error_message = message
-      job.lock_token = null
-      job.lock_expires_at = null
-      job.finished_at = now
-      job.updated_at = now
-    },
-    heartbeat: async () => undefined,
-    resetExpiredRunningJobs: async () => undefined,
-    cleanupOldJobs: async () => undefined,
-  }
-}
 function createMemoryStore() {
   const now = new Date().toISOString()
   return {

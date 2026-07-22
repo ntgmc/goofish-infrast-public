@@ -35,7 +35,6 @@ const siteFeaturesSchema = strict({
   cdk_redemption: z.boolean(),
   free_preview: z.boolean(),
   schedule_generation: z.boolean(),
-  schedule_analysis: z.boolean(),
   depot_value: z.boolean(),
   skland: z.boolean(),
   invitations: z.boolean(),
@@ -115,12 +114,6 @@ export const requestSchemas = {
   announcement: strict({
     banner: z.unknown().nullable(),
     announcements: z.array(z.unknown()).max(100),
-  }),
-  analyzeSchedule: strict({
-    operators: z.array(z.unknown()).max(2000),
-    schedule: z.unknown(),
-    config: optionalUnknown,
-    ignore_elite: z.boolean().optional(),
   }),
   usageStats: strict({
     event: shortString(64),
@@ -245,7 +238,6 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/announcement', route({ GET: none(), PUT: json('admin', requestSchemas.announcement) }, ['admin'])],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
-  ['/api/analyze-schedule', route({ POST: json('compute', requestSchemas.analyzeSchedule) })],
   ['/api/depot-value', route({ POST: json('depot', z.unknown()) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) })],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],

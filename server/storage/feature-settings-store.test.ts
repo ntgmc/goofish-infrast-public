@@ -26,7 +26,6 @@ describe('feature settings', () => {
       login: false,
       profiles: false,
       schedule_generation: false,
-      schedule_analysis: true,
     })
   })
 

@@ -1,40 +1,4 @@
 export const toolsCopy = {
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_001: "请先上传 operators.json。",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_002: "请先上传排班表 JSON。",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_003: "分析失败，请稍后重试",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_004: "分析导入排班表",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_005: "上传干员数据和已生成的排班 JSON，直接计算红脸风险、日产量和爆仓信息。",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_006: "免授权",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_007: "干员数据",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_008: "已载入 ",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_009: " 名干员",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_010: "排班表",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_011: "已载入排班表",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_012: "正在分析...",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_013: "重新分析排班表",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_014: "开始分析排班表",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_015: "已选择：",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_016: "点击选择文件",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_017: "operators.json 顶层必须是数组。",
-  // src/components/ScheduleAnalysisTool.tsx
-  components_ScheduleAnalysisTool_018: "排班表 JSON 需要是对象或数组。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_001: "仓库分析失败，请稍后重试",
   // src/pages/DepotValuePage.tsx
@@ -193,14 +157,4 @@ export const toolsCopy = {
   pages_DepotValuePage_078: "单件 ",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_079: " 理智",
-  // src/pages/ScheduleAnalysisPage.tsx
-  pages_ScheduleAnalysisPage_001: "MAA 小工具",
-  // src/pages/ScheduleAnalysisPage.tsx
-  pages_ScheduleAnalysisPage_002: "排班表分析",
-  // src/pages/ScheduleAnalysisPage.tsx
-  pages_ScheduleAnalysisPage_003: "不需要登录或 CDK，上传干员数据和已有排班表即可查看风险与产出。",
-  // src/pages/ScheduleAnalysisPage.tsx
-  pages_ScheduleAnalysisPage_004: "返回首页",
-  // src/pages/ScheduleAnalysisPage.tsx
-  pages_ScheduleAnalysisPage_005: "进入工作区",
 } as const

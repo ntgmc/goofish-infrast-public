@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { Announcement, AnnouncementAdminResponse, AnnouncementStats as AnnouncementReachStats } from '../../lib/types'
-import { ADMIN_SESSION_EXPIRED_EVENT, adminApiJson as apiJson, adminApiVoid as apiVoid, clearLegacyAdminCredentials } from '../../lib/admin-api-client'
+import { ADMIN_SESSION_EXPIRED_EVENT, adminApiJson as apiJson, adminApiVoid as apiVoid } from '../../lib/admin-api-client'
 import { GeneratedPermission, StatusFilter, PermissionFilter, BinaryFilter, FieldErrors, CdkTableFilters, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, UsageRangeMode, AnnouncementSortKey, UsageStatsResponse, RiskControlSettings, RiskControlSettingsPatch, AdminUserSummary, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, PaginationMeta, CdkOpsSummary, EMPTY_PAGINATION, EMPTY_ANNOUNCEMENTS, DEFAULT_RISK_SETTINGS, permissionLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, buildSummary, buildCdkOpsSummary, buildUsageStatsQuery, getDateOffsetString, normalizeUsageStats, normalizeRiskSettings, normalizeAnnouncementBanner, normalizeAnnouncementList, normalizeAnnouncementStatsMap, sortAnnouncements, createDraftBanner, createDraftAnnouncement, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, isAppUserStatus, buildCurrentOpsReport, buildCurrentOpsReportCsv, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp, omitProfileOperatorData } from './modules'
 
 export function useAdminController() {
@@ -231,7 +231,6 @@ export function useAdminController() {
   const loadDashboard = refreshAdminData
 
   useEffect(() => {
-      clearLegacyAdminCredentials()
       let active = true
       apiJson<{ user?: { username?: string } }>('/api/admin/session', { fallbackMessage: '管理员会话检查失败' })
         .then((data) => {
