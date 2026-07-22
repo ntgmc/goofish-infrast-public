@@ -64,6 +64,12 @@ CREATE TABLE IF NOT EXISTS feature_settings (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS public_content_settings (
+  key TEXT PRIMARY KEY,
+  record_json JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS brevo_email_deliveries (
   id TEXT PRIMARY KEY,
   quota_date DATE NOT NULL,
@@ -703,7 +709,7 @@ ALTER TABLE user_game_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
 `
 
 const TABLE_CONSTRAINT_KEYWORDS = new Set(['check', 'constraint', 'foreign', 'primary', 'unique'])
-const API_ONLY_RUNTIME_TABLES = new Set(['feature_settings'])
+const API_ONLY_RUNTIME_TABLES = new Set(['feature_settings', 'public_content_settings'])
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'
 

@@ -15,6 +15,7 @@ import { ThemeProvider } from './lib/theme'
 import { SiteFeatureProvider } from './lib/site-feature-context'
 import { FeatureRoute } from './components/FeatureUnavailablePage'
 import AccountSafetyPage from './pages/AccountSafetyPage'
+import { PublicContentProvider } from './lib/public-content-context'
 
 
 const ToolPage = lazy(() => import('./pages/ToolPage'))
@@ -24,14 +25,17 @@ const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage'))
 const DepotValuePage = lazy(() => import('./pages/DepotValuePage'))
 const PublicInfoPage = lazy(() => import('./pages/PublicInfoPage'))
 const PricingPage = lazy(() => import('./pages/PricingPage'))
+const ThanksPage = lazy(() => import('./pages/ThanksPage'))
 
 export default function App() {
   return (
     <ThemeProvider>
       <SiteFeatureProvider>
-        <MotionConfig reducedMotion="user" transition={{ duration: motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
-          <AppContent />
-        </MotionConfig>
+        <PublicContentProvider>
+          <MotionConfig reducedMotion="user" transition={{ duration: motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
+            <AppContent />
+          </MotionConfig>
+        </PublicContentProvider>
       </SiteFeatureProvider>
     </ThemeProvider>
   )
@@ -58,6 +62,7 @@ function AppContent() {
           <Route path="/faq" element={<LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage>} />
           <Route path="/support" element={<LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage>} />
           <Route path="/pricing" element={<LazyPage fallback={copy.common.App_012}><PricingPage /></LazyPage>} />
+          <Route path="/thanks" element={<LazyPage fallback={copy.common.App_013}><ThanksPage /></LazyPage>} />
           <Route path="/privacy" element={<LazyPage fallback={copy.common.App_005}><PublicInfoPage page="privacy" /></LazyPage>} />
           <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
           <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />

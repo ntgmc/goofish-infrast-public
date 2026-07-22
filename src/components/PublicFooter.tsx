@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom'
 import { copy } from '../copy/index'
+import { DEFAULT_PUBLIC_CONTENT_SETTINGS } from '../lib/public-content'
+import { usePublicContent } from '../lib/public-content-context'
 
 
-export const SUPPORT_QQ_GROUP_URL = 'http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=Hx_aCfNq_KOuGJ2w0KiRdvzIo33PlkQ6'
+export const SUPPORT_QQ_GROUP_URL = DEFAULT_PUBLIC_CONTENT_SETTINGS.qq_group.join_url
 
 const footerLinks = [
   { to: '/pricing', label: copy.public.components_PublicFooter_012 },
   { to: '/faq', label: copy.public.components_PublicFooter_001 },
+  { to: '/thanks', label: copy.public.components_PublicFooter_013 },
   { to: '/terms', label: copy.public.components_PublicFooter_002 },
   { to: '/privacy', label: copy.public.components_PublicFooter_003 },
   { to: '/disclaimer', label: copy.public.components_PublicFooter_004 },
@@ -18,6 +21,7 @@ interface PublicFooterProps {
 }
 
 export default function PublicFooter({ className = '', variant = 'landing' }: PublicFooterProps) {
+  const { content } = usePublicContent()
   const linkClassName = 'inline-flex min-h-11 items-center text-sm text-ink-secondary underline-offset-4 transition-colors hover:text-ink-primary hover:underline'
   return (
     <footer className={`public-footer ${variant === 'tool' ? 'bg-surface-1/45' : ''} ${className}`} aria-label={copy.public.components_PublicFooter_005}>
@@ -30,11 +34,11 @@ export default function PublicFooter({ className = '', variant = 'landing' }: Pu
           <Link className={linkClassName} to="/faq">{copy.public.components_PublicFooter_009}</Link>
           <a
             className={linkClassName}
-            href={SUPPORT_QQ_GROUP_URL}
+            href={content.qq_group.join_url}
             target="_blank"
             rel="noopener noreferrer"
           >
-            {copy.public.components_PublicFooter_010}</a>
+            {content.qq_group.link_label} · {content.qq_group.number}</a>
           {footerLinks.filter((link) => link.to !== '/faq').map((link) => (
             <Link key={link.to} className={linkClassName} to={link.to}>
               {link.label}
@@ -46,15 +50,16 @@ export default function PublicFooter({ className = '', variant = 'landing' }: Pu
   )
 }
 
-export function SupportGroupLink({ className = '', children = copy.public.components_PublicFooter_011 }: { className?: string; children?: React.ReactNode }) {
+export function SupportGroupLink({ className = '', children }: { className?: string; children?: React.ReactNode }) {
+  const { content } = usePublicContent()
   return (
     <a
       className={className}
-      href={SUPPORT_QQ_GROUP_URL}
+      href={content.qq_group.join_url}
       target="_blank"
       rel="noopener noreferrer"
     >
-      {children}
+      {children ?? <>{content.qq_group.link_label} · {content.qq_group.number}</>}
     </a>
   )
 }

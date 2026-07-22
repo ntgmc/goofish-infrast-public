@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { publicContentDraftSchema } from '../../src/lib/public-content'
 
 export const REQUEST_BODY_LIMITS = Object.freeze({
   none: 0,
@@ -87,6 +88,7 @@ export const requestSchemas = {
     password_reset_email_reserve: z.number().int().min(0).max(300),
   }),
   adminFeatureSettings: strict({ features: siteFeaturesSchema }),
+  adminPublicContent: publicContentDraftSchema,
   adminRegistrationInvitationCreate: strict({}),
   adminRegistrationInvitationPatch: strict({
     invitation_id: shortString(128),
@@ -210,6 +212,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/invitation-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminInvitationSettings), PATCH: json('admin', requestSchemas.adminInvitationSettings) })],
   ['/api/admin/registration-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRegistrationSettings) })],
   ['/api/admin/feature-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminFeatureSettings) })],
+  ['/api/admin/public-content', route({ GET: none(), PUT: json('admin', requestSchemas.adminPublicContent) })],
   ['/api/admin/registration-invitations', route({
     GET: none(),
     POST: json('admin', requestSchemas.adminRegistrationInvitationCreate),
@@ -229,6 +232,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/auth/change-password', route({ POST: json('auth', requestSchemas.authChangePassword) })],
   ['/api/auth/me', route({ GET: none() }, ['profile_id'])],
   ['/api/site/features', route({ GET: none() })],
+  ['/api/site/public-content', route({ GET: none() })],
   ['/api/user/data/export', route({ GET: none() })],
   ['/api/user/data/delete-request', route({ POST: json('auth', requestSchemas.accountDelete) })],
   ['/api/user/data/cancel', route({ POST: json('auth', requestSchemas.deletionToken) })],

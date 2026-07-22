@@ -9,6 +9,7 @@ import RegistrationSettingsSection from './registration/RegistrationSettingsSect
 import ThemeSwitcher from '../../components/ThemeSwitcher'
 import QueueMonitorPanel from './optimization/QueueMonitorPanel'
 import FeatureSettingsSection from './features/FeatureSettingsSection'
+import PublicContentSettingsSection from './content/PublicContentSettingsSection'
 
 import { GeneratedPermission, AdminSection, UsageRangeKey, AnnouncementSortKey, EMPTY_ANNOUNCEMENT_REACH_STATS, permissionLabels, sectionLabels, announcementSortLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, AnnouncementReachMetrics, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
 import { useAdminController } from './useAdminController'
@@ -448,6 +449,7 @@ export default function AdminDashboardView() {
             )}
 
             {activeSection === 'features' && <FeatureSettingsSection />}
+            {activeSection === 'content' && <PublicContentSettingsSection />}
             {activeSection === 'registration' && <RegistrationSettingsSection />}
             {activeSection === 'invitation' && <InvitationSettingsSection />}
   

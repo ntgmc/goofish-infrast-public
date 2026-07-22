@@ -405,4 +405,6 @@ export const publicCopy = {
   pages_PublicInfoPage_100: "请提供账号标识、订单或 CDK 的安全标识、报错时间、不含敏感信息的错误描述、操作步骤，以及相关浏览器、MAA 或游戏版本。截图应先遮盖个人信息。不要发送密码、完整 CDK、二维码、Cookie 或森空岛凭据；材料齐全后，客服会按支持页说明的时限首次响应。",
   // src/components/PublicFooter.tsx
   components_PublicFooter_012: "价格与权益",
+  // src/components/PublicFooter.tsx
+  components_PublicFooter_013: "致谢",
 } as const
