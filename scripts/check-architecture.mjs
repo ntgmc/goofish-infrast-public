@@ -31,6 +31,14 @@ for (const filename of engineFiles) {
   }
 }
 
+for await (const filename of glob('server/handlers/**/*.ts')) {
+  if (filename.endsWith('.test.ts')) continue
+  const source = await readFile(filename, 'utf8')
+  if (/from\s+['"][^'"]*\/optimization\/(?!jobs\/)/.test(source)) {
+    failures.push(`${filename}: API handler imports optimization core directly`)
+  }
+}
+
 if (failures.length > 0) {
   for (const failure of failures) console.error(`architecture error: ${failure}`)
   process.exit(1)

@@ -287,15 +287,6 @@ export function formatProductionBreakdown(manufacturing: Record<string, number>)
   return parts.length > 0 ? parts.join('，') : copy.domain.components_result_panel_formatters_018
 }
 
-export function formatOverflowSummary(overflow: NonNullable<OptimizeResult['analysis_summary']>['overflow'] | undefined): string {
-  if (!overflow) return copy.domain.components_result_panel_formatters_019
-  const parts = [
-    overflow.earliest_trading_full_time ? `${copy.domain.components_result_panel_formatters_020}${overflow.earliest_trading_full_time}` : '',
-    overflow.earliest_manufacturing_full_time ? `${copy.domain.components_result_panel_formatters_021}${overflow.earliest_manufacturing_full_time}` : '',
-  ].filter(Boolean)
-  return parts.length > 0 ? parts.join('，') : copy.domain.components_result_panel_formatters_022
-}
-
 function getDisplayEfficiency(room: ShiftRoom): number {
   return Number(
     room.overflow?.equivalent?.equivalent_efficiency ??

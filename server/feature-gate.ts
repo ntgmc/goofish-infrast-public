@@ -26,7 +26,6 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/auth/register') return ['registration']
   if (pathname === '/api/auth/login' || pathname === '/api/auth/me') return ['login']
   if (pathname === '/api/announcement') return ['announcements']
-  if (pathname === '/api/analyze-schedule') return ['schedule_analysis']
   if (pathname === '/api/depot-value') return ['depot_value']
   if (pathname === '/api/usage-stats') return ['login']
 

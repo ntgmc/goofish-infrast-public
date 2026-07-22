@@ -28,10 +28,6 @@ export const metadataCopy = {
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_014: "了解 MaaTool 排班建议、第三方服务与知识产权相关的使用边界。",
   // src/components/RouteMetadata.tsx
-  components_RouteMetadata_015: "排班表分析 | MaaTool",
-  // src/components/RouteMetadata.tsx
-  components_RouteMetadata_016: "上传干员数据和已有排班表，分析明日方舟基建排班的风险与产出。",
-  // src/components/RouteMetadata.tsx
   components_RouteMetadata_017: "仓库价值分析器 | MaaTool",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_018: "上传 MAA 仓库 JSON，按等效理智估算明日方舟仓库资产并生成分享图。",

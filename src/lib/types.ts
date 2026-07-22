@@ -244,13 +244,6 @@ export interface OptimizeJobStatusResponse {
   can_retry?: boolean;
 }
 
-export interface AnalyzeScheduleRequest {
-  operators: LicenseOperator[];
-  schedule: unknown;
-  config?: Partial<LicenseConfig>;
-  ignore_elite?: boolean;
-}
-
 export type DepotValueSource = 'upload' | 'skland';
 
 export type DepotValueRequest =
@@ -367,7 +360,6 @@ export interface OptimizeResult {
   intermediate_depletion?: IntermediateDepletion[];
   upgrade_suggestions?: RawUpgradeSuggestion[];
   upgrade_suggestions_status?: 'completed' | 'not_requested' | 'not_allowed' | 'failed';
-  analysis_summary?: ScheduleAnalysisSummary;
   preview_limit?: {
     mode?: 'room_limited' | 'full_rotation_without_export';
     room_limit?: number;
@@ -430,36 +422,6 @@ export interface ReorderCheckResult {
   reasons: string[];
   build_meta?: AppBuildMeta;
 }
-
-export interface ScheduleAnalysisSummary {
-  source: 'imported_schedule';
-  plan_count: number;
-  room_count: number;
-  mood_valid: boolean;
-  red_face_risk_count: number;
-  red_face_operator_count: number;
-  red_face_operators: string[];
-  risks: {
-    shift: string;
-    operator: string;
-    room_type: string;
-    room_index: number;
-    start?: number;
-    needed?: number;
-    end?: number;
-  }[];
-  overflow: {
-    trading_rooms: number;
-    manufacturing_rooms: number;
-    earliest_trading_full_time?: string;
-    earliest_manufacturing_full_time?: string;
-  };
-  warnings: string[];
-}
-
-export type AnalyzeScheduleResult = OptimizeResult & {
-  analysis_summary: ScheduleAnalysisSummary;
-};
 
 export interface UpgradeTrainingMaterial {
   id: string;
@@ -676,7 +638,7 @@ interface MaaDefaultComparison {
   warnings: string[];
 }
 
-export interface ShiftPlan {
+interface ShiftPlan {
   name: string;
   description?: string;
   schedule_mode?: string;

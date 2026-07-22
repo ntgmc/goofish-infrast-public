@@ -229,18 +229,12 @@ export const dashboardCopy = {
   pages_tool_dashboard_ToolsSection_002: "粘贴 MAA 仓库识别导出的 JSON，生成仓库资产估值和可下载截图；不会读取或覆盖当前账号保存的数据。",
   // src/pages/tool/dashboard/ToolsSection.tsx
   pages_tool_dashboard_ToolsSection_003: "打开独立页面",
-  // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_004: "排班表分析",
-  // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_005: "这里和公开工具页使用同一套分析能力；不会读取或覆盖当前账号保存的干员数据。",
-  // src/pages/tool/dashboard/ToolsSection.tsx
-  pages_tool_dashboard_ToolsSection_006: "打开独立页面",
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_tour_001: "使用导览",
   pages_tool_AccountDashboard_tour_002: "管理游戏账号",
   pages_tool_AccountDashboard_tour_003: "查看正式档案和免费预览档案，并从这里进入干员与基建配置准备流程。",
   pages_tool_AccountDashboard_tour_004: "独立实用工具",
-  pages_tool_AccountDashboard_tour_005: "仓库价值分析和排班表分析使用独立页面，不会覆盖当前账号保存的工作区。",
+  pages_tool_AccountDashboard_tour_005: "仓库价值分析使用独立页面，不会覆盖当前账号保存的工作区。",
   pages_tool_AccountDashboard_tour_006: "添加账号档案",
   pages_tool_AccountDashboard_tour_007: "在这里兑换 CDK 创建正式档案；没有 CDK 时也可以领取免费个人排班。",
   pages_tool_AccountDashboard_tour_008: "邀请奖励",
