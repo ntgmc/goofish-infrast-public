@@ -401,7 +401,7 @@ function ThanksSectionDetail({ section, sectionIndex, sectionCount, edit, onMove
 
   const addEntry = () => {
     const id = newId('entry')
-    edit((next) => { next.thanks.sections[sectionIndex].entries.push({ id, name: '', description: '', url: '' }) })
+    edit((next) => { next.thanks.sections[sectionIndex].entries.push({ id, name: '', description: '', url: '', avatar_url: '' }) })
     setSelectedEntryId(id)
   }
 
@@ -436,6 +436,7 @@ function ThanksSectionDetail({ section, sectionIndex, sectionCount, edit, onMove
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <TextField id={`thanks-name-${selectedEntry.id}`} label={copy.publicContent.admin_entry_name} value={selectedEntry.name} maxLength={120} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].name = value })} />
                 <TextField id={`thanks-url-${selectedEntry.id}`} label={copy.publicContent.admin_entry_url} value={selectedEntry.url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].url = value })} />
+                <TextField id={`thanks-avatar-url-${selectedEntry.id}`} label={copy.publicContent.admin_entry_avatar_url} value={selectedEntry.avatar_url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].avatar_url = value })} />
                 <div className="md:col-span-2">
                   <TextareaField id={`thanks-description-${selectedEntry.id}`} label={copy.publicContent.admin_entry_description} value={selectedEntry.description} maxLength={1000} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].description = value })} />
                 </div>

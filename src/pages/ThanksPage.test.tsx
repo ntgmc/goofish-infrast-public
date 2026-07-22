@@ -14,7 +14,11 @@ describe('ThanksPage', () => {
     expect(screen.getByText('企鹅物流')).toBeInTheDocument()
     expect(screen.getByText('PRTS Wiki')).toBeInTheDocument()
     expect(screen.getByText('MAA')).toBeInTheDocument()
-    expect(screen.getByText('铃语')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'ntgmc' })).toHaveAttribute('href', 'https://github.com/ntgmc')
+    expect(screen.getByRole('img', { name: 'ntgmc 的 GitHub 头像' })).toHaveAttribute(
+      'src',
+      'https://avatars.githubusercontent.com/u/74061867?v=4',
+    )
     expect(screen.getByText('所有参与开发、测试、反馈与验证的协助者')).toBeInTheDocument()
   })
 })

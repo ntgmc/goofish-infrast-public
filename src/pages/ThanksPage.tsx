@@ -38,12 +38,26 @@ export default function ThanksPage() {
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 {section.entries.map((entry) => (
                   <article key={entry.id} className="tool-inset p-5">
-                    <h3 className="text-base font-semibold text-ink-primary">
-                      {entry.url ? (
-                        <a href={entry.url} target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">{entry.name}</a>
-                      ) : entry.name}
-                    </h3>
-                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink-secondary">{entry.description}</p>
+                    <div className="flex items-start gap-4">
+                      {entry.avatar_url && (
+                        <img
+                          src={entry.avatar_url}
+                          alt={copy.publicContent.thanks_github_avatar_alt.replace('{name}', entry.name)}
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          className="h-14 w-14 shrink-0 rounded-full border border-surface-3 bg-surface-2 object-cover shadow-sm"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <h3 className="break-words text-base font-semibold text-ink-primary">
+                          {entry.url ? (
+                            <a href={entry.url} target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">{entry.name}</a>
+                          ) : entry.name}
+                        </h3>
+                        <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink-secondary">{entry.description}</p>
+                      </div>
+                    </div>
                   </article>
                 ))}
               </div>
