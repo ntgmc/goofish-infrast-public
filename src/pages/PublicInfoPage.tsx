@@ -5,13 +5,21 @@ import { Link } from 'react-router-dom'
 import { copy } from '../copy/index'
 import { productPolicies } from '../lib/product-catalog'
 import { usePublicContent } from '../lib/public-content-context'
+import { PERSONAL_USE_DECLARATION } from '../lib/personal-use-declaration'
 
 
 export type PublicInfoPageKind = 'faq' | 'support' | 'privacy' | 'terms' | 'disclaimer'
 
 const EFFECTIVE_DATE = copy.public.pages_PublicInfoPage_001
 
-const legalContent: Record<Exclude<PublicInfoPageKind, 'faq' | 'support'>, Array<{ id: string; heading: string; paragraphs: string[] }>> = {
+type LegalSection = {
+  id: string
+  heading: string
+  paragraphs: readonly string[]
+  items?: readonly string[]
+}
+
+const legalContent: Record<Exclude<PublicInfoPageKind, 'faq' | 'support'>, readonly LegalSection[]> = {
   privacy: [
     {
       id: 'processed-information',
@@ -37,6 +45,11 @@ const legalContent: Record<Exclude<PublicInfoPageKind, 'faq' | 'support'>, Array
         copy.public.pages_PublicInfoPage_026,
         copy.public.pages_PublicInfoPage_027,
       ],
+    },
+    {
+      id: 'personal-use-confirmation-records',
+      heading: copy.personalUse.terms_personal_use_heading,
+      paragraphs: [copy.personalUse.privacy_acceptance_notice],
     },
   ],
   terms: [
@@ -64,6 +77,12 @@ const legalContent: Record<Exclude<PublicInfoPageKind, 'faq' | 'support'>, Array
         copy.public.pages_PublicInfoPage_036,
       ],
     },
+    {
+      id: 'personal-use-declaration',
+      heading: copy.personalUse.terms_personal_use_heading,
+      paragraphs: [copy.personalUse.terms_personal_use_intro],
+    },
+    ...PERSONAL_USE_DECLARATION.sections,
   ],
   disclaimer: [
     {
@@ -208,15 +227,20 @@ function SupportContent() {
   )
 }
 
-function LegalContent({ sections }: { sections: Array<{ id: string; heading: string; paragraphs: string[] }> }) {
+function LegalContent({ sections }: { sections: readonly LegalSection[] }) {
   return (
     <div>
       <div>
         {sections.map((section) => (
-          <section key={section.id} className="public-prose-section">
+          <section key={section.id} id={section.id} className="public-prose-section">
             <h2 className="text-xl font-semibold text-ink-primary">{section.heading}</h2>
             <div className="mt-4 space-y-4 text-sm leading-7 text-ink-secondary">
               {section.paragraphs.map((paragraph, index) => <p key={`${section.id}-${index}`}>{paragraph}</p>)}
+              {section.items && section.items.length > 0 && (
+                <ul className="list-disc space-y-2 pl-5">
+                  {section.items.map((item, index) => <li key={`${section.id}-item-${index}`}>{item}</li>)}
+                </ul>
+              )}
             </div>
           </section>
         ))}

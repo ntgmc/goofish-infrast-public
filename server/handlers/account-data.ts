@@ -2,6 +2,7 @@ import { cancelAccountDeletion, requestAccountDeletion } from '../account-data-l
 import { getDepotValueSampleStore } from '../storage/depot-value-sample-store'
 import { getProfileForUser, getProfileWorkspace, getUserById, listProfilesForUser, saveUserProfile } from '../storage/user-store'
 import { query } from '../storage/postgres'
+import { listPersonalUseDeclarationAcceptancesForUser } from '../storage/personal-use-declaration-store'
 import { clearSessionCookie, jsonResponse, normalizeEmail, requireUserSession, type AuthContext } from './user-auth'
 import { verifyPasswordHash } from '../security/password'
 import { requestSchemas } from '../security/request-policy'
@@ -22,13 +23,14 @@ export default async function accountDataHandler(req: Request): Promise<Response
 async function exportData(userId: string): Promise<Response> {
   const profiles = await listProfilesForUser(userId)
   const profileIds = profiles.map((profile) => profile.id)
-  const [user, workspaces, usage, jobs, samples, deletion] = await Promise.all([
+  const [user, workspaces, usage, jobs, samples, deletion, personalUseDeclarations] = await Promise.all([
     getUserById(userId),
     Promise.all(profiles.map((profile) => getProfileWorkspace(profile.id))),
     query<{ record_json: unknown }>('select record_json from usage_events where user_id = $1 or profile_id = any($2)', [userId, profileIds]),
     query<{ id: string; status: string; source: string; result_json: unknown; created_at: string; updated_at: string }>('select id, status, source, result_json, created_at, updated_at from optimize_jobs where profile_id = any($1)', [profileIds]),
     query<{ sample_json: unknown; sampled_at: string }>('select sample_json, sampled_at from depot_value_samples where contributor_profile_id = any($1)', [profileIds]),
     query<{ scheduled_for: string; created_at: string }>('select scheduled_for, created_at from account_deletion_requests where user_id = $1', [userId]),
+    listPersonalUseDeclarationAcceptancesForUser(userId),
   ])
   const safeProfiles = profiles.map((profile) => {
     const { skland_binding, skland_pending_binding, ...rest } = profile
@@ -39,7 +41,7 @@ async function exportData(userId: string): Promise<Response> {
     }
   })
   const publicUser = user ? { id: user.id, email: user.email, permission: user.permission, status: user.status, created_at: user.created_at, updated_at: user.updated_at } : null
-  return new Response(JSON.stringify({ version: 1, exported_at: new Date().toISOString(), user: publicUser, profiles: safeProfiles, workspaces, usage_events: usage.rows.map((row) => row.record_json), optimize_jobs: jobs.rows, depot_samples: samples.rows, deletion_request: deletion.rows[0] ?? null }, null, 2), {
+  return new Response(JSON.stringify({ version: 1, exported_at: new Date().toISOString(), user: publicUser, profiles: safeProfiles, workspaces, usage_events: usage.rows.map((row) => row.record_json), optimize_jobs: jobs.rows, depot_samples: samples.rows, personal_use_declarations: personalUseDeclarations, deletion_request: deletion.rows[0] ?? null }, null, 2), {
     headers: { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': 'attachment; filename="maa-personal-data.json"', 'Cache-Control': 'no-store' },
   })
 }

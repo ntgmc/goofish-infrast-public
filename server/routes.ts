@@ -20,6 +20,7 @@ import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
 import userInvitationsHandler from './handlers/user-invitations'
 import userRewardsHandler from './handlers/user-rewards'
+import personalUseDeclarationHandler from './handlers/personal-use-declaration'
 import accountDataHandler from './handlers/account-data'
 import usageStatsHandler from './handlers/usage-stats'
 import siteFeaturesHandler from './handlers/site-features'
@@ -86,6 +87,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/invitations', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/rewards', userRewardsHandler as unknown as ApiHandler],
+  ['/api/user/personal-use-declaration', personalUseDeclarationHandler as unknown as ApiHandler],
   ['/api/optimization/jobs', optimizationHandler as unknown as ApiHandler],
   ['/api/optimization/reorder-checks', optimizationHandler as unknown as ApiHandler],
 ])

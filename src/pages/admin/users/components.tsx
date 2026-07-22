@@ -76,6 +76,8 @@ function UserDetailPanel({
           <DetailItem label="更新时间" value={formatDate(user.updated_at)} />
         </dl>
 
+        <PersonalUseDeclarations declarations={detail.personal_use_declarations} />
+
         <div className="mt-5 space-y-4">
           {detail.profiles.length === 0 ? (
             <div className="tool-inset border-dashed px-4 py-8 text-center text-sm text-ink-muted">该用户暂无档案。</div>
@@ -98,6 +100,47 @@ function UserDetailPanel({
           ))}
         </div>
       </div>
+    </section>
+  )
+}
+
+function PersonalUseDeclarations({ declarations }: { declarations: AdminUserDetail['personal_use_declarations'] }) {
+  return (
+    <section className="tool-inset mt-5 p-4" aria-labelledby="personal-use-declarations-title">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 id="personal-use-declarations-title" className="text-sm font-semibold text-ink-primary">个人使用声明确认</h3>
+        <span className="tool-status">{declarations.length} 条记录</span>
+      </div>
+      {declarations.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-muted">暂无个人使用声明确认记录。</p>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full text-left text-xs text-ink-secondary">
+            <thead className="border-b border-surface-3 text-ink-muted">
+              <tr>
+                <th className="px-2 py-2 font-medium">版本</th>
+                <th className="px-2 py-2 font-medium">触发操作</th>
+                <th className="px-2 py-2 font-medium">档案</th>
+                <th className="px-2 py-2 font-medium">IP</th>
+                <th className="px-2 py-2 font-medium">确认时间</th>
+                <th className="px-2 py-2 font-medium">保留至</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-3">
+              {declarations.map((declaration) => (
+                <tr key={`${declaration.declaration_id}-${declaration.accepted_at}`}>
+                  <td className="px-2 py-2 font-mono">{declaration.declaration_version}</td>
+                  <td className="px-2 py-2">{declaration.action === 'free_preview_claim' ? '领取免费权益' : '导出生成结果'}</td>
+                  <td className="max-w-40 truncate px-2 py-2 font-mono" title={declaration.profile_id ?? undefined}>{declaration.profile_id ?? '-'}</td>
+                  <td className="px-2 py-2 font-mono">{declaration.client_ip}</td>
+                  <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.accepted_at)}</td>
+                  <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.retain_until)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   )
 }
