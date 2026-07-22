@@ -62,7 +62,7 @@ Each completed build therefore lives at
 
 ## Database schema ownership
 
-Production API and Worker processes perform a read-only catalog compatibility check at startup and never replay schema DDL or data backfills. This prevents blue/green candidates from taking `AccessExclusiveLock` while the active API or Worker is writing the same tables. Apply schema changes as a controlled database migration before deploying a release that requires them; a missing runtime table or column must fail readiness instead of triggering an automatic migration. Development and test processes retain automatic schema setup for local and integration-test databases.
+Production API and Worker processes perform a read-only catalog compatibility check at startup and never replay schema DDL or data backfills. The check is scoped to the process role, so a dedicated Worker validates the shared and optimization tables it can access without depending on API-only tables such as `feature_settings`. This prevents blue/green candidates from taking `AccessExclusiveLock` while the active API or Worker is writing the same tables. Apply schema changes as a controlled database migration before deploying a release that requires them; a missing runtime table or column required by that role must fail readiness instead of triggering an automatic migration. Development and test processes retain automatic schema setup for local and integration-test databases.
 
 Transient validation failures are not cached permanently. The next request retries validation, while a successful validation is cached for the lifetime of the process.
 

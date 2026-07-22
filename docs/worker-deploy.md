@@ -82,7 +82,7 @@ POSTGRES_POOL_MAX=3
 
 The worker needs the current Skland credential decryption key and the previous key pair only during rotation. It does not need administrator passwords, administrator signing secrets, Brevo credentials, or public application credentials. Allow DNS and outbound HTTPS for Skland and Yituliu requests.
 
-Production `APP_ROLE=api` and `APP_ROLE=worker` processes never execute `CREATE`, `ALTER`, data backfills, or other database migrations. Their readiness paths share a cached read-only catalog compatibility check and fail with the missing table/column names when Seoul has not been migrated. Provision schema changes through a controlled database migration before starting an API or Worker release that requires them; do not grant runtime processes migration ownership as a startup workaround.
+Production `APP_ROLE=api` and `APP_ROLE=worker` processes never execute `CREATE`, `ALTER`, data backfills, or other database migrations. Their readiness paths share a cached read-only catalog compatibility check, scoped to the tables each role can access, and fail with the missing table/column names when Seoul has not been migrated. A dedicated Worker does not depend on API-only tables such as `feature_settings`. Provision schema changes through a controlled database migration before starting an API or Worker release that requires them; do not grant runtime processes migration ownership as a startup workaround.
 
 ## Least-privilege deployment commands
 
