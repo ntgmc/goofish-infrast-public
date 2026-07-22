@@ -8,6 +8,7 @@ import {
   type PublicContentSettingsV1,
 } from '../../../lib/public-content'
 import { usePublicContent } from '../../../lib/public-content-context'
+import { SortableMasterDetailList } from '../shared/SortableMasterDetailList'
 
 type TabId = 'qq' | 'faq' | 'pricing' | 'thanks'
 type EditSettings = (updater: (draft: PublicContentSettingsV1) => void) => void
@@ -160,6 +161,23 @@ function QqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit:
 }
 
 function FaqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit: EditSettings }) {
+  const [selectedId, setSelectedId] = useSelectedId(settings.faq.items.map((item) => item.id))
+  const selectedIndex = settings.faq.items.findIndex((item) => item.id === selectedId)
+  const selected = selectedIndex >= 0 ? settings.faq.items[selectedIndex] : null
+
+  const addItem = () => {
+    const id = newId('faq')
+    edit((next) => { next.faq.items.push({ id, question: '', answer: '', action: 'none' }) })
+    setSelectedId(id)
+  }
+
+  const deleteSelected = () => {
+    if (selectedIndex < 0) return
+    const nextSelected = selectionAfterDelete(settings.faq.items, selectedIndex)
+    edit((next) => { next.faq.items.splice(selectedIndex, 1) })
+    setSelectedId(nextSelected)
+  }
+
   return (
     <>
       <EditorPanel title={copy.publicContent.admin_tab_faq}>
@@ -169,29 +187,68 @@ function FaqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit
           <TextareaField id="faq-cta-body" label={copy.publicContent.admin_faq_cta_body} value={settings.faq.cta_body} maxLength={1000} onChange={(value) => edit((next) => { next.faq.cta_body = value })} />
         </div>
       </EditorPanel>
-      <EditorPanel title={copy.publicContent.admin_faq_items} action={<button type="button" className="tool-secondary-action" onClick={() => edit((next) => { next.faq.items.push({ id: newId('faq'), question: '', answer: '', action: 'none' }) })}>{copy.publicContent.admin_add_faq}</button>}>
-        <div className="space-y-4">
-          {settings.faq.items.length === 0 && <EmptyList />}
-          {settings.faq.items.map((item, index) => (
-            <article key={item.id} className="tool-inset p-4">
-              <ListActions index={index} length={settings.faq.items.length} onMove={(target) => edit((next) => { next.faq.items = moveItem(next.faq.items, index, target) })} onDelete={() => edit((next) => { next.faq.items.splice(index, 1) })} />
+      <EditorPanel title={copy.publicContent.admin_faq_items} description={copy.publicContent.admin_list_order_help} action={<button type="button" className="tool-secondary-action" onClick={addItem}>{copy.publicContent.admin_add_faq}</button>}>
+        <SortableMasterDetailList
+          items={settings.faq.items.map((item) => ({ id: item.id, title: item.question, description: item.answer }))}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onReorder={(from, to) => edit((next) => { next.faq.items = moveItem(next.faq.items, from, to) })}
+          ariaLabel={copy.publicContent.admin_faq_items}
+          detail={selected ? (
+            <div className="tool-inset p-5">
+              <ListActions index={selectedIndex} length={settings.faq.items.length} onMove={(target) => edit((next) => { next.faq.items = moveItem(next.faq.items, selectedIndex, target) })} onDelete={deleteSelected} />
               <div className="mt-4 grid gap-4">
-                <TextField id={`faq-question-${item.id}`} label={copy.publicContent.admin_question} value={item.question} maxLength={160} onChange={(value) => edit((next) => { next.faq.items[index].question = value })} />
-                <TextareaField id={`faq-answer-${item.id}`} label={copy.publicContent.admin_answer} value={item.answer} maxLength={4000} onChange={(value) => edit((next) => { next.faq.items[index].answer = value })} />
+                <TextField id={`faq-question-${selected.id}`} label={copy.publicContent.admin_question} value={selected.question} maxLength={160} onChange={(value) => edit((next) => { next.faq.items[selectedIndex].question = value })} />
+                <TextareaField id={`faq-answer-${selected.id}`} label={copy.publicContent.admin_answer} value={selected.answer} maxLength={4000} onChange={(value) => edit((next) => { next.faq.items[selectedIndex].answer = value })} />
                 <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-ink-secondary">
-                  <input type="checkbox" checked={item.action === 'qq_group'} onChange={(event) => edit((next) => { next.faq.items[index].action = event.currentTarget.checked ? 'qq_group' : 'none' })} className="h-4 w-4 accent-brand-600" />
+                  <input type="checkbox" checked={selected.action === 'qq_group'} onChange={(event) => edit((next) => { next.faq.items[selectedIndex].action = event.currentTarget.checked ? 'qq_group' : 'none' })} className="h-4 w-4 accent-brand-600" />
                   {copy.publicContent.admin_show_qq_action}
                 </label>
               </div>
-            </article>
-          ))}
-        </div>
+            </div>
+          ) : <EmptyDetail />}
+        />
       </EditorPanel>
     </>
   )
 }
 
 function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit: EditSettings }) {
+  const disclosureIds = settings.pricing.disclosures.map((_item, index) => `disclosure-${index}`)
+  const [selectedDisclosureId, setSelectedDisclosureId] = useSelectedId(disclosureIds)
+  const selectedDisclosureIndex = disclosureIds.indexOf(selectedDisclosureId ?? '')
+  const selectedDisclosure = selectedDisclosureIndex >= 0 ? settings.pricing.disclosures[selectedDisclosureIndex] : null
+  const [selectedComparisonId, setSelectedComparisonId] = useSelectedId(settings.pricing.comparison_rows.map((row) => row.id))
+  const selectedComparisonIndex = settings.pricing.comparison_rows.findIndex((row) => row.id === selectedComparisonId)
+  const selectedComparison = selectedComparisonIndex >= 0 ? settings.pricing.comparison_rows[selectedComparisonIndex] : null
+
+  const addDisclosure = () => {
+    const index = settings.pricing.disclosures.length
+    edit((next) => { next.pricing.disclosures.push('') })
+    setSelectedDisclosureId(`disclosure-${index}`)
+  }
+
+  const deleteDisclosure = () => {
+    if (selectedDisclosureIndex < 0) return
+    const remainingLength = settings.pricing.disclosures.length - 1
+    const nextIndex = Math.min(selectedDisclosureIndex, remainingLength - 1)
+    edit((next) => { next.pricing.disclosures.splice(selectedDisclosureIndex, 1) })
+    setSelectedDisclosureId(nextIndex >= 0 ? `disclosure-${nextIndex}` : null)
+  }
+
+  const addComparison = () => {
+    const id = newId('comparison')
+    edit((next) => { next.pricing.comparison_rows.push({ id, feature: '', free_preview: '', single_account_lifetime: '' }) })
+    setSelectedComparisonId(id)
+  }
+
+  const deleteComparison = () => {
+    if (selectedComparisonIndex < 0) return
+    const nextSelected = selectionAfterDelete(settings.pricing.comparison_rows, selectedComparisonIndex)
+    edit((next) => { next.pricing.comparison_rows.splice(selectedComparisonIndex, 1) })
+    setSelectedComparisonId(nextSelected)
+  }
+
   return (
     <>
       <EditorPanel title={copy.publicContent.admin_tab_pricing} description={copy.publicContent.admin_display_only_warning}>
@@ -218,34 +275,59 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
           })}
         </div>
       </EditorPanel>
-      <EditorPanel title={copy.publicContent.admin_disclosures} action={<button type="button" className="tool-secondary-action" onClick={() => edit((next) => { next.pricing.disclosures.push('') })}>{copy.publicContent.admin_add_disclosure}</button>}>
+      <EditorPanel title={copy.publicContent.admin_disclosures} description={copy.publicContent.admin_list_order_help} action={<button type="button" className="tool-secondary-action" onClick={addDisclosure}>{copy.publicContent.admin_add_disclosure}</button>}>
         <TextField id="pricing-policy-heading" label={copy.publicContent.admin_policy_heading} value={settings.pricing.policy_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.policy_heading = value })} />
-        <div className="mt-4 space-y-4">
-          {settings.pricing.disclosures.length === 0 && <EmptyList />}
-          {settings.pricing.disclosures.map((item, index) => (
-            <div key={`disclosure-${index}`} className="tool-inset p-4">
-              <ListActions index={index} length={settings.pricing.disclosures.length} onMove={(target) => edit((next) => { next.pricing.disclosures = moveItem(next.pricing.disclosures, index, target) })} onDelete={() => edit((next) => { next.pricing.disclosures.splice(index, 1) })} />
-              <TextareaField id={`pricing-disclosure-${index}`} label={`${copy.publicContent.admin_disclosures} ${index + 1}`} value={item} maxLength={500} onChange={(value) => edit((next) => { next.pricing.disclosures[index] = value })} />
-            </div>
-          ))}
-        </div>
-      </EditorPanel>
-      <EditorPanel title={copy.publicContent.admin_comparison_rows} action={<button type="button" className="tool-secondary-action" onClick={() => edit((next) => { next.pricing.comparison_rows.push({ id: newId('comparison'), feature: '', free_preview: '', single_account_lifetime: '' }) })}>{copy.publicContent.admin_add_comparison}</button>}>
-        <TextField id="pricing-comparison-heading" label={copy.publicContent.admin_comparison_heading} value={settings.pricing.comparison_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.comparison_heading = value })} />
-        <div className="mt-4 space-y-4">
-          {settings.pricing.comparison_rows.length === 0 && <EmptyList />}
-          {settings.pricing.comparison_rows.map((row, index) => (
-            <article key={row.id} className="tool-inset p-4">
-              <ListActions index={index} length={settings.pricing.comparison_rows.length} onMove={(target) => edit((next) => { next.pricing.comparison_rows = moveItem(next.pricing.comparison_rows, index, target) })} onDelete={() => edit((next) => { next.pricing.comparison_rows.splice(index, 1) })} />
-              <div className="mt-4 grid gap-4">
-                <TextField id={`comparison-feature-${row.id}`} label={copy.publicContent.admin_feature_name} value={row.feature} maxLength={120} onChange={(value) => edit((next) => { next.pricing.comparison_rows[index].feature = value })} />
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <TextareaField id={`comparison-free-${row.id}`} label={copy.publicContent.admin_free_preview} value={row.free_preview} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.comparison_rows[index].free_preview = value })} />
-                  <TextareaField id={`comparison-paid-${row.id}`} label={copy.publicContent.admin_single_lifetime} value={row.single_account_lifetime} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.comparison_rows[index].single_account_lifetime = value })} />
+        <div className="mt-4">
+          <SortableMasterDetailList
+            items={settings.pricing.disclosures.map((item, index) => ({ id: `disclosure-${index}`, title: item }))}
+            selectedId={selectedDisclosureId}
+            onSelect={setSelectedDisclosureId}
+            onReorder={(from, to) => {
+              edit((next) => { next.pricing.disclosures = moveItem(next.pricing.disclosures, from, to) })
+              setSelectedDisclosureId(`disclosure-${to}`)
+            }}
+            ariaLabel={copy.publicContent.admin_disclosures}
+            detail={selectedDisclosure !== null ? (
+              <div className="tool-inset p-5">
+                <ListActions
+                  index={selectedDisclosureIndex}
+                  length={settings.pricing.disclosures.length}
+                  onMove={(target) => {
+                    edit((next) => { next.pricing.disclosures = moveItem(next.pricing.disclosures, selectedDisclosureIndex, target) })
+                    setSelectedDisclosureId(`disclosure-${target}`)
+                  }}
+                  onDelete={deleteDisclosure}
+                />
+                <div className="mt-4">
+                  <TextareaField id={`pricing-disclosure-${selectedDisclosureIndex}`} label={`${copy.publicContent.admin_disclosures} ${selectedDisclosureIndex + 1}`} value={selectedDisclosure} maxLength={500} onChange={(value) => edit((next) => { next.pricing.disclosures[selectedDisclosureIndex] = value })} />
                 </div>
               </div>
-            </article>
-          ))}
+            ) : <EmptyDetail />}
+          />
+        </div>
+      </EditorPanel>
+      <EditorPanel title={copy.publicContent.admin_comparison_rows} description={copy.publicContent.admin_list_order_help} action={<button type="button" className="tool-secondary-action" onClick={addComparison}>{copy.publicContent.admin_add_comparison}</button>}>
+        <TextField id="pricing-comparison-heading" label={copy.publicContent.admin_comparison_heading} value={settings.pricing.comparison_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.comparison_heading = value })} />
+        <div className="mt-4">
+          <SortableMasterDetailList
+            items={settings.pricing.comparison_rows.map((row) => ({ id: row.id, title: row.feature, description: `${row.free_preview} / ${row.single_account_lifetime}` }))}
+            selectedId={selectedComparisonId}
+            onSelect={setSelectedComparisonId}
+            onReorder={(from, to) => edit((next) => { next.pricing.comparison_rows = moveItem(next.pricing.comparison_rows, from, to) })}
+            ariaLabel={copy.publicContent.admin_comparison_rows}
+            detail={selectedComparison ? (
+              <div className="tool-inset p-5">
+                <ListActions index={selectedComparisonIndex} length={settings.pricing.comparison_rows.length} onMove={(target) => edit((next) => { next.pricing.comparison_rows = moveItem(next.pricing.comparison_rows, selectedComparisonIndex, target) })} onDelete={deleteComparison} />
+                <div className="mt-4 grid gap-4">
+                  <TextField id={`comparison-feature-${selectedComparison.id}`} label={copy.publicContent.admin_feature_name} value={selectedComparison.feature} maxLength={120} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].feature = value })} />
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <TextareaField id={`comparison-free-${selectedComparison.id}`} label={copy.publicContent.admin_free_preview} value={selectedComparison.free_preview} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].free_preview = value })} />
+                    <TextareaField id={`comparison-paid-${selectedComparison.id}`} label={copy.publicContent.admin_single_lifetime} value={selectedComparison.single_account_lifetime} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].single_account_lifetime = value })} />
+                  </div>
+                </div>
+              </div>
+            ) : <EmptyDetail />}
+          />
         </div>
       </EditorPanel>
       <EditorPanel title={copy.publicContent.admin_support_heading}>
@@ -259,45 +341,110 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
 }
 
 function ThanksEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit: EditSettings }) {
+  const [selectedSectionId, setSelectedSectionId] = useSelectedId(settings.thanks.sections.map((section) => section.id))
+  const selectedSectionIndex = settings.thanks.sections.findIndex((section) => section.id === selectedSectionId)
+  const selectedSection = selectedSectionIndex >= 0 ? settings.thanks.sections[selectedSectionIndex] : null
+
+  const addSection = () => {
+    const id = newId('section')
+    edit((next) => { next.thanks.sections.push({ id, heading: '', intro: '', entries: [] }) })
+    setSelectedSectionId(id)
+  }
+
+  const deleteSection = () => {
+    if (selectedSectionIndex < 0) return
+    const nextSelected = selectionAfterDelete(settings.thanks.sections, selectedSectionIndex)
+    edit((next) => { next.thanks.sections.splice(selectedSectionIndex, 1) })
+    setSelectedSectionId(nextSelected)
+  }
+
   return (
     <>
       <EditorPanel title={copy.publicContent.admin_tab_thanks}>
         <PageFields prefix="thanks" page={settings.thanks} edit={(field, value) => edit((next) => { next.thanks[field] = value })} />
       </EditorPanel>
-      <EditorPanel title={copy.publicContent.admin_thanks_sections} action={<button type="button" className="tool-secondary-action" onClick={() => edit((next) => { next.thanks.sections.push({ id: newId('section'), heading: '', intro: '', entries: [] }) })}>{copy.publicContent.admin_add_section}</button>}>
-        <div className="space-y-5">
-          {settings.thanks.sections.length === 0 && <EmptyList />}
-          {settings.thanks.sections.map((section, sectionIndex) => (
-            <article key={section.id} className="tool-inset p-4">
-              <ListActions index={sectionIndex} length={settings.thanks.sections.length} onMove={(target) => edit((next) => { next.thanks.sections = moveItem(next.thanks.sections, sectionIndex, target) })} onDelete={() => edit((next) => { next.thanks.sections.splice(sectionIndex, 1) })} />
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <TextField id={`thanks-heading-${section.id}`} label={copy.publicContent.admin_section_heading} value={section.heading} maxLength={120} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].heading = value })} />
-                <TextareaField id={`thanks-intro-${section.id}`} label={copy.publicContent.admin_section_intro} value={section.intro} maxLength={1000} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].intro = value })} />
-              </div>
-              <div className="mt-5 flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-ink-primary">{copy.publicContent.admin_entries}</h3>
-                <button type="button" className="tool-secondary-action px-3 text-sm" onClick={() => edit((next) => { next.thanks.sections[sectionIndex].entries.push({ id: newId('entry'), name: '', description: '', url: '' }) })}>{copy.publicContent.admin_add_entry}</button>
-              </div>
-              <div className="mt-3 space-y-3">
-                {section.entries.length === 0 && <EmptyList />}
-                {section.entries.map((entry, entryIndex) => (
-                  <div key={entry.id} className="rounded-xl border border-surface-3 p-4">
-                    <ListActions index={entryIndex} length={section.entries.length} onMove={(target) => edit((next) => { next.thanks.sections[sectionIndex].entries = moveItem(next.thanks.sections[sectionIndex].entries, entryIndex, target) })} onDelete={() => edit((next) => { next.thanks.sections[sectionIndex].entries.splice(entryIndex, 1) })} />
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                      <TextField id={`thanks-name-${entry.id}`} label={copy.publicContent.admin_entry_name} value={entry.name} maxLength={120} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[entryIndex].name = value })} />
-                      <TextField id={`thanks-url-${entry.id}`} label={copy.publicContent.admin_entry_url} value={entry.url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[entryIndex].url = value })} />
-                      <div className="md:col-span-2">
-                        <TextareaField id={`thanks-description-${entry.id}`} label={copy.publicContent.admin_entry_description} value={entry.description} maxLength={1000} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[entryIndex].description = value })} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
+      <EditorPanel title={copy.publicContent.admin_thanks_sections} description={copy.publicContent.admin_list_order_help} action={<button type="button" className="tool-secondary-action" onClick={addSection}>{copy.publicContent.admin_add_section}</button>}>
+        <SortableMasterDetailList
+          items={settings.thanks.sections.map((section) => ({ id: section.id, title: section.heading, description: section.intro, meta: `${section.entries.length} ${copy.publicContent.admin_entries}` }))}
+          selectedId={selectedSectionId}
+          onSelect={setSelectedSectionId}
+          onReorder={(from, to) => edit((next) => { next.thanks.sections = moveItem(next.thanks.sections, from, to) })}
+          ariaLabel={copy.publicContent.admin_thanks_sections}
+          detail={selectedSection ? (
+            <ThanksSectionDetail
+              key={selectedSection.id}
+              section={selectedSection}
+              sectionIndex={selectedSectionIndex}
+              sectionCount={settings.thanks.sections.length}
+              edit={edit}
+              onMoveSection={(target) => edit((next) => { next.thanks.sections = moveItem(next.thanks.sections, selectedSectionIndex, target) })}
+              onDeleteSection={deleteSection}
+            />
+          ) : <EmptyDetail />}
+        />
       </EditorPanel>
     </>
+  )
+}
+
+function ThanksSectionDetail({ section, sectionIndex, sectionCount, edit, onMoveSection, onDeleteSection }: {
+  section: PublicContentSettingsV1['thanks']['sections'][number]
+  sectionIndex: number
+  sectionCount: number
+  edit: EditSettings
+  onMoveSection: (target: number) => void
+  onDeleteSection: () => void
+}) {
+  const [selectedEntryId, setSelectedEntryId] = useSelectedId(section.entries.map((entry) => entry.id))
+  const selectedEntryIndex = section.entries.findIndex((entry) => entry.id === selectedEntryId)
+  const selectedEntry = selectedEntryIndex >= 0 ? section.entries[selectedEntryIndex] : null
+
+  const addEntry = () => {
+    const id = newId('entry')
+    edit((next) => { next.thanks.sections[sectionIndex].entries.push({ id, name: '', description: '', url: '' }) })
+    setSelectedEntryId(id)
+  }
+
+  const deleteEntry = () => {
+    if (selectedEntryIndex < 0) return
+    const nextSelected = selectionAfterDelete(section.entries, selectedEntryIndex)
+    edit((next) => { next.thanks.sections[sectionIndex].entries.splice(selectedEntryIndex, 1) })
+    setSelectedEntryId(nextSelected)
+  }
+
+  return (
+    <div className="tool-inset p-5">
+      <ListActions index={sectionIndex} length={sectionCount} onMove={onMoveSection} onDelete={onDeleteSection} />
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <TextField id={`thanks-heading-${section.id}`} label={copy.publicContent.admin_section_heading} value={section.heading} maxLength={120} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].heading = value })} />
+        <TextareaField id={`thanks-intro-${section.id}`} label={copy.publicContent.admin_section_intro} value={section.intro} maxLength={1000} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].intro = value })} />
+      </div>
+      <div className="mt-6 flex items-center justify-between gap-3 border-t border-surface-3 pt-5">
+        <h3 className="text-sm font-semibold text-ink-primary">{copy.publicContent.admin_entries}</h3>
+        <button type="button" className="tool-secondary-action px-3 text-sm" onClick={addEntry}>{copy.publicContent.admin_add_entry}</button>
+      </div>
+      <div className="mt-3">
+        <SortableMasterDetailList
+          items={section.entries.map((entry) => ({ id: entry.id, title: entry.name, description: entry.description }))}
+          selectedId={selectedEntryId}
+          onSelect={setSelectedEntryId}
+          onReorder={(from, to) => edit((next) => { next.thanks.sections[sectionIndex].entries = moveItem(next.thanks.sections[sectionIndex].entries, from, to) })}
+          ariaLabel={copy.publicContent.admin_entries}
+          detail={selectedEntry ? (
+            <div className="rounded-xl border border-surface-3 p-4">
+              <ListActions index={selectedEntryIndex} length={section.entries.length} onMove={(target) => edit((next) => { next.thanks.sections[sectionIndex].entries = moveItem(next.thanks.sections[sectionIndex].entries, selectedEntryIndex, target) })} onDelete={deleteEntry} />
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <TextField id={`thanks-name-${selectedEntry.id}`} label={copy.publicContent.admin_entry_name} value={selectedEntry.name} maxLength={120} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].name = value })} />
+                <TextField id={`thanks-url-${selectedEntry.id}`} label={copy.publicContent.admin_entry_url} value={selectedEntry.url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].url = value })} />
+                <div className="md:col-span-2">
+                  <TextareaField id={`thanks-description-${selectedEntry.id}`} label={copy.publicContent.admin_entry_description} value={selectedEntry.description} maxLength={1000} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].description = value })} />
+                </div>
+              </div>
+            </div>
+          ) : <EmptyDetail />}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -366,8 +513,24 @@ function ListActions({ index, length, onMove, onDelete }: { index: number; lengt
   )
 }
 
-function EmptyList() {
-  return <div className="rounded-xl border border-dashed border-surface-3 p-4 text-sm text-ink-muted">{copy.publicContent.admin_empty_list}</div>
+function EmptyDetail() {
+  return <div className="tool-inset border-dashed p-6 text-sm text-ink-muted">{copy.publicContent.admin_select_item}</div>
+}
+
+function useSelectedId(ids: string[]): [string | null, (id: string | null) => void] {
+  const [selectedId, setSelectedId] = useState<string | null>(() => ids[0] ?? null)
+  useEffect(() => {
+    if (selectedId && ids.includes(selectedId)) return
+    setSelectedId(ids[0] ?? null)
+  }, [ids, selectedId])
+  return [selectedId, setSelectedId]
+}
+
+function selectionAfterDelete<T extends { id: string }>(items: T[], deletedIndex: number): string | null {
+  if (items.length <= 1) return null
+  return items[Math.min(deletedIndex + 1, items.length - 1)]?.id
+    ?? items[Math.max(0, deletedIndex - 1)]?.id
+    ?? null
 }
 
 function moveItem<T>(items: T[], from: number, to: number): T[] {

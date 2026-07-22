@@ -102,8 +102,6 @@ export type UsageRangeKey = '7d' | '14d' | '30d'
 
 export type UsageRangeMode = UsageRangeKey | 'custom'
 
-export type AnnouncementSortKey = 'updated_desc' | 'updated_asc' | 'active'
-
 export interface UsageRange {
   from: string;
   to: string;
@@ -472,12 +470,6 @@ export const sectionLabels: Record<AdminSection, string> = {
   invitation: '邀请设置',
   announcement: '公告管理',
   users: '用户维护',
-}
-
-export const announcementSortLabels: Record<AnnouncementSortKey, string> = {
-  updated_desc: '更新时间新到旧',
-  updated_asc: '更新时间旧到新',
-  active: '启用状态',
 }
 
 export const cdkProductPermissions: GeneratedPermission[] = listAdminIssuablePermissions()
