@@ -1,0 +1,19 @@
+[Unit]
+Description=goofish-infrast-v1 dev backend
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/goofish-infrast-v1-dev
+ExecStart=/usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=APP_ROLE=api
+Environment=PORT=3001
+Environment=HOST=127.0.0.1
+EnvironmentFile=/etc/goofish-infrast-v1/dev.env
+
+[Install]
+WantedBy=multi-user.target

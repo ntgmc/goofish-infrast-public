@@ -105,7 +105,16 @@ in GitHub Actions secrets.
 
 ## systemd
 
-Example service:
+Install the repository-managed dev service after creating
+`/etc/goofish-infrast-v1/dev.env`:
+
+```bash
+sudo install -m 0644 deploy/systemd/goofish-infrast-v1-dev.service /etc/systemd/system/goofish-infrast-v1-dev.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now goofish-infrast-v1-dev
+```
+
+The service definition is:
 
 ```ini
 [Unit]
@@ -119,6 +128,7 @@ ExecStart=/usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/index.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
+Environment=APP_ROLE=api
 Environment=PORT=3001
 Environment=HOST=127.0.0.1
 EnvironmentFile=/etc/goofish-infrast-v1/dev.env
@@ -145,6 +155,22 @@ CDK_HASH_SECRET=...
 `PUBLIC_APP_URL` is required because the dev backend still runs with
 `NODE_ENV=production`. It must be the HTTPS origin only: do not include a path,
 query string, fragment, or credentials.
+
+`APP_ROLE=api` is kept in the systemd service rather than the environment file.
+Production-mode API processes require this explicit role and do not run the
+dedicated optimization worker.
+
+If the service is already restarting with `APP_ROLE is required in production`,
+install the current repository-managed unit and restart it:
+
+```bash
+cd /opt/goofish-infrast-v1-dev
+sudo install -m 0644 deploy/systemd/goofish-infrast-v1-dev.service /etc/systemd/system/goofish-infrast-v1-dev.service
+sudo systemctl daemon-reload
+sudo systemctl restart goofish-infrast-v1-dev
+sudo journalctl -u goofish-infrast-v1-dev --no-pager -n 80
+curl -fsS http://127.0.0.1:3001/api/health
+```
 
 If the service is already restarting with `PUBLIC_APP_URL is required in
 production`, repair the server configuration and verify it before rerunning the
