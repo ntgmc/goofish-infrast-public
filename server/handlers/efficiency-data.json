@@ -173,6 +173,12 @@
         "桑葚"
       ]
     },
+    "human_fireworks_hire_providers": {
+      "name": "人间烟火办公室来源",
+      "operators": [
+        "桑葚"
+      ]
+    },
     "monster_cuisine_providers": {
       "name": "魔物料理来源",
       "operators": [
@@ -1584,8 +1590,51 @@
             "process": [
               "年"
             ],
-            "efficiency": 135,
-            "note": "搭配满烟火乌有95+40%",
+            "efficiency": 40,
+            "dynamic_resource_contributions": [
+              {
+                "resource": "human_fireworks",
+                "amount": 20,
+                "key": "uyou_dorm_full_occupancy",
+                "detail": "愿者上钩：默认4间宿舍满员提供20点人间烟火。"
+              },
+              {
+                "resource": "human_fireworks",
+                "per_group_operator": 5,
+                "group": "sui",
+                "scope": "facility",
+                "cap": 25,
+                "key": "human_fireworks_sui_facility",
+                "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
+              },
+              {
+                "resource": "human_fireworks",
+                "per_group_operator": 15,
+                "group": "human_fireworks_flat_providers",
+                "scope": "facility",
+                "cap": 15,
+                "key": "human_fireworks_flat_provider",
+                "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+              },
+              {
+                "resource": "human_fireworks",
+                "per_group_operator": 30,
+                "group": "human_fireworks_hire_providers",
+                "scope": "hire",
+                "cap": 30,
+                "key": "human_fireworks_hire_mulberry",
+                "detail": "救援队·灾后普查：桑葚在满级办公室时，额外3个招募位提供30点人间烟火。"
+              }
+            ],
+            "dynamic_resource_effects": {
+              "resource": "human_fireworks",
+              "type": "efficiency_per_resource",
+              "per_resource": 1,
+              "cap": 95,
+              "scope": "trading_station",
+              "detail": "愿者上钩：每1点人间烟火+1%订单获取效率，当前模型沿用95%上限口径。"
+            },
+            "note": "动态：但书+乌有按实际人间烟火资源计分，并允许复用本班既有挂件。",
             "priority": 6260,
             "skill_rule_refs": [
               {
@@ -2127,10 +2176,10 @@
             ]
           },
           {
-            "combo": [
-              "黑键/2",
-              "乌有/2"
-            ],
+          "combo": [
+            "黑键/2",
+            "乌有/2"
+          ],
             "control_center": [
               "重岳",
               "令/2",
@@ -2147,8 +2196,139 @@
             "process": [
               "年"
             ],
-            "efficiency": 84,
-            "note": "黑键乌有混用满挂件（迷迭香）",
+          "efficiency": 40,
+          "dynamic_resource_contributions": [
+            {
+              "resource": "human_fireworks",
+              "amount": 20,
+              "key": "uyou_dorm_full_occupancy",
+              "detail": "愿者上钩：默认4间宿舍满员提供20点人间烟火。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 5,
+              "group": "sui",
+              "scope": "facility",
+              "cap": 25,
+              "key": "human_fireworks_sui_facility",
+              "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 15,
+              "group": "human_fireworks_flat_providers",
+              "scope": "facility",
+              "cap": 15,
+              "key": "human_fireworks_flat_provider",
+              "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 30,
+              "group": "human_fireworks_hire_providers",
+              "scope": "hire",
+              "cap": 30,
+              "key": "human_fireworks_hire_mulberry",
+              "detail": "救援队·灾后普查：桑葚在满级办公室时，额外3个招募位提供30点人间烟火。"
+            },
+            {
+              "resource": "perception_information",
+              "amount": 20,
+              "key": "logos_dorm_full_occupancy",
+              "detail": "黑键：默认4宿舍满员提供20点感知信息。"
+            },
+            {
+              "resource": "perception_information",
+              "per_group_operator": 10,
+              "group": "perception_control_providers",
+              "scope": "control_center",
+              "cap": 20,
+              "key": "perception_control_dusk_ling",
+              "detail": "夕/令在控制中枢时各提供10点感知信息。"
+            },
+            {
+              "resource": "memory_fragment",
+              "per_group_operator": 30,
+              "group": "perception_hire_providers",
+              "scope": "hire",
+              "cap": 30,
+              "key": "perception_hire_whisperain",
+              "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
+            },
+            {
+              "resource": "dream",
+              "per_group_operator": 5,
+              "group": "perception_dream_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_dream_alice",
+              "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
+            },
+            {
+              "resource": "melody",
+              "per_group_operator": 5,
+              "group": "perception_melody_providers",
+              "scope": "dormitory",
+              "cap": 5,
+              "key": "perception_melody_czerny",
+              "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
+            }
+          ],
+          "dynamic_resource_effects": [
+            {
+              "resource": "human_fireworks",
+              "type": "efficiency_per_resource",
+              "per_resource": 1,
+              "cap": 95,
+              "scope": "trading_station",
+              "detail": "愿者上钩：每1点人间烟火+1%订单获取效率，当前模型沿用95%上限口径。"
+            },
+            {
+              "resource": "memory_fragment",
+              "type": "resource_conversion",
+              "key": "memory_fragment_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "dream",
+              "type": "resource_conversion",
+              "key": "dream_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "melody",
+              "type": "resource_conversion",
+              "key": "melody_to_perception_information",
+              "step_size": 1,
+              "output_resource": "perception_information",
+              "output_per_step": 1,
+              "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "perception_information",
+              "type": "resource_conversion",
+              "key": "perception_information_to_silent_resonance",
+              "step_size": 1,
+              "output_resource": "silent_resonance",
+              "output_per_step": 1,
+              "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
+            },
+            {
+              "resource": "silent_resonance",
+              "type": "efficiency_per_step",
+              "step_size": 2,
+              "per_step": 1,
+              "scope": "trading_station",
+              "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
+            }
+          ],
+          "note": "动态：但书+黑键+乌有复用人间烟火与感知信息挂件，并参与跨房间资源共享。",
             "priority": 2260,
             "skill_rule_refs": [
               {
@@ -3742,6 +3922,15 @@
               "cap": 15,
               "key": "human_fireworks_flat_provider",
               "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+            },
+            {
+              "resource": "human_fireworks",
+              "per_group_operator": 30,
+              "group": "human_fireworks_hire_providers",
+              "scope": "hire",
+              "cap": 30,
+              "key": "human_fireworks_hire_mulberry",
+              "detail": "救援队·灾后普查：桑葚在满级办公室时，额外3个招募位提供30点人间烟火。"
             }
           ],
           "dynamic_resource_effects": {
@@ -5349,6 +5538,7 @@
             "香草",
             "杰西卡"
           ],
+          "product": "Pure Gold",
           "control_center": [
             "涤火杰西卡/2"
           ],
@@ -5489,6 +5679,7 @@
             "combo": [
               "娜仁图亚/2"
             ],
+            "product": "Pure Gold",
             "note": "宿舍满级",
             "efficiency": 40,
             "priority": 3126,
@@ -6048,6 +6239,7 @@
             "森蚺/2",
             "清流/1"
           ],
+          "product": "Pure Gold",
           "efficiency": 115,
           "dynamic_effects": {
             "type": "facility_count_formula",
