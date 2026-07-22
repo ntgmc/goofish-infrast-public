@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ShieldCheck } from 'lucide-react'
 import { copy } from '../copy/index'
 
 const FOCUSABLE_SELECTOR = [
@@ -83,7 +84,9 @@ export default function PersonalUseDeclarationDialog({
         }}
       >
         <div className="flex items-start gap-3">
-          <span aria-hidden="true" className="mt-0.5 text-xl">☑️</span>
+          <span aria-hidden="true" className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-600/10 text-brand-500">
+            <ShieldCheck size={18} strokeWidth={2.25} />
+          </span>
           <div>
             <h2 id="personal-use-declaration-title" className="text-lg font-semibold text-ink-primary">{copy.personalUse.confirmation_title}</h2>
             <p id="personal-use-declaration-description" className="mt-3 text-sm leading-6 text-ink-secondary">{copy.personalUse.confirmation_intro}</p>
