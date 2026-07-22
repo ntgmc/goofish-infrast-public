@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ScheduleProgress, { type ScheduleProgressState } from './ScheduleProgress'
 
@@ -63,6 +63,7 @@ describe('ScheduleProgress motion', () => {
       estimatePhase: 'overdue',
       estimateUpdatedAt: new Date(NOW).toISOString(),
       calculationStage: 'simulating_upgrades',
+      calculationStageUpdatedAt: new Date(NOW - 10_000).toISOString(),
       upgradeSuggestionsRequested: true,
       upgradeSuggestionsAllowed: true,
     })} />)
@@ -70,11 +71,11 @@ describe('ScheduleProgress motion', () => {
     expect(screen.getByText('正在模拟优化建议')).toBeInTheDocument()
     expect(screen.getByText('计算优化建议')).toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(5)
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '78')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67')
     expect(screen.queryByText('即将完成')).not.toBeInTheDocument()
   })
 
-  it('keeps MAA baseline simulation in the calculation step before result formatting', () => {
+  it('advances within MAA baseline simulation instead of sticking at 91%', async () => {
     render(<ScheduleProgress progress={createProgress({
       startedAt: NOW - 60_000,
       jobId: 'merged-job',
@@ -85,6 +86,7 @@ describe('ScheduleProgress motion', () => {
       estimatePhase: 'overdue',
       estimateUpdatedAt: new Date(NOW).toISOString(),
       calculationStage: 'simulating_maa_baseline',
+      calculationStageUpdatedAt: new Date(NOW).toISOString(),
       upgradeSuggestionsRequested: true,
       upgradeSuggestionsAllowed: true,
     })} />)
@@ -92,7 +94,13 @@ describe('ScheduleProgress motion', () => {
     expect(screen.getByText('正在计算 MAA 对比基准')).toBeInTheDocument()
     expect(screen.getByText('计算优化建议').closest('[data-state]')).toHaveAttribute('data-state', 'active')
     expect(screen.getByText('持久化结果').closest('[data-state]')).toHaveAttribute('data-state', 'pending')
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '91')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '86')
+
+    await act(async () => vi.advanceTimersByTimeAsync(10_000))
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '88')
+
+    await act(async () => vi.advanceTimersByTimeAsync(10_000))
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '90')
   })
 
   it('does not move backwards when a running stage starts below queued progress', () => {

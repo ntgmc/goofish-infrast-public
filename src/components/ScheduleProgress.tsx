@@ -52,8 +52,8 @@ type TaskStepDefinition = { label: string; detail: string; role: TaskStepRole }
 export default function ScheduleProgress({ progress, className = '', variant = 'embedded' }: Props) {
   const [now, setNow] = useState(() => Date.now())
   const calculatedPercent = getTimedPercent(progress, now)
-  const boundedCalculatedPercent = getStageBoundedPercent(progress, calculatedPercent)
-  const boundedProgressFloor = getStageBoundedPercent(progress, progress.percentFloor ?? 0)
+  const boundedCalculatedPercent = getStageBoundedPercent(progress, calculatedPercent, now)
+  const boundedProgressFloor = getStageBoundedPercent(progress, progress.percentFloor ?? 0, now)
   const progressKey = `${progress.jobId ?? 'local'}:${progress.startedAt}`
   const [percentFloor, setPercentFloor] = useState<{ key: string; value: number }>(() => ({
     key: progressKey,
@@ -124,7 +124,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
           <motion.div
             className={`schedule-progress-fill h-full origin-left rounded-full ${task.status === 'cancelled' ? 'bg-surface-4' : 'bg-brand-500'}`}
             initial={false}
-            animate={{ scaleX: percent / 100 }}
+            animate={{ scaleX: Math.max(0, Math.min(1, rawPercent / 100)) }}
             transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: motionTokens.ease.enter }}
           />
         </div>
@@ -247,7 +247,7 @@ function getWaitingPercent(startedAt: number, now: number, estimatedDurationMs: 
   return ratio * MAX_WAITING_PERCENT
 }
 
-function getStageBoundedPercent(progress: ScheduleProgressState, percent: number): number {
+function getStageBoundedPercent(progress: ScheduleProgressState, percent: number, now: number): number {
   if (progress.completedAt || progress.estimatePhase === 'completed') return percent
   const stage = progress.calculationStage
   if (!stage || stage === 'completed') return percent
@@ -255,27 +255,34 @@ function getStageBoundedPercent(progress: ScheduleProgressState, percent: number
   const includesSuggestions = Boolean(progress.upgradeSuggestionsRequested && progress.upgradeSuggestionsAllowed)
   const bounds = includesSuggestions
     ? {
-        starting: [8, 16],
-        generating_schedule: [16, 48],
-        generating_potential_schedule: [48, 62],
-        simulating_upgrades: [62, 78],
-        enriching_training_costs: [78, 86],
-        simulating_maa_baseline: [86, 91],
-        formatting_result: [91, 94],
-        persisting_result: [94, MAX_WAITING_PERCENT],
-      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, [number, number]>
+        starting: [8, 16, 4_000],
+        generating_schedule: [16, 48, 30_000],
+        generating_potential_schedule: [48, 62, 15_000],
+        simulating_upgrades: [62, 78, 30_000],
+        enriching_training_costs: [78, 86, 15_000],
+        simulating_maa_baseline: [86, 91, 20_000],
+        formatting_result: [91, 94, 5_000],
+        persisting_result: [94, MAX_WAITING_PERCENT, 10_000],
+      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, [number, number, number]>
     : {
-        starting: [8, 18],
-        generating_schedule: [18, 68],
-        generating_potential_schedule: [68, 72],
-        simulating_upgrades: [72, 80],
-        enriching_training_costs: [80, 84],
-        simulating_maa_baseline: [68, 88],
-        formatting_result: [88, 93],
-        persisting_result: [93, MAX_WAITING_PERCENT],
-      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, [number, number]>
-  const [minimum, maximum] = bounds[stage]
-  return Math.max(minimum, Math.min(maximum, percent))
+        starting: [8, 18, 4_000],
+        generating_schedule: [18, 68, 30_000],
+        generating_potential_schedule: [68, 72, 15_000],
+        simulating_upgrades: [72, 80, 30_000],
+        enriching_training_costs: [80, 84, 15_000],
+        simulating_maa_baseline: [68, 88, 20_000],
+        formatting_result: [88, 93, 5_000],
+        persisting_result: [93, MAX_WAITING_PERCENT, 10_000],
+      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, [number, number, number]>
+  const [minimum, maximum, pacingMs] = bounds[stage]
+  const stageStartedAt = Date.parse(progress.calculationStageUpdatedAt ?? '')
+  if (!Number.isFinite(stageStartedAt)) return Math.max(minimum, Math.min(maximum, percent))
+
+  const stageElapsedMs = Math.max(0, now - stageStartedAt)
+  const stageRatio = Math.min(1, stageElapsedMs / pacingMs)
+  const activeMaximum = Math.max(minimum, maximum - 0.51)
+  const stageCeiling = minimum + (activeMaximum - minimum) * stageRatio
+  return Math.max(minimum, Math.min(stageCeiling, percent))
 }
 
 function getTaskView(progress: ScheduleProgressState, percent: number, now: number) {
