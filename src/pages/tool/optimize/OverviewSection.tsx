@@ -2,6 +2,7 @@ import type { FreeScheduleEntitlement, LicenseConfig, ReorderCheckResult, Reward
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import InfoTooltip from '../../../components/InfoTooltip'
 import { formatResultSummary, formatWorkspaceDate, isMaaJsonDownloadable } from '../../../lib/workspace-history'
+import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../../lib/workspace-limits'
 import GenerateControlBar, { DashboardMiniStat } from './GenerateControlBar'
 import { SmallActionButton } from './feedback'
 import type { ValidationState } from './types'
@@ -51,7 +52,6 @@ export default function OverviewSection({
   onReset,
   onOpenPlans,
   onOpenConfig,
-  onOpenResult,
   onViewHistory,
   onUseHistoryConfig,
   onDownloadHistory,
@@ -79,7 +79,6 @@ export default function OverviewSection({
   onReset: () => void;
   onOpenPlans: () => void;
   onOpenConfig: () => void;
-  onOpenResult: () => void;
   onViewHistory: (item: WorkspaceResultHistoryItem) => void;
   onUseHistoryConfig: (item: WorkspaceResultHistoryItem) => void;
   onDownloadHistory: (item: WorkspaceResultHistoryItem) => void;
@@ -103,7 +102,8 @@ export default function OverviewSection({
         priorityCoupon={priorityCoupon}
         extraDisabledReason={generationDisabledReason ?? freeSchedule?.generateBlockedReason ?? null}
         onGenerate={onGenerate}
-          onReset={onReset}
+        onReset={onReset}
+        onOpenConfig={onOpenConfig}
         />
       </div>
 
@@ -116,35 +116,17 @@ export default function OverviewSection({
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <section className="tool-panel p-5 sm:p-6">
+        <section className="tool-panel p-5 sm:p-6" data-tour-target="optimize-overview-workspace">
           <p className="tool-eyebrow">{copy.optimize.pages_tool_optimize_OverviewSection_001}</p>
           <h2 className="mt-1 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_OverviewSection_002}</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_003} value={`${savedConfigCount}/20`} />
-            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_004} value={`${resultHistoryCount}/10`} />
-            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_005} value={resultIsCurrent ? copy.optimize.pages_tool_optimize_OverviewSection_006 : hasResult ? copy.optimize.pages_tool_optimize_OverviewSection_007 : copy.optimize.pages_tool_optimize_OverviewSection_008} />
+          <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.optimize.pages_tool_optimize_OverviewSection_005}</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_003} value={`${savedConfigCount}/${WORKSPACE_SAVED_CONFIG_LIMIT}`} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_004} value={`${resultHistoryCount}/${WORKSPACE_RESULT_HISTORY_LIMIT}`} />
           </div>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onOpenConfig}
-              className="tool-secondary-action"
-            >
-              {copy.optimize.pages_tool_optimize_OverviewSection_009}</button>
-            <button
-              type="button"
-              onClick={onOpenPlans}
-              className="tool-secondary-action"
-            >
-              {copy.optimize.pages_tool_optimize_OverviewSection_010}</button>
-            <button
-              type="button"
-              onClick={onOpenResult}
-              disabled={!hasResult}
-              className="tool-secondary-action"
-            >
-              {copy.optimize.pages_tool_optimize_OverviewSection_011}</button>
-          </div>
+          <button type="button" onClick={onOpenPlans} className="tool-secondary-action mt-5">
+            {copy.optimize.pages_tool_optimize_OverviewSection_010}
+          </button>
         </section>
 
         <section className="tool-panel p-5 sm:p-6" data-tour-target="optimize-overview-latest">
