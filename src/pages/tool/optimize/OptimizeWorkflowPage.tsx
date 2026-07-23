@@ -23,13 +23,13 @@ export default function OptimizeWorkflowPage(props: Props) {
   const taskCenterButtonRef = useRef<HTMLButtonElement>(null)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
   const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
-  const [mainTourSeenAtMount] = useState(() => hasCompletedTour('optimize-overview', 1))
+  const [mainTourSeenAtMount] = useState(() => hasCompletedTour('optimize-overview', 2))
   const initialSectionRef = useRef(section)
   const [sectionChangedAfterMainTour, setSectionChangedAfterMainTour] = useState(false)
-  const mainTour = useFirstRunTour({ id: 'optimize-overview', version: 1 })
+  const mainTour = useFirstRunTour({ id: 'optimize-overview', version: 2 })
   const childAutoStartEnabled = mainTourSeenAtMount || sectionChangedAfterMainTour
-  const overviewTour = useFirstRunTour({ id: 'optimize-tab-overview', version: 1, autoStart: childAutoStartEnabled && section === 'overview' })
-  const plansTour = useFirstRunTour({ id: 'optimize-tab-plans', version: 1, autoStart: childAutoStartEnabled && section === 'plans' })
+  const overviewTour = useFirstRunTour({ id: 'optimize-tab-overview', version: 2, autoStart: childAutoStartEnabled && section === 'overview' })
+  const plansTour = useFirstRunTour({ id: 'optimize-tab-plans', version: 2, autoStart: childAutoStartEnabled && section === 'plans' })
   const configTour = useFirstRunTour({ id: 'optimize-tab-config', version: 1, autoStart: childAutoStartEnabled && section === 'config' })
   const resultTour = useFirstRunTour({ id: 'optimize-tab-result', version: 1, autoStart: childAutoStartEnabled && section === 'result' && hasResult })
   const labTour = useFirstRunTour({ id: 'optimize-tab-lab', version: 1, autoStart: childAutoStartEnabled && section === 'lab' && userCanUseScenarioLab && features.schedule_generation })
@@ -40,7 +40,7 @@ export default function OptimizeWorkflowPage(props: Props) {
 
   const mainTourDefinition = useMemo<TourDefinition>(() => ({
     id: 'optimize-overview',
-    version: 1,
+    version: 2,
     steps: [
       { target: 'optimize-nav-overview', title: copy.optimize.pages_tool_optimize_tour_002, body: copy.optimize.pages_tool_optimize_tour_003 },
       { target: 'optimize-nav-plans', title: copy.optimize.pages_tool_optimize_tour_004, body: copy.optimize.pages_tool_optimize_tour_005 },
@@ -49,12 +49,12 @@ export default function OptimizeWorkflowPage(props: Props) {
       ...(userCanUseScenarioLab && features.schedule_generation ? [{ target: 'optimize-nav-lab', title: copy.optimize.pages_tool_optimize_tour_010, body: copy.optimize.pages_tool_optimize_tour_011 }] : []),
     ],
   }), [features.schedule_generation, userCanUseScenarioLab])
-  const overviewTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-overview', version: 1, steps: [
+  const overviewTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-overview', version: 2, steps: [
     { target: 'optimize-overview-status', title: copy.optimize.pages_tool_optimize_tour_012, body: copy.optimize.pages_tool_optimize_tour_013 },
     { target: 'optimize-overview-generate', title: copy.optimize.pages_tool_optimize_tour_014, body: copy.optimize.pages_tool_optimize_tour_015 },
     { target: 'optimize-overview-latest', title: copy.optimize.pages_tool_optimize_tour_016, body: copy.optimize.pages_tool_optimize_tour_017 },
   ] }), [])
-  const plansTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-plans', version: 1, steps: [
+  const plansTourDefinition = useMemo<TourDefinition>(() => ({ id: 'optimize-tab-plans', version: 2, steps: [
     { target: 'optimize-plans-save', title: copy.optimize.pages_tool_optimize_tour_018, body: copy.optimize.pages_tool_optimize_tour_019 },
     { target: 'optimize-plans-saved', title: copy.optimize.pages_tool_optimize_tour_020, body: copy.optimize.pages_tool_optimize_tour_021 },
     { target: 'optimize-plans-history', title: copy.optimize.pages_tool_optimize_tour_022, body: copy.optimize.pages_tool_optimize_tour_023 },
@@ -87,10 +87,7 @@ export default function OptimizeWorkflowPage(props: Props) {
         section={section}
         permissionLabel={getProfileAccessLabel(profile)}
         showScenarioLab={userCanUseScenarioLab && features.schedule_generation}
-        badges={{
-          plans: `${savedConfigs.length}/${resultHistory.length}`,
-          result: hasResult ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_001 : undefined,
-        }}
+        badges={{ result: hasResult ? copy.optimize.pages_tool_optimize_OptimizeWorkflowPage_001 : undefined }}
         headerActions={(
           <OptimizationTaskCenterButton
             controller={taskCenter}
@@ -181,7 +178,6 @@ export default function OptimizeWorkflowPage(props: Props) {
               onReset={onReset}
               onOpenPlans={() => setSection('plans')}
               onOpenConfig={() => setSection('config')}
-              onOpenResult={() => setSection('result')}
               onViewHistory={handleViewHistory}
               onUseHistoryConfig={handleUseHistoryConfig}
               onDownloadHistory={handleDownloadHistory}
@@ -193,9 +189,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               activeConfig={activeConfig}
               savedConfigs={savedConfigs}
               resultHistory={resultHistory}
-              latestResult={latestWorkspaceResult}
               selectedHistoryId={historyItem?.id ?? null}
-              diffRows={configDiffRows}
               busyAction={workspaceBusyAction}
               notice={workspaceNotice}
               error={workspaceError}

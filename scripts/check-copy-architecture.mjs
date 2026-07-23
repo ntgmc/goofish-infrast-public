@@ -42,6 +42,7 @@ function isUserTextNode(node) {
 
 function isExcluded(filename) {
   return filename.startsWith('src/copy/')
+    || filename.startsWith('src/lib/.generated/')
     || filename.startsWith('src/pages/admin/')
     || /\.test\.tsx?$/.test(filename)
 }
@@ -56,6 +57,7 @@ function runSelfTests() {
     ['src/components/Example.tsx', '// 中文注释\nexport const Example = () => <button>Confirm</button>'],
     ['src/components/Example.test.tsx', 'export const message = "测试文案"'],
     ['src/pages/admin/Example.tsx', 'export const message = "管理后台"'],
+    ['src/lib/.generated/changelog.ts', 'export const message = "生成的更新内容"'],
     ['src/copy/zh-CN/common.ts', 'export const message = "确认"'],
   ]
 

@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../src/lib/types'
+import { WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 import {
   deleteSessionByTokenHash,
   deleteEmailVerificationTokenByHash,
@@ -761,7 +762,7 @@ function normalizeExpiredFreePreviewWorkspace(
   return {
     ...workspace,
     config: currentConfigNeedsDowngrade ? getFreePreviewDefaultConfig() : workspace.config,
-    saved_configs: savedConfigs.slice(0, 20),
+    saved_configs: savedConfigs.slice(0, WORKSPACE_SAVED_CONFIG_LIMIT),
     updated_at: new Date().toISOString(),
   }
 }

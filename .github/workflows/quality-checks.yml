@@ -92,6 +92,11 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
           BUILD_CONTEXT: quality-checks
           GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GENERATE_CHANGELOG_CANDIDATE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          CHANGELOG_BASE_SHA: ${{ vars.CHANGELOG_BASE_SHA }}
         run: |
           npm run build
           node scripts/release-artifact.mjs create \
@@ -103,7 +108,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           mkdir -p release-package
-          tar -czf release-package/release.tgz dist server/dist build-manifest.json
+          tar -czf release-package/release.tgz dist server/dist build-manifest.json changelog-release.json changelog-release.md
           (cd release-package && sha256sum release.tgz > release.tgz.sha256)
           cp deployment-decision.json release-package/deployment-decision.json
 
@@ -171,14 +176,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate data
-        run: npm run generate:data
+      - name: Generate data and local changelog metadata
+        run: npm run generate:data && npm run generate:changelog
 
       - name: Check dead code
         run: npm run check:dead-code
 
       - name: Test build relevance classification
         run: npm run test:build-relevance
+
+      - name: Test generated release metadata
+        run: npm run test:generate-changelog && npm run test:release-artifact
 
       - name: Run unit tests
         run: npm test
@@ -207,8 +215,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate data
-        run: npm run generate:data
+      - name: Generate data and local changelog metadata
+        run: npm run generate:data && npm run generate:changelog
 
       - name: Check production deployment contract
         run: npm run check:deploy

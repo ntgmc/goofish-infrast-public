@@ -19,10 +19,9 @@ import type {
   WorkspaceSavedConfig,
   FreePreviewTrial,
 } from '../../src/lib/types'
+import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 
 let schemaReady: Promise<void> | null = null
-const WORKSPACE_SAVED_CONFIG_LIMIT = 20
-const WORKSPACE_RESULT_HISTORY_LIMIT = 10
 
 export interface UserAccountRecord {
   version: 1

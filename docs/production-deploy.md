@@ -29,6 +29,36 @@ jobs locally.
 The manual action is therefore a redeploy or rollback mechanism for an already
 validated main commit, not a way to deploy a feature branch.
 
+## Changelog confirmation
+
+`package.json` supplies the manually maintained major/minor release train. The
+Quality Checks workflow appends its build number, so a production candidate may
+be identified as `2.0.435`. That number is a readable build label; the immutable
+target SHA remains the source of truth for the changes it contains.
+
+- Only a `main` push build generates a production changelog candidate. Pull
+  requests, development builds and manual quality-check runs produce no public
+  candidate record.
+- The build reads prior `changelog-release.json` assets from published GitHub
+  Releases, then creates a new candidate from the previous production SHA to
+  the immutable target SHA. Conventional `feat`, `fix`, `perf` and `security`
+  commits are grouped automatically. A commit may supply a user-facing
+  `Release-Note:` trailer, an optional `Release-Note-Type:` trailer, or
+  `Skip-Changelog: true` to opt out.
+- `changelog-release.json` and `changelog-release.md` travel inside the same
+  checksum-verified artifact as the frontend and backend. They are validated
+  against `build-manifest.json`, the generated version metadata and target SHA.
+- Only after the Worker and API deployments complete successfully does the
+  production workflow create or verify the annotated `v<version>` tag, create
+  the GitHub Release and upload the JSON release record. Failed candidates never
+  publish a tag or public changelog entry.
+
+The first automated production candidate has no previous published release
+asset, so it is marked as a changelog baseline unless a maintainer explicitly
+sets `CHANGELOG_BASE_SHA` to a known prior production SHA. The next successful
+version then uses that baseline SHA and produces the first commit-derived update
+list.
+
 ## Runtime layout
 
 The production root is not a live Git checkout:
@@ -65,6 +95,16 @@ Each completed build therefore lives at
 Production API and Worker processes perform a read-only catalog compatibility check at startup and never replay schema DDL or data backfills. The check is scoped to the process role, so a dedicated Worker validates the shared and optimization tables it can access without depending on API-only tables such as `feature_settings`. This prevents blue/green candidates from taking `AccessExclusiveLock` while the active API or Worker is writing the same tables. Apply schema changes as a controlled database migration before deploying a release that requires them; a missing runtime table or column required by that role must fail readiness instead of triggering an automatic migration. Development and test processes retain automatic schema setup for local and integration-test databases.
 
 Transient validation failures are not cached permanently. The next request retries validation, while a successful validation is cached for the lifetime of the process.
+
+### Optimizer workspace retention migration
+
+The release that introduces the workspace retention policy must run the
+controlled database migration before starting the production API or Worker.
+The migration permanently trims every `user_profile_workspaces.record_json`
+record to its newest **3 saved configurations** and newest **5 result-history
+entries**. Records are stored newest first, so the discarded items are the
+oldest ones. This cleanup has no archive or in-product restore path; rolling
+back application code does not restore trimmed data.
 
 ## One-time migration
 
@@ -253,6 +293,9 @@ ready and Nginx has switched successfully.
    graceful-drain policy.
 8. Keep every referenced release plus the five most recent releases; remove
    only unreferenced older worktrees after a successful deployment.
+9. After both services are live, publish the SHA-bound changelog record as the
+   annotated version tag and GitHub Release; this is the final confirmation that
+   the build is publicly released.
 
 The candidate and active backend overlap briefly. PostgreSQL-backed job locking
 must remain safe with two processes. Any future singleton background task must

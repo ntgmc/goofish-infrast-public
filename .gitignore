@@ -3,6 +3,8 @@ dist/
 server/dist/
 server/handlers/.generated/
 src/lib/.generated/
+changelog-release.json
+changelog-release.md
 .cache/
 .idea/
 *.pyc

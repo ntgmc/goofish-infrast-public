@@ -15,8 +15,8 @@ import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
+import { WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 
-const WORKSPACE_SAVED_CONFIG_LIMIT = 20
 const FREE_SCHEDULE_REVISION_LIMIT = 3
 const FREE_SCHEDULE_REVISION_WINDOW_HOURS = 24
 

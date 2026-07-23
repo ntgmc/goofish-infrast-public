@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import type { FreeScheduleEntitlement, OptimizeCalculationStage } from '../../src/lib/types'
-import { getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs } from '../optimize-job-config'
+import { formatOptimizeJobHardTimeout, getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs } from '../optimize-job-config'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { getShanghaiMonthKey, REORDER_CHECK_MONTHLY_LIMIT } from '../reorder-check-policy'
@@ -652,36 +652,76 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
     recoverExpiredAttempts: async (nowIso, maxFailures) => {
       await ensureSchema()
       return withTransaction(async (client) => {
+        const hardTimeoutMs = getOptimizeJobHardTimeoutMs()
+        const timedOutMessage = `任务计算超过${formatOptimizeJobHardTimeout()}上限，请重试。`
         const recovered = await client.query<OptimizeJobRow>(
           `update optimize_jobs
            set failure_count = failure_count + 1,
-               status = case when failure_count + 1 >= $2 then 'dead_lettered' else 'queued' end,
-               error_message = case when failure_count + 1 >= $2 then coalesce(error_message, '任务执行租约已过期，请重试。') else null end,
-               failure_kind = case when failure_count + 1 >= $2 then 'lease_lost' else null end,
-               public_error_code = case when failure_count + 1 >= $2 then 'execution_retries_exhausted' else null end,
+               status = case
+                 when started_at is not null and started_at <= ($1::timestamptz - ($4::integer * interval '1 millisecond')) then 'dead_lettered'
+                 when failure_count + 1 >= $2 then 'dead_lettered'
+                 else 'queued'
+               end,
+               error_message = case
+                 when started_at is not null and started_at <= ($1::timestamptz - ($4::integer * interval '1 millisecond')) then $5
+                 when failure_count + 1 >= $2 then coalesce(error_message, '任务执行租约已过期，请重试。')
+                 else null
+               end,
+               failure_kind = case
+                 when started_at is not null and started_at <= ($1::timestamptz - ($4::integer * interval '1 millisecond')) then 'timed_out'
+                 when failure_count + 1 >= $2 then 'lease_lost'
+                 else null
+               end,
+               public_error_code = case
+                 when started_at is not null and started_at <= ($1::timestamptz - ($4::integer * interval '1 millisecond')) then 'execution_retries_exhausted'
+                 when failure_count + 1 >= $2 then 'execution_retries_exhausted'
+                 else null
+               end,
                worker_id = null, heartbeat_at = null, lock_token = null, lock_expires_at = null,
-               execution_stage = case when failure_count + 1 >= $2 then execution_stage else null end,
-               stage_updated_at = case when failure_count + 1 >= $2 then stage_updated_at else null end,
-               next_attempt_at = case when failure_count + 1 >= $2 then null else $3::timestamptz end,
-               finished_at = case when failure_count + 1 >= $2 then $1::timestamptz else null end,
+               execution_stage = case
+                 when started_at is not null and started_at <= ($1::timestamptz - ($4::integer * interval '1 millisecond')) then execution_stage
+                 when failure_count + 1 >= $2 then execution_stage
+                 else null
+               end,
+               stage_updated_at = case
+                 when started_at is not null and started_at <= ($1::timestamptz - ($4::integer * interval '1 millisecond')) then stage_updated_at
+                 when failure_count + 1 >= $2 then stage_updated_at
+                 else null
+               end,
+               next_attempt_at = case
+                 when started_at is not null and started_at <= ($1::timestamptz - ($4::integer * interval '1 millisecond')) then null
+                 when failure_count + 1 >= $2 then null
+                 else $3::timestamptz
+               end,
+               finished_at = case
+                 when started_at is not null and started_at <= ($1::timestamptz - ($4::integer * interval '1 millisecond')) then $1::timestamptz
+                 when failure_count + 1 >= $2 then $1::timestamptz
+                 else null
+               end,
                updated_at = $1
-           where status = 'running' and lock_expires_at is not null and lock_expires_at < $1
+           where status = 'running' and (
+             (lock_expires_at is not null and lock_expires_at < $1)
+             or (started_at is not null and started_at <= ($1::timestamptz - ($4::integer * interval '1 millisecond')))
+           )
            returning *`,
-          [nowIso, maxFailures, retryAtForNow(nowIso, 1)],
+          [nowIso, maxFailures, retryAtForNow(nowIso, 1), hardTimeoutMs, timedOutMessage],
         )
         for (const row of recovered.rows) {
           const job = fromRow(row)
+          const timedOut = isOptimizeJobExecutionTimedOut(job, Date.parse(nowIso))
+          const failureKind: OptimizeJobFailureKind = timedOut ? 'timed_out' : 'lease_lost'
+          const errorMessage = timedOut ? timedOutMessage : '任务执行租约已过期。'
           await client.query(
             `update optimize_job_attempts
-             set status = 'lease_lost', failure_kind = 'lease_lost', error_message = '任务执行租约已过期。',
-                 finished_at = $3, heartbeat_at = $3
+             set status = $3, failure_kind = $3, error_message = $4,
+                 finished_at = $5, heartbeat_at = $5
              where job_id = $1 and attempt_no = $2 and status = 'running'`,
-            [job.id, job.attempt_count, nowIso],
+            [job.id, job.attempt_count, failureKind, errorMessage, nowIso],
           )
           if (job.status === 'dead_lettered') {
             await refundPriorityCouponInTransaction(client, job.id, nowIso)
             await releaseQueuedEntitlementInTransaction(client, job.id, job.payload_json, nowIso)
-            await createDeadLetterInTransaction(client, job, 'lease_lost', job.error_message || '任务执行租约已过期。', nowIso)
+            await createDeadLetterInTransaction(client, job, failureKind, job.error_message || errorMessage, nowIso)
           }
         }
         return recovered.rowCount ?? recovered.rows.length
@@ -1046,26 +1086,32 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
     },
     recoverExpiredAttempts: async (nowIso, maxFailures) => {
       let recovered = 0
+      const nowMs = Date.parse(nowIso)
+      const timedOutMessage = `任务计算超过${formatOptimizeJobHardTimeout()}上限，请重试。`
       for (const job of records.values()) {
-        if (job.status !== 'running' || !job.lock_expires_at || Date.parse(job.lock_expires_at) >= Date.parse(nowIso)) continue
+        const leaseExpired = Boolean(job.lock_expires_at) && Date.parse(job.lock_expires_at!) < nowMs
+        const timedOut = isOptimizeJobExecutionTimedOut(job, nowMs)
+        if (job.status !== 'running' || (!leaseExpired && !timedOut)) continue
         recovered += 1
+        const failureKind: OptimizeJobFailureKind = timedOut ? 'timed_out' : 'lease_lost'
+        const errorMessage = timedOut ? timedOutMessage : '任务执行租约已过期，请重试。'
         const attempt = attempts.get(`${job.id}:${job.attempt_count}`)
         if (attempt) {
-          attempt.status = 'lease_lost'
-          attempt.failure_kind = 'lease_lost'
+          attempt.status = timedOut ? 'timed_out' : 'lease_lost'
+          attempt.failure_kind = failureKind
           attempt.heartbeat_at = nowIso
         }
         job.failure_count += 1
         job.worker_id = null
         job.heartbeat_at = null
         job.lock_token = null
-          job.lock_expires_at = null
-          job.next_attempt_at = job.failure_count >= maxFailures ? null : retryAtForNow(nowIso, 1)
+        job.lock_expires_at = null
+        job.next_attempt_at = timedOut || job.failure_count >= maxFailures ? null : retryAtForNow(nowIso, 1)
         job.updated_at = nowIso
-        if (job.failure_count >= maxFailures) {
+        if (timedOut || job.failure_count >= maxFailures) {
           job.status = 'dead_lettered'
-          job.error_message ||= '任务执行租约已过期，请重试。'
-          job.failure_kind = 'lease_lost'
+          job.error_message = timedOut ? timedOutMessage : job.error_message || errorMessage
+          job.failure_kind = failureKind
           job.public_error_code = 'execution_retries_exhausted'
           job.finished_at = nowIso
           releaseReorderReservation(job.id)
@@ -1249,6 +1295,11 @@ function getQueueJobDurationMs(payload: unknown): number {
 function parseQueueTimestamp(value: string | null, fallback: number): number {
   const parsed = value ? Date.parse(value) : Number.NaN
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function isOptimizeJobExecutionTimedOut(job: Pick<OptimizeJobRecord, 'started_at'>, nowMs: number): boolean {
+  const startedAtMs = Date.parse(job.started_at ?? '')
+  return Number.isFinite(startedAtMs) && nowMs - startedAtMs >= getOptimizeJobHardTimeoutMs()
 }
 
 function getOptimizeGlobalQueueLimit(): number {

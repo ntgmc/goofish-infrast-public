@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 
-const workflow = await readFile('.github/workflows/deploy-production.yml', 'utf8')
+const workflow = normalizeLineEndings(await readFile('.github/workflows/deploy-production.yml', 'utf8'))
 const devWorkflow = await readFile('.github/workflows/deploy-dev.yml', 'utf8')
-const qualityChecksWorkflow = await readFile('.github/workflows/quality-checks.yml', 'utf8')
+const qualityChecksWorkflow = normalizeLineEndings(await readFile('.github/workflows/quality-checks.yml', 'utf8'))
 const securityAnalysisWorkflow = await readFile('.github/workflows/security-analysis.yml', 'utf8')
 const deployScript = await readFile('scripts/deploy-production-atomic.sh', 'utf8')
 const workerDeployScript = await readFile('scripts/deploy-worker-atomic.sh', 'utf8')
@@ -35,6 +35,7 @@ console.log('Production deployment contract checks passed.')
 
 function assertWorkflowProvenance() {
   assert.match(workflow, /commit_sha:/, 'manual production deploy should accept an immutable SHA')
+  assert.match(workflow, /^permissions:\s*\n\s+actions: read\n\s+contents: write$/m, 'production deploy should be allowed to publish a confirmed release')
   assert.doesNotMatch(workflow, /^\s+branch:/m, 'manual production deploy must not accept a branch')
   assert.match(workflow, /github\.event\.workflow_run\.head_sha/, 'automatic deploy should use workflow_run.head_sha')
   assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/, 'automatic production deploy should only accept push runs')
@@ -50,11 +51,15 @@ function assertWorkflowProvenance() {
   assert.match(workflow, /scripts\/deploy-worker-atomic\.sh "\$WORKER_DEPLOY_USER@\$WORKER_DEPLOY_HOST:\$remote_deploy_script"/, 'workflow should upload the target worker deployment script')
   assert.match(workflow, /bash \$\{REMOTE_DEPLOY_SCRIPT@Q\}/, 'SSH command should run the uploaded deployment script')
   assert.match(workflow, /rm -f -- \$\{REMOTE_DEPLOY_SCRIPT@Q\} \$\{REMOTE_ARTIFACT@Q\}/, 'SSH command should clean up temporary deployment inputs')
+  assert.match(workflow, /changelog-release\.json/, 'production deploy should extract generated changelog metadata from the verified artifact')
+  assert.match(workflow, /github\.rest\.git\.createTag/, 'production deploy should create an annotated immutable release tag after success')
+  assert.match(workflow, /github\.rest\.repos\.createRelease/, 'production deploy should publish a GitHub Release after success')
+  assert.match(workflow, /github\.rest\.repos\.uploadReleaseAsset/, 'production deploy should persist the changelog record as a release asset')
   assert.doesNotMatch(workflow, /DEPLOY_SCRIPT:/, 'production deploy must not depend on a stale server-side script')
   assert.match(workflow, /for name in[^\n]*DEPLOY_KNOWN_HOSTS/, 'production deploy should require pinned SSH host keys')
   assert.doesNotMatch(workflow, /ssh-keyscan/, 'production deploy must not trust host keys discovered at runtime')
   assert.match(workflow, /WORKER_DEPLOY_KNOWN_HOSTS/, 'production deploy should require pinned worker host keys')
-  assertOrdered(workflow, ['Deploy verified worker release first', 'Deploy verified API release second'])
+  assertOrdered(workflow, ['Deploy verified worker release first', 'Deploy verified API release second', 'Publish successful changelog release'])
   assert.doesNotMatch(workflow, /DEPLOY_BRANCH/, 'production workflow must not pass a mutable branch')
   assert.match(devWorkflow, /actions\/download-artifact@/, 'dev deploy should download the Quality Checks artifact')
   assert.match(devWorkflow, /run-id: \$\{\{ steps\.target\.outputs\.run_id \}\}/, 'dev deploy should bind the artifact to a Quality Checks run')
@@ -74,6 +79,8 @@ function assertWorkflowProvenance() {
     "'deploy/nginx/'",
     "'deploy/systemd/'",
     "'scripts/check-production-deploy.mjs'",
+    "'scripts/changelog-lib.mjs'",
+    "'scripts/generate-changelog.mjs'",
     "'scripts/deploy-production-atomic.sh'",
     "'scripts/deploy-worker-atomic.sh'",
   ]) {
@@ -88,6 +95,9 @@ function assertQualityChecksImmutability() {
   assert.doesNotMatch(qualityChecksWorkflow, /\bgit push\b/, 'Quality Checks must not advance a checked branch')
   assert.match(qualityChecksWorkflow, /actions\/upload-artifact@/, 'Quality Checks should publish an immutable release artifact')
   assert.match(qualityChecksWorkflow, /release-artifact\.mjs create/, 'Quality Checks should create a release manifest')
+  assert.match(qualityChecksWorkflow, /GENERATE_CHANGELOG_CANDIDATE/, 'Quality Checks should generate changelog candidates only for production-bound builds')
+  assert.match(qualityChecksWorkflow, /CHANGELOG_BASE_SHA: \$\{\{ vars\.CHANGELOG_BASE_SHA \}\}/, 'Quality Checks should pass an explicitly configured changelog baseline to the candidate generator')
+  assert.match(qualityChecksWorkflow, /changelog-release\.json/, 'Quality Checks should package generated changelog metadata with the immutable artifact')
   assert.match(qualityChecksWorkflow, /if: github\.event_name != 'pull_request'/, 'pull request checks should not publish deployment artifacts')
 }
 
@@ -422,4 +432,8 @@ function extractFunction(source, name) {
   const end = source.indexOf('\n}\n', start)
   assert.ok(end > start, `could not find end of function ${name}`)
   return source.slice(start, end + 2)
+}
+
+function normalizeLineEndings(source) {
+  return source.replace(/\r\n/g, '\n')
 }

@@ -17,6 +17,8 @@ test('creates and verifies an immutable release artifact', async () => {
     run(fixture, ['verify', '--sha', sha])
     const manifest = JSON.parse(await readFile(join(fixture, 'build-manifest.json'), 'utf8'))
     assert.equal(manifest.target_sha, sha)
+    assert.equal(manifest.changelog.release.version, '2.0.1')
+    assert.equal(manifest.changelog.release.targetSha, sha)
     assert.ok(manifest.files['dist/index.html'])
     assert.ok(manifest.files['server/dist/index.js'])
     assert.ok(manifest.files['server/dist/migrate.js'])
@@ -39,6 +41,20 @@ test('rejects a mismatched SHA and tampered artifact', async () => {
   }
 })
 
+test('rejects changelog metadata that does not describe the immutable target', async () => {
+  const fixture = await createFixture()
+  try {
+    const recordPath = join(fixture, 'changelog-release.json')
+    const envelope = JSON.parse(await readFile(recordPath, 'utf8'))
+    envelope.release.targetSha = 'abcdef0123456789abcdef0123456789abcdef01'
+    await writeFile(recordPath, `${JSON.stringify(envelope, null, 2)}\n`, 'utf8')
+
+    assert.throws(() => run(fixture, ['create', '--sha', sha]), /changelog target SHA mismatch/)
+  } finally {
+    await rm(fixture, { recursive: true, force: true })
+  }
+})
+
 async function createFixture() {
   const fixture = await mkdtemp(join(tmpdir(), 'goofish-release-'))
   await mkdir(join(fixture, 'dist'), { recursive: true })
@@ -53,6 +69,21 @@ async function createFixture() {
     frontend_version: '2.0.1', backend_version: '2.0.1', data_version: 'data.1.0123456',
     generated_at: '2026-07-18T00:00:00.000Z', source_summary: 'fixture', git_sha: sha, build_context: 'test',
   }, null, 2)} as const;\n`, 'utf8')
+  await writeFile(join(fixture, 'changelog-release.json'), `${JSON.stringify({
+    schema_version: 1,
+    candidate: true,
+    release: {
+      id: 'v2.0.1',
+      version: '2.0.1',
+      displayVersion: 'v2.0.1',
+      releasedAt: '2026-07-18',
+      targetSha: sha,
+      previousTargetSha: null,
+      kind: 'baseline',
+      sections: [],
+    },
+  }, null, 2)}\n`, 'utf8')
+  await writeFile(join(fixture, 'changelog-release.md'), '# v2.0.1\n\nBaseline\n', 'utf8')
   return fixture
 }
 
