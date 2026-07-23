@@ -66,6 +66,16 @@ Production API and Worker processes perform a read-only catalog compatibility ch
 
 Transient validation failures are not cached permanently. The next request retries validation, while a successful validation is cached for the lifetime of the process.
 
+### Optimizer workspace retention migration
+
+The release that introduces the workspace retention policy must run the
+controlled database migration before starting the production API or Worker.
+The migration permanently trims every `user_profile_workspaces.record_json`
+record to its newest **3 saved configurations** and newest **5 result-history
+entries**. Records are stored newest first, so the discarded items are the
+oldest ones. This cleanup has no archive or in-product restore path; rolling
+back application code does not restore trimmed data.
+
 ## One-time migration
 
 Schedule the first migration as a controlled production change. Keep the legacy

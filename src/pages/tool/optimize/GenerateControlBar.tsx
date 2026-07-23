@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import InfoTooltip from '../../../components/InfoTooltip'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
@@ -24,6 +25,7 @@ export default function GenerateControlBar({
   extraDisabledReason,
   onGenerate,
   onReset,
+  onOpenConfig,
 }: {
   config: LicenseConfig
   configChanged: boolean
@@ -41,6 +43,7 @@ export default function GenerateControlBar({
   extraDisabledReason?: string | null
   onGenerate: () => void
   onReset: () => void
+  onOpenConfig: () => void
 }) {
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const readyLabel = resultIsCurrent ? copy.optimize.pages_tool_optimize_GenerateControlBar_001 : hasResult ? copy.optimize.pages_tool_optimize_GenerateControlBar_002 : copy.optimize.pages_tool_optimize_GenerateControlBar_003
@@ -78,7 +81,15 @@ export default function GenerateControlBar({
           </div>
           <div className="mt-5 grid gap-3 border-y border-surface-3 py-4 sm:grid-cols-[minmax(7rem,0.5fr)_minmax(0,1fr)_minmax(7rem,0.5fr)]" role="group" aria-label={copy.optimize.pages_tool_optimize_GenerateControlBar_014}>
             <DashboardMiniStat label={copy.optimize.pages_tool_optimize_GenerateControlBar_015} value={`${operatorCount}${copy.optimize.pages_tool_optimize_GenerateControlBar_016}`} />
-            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_GenerateControlBar_017} value={configLabel} />
+            <DashboardMiniStat
+              label={copy.optimize.pages_tool_optimize_GenerateControlBar_017}
+              value={configLabel}
+              action={(
+                <button type="button" onClick={onOpenConfig} className="tool-secondary-action mt-2 px-3 py-2 text-xs">
+                  {copy.optimize.pages_tool_optimize_GenerateControlBar_032}
+                </button>
+              )}
+            />
             <DashboardMiniStat label={copy.optimize.pages_tool_optimize_GenerateControlBar_018} value={configChanged ? copy.optimize.pages_tool_optimize_GenerateControlBar_019 : copy.optimize.pages_tool_optimize_GenerateControlBar_020} />
           </div>
         </div>
@@ -143,11 +154,12 @@ export default function GenerateControlBar({
   )
 }
 
-export function DashboardMiniStat({ label, value }: { label: string; value: string }) {
+export function DashboardMiniStat({ label, value, action }: { label: string; value: string; action?: ReactNode }) {
   return (
     <div className="min-w-0 border-l border-surface-3 pl-3 first:border-l-0 first:pl-0">
       <p className="text-xs font-medium text-ink-muted">{label}</p>
       <p className="mt-1 truncate text-sm font-semibold text-ink-primary" title={value}>{value}</p>
+      {action}
     </div>
   )
 }
