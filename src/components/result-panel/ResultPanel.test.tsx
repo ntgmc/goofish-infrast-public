@@ -9,6 +9,15 @@ import ResultPanel from './ResultPanel'
 afterEach(cleanup)
 
 describe('ResultPanel tabs', () => {
+  it('places office cards before dormitory cards in the preview', () => {
+    render(<ResultPanel result={createPreviewOrderResult()} />)
+
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual([
+      '办公室',
+      '宿舍',
+    ])
+  })
+
   it('keeps aria controls and the latest panel synchronized during rapid switching', async () => {
     const user = userEvent.setup()
     render(<ResultPanel result={createResult()} />)
@@ -39,5 +48,18 @@ function createResult(): OptimizeResult {
     planTimes: '单班',
     plans: [],
     raw_results: [],
+  }
+}
+
+function createPreviewOrderResult(): OptimizeResult {
+  return {
+    ...createResult(),
+    plans: [{
+      name: '班次 1',
+      rooms: {
+        dormitory: [{ operators: ['宿舍干员'] }],
+        hire: [{ operators: ['办公室干员'] }],
+      },
+    }],
   }
 }
