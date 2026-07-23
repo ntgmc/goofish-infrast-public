@@ -1,12 +1,18 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { AuthSuccessResponse } from '../lib/types'
 import { ApiError, apiJson } from '../lib/api-client'
+import {
+  validateRegistrationEmail,
+  type RegistrationEmailValidation,
+} from '../lib/registration-email-policy'
 import { copy } from '../copy/index'
 import { useSiteFeatures } from '../lib/site-feature-context'
 
 
 type AuthMode = 'login' | 'register' | 'forgot'
 type FieldErrors = Record<string, string>
+type EmailInputValidation = { message: string | null; suggestedEmail: string | null }
+type RegistrationEmailApiError = { message: string; suggestedEmail: string | null }
 type RegistrationAcceptedResponse = {
   accepted: true
   message: string
@@ -41,6 +47,7 @@ export default function AuthForm({
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null)
   const [showVerificationResend, setShowVerificationResend] = useState(false)
 
   useEffect(() => {
@@ -60,16 +67,21 @@ export default function AuthForm({
     if (mode === 'register' && !features.registration) setMode(features.login ? 'login' : 'forgot')
   }, [features.login, features.registration, mode])
 
+  useEffect(() => {
+    if (mode !== 'register') setEmailSuggestion(null)
+  }, [mode])
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     const nextErrors: FieldErrors = {}
-    const emailError = validateEmailInput(email)
+    const emailValidation = validateEmailInputForMode(mode, email)
     const passwordError = mode === 'forgot' ? null : validatePasswordInput(password)
     const inviteCodeError = mode === 'register' ? validateInviteCodeInput(inviteCode, inviteCodeRequired === true) : null
-    if (emailError) nextErrors.email = emailError
+    if (emailValidation.message) nextErrors.email = emailValidation.message
     if (passwordError) nextErrors.password = passwordError
     if (inviteCodeError) nextErrors.inviteCode = inviteCodeError
     setFieldErrors(nextErrors)
+    setEmailSuggestion(emailValidation.suggestedEmail)
     if (Object.keys(nextErrors).length > 0) return
 
     setLoading(true)
@@ -105,14 +117,23 @@ export default function AuthForm({
       if (!data.user) throw new Error(mode === 'login' ? copy.auth.components_AuthForm_005 : copy.auth.components_AuthForm_006)
       onAuthenticated(data)
     } catch (caught) {
+      let handledRegistrationEmailError = false
       if (mode === 'register' && caught instanceof ApiError && isInviteCodeError(caught.data)) {
         setFieldErrors((current) => ({ ...current, inviteCode: caught.message }))
+      }
+      if (mode === 'register' && caught instanceof ApiError) {
+        const registrationEmailError = getRegistrationEmailApiError(caught.data, caught.message)
+        if (registrationEmailError) {
+          handledRegistrationEmailError = true
+          setFieldErrors((current) => ({ ...current, email: registrationEmailError.message }))
+          setEmailSuggestion(registrationEmailError.suggestedEmail)
+        }
       }
       if (caught instanceof ApiError && (
         isApiErrorCode(caught.data, 'email_not_verified')
         || isApiErrorCode(caught.data, 'verification_email_send_failed')
       )) setShowVerificationResend(true)
-      setError((caught as Error).message)
+      if (!handledRegistrationEmailError) setError((caught as Error).message)
     } finally {
       setLoading(false)
     }
@@ -150,12 +171,40 @@ export default function AuthForm({
     })
   }
 
+  const validateRegistrationEmailField = () => {
+    const validation = validateEmailInputForMode('register', email)
+    setEmailSuggestion(validation.suggestedEmail)
+    if (validation.message) {
+      setFieldErrors((current) => ({ ...current, email: validation.message! }))
+      return
+    }
+    clearFieldError('email')
+  }
+
+  const useEmailSuggestion = () => {
+    if (!emailSuggestion) return
+    const validation = validateEmailInputForMode('register', emailSuggestion)
+    setEmail(emailSuggestion)
+    setEmailSuggestion(validation.suggestedEmail)
+    if (validation.message) {
+      setFieldErrors((current) => ({ ...current, email: validation.message! }))
+      return
+    }
+    clearFieldError('email')
+  }
+
+  const emailDescriptionIds = [
+    mode === 'register' ? 'auth-registration-email-help' : null,
+    fieldErrors.email ? 'auth-email-error' : null,
+    emailSuggestion ? 'auth-email-suggestion' : null,
+  ].filter(Boolean).join(' ') || undefined
+
   return (
     <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'tool-panel space-y-5 p-6 sm:p-8'}>
       <div>
         <div className="tool-inset grid grid-cols-2 p-1" role="group" aria-label={copy.auth.components_AuthForm_007}>
-          <button type="button" disabled={!features.login} aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${mode === 'login' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{features.login ? copy.auth.components_AuthForm_008 : `${copy.auth.components_AuthForm_008} · ${copy.features.paused}`}</button>
-          <button type="button" disabled={!features.registration} aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${mode === 'register' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{features.registration ? copy.auth.components_AuthForm_009 : `${copy.auth.components_AuthForm_009} · ${copy.features.paused}`}</button>
+          <button type="button" disabled={!features.login} aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null); setEmailSuggestion(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${mode === 'login' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{features.login ? copy.auth.components_AuthForm_008 : `${copy.auth.components_AuthForm_008} · ${copy.features.paused}`}</button>
+          <button type="button" disabled={!features.registration} aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null); setEmailSuggestion(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${mode === 'register' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{features.registration ? copy.auth.components_AuthForm_009 : `${copy.auth.components_AuthForm_009} · ${copy.features.paused}`}</button>
         </div>
 
         {intro && <p className="mt-4 text-sm leading-6 text-ink-secondary">{intro}</p>}
@@ -174,16 +223,29 @@ export default function AuthForm({
           value={email}
           onChange={(event) => {
             setEmail(event.currentTarget.value)
+            setEmailSuggestion(null)
             clearFieldError('email')
           }}
           onFocus={() => clearFieldError('email')}
+          onBlur={() => {
+            if (mode === 'register') validateRegistrationEmailField()
+          }}
           className={inputClassName(Boolean(fieldErrors.email))}
           aria-invalid={Boolean(fieldErrors.email)}
-          aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
+          aria-describedby={emailDescriptionIds}
           autoComplete="email"
         />
         <FieldMessage id="auth-email-error" message={fieldErrors.email} />
       </label>
+      {mode === 'register' && <p id="auth-registration-email-help" className="-mt-3 text-xs leading-5 text-ink-secondary">{copy.auth.components_AuthForm_036}</p>}
+      {emailSuggestion && (
+        <div id="auth-email-suggestion" className="-mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
+          <span>{copy.auth.components_AuthForm_040} {emailSuggestion}</span>
+          <button type="button" onClick={useEmailSuggestion} className="tool-secondary-action min-h-9 px-3 text-sm">
+            {copy.auth.components_AuthForm_041} {emailSuggestion}
+          </button>
+        </div>
+      )}
 
       {mode !== 'forgot' && (
         <label className="block">
@@ -273,6 +335,28 @@ function validateEmailInput(value: string): string | null {
   return null
 }
 
+function validateEmailInputForMode(mode: AuthMode, value: string): EmailInputValidation {
+  const emailError = validateEmailInput(value)
+  if (emailError) return { message: emailError, suggestedEmail: null }
+  if (mode !== 'register') return { message: null, suggestedEmail: null }
+
+  const result = validateRegistrationEmail(value)
+  if (result.ok) return { message: null, suggestedEmail: null }
+  return {
+    message: registrationEmailValidationMessage(result),
+    suggestedEmail: result.suggestedEmail ?? null,
+  }
+}
+
+function registrationEmailValidationMessage(result: Exclude<RegistrationEmailValidation, { ok: true }>): string {
+  switch (result.reason) {
+    case 'invalid_format': return copy.auth.components_AuthForm_024
+    case 'unsupported_provider': return copy.auth.components_AuthForm_037
+    case 'alias_not_allowed': return copy.auth.components_AuthForm_038
+    case 'domain_typo': return copy.auth.components_AuthForm_039
+  }
+}
+
 function validatePasswordInput(value: string): string | null {
   if (!value) return copy.auth.components_AuthForm_025
   if (value.length < 8) return copy.auth.components_AuthForm_026
@@ -295,6 +379,20 @@ function isInviteCodeError(data: unknown): boolean {
 function isApiErrorCode(data: unknown, expected: string): boolean {
   if (!data || typeof data !== 'object' || !('code' in data)) return false
   return (data as { code?: unknown }).code === expected
+}
+
+function getRegistrationEmailApiError(data: unknown, message: string): RegistrationEmailApiError | null {
+  if (!data || typeof data !== 'object' || !('code' in data)) return null
+  const code = (data as { code?: unknown }).code
+  if (code !== 'email_invalid'
+    && code !== 'email_provider_not_allowed'
+    && code !== 'email_alias_not_allowed'
+    && code !== 'email_domain_typo') return null
+
+  const suggestedEmail = 'suggested_email' in data && typeof (data as { suggested_email?: unknown }).suggested_email === 'string'
+    ? (data as { suggested_email: string }).suggested_email
+    : null
+  return { message, suggestedEmail }
 }
 
 function inputClassName(hasError: boolean): string {

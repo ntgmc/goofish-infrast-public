@@ -22,6 +22,7 @@ import {
   reserveUserLoginAttemptLayered,
 } from '../security/layered-auth-rate-limit'
 import { getRequestClientIp } from '../security/client-ip'
+import { validateRegistrationEmailForRegistration } from '../security/registration-email-policy'
 import { PasswordWorkCapacityError } from '../security/password'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
@@ -52,13 +53,21 @@ export default async (req: Request): Promise<Response> => {
     if (pathname.endsWith('/register')) {
       if (req.method !== 'POST') return methodNotAllowedResponse()
       const body = await getValidatedJson(req, requestSchemas.authRegister)
+      const registrationEmail = validateRegistrationEmailForRegistration(body.email)
+      if (!registrationEmail.ok) {
+        return jsonResponse({
+          error: registrationEmail.message,
+          code: registrationEmail.code,
+          ...(registrationEmail.suggestedEmail && { suggested_email: registrationEmail.suggestedEmail }),
+        }, registrationEmail.status)
+      }
       if (typeof body.cdk === 'string' && body.cdk.trim()) {
         const gated = await requireSiteFeatures(['cdk_redemption'])
         if (gated) return gated
       }
       const registrationLimit = await reserveRegistrationAttemptLayered(
         getRequestClientIp(req),
-        normalizeEmail(body.email) ?? 'invalid',
+        registrationEmail.email,
       )
       if (!registrationLimit.allowed) return loginRateLimitResponse(registrationLimit.retryAfterSeconds)
       registrationLimit.attempt.retainFailure()
@@ -76,6 +85,7 @@ export default async (req: Request): Promise<Response> => {
         return jsonResponse({
           error: registered.message,
           ...(registered.code && { code: registered.code }),
+          ...(registered.suggestedEmail && { suggested_email: registered.suggestedEmail }),
           ...(quotaLimited && { retry_after_seconds: registered.retryAfterSeconds }),
         }, registered.status, quotaLimited ? rateLimitHeaders(registered.retryAfterSeconds!) : {})
       }

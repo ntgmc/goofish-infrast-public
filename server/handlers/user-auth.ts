@@ -47,6 +47,7 @@ import {
   type BrevoEmailReservation,
 } from './email'
 import { getRegistrationSettings } from '../storage/registration-settings-store'
+import { validateRegistrationEmailForRegistration } from '../security/registration-email-policy'
 import { authCopy } from '../../src/copy/zh-CN/auth'
 import {
   findCdkRecordByCode,
@@ -136,10 +137,11 @@ export async function registerUser(
 ): Promise<
   | { ok: true; user: UserAccountRecord; verificationRequired: false }
   | { ok: true; user: UserAccountRecord; verificationRequired: true; message: string; resendAfterSeconds: number }
-  | { ok: false; status: number; message: string; code?: string; retryAfterSeconds?: number }
+  | { ok: false; status: number; message: string; code?: string; retryAfterSeconds?: number; suggestedEmail?: string }
 > {
-  const email = normalizeEmail(emailValue)
-  if (!email) return { ok: false, status: 400, message: authCopy.api_email_invalid }
+  const emailCheck = validateRegistrationEmailForRegistration(emailValue)
+  if (!emailCheck.ok) return emailCheck
+  const email = emailCheck.email
   const passwordCheck = validatePassword(passwordValue)
   if (!passwordCheck.ok) return { ok: false, status: 400, message: passwordCheck.message }
   const registrationSettings = await getRegistrationSettings()
