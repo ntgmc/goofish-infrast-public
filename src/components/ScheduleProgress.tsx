@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { AnimatedValue, motionTokens } from './MotionPrimitives'
+import { AnimatedValue } from './MotionPrimitives'
 import type { OptimizeCalculationStage, OptimizeJobPriority, OptimizeResult } from '../lib/types'
 import { copy } from '../copy/index'
 
@@ -81,7 +81,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
       const nextNow = Date.now()
       setNow(nextNow)
       if (progress.estimatePhase !== 'cancelled' && (getTimedPercent(progress, nextNow) < 100 || !progress.completedAt)) {
-        timer = window.setTimeout(tick, progress.queueStatus === 'queued' ? 900 : 260)
+        timer = window.setTimeout(tick, PROGRESS_REFRESH_INTERVAL_MS)
       }
     }
     tick()
@@ -125,7 +125,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
             className={`schedule-progress-fill h-full origin-left rounded-full ${task.status === 'cancelled' ? 'bg-surface-4' : 'bg-brand-500'}`}
             initial={false}
             animate={{ scaleX: Math.max(0, Math.min(1, rawPercent / 100)) }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.25, ease: motionTokens.ease.enter }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: 'linear' }}
           />
         </div>
 
@@ -187,6 +187,7 @@ function CheckIcon() {
 
 const ESTIMATED_DURATION_MS = 10_000
 export const SCHEDULE_PROGRESS_COMPLETION_DURATION_MS = 420
+const PROGRESS_REFRESH_INTERVAL_MS = 1000 / 60
 const MAX_WAITING_PERCENT = 96
 
 const TASK_STEPS: Record<Exclude<ScheduleProgressState['mode'], 'generate'>, TaskStepDefinition[]> = {

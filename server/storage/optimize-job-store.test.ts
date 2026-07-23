@@ -125,6 +125,42 @@ describe('optimization job attempt lifecycle', () => {
 })
 
 describe('optimization job submission admission', () => {
+  it('reserves reorder quota once for an idempotent job and releases it on cancellation', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const profileId = randomUUID()
+    const firstInput = reorderAdmissionInput(profileId)
+    const first = await store.admitJob(firstInput)
+
+    await expect(store.admitJob(firstInput)).resolves.toMatchObject({
+      replayed: true,
+      job: { id: first.job.id },
+    })
+    await expect(store.admitJob(reorderAdmissionInput(profileId))).rejects.toMatchObject({
+      code: 'reorder_check_quota_exceeded',
+      status: 429,
+    })
+
+    await store.requestCancel(first.job.id)
+    await expect(store.admitJob(reorderAdmissionInput(profileId))).resolves.toMatchObject({ replayed: false })
+  })
+
+  it('consumes reorder quota on success and releases it on application failure', async () => {
+    const profileId = randomUUID()
+    const succeededStore = createMemoryOptimizeJobStore()
+    const succeeded = await succeededStore.admitJob(reorderAdmissionInput(profileId))
+    const succeededAttempt = await succeededStore.claimNextJob('worker-a', 'lock-a', future(), 2)
+    await succeededStore.completeAttempt(succeeded.job.id, succeededAttempt!.attempt_count, 'worker-a', 'lock-a', { recommendation: 'no_need' })
+    await expect(succeededStore.admitJob(reorderAdmissionInput(profileId))).rejects.toMatchObject({
+      code: 'reorder_check_quota_exceeded',
+    })
+
+    const failedStore = createMemoryOptimizeJobStore()
+    const failed = await failedStore.admitJob(reorderAdmissionInput(profileId))
+    const failedAttempt = await failedStore.claimNextJob('worker-b', 'lock-b', future(), 2)
+    await failedStore.failAttempt(failed.job.id, failedAttempt!.attempt_count, 'worker-b', 'lock-b', 'invalid input')
+    await expect(failedStore.admitJob(reorderAdmissionInput(profileId))).resolves.toMatchObject({ replayed: false })
+  })
+
   it('rejects a job before its estimated wait reaches the queue age limit', async () => {
     vi.stubEnv('OPTIMIZE_QUEUE_MAX_AGE_MS', '60000')
     vi.stubEnv('OPTIMIZE_GLOBAL_WORKER_CONCURRENCY', '2')
@@ -219,6 +255,19 @@ function admissionInput(ownerKey: string, source: string, estimatedDurationMs?: 
     },
     idempotency_key: randomUUID(),
     request_hash: randomUUID(),
+  }
+}
+
+function reorderAdmissionInput(profileId: string) {
+  return {
+    ...admissionInput(`reorder-job:${randomUUID()}`, 'reorder_check'),
+    profile_id: profileId,
+    payload_json: { version: 3, kind: 'reorder_check' },
+    reorderCheckQuota: {
+      profileId,
+      windowKey: '2026-07',
+      limit: 1,
+    },
   }
 }
 

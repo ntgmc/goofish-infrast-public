@@ -29,6 +29,16 @@ describe('ScheduleProgress motion', () => {
     expect(progressbar.firstElementChild).toHaveClass('origin-left')
   })
 
+  it('refreshes active progress before the previous 260 ms cadence', async () => {
+    render(<ScheduleProgress progress={createProgress({ startedAt: NOW, estimatedDurationMs: 10_000 })} />)
+
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
+
+    await act(async () => vi.advanceTimersByTimeAsync(120))
+
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1')
+  })
+
   it('shows a cancelled queued task as a terminal state', () => {
     render(<ScheduleProgress progress={createProgress({
       startedAt: NOW - 5_000,

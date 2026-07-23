@@ -58,7 +58,7 @@ interface OptimizationTimestamps {
 }
 
 type OptimizationEstimatePhase = 'queued' | 'running' | 'overdue' | 'completed' | 'failed' | 'cancelled'
-export type OptimizationJobKind = CreateOptimizationJobRequest['kind']
+export type OptimizationJobKind = CreateOptimizationJobRequest['kind'] | 'reorder_check'
 type OptimizationExecutionPhase = 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal'
 type OptimizationRecoveryAction = 'retry' | 'review_input' | 'reauthorize' | 'contact_support' | 'none'
 
@@ -134,8 +134,10 @@ export interface CreateOptimizationJobResponse<TResult = OptimizeResult> {
 export type ScenarioComparisonJobSnapshot = OptimizationJobSnapshot<ScenarioComparisonResult>
 export type CreateScenarioComparisonJobResponse = CreateOptimizationJobResponse<ScenarioComparisonResult>
 
-export interface ReorderCheckResponse {
-  result: ReorderCheckResult;
+export type ReorderCheckJobSnapshot = OptimizationJobSnapshot<ReorderCheckResult>
+export interface CreateReorderCheckJobResponse {
+  job: ReorderCheckJobSnapshot;
+  pollToken?: string;
 }
 
 export function isOptimizationJobTerminal(

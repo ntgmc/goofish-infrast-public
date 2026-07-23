@@ -1,5 +1,6 @@
 import { apiJson } from '../../../lib/api-client'
-import type { CreateOptimizationJobRequest, CreateOptimizationJobResponse, CreateReorderCheckRequest, OptimizationJobListResponse, OptimizationJobMutationResponse, OptimizationJobSnapshot, ReorderCheckResponse } from '../../../lib/optimization-contracts'
+import type { CreateOptimizationJobRequest, CreateOptimizationJobResponse, CreateReorderCheckJobResponse, CreateReorderCheckRequest, OptimizationJobListResponse, OptimizationJobMutationResponse, OptimizationJobSnapshot, ReorderCheckJobSnapshot } from '../../../lib/optimization-contracts'
+import type { ReorderCheckResult } from '../../../lib/types'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
 import { copy } from '../../../copy/index'
 
@@ -65,14 +66,25 @@ export async function requestReorderCheck(
   request: CreateReorderCheckRequest,
   fallbackMessage: string,
   idempotencyKey = crypto.randomUUID(),
-): Promise<ReorderCheckResponse['result']> {
-  const response = await apiJson<ReorderCheckResponse>('/api/optimization/reorder-checks', {
+): Promise<ReorderCheckResult> {
+  const response = await apiJson<CreateReorderCheckJobResponse>('/api/optimization/reorder-checks', {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
     json: request,
+    signal: AbortSignal.timeout(OPTIMIZE_SUBMIT_TIMEOUT_MS),
     fallbackMessage,
   })
-  return response.result
+  let job: ReorderCheckJobSnapshot = response.job
+  while (job.status === 'queued' || job.status === 'running') {
+    await delay(job.pollAfterMs)
+    job = await fetchOptimizationJobSnapshot<ReorderCheckResult>(job.id, fallbackMessage, response.pollToken)
+  }
+  if (job.status === 'succeeded') return job.result
+  throw new Error(job.error.message || fallbackMessage)
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)))
 }
 
 function toLegacyJobView(job: OptimizationJobSnapshot, pollToken?: string): OptimizeJobStatusResponse {

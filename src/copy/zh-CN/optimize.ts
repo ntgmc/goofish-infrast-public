@@ -896,6 +896,7 @@ export const optimizeCopy = {
   pages_tool_optimize_optimization_job_events_004: "练度建议已完成",
   pages_tool_optimize_optimization_job_events_005: "优化任务未完成",
   pages_tool_optimize_optimization_job_events_006: "点击返回任务中心查看详情。",
+  pages_tool_optimize_optimization_job_events_007: "重排检测已完成",
   // src/pages/tool/optimize/OptimizationTaskCenter.tsx
   pages_tool_optimize_OptimizationTaskCenter_001: "异步任务中心",
   pages_tool_optimize_OptimizationTaskCenter_002: "统一显示当前账号正在排队、执行和最近结束的优化任务。",
@@ -932,6 +933,7 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizationTaskCenter_033: "打开异步任务中心",
   pages_tool_optimize_OptimizationTaskCenter_034: "关闭",
   pages_tool_optimize_OptimizationTaskCenter_035: "个任务需要关注",
+  pages_tool_optimize_OptimizationTaskCenter_036: "重排检测",
   // src/pages/tool/optimize/optimization-api.ts
   pages_tool_optimize_optimization_api_001: "加载优化任务列表失败。",
   pages_tool_optimize_optimization_api_002: "取消优化任务失败。",

@@ -2,7 +2,7 @@ import {
   cancelOptimizationJob,
   getOptimizationJob,
   listOptimizationJobs,
-  runReorderCheck,
+  submitReorderCheck,
   submitOptimizationJob,
 } from '../optimization/jobs/service'
 export { sanitizeConfigForPublicOptimize } from '../optimization/jobs/service'
@@ -22,7 +22,7 @@ export default async function optimizationHandler(req: Request): Promise<Respons
   }
   if (pathname === REORDER_CHECKS_PATH) {
     if (req.method !== 'POST') return methodNotAllowed()
-    return runReorderCheck(req)
+    return submitReorderCheck(req)
   }
 
   const jobRoute = matchJobRoute(pathname)
