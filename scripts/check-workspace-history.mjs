@@ -12,7 +12,10 @@ const store = createMemoryStore()
 globalThis.__workspaceHistorySmokeStore = store
 const optimizeJobStoreModule = await bundleHandler('server/storage/optimize-job-store.ts')
 const optimizeJobStore = optimizeJobStoreModule.createMemoryOptimizeJobStore()
-optimizeJobStore.admitJob = async (input) => ({ job: await optimizeJobStore.createJob(input), replayed: false })
+const atomicAdmitOptimizeJob = optimizeJobStore.admitJob.bind(optimizeJobStore)
+optimizeJobStore.admitJob = async (input) => input.source === 'reorder_check'
+  ? atomicAdmitOptimizeJob(input)
+  : { job: await optimizeJobStore.createJob(input), replayed: false }
 globalThis.__maaOptimizeJobStoreForTesting = optimizeJobStore
 
 const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts')
@@ -1003,7 +1006,8 @@ async function call(handler, path, body = {}, init = {}) {
     parsed = { ...(parsed.error.details ?? {}), code: parsed.error.code, error: parsed.error.message }
   }
   if (path === '/api/optimize/reorder-check' && parsed?.result) parsed = parsed.result
-  if (path === '/api/optimize' && response.status === 202 && parsed?.job?.id) {
+  if ((path === '/api/optimize' || path === '/api/optimize/reorder-check')
+    && response.status === 202 && parsed?.job?.id) {
     return await waitForOptimizeJob(handler, parsed.job.id)
   }
   return { status: response.status, body: parsed }

@@ -382,7 +382,7 @@ function statusLabel(status: AdminOptimizationQueueStatus): string {
 }
 
 function sourceLabel(source: string): string {
-  return ({ free_preview: '免费预览', account_profile: '主排班', optimize_suggestions: '优化建议', scenario_comparison: '场景分析' } as Record<string, string>)[source] ?? source
+  return ({ free_preview: '免费预览', account_profile: '主排班', optimize_suggestions: '优化建议', scenario_comparison: '场景分析', reorder_check: '重排检测' } as Record<string, string>)[source] ?? source
 }
 
 function timingLabel(job: AdminOptimizationQueueJob): string {

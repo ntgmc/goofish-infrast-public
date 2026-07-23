@@ -3,7 +3,8 @@ import { canonicalJson, type CdkRecord, incrementCdkScheduleGenerateCount } from
 import { countSuccessfulUsageEventsForProfileInRange, recordUsageEvent } from "../../handlers/usage-stats";
 import type { UsageReasonCode } from "../../storage/usage-store";
 import type { ReorderCheckQuota, ScheduleUsageContext, FreeScheduleGenerateDecision } from './shared';
-import { FREE_PREVIEW_MODE, REORDER_CHECK_MONTHLY_LIMIT, FREE_SCHEDULE_REVISION_LIMIT, FREE_SCHEDULE_REVISION_WINDOW_HOURS, SHANGHAI_TIMEZONE, SHANGHAI_UTC_OFFSET_MS } from './shared';
+import { FREE_PREVIEW_MODE, FREE_SCHEDULE_REVISION_LIMIT, FREE_SCHEDULE_REVISION_WINDOW_HOURS, SHANGHAI_TIMEZONE, SHANGHAI_UTC_OFFSET_MS } from './shared';
+import { REORDER_CHECK_MONTHLY_LIMIT } from '../../reorder-check-policy';
 
 export function getDownloadableHistoryResult(result: OptimizeResult): OptimizeResult {
   return result;
