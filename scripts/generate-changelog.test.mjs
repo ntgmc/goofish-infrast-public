@@ -85,9 +85,8 @@ test('renders a typed generated module and matching release note envelope', () =
   assert.match(renderReleaseNotes(envelope), /Features/)
 })
 
-test('generates a production candidate from a supplied published-release history', async () => {
+test('generates a production baseline candidate without requiring Git history', async () => {
   const currentSha = runGit(['rev-parse', 'HEAD'])
-  const priorSha = runGit(['rev-parse', 'HEAD^'])
   const temporaryDirectory = await mkdtemp(join(tmpdir(), 'goofish-changelog-'))
   const historyPath = join(temporaryDirectory, 'history.json')
   const snapshots = await Promise.all([
@@ -99,18 +98,7 @@ test('generates a production candidate from a supplied published-release history
 
   try {
     await mkdir(dirname(buildMetaPath), { recursive: true })
-    await writeFile(historyPath, `${JSON.stringify([
-      {
-        id: 'v2.0.998',
-        version: '2.0.998',
-        displayVersion: 'v2.0.998',
-        releasedAt: '2026-07-22',
-        targetSha: priorSha,
-        previousTargetSha: null,
-        kind: 'baseline',
-        sections: [],
-      },
-    ], null, 2)}\n`, 'utf8')
+    await writeFile(historyPath, '[]\n', 'utf8')
     await writeFile(buildMetaPath, `export const APP_BUILD_META = ${JSON.stringify({
       frontend_version: '2.0.999',
       backend_version: '2.0.999',
@@ -127,6 +115,7 @@ test('generates a production candidate from a supplied published-release history
         ...process.env,
         GENERATE_CHANGELOG_CANDIDATE: 'true',
         CHANGELOG_HISTORY_FILE: historyPath,
+        CHANGELOG_BASE_SHA: '',
       },
       encoding: 'utf8',
     })
@@ -139,11 +128,11 @@ test('generates a production candidate from a supplied published-release history
     assert.equal(envelope.release.displayVersion, 'v2.0.999')
     assert.equal(envelope.release.releasedAt, '2026-07-23')
     assert.equal(envelope.release.targetSha, currentSha)
-    assert.equal(envelope.release.previousTargetSha, priorSha)
-    assert.equal(envelope.release.kind, 'release')
+    assert.equal(envelope.release.previousTargetSha, null)
+    assert.equal(envelope.release.kind, 'baseline')
     assert.ok(Array.isArray(envelope.release.sections))
     assert.match(await readFile(releaseNotesPath, 'utf8'), /^# v2\.0\.999/m)
-    assert.match(await readFile(generatedModulePath, 'utf8'), /v2\.0\.998/)
+    assert.match(await readFile(releaseNotesPath, 'utf8'), /## Baseline/)
     assert.match(await readFile(generatedModulePath, 'utf8'), /v2\.0\.999/)
   } finally {
     await Promise.all([
