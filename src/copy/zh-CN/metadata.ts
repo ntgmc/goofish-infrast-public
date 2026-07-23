@@ -43,4 +43,8 @@ export const metadataCopy = {
   components_RouteMetadata_023: "致谢 | MaaTool",
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_024: "感谢为 MaaTool 提供数据参考、格式基础以及开发与测试协助的项目和参与者。",
+  // src/components/RouteMetadata.tsx
+  components_RouteMetadata_025: "更新日志 | MaaTool",
+  // src/components/RouteMetadata.tsx
+  components_RouteMetadata_026: "查看 MaaTool 各版本的功能更新、体验优化与问题修复。",
 } as const

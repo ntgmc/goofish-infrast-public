@@ -20,6 +20,7 @@ import { PublicContentProvider } from './lib/public-content-context'
 
 const ToolPage = lazy(() => import('./pages/ToolPage'))
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'))
+const ChangelogPage = lazy(() => import('./pages/ChangelogPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage'))
 const DepotValuePage = lazy(() => import('./pages/DepotValuePage'))
@@ -59,6 +60,7 @@ function AppContent() {
           <Route path="/cancel-account-deletion" element={<CancelAccountDeletionPage />} />
           <Route path="/account-safety" element={<AccountSafetyPage />} />
           <Route path="/announcements" element={<FeatureRoute feature="announcements"><LazyPage fallback={copy.common.App_002}><AnnouncementsPage /></LazyPage></FeatureRoute>} />
+          <Route path="/changelog" element={<LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage>} />
           <Route path="/faq" element={<LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage>} />
           <Route path="/support" element={<LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage>} />
           <Route path="/pricing" element={<LazyPage fallback={copy.common.App_012}><PricingPage /></LazyPage>} />

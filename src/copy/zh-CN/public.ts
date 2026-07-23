@@ -43,6 +43,54 @@ export const publicCopy = {
   components_PublicFooter_010: "加入 QQ 群",
   // src/components/PublicFooter.tsx
   components_PublicFooter_011: "加入 MaaTool 交流群",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_001: "MaaTool 官方",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_002: "更新日志",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_003: "按版本记录 MaaTool 的功能更新、体验优化与问题修复。",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_004: "前端 v",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_005: "后端 v",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_006: "发布日期：",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_007: "排班准确性与稳定性",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_008: "自动安排办公室干员，并调整预览中的办公室与宿舍展示顺序。",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_009: "修正 Jaye 的精英化门槛与效率规则，提升排班结果准确性。",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_010: "平滑排班阶段进度显示，并在优化计算超过十分钟时及时终止异常任务。",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_011: "账号与个人使用",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_012: "注册时校验邮箱服务商与别名，减少不支持的邮箱配置。",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_013: "免费权益使用前新增个人用途确认，明确使用边界。",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_014: "个人用途确认提示改用盾牌图标，增强安全提示的识别性。",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_015: "工作区与管理能力",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_016: "优化优化器工作区的保留策略，改善方案与结果的持续访问体验。",
+  // src/lib/changelog.ts
+  pages_ChangelogPage_017: "管理端现可下载死信任务载荷 JSON，便于定位和处理异常任务。",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_018: "提交 ",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_019: "此版本建立了自动更新日志基线，后续版本将列出自上一正式发布以来的用户可见改动。",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_020: "本次发布未检测到面向用户的更新内容。",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_021: "新功能",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_022: "问题修复",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_023: "性能与体验",
+  // src/pages/ChangelogPage.tsx
+  pages_ChangelogPage_024: "安全与账号",
   // src/pages/AnnouncementsPage.tsx
   pages_AnnouncementsPage_001: "加载公告失败，请稍后重试",
   // src/pages/AnnouncementsPage.tsx
@@ -407,4 +455,6 @@ export const publicCopy = {
   components_PublicFooter_012: "价格与权益",
   // src/components/PublicFooter.tsx
   components_PublicFooter_013: "致谢",
+  // src/components/PublicFooter.tsx
+  components_PublicFooter_014: "更新日志",
 } as const

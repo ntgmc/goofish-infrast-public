@@ -9,6 +9,7 @@ export const SUPPORT_QQ_GROUP_URL = DEFAULT_PUBLIC_CONTENT_SETTINGS.qq_group.joi
 const footerLinks = [
   { to: '/pricing', label: copy.public.components_PublicFooter_012 },
   { to: '/faq', label: copy.public.components_PublicFooter_001 },
+  { to: '/changelog', label: copy.public.components_PublicFooter_014 },
   { to: '/thanks', label: copy.public.components_PublicFooter_013 },
   { to: '/terms', label: copy.public.components_PublicFooter_002 },
   { to: '/privacy', label: copy.public.components_PublicFooter_003 },

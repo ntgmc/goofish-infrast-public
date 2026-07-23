@@ -29,6 +29,36 @@ jobs locally.
 The manual action is therefore a redeploy or rollback mechanism for an already
 validated main commit, not a way to deploy a feature branch.
 
+## Changelog confirmation
+
+`package.json` supplies the manually maintained major/minor release train. The
+Quality Checks workflow appends its build number, so a production candidate may
+be identified as `2.0.435`. That number is a readable build label; the immutable
+target SHA remains the source of truth for the changes it contains.
+
+- Only a `main` push build generates a production changelog candidate. Pull
+  requests, development builds and manual quality-check runs produce no public
+  candidate record.
+- The build reads prior `changelog-release.json` assets from published GitHub
+  Releases, then creates a new candidate from the previous production SHA to
+  the immutable target SHA. Conventional `feat`, `fix`, `perf` and `security`
+  commits are grouped automatically. A commit may supply a user-facing
+  `Release-Note:` trailer, an optional `Release-Note-Type:` trailer, or
+  `Skip-Changelog: true` to opt out.
+- `changelog-release.json` and `changelog-release.md` travel inside the same
+  checksum-verified artifact as the frontend and backend. They are validated
+  against `build-manifest.json`, the generated version metadata and target SHA.
+- Only after the Worker and API deployments complete successfully does the
+  production workflow create or verify the annotated `v<version>` tag, create
+  the GitHub Release and upload the JSON release record. Failed candidates never
+  publish a tag or public changelog entry.
+
+The first automated production candidate has no previous published release
+asset, so it is marked as a changelog baseline unless a maintainer explicitly
+sets `CHANGELOG_BASE_SHA` to a known prior production SHA. The next successful
+version then uses that baseline SHA and produces the first commit-derived update
+list.
+
 ## Runtime layout
 
 The production root is not a live Git checkout:
@@ -263,6 +293,9 @@ ready and Nginx has switched successfully.
    graceful-drain policy.
 8. Keep every referenced release plus the five most recent releases; remove
    only unreferenced older worktrees after a successful deployment.
+9. After both services are live, publish the SHA-bound changelog record as the
+   annotated version tag and GitHub Release; this is the final confirmation that
+   the build is publicly released.
 
 The candidate and active backend overlap briefly. PostgreSQL-backed job locking
 must remain safe with two processes. Any future singleton background task must

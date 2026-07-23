@@ -323,8 +323,12 @@ rm -f admin.cookies
 | `BUILD_NUMBER` | No | 生成版本号时使用的构建序号 |
 | `BUILD_CONTEXT` | No | 构建上下文 |
 | `REFRESH_BUILD_METADATA` | No | 启用版本元数据刷新模式，等同于传入 `--refresh-metadata` |
+| `GENERATE_CHANGELOG_CANDIDATE` | No | 仅在生产候选构建中生成可发布的 Changelog 记录 |
+| `CHANGELOG_BASE_SHA` | No | 首次启用自动 Changelog 时可选的历史基线 SHA；生产候选构建从同名 GitHub Actions repository variable 读取 |
 
 `npm run generate:data` 会根据版本变量生成 `src/lib/build-meta.ts`，并在 `server/handlers/data.ts` 中写入 `data_version`、`generated_at` 和来源摘要。数据会被 Node 服务器通过 `/api/data` 提供。
+
+`npm run generate:changelog` 会生成 `src/lib/.generated/changelog.ts`、`changelog-release.json` 和 `changelog-release.md`。本地、PR 与开发构建只产生非候选元数据；`main` 的生产候选构建会以最近正式、非预发布 GitHub Release 的 SHA 为边界生成更新草稿，生产部署成功后才发布对应 tag、GitHub Release 和历史记录。首次启用时如需从既有正式版本开始计算，维护者可显式设置 `CHANGELOG_BASE_SHA`；否则该构建只建立基线。
 
 生产灾备、恢复演练、S3 权限、备份加密和密钥轮换步骤见 [灾备 Runbook](docs/disaster-recovery.md)。
 
