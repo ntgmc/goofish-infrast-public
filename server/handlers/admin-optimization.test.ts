@@ -73,6 +73,26 @@ describe('admin optimization handler', () => {
     })
   })
 
+  it('downloads the complete dead-letter payload as a no-store JSON attachment', async () => {
+    const payload = {
+      effectiveConfig: { controlCenterLevel: 5 },
+      operators: [{ name: '能天使', elite: 2 }],
+    }
+    getDeadLetterDetail.mockResolvedValue({
+      id: 'letter-1',
+      job_id: 'job-1',
+      payload_json: payload,
+    })
+
+    const response = await adminOptimizationHandler(new Request('http://localhost/api/admin/optimization?view=dead_letter_download&id=letter-1'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(response.headers.get('Content-Type')).toBe('application/json; charset=utf-8')
+    expect(response.headers.get('Content-Disposition')).toBe('attachment; filename="optimization-dead-letter-letter-1.json"')
+    await expect(response.text()).resolves.toBe(JSON.stringify(payload, null, 2))
+  })
+
   it('validates dead-letter detail IDs and reports missing records', async () => {
     const missingId = await adminOptimizationHandler(new Request('http://localhost/api/admin/optimization?view=dead_letter'))
     expect(missingId.status).toBe(400)
