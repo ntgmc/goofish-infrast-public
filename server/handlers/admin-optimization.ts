@@ -29,11 +29,12 @@ export default async function adminOptimizationHandler(req: Request): Promise<Re
           20,
         )))
       }
-      if (view === 'dead_letter') {
+      if (view === 'dead_letter' || view === 'dead_letter_download') {
         const id = url.searchParams.get('id')?.trim() ?? ''
         if (!id) return jsonResponse({ error: '缺少死信任务 ID。' }, 400)
         const deadLetter = await getOptimizationDeadLetterDetail(id)
         if (!deadLetter) return jsonResponse({ error: '死信任务不存在。' }, 404)
+        if (view === 'dead_letter_download') return jsonAttachment(deadLetter.payload_json, deadLetter.id)
         return noStore(jsonResponse({ dead_letter: deadLetter }))
       }
       if (view) return jsonResponse({ error: '不支持的异步任务视图。' }, 400)
@@ -80,4 +81,14 @@ function isDeadLetterStatus(value: string | null): value is OptimizationDeadLett
 function noStore(response: Response): Response {
   response.headers.set('Cache-Control', 'no-store')
   return response
+}
+
+function jsonAttachment(payload: unknown, id: string): Response {
+  const safeId = id.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) || 'unknown'
+  return noStore(new Response(JSON.stringify(payload, null, 2) ?? 'null', {
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="optimization-dead-letter-${safeId}.json"`,
+    },
+  }))
 }

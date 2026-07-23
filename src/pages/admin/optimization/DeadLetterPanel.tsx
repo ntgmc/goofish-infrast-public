@@ -73,7 +73,7 @@ export default function DeadLetterPanel() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="optimization-dlq-title" className="text-base font-semibold text-ink-primary">异步优化死信队列</h2>
-          <p className="mt-1 text-sm text-ink-muted">列表展示诊断摘要，可按需查看原始申请配置、干员数据和完整任务载荷。重放为管理员无偿覆盖，不扣用户额度。</p>
+          <p className="mt-1 text-sm text-ink-muted">列表展示诊断摘要，可按需查看原始申请配置、干员数据，并下载完整任务载荷。重放为管理员无偿覆盖，不扣用户额度。</p>
         </div>
         <span className={`tool-status ${pendingCount > 0 ? 'tool-status--warning' : 'tool-status--current'}`}>待处理 {pendingCount}</span>
       </div>
@@ -97,17 +97,26 @@ export default function DeadLetterPanel() {
                     <p className="text-ink-muted">失败类型 {record.failure_kind} · 尝试 {record.attempt_count} 次 · 重放 {record.replay_count} 次</p>
                     <p className="break-words text-danger">{record.internal_error_message}</p>
                     <details className="text-xs text-ink-muted"><summary className="cursor-pointer">安全诊断摘要</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(record.diagnostic_json, null, 2)}</pre></details>
-                    <button
-                      type="button"
-                      onClick={() => toggleDetail(record.id)}
-                      aria-expanded={expanded}
-                      aria-controls={detailPanelId}
-                      disabled={loadingDetail}
-                      className="mt-2 flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-brand-500 hover:bg-surface-2 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      {expanded ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
-                      {loadingDetail ? '正在加载完整申请数据...' : expanded ? '收起完整申请数据' : '查看完整申请数据'}
-                    </button>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <a
+                        href={getDeadLetterPayloadDownloadUrl(record.id)}
+                        download
+                        className="tool-secondary-action inline-flex min-h-11 items-center px-3 text-sm"
+                      >
+                        下载完整任务载荷 JSON
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => toggleDetail(record.id)}
+                        aria-expanded={expanded}
+                        aria-controls={detailPanelId}
+                        disabled={loadingDetail}
+                        className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-brand-500 hover:bg-surface-2 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {expanded ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+                        {loadingDetail ? '正在加载申请配置和干员数据...' : expanded ? '收起申请配置和干员数据' : '查看申请配置和干员数据'}
+                      </button>
+                    </div>
                   </div>
                   {record.status === 'pending_review' && <div className="flex shrink-0 items-center gap-2">
                     {isReadOnlyLegacySuggestion
@@ -149,8 +158,8 @@ function DeadLetterPayloadDetails({ detail }: { detail: AdminOptimizationDeadLet
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold text-ink-primary">完整申请数据</h3>
-        <p className="mt-1 text-xs text-ink-muted">以下内容来自原任务的持久化载荷，用于还原死信发生时实际参与计算的数据。</p>
+        <h3 className="text-sm font-semibold text-ink-primary">申请配置和干员数据</h3>
+        <p className="mt-1 text-xs text-ink-muted">以下内容来自原任务的持久化载荷；如需完整任务数据，请使用上方 JSON 下载。</p>
       </div>
       <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <PayloadSummary label="载荷版本" value={typeof payload?.version === 'number' ? String(payload.version) : '未知'} />
@@ -168,7 +177,6 @@ function DeadLetterPayloadDetails({ detail }: { detail: AdminOptimizationDeadLet
       ) : (
         <CollapsibleJsonData title={`干员数据（${operators.length}）`} value={operators} />
       )}
-      <CollapsibleJsonData title="完整任务载荷" value={detail.payload_json} />
     </div>
   )
 }
@@ -208,4 +216,8 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function formatJson(value: unknown): string {
   return JSON.stringify(value, null, 2) ?? String(value)
+}
+
+function getDeadLetterPayloadDownloadUrl(id: string): string {
+  return `/api/admin/optimization?view=dead_letter_download&id=${encodeURIComponent(id)}`
 }
