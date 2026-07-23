@@ -41,6 +41,8 @@ const buildRelevantScripts = new Set([
   'scripts/check-skland-handler.mjs',
   'scripts/check-workspace-history.mjs',
   'scripts/generate-data.mjs',
+  'scripts/changelog-lib.mjs',
+  'scripts/generate-changelog.mjs',
   'scripts/deploy-production-atomic.sh',
   'scripts/deploy-worker-atomic.sh',
   'scripts/deploy-production.sh',

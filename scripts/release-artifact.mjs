@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { validateChangelogEnvelope } from './changelog-lib.mjs'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const root = resolve(process.env.RELEASE_ROOT || repositoryRoot)
@@ -23,6 +24,7 @@ async function createReleaseManifest() {
   const targetSha = requireSha(argumentsMap.sha || process.env.VERSION_SOURCE_SHA || process.env.GITHUB_SHA)
   const buildMeta = readObjectLiteral(await readFile(join(root, 'src/lib/.generated/build-meta.ts'), 'utf8'), 'APP_BUILD_META')
   if (buildMeta.git_sha !== targetSha) throw new Error(`build metadata SHA mismatch: ${buildMeta.git_sha || 'missing'}`)
+  const changelog = await readChangelogEnvelope(root, targetSha, buildMeta)
 
   const files = await collectArtifactHashes(root)
   const manifest = {
@@ -35,6 +37,7 @@ async function createReleaseManifest() {
     github_run_url: argumentsMap['run-url'] || process.env.GITHUB_RUN_URL || 'unknown',
     node_version: process.version,
     npm_version: resolveNpmVersion(),
+    changelog,
     files,
   }
   await writeJson(join(root, 'build-manifest.json'), manifest)
@@ -57,6 +60,8 @@ async function verifyReleaseManifest() {
   if (manifest.schema_version !== 1) throw new Error('unsupported build manifest schema')
   if (manifest.target_sha !== targetSha) throw new Error(`artifact target SHA mismatch: ${manifest.target_sha || 'missing'}`)
   if (manifest.build_meta?.git_sha !== targetSha) throw new Error('artifact build metadata SHA mismatch')
+  const changelog = await readChangelogEnvelope(root, targetSha, manifest.build_meta)
+  if (JSON.stringify(manifest.changelog) !== JSON.stringify(changelog)) throw new Error('artifact changelog metadata mismatch')
 
   const expectedFiles = manifest.files
   if (!expectedFiles || typeof expectedFiles !== 'object') throw new Error('artifact file hashes are missing')
@@ -78,6 +83,30 @@ async function verifyReleaseManifest() {
     if (actualFiles[path] !== expectedFiles[path]) throw new Error(`artifact hash mismatch: ${path}`)
   }
   process.stdout.write(`Verified release artifact for ${targetSha}\n`)
+}
+
+async function readChangelogEnvelope(releaseRoot, targetSha, buildMeta) {
+  let envelope
+  let notes
+  try {
+    [envelope, notes] = await Promise.all([
+      readFile(join(releaseRoot, 'changelog-release.json'), 'utf8').then((source) => JSON.parse(source)),
+      readFile(join(releaseRoot, 'changelog-release.md'), 'utf8'),
+    ])
+  } catch (error) {
+    throw new Error(`release changelog metadata is missing or invalid: ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  if (!notes.trim().startsWith('#')) throw new Error('release changelog notes must start with a Markdown heading')
+  validateChangelogEnvelope(envelope)
+  if (!envelope.candidate) return envelope
+
+  const release = envelope.release
+  if (release.targetSha !== targetSha) throw new Error('release changelog target SHA mismatch')
+  if (release.version !== buildMeta.frontend_version || release.version !== buildMeta.backend_version) {
+    throw new Error('release changelog version does not match build metadata')
+  }
+  return envelope
 }
 
 async function collectArtifactHashes(base) {
