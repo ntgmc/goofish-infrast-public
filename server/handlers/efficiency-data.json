@@ -3204,11 +3204,11 @@
           {
             "combo": [
               "银灰",
-              "崖心"
+              "崖心/2"
             ],
             "efficiency": 55,
             "priority": 3277,
-            "order_limit_delta": 2,
+            "order_limit_delta": 8,
             "skill_rule_refs": [
               {
                 "id": "PRTS-TRD-0279",
@@ -3467,10 +3467,7 @@
             "combo": [
               "可颂/2",
               "衡沙/2",
-              "拜松/2",
-              "梓兰/1",
-              "玫兰莎",
-              "远山"
+              "拜松/2"
             ],
             "apply_each": true,
             "efficiency": 34,
@@ -3490,10 +3487,6 @@
                 "hash": "sha256:0474f3b8ee28c73af54f753d717b99b25c2bd75be735a8755e86070170d7deb4"
               },
               {
-                "id": "PRTS-TRD-0270",
-                "hash": "sha256:fbd4f045df2a738d34965012f0166570d2056fb81e1406bf44b5f25e7f7691d4"
-              },
-              {
                 "id": "PRTS-TRD-0273",
                 "hash": "sha256:4c5a6adbc8748a2fb0c13274c60bda8c40b13b705d4c96c2f07708f0597c35b0"
               },
@@ -3504,6 +3497,27 @@
               {
                 "id": "PRTS-TRD-0275",
                 "hash": "sha256:0137e2eda16271c41ed39d4d9cdfb0f60ad3375816dc7593b1773848192e481b"
+              },
+              {
+                "id": "PRTS-TRD-0298",
+                "hash": "sha256:77d10d2eed25e73963a00ec343b72fbf247f9457f1e60f8a6b705ceb5507e839"
+              }
+            ]
+          },
+          {
+            "combo": [
+              "梓兰/1",
+              "玫兰莎",
+              "远山"
+            ],
+            "apply_each": true,
+            "efficiency": 29,
+            "priority": 3795,
+            "order_limit_delta": 1,
+            "skill_rule_refs": [
+              {
+                "id": "PRTS-TRD-0270",
+                "hash": "sha256:fbd4f045df2a738d34965012f0166570d2056fb81e1406bf44b5f25e7f7691d4"
               },
               {
                 "id": "PRTS-TRD-0298",
