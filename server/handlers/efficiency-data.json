@@ -6250,6 +6250,40 @@
         {
           "combo": [
             "温蒂/2",
+            "清流/1",
+            "冬时/1"
+          ],
+          "product": "Pure Gold",
+          "efficiency": 30,
+          "dynamic_effects": {
+            "type": "facility_count_formula",
+            "base": 30,
+            "per_power_station": 15,
+            "per_trading_station": 20,
+            "scope": "manufacturing_station",
+            "detail": "温蒂、清流、冬时：冬时满编+30%，温蒂每个有效发电站+15%，清流每个贸易站+20%；三者均为设施数量加成，可在冬时清零常规生产力时保留。"
+          },
+          "priority": 5976,
+          "storage_capacity_delta": 5,
+          "note": "动态：温蒂/清流/冬时三人组仅限赤金；冬时清零同房常规生产力，但保留温蒂和清流的设施数量加成。",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0140",
+              "hash": "sha256:7332ee80977483bcc04d831183727897cb5c3665817a0a9314d02a5696b53d1c"
+            },
+            {
+              "id": "PRTS-MFG-0157",
+              "hash": "sha256:fc1a5516a69b1bd20ad12096d508dcfedafb9205ff2a3c20e340e32ce1cb5999"
+            },
+            {
+              "id": "PRTS-MFG-0191",
+              "hash": "sha256:78d76cc879d39668f547d3b735e5ce32fb581056ee8667ec1c8b963c221ab2bd"
+            }
+          ]
+        },
+        {
+          "combo": [
+            "温蒂/2",
             "森蚺/2",
             "清流/1"
           ],
