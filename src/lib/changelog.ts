@@ -6,9 +6,9 @@ export type { ChangelogRelease, ChangelogSection } from './changelog-contract'
 
 const MANUAL_CHANGELOG_RELEASES = [
   {
-    id: '2026-07-23-frontend-9.8.7-backend-9.8.6',
+    id: '2026-07-23-frontend-2.0.435-backend-2.0.435',
     version: null,
-    displayVersion: `${copy.public.pages_ChangelogPage_004}9.8.7 · ${copy.public.pages_ChangelogPage_005}9.8.6`,
+    displayVersion: `${copy.public.pages_ChangelogPage_004}2.0.435 · ${copy.public.pages_ChangelogPage_005}2.0.435`,
     releasedAt: '2026-07-23',
     kind: 'release',
     sections: [

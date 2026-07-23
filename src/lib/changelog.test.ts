@@ -15,7 +15,7 @@ describe('changelog releases', () => {
 
     expect(release).toMatchObject({
       releasedAt: '2026-07-23',
-      displayVersion: '前端 v9.8.7 · 后端 v9.8.6',
+      displayVersion: '前端 v2.0.435 · 后端 v2.0.435',
       kind: 'release',
     })
     expect(release.sections.map(({ id }) => id)).toEqual([
