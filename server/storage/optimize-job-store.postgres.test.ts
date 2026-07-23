@@ -229,6 +229,100 @@ describe('PostgreSQL optimization job admission', () => {
     expect((await query<{ count: string }>("select count(*)::text as count from entitlement_ledger where profile_id = $1 and entitlement_type = 'free_schedule'", [profileId])).rows[0]?.count).toBe('1')
   })
 
+  it('atomically reserves reorder quota once and releases it when the queued job is cancelled', async () => {
+    const profileId = await seedProfile()
+    const store = createPostgresOptimizeJobStore()
+    const windowKey = shanghaiMonthKey(new Date().toISOString())
+    const firstInput = input({
+      owner_key: `reorder-job:${randomUUID()}`,
+      profile_id: profileId,
+      source: 'reorder_check',
+      payload_json: { version: 3, kind: 'reorder_check' },
+      reorderCheckQuota: { profileId, windowKey, limit: 1 },
+    })
+    const first = await store.admitJob(firstInput)
+    await expect(store.admitJob({ ...firstInput, id: randomUUID() })).resolves.toMatchObject({
+      replayed: true,
+      job: { id: first.job.id },
+    })
+    expect((await query<{ count: string }>(
+      `select count(*)::text as count from entitlement_ledger
+       where profile_id = $1 and entitlement_type = 'reorder_check' and status = 'reserved'`,
+      [profileId],
+    )).rows[0]?.count).toBe('1')
+
+    await expect(store.admitJob(input({
+      owner_key: `reorder-job:${randomUUID()}`,
+      profile_id: profileId,
+      source: 'reorder_check',
+      payload_json: { version: 3, kind: 'reorder_check' },
+      reorderCheckQuota: { profileId, windowKey, limit: 1 },
+    }))).rejects.toMatchObject({ code: 'reorder_check_quota_exceeded', status: 429 })
+
+    await store.requestCancel(first.job.id)
+    expect((await query<{ status: string }>(
+      `select status from entitlement_ledger
+       where reference_type = 'optimization_job' and reference_id = $1`,
+      [first.job.id],
+    )).rows[0]?.status).toBe('released')
+
+    const replacement = await store.admitJob(input({
+      owner_key: `reorder-job:${randomUUID()}`,
+      profile_id: profileId,
+      source: 'reorder_check',
+      payload_json: { version: 3, kind: 'reorder_check' },
+      reorderCheckQuota: { profileId, windowKey, limit: 1 },
+    }))
+    await store.requestCancel(replacement.job.id)
+  })
+
+  it('consumes reorder quota and grants the strong bonus in the successful attempt transaction', async () => {
+    const profileId = await seedProfile()
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      priority: 2_000_000_000,
+      owner_key: `reorder-job:${randomUUID()}`,
+      profile_id: profileId,
+      source: 'reorder_check',
+      payload_json: { version: 3, kind: 'reorder_check' },
+      reorderCheckQuota: {
+        profileId,
+        windowKey: shanghaiMonthKey(new Date().toISOString()),
+        limit: 2,
+      },
+    }))
+    const lockToken = randomUUID()
+    const claimed = await store.claimNextJob('reorder-success-worker', lockToken, new Date(Date.now() + 60_000).toISOString(), 2, 10)
+    expect(claimed?.id).toBe(admitted.job.id)
+
+    await expect(store.completeAttempt(
+      admitted.job.id,
+      claimed!.attempt_count,
+      'reorder-success-worker',
+      lockToken,
+      { recommendation: 'strongly_recommended', quota: { limit: 2, used: 1, remaining: 1 } },
+    )).resolves.toBe(true)
+
+    expect((await query<{ status: string }>(
+      `select status from entitlement_ledger
+       where reference_type = 'optimization_job' and reference_id = $1 and entitlement_type = 'reorder_check'`,
+      [admitted.job.id],
+    )).rows[0]?.status).toBe('consumed')
+    expect((await query<{ strong_reorder_bonus_month: string | null }>(
+      'select strong_reorder_bonus_month from profile_entitlements where profile_id = $1',
+      [profileId],
+    )).rows[0]?.strong_reorder_bonus_month).toBe(shanghaiMonthKey(new Date().toISOString()))
+    await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({
+      status: 'succeeded',
+      result_json: {
+        recommendation: 'strongly_recommended',
+        free_schedule_entitlement: {
+          strong_reorder_bonus: { used_at: null },
+        },
+      },
+    })
+  })
+
   it('replays an idempotent submit and limits a paid owner to three queued jobs', async () => {
     const store = createPostgresOptimizeJobStore()
     const owner = `license:${randomUUID()}`

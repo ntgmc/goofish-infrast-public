@@ -234,7 +234,7 @@ export interface OptimizeJobStatusResponse {
   recovery_action?: 'retry' | 'review_input' | 'reauthorize' | 'contact_support' | 'none';
   support_reference?: string;
   failure_kind?: string;
-  job_kind?: 'schedule' | 'scenario_comparison';
+  job_kind?: 'schedule' | 'scenario_comparison' | 'reorder_check';
   source?: string;
   execution_phase?: 'initial_queue' | 'retry_wait' | 'executing' | 'settling' | 'terminal';
   attempt_count?: number;

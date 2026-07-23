@@ -151,7 +151,9 @@ async function canReadOptimizeJob(
   req: Request,
   job: OptimizeJobRecord,
 ): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
-  if (!job.owner_key.startsWith('profile:')) {
+  const profileId = job.profile_id
+    ?? (job.owner_key.startsWith('profile:') ? job.owner_key.slice('profile:'.length) : null)
+  if (!profileId) {
     const token = req.headers.get('X-Optimize-Job-Token')?.trim() ?? '';
     return verifyOptimizeJobPollToken(job, token)
       ? { ok: true }
@@ -159,13 +161,12 @@ async function canReadOptimizeJob(
   }
   const auth = await requireUserSession(req);
   if (!auth) return { ok: false, status: 401, message: '请先登录后查看任务状态。' };
-  const profileId = job.owner_key.slice('profile:'.length);
   const profile = await getProfileForUser(auth.user.id, profileId);
   if (!profile) return { ok: false, status: 403, message: '无权查看该任务。' };
   return { ok: true };
 }
 
-async function buildOptimizeJobAccepted(job: OptimizeJobRecord): Promise<OptimizationJobSnapshot> {
+export async function buildOptimizeJobAccepted(job: OptimizeJobRecord): Promise<OptimizationJobSnapshot> {
   const queuePosition = await getOptimizeJobStore().getQueuePosition(job.id);
   const estimate = getOptimizeJobEstimate(job);
   const runtimeEstimate = getOptimizeRuntimeEstimate(job, queuePosition, estimate);
@@ -256,9 +257,10 @@ function getUpgradeSuggestionIntent(job: OptimizeJobRecord): { requested: boolea
   }
 }
 
-function getOptimizeJobKind(job: OptimizeJobRecord): 'schedule' | 'scenario_comparison' {
+function getOptimizeJobKind(job: OptimizeJobRecord): 'schedule' | 'scenario_comparison' | 'reorder_check' {
   const payload = job.payload_json && typeof job.payload_json === 'object' ? job.payload_json as Record<string, unknown> : {}
   if (payload.kind === 'scenario_comparison') return 'scenario_comparison'
+  if (payload.kind === 'reorder_check') return 'reorder_check'
   return 'schedule'
 }
 

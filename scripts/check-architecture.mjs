@@ -48,10 +48,14 @@ if (jobStatusSource.includes('optimize-job-runner')) {
 }
 
 for (const filename of [
+  'server/routes.ts',
+  'server/handlers/optimization.ts',
   'server/index.ts',
   'server/api-process.ts',
   'server/api-process-hooks.ts',
   'server/optimize-queue-maintenance.ts',
+  'server/optimization/jobs/job-status.ts',
+  'server/optimization/jobs/reorder-submission.ts',
 ]) {
   const source = await readFile(filename, 'utf8')
   if (source.includes('optimize-job-runner')) {
@@ -62,6 +66,12 @@ for (const filename of [
   }
   if (source.includes('optimization/engine/')) {
     failures.push(`${filename}: public API process boundary imports optimizer engine directly`)
+  }
+  if (source.includes('reorder-analysis')) {
+    failures.push(`${filename}: public API process boundary imports reorder analysis directly`)
+  }
+  if (source.includes('reorder-executor')) {
+    failures.push(`${filename}: public API process boundary imports reorder worker executor directly`)
   }
 }
 
