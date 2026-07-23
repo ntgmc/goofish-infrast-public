@@ -6,7 +6,7 @@ import { copy, CURRENT_LOCALE } from '../../copy/index'
 
 
 const MAX_MOOD_FALLBACK = 24
-const ROOM_DISPLAY_ORDER = ['trading', 'manufacture', 'power', 'control', 'meeting', 'dormitory'] as const
+const ROOM_DISPLAY_ORDER = ['trading', 'manufacture', 'power', 'control', 'meeting', 'hire', 'dormitory'] as const
 const UNKNOWN_ROOM_DISPLAY_RANK = ROOM_DISPLAY_ORDER.length
 const ROOM_DISPLAY_RANK: Record<string, number> = ROOM_DISPLAY_ORDER.reduce(
   (rank, roomType, index) => ({ ...rank, [roomType]: index }),
