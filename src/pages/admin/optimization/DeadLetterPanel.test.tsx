@@ -18,19 +18,22 @@ describe('DeadLetterPanel', () => {
     })
   })
 
-  it('loads and displays the original configuration, operator data, and complete payload on demand', async () => {
+  it('shows the original configuration and operator data on demand while exposing the complete payload as a download', async () => {
     render(<DeadLetterPanel />)
 
     expect(await screen.findByText(/任务 job-1/)).toBeInTheDocument()
     expect(screen.queryByText('申请的基建配置')).not.toBeInTheDocument()
+    const download = screen.getByRole('link', { name: '下载完整任务载荷 JSON' })
+    expect(download).toHaveAttribute('href', '/api/admin/optimization?view=dead_letter_download&id=letter-1')
+    expect(download).toHaveAttribute('download')
 
-    fireEvent.click(screen.getByRole('button', { name: '查看完整申请数据' }))
+    fireEvent.click(screen.getByRole('button', { name: '查看申请配置和干员数据' }))
 
     expect(await screen.findByText('申请的基建配置')).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: '申请的基建配置' })).getByText(/"controlCenterLevel": 5/)).toBeInTheDocument()
     const operatorSummary = screen.getByText('干员数据（1）')
     expect(operatorSummary).toBeInTheDocument()
-    expect(screen.getByText('完整任务载荷')).toBeInTheDocument()
+    expect(screen.queryByText('完整任务载荷')).not.toBeInTheDocument()
     expect(within(operatorSummary.closest('details')!).getByText(/"name": "能天使"/)).toBeInTheDocument()
     expect(adminApiJson).toHaveBeenCalledWith(
       '/api/admin/optimization?view=dead_letter&id=letter-1',

@@ -52,6 +52,34 @@ describe('optimization dispatcher startup recovery', () => {
     delete process.env.OPTIMIZE_RETRY_BASE_MS
   })
 
+  it('enforces the hard timeout for inline execution', async () => {
+    const store = createMemoryOptimizeJobStore()
+    globalThis.__maaOptimizeJobStoreForTesting = store
+    process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS = '25'
+    process.env.OPTIMIZE_JOB_MAX_ATTEMPTS = '2'
+    registerOptimizeJobExecutor(async () => new Promise<never>(() => undefined))
+    const job = await store.createJob(input())
+
+    const startedAt = Date.now()
+    try {
+      requestOptimizeJobProcessing()
+      await waitFor(async () => (await store.getJob(job.id))?.status === 'dead_lettered')
+
+      expect(Date.now() - startedAt).toBeLessThan(750)
+      await expect(store.getJob(job.id)).resolves.toMatchObject({
+        status: 'dead_lettered',
+        attempt_count: 1,
+        failure_count: 1,
+        failure_kind: 'timed_out',
+        public_error_code: 'execution_retries_exhausted',
+      })
+    } finally {
+      registerOptimizeJobExecutor(async (nextJob) => ({ completedJobId: nextJob.id }))
+      delete process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS
+      delete process.env.OPTIMIZE_JOB_MAX_ATTEMPTS
+    }
+  })
+
   it('terminates a CPU-blocked worker at the parent wall-clock deadline', async () => {
     const store = globalThis.__maaOptimizeJobStoreForTesting!
     process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING = '1'
@@ -75,6 +103,35 @@ describe('optimization dispatcher startup recovery', () => {
     delete process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING
     delete process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS
     delete process.env.OPTIMIZE_JOB_MAX_ATTEMPTS
+  })
+
+  it('uses only the remaining calculation budget after a retry', async () => {
+    const store = createMemoryOptimizeJobStore()
+    globalThis.__maaOptimizeJobStoreForTesting = store
+    process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING = '1'
+    process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING = resolve('server/test-fixtures/optimize-busy-worker.mjs')
+    process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS = '1000'
+    process.env.OPTIMIZE_JOB_MAX_ATTEMPTS = '1'
+    const job = await store.createJob({ ...input(), payload_json: { busyMs: 2_000 } })
+    store.records.get(job.id)!.started_at = new Date(Date.now() - 900).toISOString()
+
+    const startedAt = Date.now()
+    try {
+      requestOptimizeJobProcessing()
+      await waitFor(async () => (await store.getJob(job.id))?.status === 'dead_lettered')
+
+      expect(Date.now() - startedAt).toBeLessThan(750)
+      await expect(store.getJob(job.id)).resolves.toMatchObject({
+        status: 'dead_lettered',
+        attempt_count: 1,
+        failure_kind: 'timed_out',
+      })
+    } finally {
+      delete process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING
+      delete process.env.OPTIMIZE_WORKER_ENTRY_FOR_TESTING
+      delete process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS
+      delete process.env.OPTIMIZE_JOB_MAX_ATTEMPTS
+    }
   })
 
   it('persists worker-thread progress messages before completing the attempt', async () => {

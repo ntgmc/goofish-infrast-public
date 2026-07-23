@@ -36,6 +36,7 @@ describe('public information pages', () => {
     expect(screen.getByRole('link', { name: '隐私政策' })).toHaveAttribute('href', '/privacy')
     expect(screen.getByRole('link', { name: '免责声明' })).toHaveAttribute('href', '/disclaimer')
     expect(screen.getByRole('link', { name: '致谢' })).toHaveAttribute('href', '/thanks')
+    expect(screen.getByRole('link', { name: '更新日志' })).toHaveAttribute('href', '/changelog')
 
     const supportLink = screen.getByRole('link', { name: /加入 QQ 群.*891655477/ })
     expect(supportLink).toHaveAttribute('href', SUPPORT_QQ_GROUP_URL)

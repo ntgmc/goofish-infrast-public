@@ -33,6 +33,10 @@ describe('database schema ownership', () => {
     expect(queryMock).toHaveBeenCalledTimes(2)
     expect(queryMock.mock.calls[0][0]).toMatch(/CREATE TABLE IF NOT EXISTS security_rate_limit_buckets/)
     expect(queryMock.mock.calls[0][0]).toMatch(/CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances/)
+    expect(queryMock.mock.calls[0][0]).toMatch(/WITH workspace_retention AS/)
+    expect(queryMock.mock.calls[0][0]).toMatch(/trimmed_workspace_history AS/)
+    expect(queryMock.mock.calls[0][0]).toMatch(/jsonb_array_elements\(record_json->'saved_configs'\) WITH ORDINALITY/)
+    expect(queryMock.mock.calls[0][0]).toMatch(/jsonb_array_elements\(record_json->'result_history'\) WITH ORDINALITY/)
     expect(queryMock.mock.calls[1][0]).toMatch(/insert into personal_use_declaration_versions/i)
   })
 

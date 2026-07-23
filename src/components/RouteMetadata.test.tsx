@@ -40,6 +40,12 @@ describe('RouteMetadata', () => {
     expect(document.title).toBe('致谢 | MaaTool')
     expect(metaByName('robots')).toBe('index, follow')
 
+    await act(async () => router.navigate('/changelog'))
+    expect(document.title).toBe('更新日志 | MaaTool')
+    expect(metaByName('description')).toBe('查看 MaaTool 各版本的功能更新、体验优化与问题修复。')
+    expect(metaByName('robots')).toBe('index, follow')
+    expect(metaByProperty('og:url')).toBe(currentUrl('/changelog'))
+
     await act(async () => router.navigate('/tool/profiles'))
 
     expect(document.title).toBe('MaaTool 工作台')
