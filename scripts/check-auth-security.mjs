@@ -263,7 +263,7 @@ async function assertRegistrationCdkTransaction() {
   )
 
   const registered = await userAuth.registerUser(
-    'new-user@example.com',
+    'new-user@qq.com',
     'valid-password',
     'valid-cdk',
     'registration-request',
@@ -309,8 +309,46 @@ async function assertRegistrationBrevoQuotaPolicies() {
     globalThis.__authSecurityVerificationTokens = []
   }
 
+  reset({ email_verification_required: true, invite_code_required: false, brevo_quota_action: 'pause_registration' }, false)
+  const unsupportedProvider = await userAuth.registerUser('blocked@company.example', 'valid-password')
+  assert.deepEqual(unsupportedProvider, {
+    ok: false,
+    status: 400,
+    message: '注册仅支持常用公共邮箱，不支持企业、自建或临时邮箱。',
+    code: 'email_provider_not_allowed',
+  })
+  assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
+  assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 0)
+  assert.equal(globalThis.__authSecurityVerificationTokens.length, 0)
+  assert.equal(globalThis.__authSecurityEmailSendCalls, 0)
+
+  const aliasAddress = await userAuth.registerUser('alias+tag@qq.com', 'valid-password')
+  assert.deepEqual(aliasAddress, {
+    ok: false,
+    status: 400,
+    message: '注册不支持邮箱别名。请移除“+”；Gmail 请同时移除用户名中的“.”并使用 gmail.com。',
+    code: 'email_alias_not_allowed',
+  })
+  assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
+  assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 0)
+  assert.equal(globalThis.__authSecurityVerificationTokens.length, 0)
+  assert.equal(globalThis.__authSecurityEmailSendCalls, 0)
+
+  const typoAddress = await userAuth.registerUser('correct@gmial.com', 'valid-password')
+  assert.deepEqual(typoAddress, {
+    ok: false,
+    status: 400,
+    message: '邮箱域名可能有误，请使用建议地址。',
+    code: 'email_domain_typo',
+    suggestedEmail: 'correct@gmail.com',
+  })
+  assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
+  assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 0)
+  assert.equal(globalThis.__authSecurityVerificationTokens.length, 0)
+  assert.equal(globalThis.__authSecurityEmailSendCalls, 0)
+
   reset({ email_verification_required: true, invite_code_required: true, brevo_quota_action: 'pause_registration' }, false)
-  const inviteRequired = await userAuth.registerUser('invite-required@example.com', 'valid-password')
+  const inviteRequired = await userAuth.registerUser('invite-required@qq.com', 'valid-password')
   assert.deepEqual(inviteRequired, {
     ok: false,
     status: 400,
@@ -321,7 +359,7 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 0)
 
   reset({ email_verification_required: true, invite_code_required: false, brevo_quota_action: 'pause_registration' }, true)
-  const paused = await userAuth.registerUser('paused@example.com', 'valid-password')
+  const paused = await userAuth.registerUser('paused@qq.com', 'valid-password')
   assert.deepEqual(paused, {
     ok: false,
     status: 503,
@@ -336,7 +374,7 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.equal(globalThis.__authSecurityEmailSendCalls, 0)
 
   reset({ email_verification_required: true, invite_code_required: false, brevo_quota_action: 'allow_unverified_registration' }, true)
-  const bypassed = await userAuth.registerUser('bypassed@example.com', 'valid-password')
+  const bypassed = await userAuth.registerUser('bypassed@qq.com', 'valid-password')
   assert.equal(bypassed.ok, true)
   assert.equal(bypassed.verificationRequired, false)
   assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 1)
@@ -344,14 +382,14 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.equal(globalThis.__authSecurityEmailSendCalls, 0)
 
   reset({ email_verification_required: true, invite_code_required: false, brevo_quota_action: 'allow_unverified_registration' }, false)
-  const verified = await userAuth.registerUser('verified@example.com', 'valid-password')
+  const verified = await userAuth.registerUser('verified@qq.com', 'valid-password')
   assert.equal(verified.ok, true)
   assert.equal(verified.verificationRequired, true)
   assert.equal(globalThis.__authSecurityVerificationTokens.length, 1)
   assert.equal(globalThis.__authSecurityEmailSendCalls, 1)
 
   reset({ email_verification_required: false, invite_code_required: false, brevo_quota_action: 'pause_registration' }, true)
-  const verificationDisabled = await userAuth.registerUser('disabled@example.com', 'valid-password')
+  const verificationDisabled = await userAuth.registerUser('disabled@qq.com', 'valid-password')
   assert.equal(verificationDisabled.ok, true)
   assert.equal(verificationDisabled.verificationRequired, false)
   assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
@@ -856,14 +894,58 @@ function assertClientIpResolution(clientIpModule) {
 
 async function assertUserLoginRateLimits() {
   globalThis.__authSecurityLoginCalls = 0
+  globalThis.__authSecurityRegisterCalls = 0
   globalThis.__authSecurityRegisterResult = { ok: true, user: { id: 'user-registered' }, verificationRequired: true }
   globalThis.__authSecuritySession = null
   const authHandler = await bundleModule('server/handlers/auth.ts', 'auth-handler', [authHandlerPlugin()])
 
+  const unsupportedProvider = await authHandler.default(new Request('http://local/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': '192.0.2.29' },
+    body: JSON.stringify({ email: 'blocked@company.example', password: 'correct-password' }),
+  }))
+  assert.equal(unsupportedProvider.status, 400)
+  assert.deepEqual(await unsupportedProvider.json(), {
+    error: '注册仅支持常用公共邮箱，不支持企业、自建或临时邮箱。',
+    code: 'email_provider_not_allowed',
+  })
+
+  const aliasAddress = await authHandler.default(new Request('http://local/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': '192.0.2.29' },
+    body: JSON.stringify({ email: 'alias+tag@qq.com', password: 'correct-password' }),
+  }))
+  assert.equal(aliasAddress.status, 400)
+  assert.deepEqual(await aliasAddress.json(), {
+    error: '注册不支持邮箱别名。请移除“+”；Gmail 请同时移除用户名中的“.”并使用 gmail.com。',
+    code: 'email_alias_not_allowed',
+  })
+
+  const typoAddress = await authHandler.default(new Request('http://local/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': '192.0.2.29' },
+    body: JSON.stringify({ email: 'correct@gmial.com', password: 'correct-password' }),
+  }))
+  assert.equal(typoAddress.status, 400)
+  assert.deepEqual(await typoAddress.json(), {
+    error: '邮箱域名可能有误，请使用建议地址。',
+    code: 'email_domain_typo',
+    suggested_email: 'correct@gmail.com',
+  })
+  for (const email of ['repeat-one@company.example', 'repeat-two@company.example']) {
+    const response = await authHandler.default(new Request('http://local/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': '192.0.2.29' },
+      body: JSON.stringify({ email, password: 'correct-password' }),
+    }))
+    assert.equal(response.status, 400)
+  }
+  assert.equal(globalThis.__authSecurityRegisterCalls, 0, 'invalid registration emails should skip registerUser')
+
   const registrationAccepted = await authHandler.default(new Request('http://local/api/auth/register', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': '192.0.2.30' },
-    body: JSON.stringify({ email: 'new@example.com', password: 'correct-password' }),
+    headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': '192.0.2.29' },
+    body: JSON.stringify({ email: 'new@qq.com', password: 'correct-password' }),
   }))
   assert.equal(registrationAccepted.status, 202)
   assert.deepEqual(await registrationAccepted.json(), {
@@ -871,6 +953,7 @@ async function assertUserLoginRateLimits() {
     verification_required: true,
     message: '已发送注册验证邮件，请检查您的收件箱，并在邮件中确认。',
   })
+  assert.equal(globalThis.__authSecurityRegisterCalls, 1)
 
   globalThis.__authSecurityRegisterResult = {
     ok: false,
@@ -882,7 +965,7 @@ async function assertUserLoginRateLimits() {
   const registrationQuotaLimited = await authHandler.default(new Request('http://local/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': '192.0.2.31' },
-    body: JSON.stringify({ email: 'quota@example.com', password: 'correct-password' }),
+    body: JSON.stringify({ email: 'quota@qq.com', password: 'correct-password' }),
   }))
   assert.equal(registrationQuotaLimited.status, 503)
   assert.equal(registrationQuotaLimited.headers.get('Retry-After'), '7200')
@@ -1561,7 +1644,10 @@ function userAuthMock() {
       return { ok: true, user: { id: 'user-1', email }, cookie: 'maa_session=test' }
     }
     export async function buildAuthPayload(user, activeProfileId) { return { user, active_profile_id: activeProfileId } }
-    export async function registerUser() { return globalThis.__authSecurityRegisterResult }
+    export async function registerUser() {
+      globalThis.__authSecurityRegisterCalls = (globalThis.__authSecurityRegisterCalls ?? 0) + 1
+      return globalThis.__authSecurityRegisterResult
+    }
     export async function logoutRequest() {}
     export async function requestPasswordReset() { return { ok: true } }
     export async function resendEmailVerification() { return { ok: true, message: 'ok' } }

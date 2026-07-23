@@ -5,6 +5,7 @@ import {
   getAdminOptimizationQueueSnapshot,
   getOptimizationDeadLetterDetail,
   listOptimizationDeadLetters,
+  isOptimizeJobAdmissionError,
   replayOptimizationDeadLetter,
   type OptimizationDeadLetterRecord,
 } from '../storage/optimize-job-store'
@@ -64,6 +65,9 @@ export default async function adminOptimizationHandler(req: Request): Promise<Re
 
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
+    if (isOptimizeJobAdmissionError(error)) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
     console.error('admin optimization error:', error instanceof Error ? error.name : 'UnknownError')
     return jsonResponse({ error: 'Internal server error' }, 500)
   }

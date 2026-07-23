@@ -21,6 +21,9 @@ export const authCopy = {
   api_password_too_short: "密码至少需要 8 位。",
   api_password_too_long: "密码不能超过 128 位。",
   api_email_invalid: "请输入正确的邮箱地址。",
+  api_email_provider_not_allowed: "注册仅支持常用公共邮箱，不支持企业、自建或临时邮箱。",
+  api_email_alias_not_allowed: "注册不支持邮箱别名。请移除“+”；Gmail 请同时移除用户名中的“.”并使用 gmail.com。",
+  api_email_domain_typo: "邮箱域名可能有误，请使用建议地址。",
   api_credentials_invalid: "邮箱或密码不正确。",
   api_account_inactive: "账号当前不可用。",
   api_email_not_verified: "请先验证邮箱后再登录。",
@@ -109,6 +112,18 @@ export const authCopy = {
   components_AuthForm_034: "16 位管理员邀请码",
   // src/components/AuthForm.tsx
   components_AuthForm_035: "请输入有效的 16 位管理员邀请码",
+  // src/components/AuthForm.tsx
+  components_AuthForm_036: "仅支持常用公共邮箱；不支持企业、自建、临时或别名邮箱。",
+  // src/components/AuthForm.tsx
+  components_AuthForm_037: "注册仅支持常用公共邮箱，不支持企业、自建或临时邮箱。",
+  // src/components/AuthForm.tsx
+  components_AuthForm_038: "注册不支持邮箱别名。请移除“+”；Gmail 请同时移除用户名中的“.”。",
+  // src/components/AuthForm.tsx
+  components_AuthForm_039: "邮箱域名可能有误，请使用建议地址。",
+  // src/components/AuthForm.tsx
+  components_AuthForm_040: "建议地址：",
+  // src/components/AuthForm.tsx
+  components_AuthForm_041: "使用",
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_001: "验证链接无效或已过期。",
   // src/pages/VerifyEmailPage.tsx

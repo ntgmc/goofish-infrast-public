@@ -27,7 +27,7 @@ describe('AuthForm email verification', () => {
 
     render(<AuthForm onAuthenticated={onAuthenticated} />)
     await user.click(screen.getByRole('button', { name: '注册' }))
-    await user.type(screen.getByLabelText('邮箱'), 'new@example.com')
+    await user.type(screen.getByLabelText('邮箱'), 'new@qq.com')
     await user.type(screen.getByLabelText('密码'), 'password123')
     await user.click(screen.getByRole('button', { name: '创建账号' }))
 
@@ -50,7 +50,7 @@ describe('AuthForm email verification', () => {
 
     render(<AuthForm onAuthenticated={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: '注册' }))
-    await user.type(screen.getByLabelText('邮箱'), 'bypassed@example.com')
+    await user.type(screen.getByLabelText('邮箱'), 'bypassed@qq.com')
     await user.type(screen.getByLabelText('密码'), 'password123')
     await user.click(screen.getByRole('button', { name: '创建账号' }))
 
