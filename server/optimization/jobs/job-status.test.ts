@@ -40,7 +40,7 @@ describe('schedule duration estimate buckets', () => {
 })
 
 describe('optimization hard timeout configuration', () => {
-  it('defaults to ten minutes and supports the single test override', () => {
+  it('defaults to ten minutes, supports lower test overrides, and caps larger values', () => {
     expect(DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS).toBe(600_000)
     expect(getOptimizeJobHardTimeoutMs()).toBe(600_000)
     expect(formatOptimizeJobHardTimeout()).toBe('10 分钟')
@@ -48,6 +48,10 @@ describe('optimization hard timeout configuration', () => {
     vi.stubEnv('OPTIMIZE_JOB_HARD_TIMEOUT_MS', '2500')
     expect(getOptimizeJobHardTimeoutMs()).toBe(2_500)
     expect(formatOptimizeJobHardTimeout()).toBe('3 秒')
+
+    vi.stubEnv('OPTIMIZE_JOB_HARD_TIMEOUT_MS', '900000')
+    expect(getOptimizeJobHardTimeoutMs()).toBe(600_000)
+    expect(formatOptimizeJobHardTimeout()).toBe('10 分钟')
   })
 })
 

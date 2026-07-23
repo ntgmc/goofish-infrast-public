@@ -96,6 +96,24 @@ describe('optimization job attempt lifecycle', () => {
     })
   })
 
+  it('dead-letters a running job whose calculation budget expires despite a live lease', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const job = await store.createJob(input())
+    const claimed = await store.claimNextJob('worker-a', 'lock-a', future(), 2)
+    const record = store.records.get(job.id)!
+    record.started_at = new Date(Date.now() - 10 * 60_000 - 1).toISOString()
+    record.lock_expires_at = future()
+
+    await expect(store.recoverExpiredAttempts(new Date().toISOString(), 2)).resolves.toBe(1)
+    await expect(store.getJob(job.id)).resolves.toMatchObject({
+      status: 'dead_lettered',
+      attempt_count: claimed!.attempt_count,
+      failure_count: 1,
+      failure_kind: 'timed_out',
+      public_error_code: 'execution_retries_exhausted',
+    })
+  })
+
   it('retries worker failures but treats application failures as terminal', async () => {
     const retryStore = createMemoryOptimizeJobStore()
     const retryJob = await retryStore.createJob(input())

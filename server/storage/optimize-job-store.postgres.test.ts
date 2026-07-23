@@ -461,6 +461,36 @@ describe('PostgreSQL optimization job admission', () => {
     await query("update optimize_jobs set status = 'failed', next_attempt_at = null, finished_at = now(), updated_at = now() where id = $1", [admitted.job.id])
   })
 
+  it('dead-letters a long-running attempt even while its lease remains valid', async () => {
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({ priority: 150_000 }))
+    const claimed = await store.claimNextJob('deadline-worker', 'deadline-lock', new Date(Date.now() + 60_000).toISOString(), 2, 10)
+    expect(claimed?.id).toBe(admitted.job.id)
+    await query(
+      `update optimize_jobs
+       set started_at = $2, lock_expires_at = $3, updated_at = $3
+       where id = $1`,
+      [
+        admitted.job.id,
+        new Date(Date.now() - 10 * 60_000 - 1).toISOString(),
+        new Date(Date.now() + 60_000).toISOString(),
+      ],
+    )
+
+    await expect(store.recoverExpiredAttempts(new Date().toISOString(), 2)).resolves.toBeGreaterThanOrEqual(1)
+    await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({
+      status: 'dead_lettered',
+      attempt_count: claimed!.attempt_count,
+      failure_count: 1,
+      failure_kind: 'timed_out',
+      public_error_code: 'execution_retries_exhausted',
+    })
+    expect((await query<{ status: string; failure_kind: string }>(
+      'select status, failure_kind from optimize_job_attempts where job_id = $1 and attempt_no = $2',
+      [admitted.job.id, claimed!.attempt_count],
+    )).rows[0]).toEqual({ status: 'timed_out', failure_kind: 'timed_out' })
+  })
+
   it('expires never-started jobs and releases their reserved free entitlement', async () => {
     const profileId = await seedProfile()
     const store = createPostgresOptimizeJobStore()
