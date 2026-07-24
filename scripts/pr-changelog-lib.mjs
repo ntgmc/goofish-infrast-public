@@ -37,7 +37,7 @@ export function normalizeManualSummary(value) {
   return summary ? validateManualSummary(summary) : null
 }
 
-export function normalizeDeepSeekResult(value) {
+function normalizeDeepSeekResult(value) {
   if (!isRecord(value)) throw new Error('DeepSeek 未返回 JSON 对象')
 
   const summary = normalizeChineseText(value.summary, 'DeepSeek 总结', 2000)
