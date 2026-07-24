@@ -34,7 +34,7 @@ def payload_from_rows(rows, existing=None):
 
 class FetchHtmlTests(unittest.TestCase):
     @patch("tools.scrape_prts_logistics.requests.get")
-    def test_fetch_html_uses_requests_and_declared_charset(self, mock_get):
+    def test_fetch_html_uses_browser_headers_and_declared_charset(self, mock_get):
         response = Mock()
         response.headers = {"Content-Type": "text/html; charset=gb18030"}
         response.content = "后勤技能".encode("gb18030")
@@ -50,7 +50,12 @@ class FetchHtmlTests(unittest.TestCase):
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/125.0 Safari/537.36"
-                )
+                ),
+                "Accept": (
+                    "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                    "image/avif,image/webp,*/*;q=0.8"
+                ),
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             },
             timeout=30,
         )
