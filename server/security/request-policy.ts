@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { publicContentDraftSchema } from '../../src/lib/public-content'
+import { SITE_FEATURE_KEYS, type SiteFeatureKey } from '../../src/lib/site-features'
 
 export const REQUEST_BODY_LIMITS = Object.freeze({
   none: 0,
@@ -27,20 +28,10 @@ const optionalString = (max = 256) => z.string().max(max).optional()
 const optionalUnknown = z.unknown().optional()
 const strict = z.strictObject
 
-const siteFeaturesSchema = strict({
-  site: z.boolean(),
-  registration: z.boolean(),
-  login: z.boolean(),
-  profiles: z.boolean(),
-  tools: z.boolean(),
-  cdk_redemption: z.boolean(),
-  free_preview: z.boolean(),
-  schedule_generation: z.boolean(),
-  depot_value: z.boolean(),
-  skland: z.boolean(),
-  invitations: z.boolean(),
-  announcements: z.boolean(),
-})
+const siteFeatureShape = Object.fromEntries(
+  SITE_FEATURE_KEYS.map((key) => [key, z.boolean()]),
+) as Record<SiteFeatureKey, z.ZodBoolean>
+const siteFeaturesSchema = strict(siteFeatureShape)
 
 export const requestSchemas = {
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
