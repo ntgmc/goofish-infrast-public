@@ -201,7 +201,7 @@ test('validates manual Chinese input and bounds the diff sent to DeepSeek', () =
     generatedAt: '2026-07-24T08:00:00.000Z',
     model: 'deepseek-chat',
   }), /至少一个/)
-  assert.throws(() => createPrChangelogPayload({
+  const payloadWithManyItems = createPrChangelogPayload({
     pullRequestNumber: 42,
     headSha: targetSha,
     manualSummary: '这是有效的中文人工说明。',
@@ -212,7 +212,8 @@ test('validates manual Chinese input and bounds the diff sent to DeepSeek', () =
     },
     generatedAt: '2026-07-24T08:00:00.000Z',
     model: 'deepseek-chat',
-  }), /不能超过 12 条/)
+  })
+  assert.equal(payloadWithManyItems.internal_sections[0].items.length, 13)
 
   const internalOnlyPayload = createPrChangelogPayload({
     pullRequestNumber: 43,
