@@ -1,29 +1,50 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
-import type { GiftPackContentInput, ItemDefinition, OnboardingTaskCode } from '../../../lib/inventory-contracts'
+import { itemIconPath } from '../../../lib/inventory-contracts'
+import type { ExpiryPolicy, GiftPackContentInput, ItemDefinition, OnboardingTaskCode } from '../../../lib/inventory-contracts'
 
 type GiftVersion = { id: string; item_code: string; version: number; status: 'draft' | 'published' | 'retired'; contents: GiftPackContentInput[] }
 type TaskConfig = { task_code: OnboardingTaskCode; version: number; enabled: boolean; rewards_json: GiftPackContentInput[] }
 type Campaign = { id: string; item_code: string; status: string; recipient_count: number; granted_count: number; failed_count: number; pending_count: number }
 type Audit = { id: string; admin_username: string; action: string; target_type: string; target_id: string; reason: string; created_at: string }
 type Overview = { definitions: ItemDefinition[]; gift_pack_versions: GiftVersion[]; tasks: TaskConfig[]; campaigns: Campaign[]; audits: Audit[]; user_count: number }
+type AdminTab = 'catalog' | 'packs' | 'onboarding' | 'distribution' | 'audit'
+type TaskDraft = { enabled: boolean; rewards: GiftPackContentInput[] }
 
-const DEFAULT_CONTENTS = JSON.stringify([
+const DEFAULT_CONTENTS: GiftPackContentInput[] = [
   { item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' } },
-], null, 2)
+]
+
+const ADMIN_TABS: Array<{ id: AdminTab; label: string; description: string }> = [
+  { id: 'catalog', label: '道具目录', description: '维护系统道具的展示信息和发放状态' },
+  { id: 'packs', label: '礼包管理', description: '创建礼包并管理不可变内容版本' },
+  { id: 'onboarding', label: '新人任务', description: '配置三项固定引导任务及奖励' },
+  { id: 'distribution', label: '发放中心', description: '单用户、批量发放与批次撤回' },
+  { id: 'audit', label: '操作审计', description: '查看最近的后台道具操作' },
+]
+
+const TASK_LABELS: Record<OnboardingTaskCode, string> = {
+  welcome_inventory: '认识网站',
+  bind_skland: '绑定森空岛',
+  first_main_schedule: '首次主排班',
+}
+
+function initialContents(): GiftPackContentInput[] {
+  return DEFAULT_CONTENTS.map((entry) => ({ ...entry, expiry: { ...entry.expiry } }))
+}
 
 export default function InventoryAdminSection() {
   const [data, setData] = useState<Overview | null>(null)
+  const [activeTab, setActiveTab] = useState<AdminTab>('catalog')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [giftName, setGiftName] = useState('')
   const [giftDescription, setGiftDescription] = useState('')
-  const [contents, setContents] = useState(DEFAULT_CONTENTS)
+  const [contents, setContents] = useState<GiftPackContentInput[]>(initialContents)
   const [taskCode, setTaskCode] = useState<OnboardingTaskCode>('welcome_inventory')
-  const [taskEnabled, setTaskEnabled] = useState(false)
-  const [taskRewards, setTaskRewards] = useState(DEFAULT_CONTENTS)
+  const [taskDrafts, setTaskDrafts] = useState<Partial<Record<OnboardingTaskCode, TaskDraft>>>({})
   const [itemCode, setItemCode] = useState('priority_compute_coupon')
   const [giftVersionId, setGiftVersionId] = useState('')
   const [quantity, setQuantity] = useState(1)
@@ -39,7 +60,7 @@ export default function InventoryAdminSection() {
   const [editItemDescription, setEditItemDescription] = useState('')
   const [editItemIssuance, setEditItemIssuance] = useState(true)
   const [versionItemCode, setVersionItemCode] = useState('')
-  const [versionContents, setVersionContents] = useState(DEFAULT_CONTENTS)
+  const [versionContents, setVersionContents] = useState<GiftPackContentInput[]>(initialContents)
   const [lastGrantId, setLastGrantId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -56,6 +77,20 @@ export default function InventoryAdminSection() {
     setEditItemDescription(item.description)
     setEditItemIssuance(item.issuance_enabled)
   }, [data, editItemCode])
+
+  useEffect(() => {
+    if (!data) return
+    setTaskDrafts((current) => {
+      const next = { ...current }
+      for (const task of data.tasks) {
+        next[task.task_code] ??= {
+          enabled: task.enabled,
+          rewards: task.rewards_json.map((reward) => ({ ...reward, expiry: { ...reward.expiry } })),
+        }
+      }
+      return next
+    })
+  }, [data])
 
   const run = async <T = unknown>(url: string, json: Record<string, unknown>, success: string): Promise<T | null> => {
     setBusy(true)
@@ -93,7 +128,25 @@ export default function InventoryAdminSection() {
         {notice && <div className="tool-alert tool-alert--success mt-4" role="status">{notice}</div>}
       </section>
 
-      <section className="tool-panel overflow-hidden p-5 sm:p-6">
+      <nav className="tool-panel overflow-x-auto p-2" aria-label="道具与礼包管理分区">
+        <div className="flex min-w-max gap-2" role="tablist">
+          {ADMIN_TABS.map((tab) => <button
+            key={tab.id}
+            id={`inventory-admin-tab-${tab.id}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`inventory-admin-panel-${tab.id}`}
+            className={`min-w-32 rounded-xl px-4 py-3 text-left transition ${activeTab === tab.id ? 'bg-accent-500 text-white shadow-sm' : 'text-ink-secondary hover:bg-surface-2 hover:text-ink-primary'}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <span className="block text-sm font-semibold">{tab.label}</span>
+            <span aria-hidden="true" className={`mt-1 hidden text-xs sm:block ${activeTab === tab.id ? 'text-white/80' : 'text-ink-muted'}`}>{tab.description}</span>
+          </button>)}
+        </div>
+      </nav>
+
+      {activeTab === 'catalog' && <section id="inventory-admin-panel-catalog" role="tabpanel" aria-labelledby="inventory-admin-tab-catalog" className="tool-panel overflow-hidden p-5 sm:p-6">
         <h3 className="text-base font-semibold text-ink-primary">道具目录</h3>
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -117,64 +170,71 @@ export default function InventoryAdminSection() {
             <button className="tool-secondary-action" disabled={busy}>保存目录展示信息</button>
           </div>
         </form>
-      </section>
+      </section>}
 
-      <section className="grid gap-5 xl:grid-cols-2">
+      {activeTab === 'packs' && <section id="inventory-admin-panel-packs" role="tabpanel" aria-labelledby="inventory-admin-tab-packs" className="grid gap-5 xl:grid-cols-2">
         <form className="tool-panel p-5" onSubmit={(event) => {
           event.preventDefault()
-          try {
-            void run('/api/admin/items', {
-              action: 'create_gift_pack', name: giftName, description: giftDescription,
-              icon_key: 'generic_gift_pack', contents: parseContents(contents),
-            }, '礼包草稿已创建。')
-          } catch (caught) { setError((caught as Error).message) }
+          void run('/api/admin/items', {
+            action: 'create_gift_pack', name: giftName, description: giftDescription,
+            icon_key: 'generic_gift_pack', contents,
+          }, '礼包草稿已创建。')
         }}>
           <h3 className="text-base font-semibold text-ink-primary">创建自定义礼包</h3>
           <Field label="礼包名称"><input className="tool-field mt-2 w-full" value={giftName} onChange={(event) => setGiftName(event.currentTarget.value)} /></Field>
           <Field label="说明"><textarea className="tool-field mt-2 min-h-20 w-full" value={giftDescription} onChange={(event) => setGiftDescription(event.currentTarget.value)} /></Field>
-          <JsonField value={contents} onChange={setContents} />
-          <button className="tool-primary-action mt-4" disabled={busy}>创建草稿</button>
+          <RewardListEditor id="new-pack-contents" label="礼包内容" value={contents} definitions={data.definitions} versions={data.gift_pack_versions} allowGiftPacks={false} onChange={setContents} />
+          <button className="tool-primary-action mt-4" disabled={busy || contents.length === 0}>创建草稿</button>
         </form>
 
         <div className="tool-panel p-5">
           <h3 className="text-base font-semibold text-ink-primary">礼包版本</h3>
           <form className="mt-4 border-b border-surface-3 pb-4" onSubmit={(event) => {
             event.preventDefault()
-            try { void run('/api/admin/items', { action: 'create_gift_pack_version', item_code: versionItemCode, contents: parseContents(versionContents) }, '礼包新版本草稿已创建。') }
-            catch (caught) { setError((caught as Error).message) }
+            void run('/api/admin/items', { action: 'create_gift_pack_version', item_code: versionItemCode, contents: versionContents }, '礼包新版本草稿已创建。')
           }}>
             <Field label="基于礼包创建新版本"><select className="tool-field mt-2 w-full" value={versionItemCode} onChange={(event) => setVersionItemCode(event.currentTarget.value)}><option value="">请选择礼包</option>{data.definitions.filter((item) => item.kind === 'gift_pack').map((item) => <option key={item.code} value={item.code}>{item.name} · {item.code}</option>)}</select></Field>
-            <JsonField value={versionContents} onChange={setVersionContents} label="新版本内容 JSON" />
-            <button className="tool-secondary-action mt-3" disabled={busy || !versionItemCode}>创建新版本草稿</button>
+            <RewardListEditor id="new-version-contents" label="新版本内容" value={versionContents} definitions={data.definitions} versions={data.gift_pack_versions} allowGiftPacks={false} onChange={setVersionContents} />
+            <button className="tool-secondary-action mt-3" disabled={busy || !versionItemCode || versionContents.length === 0}>创建新版本草稿</button>
           </form>
           <div className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto">
             {data.gift_pack_versions.map((version) => <article className="tool-inset p-3" key={version.id}>
-              <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">{version.item_code} · v{version.version}</span><span className="text-xs text-ink-muted">{version.status}</span></div>
-              <p className="mt-2 text-xs leading-5 text-ink-secondary">{version.contents.map((entry) => `${entry.item_code} × ${entry.quantity}`).join('、') || '空草稿'}</p>
+              <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm text-ink-primary">{data.definitions.find((item) => item.code === version.item_code)?.name ?? version.item_code} · v{version.version}</strong><span className="text-xs text-ink-muted">{giftVersionStatusLabel(version.status)}</span></div>
+              <p className="mt-1 break-all font-mono text-[11px] text-ink-muted">{version.item_code}</p>
+              <RewardSummary contents={version.contents} definitions={data.definitions} />
               {version.status === 'draft' && <button type="button" className="tool-secondary-action mt-3" disabled={busy} onClick={() => void run('/api/admin/items', { action: 'publish_gift_pack_version', version_id: version.id }, '礼包版本已发布。')}>发布</button>}
               {version.status === 'published' && <button type="button" className="tool-secondary-action mt-3" disabled={busy} onClick={() => void run('/api/admin/items', { action: 'retire_gift_pack_version', version_id: version.id }, '礼包版本已退役。')}>退役</button>}
             </article>)}
           </div>
         </div>
-      </section>
+      </section>}
 
-      <form className="tool-panel p-5 sm:p-6" onSubmit={(event) => {
+      {activeTab === 'onboarding' && <form id="inventory-admin-panel-onboarding" role="tabpanel" aria-labelledby="inventory-admin-tab-onboarding" className="tool-panel p-5 sm:p-6" onSubmit={(event) => {
         event.preventDefault()
-        try { void run('/api/admin/items', { action: 'configure_onboarding_task', task_code: taskCode, enabled: taskEnabled, rewards: parseContents(taskRewards) }, '新人任务配置版本已发布。') }
-        catch (caught) { setError((caught as Error).message) }
+        const draft = taskDrafts[taskCode] ?? { enabled: false, rewards: [] }
+        void run('/api/admin/items', { action: 'configure_onboarding_task', task_code: taskCode, enabled: draft.enabled, rewards: draft.rewards }, '新人任务配置版本已发布。')
       }}>
         <h3 className="text-base font-semibold text-ink-primary">固定新人任务</h3>
         <div className="mt-4 grid gap-4 lg:grid-cols-[240px_auto]">
           <div>
-            <Field label="任务"><select className="tool-field mt-2 w-full" value={taskCode} onChange={(event) => setTaskCode(event.currentTarget.value as OnboardingTaskCode)}><option value="welcome_inventory">认识背包</option><option value="bind_skland">绑定森空岛</option><option value="first_main_schedule">首次主排班</option></select></Field>
-            <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={taskEnabled} onChange={(event) => setTaskEnabled(event.currentTarget.checked)} />启用新版本</label>
+            <Field label="任务"><select className="tool-field mt-2 w-full" value={taskCode} onChange={(event) => setTaskCode(event.currentTarget.value as OnboardingTaskCode)}>{Object.entries(TASK_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></Field>
+            <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={taskDrafts[taskCode]?.enabled ?? false} onChange={(event) => setTaskDrafts((current) => ({ ...current, [taskCode]: { enabled: event.currentTarget.checked, rewards: current[taskCode]?.rewards ?? [] } }))} />启用新版本</label>
             <p className="mt-3 text-xs text-ink-muted">当前版本：{data.tasks.find((task) => task.task_code === taskCode)?.version ?? '—'}；默认任务保持停用，奖励内容非空后才能启用。</p>
           </div>
-          <JsonField value={taskRewards} onChange={setTaskRewards} label="奖励 JSON" />
+          <RewardListEditor
+            id={`task-rewards-${taskCode}`}
+            label={`${TASK_LABELS[taskCode]}奖励`}
+            value={taskDrafts[taskCode]?.rewards ?? []}
+            definitions={data.definitions}
+            versions={data.gift_pack_versions}
+            allowGiftPacks
+            onChange={(rewards) => setTaskDrafts((current) => ({ ...current, [taskCode]: { enabled: current[taskCode]?.enabled ?? false, rewards } }))}
+          />
         </div>
-        <button className="tool-primary-action mt-4" disabled={busy}>发布任务配置</button>
-      </form>
+        <button className="tool-primary-action mt-4" disabled={busy || (taskDrafts[taskCode]?.rewards.length ?? 0) === 0}>发布任务配置</button>
+      </form>}
 
+      {activeTab === 'distribution' && <div id="inventory-admin-panel-distribution" role="tabpanel" aria-labelledby="inventory-admin-tab-distribution" className="space-y-6">
       <section className="grid gap-5 xl:grid-cols-2">
         <form className="tool-panel p-5" onSubmit={(event) => { event.preventDefault(); void (async () => {
           const response = await run<{ grant_id: string | null }>('/api/admin/inventory', {
@@ -230,18 +290,15 @@ export default function InventoryAdminSection() {
           </div>
         </article>)}</div>
       </section>
+      </div>}
 
-      <section className="tool-panel p-5 sm:p-6"><h3 className="text-base font-semibold text-ink-primary">最近审计</h3><ul className="mt-4 max-h-96 space-y-2 overflow-y-auto text-xs text-ink-secondary">{data.audits.map((audit) => <li key={audit.id} className="tool-inset p-3">{new Date(audit.created_at).toLocaleString('zh-CN')} · {audit.admin_username} · {audit.action} · {audit.target_type}/{audit.target_id} · {audit.reason}</li>)}</ul></section>
+      {activeTab === 'audit' && <section id="inventory-admin-panel-audit" role="tabpanel" aria-labelledby="inventory-admin-tab-audit" className="tool-panel p-5 sm:p-6"><h3 className="text-base font-semibold text-ink-primary">最近审计</h3><ul className="mt-4 max-h-96 space-y-2 overflow-y-auto text-xs text-ink-secondary">{data.audits.map((audit) => <li key={audit.id} className="tool-inset p-3">{new Date(audit.created_at).toLocaleString('zh-CN')} · {audit.admin_username} · {audit.action} · {audit.target_type}/{audit.target_id} · {audit.reason}</li>)}</ul></section>}
     </div>
   )
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="mt-3 block text-sm text-ink-secondary"><span className="font-medium">{label}</span>{children}</label>
-}
-
-function JsonField({ value, onChange, label = '内容 JSON' }: { value: string; onChange: (value: string) => void; label?: string }) {
-  return <Field label={label}><textarea className="tool-field mt-2 min-h-44 w-full font-mono text-xs" value={value} onChange={(event) => onChange(event.currentTarget.value)} /></Field>
 }
 
 function ItemFields(props: {
@@ -261,8 +318,111 @@ function CampaignAction({ action, label, campaign, run }: { action: string; labe
   return <button type="button" className="tool-secondary-action" onClick={() => void run('/api/admin/inventory', { action, campaign_id: campaign.id, reason: `管理员${label}` }, `活动已${label}。`)}>{label}</button>
 }
 
-function parseContents(value: string): GiftPackContentInput[] {
-  const parsed = JSON.parse(value) as unknown
-  if (!Array.isArray(parsed)) throw new Error('内容必须是 JSON 数组。')
-  return parsed as GiftPackContentInput[]
+function RewardListEditor(props: {
+  id: string
+  label: string
+  value: GiftPackContentInput[]
+  definitions: ItemDefinition[]
+  versions: GiftVersion[]
+  allowGiftPacks: boolean
+  onChange: (value: GiftPackContentInput[]) => void
+}) {
+  const candidates = props.definitions.filter((item) => {
+    if (!item.issuance_enabled || item.kind === 'cosmetic' || item.kind === 'badge') return false
+    if (item.kind !== 'gift_pack') return true
+    return props.allowGiftPacks && props.versions.some((version) => version.item_code === item.code && version.status === 'published')
+  })
+  const available = candidates.filter((item) => !props.value.some((entry) => entry.item_code === item.code))
+  const [candidateCode, setCandidateCode] = useState('')
+  const selectedCandidate = available.some((item) => item.code === candidateCode) ? candidateCode : available[0]?.code ?? ''
+
+  const update = (index: number, changes: Partial<GiftPackContentInput>) => {
+    props.onChange(props.value.map((entry, entryIndex) => entryIndex === index ? { ...entry, ...changes } : entry))
+  }
+  const move = (index: number, direction: -1 | 1) => {
+    const target = index + direction
+    if (target < 0 || target >= props.value.length) return
+    const next = [...props.value]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    props.onChange(next)
+  }
+
+  return <fieldset className="mt-4 min-w-0" aria-describedby={`${props.id}-help`}>
+    <legend className="text-sm font-semibold text-ink-primary">{props.label}</legend>
+    <p id={`${props.id}-help`} className="mt-1 text-xs leading-5 text-ink-muted">按顺序配置实际发放内容；每项都需明确数量和有效期。{props.allowGiftPacks ? '礼包会在保存时固定最新发布版本。' : '礼包不能嵌套其他礼包。'}</p>
+    <div className="mt-3 space-y-3">
+      {props.value.length === 0 && <div className="tool-inset p-5 text-center text-sm text-ink-muted">尚未添加任何道具</div>}
+      {props.value.map((entry, index) => {
+        const definition = props.definitions.find((item) => item.code === entry.item_code)
+        const expiryMode = entry.expiry.mode
+        const published = definition?.kind === 'gift_pack'
+          ? props.versions.filter((version) => version.item_code === entry.item_code && version.status === 'published').sort((left, right) => right.version - left.version)[0]
+          : null
+        return <article key={entry.item_code} className="tool-inset p-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <img src={itemIconPath(definition?.icon_key ?? 'placeholder')} alt="" width={52} height={52} className="h-13 w-13 shrink-0 object-contain" />
+              <div className="min-w-0">
+                <strong className="block truncate text-sm text-ink-primary">{definition?.name ?? entry.item_code}</strong>
+                <span className="mt-1 block break-all font-mono text-[11px] text-ink-muted">{entry.item_code}</span>
+                <span className="mt-1 block text-xs text-ink-secondary">{definition ? itemKindLabel(definition.kind) : '目录中已不存在'}</span>
+                {published && <span className="mt-1 block text-xs text-ink-muted">保存时固定 v{published.version}</span>}
+                {(!definition || !definition.issuance_enabled || (definition.kind === 'gift_pack' && !published)) && <span className="mt-1 block text-xs font-medium text-warning-600">当前道具不可用于新配置，请移除或更换。</span>}
+              </div>
+            </div>
+            <div className="grid min-w-0 flex-[1.4] gap-3 sm:grid-cols-[110px_minmax(130px,1fr)_100px]">
+              <Field label="数量"><input aria-label={`${definition?.name ?? entry.item_code}数量`} type="number" min={1} max={10000} className="tool-field mt-2 w-full" value={entry.quantity} onChange={(event) => update(index, { quantity: Number(event.currentTarget.value) })} /></Field>
+              <Field label="有效期"><select aria-label={`${definition?.name ?? entry.item_code}有效期`} className="tool-field mt-2 w-full" value={expiryMode} onChange={(event) => update(index, { expiry: event.currentTarget.value === 'never' ? { mode: 'never' } : { mode: 'relative_days', days: 30 } })}><option value="never">永久有效</option><option value="relative_days">领取后若干天</option></select></Field>
+              {expiryMode === 'relative_days' && <Field label="天数"><input aria-label={`${definition?.name ?? entry.item_code}有效天数`} type="number" min={1} max={3650} className="tool-field mt-2 w-full" value={entry.expiry.days} onChange={(event) => update(index, { expiry: { mode: 'relative_days', days: Number(event.currentTarget.value) } })} /></Field>}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <button type="button" className="tool-secondary-action" disabled={index === 0} onClick={() => move(index, -1)} aria-label={`上移${definition?.name ?? entry.item_code}`}>上移</button>
+            <button type="button" className="tool-secondary-action" disabled={index === props.value.length - 1} onClick={() => move(index, 1)} aria-label={`下移${definition?.name ?? entry.item_code}`}>下移</button>
+            <button type="button" className="tool-secondary-action" onClick={() => props.onChange(props.value.filter((_, entryIndex) => entryIndex !== index))} aria-label={`删除${definition?.name ?? entry.item_code}`}>删除</button>
+          </div>
+        </article>
+      })}
+    </div>
+    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+      <label className="sr-only" htmlFor={`${props.id}-candidate`}>选择要添加的道具</label>
+      <select id={`${props.id}-candidate`} className="tool-field min-w-0 flex-1" value={selectedCandidate} disabled={available.length === 0} onChange={(event) => setCandidateCode(event.currentTarget.value)}>
+        {available.length === 0 ? <option value="">没有更多可添加道具</option> : available.map((item) => <option key={item.code} value={item.code}>{item.name} · {item.code}</option>)}
+      </select>
+      <button type="button" className="tool-secondary-action shrink-0" disabled={!selectedCandidate} onClick={() => {
+        if (!selectedCandidate) return
+        props.onChange([...props.value, { item_code: selectedCandidate, quantity: 1, expiry: { mode: 'never' } }])
+        setCandidateCode('')
+      }}>添加道具</button>
+    </div>
+  </fieldset>
+}
+
+function RewardSummary({ contents, definitions }: { contents: GiftPackContentInput[]; definitions: ItemDefinition[] }) {
+  if (contents.length === 0) return <p className="mt-2 text-xs text-ink-muted">空草稿</p>
+  return <ul className="mt-2 space-y-1 text-xs leading-5 text-ink-secondary">
+    {contents.map((entry) => <li key={`${entry.item_code}:${expiryKey(entry.expiry)}`}>{definitions.find((item) => item.code === entry.item_code)?.name ?? entry.item_code} ×{entry.quantity} · {formatExpiry(entry.expiry)}</li>)}
+  </ul>
+}
+
+function giftVersionStatusLabel(status: GiftVersion['status']): string {
+  if (status === 'draft') return '草稿'
+  if (status === 'published') return '已发布'
+  return '已退役'
+}
+
+function itemKindLabel(kind: ItemDefinition['kind']): string {
+  if (kind === 'consumable') return '消耗券'
+  if (kind === 'capacity_upgrade') return '档案扩容'
+  if (kind === 'gift_pack') return '礼包'
+  if (kind === 'cosmetic') return '主题装扮（预留）'
+  return '成就勋章（预留）'
+}
+
+function formatExpiry(expiry: ExpiryPolicy): string {
+  return expiry.mode === 'never' ? '永久有效' : `领取后 ${expiry.days} 天`
+}
+
+function expiryKey(expiry: ExpiryPolicy): string {
+  return expiry.mode === 'never' ? 'never' : `days:${expiry.days}`
 }

@@ -722,7 +722,7 @@ function normalizeQuantity(value: number): number {
 }
 
 function taskCopy(code: OnboardingTaskCode): { title: string; description: string } {
-  if (code === 'welcome_inventory') return { title: '认识背包', description: '打开背包并领取管理员配置的欢迎奖励。' }
+  if (code === 'welcome_inventory') return { title: '认识网站', description: '了解网站的主要功能并领取管理员配置的欢迎奖励。' }
   if (code === 'bind_skland') return { title: '绑定森空岛', description: '为任意排班档案成功绑定一次森空岛。' }
   return { title: '完成首次主排班', description: '成功完成任意账号档案的一次主排班。' }
 }
