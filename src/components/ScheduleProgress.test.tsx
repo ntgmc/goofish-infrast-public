@@ -167,6 +167,22 @@ describe('ScheduleProgress motion', () => {
     expect(screen.getByText('计算优化建议').closest('[data-state]')).toHaveAttribute('data-state', 'failed')
     expect(screen.getByText('持久化结果').closest('[data-state]')).toHaveAttribute('data-state', 'done')
   })
+
+  it('marks a partial suggestion stage as completed because verified results were preserved', () => {
+    render(<ScheduleProgress progress={createProgress({
+      startedAt: NOW - 10_000,
+      completedAt: NOW - 500,
+      estimatedDurationMs: 10_000,
+      estimatePhase: 'completed',
+      calculationStage: 'completed',
+      upgradeSuggestionsRequested: true,
+      upgradeSuggestionsAllowed: true,
+      upgradeSuggestionsStatus: 'partial',
+    })} />)
+
+    expect(screen.getByText('计算优化建议').closest('[data-state]')).toHaveAttribute('data-state', 'done')
+    expect(screen.getByText('持久化结果').closest('[data-state]')).toHaveAttribute('data-state', 'done')
+  })
 })
 
 function createProgress(patch: Partial<ScheduleProgressState>): ScheduleProgressState {
