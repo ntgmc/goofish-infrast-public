@@ -20,10 +20,21 @@ test('creates and verifies an immutable release artifact', async () => {
     assert.equal(manifest.changelog.release.version, '2.0.1')
     assert.equal(manifest.changelog.release.targetSha, sha)
     assert.ok(manifest.files['dist/index.html'])
+    assert.ok(manifest.files['server/dist/all.js'])
     assert.ok(manifest.files['server/dist/index.js'])
     assert.ok(manifest.files['server/dist/migrate.js'])
     assert.ok(manifest.files['server/dist/worker.js'])
     assert.ok(manifest.files['server/dist/optimize-worker.js'])
+  } finally {
+    await rm(fixture, { recursive: true, force: true })
+  }
+})
+
+test('rejects an artifact without the combined server entry point', async () => {
+  const fixture = await createFixture()
+  try {
+    await rm(join(fixture, 'server/dist/all.js'))
+    assert.throws(() => run(fixture, ['create', '--sha', sha]), /required artifact entry is missing.*server\/dist\/all\.js/)
   } finally {
     await rm(fixture, { recursive: true, force: true })
   }
@@ -61,6 +72,7 @@ async function createFixture() {
   await mkdir(join(fixture, 'server/dist'), { recursive: true })
   await mkdir(join(fixture, 'src/lib/.generated'), { recursive: true })
   await writeFile(join(fixture, 'dist/index.html'), '<!doctype html>', 'utf8')
+  await writeFile(join(fixture, 'server/dist/all.js'), 'export {}', 'utf8')
   await writeFile(join(fixture, 'server/dist/index.js'), 'export {}', 'utf8')
   await writeFile(join(fixture, 'server/dist/migrate.js'), 'export {}', 'utf8')
   await writeFile(join(fixture, 'server/dist/worker.js'), 'export {}', 'utf8')

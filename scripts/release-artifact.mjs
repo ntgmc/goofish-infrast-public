@@ -9,6 +9,14 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const root = resolve(process.env.RELEASE_ROOT || repositoryRoot)
 const [command, ...rawArguments] = process.argv.slice(2)
 const argumentsMap = parseArguments(rawArguments)
+const REQUIRED_ARTIFACT_PATHS = [
+  'dist/index.html',
+  'server/dist/all.js',
+  'server/dist/index.js',
+  'server/dist/migrate.js',
+  'server/dist/worker.js',
+  'server/dist/optimize-worker.js',
+]
 
 if (command === 'create') {
   await createReleaseManifest()
@@ -27,6 +35,7 @@ async function createReleaseManifest() {
   const changelog = await readChangelogEnvelope(root, targetSha, buildMeta)
 
   const files = await collectArtifactHashes(root)
+  assertRequiredArtifactEntries(files)
   const manifest = {
     schema_version: 1,
     target_sha: targetSha,
@@ -65,15 +74,7 @@ async function verifyReleaseManifest() {
 
   const expectedFiles = manifest.files
   if (!expectedFiles || typeof expectedFiles !== 'object') throw new Error('artifact file hashes are missing')
-  for (const required of [
-    'dist/index.html',
-    'server/dist/index.js',
-    'server/dist/migrate.js',
-    'server/dist/worker.js',
-    'server/dist/optimize-worker.js',
-  ]) {
-    if (!expectedFiles[required]) throw new Error(`required artifact entry is missing from manifest: ${required}`)
-  }
+  assertRequiredArtifactEntries(expectedFiles)
 
   const actualFiles = await collectArtifactHashes(root)
   const expectedPaths = Object.keys(expectedFiles).sort()
@@ -83,6 +84,12 @@ async function verifyReleaseManifest() {
     if (actualFiles[path] !== expectedFiles[path]) throw new Error(`artifact hash mismatch: ${path}`)
   }
   process.stdout.write(`Verified release artifact for ${targetSha}\n`)
+}
+
+function assertRequiredArtifactEntries(files) {
+  for (const required of REQUIRED_ARTIFACT_PATHS) {
+    if (!files[required]) throw new Error(`required artifact entry is missing from manifest: ${required}`)
+  }
 }
 
 async function readChangelogEnvelope(releaseRoot, targetSha, buildMeta) {

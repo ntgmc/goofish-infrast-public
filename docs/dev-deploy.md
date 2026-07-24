@@ -203,15 +203,19 @@ Wants=postgresql.service
 
 [Service]
 WorkingDirectory=/opt/goofish-infrast-v1-dev
+EnvironmentFile=/etc/goofish-infrast-v1/dev.env
 ExecStartPre=/usr/bin/env ALLOW_DATABASE_MIGRATION=true /usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/migrate.js
-ExecStart=/usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/index.js
+ExecStart=/usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/all.js
 Restart=always
 RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=75s
 Environment=NODE_ENV=production
-Environment=APP_ROLE=api
+Environment=APP_ROLE=all
+Environment=ALLOW_PRODUCTION_COMBINED_PROCESS=true
+Environment=OPTIMIZE_WORKER_CONCURRENCY=1
 Environment=PORT=3001
 Environment=HOST=127.0.0.1
-EnvironmentFile=/etc/goofish-infrast-v1/dev.env
 
 [Install]
 WantedBy=multi-user.target
@@ -226,6 +230,7 @@ MAA_ADMIN_PASSWORD=...
 OPTIMIZE_GLOBAL_QUEUE_LIMIT=50
 OPTIMIZE_ANALYSIS_QUEUE_LIMIT=10
 OPTIMIZE_QUEUE_MAX_AGE_MS=86400000
+OPTIMIZE_WORKER_CONCURRENCY=1
 OPTIMIZE_GLOBAL_WORKER_CONCURRENCY=1
 OPTIMIZE_RETRY_BASE_MS=2000
 MAA_ADMIN_SECRET=...
@@ -236,12 +241,17 @@ CDK_HASH_SECRET=...
 `NODE_ENV=production`. It must be the HTTPS origin only: do not include a path,
 query string, fragment, or credentials.
 
-`APP_ROLE=api` is kept in the systemd service rather than the environment file.
-Production-mode API processes require this explicit role and do not run the
-dedicated optimization worker.
+The dev service intentionally uses the combined `APP_ROLE=all` entry point so
+the API host consumes jobs from its own dev PostgreSQL queue. Production mode
+rejects this entry point unless the systemd unit also sets
+`ALLOW_PRODUCTION_COMBINED_PROCESS=true`. Keep both worker concurrency values at
+`1` so dev scheduling cannot fan out CPU work on the API host. Production keeps
+the API-only role and the separate Hangzhou worker; do not copy this opt-in into
+their environment files.
 
-If the service is already restarting with `APP_ROLE is required in production`,
-install the current repository-managed unit and restart it:
+For the first combined-worker rollout, deploy the verified artifact containing
+`server/dist/all.js` before installing the unit from the same SHA. Then reload
+systemd and restart the service:
 
 ```bash
 cd /opt/goofish-infrast-v1-dev
@@ -251,6 +261,13 @@ sudo systemctl restart goofish-infrast-v1-dev
 sudo journalctl -u goofish-infrast-v1-dev --no-pager -n 80
 curl -fsS http://127.0.0.1:3001/api/health
 ```
+
+Submit a dev schedule after the restart and confirm it progresses from `queued`
+to `running` and `succeeded`. The recorded worker id should use the dev API
+hostname. If the combined process must be rolled back, reinstall the previous
+API-only unit, run `systemctl daemon-reload`, and restart the service. Queued and
+interrupted jobs remain in the dev PostgreSQL queue and are not migrated or
+deleted by the unit change.
 
 If the service is already restarting with `PUBLIC_APP_URL is required in
 production`, repair the server configuration and verify it before rerunning the
@@ -382,6 +399,8 @@ node scripts/check-public-http-smoke.mjs https://dev.maatool.com
 Also verify:
 
 - `https://dev.maatool.com/` loads the frontend.
+- A schedule generation reaches `succeeded` and returns facility/operator assignments.
+- The dev job worker id belongs to the dev API host, with no matching job in the production queue.
 - Refreshing any frontend route falls back to `index.html` instead of 404.
 - Writes made through dev APIs appear only in the dev PostgreSQL database.
 - Production service, production database, and `Deploy Production` remain
