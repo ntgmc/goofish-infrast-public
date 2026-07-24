@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { getPool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
@@ -19,7 +19,12 @@ import type {
   WorkspaceSavedConfig,
   FreePreviewTrial,
 } from '../../src/lib/types'
-import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
+import {
+  WORKSPACE_RESULT_HISTORY_LIMIT,
+  WORKSPACE_RESULT_HISTORY_MAX_LIMIT,
+  WORKSPACE_SAVED_CONFIG_LIMIT,
+  WORKSPACE_SAVED_CONFIG_MAX_LIMIT,
+} from '../../src/lib/workspace-limits'
 
 let schemaReady: Promise<void> | null = null
 
@@ -168,6 +173,7 @@ export interface UserWorkspaceRecord {
   last_result: OptimizeResult | null
   saved_configs: WorkspaceSavedConfig[]
   result_history: WorkspaceResultHistoryItem[]
+  archived_results: WorkspaceResultHistoryItem[]
   free_schedule_entitlement: FreeScheduleEntitlement | null
   updated_at: string
 }
@@ -181,6 +187,7 @@ interface LegacyUserWorkspaceRecord {
   last_result: OptimizeResult | null
   saved_configs?: WorkspaceSavedConfig[]
   result_history?: WorkspaceResultHistoryItem[]
+  archived_results?: WorkspaceResultHistoryItem[]
   free_schedule_entitlement?: FreeScheduleEntitlement | null
   updated_at: string
 }
@@ -301,6 +308,15 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     await client.query('delete from user_announcement_reads where user_id = $1', [userId])
     await client.query('delete from user_sessions where user_id = $1', [userId])
     await markPersonalUseDeclarationAcceptancesDeleted(client, userId)
+    const deletedTargetHash = `deleted_user:${createHash('sha256').update(userId).digest('hex').slice(0, 16)}`
+    await client.query(
+      `update inventory_admin_audit
+          set target_id = case when target_id = $1 then $2 else target_id end,
+              before_json = case when before_json is null then null else jsonb_build_object('deleted_target', true, 'target_hash', $2) end,
+              after_json = case when after_json is null then null else jsonb_build_object('deleted_target', true, 'target_hash', $2) end
+        where target_id = $1 or before_json->>'user_id' = $1 or after_json->>'user_id' = $1`,
+      [userId, deletedTargetHash],
+    )
     await client.query('delete from user_game_accounts where user_id = $1', [userId])
     await client.query('delete from user_accounts where id = $1', [userId])
     await client.query('commit')
@@ -767,17 +783,23 @@ export async function updateProfileWorkspaceAtomically(
   updater: (workspace: UserWorkspaceRecord | null) => UserWorkspaceRecord,
 ): Promise<UserWorkspaceRecord> {
   await ensureSchema()
-  return withTransaction(async (client) => {
-    await lockWorkspaceForUpdate(client, profileId)
-    const current = await client.query<{ record_json: UserWorkspaceRecord }>(
-      'select record_json from user_profile_workspaces where profile_id = $1',
-      [profileId],
-    )
-    const next = normalizeWorkspaceRecord(updater(normalizeWorkspaceRecord(current.rows[0]?.record_json ?? null)))
-    if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
-    await saveProfileWorkspaceWithClient(client, next)
-    return next
-  })
+  return withTransaction((client) => updateProfileWorkspaceInTransaction(client, profileId, updater))
+}
+
+export async function updateProfileWorkspaceInTransaction(
+  client: PoolClient,
+  profileId: string,
+  updater: (workspace: UserWorkspaceRecord | null) => UserWorkspaceRecord,
+): Promise<UserWorkspaceRecord> {
+  await lockWorkspaceForUpdate(client, profileId)
+  const current = await client.query<{ record_json: UserWorkspaceRecord }>(
+    'select record_json from user_profile_workspaces where profile_id = $1',
+    [profileId],
+  )
+  const next = normalizeWorkspaceRecord(updater(normalizeWorkspaceRecord(current.rows[0]?.record_json ?? null)))
+  if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
+  await saveProfileWorkspaceWithClient(client, next)
+  return next
 }
 
 async function lockWorkspaceForUpdate(client: PoolClient, profileId: string): Promise<void> {
@@ -961,6 +983,7 @@ export function emptyWorkspace(profileId: string): UserWorkspaceRecord {
     last_result: null,
     saved_configs: [],
     result_history: [],
+    archived_results: [],
     free_schedule_entitlement: null,
     updated_at: new Date().toISOString(),
   }
@@ -1002,7 +1025,14 @@ export async function upgradeUserPasswordHash(
   return result.rows[0]?.record_json ?? null
 }
 
-export function toPublicWorkspace(workspace: UserWorkspaceRecord | null): UserWorkspace {
+export function toPublicWorkspace(
+  workspace: UserWorkspaceRecord | null,
+  limits: { plan: number; history: number; archive: number } = {
+    plan: WORKSPACE_SAVED_CONFIG_LIMIT,
+    history: WORKSPACE_RESULT_HISTORY_LIMIT,
+    archive: 0,
+  },
+): UserWorkspace {
   const normalized = normalizeWorkspaceRecord(workspace)
   const resultHistory = normalized ? getPublicResultHistory(normalized) : []
   return {
@@ -1011,8 +1041,9 @@ export function toPublicWorkspace(workspace: UserWorkspaceRecord | null): UserWo
     config: normalized?.config ?? null,
     elite_overrides: normalized?.elite_overrides ?? {},
     last_result: normalized?.last_result ?? null,
-    saved_configs: normalized?.saved_configs ?? [],
-    result_history: resultHistory,
+    saved_configs: (normalized?.saved_configs ?? []).slice(0, limits.plan),
+    result_history: resultHistory.slice(0, limits.history),
+    archived_results: (normalized?.archived_results ?? []).slice(0, limits.archive),
     free_schedule_entitlement: normalized?.free_schedule_entitlement ?? null,
     updated_at: normalized?.updated_at ?? null,
   }
@@ -1062,6 +1093,7 @@ function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null | undefi
     last_result: isRecord(workspace.last_result) ? workspace.last_result as OptimizeResult : null,
     saved_configs: normalizeSavedConfigs((workspace as { saved_configs?: unknown }).saved_configs),
     result_history: normalizeResultHistory((workspace as { result_history?: unknown }).result_history),
+    archived_results: normalizeResultHistory((workspace as { archived_results?: unknown }).archived_results),
     free_schedule_entitlement: normalizeFreeScheduleEntitlement((workspace as { free_schedule_entitlement?: unknown }).free_schedule_entitlement),
     updated_at: typeof workspace.updated_at === 'string' ? workspace.updated_at : new Date().toISOString(),
   }
@@ -1114,7 +1146,7 @@ function normalizeSavedConfigs(value: unknown): WorkspaceSavedConfig[] {
       last_used_at: typeof raw.last_used_at === 'string' ? raw.last_used_at : null,
       read_only: raw.read_only === true,
     }]
-  }).slice(0, WORKSPACE_SAVED_CONFIG_LIMIT)
+  }).slice(0, WORKSPACE_SAVED_CONFIG_MAX_LIMIT)
 }
 
 function normalizeResultHistory(value: unknown): WorkspaceResultHistoryItem[] {
@@ -1135,7 +1167,7 @@ function normalizeResultHistory(value: unknown): WorkspaceResultHistoryItem[] {
       operator_count: typeof raw.operator_count === 'number' && Number.isFinite(raw.operator_count) ? raw.operator_count : 0,
       source,
     }]
-  }).slice(0, WORKSPACE_RESULT_HISTORY_LIMIT)
+  }).slice(0, WORKSPACE_RESULT_HISTORY_MAX_LIMIT)
 }
 
 function getPublicResultHistory(workspace: UserWorkspaceRecord): WorkspaceResultHistoryItem[] {

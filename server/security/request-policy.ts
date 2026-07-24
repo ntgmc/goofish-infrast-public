@@ -173,6 +173,12 @@ export const requestSchemas = {
       config: z.unknown(),
       includeUpgradeSuggestions: z.boolean(),
       use_priority_coupon: z.boolean().optional(),
+      use_items: z.array(z.enum([
+        'priority_compute_coupon', 'reorder_check_coupon', 'scenario_simulation_coupon',
+        'training_diagnosis_coupon', 'additional_recompute_coupon', 'plan_capacity_certificate',
+        'history_capacity_certificate', 'result_archive_folder', 'maa_export_trial_coupon',
+        'newcomer_supply_pack',
+      ])).max(3).optional(),
       historySource: z.enum(['generated', 'applied_suggestions']).optional(),
     }),
     strict({
@@ -181,9 +187,68 @@ export const requestSchemas = {
       operators: z.array(z.unknown()).max(2000),
       config: z.unknown(),
       factors: optionalUnknown,
+      use_items: z.array(z.enum([
+        'priority_compute_coupon', 'reorder_check_coupon', 'scenario_simulation_coupon',
+        'training_diagnosis_coupon', 'additional_recompute_coupon', 'plan_capacity_certificate',
+        'history_capacity_certificate', 'result_archive_folder', 'maa_export_trial_coupon',
+        'newcomer_supply_pack',
+      ])).max(1).optional(),
     }),
   ]),
-  reorderCheck: strict({ profileId: shortString(128), config: z.unknown(), baselineHistoryId: optionalString(128) }),
+  reorderCheck: strict({
+    profileId: shortString(128), config: z.unknown(), baselineHistoryId: optionalString(128),
+    use_items: z.array(z.literal('reorder_check_coupon')).max(1).optional(),
+  }),
+  inventoryUse: strict({
+    item_code: shortString(128),
+    quantity: z.literal(1),
+    profile_id: optionalString(128),
+    gift_pack_version_id: optionalString(128),
+    idempotency_key: shortString(200),
+  }),
+  onboardingTaskClaim: strict({
+    task_code: z.enum(['welcome_inventory', 'bind_skland', 'first_main_schedule']).optional(),
+    idempotency_key: shortString(200),
+  }),
+  maaExport: strict({
+    profile_id: shortString(128),
+    result_id: shortString(128),
+    idempotency_key: shortString(200),
+  }),
+  resultArchive: strict({
+    profile_id: shortString(128),
+    result_id: shortString(128),
+    action: z.enum(['archive', 'unarchive', 'delete']),
+    idempotency_key: shortString(200),
+  }),
+  adminItems: strict({
+    action: shortString(64),
+    item_code: optionalString(128),
+    name: optionalString(80),
+    description: optionalString(500),
+    icon_key: optionalString(128),
+    issuance_enabled: z.boolean().optional(),
+    contents: z.array(z.unknown()).max(100).optional(),
+    version_id: optionalString(128),
+    task_code: z.enum(['welcome_inventory', 'bind_skland', 'first_main_schedule']).optional(),
+    enabled: z.boolean().optional(),
+    rewards: z.array(z.unknown()).max(100).optional(),
+  }),
+  adminInventory: strict({
+    action: shortString(64),
+    root_password: optionalUnknown,
+    user_id: optionalString(128),
+    user_ids: z.array(shortString(128)).max(10000).optional(),
+    campaign_id: optionalString(128),
+    grant_id: optionalString(128),
+    item_code: optionalString(128),
+    gift_pack_version_id: optionalString(128),
+    quantity: z.number().int().min(1).max(10000).optional(),
+    validity_days: z.number().int().min(0).max(3650).optional(),
+    target_mode: z.enum(['user_ids', 'all_users']).optional(),
+    reason: optionalString(500),
+    confirmation: optionalString(128),
+  }),
 } as const
 
 const none = (): RequestMethodPolicy => ({ bodyProfile: 'none' })
@@ -257,6 +322,13 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/invitations', route({ GET: none() })],
   ['/api/user/invitations/code', route({ POST: none() })],
   ['/api/user/rewards', route({ GET: none() })],
+  ['/api/user/inventory', route({ GET: none(), POST: json('standard', requestSchemas.inventoryUse) })],
+  ['/api/user/onboarding-tasks', route({ GET: none() })],
+  ['/api/user/onboarding-tasks/claim', route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })],
+  ['/api/user/maa-export', route({ POST: json('standard', requestSchemas.maaExport) })],
+  ['/api/user/result-archive', route({ POST: json('standard', requestSchemas.resultArchive) })],
+  ['/api/admin/items', route({ GET: none(), POST: json('admin', requestSchemas.adminItems), PATCH: json('admin', requestSchemas.adminItems) })],
+  ['/api/admin/inventory', route({ GET: none(), POST: json('admin', requestSchemas.adminInventory), PATCH: json('admin', requestSchemas.adminInventory) }, ['campaign_id'])],
   ['/api/user/personal-use-declaration', route({ GET: none(), POST: json('standard', requestSchemas.personalUseDeclarationConfirmation) }, ['profile_id'])],
   ['/api/optimization/jobs', route({ GET: none(), POST: json('compute', requestSchemas.optimizationJob) }, ['profile_id', 'limit', 'before'])],
   ['/api/optimization/reorder-checks', route({ POST: json('compute', requestSchemas.reorderCheck) })],
@@ -267,6 +339,9 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
 export function getRoutePolicy(pathname: string): RoutePolicy | null {
   const exact = ROUTE_POLICIES.get(pathname)
   if (exact) return exact
+  if (/^\/api\/user\/onboarding-tasks\/(welcome_inventory|bind_skland|first_main_schedule)\/claim$/.test(pathname)) {
+    return route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })
+  }
   if (!pathname.startsWith('/api/optimization/jobs/')) return null
   const suffix = pathname.slice('/api/optimization/jobs/'.length)
   const segments = suffix.split('/')

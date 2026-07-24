@@ -1,6 +1,6 @@
 import type { Announcement } from '../../../lib/types'
 
-export const ANNOUNCEMENT_DRAFT_VERSION = 1
+const ANNOUNCEMENT_DRAFT_VERSION = 1
 export const ANNOUNCEMENT_DRAFT_AUTOSAVE_DELAY_MS = 500
 
 export type AnnouncementDraftStatus = 'clean' | 'saving' | 'saved' | 'error'
@@ -12,7 +12,7 @@ export interface AnnouncementSnapshot {
   announcements: Announcement[]
 }
 
-export interface AnnouncementDraftV1 extends AnnouncementSnapshot {
+interface AnnouncementDraftV1 extends AnnouncementSnapshot {
   version: typeof ANNOUNCEMENT_DRAFT_VERSION
   owner: string
   saved_at: string

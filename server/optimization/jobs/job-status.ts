@@ -50,6 +50,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
         : null,
       reward_user_id: prepared.rewardUserId ?? null,
       use_priority_coupon: prepared.usePriorityCoupon === true,
+      reward_item_codes: prepared.rewardItemCodes ?? [],
     };
     // Third-party test stores predating atomic admission remain read-only test
     // doubles; production and the built-in memory store always implement admitJob.

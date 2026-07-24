@@ -756,6 +756,7 @@ export interface UserWorkspace {
   last_result: OptimizeResult | null;
   saved_configs: WorkspaceSavedConfig[];
   result_history: WorkspaceResultHistoryItem[];
+  archived_results: WorkspaceResultHistoryItem[];
   free_schedule_entitlement: FreeScheduleEntitlement | null;
   updated_at: string | null;
 }

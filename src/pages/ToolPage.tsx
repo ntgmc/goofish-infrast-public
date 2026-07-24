@@ -201,6 +201,7 @@ function dashboardFeature(section: DashboardSection, features: SiteFeatures) {
   if (section === 'tools' && !features.tools) return 'tools' as const
   if (section === 'redeem' && !features.cdk_redemption && !features.free_preview) return 'cdk_redemption' as const
   if (section === 'invitations' && !features.invitations) return 'invitations' as const
+  if (section === 'inventory' && !features.inventory) return 'inventory' as const
   if (section === 'announcements' && !features.announcements) return 'announcements' as const
   return null
 }

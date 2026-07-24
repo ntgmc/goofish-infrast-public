@@ -39,10 +39,12 @@ export function useScenarioComparison({
   profileId,
   operators,
   config,
+  onSettled,
 }: {
   profileId: string;
   operators: LicenseOperator[];
   config: LicenseConfig;
+  onSettled?: () => void | Promise<void>;
 }) {
   const initial = useMemo(() => readSession(profileId), [profileId])
   const [factors, setFactorsState] = useState<ScenarioComparisonFactors>(initial?.factors ?? DEFAULT_FACTORS)
@@ -100,6 +102,7 @@ export function useScenarioComparison({
             setResult(snapshot.result)
             setLoading(false)
             writeSession(profileId, { factors: sessionFactors, result: snapshot.result })
+            void onSettled?.()
             return
           }
           if (snapshot.status === 'failed' || snapshot.status === 'cancelled' || snapshot.status === 'dead_lettered') {
@@ -111,6 +114,7 @@ export function useScenarioComparison({
             }
             setLoading(false)
             writeSession(profileId, { factors: sessionFactors })
+            void onSettled?.()
             return
           }
           await waitForOptimizePoll(
@@ -124,6 +128,7 @@ export function useScenarioComparison({
             setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_002)
             setLoading(false)
             writeSession(profileId, { factors: sessionFactors })
+            void onSettled?.()
             return
           }
           failures += 1
@@ -139,14 +144,14 @@ export function useScenarioComparison({
     } finally {
       unsubscribe()
     }
-  }, [profileId])
+  }, [onSettled, profileId])
   const pollJobRef = useRef(pollJob)
 
   useEffect(() => {
     pollJobRef.current = pollJob
   }, [pollJob])
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (useCoupon = false) => {
     setError(null)
     setLoading(true)
     setResult(null)
@@ -156,6 +161,7 @@ export function useScenarioComparison({
       operators,
       config,
       factors,
+      ...(useCoupon && { use_items: ['scenario_simulation_coupon'] }),
     }
     const requestJson = JSON.stringify(request)
     const previousPending = readSession(profileId)?.pendingSubmission
@@ -183,8 +189,9 @@ export function useScenarioComparison({
       setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_004)
       setLoading(false)
       writeSession(profileId, { factors, pendingSubmission })
+      void onSettled?.()
     }
-  }, [config, factors, operators, pollJob, profileId])
+  }, [config, factors, onSettled, operators, pollJob, profileId])
 
   useEffect(() => {
     const restored = readSession(profileId)

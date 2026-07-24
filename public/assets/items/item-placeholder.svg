@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">道具占位图</title>
+  <desc id="description">等待替换的通用游戏道具图标</desc>
+  <defs>
+    <linearGradient id="ticket" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#254f9f"/>
+      <stop offset="1" stop-color="#10274f"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#70e5ff"/>
+      <stop offset="1" stop-color="#2ba8dc"/>
+    </linearGradient>
+  </defs>
+  <g transform="rotate(-8 128 128)">
+    <path d="M48 59h160v36a18 18 0 0 0 0 36v66H48v-66a18 18 0 0 0 0-36V59Z" fill="url(#ticket)" stroke="#0a1832" stroke-width="12" stroke-linejoin="round"/>
+    <path d="M66 77h124v102H66Z" fill="none" stroke="#d6af55" stroke-width="5" stroke-linejoin="round"/>
+    <circle cx="128" cy="128" r="39" fill="#112d58" stroke="#70e5ff" stroke-width="7"/>
+    <path d="M111 113c3-16 32-17 35-1 3 14-14 17-18 27" fill="none" stroke="url(#mark)" stroke-width="13" stroke-linecap="round"/>
+    <circle cx="128" cy="157" r="7" fill="#70e5ff"/>
+  </g>
+</svg>

@@ -62,13 +62,6 @@ export class InvitationCodeError extends Error {
   }
 }
 
-export class PriorityCouponUnavailableError extends Error {
-  constructor() {
-    super('没有可用的优先计算券。')
-    this.name = 'PriorityCouponUnavailableError'
-  }
-}
-
 export const DEFAULT_INVITATION_SETTINGS: InvitationSettingsV1 = {
   version: 1,
   enabled: true,
@@ -364,52 +357,6 @@ export async function settleInvitationForActivatedUser(userId: string): Promise<
       [invitation.id, now.toISOString(), JSON.stringify(settings), JSON.stringify(settlement)],
     )
   })
-}
-
-export async function consumePriorityCouponInTransaction(client: PoolClient, userId: string, jobId: string, nowIso: string): Promise<void> {
-  const existing = await client.query('select 1 from reward_consumptions where optimization_job_id = $1 and reward_type = $2', [jobId, PRIORITY_COMPUTE_COUPON])
-  if (existing.rowCount) return
-  const grant = await client.query<{ id: string; validity_days: number }>(
-    `select id, validity_days from reward_grants
-      where user_id = $1 and reward_type = $2 and remaining_quantity > 0
-        and (expires_at is null or expires_at > $3)
-      order by expires_at asc nulls last, created_at asc
-      for update skip locked limit 1`,
-    [userId, PRIORITY_COMPUTE_COUPON, nowIso],
-  )
-  const row = grant.rows[0]
-  if (!row) throw new PriorityCouponUnavailableError()
-  await client.query('update reward_grants set remaining_quantity = remaining_quantity - 1 where id = $1', [row.id])
-  await client.query(
-    `insert into reward_consumptions
-      (id, user_id, reward_type, grant_id, optimization_job_id, status, validity_days, consumed_at)
-     values ($1, $2, $3, $4, $5, 'consumed', $6, $7)`,
-    [randomUUID(), userId, PRIORITY_COMPUTE_COUPON, row.id, jobId, row.validity_days, nowIso],
-  )
-}
-
-export async function refundPriorityCouponInTransaction(client: PoolClient, jobId: string, nowIso: string): Promise<void> {
-  const result = await client.query<{ id: string; user_id: string; validity_days: number }>(
-    `select id, user_id, validity_days from reward_consumptions
-      where optimization_job_id = $1 and reward_type = $2 for update`,
-    [jobId, PRIORITY_COMPUTE_COUPON],
-  )
-  const consumption = result.rows[0]
-  if (!consumption) return
-  const status = await client.query<{ status: string }>('select status from reward_consumptions where id = $1', [consumption.id])
-  if (status.rows[0]?.status !== 'consumed') return
-  const expiresAt = consumption.validity_days > 0
-    ? new Date(Date.parse(nowIso) + consumption.validity_days * 24 * 60 * 60_000).toISOString()
-    : null
-  await client.query(
-    `insert into reward_grants
-      (id, user_id, reward_type, source_type, source_id, recipient_role, original_quantity, remaining_quantity,
-       validity_days, expires_at, metadata_json, created_at)
-     values ($1, $2, $3, 'optimization_refund', $4, 'refund', 1, 1, $5, $6, $7::jsonb, $8)
-     on conflict (user_id, reward_type, source_type, source_id, recipient_role) do nothing`,
-    [randomUUID(), consumption.user_id, PRIORITY_COMPUTE_COUPON, jobId, consumption.validity_days, expiresAt, JSON.stringify({ refunded_consumption_id: consumption.id }), nowIso],
-  )
-  await client.query("update reward_consumptions set status = 'refunded', refunded_at = $2 where id = $1 and status = 'consumed'", [consumption.id, nowIso])
 }
 
 async function insertRewardGrant(

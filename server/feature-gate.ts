@@ -37,6 +37,13 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/user/profiles' || pathname === '/api/user/status') return ['profiles']
   if (pathname === '/api/user/workspace/free-schedule/confirm') return ['schedule_generation']
   if (pathname === '/api/user/workspace') return ['profiles']
+  if (pathname === '/api/user/inventory' || pathname === '/api/user/maa-export' || pathname === '/api/user/result-archive') {
+    return ['inventory']
+  }
+  if (pathname === '/api/user/onboarding-tasks' || pathname === '/api/user/onboarding-tasks/claim'
+    || /^\/api\/user\/onboarding-tasks\/[^/]+\/claim$/.test(pathname)) {
+    return ['inventory', 'onboarding_tasks']
+  }
   if (pathname === '/api/user/invitations' || pathname === '/api/user/invitations/code' || pathname === '/api/user/rewards') {
     return ['invitations']
   }

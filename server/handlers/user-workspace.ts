@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { FreeScheduleEntitlement, OptimizeResult, PermissionMode } from '../../src/lib/types'
+import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 import {
   emptyWorkspace,
   getProfileForUser,
@@ -15,7 +16,8 @@ import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
-import { WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
+import { getProfileCapacityLimits } from '../storage/inventory-store'
+import { hasDatabaseUrl } from '../storage/postgres'
 
 const FREE_SCHEDULE_REVISION_LIMIT = 3
 const FREE_SCHEDULE_REVISION_WINDOW_HOURS = 24
@@ -34,8 +36,9 @@ export default async (req: Request): Promise<Response> => {
       const profile = await getProfileForUser(auth.user.id, profileId)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班工作区。' }, 403)
+      const capacityLimits = await getWorkspaceCapacityLimits(profile.id)
       const workspace = await getProfileWorkspace(profile.id)
-      return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(workspace) })
+      return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(workspace, capacityLimits) })
     }
 
     if (req.method !== 'PATCH' && req.method !== 'POST') {
@@ -55,6 +58,7 @@ export default async (req: Request): Promise<Response> => {
     const isPreviewTrial = isFreePreviewTrialActive(profile)
     const effectivePermission = getEffectiveProfilePermission(profile)
     const isRestrictedPreview = isPreviewProfile && !isPreviewTrial
+    const capacityLimits = await getWorkspaceCapacityLimits(profile.id)
     if (isPreviewProfile && !profile.skland_binding) {
       return jsonResponse({ error: '免费个人排班档案必须先绑定森空岛后才能保存工作区数据。' }, 403)
     }
@@ -83,7 +87,7 @@ export default async (req: Request): Promise<Response> => {
           updated_at: now,
         }
       })
-      return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(next) })
+      return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(next, capacityLimits) })
     }
 
     let operatorsValue: UserWorkspaceRecord['operators'] | undefined
@@ -125,7 +129,7 @@ export default async (req: Request): Promise<Response> => {
         workspace.last_result = body.last_result && typeof body.last_result === 'object' ? body.last_result as OptimizeResult : null
       }
       if ('saved_config_action' in body) {
-        const savedConfigResult = applySavedConfigAction(workspace, body.saved_config_action, effectivePermission, isRestrictedPreview)
+        const savedConfigResult = applySavedConfigAction(workspace, body.saved_config_action, effectivePermission, isRestrictedPreview, capacityLimits.plan)
         if (!savedConfigResult.ok) throw new WorkspaceMutationError(savedConfigResult.message, savedConfigResult.status ?? 400)
       }
       if ('operators' in body) workspace.last_result = null
@@ -138,6 +142,11 @@ export default async (req: Request): Promise<Response> => {
     console.error('user workspace error:', error)
     return jsonResponse({ error: 'Internal server error' }, 500)
   }
+}
+
+function getWorkspaceCapacityLimits(profileId: string): Promise<{ plan: number; history: number; archive: number }> {
+  if (hasDatabaseUrl()) return getProfileCapacityLimits(profileId)
+  return Promise.resolve({ plan: WORKSPACE_SAVED_CONFIG_LIMIT, history: WORKSPACE_RESULT_HISTORY_LIMIT, archive: 0 })
 }
 
 class WorkspaceMutationError extends Error {
@@ -165,6 +174,7 @@ function applySavedConfigAction(
   rawAction: unknown,
   permission: PermissionMode,
   isRestrictedPreview = false,
+  savedConfigLimit = 3,
 ): SavedConfigActionResult {
   if (!isRecord(rawAction) || typeof rawAction.type !== 'string') {
     return { ok: false, message: '保存方案操作不正确。' }
@@ -193,8 +203,8 @@ function applySavedConfigAction(
     if (existing?.read_only) return { ok: false, message: '体验期保存的高级配置已只读，不能覆盖。', status: 403 }
     const duplicate = workspace.saved_configs.find((item) => item.id !== id && item.name === nameResult.name)
     if (duplicate) return { ok: false, message: '已存在同名方案。' }
-    if (!existing && workspace.saved_configs.length >= WORKSPACE_SAVED_CONFIG_LIMIT) {
-      return { ok: false, message: `最多保存 ${WORKSPACE_SAVED_CONFIG_LIMIT} 套配置，请先删除不再需要的方案。` }
+    if (!existing && workspace.saved_configs.length >= savedConfigLimit) {
+      return { ok: false, message: `最多保存 ${savedConfigLimit} 套配置，请先删除不再需要的方案。` }
     }
 
     const saved = {

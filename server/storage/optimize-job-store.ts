@@ -6,10 +6,11 @@ import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { getShanghaiMonthKey, REORDER_CHECK_MONTHLY_LIMIT } from '../reorder-check-policy'
 import {
-  consumePriorityCouponInTransaction,
-  PriorityCouponUnavailableError,
-  refundPriorityCouponInTransaction,
-} from './invitation-store'
+  commitReservedItemsInTransaction,
+  ItemUnavailableError,
+  refundReservedItemsInTransaction,
+  reserveItemsInTransaction,
+} from './inventory-store'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
@@ -63,6 +64,7 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
   free_profile_id?: string | null
   reward_user_id?: string | null
   use_priority_coupon?: boolean
+  reward_item_codes?: string[]
   reorderCheckQuota?: {
     profileId: string
     windowKey: string
@@ -72,7 +74,7 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'reorder_check_quota_exceeded',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'reorder_check_quota_exceeded',
     readonly status: 409 | 429,
     message: string,
   ) {
@@ -279,15 +281,20 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           )
           const entitlement = await client.query<{
             first_generated_at: string | null; free_revision_count: number; confirmed_at: string | null; locked_at: string | null;
+            lock_reason: string | null;
             strong_reorder_bonus_month: string | null; strong_reorder_bonus_used_at: string | null;
           }>(`select first_generated_at, free_revision_count, confirmed_at, locked_at,
+                     lock_reason,
                      strong_reorder_bonus_month, strong_reorder_bonus_used_at
               from profile_entitlements where profile_id = $1 for update`, [input.free_profile_id])
           const row = entitlement.rows[0]
           const month = getShanghaiMonthKey(new Date(now))
           const bonusAvailable = row?.strong_reorder_bonus_month === month && !row.strong_reorder_bonus_used_at
           const windowExpired = row?.first_generated_at && Date.parse(row.first_generated_at) + 24 * 60 * 60_000 <= Date.parse(now)
-          if (!row || row.confirmed_at || row.locked_at || (!bonusAvailable && (windowExpired || Number(row.free_revision_count) >= 3))) {
+          const additionalRecompute = input.reward_item_codes?.includes('additional_recompute_coupon') === true
+          const canUseAdditionalRecompute = additionalRecompute && row?.lock_reason === 'revision_limit' && !windowExpired
+          if (!row || row.confirmed_at || (row.locked_at && !canUseAdditionalRecompute)
+            || (!bonusAvailable && (windowExpired || (Number(row.free_revision_count) >= 3 && !canUseAdditionalRecompute)))) {
             throw new OptimizeJobAdmissionError('free_revision_limit_exceeded', 429, '免费排班次数已用完，请确认方案或稍后再试。')
           }
           await client.query(
@@ -307,13 +314,18 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           )
         }
 
-        if (input.use_priority_coupon) {
-          if (!input.reward_user_id) throw new OptimizeJobAdmissionError('priority_coupon_unavailable', 409, '没有可用的优先计算券。')
+        const rewardItemCodes = [...new Set([
+          ...(input.reward_item_codes ?? []),
+          ...(input.use_priority_coupon ? ['priority_compute_coupon'] : []),
+        ])]
+        if (rewardItemCodes.length > 0) {
+          if (!input.reward_user_id) throw new OptimizeJobAdmissionError('item_unavailable', 409, '没有可用的任务道具。')
           try {
-            await consumePriorityCouponInTransaction(client, input.reward_user_id, input.id, now)
+            await reserveItemsInTransaction(client, input.reward_user_id, rewardItemCodes, 'optimization_job', input.id, input.profile_id ?? null, now)
           } catch (error) {
-            if (error instanceof PriorityCouponUnavailableError) {
-              throw new OptimizeJobAdmissionError('priority_coupon_unavailable', 409, error.message)
+            if (error instanceof ItemUnavailableError) {
+              const isPriority = error.itemCode === 'priority_compute_coupon'
+              throw new OptimizeJobAdmissionError(isPriority ? 'priority_coupon_unavailable' : 'item_unavailable', 409, error.message)
             }
             throw error
           }
@@ -487,6 +499,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
              and entitlement_type = 'reorder_check' and status = 'reserved'`,
           [id, now],
         )
+        await commitReservedItemsInTransaction(client, 'optimization_job', id, now)
         const completedJob = completed.rows[0]
         if (isReorderCheckPayload(completedJob?.payload_json)
           && completedJob?.profile_id
@@ -525,7 +538,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
            where job_id = $1 and attempt_no = $2 and worker_id = $3 and lock_token = $4`,
           [id, attemptNo, workerId, lockToken, errorMessage, now],
         )
-        await refundPriorityCouponInTransaction(client, id, now)
+        await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
         await releaseQueuedEntitlementInTransaction(client, id, failed.rows[0]?.payload_json, now)
         return true
       })
@@ -564,7 +577,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           [id, attemptNo, workerId, lockToken, attemptStatus, failureKind, errorMessage, now],
         )
         if (status === 'dead_lettered') {
-          await refundPriorityCouponInTransaction(client, id, now)
+          await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
           await releaseQueuedEntitlementInTransaction(client, id, updatedJob.payload_json, now)
           await createDeadLetterInTransaction(client, updatedJob, failureKind, errorMessage, now)
         }
@@ -609,7 +622,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
                next_attempt_at = null, expires_at = null, finished_at = $2, updated_at = $2
              where id = $1 and status = 'queued' returning *`, [id, now],
           )
-          await refundPriorityCouponInTransaction(client, id, now)
+          await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
           await releaseQueuedEntitlementInTransaction(client, id, current.payload_json, now)
           return cancelled.rows[0] ? fromRow(cancelled.rows[0]) : current
         }
@@ -644,7 +657,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
            where job_id = $1 and attempt_no = $2 and worker_id = $3 and lock_token = $4`,
           [id, attemptNo, workerId, lockToken, now],
         )
-        await refundPriorityCouponInTransaction(client, id, now)
+        await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
         await releaseQueuedEntitlementInTransaction(client, id, cancelled.rows[0]?.payload_json, now)
         return true
       })
@@ -719,7 +732,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             [job.id, job.attempt_count, failureKind, errorMessage, nowIso],
           )
           if (job.status === 'dead_lettered') {
-            await refundPriorityCouponInTransaction(client, job.id, nowIso)
+            await refundReservedItemsInTransaction(client, 'optimization_job', job.id, nowIso)
             await releaseQueuedEntitlementInTransaction(client, job.id, job.payload_json, nowIso)
             await createDeadLetterInTransaction(client, job, failureKind, job.error_message || errorMessage, nowIso)
           }
@@ -740,7 +753,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           [nowIso],
         )
         for (const job of expired.rows) {
-          await refundPriorityCouponInTransaction(client, job.id, nowIso)
+          await refundReservedItemsInTransaction(client, 'optimization_job', job.id, nowIso)
           await releaseQueuedEntitlementInTransaction(client, job.id, job.payload_json, nowIso)
         }
         return expired.rowCount ?? expired.rows.length

@@ -8,6 +8,7 @@ import adminRegistrationInvitationsHandler from './handlers/admin-registration-i
 import adminOptimizationHandler from './handlers/admin-optimization'
 import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
+import adminItemsHandler from './handlers/admin-items'
 import announcementHandler from './handlers/announcement'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
@@ -20,6 +21,8 @@ import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
 import userInvitationsHandler from './handlers/user-invitations'
 import userRewardsHandler from './handlers/user-rewards'
+import userInventoryHandler from './handlers/user-inventory'
+import userResultsHandler from './handlers/user-results'
 import personalUseDeclarationHandler from './handlers/personal-use-declaration'
 import accountDataHandler from './handlers/account-data'
 import usageStatsHandler from './handlers/usage-stats'
@@ -43,6 +46,8 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/optimization', adminOptimizationHandler as unknown as ApiHandler],
   ['/api/admin/session', adminSessionHandler as unknown as ApiHandler],
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
+  ['/api/admin/items', adminItemsHandler as unknown as ApiHandler],
+  ['/api/admin/inventory', adminItemsHandler as unknown as ApiHandler],
   ['/api/auth/register', authHandler as unknown as ApiHandler],
   ['/api/auth/registration-settings', authHandler as unknown as ApiHandler],
   ['/api/auth/login', authHandler as unknown as ApiHandler],
@@ -86,6 +91,11 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/invitations', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/rewards', userRewardsHandler as unknown as ApiHandler],
+  ['/api/user/inventory', userInventoryHandler as unknown as ApiHandler],
+  ['/api/user/onboarding-tasks', userInventoryHandler as unknown as ApiHandler],
+  ['/api/user/onboarding-tasks/claim', userInventoryHandler as unknown as ApiHandler],
+  ['/api/user/maa-export', userResultsHandler as unknown as ApiHandler],
+  ['/api/user/result-archive', userResultsHandler as unknown as ApiHandler],
   ['/api/user/personal-use-declaration', personalUseDeclarationHandler as unknown as ApiHandler],
   ['/api/optimization/jobs', optimizationHandler as unknown as ApiHandler],
   ['/api/optimization/reorder-checks', optimizationHandler as unknown as ApiHandler],
@@ -106,7 +116,9 @@ async function dispatchRequest(req: Request): Promise<Response> {
     return jsonResponse({ metadata: EFFICIENCY_DATA_METADATA, data: EFFICIENCY_DATA })
   }
 
-  const handler = url.pathname.startsWith('/api/optimization/jobs/')
+  const handler = /^\/api\/user\/onboarding-tasks\/(welcome_inventory|bind_skland|first_main_schedule)\/claim$/.test(url.pathname)
+    ? userInventoryHandler as unknown as ApiHandler
+    : url.pathname.startsWith('/api/optimization/jobs/')
     ? optimizationHandler as unknown as ApiHandler
     : ROUTES.get(url.pathname)
   if (!handler) {
@@ -122,7 +134,7 @@ async function dispatchRequest(req: Request): Promise<Response> {
 }
 
 export function getRegisteredApiRoutes(): string[] {
-  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/optimization/jobs/:jobId', '/api/optimization/jobs/:jobId/cancel', ...ROUTES.keys()].sort()
+  return ['/api/health', '/api/health/live', '/api/health/ready', '/api/data', '/api/user/onboarding-tasks/:code/claim', '/api/optimization/jobs/:jobId', '/api/optimization/jobs/:jobId/cancel', ...ROUTES.keys()].sort()
 }
 
 function handleLiveness(): Response {
