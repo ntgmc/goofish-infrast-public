@@ -20,6 +20,12 @@ export function resolveAppRole(environment: NodeJS.ProcessEnv = process.env): Ap
   return 'all'
 }
 
+export function canStartCombinedProcess(environment: NodeJS.ProcessEnv = process.env): boolean {
+  if (environment.NODE_ENV !== 'production') return true
+  return environment.APP_ROLE?.trim().toLowerCase() === 'all'
+    && environment.ALLOW_PRODUCTION_COMBINED_PROCESS === 'true'
+}
+
 function hasAppCapability(
   capability: AppCapability,
   role: AppRole = resolveAppRole(),

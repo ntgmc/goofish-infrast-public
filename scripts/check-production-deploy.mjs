@@ -368,10 +368,22 @@ function assertSystemdTemplate() {
 
   assert.match(devSystemdUnit, /WorkingDirectory=\/opt\/goofish-infrast-v1-dev/)
   assert.match(devSystemdUnit, /Environment=NODE_ENV=production/)
-  assert.match(devSystemdUnit, /Environment=APP_ROLE=api/)
+  assert.match(devSystemdUnit, /^ExecStart=\/usr\/bin\/node \/opt\/goofish-infrast-v1-dev\/server\/dist\/all\.js$/m)
+  assert.match(devSystemdUnit, /Environment=APP_ROLE=all/)
+  assert.match(devSystemdUnit, /Environment=ALLOW_PRODUCTION_COMBINED_PROCESS=true/)
+  assert.match(devSystemdUnit, /Environment=OPTIMIZE_WORKER_CONCURRENCY=1/)
   assert.match(devSystemdUnit, /Environment=PORT=3001/)
   assert.match(devSystemdUnit, /Environment=HOST=127\.0\.0\.1/)
   assert.match(devSystemdUnit, /EnvironmentFile=\/etc\/goofish-infrast-v1\/dev\.env/)
+  assert.match(devSystemdUnit, /KillSignal=SIGTERM/)
+  assert.match(devSystemdUnit, /TimeoutStopSec=75s/)
+  assertOrdered(devSystemdUnit, [
+    'EnvironmentFile=/etc/goofish-infrast-v1/dev.env',
+    'Environment=NODE_ENV=production',
+    'Environment=APP_ROLE=all',
+    'Environment=ALLOW_PRODUCTION_COMBINED_PROCESS=true',
+    'Environment=OPTIMIZE_WORKER_CONCURRENCY=1',
+  ])
   assert.match(
     devSystemdUnit,
     /^ExecStartPre=\/usr\/bin\/env ALLOW_DATABASE_MIGRATION=true \/usr\/bin\/node \/opt\/goofish-infrast-v1-dev\/server\/dist\/migrate\.js$/m,
@@ -396,6 +408,11 @@ function assertDeploymentDocumentation() {
     'production documentation should redirect the www alias to the canonical origin',
   )
   assert.ok(developmentDocs.includes('PUBLIC_APP_URL=https://dev.maatool.com'), 'development EnvironmentFile must declare the public origin')
+  assert.ok(
+    developmentDocs.includes('ALLOW_PRODUCTION_COMBINED_PROCESS=true') &&
+      developmentDocs.includes('OPTIMIZE_WORKER_CONCURRENCY=1'),
+    'development service should explicitly enable a single local optimize worker',
+  )
   assert.ok(
     developmentDocs.includes('CREATE DATABASE goofish_infrast_v1_dev OWNER goofish_dev'),
     'development database should be owned by its runtime role',

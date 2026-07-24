@@ -86,7 +86,7 @@ npm run start:api
 npm run start:worker
 ```
 
-`start:api` 使用 API-only 的 `server/dist/index.js`，`start:worker` 使用独立的 `server/dist/worker.js`。combined 的 `server/dist/all.js` 只用于本地开发，并会拒绝在 `NODE_ENV=production` 下启动。
+`start:api` 使用 API-only 的 `server/dist/index.js`，`start:worker` 使用独立的 `server/dist/worker.js`。combined 的 `server/dist/all.js` 默认只用于本地开发；production mode 只有在 `APP_ROLE=all` 且显式设置 `ALLOW_PRODUCTION_COMBINED_PROCESS=true` 时才允许启动。该例外仅供 `dev.maatool.com` 在本机消费自己的优化队列，正式生产仍保持 API 与杭州 worker 分离。
 
 ## 构建与检查
 
@@ -294,7 +294,8 @@ rm -f admin.cookies
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | PostgreSQL 连接字符串 |
 | `NODE_ENV` | Production | 生产环境必须设为 `production`，启用安全 Cookie 和生产保护 |
-| `APP_ROLE` | Production | 进程角色：首尔后端为 `api`，杭州计算节点为 `worker`；本地开发可用 `all` |
+| `APP_ROLE` | Production | 进程角色：正式生产首尔后端为 `api`、杭州计算节点为 `worker`；本地开发和受控 dev combined 进程使用 `all` |
+| `ALLOW_PRODUCTION_COMBINED_PROCESS` | Dev only | 仅 `dev.maatool.com` 的 combined systemd 服务设为 `true`；正式生产不得设置 |
 | `MAA_ADMIN_PASSWORD` | Yes | 管理后台主口令 |
 | `CDK_HASH_SECRET` | Yes | CDK 哈希计算密钥 |
 | `MAA_ADMIN_SECRET` | Yes | 优化任务轮询令牌签名密钥 |
