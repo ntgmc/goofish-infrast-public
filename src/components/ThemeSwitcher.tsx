@@ -9,19 +9,19 @@ const options: Array<{ value: ThemePreference; label: string; Icon: LucideIcon }
   { value: 'dark', label: copy.common.components_ThemeSwitcher_005, Icon: Moon },
 ]
 
-export default function ThemeSwitcher() {
+export default function ThemeSwitcher({ iconOnly = false }: { iconOnly?: boolean }) {
   const theme = useOptionalTheme()
   if (!theme) {
     return (
       <ThemeProvider>
-        <ThemeSwitcherContent />
+        <ThemeSwitcherContent iconOnly={iconOnly} />
       </ThemeProvider>
     )
   }
-  return <ThemeSwitcherContent />
+  return <ThemeSwitcherContent iconOnly={iconOnly} />
 }
 
-function ThemeSwitcherContent() {
+function ThemeSwitcherContent({ iconOnly }: { iconOnly: boolean }) {
   const { preference, setPreference } = useTheme()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -85,11 +85,11 @@ function ThemeSwitcherContent() {
           aria-expanded={open}
           aria-label={`${copy.common.components_ThemeSwitcher_001}：${selectedOption.label}`}
           onClick={() => setOpen((current) => !current)}
-          className="tool-secondary-action h-11 whitespace-nowrap px-3 py-0"
+          className={`tool-secondary-action h-11 whitespace-nowrap py-0 ${iconOnly ? 'w-11 justify-center px-0' : 'px-3'}`}
         >
           <SelectedIcon aria-hidden="true" className="size-4" />
-        <span className="hidden sm:inline">{selectedOption.label}</span>
-          <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+          {!iconOnly && <span className="hidden sm:inline">{selectedOption.label}</span>}
+          {!iconOnly && <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />}
         </button>
     </div>
   )

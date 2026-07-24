@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { LayoutGroup } from 'motion/react'
 import BrandLogo from '../../../components/BrandLogo'
+import CompactHeaderMenu from '../../../components/CompactHeaderMenu'
 import DeferredFeatureMenu from '../../../components/DeferredFeatureMenu'
 import { AnimatedPresenceRegion, MotionNavIndicator } from '../../../components/MotionPrimitives'
 import ThemeSwitcher from '../../../components/ThemeSwitcher'
@@ -13,6 +14,7 @@ export default function OptimizeShell({
   permissionLabel,
   badges,
   headerActions,
+  compactHeaderActions,
   showScenarioLab,
   onSectionChange,
   onOpenTour,
@@ -23,6 +25,7 @@ export default function OptimizeShell({
   permissionLabel: string
   badges?: Partial<Record<OptimizeSection, string>>
   headerActions?: ReactNode
+  compactHeaderActions?: ReactNode
   showScenarioLab: boolean
   onSectionChange: (section: OptimizeSection) => void
   onOpenTour: () => void
@@ -70,10 +73,42 @@ export default function OptimizeShell({
       </aside>
 
       <main className="lg:pl-64" tabIndex={-1} data-route-focus>
-        <header className="tool-header sticky top-0 z-20 px-5 py-4 sm:px-8">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <header className="tool-header sticky top-0 z-20 px-4 py-1.5 lg:px-8 lg:py-4">
+          <div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-2 lg:hidden">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <BrandLogo size="sm" />
+              <CompactHeaderMenu
+                ariaLabel={copy.common.components_CompactHeaderMenu_001}
+                triggerLabel={current.label}
+                align="start"
+                tourTargets={sections.map((item) => `optimize-nav-${item.id}`)}
+                className="min-w-0 flex-1 justify-between"
+                metadata={{ title: permissionLabel, description: current.description }}
+                items={[
+                  ...sections.map((item) => ({
+                    type: 'button' as const,
+                    id: item.id,
+                    label: item.label,
+                    current: section === item.id,
+                    badge: badges?.[item.id],
+                    tourTarget: `optimize-nav-${item.id}`,
+                    onSelect: () => onSectionChange(item.id),
+                  })),
+                  { type: 'separator' as const, id: 'actions' },
+                  { type: 'button' as const, id: 'tour', label: copy.optimize.pages_tool_optimize_tour_001, onSelect: onOpenTour },
+                  { type: 'button' as const, id: 'reset', label: copy.optimize.pages_tool_optimize_OptimizeShell_005, intent: 'danger' as const, onSelect: onReset },
+                ]}
+              />
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {compactHeaderActions}
+              <ThemeSwitcher iconOnly />
+              <DeferredFeatureMenu iconOnly />
+            </div>
+          </div>
+
+          <div className="mx-auto hidden max-w-7xl items-start justify-between gap-4 lg:flex">
             <div className="flex min-w-0 items-start gap-3">
-              <BrandLogo size="sm" className="lg:hidden" />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="section-index">{copy.optimize.pages_tool_optimize_OptimizeShell_004}</p>
@@ -90,28 +125,8 @@ export default function OptimizeShell({
               {headerActions}
               <ThemeSwitcher />
               <DeferredFeatureMenu />
-              <button type="button" onClick={onReset} className="tool-secondary-action lg:hidden">{copy.optimize.pages_tool_optimize_OptimizeShell_005}</button>
             </div>
           </div>
-
-          <LayoutGroup id="optimize-mobile">
-            <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.optimize.pages_tool_optimize_OptimizeShell_006}>
-              {sections.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onSectionChange(item.id)}
-                  data-tour-target={`optimize-nav-${item.id}`}
-                  aria-current={section === item.id ? 'page' : undefined}
-                  className="tool-nav-link inline-flex shrink-0 items-center gap-2 px-3 text-sm font-medium"
-                >
-                  {section === item.id && <MotionNavIndicator layoutId="optimize-active" />}
-                  <span className="relative z-10">{item.label}</span>
-                  {badges?.[item.id] && <span className="relative z-10 text-xs text-ink-muted">{badges[item.id]}</span>}
-                </button>
-              ))}
-            </nav>
-          </LayoutGroup>
         </header>
         <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
           <AnimatedPresenceRegion motionKey={section}>{children}</AnimatedPresenceRegion>

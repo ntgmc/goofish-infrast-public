@@ -57,7 +57,7 @@ describe('WorkspaceSetupPage CDK paths', () => {
     await user.click(screen.getByRole('button', { name: '下一步' }))
     expect(await screen.findByRole('heading', { name: '先选择基建配置' })).toBeInTheDocument()
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: '基建配置', hidden: true }).some((button) => button.getAttribute('aria-current') === 'page')).toBe(true)
+      expect(screen.getAllByRole('button', { name: /基建配置/, hidden: true }).some((button) => button.getAttribute('aria-current') === 'page')).toBe(true)
     })
 
     await user.click(screen.getByRole('button', { name: '下一步' }))
@@ -66,7 +66,7 @@ describe('WorkspaceSetupPage CDK paths', () => {
 
     expect(apiJsonMock).not.toHaveBeenCalled()
     expect(window.localStorage.getItem(tourStorageKey('workspace-setup', 1))).toBe('done')
-    expect(screen.getAllByRole('button', { name: '基建配置' }).some((button) => button.getAttribute('aria-current') === 'page')).toBe(true)
+    expect(screen.getAllByRole('button', { name: /基建配置/ }).some((button) => button.getAttribute('aria-current') === 'page')).toBe(true)
   })
 
   it('keeps manual operator import disabled for free profiles during the advanced trial', () => {
@@ -82,6 +82,27 @@ describe('WorkspaceSetupPage CDK paths', () => {
     expect(accountActions).toHaveClass('flex-col', 'gap-3')
     expect(within(accountActions).getByRole('button', { name: '返回账号列表' })).toBeInTheDocument()
     expect(within(accountActions).getByRole('button', { name: '退出登录' })).toBeInTheDocument()
+  })
+
+  it('switches sections and preserves account actions in the compact menu', async () => {
+    window.localStorage.setItem(tourStorageKey('workspace-setup', 1), 'done')
+    const user = userEvent.setup()
+    const onBack = vi.fn()
+    const onLogout = vi.fn()
+    renderWorkspace({ onBack, onLogout })
+
+    const openMenu = () => user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
+    await openMenu()
+    await user.click(screen.getByRole('menuitem', { name: /基建配置/ }))
+    expect(screen.getByRole('button', { name: '打开栏目菜单' })).toHaveTextContent('基建配置')
+
+    await openMenu()
+    await user.click(screen.getByRole('menuitem', { name: '返回账号列表' }))
+    expect(onBack).toHaveBeenCalledOnce()
+
+    await openMenu()
+    await user.click(screen.getByRole('menuitem', { name: '退出登录' }))
+    expect(onLogout).toHaveBeenCalledOnce()
   })
 
   it('upgrades the current free profile in place and preserves the profile id', async () => {
@@ -156,6 +177,8 @@ function renderWorkspace(overrides: {
   announcement?: Announcement | null
   onSynced?: (payload: AuthSuccessResponse) => void
   onRedeemNewProfile?: () => void
+  onBack?: () => void
+  onLogout?: () => void
 } = {}) {
   return render(
     <MemoryRouter>
@@ -169,6 +192,8 @@ function WorkspaceSetupHarness({ overrides }: {
     announcement?: Announcement | null
     onSynced?: (payload: AuthSuccessResponse) => void
     onRedeemNewProfile?: () => void
+    onBack?: () => void
+    onLogout?: () => void
   }
 }) {
   const [activeSection, setActiveSection] = useState<'operators' | 'config' | 'cdk'>('operators')
@@ -183,9 +208,9 @@ function WorkspaceSetupHarness({ overrides }: {
       onSectionChange={setActiveSection}
       onSaved={vi.fn()}
       onSynced={overrides.onSynced ?? vi.fn()}
-      onBack={vi.fn()}
+      onBack={overrides.onBack ?? vi.fn()}
       onRedeemNewProfile={overrides.onRedeemNewProfile ?? vi.fn()}
-      onLogout={vi.fn()}
+      onLogout={overrides.onLogout ?? vi.fn()}
     />
   )
 }

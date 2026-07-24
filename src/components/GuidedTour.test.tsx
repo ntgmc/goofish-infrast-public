@@ -83,6 +83,21 @@ describe('GuidedTour', () => {
     expect(findVisibleTourTarget('duplicate')).toBe(container.querySelector('button:last-child'))
   })
 
+  it('uses a compact header fallback only when the real navigation target is not visible', () => {
+    const { container } = render(
+      <>
+        <button data-tour-target="section" data-zero-rect="true">hidden navigation</button>
+        <button data-tour-fallback-targets="section other">compact menu</button>
+      </>,
+    )
+    const compactMenu = screen.getByRole('button', { name: 'compact menu' })
+    expect(findVisibleTourTarget('section')).toBe(compactMenu)
+
+    const realTarget = container.querySelector<HTMLButtonElement>('[data-tour-target="section"]')
+    realTarget?.removeAttribute('data-zero-rect')
+    expect(findVisibleTourTarget('section')).toBe(realTarget)
+  })
+
   it('skips a missing step and continues to the next available target', async () => {
     vi.useFakeTimers()
     const onFinish = vi.fn()

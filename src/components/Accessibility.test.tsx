@@ -126,6 +126,23 @@ describe('mobile touch targets', () => {
     expect(screen.getByText('更多')).toHaveClass('h-11', 'py-0')
   })
 
+  it('keeps icon-only toolbar controls square and accessibly named', () => {
+    render(
+      <MemoryRouter>
+        <ThemeSwitcher iconOnly />
+        <DeferredFeatureMenu iconOnly />
+      </MemoryRouter>,
+    )
+
+    const theme = screen.getByRole('button', { name: /选择主题：/ })
+    expect(theme).toHaveClass('h-11', 'w-11', 'px-0')
+    expect(theme).not.toHaveTextContent('跟随系统')
+
+    const more = screen.getByText('', { selector: 'summary[aria-label="更多操作"]' })
+    expect(more).toHaveClass('h-11', 'w-11', 'px-0')
+    expect(more).toHaveAccessibleName('更多操作')
+  })
+
   it('keeps AuthForm controls at 44px and the submit action at 48px', async () => {
     const user = userEvent.setup()
     render(<AuthForm onAuthenticated={vi.fn()} />)

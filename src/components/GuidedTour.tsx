@@ -225,12 +225,16 @@ export default function GuidedTour({
 }
 
 export function findVisibleTourTarget(target: string) {
-  const candidates = document.querySelectorAll<HTMLElement>(`[data-tour-target="${target}"]`)
-  return Array.from(candidates).find((candidate) => {
+  const isVisible = (candidate: HTMLElement) => {
     const rect = candidate.getBoundingClientRect()
     const style = window.getComputedStyle(candidate)
     return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden'
-  }) ?? null
+  }
+  const candidates = document.querySelectorAll<HTMLElement>(`[data-tour-target="${target}"]`)
+  const visibleTarget = Array.from(candidates).find(isVisible)
+  if (visibleTarget) return visibleTarget
+  const fallbacks = document.querySelectorAll<HTMLElement>(`[data-tour-fallback-targets~="${target}"]`)
+  return Array.from(fallbacks).find(isVisible) ?? null
 }
 
 function padTargetRect(rect: DOMRect | null) {
