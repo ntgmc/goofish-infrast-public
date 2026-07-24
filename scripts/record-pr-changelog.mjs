@@ -127,13 +127,21 @@ async function requestDeepSeek(messages) {
   const content = responseBody?.choices?.[0]?.message?.content
   if (!content) throw new Error('DeepSeek API 未返回总结内容')
 
+  const normalizedContent = String(content).replace(/^```(?:json)?\s*|\s*```$/gi, '').trim()
   let parsed
   try {
-    parsed = JSON.parse(String(content).replace(/^```(?:json)?\s*|\s*```$/gi, '').trim())
+    parsed = JSON.parse(normalizedContent)
   } catch {
+    console.error(`[record-pr-changelog] DeepSeek 原始响应：\n${normalizedContent}`)
     throw new Error('DeepSeek 返回内容不是有效 JSON')
   }
-  return normalizeDeepSeekResult(parsed)
+
+  try {
+    return normalizeDeepSeekResult(parsed)
+  } catch (error) {
+    console.error(`[record-pr-changelog] DeepSeek 返回 JSON 未通过结构校验：\n${JSON.stringify(parsed, null, 2)}`)
+    throw error
+  }
 }
 
 async function githubRequest(path, { method = 'GET', body } = {}) {
