@@ -49,15 +49,16 @@ export default function LandingPage({ onStart }: Props) {
     <main className="landing-shell min-h-screen" tabIndex={-1} data-route-focus>
       <section className="public-shell">
         <nav className="public-nav" aria-label={copy.public.pages_LandingPage_018}>
-          <Link to="/" className="flex min-w-0 items-center gap-3 rounded-lg text-left focus-visible:outline-none">
-            <BrandLogo size="md" />
+          <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left focus-visible:outline-none sm:gap-3">
+            <BrandLogo size="sm" className="sm:h-10 sm:w-10 sm:rounded-lg sm:p-1" />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold text-ink-primary">{copy.public.pages_LandingPage_018}</span>
-              <span className="mt-0.5 block truncate text-xs text-ink-muted">{copy.public.pages_LandingPage_019}</span>
+              <span className="mt-0.5 hidden truncate text-xs text-ink-muted sm:block">{copy.public.pages_LandingPage_019}</span>
             </span>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
-            <ThemeSwitcher />
+            <div className="sm:hidden"><ThemeSwitcher iconOnly /></div>
+            <div className="hidden sm:block"><ThemeSwitcher /></div>
             <button type="button" onClick={onStart} disabled={!productAvailable} className="tool-primary-action inline-flex items-center justify-center">
               {productAvailable ? copy.public.pages_LandingPage_021 : copy.features.paused}</button>
           </div>

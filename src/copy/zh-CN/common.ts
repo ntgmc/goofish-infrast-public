@@ -9,6 +9,10 @@ export const commonCopy = {
   components_ThemeSwitcher_004: "浅色",
   // src/components/ThemeSwitcher.tsx
   components_ThemeSwitcher_005: "深色",
+  // src/components/CompactHeaderMenu.tsx
+  components_CompactHeaderMenu_001: "打开栏目菜单",
+  // src/components/CompactHeaderMenu.tsx
+  components_CompactHeaderMenu_002: "更多操作",
   // src/App.tsx
   App_001: "正在载入工作台...",
   // src/App.tsx

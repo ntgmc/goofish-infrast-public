@@ -2,6 +2,8 @@ import { LayoutGroup } from 'motion/react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
 import { AnimatedPresenceRegion, MotionNavIndicator } from '../../components/MotionPrimitives'
+import BrandLogo from '../../components/BrandLogo'
+import CompactHeaderMenu from '../../components/CompactHeaderMenu'
 import SessionLoader from '../../components/SessionLoader'
 import InvitationSettingsSection from './invitations/InvitationSettingsSection'
 import RegistrationSettingsSection from './registration/RegistrationSettingsSection'
@@ -92,6 +94,8 @@ export default function AdminDashboardView() {
       )
     }
 
+  const syncStatus = `最近同步 ${loading ? '进行中' : formatDate(new Date().toISOString())}`
+
   return (
       <div className="tool-shell">
         <aside className="tool-sidebar fixed inset-y-0 left-0 hidden w-64 px-4 py-5 lg:block">
@@ -113,11 +117,38 @@ export default function AdminDashboardView() {
         </aside>
   
         <main className="lg:pl-64" tabIndex={-1} data-route-focus>
-          <header className="tool-header sticky top-0 z-20 bg-surface-0/95 px-5 py-4 backdrop-blur sm:px-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <header className="tool-header sticky top-0 z-20 bg-surface-0/95 px-4 py-1.5 backdrop-blur lg:px-8 lg:py-4">
+            <div className="flex h-11 items-center justify-between gap-2 lg:hidden">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <BrandLogo size="sm" />
+                <CompactHeaderMenu
+                  ariaLabel="打开栏目菜单"
+                  triggerLabel={sectionLabels[activeSection]}
+                  align="start"
+                  className="min-w-0 flex-1 justify-between"
+                  metadata={{ title: adminUsername ?? '', description: syncStatus }}
+                  items={[
+                    ...(Object.keys(sectionLabels) as AdminSection[]).map((section) => ({
+                      type: 'button' as const,
+                      id: section,
+                      label: sectionLabels[section],
+                      current: activeSection === section,
+                      onSelect: () => setActiveSection(section),
+                    })),
+                    { type: 'separator' as const, id: 'actions' },
+                    { type: 'button' as const, id: 'refresh', label: '刷新数据', onSelect: () => void loadDashboard() },
+                    { type: 'link' as const, id: 'settings', label: '账号设置', to: '/admin/setup' },
+                    { type: 'button' as const, id: 'logout', label: '退出登录', intent: 'danger' as const, onSelect: handleLogout },
+                  ]}
+                />
+              </div>
+              <ThemeSwitcher iconOnly />
+            </div>
+
+            <div className="hidden items-center justify-between gap-4 lg:flex">
               <div>
                 <h1 className="text-xl font-semibold text-ink-primary">{sectionLabels[activeSection]}</h1>
-                <p className="mt-1 text-sm text-ink-muted">最近同步 {loading ? '进行中' : formatDate(new Date().toISOString())}</p>
+                <p className="mt-1 text-sm text-ink-muted">{syncStatus}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <ThemeSwitcher />
@@ -125,16 +156,6 @@ export default function AdminDashboardView() {
                 <Link to="/admin/setup" className="tool-primary-action">账号设置</Link>
               </div>
             </div>
-            <LayoutGroup id="admin-mobile">
-              <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
-                {(Object.keys(sectionLabels) as AdminSection[]).map((section) => (
-                  <button key={section} type="button" onClick={() => setActiveSection(section)} aria-current={activeSection === section ? 'page' : undefined} className="tool-nav-link shrink-0 px-3">
-                    {activeSection === section && <MotionNavIndicator layoutId="admin-active" />}
-                    <span className="relative z-10">{sectionLabels[section]}</span>
-                  </button>
-                ))}
-              </div>
-            </LayoutGroup>
           </header>
   
           <div className="px-5 py-6 sm:px-8">

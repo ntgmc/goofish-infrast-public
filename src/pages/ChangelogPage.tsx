@@ -17,17 +17,18 @@ export default function ChangelogPage() {
   return (
     <main className="tool-page" tabIndex={-1} data-route-focus>
       <div className="public-shell">
-        <header className="public-nav flex-wrap">
-          <Link to="/" className="flex min-w-0 items-center gap-3 text-left">
-            <BrandLogo size="md" />
-            <span>
-              <span className="block text-sm font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_058}</span>
-              <span className="block text-xs text-ink-muted">{copy.public.pages_PublicInfoPage_059}</span>
+        <header className="public-nav">
+          <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 text-left sm:gap-3">
+            <BrandLogo size="sm" className="sm:h-10 sm:w-10 sm:rounded-lg sm:p-1" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_058}</span>
+              <span className="hidden truncate text-xs text-ink-muted sm:block">{copy.public.pages_PublicInfoPage_059}</span>
             </span>
           </Link>
-          <nav className="flex flex-wrap items-center justify-end gap-2 text-sm font-medium" aria-label={copy.public.pages_PublicInfoPage_060}>
-            <ThemeSwitcher />
-            <Link to="/" className="tool-secondary-action">{copy.public.pages_PublicInfoPage_062}</Link>
+          <nav className="flex shrink-0 items-center justify-end gap-2 text-sm font-medium" aria-label={copy.public.pages_PublicInfoPage_060}>
+            <div className="sm:hidden"><ThemeSwitcher iconOnly /></div>
+            <div className="hidden sm:block"><ThemeSwitcher /></div>
+            <Link to="/" className="tool-secondary-action hidden sm:inline-flex">{copy.public.pages_PublicInfoPage_062}</Link>
           </nav>
         </header>
 

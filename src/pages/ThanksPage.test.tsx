@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import ThanksPage from './ThanksPage'
+
+afterEach(() => cleanup())
 
 describe('ThanksPage', () => {
   it('renders the verified default projects, developer, and generic helper credit', () => {
@@ -23,5 +26,15 @@ describe('ThanksPage', () => {
     expect(helperCard).not.toBeNull()
     expect(helperCard?.querySelector('p')).toBeNull()
     expect(screen.queryByText('所有参与开发、测试、反馈与验证的协助者')).not.toBeInTheDocument()
+  })
+
+  it('keeps FAQ and home links in the compact mobile menu', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><ThanksPage /></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: '更多操作' }))
+    const menu = screen.getByRole('menu')
+    expect(within(menu).getByRole('menuitem', { name: 'FAQ' })).toHaveAttribute('href', '/faq')
+    expect(within(menu).getByRole('menuitem', { name: '返回首页' })).toHaveAttribute('href', '/')
   })
 })

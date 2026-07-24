@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import PricingPage from './PricingPage'
+
+afterEach(() => cleanup())
 
 describe('PricingPage', () => {
   it('renders the two public SKUs and full disclosure policy', () => {
@@ -21,10 +24,20 @@ describe('PricingPage', () => {
     expect(screen.getByText(/2 个工作日内首次响应/)).toBeInTheDocument()
     const contactLinks = screen.getAllByRole('link', { name: '联系客服' })
     const supportPageLink = contactLinks.find((link) => link.getAttribute('href') === '/support')
-    expect(supportPageLink).toHaveClass('inline-flex', 'items-center')
+    expect(supportPageLink).toHaveClass('hidden', 'items-center', 'sm:inline-flex')
     const table = screen.getByRole('table')
     expect(within(table).getByText('支持，保存到同一账号工作区')).toBeInTheDocument()
     expect(within(table).getByText('更换游戏账号')).toBeInTheDocument()
     expect(within(table).getByText('不支持自行更换；需人工核验')).toBeInTheDocument()
+  })
+
+  it('keeps support and home links in the compact mobile menu', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><PricingPage /></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: '更多操作' }))
+    const menu = screen.getByRole('menu')
+    expect(within(menu).getByRole('menuitem', { name: '联系客服' })).toHaveAttribute('href', '/support')
+    expect(within(menu).getByRole('menuitem', { name: '返回首页' })).toHaveAttribute('href', '/')
   })
 })

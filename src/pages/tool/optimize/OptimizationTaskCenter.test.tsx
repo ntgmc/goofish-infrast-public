@@ -40,6 +40,24 @@ describe('OptimizationTaskCenter', () => {
     expect(screen.getByText('!')).toBeInTheDocument()
   })
 
+  it('keeps the icon-only task trigger square with its complete status label', () => {
+    const triggerRef = { current: null }
+    render(
+      <OptimizationTaskCenterButton
+        controller={controller({ activeCount: 2, attentionCount: 1 })}
+        open={false}
+        onOpen={vi.fn()}
+        buttonRef={triggerRef}
+        iconOnly
+      />,
+    )
+
+    const trigger = screen.getByRole('button', { name: '打开异步任务中心，2 个进行中，1 个任务需要关注' })
+    expect(trigger).toHaveClass('h-11', 'w-11', 'px-0')
+    expect(trigger).not.toHaveTextContent('任务中心')
+    expect(trigger).toHaveTextContent('2!')
+  })
+
   it('closes on Escape and restores focus to the toolbar trigger', async () => {
     const user = userEvent.setup()
     render(<Harness controller={controller()} />)

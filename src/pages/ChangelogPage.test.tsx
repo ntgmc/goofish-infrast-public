@@ -19,6 +19,7 @@ describe('ChangelogPage', () => {
     }
 
     expect(screen.getByRole('link', { name: '返回首页' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: '返回首页' })).toHaveClass('hidden', 'sm:inline-flex')
     expect(screen.getByRole('link', { name: '更新日志' })).toHaveAttribute('href', '/changelog')
   })
 })
