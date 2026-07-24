@@ -107,12 +107,16 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-optimiz
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active --quiet goofish-optimize-worker@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-optimize-worker@blue.service --no-pager --lines=80
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-optimize-worker@green.service --no-pager --lines=80
+deploy ALL=(root) NOPASSWD: /usr/bin/journalctl --unit goofish-optimize-worker@blue.service --no-pager --lines=80
+deploy ALL=(root) NOPASSWD: /usr/bin/journalctl --unit goofish-optimize-worker@green.service --no-pager --lines=80
 ```
 
 The worker deployment performs a read-only `sudo -n -l` preflight for every
-command above before it fetches or starts a candidate. Sudoers matches command
-arguments exactly, so omitting the plain `disable` form while allowing only
-`disable --now` still causes the cutover to fail.
+`systemctl` command above before it fetches or starts a candidate. The optional
+`journalctl` grants are used only for failure diagnostics and are not a startup
+precondition. Sudoers matches command arguments exactly, so omitting the plain
+`disable` form while allowing only `disable --now` still causes the cutover to
+fail.
 
 ## GitHub production environment
 
@@ -138,9 +142,10 @@ Application and WireGuard secrets remain on the servers. They are not GitHub dep
 
 `Deploy Production` downloads one immutable Quality Checks artifact and deploys the exact SHA in this order:
 
-1. Start and verify the inactive Hangzhou worker slot.
-2. Switch the worker slot and ask systemd to gracefully drain the previous worker for up to 15 minutes without blocking the deployment.
-3. Deploy the Seoul API through its existing blue/green process.
+1. Run the target release's controlled database migration on the Seoul host.
+2. Start and verify the inactive Hangzhou worker slot against the migrated schema.
+3. Switch the worker slot and ask systemd to gracefully drain the previous worker for up to 15 minutes without blocking the deployment.
+4. Deploy the Seoul API through its existing blue/green process.
 
 The previous worker release remains protected by its slot and `previous` links while systemd completes the asynchronous drain. If the worker candidate fails readiness, the API is not deployed. If the worker succeeds and the API fails, the previous API remains active and the new worker continues to accept the previous persisted payload version. Re-run the workflow after repairing the API failure, or manually deploy the previous successful SHA to the worker.
 
@@ -166,6 +171,12 @@ sudo journalctl -u 'goofish-optimize-worker@*' --since '-30 min'
 curl -fsS http://127.0.0.1:3010/health/ready
 curl -fsS http://127.0.0.1:3012/health/ready
 ```
+
+The automated readiness probe bounds both connection and total request time,
+prints the final HTTP or transport diagnostic, and includes the candidate unit's
+last 80 journal lines on failure. Keep the two exact `journalctl --unit` sudoers
+entries above; without them the deployment still fails safely, but Actions may
+not show the worker startup exception.
 
 ## Rollback and outage handling
 

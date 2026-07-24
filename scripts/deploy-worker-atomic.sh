@@ -21,6 +21,8 @@ DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 LOCK_FILE="${LOCK_FILE:-/tmp/goofish-infrast-v1.worker.deploy.lock}"
 HEALTH_RETRIES="${HEALTH_RETRIES:-30}"
 HEALTH_DELAY_SECONDS="${HEALTH_DELAY_SECONDS:-2}"
+HEALTH_CONNECT_TIMEOUT_SECONDS="${HEALTH_CONNECT_TIMEOUT_SECONDS:-2}"
+HEALTH_REQUEST_TIMEOUT_SECONDS="${HEALTH_REQUEST_TIMEOUT_SECONDS:-5}"
 RETAIN_RELEASES="${RETAIN_RELEASES:-5}"
 INSTALL_COMMAND="${INSTALL_COMMAND:-npm ci --omit=dev}"
 ARTIFACT_PATH="${ARTIFACT_PATH:-}"
@@ -65,6 +67,10 @@ run_privileged() {
 
 run_systemctl() {
   run_privileged systemctl "$@"
+}
+
+run_journalctl() {
+  run_privileged journalctl "$@"
 }
 
 check_passwordless_sudo() {
@@ -129,20 +135,61 @@ write_active_slot() {
 }
 
 check_readiness() {
-  local slot="$1" attempt body port
+  local slot="$1" attempt body curl_error curl_exit error_file http_status port response summary
   port="$(slot_health_port "$slot")"
 
+  error_file="$(mktemp "${TMPDIR:-/tmp}/goofish-worker-health.XXXXXX")" || {
+    log "could not create a temporary file for worker readiness diagnostics"
+    return 1
+  }
+
   for attempt in $(seq 1 "$HEALTH_RETRIES"); do
-    body="$(curl -fsS "http://127.0.0.1:${port}/health/ready" 2>/dev/null || true)"
-    if printf '%s' "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true' &&
+    body=""
+    curl_error=""
+    response=""
+    if response="$(curl --silent --show-error --connect-timeout "$HEALTH_CONNECT_TIMEOUT_SECONDS" \
+      --max-time "$HEALTH_REQUEST_TIMEOUT_SECONDS" --output - --write-out $'\n%{http_code}' \
+      "http://127.0.0.1:${port}/health/ready" 2>"$error_file")"; then
+      curl_exit=0
+    else
+      curl_exit=$?
+    fi
+    curl_error="$(<"$error_file")"
+    : >"$error_file"
+    http_status="${response##*$'\n'}"
+    body="${response%$'\n'*}"
+
+    if ((curl_exit == 0)) && [[ "$http_status" == "200" ]] &&
+      printf '%s' "$body" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true' &&
       printf '%s' "$body" | grep -Eq '"role"[[:space:]]*:[[:space:]]*"worker"' &&
       printf '%s' "$body" | grep -Eq '"type"[[:space:]]*:[[:space:]]*"postgres"'; then
+      rm -f -- "$error_file"
       log "$slot readiness passed on attempt $attempt"
       return 0
     fi
-    log "$slot readiness attempt $attempt/$HEALTH_RETRIES failed"
+
+    if ((curl_exit != 0)); then
+      log "$slot readiness attempt $attempt/$HEALTH_RETRIES failed (curl exit $curl_exit)"
+    elif [[ "$http_status" != "200" ]]; then
+      log "$slot readiness attempt $attempt/$HEALTH_RETRIES failed (HTTP $http_status)"
+    else
+      log "$slot readiness attempt $attempt/$HEALTH_RETRIES failed (response is not ready)"
+    fi
     sleep "$HEALTH_DELAY_SECONDS"
   done
+
+  rm -f -- "$error_file"
+  if ((curl_exit != 0)); then
+    summary="${curl_error//$'\r'/ }"
+    summary="${summary//$'\n'/ }"
+    [[ -n "$summary" ]] || summary="no error details"
+    log "last worker readiness transport error (curl exit $curl_exit): ${summary:0:1000}"
+  else
+    summary="${body//$'\r'/ }"
+    summary="${summary//$'\n'/ }"
+    [[ -n "$summary" ]] || summary="<empty>"
+    log "last worker readiness response: HTTP $http_status; body: ${summary:0:1000}"
+  fi
   return 1
 }
 
@@ -314,12 +361,13 @@ TARGET_SHA="${TARGET_SHA,,}"
 (( BLUE_HEALTH_PORT >= 1 && BLUE_HEALTH_PORT <= 65535 && GREEN_HEALTH_PORT >= 1 && GREEN_HEALTH_PORT <= 65535 )) || fail "worker health ports must be between 1 and 65535"
 [[ "$BLUE_HEALTH_PORT" != "$GREEN_HEALTH_PORT" ]] || fail "worker health ports must differ"
 [[ "$HEALTH_RETRIES" =~ ^[1-9][0-9]*$ && "$HEALTH_DELAY_SECONDS" =~ ^[0-9]+$ ]] || fail "health retry settings must be non-negative integers"
+[[ "$HEALTH_CONNECT_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ && "$HEALTH_REQUEST_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || fail "worker health timeouts must be positive integers"
 [[ "$RETAIN_RELEASES" =~ ^[0-9]+$ ]] || fail "RETAIN_RELEASES must be a non-negative integer"
 [[ "$SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]] || fail "SERVICE_NAME contains unsafe characters"
 [[ -f "$ARTIFACT_PATH" ]] || fail "verified release artifact is required"
 [[ "$ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] || fail "ARTIFACT_SHA256 must be a SHA-256 digest"
 
-for command in git npm node curl grep systemctl realpath find sort cut sha256sum tar; do
+for command in git npm node curl grep systemctl journalctl realpath find sort cut sha256sum tar mktemp; do
   require_command "$command"
 done
 if [[ "$(id -u)" != "0" ]]; then
@@ -385,6 +433,7 @@ run_systemctl is-active --quiet "$(service_unit "$CANDIDATE_SLOT")" || fail "wor
 PHASE="candidate-readiness"
 check_readiness "$CANDIDATE_SLOT" || {
   run_systemctl status "$(service_unit "$CANDIDATE_SLOT")" --no-pager --lines=80 || true
+  run_journalctl --unit "$(service_unit "$CANDIDATE_SLOT")" --no-pager --lines=80 || true
   fail "worker candidate readiness failed"
 }
 
