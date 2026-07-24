@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import AnnouncementBodyEditor from '../../../components/AnnouncementBodyEditor'
 import type { Announcement, AnnouncementStats } from '../../../lib/types'
+import type { AnnouncementDraftStatus } from './announcement-draft'
 import {
   AnnouncementReachMetrics,
   EMPTY_ANNOUNCEMENT_REACH_STATS,
@@ -13,7 +14,15 @@ interface AnnouncementSettingsSectionProps {
   announcements: Announcement[]
   stats: Record<string, AnnouncementStats>
   saving: boolean
+  discarding: boolean
+  draftStatus: AnnouncementDraftStatus
+  draftSavedAt: string | null
+  draftRestored: boolean
+  draftConflict: boolean
+  draftError: string | null
+  draftDirty: boolean
   onSubmit: (event: FormEvent) => void
+  onDiscardDraft: () => void
   onUpdateBanner: (patch: Partial<Pick<Announcement, 'active' | 'title' | 'body'>>) => void
   onAdd: () => string
   onUpdate: (id: string, patch: Partial<Pick<Announcement, 'active' | 'title' | 'body'>>) => void
@@ -26,7 +35,15 @@ export default function AnnouncementSettingsSection({
   announcements,
   stats,
   saving,
+  discarding,
+  draftStatus,
+  draftSavedAt,
+  draftRestored,
+  draftConflict,
+  draftError,
+  draftDirty,
   onSubmit,
+  onDiscardDraft,
   onUpdateBanner,
   onAdd,
   onUpdate,
@@ -92,7 +109,7 @@ export default function AnnouncementSettingsSection({
             onSelect={setSelectedId}
             onReorder={(from, to) => onReorder(from, to)}
             ariaLabel="弹出式公告列表"
-            emptyLabel="还没有弹出式公告。新增后保存即可生效。"
+            emptyLabel="还没有弹出式公告。新增后会自动保存为本机草稿，发布后生效。"
             detail={selected ? (
               <article className="tool-inset p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -122,8 +139,44 @@ export default function AnnouncementSettingsSection({
           />
         </div>
 
-        <button type="submit" disabled={saving} className="tool-primary-action mt-5">{saving ? '保存中…' : '保存横幅和公告'}</button>
+        <div className={`mt-5 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${draftConflict || draftStatus === 'error' ? 'border-error/40 bg-error/10' : 'border-surface-3 bg-surface-1/70'}`}>
+          <div className="min-w-0">
+            <p
+              className={`text-sm font-medium ${draftConflict || draftStatus === 'error' ? 'text-error' : 'text-ink-secondary'}`}
+              role={draftStatus === 'error' ? 'alert' : undefined}
+              aria-live={draftStatus === 'error' ? 'assertive' : 'polite'}
+              aria-atomic="true"
+            >
+              {draftStatusMessage(draftStatus, draftSavedAt, draftRestored, draftConflict, draftError)}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-ink-muted">草稿只保存在当前浏览器，不会自动发布，也不会跨设备同步。</p>
+          </div>
+          {draftDirty && (
+            <button type="button" onClick={onDiscardDraft} disabled={saving || discarding} className="tool-secondary-action shrink-0 px-3 text-sm">
+              {discarding ? '正在重新载入…' : '丢弃草稿并载入线上版本'}
+            </button>
+          )}
+        </div>
+
+        <button type="submit" disabled={saving || discarding} className="tool-primary-action mt-4">
+          {saving ? '发布中…' : draftConflict ? '发布并覆盖线上版本' : '发布横幅和公告'}
+        </button>
       </section>
     </form>
   )
+}
+
+function draftStatusMessage(
+  status: AnnouncementDraftStatus,
+  savedAt: string | null,
+  restored: boolean,
+  conflict: boolean,
+  error: string | null,
+): string {
+  if (status === 'error') return error ?? '本机公告草稿保存失败，请立即备份当前内容。'
+  if (conflict) return `${restored ? '已恢复本机草稿' : '本机草稿已保存'}${savedAt ? ` · ${formatDate(savedAt)}` : ''}，但线上版本已变化，请确认后再发布。`
+  if (status === 'saving') return '正在自动保存本机草稿…'
+  if (restored) return `已恢复本机草稿${savedAt ? ` · ${formatDate(savedAt)}` : ''}`
+  if (status === 'saved') return `草稿已自动保存${savedAt ? ` · ${formatDate(savedAt)}` : ''}`
+  return '更改会在停顿 500ms 后自动保存为本机草稿，正式发布前不会影响前台。'
 }
