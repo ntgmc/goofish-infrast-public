@@ -1,5 +1,6 @@
 import type { IncomingMessage } from 'node:http'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_SITE_FEATURES } from '../../src/lib/site-features'
 import { getRegisteredApiRoutes } from '../routes'
 import { inspectIncomingRequest } from './http-boundary'
 import { getAllowedMethods, getRoutePolicy, requestSchemas } from './request-policy'
@@ -124,6 +125,18 @@ describe('request validation boundary', () => {
       kind: 'schedule',
       includeUpgradeSuggestions: false,
       historyResultId: 'legacy-history',
+    }).success).toBe(false)
+  })
+
+  it('keeps the strict admin feature schema aligned with the shared feature contract', () => {
+    expect(requestSchemas.adminFeatureSettings.safeParse({
+      features: DEFAULT_SITE_FEATURES,
+    }).success).toBe(true)
+    expect(requestSchemas.adminFeatureSettings.safeParse({
+      features: Object.fromEntries(Object.entries(DEFAULT_SITE_FEATURES).filter(([key]) => key !== 'inventory')),
+    }).success).toBe(false)
+    expect(requestSchemas.adminFeatureSettings.safeParse({
+      features: { ...DEFAULT_SITE_FEATURES, unknown_feature: true },
     }).success).toBe(false)
   })
 })
