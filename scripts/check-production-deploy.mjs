@@ -101,7 +101,7 @@ function assertPrChangelogWorkflow() {
     'PR changelog recording should keep the Chinese manual summary optional',
   )
   assert.match(prChangelogWorkflow, /^\s+issues: write$/m, 'PR changelog recording should write a bot-owned canonical comment')
-  assert.match(prChangelogWorkflow, /^\s+pull-requests: read$/m, 'PR changelog recording should read the selected PR')
+  assert.match(prChangelogWorkflow, /^\s+pull-requests: write$/m, 'PR changelog recording should write the selected PR comment')
   assert.match(prChangelogWorkflow, /^\s+statuses: write$/m, 'PR changelog recording should publish a merge-gating status')
   assert.match(prChangelogWorkflow, /github\.ref == 'refs\/heads\/main'/, 'trusted changelog workflow code must run from main')
   assert.match(prChangelogWorkflow, /secrets\.DEEPSEEK_API_KEY/, 'PR changelog recording should use the DeepSeek API secret')
@@ -109,6 +109,8 @@ function assertPrChangelogWorkflow() {
   assert.match(prChangelogWorkflow, /node scripts\/record-pr-changelog\.mjs/, 'PR changelog workflow should run the reviewed recording script')
   assert.match(prChangelogScript, /return parsed/, 'PR changelog recording should pass the raw DeepSeek payload to the canonical validator')
   assert.doesNotMatch(prChangelogScript, /return normalizeDeepSeekResult\(parsed\)/, 'PR changelog recording must not normalize the DeepSeek payload twice')
+  assert.match(prChangelogScript, /GitHub API 请求失败：\$\{method\} \$\{path\}/, 'GitHub API failures should identify the rejected request')
+  assert.match(prChangelogScript, /'message', 'documentation_url', 'status'/, 'GitHub API failures should include safe response details')
 }
 
 function assertQualityChecksImmutability() {

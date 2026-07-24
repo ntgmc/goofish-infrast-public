@@ -170,9 +170,32 @@ async function githubRequest(path, { method = 'GET', body } = {}) {
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  const responseBody = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(`GitHub API 请求失败：HTTP ${response.status} ${response.statusText}`)
+  const responseText = await response.text()
+  let responseBody
+  try {
+    responseBody = JSON.parse(responseText)
+  } catch {
+    responseBody = null
+  }
+  if (!response.ok) {
+    throw new Error(
+      `GitHub API 请求失败：${method} ${path} -> HTTP ${response.status} ${response.statusText}${formatGitHubErrorDetails(responseBody)}`,
+    )
+  }
   return responseBody
+}
+
+function formatGitHubErrorDetails(responseBody) {
+  if (!responseBody || typeof responseBody !== 'object' || Array.isArray(responseBody)) return ''
+
+  const details = ['message', 'documentation_url', 'status']
+    .flatMap((field) => {
+      const value = responseBody[field]
+      return typeof value === 'string' || typeof value === 'number'
+        ? [`${field}=${String(value).trim().slice(0, 2000)}`]
+        : []
+    })
+  return details.length > 0 ? `；${details.join('；')}` : ''
 }
 
 async function writeCommitStatus(state, description) {
