@@ -5,14 +5,20 @@ const DATA_MARKER_PATTERN = /<!-- pr-changelog:data:([A-Za-z0-9_-]+) -->/
 const SHA_PATTERN = /^[0-9a-f]{40}$/i
 const CHINESE_PATTERN = /[\u3400-\u9fff]/
 
-const SECTION_LABELS = {
+const PUBLIC_SECTION_LABELS = {
   feature: '功能更新',
   fix: '问题修复',
   performance: '性能优化',
   security: '安全更新',
 }
-
-const SECTION_KINDS = Object.keys(SECTION_LABELS)
+const INTERNAL_SECTION_LABELS = {
+  admin: '管理后台',
+  operations: '运维与 CI',
+  maintenance: '内部维护与重构',
+}
+const SECTION_LABELS = { ...PUBLIC_SECTION_LABELS, ...INTERNAL_SECTION_LABELS }
+const PUBLIC_SECTION_KINDS = Object.keys(PUBLIC_SECTION_LABELS)
+const INTERNAL_SECTION_KINDS = Object.keys(INTERNAL_SECTION_LABELS)
 
 export function validateManualSummary(value) {
   const summary = String(value ?? '').trim()
@@ -30,9 +36,12 @@ export function normalizeDeepSeekResult(value) {
   if (!isRecord(value)) throw new Error('DeepSeek 未返回 JSON 对象')
 
   const summary = normalizeChineseText(value.summary, 'DeepSeek 总结', 2000)
-  const sections = normalizeSections(value.sections)
-  if (sections.length === 0) throw new Error('DeepSeek 必须返回至少一个 changelog 分类条目')
-  return { summary, sections }
+  const publicSections = normalizeSections(value.public_sections, PUBLIC_SECTION_KINDS, 'public_sections')
+  const internalSections = normalizeSections(value.internal_sections, INTERNAL_SECTION_KINDS, 'internal_sections')
+  const itemCount = countSectionItems(publicSections) + countSectionItems(internalSections)
+  if (itemCount === 0) throw new Error('DeepSeek 必须返回至少一个 changelog 分类条目')
+  if (itemCount > 12) throw new Error('DeepSeek changelog 条目不能超过 12 条')
+  return { summary, publicSections, internalSections }
 }
 
 export function createPrChangelogPayload({ pullRequestNumber, headSha, manualSummary, deepseekResult, generatedAt, model }) {
@@ -50,12 +59,13 @@ export function createPrChangelogPayload({ pullRequestNumber, headSha, manualSum
   if (!normalizedModel) throw new Error('DeepSeek 模型名称不能为空')
 
   return {
-    schema_version: 1,
+    schema_version: 2,
     pull_request: pullRequest,
     head_sha: normalizedHeadSha,
     manual_summary: validateManualSummary(manualSummary),
     deepseek_summary: normalizedResult.summary,
-    sections: normalizedResult.sections,
+    public_sections: normalizedResult.publicSections,
+    internal_sections: normalizedResult.internalSections,
     generated_at: timestamp.toISOString(),
     model: normalizedModel,
   }
@@ -64,12 +74,8 @@ export function createPrChangelogPayload({ pullRequestNumber, headSha, manualSum
 export function renderPrChangelogBlock(payload) {
   const validated = validatePayload(payload)
   const encoded = Buffer.from(JSON.stringify(validated), 'utf8').toString('base64url')
-  const sectionLines = validated.sections.flatMap((section) => [
-    `#### ${SECTION_LABELS[section.kind]}`,
-    '',
-    ...section.items.map((item) => `- ${item}`),
-    '',
-  ])
+  const publicSectionLines = renderSectionLines(validated.public_sections, '本次 PR 没有普通用户可直接感知的变化。')
+  const internalSectionLines = renderSectionLines(validated.internal_sections, '本次 PR 没有仅限仓库记录的内部变化。')
 
   return [
     MARKER_START,
@@ -86,7 +92,12 @@ export function renderPrChangelogBlock(payload) {
     '',
     validated.deepseek_summary,
     '',
-    ...sectionLines,
+    '### 网站公开变更',
+    '',
+    ...publicSectionLines,
+    '### 仓库内部变更',
+    '',
+    ...internalSectionLines,
     `${DATA_MARKER_PREFIX}${encoded} -->`,
     '',
     MARKER_END,
@@ -136,13 +147,14 @@ export function findTrustedPrChangelogPayload(comments, botLogin = 'github-actio
   return null
 }
 
-export function flattenPrChangelogChanges(payload) {
+export function collectPrChangelogChanges(payload) {
   const validated = validatePayload(payload)
-  return validated.sections.flatMap((section) => section.items.map((summary) => ({
-    kind: section.kind,
-    summary,
-    sha: validated.head_sha,
-  })))
+  const publicChanges = flattenSections(validated.public_sections, validated.head_sha)
+  const internalChanges = flattenSections(validated.internal_sections, validated.head_sha)
+  return {
+    publicChanges,
+    repositoryChanges: [...publicChanges, ...internalChanges],
+  }
 }
 
 export function buildPullRequestDiffContext(files, maxLength = 60000) {
@@ -181,10 +193,12 @@ export function buildDeepSeekMessages({ title, body, manualSummary, diffContext 
     {
       role: 'system',
       content: [
-        '你是软件发布说明编辑。请根据维护者的人工说明和 PR diff，生成面向最终用户的简体中文变更总结。',
+        '你是软件发布说明编辑。请根据维护者的人工说明和 PR diff，生成分为网站公开内容与仓库内部内容的简体中文变更总结。',
         '只输出 JSON 对象，不要输出 Markdown 代码块。JSON 格式：',
-        '{"summary":"一段中文总体总结","sections":[{"kind":"feature|fix|performance|security","items":["中文条目"]}]}',
-        'sections 只允许 feature、fix、performance、security，至少包含一个且总计不超过 12 个条目；忽略纯测试、格式化、重构和 CI 细节，除非它们直接影响用户。',
+        '{"summary":"一段中文总体总结","public_sections":[{"kind":"feature|fix|performance|security","items":["中文条目"]}],"internal_sections":[{"kind":"admin|operations|maintenance","items":["中文条目"]}]}',
+        'public_sections 只记录普通用户在网站、公开 API 或核心业务功能中能直接感受到的变化；管理后台、开发工具、测试、文档、重构、依赖、构建、部署和 CI 不得放入 public_sections。',
+        'internal_sections 记录不应在网站展示但需要在仓库追溯的变化：管理后台用 admin，部署/运维/CI/构建用 operations，重构/测试/文档/依赖/开发维护用 maintenance。',
+        'public_sections 可以为空；public_sections 与 internal_sections 合计至少一个且不超过 12 个条目。',
         '不得虚构 diff 中不存在的行为。人工说明用于表达维护者意图，diff 用于核验和补充。条目应简洁、明确、使用中文。',
       ].join('\n'),
     },
@@ -203,26 +217,31 @@ export function buildDeepSeekMessages({ title, body, manualSummary, diffContext 
 }
 
 function validatePayload(value) {
-  if (!isRecord(value) || value.schema_version !== 1) throw new Error('PR changelog 数据版本无效')
+  if (!isRecord(value) || (value.schema_version !== 1 && value.schema_version !== 2)) {
+    throw new Error('PR changelog 数据版本无效')
+  }
+  const publicSections = value.schema_version === 1 ? value.sections : value.public_sections
+  const internalSections = value.schema_version === 1 ? [] : value.internal_sections
   return createPrChangelogPayload({
     pullRequestNumber: value.pull_request,
     headSha: value.head_sha,
     manualSummary: value.manual_summary,
     deepseekResult: {
       summary: value.deepseek_summary,
-      sections: value.sections,
+      public_sections: publicSections,
+      internal_sections: internalSections,
     },
     generatedAt: value.generated_at,
     model: value.model,
   })
 }
 
-function normalizeSections(value) {
-  if (!Array.isArray(value)) throw new Error('DeepSeek sections 必须是数组')
+function normalizeSections(value, allowedKinds, fieldName) {
+  if (!Array.isArray(value)) throw new Error(`DeepSeek ${fieldName} 必须是数组`)
 
-  const grouped = new Map(SECTION_KINDS.map((kind) => [kind, []]))
+  const grouped = new Map(allowedKinds.map((kind) => [kind, []]))
   for (const section of value) {
-    if (!isRecord(section) || !SECTION_KINDS.includes(section.kind) || !Array.isArray(section.items)) {
+    if (!isRecord(section) || !allowedKinds.includes(section.kind) || !Array.isArray(section.items)) {
       throw new Error('DeepSeek 返回了无效的 changelog 分类')
     }
     for (const item of section.items) {
@@ -232,13 +251,32 @@ function normalizeSections(value) {
     }
   }
 
-  const itemCount = [...grouped.values()].reduce((total, items) => total + items.length, 0)
-  if (itemCount > 12) throw new Error('DeepSeek changelog 条目不能超过 12 条')
-
-  return SECTION_KINDS.flatMap((kind) => {
+  return allowedKinds.flatMap((kind) => {
     const items = grouped.get(kind)
     return items.length ? [{ kind, items }] : []
   })
+}
+
+function renderSectionLines(sections, emptyMessage) {
+  if (sections.length === 0) return [`- ${emptyMessage}`, '']
+  return sections.flatMap((section) => [
+    `#### ${SECTION_LABELS[section.kind]}`,
+    '',
+    ...section.items.map((item) => `- ${item}`),
+    '',
+  ])
+}
+
+function flattenSections(sections, sha) {
+  return sections.flatMap((section) => section.items.map((summary) => ({
+    kind: section.kind,
+    summary,
+    sha,
+  })))
+}
+
+function countSectionItems(sections) {
+  return sections.reduce((total, section) => total + section.items.length, 0)
 }
 
 function normalizeChineseText(value, label, maxLength) {

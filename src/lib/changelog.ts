@@ -33,22 +33,25 @@ const MANUAL_CHANGELOG_RELEASES = [
         ],
       },
       {
-        id: 'workspace-and-admin',
+        id: 'workspace-experience',
         kind: 'custom',
         title: copy.public.pages_ChangelogPage_015,
         items: [
           copy.public.pages_ChangelogPage_016,
-          copy.public.pages_ChangelogPage_017,
         ],
       },
     ],
   },
 ] as const satisfies readonly ChangelogRelease[]
 
-export const CHANGELOG_RELEASES = sortChangelogReleases([
+export const CHANGELOG_RELEASES = selectPublicChangelogReleases([
   ...GENERATED_CHANGELOG_RELEASES,
   ...MANUAL_CHANGELOG_RELEASES,
 ])
+
+export function selectPublicChangelogReleases(releases: readonly ChangelogRelease[]): readonly ChangelogRelease[] {
+  return sortChangelogReleases(releases).filter((release) => release.sections.some((section) => section.items.length > 0))
+}
 
 export function sortChangelogReleases(releases: readonly ChangelogRelease[]): readonly ChangelogRelease[] {
   const byId = new Map<string, ChangelogRelease>()

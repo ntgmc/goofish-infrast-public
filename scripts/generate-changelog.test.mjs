@@ -13,13 +13,14 @@ import {
   renderGeneratedModule,
   renderReleaseNotes,
   selectPublicChanges,
+  selectRepositoryChanges,
   validateChangelogEnvelope,
 } from './changelog-lib.mjs'
 import {
   buildPullRequestDiffContext,
   createPrChangelogPayload,
   findTrustedPrChangelogPayload,
-  flattenPrChangelogChanges,
+  collectPrChangelogChanges,
   parsePrChangelogPayload,
   renderPrChangelogBlock,
   upsertPrChangelogBlock,
@@ -40,12 +41,19 @@ test('groups conventional commits and explicit release note trailers', () => {
     `${targetSha}\u001ffeat(optimize): schedule office operators automatically\u001f\u001e`,
     `${previousSha}\u001ffix: smooth schedule progress updates\u001fRelease-Note: 平滑排班进度显示\nRelease-Note-Type: performance\u001e`,
     `${previousSha}\u001fchore: refresh fixtures\u001f\u001e`,
+    `${previousSha}\u001ffeat(admin): export failed job payloads\u001f\u001e`,
     `${previousSha}\u001frefactor: move internal worker check\u001fSkip-Changelog: true\u001e`,
   ].join(''))
 
   assert.deepEqual(selectPublicChanges(commits), [
     { kind: 'feature', summary: 'schedule office operators automatically', sha: targetSha },
     { kind: 'performance', summary: '平滑排班进度显示', sha: previousSha },
+  ])
+  assert.deepEqual(selectRepositoryChanges(commits), [
+    { kind: 'feature', summary: 'schedule office operators automatically', sha: targetSha },
+    { kind: 'performance', summary: '平滑排班进度显示', sha: previousSha },
+    { kind: 'maintenance', summary: 'refresh fixtures', sha: previousSha },
+    { kind: 'admin', summary: 'export failed job payloads', sha: previousSha },
   ])
 })
 
@@ -65,6 +73,7 @@ test('creates a baseline before the first published release and orders same-day 
 
   assert.equal(baseline.kind, 'baseline')
   assert.deepEqual(baseline.sections, [])
+  assert.deepEqual(baseline.repositorySections, [])
   assert.equal(release.kind, 'release')
   assert.deepEqual(release.sections, [{ id: 'fix', kind: 'fix', items: ['improve release pipeline'] }])
   assert.deepEqual(mergeChangelogReleases([baseline], release).map((item) => item.version), ['2.0.100', '2.0.99'])
@@ -77,9 +86,11 @@ test('records and parses a Chinese PR changelog block without replacing the rest
     manualSummary: '新增手动录入中文变更说明，并在合并前完成审核。',
     deepseekResult: {
       summary: '现在可以在合并前生成并确认面向用户的中文更新说明。',
-      sections: [
+      public_sections: [
         { kind: 'feature', items: ['支持通过手动工作流记录中文变更说明'] },
-        { kind: 'fix', items: ['避免发布时仅依赖英文提交标题生成说明'] },
+      ],
+      internal_sections: [
+        { kind: 'operations', items: ['记录完整的发布与 CI 调整供仓库追溯'] },
       ],
     },
     generatedAt: '2026-07-24T08:00:00.000Z',
@@ -91,10 +102,17 @@ test('records and parses a Chinese PR changelog block without replacing the rest
   assert.match(body, /^原有 PR 描述/)
   assert.match(body, /### 人工说明/)
   assert.deepEqual(parsePrChangelogPayload(body), payload)
-  assert.deepEqual(flattenPrChangelogChanges(payload), [
-    { kind: 'feature', summary: '支持通过手动工作流记录中文变更说明', sha: targetSha },
-    { kind: 'fix', summary: '避免发布时仅依赖英文提交标题生成说明', sha: targetSha },
-  ])
+  assert.deepEqual(collectPrChangelogChanges(payload), {
+    publicChanges: [
+      { kind: 'feature', summary: '支持通过手动工作流记录中文变更说明', sha: targetSha },
+    ],
+    repositoryChanges: [
+      { kind: 'feature', summary: '支持通过手动工作流记录中文变更说明', sha: targetSha },
+      { kind: 'operations', summary: '记录完整的发布与 CI 调整供仓库追溯', sha: targetSha },
+    ],
+  })
+  assert.match(body, /### 网站公开变更/)
+  assert.match(body, /### 仓库内部变更/)
 
   const updated = upsertPrChangelogBlock(body, renderPrChangelogBlock({
     ...payload,
@@ -109,7 +127,8 @@ test('records and parses a Chinese PR changelog block without replacing the rest
     manualSummary: '尝试用普通用户评论替换可信说明。',
     deepseekResult: {
       summary: '这条内容不应被生产构建采纳。',
-      sections: [{ kind: 'feature', items: ['不可信的伪造更新说明'] }],
+      public_sections: [{ kind: 'feature', items: ['不可信的伪造更新说明'] }],
+      internal_sections: [],
     },
     generatedAt: '2026-07-24T09:00:00.000Z',
     model: 'deepseek-chat',
@@ -119,6 +138,22 @@ test('records and parses a Chinese PR changelog block without replacing the rest
     { user: { login: 'pull-request-author' }, body: renderPrChangelogBlock(maliciousPayload) },
   ])
   assert.deepEqual(trustedPayload, payload)
+
+  const legacyPayload = {
+    schema_version: 1,
+    pull_request: 42,
+    head_sha: targetSha,
+    manual_summary: '旧版工作流记录的中文人工说明。',
+    deepseek_summary: '旧版内容原本就只包含用户可见变化。',
+    sections: [{ kind: 'fix', items: ['兼容旧版用户端变更记录'] }],
+    generated_at: '2026-07-24T07:00:00.000Z',
+    model: 'deepseek-chat',
+  }
+  const legacyBody = `<!-- pr-changelog:data:${Buffer.from(JSON.stringify(legacyPayload), 'utf8').toString('base64url')} -->`
+  assert.deepEqual(collectPrChangelogChanges(parsePrChangelogPayload(legacyBody)), {
+    publicChanges: [{ kind: 'fix', summary: '兼容旧版用户端变更记录', sha: targetSha }],
+    repositoryChanges: [{ kind: 'fix', summary: '兼容旧版用户端变更记录', sha: targetSha }],
+  })
 })
 
 test('validates manual Chinese input and bounds the diff sent to DeepSeek', () => {
@@ -128,7 +163,7 @@ test('validates manual Chinese input and bounds the diff sent to DeepSeek', () =
     pullRequestNumber: 42,
     headSha: targetSha,
     manualSummary: '这是有效的中文人工说明。',
-    deepseekResult: { summary: '这是有效的中文总结。', sections: [] },
+    deepseekResult: { summary: '这是有效的中文总结。', public_sections: [], internal_sections: [] },
     generatedAt: '2026-07-24T08:00:00.000Z',
     model: 'deepseek-chat',
   }), /至少一个/)
@@ -138,11 +173,29 @@ test('validates manual Chinese input and bounds the diff sent to DeepSeek', () =
     manualSummary: '这是有效的中文人工说明。',
     deepseekResult: {
       summary: '这是有效的中文总结。',
-      sections: [{ kind: 'feature', items: Array.from({ length: 13 }, (_, index) => `中文条目${index}`) }],
+      public_sections: [],
+      internal_sections: [{ kind: 'maintenance', items: Array.from({ length: 13 }, (_, index) => `中文条目${index}`) }],
     },
     generatedAt: '2026-07-24T08:00:00.000Z',
     model: 'deepseek-chat',
   }), /不能超过 12 条/)
+
+  const internalOnlyPayload = createPrChangelogPayload({
+    pullRequestNumber: 43,
+    headSha: targetSha,
+    manualSummary: '本次修改只涉及管理后台能力。',
+    deepseekResult: {
+      summary: '新增仅供管理员使用的内部操作能力。',
+      public_sections: [],
+      internal_sections: [{ kind: 'admin', items: ['支持管理员查看内部任务诊断信息'] }],
+    },
+    generatedAt: '2026-07-24T08:00:00.000Z',
+    model: 'deepseek-chat',
+  })
+  assert.deepEqual(collectPrChangelogChanges(internalOnlyPayload), {
+    publicChanges: [],
+    repositoryChanges: [{ kind: 'admin', summary: '支持管理员查看内部任务诊断信息', sha: targetSha }],
+  })
 
   const context = buildPullRequestDiffContext([
     { filename: 'src/example.ts', status: 'modified', additions: 2, deletions: 1, patch: '+中文修改\n'.repeat(100) },
@@ -161,9 +214,17 @@ test('creates release sections from recorded PR changes instead of commit subjec
     releasedAt: '2026-07-24T08:00:00.000Z',
     commits: [{ sha: targetSha, subject: 'feat: ignored fallback title', body: '' }],
     changes: [{ kind: 'feature', summary: '使用审核后的中文 PR 更新说明', sha: targetSha }],
+    repositoryChanges: [
+      { kind: 'feature', summary: '使用审核后的中文 PR 更新说明', sha: targetSha },
+      { kind: 'maintenance', summary: '重构内部发布数据流', sha: targetSha },
+    ],
   })
 
   assert.deepEqual(release.sections, [{ id: 'feature', kind: 'feature', items: ['使用审核后的中文 PR 更新说明'] }])
+  assert.deepEqual(release.repositorySections, [
+    { id: 'feature', kind: 'feature', items: ['使用审核后的中文 PR 更新说明'] },
+    { id: 'maintenance', kind: 'maintenance', items: ['重构内部发布数据流'] },
+  ])
 })
 
 test('rejects a release that uses its target SHA as its previous boundary', () => {
@@ -181,14 +242,22 @@ test('renders a typed generated module and matching release note envelope', () =
     targetSha,
     previousTargetSha: previousSha,
     releasedAt: '2026-07-24T00:00:00.000Z',
-    commits: [{ sha: targetSha, subject: 'feat: add changelog automation', body: '' }],
+    changes: [{ kind: 'feature', summary: '新增用户端更新记录', sha: targetSha }],
+    repositoryChanges: [
+      { kind: 'feature', summary: '新增用户端更新记录', sha: targetSha },
+      { kind: 'operations', summary: '接入发布工作流自动化', sha: targetSha },
+    ],
   })
   const envelope = createChangelogEnvelope(true, release)
 
   assert.equal(validateChangelogEnvelope(envelope), envelope)
-  assert.match(renderGeneratedModule([release]), /GENERATED_CHANGELOG_RELEASES/)
+  const generatedModule = renderGeneratedModule([release])
+  assert.match(generatedModule, /GENERATED_CHANGELOG_RELEASES/)
+  assert.doesNotMatch(generatedModule, /repositorySections|接入发布工作流自动化/)
   assert.match(renderReleaseNotes(envelope), /# v2\.0\.436/)
   assert.match(renderReleaseNotes(envelope), /Features/)
+  assert.match(renderReleaseNotes(envelope), /Operations and CI/)
+  assert.match(renderReleaseNotes(envelope), /接入发布工作流自动化/)
 })
 
 test('generates a production baseline candidate without requiring Git history', async () => {
@@ -237,6 +306,7 @@ test('generates a production baseline candidate without requiring Git history', 
     assert.equal(envelope.release.previousTargetSha, null)
     assert.equal(envelope.release.kind, 'baseline')
     assert.ok(Array.isArray(envelope.release.sections))
+    assert.ok(Array.isArray(envelope.release.repositorySections))
     assert.match(await readFile(releaseNotesPath, 'utf8'), /^# v2\.0\.999/m)
     assert.match(await readFile(releaseNotesPath, 'utf8'), /## Baseline/)
     assert.match(await readFile(generatedModulePath, 'utf8'), /v2\.0\.999/)
