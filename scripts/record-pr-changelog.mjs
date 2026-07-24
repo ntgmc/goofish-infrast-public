@@ -106,20 +106,41 @@ async function writeChangelogComment(body) {
 }
 
 async function requestDeepSeek(messages) {
-  const response = await fetch(`${deepseekApiUrl}/chat/completions`, {
+  const requestUrl = `${deepseekApiUrl}/chat/completions`
+  const requestBody = {
+    model: deepseekModel,
+    messages,
+    response_format: { type: 'json_object' },
+    temperature: 0.2,
+  }
+  console.log('[record-pr-changelog] DeepSeek 完整请求：')
+  console.log(JSON.stringify({
+    url: requestUrl,
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer [REDACTED]',
+      'Content-Type': 'application/json',
+    },
+    body: requestBody,
+  }, null, 2))
+
+  const response = await fetch(requestUrl, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${deepseekApiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: deepseekModel,
-      messages,
-      response_format: { type: 'json_object' },
-      temperature: 0.2,
-    }),
+    body: JSON.stringify(requestBody),
   })
-  const responseBody = await response.json().catch(() => null)
+  const responseText = await response.text()
+  console.log(`[record-pr-changelog] DeepSeek 完整响应：HTTP ${response.status} ${response.statusText}\n${responseText}`)
+
+  let responseBody
+  try {
+    responseBody = JSON.parse(responseText)
+  } catch {
+    responseBody = null
+  }
   if (!response.ok) {
     throw new Error(`DeepSeek API 请求失败：HTTP ${response.status} ${response.statusText}`)
   }
