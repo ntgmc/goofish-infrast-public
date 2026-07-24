@@ -3,6 +3,11 @@ import { query } from './postgres'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 
+const MIGRATION_PHASE_SEPARATOR = '-- goofish:migration-phase'
+const RETRIABLE_MIGRATION_CODES = new Set(['40P01', '40001', '55P03'])
+const MIGRATION_PHASE_MAX_ATTEMPTS = 5
+const MIGRATION_RETRY_BASE_MS = 1_000
+
 const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS cdk_records (
   key TEXT PRIMARY KEY,
@@ -36,6 +41,7 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_cdk_records_license_order_hash
   ON cdk_records(license_order_hash) WHERE license_order_hash IS NOT NULL;
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS announcements (
   key TEXT PRIMARY KEY,
   data_json JSONB NOT NULL,
@@ -72,6 +78,7 @@ CREATE TABLE IF NOT EXISTS public_content_settings (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS brevo_email_deliveries (
   id TEXT PRIMARY KEY,
   quota_date DATE NOT NULL,
@@ -120,6 +127,7 @@ CREATE TABLE IF NOT EXISTS brevo_email_quota_snapshots (
   synced_at TIMESTAMPTZ
 );
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS usage_events (
   key TEXT PRIMARY KEY,
   event TEXT NOT NULL,
@@ -244,6 +252,7 @@ CREATE TABLE IF NOT EXISTS optimization_job_effects (
   PRIMARY KEY (job_id, effect_type)
 );
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS admin_users (
   username TEXT PRIMARY KEY,
   password_hash TEXT NOT NULL,
@@ -267,6 +276,7 @@ CREATE INDEX IF NOT EXISTS idx_admin_sessions_username ON admin_sessions(usernam
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires_at ON admin_sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_last_seen_at ON admin_sessions(last_seen_at);
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS user_accounts (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
@@ -302,6 +312,7 @@ BEGIN
   END IF;
 END $$;
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS invitation_codes (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
   code TEXT NOT NULL UNIQUE,
@@ -341,6 +352,7 @@ UPDATE invitations
    AND settled_at IS NOT NULL
    AND coalesce(settlement_json->'rewards'->'inviter'->>'applied', '') ~ '^[1-9][0-9]*$';
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS admin_registration_invitations (
   id TEXT PRIMARY KEY,
   code_hash TEXT NOT NULL UNIQUE,
@@ -390,6 +402,7 @@ CREATE TABLE IF NOT EXISTS reward_consumptions (
 );
 CREATE INDEX IF NOT EXISTS idx_reward_consumptions_user ON reward_consumptions(user_id, consumed_at DESC);
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS account_deletion_requests (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL UNIQUE REFERENCES user_accounts(id) ON DELETE CASCADE,
@@ -426,6 +439,7 @@ CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_user ON pers
 CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_profile ON personal_use_declaration_acceptances(profile_id, accepted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_retention ON personal_use_declaration_acceptances(retain_until) WHERE retain_until IS NOT NULL;
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS user_sessions (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
@@ -495,6 +509,7 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_game_accounts_cdk_code_hash
   ON user_game_accounts(cdk_code_hash) WHERE cdk_code_hash IS NOT NULL;
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS cdk_redemption_idempotency (
   scope TEXT NOT NULL,
   idempotency_key TEXT NOT NULL,
@@ -526,6 +541,7 @@ CREATE TABLE IF NOT EXISTS free_preview_pending_claims (
 CREATE INDEX IF NOT EXISTS idx_free_preview_pending_claims_user_id ON free_preview_pending_claims(user_id);
 CREATE INDEX IF NOT EXISTS idx_free_preview_pending_claims_expires_at ON free_preview_pending_claims(expires_at);
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS user_workspaces (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
   operators_json JSONB,
@@ -546,6 +562,7 @@ CREATE TABLE IF NOT EXISTS user_profile_workspaces (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
+-- goofish:migration-phase
 -- Workspaces store newest saved configurations and history entries first.  Trim
 -- pre-existing records once the lower retention policy is deployed, while
 -- leaving malformed legacy fields to the application normalizer.
@@ -616,6 +633,7 @@ SET record_json = jsonb_set(
 FROM trimmed_workspace_history AS trimmed
 WHERE workspace.profile_id = trimmed.profile_id;
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS profile_entitlements (
   profile_id TEXT PRIMARY KEY REFERENCES user_game_accounts(id) ON DELETE CASCADE,
   first_generated_at TIMESTAMPTZ,
@@ -686,6 +704,7 @@ FROM user_profile_workspaces workspace
 WHERE workspace.record_json->'free_schedule_entitlement' IS NOT NULL
 ON CONFLICT (profile_id) DO NOTHING;
 
+-- goofish:migration-phase
 -- Existing installations may already contain duplicate active jobs.  Keep the
 -- earliest running job (or earliest queued job) for each owner and fail the rest
 -- before creating the partial unique indexes below.
@@ -714,6 +733,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_optimize_jobs_owner_running
 CREATE UNIQUE INDEX IF NOT EXISTS uq_optimize_jobs_free_owner_active
   ON optimize_jobs(owner_key) WHERE source = 'free_preview' AND status IN ('queued', 'running');
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS user_announcement_reads (
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
   announcement_id TEXT NOT NULL,
@@ -752,12 +772,14 @@ CREATE TABLE IF NOT EXISTS security_rate_limit_buckets (
 CREATE INDEX IF NOT EXISTS idx_security_rate_limit_buckets_expires_at
   ON security_rate_limit_buckets(expires_at);
 
+-- goofish:migration-phase
 ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS user_id TEXT;
 ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS profile_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_usage_events_user_id ON usage_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_usage_events_profile_id ON usage_events(profile_id);
 UPDATE usage_events SET profile_id = record_json->>'profile_id' WHERE profile_id IS NULL AND record_json ? 'profile_id';
 
+-- goofish:migration-phase
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS profile_id TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS failure_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS worker_id TEXT;
@@ -813,6 +835,7 @@ BEGIN
   END IF;
 END $$;
 
+-- goofish:migration-phase
 ALTER TABLE user_accounts ALTER COLUMN cdk_key DROP NOT NULL;
 ALTER TABLE user_accounts ALTER COLUMN cdk_code_hash DROP NOT NULL;
 ALTER TABLE user_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
@@ -820,6 +843,7 @@ ALTER TABLE user_game_accounts ALTER COLUMN cdk_key DROP NOT NULL;
 ALTER TABLE user_game_accounts ALTER COLUMN cdk_code_hash DROP NOT NULL;
 ALTER TABLE user_game_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS item_definitions (
   code TEXT PRIMARY KEY,
   kind TEXT NOT NULL,
@@ -852,6 +876,7 @@ CREATE TABLE IF NOT EXISTS gift_pack_version_contents (
   PRIMARY KEY (gift_pack_version_id, item_code)
 );
 
+-- goofish:migration-phase
 ALTER TABLE reward_grants ADD COLUMN IF NOT EXISTS gift_pack_version_id TEXT;
 ALTER TABLE reward_grants ADD COLUMN IF NOT EXISTS revoked_quantity INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS reference_type TEXT;
@@ -901,6 +926,7 @@ BEGIN
   END IF;
 END $$;
 
+-- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS inventory_ledger (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
@@ -1016,6 +1042,7 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_inventory_distribution_pending
   ON inventory_distribution_recipients(campaign_id, status, user_id);
 
+-- goofish:migration-phase
 INSERT INTO item_definitions
   (code, kind, effect_code, name, description, icon_key, system_owned, issuance_enabled, created_at, updated_at)
 VALUES
@@ -1077,20 +1104,64 @@ export async function ensureDatabaseSchema(): Promise<void> {
 }
 
 export async function migrateDatabaseSchema(): Promise<void> {
-  await query(CREATE_SCHEMA_SQL)
-  await query(
-    `insert into personal_use_declaration_versions
+  const migrationPhases: Array<{ sql: string; values?: unknown[] }> = CREATE_SCHEMA_SQL
+    .split(MIGRATION_PHASE_SEPARATOR)
+    .map((sql) => sql.trim())
+    .filter(Boolean)
+    .map((sql) => ({ sql }))
+
+  migrationPhases.push({
+    sql: `insert into personal_use_declaration_versions
       (declaration_id, display_version, effective_date, content_text, content_hash, created_at)
      values ($1, $2, $3, $4, $5, now())
      on conflict (declaration_id) do nothing`,
-    [
+    values: [
       CURRENT_PERSONAL_USE_DECLARATION.id,
       CURRENT_PERSONAL_USE_DECLARATION.version,
       CURRENT_PERSONAL_USE_DECLARATION.effectiveDate,
       CURRENT_PERSONAL_USE_DECLARATION.content,
       CURRENT_PERSONAL_USE_DECLARATION.contentHash,
     ],
-  )
+  })
+
+  for (const [index, phase] of migrationPhases.entries()) {
+    await runMigrationPhase(phase.sql, phase.values ?? [], index + 1, migrationPhases.length)
+  }
+}
+
+async function runMigrationPhase(
+  sql: string,
+  values: unknown[],
+  phaseNumber: number,
+  totalPhases: number,
+): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await query(sql, values)
+      return
+    } catch (error) {
+      const code = postgresErrorCode(error)
+      if (!code || !RETRIABLE_MIGRATION_CODES.has(code) || attempt >= MIGRATION_PHASE_MAX_ATTEMPTS) {
+        throw error
+      }
+      const delayMs = MIGRATION_RETRY_BASE_MS * 2 ** (attempt - 1)
+      console.warn(
+        `[database-migration] phase ${phaseNumber}/${totalPhases} failed with ${code}; ` +
+        `retrying in ${delayMs}ms (attempt ${attempt + 1}/${MIGRATION_PHASE_MAX_ATTEMPTS})`,
+      )
+      await sleep(delayMs)
+    }
+  }
+}
+
+function postgresErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') return null
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' ? code : null
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 export async function validateRuntimeDatabaseSchema(): Promise<void> {

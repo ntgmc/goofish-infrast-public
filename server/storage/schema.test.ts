@@ -19,6 +19,7 @@ const originalAppRole = process.env.APP_ROLE
 const originalNodeEnv = process.env.NODE_ENV
 
 afterEach(() => {
+  vi.useRealTimers()
   queryMock.mockReset()
   restoreEnvironment('APP_ROLE', originalAppRole)
   restoreEnvironment('NODE_ENV', originalNodeEnv)
@@ -30,16 +31,58 @@ describe('database schema ownership', () => {
 
     await migrateDatabaseSchema()
 
-    expect(queryMock).toHaveBeenCalledTimes(2)
-    expect(queryMock.mock.calls[0][0]).toMatch(/CREATE TABLE IF NOT EXISTS security_rate_limit_buckets/)
-    expect(queryMock.mock.calls[0][0]).toMatch(/CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances/)
-    expect(queryMock.mock.calls[0][0]).toMatch(/WITH workspace_retention AS/)
-    expect(queryMock.mock.calls[0][0]).toMatch(/trimmed_workspace_history AS/)
-    expect(queryMock.mock.calls[0][0]).toMatch(/jsonb_array_elements\(record_json->'saved_configs'\) WITH ORDINALITY/)
-    expect(queryMock.mock.calls[0][0]).toMatch(/jsonb_array_elements\(record_json->'result_history'\) WITH ORDINALITY/)
-    expect(queryMock.mock.calls[0][0]).toMatch(/select 1 from optimize_jobs job/)
-    expect(queryMock.mock.calls[0][0]).not.toMatch(/\boptimization_jobs\b/)
-    expect(queryMock.mock.calls[1][0]).toMatch(/insert into personal_use_declaration_versions/i)
+    const statements = queryMock.mock.calls.map(([statement]) => String(statement))
+    const schemaStatements = statements.slice(0, -1)
+    const combinedSchema = schemaStatements.join('\n')
+    expect(schemaStatements.length).toBeGreaterThan(10)
+    expect(schemaStatements.every((statement) => !statement.includes('goofish:migration-phase'))).toBe(true)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS security_rate_limit_buckets/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances/)
+    expect(combinedSchema).toMatch(/WITH workspace_retention AS/)
+    expect(combinedSchema).toMatch(/trimmed_workspace_history AS/)
+    expect(combinedSchema).toMatch(/jsonb_array_elements\(record_json->'saved_configs'\) WITH ORDINALITY/)
+    expect(combinedSchema).toMatch(/jsonb_array_elements\(record_json->'result_history'\) WITH ORDINALITY/)
+    expect(combinedSchema).toMatch(/select 1 from optimize_jobs job/)
+    expect(combinedSchema).not.toMatch(/\boptimization_jobs\b/)
+    expect(statements.at(-1)).toMatch(/insert into personal_use_declaration_versions/i)
+  })
+
+  it('retries only the migration phase that deadlocked', async () => {
+    vi.useFakeTimers()
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const deadlock = Object.assign(new Error('deadlock detected'), { code: '40P01' })
+    let rewardPhaseAttempts = 0
+    queryMock.mockImplementation(async (statement: string) => {
+      if (statement.includes('ALTER TABLE reward_grants ADD COLUMN')) {
+        rewardPhaseAttempts += 1
+        if (rewardPhaseAttempts === 1) throw deadlock
+      }
+      return { rows: [] }
+    })
+
+    const migration = migrateDatabaseSchema()
+    await vi.runAllTimersAsync()
+    await migration
+
+    const statements = queryMock.mock.calls.map(([statement]) => String(statement))
+    expect(statements.filter((statement) => statement.includes('CREATE TABLE IF NOT EXISTS cdk_records'))).toHaveLength(1)
+    expect(statements.filter((statement) => statement.includes('ALTER TABLE reward_grants ADD COLUMN'))).toHaveLength(2)
+    expect(statements.filter((statement) => statement.includes('CREATE TABLE IF NOT EXISTS inventory_ledger'))).toHaveLength(1)
+    expect(warning).toHaveBeenCalledWith(expect.stringMatching(/phase \d+\/\d+ failed with 40P01; retrying in 1000ms/))
+  })
+
+  it('does not retry a non-transient migration failure', async () => {
+    const constraintError = Object.assign(new Error('duplicate data'), { code: '23505' })
+    queryMock.mockImplementation(async (statement: string) => {
+      if (statement.includes('ALTER TABLE reward_grants ADD COLUMN')) throw constraintError
+      return { rows: [] }
+    })
+
+    await expect(migrateDatabaseSchema()).rejects.toBe(constraintError)
+
+    const statements = queryMock.mock.calls.map(([statement]) => String(statement))
+    expect(statements.filter((statement) => statement.includes('ALTER TABLE reward_grants ADD COLUMN'))).toHaveLength(1)
+    expect(statements.some((statement) => statement.includes('CREATE TABLE IF NOT EXISTS inventory_ledger'))).toBe(false)
   })
 
   it('retries a transient runtime validation error and then caches success without executing DDL', async () => {
