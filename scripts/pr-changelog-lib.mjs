@@ -45,7 +45,6 @@ function normalizeDeepSeekResult(value) {
   const internalSections = normalizeSections(value.internal_sections, INTERNAL_SECTION_KINDS, 'internal_sections')
   const itemCount = countSectionItems(publicSections) + countSectionItems(internalSections)
   if (itemCount === 0) throw new Error('DeepSeek 必须返回至少一个 changelog 分类条目')
-  if (itemCount > 12) throw new Error('DeepSeek changelog 条目不能超过 12 条')
   return { summary, publicSections, internalSections }
 }
 
@@ -203,7 +202,7 @@ export function buildDeepSeekMessages({ title, body, manualSummary, diffContext 
         '{"summary":"一段中文总体总结","public_sections":[{"kind":"feature|fix|performance|security","items":["中文条目"]}],"internal_sections":[{"kind":"admin|operations|maintenance","items":["中文条目"]}]}',
         'public_sections 只记录普通用户在网站、公开 API 或核心业务功能中能直接感受到的变化；管理后台、开发工具、测试、文档、重构、依赖、构建、部署和 CI 不得放入 public_sections。',
         'internal_sections 记录不应在网站展示但需要在仓库追溯的变化：管理后台用 admin，部署/运维/CI/构建用 operations，重构/测试/文档/依赖/开发维护用 maintenance。',
-        'public_sections 可以为空；public_sections 与 internal_sections 合计至少一个且不超过 12 个条目。',
+        'public_sections 可以为空；public_sections 与 internal_sections 合计至少包含一个条目。',
         '不得虚构 diff 中不存在的行为。人工说明如有提供，用于表达维护者意图，diff 用于核验和补充。条目应简洁、明确、使用中文。',
       ].join('\n'),
     },
