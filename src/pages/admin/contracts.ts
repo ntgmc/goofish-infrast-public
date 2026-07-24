@@ -1,4 +1,4 @@
-import type { Announcement, AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../../lib/types'
+import type { AnnouncementStats as AnnouncementReachStats, LicenseOperator, ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from '../../lib/types'
 import type { AdminSection } from '../../lib/app-routes'
 import { copy } from '../../copy/index'
 import { getPermissionProfile, getPermissionRank, listAdminIssuablePermissions, productPolicies } from '../../lib/product-catalog'
@@ -436,8 +436,6 @@ export interface AdminProfileOperatorData {
   generated_at: string;
 }
 
-export const EMPTY_ANNOUNCEMENTS: Announcement[] = []
-
 export const EMPTY_ANNOUNCEMENT_REACH_STATS: AnnouncementReachStats = {
   impressions: 0,
   reads: 0,
@@ -474,6 +472,7 @@ export const sectionLabels: Record<AdminSection, string> = {
   features: copy.features.admin_nav,
   content: copy.publicContent.admin_nav,
   queue: '异步队列',
+  items: '道具与礼包',
   cdk: 'CDK',
   risk: '风控',
   registration: copy.admin.registration_nav,

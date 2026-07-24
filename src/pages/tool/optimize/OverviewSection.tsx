@@ -17,6 +17,7 @@ type ReorderCheckViewState = {
   result: ReorderCheckResult | null;
   onCheck: () => void;
   onGenerate: () => void;
+  coupon?: { visible: boolean; balance: number; selected: boolean; onChange: (selected: boolean) => void };
 }
 
 type FreeScheduleViewState = {
@@ -42,8 +43,11 @@ export default function OverviewSection({
   resultIsCurrent,
   error,
   priorityCoupon,
+  additionalCoupons,
   savedConfigCount,
+  savedConfigLimit = WORKSPACE_SAVED_CONFIG_LIMIT,
   resultHistoryCount,
+  resultHistoryLimit = WORKSPACE_RESULT_HISTORY_LIMIT,
   latestResult,
   generationDisabledReason,
   freeSchedule,
@@ -69,8 +73,11 @@ export default function OverviewSection({
   resultIsCurrent: boolean;
   error: string | null;
   priorityCoupon: { balance: RewardBalance | null; selected: boolean; onChange: (selected: boolean) => void };
+  additionalCoupons?: Array<{ id: string; label: string; help: string; balance: number; selected: boolean; onChange: (selected: boolean) => void }>;
   savedConfigCount: number;
+  savedConfigLimit?: number;
   resultHistoryCount: number;
+  resultHistoryLimit?: number;
   latestResult: WorkspaceResultHistoryItem | null;
   generationDisabledReason?: string | null;
   freeSchedule?: FreeScheduleViewState;
@@ -100,6 +107,7 @@ export default function OverviewSection({
         resultIsCurrent={resultIsCurrent}
         error={error}
         priorityCoupon={priorityCoupon}
+        additionalCoupons={additionalCoupons}
         extraDisabledReason={generationDisabledReason ?? freeSchedule?.generateBlockedReason ?? null}
         onGenerate={onGenerate}
         onReset={onReset}
@@ -121,8 +129,8 @@ export default function OverviewSection({
           <h2 className="mt-1 text-lg font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_OverviewSection_002}</h2>
           <p className="mt-1 text-sm leading-6 text-ink-secondary">{copy.optimize.pages_tool_optimize_OverviewSection_005}</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_003} value={`${savedConfigCount}/${WORKSPACE_SAVED_CONFIG_LIMIT}`} />
-            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_004} value={`${resultHistoryCount}/${WORKSPACE_RESULT_HISTORY_LIMIT}`} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_003} value={`${savedConfigCount}/${savedConfigLimit}`} />
+            <DashboardMiniStat label={copy.optimize.pages_tool_optimize_OverviewSection_004} value={`${resultHistoryCount}/${resultHistoryLimit}`} />
           </div>
           <button type="button" onClick={onOpenPlans} className="tool-secondary-action mt-5">
             {copy.optimize.pages_tool_optimize_OverviewSection_010}
@@ -245,6 +253,22 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
           {state.loading ? copy.optimize.pages_tool_optimize_OverviewSection_040 : copy.optimize.pages_tool_optimize_OverviewSection_041}
         </button>
       </div>
+
+      {state.coupon?.visible && (
+        <label className="tool-inset mt-4 flex cursor-pointer items-start gap-3 px-4 py-3 text-sm text-ink-secondary">
+          <input
+            type="checkbox"
+            checked={state.coupon.selected}
+            disabled={state.loading || state.coupon.balance < 1}
+            onChange={(event) => state.coupon?.onChange(event.currentTarget.checked)}
+            className="mt-0.5 h-4 w-4 accent-brand-600"
+          />
+          <span>
+            <span className="block font-semibold text-ink-primary">{copy.inventory.reorder_coupon}</span>
+            <span className="mt-1 block text-xs leading-5">{copy.inventory.reorder_coupon_help} {copy.inventory.coupon_available}{state.coupon.balance}</span>
+          </span>
+        </label>
+      )}
 
       {state.disabledReason && (
         <div className="tool-inset mt-4 px-4 py-3 text-sm leading-6 text-ink-secondary">

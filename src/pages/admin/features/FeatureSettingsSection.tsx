@@ -14,7 +14,7 @@ const GROUPS: Array<{ label: string; features: SiteFeatureKey[] }> = [
   { label: copy.features.admin_groups.account, features: ['registration', 'login', 'profiles', 'cdk_redemption', 'free_preview', 'skland'] },
   { label: copy.features.admin_groups.scheduling, features: ['schedule_generation'] },
   { label: copy.features.admin_groups.tools, features: ['tools', 'depot_value'] },
-  { label: copy.features.admin_groups.community, features: ['invitations', 'announcements'] },
+  { label: copy.features.admin_groups.community, features: ['invitations', 'inventory', 'onboarding_tasks', 'announcements'] },
 ]
 
 export default function FeatureSettingsSection() {

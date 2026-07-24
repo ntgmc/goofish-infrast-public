@@ -1,5 +1,6 @@
 import type { IncomingMessage } from 'node:http'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_SITE_FEATURES } from '../../src/lib/site-features'
 import { getRegisteredApiRoutes } from '../routes'
 import { inspectIncomingRequest } from './http-boundary'
 import { getAllowedMethods, getRoutePolicy, requestSchemas } from './request-policy'
@@ -30,11 +31,18 @@ function incomingGet(target: string): IncomingMessage {
 describe('request validation boundary', () => {
   it('declares a fail-closed policy for every registered API route', () => {
     for (const registeredRoute of getRegisteredApiRoutes()) {
-      const pathname = registeredRoute.replace(':jobId', 'job_test-1')
+      const pathname = registeredRoute
+        .replace(':jobId', 'job_test-1')
+        .replace(':code', 'welcome_inventory')
       const policy = getRoutePolicy(pathname)
       expect(policy, `missing request policy for ${registeredRoute}`).not.toBeNull()
       expect(getAllowedMethods(policy!)).not.toHaveLength(0)
     }
+  })
+
+  it('only declares onboarding claim policies for fixed task codes', () => {
+    expect(getRoutePolicy('/api/user/onboarding-tasks/welcome_inventory/claim')).not.toBeNull()
+    expect(getRoutePolicy('/api/user/onboarding-tasks/custom_task/claim')).toBeNull()
   })
 
   it('allows profile selection when restoring an authenticated session', async () => {
@@ -117,6 +125,18 @@ describe('request validation boundary', () => {
       kind: 'schedule',
       includeUpgradeSuggestions: false,
       historyResultId: 'legacy-history',
+    }).success).toBe(false)
+  })
+
+  it('keeps the strict admin feature schema aligned with the shared feature contract', () => {
+    expect(requestSchemas.adminFeatureSettings.safeParse({
+      features: DEFAULT_SITE_FEATURES,
+    }).success).toBe(true)
+    expect(requestSchemas.adminFeatureSettings.safeParse({
+      features: Object.fromEntries(Object.entries(DEFAULT_SITE_FEATURES).filter(([key]) => key !== 'inventory')),
+    }).success).toBe(false)
+    expect(requestSchemas.adminFeatureSettings.safeParse({
+      features: { ...DEFAULT_SITE_FEATURES, unknown_feature: true },
     }).success).toBe(false)
   })
 })

@@ -10,6 +10,8 @@ export const SITE_FEATURE_KEYS = [
   'depot_value',
   'skland',
   'invitations',
+  'inventory',
+  'onboarding_tasks',
   'announcements',
 ] as const
 
@@ -34,6 +36,8 @@ export const DEFAULT_SITE_FEATURES: SiteFeatures = Object.freeze({
   depot_value: true,
   skland: true,
   invitations: true,
+  inventory: true,
+  onboarding_tasks: true,
   announcements: true,
 })
 
@@ -75,6 +79,8 @@ export function computeEffectiveSiteFeatures(settings: SiteFeatureSettingsV1): S
     depot_value: tools && raw.depot_value,
     skland: profiles && raw.skland,
     invitations: login && raw.invitations,
+    inventory: login && raw.inventory,
+    onboarding_tasks: login && raw.inventory && raw.onboarding_tasks,
     announcements: site && raw.announcements,
   }
 }
