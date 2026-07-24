@@ -65,30 +65,13 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
     })
   }
 
-  const downloadExport = async () => {
+  const clearCredential = async (profile: UserGameAccount) => {
+    const label = copy.dashboard.pages_tool_dashboard_SettingsSection_008
+    if (!window.confirm(`${copy.dashboard.pages_tool_dashboard_SettingsSection_011}${label}${copy.dashboard.pages_tool_dashboard_SettingsSection_012}`)) return
     setPrivacyError(null)
-    setPrivacyLoading('export')
-    try {
-      const response = await fetch('/api/user/data/export')
-      if (!response.ok) throw new Error(copy.dashboard.pages_tool_dashboard_SettingsSection_006)
-      const url = URL.createObjectURL(await response.blob())
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'maa-personal-data.json'
-      link.click()
-      URL.revokeObjectURL(url)
-    } catch (caught) {
-      setPrivacyError(caught instanceof Error ? caught.message : copy.dashboard.pages_tool_dashboard_SettingsSection_007)
-    } finally { setPrivacyLoading(null) }
-  }
-
-  const profileAction = async (action: 'credential/clear' | 'depot-sample/revoke', profile: UserGameAccount) => {
-    const labels = { 'credential/clear': copy.dashboard.pages_tool_dashboard_SettingsSection_008, 'depot-sample/revoke': copy.dashboard.pages_tool_dashboard_SettingsSection_010 }
-    if (!window.confirm(`${copy.dashboard.pages_tool_dashboard_SettingsSection_011}${labels[action]}${copy.dashboard.pages_tool_dashboard_SettingsSection_012}`)) return
-    setPrivacyError(null)
-    setPrivacyLoading(`${action}:${profile.id}`)
-    try { await apiVoid(`/api/user/data/${action}`, { method: 'POST', json: { profile_id: profile.id } }) }
-    catch (caught) { setPrivacyError(caught instanceof Error ? caught.message : `${labels[action]}${copy.dashboard.pages_tool_dashboard_SettingsSection_013}`) }
+    setPrivacyLoading(`credential/clear:${profile.id}`)
+    try { await apiVoid('/api/user/data/credential/clear', { method: 'POST', json: { profile_id: profile.id } }) }
+    catch (caught) { setPrivacyError(caught instanceof Error ? caught.message : `${label}${copy.dashboard.pages_tool_dashboard_SettingsSection_013}`) }
     finally { setPrivacyLoading(null) }
   }
 
@@ -168,15 +151,13 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
       <h2 className="text-lg font-semibold text-ink-primary">{copy.dashboard.pages_tool_dashboard_SettingsSection_022}</h2>
       <p className="mt-2 text-sm text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_023}</p>
       {privacyError && <div className="tool-alert tool-alert--error mt-4" role="alert">{privacyError}</div>}
-      <button type="button" onClick={() => void downloadExport()} disabled={privacyLoading !== null} className="tool-secondary-action mt-4">{privacyLoading === 'export' ? copy.dashboard.pages_tool_dashboard_SettingsSection_024 : copy.dashboard.pages_tool_dashboard_SettingsSection_025}</button>
       <div className="mt-5 space-y-3">
-        {profiles.filter((profile) => profile.skland_binding || profile.kind === 'depot_value').map((profile) => (
+        {profiles.filter((profile) => profile.skland_binding).map((profile) => (
           <div key={profile.id} className="tool-inset p-4">
             <p className="font-medium text-ink-primary">{profile.display_name}</p>
             {profile.skland_binding && <p className="mt-2 text-xs leading-5 text-ink-muted">{copy.dashboard.pages_tool_dashboard_SettingsSection_035}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
-              {profile.skland_binding && <button type="button" onClick={() => void profileAction('credential/clear', profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">{copy.dashboard.pages_tool_dashboard_SettingsSection_026}</button>}
-              <button type="button" onClick={() => void profileAction('depot-sample/revoke', profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">{copy.dashboard.pages_tool_dashboard_SettingsSection_028}</button>
+              {profile.skland_binding && <button type="button" onClick={() => void clearCredential(profile)} disabled={privacyLoading !== null} className="tool-secondary-action px-3 text-sm">{copy.dashboard.pages_tool_dashboard_SettingsSection_026}</button>}
             </div>
           </div>
         ))}
