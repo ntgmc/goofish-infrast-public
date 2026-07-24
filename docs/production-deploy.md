@@ -96,6 +96,8 @@ Production API and Worker processes perform a read-only catalog compatibility ch
 
 The workflow invokes `scripts/deploy-production-atomic.sh` with `MIGRATION_ONLY=true`. That mode verifies and publishes the immutable release, updates only the `migration-candidate` link, runs the guarded oneshot, and exits without starting an API slot or changing Nginx. Migrations must remain forward-compatible with the currently active API and Worker because database changes commit before either service is cut over. A later deployment failure does not roll back schema or destructive data backfills.
 
+The migration entry point executes the idempotent schema in ordered, short transaction phases instead of holding every table lock for the complete schema script. If a phase encounters PostgreSQL deadlock, serialization, or lock-unavailable errors (`40P01`, `40001`, or `55P03`), only that phase is retried with one-second exponential backoff, up to five attempts. Earlier committed phases are not replayed by that retry. Non-transient errors fail immediately, and the deployment remains stopped before either candidate starts.
+
 Transient validation failures are not cached permanently. The next request retries validation, while a successful validation is cached for the lifetime of the process.
 
 ### Optimizer workspace retention migration

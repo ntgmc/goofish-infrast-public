@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { closePool, query } from './postgres'
+import { closePool, getPool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
 
 let container: PostgreSqlContainer
@@ -17,7 +17,7 @@ afterAll(async () => {
   if (container) await container.stop()
 })
 
-describe('PostgreSQL workspace retention migration', () => {
+describe('PostgreSQL schema migration', () => {
   it('permanently trims existing workspace JSON to the newest 3 configurations and 5 results', async () => {
     const profile = await seedProfile()
     const savedConfigs = Array.from({ length: 4 }, (_, index) => ({ id: `config-${index + 1}` }))
@@ -65,7 +65,58 @@ describe('PostgreSQL workspace retention migration', () => {
       await query('delete from user_accounts where id = $1', [profile.userId])
     }
   })
+
+  it('releases earlier phase locks before a later migration phase waits', async () => {
+    const blocker = await getPool().connect()
+    let blockerInTransaction = false
+    let migration: Promise<void> | null = null
+    try {
+      await blocker.query('begin')
+      blockerInTransaction = true
+      await blocker.query('lock table reward_grants in access share mode')
+
+      migration = migrateDatabaseSchema()
+      await waitForBlockedRewardMigration()
+
+      const earlierLocks = await query<{ lock_count: string }>(
+        `select count(*)::text as lock_count
+         from pg_locks
+         where relation = 'cdk_records'::regclass
+           and granted`,
+      )
+      expect(Number(earlierLocks.rows[0]?.lock_count ?? -1)).toBe(0)
+
+      await blocker.query("set local lock_timeout = '2s'")
+      await expect(blocker.query('lock table cdk_records in access exclusive mode')).resolves.toBeDefined()
+      await blocker.query('commit')
+      blockerInTransaction = false
+
+      await migration
+    } finally {
+      if (blockerInTransaction) await blocker.query('rollback')
+      blocker.release()
+      if (migration) await migration
+    }
+  })
 })
+
+async function waitForBlockedRewardMigration(): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const waiting = await query<{ waiting: boolean }>(
+      `select exists (
+         select 1
+         from pg_stat_activity
+         where datname = current_database()
+           and pid <> pg_backend_pid()
+           and wait_event_type = 'Lock'
+           and query like '%ALTER TABLE reward_grants ADD COLUMN%'
+       ) as waiting`,
+    )
+    if (waiting.rows[0]?.waiting) return
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+  throw new Error('Migration did not block on the reward_grants phase')
+}
 
 async function readWorkspace(profileId: string): Promise<StoredWorkspaceRecord> {
   const result = await query<{ record_json: StoredWorkspaceRecord }>(
