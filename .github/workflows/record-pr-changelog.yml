@@ -44,6 +44,6 @@ jobs:
           MANUAL_CHANGELOG_SUMMARY: ${{ inputs.chinese_change_summary }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           DEEPSEEK_API_URL: ${{ vars.DEEPSEEK_API_URL || 'https://api.deepseek.com' }}
-          DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL || 'deepseek-v4-flash' }}
+          DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL || 'deepseek-v4-pro' }}
           CHANGELOG_BOT_LOGIN: ${{ vars.CHANGELOG_BOT_LOGIN || 'github-actions[bot]' }}
         run: node scripts/record-pr-changelog.mjs

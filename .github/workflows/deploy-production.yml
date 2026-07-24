@@ -46,6 +46,7 @@ jobs:
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT || '/opt/goofish-infrast-v1' }}
       DEPLOY_REPO_DIR: ${{ vars.DEPLOY_REPO_DIR || '/opt/goofish-infrast-v1/repository' }}
       DEPLOY_SERVICE_NAME: ${{ vars.DEPLOY_SERVICE_NAME || 'goofish-infrast-v1' }}
+      DEPLOY_MIGRATION_SERVICE_NAME: ${{ vars.DEPLOY_MIGRATION_SERVICE_NAME || 'goofish-database-migrate.service' }}
       DEPLOY_PUBLIC_BASE_URL: ${{ vars.DEPLOY_PUBLIC_BASE_URL || 'https://maatool.com' }}
       DEPLOY_BLUE_PORT: ${{ vars.DEPLOY_BLUE_PORT || '3000' }}
       DEPLOY_GREEN_PORT: ${{ vars.DEPLOY_GREEN_PORT || '3002' }}
@@ -92,6 +93,7 @@ jobs:
           (( WORKER_GREEN_HEALTH_PORT >= 1 && WORKER_GREEN_HEALTH_PORT <= 65535 )) || { echo 'WORKER_GREEN_HEALTH_PORT is outside 1-65535' >&2; exit 1; }
           [[ "$WORKER_BLUE_HEALTH_PORT" != "$WORKER_GREEN_HEALTH_PORT" ]] || { echo 'worker health ports must differ' >&2; exit 1; }
           [[ "$DEPLOY_SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]] || { echo 'DEPLOY_SERVICE_NAME contains unsafe characters' >&2; exit 1; }
+          [[ "$DEPLOY_MIGRATION_SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || { echo 'DEPLOY_MIGRATION_SERVICE_NAME contains unsafe characters' >&2; exit 1; }
           [[ "$WORKER_DEPLOY_SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]] || { echo 'WORKER_DEPLOY_SERVICE_NAME contains unsafe characters' >&2; exit 1; }
           for path in "$DEPLOY_ROOT" "$DEPLOY_REPO_DIR" "$WORKER_DEPLOY_ROOT" "$WORKER_DEPLOY_REPO_DIR"; do
             [[ "$path" == /* && "$path" != *$'\n'* ]] || { echo "unsafe absolute deployment path: $path" >&2; exit 1; }
@@ -238,6 +240,41 @@ jobs:
       - name: Skip non-build deployment
         if: steps.artifact.outputs.deployable != 'true'
         run: echo 'Quality Checks marked this commit as not requiring deployment.'
+
+      - name: Upload verified artifact and database migration script
+        if: steps.artifact.outputs.deployable == 'true'
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          set -euo pipefail
+          remote_artifact="/tmp/goofish-migration-release-${TARGET_SHA}-${GITHUB_RUN_ID}.tgz"
+          remote_deploy_script="/tmp/goofish-migration-deploy-${TARGET_SHA}-${GITHUB_RUN_ID}.sh"
+          scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o IdentitiesOnly=yes \
+            release-package/release.tgz "$DEPLOY_USER@$DEPLOY_HOST:$remote_artifact"
+          scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o IdentitiesOnly=yes \
+            scripts/deploy-production-atomic.sh "$DEPLOY_USER@$DEPLOY_HOST:$remote_deploy_script"
+          echo "MIGRATION_REMOTE_ARTIFACT=$remote_artifact" >> "$GITHUB_ENV"
+          echo "MIGRATION_REMOTE_DEPLOY_SCRIPT=$remote_deploy_script" >> "$GITHUB_ENV"
+
+      - name: Apply controlled database migration first
+        if: steps.artifact.outputs.deployable == 'true'
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+          DEPLOY_RUN_ID: ${{ github.run_id }}
+          DEPLOY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ARTIFACT_SHA256: ${{ steps.artifact.outputs.archive_sha }}
+        run: |
+          set -euo pipefail
+
+          remote_command="TARGET_SHA=${TARGET_SHA@Q} MIGRATION_ONLY=true DEPLOY_ROOT=${DEPLOY_ROOT@Q} REPO_DIR=${DEPLOY_REPO_DIR@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} MIGRATION_SERVICE_NAME=${DEPLOY_MIGRATION_SERVICE_NAME@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} BLUE_PORT=${DEPLOY_BLUE_PORT@Q} GREEN_PORT=${DEPLOY_GREEN_PORT@Q} DEPLOY_RUN_ID=${DEPLOY_RUN_ID@Q} DEPLOY_RUN_URL=${DEPLOY_RUN_URL@Q} ARTIFACT_PATH=${MIGRATION_REMOTE_ARTIFACT@Q} ARTIFACT_SHA256=${ARTIFACT_SHA256@Q} bash ${MIGRATION_REMOTE_DEPLOY_SCRIPT@Q}; status=\$?; rm -f -- ${MIGRATION_REMOTE_DEPLOY_SCRIPT@Q} ${MIGRATION_REMOTE_ARTIFACT@Q}; exit \$status"
+
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -p "$DEPLOY_PORT" \
+            -o IdentitiesOnly=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "$remote_command"
 
       - name: Upload verified artifact and worker deploy script
         if: steps.artifact.outputs.deployable == 'true'

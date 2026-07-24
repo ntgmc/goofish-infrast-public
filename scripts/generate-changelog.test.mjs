@@ -188,6 +188,23 @@ test('records a PR changelog without requiring a manual Chinese summary', () => 
   assert.match(messages[1].content, /维护者人工说明：未提供/)
 })
 
+test('instructs DeepSeek to keep admin autosave changes internal', () => {
+  const messages = buildDeepSeekMessages({
+    title: 'perf(admin): optimize announcement draft autosave frequency',
+    body: '',
+    manualSummary: undefined,
+    diffContext: '### src/pages/admin/AnnouncementEditor.tsx\n\n+优化管理后台公告草稿自动保存频率',
+  })
+  const systemPrompt = messages[0].content
+
+  assert.match(systemPrompt, /必须先判断受众/)
+  assert.match(systemPrompt, /普通用户.*不包括管理员/)
+  assert.match(systemPrompt, /公告草稿自动保存/)
+  assert.match(systemPrompt, /只能放入 internal_sections 的 admin/)
+  assert.match(systemPrompt, /不得归入 public_sections 的 feature、fix 或 performance/)
+  assert.match(systemPrompt, /无法确认.*默认归入 internal_sections/)
+})
+
 test('validates manual Chinese input and bounds the diff sent to DeepSeek', () => {
   assert.throws(() => validateManualSummary('中文'), /长度必须在 5 到 2000/)
   assert.throws(() => validateManualSummary('English only'), /必须包含中文/)
