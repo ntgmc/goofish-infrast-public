@@ -8,8 +8,8 @@ on:
         required: true
         type: string
       chinese_change_summary:
-        description: "本次 PR 的中文变更说明（5-2000 字）"
-        required: true
+        description: "可选：本次 PR 的中文变更说明（5-2000 字）；留空时由 DeepSeek 自动总结"
+        required: false
         type: string
 
 permissions:
