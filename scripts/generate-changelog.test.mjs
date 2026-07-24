@@ -17,10 +17,12 @@ import {
   validateChangelogEnvelope,
 } from './changelog-lib.mjs'
 import {
+  buildDeepSeekMessages,
   buildPullRequestDiffContext,
   createPrChangelogPayload,
   findTrustedPrChangelogPayload,
   collectPrChangelogChanges,
+  normalizeManualSummary,
   parsePrChangelogPayload,
   renderPrChangelogBlock,
   upsertPrChangelogBlock,
@@ -156,9 +158,41 @@ test('records and parses a Chinese PR changelog block without replacing the rest
   })
 })
 
+test('records a PR changelog without requiring a manual Chinese summary', () => {
+  assert.equal(normalizeManualSummary(undefined), null)
+  assert.equal(normalizeManualSummary('   '), null)
+
+  const payload = createPrChangelogPayload({
+    pullRequestNumber: 44,
+    headSha: targetSha,
+    manualSummary: '',
+    deepseekResult: {
+      summary: '根据 PR 修改自动生成中文变更总结。',
+      public_sections: [{ kind: 'fix', items: ['修复用户端可感知的问题'] }],
+      internal_sections: [],
+    },
+    generatedAt: '2026-07-24T10:00:00.000Z',
+    model: 'deepseek-chat',
+  })
+  const block = renderPrChangelogBlock(payload)
+  const messages = buildDeepSeekMessages({
+    title: 'fix: resolve a user-facing issue',
+    body: '',
+    manualSummary: undefined,
+    diffContext: '### src/example.ts\n\n+修复用户端问题',
+  })
+
+  assert.equal(payload.manual_summary, null)
+  assert.deepEqual(parsePrChangelogPayload(block), payload)
+  assert.doesNotMatch(block, /### 人工说明/)
+  assert.match(messages[1].content, /维护者人工说明：未提供/)
+})
+
 test('validates manual Chinese input and bounds the diff sent to DeepSeek', () => {
+  assert.throws(() => validateManualSummary('中文'), /长度必须在 5 到 2000/)
   assert.throws(() => validateManualSummary('English only'), /必须包含中文/)
   assert.throws(() => validateManualSummary('中文<!-- pr-changelog:start -->'), /保留标记/)
+  assert.throws(() => normalizeManualSummary('English only'), /必须包含中文/)
   assert.throws(() => createPrChangelogPayload({
     pullRequestNumber: 42,
     headSha: targetSha,

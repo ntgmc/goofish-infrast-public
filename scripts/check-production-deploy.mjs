@@ -94,7 +94,11 @@ function assertWorkflowProvenance() {
 function assertPrChangelogWorkflow() {
   assert.match(prChangelogWorkflow, /^\s+workflow_dispatch:$/m, 'PR changelog recording must be manually dispatched')
   assert.match(prChangelogWorkflow, /pull_request_number:/, 'PR changelog recording should require a PR number')
-  assert.match(prChangelogWorkflow, /chinese_change_summary:/, 'PR changelog recording should require a Chinese manual summary')
+  assert.match(
+    prChangelogWorkflow,
+    /chinese_change_summary:\s*\n\s+description:.*\n\s+required: false/,
+    'PR changelog recording should keep the Chinese manual summary optional',
+  )
   assert.match(prChangelogWorkflow, /^\s+issues: write$/m, 'PR changelog recording should write a bot-owned canonical comment')
   assert.match(prChangelogWorkflow, /^\s+pull-requests: read$/m, 'PR changelog recording should read the selected PR')
   assert.match(prChangelogWorkflow, /^\s+statuses: write$/m, 'PR changelog recording should publish a merge-gating status')
