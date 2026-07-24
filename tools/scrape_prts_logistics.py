@@ -6,12 +6,25 @@ import json
 import os
 import re
 import urllib.parse
-import urllib.request
 from html.parser import HTMLParser
+
+import requests
 
 
 DEFAULT_URL = "https://prts.wiki/w/%E5%90%8E%E5%8B%A4%E6%8A%80%E8%83%BD%E4%B8%80%E8%A7%88"
 DEFAULT_OUTPUT = "prts_logistics_skills.json"
+REQUEST_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0 Safari/537.36"
+    ),
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "image/avif,image/webp,*/*;q=0.8"
+    ),
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+}
 VOID_TAGS = {
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link",
     "meta", "param", "source", "track", "wbr",
@@ -95,19 +108,21 @@ class TreeParser(HTMLParser):
 
 
 def fetch_html(url):
-    request = urllib.request.Request(
+    response = requests.get(
         url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/125.0 Safari/537.36"
-            )
-        },
+        headers=REQUEST_HEADERS,
+        timeout=30,
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        charset = response.headers.get_content_charset() or "utf-8"
-        return response.read().decode(charset, errors="replace")
+    response.raise_for_status()
+
+    content_type = response.headers.get("Content-Type", "")
+    charset_match = re.search(
+        r"charset\s*=\s*[\"']?([^;\s\"']+)",
+        content_type,
+        re.IGNORECASE,
+    )
+    charset = charset_match.group(1) if charset_match else "utf-8"
+    return response.content.decode(charset, errors="replace")
 
 
 def normalize_text(value):

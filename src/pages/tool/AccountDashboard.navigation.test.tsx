@@ -36,11 +36,14 @@ describe('AccountDashboard route navigation', () => {
     render(<RouterProvider router={router} />)
     expect(screen.getByRole('heading', { name: '游戏账号' })).toBeInTheDocument()
 
-    await user.click(screen.getAllByRole('button', { name: '工具' })[0])
+    await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
+    await user.click(screen.getByRole('menuitem', { name: '工具' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/tools'))
-    await waitFor(() => expect(screen.getAllByRole('button', { name: '工具' })[0]).toHaveAttribute('aria-current', 'page'))
+    await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: '工具' })).toHaveAttribute('aria-current', 'page'))
+    await user.keyboard('{Escape}')
 
-    await user.click(screen.getAllByRole('button', { name: '公告' })[0])
+    await user.click(screen.getByRole('button', { name: '公告' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/tool/announcements'))
 
     await act(async () => router.navigate(-1))

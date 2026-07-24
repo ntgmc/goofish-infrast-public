@@ -5,13 +5,24 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/
 
 const CHANGELOG_RELEASE_SCHEMA_VERSION = 1
 
-const SECTION_ORDER = ['feature', 'fix', 'performance', 'security']
-const CONVENTIONAL_TYPES = {
+const PUBLIC_SECTION_ORDER = ['feature', 'fix', 'performance', 'security']
+const REPOSITORY_SECTION_ORDER = [...PUBLIC_SECTION_ORDER, 'admin', 'operations', 'maintenance']
+const PUBLIC_CONVENTIONAL_TYPES = {
   feat: 'feature',
   fix: 'fix',
   perf: 'performance',
   security: 'security',
 }
+const REPOSITORY_CONVENTIONAL_TYPES = {
+  ...PUBLIC_CONVENTIONAL_TYPES,
+  refactor: 'maintenance',
+  chore: 'maintenance',
+  docs: 'maintenance',
+  test: 'maintenance',
+  ci: 'operations',
+  build: 'operations',
+}
+const INTERNAL_SCOPES = new Set(['admin', 'internal', 'ops', 'ci', 'dev', 'tooling'])
 
 export function parseGitLog(output) {
   return output
@@ -31,8 +42,9 @@ export function selectPublicChanges(commits) {
     const conventional = parseConventionalSubject(commit.subject)
 
     if (isTrueTrailer(commit.body, 'Skip-Changelog')) return []
+    if (!releaseNote && conventional?.scope && INTERNAL_SCOPES.has(conventional.scope)) return []
 
-    const kind = trailerType ?? conventional?.kind ?? (releaseNote ? 'feature' : null)
+    const kind = trailerType ?? PUBLIC_CONVENTIONAL_TYPES[conventional?.type] ?? (releaseNote ? 'feature' : null)
     const summary = releaseNote ?? conventional?.summary
     if (!kind || !summary) return []
 
@@ -40,7 +52,15 @@ export function selectPublicChanges(commits) {
   })
 }
 
-export function createReleaseRecord({ version, targetSha, previousTargetSha = null, releasedAt, commits = [] }) {
+export function createReleaseRecord({
+  version,
+  targetSha,
+  previousTargetSha = null,
+  releasedAt,
+  commits = [],
+  changes = null,
+  repositoryChanges = null,
+}) {
   const normalizedVersion = normalizeVersion(version)
   const normalizedTargetSha = normalizeSha(targetSha)
   const normalizedPreviousSha = previousTargetSha ? normalizeSha(previousTargetSha) : null
@@ -49,6 +69,12 @@ export function createReleaseRecord({ version, targetSha, previousTargetSha = nu
     throw new Error('the previous changelog SHA must differ from the release target SHA')
   }
   const kind = normalizedPreviousSha ? 'release' : 'baseline'
+  const publicChanges = changes === null
+    ? selectPublicChanges(commits)
+    : normalizeChanges(changes, PUBLIC_SECTION_ORDER)
+  const allRepositoryChanges = repositoryChanges === null
+    ? (changes === null ? selectRepositoryChanges(commits) : publicChanges)
+    : normalizeChanges(repositoryChanges, REPOSITORY_SECTION_ORDER)
 
   return {
     id: `v${normalizedVersion}`,
@@ -58,7 +84,8 @@ export function createReleaseRecord({ version, targetSha, previousTargetSha = nu
     targetSha: normalizedTargetSha,
     previousTargetSha: normalizedPreviousSha,
     kind,
-    sections: normalizedPreviousSha ? groupChanges(selectPublicChanges(commits)) : [],
+    sections: normalizedPreviousSha ? groupChanges(publicChanges, PUBLIC_SECTION_ORDER) : [],
+    repositorySections: normalizedPreviousSha ? groupChanges(allRepositoryChanges, REPOSITORY_SECTION_ORDER) : [],
   }
 }
 
@@ -111,10 +138,11 @@ function compareChangelogReleaseOrder(left, right) {
 }
 
 export function renderGeneratedModule(releases) {
+  const publicReleases = releases.map(({ repositorySections: _repositorySections, ...release }) => release)
   return [
     "import type { ChangelogRelease } from '../changelog-contract'",
     '',
-    `export const GENERATED_CHANGELOG_RELEASES = ${JSON.stringify(releases, null, 2)} as const satisfies readonly ChangelogRelease[]`,
+    `export const GENERATED_CHANGELOG_RELEASES = ${JSON.stringify(publicReleases, null, 2)} as const satisfies readonly ChangelogRelease[]`,
     '',
   ].join('\n')
 }
@@ -136,12 +164,13 @@ export function renderReleaseNotes(envelope) {
     return `${lines.join('\n')}\n`
   }
 
-  if (release.sections.length === 0) {
-    lines.push('', '## Maintenance', '', 'No user-facing changes were detected from the included commits.')
+  const repositorySections = release.repositorySections ?? release.sections
+  if (repositorySections.length === 0) {
+    lines.push('', '## Maintenance', '', 'No changelog entries were detected from the included commits.')
     return `${lines.join('\n')}\n`
   }
 
-  for (const section of release.sections) {
+  for (const section of repositorySections) {
     lines.push('', `## ${sectionHeading(section.kind)}`, '')
     for (const item of section.items) lines.push(`- ${item}`)
   }
@@ -177,12 +206,13 @@ export function normalizeSha(value) {
 }
 
 function parseConventionalSubject(subject) {
-  const match = String(subject ?? '').trim().match(/^(feat|fix|perf|security)(?:\([^)]*\))?!?:\s*(.+)$/i)
+  const match = String(subject ?? '').trim().match(/^([a-zA-Z]+)(?:\(([^)]*)\))?!?:\s*(.+)$/i)
   if (!match) return null
 
   return {
-    kind: CONVENTIONAL_TYPES[match[1].toLowerCase()],
-    summary: match[2].trim(),
+    type: match[1].toLowerCase(),
+    scope: match[2]?.trim().toLowerCase() ?? null,
+    summary: match[3].trim(),
   }
 }
 
@@ -205,17 +235,59 @@ function normalizeSectionKind(value) {
   return null
 }
 
-function groupChanges(changes) {
-  const grouped = new Map(SECTION_ORDER.map((kind) => [kind, []]))
+function normalizeRepositorySectionKind(value) {
+  const kind = normalizeSectionKind(value) ?? String(value ?? '').trim().toLowerCase()
+  return REPOSITORY_SECTION_ORDER.includes(kind) ? kind : null
+}
+
+function groupChanges(changes, sectionOrder) {
+  const grouped = new Map(sectionOrder.map((kind) => [kind, []]))
   for (const change of changes) {
     const items = grouped.get(change.kind)
     if (items && !items.includes(change.summary)) items.push(change.summary)
   }
 
-  return SECTION_ORDER.flatMap((kind) => {
+  return sectionOrder.flatMap((kind) => {
     const items = grouped.get(kind)
     return items?.length ? [{ id: kind, kind, items }] : []
   })
+}
+
+function normalizeChanges(changes, allowedKinds) {
+  if (!Array.isArray(changes)) throw new Error('changelog changes must be an array')
+  return changes.map((change) => {
+    if (!isRecord(change) || !allowedKinds.includes(change.kind)) throw new Error('invalid changelog change kind')
+    const summary = String(change.summary ?? '').trim()
+    if (!summary) throw new Error('changelog change summary is required')
+    return {
+      kind: change.kind,
+      summary,
+      sha: change.sha ? normalizeSha(change.sha) : null,
+    }
+  })
+}
+
+export function selectRepositoryChanges(commits) {
+  return commits.flatMap((commit) => {
+    if (isTrueTrailer(commit.body, 'Skip-Changelog')) return []
+
+    const releaseNote = readTrailer(commit.body, 'Release-Note')
+    const trailerType = normalizeRepositorySectionKind(readTrailer(commit.body, 'Release-Note-Type'))
+    const conventional = parseConventionalSubject(commit.subject)
+    const kind = trailerType ?? repositoryKindForConventional(conventional) ?? (releaseNote ? 'maintenance' : null)
+    const summary = releaseNote ?? conventional?.summary
+    if (!kind || !summary) return []
+
+    return [{ kind, summary, sha: normalizeSha(commit.sha) }]
+  })
+}
+
+function repositoryKindForConventional(conventional) {
+  if (!conventional) return null
+  if (conventional.scope === 'admin') return 'admin'
+  if (conventional.scope === 'ops' || conventional.scope === 'ci') return 'operations'
+  if (conventional.scope && INTERNAL_SCOPES.has(conventional.scope)) return 'maintenance'
+  return REPOSITORY_CONVENTIONAL_TYPES[conventional.type] ?? null
 }
 
 function validateReleaseRecord(value) {
@@ -233,9 +305,16 @@ function validateReleaseRecord(value) {
   if (value.kind === 'release' && !previousTargetSha) throw new Error('release changelog records require a previous target SHA')
   if (previousTargetSha === targetSha) throw new Error('the previous changelog SHA must differ from the release target SHA')
   if (!Array.isArray(value.sections)) throw new Error('changelog release sections must be an array')
+  validateSections(value.sections, PUBLIC_SECTION_ORDER)
+  if (value.repositorySections !== undefined) {
+    if (!Array.isArray(value.repositorySections)) throw new Error('changelog repositorySections must be an array')
+    validateSections(value.repositorySections, REPOSITORY_SECTION_ORDER)
+  }
+}
 
-  for (const section of value.sections) {
-    if (!isRecord(section) || !SECTION_ORDER.includes(section.kind) || !Array.isArray(section.items)) {
+function validateSections(sections, allowedKinds) {
+  for (const section of sections) {
+    if (!isRecord(section) || !allowedKinds.includes(section.kind) || !Array.isArray(section.items)) {
       throw new Error('invalid changelog release section')
     }
     if (section.items.some((item) => typeof item !== 'string' || !item.trim())) {
@@ -256,6 +335,9 @@ function sectionHeading(kind) {
     fix: 'Fixes',
     performance: 'Performance',
     security: 'Security',
+    admin: 'Administration',
+    operations: 'Operations and CI',
+    maintenance: 'Internal Maintenance',
   }[kind]
 }
 

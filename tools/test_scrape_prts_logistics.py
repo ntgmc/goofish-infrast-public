@@ -1,10 +1,12 @@
 import copy
 import unittest
+from unittest.mock import Mock, patch
 
 from tools.scrape_prts_logistics import (
     assign_rule_audit_fields,
     build_payload,
     calculate_content_hash,
+    fetch_html,
     merge_duplicate_rows,
     validate_existing_payload,
 )
@@ -28,6 +30,48 @@ def make_row(
 
 def payload_from_rows(rows, existing=None):
     return build_payload("https://example.test/source", rows, existing)
+
+
+class FetchHtmlTests(unittest.TestCase):
+    @patch("tools.scrape_prts_logistics.requests.get")
+    def test_fetch_html_uses_browser_headers_and_declared_charset(self, mock_get):
+        response = Mock()
+        response.headers = {"Content-Type": "text/html; charset=gb18030"}
+        response.content = "后勤技能".encode("gb18030")
+        mock_get.return_value = response
+
+        result = fetch_html("https://example.test/logistics")
+
+        self.assertEqual(result, "后勤技能")
+        mock_get.assert_called_once_with(
+            "https://example.test/logistics",
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/125.0 Safari/537.36"
+                ),
+                "Accept": (
+                    "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                    "image/avif,image/webp,*/*;q=0.8"
+                ),
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            },
+            timeout=30,
+        )
+        response.raise_for_status.assert_called_once_with()
+
+    @patch("tools.scrape_prts_logistics.requests.get")
+    def test_fetch_html_defaults_to_utf8_without_declared_charset(self, mock_get):
+        response = Mock()
+        response.headers = {"Content-Type": "text/html"}
+        response.content = "后勤技能".encode("utf-8")
+        mock_get.return_value = response
+
+        self.assertEqual(
+            fetch_html("https://example.test/logistics"),
+            "后勤技能",
+        )
 
 
 class RuleAuditFieldTests(unittest.TestCase):

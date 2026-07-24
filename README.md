@@ -325,10 +325,20 @@ rm -f admin.cookies
 | `REFRESH_BUILD_METADATA` | No | 启用版本元数据刷新模式，等同于传入 `--refresh-metadata` |
 | `GENERATE_CHANGELOG_CANDIDATE` | No | 仅在生产候选构建中生成可发布的 Changelog 记录 |
 | `CHANGELOG_BASE_SHA` | No | 首次启用自动 Changelog 时可选的历史基线 SHA；生产候选构建从同名 GitHub Actions repository variable 读取 |
+| `DEEPSEEK_API_KEY` | Yes (GitHub Actions) | `Record PR Changelog` 工作流调用 DeepSeek 时使用的 repository secret |
+| `DEEPSEEK_API_URL` | No | DeepSeek 兼容 API 根地址，默认 `https://api.deepseek.com`，配置为 GitHub Actions repository variable |
+| `DEEPSEEK_MODEL` | No | PR 变更总结模型，默认 `deepseek-chat`，配置为 GitHub Actions repository variable |
+| `CHANGELOG_BOT_LOGIN` | No | 写入可信 changelog 评论的 Actions bot 登录名，默认 `github-actions[bot]`，配置为 GitHub Actions repository variable |
 
 `npm run generate:data` 会根据版本变量生成 `src/lib/build-meta.ts`，并在 `server/handlers/data.ts` 中写入 `data_version`、`generated_at` 和来源摘要。数据会被 Node 服务器通过 `/api/data` 提供。
 
-`npm run generate:changelog` 会生成 `src/lib/.generated/changelog.ts`、`changelog-release.json` 和 `changelog-release.md`。本地、PR 与开发构建只产生非候选元数据；`main` 的生产候选构建会以最近正式、非预发布 GitHub Release 的 SHA 为边界生成更新草稿，生产部署成功后才发布对应 tag、GitHub Release 和历史记录。首次启用时如需从既有正式版本开始计算，维护者可显式设置 `CHANGELOG_BASE_SHA`；否则该构建只建立基线。
+`npm run generate:changelog` 会生成 `src/lib/.generated/changelog.ts`、`changelog-release.json` 和 `changelog-release.md`。Changelog 分为两层：网站 `/changelog` 和前端生成模块只包含普通用户能在公开网站、公开 API 或核心业务功能中直接感受到的变化，只有内部变化而没有用户可见条目的版本会从网站列表完全隐藏；PR 的 Actions bot 规范评论、`changelog-release.json` 与 GitHub Release 则保留全量记录，包括管理后台、运维、CI、构建、重构、测试、文档、依赖和内部维护。内部记录不会写入前端生成模块，因此不会进入网站 bundle。
+
+本地、PR 与开发构建只产生非候选元数据；`main` 的生产候选构建会以最近正式、非预发布 GitHub Release 的 SHA 为边界生成更新草稿，优先读取已合并 PR 中审核过的中文 changelog 数据，未录入的历史 PR 或直接提交才回退到 Conventional Commit / `Release-Note` Trailer。生产部署成功后才发布对应 tag、GitHub Release 和历史记录。首次启用时如需从既有正式版本开始计算，维护者可显式设置 `CHANGELOG_BASE_SHA`；否则该构建只建立基线。
+
+合并目标为 `main` 的 PR 前，维护者需要在 Actions 中手动运行一次 `Record PR Changelog`：选择 `main` 分支，填写 PR 编号和本次 PR 的中文变更说明。工作流会读取对应 PR 的文件差异，将代码和人工说明发送给 DeepSeek，分别生成“网站公开变更”和“仓库内部变更”，并由 `github-actions[bot]` 把人工说明、AI 总结及两层机器可读记录写入该 PR 的规范评论。生产构建只信任这个 bot 评论，不读取 PR 作者可编辑的同名内容。PR 后续若有新提交，head SHA 会变化，必须重新运行工作流。
+
+仓库需配置 `DEEPSEEK_API_KEY` repository secret。为强制执行“填写后才能合并”，还应在 `main` 的 branch ruleset / branch protection 中把 `changelog/deepseek-summary` 设为 required status check；成功状态只写到本次分析对应的 PR head SHA，不会被后续提交沿用。首次部署该工作流的 PR 无法在合并前调用尚未存在于默认分支的手动工作流，因此生产生成器保留了历史兼容回退；工作流进入 `main` 后再启用 required status check。
 
 生产灾备、恢复演练、S3 权限、备份加密和密钥轮换步骤见 [灾备 Runbook](docs/disaster-recovery.md)。
 

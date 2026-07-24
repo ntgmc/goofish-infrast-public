@@ -54,6 +54,8 @@ describe('AnnouncementPopup accessibility', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '第一条公告' })
     expect(HTMLDialogElement.prototype.showModal).toHaveBeenCalledOnce()
+    expect(dialog).toHaveClass('backdrop:bg-black/55')
+    expect(dialog).not.toHaveClass('backdrop:bg-ink-primary/45')
     expect(screen.getByRole('button', { name: '已读' })).toHaveFocus()
     expect(document.documentElement).toHaveStyle({ overflow: 'hidden' })
 
@@ -122,6 +124,23 @@ describe('mobile touch targets', () => {
 
     expect(screen.getByRole('button', { name: /选择主题/ })).toHaveClass('h-11', 'py-0')
     expect(screen.getByText('更多')).toHaveClass('h-11', 'py-0')
+  })
+
+  it('keeps icon-only toolbar controls square and accessibly named', () => {
+    render(
+      <MemoryRouter>
+        <ThemeSwitcher iconOnly />
+        <DeferredFeatureMenu iconOnly />
+      </MemoryRouter>,
+    )
+
+    const theme = screen.getByRole('button', { name: /选择主题：/ })
+    expect(theme).toHaveClass('h-11', 'w-11', 'px-0')
+    expect(theme).not.toHaveTextContent('跟随系统')
+
+    const more = screen.getByText('', { selector: 'summary[aria-label="更多操作"]' })
+    expect(more).toHaveClass('h-11', 'w-11', 'px-0')
+    expect(more).toHaveAccessibleName('更多操作')
   })
 
   it('keeps AuthForm controls at 44px and the submit action at 48px', async () => {

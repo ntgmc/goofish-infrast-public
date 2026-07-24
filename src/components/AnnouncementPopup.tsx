@@ -95,7 +95,7 @@ export default function AnnouncementPopup({ announcements }: Props) {
       aria-describedby="announcement-popup-body"
       aria-modal="true"
       onCancel={handleCancel}
-      className="m-auto max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto border-0 bg-transparent p-0 text-left backdrop:bg-ink-primary/45"
+      className="m-auto max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto border-0 bg-transparent p-0 text-left backdrop:bg-black/55"
     >
       <section className="tool-panel w-full max-w-lg p-5 text-left shadow-xl">
         <AnimatedPresenceRegion motionKey={announcementVersionKey(current)}>

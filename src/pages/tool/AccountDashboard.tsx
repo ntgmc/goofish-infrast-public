@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
+import CompactHeaderMenu from '../../components/CompactHeaderMenu'
 import GuidedTour, { hasCompletedTour, useFirstRunTour, type TourDefinition } from '../../components/GuidedTour'
 import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
@@ -79,6 +80,10 @@ export default function AccountDashboard({
     if (key === 'announcements') return features.announcements
     return true
   })
+  const replayTour = () => {
+    if (section === 'redeem') setRedeemTourReplayToken((token) => token + 1)
+    else dashboardTour.start()
+  }
 
   return (
     <div className="tool-shell">
@@ -118,10 +123,40 @@ export default function AccountDashboard({
       </aside>
 
       <main className="lg:pl-64" tabIndex={-1} data-route-focus>
-        <header className="tool-header sticky top-0 z-20 px-5 py-4 sm:px-8">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="tool-header sticky top-0 z-20 px-4 py-1.5 lg:px-8 lg:py-4">
+          <div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-2 lg:hidden">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <BrandLogo size="sm" />
+              <CompactHeaderMenu
+                ariaLabel={copy.common.components_CompactHeaderMenu_001}
+                triggerLabel={labels[section]}
+                align="start"
+                tourTargets={sections.map((key) => `dashboard-nav-${key}`)}
+                className="min-w-0 flex-1 justify-between"
+                metadata={{
+                  title: copy.common.pages_tool_AccountDashboard_010,
+                  description: activeProfile ? `${copy.common.pages_tool_AccountDashboard_011}${activeProfile.display_name}` : copy.common.pages_tool_AccountDashboard_012,
+                }}
+                items={[
+                  ...sections.map((key) => ({
+                    type: 'button' as const,
+                    id: key,
+                    label: labels[key],
+                    current: section === key,
+                    tourTarget: `dashboard-nav-${key}`,
+                    onSelect: () => onSectionChange(key),
+                  })),
+                  { type: 'separator' as const, id: 'actions' },
+                  { type: 'button' as const, id: 'tour', label: copy.dashboard.pages_tool_AccountDashboard_tour_001, onSelect: replayTour },
+                  { type: 'button' as const, id: 'logout', label: copy.common.pages_tool_AccountDashboard_013, intent: 'danger' as const, onSelect: onLogout },
+                ]}
+              />
+            </div>
+            <ThemeSwitcher iconOnly />
+          </div>
+
+          <div className="mx-auto hidden max-w-7xl items-center justify-between gap-4 lg:flex">
             <div className="flex min-w-0 items-start gap-3">
-              <BrandLogo size="sm" className="lg:hidden" />
               <div className="min-w-0">
                 <p className="section-index">{copy.common.pages_tool_AccountDashboard_010}</p>
                 <h1 className="display-title mt-1 text-xl text-ink-primary">{labels[section]}</h1>
@@ -133,37 +168,14 @@ export default function AccountDashboard({
             <div className="flex flex-wrap gap-2 self-start">
               <button
                 type="button"
-                onClick={() => {
-                  if (section === 'redeem') setRedeemTourReplayToken((token) => token + 1)
-                  else dashboardTour.start()
-                }}
+                onClick={replayTour}
                 className="tool-secondary-action"
               >
                 {copy.dashboard.pages_tool_AccountDashboard_tour_001}
               </button>
               <ThemeSwitcher />
-              <button type="button" onClick={onLogout} className="tool-secondary-action lg:hidden">
-                {copy.common.pages_tool_AccountDashboard_013}</button>
             </div>
           </div>
-
-          <LayoutGroup id="dashboard-mobile">
-            <nav className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.common.pages_tool_AccountDashboard_014}>
-              {sections.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => onSectionChange(key)}
-                  data-tour-target={`dashboard-nav-${key}`}
-                  aria-current={section === key ? 'page' : undefined}
-                  className="tool-nav-link shrink-0 px-3 text-sm font-medium"
-                >
-                  {section === key && <MotionNavIndicator layoutId="dashboard-active" />}
-                  <span className="relative z-10">{labels[key]}</span>
-                </button>
-              ))}
-            </nav>
-          </LayoutGroup>
         </header>
 
         <div className="mx-auto max-w-7xl space-y-4 px-5 py-6 sm:px-8">

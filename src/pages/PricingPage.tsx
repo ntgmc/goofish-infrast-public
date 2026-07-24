@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
+import CompactHeaderMenu from '../components/CompactHeaderMenu'
 import PublicFooter, { SupportGroupLink } from '../components/PublicFooter'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy/index'
@@ -13,15 +14,26 @@ export default function PricingPage() {
   return (
     <main className="tool-page" tabIndex={-1} data-route-focus>
       <div className="public-shell">
-        <header className="public-nav flex-wrap">
-          <Link to="/" className="flex min-w-0 items-center gap-3 text-left">
-            <BrandLogo size="md" />
-            <span className="text-sm font-semibold text-ink-primary">{copy.public.pages_PricingPage_001}</span>
+        <header className="public-nav">
+          <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 text-left sm:gap-3">
+            <BrandLogo size="sm" className="sm:h-10 sm:w-10 sm:rounded-lg sm:p-1" />
+            <span className="truncate text-sm font-semibold text-ink-primary">{copy.public.pages_PricingPage_001}</span>
           </Link>
-          <nav className="flex items-center gap-3" aria-label={copy.public.pages_PricingPage_001}>
-            <ThemeSwitcher />
-            <Link to="/support" className="tool-nav-link inline-flex items-center px-3">{copy.public.pages_PricingPage_010}</Link>
-            <Link to="/" className="tool-secondary-action">{copy.public.pages_PricingPage_011}</Link>
+          <nav className="flex shrink-0 items-center gap-2 sm:gap-3" aria-label={copy.public.pages_PricingPage_001}>
+            <div className="sm:hidden"><ThemeSwitcher iconOnly /></div>
+            <div className="sm:hidden">
+              <CompactHeaderMenu
+                ariaLabel={copy.common.components_CompactHeaderMenu_002}
+                triggerVariant="icon"
+                items={[
+                  { type: 'link', id: 'support', label: copy.public.pages_PricingPage_010, to: '/support' },
+                  { type: 'link', id: 'home', label: copy.public.pages_PricingPage_011, to: '/' },
+                ]}
+              />
+            </div>
+            <div className="hidden sm:block"><ThemeSwitcher /></div>
+            <Link to="/support" className="tool-nav-link hidden items-center px-3 sm:inline-flex">{copy.public.pages_PricingPage_010}</Link>
+            <Link to="/" className="tool-secondary-action hidden sm:inline-flex">{copy.public.pages_PricingPage_011}</Link>
           </nav>
         </header>
 

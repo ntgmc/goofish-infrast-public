@@ -1,4 +1,5 @@
 import BrandLogo from '../components/BrandLogo'
+import CompactHeaderMenu from '../components/CompactHeaderMenu'
 import PublicFooter, { SupportGroupLink } from '../components/PublicFooter'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { Link } from 'react-router-dom'
@@ -121,19 +122,31 @@ export default function PublicInfoPage({ page }: { page: PublicInfoPageKind }) {
   return (
     <main className="tool-page" tabIndex={-1} data-route-focus>
       <div className="public-shell">
-        <header className="public-nav flex-wrap">
-          <Link to="/" className="flex min-w-0 items-center gap-3 text-left">
-            <BrandLogo size="md" />
-            <span>
-              <span className="block text-sm font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_058}</span>
-              <span className="block text-xs text-ink-muted">{copy.public.pages_PublicInfoPage_059}</span>
+        <header className="public-nav">
+          <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 text-left sm:gap-3">
+            <BrandLogo size="sm" className="sm:h-10 sm:w-10 sm:rounded-lg sm:p-1" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-ink-primary">{copy.public.pages_PublicInfoPage_058}</span>
+              <span className="hidden truncate text-xs text-ink-muted sm:block">{copy.public.pages_PublicInfoPage_059}</span>
             </span>
           </Link>
-          <nav className="flex flex-wrap items-center justify-end gap-2 text-sm font-medium" aria-label={copy.public.pages_PublicInfoPage_060}>
-            <ThemeSwitcher />
-            <Link to="/faq" className="tool-nav-link inline-flex items-center px-3">FAQ</Link>
-            <Link to="/support" className="tool-nav-link inline-flex items-center px-3">{copy.public.pages_PublicInfoPage_061}</Link>
-            <Link to="/" className="tool-secondary-action">{copy.public.pages_PublicInfoPage_062}</Link>
+          <nav className="flex shrink-0 items-center justify-end gap-2 text-sm font-medium" aria-label={copy.public.pages_PublicInfoPage_060}>
+            <div className="sm:hidden"><ThemeSwitcher iconOnly /></div>
+            <div className="sm:hidden">
+              <CompactHeaderMenu
+                ariaLabel={copy.common.components_CompactHeaderMenu_002}
+                triggerVariant="icon"
+                items={[
+                  { type: 'link', id: 'faq', label: 'FAQ', to: '/faq', current: page === 'faq' },
+                  { type: 'link', id: 'support', label: copy.public.pages_PublicInfoPage_061, to: '/support', current: page === 'support' },
+                  { type: 'link', id: 'home', label: copy.public.pages_PublicInfoPage_062, to: '/' },
+                ]}
+              />
+            </div>
+            <div className="hidden sm:block"><ThemeSwitcher /></div>
+            <Link to="/faq" className="tool-nav-link hidden items-center px-3 sm:inline-flex">FAQ</Link>
+            <Link to="/support" className="tool-nav-link hidden items-center px-3 sm:inline-flex">{copy.public.pages_PublicInfoPage_061}</Link>
+            <Link to="/" className="tool-secondary-action hidden sm:inline-flex">{copy.public.pages_PublicInfoPage_062}</Link>
           </nav>
         </header>
 

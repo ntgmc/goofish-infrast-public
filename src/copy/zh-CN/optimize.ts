@@ -485,6 +485,10 @@ export const optimizeCopy = {
   pages_tool_optimize_ResultSection_011: "排班已完成，当前权益不包含优化建议。",
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_012: "排班已完成，本次未请求优化建议。",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_013: "排班已完成；优化建议已完整验证 {evaluated}/{candidate} 个候选，其余候选因时间预算不足尚未模拟。",
+  // src/pages/tool/optimize/ResultSection.tsx
+  pages_tool_optimize_ResultSection_014: "排班已完成；优化建议已完整验证 {evaluated}/{candidate} 个候选，其余候选达到本次完整模拟上限，尚未验证。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_001: "组合网格",
   // src/pages/tool/optimize/ScenarioLabSection.tsx

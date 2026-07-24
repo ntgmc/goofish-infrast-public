@@ -1,0 +1,49 @@
+name: Record PR Changelog
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: "目标为 main 的 PR 编号"
+        required: true
+        type: string
+      chinese_change_summary:
+        description: "本次 PR 的中文变更说明（5-2000 字）"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ inputs.pull_request_number }}
+  cancel-in-progress: true
+
+jobs:
+  record:
+    name: Analyze and Record Chinese Changelog
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout trusted main workflow code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Analyze PR with DeepSeek and record changelog
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pull_request_number }}
+          MANUAL_CHANGELOG_SUMMARY: ${{ inputs.chinese_change_summary }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_API_URL: ${{ vars.DEEPSEEK_API_URL || 'https://api.deepseek.com' }}
+          DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL || 'deepseek-chat' }}
+          CHANGELOG_BOT_LOGIN: ${{ vars.CHANGELOG_BOT_LOGIN || 'github-actions[bot]' }}
+        run: node scripts/record-pr-changelog.mjs
