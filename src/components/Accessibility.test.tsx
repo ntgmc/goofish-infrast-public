@@ -54,6 +54,8 @@ describe('AnnouncementPopup accessibility', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '第一条公告' })
     expect(HTMLDialogElement.prototype.showModal).toHaveBeenCalledOnce()
+    expect(dialog).toHaveClass('backdrop:bg-black/55')
+    expect(dialog).not.toHaveClass('backdrop:bg-ink-primary/45')
     expect(screen.getByRole('button', { name: '已读' })).toHaveFocus()
     expect(document.documentElement).toHaveStyle({ overflow: 'hidden' })
 
