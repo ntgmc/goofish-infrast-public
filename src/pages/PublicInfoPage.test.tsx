@@ -1,14 +1,20 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../App'
 import LandingPage from './LandingPage'
 import { type PublicInfoPageKind } from './PublicInfoPage'
 import { SUPPORT_QQ_GROUP_URL } from '../components/PublicFooter'
 import { ThemeProvider } from '../lib/theme'
+import { DEFAULT_SITE_FEATURES } from '../lib/site-features'
+import * as siteFeatureContext from '../lib/site-feature-context'
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 const pages: Array<[PublicInfoPageKind, string]> = [
   ['faq', '常见问题'],
@@ -42,6 +48,31 @@ describe('public information pages', () => {
     expect(supportLink).toHaveAttribute('href', SUPPORT_QQ_GROUP_URL)
     expect(supportLink).toHaveAttribute('target', '_blank')
     expect(supportLink).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('keeps FAQ, support, and home links in the compact public menu', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/privacy']}><App /></MemoryRouter>)
+
+    await user.click(await screen.findByRole('button', { name: '更多操作' }))
+    const menu = screen.getByRole('menu')
+    expect(within(menu).getByRole('menuitem', { name: 'FAQ' })).toHaveAttribute('href', '/faq')
+    expect(within(menu).getByRole('menuitem', { name: '客服' })).toHaveAttribute('href', '/support')
+    expect(within(menu).getByRole('menuitem', { name: '返回首页' })).toHaveAttribute('href', '/')
+  })
+
+  it('preserves the disabled landing header CTA while site features are unavailable', () => {
+    vi.spyOn(siteFeatureContext, 'useSiteFeatures').mockReturnValue({
+      status: 'ready',
+      features: { ...DEFAULT_SITE_FEATURES, site: false },
+      updatedAt: null,
+      retry: vi.fn(),
+    })
+    const { container } = render(<ThemeProvider><MemoryRouter><LandingPage onStart={() => undefined} /></MemoryRouter></ThemeProvider>)
+
+    const headerCta = container.querySelector<HTMLButtonElement>('.public-nav .tool-primary-action')
+    expect(headerCta).toBeDisabled()
+    expect(headerCta).toHaveClass('inline-flex', 'items-center', 'justify-center')
   })
 
   it('highlights the complete FAQ card when its summary receives keyboard focus', async () => {

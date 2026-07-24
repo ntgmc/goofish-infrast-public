@@ -17,6 +17,13 @@ _tmp.py
 .vite-dev.*
 
 .codex
+# Version the repository-owned optimizer diagnostics skill but retain local Codex state.
+!.codex/
+.codex/*
+!.codex/skills/
+.codex/skills/*
+!.codex/skills/arknights-optimizer-diagnostics/
+!.codex/skills/arknights-optimizer-diagnostics/**
 graphify-out
 .graphifyignore
 

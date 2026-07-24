@@ -360,7 +360,10 @@ export interface OptimizeResult {
   orundum_economy?: OrundumEconomy;
   intermediate_depletion?: IntermediateDepletion[];
   upgrade_suggestions?: RawUpgradeSuggestion[];
-  upgrade_suggestions_status?: 'completed' | 'not_requested' | 'not_allowed' | 'failed';
+  upgrade_suggestions_status?: 'completed' | 'partial' | 'not_requested' | 'not_allowed' | 'failed';
+  upgrade_suggestions_candidate_count?: number;
+  upgrade_suggestions_evaluated_count?: number;
+  upgrade_suggestions_truncated_reason?: 'deadline_budget' | 'simulation_limit';
   preview_limit?: {
     mode?: 'room_limited' | 'full_rotation_without_export';
     room_limit?: number;

@@ -21,6 +21,8 @@ export default function OptimizeWorkflowPage(props: Props) {
   const generationDisabledReason = features.schedule_generation ? null : copy.features.schedule_read_only
   const [taskCenterOpen, setTaskCenterOpen] = useState(false)
   const taskCenterButtonRef = useRef<HTMLButtonElement>(null)
+  const compactTaskCenterButtonRef = useRef<HTMLButtonElement>(null)
+  const taskCenterTriggerRef = useRef(taskCenterButtonRef)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
   const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
   const [mainTourSeenAtMount] = useState(() => hasCompletedTour('optimize-overview', 2))
@@ -79,7 +81,7 @@ export default function OptimizeWorkflowPage(props: Props) {
 
   const closeTaskCenter = () => {
     setTaskCenterOpen(false)
-    window.setTimeout(() => taskCenterButtonRef.current?.focus(), 0)
+    window.setTimeout(() => taskCenterTriggerRef.current.current?.focus(), 0)
   }
 
   return (
@@ -92,8 +94,23 @@ export default function OptimizeWorkflowPage(props: Props) {
           <OptimizationTaskCenterButton
             controller={taskCenter}
             open={taskCenterOpen}
-            onOpen={() => setTaskCenterOpen(true)}
+            onOpen={() => {
+              taskCenterTriggerRef.current = taskCenterButtonRef
+              setTaskCenterOpen(true)
+            }}
             buttonRef={taskCenterButtonRef}
+          />
+        )}
+        compactHeaderActions={(
+          <OptimizationTaskCenterButton
+            controller={taskCenter}
+            open={taskCenterOpen}
+            onOpen={() => {
+              taskCenterTriggerRef.current = compactTaskCenterButtonRef
+              setTaskCenterOpen(true)
+            }}
+            buttonRef={compactTaskCenterButtonRef}
+            iconOnly
           />
         )}
         onSectionChange={setSection}

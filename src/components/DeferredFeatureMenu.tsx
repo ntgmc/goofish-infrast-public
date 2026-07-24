@@ -1,3 +1,4 @@
+import { MoreHorizontal } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { copy } from '../copy/index'
 import { useSiteFeatures } from '../lib/site-feature-context'
@@ -22,24 +23,28 @@ const deferredFeatures: DeferredFeature[] = [
 
 interface DeferredFeatureMenuProps {
   className?: string
+  iconOnly?: boolean
 }
 
-export default function DeferredFeatureMenu({ className = '' }: DeferredFeatureMenuProps) {
+export default function DeferredFeatureMenu({ className = '', iconOnly = false }: DeferredFeatureMenuProps) {
   const { features } = useSiteFeatures()
   const visibleFeatures = deferredFeatures.filter((feature) => features[feature.feature])
   if (visibleFeatures.length === 0) return null
   return (
     <details className={`group relative z-20 flex-shrink-0 ${className}`}>
-      <summary className="tool-secondary-action flex h-11 cursor-pointer list-none gap-2 px-3 py-0 text-sm [&::-webkit-details-marker]:hidden">
-        {copy.common.components_DeferredFeatureMenu_016}<svg
-          className="h-4 w-4 transition-transform duration-150 group-open:rotate-180"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 9l6 6 6-6" />
-        </svg>
+      <summary
+        aria-label={iconOnly ? copy.common.components_CompactHeaderMenu_002 : undefined}
+        className={`tool-secondary-action flex h-11 cursor-pointer list-none gap-2 py-0 text-sm [&::-webkit-details-marker]:hidden ${iconOnly ? 'w-11 justify-center px-0' : 'px-3'}`}
+      >
+        {iconOnly ? <MoreHorizontal aria-hidden="true" className="size-5" /> : <>{copy.common.components_DeferredFeatureMenu_016}<svg
+            className="h-4 w-4 transition-transform duration-150 group-open:rotate-180"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 9l6 6 6-6" />
+          </svg></>}
       </summary>
       <div className="deferred-menu-panel tool-panel absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden">
         <div className="tool-panel-header px-4 py-3">

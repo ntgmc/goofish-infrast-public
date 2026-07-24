@@ -3,6 +3,7 @@ import { LayoutGroup } from 'motion/react'
 import type { Announcement, AuthSuccessResponse, AuthUser, LicenseConfig, LicenseOperator, UserGameAccount, UserWorkspace } from '../../lib/types'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
+import CompactHeaderMenu from '../../components/CompactHeaderMenu'
 import GuidedTour, { useFirstRunTour, type TourDefinition } from '../../components/GuidedTour'
 import { AnimatedPresenceRegion, MotionNavIndicator, MotionSkeleton } from '../../components/MotionPrimitives'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
@@ -236,10 +237,39 @@ export default function WorkspaceSetupPage({
       </aside>
 
       <main className="lg:pl-64" tabIndex={-1} data-route-focus>
-        <header className="tool-header sticky top-0 z-20 px-5 py-4 sm:px-8">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="tool-header sticky top-0 z-20 px-4 py-1.5 lg:px-8 lg:py-4">
+          <div className="mx-auto flex h-11 max-w-7xl items-center justify-between gap-2 lg:hidden">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <BrandLogo size="sm" />
+              <CompactHeaderMenu
+                ariaLabel={copy.common.components_CompactHeaderMenu_001}
+                triggerLabel={setupSections.find((item) => item.id === activeSection)?.label}
+                align="start"
+                tourTargets={['workspace-setup-nav']}
+                className="min-w-0 flex-1 justify-between"
+                metadata={{ title: profile.display_name, description: copy.workspace.pages_tool_WorkspaceSetupPage_020 }}
+                items={[
+                  ...setupSections.map((item) => ({
+                    type: 'button' as const,
+                    id: item.id,
+                    label: item.label,
+                    current: activeSection === item.id,
+                    badge: item.ready === undefined ? undefined : item.ready ? copy.workspace.pages_tool_WorkspaceSetupPage_015 : copy.workspace.pages_tool_WorkspaceSetupPage_016,
+                    tourTarget: 'workspace-setup-nav',
+                    onSelect: () => onSectionChange(item.id),
+                  })),
+                  { type: 'separator' as const, id: 'actions' },
+                  { type: 'button' as const, id: 'tour', label: copy.workspace.pages_tool_WorkspaceSetupPage_tour_001, onSelect: setupTour.start },
+                  { type: 'button' as const, id: 'back', label: copy.workspace.pages_tool_WorkspaceSetupPage_021, onSelect: onBack },
+                  { type: 'button' as const, id: 'logout', label: copy.workspace.pages_tool_WorkspaceSetupPage_022, intent: 'danger' as const, onSelect: onLogout },
+                ]}
+              />
+            </div>
+            <ThemeSwitcher iconOnly />
+          </div>
+
+          <div className="mx-auto hidden max-w-7xl items-center justify-between gap-4 lg:flex">
             <div className="flex min-w-0 items-start gap-3">
-              <BrandLogo size="sm" className="lg:hidden" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-brand-400">{profile.display_name}</p>
                 <h1 className="display-title mt-1 text-xl text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_019}</h1>
@@ -252,19 +282,8 @@ export default function WorkspaceSetupPage({
               </button>
               <ThemeSwitcher />
               <button type="button" onClick={onBack} className="tool-secondary-action">{copy.workspace.pages_tool_WorkspaceSetupPage_021}</button>
-              <button type="button" onClick={onLogout} className="tool-secondary-action lg:hidden">{copy.workspace.pages_tool_WorkspaceSetupPage_022}</button>
             </div>
           </div>
-          <LayoutGroup id="workspace-mobile">
-            <nav className="mx-auto mt-4 flex max-w-7xl gap-2 overflow-x-auto pb-1 lg:hidden" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_023} data-tour-target="workspace-setup-nav">
-              {setupSections.map((section) => (
-                <button key={section.id} type="button" onClick={() => onSectionChange(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} className="tool-nav-link shrink-0 whitespace-nowrap px-3 text-sm font-medium">
-                  {activeSection === section.id && <MotionNavIndicator layoutId="workspace-active" />}
-                  <span className="relative z-10">{section.label}</span>
-                </button>
-              ))}
-            </nav>
-          </LayoutGroup>
         </header>
 
         <div className="mx-auto max-w-7xl space-y-4 px-5 py-6 sm:px-8">

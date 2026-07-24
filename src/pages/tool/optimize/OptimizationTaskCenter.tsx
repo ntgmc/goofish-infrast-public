@@ -1,3 +1,4 @@
+import { ListTodo } from 'lucide-react'
 import { useEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import type { OptimizationJobListItem } from '../../../lib/optimization-contracts'
 import { copy, CURRENT_LOCALE } from '../../../copy/index'
@@ -8,11 +9,13 @@ export function OptimizationTaskCenterButton({
   open,
   onOpen,
   buttonRef,
+  iconOnly = false,
 }: {
   controller: OptimizationTaskCenterController;
   open: boolean;
   onOpen: () => void;
   buttonRef: RefObject<HTMLButtonElement>;
+  iconOnly?: boolean;
 }) {
   const { activeCount, attentionCount } = controller
   const ariaLabel = [
@@ -30,11 +33,11 @@ export function OptimizationTaskCenterButton({
       aria-expanded={open}
       aria-controls="optimization-task-center-dialog"
       aria-label={ariaLabel}
-      className="tool-secondary-action inline-flex h-11 items-center gap-2 py-0"
+      className={`tool-secondary-action relative inline-flex h-11 items-center gap-2 py-0 ${iconOnly ? 'w-11 justify-center px-0' : ''}`}
     >
-      <span>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_032}</span>
-      {activeCount > 0 && <span className="tool-status tool-status--current px-1.5 py-0.5 text-[11px]">{activeCount}</span>}
-      {attentionCount > 0 && <span className="tool-status tool-status--error px-1.5 py-0.5 text-[11px]">!</span>}
+      {iconOnly ? <ListTodo aria-hidden="true" className="size-5" /> : <span>{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_032}</span>}
+      {activeCount > 0 && <span className={`tool-status tool-status--current px-1.5 py-0.5 text-[11px] ${iconOnly ? 'absolute -right-1 -top-1 min-w-5 justify-center' : ''}`}>{activeCount}</span>}
+      {attentionCount > 0 && <span className={`tool-status tool-status--error px-1.5 py-0.5 text-[11px] ${iconOnly ? 'absolute -bottom-1 -right-1 min-w-5 justify-center' : ''}`}>!</span>}
     </button>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHANGELOG_RELEASES, sortChangelogReleases } from './changelog'
+import { CHANGELOG_RELEASES, selectPublicChangelogReleases, sortChangelogReleases } from './changelog'
 
 describe('changelog releases', () => {
   it('keeps release identities unique and ordered from newest to oldest', () => {
@@ -21,7 +21,7 @@ describe('changelog releases', () => {
     expect(release.sections.map(({ id }) => id)).toEqual([
       'optimizer-reliability',
       'account-and-personal-use',
-      'workspace-and-admin',
+      'workspace-experience',
     ])
   })
 
@@ -46,5 +46,28 @@ describe('changelog releases', () => {
     ])
 
     expect(releases.map(({ version }) => version)).toEqual(['2.0.100', '2.0.99'])
+  })
+
+  it('hides releases that only contain repository-internal changes', () => {
+    const releases = selectPublicChangelogReleases([
+      {
+        id: 'v2.0.101',
+        version: '2.0.101',
+        displayVersion: 'v2.0.101',
+        releasedAt: '2026-07-24',
+        kind: 'release',
+        sections: [],
+      },
+      {
+        id: 'v2.0.102',
+        version: '2.0.102',
+        displayVersion: 'v2.0.102',
+        releasedAt: '2026-07-24',
+        kind: 'release',
+        sections: [{ id: 'fix', kind: 'fix', items: ['修复用户端排班显示问题'] }],
+      },
+    ])
+
+    expect(releases.map(({ id }) => id)).toEqual(['v2.0.102'])
   })
 })

@@ -6,6 +6,7 @@ const workflow = normalizeLineEndings(await readFile('.github/workflows/deploy-p
 const devWorkflow = await readFile('.github/workflows/deploy-dev.yml', 'utf8')
 const qualityChecksWorkflow = normalizeLineEndings(await readFile('.github/workflows/quality-checks.yml', 'utf8'))
 const securityAnalysisWorkflow = await readFile('.github/workflows/security-analysis.yml', 'utf8')
+const prChangelogWorkflow = normalizeLineEndings(await readFile('.github/workflows/record-pr-changelog.yml', 'utf8'))
 const deployScript = await readFile('scripts/deploy-production-atomic.sh', 'utf8')
 const workerDeployScript = await readFile('scripts/deploy-worker-atomic.sh', 'utf8')
 const devDeployScript = await readFile('scripts/deploy-production.sh', 'utf8')
@@ -25,6 +26,7 @@ const developmentDocs = await readFile('docs/dev-deploy.md', 'utf8')
 assertWorkflowProvenance()
 assertQualityChecksImmutability()
 assertSecurityAnalysisGate()
+assertPrChangelogWorkflow()
 assertDeploymentScript()
 assertWorkerDeploymentScript()
 assertNginxBlueGreenConfig()
@@ -81,6 +83,7 @@ function assertWorkflowProvenance() {
     "'scripts/check-production-deploy.mjs'",
     "'scripts/changelog-lib.mjs'",
     "'scripts/generate-changelog.mjs'",
+    "'scripts/pr-changelog-lib.mjs'",
     "'scripts/deploy-production-atomic.sh'",
     "'scripts/deploy-worker-atomic.sh'",
   ]) {
@@ -88,8 +91,24 @@ function assertWorkflowProvenance() {
   }
 }
 
+function assertPrChangelogWorkflow() {
+  assert.match(prChangelogWorkflow, /^\s+workflow_dispatch:$/m, 'PR changelog recording must be manually dispatched')
+  assert.match(prChangelogWorkflow, /pull_request_number:/, 'PR changelog recording should require a PR number')
+  assert.match(prChangelogWorkflow, /chinese_change_summary:/, 'PR changelog recording should require a Chinese manual summary')
+  assert.match(prChangelogWorkflow, /^\s+issues: write$/m, 'PR changelog recording should write a bot-owned canonical comment')
+  assert.match(prChangelogWorkflow, /^\s+pull-requests: read$/m, 'PR changelog recording should read the selected PR')
+  assert.match(prChangelogWorkflow, /^\s+statuses: write$/m, 'PR changelog recording should publish a merge-gating status')
+  assert.match(prChangelogWorkflow, /github\.ref == 'refs\/heads\/main'/, 'trusted changelog workflow code must run from main')
+  assert.match(prChangelogWorkflow, /secrets\.DEEPSEEK_API_KEY/, 'PR changelog recording should use the DeepSeek API secret')
+  assert.match(prChangelogWorkflow, /node scripts\/record-pr-changelog\.mjs/, 'PR changelog workflow should run the reviewed recording script')
+}
+
 function assertQualityChecksImmutability() {
-  assert.match(qualityChecksWorkflow, /^permissions:\s*\n\s+contents: read$/m, 'Quality Checks should only read repository contents')
+  assert.match(
+    qualityChecksWorkflow,
+    /^permissions:\s*\n\s+contents: read\n\s+issues: read\n\s+pull-requests: read$/m,
+    'Quality Checks should only read repository contents and merged PR changelog comments',
+  )
   assert.doesNotMatch(qualityChecksWorkflow, /refresh-build-metadata/, 'Quality Checks must not refresh committed build metadata')
   assert.doesNotMatch(qualityChecksWorkflow, /--refresh-metadata/, 'Quality Checks must not generate metadata for a repository commit')
   assert.doesNotMatch(qualityChecksWorkflow, /\bgit push\b/, 'Quality Checks must not advance a checked branch')

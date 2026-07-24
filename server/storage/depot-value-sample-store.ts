@@ -30,7 +30,6 @@ interface DepotValueSampleDistribution {
 export interface DepotValueSampleStore {
   save: (record: DepotValueSampleRecord) => Promise<void>
   getDistribution: (totalEquivalentSanity: number) => Promise<DepotValueSampleDistribution>
-  deleteForProfile: (profileId: string) => Promise<void>
 }
 
 let schemaReady: Promise<void> | null = null
@@ -107,10 +106,6 @@ function createPostgresDepotValueSampleStore(): DepotValueSampleStore {
         less_count: result.rows[0]?.less_count ?? 0,
         equal_count: result.rows[0]?.equal_count ?? 0,
       }
-    },
-    deleteForProfile: async (profileId) => {
-      await ensureSchema()
-      await query('delete from depot_value_samples where contributor_profile_id = $1', [profileId])
     },
   }
 }

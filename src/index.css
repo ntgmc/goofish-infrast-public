@@ -855,9 +855,11 @@ dialog[open] > * {
   }
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 39.999rem) {
   .public-nav {
-    min-height: 4.5rem;
+    min-height: 3.5rem;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
   }
 
   .public-nav .tool-primary-action,

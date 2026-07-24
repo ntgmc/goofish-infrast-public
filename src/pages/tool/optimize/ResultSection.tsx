@@ -137,18 +137,27 @@ export default function ResultSection({
 export function UpgradeSuggestionStatusNotice({ result }: { result: OptimizeResult }) {
   const status = result.upgrade_suggestions_status
   if (!status) return null
+  const evaluated = result.upgrade_suggestions_evaluated_count ?? 0
+  const candidate = result.upgrade_suggestions_candidate_count ?? 0
+  const partialTemplate = result.upgrade_suggestions_truncated_reason === 'simulation_limit'
+    ? copy.optimize.pages_tool_optimize_ResultSection_014
+    : copy.optimize.pages_tool_optimize_ResultSection_013
   const message = status === 'completed'
     ? result.upgrade_suggestions?.length
       ? copy.optimize.pages_tool_optimize_ResultSection_008
       : copy.optimize.pages_tool_optimize_ResultSection_009
-    : status === 'failed'
-      ? copy.optimize.pages_tool_optimize_ResultSection_010
-      : status === 'not_allowed'
-        ? copy.optimize.pages_tool_optimize_ResultSection_011
-        : copy.optimize.pages_tool_optimize_ResultSection_012
+    : status === 'partial'
+      ? partialTemplate
+        .replace('{evaluated}', String(evaluated))
+        .replace('{candidate}', String(candidate))
+      : status === 'failed'
+        ? copy.optimize.pages_tool_optimize_ResultSection_010
+        : status === 'not_allowed'
+          ? copy.optimize.pages_tool_optimize_ResultSection_011
+          : copy.optimize.pages_tool_optimize_ResultSection_012
   const className = status === 'completed'
     ? 'tool-alert--success'
-    : status === 'failed' || status === 'not_allowed' ? 'tool-alert--warning' : ''
+    : status === 'failed' || status === 'not_allowed' || status === 'partial' ? 'tool-alert--warning' : ''
   return (
     <div
       className={`tool-alert ${className} mb-4`}

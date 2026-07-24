@@ -1,5 +1,4 @@
 import { cancelAccountDeletion, requestAccountDeletion } from '../account-data-lifecycle'
-import { getDepotValueSampleStore } from '../storage/depot-value-sample-store'
 import { getProfileForUser, getProfileWorkspace, getUserById, listProfilesForUser, saveUserProfile } from '../storage/user-store'
 import { query } from '../storage/postgres'
 import { listPersonalUseDeclarationAcceptancesForUser } from '../storage/personal-use-declaration-store'
@@ -16,7 +15,6 @@ export default async function accountDataHandler(req: Request): Promise<Response
   if (pathname.endsWith('/export')) return exportData(auth.user.id)
   if (pathname.endsWith('/delete-request')) return requestDeletion(req, auth)
   if (pathname.endsWith('/credential/clear')) return clearCredential(req, auth.user.id)
-  if (pathname.endsWith('/depot-sample/revoke')) return revokeDepotSample(req, auth.user.id)
   return jsonResponse({ error: 'API route not found' }, 404)
 }
 
@@ -62,17 +60,6 @@ async function clearCredential(req: Request, userId: string): Promise<Response> 
   const profile = typeof body.profile_id === 'string' ? await getProfileForUser(userId, body.profile_id) : null
   if (!profile?.skland_binding) return jsonResponse({ error: '森空岛绑定不存在。' }, 404)
   await saveUserProfile({ ...profile, skland_binding: { ...profile.skland_binding, encrypted_cred: '', credential_status: 'invalid', credential_invalid_at: new Date().toISOString() }, updated_at: new Date().toISOString() })
-  return jsonResponse({ ok: true })
-}
-
-async function revokeDepotSample(req: Request, userId: string): Promise<Response> {
-  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-  const body = await getValidatedJson(req, requestSchemas.profileId)
-  const profile = typeof body.profile_id === 'string' ? await getProfileForUser(userId, body.profile_id) : null
-  if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
-  const store = getDepotValueSampleStore()
-  if (!store) return jsonResponse({ error: '样本库不可用。' }, 503)
-  await store.deleteForProfile(profile.id)
   return jsonResponse({ ok: true })
 }
 

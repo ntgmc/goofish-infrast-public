@@ -241,7 +241,6 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/data/delete-request', route({ POST: json('auth', requestSchemas.accountDelete) })],
   ['/api/user/data/cancel', route({ POST: json('auth', requestSchemas.deletionToken) })],
   ['/api/user/data/credential/clear', route({ POST: json('standard', requestSchemas.profileId) })],
-  ['/api/user/data/depot-sample/revoke', route({ POST: json('standard', requestSchemas.profileId) })],
   ['/api/announcement', route({ GET: none() }, ['admin'])],
   ['/api/admin/announcement', route({ GET: none(), PUT: json('admin', requestSchemas.announcement) }, ['admin'])],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
