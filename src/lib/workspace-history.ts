@@ -48,16 +48,6 @@ export function describeConfigDiff(current: LicenseConfig, previous: LicenseConf
   return rows
 }
 
-export function downloadOptimizeResult(result: OptimizeResult, filenameBase = 'maa_schedule_optimized'): void {
-  const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${filenameBase}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 export function formatWorkspaceDate(value: string | null | undefined): string {
   if (!value) return copy.common.lib_workspace_history_026
   const time = Date.parse(value)

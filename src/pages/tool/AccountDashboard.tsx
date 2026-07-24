@@ -16,6 +16,7 @@ const ProfilesSection = lazy(() => import('./dashboard/ProfilesSection'))
 const ToolsSection = lazy(() => import('./dashboard/ToolsSection'))
 const RedeemSection = lazy(() => import('./dashboard/RedeemSection'))
 const InvitationsSection = lazy(() => import('./dashboard/InvitationsSection'))
+const InventorySection = lazy(() => import('./dashboard/InventorySection'))
 const AnnouncementsSection = lazy(() => import('./dashboard/AnnouncementsSection'))
 const SettingsSection = lazy(() => import('./dashboard/SettingsSection'))
 
@@ -69,6 +70,7 @@ export default function AccountDashboard({
     tools: copy.common.pages_tool_AccountDashboard_002,
     redeem: copy.common.pages_tool_AccountDashboard_003,
     invitations: copy.common.pages_tool_AccountDashboard_004,
+    inventory: copy.inventory.nav,
     announcements: `${copy.common.pages_tool_AccountDashboard_005}${announcementUnreadCount > 0 ? ` (${announcementUnreadCount})` : ''}`,
     settings: copy.common.pages_tool_AccountDashboard_006,
   }
@@ -77,6 +79,7 @@ export default function AccountDashboard({
     if (key === 'tools') return features.tools
     if (key === 'redeem') return features.cdk_redemption || features.free_preview
     if (key === 'invitations') return features.invitations
+    if (key === 'inventory') return features.inventory
     if (key === 'announcements') return features.announcements
     return true
   })
@@ -191,6 +194,7 @@ export default function AccountDashboard({
               {section === 'tools' && <ToolsSection />}
               {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}
               {section === 'invitations' && <InvitationsSection />}
+              {section === 'inventory' && <InventorySection />}
               {section === 'announcements' && <AnnouncementsSection />}
               {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} />}
             </Suspense>

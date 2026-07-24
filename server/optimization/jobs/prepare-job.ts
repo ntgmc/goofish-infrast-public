@@ -47,7 +47,19 @@ export async function prepareOptimizeJob(
     const profile_id = body.identity.profileId;
     const includeUpgradeSuggestions = body.kind === 'schedule' && body.includeUpgradeSuggestions;
     const history_source = body.kind === 'schedule' ? body.historySource : undefined;
-    const usePriorityCoupon = rawBody.use_priority_coupon === true;
+    const submittedItems = Array.isArray(body.use_items) ? body.use_items : [];
+    if (new Set(submittedItems).size !== submittedItems.length) {
+      return fail({ error: '同一种道具每次最多使用一张。', code: 'duplicate_item' }, 400);
+    }
+    const requestedItems = new Set<string>(submittedItems);
+    if (rawBody.use_priority_coupon === true) requestedItems.add('priority_compute_coupon');
+    const usePriorityCoupon = requestedItems.has('priority_compute_coupon');
+    const allowedItems = body.kind === 'schedule'
+      ? new Set(['priority_compute_coupon', 'training_diagnosis_coupon', 'additional_recompute_coupon'])
+      : new Set(['scenario_simulation_coupon']);
+    if ([...requestedItems].some((item) => !allowedItems.has(item))) {
+      return fail({ error: '所选道具不能用于当前计算类型。', code: 'item_not_applicable' }, 400);
+    }
 
     if (usePriorityCoupon && body.kind !== 'schedule') {
       return fail({ error: '优先计算券仅适用于已登录账号档案的主排班计算。', code: 'priority_coupon_not_applicable' }, 400);
@@ -121,7 +133,11 @@ export async function prepareOptimizeJob(
     };
     scheduleUsage = scheduleFailure('optimizer_runtime_error', scheduleUsageBase);
 
-    if (isScenarioComparison && (optimizePermission === 'free_preview' || !hasCapability({ permission: optimizePermission }, 'run_scenario_comparison'))) {
+    const hasScenarioCapability = optimizePermission !== 'free_preview'
+      && hasCapability({ permission: optimizePermission }, 'run_scenario_comparison');
+    const useScenarioCoupon = isScenarioComparison && !hasScenarioCapability
+      && requestedItems.has('scenario_simulation_coupon');
+    if (isScenarioComparison && !hasScenarioCapability && !useScenarioCoupon) {
       return fail({ error: '当前套餐不包含场景对比实验室。' }, 403);
     }
 
@@ -137,7 +153,13 @@ export async function prepareOptimizeJob(
       }
     }
 
-    const canUseUpgrades = (!isPreviewProfile || isPreviewTrial) && canUseUpgradeFeatures(effectiveLicense);
+    const hasUpgradeCapability = (!isPreviewProfile || isPreviewTrial) && canUseUpgradeFeatures(effectiveLicense);
+    const useTrainingCoupon = body.kind === 'schedule' && !hasUpgradeCapability
+      && requestedItems.has('training_diagnosis_coupon');
+    if (body.kind === 'schedule' && requestedItems.has('training_diagnosis_coupon') && !body.includeUpgradeSuggestions) {
+      return fail({ error: '练度诊断券必须与练度诊断功能一同启用。', code: 'item_not_applicable' }, 400);
+    }
+    const canUseUpgrades = hasUpgradeCapability || useTrainingCoupon;
 
     const configForPermission = isPreviewProfile && !isPreviewTrial
       ? resolveFreePreviewConfig(config)
@@ -169,8 +191,9 @@ export async function prepareOptimizeJob(
           priorityValue: queuePriority.value,
           permission: optimizePermission,
           source: 'scenario_comparison',
-          rewardUserId: null,
+          rewardUserId: useScenarioCoupon ? auth.user.id : null,
           usePriorityCoupon: false,
+          rewardItemCodes: useScenarioCoupon ? ['scenario_simulation_coupon'] : [],
           payload: {
             version: 3,
             kind: 'scenario_comparison',
@@ -202,6 +225,18 @@ export async function prepareOptimizeJob(
       );
       const decision = resolveFreeScheduleGenerateDecision(entitlement);
       if (!decision.ok) {
+        const additionalCouponApplicable = requestedItems.has('additional_recompute_coupon')
+          && decision.entitlement.lock_reason === 'revision_limit'
+          && !decision.entitlement.confirmed_at
+          && Boolean(decision.entitlement.first_generated_at)
+          && Date.now() - Date.parse(decision.entitlement.first_generated_at!) < 24 * 60 * 60_000;
+        if (additionalCouponApplicable) {
+          freeScheduleDecision = {
+            ok: true,
+            mode: 'revision',
+            entitlement: { ...decision.entitlement, locked_at: null, lock_reason: null },
+          };
+        } else {
         scheduleUsage = scheduleFailure('permission_denied', scheduleUsageBase);
         if (decision.entitlement.locked_at !== previewWorkspaceForGeneration.free_schedule_entitlement?.locked_at
           || decision.entitlement.lock_reason !== previewWorkspaceForGeneration.free_schedule_entitlement?.lock_reason) {
@@ -212,8 +247,15 @@ export async function prepareOptimizeJob(
           }));
         }
         return fail({ error: decision.message, free_schedule_entitlement: decision.entitlement }, decision.status);
+        }
+      } else {
+        if (requestedItems.has('additional_recompute_coupon')) {
+          return fail({ error: '当前仍有免费修订次数，无需使用追加重算券。', code: 'item_not_applicable' }, 409);
+        }
+        freeScheduleDecision = decision;
       }
-      freeScheduleDecision = decision;
+    } else if (requestedItems.has('additional_recompute_coupon')) {
+      return fail({ error: '追加重算券只适用于仍在修订窗口内的免费预览档案。', code: 'item_not_applicable' }, 400);
     }
 
     const source: OptimizeJobSource = isPreviewProfile ? 'free_preview' : 'account_profile';
@@ -229,8 +271,12 @@ export async function prepareOptimizeJob(
         priorityValue: priority === 'priority_coupon' ? 20 : priority === 'paid' ? 10 : 0,
         permission: scheduleUsageBase.permission ?? null,
         source,
-        rewardUserId: usePriorityCoupon ? auth.user.id : null,
+        rewardUserId: requestedItems.size > 0 ? auth.user.id : null,
         usePriorityCoupon,
+        rewardItemCodes: [
+          ...(useTrainingCoupon ? ['training_diagnosis_coupon'] : []),
+          ...(requestedItems.has('additional_recompute_coupon') ? ['additional_recompute_coupon'] : []),
+        ],
         payload: createPersistedOptimizeJobPayload({
           submittedAt,
           operators,

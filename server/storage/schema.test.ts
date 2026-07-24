@@ -37,6 +37,8 @@ describe('database schema ownership', () => {
     expect(queryMock.mock.calls[0][0]).toMatch(/trimmed_workspace_history AS/)
     expect(queryMock.mock.calls[0][0]).toMatch(/jsonb_array_elements\(record_json->'saved_configs'\) WITH ORDINALITY/)
     expect(queryMock.mock.calls[0][0]).toMatch(/jsonb_array_elements\(record_json->'result_history'\) WITH ORDINALITY/)
+    expect(queryMock.mock.calls[0][0]).toMatch(/select 1 from optimize_jobs job/)
+    expect(queryMock.mock.calls[0][0]).not.toMatch(/\boptimization_jobs\b/)
     expect(queryMock.mock.calls[1][0]).toMatch(/insert into personal_use_declaration_versions/i)
   })
 

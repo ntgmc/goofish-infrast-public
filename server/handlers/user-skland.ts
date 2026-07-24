@@ -25,6 +25,8 @@ import {
   type SklandPendingConfirmationRecord,
   type UserGameAccountRecord,
 } from '../storage/user-store'
+import { markOnboardingTaskComplete } from '../storage/inventory-store'
+import { hasDatabaseUrl } from '../storage/postgres'
 import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
 import { getValidatedJsonRecord } from '../security/request-validation'
@@ -853,6 +855,13 @@ async function saveSklandImport(
     skland_risk: { uid_mismatch_count: 0, last_mismatch_uid: null, last_mismatch_nickname: null, last_mismatch_at: null },
     updated_at: imported.importedAt,
   })
+  if (hasDatabaseUrl()) {
+    try {
+      await markOnboardingTaskComplete(userId, 'bind_skland', imported.importedAt)
+    } catch (error) {
+      console.warn('bind_skland onboarding progress skipped:', error)
+    }
+  }
 
   return {
     status: 'imported',

@@ -38,6 +38,8 @@ export const featuresCopy = {
     depot_value: '基建价值分析',
     skland: '森空岛导入',
     invitations: '邀请与奖励',
+    inventory: '背包与统一道具',
+    onboarding_tasks: '新人任务',
     announcements: '公告',
   },
   admin_nav: '功能开关',

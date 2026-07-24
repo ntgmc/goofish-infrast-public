@@ -756,6 +756,7 @@ export interface UserWorkspace {
   last_result: OptimizeResult | null;
   saved_configs: WorkspaceSavedConfig[];
   result_history: WorkspaceResultHistoryItem[];
+  archived_results: WorkspaceResultHistoryItem[];
   free_schedule_entitlement: FreeScheduleEntitlement | null;
   updated_at: string | null;
 }
@@ -809,18 +810,24 @@ export interface AuthSuccessResponse {
   announcement_unread_count?: number;
 }
 
-type InvitationRewardType = 'priority_compute_coupon';
 export type InvitationRewardRecipient = 'inviter' | 'invitee';
 
-interface InvitationRewardRule {
+export type InvitationExpiryPolicy =
+  | { mode: 'never' }
+  | { mode: 'relative_days'; days: number };
+
+type InvitationItemKind = 'consumable' | 'capacity_upgrade' | 'gift_pack';
+
+export interface InvitationRewardRule {
   recipient: InvitationRewardRecipient;
-  type: InvitationRewardType;
+  item_code: string;
   quantity: number;
-  validity_days: number;
+  expiry: InvitationExpiryPolicy;
+  gift_pack_version_id: string | null;
 }
 
 export interface InvitationSettings {
-  version: 1;
+  version: 2;
   enabled: boolean;
   activation_rule: 'first_active_profile';
   daily_inviter_reward_limit: number;
@@ -892,17 +899,96 @@ export interface AdminRegistrationInvitation {
 
 export interface InvitationSummary {
   can_invite: boolean;
+  campaign_enabled: boolean;
   code: string | null;
   share_url: string | null;
-  stats: { registered: number; activated: number; rewards_earned: number };
-  settings: InvitationSettings;
+  reward_preview: {
+    inviter: InvitationRewardPreviewItem[];
+    invitee: InvitationRewardPreviewItem[];
+  };
+  stats: {
+    registered: number;
+    activated: number;
+    rewarded_invitations: number;
+    today_rewarded: number;
+  };
+  daily_limit: {
+    used: number;
+    limit: number;
+    remaining: number;
+    reset_at: string;
+  };
+  records: InvitationRecordSummary[];
+  next_cursor: string | null;
 }
 
 export interface RewardBalance {
-  type: InvitationRewardType;
+  type: 'priority_compute_coupon';
   available: number;
   permanent: number;
   next_expiry_at: string | null;
+}
+
+export interface InvitationGiftPackSummary {
+  id: string;
+  version: number;
+  status: 'published' | 'retired';
+  contents: Array<{
+    item_code: string;
+    name: string;
+    quantity: number;
+    expiry: InvitationExpiryPolicy;
+  }>;
+}
+
+export interface InvitationRewardCatalogItem {
+  item_code: string;
+  name: string;
+  description: string;
+  kind: InvitationItemKind;
+  icon_key: string;
+  issuance_enabled: boolean;
+  selectable: boolean;
+  unavailable_reason: string | null;
+  latest_gift_pack_version: InvitationGiftPackSummary | null;
+}
+
+export interface AdminInvitationSettingsResponse {
+  settings: InvitationSettings;
+  catalog: InvitationRewardCatalogItem[];
+  configured_gift_pack_versions: InvitationGiftPackSummary[];
+}
+
+export interface InvitationRewardPreviewItem {
+  item_code: string;
+  name: string;
+  description: string;
+  kind: InvitationItemKind;
+  icon_key: string;
+  quantity: number;
+  expiry: InvitationExpiryPolicy;
+  gift_pack_version: InvitationGiftPackSummary | null;
+  available: boolean;
+}
+
+type InvitationProgressStatus = 'registered' | 'activated' | 'settled';
+export type InviterRewardStatus =
+  | 'pending_activation'
+  | 'pending_campaign_resume'
+  | 'settlement_pending'
+  | 'granted'
+  | 'daily_limit_skipped'
+  | 'inviter_ineligible'
+  | 'not_configured';
+
+export interface InvitationRecordSummary {
+  id: string;
+  invitee_label: string;
+  registered_at: string;
+  activated_at: string | null;
+  status: InvitationProgressStatus;
+  inviter_reward_status: InviterRewardStatus;
+  inviter_rewards: InvitationRewardPreviewItem[];
 }
 
 export type DepotValueProfileResponse = AuthSuccessResponse & {

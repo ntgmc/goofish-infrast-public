@@ -2,6 +2,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ComponentProps } from 'react'
 import type { Announcement } from '../../../lib/types'
 import AnnouncementSettingsSection from './AnnouncementSettingsSection'
 
@@ -47,12 +48,34 @@ describe('AnnouncementSettingsSection', () => {
     expect(callbacks.onDelete).toHaveBeenCalledWith('two')
     await user.click(screen.getByRole('button', { name: '新增弹出式公告' }))
     expect(callbacks.onAdd).toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: '保存横幅和公告' }))
+    await user.click(screen.getByRole('button', { name: '发布横幅和公告' }))
     expect(callbacks.onSubmit).toHaveBeenCalled()
+  })
+
+  it('announces restored conflicts and exposes draft recovery actions', async () => {
+    const user = userEvent.setup()
+    const callbacks = renderSection({
+      draftStatus: 'saved',
+      draftSavedAt: '2026-07-24T13:00:00.000Z',
+      draftRestored: true,
+      draftConflict: true,
+      draftDirty: true,
+    })
+
+    expect(screen.getByText(/已恢复本机草稿/)).toHaveAttribute('aria-live', 'polite')
+    expect(screen.getByText(/线上版本已变化/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '发布并覆盖线上版本' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '丢弃草稿并载入线上版本' }))
+    expect(callbacks.onDiscardDraft).toHaveBeenCalledOnce()
+  })
+
+  it('announces local storage failures as alerts', () => {
+    renderSection({ draftStatus: 'error', draftError: '草稿空间不足', draftDirty: true })
+    expect(screen.getByRole('alert')).toHaveTextContent('草稿空间不足')
   })
 })
 
-function renderSection() {
+function renderSection(overrides: Partial<ComponentProps<typeof AnnouncementSettingsSection>> = {}) {
   const callbacks = {
     onSubmit: vi.fn((event) => event.preventDefault()),
     onUpdateBanner: vi.fn(),
@@ -60,6 +83,7 @@ function renderSection() {
     onUpdate: vi.fn(),
     onDelete: vi.fn(),
     onReorder: vi.fn(),
+    onDiscardDraft: vi.fn(),
   }
   render(
     <AnnouncementSettingsSection
@@ -67,7 +91,15 @@ function renderSection() {
       announcements={announcements}
       stats={{}}
       saving={false}
+      discarding={false}
+      draftStatus="clean"
+      draftSavedAt={null}
+      draftRestored={false}
+      draftConflict={false}
+      draftError={null}
+      draftDirty={false}
       {...callbacks}
+      {...overrides}
     />,
   )
   return callbacks

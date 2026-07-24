@@ -1,15 +1,18 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
 import type { AuthSuccessResponse, LicenseConfig, OptimizeResult, UpgradeSuggestion, WorkspaceResultHistoryItem, WorkspaceSavedConfig, WorkspaceSavedConfigAction } from '../../../lib/types'
-import { downloadOptimizeResult, isMaaJsonDownloadable } from '../../../lib/workspace-history'
+import { isMaaJsonDownloadable } from '../../../lib/workspace-history'
 import { normalizeUpgradeSuggestions } from './workflow-utils'
 import type { WorkspacePatch } from '../useToolSession'
 import type { OptimizePhase, OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
+import { requestMaaExport } from './optimization-api'
+import { apiJson } from '../../../lib/api-client'
 
 
 type Setter<T> = Dispatch<SetStateAction<T>>
 
 type UseOptimizeWorkspaceOptions = {
+  profileId: string
   activeConfig: LicenseConfig
   normalizeAllowedConfigOverride: (config: LicenseConfig) => LicenseConfig
   onWorkspacePatch: (patch: WorkspacePatch) => Promise<AuthSuccessResponse | void>
@@ -29,6 +32,7 @@ type UseOptimizeWorkspaceOptions = {
 }
 
 export function useOptimizeWorkspace({
+  profileId,
   activeConfig,
   normalizeAllowedConfigOverride,
   onWorkspacePatch,
@@ -140,10 +144,32 @@ export function useOptimizeWorkspace({
       setWorkspaceError(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_013)
       return
     }
-    void guardGeneratedResultExport(() => {
-      downloadOptimizeResult(item.result, `maa-schedule-${item.id.slice(0, 8) || 'history'}`)
-    })
-  }, [guardGeneratedResultExport, setWorkspaceError])
+    void guardGeneratedResultExport(async () => {
+      await requestMaaExport(profileId, item.id)
+    }).catch((error) => setWorkspaceError((error as Error).message))
+  }, [guardGeneratedResultExport, profileId, setWorkspaceError])
+
+  const mutateHistoryResult = useCallback(async (
+    item: WorkspaceResultHistoryItem,
+    action: 'archive' | 'unarchive' | 'delete',
+  ) => {
+    if (action === 'delete' && !window.confirm(copy.inventory.delete_result_confirm)) return
+    setWorkspaceBusyAction(`${action}:${item.id}`)
+    setWorkspaceError(null)
+    try {
+      await apiJson('/api/user/result-archive', {
+        method: 'POST',
+        json: { profile_id: profileId, result_id: item.id, action, idempotency_key: crypto.randomUUID() },
+        fallbackMessage: action === 'archive' ? copy.inventory.archive_full : action === 'unarchive' ? copy.inventory.history_full_for_unarchive : copy.inventory.delete_result,
+      })
+      await onWorkspacePatch({})
+      setWorkspaceNotice(action === 'archive' ? copy.inventory.archive_done : action === 'unarchive' ? copy.inventory.unarchive_done : copy.inventory.delete_result_done)
+    } catch (error) {
+      setWorkspaceError((error as Error).message)
+    } finally {
+      setWorkspaceBusyAction(null)
+    }
+  }, [onWorkspacePatch, profileId, setWorkspaceBusyAction, setWorkspaceError, setWorkspaceNotice])
 
   return {
     handleSaveCurrentConfig,
@@ -153,5 +179,8 @@ export function useOptimizeWorkspace({
     handleViewHistory,
     handleUseHistoryConfig,
     handleDownloadHistory,
+    handleArchiveHistory: (item: WorkspaceResultHistoryItem) => mutateHistoryResult(item, 'archive'),
+    handleUnarchiveHistory: (item: WorkspaceResultHistoryItem) => mutateHistoryResult(item, 'unarchive'),
+    handleDeleteHistory: (item: WorkspaceResultHistoryItem) => mutateHistoryResult(item, 'delete'),
   }
 }

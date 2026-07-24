@@ -1,4 +1,4 @@
-export const DASHBOARD_SECTIONS = ['profiles', 'tools', 'redeem', 'invitations', 'announcements', 'settings'] as const
+export const DASHBOARD_SECTIONS = ['profiles', 'tools', 'redeem', 'invitations', 'inventory', 'announcements', 'settings'] as const
 export type DashboardSection = typeof DASHBOARD_SECTIONS[number]
 
 export const WORKSPACE_SETUP_SECTIONS = ['operators', 'config', 'cdk'] as const
@@ -7,7 +7,7 @@ export type WorkspaceSetupSection = typeof WORKSPACE_SETUP_SECTIONS[number]
 export const OPTIMIZE_ROUTE_SECTIONS = ['overview', 'plans', 'config', 'result', 'lab'] as const
 export type OptimizeSection = typeof OPTIMIZE_ROUTE_SECTIONS[number]
 
-export const ADMIN_SECTIONS = ['overview', 'features', 'content', 'queue', 'cdk', 'risk', 'registration', 'invitation', 'announcement', 'users'] as const
+export const ADMIN_SECTIONS = ['overview', 'features', 'content', 'queue', 'items', 'cdk', 'risk', 'registration', 'invitation', 'announcement', 'users'] as const
 export type AdminSection = typeof ADMIN_SECTIONS[number]
 
 export type ToolRoute =
@@ -20,6 +20,7 @@ const dashboardPaths: Record<DashboardSection, string> = {
   tools: '/tool/tools',
   redeem: '/tool/redeem',
   invitations: '/tool/invitations',
+  inventory: '/tool/inventory',
   announcements: '/tool/announcements',
   settings: '/tool/settings',
 }
@@ -43,6 +44,7 @@ const adminPaths: Record<AdminSection, string> = {
   features: '/admin/features',
   content: '/admin/content',
   queue: '/admin/queue',
+  items: '/admin/items',
   cdk: '/admin/cdk',
   risk: '/admin/risk',
   registration: '/admin/registration',

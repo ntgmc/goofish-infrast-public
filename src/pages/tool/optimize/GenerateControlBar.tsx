@@ -22,6 +22,7 @@ export default function GenerateControlBar({
   resultIsCurrent,
   error,
   priorityCoupon,
+  additionalCoupons = [],
   extraDisabledReason,
   onGenerate,
   onReset,
@@ -40,6 +41,7 @@ export default function GenerateControlBar({
   resultIsCurrent: boolean
   error: string | null
   priorityCoupon: { balance: RewardBalance | null; selected: boolean; onChange: (selected: boolean) => void }
+  additionalCoupons?: Array<{ id: string; label: string; help: string; balance: number; selected: boolean; onChange: (selected: boolean) => void }>
   extraDisabledReason?: string | null
   onGenerate: () => void
   onReset: () => void
@@ -117,6 +119,27 @@ export default function GenerateControlBar({
               </span>
             </div>
           </div>
+          {additionalCoupons.map((coupon) => (
+            <div key={coupon.id} className="tool-inset flex items-start gap-3 px-3 py-3 text-sm text-ink-secondary">
+              <input
+                id={coupon.id}
+                type="checkbox"
+                checked={coupon.selected}
+                disabled={coupon.balance < 1 || loading || syncing}
+                onChange={(event) => coupon.onChange(event.currentTarget.checked)}
+                className="mt-0.5 h-4 w-4 accent-brand-600"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor={coupon.id} className="font-semibold text-ink-primary">{coupon.label}</label>
+                  <InfoTooltip label={coupon.label}><span className="block">{coupon.help}</span></InfoTooltip>
+                </div>
+                <span className="mt-1 block text-xs leading-5 text-ink-secondary">
+                  {copy.inventory.coupon_available}{coupon.balance}
+                </span>
+              </div>
+            </div>
+          ))}
           <button
             type="button"
             onClick={onGenerate}

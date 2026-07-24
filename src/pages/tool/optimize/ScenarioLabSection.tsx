@@ -13,17 +13,25 @@ export default function ScenarioLabSection({
   profileId,
   operators,
   activeConfig,
+  requiresCoupon = false,
+  couponBalance = 0,
+  onInventoryChange,
   onApplyConfig,
 }: {
   profileId: string;
   operators: LicenseOperator[];
   activeConfig: LicenseConfig;
+  requiresCoupon?: boolean;
+  couponBalance?: number;
+  onInventoryChange?: () => void | Promise<void>;
   onApplyConfig: (config: LicenseConfig) => void;
 }) {
+  const [useCoupon, setUseCoupon] = useState(false)
   const { factors, setFactors, result, error, loading, progress, run } = useScenarioComparison({
     profileId,
     operators,
     config: activeConfig,
+    onSettled: onInventoryChange,
   })
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const expansion = useMemo(() => {
@@ -39,6 +47,10 @@ export default function ScenarioLabSection({
     const preferred = result.frontierScenarioIds[0] ?? result.points.find((point) => point.status === 'succeeded')?.id ?? null
     setSelectedId((current) => result.points.some((point) => point.id === current) ? current : preferred)
   }, [result])
+
+  useEffect(() => {
+    if (!requiresCoupon || couponBalance < 1) setUseCoupon(false)
+  }, [couponBalance, requiresCoupon])
 
   const selected = result?.points.find((point) => point.id === selectedId) ?? null
   return (
@@ -65,10 +77,28 @@ export default function ScenarioLabSection({
           ))}
         </div>
         {error && <div role="alert" className="tool-alert tool-alert--error mt-4">{error}</div>}
+        {requiresCoupon && (
+          <label className="tool-inset mt-4 flex cursor-pointer items-start gap-3 px-4 py-3 text-sm text-ink-secondary">
+            <input
+              type="checkbox"
+              checked={useCoupon}
+              disabled={loading || couponBalance < 1}
+              onChange={(event) => setUseCoupon(event.currentTarget.checked)}
+              className="mt-0.5 h-4 w-4 accent-brand-600"
+            />
+            <span>
+              <span className="block font-semibold text-ink-primary">{copy.inventory.scenario_coupon}</span>
+              <span className="mt-1 block text-xs leading-5">{copy.inventory.scenario_coupon_help} {copy.inventory.coupon_available}{couponBalance}</span>
+            </span>
+          </label>
+        )}
+        {requiresCoupon && !useCoupon && (
+          <p className="tool-alert tool-alert--warning mt-4 text-sm" role="status">{copy.inventory.scenario_coupon_required}</p>
+        )}
         <button
           type="button"
-          disabled={loading || !expansion.value}
-          onClick={() => void run()}
+          disabled={loading || !expansion.value || (requiresCoupon && !useCoupon)}
+          onClick={() => void run(requiresCoupon && useCoupon)}
           className="tool-primary-action mt-4 w-full"
           data-tour-target="optimize-lab-run"
         >
