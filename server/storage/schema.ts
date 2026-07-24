@@ -805,6 +805,231 @@ ALTER TABLE user_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
 ALTER TABLE user_game_accounts ALTER COLUMN cdk_key DROP NOT NULL;
 ALTER TABLE user_game_accounts ALTER COLUMN cdk_code_hash DROP NOT NULL;
 ALTER TABLE user_game_accounts ALTER COLUMN cdk_order_hash DROP NOT NULL;
+
+CREATE TABLE IF NOT EXISTS item_definitions (
+  code TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  effect_code TEXT,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  icon_key TEXT NOT NULL DEFAULT 'placeholder',
+  system_owned BOOLEAN NOT NULL DEFAULT FALSE,
+  issuance_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  CHECK (kind IN ('consumable', 'capacity_upgrade', 'gift_pack', 'cosmetic', 'badge'))
+);
+
+CREATE TABLE IF NOT EXISTS gift_pack_versions (
+  id TEXT PRIMARY KEY,
+  item_code TEXT NOT NULL REFERENCES item_definitions(code) ON DELETE RESTRICT,
+  version INTEGER NOT NULL CHECK (version > 0),
+  status TEXT NOT NULL CHECK (status IN ('draft', 'published', 'retired')),
+  created_at TIMESTAMPTZ NOT NULL,
+  published_at TIMESTAMPTZ,
+  UNIQUE (item_code, version)
+);
+
+CREATE TABLE IF NOT EXISTS gift_pack_version_contents (
+  gift_pack_version_id TEXT NOT NULL REFERENCES gift_pack_versions(id) ON DELETE CASCADE,
+  item_code TEXT NOT NULL REFERENCES item_definitions(code) ON DELETE RESTRICT,
+  quantity INTEGER NOT NULL CHECK (quantity > 0 AND quantity <= 10000),
+  validity_days INTEGER NOT NULL CHECK (validity_days >= 0 AND validity_days <= 3650),
+  PRIMARY KEY (gift_pack_version_id, item_code)
+);
+
+ALTER TABLE reward_grants ADD COLUMN IF NOT EXISTS gift_pack_version_id TEXT;
+ALTER TABLE reward_grants ADD COLUMN IF NOT EXISTS revoked_quantity INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS reference_type TEXT;
+ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS reference_id TEXT;
+ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS profile_id TEXT;
+ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS committed_at TIMESTAMPTZ;
+ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS refunded_grant_id TEXT;
+ALTER TABLE reward_consumptions ALTER COLUMN optimization_job_id DROP NOT NULL;
+UPDATE reward_consumptions
+SET reference_type = coalesce(reference_type, 'optimization_job'),
+    reference_id = coalesce(reference_id, optimization_job_id),
+    status = case
+      when status = 'consumed' and exists (
+        select 1 from optimization_jobs job
+        where job.id = reward_consumptions.optimization_job_id
+          and job.status in ('queued', 'running')
+      ) then 'reserved'
+      when status = 'consumed' then 'committed'
+      else status
+    end,
+    committed_at = case
+      when status = 'consumed' and not exists (
+        select 1 from optimization_jobs job
+        where job.id = reward_consumptions.optimization_job_id
+          and job.status in ('queued', 'running')
+      ) then coalesce(committed_at, consumed_at)
+      else committed_at
+    end
+WHERE reference_type IS NULL OR reference_id IS NULL OR status = 'consumed';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reward_consumptions_reference
+  ON reward_consumptions(reference_type, reference_id, reward_type)
+  WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'reward_grants_gift_pack_version_fk') THEN
+    ALTER TABLE reward_grants ADD CONSTRAINT reward_grants_gift_pack_version_fk
+      FOREIGN KEY (gift_pack_version_id) REFERENCES gift_pack_versions(id) ON DELETE RESTRICT NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'reward_consumptions_profile_fk') THEN
+    ALTER TABLE reward_consumptions ADD CONSTRAINT reward_consumptions_profile_fk
+      FOREIGN KEY (profile_id) REFERENCES user_game_accounts(id) ON DELETE SET NULL NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'reward_consumptions_refunded_grant_fk') THEN
+    ALTER TABLE reward_consumptions ADD CONSTRAINT reward_consumptions_refunded_grant_fk
+      FOREIGN KEY (refunded_grant_id) REFERENCES reward_grants(id) ON DELETE SET NULL NOT VALID;
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS inventory_ledger (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  item_code TEXT NOT NULL REFERENCES item_definitions(code) ON DELETE RESTRICT,
+  event_type TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  grant_id TEXT REFERENCES reward_grants(id) ON DELETE SET NULL,
+  reference_type TEXT NOT NULL,
+  reference_id TEXT NOT NULL,
+  metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (user_id, item_code, event_type, reference_type, reference_id)
+);
+CREATE INDEX IF NOT EXISTS idx_inventory_ledger_user_created ON inventory_ledger(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS inventory_operations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  idempotency_key TEXT NOT NULL,
+  operation_type TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  response_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  UNIQUE (user_id, idempotency_key)
+);
+
+CREATE TABLE IF NOT EXISTS profile_entitlement_balances (
+  profile_id TEXT NOT NULL REFERENCES user_game_accounts(id) ON DELETE CASCADE,
+  entitlement_type TEXT NOT NULL,
+  units INTEGER NOT NULL DEFAULT 0 CHECK (units >= 0),
+  updated_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (profile_id, entitlement_type)
+);
+
+CREATE TABLE IF NOT EXISTS onboarding_task_versions (
+  id TEXT PRIMARY KEY,
+  task_code TEXT NOT NULL,
+  version INTEGER NOT NULL CHECK (version > 0),
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  rewards_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (task_code, version)
+);
+
+CREATE TABLE IF NOT EXISTS onboarding_task_current (
+  task_code TEXT PRIMARY KEY,
+  version_id TEXT NOT NULL REFERENCES onboarding_task_versions(id) ON DELETE RESTRICT,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_onboarding_tasks (
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  task_code TEXT NOT NULL,
+  version_id TEXT NOT NULL REFERENCES onboarding_task_versions(id) ON DELETE RESTRICT,
+  completed_at TIMESTAMPTZ NOT NULL,
+  claimed_at TIMESTAMPTZ,
+  claim_operation_id TEXT,
+  PRIMARY KEY (user_id, task_code)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_admin_audit (
+  id TEXT PRIMARY KEY,
+  admin_username TEXT NOT NULL,
+  action TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  before_json JSONB,
+  after_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_inventory_admin_audit_created ON inventory_admin_audit(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS inventory_distribution_campaigns (
+  id TEXT PRIMARY KEY,
+  item_code TEXT NOT NULL REFERENCES item_definitions(code) ON DELETE RESTRICT,
+  gift_pack_version_id TEXT REFERENCES gift_pack_versions(id) ON DELETE RESTRICT,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  validity_days INTEGER NOT NULL CHECK (validity_days >= 0 AND validity_days <= 3650),
+  target_mode TEXT NOT NULL CHECK (target_mode IN ('user_ids', 'all_users')),
+  status TEXT NOT NULL CHECK (status IN ('draft', 'queued', 'running', 'paused', 'completed', 'cancelled', 'reversing', 'reversed')),
+  reason TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS inventory_distribution_recipients (
+  campaign_id TEXT NOT NULL REFERENCES inventory_distribution_campaigns(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'granted', 'failed', 'revoked', 'skipped')),
+  grant_id TEXT REFERENCES reward_grants(id) ON DELETE SET NULL,
+  error_message TEXT,
+  processed_at TIMESTAMPTZ,
+  PRIMARY KEY (campaign_id, user_id)
+);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'inventory_distribution_recipients_status_check'
+       AND conrelid = 'inventory_distribution_recipients'::regclass
+       AND pg_get_constraintdef(oid) LIKE '%processing%'
+  ) THEN
+    ALTER TABLE inventory_distribution_recipients
+      DROP CONSTRAINT IF EXISTS inventory_distribution_recipients_status_check;
+    ALTER TABLE inventory_distribution_recipients
+      ADD CONSTRAINT inventory_distribution_recipients_status_check
+      CHECK (status IN ('pending', 'processing', 'granted', 'failed', 'revoked', 'skipped'));
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_inventory_distribution_pending
+  ON inventory_distribution_recipients(campaign_id, status, user_id);
+
+INSERT INTO item_definitions
+  (code, kind, effect_code, name, description, icon_key, system_owned, issuance_enabled, created_at, updated_at)
+VALUES
+  ('priority_compute_coupon', 'consumable', 'priority_compute', '优先计算券', '让一次主排班进入最高优先队列。', 'priority_compute_coupon', true, true, now(), now()),
+  ('reorder_check_coupon', 'consumable', 'reorder_check', '调序检查券', '免费调序检查配额用尽后增加一次检查。', 'reorder_check_coupon', true, true, now(), now()),
+  ('scenario_simulation_coupon', 'consumable', 'scenario_simulation', '情景推演券', '运行一次情景比较实验。', 'scenario_simulation_coupon', true, true, now(), now()),
+  ('training_diagnosis_coupon', 'consumable', 'training_diagnosis', '练度诊断券', '为一次主排班启用练度与升级诊断。', 'training_diagnosis_coupon', true, true, now(), now()),
+  ('additional_recompute_coupon', 'consumable', 'additional_recompute', '追加重算券', '在有效修订窗口内增加一次免费档案重算。', 'additional_recompute_coupon', true, true, now(), now()),
+  ('plan_capacity_certificate', 'capacity_upgrade', 'plan_capacity', '方案扩容证', '指定档案的保存方案槽位永久增加 1。', 'plan_capacity_certificate', true, true, now(), now()),
+  ('history_capacity_certificate', 'capacity_upgrade', 'history_capacity', '历史档案扩容证', '指定档案的滚动结果历史槽位永久增加 1。', 'history_capacity_certificate', true, true, now(), now()),
+  ('result_archive_folder', 'capacity_upgrade', 'result_archive_capacity', '结果封存夹', '指定档案的结果封存区永久增加 1 个槽位。', 'result_archive_folder', true, true, now(), now()),
+  ('maa_export_trial_coupon', 'consumable', 'maa_export_trial', 'MAA 导出体验券', '导出一次指定排班结果。', 'maa_export_trial_coupon', true, true, now(), now()),
+  ('newcomer_supply_pack', 'gift_pack', 'open_gift_pack', '新人补给包', '内容由后台配置的新人礼包。', 'newcomer_supply_pack', true, true, now(), now())
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO onboarding_task_versions (id, task_code, version, enabled, rewards_json, created_at)
+VALUES
+  ('onboarding:welcome_inventory:v1', 'welcome_inventory', 1, false, '[]'::jsonb, now()),
+  ('onboarding:bind_skland:v1', 'bind_skland', 1, false, '[]'::jsonb, now()),
+  ('onboarding:first_main_schedule:v1', 'first_main_schedule', 1, false, '[]'::jsonb, now())
+ON CONFLICT (task_code, version) DO NOTHING;
+
+INSERT INTO onboarding_task_current (task_code, version_id, updated_at)
+VALUES
+  ('welcome_inventory', 'onboarding:welcome_inventory:v1', now()),
+  ('bind_skland', 'onboarding:bind_skland:v1', now()),
+  ('first_main_schedule', 'onboarding:first_main_schedule:v1', now())
+ON CONFLICT (task_code) DO NOTHING;
 `
 
 const TABLE_CONSTRAINT_KEYWORDS = new Set(['check', 'constraint', 'foreign', 'primary', 'unique'])

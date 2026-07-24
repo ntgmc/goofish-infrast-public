@@ -30,11 +30,18 @@ function incomingGet(target: string): IncomingMessage {
 describe('request validation boundary', () => {
   it('declares a fail-closed policy for every registered API route', () => {
     for (const registeredRoute of getRegisteredApiRoutes()) {
-      const pathname = registeredRoute.replace(':jobId', 'job_test-1')
+      const pathname = registeredRoute
+        .replace(':jobId', 'job_test-1')
+        .replace(':code', 'welcome_inventory')
       const policy = getRoutePolicy(pathname)
       expect(policy, `missing request policy for ${registeredRoute}`).not.toBeNull()
       expect(getAllowedMethods(policy!)).not.toHaveLength(0)
     }
+  })
+
+  it('only declares onboarding claim policies for fixed task codes', () => {
+    expect(getRoutePolicy('/api/user/onboarding-tasks/welcome_inventory/claim')).not.toBeNull()
+    expect(getRoutePolicy('/api/user/onboarding-tasks/custom_task/claim')).toBeNull()
   })
 
   it('allows profile selection when restoring an authenticated session', async () => {

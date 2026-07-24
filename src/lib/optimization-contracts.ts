@@ -9,6 +9,7 @@ import type {
   ReorderCheckResult,
 } from './types'
 import type { ScenarioComparisonFactors, ScenarioComparisonResult } from './scenario-comparison'
+import type { SystemItemCode } from './inventory-contracts'
 
 type OptimizationIdentity = { type: 'profile'; profileId: string }
 
@@ -24,17 +25,20 @@ export type CreateOptimizationJobRequest =
       includeUpgradeSuggestions: boolean;
       historySource?: 'generated' | 'applied_suggestions';
       use_priority_coupon?: boolean;
+      use_items?: SystemItemCode[];
     })
   | (Omit<OptimizationJobInput, 'identity'> & {
       kind: 'scenario_comparison';
       identity: OptimizationIdentity;
       factors: ScenarioComparisonFactors;
+      use_items?: SystemItemCode[];
     })
 
 export interface CreateReorderCheckRequest {
   profileId: string;
   config: LicenseConfig;
   baselineHistoryId: string;
+  use_items?: SystemItemCode[];
 }
 
 interface ApiContractError {

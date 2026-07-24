@@ -83,6 +83,21 @@ export async function requestReorderCheck(
   throw new Error(job.error.message || fallbackMessage)
 }
 
+export async function requestMaaExport(profileId: string, resultId: string): Promise<void> {
+  const response = await apiJson<{ result: unknown; filename: string }>('/api/user/maa-export', {
+    method: 'POST',
+    json: { profile_id: profileId, result_id: resultId, idempotency_key: crypto.randomUUID() },
+    fallbackMessage: copy.inventory.maa_export_failed,
+  })
+  const blob = new Blob([JSON.stringify(response.result, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = response.filename || `maa-schedule-${resultId.slice(0, 8)}.json`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)))
 }

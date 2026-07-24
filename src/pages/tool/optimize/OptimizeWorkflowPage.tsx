@@ -24,7 +24,7 @@ export default function OptimizeWorkflowPage(props: Props) {
   const compactTaskCenterButtonRef = useRef<HTMLButtonElement>(null)
   const taskCenterTriggerRef = useRef(taskCenterButtonRef)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
-  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
+  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
   const [mainTourSeenAtMount] = useState(() => hasCompletedTour('optimize-overview', 2))
   const initialSectionRef = useRef(section)
   const [sectionChangedAfterMainTour, setSectionChangedAfterMainTour] = useState(false)
@@ -170,8 +170,28 @@ export default function OptimizeWorkflowPage(props: Props) {
               resultIsCurrent={resultIsCurrent}
               error={inlineError?.scope === 'generate' ? inlineError.message : null}
               priorityCoupon={{ balance: priorityCouponBalance, selected: usePriorityCoupon, onChange: setUsePriorityCoupon }}
+              additionalCoupons={[
+                ...(!userCanUseUpgradeFeatures && (itemBalances.training_diagnosis_coupon ?? 0) > 0 ? [{
+                  id: 'use-training-diagnosis-coupon',
+                  label: copy.inventory.training_coupon,
+                  help: copy.inventory.training_coupon_help,
+                  balance: itemBalances.training_diagnosis_coupon ?? 0,
+                  selected: useTrainingDiagnosisCoupon,
+                  onChange: setUseTrainingDiagnosisCoupon,
+                }] : []),
+                ...(additionalRecomputeCouponEligible ? [{
+                  id: 'use-additional-recompute-coupon',
+                  label: copy.inventory.recompute_coupon,
+                  help: copy.inventory.recompute_coupon_help,
+                  balance: itemBalances.additional_recompute_coupon ?? 0,
+                  selected: useAdditionalRecomputeCoupon,
+                  onChange: setUseAdditionalRecomputeCoupon,
+                }] : []),
+              ]}
               savedConfigCount={savedConfigs.length}
+              savedConfigLimit={profileCapacity?.plan_slots.limit}
               resultHistoryCount={resultHistory.length}
+              resultHistoryLimit={profileCapacity?.history_slots.limit}
               latestResult={latestWorkspaceResult}
               generationDisabledReason={generationDisabledReason}
               freeSchedule={{
@@ -190,6 +210,12 @@ export default function OptimizeWorkflowPage(props: Props) {
                 result: reorderCheckResult,
                 onCheck: handleReorderCheck,
                 onGenerate: handleGenerate,
+                coupon: {
+                  visible: reorderQuota?.remaining === 0 && (itemBalances.reorder_check_coupon ?? 0) > 0,
+                  balance: itemBalances.reorder_check_coupon ?? 0,
+                  selected: useReorderCheckCoupon,
+                  onChange: setUseReorderCheckCoupon,
+                },
               }}
               onGenerate={handleGenerate}
               onReset={onReset}
@@ -206,6 +232,10 @@ export default function OptimizeWorkflowPage(props: Props) {
               activeConfig={activeConfig}
               savedConfigs={savedConfigs}
               resultHistory={resultHistory}
+              archivedResults={archivedResults}
+              savedConfigLimit={profileCapacity?.plan_slots.limit}
+              resultHistoryLimit={profileCapacity?.history_slots.limit}
+              archiveLimit={profileCapacity?.archive_slots.limit}
               selectedHistoryId={historyItem?.id ?? null}
               busyAction={workspaceBusyAction}
               notice={workspaceNotice}
@@ -217,6 +247,9 @@ export default function OptimizeWorkflowPage(props: Props) {
               onViewHistory={handleViewHistory}
               onUseHistoryConfig={handleUseHistoryConfig}
               onDownloadHistory={handleDownloadHistory}
+              onArchiveHistory={handleArchiveHistory}
+              onUnarchiveHistory={handleUnarchiveHistory}
+              onDeleteHistory={handleDeleteHistory}
             />
           )}
   
@@ -257,7 +290,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               upgradeError={upgradeError}
               onUpgradeCdkChange={setUpgradeCdk}
               onUpgradePreviewProfile={handleUpgradePreviewProfile}
-              onDownloadMAA={isRestrictedPreview ? undefined : handleDownloadMAA}
+              onDownloadMAA={handleDownloadMAA}
               onApplySuggestions={handleApplySuggestions}
               suggestionsReadOnly={!features.schedule_generation}
               onReset={onReset}
@@ -269,6 +302,9 @@ export default function OptimizeWorkflowPage(props: Props) {
               profileId={props.profileId}
               operators={mergedOperators}
               activeConfig={activeConfig}
+              requiresCoupon={!userHasScenarioLabCapability}
+              couponBalance={itemBalances.scenario_simulation_coupon ?? 0}
+              onInventoryChange={refreshInventory}
               onApplyConfig={handleApplyScenarioConfig}
             />
           )}
