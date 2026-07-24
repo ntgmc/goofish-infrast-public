@@ -328,7 +328,7 @@ rm -f admin.cookies
 | `CHANGELOG_BASE_SHA` | No | 首次启用自动 Changelog 时可选的历史基线 SHA；生产候选构建从同名 GitHub Actions repository variable 读取 |
 | `DEEPSEEK_API_KEY` | Yes (GitHub Actions) | `Record PR Changelog` 工作流调用 DeepSeek 时使用的 repository secret |
 | `DEEPSEEK_API_URL` | No | DeepSeek 兼容 API 根地址，默认 `https://api.deepseek.com`，配置为 GitHub Actions repository variable |
-| `DEEPSEEK_MODEL` | No | PR 变更总结模型，默认 `deepseek-v4-flash`，配置为 GitHub Actions repository variable |
+| `DEEPSEEK_MODEL` | No | PR 变更总结模型，默认 `deepseek-v4-pro`，配置为 GitHub Actions repository variable |
 | `CHANGELOG_BOT_LOGIN` | No | 写入可信 changelog 评论的 Actions bot 登录名，默认 `github-actions[bot]`，配置为 GitHub Actions repository variable |
 
 `npm run generate:data` 会根据版本变量生成 `src/lib/build-meta.ts`，并在 `server/handlers/data.ts` 中写入 `data_version`、`generated_at` 和来源摘要。数据会被 Node 服务器通过 `/api/data` 提供。
