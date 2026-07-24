@@ -72,11 +72,9 @@ export const publicCopy = {
   // src/lib/changelog.ts
   pages_ChangelogPage_014: "个人用途确认提示改用盾牌图标，增强安全提示的识别性。",
   // src/lib/changelog.ts
-  pages_ChangelogPage_015: "工作区与管理能力",
+  pages_ChangelogPage_015: "工作区体验",
   // src/lib/changelog.ts
   pages_ChangelogPage_016: "优化优化器工作区的保留策略，改善方案与结果的持续访问体验。",
-  // src/lib/changelog.ts
-  pages_ChangelogPage_017: "管理端现可下载死信任务载荷 JSON，便于定位和处理异常任务。",
   // src/pages/ChangelogPage.tsx
   pages_ChangelogPage_018: "提交 ",
   // src/pages/ChangelogPage.tsx

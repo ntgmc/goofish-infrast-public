@@ -172,7 +172,8 @@ async function writeStepSummary(payload, fileCount) {
     '',
     `- 分析文件：${fileCount}`,
     `- DeepSeek 模型：${payload.model}`,
-    `- Changelog 分类：${payload.sections.length}`,
+    `- 网站公开条目：${countItems(payload.public_sections)}`,
+    `- 仓库内部条目：${countItems(payload.internal_sections)}`,
     `- Head SHA：\`${payload.head_sha}\``,
     '',
   ].join('\n'), 'utf8')
@@ -192,4 +193,8 @@ function parsePullRequestNumber(value) {
   const number = Number(value)
   if (!Number.isInteger(number) || number < 1) throw new Error('PR_NUMBER 必须是正整数')
   return number
+}
+
+function countItems(sections) {
+  return sections.reduce((total, section) => total + section.items.length, 0)
 }

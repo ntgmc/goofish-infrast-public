@@ -12,9 +12,10 @@ import {
   renderGeneratedModule,
   renderReleaseNotes,
   selectPublicChanges,
+  selectRepositoryChanges,
   validateChangelogEnvelope,
 } from './changelog-lib.mjs'
-import { findTrustedPrChangelogPayload, flattenPrChangelogChanges } from './pr-changelog-lib.mjs'
+import { collectPrChangelogChanges, findTrustedPrChangelogPayload } from './pr-changelog-lib.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const buildMetaPath = resolve(root, 'src/lib/.generated/build-meta.ts')
@@ -30,14 +31,17 @@ const history = await loadReleaseHistory()
 const previousRelease = candidate ? findPreviousRelease(history, targetSha, releaseVersion) : null
 const previousTargetSha = candidate ? resolvePreviousTargetSha(previousRelease) : null
 const commits = candidate && previousTargetSha ? readCommits(previousTargetSha, targetSha) : []
-const changes = candidate && previousTargetSha ? await resolvePublicChanges(commits) : []
+const changeSets = candidate && previousTargetSha
+  ? await resolveChangelogChanges(commits)
+  : { publicChanges: [], repositoryChanges: [] }
 const release = candidate
   ? createReleaseRecord({
     version: releaseVersion,
     targetSha,
     previousTargetSha,
     releasedAt: buildMeta.generated_at,
-    changes,
+    changes: changeSets.publicChanges,
+    repositoryChanges: changeSets.repositoryChanges,
   })
   : null
 const envelope = createChangelogEnvelope(candidate, release)
@@ -112,7 +116,7 @@ function readCommits(fromSha, toSha) {
   return parseGitLog(output)
 }
 
-async function resolvePublicChanges(commits) {
+async function resolveChangelogChanges(commits) {
   const repository = String(process.env.GITHUB_REPOSITORY ?? '').trim()
   const token = String(process.env.GITHUB_TOKEN ?? '').trim()
   if (!repository || !token) throw new Error('production PR changelog generation requires GITHUB_REPOSITORY and GITHUB_TOKEN')
@@ -137,7 +141,8 @@ async function resolvePublicChanges(commits) {
     }
   }
 
-  const recordedChanges = []
+  const recordedPublicChanges = []
+  const recordedRepositoryChanges = []
   const handledCommitShas = new Set()
   for (const [pullRequestNumber, entry] of pullRequestsByNumber) {
     const pullRequest = await requestJson(`${apiUrl}/repos/${repository}/pulls/${pullRequestNumber}`, token)
@@ -151,13 +156,18 @@ async function resolvePublicChanges(commits) {
       throw new Error(`PR #${pullRequestNumber} changelog payload is stale for the merged head SHA`)
     }
 
-    recordedChanges.push(...flattenPrChangelogChanges(payload))
+    const payloadChanges = collectPrChangelogChanges(payload)
+    recordedPublicChanges.push(...payloadChanges.publicChanges)
+    recordedRepositoryChanges.push(...payloadChanges.repositoryChanges)
     for (const sha of entry.commitShas) handledCommitShas.add(sha)
     console.log(`[generate-changelog] using recorded Chinese PR summary for #${pullRequestNumber}`)
   }
 
   const fallbackCommits = commits.filter((commit) => !handledCommitShas.has(commit.sha))
-  return [...recordedChanges, ...selectPublicChanges(fallbackCommits)]
+  return {
+    publicChanges: [...recordedPublicChanges, ...selectPublicChanges(fallbackCommits)],
+    repositoryChanges: [...recordedRepositoryChanges, ...selectRepositoryChanges(fallbackCommits)],
+  }
 }
 
 async function readIssueComments(apiUrl, repository, pullRequestNumber, token) {
