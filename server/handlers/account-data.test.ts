@@ -15,7 +15,6 @@ vi.mock('../storage/user-store', () => ({
   saveUserProfile: mocks.saveUserProfile,
 }))
 
-vi.mock('../storage/depot-value-sample-store', () => ({ getDepotValueSampleStore: vi.fn() }))
 vi.mock('../storage/postgres', () => ({ query: vi.fn() }))
 vi.mock('../account-data-lifecycle', () => ({ cancelAccountDeletion: vi.fn(), requestAccountDeletion: vi.fn() }))
 vi.mock('../security/password', () => ({ verifyPasswordHash: vi.fn() }))
@@ -83,5 +82,16 @@ describe('account data Skland controls', () => {
     expect(response.status).toBe(404)
     await expect(response.json()).resolves.toEqual({ error: 'API route not found' })
     expect(mocks.saveUserProfile).not.toHaveBeenCalled()
+  })
+
+  it('does not expose depot sample revocation through the account data handler', async () => {
+    const response = await accountDataHandler(new Request('http://localhost/api/user/data/depot-sample/revoke', {
+      method: 'POST',
+      body: JSON.stringify({ profile_id: 'profile-1' }),
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({ error: 'API route not found' })
   })
 })

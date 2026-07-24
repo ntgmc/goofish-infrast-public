@@ -168,13 +168,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_005: "密码已更新。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_006: "导出失败，请稍后重试",
-  // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_007: "导出个人数据失败，请稍后重试。",
-  // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_008: "清除森空岛凭据",
-  // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_010: "撤回仓库样本",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_011: "确定要",
   // src/pages/tool/dashboard/SettingsSection.tsx
@@ -202,13 +196,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_023: "服务保存登录资料、游戏档案、工作区、使用记录和你主动贡献的仓库样本。注销后进入 7 天冷静期，期满会删除所有可关联数据；仅保留无法关联的汇总统计。",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_024: "正在导出...",
-  // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_025: "导出个人数据",
-  // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_026: "清除凭据",
-  // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_028: "撤回仓库样本",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_029: "注销账号",
   // src/pages/tool/dashboard/SettingsSection.tsx

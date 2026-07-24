@@ -29,9 +29,7 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/depot-value') return ['depot_value']
   if (pathname === '/api/usage-stats') return ['login']
 
-  if (pathname === '/api/user/data/credential/clear' || pathname === '/api/user/data/depot-sample/revoke') {
-    return ['profiles']
-  }
+  if (pathname === '/api/user/data/credential/clear') return ['profiles']
   if (pathname === '/api/user/announcements') return ['login', 'announcements']
   if (pathname === '/api/user/profiles/preview') return ['free_preview']
   if (pathname === '/api/user/profiles/redeem') return ['cdk_redemption']
