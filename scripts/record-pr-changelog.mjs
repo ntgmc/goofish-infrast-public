@@ -14,7 +14,7 @@ const pullRequestNumber = parsePullRequestNumber(requireEnvironment('PR_NUMBER')
 const manualSummary = normalizeManualSummary(process.env.MANUAL_CHANGELOG_SUMMARY)
 const githubApiUrl = String(process.env.GITHUB_API_URL ?? 'https://api.github.com').replace(/\/$/, '')
 const deepseekApiUrl = String(process.env.DEEPSEEK_API_URL ?? 'https://api.deepseek.com').replace(/\/$/, '')
-const deepseekModel = String(process.env.DEEPSEEK_MODEL ?? 'deepseek-v4-flash').trim()
+const deepseekModel = String(process.env.DEEPSEEK_MODEL ?? 'deepseek-v4-pro').trim()
 const changelogBotLogin = String(process.env.CHANGELOG_BOT_LOGIN ?? 'github-actions[bot]').trim()
 const [owner, repo] = repository.split('/')
 
