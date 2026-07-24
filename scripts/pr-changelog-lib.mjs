@@ -32,6 +32,11 @@ export function validateManualSummary(value) {
   return summary
 }
 
+export function normalizeManualSummary(value) {
+  const summary = String(value ?? '').trim()
+  return summary ? validateManualSummary(summary) : null
+}
+
 export function normalizeDeepSeekResult(value) {
   if (!isRecord(value)) throw new Error('DeepSeek 未返回 JSON 对象')
 
@@ -62,7 +67,7 @@ export function createPrChangelogPayload({ pullRequestNumber, headSha, manualSum
     schema_version: 2,
     pull_request: pullRequest,
     head_sha: normalizedHeadSha,
-    manual_summary: validateManualSummary(manualSummary),
+    manual_summary: normalizeManualSummary(manualSummary),
     deepseek_summary: normalizedResult.summary,
     public_sections: normalizedResult.publicSections,
     internal_sections: normalizedResult.internalSections,
@@ -76,6 +81,9 @@ export function renderPrChangelogBlock(payload) {
   const encoded = Buffer.from(JSON.stringify(validated), 'utf8').toString('base64url')
   const publicSectionLines = renderSectionLines(validated.public_sections, '本次 PR 没有普通用户可直接感知的变化。')
   const internalSectionLines = renderSectionLines(validated.internal_sections, '本次 PR 没有仅限仓库记录的内部变化。')
+  const manualSummaryLines = validated.manual_summary
+    ? ['### 人工说明', '', validated.manual_summary, '']
+    : []
 
   return [
     MARKER_START,
@@ -84,10 +92,7 @@ export function renderPrChangelogBlock(payload) {
     '',
     '> 此区域由 `Record PR Changelog` 工作流生成；PR 更新后需重新运行。',
     '',
-    '### 人工说明',
-    '',
-    validated.manual_summary,
-    '',
+    ...manualSummaryLines,
     '### DeepSeek 分析',
     '',
     validated.deepseek_summary,
@@ -188,18 +193,18 @@ export function buildPullRequestDiffContext(files, maxLength = 60000) {
 }
 
 export function buildDeepSeekMessages({ title, body, manualSummary, diffContext }) {
-  const normalizedManualSummary = validateManualSummary(manualSummary)
+  const normalizedManualSummary = normalizeManualSummary(manualSummary)
   return [
     {
       role: 'system',
       content: [
-        '你是软件发布说明编辑。请根据维护者的人工说明和 PR diff，生成分为网站公开内容与仓库内部内容的简体中文变更总结。',
+        '你是软件发布说明编辑。请根据 PR 标题、正文和 diff，生成分为网站公开内容与仓库内部内容的简体中文变更总结；维护者人工说明如有提供，可作为补充上下文。',
         '只输出 JSON 对象，不要输出 Markdown 代码块。JSON 格式：',
         '{"summary":"一段中文总体总结","public_sections":[{"kind":"feature|fix|performance|security","items":["中文条目"]}],"internal_sections":[{"kind":"admin|operations|maintenance","items":["中文条目"]}]}',
         'public_sections 只记录普通用户在网站、公开 API 或核心业务功能中能直接感受到的变化；管理后台、开发工具、测试、文档、重构、依赖、构建、部署和 CI 不得放入 public_sections。',
         'internal_sections 记录不应在网站展示但需要在仓库追溯的变化：管理后台用 admin，部署/运维/CI/构建用 operations，重构/测试/文档/依赖/开发维护用 maintenance。',
         'public_sections 可以为空；public_sections 与 internal_sections 合计至少一个且不超过 12 个条目。',
-        '不得虚构 diff 中不存在的行为。人工说明用于表达维护者意图，diff 用于核验和补充。条目应简洁、明确、使用中文。',
+        '不得虚构 diff 中不存在的行为。人工说明如有提供，用于表达维护者意图，diff 用于核验和补充。条目应简洁、明确、使用中文。',
       ].join('\n'),
     },
     {
@@ -207,7 +212,9 @@ export function buildDeepSeekMessages({ title, body, manualSummary, diffContext 
       content: [
         `PR 标题：${String(title ?? '').trim()}`,
         `PR 正文：${String(body ?? '').trim().slice(0, 5000) || '(空)'}`,
-        `维护者人工说明：${normalizedManualSummary}`,
+        normalizedManualSummary
+          ? `维护者人工说明：${normalizedManualSummary}`
+          : '维护者人工说明：未提供，请仅根据 PR 标题、正文和 diff 总结。',
         '',
         'PR 修改：',
         String(diffContext ?? ''),

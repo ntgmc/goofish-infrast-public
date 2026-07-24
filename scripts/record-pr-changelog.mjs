@@ -3,16 +3,16 @@ import {
   buildDeepSeekMessages,
   buildPullRequestDiffContext,
   createPrChangelogPayload,
+  normalizeManualSummary,
   normalizeDeepSeekResult,
   renderPrChangelogBlock,
-  validateManualSummary,
 } from './pr-changelog-lib.mjs'
 
 const repository = requireEnvironment('GITHUB_REPOSITORY')
 const githubToken = requireEnvironment('GITHUB_TOKEN')
 const deepseekApiKey = requireEnvironment('DEEPSEEK_API_KEY')
 const pullRequestNumber = parsePullRequestNumber(requireEnvironment('PR_NUMBER'))
-const manualSummary = validateManualSummary(requireEnvironment('MANUAL_CHANGELOG_SUMMARY'))
+const manualSummary = normalizeManualSummary(process.env.MANUAL_CHANGELOG_SUMMARY)
 const githubApiUrl = String(process.env.GITHUB_API_URL ?? 'https://api.github.com').replace(/\/$/, '')
 const deepseekApiUrl = String(process.env.DEEPSEEK_API_URL ?? 'https://api.deepseek.com').replace(/\/$/, '')
 const deepseekModel = String(process.env.DEEPSEEK_MODEL ?? 'deepseek-chat').trim()
@@ -53,7 +53,7 @@ try {
   })
   const block = renderPrChangelogBlock(payload)
   await writeChangelogComment(block)
-  await writeCommitStatus('success', '中文变更说明与 DeepSeek 总结已记录')
+  await writeCommitStatus('success', 'DeepSeek changelog 总结已记录')
   await writeStepSummary(payload, files.length)
   console.log(`Recorded Chinese changelog summary for PR #${pullRequestNumber}.`)
 } catch (error) {
@@ -127,13 +127,21 @@ async function requestDeepSeek(messages) {
   const content = responseBody?.choices?.[0]?.message?.content
   if (!content) throw new Error('DeepSeek API 未返回总结内容')
 
+  const normalizedContent = String(content).replace(/^```(?:json)?\s*|\s*```$/gi, '').trim()
   let parsed
   try {
-    parsed = JSON.parse(String(content).replace(/^```(?:json)?\s*|\s*```$/gi, '').trim())
+    parsed = JSON.parse(normalizedContent)
   } catch {
+    console.error(`[record-pr-changelog] DeepSeek 原始响应：\n${normalizedContent}`)
     throw new Error('DeepSeek 返回内容不是有效 JSON')
   }
-  return normalizeDeepSeekResult(parsed)
+
+  try {
+    return normalizeDeepSeekResult(parsed)
+  } catch (error) {
+    console.error(`[record-pr-changelog] DeepSeek 返回 JSON 未通过结构校验：\n${JSON.stringify(parsed, null, 2)}`)
+    throw error
+  }
 }
 
 async function githubRequest(path, { method = 'GET', body } = {}) {
