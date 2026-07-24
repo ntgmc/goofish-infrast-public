@@ -7,6 +7,7 @@ const devWorkflow = await readFile('.github/workflows/deploy-dev.yml', 'utf8')
 const qualityChecksWorkflow = normalizeLineEndings(await readFile('.github/workflows/quality-checks.yml', 'utf8'))
 const securityAnalysisWorkflow = await readFile('.github/workflows/security-analysis.yml', 'utf8')
 const prChangelogWorkflow = normalizeLineEndings(await readFile('.github/workflows/record-pr-changelog.yml', 'utf8'))
+const prChangelogScript = normalizeLineEndings(await readFile('scripts/record-pr-changelog.mjs', 'utf8'))
 const deployScript = await readFile('scripts/deploy-production-atomic.sh', 'utf8')
 const workerDeployScript = await readFile('scripts/deploy-worker-atomic.sh', 'utf8')
 const devDeployScript = await readFile('scripts/deploy-production.sh', 'utf8')
@@ -106,6 +107,8 @@ function assertPrChangelogWorkflow() {
   assert.match(prChangelogWorkflow, /secrets\.DEEPSEEK_API_KEY/, 'PR changelog recording should use the DeepSeek API secret')
   assert.match(prChangelogWorkflow, /vars\.DEEPSEEK_MODEL \|\| 'deepseek-v4-flash'/, 'PR changelog recording should default to DeepSeek V4 Flash')
   assert.match(prChangelogWorkflow, /node scripts\/record-pr-changelog\.mjs/, 'PR changelog workflow should run the reviewed recording script')
+  assert.match(prChangelogScript, /return parsed/, 'PR changelog recording should pass the raw DeepSeek payload to the canonical validator')
+  assert.doesNotMatch(prChangelogScript, /return normalizeDeepSeekResult\(parsed\)/, 'PR changelog recording must not normalize the DeepSeek payload twice')
 }
 
 function assertQualityChecksImmutability() {
@@ -214,6 +217,11 @@ function assertDeploymentScript() {
   assert.match(devDeployScript, /systemctl cat "\$SERVICE_NAME"/, 'dev deploy should inspect the installed unit without sudo')
   assert.match(devDeployScript, /missing the migration ExecStartPre/, 'dev deploy should explain how to upgrade an older unit')
   const migrationPrestartBody = extractFunction(devDeployScript, 'check_migration_prestart')
+  assert.match(
+    migrationPrestartBody,
+    /ExecStartPre=\/usr\/bin\/env APP_ROLE=api ALLOW_DATABASE_MIGRATION=true \/usr\/bin\/node \/opt\/goofish-infrast-v1-dev\/server\/dist\/migrate\.js/,
+    'dev deployment should require an API-scoped migration child process',
+  )
   assert.match(migrationPrestartBody, /if \[\[ "\$REQUIRE_MIGRATION_PRESTART" != "true" \]\]; then\s+return 0\s+fi/, 'optional dev migration pre-start validation should skip successfully')
   assert.doesNotMatch(migrationPrestartBody, /\]\] \|\| return(?:\s|$)/, 'dev migration pre-start validation must not inherit a failed condition status')
   const migrationSkip = spawnSync('bash', ['-c', `set -Eeuo pipefail
@@ -387,7 +395,7 @@ function assertSystemdTemplate() {
   ])
   assert.match(
     devSystemdUnit,
-    /^ExecStartPre=\/usr\/bin\/env ALLOW_DATABASE_MIGRATION=true \/usr\/bin\/node \/opt\/goofish-infrast-v1-dev\/server\/dist\/migrate\.js$/m,
+    /^ExecStartPre=\/usr\/bin\/env APP_ROLE=api ALLOW_DATABASE_MIGRATION=true \/usr\/bin\/node \/opt\/goofish-infrast-v1-dev\/server\/dist\/migrate\.js$/m,
   )
 
   assert.match(workerSystemdUnit, /^User=ntgmc$/m)

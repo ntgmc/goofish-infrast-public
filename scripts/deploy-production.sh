@@ -88,7 +88,7 @@ check_migration_prestart() {
   unit_definition="$(systemctl cat "$SERVICE_NAME")" ||
     fail "cannot inspect installed systemd service: $SERVICE_NAME"
   if ! printf '%s\n' "$unit_definition" |
-    grep -Fq 'ExecStartPre=/usr/bin/env ALLOW_DATABASE_MIGRATION=true /usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/migrate.js'; then
+    grep -Fq 'ExecStartPre=/usr/bin/env APP_ROLE=api ALLOW_DATABASE_MIGRATION=true /usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/migrate.js'; then
     fail "installed $SERVICE_NAME unit is missing the migration ExecStartPre; install deploy/systemd/goofish-infrast-v1-dev.service, run systemctl daemon-reload, and force redeploy"
   fi
 }

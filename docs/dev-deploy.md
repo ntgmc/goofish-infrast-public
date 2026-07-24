@@ -162,12 +162,14 @@ sudo systemctl enable goofish-infrast-v1-dev
 ```
 
 The dev service runs `server/dist/migrate.js` as an `ExecStartPre` hook with the
-explicit `ALLOW_DATABASE_MIGRATION=true` guard. `systemctl restart` stops the old
-API, applies the idempotent schema migration, and starts the production-mode API
-only after migration succeeds. The normal API process retains read-only schema
-validation and never executes DDL. This preserves the existing restricted
-sudoers contract: deployment needs no passwordless `stop` or secondary-unit
-`start` command.
+explicit `APP_ROLE=api` and `ALLOW_DATABASE_MIGRATION=true` guards. The role
+override applies only to the migration child process; the combined API/worker
+main process still starts with `APP_ROLE=all`. `systemctl restart` stops the old
+service, applies the idempotent schema migration, and starts the new artifact
+only after migration succeeds. The normal combined process retains read-only
+schema validation and never executes DDL. This preserves the existing
+restricted sudoers contract: deployment needs no passwordless `stop` or
+secondary-unit `start` command.
 
 For an existing dev deployment whose runtime schema check reports missing
 columns, install the updated service from the same checked-out release and
@@ -204,7 +206,7 @@ Wants=postgresql.service
 [Service]
 WorkingDirectory=/opt/goofish-infrast-v1-dev
 EnvironmentFile=/etc/goofish-infrast-v1/dev.env
-ExecStartPre=/usr/bin/env ALLOW_DATABASE_MIGRATION=true /usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/migrate.js
+ExecStartPre=/usr/bin/env APP_ROLE=api ALLOW_DATABASE_MIGRATION=true /usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/migrate.js
 ExecStart=/usr/bin/node /opt/goofish-infrast-v1-dev/server/dist/all.js
 Restart=always
 RestartSec=5
