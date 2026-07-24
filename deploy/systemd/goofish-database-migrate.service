@@ -1,0 +1,19 @@
+[Unit]
+Description=goofish-infrast-v1 controlled database migration
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=15min
+User=ntgmc
+Group=ntgmc
+WorkingDirectory=/opt/goofish-infrast-v1/migration-candidate
+ExecStart=/usr/bin/env APP_ROLE=api ALLOW_DATABASE_MIGRATION=true /usr/bin/node /opt/goofish-infrast-v1/migration-candidate/server/dist/migrate.js
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/goofish-infrast-v1/backend.env
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
