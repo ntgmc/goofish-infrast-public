@@ -11,6 +11,10 @@ import {
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
 import { grantItemInTransaction, InventoryError } from './inventory-store'
+import {
+  assertInvitationGiftVersionCanBeRetired,
+  assertInvitationItemCanBeDisabled,
+} from './invitation-store'
 
 type CampaignStatus = 'draft' | 'queued' | 'running' | 'paused' | 'completed' | 'cancelled' | 'reversing' | 'reversed'
 
@@ -137,6 +141,7 @@ export async function publishGiftPackVersion(adminUsername: string, versionId: s
 
 export async function retireGiftPackVersion(adminUsername: string, versionId: string): Promise<void> {
   await withTransaction(async (client) => {
+    await assertInvitationGiftVersionCanBeRetired(client, versionId)
     const version = await client.query<{ status: string }>('select status from gift_pack_versions where id = $1 for update', [versionId])
     if (!version.rows[0]) throw new InventoryError('gift_pack_version_missing', '礼包版本不存在。', 404)
     if (version.rows[0].status !== 'published') throw new InventoryError('gift_pack_version_not_published', '只有已发布版本可以退役。', 409)
@@ -152,6 +157,7 @@ export async function updateItemPresentation(
   patch: { name?: unknown; description?: unknown; icon_key?: unknown; issuance_enabled?: unknown },
 ): Promise<void> {
   await withTransaction(async (client) => {
+    if (patch.issuance_enabled === false) await assertInvitationItemCanBeDisabled(client, itemCode)
     const current = await client.query<ItemDefinition>('select * from item_definitions where code = $1 for update', [itemCode])
     if (!current.rows[0]) throw new InventoryError('item_unknown', '道具不存在。', 404)
     const next = {

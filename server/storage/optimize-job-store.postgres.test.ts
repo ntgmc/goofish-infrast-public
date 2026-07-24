@@ -12,6 +12,7 @@ import { emptyWorkspace, getWorkspace, saveWorkspace, updateProfileWorkspaceAtom
 import {
   ensureInvitationCode,
   getRewardBalances,
+  processInvitationSettlementBatch,
   saveInvitationSettings,
   settleInvitationForActivatedUser,
 } from './invitation-store'
@@ -367,16 +368,98 @@ describe('PostgreSQL optimization job admission', () => {
        values ($1, $2, $3, $4, 'registered', now(), now())`,
       [randomUUID(), inviter, invitee, code],
     )
-    await saveInvitationSettings({
+    await saveInvitationSettings('root', {
       rewards: [
-        { recipient: 'inviter', type: 'priority_compute_coupon', quantity: 1, validity_days: 0 },
-        { recipient: 'invitee', type: 'priority_compute_coupon', quantity: 1, validity_days: 30 },
+        { recipient: 'inviter', item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' }, gift_pack_version_id: null },
+        { recipient: 'invitee', item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'relative_days', days: 30 }, gift_pack_version_id: null },
       ],
     })
     await Promise.all(Array.from({ length: 4 }, () => settleInvitationForActivatedUser(invitee)))
     expect((await getRewardBalances(inviter))[0].available).toBe(1)
     expect((await getRewardBalances(invitee))[0].available).toBe(1)
     expect((await query<{ count: string }>('select count(*)::text as count from reward_grants where source_type = $1 and user_id = $2', ['invitation', inviter])).rows[0]?.count).toBe('1')
+  })
+
+  it('counts a multi-item inviter reward group as one daily invitation under concurrency', async () => {
+    const inviterProfileId = await seedProfile()
+    const inviter = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviterProfileId])).rows[0]!.user_id
+    const code = await ensureInvitationCode(inviter)
+    const invitees = await Promise.all([seedProfile(), seedProfile()])
+    const inviteeUsers = await Promise.all(invitees.map(async (profileId) => (
+      (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [profileId])).rows[0]!.user_id
+    )))
+    await saveInvitationSettings('root', {
+      enabled: true,
+      daily_inviter_reward_limit: 1,
+      rewards: [
+        { recipient: 'inviter', item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' }, gift_pack_version_id: null },
+        { recipient: 'inviter', item_code: 'training_diagnosis_coupon', quantity: 2, expiry: { mode: 'never' }, gift_pack_version_id: null },
+        { recipient: 'invitee', item_code: 'reorder_check_coupon', quantity: 1, expiry: { mode: 'never' }, gift_pack_version_id: null },
+      ],
+    })
+    for (const invitee of inviteeUsers) {
+      await query(
+        `insert into invitations (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, updated_at)
+         values ($1, $2, $3, $4, 'registered', now(), now())`,
+        [randomUUID(), inviter, invitee, code],
+      )
+    }
+
+    await Promise.all(inviteeUsers.map((invitee) => settleInvitationForActivatedUser(invitee)))
+
+    const invitations = await query<{ rewarded: string; settled: string }>(
+      `select count(*) filter (where inviter_rewarded_at is not null)::text as rewarded,
+              count(*) filter (where status = 'settled')::text as settled
+         from invitations where inviter_user_id = $1 and invitee_user_id = any($2::text[])`,
+      [inviter, inviteeUsers],
+    )
+    expect(invitations.rows[0]).toEqual({ rewarded: '1', settled: '2' })
+    expect((await query<{ count: string }>(
+      `select count(*)::text as count from reward_grants
+        where user_id = $1 and source_type = 'invitation' and recipient_role = 'inviter'`,
+      [inviter],
+    )).rows[0]?.count).toBe('2')
+    expect((await query<{ count: string }>(
+      `select count(*)::text as count from reward_grants
+        where user_id = any($1::text[]) and source_type = 'invitation' and recipient_role = 'invitee'`,
+      [inviteeUsers],
+    )).rows[0]?.count).toBe('2')
+  })
+
+  it('keeps an activation snapshot while paused and lets the worker settle it after resume', async () => {
+    const inviterProfileId = await seedProfile()
+    const inviter = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviterProfileId])).rows[0]!.user_id
+    const code = await ensureInvitationCode(inviter)
+    const inviteeProfileId = await seedProfile()
+    const invitee = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviteeProfileId])).rows[0]!.user_id
+    await saveInvitationSettings('root', {
+      enabled: false,
+      rewards: [{ recipient: 'inviter', item_code: 'scenario_simulation_coupon', quantity: 1, expiry: { mode: 'relative_days', days: 7 }, gift_pack_version_id: null }],
+    })
+    const invitationId = randomUUID()
+    await query(
+      `insert into invitations (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, updated_at)
+       values ($1, $2, $3, $4, 'registered', now(), now())`,
+      [invitationId, inviter, invitee, code],
+    )
+
+    await settleInvitationForActivatedUser(invitee)
+    expect((await query<{ status: string; settings_snapshot: { enabled: boolean } }>(
+      'select status, settings_snapshot from invitations where id = $1', [invitationId],
+    )).rows[0]).toMatchObject({ status: 'activated', settings_snapshot: { enabled: false } })
+    expect((await query<{ count: string }>('select count(*)::text as count from reward_grants where source_id = $1', [invitationId])).rows[0]?.count).toBe('0')
+
+    await saveInvitationSettings('root', {
+      enabled: true,
+      rewards: [{ recipient: 'inviter', item_code: 'priority_compute_coupon', quantity: 99, expiry: { mode: 'never' }, gift_pack_version_id: null }],
+    })
+    await expect(processInvitationSettlementBatch(10)).resolves.toBeGreaterThanOrEqual(1)
+
+    const grants = await query<{ reward_type: string; original_quantity: number; validity_days: number }>(
+      'select reward_type, original_quantity, validity_days from reward_grants where source_id = $1', [invitationId],
+    )
+    expect(grants.rows).toEqual([{ reward_type: 'scenario_simulation_coupon', original_quantity: 1, validity_days: 7 }])
+    expect((await query<{ status: string }>('select status from invitations where id = $1', [invitationId])).rows[0]?.status).toBe('settled')
   })
 
   it('atomically consumes a priority coupon and refunds it once on terminal failure', async () => {

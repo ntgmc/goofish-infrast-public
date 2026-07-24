@@ -12,7 +12,16 @@ export default async function userInvitationsHandler(req: Request): Promise<Resp
       return jsonResponse({ code, share_url: `/tool/profiles?invite=${encodeURIComponent(code)}` })
     }
     if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
-    return jsonResponse(await getInvitationSummary(auth.user.id))
+    const url = new URL(req.url)
+    const rawLimit = url.searchParams.get('limit')
+    const limit = rawLimit === null ? undefined : Number(rawLimit)
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 50)) {
+      return jsonResponse({ error: '邀请记录数量必须是 1 到 50 之间的整数。', code: 'invalid_limit' }, 400)
+    }
+    return jsonResponse(await getInvitationSummary(auth.user.id, {
+      cursor: url.searchParams.get('cursor'),
+      limit,
+    }))
   } catch (error) {
     if (error instanceof InvitationCodeError) return jsonResponse({ error: error.message, code: error.code }, 400)
     console.error('user invitations error:', error)
