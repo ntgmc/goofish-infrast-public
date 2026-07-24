@@ -1498,6 +1498,20 @@ function memoryOptimizerModule() {
       }
       calculateUpgradeTargetSuggestions() { return [] }
       collectUpgradeTasks() { return [] }
+      simulateUpgradeBatch() {
+        return {
+          suggestions: [],
+          candidateCount: 0,
+          evaluatedCount: 0,
+          primarySimulationCount: 0,
+          primaryElapsedMs: 0,
+          partialCandidateCount: 0,
+          partialEvaluatedCount: 0,
+          partialSimulationCount: 0,
+          partialElapsedMs: 0,
+          cacheHits: 0,
+        }
+      }
       simulateUpgradeTasks() { return [] }
       simulateUpgrades(...args) { return this.simulateUpgradeTasks(...args) }
       _calculateDailyTotalScore() { return 0 }
