@@ -326,6 +326,20 @@ CREATE TABLE IF NOT EXISTS invitations (
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_registered_at ON invitations(inviter_user_id, registered_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_settled_at ON invitations(inviter_user_id, settled_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_invitation_code ON invitations(invitation_code);
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS inviter_rewarded_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_invitations_inviter_registered_cursor
+  ON invitations(inviter_user_id, registered_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_invitations_inviter_rewarded
+  ON invitations(inviter_user_id, inviter_rewarded_at)
+  WHERE inviter_rewarded_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_invitations_pending_settlement
+  ON invitations(activated_at ASC, id ASC)
+  WHERE status = 'activated';
+UPDATE invitations
+   SET inviter_rewarded_at = settled_at
+ WHERE inviter_rewarded_at IS NULL
+   AND settled_at IS NOT NULL
+   AND coalesce(settlement_json->'rewards'->'inviter'->>'applied', '') ~ '^[1-9][0-9]*$';
 
 CREATE TABLE IF NOT EXISTS admin_registration_invitations (
   id TEXT PRIMARY KEY,

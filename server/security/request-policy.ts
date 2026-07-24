@@ -319,7 +319,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/status', route({ GET: none() }, ['profile_id'])],
   ['/api/user/workspace', route({ GET: none(), POST: json('compute', requestSchemas.userWorkspace), PATCH: json('compute', requestSchemas.userWorkspace) }, ['profile_id'])],
   ['/api/user/workspace/free-schedule/confirm', route({ POST: json('standard', requestSchemas.userWorkspace) })],
-  ['/api/user/invitations', route({ GET: none() })],
+  ['/api/user/invitations', route({ GET: none() }, ['cursor', 'limit'])],
   ['/api/user/invitations/code', route({ POST: none() })],
   ['/api/user/rewards', route({ GET: none() })],
   ['/api/user/inventory', route({ GET: none(), POST: json('standard', requestSchemas.inventoryUse) })],

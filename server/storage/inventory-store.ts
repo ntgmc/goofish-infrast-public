@@ -98,6 +98,7 @@ type GrantInput = {
   recipientRole: string
   giftPackVersionId?: string | null
   metadata?: Record<string, unknown>
+  allowHistoricalSnapshot?: boolean
   now?: string
 }
 
@@ -212,8 +213,11 @@ export async function grantItemInTransaction(client: PoolClient, input: GrantInp
     [input.itemCode],
   )
   const item = definition.rows[0]
+  const historicalInvitationSnapshot = input.allowHistoricalSnapshot === true
+    && input.sourceType === 'invitation'
+    && input.metadata?.invitation_snapshot === true
   if (!item) throw new InventoryError('item_unknown', '道具不存在。', 404)
-  if (!item.issuance_enabled) throw new InventoryError('item_issuance_disabled', '该道具当前不可发放。', 409)
+  if (!item.issuance_enabled && !historicalInvitationSnapshot) throw new InventoryError('item_issuance_disabled', '该道具当前不可发放。', 409)
   if (item.kind === 'gift_pack' && !input.giftPackVersionId) {
     throw new InventoryError('gift_pack_version_required', '礼包发放必须指定已发布版本。', 400)
   }
@@ -222,7 +226,9 @@ export async function grantItemInTransaction(client: PoolClient, input: GrantInp
       'select status, item_code from gift_pack_versions where id = $1',
       [input.giftPackVersionId],
     )
-    if (version.rows[0]?.status !== 'published' || version.rows[0]?.item_code !== input.itemCode) {
+    const versionAvailable = version.rows[0]?.status === 'published'
+      || (historicalInvitationSnapshot && version.rows[0]?.status === 'retired')
+    if (!versionAvailable || version.rows[0]?.item_code !== input.itemCode) {
       throw new InventoryError('gift_pack_version_unavailable', '礼包版本不可发放。', 409)
     }
   }
