@@ -17,6 +17,7 @@ const canonicalRedirectNginx = await readFile('deploy/nginx/goofish-canonical-re
 const blueUpstream = await readFile('deploy/nginx/goofish-upstream-blue.conf', 'utf8')
 const greenUpstream = await readFile('deploy/nginx/goofish-upstream-green.conf', 'utf8')
 const systemdUnit = await readFile('deploy/systemd/goofish-infrast-v1@.service', 'utf8')
+const migrationSystemdUnit = await readFile('deploy/systemd/goofish-database-migrate.service', 'utf8')
 const devSystemdUnit = await readFile('deploy/systemd/goofish-infrast-v1-dev.service', 'utf8')
 const workerSystemdUnit = await readFile('deploy/systemd/goofish-optimize-worker@.service', 'utf8')
 const buildRelevance = await readFile('scripts/check-build-relevance.mjs', 'utf8')
@@ -52,6 +53,8 @@ function assertWorkflowProvenance() {
   assert.match(workflow, /ref: \$\{\{ steps\.target\.outputs\.sha \}\}/, 'production deploy should checkout the immutable target SHA')
   assert.match(workflow, /scripts\/deploy-production-atomic\.sh "\$DEPLOY_USER@\$DEPLOY_HOST:\$remote_deploy_script"/, 'workflow should upload the target deployment script')
   assert.match(workflow, /scripts\/deploy-worker-atomic\.sh "\$WORKER_DEPLOY_USER@\$WORKER_DEPLOY_HOST:\$remote_deploy_script"/, 'workflow should upload the target worker deployment script')
+  assert.match(workflow, /MIGRATION_ONLY=true/, 'production workflow should run the controlled migration mode')
+  assert.match(workflow, /MIGRATION_SERVICE_NAME=\$\{DEPLOY_MIGRATION_SERVICE_NAME@Q\}/, 'migration mode should use the configured oneshot service')
   assert.match(workflow, /bash \$\{REMOTE_DEPLOY_SCRIPT@Q\}/, 'SSH command should run the uploaded deployment script')
   assert.match(workflow, /rm -f -- \$\{REMOTE_DEPLOY_SCRIPT@Q\} \$\{REMOTE_ARTIFACT@Q\}/, 'SSH command should clean up temporary deployment inputs')
   assert.match(workflow, /changelog-release\.json/, 'production deploy should extract generated changelog metadata from the verified artifact')
@@ -62,7 +65,7 @@ function assertWorkflowProvenance() {
   assert.match(workflow, /for name in[^\n]*DEPLOY_KNOWN_HOSTS/, 'production deploy should require pinned SSH host keys')
   assert.doesNotMatch(workflow, /ssh-keyscan/, 'production deploy must not trust host keys discovered at runtime')
   assert.match(workflow, /WORKER_DEPLOY_KNOWN_HOSTS/, 'production deploy should require pinned worker host keys')
-  assertOrdered(workflow, ['Deploy verified worker release first', 'Deploy verified API release second', 'Publish successful changelog release'])
+  assertOrdered(workflow, ['Apply controlled database migration first', 'Deploy verified worker release first', 'Deploy verified API release second', 'Publish successful changelog release'])
   assert.doesNotMatch(workflow, /DEPLOY_BRANCH/, 'production workflow must not pass a mutable branch')
   assert.match(devWorkflow, /actions\/download-artifact@/, 'dev deploy should download the Quality Checks artifact')
   assert.match(devWorkflow, /run-id: \$\{\{ steps\.target\.outputs\.run_id \}\}/, 'dev deploy should bind the artifact to a Quality Checks run')
@@ -105,9 +108,10 @@ function assertPrChangelogWorkflow() {
   assert.match(prChangelogWorkflow, /^\s+statuses: write$/m, 'PR changelog recording should publish a merge-gating status')
   assert.match(prChangelogWorkflow, /github\.ref == 'refs\/heads\/main'/, 'trusted changelog workflow code must run from main')
   assert.match(prChangelogWorkflow, /secrets\.DEEPSEEK_API_KEY/, 'PR changelog recording should use the DeepSeek API secret')
-  assert.match(prChangelogWorkflow, /vars\.DEEPSEEK_MODEL \|\| 'deepseek-v4-flash'/, 'PR changelog recording should default to DeepSeek V4 Flash')
+  assert.match(prChangelogWorkflow, /vars\.DEEPSEEK_MODEL \|\| 'deepseek-v4-pro'/, 'PR changelog recording should default to DeepSeek V4 Pro')
   assert.match(prChangelogWorkflow, /node scripts\/record-pr-changelog\.mjs/, 'PR changelog workflow should run the reviewed recording script')
   assert.match(prChangelogScript, /return parsed/, 'PR changelog recording should pass the raw DeepSeek payload to the canonical validator')
+  assert.match(prChangelogScript, /process\.env\.DEEPSEEK_MODEL \?\? 'deepseek-v4-pro'/, 'PR changelog script should share the workflow DeepSeek model default')
   assert.doesNotMatch(prChangelogScript, /return normalizeDeepSeekResult\(parsed\)/, 'PR changelog recording must not normalize the DeepSeek payload twice')
   assert.match(prChangelogScript, /GitHub API 请求失败：\$\{method\} \$\{path\}/, 'GitHub API failures should identify the rejected request')
   assert.match(prChangelogScript, /'message', 'documentation_url', 'status'/, 'GitHub API failures should include safe response details')
@@ -188,6 +192,9 @@ function assertDeploymentScript() {
     /tar -xzf "\$ARTIFACT_PATH"/,
     /release\.json/,
     /check_readiness "\$CANDIDATE_SLOT"/,
+    /MIGRATION_ONLY/,
+    /CANDIDATE_ONLY and MIGRATION_ONLY cannot both be true/,
+    /run_systemctl start "\$MIGRATION_SERVICE_NAME"/,
     /CANDIDATE_ONLY/,
     /run_systemctl reload nginx/,
     /run_systemctl enable "\$\(service_unit "\$CANDIDATE_SLOT"\)"/,
@@ -240,6 +247,10 @@ printf 'migration skip continued\\n'
   const mainFlow = deployScript.slice(deployScript.indexOf('RELEASE_DIR="$RELEASES_DIR/$TARGET_SHA"'))
   assertOrdered(mainFlow, [
     'build_release',
+    'if [[ "$MIGRATION_ONLY" == "true" ]]',
+    'run_systemctl start "$MIGRATION_SERVICE_NAME"',
+    'exit 0',
+    'write_upstream_configs',
     'run_systemctl restart "$(service_unit "$CANDIDATE_SLOT")"',
     'check_readiness "$CANDIDATE_SLOT"',
     'if [[ "$CANDIDATE_ONLY" == "true" ]]',
@@ -289,6 +300,10 @@ function assertWorkerDeploymentScript() {
     assert.match(workerDeployScript, contract)
   }
   assert.doesNotMatch(workerDeployScript, /npm run build/, 'worker deploy must not build on the server')
+  assert.match(workerDeployScript, /--connect-timeout "\$HEALTH_CONNECT_TIMEOUT_SECONDS"/, 'worker readiness should bound connection time')
+  assert.match(workerDeployScript, /--max-time "\$HEALTH_REQUEST_TIMEOUT_SECONDS"/, 'worker readiness should bound total request time')
+  assert.match(workerDeployScript, /last worker readiness (?:transport error|response)/, 'worker readiness should report its final diagnostic')
+  assert.match(workerDeployScript, /run_journalctl --unit/, 'worker readiness failures should include unit journal output')
   assert.doesNotMatch(workerDeployScript, /git restore/, 'worker deploy must not restore generated files')
   assert.doesNotMatch(
     workerDeployScript,
@@ -377,6 +392,16 @@ function assertSystemdTemplate() {
   assert.match(systemdUnit, /KillSignal=SIGTERM/)
   assert.match(systemdUnit, /TimeoutStopSec=75s/)
 
+  assert.match(migrationSystemdUnit, /^Type=oneshot$/m)
+  assert.match(migrationSystemdUnit, /^TimeoutStartSec=15min$/m)
+  assert.match(migrationSystemdUnit, /^User=ntgmc$/m)
+  assert.match(migrationSystemdUnit, /^Group=ntgmc$/m)
+  assert.match(migrationSystemdUnit, /WorkingDirectory=\/opt\/goofish-infrast-v1\/migration-candidate/)
+  assert.match(migrationSystemdUnit, /APP_ROLE=api ALLOW_DATABASE_MIGRATION=true/)
+  assert.match(migrationSystemdUnit, /server\/dist\/migrate\.js/)
+  assert.match(migrationSystemdUnit, /EnvironmentFile=\/etc\/goofish-infrast-v1\/backend\.env/)
+  assert.match(migrationSystemdUnit, /^NoNewPrivileges=true$/m)
+
   assert.match(devSystemdUnit, /WorkingDirectory=\/opt\/goofish-infrast-v1-dev/)
   assert.match(devSystemdUnit, /Environment=NODE_ENV=production/)
   assert.match(devSystemdUnit, /^ExecStart=\/usr\/bin\/node \/opt\/goofish-infrast-v1-dev\/server\/dist\/all\.js$/m)
@@ -440,6 +465,8 @@ function assertDeploymentDocumentation() {
     'development deployment should run guarded migration through the existing service restart',
   )
   assert.ok(productionDocs.includes('[worker-deploy.md](worker-deploy.md)'), 'production docs should link the worker runbook')
+  assert.ok(productionDocs.includes('goofish-database-migrate.service'), 'production docs should install the controlled migration unit')
+  assert.ok(productionDocs.includes('MIGRATION_ONLY=true'), 'production docs should explain the migration-only deployment phase')
   for (const expected of [
     '/opt/goofish-infrast-v1/releases/',
     '/opt/goofish-infrast-v1/current/dist',
@@ -461,6 +488,7 @@ function assertDeploymentDocumentation() {
     'Worker deployment accepts the same immutable artifact contract',
     '/usr/bin/systemctl disable goofish-optimize-worker@blue.service',
     '/usr/bin/systemctl disable --now goofish-optimize-worker@blue.service',
+    '/usr/bin/journalctl --unit goofish-optimize-worker@blue.service --no-pager --lines=80',
     'sudo -n -l',
   ]) {
     assert.ok(workerDocs.includes(expected), `worker documentation should include ${expected}`)

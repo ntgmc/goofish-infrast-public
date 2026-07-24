@@ -5,6 +5,7 @@ set -Eeuo pipefail
 TARGET_SHA="${TARGET_SHA:-}"
 ALLOW_REDEPLOY="${ALLOW_REDEPLOY:-false}"
 CANDIDATE_ONLY="${CANDIDATE_ONLY:-false}"
+MIGRATION_ONLY="${MIGRATION_ONLY:-false}"
 DEPLOY_ROOT="${DEPLOY_ROOT:-/opt/goofish-infrast-v1}"
 REPO_DIR="${REPO_DIR:-$DEPLOY_ROOT/repository}"
 RELEASES_DIR="${RELEASES_DIR:-$DEPLOY_ROOT/releases}"
@@ -13,9 +14,11 @@ STATE_DIR="${STATE_DIR:-$DEPLOY_ROOT/state}"
 NGINX_STATE_DIR="${NGINX_STATE_DIR:-$DEPLOY_ROOT/nginx}"
 CURRENT_LINK="${CURRENT_LINK:-$DEPLOY_ROOT/current}"
 PREVIOUS_LINK="${PREVIOUS_LINK:-$DEPLOY_ROOT/previous}"
+MIGRATION_LINK="${MIGRATION_LINK:-$DEPLOY_ROOT/migration-candidate}"
 ACTIVE_SLOT_FILE="${ACTIVE_SLOT_FILE:-$STATE_DIR/active-slot}"
 ACTIVE_UPSTREAM_LINK="${ACTIVE_UPSTREAM_LINK:-$NGINX_STATE_DIR/active-upstream.conf}"
 SERVICE_NAME="${SERVICE_NAME:-goofish-infrast-v1}"
+MIGRATION_SERVICE_NAME="${MIGRATION_SERVICE_NAME:-goofish-database-migrate.service}"
 PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 BLUE_PORT="${BLUE_PORT:-3000}"
 GREEN_PORT="${GREEN_PORT:-3002}"
@@ -146,6 +149,7 @@ verify_release() {
   local release_dir="$1"
   [[ -s "$release_dir/dist/index.html" ]] || return 1
   [[ -s "$release_dir/server/dist/index.js" ]] || return 1
+  [[ -s "$release_dir/server/dist/migrate.js" ]] || return 1
   [[ -s "$release_dir/build-manifest.json" ]] || return 1
   [[ -s "$release_dir/release.json" ]] || return 1
   RELEASE_ROOT="$release_dir" node "$release_dir/scripts/release-artifact.mjs" verify --sha "$TARGET_SHA" || return 1
@@ -327,6 +331,8 @@ trap on_error ERR
 TARGET_SHA="${TARGET_SHA,,}"
 [[ "$ALLOW_REDEPLOY" == "true" || "$ALLOW_REDEPLOY" == "false" ]] || fail "ALLOW_REDEPLOY must be true or false"
 [[ "$CANDIDATE_ONLY" == "true" || "$CANDIDATE_ONLY" == "false" ]] || fail "CANDIDATE_ONLY must be true or false"
+[[ "$MIGRATION_ONLY" == "true" || "$MIGRATION_ONLY" == "false" ]] || fail "MIGRATION_ONLY must be true or false"
+[[ "$CANDIDATE_ONLY" != "true" || "$MIGRATION_ONLY" != "true" ]] || fail "CANDIDATE_ONLY and MIGRATION_ONLY cannot both be true"
 [[ "$BLUE_PORT" =~ ^[0-9]{1,5}$ && "$GREEN_PORT" =~ ^[0-9]{1,5}$ ]] || fail "slot ports must be numeric"
 (( BLUE_PORT >= 1 && BLUE_PORT <= 65535 && GREEN_PORT >= 1 && GREEN_PORT <= 65535 )) || fail "slot ports must be between 1 and 65535"
 [[ "$BLUE_PORT" != "$GREEN_PORT" ]] || fail "blue and green ports must differ"
@@ -334,6 +340,7 @@ TARGET_SHA="${TARGET_SHA,,}"
 [[ "$PUBLIC_SMOKE_RETRIES" =~ ^[1-9][0-9]*$ && "$PUBLIC_SMOKE_DELAY_SECONDS" =~ ^[0-9]+$ ]] || fail "public smoke retry settings must be non-negative integers"
 [[ "$RETAIN_RELEASES" =~ ^[0-9]+$ ]] || fail "RETAIN_RELEASES must be a non-negative integer"
 [[ "$SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]] || fail "SERVICE_NAME contains unsafe characters"
+[[ "$MIGRATION_SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+\.service$ ]] || fail "MIGRATION_SERVICE_NAME contains unsafe characters"
 [[ -n "$PUBLIC_BASE_URL" ]] || fail "PUBLIC_BASE_URL is required"
 [[ -f "$ARTIFACT_PATH" ]] || fail "verified release artifact is required"
 [[ "$ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]] || fail "ARTIFACT_SHA256 must be a SHA-256 digest"
@@ -363,7 +370,7 @@ git -C "$REPO_DIR" merge-base --is-ancestor "$TARGET_SHA" "$REMOTE/$BLUE_GREEN_B
 
 if [[ -e "$CURRENT_LINK" ]]; then
   current_release="$(realpath -e "$CURRENT_LINK")"
-  if [[ "$(basename "$current_release")" == "$TARGET_SHA" && "$ALLOW_REDEPLOY" != "true" ]]; then
+  if [[ "$(basename "$current_release")" == "$TARGET_SHA" && "$ALLOW_REDEPLOY" != "true" && "$MIGRATION_ONLY" != "true" ]]; then
     log "release $TARGET_SHA is already active"
     rm -f -- "$ARTIFACT_PATH"
     exit 0
@@ -373,6 +380,20 @@ fi
 RELEASE_DIR="$RELEASES_DIR/$TARGET_SHA"
 PHASE="build"
 build_release
+
+if [[ "$MIGRATION_ONLY" == "true" ]]; then
+  PHASE="database-migration"
+  log "running controlled database migration for $TARGET_SHA"
+  atomic_link "releases/$TARGET_SHA" "$MIGRATION_LINK"
+  if ! run_systemctl start "$MIGRATION_SERVICE_NAME"; then
+    run_systemctl status "$MIGRATION_SERVICE_NAME" --no-pager --lines=80 || true
+    fail "controlled database migration failed"
+  fi
+  rm -f -- "$ARTIFACT_PATH"
+  log "controlled database migration complete for $TARGET_SHA"
+  exit 0
+fi
+
 write_upstream_configs
 
 if [[ -s "$ACTIVE_SLOT_FILE" ]]; then

@@ -92,7 +92,9 @@ Each completed build therefore lives at
 
 ## Database schema ownership
 
-Production API and Worker processes perform a read-only catalog compatibility check at startup and never replay schema DDL or data backfills. The check is scoped to the process role, so a dedicated Worker validates the shared and optimization tables it can access without depending on API-only tables such as `feature_settings`. This prevents blue/green candidates from taking `AccessExclusiveLock` while the active API or Worker is writing the same tables. Apply schema changes as a controlled database migration before deploying a release that requires them; a missing runtime table or column required by that role must fail readiness instead of triggering an automatic migration. Development and test processes retain automatic schema setup for local and integration-test databases.
+Production API and Worker processes perform a read-only catalog compatibility check at startup and never replay schema DDL or data backfills. The check is scoped to the process role, so a dedicated Worker validates the shared and optimization tables it can access without depending on API-only tables such as `feature_settings`. This prevents blue/green candidates from taking `AccessExclusiveLock` while the active API or Worker is writing the same tables. `Deploy Production` applies the target release's controlled migration through `goofish-database-migrate.service` before starting either candidate. A missing runtime table or column required by a role must still fail readiness instead of triggering migration inside that runtime process. Development and test processes retain automatic schema setup for local and integration-test databases.
+
+The workflow invokes `scripts/deploy-production-atomic.sh` with `MIGRATION_ONLY=true`. That mode verifies and publishes the immutable release, updates only the `migration-candidate` link, runs the guarded oneshot, and exits without starting an API slot or changing Nginx. Migrations must remain forward-compatible with the currently active API and Worker because database changes commit before either service is cut over. A later deployment failure does not roll back schema or destructive data backfills.
 
 Transient validation failures are not cached permanently. The next request retries validation, while a successful validation is cached for the lifetime of the process.
 
@@ -127,10 +129,11 @@ ready and Nginx has switched successfully.
    checkout would invalidate the legacy unit path, update the legacy unit to the
    `repository` path and verify it before continuing.
 
-2. Install the blue/green unit and slot port files:
+2. Install the blue/green unit, controlled migration unit, and slot port files:
 
    ```bash
    sudo install -m 0644 deploy/systemd/goofish-infrast-v1@.service /etc/systemd/system/goofish-infrast-v1@.service
+   sudo install -m 0644 deploy/systemd/goofish-database-migrate.service /etc/systemd/system/goofish-database-migrate.service
    sudo install -d -m 0750 /etc/goofish-infrast-v1
    sudo install -m 0644 deploy/systemd/blue.env /etc/goofish-infrast-v1/blue.env
    sudo install -m 0644 deploy/systemd/green.env /etc/goofish-infrast-v1/green.env
@@ -237,6 +240,7 @@ ready and Nginx has switched successfully.
    | `DEPLOY_ROOT` | `/opt/goofish-infrast-v1` |
    | `DEPLOY_REPO_DIR` | `/opt/goofish-infrast-v1/repository` |
    | `DEPLOY_SERVICE_NAME` | `goofish-infrast-v1` |
+   | `DEPLOY_MIGRATION_SERVICE_NAME` | `goofish-database-migrate.service` |
    | `DEPLOY_PUBLIC_BASE_URL` | `https://maatool.com` |
    | `DEPLOY_BLUE_PORT` | `3000` |
    | `DEPLOY_GREEN_PORT` | `3002` |
@@ -284,16 +288,20 @@ ready and Nginx has switched successfully.
 4. Write `release.json`, preserving both CI build provenance and deployment run
    provenance, then atomically move the worktree to
    `releases/<sha>`.
-5. Point the inactive slot at the release, restart only that slot, and poll
+5. Point `migration-candidate` at the verified release and run the guarded
+   migration oneshot. The workflow stops here if migration fails, before a new
+   Worker or API starts.
+6. Deploy and verify the dedicated Worker candidate against the migrated schema.
+7. Point the inactive API slot at the release, restart only that slot, and poll
    `/api/health/ready` for `ok=true` and `storage.type=postgres`.
-6. Validate Nginx, atomically update `current`, `previous`, the active upstream
+8. Validate Nginx, atomically update `current`, `previous`, the active upstream
    and active-slot state, validate again, then reload Nginx.
-7. Run the public HTTPS smoke test. Only after it passes is the candidate slot
+9. Run the public HTTPS smoke test. Only after it passes is the candidate slot
    enabled for boot and the old slot disabled/stopped through its 75-second
    graceful-drain policy.
-8. Keep every referenced release plus the five most recent releases; remove
+10. Keep every referenced release plus the five most recent releases; remove
    only unreferenced older worktrees after a successful deployment.
-9. After both services are live, publish the SHA-bound changelog record as the
+11. After both services are live, publish the SHA-bound changelog record as the
    annotated version tag and GitHub Release; this is the final confirmation that
    the build is publicly released.
 
@@ -344,10 +352,13 @@ still must belong to main and have successful Quality Checks.
 
 ## Least-privilege operations
 
-The deployment account needs passwordless access only to the two slot units,
-Nginx validation, and Nginx reload. Adapt command paths to the server:
+The deployment account needs passwordless access only to the controlled
+migration oneshot, the two slot units, Nginx validation, and Nginx reload.
+Adapt command paths to the server:
 
 ```sudoers
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl start goofish-database-migrate.service
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl status goofish-database-migrate.service --no-pager --lines=80
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart goofish-infrast-v1@blue.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart goofish-infrast-v1@green.service
 deploy ALL=(root) NOPASSWD: /usr/bin/systemctl stop goofish-infrast-v1@blue.service
