@@ -104,6 +104,7 @@ function assertPrChangelogWorkflow() {
   assert.match(prChangelogWorkflow, /^\s+statuses: write$/m, 'PR changelog recording should publish a merge-gating status')
   assert.match(prChangelogWorkflow, /github\.ref == 'refs\/heads\/main'/, 'trusted changelog workflow code must run from main')
   assert.match(prChangelogWorkflow, /secrets\.DEEPSEEK_API_KEY/, 'PR changelog recording should use the DeepSeek API secret')
+  assert.match(prChangelogWorkflow, /vars\.DEEPSEEK_MODEL \|\| 'deepseek-v4-flash'/, 'PR changelog recording should default to DeepSeek V4 Flash')
   assert.match(prChangelogWorkflow, /node scripts\/record-pr-changelog\.mjs/, 'PR changelog workflow should run the reviewed recording script')
 }
 
