@@ -6604,6 +6604,30 @@
         },
         {
           "combo": [
+            "机械师/2"
+          ],
+          "efficiency": 40,
+          "product": [
+            "Battle Record"
+          ],
+          "note": "30%-40%；单次连续工作达到12小时后生产力+10%",
+          "priority": 4080,
+          "stable_position_operators": [
+            "机械师"
+          ],
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-MFG-0136",
+              "hash": "sha256:67c92d3cf977770cda49e8f3bc38096a71be974117ca665b7f7dbd85b9b188da"
+            },
+            {
+              "id": "PRTS-MFG-0695",
+              "hash": "sha256:6f515c8dadbc904dcc642f6df1e02bbbad6b31e497fd15bc6c2309704c7288fb"
+            }
+          ]
+        },
+        {
+          "combo": [
             "清流/1"
           ],
           "efficiency": 40,
@@ -7049,6 +7073,7 @@
         {
           "combo": [
             "Castle-3",
+            "机械师",
             "怒潮凛冬",
             "白雪/1",
             "红豆",
@@ -7064,7 +7089,7 @@
           "skill_rule_refs": [
             {
               "id": "PRTS-MFG-0136",
-              "hash": "sha256:8a70374241b41c87ce0630e5f47f92f8480fcc77ae33b96ef1dcecb9c1ba28da"
+              "hash": "sha256:67c92d3cf977770cda49e8f3bc38096a71be974117ca665b7f7dbd85b9b188da"
             },
             {
               "id": "PRTS-MFG-0221",
