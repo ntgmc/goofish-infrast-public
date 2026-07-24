@@ -217,6 +217,11 @@ function assertDeploymentScript() {
   assert.match(devDeployScript, /systemctl cat "\$SERVICE_NAME"/, 'dev deploy should inspect the installed unit without sudo')
   assert.match(devDeployScript, /missing the migration ExecStartPre/, 'dev deploy should explain how to upgrade an older unit')
   const migrationPrestartBody = extractFunction(devDeployScript, 'check_migration_prestart')
+  assert.match(
+    migrationPrestartBody,
+    /ExecStartPre=\/usr\/bin\/env APP_ROLE=api ALLOW_DATABASE_MIGRATION=true \/usr\/bin\/node \/opt\/goofish-infrast-v1-dev\/server\/dist\/migrate\.js/,
+    'dev deployment should require an API-scoped migration child process',
+  )
   assert.match(migrationPrestartBody, /if \[\[ "\$REQUIRE_MIGRATION_PRESTART" != "true" \]\]; then\s+return 0\s+fi/, 'optional dev migration pre-start validation should skip successfully')
   assert.doesNotMatch(migrationPrestartBody, /\]\] \|\| return(?:\s|$)/, 'dev migration pre-start validation must not inherit a failed condition status')
   const migrationSkip = spawnSync('bash', ['-c', `set -Eeuo pipefail
@@ -390,7 +395,7 @@ function assertSystemdTemplate() {
   ])
   assert.match(
     devSystemdUnit,
-    /^ExecStartPre=\/usr\/bin\/env ALLOW_DATABASE_MIGRATION=true \/usr\/bin\/node \/opt\/goofish-infrast-v1-dev\/server\/dist\/migrate\.js$/m,
+    /^ExecStartPre=\/usr\/bin\/env APP_ROLE=api ALLOW_DATABASE_MIGRATION=true \/usr\/bin\/node \/opt\/goofish-infrast-v1-dev\/server\/dist\/migrate\.js$/m,
   )
 
   assert.match(workerSystemdUnit, /^User=ntgmc$/m)
