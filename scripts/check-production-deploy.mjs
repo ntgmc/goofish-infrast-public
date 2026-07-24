@@ -7,6 +7,7 @@ const devWorkflow = await readFile('.github/workflows/deploy-dev.yml', 'utf8')
 const qualityChecksWorkflow = normalizeLineEndings(await readFile('.github/workflows/quality-checks.yml', 'utf8'))
 const securityAnalysisWorkflow = await readFile('.github/workflows/security-analysis.yml', 'utf8')
 const prChangelogWorkflow = normalizeLineEndings(await readFile('.github/workflows/record-pr-changelog.yml', 'utf8'))
+const prChangelogScript = normalizeLineEndings(await readFile('scripts/record-pr-changelog.mjs', 'utf8'))
 const deployScript = await readFile('scripts/deploy-production-atomic.sh', 'utf8')
 const workerDeployScript = await readFile('scripts/deploy-worker-atomic.sh', 'utf8')
 const devDeployScript = await readFile('scripts/deploy-production.sh', 'utf8')
@@ -106,6 +107,8 @@ function assertPrChangelogWorkflow() {
   assert.match(prChangelogWorkflow, /secrets\.DEEPSEEK_API_KEY/, 'PR changelog recording should use the DeepSeek API secret')
   assert.match(prChangelogWorkflow, /vars\.DEEPSEEK_MODEL \|\| 'deepseek-v4-flash'/, 'PR changelog recording should default to DeepSeek V4 Flash')
   assert.match(prChangelogWorkflow, /node scripts\/record-pr-changelog\.mjs/, 'PR changelog workflow should run the reviewed recording script')
+  assert.match(prChangelogScript, /return parsed/, 'PR changelog recording should pass the raw DeepSeek payload to the canonical validator')
+  assert.doesNotMatch(prChangelogScript, /return normalizeDeepSeekResult\(parsed\)/, 'PR changelog recording must not normalize the DeepSeek payload twice')
 }
 
 function assertQualityChecksImmutability() {
