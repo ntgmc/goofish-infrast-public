@@ -851,7 +851,7 @@ SET reference_type = coalesce(reference_type, 'optimization_job'),
     reference_id = coalesce(reference_id, optimization_job_id),
     status = case
       when status = 'consumed' and exists (
-        select 1 from optimization_jobs job
+        select 1 from optimize_jobs job
         where job.id = reward_consumptions.optimization_job_id
           and job.status in ('queued', 'running')
       ) then 'reserved'
@@ -860,7 +860,7 @@ SET reference_type = coalesce(reference_type, 'optimization_job'),
     end,
     committed_at = case
       when status = 'consumed' and not exists (
-        select 1 from optimization_jobs job
+        select 1 from optimize_jobs job
         where job.id = reward_consumptions.optimization_job_id
           and job.status in ('queued', 'running')
       ) then coalesce(committed_at, consumed_at)
