@@ -11,8 +11,10 @@ import {
   parseGitLog,
   renderGeneratedModule,
   renderReleaseNotes,
+  selectPublicChanges,
   validateChangelogEnvelope,
 } from './changelog-lib.mjs'
+import { findTrustedPrChangelogPayload, flattenPrChangelogChanges } from './pr-changelog-lib.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const buildMetaPath = resolve(root, 'src/lib/.generated/build-meta.ts')
@@ -28,13 +30,14 @@ const history = await loadReleaseHistory()
 const previousRelease = candidate ? findPreviousRelease(history, targetSha, releaseVersion) : null
 const previousTargetSha = candidate ? resolvePreviousTargetSha(previousRelease) : null
 const commits = candidate && previousTargetSha ? readCommits(previousTargetSha, targetSha) : []
+const changes = candidate && previousTargetSha ? await resolvePublicChanges(commits) : []
 const release = candidate
   ? createReleaseRecord({
     version: releaseVersion,
     targetSha,
     previousTargetSha,
     releasedAt: buildMeta.generated_at,
-    commits,
+    changes,
   })
   : null
 const envelope = createChangelogEnvelope(candidate, release)
@@ -107,6 +110,68 @@ function readCommits(fromSha, toSha) {
 
   const output = runGit(['log', `${fromSha}..${toSha}`, '--format=%H%x1f%s%x1f%b%x1e'])
   return parseGitLog(output)
+}
+
+async function resolvePublicChanges(commits) {
+  const repository = String(process.env.GITHUB_REPOSITORY ?? '').trim()
+  const token = String(process.env.GITHUB_TOKEN ?? '').trim()
+  if (!repository || !token) throw new Error('production PR changelog generation requires GITHUB_REPOSITORY and GITHUB_TOKEN')
+
+  const apiUrl = String(process.env.GITHUB_API_URL ?? 'https://api.github.com').replace(/\/$/, '')
+  const changelogBotLogin = String(process.env.CHANGELOG_BOT_LOGIN ?? 'github-actions[bot]').trim()
+  if (!changelogBotLogin) throw new Error('CHANGELOG_BOT_LOGIN must not be empty')
+  const pullRequestsByNumber = new Map()
+
+  for (const commit of commits) {
+    const pullRequests = await requestJson(
+      `${apiUrl}/repos/${repository}/commits/${encodeURIComponent(commit.sha)}/pulls?per_page=100`,
+      token,
+    )
+    if (!Array.isArray(pullRequests)) throw new Error('GitHub associated pull requests API returned an unexpected payload')
+
+    for (const pullRequest of pullRequests) {
+      if (!pullRequest?.number || !pullRequest.merged_at || pullRequest.base?.ref !== 'main') continue
+      const entry = pullRequestsByNumber.get(pullRequest.number) ?? { commitShas: new Set() }
+      entry.commitShas.add(commit.sha)
+      pullRequestsByNumber.set(pullRequest.number, entry)
+    }
+  }
+
+  const recordedChanges = []
+  const handledCommitShas = new Set()
+  for (const [pullRequestNumber, entry] of pullRequestsByNumber) {
+    const pullRequest = await requestJson(`${apiUrl}/repos/${repository}/pulls/${pullRequestNumber}`, token)
+    const comments = await readIssueComments(apiUrl, repository, pullRequestNumber, token)
+    const payload = findTrustedPrChangelogPayload(comments, changelogBotLogin)
+    if (!payload) continue
+    if (payload.pull_request !== pullRequestNumber) {
+      throw new Error(`PR #${pullRequestNumber} changelog payload references PR #${payload.pull_request}`)
+    }
+    if (payload.head_sha !== String(pullRequest.head?.sha ?? '').toLowerCase()) {
+      throw new Error(`PR #${pullRequestNumber} changelog payload is stale for the merged head SHA`)
+    }
+
+    recordedChanges.push(...flattenPrChangelogChanges(payload))
+    for (const sha of entry.commitShas) handledCommitShas.add(sha)
+    console.log(`[generate-changelog] using recorded Chinese PR summary for #${pullRequestNumber}`)
+  }
+
+  const fallbackCommits = commits.filter((commit) => !handledCommitShas.has(commit.sha))
+  return [...recordedChanges, ...selectPublicChanges(fallbackCommits)]
+}
+
+async function readIssueComments(apiUrl, repository, pullRequestNumber, token) {
+  const comments = []
+  for (let page = 1; page <= 100; page += 1) {
+    const batch = await requestJson(
+      `${apiUrl}/repos/${repository}/issues/${pullRequestNumber}/comments?per_page=100&page=${page}`,
+      token,
+    )
+    if (!Array.isArray(batch)) throw new Error('GitHub issue comments API returned an unexpected payload')
+    comments.push(...batch)
+    if (batch.length < 100) break
+  }
+  return comments
 }
 
 function resolveReleaseVersion(meta) {

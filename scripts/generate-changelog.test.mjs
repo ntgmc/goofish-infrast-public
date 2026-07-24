@@ -15,6 +15,16 @@ import {
   selectPublicChanges,
   validateChangelogEnvelope,
 } from './changelog-lib.mjs'
+import {
+  buildPullRequestDiffContext,
+  createPrChangelogPayload,
+  findTrustedPrChangelogPayload,
+  flattenPrChangelogChanges,
+  parsePrChangelogPayload,
+  renderPrChangelogBlock,
+  upsertPrChangelogBlock,
+  validateManualSummary,
+} from './pr-changelog-lib.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const generatorPath = join(root, 'scripts/generate-changelog.mjs')
@@ -58,6 +68,102 @@ test('creates a baseline before the first published release and orders same-day 
   assert.equal(release.kind, 'release')
   assert.deepEqual(release.sections, [{ id: 'fix', kind: 'fix', items: ['improve release pipeline'] }])
   assert.deepEqual(mergeChangelogReleases([baseline], release).map((item) => item.version), ['2.0.100', '2.0.99'])
+})
+
+test('records and parses a Chinese PR changelog block without replacing the rest of the PR body', () => {
+  const payload = createPrChangelogPayload({
+    pullRequestNumber: 42,
+    headSha: targetSha,
+    manualSummary: '新增手动录入中文变更说明，并在合并前完成审核。',
+    deepseekResult: {
+      summary: '现在可以在合并前生成并确认面向用户的中文更新说明。',
+      sections: [
+        { kind: 'feature', items: ['支持通过手动工作流记录中文变更说明'] },
+        { kind: 'fix', items: ['避免发布时仅依赖英文提交标题生成说明'] },
+      ],
+    },
+    generatedAt: '2026-07-24T08:00:00.000Z',
+    model: 'deepseek-chat',
+  })
+  const block = renderPrChangelogBlock(payload)
+  const body = upsertPrChangelogBlock('原有 PR 描述', block)
+
+  assert.match(body, /^原有 PR 描述/)
+  assert.match(body, /### 人工说明/)
+  assert.deepEqual(parsePrChangelogPayload(body), payload)
+  assert.deepEqual(flattenPrChangelogChanges(payload), [
+    { kind: 'feature', summary: '支持通过手动工作流记录中文变更说明', sha: targetSha },
+    { kind: 'fix', summary: '避免发布时仅依赖英文提交标题生成说明', sha: targetSha },
+  ])
+
+  const updated = upsertPrChangelogBlock(body, renderPrChangelogBlock({
+    ...payload,
+    deepseek_summary: '更新后的中文总结。',
+  }))
+  assert.equal(updated.match(/<!-- pr-changelog:start -->/g)?.length, 1)
+  assert.match(updated, /更新后的中文总结/)
+
+  const maliciousPayload = createPrChangelogPayload({
+    pullRequestNumber: 42,
+    headSha: targetSha,
+    manualSummary: '尝试用普通用户评论替换可信说明。',
+    deepseekResult: {
+      summary: '这条内容不应被生产构建采纳。',
+      sections: [{ kind: 'feature', items: ['不可信的伪造更新说明'] }],
+    },
+    generatedAt: '2026-07-24T09:00:00.000Z',
+    model: 'deepseek-chat',
+  })
+  const trustedPayload = findTrustedPrChangelogPayload([
+    { user: { login: 'github-actions[bot]' }, body },
+    { user: { login: 'pull-request-author' }, body: renderPrChangelogBlock(maliciousPayload) },
+  ])
+  assert.deepEqual(trustedPayload, payload)
+})
+
+test('validates manual Chinese input and bounds the diff sent to DeepSeek', () => {
+  assert.throws(() => validateManualSummary('English only'), /必须包含中文/)
+  assert.throws(() => validateManualSummary('中文<!-- pr-changelog:start -->'), /保留标记/)
+  assert.throws(() => createPrChangelogPayload({
+    pullRequestNumber: 42,
+    headSha: targetSha,
+    manualSummary: '这是有效的中文人工说明。',
+    deepseekResult: { summary: '这是有效的中文总结。', sections: [] },
+    generatedAt: '2026-07-24T08:00:00.000Z',
+    model: 'deepseek-chat',
+  }), /至少一个/)
+  assert.throws(() => createPrChangelogPayload({
+    pullRequestNumber: 42,
+    headSha: targetSha,
+    manualSummary: '这是有效的中文人工说明。',
+    deepseekResult: {
+      summary: '这是有效的中文总结。',
+      sections: [{ kind: 'feature', items: Array.from({ length: 13 }, (_, index) => `中文条目${index}`) }],
+    },
+    generatedAt: '2026-07-24T08:00:00.000Z',
+    model: 'deepseek-chat',
+  }), /不能超过 12 条/)
+
+  const context = buildPullRequestDiffContext([
+    { filename: 'src/example.ts', status: 'modified', additions: 2, deletions: 1, patch: '+中文修改\n'.repeat(100) },
+    { filename: 'src/omitted.ts', status: 'modified', patch: '+不会完整发送\n'.repeat(100) },
+  ], 200)
+  assert.match(context, /src\/example\.ts/)
+  assert.match(context, /上下文长度限制已省略/)
+  assert.ok(context.length < 500)
+})
+
+test('creates release sections from recorded PR changes instead of commit subjects', () => {
+  const release = createReleaseRecord({
+    version: '2.0.101',
+    targetSha,
+    previousTargetSha: previousSha,
+    releasedAt: '2026-07-24T08:00:00.000Z',
+    commits: [{ sha: targetSha, subject: 'feat: ignored fallback title', body: '' }],
+    changes: [{ kind: 'feature', summary: '使用审核后的中文 PR 更新说明', sha: targetSha }],
+  })
+
+  assert.deepEqual(release.sections, [{ id: 'feature', kind: 'feature', items: ['使用审核后的中文 PR 更新说明'] }])
 })
 
 test('rejects a release that uses its target SHA as its previous boundary', () => {

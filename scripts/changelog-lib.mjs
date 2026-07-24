@@ -40,7 +40,7 @@ export function selectPublicChanges(commits) {
   })
 }
 
-export function createReleaseRecord({ version, targetSha, previousTargetSha = null, releasedAt, commits = [] }) {
+export function createReleaseRecord({ version, targetSha, previousTargetSha = null, releasedAt, commits = [], changes = null }) {
   const normalizedVersion = normalizeVersion(version)
   const normalizedTargetSha = normalizeSha(targetSha)
   const normalizedPreviousSha = previousTargetSha ? normalizeSha(previousTargetSha) : null
@@ -58,7 +58,7 @@ export function createReleaseRecord({ version, targetSha, previousTargetSha = nu
     targetSha: normalizedTargetSha,
     previousTargetSha: normalizedPreviousSha,
     kind,
-    sections: normalizedPreviousSha ? groupChanges(selectPublicChanges(commits)) : [],
+    sections: normalizedPreviousSha ? groupChanges(changes === null ? selectPublicChanges(commits) : normalizePublicChanges(changes)) : [],
   }
 }
 
@@ -215,6 +215,20 @@ function groupChanges(changes) {
   return SECTION_ORDER.flatMap((kind) => {
     const items = grouped.get(kind)
     return items?.length ? [{ id: kind, kind, items }] : []
+  })
+}
+
+function normalizePublicChanges(changes) {
+  if (!Array.isArray(changes)) throw new Error('changelog changes must be an array')
+  return changes.map((change) => {
+    if (!isRecord(change) || !SECTION_ORDER.includes(change.kind)) throw new Error('invalid changelog change kind')
+    const summary = String(change.summary ?? '').trim()
+    if (!summary) throw new Error('changelog change summary is required')
+    return {
+      kind: change.kind,
+      summary,
+      sha: change.sha ? normalizeSha(change.sha) : null,
+    }
   })
 }
 
