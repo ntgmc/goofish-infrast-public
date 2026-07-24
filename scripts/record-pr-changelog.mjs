@@ -4,7 +4,6 @@ import {
   buildPullRequestDiffContext,
   createPrChangelogPayload,
   normalizeManualSummary,
-  normalizeDeepSeekResult,
   renderPrChangelogBlock,
 } from './pr-changelog-lib.mjs'
 
@@ -157,12 +156,7 @@ async function requestDeepSeek(messages) {
     throw new Error('DeepSeek 返回内容不是有效 JSON')
   }
 
-  try {
-    return normalizeDeepSeekResult(parsed)
-  } catch (error) {
-    console.error(`[record-pr-changelog] DeepSeek 返回 JSON 未通过结构校验：\n${JSON.stringify(parsed, null, 2)}`)
-    throw error
-  }
+  return parsed
 }
 
 async function githubRequest(path, { method = 'GET', body } = {}) {
