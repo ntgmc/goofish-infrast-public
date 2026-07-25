@@ -133,9 +133,9 @@ export interface OnboardingTaskView {
 
 export const ITEM_ICON_PATHS: Record<string, string> = {
   placeholder: '/assets/items/item-placeholder.svg',
-  priority_compute_coupon: '/assets/items/item-placeholder.svg',
-  reorder_check_coupon: '/assets/items/item-placeholder.svg',
-  scenario_simulation_coupon: '/assets/items/item-placeholder.svg',
+  priority_compute_coupon: '/assets/items/priority-compute-coupon.png',
+  reorder_check_coupon: '/assets/items/reorder-check-coupon.png',
+  scenario_simulation_coupon: '/assets/items/scenario-simulation-coupon.png',
   training_diagnosis_coupon: '/assets/items/item-placeholder.svg',
   additional_recompute_coupon: '/assets/items/item-placeholder.svg',
   plan_capacity_certificate: '/assets/items/item-placeholder.svg',
