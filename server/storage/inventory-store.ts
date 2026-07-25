@@ -16,7 +16,7 @@ import {
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
-import { getProfileWorkspace, listProfilesForUser } from './user-store'
+import { getProfileWorkspace, isDepotValueProfile, listProfilesForUser } from './user-store'
 
 const PROFILE_CAPACITY_LIMITS = Object.freeze({
   plan: { base: WORKSPACE_SAVED_CONFIG_LIMIT, maximum: 20, entitlement: 'plan_slots' },
@@ -518,7 +518,9 @@ export async function claimOnboardingTask(userId: string, taskCode: OnboardingTa
 }
 
 async function getProfileCapacities(userId: string): Promise<ProfileCapacitySummary[]> {
-  const profiles = (await listProfilesForUser(userId)).filter((profile) => profile.status === 'active')
+  const profiles = (await listProfilesForUser(userId)).filter(
+    (profile) => profile.status === 'active' && !isDepotValueProfile(profile),
+  )
   const balances = await query<{ profile_id: string; entitlement_type: string; units: number }>(
     `select balances.profile_id, balances.entitlement_type, balances.units
        from profile_entitlement_balances balances
@@ -535,14 +537,12 @@ async function getProfileCapacities(userId: string): Promise<ProfileCapacitySumm
   return Promise.all(profiles.map(async (profile) => {
     const workspace = await getProfileWorkspace(profile.id)
     const units = byProfile.get(profile.id) ?? new Map<string, number>()
-    const archived = Array.isArray((workspace as unknown as { archived_results?: unknown[] }).archived_results)
-      ? (workspace as unknown as { archived_results: unknown[] }).archived_results.length : 0
     return {
       profile_id: profile.id,
       display_name: profile.display_name,
-      plan_slots: capacity(workspace.saved_configs.length, PROFILE_CAPACITY_LIMITS.plan, units),
-      history_slots: capacity(workspace.result_history.length, PROFILE_CAPACITY_LIMITS.history, units),
-      archive_slots: capacity(archived, PROFILE_CAPACITY_LIMITS.archive, units),
+      plan_slots: capacity(workspace?.saved_configs.length ?? 0, PROFILE_CAPACITY_LIMITS.plan, units),
+      history_slots: capacity(workspace?.result_history.length ?? 0, PROFILE_CAPACITY_LIMITS.history, units),
+      archive_slots: capacity(workspace?.archived_results.length ?? 0, PROFILE_CAPACITY_LIMITS.archive, units),
     }
   }))
 }

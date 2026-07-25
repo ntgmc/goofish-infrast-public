@@ -11,6 +11,7 @@ import {
   getItemBalance,
   getProfileCapacityLimits,
   grantItem,
+  listInventory,
   refundReservedItemsInTransaction,
   reserveItemsInTransaction,
   useInventoryItem,
@@ -32,6 +33,20 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL unified inventory', () => {
+  it('lists an empty inventory for a scheduling profile without a workspace', async () => {
+    const { userId, profileId } = await seedUserProfile()
+
+    const inventory = await listInventory(userId)
+
+    expect(inventory.stacks).toEqual([])
+    expect(inventory.capacities).toEqual([expect.objectContaining({
+      profile_id: profileId,
+      plan_slots: expect.objectContaining({ used: 0 }),
+      history_slots: expect.objectContaining({ used: 0 }),
+      archive_slots: expect.objectContaining({ used: 0 }),
+    })])
+  })
+
   it('consumes the earliest expiring batch and refunds once with a renewed relative lifetime', async () => {
     const { userId, profileId } = await seedUserProfile()
     const grantedAt = '2026-07-01T00:00:00.000Z'
