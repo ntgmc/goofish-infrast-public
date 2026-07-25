@@ -11,14 +11,26 @@ import {
   updateProfileWorkspaceAtomically,
   type UserWorkspaceRecord,
 } from '../storage/user-store'
-import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
+import {
+  evaluateOperatorRisk,
+  formatOperatorRiskBlockMessage,
+  getCdkRecordStore,
+  getRiskControlSettings,
+  normalizePermissionMode,
+  recordOperatorFingerprint,
+  recordSoftBlockedRiskEvent,
+  resolveConfigForPermission,
+  resolveFreePreviewConfig,
+  validateConfig,
+  validateOperators,
+} from './license-utils'
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import { getProfileCapacityLimits } from '../storage/inventory-store'
 import { hasDatabaseUrl } from '../storage/postgres'
-import { recordAuthenticatedRequestBehaviorEvent } from '../behavior-risk/service'
+import { recordAuthenticatedRequestBehaviorEvent, recordOperatorDataAnomalyBehaviorEvent } from '../behavior-risk/service'
 
 const FREE_SCHEDULE_REVISION_LIMIT = 3
 const FREE_SCHEDULE_REVISION_WINDOW_HOURS = 24
@@ -119,6 +131,37 @@ export default async (req: Request): Promise<Response> => {
           : resolveConfigForPermission(effectivePermission, configCheck.config)
         if (!permissionCheck.ok) return jsonResponse({ error: permissionCheck.message }, 403)
         configValue = permissionCheck.config
+      }
+    }
+
+    if (operatorsValue && profile.cdk_key) {
+      const cdkStore = await getCdkRecordStore()
+      const cdkRecord = await cdkStore.get(profile.cdk_key)
+      if (cdkRecord?.status === 'used' && normalizePermissionMode(cdkRecord.permission) === 'advanced') {
+        const riskSettings = await getRiskControlSettings()
+        if (riskSettings.operator_data_risk_enabled) {
+          const operatorRisk = evaluateOperatorRisk(cdkRecord, operatorsValue)
+          if (!operatorRisk.ok) {
+            const blocked = await recordSoftBlockedRiskEvent(
+              cdkRecord,
+              operatorRisk.event,
+              formatOperatorRiskBlockMessage(operatorRisk.event.reason),
+              operatorRisk.fingerprint,
+            )
+            await recordOperatorDataAnomalyBehaviorEvent({
+              req,
+              auth,
+              profileId: profile.id,
+              uid: profile.skland_binding?.uid ?? null,
+              anomalyType: operatorRisk.event.type,
+              fingerprintHash: operatorRisk.fingerprint.hash,
+              ownedCount: operatorRisk.fingerprint.owned_count,
+              occurredAt: new Date(operatorRisk.event.at),
+            })
+            return jsonResponse({ error: blocked.message }, blocked.frozen ? 403 : 409)
+          }
+          await recordOperatorFingerprint(cdkRecord, operatorRisk.fingerprint)
+        }
       }
     }
 

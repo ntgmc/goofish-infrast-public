@@ -439,6 +439,10 @@ async function assertConfirmImport() {
   if (workspace?.operators?.length !== 2) {
     throw new Error('confirm import: workspace operators were not saved')
   }
+  const cdkRecord = store.cdks.get('cdk/profile-1')
+  if (!cdkRecord?.baseline_operator_fingerprint || cdkRecord.latest_operator_fingerprint?.owned_count !== 2) {
+    throw new Error('confirm import: trusted operator fingerprint baseline was not saved')
+  }
   if (workspace.config?.desc !== 'existing config') {
     throw new Error('confirm import: existing config was not preserved')
   }
@@ -907,11 +911,12 @@ async function callSkland(path, body, init = {}) {
 
 function seedProfile({ id, status }) {
   const now = '2026-01-01T00:00:00.000Z'
+  const cdkKey = `cdk/${id}`
   store.profiles.set(id, {
     version: 1,
     id,
     user_id: 'user-1',
-    cdk_key: `cdk/${id}`,
+    cdk_key: cdkKey,
     cdk_code_hash: `hash-${id}`,
     cdk_order_hash: null,
     permission: 'advanced',
@@ -924,6 +929,11 @@ function seedProfile({ id, status }) {
     skland_risk: null,
     created_at: now,
     updated_at: now,
+  })
+  store.cdks.set(cdkKey, {
+    code_hash: id,
+    permission: 'advanced',
+    status: 'used',
   })
   store.workspaces.set(id, {
     version: 1,
@@ -1141,6 +1151,7 @@ function createMemoryStore() {
     },
     profiles: new Map(),
     workspaces: new Map(),
+    cdks: new Map(),
     freePreviewClaims: new Map(),
     freePreviewPendingClaims: new Map(),
     personalUseAcceptance: {
@@ -1429,6 +1440,36 @@ function memoryLicenseUtilsModule() {
 
 function memoryLicenseUtilsModuleFixed() {
   return `
+    const store = globalThis.__sklandHandlerSmokeStore
+    export function buildOperatorFingerprint(operators) {
+      const snapshot = Object.fromEntries(operators.map((operator) => [String(operator.id || operator.name), {
+        name: operator.name,
+        own: Boolean(operator.own),
+        elite: Number(operator.elite) || 0,
+        rarity: Number(operator.rarity) || 0,
+      }]))
+      return { hash: 'c'.repeat(64), owned_count: operators.filter((operator) => operator.own).length, operators: snapshot }
+    }
+    export async function getCdkRecordStore() {
+      return { get: async (key) => store.cdks.get(key) ?? null }
+    }
+    export async function getRiskControlSettings() {
+      return { operator_data_risk_enabled: true, updated_at: null }
+    }
+    export function normalizePermissionMode(permission) {
+      return permission ?? 'advanced'
+    }
+    export async function recordOperatorFingerprint(record, fingerprint) {
+      const entry = [...store.cdks.entries()].find(([, current]) => current === record)
+      if (!entry) return record
+      const next = {
+        ...record,
+        baseline_operator_fingerprint: record.baseline_operator_fingerprint ?? fingerprint,
+        latest_operator_fingerprint: fingerprint,
+      }
+      store.cdks.set(entry[0], next)
+      return next
+    }
     export function validateOperators(operators) {
       if (!Array.isArray(operators) || operators.length === 0) {
         return { ok: false, message: 'operator data is empty' }

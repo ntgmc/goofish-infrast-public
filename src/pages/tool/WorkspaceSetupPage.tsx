@@ -74,6 +74,7 @@ export default function WorkspaceSetupPage({
   const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(workspace?.config ?? cloneConfig(CONFIG_PRESETS['243'])))
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
+  const [operatorUploading, setOperatorUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [sklandDialogOpen, setSklandDialogOpen] = useState(false)
   const [sklandRefreshing, setSklandRefreshing] = useState(false)
@@ -107,23 +108,37 @@ export default function WorkspaceSetupPage({
   }, [normalizedConfig])
 
   const handleOperatorsFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0]
-    setOperatorFileName(file?.name ?? null)
+    const input = event.currentTarget
+    const file = input.files?.[0]
     setError(null)
     setStatus(null)
     setSklandRefreshNotice(null)
     if (isPreviewProfile) {
       setOperatorFileName(null)
       setError(copy.workspace.pages_tool_WorkspaceSetupPage_004)
-      event.currentTarget.value = ''
+      input.value = ''
       return
     }
     if (!file) return
+    setOperatorUploading(true)
     try {
-      setOperators(parseOperatorsText(await file.text()))
+      const importedOperators = parseOperatorsText(await file.text())
+      const data = await apiJson<AuthSuccessResponse>('/api/user/workspace', {
+        method: 'PATCH',
+        json: { profile_id: profile.id, operators: importedOperators },
+        fallbackMessage: copy.workspace.pages_tool_WorkspaceSetupPage_096,
+      })
+      if (!data.user) throw new Error(copy.workspace.pages_tool_WorkspaceSetupPage_096)
+      setOperators(data.workspace?.operators ?? importedOperators)
+      setOperatorFileName(file.name)
+      setStatus(copy.workspace.pages_tool_WorkspaceSetupPage_097)
+      onSynced(data)
     } catch (caught) {
-      setOperators(null)
+      setOperatorFileName(null)
       setError((caught as Error).message)
+    } finally {
+      setOperatorUploading(false)
+      input.value = ''
     }
   }
 
@@ -311,7 +326,7 @@ export default function WorkspaceSetupPage({
                         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                           <label className="tool-secondary-action inline-flex cursor-pointer items-center justify-center">
                             {operatorFileName ? `${copy.workspace.pages_tool_WorkspaceSetupPage_027}${operatorFileName}` : operators ? `${copy.workspace.pages_tool_WorkspaceSetupPage_028}${ownedOperatorCount}${copy.workspace.pages_tool_WorkspaceSetupPage_029}` : copy.workspace.pages_tool_WorkspaceSetupPage_030}
-                            <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} disabled={!canManualEditOperators} className="hidden" />
+                            <input type="file" accept=".json,.txt,application/json,text/plain" onChange={handleOperatorsFile} disabled={!canManualEditOperators || operatorUploading} className="hidden" />
                           </label>
                           {operators && <span className="text-sm text-brand-400">{copy.workspace.pages_tool_WorkspaceSetupPage_031}{ownedOperatorCount} {copy.workspace.pages_tool_WorkspaceSetupPage_032}</span>}
                         </div>

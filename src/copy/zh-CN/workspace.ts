@@ -423,6 +423,10 @@ export const workspaceCopy = {
   pages_tool_WorkspaceSetupPage_094: "凭据已失效，请重新绑定",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_095: "凭据不可用，请重新绑定",
+  // src/pages/tool/WorkspaceSetupPage.tsx
+  pages_tool_WorkspaceSetupPage_096: "导入干员数据失败，请稍后重试",
+  // src/pages/tool/WorkspaceSetupPage.tsx
+  pages_tool_WorkspaceSetupPage_097: "干员数据已通过校验并导入。",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
   pages_tool_optimize_useOptimizeWorkspace_001: "请填写方案名称。",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
