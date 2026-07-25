@@ -18,7 +18,6 @@ const LAYOUTS: Array<{ id: ScenarioLayout; trading: number; manufacturing: numbe
 const SCHEDULES: Array<{ id: ScenarioMaaSchedule; label: string }> = [
   { id: 'variable', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_001 },
   { id: '8x3', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_002 },
-  { id: '12x2', label: copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_003 },
 ]
 
 const DRONES: Array<{ id: ScenarioDroneStrategy; label: string }> = [
@@ -276,5 +275,5 @@ function samePlan(left: ScenarioProductionPlan, right: ScenarioProductionPlan): 
 }
 
 function scheduleOrder(left: ScenarioMaaSchedule, right: ScenarioMaaSchedule): number {
-  return ['variable', '8x3', '12x2'].indexOf(left) - ['variable', '8x3', '12x2'].indexOf(right)
+  return ['variable', '8x3'].indexOf(left) - ['variable', '8x3'].indexOf(right)
 }

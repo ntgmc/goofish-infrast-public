@@ -17,7 +17,7 @@ const PROFILE_A_FACTORS: ScenarioComparisonFactors = {
 
 const PROFILE_B_FACTORS: ScenarioComparisonFactors = {
   layouts: [{ layout: '333', plans: [{ trading: { lmd: 2, orundum: 1 }, manufacturing: { pureGold: 1, battleRecord: 1, originiumShard: 1 } }] }],
-  maaSchedules: ['12x2'],
+  maaSchedules: ['8x3'],
   includeRotation: true,
   droneStrategies: ['auto'],
 }
@@ -38,7 +38,21 @@ describe('useScenarioComparison', () => {
       operators: [],
       config: {} as LicenseConfig,
     }))
-    expect(result.current.factors.maaSchedules).toEqual(['variable', '8x3', '12x2'])
+    expect(result.current.factors.maaSchedules).toEqual(['variable', '8x3'])
+  })
+
+  it('filters the retired two-shift MAA option from stored sessions', () => {
+    window.sessionStorage.setItem('maa:scenario-lab:v2:profile-old-two-shift', JSON.stringify({
+      factors: { ...PROFILE_A_FACTORS, maaSchedules: ['12x2'] },
+    }))
+
+    const { result } = renderHook(() => useScenarioComparison({
+      profileId: 'profile-old-two-shift',
+      operators: [],
+      config: {} as LicenseConfig,
+    }))
+
+    expect(result.current.factors.maaSchedules).toEqual(['variable', '8x3'])
   })
 
   it('preserves the previous account session and restores the next account factors', async () => {

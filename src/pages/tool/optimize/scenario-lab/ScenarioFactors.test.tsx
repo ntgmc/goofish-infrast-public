@@ -46,7 +46,7 @@ describe('ScenarioFactors', () => {
       })]),
     }))
 
-    await user.click(screen.getByLabelText('MAA 自动非固定间隔（2–4 班）'))
+    await user.click(screen.getByLabelText('MAA 自动非固定间隔（3–4 班）'))
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ maaSchedules: ['variable', '8x3'] }))
     await user.click(screen.getByLabelText('合成玉'))
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ droneStrategies: ['off', 'orundum'] }))

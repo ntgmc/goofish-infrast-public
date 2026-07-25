@@ -618,7 +618,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/job-progress.ts
   pages_tool_optimize_job_progress_006: "排班已完成，已进入练度建议阶段",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
-  pages_tool_optimize_scenario_lab_ScenarioFactors_001: "MAA 自动非固定间隔（2–4 班）",
+  pages_tool_optimize_scenario_lab_ScenarioFactors_001: "MAA 自动非固定间隔（3–4 班）",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_002: "MAA 8 小时 × 3",
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx

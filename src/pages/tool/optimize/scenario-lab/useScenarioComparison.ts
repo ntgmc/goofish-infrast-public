@@ -7,7 +7,7 @@ import type {
   CreateScenarioComparisonJobResponse,
   ScenarioComparisonJobSnapshot,
 } from '../../../../lib/optimization-contracts'
-import type { ScenarioComparisonFactors, ScenarioComparisonResult } from '../../../../lib/scenario-comparison'
+import type { ScenarioComparisonFactors, ScenarioComparisonResult, ScenarioMaaSchedule } from '../../../../lib/scenario-comparison'
 import type { LicenseConfig, LicenseOperator } from '../../../../lib/types'
 import { copy } from '../../../../copy/index'
 import { fetchOptimizeJobSnapshotStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, waitForOptimizePoll } from '../job-progress'
@@ -23,7 +23,7 @@ const DEFAULT_FACTORS: ScenarioComparisonFactors = {
       manufacturing: { pureGold: 2, battleRecord: 2, originiumShard: 0 },
     }],
   }],
-  maaSchedules: ['variable', '8x3', '12x2'],
+  maaSchedules: ['variable', '8x3'],
   includeRotation: true,
   droneStrategies: ['off', 'auto'],
 }
@@ -243,9 +243,24 @@ function sessionKey(profileId: string): string {
 function readSession(profileId: string): StoredScenarioSession | null {
   try {
     const raw = window.sessionStorage.getItem(sessionKey(profileId))
-    return raw ? JSON.parse(raw) as StoredScenarioSession : null
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as StoredScenarioSession
+    if (!parsed?.factors) return null
+    return { ...parsed, factors: normalizeStoredFactors(parsed.factors) }
   } catch {
     return null
+  }
+}
+
+function normalizeStoredFactors(factors: ScenarioComparisonFactors): ScenarioComparisonFactors {
+  const maaSchedules = Array.isArray(factors.maaSchedules)
+    ? factors.maaSchedules.filter((value): value is ScenarioMaaSchedule => value === 'variable' || value === '8x3')
+    : [...DEFAULT_FACTORS.maaSchedules]
+  return {
+    ...factors,
+    maaSchedules: maaSchedules.length > 0 || factors.includeRotation
+      ? maaSchedules
+      : [...DEFAULT_FACTORS.maaSchedules],
   }
 }
 
