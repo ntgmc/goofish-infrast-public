@@ -86,6 +86,16 @@ export const requestSchemas = {
     action: z.literal('revoke'),
   }),
   adminRiskSettings: strict({ operator_data_risk_enabled: z.boolean().optional() }),
+  adminBehaviorRiskReview: strict({
+    case_id: shortString(128),
+    outcome: z.enum(['dismiss', 'restrict']),
+    note: shortString(1000),
+    members: z.array(strict({
+      user_id: shortString(128),
+      action: z.enum(['freeze_account', 'freeze_profile']),
+      profile_id: optionalString(128),
+    })).max(100),
+  }),
   adminUserCreate: strict({
     root_password: optionalUnknown,
     username: optionalUnknown,
@@ -136,6 +146,9 @@ export const requestSchemas = {
     last_result: optionalUnknown,
     saved_config_action: optionalUnknown,
     result_history_id: optionalString(128),
+  }),
+  behaviorRiskEngagement: strict({
+    page_category: z.enum(['landing', 'auth', 'profiles', 'workspace', 'optimizer', 'result', 'account', 'public_info', 'other']),
   }),
   sklandProfile: strict({ profile_id: shortString(128) }),
   sklandScan: strict({ profile_id: shortString(128), scan_id: shortString(256) }),
@@ -269,6 +282,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/data', route({ GET: none() })],
   ['/api/admin/cdk', route({ GET: none(), POST: json('admin', requestSchemas.adminCdkCreate), PATCH: json('admin', requestSchemas.adminCdkPatch), DELETE: json('admin', requestSchemas.adminCdkDelete) }, ['code_hash', 'view', 'permission', 'risk', 'generated', 'status', 'page', 'page_size', 'search'])],
   ['/api/admin/risk-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRiskSettings), PATCH: json('admin', requestSchemas.adminRiskSettings) })],
+  ['/api/admin/behavior-risk', route({ GET: none(), POST: json('admin', requestSchemas.adminBehaviorRiskReview) }, ['status', 'page', 'page_size'])],
   ['/api/admin/invitation-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminInvitationSettings), PATCH: json('admin', requestSchemas.adminInvitationSettings) })],
   ['/api/admin/registration-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRegistrationSettings) })],
   ['/api/admin/feature-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminFeatureSettings) })],
@@ -310,6 +324,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/status', route({ GET: none() }, ['profile_id'])],
   ['/api/user/workspace', route({ GET: none(), POST: json('compute', requestSchemas.userWorkspace), PATCH: json('compute', requestSchemas.userWorkspace) }, ['profile_id'])],
   ['/api/user/workspace/free-schedule/confirm', route({ POST: json('standard', requestSchemas.userWorkspace) })],
+  ['/api/user/behavior-risk/engagement', route({ POST: json('standard', requestSchemas.behaviorRiskEngagement) })],
   ['/api/user/invitations', route({ GET: none() }, ['cursor', 'limit'])],
   ['/api/user/invitations/code', route({ POST: none() })],
   ['/api/user/rewards', route({ GET: none() })],

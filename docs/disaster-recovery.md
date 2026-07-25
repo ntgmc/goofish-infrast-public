@@ -88,6 +88,12 @@ required production secrets. Rotate them only with a dedicated data-migration
 and deletion-path verification procedure; they intentionally do not fall back
 to `CDK_HASH_SECRET`.
 
+`BEHAVIOR_RISK_HMAC_SECRET` is also independent and must match on the API and
+Worker processes. It never falls back to raw identifiers or another product
+secret. Record `BEHAVIOR_RISK_HMAC_KEY_VERSION` with each rotation; signals
+written under different key versions intentionally stop linking, while the old
+HMAC-only evidence expires under the 90-day behavior-risk retention policy.
+
 ## Hangzhou Worker or WireGuard Outage
 
 The Seoul API remains the queue authority when the Hangzhou worker or the

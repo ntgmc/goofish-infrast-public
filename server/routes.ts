@@ -1,5 +1,6 @@
 import adminCdkHandler from './handlers/admin-cdk'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
+import adminBehaviorRiskHandler from './handlers/admin-behavior-risk'
 import adminInvitationSettingsHandler from './handlers/admin-invitation-settings'
 import adminRegistrationSettingsHandler from './handlers/admin-registration-settings'
 import adminFeatureSettingsHandler from './handlers/admin-feature-settings'
@@ -19,6 +20,7 @@ import userProfilesHandler from './handlers/user-profiles'
 import userSklandHandler from './handlers/user-skland'
 import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
+import userBehaviorRiskHandler from './handlers/user-behavior-risk'
 import userInvitationsHandler from './handlers/user-invitations'
 import userRewardsHandler from './handlers/user-rewards'
 import userInventoryHandler from './handlers/user-inventory'
@@ -38,6 +40,7 @@ type ApiHandler = (req: Request) => Promise<Response>
 const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/cdk', adminCdkHandler as unknown as ApiHandler],
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/behavior-risk', adminBehaviorRiskHandler as unknown as ApiHandler],
   ['/api/admin/invitation-settings', adminInvitationSettingsHandler as unknown as ApiHandler],
   ['/api/admin/registration-settings', adminRegistrationSettingsHandler as unknown as ApiHandler],
   ['/api/admin/feature-settings', adminFeatureSettingsHandler as unknown as ApiHandler],
@@ -88,6 +91,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
   ['/api/user/workspace/free-schedule/confirm', userWorkspaceHandler as unknown as ApiHandler],
+  ['/api/user/behavior-risk/engagement', userBehaviorRiskHandler as unknown as ApiHandler],
   ['/api/user/invitations', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/rewards', userRewardsHandler as unknown as ApiHandler],

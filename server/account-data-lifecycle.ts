@@ -4,6 +4,7 @@ import { getPool, query } from './storage/postgres'
 import { deleteUserAccount, getUserById, type UserAccountRecord } from './storage/user-store'
 import { purgeExpiredPersonalUseDeclarationAcceptances } from './storage/personal-use-declaration-store'
 import { sendAccountDeletionCancellationEmail, sendAccountDeletionReceiptEmail } from './handlers/email'
+import { recordAccountDeletedBehaviorEvent } from './behavior-risk/service'
 
 const DELETION_DELAY_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -108,6 +109,7 @@ async function processDueAccountDeletions(now = new Date()): Promise<number> {
   )
   for (const request of due.rows) {
     await deleteUserAccount(request.user_id)
+    await recordAccountDeletedBehaviorEvent(request.user_id, now)
     try {
       await sendAccountDeletionReceiptEmail(request.email, request.id)
     } catch (error) {

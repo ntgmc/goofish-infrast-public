@@ -465,7 +465,8 @@ export async function incrementCdkScheduleGenerateCount(record: Pick<CdkRecord, 
 }
 
 const SOFT_BLOCK_WINDOW_MS = productPolicies.risk.soft_block_window_hours * 60 * 60 * 1000
-const SOFT_BLOCK_FREEZE_COUNT = productPolicies.risk.soft_blocks_before_freeze
+const OPERATOR_ANOMALY_EVENTS_BEFORE_REVIEW = productPolicies.risk.operator_anomaly_events_before_review
+const OPERATOR_RISK_DEDUP_WINDOW_MS = 5 * 60 * 1000
 
 export function buildOperatorFingerprint(operators: LicenseOperator[]): OperatorFingerprint {
   const normalized = operators
@@ -565,11 +566,34 @@ export function formatOperatorRiskBlockMessage(reason: string): string {
   return `本次操作已拦截：${reason} 这通常是误选了其他账号或旧版 operators.json，请确认文件后重新上传。`
 }
 
+export async function recordOperatorFingerprint(
+  record: CdkRecord,
+  fingerprint: OperatorFingerprint,
+): Promise<CdkRecord> {
+  const store = await getCdkRecordStore()
+  return (await store.mutate(`cdk/${record.code_hash}.json`, (current) => {
+    const baseline = current.baseline_operator_fingerprint ?? fingerprint
+    if (
+      current.baseline_operator_fingerprint?.hash === baseline.hash
+      && current.latest_operator_fingerprint?.hash === fingerprint.hash
+    ) return current
+    return {
+      ...current,
+      baseline_operator_fingerprint: baseline,
+      latest_operator_fingerprint: fingerprint,
+    }
+  }, { allowedStatuses: ['used'] })) ?? record
+}
+
 export async function recordSoftBlockedRiskEvent(
   record: CdkRecord,
   event: RiskEvent,
   message: string,
-): Promise<{ frozen: false; record: CdkRecord; message: string } | { frozen: true; record: CdkRecord; message: string }> {
+  fingerprint: OperatorFingerprint,
+): Promise<
+  | { frozen: false; reviewRecommended: boolean; record: CdkRecord; message: string }
+  | { frozen: true; reviewRecommended: boolean; record: CdkRecord; message: string }
+> {
   const now = event.at || new Date().toISOString()
   const softEvent: RiskEvent = {
     ...event,
@@ -577,41 +601,65 @@ export async function recordSoftBlockedRiskEvent(
     detail: {
       ...(event.detail ?? {}),
       soft_block: true,
+      fingerprint_hash: fingerprint.hash,
+      owned_count: fingerprint.owned_count,
     },
   }
   const store = await getCdkRecordStore()
-  let thresholdReason: string | null = null
+  let reviewRecommended = false
   const updated = await store.mutate(`cdk/${record.code_hash}.json`, (current) => {
-    const riskEvents = [...(current.risk_events ?? []), softEvent].slice(-20)
+    const existingEvents = current.risk_events ?? []
+    const nowMs = Date.parse(now)
+    const duplicate = existingEvents.some((item) => (
+      item.type === event.type
+      && item.detail?.fingerprint_hash === fingerprint.hash
+      && Number.isFinite(Date.parse(item.at))
+      && Math.abs(nowMs - Date.parse(item.at)) < OPERATOR_RISK_DEDUP_WINDOW_MS
+    ))
+    let riskEvents = duplicate ? existingEvents : [...existingEvents, softEvent].slice(-20)
     const cutoff = Date.parse(now) - SOFT_BLOCK_WINDOW_MS
-    const softBlockCount = riskEvents.filter((item) => {
+    const recentAnomalies = riskEvents.filter((item) => {
       const at = Date.parse(item.at)
       return Number.isFinite(at) && at > cutoff && item.detail?.soft_block === true
-    }).length
-    if (softBlockCount < SOFT_BLOCK_FREEZE_COUNT) return { ...current, risk_events: riskEvents }
-
-    thresholdReason = `24 小时内第 ${SOFT_BLOCK_FREEZE_COUNT} 次尝试被拦截。最近原因：${event.reason}`
+    })
+    const recentFingerprints = new Set(recentAnomalies.flatMap((item) => {
+      const fingerprintHash = item.detail?.fingerprint_hash
+      return typeof fingerprintHash === 'string' ? [fingerprintHash] : []
+    }))
+    reviewRecommended = recentAnomalies.length >= OPERATOR_ANOMALY_EVENTS_BEFORE_REVIEW && recentFingerprints.size >= 2
+    const recommendationExists = riskEvents.some((item) => (
+      item.type === 'operator_review_recommended'
+      && Number.isFinite(Date.parse(item.at))
+      && Date.parse(item.at) > cutoff
+    ))
+    if (reviewRecommended && !recommendationExists) {
+      riskEvents = [...riskEvents, {
+        at: now,
+        type: 'operator_review_recommended',
+        reason: `24 小时内检测到 ${recentAnomalies.length} 次异常干员提交，涉及 ${recentFingerprints.size} 份不同快照，已进入人工复核。`,
+        detail: {
+          reviewed: false,
+          anomaly_event_count: recentAnomalies.length,
+          distinct_fingerprint_count: recentFingerprints.size,
+          latest_block_type: event.type,
+        },
+      }].slice(-20)
+    }
     return {
       ...current,
-      risk_events: [...riskEvents, {
-        at: now,
-        type: 'soft_block_threshold',
-        reason: thresholdReason,
-        detail: { soft_block_count: softBlockCount, latest_block_type: event.type },
-      }].slice(-20),
+      latest_operator_fingerprint: fingerprint,
+      risk_events: riskEvents,
     }
-  })
+  }, { allowedStatuses: ['used'] })
   if (!updated || updated.status === 'revoked') {
-    return { frozen: true, record: updated ?? record, message: updated?.freeze_reason || '授权已撤销。' }
-  }
-  if (thresholdReason) {
-    return { frozen: true, record: updated, message: formatRiskFreezeMessage(thresholdReason) }
+    return { frozen: true, reviewRecommended, record: updated ?? record, message: updated?.freeze_reason || '授权已撤销。' }
   }
   if (updated.status === 'frozen') {
-    return { frozen: true, record: updated, message: updated.freeze_reason || formatRiskFreezeMessage(thresholdReason || event.reason) }
+    return { frozen: true, reviewRecommended, record: updated, message: updated.freeze_reason || formatRiskFreezeMessage(event.reason) }
   }
   return {
     frozen: false,
+    reviewRecommended,
     record: updated,
     message,
   }

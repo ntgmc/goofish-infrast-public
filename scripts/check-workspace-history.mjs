@@ -1348,6 +1348,7 @@ function memoryLicenseUtilsModule() {
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, updated_at: null } }
     export async function incrementCdkScheduleGenerateCount() {}
     export function normalizePermissionMode(permission) { return permission ?? 'advanced' }
+    export async function recordOperatorFingerprint(record) { return record }
     export async function recordSoftBlockedRiskEvent() { return { message: 'blocked', frozen: false } }
     export function resolveConfigForPermission(_permission, config) {
       if (config?.permission_blocked) return { ok: false, message: 'permission blocked' }

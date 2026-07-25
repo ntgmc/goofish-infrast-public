@@ -1,6 +1,6 @@
 import type { LicenseFile } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
-import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, recordSoftBlockedRiskEvent, getPermissionMode, getCdkRecordStore, getRiskControlSettings, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
+import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getCdkRecordStore, getRiskControlSettings, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
 import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, updateProfileWorkspaceAtomically } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
@@ -17,6 +17,7 @@ import { getFreeScheduleEntitlement } from '../../storage/reorder-admission';
 import { requestSchemas } from '../../security/request-policy';
 import { getValidatedJson } from '../../security/request-validation';
 import { formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
+import { recordOperatorDataAnomalyBehaviorEvent } from '../../behavior-risk/service';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -77,6 +78,7 @@ export async function prepareOptimizeJob(
     }
     let effectiveLicense: LicenseFile;
     let activeProfileId: string | null = null;
+    let activeProfileUid: string | null = null;
     let isPreviewProfile = false;
     let isPreviewTrial = false;
 
@@ -96,6 +98,7 @@ export async function prepareOptimizeJob(
         return fail({ error: '仓库分析档案不能用于生成排班。' }, 403);
       }
       isPreviewProfile = isFreePreviewProfile(profile);
+      activeProfileUid = profile.skland_binding?.uid ?? null;
       isPreviewTrial = isFreePreviewTrialActive(profile);
       if (isPreviewProfile && !profile.skland_binding) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: 'free_preview', source: 'free_preview' });
@@ -109,7 +112,11 @@ export async function prepareOptimizeJob(
       }
       if (checkedCdkRecord?.status === 'frozen' || profile.status === 'frozen') {
         scheduleUsage = scheduleFailure('cdk_frozen', { profile_id: activeProfileId, permission: profile.permission, cdk_status: checkedCdkRecord?.status ?? profile.status, source: 'account_profile' });
-        return fail({ error: formatRiskFreezeMessage(checkedCdkRecord?.freeze_reason || 'Account authorization is frozen.') }, 403);
+        return fail({
+          error: checkedCdkRecord?.status === 'frozen'
+            ? formatRiskFreezeMessage(checkedCdkRecord.freeze_reason || 'Account authorization is frozen.')
+            : '当前档案暂时不可用，请联系支持人员核验或恢复。',
+        }, 403);
       }
       effectiveLicense = {
         version: 2,
@@ -146,10 +153,26 @@ export async function prepareOptimizeJob(
       if (riskSettings.operator_data_risk_enabled) {
         const operatorRisk = evaluateOperatorRisk(checkedCdkRecord, operators);
         if (!operatorRisk.ok) {
-          const blocked = await recordSoftBlockedRiskEvent(checkedCdkRecord, operatorRisk.event, formatOperatorRiskBlockMessage(operatorRisk.event.reason));
+          const blocked = await recordSoftBlockedRiskEvent(
+            checkedCdkRecord,
+            operatorRisk.event,
+            formatOperatorRiskBlockMessage(operatorRisk.event.reason),
+            operatorRisk.fingerprint,
+          );
+          await recordOperatorDataAnomalyBehaviorEvent({
+            req,
+            auth,
+            profileId: activeProfileId,
+            uid: activeProfileUid,
+            anomalyType: operatorRisk.event.type,
+            fingerprintHash: operatorRisk.fingerprint.hash,
+            ownedCount: operatorRisk.fingerprint.owned_count,
+            occurredAt: new Date(operatorRisk.event.at),
+          });
           scheduleUsage = scheduleFailure(blocked.frozen ? 'risk_frozen' : 'risk_soft_blocked', { ...scheduleUsageBase, cdk_status: blocked.record.status });
           return fail({ error: blocked.message }, blocked.frozen ? 403 : 409);
         }
+        checkedCdkRecord = await recordOperatorFingerprint(checkedCdkRecord, operatorRisk.fingerprint);
       }
     }
 
@@ -277,6 +300,7 @@ export async function prepareOptimizeJob(
           ...(useTrainingCoupon ? ['training_diagnosis_coupon'] : []),
           ...(requestedItems.has('additional_recompute_coupon') ? ['additional_recompute_coupon'] : []),
         ],
+        behaviorIdentity: { userId: auth.user.id, sessionTokenHash: auth.tokenHash },
         payload: createPersistedOptimizeJobPayload({
           submittedAt,
           operators,

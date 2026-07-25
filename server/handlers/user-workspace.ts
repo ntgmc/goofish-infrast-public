@@ -18,6 +18,7 @@ import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import { getProfileCapacityLimits } from '../storage/inventory-store'
 import { hasDatabaseUrl } from '../storage/postgres'
+import { recordAuthenticatedRequestBehaviorEvent } from '../behavior-risk/service'
 
 const FREE_SCHEDULE_REVISION_LIMIT = 3
 const FREE_SCHEDULE_REVISION_WINDOW_HOURS = 24
@@ -87,6 +88,7 @@ export default async (req: Request): Promise<Response> => {
           updated_at: now,
         }
       })
+      await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })
       return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(next, capacityLimits) })
     }
 
@@ -136,6 +138,7 @@ export default async (req: Request): Promise<Response> => {
       workspace.updated_at = new Date().toISOString()
       return workspace
     })
+    await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })
     return jsonResponse(await buildAuthPayload(auth.user, profile.id))
   } catch (error) {
     if (error instanceof WorkspaceMutationError) return jsonResponse({ error: error.message }, error.status)

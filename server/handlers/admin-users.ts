@@ -38,6 +38,7 @@ import type { ProductPermissionMode } from '../../src/lib/types'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import { listPersonalUseDeclarationAcceptancesForUser } from '../storage/personal-use-declaration-store'
+import { recordAccountDeletedBehaviorEvent } from '../behavior-risk/service'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -200,6 +201,7 @@ export default async (req: Request): Promise<Response> => {
           return jsonResponse({ error: '确认邮箱不匹配。' }, 400)
         }
         await deleteUserAccount(target.id)
+        await recordAccountDeletedBehaviorEvent(target.id)
         return jsonResponse({ ok: true, deleted: true, user: { id: target.id, email: target.email } })
       }
 

@@ -89,7 +89,7 @@
     "risk": {
       "operator_data_enabled_by_default": true,
       "soft_block_window_hours": 24,
-      "soft_blocks_before_freeze": 3
+      "operator_anomaly_events_before_review": 3
     },
     "support": {
       "channel": "MaaTool 官方 QQ 群",

@@ -1,3 +1,5 @@
+import { BEHAVIOR_RISK_BROWSER_HEADER, getBehaviorRiskBrowserInstance } from './behavior-risk-client'
+
 export class ApiError extends Error {
   status: number
   data: unknown
@@ -39,11 +41,16 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 
 async function request(url: string, init: ApiRequestInit): Promise<Response> {
   const { json, fallbackMessage, headers, ...rest } = init
-  const requestInit: RequestInit = { ...rest, headers }
+  const requestHeaders = new Headers(headers)
+  const browserInstance = getBehaviorRiskBrowserInstance()
+  if (browserInstance && !requestHeaders.has(BEHAVIOR_RISK_BROWSER_HEADER)) {
+    requestHeaders.set(BEHAVIOR_RISK_BROWSER_HEADER, browserInstance)
+  }
+  const requestInit: RequestInit = { ...rest, headers: requestHeaders }
 
   if (json !== undefined) {
     requestInit.body = JSON.stringify(json)
-    requestInit.headers = withJsonHeader(headers)
+    requestInit.headers = withJsonHeader(requestHeaders)
   }
 
   const response = await fetch(url, requestInit)

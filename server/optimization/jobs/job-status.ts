@@ -15,6 +15,7 @@ import { prepareOptimizeJob } from './prepare-job';
 import { getServiceLifecycleState } from '../../lifecycle';
 import { getSecretKeyring } from '../../handlers/license-utils';
 import { getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
+import { recordRequestBehaviorEvent } from '../../behavior-risk/service';
 
 export async function submitOptimizationJob(req: Request): Promise<Response> {
   const lifecycleState = getServiceLifecycleState();
@@ -57,6 +58,20 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
     const admitted = typeof (store as Partial<typeof store>).admitJob === 'function'
       ? await store.admitJob(admissionInput)
       : { job: await store.createJob(admissionInput), replayed: false };
+
+    if (prepared.source === 'account_profile' || prepared.source === 'free_preview') {
+      if (prepared.behaviorIdentity) {
+        await recordRequestBehaviorEvent({
+          req,
+          eventType: 'job_submit',
+          userId: prepared.behaviorIdentity.userId,
+          sessionTokenHash: prepared.behaviorIdentity.sessionTokenHash,
+          profileId: admitted.job.profile_id,
+          jobId: admitted.job.id,
+          eventKey: `job-submit:${admitted.job.id}`,
+        });
+      }
+    }
 
     requestOptimizeJobProcessing();
     return jsonResponse({

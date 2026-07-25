@@ -42,7 +42,7 @@ describe('product catalog', () => {
   it('owns risk and support policy values', () => {
     expect(productPolicies.risk).toMatchObject({
       operator_data_enabled_by_default: true,
-      soft_blocks_before_freeze: 3,
+      operator_anomaly_events_before_review: 3,
     })
     expect(productPolicies.support.first_response_business_days).toBe(2)
   })

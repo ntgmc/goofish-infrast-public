@@ -233,13 +233,13 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_022: "数据与隐私",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_023: "服务保存登录资料、游戏档案、工作区、使用记录和你主动贡献的仓库样本。注销后进入 7 天冷静期，期满会删除所有可关联数据；仅保留无法关联的汇总统计。",
+  pages_tool_dashboard_SettingsSection_023: "服务保存登录资料、游戏档案、工作区、使用记录和你主动贡献的仓库样本。注销后进入 7 天冷静期，期满删除常规账号与工作区数据；HMAC 行为风控证据最长保留 90 天，个人使用声明确认记录按账号存续期加注销后一年保留。详情见隐私政策。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_026: "清除凭据",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_029: "注销账号",
   // src/pages/tool/dashboard/SettingsSection.tsx
-  pages_tool_dashboard_SettingsSection_030: "提交后会退出登录并发送撤销链接。7 天内可撤销；到期后将永久擦除账户、档案、凭据、样本、任务和使用记录。",
+  pages_tool_dashboard_SettingsSection_030: "提交后会退出登录并发送撤销链接。7 天内可撤销；到期后将永久擦除账户、档案、凭据、样本、任务和常规使用记录。限期保留的 HMAC 行为风控证据及个人使用声明确认记录将按隐私政策所列期限到期删除。",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_031: "确认邮箱",
   // src/pages/tool/dashboard/SettingsSection.tsx
