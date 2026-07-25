@@ -36,7 +36,7 @@ export type BehaviorRiskEventInput = {
   occurredAt?: Date
 }
 
-export type BehaviorRiskReviewAction = {
+type BehaviorRiskReviewAction = {
   userId: string
   action: 'freeze_account' | 'freeze_profile'
   profileId?: string | null
