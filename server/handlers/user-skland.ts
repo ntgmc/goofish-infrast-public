@@ -27,7 +27,17 @@ import {
 } from '../storage/user-store'
 import { markOnboardingTaskComplete } from '../storage/inventory-store'
 import { hasDatabaseUrl } from '../storage/postgres'
-import { resolveConfigForPermission, resolveFreePreviewConfig, validateConfig, validateOperators } from './license-utils'
+import {
+  buildOperatorFingerprint,
+  getCdkRecordStore,
+  getRiskControlSettings,
+  normalizePermissionMode,
+  recordOperatorFingerprint,
+  resolveConfigForPermission,
+  resolveFreePreviewConfig,
+  validateConfig,
+  validateOperators,
+} from './license-utils'
 import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
 import { getValidatedJsonRecord } from '../security/request-validation'
 import { reserveSklandAttemptLayered } from '../security/layered-auth-rate-limit'
@@ -853,6 +863,17 @@ async function saveSklandImport(
   if (isFreePreviewProfile(profile)) {
     const claim = await claimFreePreviewProfileUid(userId, profile, imported.binding, imported.importedAt)
     if (!claim.ok) throw new Error(claim.message)
+  }
+
+  if (profile.cdk_key) {
+    const cdkStore = await getCdkRecordStore()
+    const cdkRecord = await cdkStore.get(profile.cdk_key)
+    if (cdkRecord?.status === 'used' && normalizePermissionMode(cdkRecord.permission) === 'advanced') {
+      const riskSettings = await getRiskControlSettings()
+      if (riskSettings.operator_data_risk_enabled) {
+        await recordOperatorFingerprint(cdkRecord, buildOperatorFingerprint(operatorsCheck.operators))
+      }
+    }
   }
 
   let configResult: ReturnType<typeof resolveSklandImportConfig> = { config: null }

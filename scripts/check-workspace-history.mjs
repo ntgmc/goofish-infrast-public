@@ -116,6 +116,7 @@ await assertFreePreviewWorkspaceAndOptimizeLimits()
 await assertFreePreviewTrialWorkspaceLimits()
 await assertFreeScheduleEntitlementLifecycle()
 await assertOperatorsPatchKeepsHistory()
+await assertManualOperatorImportRisk()
 
 console.log('workspace history smoke check ok')
 
@@ -830,6 +831,62 @@ async function assertOperatorsPatchKeepsHistory() {
   }
 }
 
+async function assertManualOperatorImportRisk() {
+  const originalProfile = store.profiles.get('profile-1')
+  const originalWorkspace = store.workspaces.get('profile-1')
+  const cdkKey = 'cdk/operator-risk.json'
+  store.profiles.set('profile-1', {
+    ...originalProfile,
+    cdk_key: cdkKey,
+    skland_binding: {
+      uid: 'operator-risk-uid',
+      nickname: 'Doctor',
+      channel_name: 'official',
+      bound_at: new Date().toISOString(),
+      last_imported_at: new Date().toISOString(),
+    },
+  })
+  store.workspaces.set('profile-1', {
+    ...originalWorkspace,
+    operators: sampleOperators,
+  })
+  store.cdks.set(cdkKey, {
+    code_hash: 'operator-risk',
+    permission: 'advanced',
+    status: 'used',
+    baseline_operator_fingerprint: {
+      hash: 'b'.repeat(64),
+      owned_count: 2,
+      operators: {
+        char_002_amiya: { name: 'Amiya', own: true, elite: 2, rarity: 4 },
+        char_010_chen: { name: 'Chen', own: true, elite: 1, rarity: 5 },
+      },
+    },
+  })
+
+  try {
+    const blocked = await call(workspaceHandler, '/api/user/workspace', {
+      profile_id: 'profile-1',
+      operators: [sampleOperators[0]],
+    }, { method: 'PATCH' })
+    if (blocked.status !== 409 || blocked.body.error !== 'blocked') {
+      throw new Error(`manual operator risk: expected 409 block, got ${blocked.status}`)
+    }
+    const workspace = store.workspaces.get('profile-1')
+    if (workspace?.operators?.length !== sampleOperators.length) {
+      throw new Error('manual operator risk: blocked JSON replaced the trusted workspace')
+    }
+    const cdk = store.cdks.get(cdkKey)
+    if (cdk?.risk_events?.length !== 1 || cdk.latest_operator_fingerprint?.owned_count !== 1) {
+      throw new Error('manual operator risk: anomaly evidence was not recorded')
+    }
+  } finally {
+    store.profiles.set('profile-1', originalProfile)
+    store.workspaces.set('profile-1', originalWorkspace)
+    store.cdks.delete(cdkKey)
+  }
+}
+
 function assertFreePreviewResult(result, label) {
   if (!result || typeof result !== 'object') {
     throw new Error(`${label}: missing result`)
@@ -1333,23 +1390,67 @@ function memoryUserAuthModule() {
 
 function memoryLicenseUtilsModule() {
   return `
+    const store = globalThis.__workspaceHistorySmokeStore
     export function canUseUpgradeFeatures() { return true }
     export function canonicalJson(obj) {
       if (obj === null || typeof obj !== 'object') return JSON.stringify(obj)
       if (Array.isArray(obj)) return '[' + obj.map(canonicalJson).join(',') + ']'
       return '{' + Object.keys(obj).sort().map((key) => JSON.stringify(key) + ':' + canonicalJson(obj[key])).join(',') + '}'
     }
-    export function evaluateOperatorRisk() { return { ok: true } }
+    export function buildOperatorFingerprint(operators) {
+      const snapshot = Object.fromEntries(operators.map((operator) => [String(operator.id || operator.name), {
+        name: operator.name,
+        own: Boolean(operator.own),
+        elite: Number(operator.elite) || 0,
+        rarity: Number(operator.rarity) || 0,
+      }]))
+      return { hash: 'a'.repeat(64), owned_count: operators.filter((operator) => operator.own).length, operators: snapshot }
+    }
+    export function evaluateOperatorRisk(record, operators) {
+      const fingerprint = buildOperatorFingerprint(operators)
+      for (const [key, previous] of Object.entries(record.baseline_operator_fingerprint?.operators ?? {})) {
+        const next = fingerprint.operators[key]
+        if (previous.own && previous.rarity >= 4 && (!next || !next.own)) {
+          return {
+            ok: false,
+            fingerprint,
+            event: { at: new Date().toISOString(), type: 'operator_ownership_regression', reason: previous.name + ' missing' },
+          }
+        }
+      }
+      return { ok: true, fingerprint }
+    }
     export function formatOperatorRiskBlockMessage() { return 'blocked' }
     export function formatRiskFreezeMessage(message) { return message }
     export function getPermissionMode(license) { return license?.permission ?? 'advanced' }
     export function getSecretKeyring() { return ['workspace-history-test-secret'] }
-    export async function getCdkRecordStore() { return { get: async () => null, mutate: async () => null } }
+    export async function getCdkRecordStore() {
+      return {
+        get: async (key) => store.cdks.get(key) ?? null,
+        mutate: async (key, mutate) => {
+          const current = store.cdks.get(key)
+          if (!current) return null
+          const next = mutate(current)
+          if (next) store.cdks.set(key, next)
+          return next
+        },
+      }
+    }
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, updated_at: null } }
     export async function incrementCdkScheduleGenerateCount() {}
     export function normalizePermissionMode(permission) { return permission ?? 'advanced' }
-    export async function recordOperatorFingerprint(record) { return record }
-    export async function recordSoftBlockedRiskEvent() { return { message: 'blocked', frozen: false } }
+    export async function recordOperatorFingerprint(record, fingerprint) {
+      const key = 'cdk/' + record.code_hash + '.json'
+      const next = { ...record, baseline_operator_fingerprint: record.baseline_operator_fingerprint ?? fingerprint, latest_operator_fingerprint: fingerprint }
+      store.cdks.set(key, next)
+      return next
+    }
+    export async function recordSoftBlockedRiskEvent(record, event, message, fingerprint) {
+      const key = 'cdk/' + record.code_hash + '.json'
+      const next = { ...record, latest_operator_fingerprint: fingerprint, risk_events: [...(record.risk_events ?? []), event] }
+      store.cdks.set(key, next)
+      return { message, frozen: false, reviewRecommended: false, record: next }
+    }
     export function resolveConfigForPermission(_permission, config) {
       if (config?.permission_blocked) return { ok: false, message: 'permission blocked' }
       return validateConfig(config)

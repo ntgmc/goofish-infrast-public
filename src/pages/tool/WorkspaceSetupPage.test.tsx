@@ -75,6 +75,36 @@ describe('WorkspaceSetupPage CDK paths', () => {
     expect(container.querySelector<HTMLInputElement>('input[type="file"]')).toBeDisabled()
   })
 
+  it('checks an uploaded operator file immediately and preserves trusted data when blocked', async () => {
+    const user = userEvent.setup()
+    const onSynced = vi.fn()
+    apiJsonMock.mockRejectedValue(new Error('本次操作已拦截：高星干员从绑定账号中消失。'))
+    const { container } = renderWorkspace({
+      profile: createAdvancedProfile(),
+      workspace: createAdvancedWorkspace(),
+      onSynced,
+    })
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')
+    expect(input).not.toBeDisabled()
+
+    await user.upload(input!, new File([JSON.stringify([
+      { id: 'char_002_amiya', name: '阿米娅', own: true, elite: 2, rarity: 4 },
+    ])], 'operators.json', { type: 'application/json' }))
+
+    await waitFor(() => expect(apiJsonMock).toHaveBeenCalledWith('/api/user/workspace', {
+      method: 'PATCH',
+      json: {
+        profile_id: 'advanced-profile',
+        operators: [{ id: 'char_002_amiya', name: '阿米娅', own: true, elite: 2, rarity: 4 }],
+      },
+      fallbackMessage: '导入干员数据失败，请稍后重试',
+    }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('本次操作已拦截')
+    expect(screen.getByText('陈')).toBeInTheDocument()
+    expect(screen.queryByText('阿米娅')).not.toBeInTheDocument()
+    expect(onSynced).not.toHaveBeenCalled()
+  })
+
   it('separates the desktop account actions in one bottom navigation group', () => {
     renderWorkspace()
 
@@ -175,6 +205,8 @@ async function openCdkTab(user: ReturnType<typeof userEvent.setup>) {
 
 function renderWorkspace(overrides: {
   announcement?: Announcement | null
+  profile?: UserGameAccount
+  workspace?: AuthSuccessResponse['workspace']
   onSynced?: (payload: AuthSuccessResponse) => void
   onRedeemNewProfile?: () => void
   onBack?: () => void
@@ -190,6 +222,8 @@ function renderWorkspace(overrides: {
 function WorkspaceSetupHarness({ overrides }: {
   overrides: {
     announcement?: Announcement | null
+    profile?: UserGameAccount
+    workspace?: AuthSuccessResponse['workspace']
     onSynced?: (payload: AuthSuccessResponse) => void
     onRedeemNewProfile?: () => void
     onBack?: () => void
@@ -201,8 +235,8 @@ function WorkspaceSetupHarness({ overrides }: {
   return (
     <WorkspaceSetupPage
       user={{ id: 'user-1', email: 'test@example.com' } as AuthUser}
-      profile={createPreviewProfile()}
-      workspace={null}
+      profile={overrides.profile ?? createPreviewProfile()}
+      workspace={overrides.workspace ?? null}
       announcement={overrides.announcement ?? null}
       activeSection={activeSection}
       onSectionChange={setActiveSection}
@@ -229,6 +263,31 @@ function createPreviewProfile(): UserGameAccount {
     operator_count: 0,
     updated_at: null,
     created_at: '2026-07-11T00:00:00.000Z',
+  }
+}
+
+function createAdvancedProfile(): UserGameAccount {
+  return {
+    ...createPreviewProfile(),
+    id: 'advanced-profile',
+    kind: 'cdk',
+    permission: 'advanced',
+    display_name: '高级档案',
+  }
+}
+
+function createAdvancedWorkspace(): NonNullable<AuthSuccessResponse['workspace']> {
+  return {
+    profile_id: 'advanced-profile',
+    operators: [{ id: 'char_010_chen', name: '陈', own: true, elite: 2, rarity: 5 }],
+    config: null,
+    elite_overrides: {},
+    last_result: null,
+    saved_configs: [],
+    result_history: [],
+    archived_results: [],
+    free_schedule_entitlement: null,
+    updated_at: '2026-07-25T00:00:00.000Z',
   }
 }
 
