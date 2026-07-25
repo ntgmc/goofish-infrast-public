@@ -8,6 +8,8 @@ export const SCHEDULE_MODE_LABELS: Record<string, string> = {
 }
 
 const DEFAULT_SHIFT_HOURS = [8, 8, 8]
+const MIN_MAA_SHIFT_COUNT = 3
+const MAX_MAA_SHIFT_COUNT = 6
 
 export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   '243': {
@@ -84,12 +86,15 @@ export function parseShiftHours(value: unknown): number[] | null {
       : null
   if (!items) return null
   const hours = items.map((item) => Number(item))
-  if (hours.length === 0 || hours.length > 6) return null
+  if (hours.length === 0 || hours.length > MAX_MAA_SHIFT_COUNT) return null
   if (hours.some((hour) => !Number.isFinite(hour) || hour <= 0)) return null
-  return hours.map((hour) => Math.round(hour * 100) / 100)
+  return hours
+    .map((hour) => Math.round(hour * 100) / 100)
+    .sort((left, right) => right - left)
 }
 
 export function isValidShiftHours(hours: number[]): boolean {
+  if (hours.length < MIN_MAA_SHIFT_COUNT || hours.length > MAX_MAA_SHIFT_COUNT) return false
   const total = hours.reduce((sum, hour) => sum + hour, 0)
   return Math.abs(total - 24) <= 0.0001
 }

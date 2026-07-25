@@ -216,13 +216,13 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_080: "固源岩",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_081: "请输入 1–6 个正数，并确保总计为 24 小时。",
+  components_ConfigEditor_081: "请输入 3–6 个正数，并确保总计为 24 小时。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_082: "MAA 换班间隔",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_083: "应用间隔",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_084: "使用短横线或逗号分隔，例如 12-6-6；最多 6 班，总计 24 小时。",
+  components_ConfigEditor_084: "使用短横线或逗号分隔，例如 12-6-6；至少 3 班、最多 6 班，总计 24 小时。长班会优先作为高效率班。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_085: "龙门币，赤金，龙门币",
   // src/components/DeferredFeatureMenu.tsx

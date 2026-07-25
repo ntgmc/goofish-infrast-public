@@ -8,7 +8,7 @@ const SCENARIO_PARETO_EPSILON = 0.01
 export const SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT = 13
 
 export type ScenarioLayout = '153' | '243' | '333'
-export type ScenarioMaaSchedule = 'variable' | '8x3' | '12x2'
+export type ScenarioMaaSchedule = 'variable' | '8x3'
 export type ScenarioDroneStrategy =
   | 'off'
   | 'auto'
@@ -132,7 +132,6 @@ const LAYOUT_COUNTS: Record<ScenarioLayout, { trading: number; manufacturing: nu
 
 const SCHEDULES: Record<Exclude<ScenarioMaaSchedule, 'variable'>, number[]> = {
   '8x3': [8, 8, 8],
-  '12x2': [12, 12],
 }
 
 const DRONE_LABELS: Record<ScenarioDroneStrategy, string> = {
@@ -281,7 +280,7 @@ function validateFactors(factors: ScenarioComparisonFactors): void {
       throw new Error(copy.domain.lib_scenario_comparison_022)
     }
   }
-  if (factors.maaSchedules.some((value) => !['variable', '8x3', '12x2'].includes(value))) {
+  if (factors.maaSchedules.some((value) => !['variable', '8x3'].includes(value))) {
     throw new Error(copy.domain.lib_scenario_comparison_023)
   }
   if (factors.droneStrategies.some((value) => !Object.prototype.hasOwnProperty.call(DRONE_LABELS, value))) {
@@ -442,6 +441,5 @@ function scenarioDescription(
 function scheduleLabel(strategy: ScenarioMaaSchedule | 'rotation'): string {
   if (strategy === 'variable') return copy.domain.lib_scenario_comparison_038
   if (strategy === '8x3') return 'MAA 8h×3'
-  if (strategy === '12x2') return 'MAA 12h×2'
   return copy.domain.lib_scenario_comparison_039
 }

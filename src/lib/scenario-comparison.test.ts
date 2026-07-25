@@ -23,7 +23,7 @@ const orundumPlan: ScenarioProductionPlan = {
 
 const baseFactors: ScenarioComparisonFactors = {
   layouts: [{ layout: '243', plans: [balancedPlan] }],
-  maaSchedules: ['variable', '8x3', '12x2'],
+  maaSchedules: ['variable', '8x3'],
   includeRotation: true,
   droneStrategies: ['off', 'auto', 'lmd', 'orundum', 'pure_gold', 'battle_record', 'originium_shard'],
 }
@@ -35,7 +35,7 @@ describe('expandScenarioComparison', () => {
       orundum_planning: { daily_sanity_budget: 300, monthly_card: true },
     }
     const result = expandScenarioComparison(base, baseFactors)
-    expect(result.scenarios).toHaveLength(16)
+    expect(result.scenarios).toHaveLength(11)
     expect(result.variableScenarioCount).toBe(5)
     expect(result.scenarios.filter((item) => item.scheduleStrategy === 'rotation')).toHaveLength(1)
     const variable = result.scenarios.find((item) => item.scheduleStrategy === 'variable')
@@ -48,7 +48,6 @@ describe('expandScenarioComparison', () => {
     }))
     expect(variable?.config.orundum_planning).toEqual(base.orundum_planning)
     expect(result.scenarios.find((item) => item.scheduleStrategy === '8x3')?.shiftHours).toEqual([8, 8, 8])
-    expect(result.scenarios.find((item) => item.scheduleStrategy === '12x2')?.shiftHours).toEqual([12, 12])
   })
 
   it('supports sustainable, inventory-only, and shard-stockpiling production plans', () => {
@@ -105,7 +104,14 @@ describe('expandScenarioComparison', () => {
 
     expect(() => expandScenarioComparison(CONFIG_PRESETS['243'], {
       ...baseFactors,
-      layouts: [{ layout: '243', plans: [balancedPlan, orundumPlan] }],
+      layouts: [{
+        layout: '243',
+        plans: [
+          balancedPlan,
+          orundumPlan,
+          { trading: { lmd: 2, orundum: 0 }, manufacturing: { pureGold: 1, battleRecord: 3, originiumShard: 0 } },
+        ],
+      }],
     })).toThrow(/最多允许 24/)
   })
 
