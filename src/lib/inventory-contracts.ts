@@ -143,7 +143,7 @@ export const ITEM_ICON_PATHS: Record<string, string> = {
   result_archive_folder: '/assets/items/item-placeholder.svg',
   maa_export_trial_coupon: '/assets/items/item-placeholder.svg',
   newcomer_supply_pack: '/assets/items/item-placeholder.svg',
-  generic_gift_pack: '/assets/items/item-placeholder.svg',
+  generic_gift_pack: '/assets/items/generic-gift-pack.png',
 }
 
 export function itemIconPath(iconKey: string): string {
