@@ -414,7 +414,7 @@ function summarizeRiskEvent(event: NonNullable<CdkRecord['risk_events']>[number]
     type: event.type,
     reason: event.reason,
     soft_block: event.detail?.soft_block === true,
-    escalation: event.type === 'soft_block_threshold',
+    escalation: event.type === 'operator_review_recommended' || event.type === 'soft_block_threshold',
   }
 }
 

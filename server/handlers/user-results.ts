@@ -19,6 +19,8 @@ import {
 } from '../storage/user-store'
 import { withTransaction } from '../storage/postgres'
 import { jsonResponse, requireUserSession } from './user-auth'
+import { recordTrackedExportBehaviorEvent } from '../behavior-risk/service'
+import { getPersonalUseDeclarationAcceptance } from '../storage/personal-use-declaration-store'
 
 export default async function userResultsHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -37,8 +39,21 @@ export default async function userResultsHandler(req: Request): Promise<Response
       if (!historyItem) return jsonResponse({ error: '排班结果不存在。' }, 404)
       if (historyItem.result.schedule_mode === 'rotation') return jsonResponse({ error: '轮班制结果不能导出为 MAA JSON。' }, 409)
       const result = JSON.parse(JSON.stringify(historyItem.result)) as Record<string, unknown>
+      const behaviorDeclaration = await getPersonalUseDeclarationAcceptance(auth.user.id).catch(() => null)
       const permanent = hasCapability({ permission: getEffectiveProfilePermission(profile) }, 'export_maa_json')
       if (permanent) {
+        await recordTrackedExportBehaviorEvent({
+          req,
+          auth,
+          profileId: profile.id,
+          jobId: historyItem.id,
+          uid: profile.skland_binding?.uid,
+          result,
+          eventKey: `export:${auth.user.id}:${body.idempotency_key}`,
+          activityClaimedAt: isFreePreviewProfile(profile) ? profile.created_at : null,
+          declarationVersion: behaviorDeclaration?.declaration_version,
+          declarationAcceptedAt: behaviorDeclaration?.accepted_at,
+        })
         return jsonResponse({ result, result_id: historyItem.id, filename: `maa_schedule_${historyItem.id}.json`, consumed_coupon: false })
       }
       const requestHash = createHash('sha256').update(stableJsonStringify(body)).digest('hex')
@@ -50,6 +65,18 @@ export default async function userResultsHandler(req: Request): Promise<Response
         requestHash,
         operationType: 'maa_export',
         response: { result, result_id: historyItem.id, filename: `maa_schedule_${historyItem.id}.json`, consumed_coupon: true },
+      })
+      await recordTrackedExportBehaviorEvent({
+        req,
+        auth,
+        profileId: profile.id,
+        jobId: historyItem.id,
+        uid: profile.skland_binding?.uid,
+        result,
+        eventKey: `export:${auth.user.id}:${body.idempotency_key}`,
+        activityClaimedAt: isFreePreviewProfile(profile) ? profile.created_at : null,
+        declarationVersion: behaviorDeclaration?.declaration_version,
+        declarationAcceptedAt: behaviorDeclaration?.accepted_at,
       })
       return jsonResponse(response)
     }

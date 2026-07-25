@@ -31,6 +31,7 @@ import { authCopy } from '../../src/copy/zh-CN/auth'
 import { BrevoDailyQuotaExceededError } from './email'
 import { getRegistrationSettings } from '../storage/registration-settings-store'
 import { requireSiteFeatures } from '../feature-gate'
+import { recordRequestBehaviorEvent } from '../behavior-risk/service'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -90,6 +91,13 @@ export default async (req: Request): Promise<Response> => {
         }, registered.status, quotaLimited ? rateLimitHeaders(registered.retryAfterSeconds!) : {})
       }
       await recordRegister('success', startedAt)
+      await recordRequestBehaviorEvent({
+        req,
+        eventType: 'register',
+        userId: registered.user.id,
+        eventKey: `register:${registered.user.id}`,
+        occurredAt: new Date(startedAt),
+      })
       return registrationAcceptedResponse(registered.verificationRequired)
     }
 
@@ -114,6 +122,11 @@ export default async (req: Request): Promise<Response> => {
         return jsonResponse({ error: loggedIn.message, ...(loggedIn.code && { code: loggedIn.code }) }, loggedIn.status)
       }
       await rateLimit.attempt.refund()
+      await recordRequestBehaviorEvent({
+        req,
+        eventType: 'login',
+        userId: loggedIn.user.id,
+      })
       return jsonResponse(await buildAuthPayload(loggedIn.user), 200, { 'Set-Cookie': loggedIn.cookie })
     }
 
@@ -161,6 +174,12 @@ export default async (req: Request): Promise<Response> => {
         return jsonResponse({ error: verified.message }, verified.status)
       }
       await tokenLimit.attempt.refund()
+      await recordRequestBehaviorEvent({
+        req,
+        eventType: 'activation',
+        userId: verified.user.id,
+        eventKey: `activation:${verified.user.id}`,
+      })
       return jsonResponse(await buildAuthPayload(verified.user), 200, { 'Set-Cookie': verified.cookie })
     }
 

@@ -177,7 +177,7 @@ function CdkDetailPanel({
           {detail.status !== 'revoked' && <SmallButton onClick={() => void onSetPermission(detail)} loading={busyAction === `set_permission:${detail.code_hash}`}>改授权</SmallButton>}
           {nextPermission && detail.status !== 'frozen' && detail.status !== 'revoked' && <SmallButton onClick={() => void onPatch(detail, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${detail.code_hash}`}>升级</SmallButton>}
           {detail.status === 'frozen' && <SmallButton onClick={() => void onPatch(detail, 'unfreeze')} loading={busyAction === `unfreeze:${detail.code_hash}`} tone="success">解冻</SmallButton>}
-          {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => runReviewedAction('accept_operator_baseline_and_unfreeze', '请输入干员数据误拦截核验备注。该操作会接受最新快照为新基线并解冻。')} loading={busyAction === `accept_operator_baseline_and_unfreeze:${detail.code_hash}`} tone="success">接受干员基线</SmallButton>}
+          {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => runReviewedAction('accept_operator_baseline_and_unfreeze', '请输入干员数据核验备注。该操作会接受最新异常快照为新基线；如授权处于冻结状态，也会一并解冻。')} loading={busyAction === `accept_operator_baseline_and_unfreeze:${detail.code_hash}`} tone="success">接受干员基线</SmallButton>}
           {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => void onPatch(detail, 'revoke')} loading={busyAction === `revoke:${detail.code_hash}`} tone="danger">撤销</SmallButton>}
           <SmallButton onClick={onClose} autoFocus>关闭</SmallButton>
         </div>
@@ -249,14 +249,14 @@ export function RiskSettingsPanel({
       <div className="tool-panel-header flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <h2 className="text-base font-semibold text-ink-primary">风控开关</h2>
-          <p className="mt-1 text-sm text-ink-muted">控制账号档案的干员数据异常检测。</p>
+          <p className="mt-1 text-sm text-ink-muted">控制账号档案的干员数据异常检测；异常提交会被软拦截并进入全站行为评分，不会自动冻结授权。</p>
         </div>
         <span className="text-xs text-ink-muted" role="status" aria-live="polite">{saving ? '保存中...' : `更新 ${formatDate(settings.updated_at)}`}</span>
       </div>
       <div className="grid gap-3 p-4">
         <RiskToggle
           label="干员数据风控"
-          description="校验干员消失、练度回退和拥有数异常下降。"
+          description="校验干员消失、练度回退和拥有数异常下降；重复且不同的异常快照会进入人工复核。"
           checked={settings.operator_data_risk_enabled}
           disabled={saving}
           onChange={(checked) => onChange({ operator_data_risk_enabled: checked })}

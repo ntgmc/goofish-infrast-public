@@ -301,6 +301,8 @@ rm -f admin.cookies
 | `MAA_ADMIN_SECRET` | Yes | 优化任务轮询令牌签名密钥 |
 | `DEPOT_SAMPLE_HASH_SECRET` | Yes | 仓库匿名样本哈希密钥，不得复用 CDK 密钥 |
 | `FREE_PREVIEW_UID_HASH_SECRET` | Yes | 免费领取 UID 哈希密钥，不得复用 CDK 密钥 |
+| `BEHAVIOR_RISK_HMAC_SECRET` | Yes | 行为风控关联信号 HMAC 密钥，API 与 Worker 必须使用同一独立密钥；生产环境至少 32 字符 |
+| `BEHAVIOR_RISK_HMAC_KEY_VERSION` | No | 行为风控 HMAC 密钥版本，默认 `v1`；轮换密钥时同步更新并保留在事件审计中 |
 | `SKLAND_CREDENTIAL_SECRET` | Yes | 森空岛凭据加密密钥，长度至少 16 字符 |
 | `CDK_HASH_SECRET_PREVIOUS` | No | CDK 轮换期间的前代密钥 |
 | `MAA_ADMIN_SECRET_PREVIOUS` | No | 授权签名轮换期间的前代密钥 |

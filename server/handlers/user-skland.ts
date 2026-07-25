@@ -57,6 +57,7 @@ import {
   attachPersonalUseDeclarationAcceptanceToProfile,
   getPersonalUseDeclarationAcceptance,
 } from '../storage/personal-use-declaration-store'
+import { recordAuthenticatedRequestBehaviorEvent, recordRequestBehaviorEvent } from '../behavior-risk/service'
 
 const PENDING_BINDING_TTL_MS = 10 * 60 * 1000
 const UID_MISMATCH_FREEZE_THRESHOLD = 3
@@ -168,7 +169,7 @@ export default async (req: Request): Promise<Response> => {
       if (typeof body.confirmation_id !== 'string' || !body.confirmation_id.trim()) {
         return jsonResponse({ error: 'Missing confirmation_id.' }, 400)
       }
-      return confirmFreePreviewClaim(auth.user, body.confirmation_id.trim())
+      return confirmFreePreviewClaim(auth.user, body.confirmation_id.trim(), req, auth.tokenHash)
     }
 
     if (pathname.endsWith('/login/start')) {
@@ -254,7 +255,9 @@ export default async (req: Request): Promise<Response> => {
       }
 
       if (isDepotValueProfile(profile)) {
-        return jsonResponse(await saveDepotValueSklandBinding(auth.user, profile))
+        const payload = await saveDepotValueSklandBinding(auth.user, profile)
+        await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'bind', profileId: profile.id, uid: pending.uid })
+        return jsonResponse(payload)
       }
 
       if (isFreePreviewProfile(profile)) {
@@ -273,6 +276,19 @@ export default async (req: Request): Promise<Response> => {
         throw error
       }
       await recordSklandImport('success', 'ok', startedAt, profile.id, 'login_confirm')
+      const behaviorDeclaration = isFreePreviewProfile(profile)
+        ? await getPersonalUseDeclarationAcceptance(auth.user.id).catch(() => null)
+        : null
+      await recordAuthenticatedRequestBehaviorEvent({
+        req,
+        auth,
+        eventType: 'bind',
+        profileId: profile.id,
+        uid: imported.uid,
+        activityClaimedAt: isFreePreviewProfile(profile) ? profile.created_at : null,
+        declarationVersion: behaviorDeclaration?.declaration_version,
+        declarationAcceptedAt: behaviorDeclaration?.accepted_at,
+      })
       return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
     }
 
@@ -301,6 +317,7 @@ export default async (req: Request): Promise<Response> => {
       try {
         const imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(encryptedCred), profile.skland_binding!.uid)
         await recordSklandImport('success', 'ok', startedAt, profile.id, 'refresh')
+        await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })
         return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
       } catch (caught) {
         if (isSklandCredentialInvalid(caught)) {
@@ -502,7 +519,12 @@ async function createPendingFreePreviewConfirmationFromCred(
   })
 }
 
-async function confirmFreePreviewClaim(user: AuthPayloadUser, confirmationId: string): Promise<Response> {
+async function confirmFreePreviewClaim(
+  user: AuthPayloadUser,
+  confirmationId: string,
+  req: Request,
+  sessionTokenHash: string,
+): Promise<Response> {
   const pending = await getFreePreviewPendingClaim(user.id, confirmationId)
   if (!isFreePreviewConfirmationPending(pending)) {
     return jsonResponse({ error: '免费个人排班确认已过期，请重新登录森空岛。' }, 400)
@@ -564,6 +586,17 @@ async function confirmFreePreviewClaim(user: AuthPayloadUser, confirmationId: st
     await attachPersonalUseDeclarationAcceptanceToProfile(user.id, profile.id)
     const imported = await saveSklandImport(user.id, profile, decryptSklandCredential(pending.encrypted_cred), pending.uid)
     await deleteFreePreviewPendingClaim(user.id, confirmationId)
+    await recordRequestBehaviorEvent({
+      req,
+      eventType: 'bind',
+      userId: user.id,
+      sessionTokenHash,
+      profileId: profile.id,
+      uid: imported.uid,
+      activityClaimedAt: now,
+      declarationVersion: personalUseAcceptance?.declaration_version,
+      declarationAcceptedAt: personalUseAcceptance?.accepted_at,
+    })
     return jsonResponse(await buildPayloadWithImport(user, profile.id, imported))
   } catch (error) {
     if (!existingPreview) await deleteFreePreviewClaim(uidHash, profile.id)

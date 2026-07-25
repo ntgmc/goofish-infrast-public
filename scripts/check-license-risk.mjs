@@ -22,25 +22,57 @@ const regressedOperators = [
 ]
 
 let record = createRecord('operator-risk')
-record.baseline_operator_fingerprint = licenseUtils.buildOperatorFingerprint(baselineOperators)
-record.latest_operator_fingerprint = record.baseline_operator_fingerprint
 await store.create(`cdk/${record.code_hash}.json`, record)
 
-const risk = licenseUtils.evaluateOperatorRisk(record, regressedOperators)
-if (risk.ok || risk.event.type !== 'operator_ownership_regression') {
-  throw new Error('operator risk should reject a missing owned high-rarity operator')
+const initial = licenseUtils.evaluateOperatorRisk(record, baselineOperators)
+if (!initial.ok) throw new Error('operator risk should accept the first valid snapshot')
+record = await licenseUtils.recordOperatorFingerprint(record, initial.fingerprint)
+if (
+  record.baseline_operator_fingerprint?.hash !== initial.fingerprint.hash
+  || record.latest_operator_fingerprint?.hash !== initial.fingerprint.hash
+) {
+  throw new Error('operator risk should persist the first valid snapshot as baseline and latest')
 }
 
-for (let index = 0; index < 3; index += 1) {
-  const blocked = await licenseUtils.recordSoftBlockedRiskEvent(record, risk.event, licenseUtils.formatOperatorRiskBlockMessage(risk.event.reason))
-  if (index < 2 && blocked.frozen) throw new Error('operator risk should soft-block before the threshold')
-  if (index === 2 && !blocked.frozen) throw new Error('operator risk should escalate at the threshold')
+const regressedVariants = [
+  regressedOperators,
+  [...regressedOperators, { id: 'char_003', name: '未拥有干员 A', own: false, elite: 0, rarity: 4 }],
+  [...regressedOperators, { id: 'char_004', name: '未拥有干员 B', own: false, elite: 0, rarity: 5 }],
+]
+for (const [index, operators] of regressedVariants.entries()) {
+  const risk = licenseUtils.evaluateOperatorRisk(record, operators)
+  if (risk.ok || risk.event.type !== 'operator_ownership_regression') {
+    throw new Error('operator risk should reject a missing owned high-rarity operator')
+  }
+  const blocked = await licenseUtils.recordSoftBlockedRiskEvent(
+    record,
+    risk.event,
+    licenseUtils.formatOperatorRiskBlockMessage(risk.event.reason),
+    risk.fingerprint,
+  )
+  if (blocked.frozen || blocked.record.status !== 'used') {
+    throw new Error('operator risk should never freeze an authorization automatically')
+  }
+  if (blocked.reviewRecommended !== (index === 2)) {
+    throw new Error('operator risk should recommend review only after enough different anomaly fingerprints')
+  }
   record = blocked.record
+
+  if (index === 0) {
+    const countBeforeRetry = record.risk_events?.length ?? 0
+    const retried = await licenseUtils.recordSoftBlockedRiskEvent(
+      record,
+      risk.event,
+      licenseUtils.formatOperatorRiskBlockMessage(risk.event.reason),
+      risk.fingerprint,
+    )
+    if ((retried.record.risk_events?.length ?? 0) !== countBeforeRetry) {
+      throw new Error('operator risk should deduplicate retries for the same fingerprint in one five-minute window')
+    }
+    record = retried.record
+  }
 }
 
-record.status = 'frozen'
-record.latest_operator_fingerprint = licenseUtils.buildOperatorFingerprint(regressedOperators)
-await store.set(`cdk/${record.code_hash}.json`, record)
 const recovered = await licenseUtils.acceptLatestOperatorBaselineAndUnfreeze(record, 'verified operator snapshot')
 if (!recovered || recovered.status !== 'used' || recovered.baseline_operator_fingerprint?.hash !== recovered.latest_operator_fingerprint?.hash) {
   throw new Error('reviewed recovery should accept the latest operator snapshot and unfreeze the record')

@@ -13,6 +13,7 @@ import FeatureSettingsSection from './features/FeatureSettingsSection'
 import PublicContentSettingsSection from './content/PublicContentSettingsSection'
 import AnnouncementSettingsSection from './announcements/AnnouncementSettingsSection'
 import InventoryAdminSection from './inventory/InventoryAdminSection'
+import BehaviorRiskPanel from './risk/BehaviorRiskPanel'
 
 import { GeneratedPermission, AdminSection, UsageRangeKey, permissionLabels, sectionLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, UserDetailDialog, CdkTable, CdkDetailDialog, RiskSettingsPanel, RiskTable, Metric, EMPTY_LATENCY_STATS, EMPTY_SKLAND_STATS, EMPTY_ANNOUNCEMENT_STATS, FunnelPanel, FailureReasonPanel, LatencyPanel, OpsSummaryPanel, SklandPanel, AnnouncementStatsPanel, CdkDistributionPanel, CdkRecordDistributionPanel, RiskConsoleSummary, RiskTrendPanel, RiskReasonPanel, UsageTrendChart, UserStatusPill, SmallButton, formatDate, formatDuration, omitFieldError, inputClassName, formatAdminProfileAccess } from './modules'
 import { useAdminController } from './useAdminController'
@@ -345,6 +346,7 @@ export default function AdminDashboardView() {
                   saving={busyAction === 'risk-settings'}
                   onChange={handleSaveRiskSettings}
                 />
+                <BehaviorRiskPanel />
                 <RiskConsoleSummary summary={cdkOpsSummary} />
                 <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
                   <RiskTrendPanel days={cdkOpsSummary.risk_trend} />

@@ -228,7 +228,7 @@ export const publicCopy = {
   // src/pages/LandingPage.tsx
   pages_LandingPage_060: "结果已可导出",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_001: "2026年7月14日",
+  pages_PublicInfoPage_001: "2026年7月25日",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_002: "使用 MaaTool 需要准备什么？",
   // src/pages/PublicInfoPage.tsx
@@ -383,6 +383,16 @@ export const publicCopy = {
   pages_PublicInfoPage_077: "联系我们",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_078: "如对本页面内容或数据处理有疑问，请通过 MaaTool QQ 群联系官方。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_101: "行为风控与保留期限",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_102: "为识别批量代办、活动权益滥用等异常使用，服务会关联注册或激活、绑定档案、提交与完成生成、完整 MAA JSON 导出、成功登录、工作区保存、干员数据与已确认基线的异常差异，以及不含完整网址和参数的粗粒度页面类别与时间。风险模型和每次生成还会记录对应版本。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_103: "浏览器随机实例标识、会话、网络地址、浏览器 User-Agent 和游戏 UID 仅以服务端 HMAC 标识进入行为风控库；不会在该库长期保存它们的原始值，也不会采集硬件指纹。输出证据仅包含下载文件 SHA-256、生成或下载次数，以及不含干员、房间名称和完整 JSON 的排班结构摘要。干员数据异常证据只记录异常类型、拥有数量和规范化快照 SHA-256，不把干员名称、干员 ID 或完整干员列表写入行为风控库。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_104: "异常信号采用多项评分并进入人工复核；共用同一 IP、一次快速操作或一次导出高峰不会单独构成强风险结论。待复核状态、分数和证据不会向普通用户展示；只有管理员人工确认并实施限制后，账号或档案才会显示中性的不可用与联系客服提示。",
+  // src/pages/PublicInfoPage.tsx
+  pages_PublicInfoPage_105: "上述行为风控事件、关联复核单和可关联审计证据最长保留 90 天，到期删除；系统不回填上线前历史。账号注销冷静期结束后，常规账户和工作区数据会删除，但尚未到期的 HMAC 风控证据仍按该 90 天上限到期删除。个人使用声明确认记录属于独立的法律与争议处理记录，其中包含确认时客户端 IP，按账号存续期加注销后一年保留，不适用行为风控库的 90 天期限。",
   // src/pages/PricingPage.tsx
   pages_PricingPage_001: "价格与权益",
   // src/pages/PricingPage.tsx

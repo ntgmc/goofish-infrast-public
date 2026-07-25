@@ -381,7 +381,8 @@ deploy ALL=(root) NOPASSWD: /usr/bin/systemctl reload nginx
 
 Production secrets such as `DATABASE_URL`, `MAA_ADMIN_PASSWORD`,
 `MAA_ADMIN_SECRET`, `CDK_HASH_SECRET`, `DEPOT_SAMPLE_HASH_SECRET`,
-`FREE_PREVIEW_UID_HASH_SECRET`, and `SKLAND_CREDENTIAL_SECRET` stay in the
+`FREE_PREVIEW_UID_HASH_SECRET`, `BEHAVIOR_RISK_HMAC_SECRET`, and
+`SKLAND_CREDENTIAL_SECRET` stay in the
 systemd `EnvironmentFile`; they are not deployment workflow secrets. Backup,
 recovery, key rotation and restore drills remain documented in
 [disaster-recovery.md](disaster-recovery.md).

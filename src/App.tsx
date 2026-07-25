@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { MotionConfig } from 'motion/react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import BuildMetaStrip from './components/BuildMetaStrip'
@@ -16,6 +16,8 @@ import { SiteFeatureProvider } from './lib/site-feature-context'
 import { FeatureRoute } from './components/FeatureUnavailablePage'
 import AccountSafetyPage from './pages/AccountSafetyPage'
 import { PublicContentProvider } from './lib/public-content-context'
+import { apiVoid } from './lib/api-client'
+import { categorizeBehaviorRiskPath } from './lib/behavior-risk-client'
 
 
 const ToolPage = lazy(() => import('./pages/ToolPage'))
@@ -46,6 +48,14 @@ function AppContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const routeGroup = getRouteGroup(location.pathname)
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/admin')) return
+    void apiVoid('/api/user/behavior-risk/engagement', {
+      method: 'POST',
+      json: { page_category: categorizeBehaviorRiskPath(location.pathname) },
+    }).catch(() => undefined)
+  }, [location.pathname])
 
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">

@@ -1042,6 +1042,90 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_inventory_distribution_pending
   ON inventory_distribution_recipients(campaign_id, status, user_id);
 
+CREATE TABLE IF NOT EXISTS behavior_risk_events (
+  id TEXT PRIMARY KEY,
+  event_key TEXT UNIQUE,
+  event_type TEXT NOT NULL CHECK (event_type IN ('register', 'activation', 'login', 'bind', 'job_submit', 'generate', 'export', 'workspace_save', 'page_view', 'operator_data_anomaly', 'account_deleted')),
+  user_id TEXT,
+  profile_id TEXT,
+  job_id TEXT,
+  browser_hmac TEXT,
+  session_hmac TEXT,
+  network_hmac TEXT,
+  ua_hmac TEXT,
+  uid_hmac TEXT,
+  output_hash TEXT,
+  page_category TEXT,
+  key_version TEXT NOT NULL,
+  model_version TEXT NOT NULL,
+  optimizer_version TEXT,
+  structure_summary JSONB,
+  activity_claimed_at TIMESTAMPTZ,
+  declaration_version TEXT,
+  declaration_accepted_at TIMESTAMPTZ,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+ALTER TABLE behavior_risk_events DROP CONSTRAINT IF EXISTS behavior_risk_events_event_type_check;
+ALTER TABLE behavior_risk_events
+  ADD CONSTRAINT behavior_risk_events_event_type_check
+  CHECK (event_type IN ('register', 'activation', 'login', 'bind', 'job_submit', 'generate', 'export', 'workspace_save', 'page_view', 'operator_data_anomaly', 'account_deleted'));
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_user_time ON behavior_risk_events(user_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_browser_time ON behavior_risk_events(browser_hmac, occurred_at DESC) WHERE browser_hmac IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_network_ua_time ON behavior_risk_events(network_hmac, ua_hmac, occurred_at DESC) WHERE network_hmac IS NOT NULL AND ua_hmac IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_uid_time ON behavior_risk_events(uid_hmac, occurred_at DESC) WHERE uid_hmac IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_job ON behavior_risk_events(job_id) WHERE job_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_expiry ON behavior_risk_events(expires_at);
+
+CREATE TABLE IF NOT EXISTS behavior_risk_cases (
+  id TEXT PRIMARY KEY,
+  group_key TEXT NOT NULL,
+  evidence_key TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'dismissed', 'actioned')),
+  score INTEGER NOT NULL CHECK (score >= 0 AND score <= 100),
+  categories_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  rules_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  model_version TEXT NOT NULL,
+  first_seen_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by TEXT
+);
+ALTER TABLE behavior_risk_cases ADD COLUMN IF NOT EXISTS evidence_key TEXT;
+UPDATE behavior_risk_cases
+  SET evidence_key = group_key || ':legacy:' || id
+  WHERE evidence_key IS NULL;
+ALTER TABLE behavior_risk_cases ALTER COLUMN evidence_key SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_behavior_risk_open_group ON behavior_risk_cases(group_key) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_reviewed_evidence ON behavior_risk_cases(group_key, evidence_key, status);
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_cases_status_time ON behavior_risk_cases(status, last_seen_at DESC);
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_cases_expiry ON behavior_risk_cases(expires_at);
+
+CREATE TABLE IF NOT EXISTS behavior_risk_case_members (
+  case_id TEXT NOT NULL REFERENCES behavior_risk_cases(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL,
+  evidence_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (case_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS behavior_risk_review_audit (
+  id TEXT PRIMARY KEY,
+  case_id TEXT NOT NULL REFERENCES behavior_risk_cases(id) ON DELETE CASCADE,
+  admin_username TEXT NOT NULL,
+  outcome TEXT NOT NULL CHECK (outcome IN ('dismiss', 'restrict')),
+  note TEXT NOT NULL CHECK (length(trim(note)) > 0),
+  actions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  case_snapshot_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_review_case ON behavior_risk_review_audit(case_id, created_at DESC);
+
 -- goofish:migration-phase
 INSERT INTO item_definitions
   (code, kind, effect_code, name, description, icon_key, system_owned, issuance_enabled, created_at, updated_at)

@@ -40,6 +40,16 @@ const legalContent: Record<Exclude<PublicInfoPageKind, 'faq' | 'support'>, reado
       ],
     },
     {
+      id: 'behavior-risk-controls',
+      heading: copy.public.pages_PublicInfoPage_101,
+      paragraphs: [
+        copy.public.pages_PublicInfoPage_102,
+        copy.public.pages_PublicInfoPage_103,
+        copy.public.pages_PublicInfoPage_104,
+        copy.public.pages_PublicInfoPage_105,
+      ],
+    },
+    {
       id: 'storage-security-rights',
       heading: copy.public.pages_PublicInfoPage_025,
       paragraphs: [
