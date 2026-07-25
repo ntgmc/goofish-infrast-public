@@ -11,7 +11,7 @@ import {
 import type { AuthContext } from '../handlers/user-auth'
 import type { BehaviorRiskEventType, BehaviorRiskPageCategory } from './scoring'
 
-export const BEHAVIOR_RISK_BROWSER_HEADER = 'X-Maa-Behavior-Instance'
+const BEHAVIOR_RISK_BROWSER_HEADER = 'X-Maa-Behavior-Instance'
 const DEFAULT_KEY_VERSION = 'v1'
 const EVALUATION_DELAY_MS = 5_000
 

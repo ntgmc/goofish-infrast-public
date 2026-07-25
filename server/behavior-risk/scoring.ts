@@ -42,7 +42,7 @@ export type BehaviorRiskEvent = {
   expires_at: string
 }
 
-export type BehaviorRiskRule = {
+type BehaviorRiskRule = {
   code: string
   category: string
   score: number
