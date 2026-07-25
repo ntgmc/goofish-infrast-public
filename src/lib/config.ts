@@ -10,6 +10,7 @@ export const SCHEDULE_MODE_LABELS: Record<string, string> = {
 const DEFAULT_SHIFT_HOURS = [8, 8, 8]
 const MIN_MAA_SHIFT_COUNT = 3
 const MAX_MAA_SHIFT_COUNT = 6
+const FIXED_MAA_SHIFT_INTERVALS = [8, 12, 24]
 
 export const CONFIG_PRESETS: Record<string, LicenseConfig> = {
   '243': {
@@ -96,7 +97,9 @@ export function parseShiftHours(value: unknown): number[] | null {
 export function isValidShiftHours(hours: number[]): boolean {
   if (hours.length < MIN_MAA_SHIFT_COUNT || hours.length > MAX_MAA_SHIFT_COUNT) return false
   const total = hours.reduce((sum, hour) => sum + hour, 0)
-  return Math.abs(total - 24) <= 0.0001
+  if (Math.abs(total - 24) <= 0.0001) return true
+  const fixedInterval = hours.every((hour) => Math.abs(hour - hours[0]!) <= 0.0001)
+  return fixedInterval && FIXED_MAA_SHIFT_INTERVALS.some((interval) => Math.abs(hours[0]! - interval) <= 0.0001)
 }
 
 function sumCounts(counts: Record<string, number> | undefined): number {
