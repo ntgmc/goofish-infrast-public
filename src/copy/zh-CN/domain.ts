@@ -420,7 +420,7 @@ export const domainCopy = {
   // src/lib/config.ts
   lib_config_034: "，需要等于 ",
   // src/lib/config.ts
-  lib_config_035: "MAA 换班间隔需要由 3–6 个正数构成，并覆盖完整 24 小时。",
+  lib_config_035: "MAA 排班表需要 3–6 班；非等长间隔需覆盖 24 小时，等长间隔支持每 8、12 或 24 小时换班。",
   // src/lib/config.ts
   lib_config_036: "启用无人机时至少需要一个加速目标。",
   // src/lib/production-sanity.ts

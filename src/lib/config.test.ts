@@ -5,8 +5,10 @@ describe('shift hour normalization', () => {
   it.each([
     [6, 6, 6, 6],
     [8, 8, 8],
+    [12, 12, 12],
+    [24, 24, 24],
     [12, 6, 6],
-  ])('preserves valid 24-hour patterns', (...hours) => {
+  ])('preserves supported MAA patterns', (...hours) => {
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: hours })
     expect(config.shift_hours).toEqual(hours)
     expect(validateConfig(config)).toEqual({ ok: true })
@@ -19,7 +21,7 @@ describe('shift hour normalization', () => {
     expect(normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [12, 12] }).shift_hours).toEqual([8, 8, 8])
     expect(validateConfig({ ...CONFIG_PRESETS['243'], shift_hours: [12, 12] })).toEqual({
       ok: false,
-      message: 'MAA 换班间隔需要由 3–6 个正数构成，并覆盖完整 24 小时。',
+      message: 'MAA 排班表需要 3–6 班；非等长间隔需覆盖 24 小时，等长间隔支持每 8、12 或 24 小时换班。',
     })
   })
 
