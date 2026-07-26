@@ -300,8 +300,6 @@ async function assertNoServerCorsHeaders() {
 async function assertDeploymentDocumentation() {
   for (const path of [
     'README.md',
-    'docs/production-deploy.md',
-    'docs/dev-deploy.md',
     'docs/netlify-migration-plan.md',
   ]) {
     const contents = await readFile(path, 'utf8')
@@ -309,7 +307,7 @@ async function assertDeploymentDocumentation() {
     assert(contents.includes('goofish-static-files.conf'), `${path} should install the static Nginx snippet`)
     assert(/HTTPS|TLS/i.test(contents), `${path} should limit the security snippet to TLS`)
   }
-  for (const path of ['README.md', 'docs/production-deploy.md', 'docs/dev-deploy.md']) {
+  for (const path of ['README.md']) {
     const contents = await readFile(path, 'utf8')
     assert(contents.includes('goofish-server-hardening.conf'), `${path} should install and include server hardening`)
   }

@@ -22,7 +22,7 @@ const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts'
 const optimizeHandler = await bundleHandler('server/handlers/optimization.ts', [], [
   `import './server/optimize-job-runner.ts';`,
   `import { registerOptimizerPort } from './server/optimization/jobs/optimizer-port.ts';`,
-  `import { optimizerPort } from './server/optimization/jobs/executor.ts';`,
+  `import { optimizerPort } from './scripts/workspace-history-optimizer-port.ts';`,
   'registerOptimizerPort(optimizerPort);',
 ])
 const profilesHandler = await bundleHandler('server/handlers/user-profiles.ts')
@@ -1151,8 +1151,8 @@ function memoryStorePlugin() {
         path: 'memory-training-cost',
         namespace: 'workspace-history-smoke',
       }))
-      build.onResolve({ filter: /(^|[\\/])optimizer(?:-engine)?(\.ts)?$/ }, () => ({
-        path: 'memory-optimizer',
+      build.onResolve({ filter: /workspace-history-optimizer-port(\.ts)?$/ }, () => ({
+        path: 'memory-optimizer-port',
         namespace: 'workspace-history-smoke',
       }))
       build.onResolve({ filter: /build-meta$/ }, () => ({
@@ -1173,7 +1173,7 @@ function memoryModule(path) {
   if (path === 'memory-license-utils') return memoryLicenseUtilsModule()
   if (path === 'memory-usage-stats') return memoryUsageStatsModule()
   if (path === 'memory-training-cost') return 'export async function attachTrainingCostsToUpgradeSuggestions({ suggestions }) { return suggestions }'
-  if (path === 'memory-optimizer') return memoryOptimizerModule()
+  if (path === 'memory-optimizer-port') return memoryOptimizerPortModule()
   return 'export const APP_BUILD_META = { frontend_version: "test", backend_version: "test", data_version: "test", generated_at: "test", source_summary: "test" }'
 }
 
@@ -1530,7 +1530,7 @@ function memoryLicenseUtilsModule() {
   `
 }
 
-function memoryOptimizerModule() {
+function memoryOptimizerPortModule() {
   return `
     const previewRooms = {
       trading: [
@@ -1551,21 +1551,16 @@ function memoryOptimizerModule() {
     function room(id, name, product) {
       return { id, name, product, operators: [{ id: 'char_002_amiya', name: 'Amiya' }], final_efficiency: 1.23, efficiency: 1.23 }
     }
-    export class OptimizerEngine {
-      constructor(operators, config) {
-        this.operators = operators
-        this.config = config
-      }
-      getOptimalAssignments(_unused, ignoreElite) {
-        return {
+    function createScheduleResult(payload) {
+      const result = {
           author: 'test',
-          title: ignoreElite ? 'potential' : 'current',
+          title: 'public port fixture',
           description: 'test result',
-          schedule_mode: this.config.schedule_mode ?? 'maa',
+          schedule_mode: payload.effectiveConfig?.schedule_mode ?? 'maa',
           buildingType: 243,
           planTimes: '3 shifts',
           plans: [{ name: 'A', rooms: previewRooms }],
-          raw_results: [{ totalEfficiency: ignoreElite ? 200 : 100, assignmentDetail: [{ room: 'trade-1' }] }],
+          raw_results: [{ totalEfficiency: 100, assignmentDetail: [{ room: 'trade-1' }] }],
           daily_production: {
             manufacturing: { 'Pure Gold': 1 },
             trading: { LMD: 1 },
@@ -1573,55 +1568,143 @@ function memoryOptimizerModule() {
             net: {},
             drones: {},
           },
-          total_efficiency: ignoreElite ? 200 : 100,
+          total_efficiency: 100,
+          upgrade_suggestions: payload.request.include_upgrade_suggestions ? [] : undefined,
+          upgrade_suggestions_status: payload.request.include_upgrade_suggestions ? 'completed' : 'not_requested',
+        }
+      if (!payload.isPreviewProfile) return result
+      const previewResult = {
+        ...result,
+        raw_results: [],
+        upgrade_suggestions_status: 'not_allowed',
+        preview_limit: {
+          mode: 'full_rotation_without_export',
+          hidden_room_count: 0,
+          notice: 'public port fixture',
+          free_schedule_entitlement: payload.freeScheduleDecision?.entitlement,
+        },
+      }
+      for (const key of ['daily_production', 'upgrade_suggestions', 'total_efficiency']) delete previewResult[key]
+      return previewResult
+    }
+    function persistScheduleResult(payload, result) {
+      const store = globalThis.__workspaceHistorySmokeStore
+      const profileId = payload.activeProfileId
+      if (!profileId) return
+      const workspace = store.workspaces.get(profileId)
+      if (!workspace) return
+      const now = new Date().toISOString()
+      const matchingConfig = workspace.saved_configs.find((saved) => JSON.stringify(saved.config) === JSON.stringify(payload.effectiveConfig))
+      if (matchingConfig) matchingConfig.last_used_at = now
+      const entitlement = payload.freeScheduleDecision?.entitlement
+        ? JSON.parse(JSON.stringify(payload.freeScheduleDecision.entitlement))
+        : workspace.free_schedule_entitlement
+      if (payload.freeScheduleDecision?.mode === 'strong_reorder_bonus' && entitlement?.strong_reorder_bonus) {
+        entitlement.strong_reorder_bonus.used_at = now
+      } else if (payload.freeScheduleDecision?.mode === 'revision' && entitlement) {
+        entitlement.first_generated_at = entitlement.first_generated_at ?? now
+        entitlement.revision_count = Math.max(0, entitlement.revision_count ?? 0) + 1
+        if (entitlement.revision_count >= 3) {
+          entitlement.locked_at = now
+          entitlement.lock_reason = 'revision_limit'
         }
       }
-      generateSchedule(ignoreElite) {
-        return this.getOptimalAssignments(undefined, ignoreElite)
+      if (result.preview_limit && entitlement) result.preview_limit.free_schedule_entitlement = entitlement
+      const history = {
+        id: 'history-' + profileId + '-' + (workspace.result_history.length + 1),
+        name: matchingConfig?.name ?? 'Generated schedule',
+        created_at: now,
+        config: payload.effectiveConfig,
+        result,
+        operator_count: payload.operators.length,
+        source: payload.request.history_source ?? 'generated',
       }
-      simulateMaaDefaultAssignments() {
-        return {
-          plans: [{ name: 'Default', rooms: previewRooms }],
-          raw_results: [{ totalEfficiency: 50, assignmentDetail: [] }],
-          daily_production: {
-            manufacturing: { 'Pure Gold': 0.5 },
-            trading: { LMD: 0.5 },
-            consumption: {},
-            net: {},
-            drones: {},
-          },
-          shift_hours: [8, 16, 24],
+      store.workspaces.set(profileId, {
+        ...workspace,
+        last_result: result,
+        result_history: [history, ...workspace.result_history].slice(0, 10),
+        free_schedule_entitlement: entitlement,
+        updated_at: now,
+      })
+      store.usageEvents.push({ event: 'schedule_generate', status: 'success', profile_id: profileId, created_at: now })
+      if (payload.isPreviewProfile) store.usageEvents.push({ event: 'free_preview', status: 'success', profile_id: profileId, created_at: now })
+    }
+    function roomOperators(result, type, index) {
+      return result?.plans?.[0]?.rooms?.[type]?.[index]?.operators ?? []
+    }
+    function operatorsMatch(left, right) {
+      return JSON.stringify(left.map((operator) => operator.id ?? operator.name))
+        === JSON.stringify(right.map((operator) => operator.id ?? operator.name))
+    }
+    function createReorderResult(payload) {
+      const store = globalThis.__workspaceHistorySmokeStore
+      const baselineResult = payload.baseline?.result
+      const tradingChanged = previewRooms.trading.some((room, index) => !operatorsMatch(roomOperators(baselineResult, 'trading', index), room.operators))
+      const otherChanged = ['manufacture', 'power', 'dormitory'].some((type) =>
+        previewRooms[type].some((room, index) => !operatorsMatch(roomOperators(baselineResult, type, index), room.operators)))
+      const recommendation = tradingChanged ? 'strongly_recommended' : otherChanged ? 'recommended' : 'no_need'
+      const changedRoomCount = tradingChanged || otherChanged ? 1 : 0
+      const now = new Date().toISOString()
+      const previousUsage = store.usageEvents.filter((event) =>
+        event.event === 'reorder_check' && event.status === 'success' && event.profile_id === payload.activeProfileId).length
+      const used = payload.isPreviewTrial ? 0 : Math.min(2, previousUsage + 1)
+      store.usageEvents.push({ event: 'reorder_check', status: 'success', profile_id: payload.activeProfileId, created_at: now })
+      if (recommendation === 'strongly_recommended') {
+        const workspace = store.workspaces.get(payload.activeProfileId)
+        if (workspace) {
+          const month = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 7)
+          const current = workspace.free_schedule_entitlement ?? {
+            first_generated_at: null,
+            revision_count: 0,
+            revision_limit: 3,
+            revision_window_hours: 24,
+            confirmed_at: null,
+            locked_at: null,
+            lock_reason: null,
+            strong_reorder_bonus: null,
+          }
+          workspace.free_schedule_entitlement = {
+            ...current,
+            strong_reorder_bonus: { month, granted_at: now, used_at: null },
+          }
         }
       }
-      calculateDailyProduction() {
-        return {
-          manufacturing: { 'Pure Gold': 1 },
-          trading: { LMD: 1 },
-          consumption: {},
-          net: {},
-          drones: {},
-        }
+      return {
+        recommendation,
+        estimated_gain_range: {
+          min: null,
+          max: null,
+          unit: 'room_change_only',
+          label: changedRoomCount ? 'test room change' : 'no material change',
+        },
+        changed_room_count: changedRoomCount,
+        affected_facility_types: tradingChanged ? ['trading'] : otherChanged ? ['power'] : [],
+        key_operators: [],
+        current_plan_usable: recommendation === 'no_need',
+        quota: {
+          limit: 2,
+          used,
+          remaining: 2 - used,
+          reset_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          timezone: 'Asia/Shanghai',
+        },
+        baseline: {
+          history_id: payload.baseline.id,
+          created_at: payload.baseline.created_at,
+          name: payload.baseline.name,
+        },
+        reasons: [recommendation],
       }
-      calculateUpgradeTargetSuggestions() { return [] }
-      collectUpgradeTasks() { return [] }
-      simulateUpgradeBatch() {
-        return {
-          suggestions: [],
-          candidateCount: 0,
-          evaluatedCount: 0,
-          primarySimulationCount: 0,
-          primaryElapsedMs: 0,
-          partialCandidateCount: 0,
-          partialEvaluatedCount: 0,
-          partialSimulationCount: 0,
-          partialElapsedMs: 0,
-          cacheHits: 0,
-        }
-      }
-      simulateUpgradeTasks() { return [] }
-      simulateUpgrades(...args) { return this.simulateUpgradeTasks(...args) }
-      _calculateDailyTotalScore() { return 0 }
-      extractFiammettaTargets() { return [] }
+    }
+    export const optimizerPort = {
+      version: 1,
+      async executeSchedule(payload) {
+        const result = createScheduleResult(payload)
+        persistScheduleResult(payload, result)
+        return result
+      },
+      async executeScenarioComparison() { throw new Error('scenario comparison is outside this smoke test') },
+      async executeReorderCheck(payload) { return createReorderResult(payload) },
     }
   `
 }

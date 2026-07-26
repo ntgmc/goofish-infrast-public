@@ -145,12 +145,18 @@ async function checkFile(filename, limit) {
 
 async function checkLocalDevelopmentScripts() {
   const packageJson = JSON.parse(await readFile('package.json', 'utf8'))
-  const expectedScripts = {
-    'build:server': 'npm run build:server:release',
-    'start:server': 'npm run build:server && npm run start:all',
-    'start:api': 'node --env-file=.env server/dist/index.js',
-    'start:all': 'node --env-file=.env server/dist/all.js',
-  }
+  const expectedScripts = publicOnly
+    ? {
+        'build:server': 'npm run build:server:public',
+        'start:server': 'npm run build:server && npm run start:api',
+        'start:api': 'node --env-file=.env server/dist/index.js',
+      }
+    : {
+        'build:server': 'npm run build:server:release',
+        'start:server': 'npm run build:server && npm run start:all',
+        'start:api': 'node --env-file=.env server/dist/index.js',
+        'start:all': 'node --env-file=.env server/dist/all.js',
+      }
   for (const [name, expected] of Object.entries(expectedScripts)) {
     if (packageJson.scripts?.[name] !== expected) {
       failures.push(`package.json: ${name} must remain ${JSON.stringify(expected)}`)

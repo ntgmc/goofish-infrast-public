@@ -1,0 +1,13 @@
+goofish-infrast-v1
+Copyright 2026 Zsm1n
+
+This product includes an open-source web application, API, PostgreSQL job
+infrastructure, worker runtime, and the OptimizerPort contract.
+
+The production optimizer implementation is not included. Candidate generation,
+optimization rules, solvers, economic objectives, scenario and reorder
+calculations, and private result formatting are maintained separately.
+
+Arknights and related names, trademarks, characters, artwork, and game data are
+the property of their respective owners. This project is not affiliated with or
+endorsed by those owners.
