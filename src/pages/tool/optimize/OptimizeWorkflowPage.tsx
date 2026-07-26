@@ -24,7 +24,7 @@ export default function OptimizeWorkflowPage(props: Props) {
   const compactTaskCenterButtonRef = useRef<HTMLButtonElement>(null)
   const taskCenterTriggerRef = useRef(taskCenterButtonRef)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
-  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
+  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleDownloadFullResultHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
   const [mainTourSeenAtMount] = useState(() => hasCompletedTour('optimize-overview', 2))
   const initialSectionRef = useRef(section)
   const [sectionChangedAfterMainTour, setSectionChangedAfterMainTour] = useState(false)
@@ -224,6 +224,8 @@ export default function OptimizeWorkflowPage(props: Props) {
               onViewHistory={handleViewHistory}
               onUseHistoryConfig={handleUseHistoryConfig}
               onDownloadHistory={handleDownloadHistory}
+              canDownloadFullResult={userCanDownloadFullResult}
+              onDownloadFullResultHistory={handleDownloadFullResultHistory}
             />
           )}
   
@@ -247,6 +249,8 @@ export default function OptimizeWorkflowPage(props: Props) {
               onViewHistory={handleViewHistory}
               onUseHistoryConfig={handleUseHistoryConfig}
               onDownloadHistory={handleDownloadHistory}
+              canDownloadFullResult={userCanDownloadFullResult}
+              onDownloadFullResultHistory={handleDownloadFullResultHistory}
               onArchiveHistory={handleArchiveHistory}
               onUnarchiveHistory={handleUnarchiveHistory}
               onDeleteHistory={handleDeleteHistory}
@@ -291,6 +295,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               onUpgradeCdkChange={setUpgradeCdk}
               onUpgradePreviewProfile={handleUpgradePreviewProfile}
               onDownloadMAA={handleDownloadMAA}
+              onDownloadFullResult={userCanDownloadFullResult ? handleDownloadFullResult : undefined}
               onApplySuggestions={handleApplySuggestions}
               suggestionsReadOnly={!features.schedule_generation}
               onReset={onReset}

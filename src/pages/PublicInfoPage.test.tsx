@@ -109,7 +109,8 @@ describe('public information pages', () => {
     for (const question of expectedQuestions) {
       expect(screen.getByText(question)).toBeInTheDocument()
     }
-    expect(screen.getByText(/免费档案不提供 JSON 下载/)).toBeInTheDocument()
+    expect(screen.getByText(/免费档案按有效高级体验期或导出体验券规则使用/)).toBeInTheDocument()
+    expect(screen.getAllByText(/完整计算 JSON.*不应导入 MAA/).length).toBeGreaterThan(0)
     expect(screen.getByText(/游戏内轮换会生成两班设施预设队列/)).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /加入 QQ 群.*891655477/ }).length).toBeGreaterThan(0)
   })

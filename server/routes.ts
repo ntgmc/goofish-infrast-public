@@ -99,6 +99,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/onboarding-tasks', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/onboarding-tasks/claim', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/maa-export', userResultsHandler as unknown as ApiHandler],
+  ['/api/user/full-result-export', userResultsHandler as unknown as ApiHandler],
   ['/api/user/result-archive', userResultsHandler as unknown as ApiHandler],
   ['/api/user/personal-use-declaration', personalUseDeclarationHandler as unknown as ApiHandler],
   ['/api/optimization/jobs', optimizationHandler as unknown as ApiHandler],

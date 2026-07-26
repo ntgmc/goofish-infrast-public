@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OptimizeResult } from '../../lib/types'
 import ResultPanel from './ResultPanel'
 
@@ -36,6 +36,24 @@ describe('ResultPanel tabs', () => {
     expect(detailTab).toHaveAttribute('aria-selected', 'true')
     expect(boardTab).toHaveAttribute('aria-selected', 'false')
     expect(screen.getByRole('tabpanel')).toHaveAttribute('id', detailTab.getAttribute('aria-controls'))
+  })
+
+  it('keeps the full result download available for rotation results while hiding MAA download', async () => {
+    const user = userEvent.setup()
+    const onDownload = vi.fn()
+    const onDownloadFullResult = vi.fn()
+    render(
+      <ResultPanel
+        result={{ ...createResult(), schedule_mode: 'rotation' }}
+        onDownload={onDownload}
+        onDownloadFullResult={onDownloadFullResult}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: '下载 MAA JSON' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '下载完整计算数据' }))
+    expect(onDownload).not.toHaveBeenCalled()
+    expect(onDownloadFullResult).toHaveBeenCalledTimes(1)
   })
 })
 

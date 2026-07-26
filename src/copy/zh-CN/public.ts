@@ -244,7 +244,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_008: "生成的 JSON 应该如何使用？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_009: "在支持导出的结果页下载 MAA JSON，然后在 MAA 的自定义基建配置中选择该文件。使用前请核对 MAA 版本、游戏内房间布局和当前干员状态，并保留原有配置以便恢复。游戏内轮换模式不会生成 MAA JSON。",
+  pages_PublicInfoPage_009: "在支持导出的结果页下载轻量 MAA JSON，然后在 MAA 的自定义基建配置中选择该文件。它只包含班次、房间、入驻干员、产品和自动执行动作；完整计算 JSON 是高级版的分析与排障数据，不应导入 MAA。使用前请核对 MAA 版本、游戏内房间布局和当前干员状态，并保留原有配置以便恢复。游戏内轮换模式不会生成 MAA JSON。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_010: "为什么结果与实际收益不同？",
   // src/pages/PublicInfoPage.tsx
@@ -252,7 +252,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_012: "免费仓库估值和排班功能有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_013: "免费仓库估值只用于查看库存价值和等效理智参考，不会生成个人排班。排班功能会结合干员、房间、生产目标和策略计算排班及相关指标；免费档案可查看完整游戏内轮换，MAA JSON 下载、完整数据和高级分析则取决于档案权益。",
+  pages_PublicInfoPage_013: "免费仓库估值只用于查看库存价值和等效理智参考，不会生成个人排班。排班功能会结合干员、房间、生产目标和策略计算排班及相关指标；轻量 MAA JSON 按现有档案权益、体验期或体验券规则导出，完整计算 JSON 则是高级版独立的分析与排障下载。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_014: "授权或导入失败怎么办？",
   // src/pages/PublicInfoPage.tsx
@@ -430,7 +430,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_085: "免费档案和单账号终身版有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，一个游戏 UID 全站只能领取一次，可生成并查看完整游戏内轮换，但不提供 MAA JSON 下载、原始数据和高级分析。单账号终身版同样绑定一个游戏 UID，增加长期重新生成、MAA JSON 导出、完整数据、练度建议、自定义配置和场景对比等能力。具体权益与限制以价格与权益页为准。",
+  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，一个游戏 UID 全站只能领取一次，可生成并查看完整游戏内轮换；轻量 MAA JSON 仅可按有效高级体验期或导出体验券规则下载，不提供完整计算数据和高级分析。单账号终身版同样绑定一个游戏 UID，增加长期重新生成、轻量 MAA JSON 导出、完整计算 JSON、练度建议、自定义配置和场景对比等能力。具体权益与限制以价格与权益页为准。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_087: "森空岛授权后会立即保存账号吗？",
   // src/pages/PublicInfoPage.tsx
@@ -442,7 +442,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_091: "为什么结果页没有 MAA JSON 下载？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_092: "MAA JSON 下载同时取决于档案权益和排班模式。免费档案不提供 JSON 下载；正式档案也只有具备导出权益并使用 MAA 排班模式时才会显示下载。游戏内轮换模式生成的是供游戏内队列轮换或快速切换使用的方案，不会生成 MAA JSON。",
+  pages_PublicInfoPage_092: "轻量 MAA JSON 下载同时取决于档案权益和排班模式：正式档案可直接导出，免费档案按有效高级体验期或导出体验券规则使用，且结果必须采用 MAA 排班模式。游戏内轮换不会生成 MAA JSON。完整计算 JSON 是另一项高级版下载，可用于普通历史、封存历史和轮换结果的分析与排障，但不应导入 MAA。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_093: "MAA 排班和游戏内轮换有什么区别？",
   // src/pages/PublicInfoPage.tsx

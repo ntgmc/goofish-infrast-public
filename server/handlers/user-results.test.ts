@@ -50,7 +50,7 @@ vi.mock('../storage/personal-use-declaration-store', () => ({
   getPersonalUseDeclarationAcceptance: mocks.getPersonalUseDeclarationAcceptance,
 }))
 vi.mock('../security/request-policy', () => ({
-  requestSchemas: { maaExport: {}, resultArchive: {} },
+  requestSchemas: { maaExport: {}, fullResultExport: {}, resultArchive: {} },
 }))
 vi.mock('../security/request-validation', () => ({
   getValidatedJson: mocks.getValidatedJson,
@@ -81,7 +81,7 @@ beforeEach(() => {
   mocks.getValidatedJson.mockResolvedValue(exportBody)
   mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'growth'))
   mocks.getProfileWorkspace.mockResolvedValue({
-    result_history: [{ id: 'result-1', result: { schedule_mode: 'maa', plans: [] } }],
+    result_history: [{ id: 'result-1', result: optimizerResult() }],
     archived_results: [],
   })
   mocks.getPersonalUseDeclarationAcceptance.mockResolvedValue(null)
@@ -102,8 +102,31 @@ describe('MAA JSON export entitlement', () => {
     const response = await userResultsHandler(exportRequest())
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({ consumed_coupon: false, result_id: 'result-1' })
+    await expect(response.json()).resolves.toMatchObject({
+      consumed_coupon: false,
+      result_id: 'result-1',
+      result: {
+        title: '测试排班',
+        description: '测试说明',
+        plans: [{
+          name: '第1班',
+          rooms: {
+            trading: [{
+              operators: ['巫恋'],
+              skip: false,
+              sort: true,
+              autofill: false,
+              product: 'LMD',
+            }],
+          },
+        }],
+      },
+    })
     expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+    expect(mocks.recordTrackedExportBehaviorEvent).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: 'maa-export:user-1:export-request-1',
+      result: expect.not.objectContaining({ raw_results: expect.anything() }),
+    }))
   })
 
   it('lets an active advanced free preview export without consuming a trial coupon', async () => {
@@ -182,10 +205,86 @@ describe('MAA JSON export entitlement', () => {
       code: 'maa_export_failed',
     })
   })
+
+  it('lets an advanced profile download the complete stored result', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
+
+    const response = await userResultsHandler(exportRequest('full-result-export'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      result_id: 'result-1',
+      filename: 'maatool_full_result_result-1.json',
+      result: {
+        raw_results: [{ total_efficiency: 100 }],
+        daily_production: { manufacturing: { LMD: 1000 } },
+      },
+    })
+    expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+    expect(mocks.recordTrackedExportBehaviorEvent).toHaveBeenCalledWith(expect.objectContaining({
+      eventKey: 'full-result-export:user-1:export-request-1',
+      result: expect.objectContaining({ raw_results: expect.any(Array) }),
+    }))
+  })
+
+  it('rejects complete-result downloads without the advanced capability', async () => {
+    vi.setSystemTime(new Date(FREE_PREVIEW_ADVANCED_TRIAL.endsAt))
+    mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+
+    const response = await userResultsHandler(exportRequest('full-result-export'))
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toEqual({
+      error: '当前档案不支持下载完整计算数据。',
+      code: 'full_result_export_forbidden',
+    })
+    expect(mocks.getProfileWorkspace).not.toHaveBeenCalled()
+    expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+  })
+
+  it('downloads a complete rotation result from the archive', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
+    mocks.getProfileWorkspace.mockResolvedValue({
+      result_history: [],
+      archived_results: [{ id: 'result-1', result: { ...optimizerResult(), schedule_mode: 'rotation' } }],
+    })
+
+    const response = await userResultsHandler(exportRequest('full-result-export'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      result: { schedule_mode: 'rotation', raw_results: expect.any(Array) },
+    })
+  })
+
+  it('does not fail a complete-result download when behavior tracking fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
+    mocks.recordTrackedExportBehaviorEvent.mockRejectedValue(new Error('tracking unavailable'))
+
+    const response = await userResultsHandler(exportRequest('full-result-export'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ result_id: 'result-1' })
+  })
+
+  it('returns a stable localized error for an unexpected complete-result export failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
+    mocks.getProfileWorkspace.mockRejectedValue(new Error('database unavailable'))
+
+    const response = await userResultsHandler(exportRequest('full-result-export'))
+
+    expect(response.status).toBe(500)
+    await expect(response.json()).resolves.toEqual({
+      error: '下载完整计算数据失败，请稍后重试。',
+      code: 'full_result_export_failed',
+    })
+  })
 })
 
-function exportRequest(): Request {
-  return new Request('http://localhost/api/user/maa-export', { method: 'POST' })
+function exportRequest(path = 'maa-export'): Request {
+  return new Request(`http://localhost/api/user/${path}`, { method: 'POST' })
 }
 
 function profile(kind: 'cdk' | 'free_preview', permission: 'growth' | 'advanced') {
@@ -200,5 +299,32 @@ function profile(kind: 'cdk' | 'free_preview', permission: 'growth' | 'advanced'
     created_at: '2026-07-01T00:00:00.000Z',
     updated_at: '2026-07-01T00:00:00.000Z',
     skland_binding: null,
+  }
+}
+
+function optimizerResult() {
+  return {
+    author: '开发者',
+    title: '测试排班',
+    description: '测试说明',
+    schedule_mode: 'maa',
+    buildingType: 253,
+    planTimes: '1班',
+    plans: [{
+      name: '第1班',
+      rooms: {
+        trading: [{
+          operators: ['巫恋'],
+          product: 'LMD',
+          skip: false,
+          sort: true,
+          autofill: false,
+          efficiency: 100,
+          mood: { 巫恋: { start: 24, end: 12 } },
+        }],
+      },
+    }],
+    raw_results: [{ total_efficiency: 100, assignment_detail: [] }],
+    daily_production: { manufacturing: { LMD: 1000 } },
   }
 }

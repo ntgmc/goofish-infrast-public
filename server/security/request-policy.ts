@@ -219,6 +219,11 @@ export const requestSchemas = {
     result_id: shortString(128),
     idempotency_key: shortString(200),
   }),
+  fullResultExport: strict({
+    profile_id: shortString(128),
+    result_id: shortString(128),
+    idempotency_key: shortString(200),
+  }),
   resultArchive: strict({
     profile_id: shortString(128),
     result_id: shortString(128),
@@ -332,6 +337,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/onboarding-tasks', route({ GET: none() })],
   ['/api/user/onboarding-tasks/claim', route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })],
   ['/api/user/maa-export', route({ POST: json('standard', requestSchemas.maaExport) })],
+  ['/api/user/full-result-export', route({ POST: json('standard', requestSchemas.fullResultExport) })],
   ['/api/user/result-archive', route({ POST: json('standard', requestSchemas.resultArchive) })],
   ['/api/admin/items', route({ GET: none(), POST: json('admin', requestSchemas.adminItems), PATCH: json('admin', requestSchemas.adminItems) })],
   ['/api/admin/inventory', route({ GET: none(), POST: json('admin', requestSchemas.adminInventory), PATCH: json('admin', requestSchemas.adminInventory) }, ['campaign_id'])],

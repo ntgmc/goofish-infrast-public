@@ -14,6 +14,7 @@ export default function ResultPanel({
   result,
   operators = [],
   onDownload,
+  onDownloadFullResult,
   onSaveWorkfile,
   detailDefaultOpen = false,
   suggestionsSlot,
@@ -80,7 +81,7 @@ export default function ResultPanel({
                   : copy.domain.components_result_panel_ResultPanel_031}
             </p>
           </div>
-          {(onDownload || onSaveWorkfile) && (
+          {(onDownload || onDownloadFullResult || onSaveWorkfile) && (
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
               {!isRotationMode && onDownload && (
                 <button
@@ -89,6 +90,14 @@ export default function ResultPanel({
                   className="tool-primary-action"
                 >
                   {copy.domain.components_result_panel_ResultPanel_032}</button>
+              )}
+              {onDownloadFullResult && (
+                <button
+                  type="button"
+                  onClick={onDownloadFullResult}
+                  className="tool-secondary-action"
+                >
+                  {copy.domain.components_result_panel_ResultPanel_039}</button>
               )}
               {onSaveWorkfile && (
                 <button

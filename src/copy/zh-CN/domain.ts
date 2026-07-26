@@ -238,9 +238,9 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_030: "按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_031: "排班 JSON 用于导入或交给 MAA 使用；账号空间接入后会自动保存当前练度和配置。",
+  components_result_panel_ResultPanel_031: "MAA JSON 是可直接导入 MAA 的轻量执行配置；完整计算数据是独立的分析与排障文件。",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_032: "\r\n                  下载排班 JSON\r\n                ",
+  components_result_panel_ResultPanel_032: "下载 MAA JSON",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_033: "\r\n                  导出本地备份\r\n                ",
   // src/components/result-panel/ResultPanel.tsx
@@ -253,6 +253,8 @@ export const domainCopy = {
   components_result_panel_ResultPanel_037: "未启用",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_038: "排班结果视图",
+  // src/components/result-panel/ResultPanel.tsx
+  components_result_panel_ResultPanel_039: "下载完整计算数据",
   // src/components/result-panel/formatters.ts
   components_result_panel_formatters_001: "按每队列 ",
   // src/components/result-panel/formatters.ts

@@ -63,4 +63,5 @@ export const inventoryCopy = {
   archive_full: '封存区已满，请先取消封存或使用结果封存夹扩容。',
   history_full_for_unarchive: '普通历史区已满，请先删除一个普通结果后再取消封存。',
   maa_export_failed: '导出 MAA JSON 失败。',
+  full_result_export_failed: '下载完整计算数据失败。',
 } as const
