@@ -2,27 +2,45 @@ import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
+  getOptimizeJobProcessingState,
   initializeOptimizeJobProcessing,
-  registerOptimizeJobExecutor,
   shutdownOptimizeJobProcessing,
 } from './optimize-job-runner'
 import { shutdownOptimizeQueueMaintenance } from './optimize-queue-maintenance'
 import { requestOptimizeJobProcessing } from './optimize-job-signals'
+import {
+  OPTIMIZER_PORT_VERSION,
+  registerOptimizerPort,
+  type OptimizeExecutionContext,
+  type OptimizerPort,
+} from './optimization/jobs/optimizer-port'
 import { createMemoryOptimizeJobStore } from './storage/optimize-job-store'
+
+let executeSchedule: (context: OptimizeExecutionContext) => Promise<unknown> = async (context) => ({
+  completedJobId: context.jobId,
+})
+let unregisterOptimizerPort: (() => void) | null = null
 
 afterAll(async () => {
   await shutdownOptimizeJobProcessing(1_000)
   shutdownOptimizeQueueMaintenance()
+  unregisterOptimizerPort?.()
   globalThis.__maaOptimizeJobStoreForTesting = undefined
   delete process.env.APP_ROLE
 })
 
 describe('optimization dispatcher startup recovery', () => {
+  it('fails before initialization when no optimizer implementation is registered', async () => {
+    await expect(initializeOptimizeJobProcessing()).rejects.toThrow('OptimizerPort is not registered')
+    expect(getOptimizeJobProcessingState()).toMatchObject({ initialized: false, accepting: false })
+  })
+
   it('recovers an expired attempt and consumes queued jobs without an HTTP kick', async () => {
     process.env.OPTIMIZE_RETRY_BASE_MS = '100'
     const store = createMemoryOptimizeJobStore()
     globalThis.__maaOptimizeJobStoreForTesting = store
-    registerOptimizeJobExecutor(async (job) => ({ completedJobId: job.id }))
+    unregisterOptimizerPort = registerOptimizerPort(fakePort())
+    executeSchedule = async (context) => ({ completedJobId: context.jobId })
 
     const expired = await store.createJob(input())
     const queued = await store.createJob(input())
@@ -57,7 +75,7 @@ describe('optimization dispatcher startup recovery', () => {
     globalThis.__maaOptimizeJobStoreForTesting = store
     process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS = '25'
     process.env.OPTIMIZE_JOB_MAX_ATTEMPTS = '2'
-    registerOptimizeJobExecutor(async () => new Promise<never>(() => undefined))
+    executeSchedule = async () => new Promise<never>(() => undefined)
     const job = await store.createJob(input())
 
     const startedAt = Date.now()
@@ -74,7 +92,7 @@ describe('optimization dispatcher startup recovery', () => {
         public_error_code: 'execution_retries_exhausted',
       })
     } finally {
-      registerOptimizeJobExecutor(async (nextJob) => ({ completedJobId: nextJob.id }))
+      executeSchedule = async (context) => ({ completedJobId: context.jobId })
       delete process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS
       delete process.env.OPTIMIZE_JOB_MAX_ATTEMPTS
     }
@@ -186,7 +204,16 @@ function input() {
     owner_key: `license:${randomUUID()}`,
     permission: 'growth',
     source: 'account_profile',
-    payload_json: { test: true },
+    payload_json: { version: 3 },
+  }
+}
+
+function fakePort(): OptimizerPort {
+  return {
+    version: OPTIMIZER_PORT_VERSION,
+    executeSchedule: async (_payload, context) => executeSchedule(context) as Promise<never>,
+    executeScenarioComparison: async () => ({} as never),
+    executeReorderCheck: async () => ({} as never),
   }
 }
 

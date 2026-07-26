@@ -75,6 +75,45 @@ for (const filename of [
   }
 }
 
+const privateOptimizerImportPattern = /from\s+['"][^'"]*(?:optimization\/jobs\/(?:executor|reorder-executor)|optimization\/scenario-comparison\/service|optimization\/(?:engine|candidates|economics|rules|solvers)\/|optimization\/domain\/runtime)/
+for (const filename of [
+  'server/optimize-job-runner.ts',
+  'server/optimize-worker-process.ts',
+  'server/optimize-worker-runtime.ts',
+  'server/combined-process-hooks.ts',
+  'server/optimize-queue-maintenance.ts',
+  'server/api-process.ts',
+  'server/api-process-hooks.ts',
+  'server/index.ts',
+  'server/routes.ts',
+  'server/optimization/jobs/optimizer-port.ts',
+  'server/optimization/jobs/optimizer-dispatcher.ts',
+]) {
+  const source = await readFile(filename, 'utf8')
+  if (privateOptimizerImportPattern.test(source)) {
+    failures.push(`${filename}: public worker/API boundary imports private optimizer implementation`)
+  }
+}
+
+const privateExecutorCompositionRoots = new Set([
+  'server/all.ts',
+  'server/worker.ts',
+  'server/optimize-worker.ts',
+])
+for await (const filename of glob('server/**/*.ts')) {
+  const normalized = filename.replaceAll('\\', '/')
+  if (normalized.endsWith('.test.ts')) continue
+  const source = await readFile(filename, 'utf8')
+  if (source.includes('optimization/jobs/executor') && !privateExecutorCompositionRoots.has(normalized)) {
+    failures.push(`${filename}: only private composition roots may import the optimizer executor`)
+  }
+}
+
+const privateExecutorSource = await readFile('server/optimization/jobs/executor.ts', 'utf8')
+if (privateExecutorSource.includes('optimize-job-runner')) {
+  failures.push('server/optimization/jobs/executor.ts: private optimizer implementation imports the public runner')
+}
+
 if (failures.length > 0) {
   for (const failure of failures) console.error(`architecture error: ${failure}`)
   process.exit(1)
