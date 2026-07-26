@@ -61,14 +61,13 @@ npm run dev
 
 开发命令会先执行 `npm run generate:data`，生成前端和后端优化接口共享的效率数据。
 
-本地后端需要先构建服务端：
+启动本地后端：
 
 ```bash
-npm run build:server
 npm run start:server
 ```
 
-`build:server` 会生成 public API 与私有优化器入口，`start:server` 会从仓库根目录的 `.env` 加载配置并启动 combined 的 `server/dist/all.js`。本地提交的优化任务由这个进程在本机消费，不会等待或调用独立 worker 进程；具体计算仍在线程中隔离，避免阻塞 API 事件循环。本地后端至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
+`start:server` 会先生成 public API 与私有优化器入口，再从仓库根目录的 `.env` 加载配置并启动 combined 的 `server/dist/all.js`，因此在全新检出或执行过 public-only 构建后也可直接运行。本地提交的优化任务由这个进程在本机消费，不会等待或调用独立 worker 进程；具体计算仍在线程中隔离，避免阻塞 API 事件循环。本地后端至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
 
 ```text
 DATABASE_URL=postgresql://<本地用户>:<本地密码>@127.0.0.1:5432/<本地数据库>
