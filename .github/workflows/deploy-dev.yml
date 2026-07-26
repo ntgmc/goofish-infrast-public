@@ -75,12 +75,12 @@ jobs:
       - name: Download verified release decision
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: goofish-release-${{ steps.target.outputs.sha }}
-          path: release-package
+          name: goofish-deployment-${{ steps.target.outputs.sha }}
+          path: release-decision
           run-id: ${{ steps.target.outputs.run_id }}
           github-token: ${{ github.token }}
 
-      - name: Validate deployment decision and archive
+      - name: Validate deployment decision
         id: artifact
         env:
           TARGET_SHA: ${{ steps.target.outputs.sha }}
@@ -88,17 +88,29 @@ jobs:
           set -euo pipefail
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
-          const decision = JSON.parse(readFileSync('release-package/deployment-decision.json', 'utf8'))
+          const decision = JSON.parse(readFileSync('release-decision/deployment-decision.json', 'utf8'))
           if (decision.target_sha !== process.env.TARGET_SHA) throw new Error('deployment decision SHA mismatch')
           process.stdout.write(`deployable=${decision.deployable ? 'true' : 'false'}\n`)
           NODE
-          deployable="$(node -p "JSON.parse(require('fs').readFileSync('release-package/deployment-decision.json')).deployable")"
+          deployable="$(node -p "JSON.parse(require('fs').readFileSync('release-decision/deployment-decision.json')).deployable")"
           echo "deployable=$deployable" >> "$GITHUB_OUTPUT"
-          if [[ "$deployable" == "true" ]]; then
-            (cd release-package && sha256sum -c release.tgz.sha256)
-            archive_sha="$(cut -d ' ' -f1 release-package/release.tgz.sha256)"
-            echo "archive_sha=$archive_sha" >> "$GITHUB_OUTPUT"
-          fi
+
+      - name: Download combined release
+        if: steps.artifact.outputs.deployable == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: goofish-combined-${{ steps.target.outputs.sha }}
+          path: combined-package
+          run-id: ${{ steps.target.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Validate combined release archive
+        id: archive
+        if: steps.artifact.outputs.deployable == 'true'
+        run: |
+          set -euo pipefail
+          (cd combined-package && sha256sum -c combined.tgz.sha256)
+          echo "archive_sha=$(cut -d ' ' -f1 combined-package/combined.tgz.sha256)" >> "$GITHUB_OUTPUT"
 
       - name: Skip non-build deployment
         if: steps.artifact.outputs.deployable != 'true'
@@ -124,10 +136,10 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
-          remote_artifact="/tmp/goofish-release-${TARGET_SHA}-${GITHUB_RUN_ID}.tgz"
+          remote_artifact="/tmp/goofish-combined-release-${TARGET_SHA}-${GITHUB_RUN_ID}.tgz"
           remote_deploy_script="/tmp/goofish-dev-deploy-${TARGET_SHA}-${GITHUB_RUN_ID}.sh"
           scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o IdentitiesOnly=yes \
-            release-package/release.tgz "$DEPLOY_USER@$DEPLOY_HOST:$remote_artifact"
+            combined-package/combined.tgz "$DEPLOY_USER@$DEPLOY_HOST:$remote_artifact"
           scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o IdentitiesOnly=yes \
             scripts/deploy-production.sh "$DEPLOY_USER@$DEPLOY_HOST:$remote_deploy_script"
           echo "REMOTE_ARTIFACT=$remote_artifact" >> "$GITHUB_ENV"
@@ -137,7 +149,7 @@ jobs:
         if: steps.artifact.outputs.deployable == 'true'
         env:
           TARGET_SHA: ${{ steps.target.outputs.sha }}
-          ARTIFACT_SHA256: ${{ steps.artifact.outputs.archive_sha }}
+          ARTIFACT_SHA256: ${{ steps.archive.outputs.archive_sha }}
         run: |
           set -euo pipefail
           remote_command="APP_DIR=${DEPLOY_APP_DIR@Q} TARGET_SHA=${TARGET_SHA@Q} SERVICE_NAME=${DEPLOY_SERVICE_NAME@Q} REQUIRE_MIGRATION_PRESTART=true HEALTH_URL=${DEPLOY_HEALTH_URL@Q} PUBLIC_BASE_URL=${DEPLOY_PUBLIC_BASE_URL@Q} LOCK_FILE=${DEPLOY_LOCK_FILE@Q} FORCE_DEPLOY=${FORCE_DEPLOY@Q} ARTIFACT_PATH=${REMOTE_ARTIFACT@Q} ARTIFACT_SHA256=${ARTIFACT_SHA256@Q} bash ${REMOTE_DEPLOY_SCRIPT@Q}; status=\$?; rm -f -- ${REMOTE_DEPLOY_SCRIPT@Q} ${REMOTE_ARTIFACT@Q}; exit \$status"

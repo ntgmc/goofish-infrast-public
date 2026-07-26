@@ -68,7 +68,7 @@ npm run build:server
 npm run start:server
 ```
 
-`start:server` 会从仓库根目录的 `.env` 加载本地后端配置，并通过非生产的 `APP_ROLE=all` 组合入口同时启动 API 和优化 worker。本地 API 至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
+`start:server` 会从仓库根目录的 `.env` 加载配置并启动 API-only 的 `server/dist/index.js`。本地 API 至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
 
 ```text
 DATABASE_URL=postgresql://<本地用户>:<本地密码>@127.0.0.1:5432/<本地数据库>
@@ -79,24 +79,32 @@ SKLAND_CREDENTIAL_SECRET=<至少 16 个字符的本地随机值>
 
 默认监听地址是 `http://127.0.0.1:3000`，Vite 的 `/api` 请求会代理到该地址。可以通过 `PORT` 和 `HOST` 覆盖监听配置。
 
-如需像生产环境一样拆分进程，可分别运行：
+公共 API 可以提交、查询和取消优化任务；未连接私有 worker 时，任务会可靠地保留在 PostgreSQL 队列中等待消费，不会在 API 进程中执行优化计算。当前私有仓库如需运行真实优化器，可先执行 `npm run build:private`，再分别运行：
 
 ```bash
 npm run start:api
 npm run start:worker
 ```
 
-`start:api` 使用 API-only 的 `server/dist/index.js`，`start:worker` 使用独立的 `server/dist/worker.js`。combined 的 `server/dist/all.js` 默认只用于本地开发；production mode 只有在 `APP_ROLE=all` 且显式设置 `ALLOW_PRODUCTION_COMBINED_PROCESS=true` 时才允许启动。该例外仅供 `dev.maatool.com` 在本机消费自己的优化队列，正式生产仍保持 API 与杭州 worker 分离。
+`start:api` 是 `start:server` 的兼容别名，`start:worker` 使用私有 `server/dist/worker.js`。若需要当前私有仓库原有的单进程本地体验，显式运行 `npm run start:all`；它使用 `server/dist/all.js`。production mode 只有在 `APP_ROLE=all` 且显式设置 `ALLOW_PRODUCTION_COMBINED_PROCESS=true` 时才允许 combined 启动。该例外仅供 `dev.maatool.com` 在本机消费自己的优化队列，正式生产仍保持 API 与杭州 worker 分离。
 
 ## 构建与检查
 
-生产构建：
+默认公共构建：
 
 ```bash
 npm run build
 ```
 
-该命令会依次生成规则数据、构建 Vite 前端，并打包 `server/` 后端。
+该命令会依次生成规则数据与 changelog、构建 Vite 前端，并且只打包公共 `index`、`migrate`、`routes` 服务端入口。它不依赖私有优化器源码，适合作为未来公开仓库的默认构建。
+
+当前私有仓库需要生成 worker、combined 和完整发布制品时运行：
+
+```bash
+npm run build:private
+```
+
+服务端也可单独使用 `build:server:public`、`build:server:private` 和 `build:server:release` 验证三个构建范围。
 
 本地完整检查：
 
@@ -128,16 +136,17 @@ npm run check:migration
 | Job | Command | Purpose |
 | --- | --- | --- |
 | `Build Relevance` | `npm run check:build-relevance` | 判断本次变更是否需要继续运行构建检查。 |
-| `Web Build` | `npm run build` | 生成效率数据、执行 TypeScript 检查、构建 Vite 前端并打包 Node 后端。 |
+| `Public Build and Artifact` | `npm run build` + `npm run check:public-export` | 构建公共 Web/API，验证删除私有优化器源码后仍可构建，并生成 public 制品。 |
+| `Private Worker and Combined Artifacts` | `npm run build:private` | 验证并生成独立的 worker 与 combined 私有制品。 |
 | `API Smoke Test` | `npm run generate:data` + `npm run check:api` | 验证服务器 API 处理器可以被打包和调用。 |
 
-`Web Build` 和 `API Smoke Test` 只在 `Build Relevance` 判断为需要构建相关检查时运行。只修改文档或仓库元数据时，Quality Checks 会保留构建相关性检查，但跳过构建和 smoke test。
+公共/私有制品构建和 `API Smoke Test` 只在 `Build Relevance` 判断为需要构建相关检查时运行。非 PR 构建分别上传 `goofish-public-<sha>`、`goofish-worker-<sha>`、`goofish-combined-<sha>` 和独立的 `goofish-deployment-<sha>` 决策；公共制品不包含私有 worker bundle 或 sourcemap。只修改文档或仓库元数据时，Quality Checks 只上传不可部署决策。
 
 另外，仓库使用 GitHub Actions 在 PR 创建、重新打开、更新 commit 或标记 ready 时，根据 PR 内 commit message 自动更新 PR description。配置文件位于 `.github/workflows/pr-details.yml`。该流程只维护 PR description 中 `<!-- pr-details:start -->` `<!-- pr-details:end -->` 之间的自动生成区块，区块外的人工内容会保留。
 
 ## 自动部署
 
-生产部署由 `.github/workflows/deploy-production.yml` 触发，并在自托管服务器上执行 `scripts/deploy-production.sh`。`main` 的 Quality Checks 通过后会自动 SSH 到服务器，完成拉取代码、安装依赖、生产构建、重启 systemd 服务和 `/api/health` 健康检查。
+生产部署由 `.github/workflows/deploy-production.yml` 触发。`main` 的 Quality Checks 通过后，数据库迁移和 API 部署只消费 public 制品，杭州计算节点只消费 worker 制品；服务器不会重新构建。开发环境使用独立 combined 制品。
 
 服务器准备步骤、GitHub Secrets/Variables 和故障处理见 [Production Deploy Workflow](docs/production-deploy.md)。
 
@@ -172,11 +181,10 @@ npm run check:migration
 3. 向 `main` 发起 pull request。
 4. 等待 GitHub Actions Quality Checks 通过。
 5. 合并到 `main`。
-6. 在服务器拉取最新代码或发布构建产物。
-7. 在服务器执行 `npm ci`、`npm run build`。
-8. 确认环境变量和 PostgreSQL 可用。
-9. 重启 Node 后端服务。
-10. 访问 <https://maatool.com/>，并检查 `/api/health` 与核心接口。
+6. 由部署 workflow 下载并校验目标 SHA 的角色专用制品。
+7. 确认环境变量和 PostgreSQL 可用。
+8. 按迁移、worker、API 顺序完成候选槽健康检查与切换。
+9. 访问 <https://maatool.com/>，并检查 `/api/health` 与核心接口。
 
 生产环境建议由 Nginx 提供静态文件和 TLS，并使用仓库内受管的
 `deploy/nginx/goofish-api-production.conf` 片段把 `/api/` 反向代理到 Node 后端。

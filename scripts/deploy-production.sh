@@ -240,7 +240,7 @@ ARTIFACT_DIR="$APP_DIR/.artifact-$TARGET_SHA-$$"
 rm -rf -- "$ARTIFACT_DIR"
 mkdir -p "$ARTIFACT_DIR"
 tar -xzf "$ARTIFACT_PATH" -C "$ARTIFACT_DIR"
-RELEASE_ROOT="$ARTIFACT_DIR" node scripts/release-artifact.mjs verify --sha "$TARGET_SHA"
+RELEASE_ROOT="$ARTIFACT_DIR" node scripts/release-artifact.mjs verify --kind combined --sha "$TARGET_SHA"
 
 rm -rf -- dist server/dist
 mv "$ARTIFACT_DIR/dist" dist
@@ -249,7 +249,8 @@ rm -rf -- "$ARTIFACT_DIR"
 ARTIFACT_DIR=""
 
 [[ -f "$APP_DIR/dist/index.html" ]] || fail "missing frontend artifact: dist/index.html"
-[[ -f "$APP_DIR/server/dist/index.js" ]] || fail "missing backend artifact: server/dist/index.js"
+[[ -f "$APP_DIR/server/dist/all.js" ]] || fail "missing combined backend artifact: server/dist/all.js"
+[[ -f "$APP_DIR/server/dist/optimize-worker.js" ]] || fail "missing thread worker artifact: server/dist/optimize-worker.js"
 [[ -f "$APP_DIR/server/dist/migrate.js" ]] || fail "missing migration artifact: server/dist/migrate.js"
 check_migration_prestart
 

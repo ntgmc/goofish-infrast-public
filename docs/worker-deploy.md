@@ -140,7 +140,7 @@ Application and WireGuard secrets remain on the servers. They are not GitHub dep
 
 ## Deployment order and partial failures
 
-`Deploy Production` downloads one immutable Quality Checks artifact and deploys the exact SHA in this order:
+`Deploy Production` downloads separate immutable public and worker artifacts for the same Quality Checks SHA and deploys them in this order:
 
 1. Run the target release's controlled database migration on the Seoul host.
 2. Start and verify the inactive Hangzhou worker slot against the migrated schema.
@@ -180,6 +180,6 @@ not show the worker startup exception.
 
 ## Rollback and outage handling
 
-A normal rollback is a manual `Deploy Production` run for the previous validated main SHA. The Worker deployment accepts the same immutable artifact contract as the API.
+A normal rollback is a manual `Deploy Production` run for the previous validated main SHA. The Worker deployment accepts only the `worker` manifest kind containing `server/dist/worker.js` and `server/dist/optimize-worker.js`; it rejects the public API and combined artifacts.
 
 If WireGuard or Hangzhou fails, Seoul continues accepting and maintaining queued jobs but does not execute them. Lower queue admission limits or temporarily stop new submissions during a prolonged incident. Do not expose PostgreSQL publicly as a recovery shortcut. Restore the tunnel or Worker, verify readiness, and allow expired leases to recover through PostgreSQL.

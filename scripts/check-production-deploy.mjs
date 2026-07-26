@@ -49,6 +49,13 @@ function assertWorkflowProvenance() {
   assert.match(workflow, /git merge-base --is-ancestor "\$TARGET_SHA" origin\/main/, 'workflow should verify main ancestry')
   assert.match(workflow, /TARGET_SHA=\$\{TARGET_SHA@Q\}/, 'SSH command should pass a shell-quoted target SHA')
   assert.match(workflow, /actions\/download-artifact@/, 'production deploy should download the Quality Checks artifact')
+  assert.match(workflow, /goofish-deployment-\$\{\{ steps\.target\.outputs\.sha \}\}/, 'production deploy should download the deployment decision separately')
+  assert.match(workflow, /goofish-public-\$\{\{ steps\.target\.outputs\.sha \}\}/, 'production deploy should download the public API artifact')
+  assert.match(workflow, /goofish-worker-\$\{\{ steps\.target\.outputs\.sha \}\}/, 'production deploy should download the private worker artifact')
+  assert.match(workflow, /public-package\/public\.tgz/, 'production API and migration should consume the public archive')
+  assert.match(workflow, /worker-package\/worker\.tgz/, 'production worker should consume the worker archive')
+  assert.match(workflow, /steps\.archives\.outputs\.public_archive_sha/, 'production API should use the public archive checksum')
+  assert.match(workflow, /steps\.archives\.outputs\.worker_archive_sha/, 'production worker should use the worker archive checksum')
   assert.match(workflow, /ARTIFACT_SHA256=\$\{ARTIFACT_SHA256@Q\}/, 'SSH command should pass the verified artifact checksum')
   assert.match(workflow, /ref: \$\{\{ steps\.target\.outputs\.sha \}\}/, 'production deploy should checkout the immutable target SHA')
   assert.match(workflow, /scripts\/deploy-production-atomic\.sh "\$DEPLOY_USER@\$DEPLOY_HOST:\$remote_deploy_script"/, 'workflow should upload the target deployment script')
@@ -68,6 +75,8 @@ function assertWorkflowProvenance() {
   assertOrdered(workflow, ['Apply controlled database migration first', 'Deploy verified worker release first', 'Deploy verified API release second', 'Publish successful changelog release'])
   assert.doesNotMatch(workflow, /DEPLOY_BRANCH/, 'production workflow must not pass a mutable branch')
   assert.match(devWorkflow, /actions\/download-artifact@/, 'dev deploy should download the Quality Checks artifact')
+  assert.match(devWorkflow, /goofish-combined-\$\{\{ steps\.target\.outputs\.sha \}\}/, 'dev deploy should download only the private combined artifact')
+  assert.match(devWorkflow, /combined-package\/combined\.tgz/, 'dev deploy should consume the combined archive')
   assert.match(devWorkflow, /run-id: \$\{\{ steps\.target\.outputs\.run_id \}\}/, 'dev deploy should bind the artifact to a Quality Checks run')
   assert.match(devWorkflow, /github\.event\.workflow_run\.event == 'push'/, 'automatic dev deploy should only accept push runs')
   assert.match(devWorkflow, /event: 'push'/, 'manual dev deploy should only query push runs')
@@ -128,6 +137,11 @@ function assertQualityChecksImmutability() {
   assert.doesNotMatch(qualityChecksWorkflow, /\bgit push\b/, 'Quality Checks must not advance a checked branch')
   assert.match(qualityChecksWorkflow, /actions\/upload-artifact@/, 'Quality Checks should publish an immutable release artifact')
   assert.match(qualityChecksWorkflow, /release-artifact\.mjs create/, 'Quality Checks should create a release manifest')
+  for (const artifactName of ['goofish-deployment-', 'goofish-public-', 'goofish-worker-', 'goofish-combined-']) {
+    assert.ok(qualityChecksWorkflow.includes(artifactName), `Quality Checks should publish ${artifactName}<sha>`)
+  }
+  assert.match(qualityChecksWorkflow, /npm run check:public-export/, 'Quality Checks should prove that the public tree builds without private optimizer sources')
+  assert.match(qualityChecksWorkflow, /check-release-artifact-set\.mjs/, 'Quality Checks should coordinate all artifact manifests on one target SHA')
   assert.match(qualityChecksWorkflow, /GENERATE_CHANGELOG_CANDIDATE/, 'Quality Checks should generate changelog candidates only for production-bound builds')
   assert.match(qualityChecksWorkflow, /CHANGELOG_BASE_SHA: \$\{\{ vars\.CHANGELOG_BASE_SHA \}\}/, 'Quality Checks should pass an explicitly configured changelog baseline to the candidate generator')
   assert.match(qualityChecksWorkflow, /changelog-release\.json/, 'Quality Checks should package generated changelog metadata with the immutable artifact')
@@ -188,7 +202,7 @@ function assertDeploymentScript() {
     /git -C "\$REPO_DIR" merge-base --is-ancestor "\$TARGET_SHA"/,
     /worktree add --detach "\$BUILD_DIR" "\$TARGET_SHA"/,
     /sha256sum "\$ARTIFACT_PATH"/,
-    /release-artifact\.mjs verify --sha "\$TARGET_SHA"/,
+    /release-artifact\.mjs verify --kind public --sha "\$TARGET_SHA"/,
     /tar -xzf "\$ARTIFACT_PATH"/,
     /release\.json/,
     /check_readiness "\$CANDIDATE_SLOT"/,
@@ -218,7 +232,7 @@ function assertDeploymentScript() {
   assert.match(devDeployScript, /last health check transport error \(curl exit \$curl_exit\):/, 'dev deploy should distinguish transport failures')
   assertOrdered(devDeployScript, [
     'sha256sum "$ARTIFACT_PATH"',
-    'release-artifact.mjs verify --sha "$TARGET_SHA"',
+    'release-artifact.mjs verify --kind combined --sha "$TARGET_SHA"',
     'run_systemctl restart "$SERVICE_NAME"',
   ])
   assert.doesNotMatch(devDeployScript, /MIGRATION_SERVICE_NAME/, 'dev deploy should preserve the existing systemctl sudoers contract')
@@ -287,7 +301,7 @@ function assertWorkerDeploymentScript() {
     /git -C "\$REPO_DIR" merge-base --is-ancestor "\$TARGET_SHA"/,
     /worktree add --detach "\$BUILD_DIR" "\$TARGET_SHA"/,
     /sha256sum "\$ARTIFACT_PATH"/,
-    /release-artifact\.mjs verify --sha "\$TARGET_SHA"/,
+    /release-artifact\.mjs verify --kind worker --sha "\$TARGET_SHA"/,
     /node --check server\/dist\/worker\.js/,
     /node --check server\/dist\/optimize-worker\.js/,
     /check_readiness "\$CANDIDATE_SLOT"/,
@@ -485,7 +499,7 @@ function assertDeploymentDocumentation() {
     'wg-quick@wg0.service',
     'hostssl goofish_infrast_v1 goofish_worker 10.66.0.2/32 scram-sha-256',
     'WORKER_DEPLOY_KNOWN_HOSTS',
-    'Worker deployment accepts the same immutable artifact contract',
+    'The Worker deployment accepts only the `worker` manifest kind',
     '/usr/bin/systemctl disable goofish-optimize-worker@blue.service',
     '/usr/bin/systemctl disable --now goofish-optimize-worker@blue.service',
     '/usr/bin/journalctl --unit goofish-optimize-worker@blue.service --no-pager --lines=80',
@@ -493,6 +507,14 @@ function assertDeploymentDocumentation() {
   ]) {
     assert.ok(workerDocs.includes(expected), `worker documentation should include ${expected}`)
   }
+  assert.ok(
+    productionDocs.includes('Migration and API') && productionDocs.includes('`public` manifest kind'),
+    'production documentation should require the public artifact for migration and API',
+  )
+  assert.ok(
+    developmentDocs.includes('goofish-combined-<sha>') && developmentDocs.includes('combined.tgz'),
+    'development documentation should require the combined artifact',
+  )
   assert.ok(workerDocs.includes('Do not expose PostgreSQL 5432 publicly'), 'worker docs must forbid public PostgreSQL')
 }
 

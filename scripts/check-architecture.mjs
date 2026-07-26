@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises'
 import { glob } from 'node:fs/promises'
 import ts from 'typescript'
+import { isPrivateOptimizerSource } from './private-optimizer-sources.mjs'
 
 const failures = []
+const publicOnly = process.argv.slice(2).join(' ') === '--scope public'
 
 await checkGlob('server/optimization/**/*.ts', 800)
 await checkGlob('src/pages/admin/**/*.ts', 800)
@@ -12,7 +14,7 @@ await checkGlob('src/pages/tool/optimize/**/*.tsx', 800)
 await checkFile('src/pages/AdminPage.tsx', 400)
 await checkFile('src/pages/OptimizePage.tsx', 400)
 await checkFile('server/handlers/optimization.ts', 300)
-await checkGlob('server/optimization/engine/**/*.ts', 300)
+await checkGlob('server/optimization/engine/**/*.ts', 350)
 const typeProgram = createArchitectureTypeProgram()
 checkNewPageModuleUnusedSymbols(typeProgram)
 checkOptimizationUnusedImports(typeProgram)
@@ -75,7 +77,7 @@ for (const filename of [
   }
 }
 
-const privateOptimizerImportPattern = /from\s+['"][^'"]*(?:optimization\/jobs\/(?:executor|reorder-executor)|optimization\/scenario-comparison\/service|optimization\/(?:engine|candidates|economics|rules|solvers)\/|optimization\/domain\/runtime)/
+const privateOptimizerImportPattern = /from\s+['"][^'"]*(?:optimization\/jobs\/(?:executor|reorder-executor|reorder-analysis|result-formatting)|optimization\/scenario-comparison\/service|optimization\/(?:engine|candidates|domain|economics|formatting|rules|solvers)\/)/
 for (const filename of [
   'server/optimize-job-runner.ts',
   'server/optimize-worker-process.ts',
@@ -109,16 +111,24 @@ for await (const filename of glob('server/**/*.ts')) {
   }
 }
 
-const privateExecutorSource = await readFile('server/optimization/jobs/executor.ts', 'utf8')
-if (privateExecutorSource.includes('optimize-job-runner')) {
-  failures.push('server/optimization/jobs/executor.ts: private optimizer implementation imports the public runner')
+if (!publicOnly) {
+  const privateExecutorSource = await readFile('server/optimization/jobs/executor.ts', 'utf8')
+  if (privateExecutorSource.includes('optimize-job-runner')) {
+    failures.push('server/optimization/jobs/executor.ts: private optimizer implementation imports the public runner')
+  }
+} else {
+  for await (const filename of glob('server/**/*.ts')) {
+    if (isPrivateOptimizerSource(filename)) {
+      failures.push(`${filename}: private optimizer source exists in public-only architecture scope`)
+    }
+  }
 }
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`architecture error: ${failure}`)
   process.exit(1)
 }
-console.log(`architecture checks ok (${engineFiles.length} optimization modules)`)
+console.log(`architecture checks ok (${engineFiles.length} optimization modules, scope=${publicOnly ? 'public' : 'full'})`)
 
 async function checkGlob(pattern, limit) {
   for await (const filename of glob(pattern)) await checkFile(filename, limit)

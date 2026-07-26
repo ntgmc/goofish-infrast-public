@@ -279,9 +279,10 @@ ready and Nginx has switched successfully.
 `flock` lock:
 
 1. Verify the full target SHA exists and is an ancestor of `origin/main`.
-2. Check out the immutable target SHA, download its SHA-bound artifact from the
-   successful `Quality Checks` run, verify the archive SHA-256, and upload both
-   the artifact and that commit's deployment script to temporary server paths.
+2. Check out the immutable target SHA and download its SHA-bound public and
+   worker artifacts from the successful `Quality Checks` run. Verify each
+   archive SHA-256 independently, then upload the public archive to the API host,
+   the worker archive to the worker host, and the matching deployment scripts.
    Running the uploaded script avoids bootstrapping through a stale repository
    checkout; both temporary inputs are removed after the SSH command finishes.
 3. Create a detached temporary worktree, run `npm ci --omit=dev`, extract the
@@ -311,11 +312,14 @@ The candidate and active backend overlap briefly. PostgreSQL-backed job locking
 must remain safe with two processes. Any future singleton background task must
 gain a database-level lock before it is enabled in production.
 
-GitHub Actions artifacts are the only trusted build source. The production host
-never regenerates `data.ts` or `build-meta.ts` and never runs `npm run build`.
-If an artifact is missing or has expired, rerun `Quality Checks` for that exact
-SHA; there is intentionally no server-side build fallback. An existing immutable
-release may be reused only after its manifest and file hashes validate.
+GitHub Actions artifacts are the only trusted build source. Migration and API
+slots accept only the `public` manifest kind; the Hangzhou worker accepts only
+the `worker` kind. Both manifests and archive checksums must identify the same
+target SHA. The production hosts never regenerate `data.ts` or `build-meta.ts`
+and never run `npm run build`. If either artifact is missing or has expired,
+rerun `Quality Checks` for that exact SHA; there is intentionally no server-side
+build fallback. An existing immutable release may be reused only after its
+role-specific manifest and file hashes validate.
 
 Normal deployments never run `systemctl daemon-reload` and never restart Nginx.
 Unit installation uses `daemon-reload` once; traffic changes use
