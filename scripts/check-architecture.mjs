@@ -147,7 +147,7 @@ async function checkLocalDevelopmentScripts() {
   const packageJson = JSON.parse(await readFile('package.json', 'utf8'))
   const expectedScripts = {
     'build:server': 'npm run build:server:release',
-    'start:server': 'npm run start:all',
+    'start:server': 'npm run build:server && npm run start:all',
     'start:api': 'node --env-file=.env server/dist/index.js',
     'start:all': 'node --env-file=.env server/dist/all.js',
   }
