@@ -1,6 +1,6 @@
 import { Check, ChevronDown, MoreHorizontal } from 'lucide-react'
 import { DropdownMenu } from 'radix-ui'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 type CompactHeaderMenuItem =
   | {

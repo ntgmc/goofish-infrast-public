@@ -2,7 +2,7 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 'react-router-dom'
+import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from 'react-router'
 import type { AuthUser } from '../../lib/types'
 import { dashboardPath, resolveToolRoute, type DashboardSection } from '../../lib/app-routes'
 import { tourStorageKey } from '../../components/GuidedTour'

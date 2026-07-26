@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import CompactHeaderMenu from '../components/CompactHeaderMenu'
 import PublicFooter from '../components/PublicFooter'

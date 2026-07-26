@@ -14,7 +14,7 @@ export function OptimizationTaskCenterButton({
   controller: OptimizationTaskCenterController;
   open: boolean;
   onOpen: () => void;
-  buttonRef: RefObject<HTMLButtonElement>;
+  buttonRef: RefObject<HTMLButtonElement | null>;
   iconOnly?: boolean;
 }) {
   const { activeCount, attentionCount } = controller

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import AuthForm from '../components/AuthForm'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
@@ -454,7 +454,7 @@ function SharePanel({
   onDownload,
 }: {
   result: DepotValueResponse
-  canvasRef: RefObject<HTMLCanvasElement>
+  canvasRef: RefObject<HTMLCanvasElement | null>
   onDownload: () => void
 }) {
   return (

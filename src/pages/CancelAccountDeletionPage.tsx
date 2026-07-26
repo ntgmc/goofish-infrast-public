@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { apiVoid } from '../lib/api-client'
 import { copy } from '../copy/index'
 import ThemeSwitcher from '../components/ThemeSwitcher'

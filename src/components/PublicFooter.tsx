@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { copy } from '../copy/index'
 import { DEFAULT_PUBLIC_CONTENT_SETTINGS } from '../lib/public-content'
 import { usePublicContent } from '../lib/public-content-context'

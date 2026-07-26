@@ -1,5 +1,5 @@
 import { LayoutGroup } from 'motion/react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
 import { AnimatedPresenceRegion, MotionNavIndicator } from '../../components/MotionPrimitives'
 import BrandLogo from '../../components/BrandLogo'

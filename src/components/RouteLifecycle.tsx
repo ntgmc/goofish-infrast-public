@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useLocation, useNavigationType } from 'react-router-dom'
+import { useLocation, useNavigationType } from 'react-router'
 
 type ScrollPosition = { x: number; y: number }
 

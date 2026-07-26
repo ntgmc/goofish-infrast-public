@@ -287,7 +287,7 @@ function ManualModePanel({
   onPreview,
 }: {
   busy: boolean
-  inputRef: RefObject<HTMLTextAreaElement>
+  inputRef: RefObject<HTMLTextAreaElement | null>
   onPreview: () => void
 }) {
   return (
@@ -335,7 +335,7 @@ function BookmarkletModePanel({
   onMessage,
 }: {
   busy: boolean
-  inputRef: RefObject<HTMLTextAreaElement>
+  inputRef: RefObject<HTMLTextAreaElement | null>
   onPreview: () => void
   onMessage: (message: string) => void
 }) {
@@ -407,7 +407,7 @@ function AccountSelectionPanel({
 }: {
   accounts: SklandAccountOption[]
   selectedUid: string | null
-  firstAccountRef: RefObject<HTMLInputElement>
+  firstAccountRef: RefObject<HTMLInputElement | null>
   onSelect: (uid: string) => void
 }) {
   return (
