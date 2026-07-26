@@ -113,6 +113,36 @@ describe('ScheduleProgress motion', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '90')
   })
 
+  it('changes speed without jumping to the next stage percentage', async () => {
+    const simulating = createProgress({
+      startedAt: NOW - 20_000,
+      jobId: 'buffered-job',
+      queueStatus: 'running',
+      observedRunning: true,
+      estimatedRemainingMs: 0,
+      estimatedTotalMs: 10_000,
+      estimatePhase: 'overdue',
+      estimateUpdatedAt: new Date(NOW).toISOString(),
+      calculationStage: 'simulating_upgrades',
+      calculationStageUpdatedAt: new Date(NOW - 10_000).toISOString(),
+      upgradeSuggestionsRequested: true,
+      upgradeSuggestionsAllowed: true,
+    })
+    const { rerender } = render(<ScheduleProgress progress={simulating} />)
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67')
+
+    rerender(<ScheduleProgress progress={{
+      ...simulating,
+      calculationStage: 'enriching_training_costs',
+      calculationStageUpdatedAt: new Date(NOW).toISOString(),
+    }} />)
+
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67')
+
+    await act(async () => vi.advanceTimersByTimeAsync(1_000))
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '68')
+  })
+
   it('does not move backwards when a running stage starts below queued progress', () => {
     const queued = createProgress({
       startedAt: NOW - 20_000,
