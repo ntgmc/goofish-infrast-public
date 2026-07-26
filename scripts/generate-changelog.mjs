@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,13 +7,13 @@ import {
   mergeChangelogReleases,
   normalizeSha,
   normalizeVersion,
-  parseGitLog,
   renderGeneratedModule,
   renderReleaseNotes,
   selectPublicChanges,
   selectRepositoryChanges,
   validateChangelogEnvelope,
 } from './changelog-lib.mjs'
+import { readChangelogCommits, resolveChangelogGitRoot } from './changelog-git.mjs'
 import { collectPrChangelogChanges, findTrustedPrChangelogPayload } from './pr-changelog-lib.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -23,6 +22,7 @@ const generatedModulePath = resolve(root, 'src/lib/.generated/changelog.ts')
 const releaseRecordPath = resolve(root, 'changelog-release.json')
 const releaseNotesPath = resolve(root, 'changelog-release.md')
 const candidate = isEnabled(process.env.GENERATE_CHANGELOG_CANDIDATE)
+const gitRoot = resolveChangelogGitRoot(root, process.env.CHANGELOG_GIT_ROOT)
 
 const buildMeta = readObjectLiteral(await readFile(buildMetaPath, 'utf8'), 'APP_BUILD_META')
 const releaseVersion = candidate ? resolveReleaseVersion(buildMeta) : null
@@ -30,7 +30,9 @@ const targetSha = candidate ? normalizeSha(buildMeta.git_sha) : null
 const history = await loadReleaseHistory()
 const previousRelease = candidate ? findPreviousRelease(history, targetSha, releaseVersion) : null
 const previousTargetSha = candidate ? resolvePreviousTargetSha(previousRelease) : null
-const commits = candidate && previousTargetSha ? readCommits(previousTargetSha, targetSha) : []
+const commits = candidate && previousTargetSha
+  ? readChangelogCommits(previousTargetSha, targetSha, gitRoot)
+  : []
 const changeSets = candidate && previousTargetSha
   ? await resolveChangelogChanges(commits)
   : { publicChanges: [], repositoryChanges: [] }
@@ -102,18 +104,6 @@ function resolvePreviousTargetSha(previousRelease) {
   const configuredBase = String(process.env.CHANGELOG_BASE_SHA ?? '').trim()
   if (configuredBase) return normalizeSha(configuredBase)
   return null
-}
-
-function readCommits(fromSha, toSha) {
-  if (fromSha === toSha) throw new Error('the changelog range must use distinct previous and target SHAs')
-  try {
-    runGit(['merge-base', '--is-ancestor', fromSha, toSha])
-  } catch {
-    throw new Error(`the previous changelog SHA ${fromSha} is not an ancestor of ${toSha}`)
-  }
-
-  const output = runGit(['log', `${fromSha}..${toSha}`, '--format=%H%x1f%s%x1f%b%x1e'])
-  return parseGitLog(output)
 }
 
 async function resolveChangelogChanges(commits) {
@@ -191,10 +181,6 @@ function resolveReleaseVersion(meta) {
     throw new Error(`automatic changelog releases require matching frontend/backend versions; received ${frontendVersion} and ${backendVersion}`)
   }
   return frontendVersion
-}
-
-function runGit(argumentsList) {
-  return execFileSync('git', argumentsList, { cwd: root, encoding: 'utf8' })
 }
 
 async function requestJson(url, token, accept = 'application/vnd.github+json') {
