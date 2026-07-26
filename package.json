@@ -83,5 +83,13 @@
     "typescript": "^5.6.3",
     "vite": "^6.0.0",
     "vitest": "^4.1.10"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ntgmc/goofish-infrast-public.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ntgmc/goofish-infrast-public/issues"
+  },
+  "homepage": "https://github.com/ntgmc/goofish-infrast-public#readme"
 }
