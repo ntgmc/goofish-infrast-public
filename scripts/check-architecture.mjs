@@ -19,6 +19,7 @@ const typeProgram = createArchitectureTypeProgram()
 checkNewPageModuleUnusedSymbols(typeProgram)
 checkOptimizationUnusedImports(typeProgram)
 await checkProductCatalogOwnership()
+await checkLocalDevelopmentScripts()
 
 const engineFiles = []
 for await (const filename of glob('server/optimization/**/*.ts')) engineFiles.push(filename)
@@ -140,6 +141,21 @@ async function checkFile(filename, limit) {
   if (lines <= limit) return
   const message = `${filename}: ${lines} lines exceeds ${limit}`
   failures.push(message)
+}
+
+async function checkLocalDevelopmentScripts() {
+  const packageJson = JSON.parse(await readFile('package.json', 'utf8'))
+  const expectedScripts = {
+    'build:server': 'npm run build:server:release',
+    'start:server': 'npm run start:all',
+    'start:api': 'node --env-file=.env server/dist/index.js',
+    'start:all': 'node --env-file=.env server/dist/all.js',
+  }
+  for (const [name, expected] of Object.entries(expectedScripts)) {
+    if (packageJson.scripts?.[name] !== expected) {
+      failures.push(`package.json: ${name} must remain ${JSON.stringify(expected)}`)
+    }
+  }
 }
 
 function createArchitectureTypeProgram() {
