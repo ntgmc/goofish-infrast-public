@@ -51,6 +51,16 @@ describe('ResultPanel tabs', () => {
     )
 
     expect(screen.queryByRole('button', { name: '下载 MAA JSON' })).not.toBeInTheDocument()
+    expect(screen.queryByText('开发者与排障')).not.toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('tab')[2])
+    const disclosureLabel = screen.getByText('开发者与排障')
+    const disclosure = disclosureLabel.closest('details')
+    expect(disclosure).not.toHaveAttribute('open')
+
+    await user.click(disclosureLabel)
+    expect(disclosure).toHaveAttribute('open')
+    expect(screen.getByText(/不应导入 MAA/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '下载完整计算数据' }))
     expect(onDownload).not.toHaveBeenCalled()
     expect(onDownloadFullResult).toHaveBeenCalledTimes(1)

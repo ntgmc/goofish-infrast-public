@@ -5,7 +5,7 @@ import { normalizeUpgradeSuggestions } from './workflow-utils'
 import type { WorkspacePatch } from '../useToolSession'
 import type { OptimizePhase, OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
-import { requestFullResultExport, requestMaaExport } from './optimization-api'
+import { requestMaaExport } from './optimization-api'
 import { apiJson } from '../../../lib/api-client'
 
 
@@ -149,12 +149,6 @@ export function useOptimizeWorkspace({
     }).catch((error) => setWorkspaceError((error as Error).message))
   }, [guardGeneratedResultExport, profileId, setWorkspaceError])
 
-  const handleDownloadFullResultHistory = useCallback((item: WorkspaceResultHistoryItem) => {
-    void guardGeneratedResultExport(async () => {
-      await requestFullResultExport(profileId, item.id)
-    }).catch((error) => setWorkspaceError((error as Error).message))
-  }, [guardGeneratedResultExport, profileId, setWorkspaceError])
-
   const mutateHistoryResult = useCallback(async (
     item: WorkspaceResultHistoryItem,
     action: 'archive' | 'unarchive' | 'delete',
@@ -185,7 +179,6 @@ export function useOptimizeWorkspace({
     handleViewHistory,
     handleUseHistoryConfig,
     handleDownloadHistory,
-    handleDownloadFullResultHistory,
     handleArchiveHistory: (item: WorkspaceResultHistoryItem) => mutateHistoryResult(item, 'archive'),
     handleUnarchiveHistory: (item: WorkspaceResultHistoryItem) => mutateHistoryResult(item, 'unarchive'),
     handleDeleteHistory: (item: WorkspaceResultHistoryItem) => mutateHistoryResult(item, 'delete'),

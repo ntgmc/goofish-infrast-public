@@ -238,7 +238,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_030: "按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_031: "MAA JSON 是可直接导入 MAA 的轻量执行配置；完整计算数据是独立的分析与排障文件。",
+  components_result_panel_ResultPanel_031: "MAA JSON 是可直接导入 MAA 的轻量执行配置；账号空间会保留本次结果和配置。",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_032: "下载 MAA JSON",
   // src/components/result-panel/ResultPanel.tsx
@@ -255,6 +255,10 @@ export const domainCopy = {
   components_result_panel_ResultPanel_038: "排班结果视图",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_039: "下载完整计算数据",
+  // src/components/result-panel/ResultPanel.tsx
+  components_result_panel_ResultPanel_040: "开发者与排障",
+  // src/components/result-panel/ResultPanel.tsx
+  components_result_panel_ResultPanel_041: "完整计算 JSON 包含心情、效率、原始结果和调试字段，仅用于分析或问题排查，不应导入 MAA。",
   // src/components/result-panel/formatters.ts
   components_result_panel_formatters_001: "按每队列 ",
   // src/components/result-panel/formatters.ts
