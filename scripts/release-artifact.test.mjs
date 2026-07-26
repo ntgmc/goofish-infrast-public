@@ -9,7 +9,6 @@ import { ARTIFACT_KINDS } from './release-artifact-config.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const script = join(root, 'scripts/release-artifact.mjs')
-const artifactSetScript = join(root, 'scripts/check-release-artifact-set.mjs')
 const sha = '0123456789abcdef0123456789abcdef01234567'
 
 for (const kind of Object.keys(ARTIFACT_KINDS)) {
@@ -40,7 +39,7 @@ test('rejects missing, extra, wrong-kind, and tampered artifact files', async ()
     assert.throws(() => run(fixture, ['create', '--kind', 'public', '--sha', sha]), /unexpected public artifact entry.*worker\.js/)
     await rm(join(fixture.artifact, 'server/dist/worker.js'))
     run(fixture, ['create', '--kind', 'public', '--sha', sha])
-    assert.throws(() => run(fixture, ['verify', '--kind', 'worker', '--sha', sha]), /artifact kind mismatch/)
+    assert.throws(() => run(fixture, ['verify', '--kind', 'worker', '--sha', sha]), /artifact kind must be public/)
     await writeFile(join(fixture.artifact, 'dist/index.html'), 'tampered', 'utf8')
     assert.throws(() => run(fixture, ['verify', '--kind', 'public', '--sha', sha]), /hash mismatch/)
   } finally {
@@ -64,25 +63,25 @@ test('rejects private optimizer sources embedded in a public sourcemap', async (
 })
 
 test('rejects changelog and build metadata that do not describe the target', async () => {
-  const fixture = await createFixture('worker')
+  const fixture = await createFixture('public')
   try {
     const recordPath = join(fixture.artifact, 'changelog-release.json')
     const envelope = JSON.parse(await readFile(recordPath, 'utf8'))
     envelope.release.targetSha = 'abcdef0123456789abcdef0123456789abcdef01'
     await writeFile(recordPath, `${JSON.stringify(envelope, null, 2)}\n`, 'utf8')
-    assert.throws(() => run(fixture, ['create', '--kind', 'worker', '--sha', sha]), /changelog target SHA mismatch/)
+    assert.throws(() => run(fixture, ['create', '--kind', 'public', '--sha', sha]), /changelog target SHA mismatch/)
   } finally {
     await rm(fixture.root, { recursive: true, force: true })
   }
 })
 
 test('allows an immutable deployment worktree only when explicitly requested', async () => {
-  const fixture = await createFixture('worker')
+  const fixture = await createFixture('public')
   try {
-    run(fixture, ['create', '--kind', 'worker', '--sha', sha])
+    run(fixture, ['create', '--kind', 'public', '--sha', sha])
     await writeFile(join(fixture.artifact, 'package.json'), '{}\n', 'utf8')
-    assert.throws(() => run(fixture, ['verify', '--kind', 'worker', '--sha', sha]), /unexpected worker artifact entry.*package\.json/)
-    run(fixture, ['verify', '--kind', 'worker', '--sha', sha], { RELEASE_ALLOW_SOURCE_TREE: 'true' })
+    assert.throws(() => run(fixture, ['verify', '--kind', 'public', '--sha', sha]), /unexpected public artifact entry.*package\.json/)
+    run(fixture, ['verify', '--kind', 'public', '--sha', sha], { RELEASE_ALLOW_SOURCE_TREE: 'true' })
   } finally {
     await rm(fixture.root, { recursive: true, force: true })
   }
@@ -101,22 +100,6 @@ test('writes a separate deployable decision for build-relevant releases', async 
     })
   } finally {
     await rm(fixture.root, { recursive: true, force: true })
-  }
-})
-
-test('coordinates public, worker, and combined manifests on one target SHA', async () => {
-  const fixtures = Object.fromEntries(await Promise.all(Object.keys(ARTIFACT_KINDS).map(async (kind) => [kind, await createFixture(kind)])))
-  try {
-    for (const kind of Object.keys(ARTIFACT_KINDS)) run(fixtures[kind], ['create', '--kind', kind, '--sha', sha])
-    runArtifactSet(fixtures, sha)
-
-    const workerManifestPath = join(fixtures.worker.artifact, 'build-manifest.json')
-    const workerManifest = JSON.parse(await readFile(workerManifestPath, 'utf8'))
-    workerManifest.target_sha = 'abcdef0123456789abcdef0123456789abcdef01'
-    await writeFile(workerManifestPath, `${JSON.stringify(workerManifest, null, 2)}\n`, 'utf8')
-    assert.throws(() => runArtifactSet(fixtures, sha), /worker manifest target SHA mismatch/)
-  } finally {
-    await Promise.all(Object.values(fixtures).map((fixture) => rm(fixture.root, { recursive: true, force: true })))
   }
 })
 
@@ -169,16 +152,5 @@ function run(fixture, argumentsList, environment = {}) {
     },
     encoding: 'utf8',
   })
-  if (result.status !== 0) throw new Error(result.stderr || result.stdout)
-}
-
-function runArtifactSet(fixtures, targetSha) {
-  const result = spawnSync(process.execPath, [
-    artifactSetScript,
-    '--sha', targetSha,
-    '--public', fixtures.public.artifact,
-    '--worker', fixtures.worker.artifact,
-    '--combined', fixtures.combined.artifact,
-  ], { cwd: root, encoding: 'utf8' })
   if (result.status !== 0) throw new Error(result.stderr || result.stdout)
 }

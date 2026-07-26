@@ -2,18 +2,13 @@ name: Quality Checks
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
   push:
-    branches:
-      - main
-      - dev
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-  issues: read
-  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,52 +18,10 @@ env:
   NODE_VERSION: "24"
 
 jobs:
-  build-relevance:
-    name: Build Relevance
+  public-validation:
+    name: Public Build, Tests, and Boundaries
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      build_required: ${{ steps.check.outputs.build_required }}
-      documentation_only: ${{ steps.check.outputs.documentation_only }}
-      reason: ${{ steps.check.outputs.reason }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Check build relevance
-        id: check
-        env:
-          CACHED_COMMIT_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-          COMMIT_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-        run: node scripts/check-build-relevance.mjs --check
-
-      - name: Write summary
-        run: |
-          echo "Build required: ${{ steps.check.outputs.build_required }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Documentation only: ${{ steps.check.outputs.documentation_only }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Reason: ${{ steps.check.outputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
-
-  static-security:
-    name: Static Security Analysis
-    needs: build-relevance
-    if: needs.build-relevance.outputs.documentation_only != 'true'
-    permissions:
-      contents: read
-    uses: ./.github/workflows/security-analysis.yml
-
-  public-build:
-    name: Public Build and Artifact
-    needs: build-relevance
-    if: needs.build-relevance.outputs.build_required == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -84,76 +37,60 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check product catalog and generated pricing
-        run: npm run check:catalog
+      - name: Validate public source and API boundaries
+        run: |
+          npm run check:catalog
+          npm run check:architecture
+          npm run check:dead-code
+          npm run check:api
+
+      - name: Run public tests
+        run: |
+          npm run test:generate-changelog
+          npm run test:release-artifact
+          npm test
 
       - name: Build public application
         env:
           REFRESH_BUILD_METADATA: "true"
           VERSION_SOURCE_SHA: ${{ github.sha }}
           BUILD_NUMBER: ${{ github.run_number }}
-          BUILD_CONTEXT: quality-checks
-          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GENERATE_CHANGELOG_CANDIDATE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_API_URL: ${{ github.api_url }}
-          CHANGELOG_BASE_SHA: ${{ vars.CHANGELOG_BASE_SHA }}
+          BUILD_CONTEXT: public-quality-checks
+          GENERATE_CHANGELOG_CANDIDATE: "false"
         run: |
           npm run build
           npm run check:public-export
-          node scripts/stage-release-artifact.mjs --kind public --output .release-staging/public
-          RELEASE_ROOT="$PWD/.release-staging/public" RELEASE_SOURCE_ROOT="$PWD" \
-            node scripts/release-artifact.mjs create \
-            --kind public \
-            --sha "$GITHUB_SHA" \
-            --run-id "$GITHUB_RUN_ID" \
-            --run-url "$GITHUB_RUN_URL"
-          RELEASE_ROOT="$PWD/.release-staging/public" \
-            node scripts/release-artifact.mjs verify --kind public --sha "$GITHUB_SHA"
 
-      - name: Package public release and deployment decision
-        if: github.event_name != 'pull_request'
+      - name: Create and verify public artifact
+        if: github.event_name == 'push'
+        env:
+          RELEASE_ROOT: ${{ github.workspace }}/.release-staging/public
+          RELEASE_SOURCE_ROOT: ${{ github.workspace }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          mkdir -p .release-packages/public .release-decision
-          tar -C .release-staging/public -czf .release-packages/public/public.tgz \
-            dist server build-manifest.json changelog-release.json changelog-release.md
+          node scripts/stage-release-artifact.mjs --kind public --output .release-staging/public
+          node scripts/release-artifact.mjs create --kind public --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --run-url "$GITHUB_RUN_URL"
+          node scripts/release-artifact.mjs verify --kind public --sha "$GITHUB_SHA"
+          mkdir -p .release-packages/public
+          tar -C .release-staging/public -czf .release-packages/public/public.tgz dist server build-manifest.json changelog-release.json changelog-release.md
           (cd .release-packages/public && sha256sum public.tgz > public.tgz.sha256)
-          RELEASE_ROOT="$PWD/.release-decision" node scripts/release-artifact.mjs decision \
-            --sha "$GITHUB_SHA" \
-            --deployable true
 
-      - name: Upload public release
-        if: github.event_name != 'pull_request'
+      - name: Upload public artifact
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: goofish-public-${{ github.sha }}
           path: .release-packages/public/
-          include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload deployable decision
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: goofish-deployment-${{ github.sha }}
-          path: .release-decision/
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 30
-
-  private-artifacts:
-    name: Private Worker and Combined Artifacts
-    needs: build-relevance
-    if: needs.build-relevance.outputs.build_required == 'true'
+  postgres-integration:
+    name: PostgreSQL Integration
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -164,172 +101,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and verify private artifacts
-        env:
-          REFRESH_BUILD_METADATA: "true"
-          VERSION_SOURCE_SHA: ${{ github.sha }}
-          BUILD_NUMBER: ${{ github.run_number }}
-          BUILD_CONTEXT: quality-checks-private
-          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GENERATE_CHANGELOG_CANDIDATE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_API_URL: ${{ github.api_url }}
-          CHANGELOG_BASE_SHA: ${{ vars.CHANGELOG_BASE_SHA }}
-        run: |
-          npm run build:private
-          for kind in public worker combined; do
-            node scripts/stage-release-artifact.mjs --kind "$kind" --output ".release-staging/$kind"
-            RELEASE_ROOT="$PWD/.release-staging/$kind" RELEASE_SOURCE_ROOT="$PWD" \
-              node scripts/release-artifact.mjs create \
-                --kind "$kind" \
-                --sha "$GITHUB_SHA" \
-                --run-id "$GITHUB_RUN_ID" \
-                --run-url "$GITHUB_RUN_URL"
-            RELEASE_ROOT="$PWD/.release-staging/$kind" \
-              node scripts/release-artifact.mjs verify --kind "$kind" --sha "$GITHUB_SHA"
-          done
-          node scripts/check-release-artifact-set.mjs \
-            --sha "$GITHUB_SHA" \
-            --public .release-staging/public \
-            --worker .release-staging/worker \
-            --combined .release-staging/combined
-
-      - name: Package private artifacts
-        if: github.event_name != 'pull_request'
-        run: |
-          mkdir -p .release-packages/worker .release-packages/combined
-          tar -C .release-staging/worker -czf .release-packages/worker/worker.tgz \
-            server build-manifest.json changelog-release.json changelog-release.md
-          tar -C .release-staging/combined -czf .release-packages/combined/combined.tgz \
-            dist server build-manifest.json changelog-release.json changelog-release.md
-          (cd .release-packages/worker && sha256sum worker.tgz > worker.tgz.sha256)
-          (cd .release-packages/combined && sha256sum combined.tgz > combined.tgz.sha256)
-
-      - name: Upload worker release
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: goofish-worker-${{ github.sha }}
-          path: .release-packages/worker/
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload combined release
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: goofish-combined-${{ github.sha }}
-          path: .release-packages/combined/
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 30
-
-  deployment-decision:
-    name: Deployment Decision
-    needs: build-relevance
-    if: github.event_name != 'pull_request' && needs.build-relevance.outputs.build_required != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Record skipped deployment
-        env:
-          DECISION_REASON: ${{ needs.build-relevance.outputs.reason }}
-        run: |
-          mkdir -p .release-decision
-          RELEASE_ROOT="$PWD/.release-decision" node scripts/release-artifact.mjs decision \
-            --sha "$GITHUB_SHA" \
-            --deployable false \
-            --reason "$DECISION_REASON"
-
-      - name: Upload deployment decision
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: goofish-deployment-${{ github.sha }}
-          path: .release-decision/
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 30
-
-  test-and-architecture:
-    name: Unit Tests and Architecture
-    needs: build-relevance
-    if: >-
-      needs.build-relevance.outputs.documentation_only != 'true' &&
-      (github.event_name == 'pull_request' ||
-      github.event_name == 'workflow_dispatch' ||
-      github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate data and local changelog metadata
-        run: npm run generate:data && npm run generate:changelog
-
-      - name: Check dead code
-        run: npm run check:dead-code
-
-      - name: Test build relevance classification
-        run: npm run test:build-relevance
-
-      - name: Test generated release metadata
-        run: npm run test:generate-changelog && npm run test:release-artifact
-
-      - name: Run unit tests
-        run: npm test
-
-      - name: Check architecture boundaries
-        run: npm run check:architecture
-
-  api-smoke-test:
-    name: API Smoke Test
-    needs: build-relevance
-    if: needs.build-relevance.outputs.build_required == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate data and local changelog metadata
-        run: npm run generate:data && npm run generate:changelog
-
-      - name: Check production deployment contract
-        run: npm run check:deploy
-
-      - name: Run API smoke check
-        run: npm run check:api
-
-      - name: Run PostgreSQL redemption integration tests
+      - name: Run PostgreSQL integration tests
         run: npm run test:postgres
