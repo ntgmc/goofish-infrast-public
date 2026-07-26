@@ -50,36 +50,31 @@ type TaskStepRole = 'submit' | 'queue' | 'schedule' | 'suggestions' | 'persist'
 type TaskStepDefinition = { label: string; detail: string; role: TaskStepRole }
 
 export default function ScheduleProgress({ progress, className = '', variant = 'embedded' }: Props) {
-  const [now, setNow] = useState(() => Date.now())
-  const calculatedPercent = getTimedPercent(progress, now)
-  const boundedCalculatedPercent = getStageBoundedPercent(progress, calculatedPercent, now)
-  const boundedProgressFloor = getStageBoundedPercent(progress, progress.percentFloor ?? 0, now)
   const progressKey = `${progress.jobId ?? 'local'}:${progress.startedAt}`
-  const [percentFloor, setPercentFloor] = useState<{ key: string; value: number }>(() => ({
-    key: progressKey,
-    value: Math.max(boundedCalculatedPercent, boundedProgressFloor),
-  }))
-  const floor = percentFloor.key === progressKey ? Math.max(percentFloor.value, boundedProgressFloor) : boundedProgressFloor
-  const rawPercent = Math.max(boundedCalculatedPercent, floor)
+  const [progressFrame, setProgressFrame] = useState(() => {
+    const now = Date.now()
+    return { key: progressKey, value: getTargetPercent(progress, now), now }
+  })
+  const now = progressFrame.now
+  const targetPercent = getTargetPercent(progress, now)
+  const rawPercent = progressFrame.key === progressKey ? progressFrame.value : targetPercent
   const percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
   const task = useMemo(() => getTaskView(progress, rawPercent, now), [progress, rawPercent, now])
   const compact = variant === 'embedded'
   const reduceMotion = useReducedMotion()
 
   useEffect(() => {
-    setPercentFloor((current) => {
-    const nextCalculated = Math.max(boundedCalculatedPercent, boundedProgressFloor)
-    if (current.key !== progressKey) return { key: progressKey, value: nextCalculated }
-    const nextValue = Math.max(current.value, nextCalculated)
-      return nextValue === current.value ? current : { key: progressKey, value: nextValue }
-    })
-  }, [boundedCalculatedPercent, boundedProgressFloor, progress.completedAt, progressKey])
-
-  useEffect(() => {
     let timer = 0
     const tick = () => {
       const nextNow = Date.now()
-      setNow(nextNow)
+      setProgressFrame((current) => {
+        const nextTarget = getTargetPercent(progress, nextNow)
+        if (current.key !== progressKey) return { key: progressKey, value: nextTarget, now: nextNow }
+        const elapsedMs = Math.max(0, nextNow - current.now)
+        const nextValue = getBufferedPercent(current.value, nextTarget, progress, nextNow, elapsedMs)
+        if (nextValue === current.value && current.now === nextNow) return current
+        return { key: progressKey, value: nextValue, now: nextNow }
+      })
       if (progress.estimatePhase !== 'cancelled' && (getTimedPercent(progress, nextNow) < 100 || !progress.completedAt)) {
         timer = window.setTimeout(tick, PROGRESS_REFRESH_INTERVAL_MS)
       }
@@ -189,6 +184,7 @@ const ESTIMATED_DURATION_MS = 10_000
 export const SCHEDULE_PROGRESS_COMPLETION_DURATION_MS = 420
 const PROGRESS_REFRESH_INTERVAL_MS = 1000 / 60
 const MAX_WAITING_PERCENT = 96
+type StageProgressBounds = [minimum: number, maximum: number, pacingMs: number]
 
 const TASK_STEPS: Record<Exclude<ScheduleProgressState['mode'], 'generate'>, TaskStepDefinition[]> = {
   apply: [
@@ -248,10 +244,57 @@ function getWaitingPercent(startedAt: number, now: number, estimatedDurationMs: 
   return ratio * MAX_WAITING_PERCENT
 }
 
+function getTargetPercent(progress: ScheduleProgressState, now: number): number {
+  const calculatedPercent = getStageBoundedPercent(progress, getTimedPercent(progress, now), now)
+  const progressFloor = getStageBoundedPercent(progress, progress.percentFloor ?? 0, now)
+  return Math.max(calculatedPercent, progressFloor)
+}
+
 function getStageBoundedPercent(progress: ScheduleProgressState, percent: number, now: number): number {
   if (progress.completedAt || progress.estimatePhase === 'completed') return percent
+  const bounds = getStageProgressBounds(progress)
+  if (!bounds) return percent
+
+  const [minimum, maximum, pacingMs] = bounds
+  const stageStartedAt = Date.parse(progress.calculationStageUpdatedAt ?? '')
+  if (!Number.isFinite(stageStartedAt)) return Math.max(minimum, Math.min(maximum, percent))
+
+  const stageElapsedMs = Math.max(0, now - stageStartedAt)
+  const stageRatio = Math.min(1, stageElapsedMs / pacingMs)
+  const activeMaximum = Math.max(minimum, maximum - 0.51)
+  const stageCeiling = minimum + (activeMaximum - minimum) * stageRatio
+  return Math.max(minimum, Math.min(stageCeiling, percent))
+}
+
+function getBufferedPercent(
+  current: number,
+  target: number,
+  progress: ScheduleProgressState,
+  now: number,
+  elapsedMs: number,
+): number {
+  if (target <= current || elapsedMs <= 0 || progress.estimatePhase === 'cancelled') return current
+  const speedPerMs = getProgressSpeedPerMs(progress, now)
+  return Math.min(target, current + speedPerMs * elapsedMs)
+}
+
+function getProgressSpeedPerMs(progress: ScheduleProgressState, now: number): number {
+  if (progress.completedAt || progress.estimatePhase === 'completed') {
+    return 100 / SCHEDULE_PROGRESS_COMPLETION_DURATION_MS
+  }
+
+  const bounds = getStageProgressBounds(progress)
+  if (bounds) {
+    const [minimum, maximum, pacingMs] = bounds
+    return (maximum - minimum) / pacingMs
+  }
+
+  return MAX_WAITING_PERCENT / getEstimatedTotalMs(progress, now)
+}
+
+function getStageProgressBounds(progress: ScheduleProgressState): StageProgressBounds | null {
   const stage = progress.calculationStage
-  if (!stage || stage === 'completed') return percent
+  if (!stage || stage === 'completed') return null
 
   const includesSuggestions = Boolean(progress.upgradeSuggestionsRequested && progress.upgradeSuggestionsAllowed)
   const bounds = includesSuggestions
@@ -264,7 +307,7 @@ function getStageBoundedPercent(progress: ScheduleProgressState, percent: number
         simulating_maa_baseline: [86, 91, 20_000],
         formatting_result: [91, 94, 5_000],
         persisting_result: [94, MAX_WAITING_PERCENT, 10_000],
-      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, [number, number, number]>
+      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, StageProgressBounds>
     : {
         starting: [8, 18, 4_000],
         generating_schedule: [18, 68, 30_000],
@@ -274,16 +317,8 @@ function getStageBoundedPercent(progress: ScheduleProgressState, percent: number
         simulating_maa_baseline: [68, 88, 20_000],
         formatting_result: [88, 93, 5_000],
         persisting_result: [93, MAX_WAITING_PERCENT, 10_000],
-      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, [number, number, number]>
-  const [minimum, maximum, pacingMs] = bounds[stage]
-  const stageStartedAt = Date.parse(progress.calculationStageUpdatedAt ?? '')
-  if (!Number.isFinite(stageStartedAt)) return Math.max(minimum, Math.min(maximum, percent))
-
-  const stageElapsedMs = Math.max(0, now - stageStartedAt)
-  const stageRatio = Math.min(1, stageElapsedMs / pacingMs)
-  const activeMaximum = Math.max(minimum, maximum - 0.51)
-  const stageCeiling = minimum + (activeMaximum - minimum) * stageRatio
-  return Math.max(minimum, Math.min(stageCeiling, percent))
+      } satisfies Record<Exclude<OptimizeCalculationStage, 'completed'>, StageProgressBounds>
+  return bounds[stage]
 }
 
 function getTaskView(progress: ScheduleProgressState, percent: number, now: number) {
