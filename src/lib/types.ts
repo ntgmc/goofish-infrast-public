@@ -356,6 +356,9 @@ export interface OptimizeResult {
   cache_key?: string;
   job_recommended?: boolean;
   cross_shift_trace?: Record<string, unknown>[];
+  bounded_incumbent_source?: 'fast_beam';
+  bounded_incumbent_daily_score?: number;
+  discarded_exact_daily_score?: number;
   maa_default_comparison?: MaaDefaultComparison;
   orundum_economy?: OrundumEconomy;
   intermediate_depletion?: IntermediateDepletion[];
