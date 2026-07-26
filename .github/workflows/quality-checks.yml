@@ -63,12 +63,12 @@ jobs:
       contents: read
     uses: ./.github/workflows/security-analysis.yml
 
-  web-build:
-    name: Web Build
+  public-build:
+    name: Public Build and Artifact
     needs: build-relevance
     if: needs.build-relevance.outputs.build_required == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -87,7 +87,7 @@ jobs:
       - name: Check product catalog and generated pricing
         run: npm run check:catalog
 
-      - name: Build web app
+      - name: Build public application
         env:
           REFRESH_BUILD_METADATA: "true"
           VERSION_SOURCE_SHA: ${{ github.sha }}
@@ -101,25 +101,124 @@ jobs:
           CHANGELOG_BASE_SHA: ${{ vars.CHANGELOG_BASE_SHA }}
         run: |
           npm run build
-          node scripts/release-artifact.mjs create \
+          npm run check:public-export
+          node scripts/stage-release-artifact.mjs --kind public --output .release-staging/public
+          RELEASE_ROOT="$PWD/.release-staging/public" RELEASE_SOURCE_ROOT="$PWD" \
+            node scripts/release-artifact.mjs create \
+            --kind public \
             --sha "$GITHUB_SHA" \
             --run-id "$GITHUB_RUN_ID" \
             --run-url "$GITHUB_RUN_URL"
+          RELEASE_ROOT="$PWD/.release-staging/public" \
+            node scripts/release-artifact.mjs verify --kind public --sha "$GITHUB_SHA"
 
-      - name: Package deployable release
+      - name: Package public release and deployment decision
         if: github.event_name != 'pull_request'
         run: |
-          mkdir -p release-package
-          tar -czf release-package/release.tgz dist server/dist build-manifest.json changelog-release.json changelog-release.md
-          (cd release-package && sha256sum release.tgz > release.tgz.sha256)
-          cp deployment-decision.json release-package/deployment-decision.json
+          mkdir -p .release-packages/public .release-decision
+          tar -C .release-staging/public -czf .release-packages/public/public.tgz \
+            dist server build-manifest.json changelog-release.json changelog-release.md
+          (cd .release-packages/public && sha256sum public.tgz > public.tgz.sha256)
+          RELEASE_ROOT="$PWD/.release-decision" node scripts/release-artifact.mjs decision \
+            --sha "$GITHUB_SHA" \
+            --deployable true
 
-      - name: Upload deployable release
+      - name: Upload public release
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: goofish-release-${{ github.sha }}
-          path: release-package/
+          name: goofish-public-${{ github.sha }}
+          path: .release-packages/public/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload deployable decision
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: goofish-deployment-${{ github.sha }}
+          path: .release-decision/
+          if-no-files-found: error
+          retention-days: 30
+
+  private-artifacts:
+    name: Private Worker and Combined Artifacts
+    needs: build-relevance
+    if: needs.build-relevance.outputs.build_required == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and verify private artifacts
+        env:
+          REFRESH_BUILD_METADATA: "true"
+          VERSION_SOURCE_SHA: ${{ github.sha }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          BUILD_CONTEXT: quality-checks-private
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GENERATE_CHANGELOG_CANDIDATE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          CHANGELOG_BASE_SHA: ${{ vars.CHANGELOG_BASE_SHA }}
+        run: |
+          npm run build:private
+          for kind in public worker combined; do
+            node scripts/stage-release-artifact.mjs --kind "$kind" --output ".release-staging/$kind"
+            RELEASE_ROOT="$PWD/.release-staging/$kind" RELEASE_SOURCE_ROOT="$PWD" \
+              node scripts/release-artifact.mjs create \
+                --kind "$kind" \
+                --sha "$GITHUB_SHA" \
+                --run-id "$GITHUB_RUN_ID" \
+                --run-url "$GITHUB_RUN_URL"
+            RELEASE_ROOT="$PWD/.release-staging/$kind" \
+              node scripts/release-artifact.mjs verify --kind "$kind" --sha "$GITHUB_SHA"
+          done
+          node scripts/check-release-artifact-set.mjs \
+            --sha "$GITHUB_SHA" \
+            --public .release-staging/public \
+            --worker .release-staging/worker \
+            --combined .release-staging/combined
+
+      - name: Package private artifacts
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p .release-packages/worker .release-packages/combined
+          tar -C .release-staging/worker -czf .release-packages/worker/worker.tgz \
+            server build-manifest.json changelog-release.json changelog-release.md
+          tar -C .release-staging/combined -czf .release-packages/combined/combined.tgz \
+            dist server build-manifest.json changelog-release.json changelog-release.md
+          (cd .release-packages/worker && sha256sum worker.tgz > worker.tgz.sha256)
+          (cd .release-packages/combined && sha256sum combined.tgz > combined.tgz.sha256)
+
+      - name: Upload worker release
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: goofish-worker-${{ github.sha }}
+          path: .release-packages/worker/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload combined release
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: goofish-combined-${{ github.sha }}
+          path: .release-packages/combined/
           if-no-files-found: error
           retention-days: 30
 
@@ -142,16 +241,17 @@ jobs:
         env:
           DECISION_REASON: ${{ needs.build-relevance.outputs.reason }}
         run: |
-          mkdir -p release-package
-          RELEASE_ROOT="$PWD/release-package" node scripts/release-artifact.mjs decision \
+          mkdir -p .release-decision
+          RELEASE_ROOT="$PWD/.release-decision" node scripts/release-artifact.mjs decision \
             --sha "$GITHUB_SHA" \
+            --deployable false \
             --reason "$DECISION_REASON"
 
       - name: Upload deployment decision
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: goofish-release-${{ github.sha }}
-          path: release-package/
+          name: goofish-deployment-${{ github.sha }}
+          path: .release-decision/
           if-no-files-found: error
           retention-days: 30
 

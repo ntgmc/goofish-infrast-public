@@ -23,8 +23,9 @@ does not create per-PR preview URLs.
 4. The workflow SSHs into the server using the `development` GitHub environment.
 5. The workflow uploads `scripts/deploy-production.sh` from the immutable target
    commit and runs that temporary copy with dev-specific parameters.
-6. The workflow downloads the SHA-bound release artifact produced by the
-   successful `Quality Checks` run and verifies its SHA-256 before upload.
+6. The workflow downloads the SHA-bound `goofish-combined-<sha>` artifact
+   produced by the successful `Quality Checks` run and verifies
+   `combined.tgz` and its SHA-256 before upload.
 7. The script checks out the immutable target SHA, runs `npm ci --omit=dev`,
    verifies and installs the prebuilt `dist` and `server/dist`, and restarts the
    existing systemd service. Its pre-start hook runs the controlled dev database
@@ -251,8 +252,9 @@ rejects this entry point unless the systemd unit also sets
 the API-only role and the separate Hangzhou worker; do not copy this opt-in into
 their environment files.
 
-For the first combined-worker rollout, deploy the verified artifact containing
-`server/dist/all.js` before installing the unit from the same SHA. Then reload
+For the first combined-worker rollout, deploy the verified `combined` artifact
+containing `server/dist/all.js`, `server/dist/optimize-worker.js`, and
+`server/dist/migrate.js` before installing the unit from the same SHA. Then reload
 systemd and restart the service:
 
 ```bash

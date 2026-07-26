@@ -152,7 +152,7 @@ verify_release() {
   [[ -s "$release_dir/server/dist/migrate.js" ]] || return 1
   [[ -s "$release_dir/build-manifest.json" ]] || return 1
   [[ -s "$release_dir/release.json" ]] || return 1
-  RELEASE_ROOT="$release_dir" node "$release_dir/scripts/release-artifact.mjs" verify --sha "$TARGET_SHA" || return 1
+  RELEASE_ROOT="$release_dir" RELEASE_ALLOW_SOURCE_TREE=true node "$release_dir/scripts/release-artifact.mjs" verify --kind public --sha "$TARGET_SHA" || return 1
   RELEASE_DIR_TO_VERIFY="$release_dir" EXPECTED_SHA="$TARGET_SHA" node --input-type=module <<'NODE'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -176,6 +176,7 @@ const build = JSON.parse(await readFile(join(root, 'build-manifest.json'), 'utf8
 const manifest = {
   target_sha: process.env.RELEASE_TARGET_SHA,
   artifact_sha256: process.env.RELEASE_ARTIFACT_SHA,
+  artifact_kind: build.artifact_kind,
   build,
   deployment: {
     github_run_id: process.env.RELEASE_RUN_ID,
@@ -209,7 +210,7 @@ build_release() {
     tar -xzf "$ARTIFACT_PATH" -C "$BUILD_DIR"
     [[ -s dist/index.html ]] || fail "missing frontend artifact: dist/index.html"
     [[ -s server/dist/index.js ]] || fail "missing backend artifact: server/dist/index.js"
-    RELEASE_ROOT="$BUILD_DIR" node scripts/release-artifact.mjs verify --sha "$TARGET_SHA"
+    RELEASE_ROOT="$BUILD_DIR" RELEASE_ALLOW_SOURCE_TREE=true node scripts/release-artifact.mjs verify --kind public --sha "$TARGET_SHA"
     node --check server/dist/index.js
     npm ls --omit=dev >/dev/null
   )

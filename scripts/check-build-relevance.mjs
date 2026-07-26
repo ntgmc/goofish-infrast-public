@@ -16,6 +16,7 @@ const buildRelevantFiles = new Set([
   'vite.config.ts',
   '.github/workflows/deploy-production.yml',
   '.github/workflows/deploy-dev.yml',
+  '.github/workflows/quality-checks.yml',
   '.github/workflows/record-pr-changelog.yml',
   'docs/dev-deploy.md',
   'docs/production-deploy.md',
@@ -33,9 +34,12 @@ const buildRelevantPrefixes = [
 
 const buildRelevantScripts = new Set([
   'scripts/build-server.mjs',
+  'scripts/check-architecture.mjs',
   'scripts/check-api-handlers.mjs',
   'scripts/check-build-relevance.mjs',
   'scripts/check-production-deploy.mjs',
+  'scripts/check-public-export.mjs',
+  'scripts/check-release-artifact-set.mjs',
   'scripts/check-worker-link.mjs',
   'scripts/check-depot-profile.mjs',
   'scripts/check-server-routes.mjs',
@@ -50,6 +54,9 @@ const buildRelevantScripts = new Set([
   'scripts/deploy-worker-atomic.sh',
   'scripts/deploy-production.sh',
   'scripts/release-artifact.mjs',
+  'scripts/release-artifact-config.mjs',
+  'scripts/stage-release-artifact.mjs',
+  'scripts/private-optimizer-sources.mjs',
   'scripts/import-postgres.mjs',
   'scripts/verify-migrated-data.mjs',
 ])
