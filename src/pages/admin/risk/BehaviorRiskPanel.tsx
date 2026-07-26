@@ -202,10 +202,13 @@ export default function BehaviorRiskPanel() {
                       className="tool-field min-h-10"
                       value={selection.action}
                       disabled={riskCase.status !== 'pending'}
-                      onChange={(event) => setSelections((current) => ({
-                        ...current,
-                        [key]: { ...selection, action: event.currentTarget.value as MemberAction },
-                      }))}
+                      onChange={(event) => {
+                        const action = event.currentTarget.value as MemberAction
+                        setSelections((current) => ({
+                          ...current,
+                          [key]: { ...selection, action },
+                        }))
+                      }}
                     >
                       <option value="none">不处置此成员</option>
                       <option value="freeze_account">冻结整个账号</option>
@@ -215,7 +218,10 @@ export default function BehaviorRiskPanel() {
                       className="tool-field min-h-10"
                       value={selection.profileId}
                       disabled={riskCase.status !== 'pending' || selection.action !== 'freeze_profile'}
-                      onChange={(event) => setSelections((current) => ({ ...current, [key]: { ...selection, profileId: event.currentTarget.value } }))}
+                      onChange={(event) => {
+                        const profileId = event.currentTarget.value
+                        setSelections((current) => ({ ...current, [key]: { ...selection, profileId } }))
+                      }}
                     >
                       {member.profiles.length === 0 && <option value="">无可选档案</option>}
                       {member.profiles.map((profile) => <option key={profile.profile_id} value={profile.profile_id}>{profile.profile_label} · {profile.kind} · {profile.status}</option>)}
@@ -233,7 +239,10 @@ export default function BehaviorRiskPanel() {
                     className="tool-field min-h-24 w-full resize-y"
                     maxLength={1000}
                     value={notes[riskCase.id] ?? ''}
-                    onChange={(event) => setNotes((current) => ({ ...current, [riskCase.id]: event.currentTarget.value }))}
+                    onChange={(event) => {
+                      const note = event.currentTarget.value
+                      setNotes((current) => ({ ...current, [riskCase.id]: note }))
+                    }}
                     placeholder="记录核验依据、沟通情况或处置原因。"
                   />
                 </label>
