@@ -36,7 +36,6 @@ describe('PlansSection', () => {
     const callbacks = {
       onDeleteSavedConfig: vi.fn().mockResolvedValue(undefined),
       onDownloadHistory: vi.fn(),
-      onDownloadFullResultHistory: vi.fn(),
       onRenameSavedConfig: vi.fn().mockResolvedValue(undefined),
       onSaveCurrent: vi.fn().mockResolvedValue(undefined),
       onUseHistoryConfig: vi.fn(),
@@ -44,14 +43,13 @@ describe('PlansSection', () => {
       onViewHistory: vi.fn(),
     }
 
-    renderSection({ savedConfigs: [saved], resultHistory: [history], canDownloadFullResult: true, ...callbacks })
+    renderSection({ savedConfigs: [saved], resultHistory: [history], ...callbacks })
 
     await user.click(screen.getByRole('button', { name: '载入到配置编辑器' }))
     await user.click(screen.getByRole('button', { name: '重命名方案' }))
     await user.click(screen.getByRole('button', { name: '删除方案' }))
     await user.click(screen.getByRole('button', { name: '查看排班结果' }))
     await user.click(screen.getByRole('button', { name: '下载 MAA JSON' }))
-    await user.click(screen.getByRole('button', { name: '下载完整计算数据' }))
     await user.click(screen.getByRole('button', { name: '用此配置继续调整' }))
 
     expect(callbacks.onUseSavedConfig).toHaveBeenCalledWith(saved)
@@ -59,43 +57,19 @@ describe('PlansSection', () => {
     expect(callbacks.onDeleteSavedConfig).toHaveBeenCalledWith(saved)
     expect(callbacks.onViewHistory).toHaveBeenCalledWith(history)
     expect(callbacks.onDownloadHistory).toHaveBeenCalledWith(history)
-    expect(callbacks.onDownloadFullResultHistory).toHaveBeenCalledWith(history)
     expect(callbacks.onUseHistoryConfig).toHaveBeenCalledWith(history)
+    expect(screen.queryByRole('button', { name: '下载完整计算数据' })).not.toBeInTheDocument()
   })
 
-  it('hides full data without capability and keeps it available for archived rotation results', async () => {
-    const user = userEvent.setup()
+  it('keeps full calculation downloads out of history shortcuts', () => {
     const rotation = historyItem(2, 'rotation')
-    const onDownloadFullResultHistory = vi.fn()
+    renderSection({ resultHistory: [historyItem(1)], archivedResults: [rotation] })
 
-    const { rerender } = renderSection({ resultHistory: [rotation] })
+    const maaButtons = screen.getAllByRole('button', { name: '下载 MAA JSON' })
+    expect(maaButtons).toHaveLength(2)
+    expect(maaButtons[0]).toBeEnabled()
+    expect(maaButtons[1]).toBeDisabled()
     expect(screen.queryByRole('button', { name: '下载完整计算数据' })).not.toBeInTheDocument()
-
-    rerender(
-      <PlansSection
-        activeConfig={config}
-        savedConfigs={[]}
-        resultHistory={[]}
-        archivedResults={[rotation]}
-        selectedHistoryId={null}
-        busyAction={null}
-        notice={null}
-        error={null}
-        canDownloadFullResult
-        onSaveCurrent={vi.fn().mockResolvedValue(undefined)}
-        onUseSavedConfig={vi.fn()}
-        onRenameSavedConfig={vi.fn().mockResolvedValue(undefined)}
-        onDeleteSavedConfig={vi.fn().mockResolvedValue(undefined)}
-        onViewHistory={vi.fn()}
-        onUseHistoryConfig={vi.fn()}
-        onDownloadHistory={vi.fn()}
-        onDownloadFullResultHistory={onDownloadFullResultHistory}
-      />,
-    )
-
-    expect(screen.getByRole('button', { name: '下载 MAA JSON' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: '下载完整计算数据' }))
-    expect(onDownloadFullResultHistory).toHaveBeenCalledWith(rotation)
   })
 })
 
@@ -116,8 +90,6 @@ function renderSection(overrides: Partial<ComponentProps<typeof PlansSection>> =
       onViewHistory={vi.fn()}
       onUseHistoryConfig={vi.fn()}
       onDownloadHistory={vi.fn()}
-      canDownloadFullResult={false}
-      onDownloadFullResultHistory={vi.fn()}
       {...overrides}
     />,
   )

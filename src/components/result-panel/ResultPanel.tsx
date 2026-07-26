@@ -81,7 +81,7 @@ export default function ResultPanel({
                   : copy.domain.components_result_panel_ResultPanel_031}
             </p>
           </div>
-          {(onDownload || onDownloadFullResult || onSaveWorkfile) && (
+          {(onDownload || onSaveWorkfile) && (
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-shrink-0">
               {!isRotationMode && onDownload && (
                 <button
@@ -90,14 +90,6 @@ export default function ResultPanel({
                   className="tool-primary-action"
                 >
                   {copy.domain.components_result_panel_ResultPanel_032}</button>
-              )}
-              {onDownloadFullResult && (
-                <button
-                  type="button"
-                  onClick={onDownloadFullResult}
-                  className="tool-secondary-action"
-                >
-                  {copy.domain.components_result_panel_ResultPanel_039}</button>
               )}
               {onSaveWorkfile && (
                 <button
@@ -167,7 +159,12 @@ export default function ResultPanel({
         labelledBy={`result-${selectedTab}-tab`}
       >
         {selectedTab === 'board' && <ResultBoard isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
-        {selectedTab === 'data' && <ResultMetrics isRotationMode={isRotationMode} prepared={prepared} />}
+        {selectedTab === 'data' && (
+          <div className="space-y-4">
+            <ResultMetrics isRotationMode={isRotationMode} prepared={prepared} />
+            {onDownloadFullResult && <FullResultExportDisclosure onDownload={onDownloadFullResult} />}
+          </div>
+        )}
         {selectedTab === 'detail' && <ResultDetail isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
         {selectedTab === 'import' && (
           <section className="tool-panel overflow-hidden p-5 sm:p-6">
@@ -177,5 +174,27 @@ export default function ResultPanel({
         {selectedTab === 'suggestions' && suggestionsSlot && <section className="tool-panel overflow-hidden p-5 sm:p-6">{suggestionsSlot}</section>}
       </AnimatedPresenceRegion>
     </div>
+  )
+}
+
+function FullResultExportDisclosure({ onDownload }: { onDownload: () => void }) {
+  return (
+    <details className="tool-panel overflow-hidden">
+      <summary className="cursor-pointer px-5 py-4 text-xs font-medium text-ink-muted transition-colors hover:text-ink-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500/45 sm:px-6">
+        {copy.domain.components_result_panel_ResultPanel_040}
+      </summary>
+      <div className="border-t border-surface-3/60 px-5 py-4 sm:px-6">
+        <p className="text-xs leading-5 text-ink-muted">
+          {copy.domain.components_result_panel_ResultPanel_041}
+        </p>
+        <button
+          type="button"
+          onClick={onDownload}
+          className="mt-3 inline-flex min-h-10 items-center text-sm font-medium text-ink-muted underline decoration-surface-4 underline-offset-4 transition-colors hover:text-ink-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45"
+        >
+          {copy.domain.components_result_panel_ResultPanel_039}
+        </button>
+      </div>
+    </details>
   )
 }

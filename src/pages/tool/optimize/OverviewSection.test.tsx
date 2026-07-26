@@ -27,7 +27,6 @@ describe('OverviewSection', () => {
     const onOpenPlans = vi.fn()
     const onViewHistory = vi.fn()
     const onDownloadHistory = vi.fn()
-    const onDownloadFullResultHistory = vi.fn()
     const onUseHistoryConfig = vi.fn()
 
     render(
@@ -55,8 +54,6 @@ describe('OverviewSection', () => {
         onViewHistory={onViewHistory}
         onUseHistoryConfig={onUseHistoryConfig}
         onDownloadHistory={onDownloadHistory}
-        canDownloadFullResult
-        onDownloadFullResultHistory={onDownloadFullResultHistory}
       />,
     )
 
@@ -68,14 +65,13 @@ describe('OverviewSection', () => {
     await user.click(screen.getByRole('button', { name: '打开方案与历史' }))
     await user.click(screen.getByRole('button', { name: '查看排班结果' }))
     await user.click(screen.getByRole('button', { name: '下载 MAA JSON' }))
-    await user.click(screen.getByRole('button', { name: '下载完整计算数据' }))
     await user.click(screen.getByRole('button', { name: '用此配置继续调整' }))
 
     expect(onOpenConfig).toHaveBeenCalledTimes(1)
     expect(onOpenPlans).toHaveBeenCalledTimes(1)
     expect(onViewHistory).toHaveBeenCalledWith(historyItem)
     expect(onDownloadHistory).toHaveBeenCalledWith(historyItem)
-    expect(onDownloadFullResultHistory).toHaveBeenCalledWith(historyItem)
     expect(onUseHistoryConfig).toHaveBeenCalledWith(historyItem)
+    expect(screen.queryByRole('button', { name: '下载完整计算数据' })).not.toBeInTheDocument()
   })
 })

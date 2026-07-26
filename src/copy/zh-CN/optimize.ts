@@ -204,7 +204,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_012: "查看排班计算说明",
   // src/pages/tool/optimize/GenerateControlBar.tsx
-  pages_tool_optimize_GenerateControlBar_013: "计算会使用当前干员数据和基建配置。MAA JSON 仅包含可直接导入 MAA 的轻量执行配置；具备高级权益时可另行下载分析与排障用的完整计算数据。",
+  pages_tool_optimize_GenerateControlBar_013: "计算会使用当前干员数据和基建配置。MAA JSON 仅包含可直接导入 MAA 的轻量执行配置；数据页签会展示效率与生产明细。",
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_014: "当前生成输入",
   // src/pages/tool/optimize/GenerateControlBar.tsx
@@ -393,8 +393,6 @@ export const optimizeCopy = {
   pages_tool_optimize_OverviewSection_067: "本月剩余 ",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_068: " 重置",
-  // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_069: "下载完整计算数据",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_001: "配置库",
   // src/pages/tool/optimize/PlansSection.tsx
@@ -463,8 +461,6 @@ export const optimizeCopy = {
   pages_tool_optimize_PlansSection_033: "自动保留最新 5 次排班结果；超过数量后会删除最早记录。",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_034: "结果记录",
-  // src/pages/tool/optimize/PlansSection.tsx
-  pages_tool_optimize_PlansSection_035: "下载完整计算数据",
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_001: "生成后将在这里显示排班结果",
   // src/pages/tool/optimize/ResultSection.tsx
@@ -960,7 +956,7 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_006: "调整配置",
   pages_tool_optimize_tour_007: "修改下一次计算使用的基建与排班参数；修改后需要回到总览重新计算。",
   pages_tool_optimize_tour_008: "查看结果",
-  pages_tool_optimize_tour_009: "查看当前或历史排班结果，并在权限允许时分别下载轻量 MAA JSON、完整计算数据或应用升级建议。",
+  pages_tool_optimize_tour_009: "查看当前或历史排班结果，并在权限允许时下载轻量 MAA JSON 或应用升级建议。",
   pages_tool_optimize_tour_010: "情景实验室",
   pages_tool_optimize_tour_011: "批量比较多组情景，从图表或表格中选择方案，再把选中配置带回普通优化流程。",
   pages_tool_optimize_tour_012: "确认输入并编辑配置",
@@ -968,13 +964,13 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_014: "开始排班",
   pages_tool_optimize_tour_015: "使用开始排班或重新计算按钮提交任务；禁用原因、优先券和计算进度也会显示在这里。",
   pages_tool_optimize_tour_016: "使用最近一次排班结果",
-  pages_tool_optimize_tour_017: "可直接查看排班结果、下载轻量 MAA JSON；具备高级权益时还可下载完整计算数据，或恢复当时配置继续调整。完整历史位于方案与历史页。",
+  pages_tool_optimize_tour_017: "可直接查看排班结果、下载轻量 MAA JSON，或恢复当时配置继续调整。完整历史位于方案与历史页。",
   pages_tool_optimize_tour_018: "保存当前配置",
   pages_tool_optimize_tour_019: "为当前配置命名并保存；最多保存 3 套，保存不会立即开始新的计算。",
   pages_tool_optimize_tour_020: "管理已保存配置",
   pages_tool_optimize_tour_021: "已保存配置可载入到编辑器、重命名或删除；载入后会成为下一次计算的当前配置。",
   pages_tool_optimize_tour_022: "回看历史排班结果",
-  pages_tool_optimize_tour_023: "历史结果自动保留最新 5 条；每条可查看、按权益下载轻量 MAA JSON 或完整计算数据，也可恢复当时的配置继续调整。",
+  pages_tool_optimize_tour_023: "历史结果自动保留最新 5 条；每条可查看、下载轻量 MAA JSON，也可恢复当时的配置继续调整。",
   pages_tool_optimize_tour_024: "编辑排班配置",
   pages_tool_optimize_tour_025: "选择预设并调整具体参数，这些改动只影响下一次计算。",
   pages_tool_optimize_tour_026: "留意校验与同步",
@@ -982,7 +978,7 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_028: "阅读排班结果",
   pages_tool_optimize_tour_029: "这里展示当前或选中的历史结果，包括房间安排、轮换与相关分析。",
   pages_tool_optimize_tour_030: "继续使用结果",
-  pages_tool_optimize_tour_031: "权限允许时可下载轻量 MAA JSON；高级版可另行下载不应导入 MAA 的完整计算数据。也可在这里应用升级建议或输入 CDK 升级。",
+  pages_tool_optimize_tour_031: "权限允许时可下载轻量 MAA JSON、应用升级建议；完整计算数据仅收在数据页签底部的开发者与排障区域。",
   pages_tool_optimize_tour_032: "选择实验因素",
   pages_tool_optimize_tour_033: "设置要比较的班次、策略等因素，并先检查页面计算出的有效组合数量。",
   pages_tool_optimize_tour_034: "开始情景对比",
