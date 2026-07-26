@@ -16,6 +16,7 @@ import {
   selectRepositoryChanges,
   validateChangelogEnvelope,
 } from './changelog-lib.mjs'
+import { readChangelogCommits, resolveChangelogGitRoot } from './changelog-git.mjs'
 import {
   buildDeepSeekMessages,
   buildPullRequestDiffContext,
@@ -312,6 +313,38 @@ test('renders a typed generated module and matching release note envelope', () =
   assert.match(renderReleaseNotes(envelope), /接入发布工作流自动化/)
 })
 
+test('reads a changelog range from an explicitly configured Git root', async () => {
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), 'goofish-changelog-git-'))
+
+  try {
+    runGitAt(temporaryDirectory, ['init'])
+    runGitAt(temporaryDirectory, ['config', 'user.name', 'Changelog Test'])
+    runGitAt(temporaryDirectory, ['config', 'user.email', 'changelog-test@example.invalid'])
+    await writeFile(join(temporaryDirectory, 'fixture.txt'), 'baseline\n', 'utf8')
+    runGitAt(temporaryDirectory, ['add', 'fixture.txt'])
+    runGitAt(temporaryDirectory, ['commit', '-m', 'chore: establish baseline'])
+    const baselineSha = runGitAt(temporaryDirectory, ['rev-parse', 'HEAD'])
+
+    await writeFile(join(temporaryDirectory, 'fixture.txt'), 'release\n', 'utf8')
+    runGitAt(temporaryDirectory, ['add', 'fixture.txt'])
+    runGitAt(temporaryDirectory, ['commit', '-m', 'fix: read private release history'])
+    const targetSha = runGitAt(temporaryDirectory, ['rev-parse', 'HEAD'])
+
+    assert.equal(resolveChangelogGitRoot(root, temporaryDirectory), temporaryDirectory)
+    assert.deepEqual(readChangelogCommits(baselineSha, targetSha, temporaryDirectory), [{
+      sha: targetSha,
+      subject: 'fix: read private release history',
+      body: '',
+    }])
+    assert.throws(
+      () => readChangelogCommits(baselineSha, targetSha, root),
+      /is not an ancestor/,
+    )
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true })
+  }
+})
+
 test('generates a production baseline candidate without requiring Git history', async () => {
   const currentSha = runGit(['rev-parse', 'HEAD'])
   const temporaryDirectory = await mkdtemp(join(tmpdir(), 'goofish-changelog-'))
@@ -375,6 +408,12 @@ test('generates a production baseline candidate without requiring Git history', 
 
 function runGit(argumentsList) {
   const result = spawnSync('git', argumentsList, { cwd: root, encoding: 'utf8' })
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout)
+  return result.stdout.trim()
+}
+
+function runGitAt(cwd, argumentsList) {
+  const result = spawnSync('git', argumentsList, { cwd, encoding: 'utf8' })
   if (result.status !== 0) throw new Error(result.stderr || result.stdout)
   return result.stdout.trim()
 }
