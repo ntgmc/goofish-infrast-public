@@ -89,11 +89,24 @@ export async function requestMaaExport(profileId: string, resultId: string): Pro
     json: { profile_id: profileId, result_id: resultId, idempotency_key: crypto.randomUUID() },
     fallbackMessage: copy.inventory.maa_export_failed,
   })
+  downloadJsonPayload(response, `maa_schedule_${resultId.slice(0, 8)}.json`)
+}
+
+export async function requestFullResultExport(profileId: string, resultId: string): Promise<void> {
+  const response = await apiJson<{ result: unknown; filename: string }>('/api/user/full-result-export', {
+    method: 'POST',
+    json: { profile_id: profileId, result_id: resultId, idempotency_key: crypto.randomUUID() },
+    fallbackMessage: copy.inventory.full_result_export_failed,
+  })
+  downloadJsonPayload(response, `maatool_full_result_${resultId.slice(0, 8)}.json`)
+}
+
+function downloadJsonPayload(response: { result: unknown; filename: string }, fallbackFilename: string): void {
   const blob = new Blob([JSON.stringify(response.result, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = response.filename || `maa-schedule-${resultId.slice(0, 8)}.json`
+  link.download = response.filename || fallbackFilename
   link.click()
   URL.revokeObjectURL(url)
 }

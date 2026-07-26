@@ -22,16 +22,58 @@ import { withTransaction } from '../storage/postgres'
 import { jsonResponse, requireUserSession } from './user-auth'
 import { recordTrackedExportBehaviorEvent } from '../behavior-risk/service'
 import { getPersonalUseDeclarationAcceptance } from '../storage/personal-use-declaration-store'
+import { buildMaaExportPayload } from '../optimization/jobs/maa-export'
 
 export default async function userResultsHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
-  const isMaaExportRequest = new URL(req.url).pathname.endsWith('/maa-export')
+  const pathname = new URL(req.url).pathname
+  const isMaaExportRequest = pathname.endsWith('/maa-export')
+  const isFullResultExportRequest = pathname.endsWith('/full-result-export')
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
-    const url = new URL(req.url)
-    if (url.pathname.endsWith('/maa-export')) {
+    if (isFullResultExportRequest) {
+      const body = await getValidatedJson(req, requestSchemas.fullResultExport)
+      const profile = await getProfileForUser(auth.user.id, body.profile_id)
+      if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
+      if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班结果。' }, 403)
+      if (!hasCapability({
+        kind: profile.kind,
+        permission: getEffectiveProfilePermission(profile),
+      }, 'export_full_result_json')) {
+        return jsonResponse({
+          error: '当前档案不支持下载完整计算数据。',
+          code: 'full_result_export_forbidden',
+        }, 403)
+      }
+      const workspace = await getProfileWorkspace(profile.id)
+      const historyItem = findHistoryItem(workspace?.result_history ?? [], workspace?.archived_results ?? [], body.result_id)
+      if (!historyItem) return jsonResponse({ error: '排班结果不存在。' }, 404)
+      const result = JSON.parse(JSON.stringify(historyItem.result)) as Record<string, unknown>
+      const behaviorDeclaration = await getPersonalUseDeclarationAcceptance(auth.user.id).catch(() => null)
+      await recordTrackedExportBehaviorEvent({
+        req,
+        auth,
+        profileId: profile.id,
+        jobId: historyItem.id,
+        uid: profile.skland_binding?.uid,
+        result,
+        eventKey: `full-result-export:${auth.user.id}:${body.idempotency_key}`,
+        activityClaimedAt: isFreePreviewProfile(profile) ? profile.created_at : null,
+        declarationVersion: behaviorDeclaration?.declaration_version,
+        declarationAcceptedAt: behaviorDeclaration?.accepted_at,
+      }).catch((error) => {
+        console.warn('Full result export behavior event skipped:', error instanceof Error ? error.message : 'unknown error')
+        return false
+      })
+      return jsonResponse({
+        result,
+        result_id: historyItem.id,
+        filename: `maatool_full_result_${historyItem.id}.json`,
+      })
+    }
+    if (isMaaExportRequest) {
       const body = await getValidatedJson(req, requestSchemas.maaExport)
       const profile = await getProfileForUser(auth.user.id, body.profile_id)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
@@ -40,7 +82,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
       const historyItem = findHistoryItem(workspace?.result_history ?? [], workspace?.archived_results ?? [], body.result_id)
       if (!historyItem) return jsonResponse({ error: '排班结果不存在。' }, 404)
       if (historyItem.result.schedule_mode === 'rotation') return jsonResponse({ error: '轮班制结果不能导出为 MAA JSON。' }, 409)
-      const result = JSON.parse(JSON.stringify(historyItem.result)) as Record<string, unknown>
+      const result = buildMaaExportPayload(historyItem.result)
       const behaviorDeclaration = await getPersonalUseDeclarationAcceptance(auth.user.id).catch(() => null)
       const isFreePreview = isFreePreviewProfile(profile)
       const canExportWithoutCoupon = !isFreePreview || hasCapability({
@@ -54,7 +96,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
         jobId: historyItem.id,
         uid: profile.skland_binding?.uid,
         result,
-        eventKey: `export:${auth.user.id}:${body.idempotency_key}`,
+        eventKey: `maa-export:${auth.user.id}:${body.idempotency_key}`,
         activityClaimedAt: isFreePreview ? profile.created_at : null,
         declarationVersion: behaviorDeclaration?.declaration_version,
         declarationAcceptedAt: behaviorDeclaration?.accepted_at,
@@ -139,6 +181,9 @@ export default async function userResultsHandler(req: Request): Promise<Response
       return jsonResponse({ error: error.message, code: error instanceof InventoryError ? error.code : 'result_archive_failed' }, error.status)
     }
     console.error('user result operation error:', error)
+    if (isFullResultExportRequest) {
+      return jsonResponse({ error: '下载完整计算数据失败，请稍后重试。', code: 'full_result_export_failed' }, 500)
+    }
     if (isMaaExportRequest) {
       return jsonResponse({ error: '导出 MAA JSON 失败，请稍后重试。', code: 'maa_export_failed' }, 500)
     }

@@ -27,6 +27,7 @@ export default function ResultSection({
   onUpgradeCdkChange,
   onUpgradePreviewProfile,
   onDownloadMAA,
+  onDownloadFullResult,
   onApplySuggestions,
   suggestionsReadOnly = false,
   onReset,
@@ -47,6 +48,7 @@ export default function ResultSection({
   onUpgradeCdkChange: (value: string) => void;
   onUpgradePreviewProfile: (event: FormEvent) => void;
   onDownloadMAA?: () => void;
+  onDownloadFullResult?: () => void;
   onApplySuggestions: (selectedIds: string[]) => Promise<void>;
   suggestionsReadOnly?: boolean;
   onReset: () => void;
@@ -74,6 +76,7 @@ export default function ResultSection({
             operators={operators}
             previewLimit={previewProfile ? historyItem.result.preview_limit : undefined}
             onDownload={onDownloadMAA && isMaaJsonDownloadable(historyItem.result) ? onDownloadMAA : undefined}
+            onDownloadFullResult={onDownloadFullResult}
             suggestionsSlot={!previewProfile && suggestions.length > 0 ? (
               <Suspense fallback={<ResultFallback />}>
                 <UpgradeSuggestions
@@ -99,6 +102,7 @@ export default function ResultSection({
             operators={operators}
             previewLimit={previewProfile ? currentResult.preview_limit : undefined}
             onDownload={onDownloadMAA}
+            onDownloadFullResult={onDownloadFullResult}
             suggestionsSlot={!previewProfile && suggestions.length > 0 ? (
               <Suspense fallback={<ResultFallback />}>
                 <UpgradeSuggestions
@@ -125,6 +129,7 @@ export default function ResultSection({
             operators={operators}
             previewLimit={previewProfile ? finalResult.preview_limit : undefined}
             onDownload={onDownloadMAA}
+            onDownloadFullResult={onDownloadFullResult}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
         </Suspense>

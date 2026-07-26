@@ -5,6 +5,7 @@ export interface ResultPanelProps {
   result: OptimizeResult;
   operators?: LicenseOperator[];
   onDownload?: () => void;
+  onDownloadFullResult?: () => void;
   onSaveWorkfile?: () => void;
   detailDefaultOpen?: boolean;
   suggestionsSlot?: ReactNode;
