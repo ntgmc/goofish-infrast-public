@@ -14,6 +14,7 @@ import {
   getProfileForUser,
   getProfileWorkspace,
   isDepotValueProfile,
+  isFreePreviewProfile,
   toPublicWorkspace,
   updateProfileWorkspaceInTransaction,
 } from '../storage/user-store'
@@ -25,6 +26,7 @@ import { getPersonalUseDeclarationAcceptance } from '../storage/personal-use-dec
 export default async function userResultsHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
+  const isMaaExportRequest = new URL(req.url).pathname.endsWith('/maa-export')
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
@@ -40,20 +42,28 @@ export default async function userResultsHandler(req: Request): Promise<Response
       if (historyItem.result.schedule_mode === 'rotation') return jsonResponse({ error: '轮班制结果不能导出为 MAA JSON。' }, 409)
       const result = JSON.parse(JSON.stringify(historyItem.result)) as Record<string, unknown>
       const behaviorDeclaration = await getPersonalUseDeclarationAcceptance(auth.user.id).catch(() => null)
-      const permanent = hasCapability({ permission: getEffectiveProfilePermission(profile) }, 'export_maa_json')
-      if (permanent) {
-        await recordTrackedExportBehaviorEvent({
-          req,
-          auth,
-          profileId: profile.id,
-          jobId: historyItem.id,
-          uid: profile.skland_binding?.uid,
-          result,
-          eventKey: `export:${auth.user.id}:${body.idempotency_key}`,
-          activityClaimedAt: isFreePreviewProfile(profile) ? profile.created_at : null,
-          declarationVersion: behaviorDeclaration?.declaration_version,
-          declarationAcceptedAt: behaviorDeclaration?.accepted_at,
-        })
+      const isFreePreview = isFreePreviewProfile(profile)
+      const canExportWithoutCoupon = !isFreePreview || hasCapability({
+        kind: profile.kind,
+        permission: getEffectiveProfilePermission(profile),
+      }, 'export_maa_json')
+      const recordExportBehavior = () => recordTrackedExportBehaviorEvent({
+        req,
+        auth,
+        profileId: profile.id,
+        jobId: historyItem.id,
+        uid: profile.skland_binding?.uid,
+        result,
+        eventKey: `export:${auth.user.id}:${body.idempotency_key}`,
+        activityClaimedAt: isFreePreview ? profile.created_at : null,
+        declarationVersion: behaviorDeclaration?.declaration_version,
+        declarationAcceptedAt: behaviorDeclaration?.accepted_at,
+      }).catch((error) => {
+        console.warn('MAA export behavior event skipped:', error instanceof Error ? error.message : 'unknown error')
+        return false
+      })
+      if (canExportWithoutCoupon) {
+        await recordExportBehavior()
         return jsonResponse({ result, result_id: historyItem.id, filename: `maa_schedule_${historyItem.id}.json`, consumed_coupon: false })
       }
       const requestHash = createHash('sha256').update(stableJsonStringify(body)).digest('hex')
@@ -66,18 +76,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
         operationType: 'maa_export',
         response: { result, result_id: historyItem.id, filename: `maa_schedule_${historyItem.id}.json`, consumed_coupon: true },
       })
-      await recordTrackedExportBehaviorEvent({
-        req,
-        auth,
-        profileId: profile.id,
-        jobId: historyItem.id,
-        uid: profile.skland_binding?.uid,
-        result,
-        eventKey: `export:${auth.user.id}:${body.idempotency_key}`,
-        activityClaimedAt: isFreePreviewProfile(profile) ? profile.created_at : null,
-        declarationVersion: behaviorDeclaration?.declaration_version,
-        declarationAcceptedAt: behaviorDeclaration?.accepted_at,
-      })
+      await recordExportBehavior()
       return jsonResponse(response)
     }
 
@@ -140,7 +139,10 @@ export default async function userResultsHandler(req: Request): Promise<Response
       return jsonResponse({ error: error.message, code: error instanceof InventoryError ? error.code : 'result_archive_failed' }, error.status)
     }
     console.error('user result operation error:', error)
-    return jsonResponse({ error: 'Internal server error' }, 500)
+    if (isMaaExportRequest) {
+      return jsonResponse({ error: '导出 MAA JSON 失败，请稍后重试。', code: 'maa_export_failed' }, 500)
+    }
+    return jsonResponse({ error: '结果操作失败，请稍后重试。', code: 'result_operation_failed' }, 500)
   }
 }
 
