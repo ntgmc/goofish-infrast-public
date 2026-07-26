@@ -19,8 +19,11 @@ optimizeJobStore.admitJob = async (input) => input.source === 'reorder_check'
 globalThis.__maaOptimizeJobStoreForTesting = optimizeJobStore
 
 const workspaceHandler = await bundleHandler('server/handlers/user-workspace.ts')
-const optimizeHandler = await bundleHandler('server/handlers/optimization.ts', [
-  'server/optimization/jobs/executor.ts',
+const optimizeHandler = await bundleHandler('server/handlers/optimization.ts', [], [
+  `import './server/optimize-job-runner.ts';`,
+  `import { registerOptimizerPort } from './server/optimization/jobs/optimizer-port.ts';`,
+  `import { optimizerPort } from './server/optimization/jobs/executor.ts';`,
+  'registerOptimizerPort(optimizerPort);',
 ])
 const profilesHandler = await bundleHandler('server/handlers/user-profiles.ts')
 const { FREE_PREVIEW_ADVANCED_TRIAL } = await bundleHandler('server/free-preview-trial.ts')
@@ -1093,13 +1096,14 @@ function toOptimizationRequest(body) {
     historySource: body.history_source,
   }
 }
-async function bundleHandler(entryPoint, setupEntryPoints = []) {
+async function bundleHandler(entryPoint, setupEntryPoints = [], setupStatements = []) {
   const outputPath = resolve(bundleDir, `${entryPoint.replace(/[\\/.:]/g, '-')}.mjs`)
-  const entryConfig = setupEntryPoints.length > 0
+  const entryConfig = setupEntryPoints.length > 0 || setupStatements.length > 0
     ? {
         stdin: {
           contents: [
             ...setupEntryPoints.map((setupEntryPoint) => `import ${JSON.stringify(`./${setupEntryPoint}`)};`),
+            ...setupStatements,
             `export { default } from ${JSON.stringify(`./${entryPoint}`)};`,
             `export * from ${JSON.stringify(`./${entryPoint}`)};`,
           ].join('\n'),

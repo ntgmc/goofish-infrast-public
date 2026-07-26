@@ -3,13 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const {
   initializeJobProcessing,
   initializeQueueMaintenance,
+  initializeBehaviorMaintenance,
   shutdownJobProcessing,
   shutdownQueueMaintenance,
+  shutdownBehaviorMaintenance,
 } = vi.hoisted(() => ({
   initializeJobProcessing: vi.fn(async () => undefined),
   initializeQueueMaintenance: vi.fn(async () => undefined),
+  initializeBehaviorMaintenance: vi.fn(async () => undefined),
   shutdownJobProcessing: vi.fn(async () => undefined),
   shutdownQueueMaintenance: vi.fn(),
+  shutdownBehaviorMaintenance: vi.fn(),
 }))
 
 vi.mock('./optimize-job-runner', () => ({
@@ -20,11 +24,27 @@ vi.mock('./optimize-queue-maintenance', () => ({
   initializeOptimizeQueueMaintenance: initializeQueueMaintenance,
   shutdownOptimizeQueueMaintenance: shutdownQueueMaintenance,
 }))
+vi.mock('./behavior-risk-maintenance', () => ({
+  initializeBehaviorRiskMaintenance: initializeBehaviorMaintenance,
+  shutdownBehaviorRiskMaintenance: shutdownBehaviorMaintenance,
+}))
 
 import { apiOnlyProcessHooks } from './api-process-hooks'
-import { combinedProcessHooks } from './combined-process-hooks'
+import { createCombinedProcessHooks } from './combined-process-hooks'
+import {
+  getRegisteredOptimizerPort,
+  OPTIMIZER_PORT_VERSION,
+  type OptimizerPort,
+} from './optimization/jobs/optimizer-port'
 
 beforeEach(() => vi.clearAllMocks())
+
+const optimizerPort: OptimizerPort = {
+  version: OPTIMIZER_PORT_VERSION,
+  executeSchedule: vi.fn(async () => ({} as never)),
+  executeScenarioComparison: vi.fn(async () => ({} as never)),
+  executeReorderCheck: vi.fn(async () => ({} as never)),
+}
 
 describe('API process hook compositions', () => {
   it('keeps the API-only lifecycle limited to queue maintenance', async () => {
@@ -39,29 +59,56 @@ describe('API process hook compositions', () => {
   })
 
   it('initializes maintenance before processing in the combined lifecycle', async () => {
+    const combinedProcessHooks = createCombinedProcessHooks(optimizerPort)
+    initializeQueueMaintenance.mockImplementationOnce(async () => {
+      expect(getRegisteredOptimizerPort()).toBe(optimizerPort)
+    })
     await combinedProcessHooks.initialize()
 
     expect(initializeQueueMaintenance).toHaveBeenCalledOnce()
+    expect(initializeBehaviorMaintenance).toHaveBeenCalledOnce()
     expect(initializeJobProcessing).toHaveBeenCalledOnce()
     expect(initializeQueueMaintenance.mock.invocationCallOrder[0])
       .toBeLessThan(initializeJobProcessing.mock.invocationCallOrder[0]!)
+    await combinedProcessHooks.forceDrain()
   })
 
   it('drains processing before stopping maintenance in the combined lifecycle', async () => {
+    const combinedProcessHooks = createCombinedProcessHooks(optimizerPort)
+    await combinedProcessHooks.initialize()
+    vi.clearAllMocks()
     await combinedProcessHooks.drain()
 
     expect(shutdownJobProcessing).toHaveBeenCalledWith()
     expect(shutdownQueueMaintenance).toHaveBeenCalledOnce()
+    expect(shutdownBehaviorMaintenance).toHaveBeenCalledOnce()
     expect(shutdownJobProcessing.mock.invocationCallOrder[0])
       .toBeLessThan(shutdownQueueMaintenance.mock.invocationCallOrder[0]!)
+    expect(getRegisteredOptimizerPort()).toBeNull()
   })
 
   it('uses a zero grace period before stopping maintenance on force drain', async () => {
+    const combinedProcessHooks = createCombinedProcessHooks(optimizerPort)
+    await combinedProcessHooks.initialize()
+    vi.clearAllMocks()
     await combinedProcessHooks.forceDrain()
 
     expect(shutdownJobProcessing).toHaveBeenCalledWith(0)
     expect(shutdownQueueMaintenance).toHaveBeenCalledOnce()
     expect(shutdownJobProcessing.mock.invocationCallOrder[0])
       .toBeLessThan(shutdownQueueMaintenance.mock.invocationCallOrder[0]!)
+    expect(getRegisteredOptimizerPort()).toBeNull()
+  })
+
+  it('rolls back maintenance and registration when combined initialization fails', async () => {
+    const combinedProcessHooks = createCombinedProcessHooks(optimizerPort)
+    initializeBehaviorMaintenance.mockRejectedValueOnce(new Error('maintenance failed'))
+
+    await expect(combinedProcessHooks.initialize()).rejects.toThrow('maintenance failed')
+
+    expect(shutdownJobProcessing).toHaveBeenCalledWith(0)
+    expect(shutdownQueueMaintenance).toHaveBeenCalledOnce()
+    expect(shutdownBehaviorMaintenance).toHaveBeenCalledOnce()
+    expect(getRegisteredOptimizerPort()).toBeNull()
   })
 })
