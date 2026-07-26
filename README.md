@@ -61,14 +61,14 @@ npm run dev
 
 开发命令会先执行 `npm run generate:data`，生成前端和后端优化接口共享的效率数据。
 
-本地 API 服务器需要先构建后端：
+本地后端需要先构建服务端：
 
 ```bash
 npm run build:server
 npm run start:server
 ```
 
-`start:server` 会从仓库根目录的 `.env` 加载配置并启动 API-only 的 `server/dist/index.js`。本地 API 至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
+`build:server` 会生成 public API 与私有优化器入口，`start:server` 会从仓库根目录的 `.env` 加载配置并启动 combined 的 `server/dist/all.js`。本地提交的优化任务由这个进程在本机消费，不会等待或调用独立 worker 进程；具体计算仍在线程中隔离，避免阻塞 API 事件循环。本地后端至少需要 PostgreSQL 连接；森空岛扫码和凭据导入还需要一把稳定的本地加密密钥：
 
 ```text
 DATABASE_URL=postgresql://<本地用户>:<本地密码>@127.0.0.1:5432/<本地数据库>
@@ -79,14 +79,14 @@ SKLAND_CREDENTIAL_SECRET=<至少 16 个字符的本地随机值>
 
 默认监听地址是 `http://127.0.0.1:3000`，Vite 的 `/api` 请求会代理到该地址。可以通过 `PORT` 和 `HOST` 覆盖监听配置。
 
-公共 API 可以提交、查询和取消优化任务；未连接私有 worker 时，任务会可靠地保留在 PostgreSQL 队列中等待消费，不会在 API 进程中执行优化计算。当前私有仓库如需运行真实优化器，可先执行 `npm run build:private`，再分别运行：
+如需验证 API-only 与独立 worker 的生产拓扑，可先执行 `npm run build:private`，再分别运行：
 
 ```bash
 npm run start:api
 npm run start:worker
 ```
 
-`start:api` 是 `start:server` 的兼容别名，`start:worker` 使用私有 `server/dist/worker.js`。若需要当前私有仓库原有的单进程本地体验，显式运行 `npm run start:all`；它使用 `server/dist/all.js`。production mode 只有在 `APP_ROLE=all` 且显式设置 `ALLOW_PRODUCTION_COMBINED_PROCESS=true` 时才允许 combined 启动。该例外仅供 `dev.maatool.com` 在本机消费自己的优化队列，正式生产仍保持 API 与杭州 worker 分离。
+`start:api` 使用 public 的 `server/dist/index.js`，只负责提交、查询和取消优化任务；`start:worker` 使用私有 `server/dist/worker.js` 消费队列。`start:all` 与本地默认的 `start:server` 都使用 `server/dist/all.js`。production mode 只有在 `APP_ROLE=all` 且显式设置 `ALLOW_PRODUCTION_COMBINED_PROCESS=true` 时才允许 combined 启动；该例外仅供 `dev.maatool.com` 在本机消费自己的优化队列，正式生产仍保持 API 与杭州 worker 分离。若只需要未来公开仓库的 API-only 构建，可运行 `npm run build:server:public` 后使用 `npm run start:api`。
 
 ## 构建与检查
 
