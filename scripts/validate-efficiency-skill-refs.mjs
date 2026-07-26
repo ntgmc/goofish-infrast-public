@@ -63,6 +63,17 @@ const MANUFACTURING_PRODUCT_SCOPES = [
   [/贵金属类配方/u, 'Pure Gold'],
   [/源石类配方/u, 'Originium Shard'],
 ]
+const DECLARED_OPERATOR_FIELDS = [
+  'combo',
+  'control_center',
+  'dormitory',
+  'power_station',
+  'hire',
+  'process',
+]
+const HOLDER_EXEMPTION_REASONS = new Set([
+  'global_dynamic_resource_source',
+])
 
 function canonicalRuleContent(rule) {
   return {
@@ -84,6 +95,29 @@ export function calculateSkillContentHash(rule) {
 
 function assertCondition(condition, message) {
   if (!condition) throw new Error(message)
+}
+
+function declaredOperators(raw, path) {
+  if (raw === undefined || raw === null) return []
+  const values = Array.isArray(raw) ? raw : [raw]
+  return values.map((value, index) => {
+    const valuePath = `${path}[${index}]`
+    assertCondition(typeof value === 'string', `${valuePath} must be a string.`)
+    const match = /^(.*?)(?:\/([0-2]))?$/u.exec(value.trim())
+    assertCondition(match && match[1].trim(), `${valuePath} has an invalid operator value.`)
+    return {
+      name: match[1].trim(),
+      elite: match[2] === undefined ? 0 : Number(match[2]),
+    }
+  })
+}
+
+function ruleDeclaredOperators(rule, path, inherited = []) {
+  const operators = [...inherited]
+  for (const field of DECLARED_OPERATOR_FIELDS) {
+    operators.push(...declaredOperators(rule[field], `${path}.${field}`))
+  }
+  return operators
 }
 
 function normalizedSkillName(skill) {
@@ -141,6 +175,22 @@ function validateSkills(payload) {
       rule.content_hash === expectedHash,
       `${path} (${rule.rule_id}) has stale content_hash; expected ${expectedHash}.`,
     )
+    assertCondition(Array.isArray(rule.holders) && rule.holders.length > 0, `${path} must have holders.`)
+    const holderKeys = new Set()
+    for (const [holderIndex, holder] of rule.holders.entries()) {
+      const holderPath = `${path}.holders[${holderIndex}]`
+      assertCondition(
+        holder && typeof holder.name === 'string' && holder.name.trim(),
+        `${holderPath}.name must be a non-empty string.`,
+      )
+      assertCondition(
+        Number.isInteger(holder.elite) && holder.elite >= 0 && holder.elite <= 2,
+        `${holderPath}.elite must be 0, 1, or 2.`,
+      )
+      const holderKey = `${holder.name}\u0000${holder.elite}`
+      assertCondition(!holderKeys.has(holderKey), `${path} duplicates holder ${holder.name}/${holder.elite}.`)
+      holderKeys.add(holderKey)
+    }
     byId.set(rule.rule_id, rule)
   }
   assertCondition(
@@ -159,11 +209,16 @@ function enumerateEfficiencyRules(data) {
     for (const [systemName, systemData] of Object.entries(systems ?? {})) {
       const rules = Array.isArray(systemData) ? systemData : systemData?.rules
       const inheritedProduct = Array.isArray(systemData) ? undefined : systemData?.product
+      const systemPath = `combination_rules.${workplace}.${systemName}`
+      const inheritedOperators = Array.isArray(systemData)
+        ? []
+        : declaredOperators(systemData?.base_combo, `${systemPath}.base_combo`)
       assertCondition(
         Array.isArray(rules),
         `combination_rules.${workplace}.${systemName} must be an array or contain rules.`,
       )
       for (const [index, rule] of rules.entries()) {
+        const path = `${systemPath}[${index}]`
         const facilities = new Set([primaryFacility])
         for (const [field, facility] of DEPENDENCY_FACILITIES) {
           if (Array.isArray(rule[field]) && rule[field].length > 0) facilities.add(facility)
@@ -171,8 +226,10 @@ function enumerateEfficiencyRules(data) {
         collectScopedFacilities(rule, facilities)
         leaves.push({
           rule,
-          path: `combination_rules.${workplace}.${systemName}[${index}]`,
+          path,
           facilities,
+          primaryFacility,
+          declaredOperators: ruleDeclaredOperators(rule, path, inheritedOperators),
           workplace,
           products: normalizeProductList(rule.product ?? inheritedProduct),
         })
@@ -181,17 +238,27 @@ function enumerateEfficiencyRules(data) {
   }
 
   for (const [index, rule] of (data.control_center_rules ?? []).entries()) {
+    const path = `control_center_rules[${index}]`
     leaves.push({
       rule,
-      path: `control_center_rules[${index}]`,
+      path,
       facilities: new Set(['控制中枢']),
+      primaryFacility: '控制中枢',
+      declaredOperators: declaredOperators(rule.operators ?? rule.operator, `${path}.operator`),
     })
   }
   for (const [index, rule] of (data.dormitory_mood_recovery_rules ?? []).entries()) {
+    const path = `dormitory_mood_recovery_rules[${index}]`
+    assertCondition(
+      Number.isInteger(rule.elite) && rule.elite >= 0 && rule.elite <= 2,
+      `${path}.elite must be 0, 1, or 2.`,
+    )
     leaves.push({
       rule,
-      path: `dormitory_mood_recovery_rules[${index}]`,
+      path,
       facilities: new Set(['宿舍']),
+      primaryFacility: '宿舍',
+      declaredOperators: [{ name: rule.holder, elite: rule.elite }],
     })
   }
   return leaves
@@ -254,15 +321,47 @@ export function validateEfficiencySkillReferences(skillPayload, efficiencyData) 
   const leaves = enumerateEfficiencyRules(efficiencyData)
   const referencedSkillIds = new Set()
 
-  for (const { rule, path, facilities, workplace, products } of leaves) {
+  for (const {
+    rule,
+    path,
+    facilities,
+    primaryFacility,
+    declaredOperators: operators,
+    workplace,
+    products,
+  } of leaves) {
     assertCondition(
       Object.hasOwn(rule, 'skill_rule_refs') && Array.isArray(rule.skill_rule_refs),
       `${path} must define skill_rule_refs as an array.`,
     )
     const refs = rule.skill_rule_refs
     const exemption = rule.skill_rule_exemption
+    const rawHolderExemptions = rule.skill_ref_holder_exemptions ?? []
+    assertCondition(
+      Array.isArray(rawHolderExemptions),
+      `${path}.skill_ref_holder_exemptions must be an array.`,
+    )
+    const holderExemptions = new Map()
+    for (const [index, holderExemption] of rawHolderExemptions.entries()) {
+      const exemptionPath = `${path}.skill_ref_holder_exemptions[${index}]`
+      assertCondition(
+        holderExemption && typeof holderExemption === 'object',
+        `${exemptionPath} must be an object.`,
+      )
+      assertCondition(typeof holderExemption.id === 'string', `${exemptionPath}.id must be a string.`)
+      assertCondition(
+        HOLDER_EXEMPTION_REASONS.has(holderExemption.reason),
+        `${exemptionPath} has unsupported reason ${JSON.stringify(holderExemption.reason)}.`,
+      )
+      assertCondition(
+        !holderExemptions.has(holderExemption.id),
+        `${path} duplicates holder exemption ${holderExemption.id}.`,
+      )
+      holderExemptions.set(holderExemption.id, holderExemption.reason)
+    }
 
     if (refs.length === 0) {
+      assertCondition(holderExemptions.size === 0, `${path} cannot exempt holders without skill references.`)
       assertCondition(
         exemption === 'non_skill_condition',
         `${path} has no skill references and must declare non_skill_condition.`,
@@ -295,7 +394,33 @@ export function validateEfficiencySkillReferences(skillPayload, efficiencyData) 
         facilities.has(skill.facility),
         `${refPath} references ${skill.facility}, expected one of ${[...facilities].join(', ')}.`,
       )
+      const holderMatched = skill.holders.some((holder) => operators.some((operator) => (
+        operator.name === holder.name && operator.elite >= holder.elite
+      )))
+      const holderExemption = holderExemptions.get(ref.id)
+      if (holderMatched) {
+        assertCondition(
+          holderExemption === undefined,
+          `${refPath} has an unnecessary skill holder exemption.`,
+        )
+      } else {
+        assertCondition(
+          holderExemption !== undefined,
+          `${refPath} is not backed by a declared holder at the required elite level; ` +
+            `expected one of ${skill.holders.map((holder) => `${holder.name}/${holder.elite}`).join(', ')}.`,
+        )
+        assertCondition(
+          skill.facility !== primaryFacility,
+          `${refPath} cannot exempt a holder mismatch in its primary facility ${primaryFacility}.`,
+        )
+      }
       referencedSkills.push(skill)
+    }
+    for (const exemptedId of holderExemptions.keys()) {
+      assertCondition(
+        seen.has(exemptedId),
+        `${path} has holder exemption for unreferenced skill ${exemptedId}.`,
+      )
     }
     for (let left = 0; left < referencedSkills.length; left += 1) {
       for (let right = left + 1; right < referencedSkills.length; right += 1) {
@@ -367,6 +492,53 @@ export function runSelfTests() {
     validateEfficiencySkillReferences(valid.skills, valid.efficiency),
     { skillCount: 1, efficiencyRuleCount: 1 },
   )
+
+  const eliteMismatch = makeFixture()
+  eliteMismatch.skills.skills[0].holders[0].elite = 2
+  eliteMismatch.skills.skills[0].content_hash = calculateSkillContentHash(eliteMismatch.skills.skills[0])
+  eliteMismatch.efficiency.combination_rules.trading_station['通用单人'][0]
+    .skill_rule_refs[0].hash = eliteMismatch.skills.skills[0].content_hash
+  assert.throws(
+    () => validateEfficiencySkillReferences(eliteMismatch.skills, eliteMismatch.efficiency),
+    /not backed by a declared holder at the required elite level/,
+  )
+  eliteMismatch.efficiency.combination_rules.trading_station['通用单人'][0].combo = ['测试干员/2']
+  validateEfficiencySkillReferences(eliteMismatch.skills, eliteMismatch.efficiency)
+
+  const unrelatedHolder = makeFixture()
+  unrelatedHolder.skills.skills[0].holders[0].name = '其他干员'
+  unrelatedHolder.skills.skills[0].content_hash = calculateSkillContentHash(unrelatedHolder.skills.skills[0])
+  unrelatedHolder.efficiency.combination_rules.trading_station['通用单人'][0]
+    .skill_rule_refs[0].hash = unrelatedHolder.skills.skills[0].content_hash
+  assert.throws(
+    () => validateEfficiencySkillReferences(unrelatedHolder.skills, unrelatedHolder.efficiency),
+    /not backed by a declared holder at the required elite level/,
+  )
+  unrelatedHolder.efficiency.combination_rules.trading_station['通用单人'][0]
+    .skill_ref_holder_exemptions = [{
+      id: unrelatedHolder.skills.skills[0].rule_id,
+      reason: 'global_dynamic_resource_source',
+    }]
+  assert.throws(
+    () => validateEfficiencySkillReferences(unrelatedHolder.skills, unrelatedHolder.efficiency),
+    /cannot exempt a holder mismatch in its primary facility/,
+  )
+
+  const globalResourceSource = makeFixture()
+  const globalSkill = globalResourceSource.skills.skills[0]
+  globalSkill.rule_id = 'PRTS-DORM-0001'
+  globalSkill.facility = '宿舍'
+  globalSkill.holders = [{ name: '全局资源来源', elite: 0 }]
+  globalSkill.content_hash = calculateSkillContentHash(globalSkill)
+  const globalRule = globalResourceSource.efficiency.combination_rules.trading_station['通用单人'][0]
+  globalRule.dormitory = ['辅助宿舍干员']
+  globalRule.skill_rule_refs = [{ id: globalSkill.rule_id, hash: globalSkill.content_hash }]
+  globalRule.skill_ref_holder_exemptions = [{
+    id: globalSkill.rule_id,
+    reason: 'global_dynamic_resource_source',
+  }]
+  validateEfficiencySkillReferences(globalResourceSource.skills, globalResourceSource.efficiency)
+
   expectFailure(
     ({ efficiency }) => delete efficiency.combination_rules.trading_station['通用单人'][0].skill_rule_refs,
     /must define skill_rule_refs/,
@@ -401,6 +573,7 @@ export function runSelfTests() {
   )
   expectFailure(
     ({ skills, efficiency }) => {
+      efficiency.combination_rules.trading_station['通用单人'][0].combo = ['测试干员/2']
       const upgraded = makeSkill({
         rule_id: 'PRTS-TRD-0002',
         skill: '订单管理·β',

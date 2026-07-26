@@ -1308,10 +1308,6 @@
                 "hash": "sha256:31acc65022d367c8bf07e0cbbe062786489f9797a4ccc587ff2ca2d82401caca"
               },
               {
-                "id": "PRTS-TRD-0320",
-                "hash": "sha256:b97f8df50edd30b8902b3961c9504f06becfc56a48da40ba998339cdb8fe91cb"
-              },
-              {
                 "id": "PRTS-DORM-0330",
                 "hash": "sha256:9b474fdd8e443bc8c6efa2d1a94c4121fa5eb91ca7cf0faf53a45fb9b53acfa3"
               },
@@ -2518,6 +2514,12 @@
             ],
             "note": "动态：但书+黑键+伺夜，伺夜按40%，黑键按无声共鸣链读取挂件。",
             "priority": 2420,
+            "skill_ref_holder_exemptions": [
+              {
+                "id": "PRTS-DORM-0357",
+                "reason": "global_dynamic_resource_source"
+              }
+            ],
             "skill_rule_refs": [
               {
                 "id": "PRTS-CC-0074",
@@ -2694,6 +2696,12 @@
             ],
             "note": "动态：但书+黑键+空弦，空弦按45%，黑键按无声共鸣链读取挂件。",
             "priority": 2640,
+            "skill_ref_holder_exemptions": [
+              {
+                "id": "PRTS-DORM-0357",
+                "reason": "global_dynamic_resource_source"
+              }
+            ],
             "skill_rule_refs": [
               {
                 "id": "PRTS-CC-0074",
@@ -2871,6 +2879,12 @@
             ],
             "note": "动态：但书+黑键+伺夜+八幡海铃，伺夜按45%，黑键按无声共鸣链读取挂件。",
             "priority": 2760,
+            "skill_ref_holder_exemptions": [
+              {
+                "id": "PRTS-DORM-0357",
+                "reason": "global_dynamic_resource_source"
+              }
+            ],
             "skill_rule_refs": [
               {
                 "id": "PRTS-CC-0006",
@@ -3627,7 +3641,7 @@
           "combo": [
             "推进之王",
             "摩根/2",
-            "维娜/2"
+            "维娜·维多利亚/2"
           ],
           "control_center": [
             "戴菲恩/2"
@@ -4195,10 +4209,6 @@
             {
               "id": "PRTS-TRD-0264",
               "hash": "sha256:31acc65022d367c8bf07e0cbbe062786489f9797a4ccc587ff2ca2d82401caca"
-            },
-            {
-              "id": "PRTS-TRD-0320",
-              "hash": "sha256:b97f8df50edd30b8902b3961c9504f06becfc56a48da40ba998339cdb8fe91cb"
             },
             {
               "id": "PRTS-DORM-0330",
@@ -4782,6 +4792,12 @@
           ],
           "note": "动态：无声共鸣；基础感知信息按4宿舍满员20点计算，额外挂件按已入驻辅助房间读取。",
           "priority": 1200,
+          "skill_ref_holder_exemptions": [
+            {
+              "id": "PRTS-DORM-0357",
+              "reason": "global_dynamic_resource_source"
+            }
+          ],
           "skill_rule_refs": [
             {
               "id": "PRTS-TRD-0302",
@@ -5012,10 +5028,6 @@
             {
               "id": "PRTS-TRD-0282",
               "hash": "sha256:b2effbab5705c0a22831b638f1e275d3f55d1ac7f002efd694828fbb1227af79"
-            },
-            {
-              "id": "PRTS-TRD-0320",
-              "hash": "sha256:b97f8df50edd30b8902b3961c9504f06becfc56a48da40ba998339cdb8fe91cb"
             }
           ]
         },
@@ -6761,40 +6773,6 @@
             {
               "id": "PRTS-MFG-0197",
               "hash": "sha256:eeb77c5bffd4c5688d5412bb9f64732fa80390fd4b3ce1d349d2dc32b7410986"
-            }
-          ]
-        },
-        {
-          "combo": [
-            "战车/2"
-          ],
-          "efficiency": 20,
-          "dynamic_resource_contributions": {
-            "resource": "ursus_drink",
-            "per_group_operator": 1,
-            "group": "ursus_student_self_governing_group",
-            "required_operators": "战车",
-            "scope": "control_center",
-            "key": "ursus_drink_tachanka_control",
-            "detail": "战车精二：进驻控制中枢时，控制中枢内每1名乌萨斯学生自治团干员提供1瓶乌萨斯特饮。"
-          },
-          "dynamic_resource_effects": {
-            "resource": "ursus_drink",
-            "type": "storage_capacity_delta_per_resource",
-            "per_resource": 2,
-            "scope": "manufacturing_station",
-            "detail": "实干的寡言者：每1瓶乌萨斯特饮使仓库容量上限+2。"
-          },
-          "note": "动态：实干的寡言者，基础生产力+20%，每1瓶乌萨斯特饮仓库容量+2。",
-          "priority": 2100,
-          "skill_rule_refs": [
-            {
-              "id": "PRTS-CC-0081",
-              "hash": "sha256:d740ac3bdd892754a1bb0bd426564a2badbf14cfc4c5a8a39973e909004a537f"
-            },
-            {
-              "id": "PRTS-MFG-0130",
-              "hash": "sha256:b412663b93e7e244031f4659d41c6c7bec231ce3c9dbe38a85bf3d05ea12c735"
             }
           ]
         },
@@ -8560,16 +8538,23 @@
             "夏栎/2",
             "苦艾",
             "苦艾/2",
-            "山/2"
+            "山/2",
+            "谜图/2"
           ],
           "efficiency": 0,
           "apply_each": true,
           "priority": 120,
           "note": "会客室线索倾向/保底概率类技能：当前评分模型只折算线索搜集速度，不将特定阵营线索出现概率转换为效率。",
+          "modeled_placeholder": true,
+          "unmodeled_reason": "clue_probability_not_scored",
           "skill_rule_refs": [
             {
               "id": "PRTS-MEET-0634",
               "hash": "sha256:7df06800efda7d37b3b52712146a4c040e61e177fc3011a800888d0411ded560"
+            },
+            {
+              "id": "PRTS-MEET-0638",
+              "hash": "sha256:7e591f7c8406b3671b507e78b337bc865d0f599e35108cda7b13d3ad9ad7dc6f"
             },
             {
               "id": "PRTS-MEET-0642",
@@ -8754,10 +8739,6 @@
             {
               "id": "PRTS-MEET-0633",
               "hash": "sha256:e546a8deba6e30c457a3788f9142dd8b4a9a45434045e80f26a097446c01d744"
-            },
-            {
-              "id": "PRTS-MEET-0638",
-              "hash": "sha256:7e591f7c8406b3671b507e78b337bc865d0f599e35108cda7b13d3ad9ad7dc6f"
             }
           ]
         },
@@ -10353,35 +10334,49 @@
           "group": "control_mood_recovery_r6_skill"
         }
       ],
-      "dynamic_resource_contributions": [
+      "skill_rule_refs": [
         {
-          "resource": "intelligence_reserve",
-          "per_group_operator": 1,
-          "group": "rainbow_team",
-          "required_operators": "灰烬",
-          "scope": "control_center",
-          "key": "intelligence_reserve_ash_rainbow_control",
-          "detail": "灰烬精二：进驻控制中枢时，控制中枢内每1名彩虹小队干员提供1点情报储备。"
-        },
-        {
-          "resource": "ursus_drink",
-          "per_group_operator": 1,
-          "group": "ursus_student_self_governing_group",
-          "required_operators": "战车",
-          "scope": "control_center",
-          "key": "ursus_drink_tachanka_control",
-          "detail": "战车精二：进驻控制中枢时，控制中枢内每1名乌萨斯学生自治团干员提供1瓶乌萨斯特饮。"
+          "id": "PRTS-CC-0079",
+          "hash": "sha256:3b84320f8b795267123e9f440088ebae974cac03e1135734cfcb3a0a02700a73"
         }
-      ],
+      ]
+    },
+    {
+      "operator": "灰烬/2",
+      "description": "进驻控制中枢时，控制中枢内每有1名彩虹小队干员，则情报储备+1",
+      "priority": 571,
+      "effects": [],
+      "dynamic_resource_contributions": {
+        "resource": "intelligence_reserve",
+        "per_group_operator": 1,
+        "group": "rainbow_team",
+        "required_operators": "灰烬",
+        "scope": "control_center",
+        "key": "intelligence_reserve_ash_rainbow_control",
+        "detail": "灰烬精二：进驻控制中枢时，控制中枢内每1名彩虹小队干员提供1点情报储备。"
+      },
       "skill_rule_refs": [
         {
           "id": "PRTS-CC-0078",
           "hash": "sha256:0355dc667616d26c8b0f41e21b63e4be090268a2d0ad8b603be66c4612371330"
-        },
-        {
-          "id": "PRTS-CC-0079",
-          "hash": "sha256:3b84320f8b795267123e9f440088ebae974cac03e1135734cfcb3a0a02700a73"
-        },
+        }
+      ]
+    },
+    {
+      "operator": "战车/2",
+      "description": "进驻控制中枢时，控制中枢内每有1名乌萨斯学生自治团干员，则乌萨斯特饮+1",
+      "priority": 571,
+      "effects": [],
+      "dynamic_resource_contributions": {
+        "resource": "ursus_drink",
+        "per_group_operator": 1,
+        "group": "ursus_student_self_governing_group",
+        "required_operators": "战车",
+        "scope": "control_center",
+        "key": "ursus_drink_tachanka_control",
+        "detail": "战车精二：进驻控制中枢时，控制中枢内每1名乌萨斯学生自治团干员提供1瓶乌萨斯特饮。"
+      },
+      "skill_rule_refs": [
         {
           "id": "PRTS-CC-0081",
           "hash": "sha256:d740ac3bdd892754a1bb0bd426564a2badbf14cfc4c5a8a39973e909004a537f"
@@ -10630,7 +10625,7 @@
       ]
     },
     {
-      "operator": "凯尔希",
+      "operator": "凯尔希/2",
       "description": "所有制造站生产力+2%",
       "priority": 260,
       "effects": [
@@ -10765,7 +10760,7 @@
       ]
     },
     {
-      "operator": "祈天寺若麦/2",
+      "operator": "祐天寺若麦/2",
       "description": "当与丰川祥子一起进驻控制中枢时，丰川祥子心情每小时消耗+0.05，会客室线索搜集速度额外提升+5%（同种效果取最高）",
       "priority": 1110,
       "effects": [
