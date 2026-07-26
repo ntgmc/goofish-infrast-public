@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import type { Announcement } from '../lib/types'
 import { apiVoid } from '../lib/api-client'
 import AnnouncementMarkdown from './AnnouncementMarkdown'

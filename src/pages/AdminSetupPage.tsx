@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { apiJson, apiVoid, getApiErrorMessage } from '../lib/api-client'
 import { adminApiJson } from '../lib/admin-api-client'
 import { copy } from '../copy/index'

@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMemoryRouter, RouterProvider, useLocation } from 'react-router-dom'
+import { createMemoryRouter, RouterProvider, useLocation } from 'react-router'
 import RouteLifecycle from './RouteLifecycle'
 
 const scrollToMock = vi.fn()

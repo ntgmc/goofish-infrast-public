@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { MotionConfig } from 'motion/react'
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import BuildMetaStrip from './components/BuildMetaStrip'
 import { AnimatedPresenceRegion, motionTokens } from './components/MotionPrimitives'
 import RouteLifecycle from './components/RouteLifecycle'

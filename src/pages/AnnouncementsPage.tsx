@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import type { Announcement, AnnouncementPublicResponse } from '../lib/types'
 import { apiJson } from '../lib/api-client'
 import AnnouncementMarkdown from '../components/AnnouncementMarkdown'

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import PublicFooter from '../components/PublicFooter'
 import ThemeSwitcher from '../components/ThemeSwitcher'

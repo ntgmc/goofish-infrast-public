@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import type { SiteFeatureKey } from '../lib/site-features'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import SessionLoader from './SessionLoader'

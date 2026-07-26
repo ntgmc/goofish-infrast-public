@@ -101,7 +101,7 @@ jobs:
 
       - name: Resolve immutable target SHA
         id: target
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           RAW_TARGET_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.commit_sha }}
         with:
@@ -143,7 +143,7 @@ jobs:
             core.setOutput('allow_redeploy', automatic ? 'false' : 'true')
 
       - name: Verify target belongs to main
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ steps.target.outputs.sha }}
           fetch-depth: 0
@@ -179,7 +179,7 @@ jobs:
           chmod 600 ~/.ssh/known_hosts
 
       - name: Download verified release decision
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: goofish-deployment-${{ steps.target.outputs.sha }}
           path: release-decision
@@ -202,7 +202,7 @@ jobs:
 
       - name: Download public release
         if: steps.artifact.outputs.deployable == 'true'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: goofish-public-${{ steps.target.outputs.sha }}
           path: public-package
@@ -211,7 +211,7 @@ jobs:
 
       - name: Download worker release
         if: steps.artifact.outputs.deployable == 'true'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: goofish-worker-${{ steps.target.outputs.sha }}
           path: worker-package
@@ -374,7 +374,7 @@ jobs:
 
       - name: Publish successful changelog release
         if: steps.artifact.outputs.deployable == 'true' && steps.changelog.outputs.candidate == 'true'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           TARGET_SHA: ${{ steps.target.outputs.sha }}
           RELEASE_VERSION: ${{ steps.changelog.outputs.version }}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { expect, it, vi } from 'vitest'
 import type { Announcement } from '../../lib/types'
 import AuthPage from './AuthPage'

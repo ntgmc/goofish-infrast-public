@@ -1,5 +1,5 @@
 import { MoreHorizontal } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { copy } from '../copy/index'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import type { SiteFeatureKey } from '../lib/site-features'

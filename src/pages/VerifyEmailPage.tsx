@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import type { AuthSuccessResponse } from '../lib/types'
 import { apiJson } from '../lib/api-client'
 import { copy } from '../copy/index'

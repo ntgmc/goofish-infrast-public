@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import GuidedTour, { findVisibleTourTarget, tourStorageKey, useFirstRunTour, type TourDefinition } from './GuidedTour'
@@ -116,7 +116,9 @@ describe('GuidedTour', () => {
       </>,
     )
 
-    await vi.advanceTimersByTimeAsync(1_250)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_250)
+    })
     expect(screen.getByRole('heading', { name: '可用' })).toBeInTheDocument()
     expect(onFinish).not.toHaveBeenCalled()
   })
