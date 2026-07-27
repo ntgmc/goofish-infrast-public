@@ -12,6 +12,25 @@ afterEach(() => {
 })
 
 describe('AuthForm registration email policy', () => {
+  it('shows the public-email restriction only after registration email validation fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ invite_code_required: false })))
+    const user = userEvent.setup()
+
+    render(<AuthForm onAuthenticated={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: '注册' }))
+
+    const restriction = '仅支持常用公共邮箱；不支持企业、自建、临时或别名邮箱。'
+    const emailField = screen.getByLabelText('邮箱')
+    expect(screen.queryByText(restriction)).not.toBeInTheDocument()
+    expect(emailField).not.toHaveAttribute('aria-describedby')
+
+    await user.type(emailField, 'user@company.example')
+    await user.tab()
+
+    expect(await screen.findByText(restriction)).toHaveAttribute('role', 'alert')
+    expect(emailField).toHaveAttribute('aria-describedby', 'auth-email-error')
+  })
+
   it('blocks a typo on blur, lets the user apply its suggestion, and waits for submit before requesting registration', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse({ invite_code_required: false }))

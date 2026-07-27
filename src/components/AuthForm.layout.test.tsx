@@ -68,7 +68,7 @@ describe('AuthForm registration field spacing', () => {
     await user.click(screen.getByRole('button', { name: '创建账号' }))
 
     expect(container.querySelectorAll('.auth-field-message')).toHaveLength(2)
-    expect(emailField).toHaveAttribute('aria-describedby', 'auth-registration-email-help auth-email-error')
+    expect(emailField).toHaveAttribute('aria-describedby', 'auth-email-error')
     expect(passwordField).toHaveAttribute('aria-describedby', 'auth-password-error')
     expect(screen.getByText('请输入邮箱')).toHaveAttribute('role', 'alert')
     expect(screen.getByText('请输入密码')).toHaveAttribute('role', 'alert')

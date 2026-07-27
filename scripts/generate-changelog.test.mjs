@@ -18,7 +18,7 @@ import {
 } from './changelog-lib.mjs'
 import { readChangelogCommits, resolveChangelogGitRoot } from './changelog-git.mjs'
 import {
-  buildDeepSeekMessages,
+  buildOpenAIMessages,
   buildPullRequestDiffContext,
   createPrChangelogPayload,
   findTrustedPrChangelogPayload,
@@ -87,7 +87,7 @@ test('records and parses a Chinese PR changelog block without replacing the rest
     pullRequestNumber: 42,
     headSha: targetSha,
     manualSummary: '新增手动录入中文变更说明，并在合并前完成审核。',
-    deepseekResult: {
+    modelResult: {
       summary: '现在可以在合并前生成并确认面向用户的中文更新说明。',
       public_sections: [
         { kind: 'feature', items: ['支持通过手动工作流记录中文变更说明'] },
@@ -97,13 +97,14 @@ test('records and parses a Chinese PR changelog block without replacing the rest
       ],
     },
     generatedAt: '2026-07-24T08:00:00.000Z',
-    model: 'deepseek-chat',
+    model: 'gpt-5.6-luna',
   })
   const block = renderPrChangelogBlock(payload)
   const body = upsertPrChangelogBlock('原有 PR 描述', block)
 
   assert.match(body, /^原有 PR 描述/)
   assert.match(body, /### 人工说明/)
+  assert.match(body, /### OpenAI 分析/)
   assert.deepEqual(parsePrChangelogPayload(body), payload)
   assert.deepEqual(collectPrChangelogChanges(payload), {
     publicChanges: [
@@ -128,13 +129,13 @@ test('records and parses a Chinese PR changelog block without replacing the rest
     pullRequestNumber: 42,
     headSha: targetSha,
     manualSummary: '尝试用普通用户评论替换可信说明。',
-    deepseekResult: {
+    modelResult: {
       summary: '这条内容不应被生产构建采纳。',
       public_sections: [{ kind: 'feature', items: ['不可信的伪造更新说明'] }],
       internal_sections: [],
     },
     generatedAt: '2026-07-24T09:00:00.000Z',
-    model: 'deepseek-chat',
+    model: 'gpt-5.6-luna',
   })
   const trustedPayload = findTrustedPrChangelogPayload([
     { user: { login: 'github-actions[bot]' }, body },
@@ -167,16 +168,16 @@ test('records a PR changelog without requiring a manual Chinese summary', () => 
     pullRequestNumber: 44,
     headSha: targetSha,
     manualSummary: '',
-    deepseekResult: {
+    modelResult: {
       summary: '根据 PR 修改自动生成中文变更总结。',
       public_sections: [{ kind: 'fix', items: ['修复用户端可感知的问题'] }],
       internal_sections: [],
     },
     generatedAt: '2026-07-24T10:00:00.000Z',
-    model: 'deepseek-chat',
+    model: 'gpt-5.6-luna',
   })
   const block = renderPrChangelogBlock(payload)
-  const messages = buildDeepSeekMessages({
+  const messages = buildOpenAIMessages({
     title: 'fix: resolve a user-facing issue',
     body: '',
     manualSummary: undefined,
@@ -189,8 +190,8 @@ test('records a PR changelog without requiring a manual Chinese summary', () => 
   assert.match(messages[1].content, /维护者人工说明：未提供/)
 })
 
-test('instructs DeepSeek to keep admin autosave changes internal', () => {
-  const messages = buildDeepSeekMessages({
+test('instructs OpenAI to keep admin autosave changes internal', () => {
+  const messages = buildOpenAIMessages({
     title: 'perf(admin): optimize announcement draft autosave frequency',
     body: '',
     manualSummary: undefined,
@@ -206,7 +207,7 @@ test('instructs DeepSeek to keep admin autosave changes internal', () => {
   assert.match(systemPrompt, /无法确认.*默认归入 internal_sections/)
 })
 
-test('validates manual Chinese input and bounds the diff sent to DeepSeek', () => {
+test('validates manual Chinese input and bounds the diff sent to OpenAI', () => {
   assert.throws(() => validateManualSummary('中文'), /长度必须在 5 到 2000/)
   assert.throws(() => validateManualSummary('English only'), /必须包含中文/)
   assert.throws(() => validateManualSummary('中文<!-- pr-changelog:start -->'), /保留标记/)
@@ -215,21 +216,21 @@ test('validates manual Chinese input and bounds the diff sent to DeepSeek', () =
     pullRequestNumber: 42,
     headSha: targetSha,
     manualSummary: '这是有效的中文人工说明。',
-    deepseekResult: { summary: '这是有效的中文总结。', public_sections: [], internal_sections: [] },
+    modelResult: { summary: '这是有效的中文总结。', public_sections: [], internal_sections: [] },
     generatedAt: '2026-07-24T08:00:00.000Z',
-    model: 'deepseek-chat',
+    model: 'gpt-5.6-luna',
   }), /至少一个/)
   const payloadWithManyItems = createPrChangelogPayload({
     pullRequestNumber: 42,
     headSha: targetSha,
     manualSummary: '这是有效的中文人工说明。',
-    deepseekResult: {
+    modelResult: {
       summary: '这是有效的中文总结。',
       public_sections: [],
       internal_sections: [{ kind: 'maintenance', items: Array.from({ length: 13 }, (_, index) => `中文条目${index}`) }],
     },
     generatedAt: '2026-07-24T08:00:00.000Z',
-    model: 'deepseek-chat',
+    model: 'gpt-5.6-luna',
   })
   assert.equal(payloadWithManyItems.internal_sections[0].items.length, 13)
 
@@ -237,13 +238,13 @@ test('validates manual Chinese input and bounds the diff sent to DeepSeek', () =
     pullRequestNumber: 43,
     headSha: targetSha,
     manualSummary: '本次修改只涉及管理后台能力。',
-    deepseekResult: {
+    modelResult: {
       summary: '新增仅供管理员使用的内部操作能力。',
       public_sections: [],
       internal_sections: [{ kind: 'admin', items: ['支持管理员查看内部任务诊断信息'] }],
     },
     generatedAt: '2026-07-24T08:00:00.000Z',
-    model: 'deepseek-chat',
+    model: 'gpt-5.6-luna',
   })
   assert.deepEqual(collectPrChangelogChanges(internalOnlyPayload), {
     publicChanges: [],

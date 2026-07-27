@@ -194,7 +194,6 @@ export default function AuthForm({
   }
 
   const emailDescriptionIds = [
-    mode === 'register' ? 'auth-registration-email-help' : null,
     fieldErrors.email ? 'auth-email-error' : null,
     emailSuggestion ? 'auth-email-suggestion' : null,
   ].filter(Boolean).join(' ') || undefined
@@ -237,7 +236,6 @@ export default function AuthForm({
         />
         <FieldMessage id="auth-email-error" message={fieldErrors.email} />
       </label>
-      {mode === 'register' && <p id="auth-registration-email-help" className="-mt-3 text-xs leading-5 text-ink-secondary">{copy.auth.components_AuthForm_036}</p>}
       {emailSuggestion && (
         <div id="auth-email-suggestion" className="-mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
           <span>{copy.auth.components_AuthForm_040} {emailSuggestion}</span>
@@ -351,7 +349,7 @@ function validateEmailInputForMode(mode: AuthMode, value: string): EmailInputVal
 function registrationEmailValidationMessage(result: Exclude<RegistrationEmailValidation, { ok: true }>): string {
   switch (result.reason) {
     case 'invalid_format': return copy.auth.components_AuthForm_024
-    case 'unsupported_provider': return copy.auth.components_AuthForm_037
+    case 'unsupported_provider': return copy.auth.components_AuthForm_036
     case 'alias_not_allowed': return copy.auth.components_AuthForm_038
     case 'domain_typo': return copy.auth.components_AuthForm_039
   }
