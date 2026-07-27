@@ -25,6 +25,7 @@
     "test:generate-changelog": "node --test scripts/generate-changelog.test.mjs",
     "test:release-artifact": "node --test scripts/release-artifact.test.mjs",
     "test:build-relevance": "node --test scripts/build-relevance-lib.test.mjs",
+    "test:workflow-contracts": "node --test scripts/dependency-audit-workflow.test.mjs",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:watch": "vitest",
     "check:copy": "node scripts/check-copy-architecture.mjs",

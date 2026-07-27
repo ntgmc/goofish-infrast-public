@@ -3,6 +3,10 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import {
+  isPublicEfficiencyDataFallback,
+  readEfficiencyDataSource,
+} from './efficiency-data-source.mjs'
 
 const FACILITY_PREFIXES = new Map([
   ['控制中枢', 'CC'],
@@ -116,6 +120,24 @@ function ruleDeclaredOperators(rule, path, inherited = []) {
   const operators = [...inherited]
   for (const field of DECLARED_OPERATOR_FIELDS) {
     operators.push(...declaredOperators(rule[field], `${path}.${field}`))
+  }
+  const effects = rule.dynamic_effects ?? rule.dynamicEffects ?? []
+  for (const [index, effect] of (Array.isArray(effects) ? effects : [effects]).entries()) {
+    const eliteRequirements = effect?.operator_elite_requirements ?? effect?.operatorEliteRequirements
+    if (eliteRequirements === undefined || eliteRequirements === null) continue
+    const effectPath = `${path}.dynamic_effects[${index}].operator_elite_requirements`
+    assertCondition(
+      eliteRequirements && typeof eliteRequirements === 'object' && !Array.isArray(eliteRequirements),
+      `${effectPath} must be an object.`,
+    )
+    for (const [name, elite] of Object.entries(eliteRequirements)) {
+      assertCondition(typeof name === 'string' && name.trim(), `${effectPath} has an invalid operator name.`)
+      assertCondition(
+        Number.isInteger(elite) && elite >= 0 && elite <= 2,
+        `${effectPath}.${name} must be 0, 1, or 2.`,
+      )
+      operators.push({ name: name.trim(), elite })
+    }
   }
   return operators
 }
@@ -308,7 +330,10 @@ function collectScopedFacilities(value, facilities) {
   }
   if (!value || typeof value !== 'object') return
   for (const [key, child] of Object.entries(value)) {
-    if (key === 'scope' && typeof child === 'string') {
+    if (
+      (key === 'scope' || key === 'dependency_scope' || key === 'dependencyScope') &&
+      typeof child === 'string'
+    ) {
       const facility = SCOPE_FACILITIES.get(child)
       if (facility) facilities.add(facility)
     }
@@ -320,6 +345,19 @@ export function validateEfficiencySkillReferences(skillPayload, efficiencyData) 
   const skillsById = validateSkills(skillPayload)
   const leaves = enumerateEfficiencyRules(efficiencyData)
   const referencedSkillIds = new Set()
+  const operatorGroupNames = new Set(Object.keys(efficiencyData.operator_groups ?? {}))
+
+  for (const [ruleIndex, rule] of (efficiencyData.dormitory_mood_recovery_rules ?? []).entries()) {
+    for (const [bonusIndex, bonus] of (rule.target_bonuses ?? []).entries()) {
+      if (bonus.target_group === undefined || bonus.target_group === null) continue
+      const path = `dormitory_mood_recovery_rules[${ruleIndex}].target_bonuses[${bonusIndex}].target_group`
+      assertCondition(typeof bonus.target_group === 'string' && bonus.target_group, `${path} must be a string.`)
+      assertCondition(
+        operatorGroupNames.has(bonus.target_group),
+        `${path} references unknown operator group ${JSON.stringify(bonus.target_group)}.`,
+      )
+    }
+  }
 
   for (const {
     rule,
@@ -603,6 +641,38 @@ export function runSelfTests() {
     },
     /expected one of/,
   )
+
+  const dynamicControlDependency = makeFixture()
+  const dynamicControlSkill = makeSkill({
+    rule_id: 'PRTS-CC-0001',
+    facility: '控制中枢',
+    holders: [{ name: '辅助中枢干员', elite: 2 }],
+  })
+  dynamicControlDependency.skills.skills[0] = dynamicControlSkill
+  const dynamicControlRule = dynamicControlDependency.efficiency
+    .combination_rules.trading_station['通用单人'][0]
+  dynamicControlRule.skill_rule_refs[0] = {
+    id: dynamicControlSkill.rule_id,
+    hash: dynamicControlSkill.content_hash,
+  }
+  dynamicControlRule.dynamic_effects = {
+    type: 'operator_presence_count',
+    operators: ['辅助中枢干员'],
+    operator_elite_requirements: { 辅助中枢干员: 2 },
+    dependency_scope: 'control_center',
+  }
+  validateEfficiencySkillReferences(
+    dynamicControlDependency.skills,
+    dynamicControlDependency.efficiency,
+  )
+  dynamicControlRule.dynamic_effects.operator_elite_requirements.辅助中枢干员 = 1
+  assert.throws(
+    () => validateEfficiencySkillReferences(
+      dynamicControlDependency.skills,
+      dynamicControlDependency.efficiency,
+    ),
+    /not backed by a declared holder at the required elite level/,
+  )
   expectFailure(
     ({ efficiency }) => { efficiency.combination_rules.trading_station['通用单人'][0].skill_rule_refs = [] },
     /must declare non_skill_condition/,
@@ -652,6 +722,17 @@ export function runSelfTests() {
   scoped.efficiency.combination_rules.manufacturing_station['通用单人'][0].product = 'Pure Gold'
   validateEfficiencySkillReferences(scoped.skills, scoped.efficiency)
 
+  expectFailure(
+    ({ efficiency }) => {
+      efficiency.dormitory_mood_recovery_rules = [{
+        holder: '测试干员',
+        elite: 0,
+        target_bonuses: [{ target_group: 'missing_group', bonus: 0.45 }],
+      }]
+    },
+    /references unknown operator group "missing_group"/,
+  )
+
   const exempt = makeFixture()
   const coveredRule = structuredClone(
     exempt.efficiency.combination_rules.trading_station['通用单人'][0],
@@ -673,10 +754,15 @@ async function main() {
   }
 
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-  const [skillPayload, efficiencyData] = await Promise.all([
+  const [skillPayload, efficiencySource] = await Promise.all([
     readFile(resolve(root, 'tools/prts_logistics_skills.json'), 'utf8').then(JSON.parse),
-    readFile(resolve(root, 'server/handlers/efficiency-data.json'), 'utf8').then(JSON.parse),
+    readEfficiencyDataSource(resolve(root, 'server/handlers/efficiency-data.json')),
   ])
+  if (isPublicEfficiencyDataFallback(efficiencySource)) {
+    console.log('Skipped efficiency skill reference validation because the private efficiency source is unavailable.')
+    return
+  }
+  const efficiencyData = JSON.parse(efficiencySource)
   const result = validateEfficiencySkillReferences(skillPayload, efficiencyData)
   console.log(
     `Validated ${result.efficiencyRuleCount} efficiency rules against ${result.skillCount} PRTS skills.`,
