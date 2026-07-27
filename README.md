@@ -41,6 +41,8 @@ DATABASE_URL=postgresql://<user>:<password>@127.0.0.1:5432/<database>
 SKLAND_CREDENTIAL_SECRET=<stable local random value of at least 16 characters>
 ```
 
+PostgreSQL 新连接默认最多等待 10 秒；可通过 `POSTGRES_CONNECTION_TIMEOUT_MS` 覆盖，允许范围为 1000–60000 毫秒。有限连接超时可以避免 API 或外部 worker 在数据库不可达时无限停留在启动阶段。
+
 没有外部 worker 时，已提交任务会可靠保留在 PostgreSQL 队列中，直到兼容的 `OptimizerPort` worker 消费。仓库不提供 fake optimizer，避免生成看似成功但并非真实优化结果的数据。
 
 默认 API 地址为 `http://127.0.0.1:3000`；可通过 `HOST` 和 `PORT` 覆盖。

@@ -1,5 +1,5 @@
 import type { Server } from 'node:http'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createOptimizeWorkerHealthServer,
   type WorkerLifecycleState,
@@ -44,6 +44,21 @@ describe('optimize worker health server', () => {
     })
   })
 
+  it('reports starting readiness without waiting for PostgreSQL', async () => {
+    const checkDatabase = vi.fn(async () => ({ ok: true as const }))
+    const server = await startServer('starting', false, false, checkDatabase)
+    const response = await fetch(url(server, '/health/ready'))
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      role: 'worker',
+      state: 'starting',
+      storage: { type: 'postgres', ok: false },
+    })
+    expect(checkDatabase).not.toHaveBeenCalled()
+  })
+
   it('rejects unknown routes', async () => {
     const server = await startServer('ready', true, true)
     const response = await fetch(url(server, '/metrics'))
@@ -55,6 +70,9 @@ async function startServer(
   lifecycle: WorkerLifecycleState,
   accepting: boolean,
   databaseOk: boolean,
+  checkDatabase: () => Promise<{ ok: true } | { ok: false; error: string }> = async () => databaseOk
+    ? { ok: true as const }
+    : { ok: false as const, error: 'unavailable' },
 ): Promise<Server> {
   const server = createOptimizeWorkerHealthServer(
     () => lifecycle,
@@ -66,9 +84,7 @@ async function startServer(
         activeAttempts: 2,
         workerId: 'secret-worker-id',
       }),
-      checkDatabase: async () => databaseOk
-        ? { ok: true as const }
-        : { ok: false as const, error: 'unavailable' },
+      checkDatabase,
     },
   )
   await new Promise<void>((resolveListen, rejectListen) => {
