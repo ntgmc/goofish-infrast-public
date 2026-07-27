@@ -5,6 +5,9 @@ const DEADLOCK_DETECTED = '40P01'
 const SERIALIZATION_FAILURE = '40001'
 const RETRIABLE_POSTGRES_CODES = new Set([DEADLOCK_DETECTED, SERIALIZATION_FAILURE])
 const MAX_QUERY_RETRIES = 3
+const DEFAULT_CONNECTION_TIMEOUT_MS = 10_000
+const MIN_CONNECTION_TIMEOUT_MS = 1_000
+const MAX_CONNECTION_TIMEOUT_MS = 60_000
 
 export function hasDatabaseUrl(): boolean {
   return Boolean(process.env.DATABASE_URL?.trim())
@@ -20,6 +23,7 @@ export function getPool(): Pool {
     const nextPool = new Pool({
       connectionString,
       max: Number(process.env.POSTGRES_POOL_MAX || 10),
+      connectionTimeoutMillis: resolvePostgresConnectionTimeoutMs(),
       application_name: 'goofish-infrast-v1',
     })
     nextPool.on('error', (error) => {
@@ -31,6 +35,23 @@ export function getPool(): Pool {
   }
 
   return pool
+}
+
+export function resolvePostgresConnectionTimeoutMs(
+  environment: Pick<NodeJS.ProcessEnv, 'POSTGRES_CONNECTION_TIMEOUT_MS'> = process.env,
+): number {
+  const rawValue = environment.POSTGRES_CONNECTION_TIMEOUT_MS?.trim()
+  if (!rawValue) return DEFAULT_CONNECTION_TIMEOUT_MS
+
+  const configured = Number(rawValue)
+  if (!Number.isInteger(configured)
+    || configured < MIN_CONNECTION_TIMEOUT_MS
+    || configured > MAX_CONNECTION_TIMEOUT_MS) {
+    throw new Error(
+      `POSTGRES_CONNECTION_TIMEOUT_MS must be an integer between ${MIN_CONNECTION_TIMEOUT_MS} and ${MAX_CONNECTION_TIMEOUT_MS}`,
+    )
+  }
+  return configured
 }
 
 export async function query<T extends QueryResultRow = QueryResultRow>(

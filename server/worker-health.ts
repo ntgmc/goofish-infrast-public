@@ -34,7 +34,9 @@ export function createOptimizeWorkerHealthServer(
       return
     }
 
-    const database = await checkDatabase()
+    const database = lifecycle === 'ready'
+      ? await checkDatabase()
+      : { ok: false as const, error: 'worker_not_ready' }
     const ok = lifecycle === 'ready'
       && processing.initialized
       && processing.accepting
