@@ -3,6 +3,10 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  isPublicEfficiencyDataFallback,
+  readEfficiencyDataSource,
+} from './efficiency-data-source.mjs'
 import { validateEfficiencySkillReferences } from './validate-efficiency-skill-refs.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -13,10 +17,10 @@ const buildMetaPath = resolve(root, 'src/lib/.generated/build-meta.ts')
 const packagePath = resolve(root, 'package.json')
 const LINE_ENDING = '\n'
 
-const source = await readFile(sourcePath, 'utf8')
+const source = await readEfficiencyDataSource(sourcePath)
 const data = JSON.parse(source.replace(/^\uFEFF/, ''))
 const skillData = JSON.parse((await readFile(skillSourcePath, 'utf8')).replace(/^\uFEFF/, ''))
-validateEfficiencySkillReferences(skillData, data)
+if (!isPublicEfficiencyDataFallback(source)) validateEfficiencySkillReferences(skillData, data)
 const packageJson = JSON.parse(await readFile(packagePath, 'utf8'))
 const sourceHash = createHash('sha256').update(source).digest('hex')
 const baseVersion = String(packageJson.version || '0.0.0')
