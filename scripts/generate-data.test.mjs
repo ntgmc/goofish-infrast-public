@@ -4,6 +4,10 @@ import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import test from 'node:test'
+import {
+  PUBLIC_EFFICIENCY_DATA_FALLBACK,
+  readEfficiencyDataSource,
+} from './efficiency-data-source.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const dataOutput = resolve(root, 'server/handlers/.generated/data.ts')
@@ -20,9 +24,17 @@ test('generates deterministic ignored modules and content-addressed data version
   assert.equal(await readFile(dataOutput, 'utf8'), firstData)
   assert.equal(await readFile(metaOutput, 'utf8'), firstMeta)
 
-  const sourceHash = createHash('sha256').update(await readFile(sourcePath, 'utf8')).digest('hex').slice(0, 12)
+  const sourceHash = createHash('sha256').update(await readEfficiencyDataSource(sourcePath)).digest('hex').slice(0, 12)
   assert.match(firstMeta, new RegExp(`"data_version": "data\\.${sourceHash}"`))
   assert.match(firstMeta, new RegExp(`"git_sha": "${sha}"`))
+})
+
+test('uses an empty public fallback when the private efficiency source is absent', async () => {
+  const missingSource = resolve(root, `.cache/missing-efficiency-data-${process.pid}.json`)
+  assert.deepEqual(
+    JSON.parse(await readEfficiencyDataSource(missingSource)),
+    PUBLIC_EFFICIENCY_DATA_FALLBACK,
+  )
 })
 
 test('honors explicit release metadata', async () => {

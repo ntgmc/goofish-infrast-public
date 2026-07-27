@@ -3,6 +3,10 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import {
+  isPublicEfficiencyDataFallback,
+  readEfficiencyDataSource,
+} from './efficiency-data-source.mjs'
 
 const FACILITY_PREFIXES = new Map([
   ['控制中枢', 'CC'],
@@ -750,10 +754,15 @@ async function main() {
   }
 
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-  const [skillPayload, efficiencyData] = await Promise.all([
+  const [skillPayload, efficiencySource] = await Promise.all([
     readFile(resolve(root, 'tools/prts_logistics_skills.json'), 'utf8').then(JSON.parse),
-    readFile(resolve(root, 'server/handlers/efficiency-data.json'), 'utf8').then(JSON.parse),
+    readEfficiencyDataSource(resolve(root, 'server/handlers/efficiency-data.json')),
   ])
+  if (isPublicEfficiencyDataFallback(efficiencySource)) {
+    console.log('Skipped efficiency skill reference validation because the private efficiency source is unavailable.')
+    return
+  }
+  const efficiencyData = JSON.parse(efficiencySource)
   const result = validateEfficiencySkillReferences(skillPayload, efficiencyData)
   console.log(
     `Validated ${result.efficiencyRuleCount} efficiency rules against ${result.skillCount} PRTS skills.`,
