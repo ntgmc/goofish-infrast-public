@@ -46,6 +46,7 @@ jobs:
 
       - name: Run public tests
         run: |
+          npm run test:workflow-contracts
           npm run test:generate-changelog
           npm run test:release-artifact
           npm test
