@@ -6,9 +6,9 @@ let timer: ReturnType<typeof setInterval> | null = null
 
 export async function initializeBehaviorRiskMaintenance(): Promise<void> {
   if (timer) return
-  await runMaintenance()
   timer = setInterval(() => void runMaintenance(), DAY_MS)
   timer.unref?.()
+  void runMaintenance()
 }
 
 export function shutdownBehaviorRiskMaintenance(): void {
@@ -17,9 +17,19 @@ export function shutdownBehaviorRiskMaintenance(): void {
 }
 
 async function runMaintenance(): Promise<void> {
+  const startedAt = Date.now()
   try {
-    await runBehaviorRiskEvaluation()
+    const result = await runBehaviorRiskEvaluation()
+    console.info(
+      `[behavior-risk] daily maintenance completed in ${Date.now() - startedAt}ms: ${result.cases} cases, ${result.purgedEvents} expired events purged`,
+    )
   } catch (error) {
-    console.warn('[behavior-risk] daily maintenance skipped:', error instanceof Error ? error.message : 'unknown error')
+    const code = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+      ? ` code=${error.code}`
+      : ''
+    console.warn(
+      `[behavior-risk] daily maintenance skipped after ${Date.now() - startedAt}ms${code}:`,
+      error instanceof Error ? error.message : 'unknown error',
+    )
   }
 }
