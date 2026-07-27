@@ -15,6 +15,8 @@ const RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 const MAINTENANCE_LOCK_KEY = 1_743_861_291
 const MODEL_RECALIBRATION_ADMIN = `system:${BEHAVIOR_RISK_MODEL_VERSION}`
 const MODEL_RECALIBRATION_NOTE = `评分模型升级至 ${BEHAVIOR_RISK_MODEL_VERSION}，旧待复核单已自动归档并按新模型重算。`
+const DEFAULT_MAINTENANCE_STATEMENT_TIMEOUT_MS = 30_000
+const DEFAULT_MAINTENANCE_LOCK_TIMEOUT_MS = 5_000
 
 export type BehaviorRiskEventInput = {
   eventKey?: string | null
@@ -128,7 +130,21 @@ export async function runBehaviorRiskEvaluation(now = new Date()): Promise<{ cas
   await ensureDatabaseSchema()
   const client = await getPool().connect()
   let locked = false
+  let discardClient = false
+  let previousTimeouts: { statement_timeout: string; lock_timeout: string } | null = null
   try {
+    previousTimeouts = (await client.query<{ statement_timeout: string; lock_timeout: string }>(
+      `select current_setting('statement_timeout') as statement_timeout,
+              current_setting('lock_timeout') as lock_timeout`,
+    )).rows[0] ?? null
+    await client.query(
+      `select set_config('statement_timeout', $1, false),
+              set_config('lock_timeout', $2, false)`,
+      [
+        `${readPositiveInteger('BEHAVIOR_RISK_STATEMENT_TIMEOUT_MS', DEFAULT_MAINTENANCE_STATEMENT_TIMEOUT_MS)}ms`,
+        `${readPositiveInteger('BEHAVIOR_RISK_LOCK_TIMEOUT_MS', DEFAULT_MAINTENANCE_LOCK_TIMEOUT_MS)}ms`,
+      ],
+    )
     locked = Boolean((await client.query<{ locked: boolean }>('select pg_try_advisory_lock($1) as locked', [MAINTENANCE_LOCK_KEY])).rows[0]?.locked)
     if (!locked) return { cases: 0, purgedEvents: 0 }
 
@@ -157,9 +173,28 @@ export async function runBehaviorRiskEvaluation(now = new Date()): Promise<{ cas
       throw error
     }
   } finally {
-    if (locked) await client.query('select pg_advisory_unlock($1)', [MAINTENANCE_LOCK_KEY]).catch(() => undefined)
-    client.release()
+    if (locked) {
+      const unlocked = await client.query<{ unlocked: boolean }>(
+        'select pg_advisory_unlock($1) as unlocked',
+        [MAINTENANCE_LOCK_KEY],
+      ).then((result) => result.rows[0]?.unlocked === true).catch(() => false)
+      discardClient ||= !unlocked
+    }
+    if (previousTimeouts) {
+      const restored = await client.query(
+        `select set_config('statement_timeout', $1, false),
+                set_config('lock_timeout', $2, false)`,
+        [previousTimeouts.statement_timeout, previousTimeouts.lock_timeout],
+      ).then(() => true).catch(() => false)
+      discardClient ||= !restored
+    }
+    client.release(discardClient)
   }
+}
+
+function readPositiveInteger(name: string, fallback: number): number {
+  const value = Number(process.env[name] ?? fallback)
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback
 }
 
 export async function listBehaviorRiskCases(options: {
