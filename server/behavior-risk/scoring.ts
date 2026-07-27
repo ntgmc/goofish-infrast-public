@@ -1,5 +1,5 @@
 export const BEHAVIOR_RISK_MODEL_VERSION = 'behavior-risk-v1.2.0'
-export const MULTI_IDENTITY_THRESHOLD = 3
+const MULTI_IDENTITY_THRESHOLD = 3
 
 export type BehaviorRiskEventType =
   | 'register'
