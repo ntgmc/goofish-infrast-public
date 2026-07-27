@@ -21,6 +21,11 @@ import {
   type WorkerLifecycleState,
 } from './worker-health'
 
+export type OptimizeWorkerStartupStage = {
+  name: string
+  initialize: () => Promise<void>
+}
+
 export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
   const unregisterOptimizerPort = registerOptimizerPort(optimizerPort)
   let portRegistered = true
@@ -56,6 +61,7 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
   process.on('SIGINT', () => startShutdown('SIGINT'))
 
   void start().catch(async (error) => {
+    if (shutdownPromise) return
     console.error('optimize worker startup failed:', error)
     lifecycleState = 'draining'
     try {
@@ -71,12 +77,13 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
   })
 
   async function start(): Promise<void> {
-    await initializeOptimizeQueueMaintenance()
-    await initializeInventoryCampaignWorker()
-    await initializeInvitationSettlementWorker()
-    await initializeBehaviorRiskMaintenance()
-    await initializeOptimizeJobProcessing()
-    await listen(healthServer, healthPort, healthHost)
+    const initialized = await initializeOptimizeWorkerRuntime(
+      healthServer,
+      healthPort,
+      healthHost,
+      () => lifecycleState === 'starting',
+    )
+    if (!initialized) return
     lifecycleState = 'ready'
     console.log(`goofish optimize worker ready on http://${healthHost}:${healthPort}`)
   }
@@ -115,6 +122,36 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
     }
     console.log('optimize worker shutdown complete')
   }
+}
+
+export async function initializeOptimizeWorkerRuntime(
+  healthServer: Server,
+  healthPort: number,
+  healthHost: string,
+  shouldContinue: () => boolean,
+  stages: readonly OptimizeWorkerStartupStage[] = optimizeWorkerStartupStages(),
+  log: (message: string) => void = console.log,
+): Promise<boolean> {
+  await listen(healthServer, healthPort, healthHost)
+  log(`[worker-startup] health server listening on http://${healthHost}:${healthPort}`)
+
+  for (const stage of stages) {
+    if (!shouldContinue()) return false
+    log(`[worker-startup] initializing ${stage.name}`)
+    await stage.initialize()
+    log(`[worker-startup] initialized ${stage.name}`)
+  }
+  return shouldContinue()
+}
+
+function optimizeWorkerStartupStages(): readonly OptimizeWorkerStartupStage[] {
+  return [
+    { name: 'optimize queue maintenance', initialize: initializeOptimizeQueueMaintenance },
+    { name: 'inventory campaign worker', initialize: initializeInventoryCampaignWorker },
+    { name: 'invitation settlement worker', initialize: initializeInvitationSettlementWorker },
+    { name: 'behavior risk maintenance', initialize: initializeBehaviorRiskMaintenance },
+    { name: 'optimize job processing', initialize: initializeOptimizeJobProcessing },
+  ]
 }
 
 function shutdownMaintenance(): void {
