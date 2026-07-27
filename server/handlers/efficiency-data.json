@@ -242,6 +242,13 @@
         "泰拉大陆调查团"
       ]
     },
+    "orchid_hunting_team": {
+      "name": "泡影国狩猎小队",
+      "operators": [
+        "焰狐龙梓兰",
+        "雷狼龙S空爆"
+      ]
+    },
     "mygo_passion_providers": {
       "name": "热情值来源",
       "operators": [
@@ -286,7 +293,8 @@
         "铅踝",
         "见行者",
         "隐现",
-        "奥伦"
+        "奥伦",
+        "新约能天使"
       ]
     },
     "glasgow": {
@@ -365,188 +373,12 @@
         ],
         "rules": [
           {
-            "//": "卡夫卡 - 有Buff",
-            "combo": [
-              "卡夫卡/2"
-            ],
-            "efficiency": 140,
-            "priority": 4907,
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "stable_position_operators": [
-              "巫恋",
-              "卡夫卡"
-            ],
-            "mood_consumption_delta": {
-              "巫恋": -0.25,
-              "龙舌兰": -0.25,
-              "卡夫卡": -0.25
-            },
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0247",
-                "hash": "sha256:bf91e02278b1aa71413a86a5a06f855295075c0bbb63c7c7134b5c9ea7fd9a6a"
-              },
-              {
-                "id": "PRTS-TRD-0309",
-                "hash": "sha256:c0a00be9c818c4f86a12cacc608350a957d19a497c46a513135e083e1a486806"
-              },
-              {
-                "id": "PRTS-TRD-0314",
-                "hash": "sha256:1d6911c4a8387d2b1e3779a04cc1bf825cee2d29ce9dbe07f455011531b0abfa"
-              },
-              {
-                "id": "PRTS-TRD-0318",
-                "hash": "sha256:a11e82ead08e2935e2ef16dc7f5e51c30033c9b7f8f7663558cf4ba196fed6dc"
-              }
-            ]
-          },
-          {
-            "//": "折光 - 有Buff",
-            "combo": [
-              "折光/2"
-            ],
-            "efficiency": 140,
-            "priority": 4907,
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "stable_position_operators": [
-              "巫恋",
-              "折光"
-            ],
-            "mood_consumption_delta": {
-              "巫恋": -0.25,
-              "龙舌兰": -0.25,
-              "折光": -0.25
-            },
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0247",
-                "hash": "sha256:bf91e02278b1aa71413a86a5a06f855295075c0bbb63c7c7134b5c9ea7fd9a6a"
-              },
-              {
-                "id": "PRTS-TRD-0310",
-                "hash": "sha256:04a4ac67d7872cbbb3376e5af4371717bf9fe379f870303f0b3da3f04f2b2cea"
-              },
-              {
-                "id": "PRTS-TRD-0314",
-                "hash": "sha256:1d6911c4a8387d2b1e3779a04cc1bf825cee2d29ce9dbe07f455011531b0abfa"
-              },
-              {
-                "id": "PRTS-TRD-0318",
-                "hash": "sha256:a11e82ead08e2935e2ef16dc7f5e51c30033c9b7f8f7663558cf4ba196fed6dc"
-              }
-            ]
-          },
-          {
-            "//": "明椒 - 有Buff",
-            "combo": [
-              "明椒/2"
-            ],
-            "efficiency": 140,
-            "priority": 4907,
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "stable_position_operators": [
-              "巫恋",
-              "明椒"
-            ],
-            "mood_consumption_delta": {
-              "巫恋": -0.25,
-              "龙舌兰": -0.25,
-              "明椒": -0.25
-            },
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0247",
-                "hash": "sha256:bf91e02278b1aa71413a86a5a06f855295075c0bbb63c7c7134b5c9ea7fd9a6a"
-              },
-              {
-                "id": "PRTS-TRD-0308",
-                "hash": "sha256:631b266288e5ae2c5540b6ff17571baada471dcd00e7ef1dd7be08294ee9f78c"
-              },
-              {
-                "id": "PRTS-TRD-0318",
-                "hash": "sha256:a11e82ead08e2935e2ef16dc7f5e51c30033c9b7f8f7663558cf4ba196fed6dc"
-              }
-            ]
-          },
-          {
-            "//": "情况1：八幡海铃在控制中枢加速巫恋，效率+5%",
-            "combo": [
-              "柏喙/2"
-            ],
-            "efficiency": 140,
-            "priority": 4907,
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "stable_position_operators": [
-              "巫恋",
-              "柏喙"
-            ],
-            "mood_consumption_delta": {
-              "巫恋": -0.25,
-              "龙舌兰": -0.25,
-              "柏喙": -0.25
-            },
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0247",
-                "hash": "sha256:bf91e02278b1aa71413a86a5a06f855295075c0bbb63c7c7134b5c9ea7fd9a6a"
-              },
-              {
-                "id": "PRTS-TRD-0308",
-                "hash": "sha256:631b266288e5ae2c5540b6ff17571baada471dcd00e7ef1dd7be08294ee9f78c"
-              },
-              {
-                "id": "PRTS-TRD-0318",
-                "hash": "sha256:a11e82ead08e2935e2ef16dc7f5e51c30033c9b7f8f7663558cf4ba196fed6dc"
-              }
-            ]
-          },
-          {
-            "//": "卡夫卡 - 普通",
+            "//": "动态：基础135%，八幡海铃在控制中枢时额外+5%",
             "combo": [
               "卡夫卡/2"
             ],
             "efficiency": 135,
-            "priority": 4775,
+            "priority": 4907,
             "stable_position_operators": [
               "巫恋",
               "卡夫卡"
@@ -572,16 +404,37 @@
               {
                 "id": "PRTS-TRD-0318",
                 "hash": "sha256:a11e82ead08e2935e2ef16dc7f5e51c30033c9b7f8f7663558cf4ba196fed6dc"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
           {
-            "//": "折光 - 普通",
+            "//": "动态：基础135%，八幡海铃在控制中枢时额外+5%",
             "combo": [
               "折光/2"
             ],
             "efficiency": 135,
-            "priority": 4775,
+            "priority": 4907,
             "stable_position_operators": [
               "巫恋",
               "折光"
@@ -607,16 +460,37 @@
               {
                 "id": "PRTS-TRD-0318",
                 "hash": "sha256:a11e82ead08e2935e2ef16dc7f5e51c30033c9b7f8f7663558cf4ba196fed6dc"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
           {
-            "//": "明椒 - 普通",
+            "//": "动态：基础135%，八幡海铃在控制中枢时额外+5%",
             "combo": [
               "明椒/2"
             ],
             "efficiency": 135,
-            "priority": 4775,
+            "priority": 4907,
             "stable_position_operators": [
               "巫恋",
               "明椒"
@@ -638,16 +512,37 @@
               {
                 "id": "PRTS-TRD-0318",
                 "hash": "sha256:a11e82ead08e2935e2ef16dc7f5e51c30033c9b7f8f7663558cf4ba196fed6dc"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
           {
-            "//": "情况2：普通情况，无中枢加成",
+            "//": "动态：基础135%，八幡海铃在控制中枢时额外+5%",
             "combo": [
               "柏喙/2"
             ],
             "efficiency": 135,
-            "priority": 4775,
+            "priority": 4907,
             "stable_position_operators": [
               "巫恋",
               "柏喙"
@@ -669,6 +564,27 @@
               {
                 "id": "PRTS-TRD-0318",
                 "hash": "sha256:a11e82ead08e2935e2ef16dc7f5e51c30033c9b7f8f7663558cf4ba196fed6dc"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           }
@@ -748,6 +664,27 @@
               {
                 "id": "PRTS-TRD-0290",
                 "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 10,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+10%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
@@ -779,90 +716,27 @@
               {
                 "id": "PRTS-TRD-0290",
                 "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "伺夜/2",
-              "贝洛内/2"
-            ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "note": "基础效率90%，但+2订单上限，13.7h爆仓",
-            "efficiency": 90,
-            "priority": 3080,
-            "order_limit_delta": 2,
-            "mood_consumption_delta": {
-              "贝洛内": -0.1
-            },
-            "skill_rule_refs": [
+              },
               {
                 "id": "PRTS-CC-0006",
                 "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0234",
-                "hash": "sha256:1d5ac3d3f64b0d9f05a27f715d461919d07576ae8a60b208e8509f0560ccf571"
-              },
-              {
-                "id": "PRTS-TRD-0242",
-                "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-              },
-              {
-                "id": "PRTS-TRD-0252",
-                "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
-              },
-              {
-                "id": "PRTS-TRD-0290",
-                "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
               }
-            ]
-          },
-          {
-            "combo": [
-              "伺夜/2",
-              "贝洛内"
             ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "note": "基础效率80%，但+2订单上限",
-            "efficiency": 80,
-            "priority": 3079,
-            "order_limit_delta": 2,
-            "mood_consumption_delta": {
-              "贝洛内": -0.1
-            },
-            "skill_rule_refs": [
+            "dynamic_effects": [
               {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0233",
-                "hash": "sha256:a087f6fceed5aea95e36c276f874dfb13df6205c0be2600e243b2dd22f28899e"
-              },
-              {
-                "id": "PRTS-TRD-0242",
-                "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-              },
-              {
-                "id": "PRTS-TRD-0252",
-                "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
-              },
-              {
-                "id": "PRTS-TRD-0290",
-                "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 10,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+10%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
@@ -898,108 +772,38 @@
               "推进之王",
               "摩根/2"
             ],
-            "control_center": [
-              "戴菲恩/2"
-            ],
-            "efficiency": 95,
+            "note": "基础效率75%",
+            "efficiency": 75,
             "priority": 3132,
             "skill_rule_refs": [
               {
+                "id": "PRTS-TRD-0252",
+                "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
+              },
+              {
+                "id": "PRTS-TRD-0257",
+                "hash": "sha256:9641d20858aee9707328f444401bbcd6bb530bd996e08a72f0c4b5fe4c08cfb0"
+              },
+              {
                 "id": "PRTS-CC-0042",
                 "hash": "sha256:c17fedabb8cc82658be2dbee03830b187ff248a849aa4e04b4dd4228565a4c98"
-              },
-              {
-                "id": "PRTS-TRD-0252",
-                "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
-              },
-              {
-                "id": "PRTS-TRD-0257",
-                "hash": "sha256:9641d20858aee9707328f444401bbcd6bb530bd996e08a72f0c4b5fe4c08cfb0"
               }
-            ]
-          },
-          {
-            "combo": [
-              "推进之王",
-              "摩根/2"
             ],
-            "note": "基础效率75%",
-            "efficiency": 75,
-            "priority": 2833,
-            "skill_rule_refs": [
+            "dynamic_effects": [
               {
-                "id": "PRTS-TRD-0252",
-                "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
-              },
-              {
-                "id": "PRTS-TRD-0257",
-                "hash": "sha256:9641d20858aee9707328f444401bbcd6bb530bd996e08a72f0c4b5fe4c08cfb0"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "伺夜/2"
-            ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 45,
-            "priority": 2715,
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0252",
-                "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
-              },
-              {
-                "id": "PRTS-TRD-0290",
-                "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "德克萨斯",
-              "拉普兰德"
-            ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 70,
-            "priority": 2698,
-            "order_limit_delta": 2,
-            "mood_consumption_delta": {
-              "德克萨斯": 0.3,
-              "拉普兰德": -0.1
-            },
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0243",
-                "hash": "sha256:eea7a75deb7c97505f8225b23c2c7b47d83ce0dba8cdf4b2116548b11099805c"
-              },
-              {
-                "id": "PRTS-TRD-0245",
-                "hash": "sha256:930c54dbaf2cce198d5a95e6f2b9119efeb548cc25e88b75af599c12f9f58545"
-              },
-              {
-                "id": "PRTS-TRD-0252",
-                "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 20,
+                "operators": [
+                  "戴菲恩"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "戴菲恩进驻控制中枢时，本组合内格拉斯哥帮干员合计额外+20%订单获取效率。",
+                "operator_elite_requirements": {
+                  "戴菲恩": 2
+                }
               }
             ]
           },
@@ -1009,7 +813,7 @@
               "拉普兰德"
             ],
             "efficiency": 65,
-            "priority": 2566,
+            "priority": 2698,
             "order_limit_delta": 2,
             "mood_consumption_delta": {
               "德克萨斯": 0.3,
@@ -1027,6 +831,27 @@
               {
                 "id": "PRTS-TRD-0252",
                 "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
@@ -1038,6 +863,24 @@
             ],
             "efficiency": 40,
             "apply_each": true,
+            "dynamic_effects": {
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 5,
+              "operators": [
+                "八幡海铃"
+              ],
+              "target_operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "control_center",
+              "scope": "trading_station",
+              "detail": "伺夜基础效率40%，八幡海铃进驻控制中枢时额外+5%。",
+              "operator_elite_requirements": {
+                "八幡海铃": 2
+              }
+            },
             "priority": 2500,
             "skill_rule_refs": [
               {
@@ -1055,6 +898,10 @@
               {
                 "id": "PRTS-TRD-0300",
                 "hash": "sha256:fc227efa59911a52848d3a357d80e0689854522a1cd2c73edc98fff57b46f181"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
               }
             ]
           },
@@ -1130,7 +977,6 @@
               "芬/1",
               "渡桥/2",
               "瑰盐/2",
-              "新约能天使/2",
               "空/2"
             ],
             "efficiency": 30,
@@ -1150,10 +996,6 @@
               {
                 "id": "PRTS-TRD-0252",
                 "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
-              },
-              {
-                "id": "PRTS-TRD-0255",
-                "hash": "sha256:052373b55b0df01c0dfb8f817cb363472390ee5567e84a0ea1f9a480c3718175"
               },
               {
                 "id": "PRTS-TRD-0256",
@@ -1178,92 +1020,6 @@
               {
                 "id": "PRTS-TRD-0317",
                 "hash": "sha256:eccdb25ce0de30407f1ff3edcabe5a76e895c8fbe25f66d06e94b10b36b84079"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "贝洛内/2"
-            ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 35,
-            "dynamic_effects": {
-              "type": "operator_presence_count",
-              "base": 35,
-              "per_operator": 10,
-              "operators": [
-                "伺夜"
-              ],
-              "dependency_scope": "facility",
-              "scope": "trading_station",
-              "detail": "家族经营·β：基础35%，伺夜在基建内时额外+10%。"
-            },
-            "priority": 2347,
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0234",
-                "hash": "sha256:1d5ac3d3f64b0d9f05a27f715d461919d07576ae8a60b208e8509f0560ccf571"
-              },
-              {
-                "id": "PRTS-TRD-0242",
-                "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-              },
-              {
-                "id": "PRTS-TRD-0252",
-                "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "贝洛内"
-            ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 30,
-            "dynamic_effects": {
-              "type": "operator_presence_count",
-              "base": 30,
-              "per_operator": 5,
-              "operators": [
-                "伺夜"
-              ],
-              "dependency_scope": "facility",
-              "scope": "trading_station",
-              "detail": "家族经营·α：基础30%，伺夜在基建内时额外+5%。"
-            },
-            "priority": 2346,
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0233",
-                "hash": "sha256:a087f6fceed5aea95e36c276f874dfb13df6205c0be2600e243b2dd22f28899e"
-              },
-              {
-                "id": "PRTS-TRD-0242",
-                "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-              },
-              {
-                "id": "PRTS-TRD-0252",
-                "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
               }
             ]
           },
@@ -1375,19 +1131,36 @@
               "贝洛内/2"
             ],
             "efficiency": 30,
-            "dynamic_effects": {
-              "type": "operator_presence_count",
-              "base": 30,
-              "per_operator": 10,
-              "operators": [
-                "伺夜"
-              ],
-              "dependency_scope": "facility",
-              "scope": "trading_station",
-              "detail": "家族经营·β：基础30%，伺夜在基建内时额外+10%。"
-            },
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "base": 30,
+                "per_operator": 10,
+                "operators": [
+                  "伺夜"
+                ],
+                "dependency_scope": "facility",
+                "scope": "trading_station",
+                "detail": "家族经营·β：基础30%，伺夜在基建内时额外+10%。"
+              },
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
+              }
+            ],
             "apply_each": true,
-            "priority": 2172,
+            "priority": 2347,
             "skill_rule_refs": [
               {
                 "id": "PRTS-TRD-0234",
@@ -1400,6 +1173,10 @@
               {
                 "id": "PRTS-TRD-0252",
                 "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
               }
             ]
           },
@@ -1408,19 +1185,36 @@
               "贝洛内"
             ],
             "efficiency": 25,
-            "dynamic_effects": {
-              "type": "operator_presence_count",
-              "base": 25,
-              "per_operator": 5,
-              "operators": [
-                "伺夜"
-              ],
-              "dependency_scope": "facility",
-              "scope": "trading_station",
-              "detail": "家族经营·α：基础25%，伺夜在基建内时额外+5%。"
-            },
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "base": 25,
+                "per_operator": 5,
+                "operators": [
+                  "伺夜"
+                ],
+                "dependency_scope": "facility",
+                "scope": "trading_station",
+                "detail": "家族经营·α：基础25%，伺夜在基建内时额外+5%。"
+              },
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
+              }
+            ],
             "apply_each": true,
-            "priority": 2171,
+            "priority": 2346,
             "skill_rule_refs": [
               {
                 "id": "PRTS-TRD-0233",
@@ -1433,6 +1227,10 @@
               {
                 "id": "PRTS-TRD-0252",
                 "hash": "sha256:f6b3c08defd7d6aaa9cc7ef0bae9f2573022d64a1ef40976554c57e024536c64"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
               }
             ]
           },
@@ -1692,16 +1490,9 @@
               "推进之王",
               "摩根/2"
             ],
-            "control_center": [
-              "戴菲恩/2"
-            ],
-            "efficiency": 95,
+            "efficiency": 75,
             "priority": 3132,
             "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0042",
-                "hash": "sha256:c17fedabb8cc82658be2dbee03830b187ff248a849aa4e04b4dd4228565a4c98"
-              },
               {
                 "id": "PRTS-TRD-0257",
                 "hash": "sha256:9641d20858aee9707328f444401bbcd6bb530bd996e08a72f0c4b5fe4c08cfb0"
@@ -1713,190 +1504,27 @@
               {
                 "id": "PRTS-TRD-0313",
                 "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
+              },
+              {
+                "id": "PRTS-CC-0042",
+                "hash": "sha256:c17fedabb8cc82658be2dbee03830b187ff248a849aa4e04b4dd4228565a4c98"
               }
-            ]
-          },
-          {
-            "combo": [
-              "贝洛内/2",
-              "伺夜/2"
             ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 90,
-            "priority": 3097,
-            "order_limit_delta": 2,
-            "mood_consumption_delta": {
-              "贝洛内": -0.1
-            },
-            "skill_rule_refs": [
+            "dynamic_effects": [
               {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0234",
-                "hash": "sha256:1d5ac3d3f64b0d9f05a27f715d461919d07576ae8a60b208e8509f0560ccf571"
-              },
-              {
-                "id": "PRTS-TRD-0242",
-                "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-              },
-              {
-                "id": "PRTS-TRD-0290",
-                "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
-              },
-              {
-                "id": "PRTS-TRD-0311",
-                "hash": "sha256:bdb14ee11470395fdf091be8fde7833cd183277ea602099a5d03797ac79a4d60"
-              },
-              {
-                "id": "PRTS-TRD-0313",
-                "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "贝洛内",
-              "伺夜/2"
-            ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 80,
-            "priority": 3096,
-            "order_limit_delta": 2,
-            "mood_consumption_delta": {
-              "贝洛内": -0.1
-            },
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0233",
-                "hash": "sha256:a087f6fceed5aea95e36c276f874dfb13df6205c0be2600e243b2dd22f28899e"
-              },
-              {
-                "id": "PRTS-TRD-0242",
-                "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-              },
-              {
-                "id": "PRTS-TRD-0290",
-                "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
-              },
-              {
-                "id": "PRTS-TRD-0311",
-                "hash": "sha256:bdb14ee11470395fdf091be8fde7833cd183277ea602099a5d03797ac79a4d60"
-              },
-              {
-                "id": "PRTS-TRD-0313",
-                "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "贝洛内/2"
-            ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 35,
-            "dynamic_effects": {
-              "type": "operator_presence_count",
-              "base": 35,
-              "per_operator": 10,
-              "operators": [
-                "伺夜"
-              ],
-              "dependency_scope": "facility",
-              "scope": "trading_station",
-              "detail": "家族经营·β：基础35%，伺夜在基建内时额外+10%。"
-            },
-            "priority": 3095,
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0234",
-                "hash": "sha256:1d5ac3d3f64b0d9f05a27f715d461919d07576ae8a60b208e8509f0560ccf571"
-              },
-              {
-                "id": "PRTS-TRD-0242",
-                "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-              },
-              {
-                "id": "PRTS-TRD-0311",
-                "hash": "sha256:bdb14ee11470395fdf091be8fde7833cd183277ea602099a5d03797ac79a4d60"
-              },
-              {
-                "id": "PRTS-TRD-0313",
-                "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "贝洛内"
-            ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 30,
-            "dynamic_effects": {
-              "type": "operator_presence_count",
-              "base": 30,
-              "per_operator": 5,
-              "operators": [
-                "伺夜"
-              ],
-              "dependency_scope": "facility",
-              "scope": "trading_station",
-              "detail": "家族经营·α：基础30%，伺夜在基建内时额外+5%。"
-            },
-            "priority": 3094,
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0233",
-                "hash": "sha256:a087f6fceed5aea95e36c276f874dfb13df6205c0be2600e243b2dd22f28899e"
-              },
-              {
-                "id": "PRTS-TRD-0242",
-                "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-              },
-              {
-                "id": "PRTS-TRD-0311",
-                "hash": "sha256:bdb14ee11470395fdf091be8fde7833cd183277ea602099a5d03797ac79a4d60"
-              },
-              {
-                "id": "PRTS-TRD-0313",
-                "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 20,
+                "operators": [
+                  "戴菲恩"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "戴菲恩进驻控制中枢时，本组合内格拉斯哥帮干员合计额外+20%订单获取效率。",
+                "operator_elite_requirements": {
+                  "戴菲恩": 2
+                }
               }
             ]
           },
@@ -1943,61 +1571,45 @@
               "空弦/2",
               "伺夜/2"
             ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 90,
+            "efficiency": 85,
             "priority": 2965,
             "skill_rule_refs": [
               {
+                "id": "PRTS-TRD-0290",
+                "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
+              },
+              {
+                "id": "PRTS-TRD-0300",
+                "hash": "sha256:fc227efa59911a52848d3a357d80e0689854522a1cd2c73edc98fff57b46f181"
+              },
+              {
+                "id": "PRTS-TRD-0311",
+                "hash": "sha256:bdb14ee11470395fdf091be8fde7833cd183277ea602099a5d03797ac79a4d60"
+              },
+              {
+                "id": "PRTS-TRD-0313",
+                "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
+              },
+              {
                 "id": "PRTS-CC-0006",
                 "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0290",
-                "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
-              },
-              {
-                "id": "PRTS-TRD-0300",
-                "hash": "sha256:fc227efa59911a52848d3a357d80e0689854522a1cd2c73edc98fff57b46f181"
-              },
-              {
-                "id": "PRTS-TRD-0311",
-                "hash": "sha256:bdb14ee11470395fdf091be8fde7833cd183277ea602099a5d03797ac79a4d60"
-              },
-              {
-                "id": "PRTS-TRD-0313",
-                "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
               }
-            ]
-          },
-          {
-            "combo": [
-              "空弦/2",
-              "伺夜/2"
             ],
-            "efficiency": 85,
-            "priority": 2833,
-            "skill_rule_refs": [
+            "dynamic_effects": [
               {
-                "id": "PRTS-TRD-0290",
-                "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
-              },
-              {
-                "id": "PRTS-TRD-0300",
-                "hash": "sha256:fc227efa59911a52848d3a357d80e0689854522a1cd2c73edc98fff57b46f181"
-              },
-              {
-                "id": "PRTS-TRD-0311",
-                "hash": "sha256:bdb14ee11470395fdf091be8fde7833cd183277ea602099a5d03797ac79a4d60"
-              },
-              {
-                "id": "PRTS-TRD-0313",
-                "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
@@ -2007,7 +1619,7 @@
               "伺夜/2"
             ],
             "efficiency": 80,
-            "priority": 2799,
+            "priority": 3097,
             "order_limit_delta": 2,
             "mood_consumption_delta": {
               "贝洛内": -0.1
@@ -2032,6 +1644,27 @@
               {
                 "id": "PRTS-TRD-0313",
                 "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 10,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+10%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
@@ -2041,7 +1674,7 @@
               "伺夜/2"
             ],
             "efficiency": 70,
-            "priority": 2798,
+            "priority": 3096,
             "order_limit_delta": 2,
             "mood_consumption_delta": {
               "贝洛内": -0.1
@@ -2066,6 +1699,27 @@
               {
                 "id": "PRTS-TRD-0313",
                 "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 10,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+10%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
@@ -2074,18 +1728,35 @@
               "贝洛内/2"
             ],
             "efficiency": 30,
-            "dynamic_effects": {
-              "type": "operator_presence_count",
-              "base": 30,
-              "per_operator": 10,
-              "operators": [
-                "伺夜"
-              ],
-              "dependency_scope": "facility",
-              "scope": "trading_station",
-              "detail": "家族经营·β：基础30%，伺夜在基建内时额外+10%。"
-            },
-            "priority": 2797,
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "base": 30,
+                "per_operator": 10,
+                "operators": [
+                  "伺夜"
+                ],
+                "dependency_scope": "facility",
+                "scope": "trading_station",
+                "detail": "家族经营·β：基础30%，伺夜在基建内时额外+10%。"
+              },
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
+              }
+            ],
+            "priority": 3095,
             "skill_rule_refs": [
               {
                 "id": "PRTS-TRD-0234",
@@ -2102,6 +1773,10 @@
               {
                 "id": "PRTS-TRD-0313",
                 "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
               }
             ]
           },
@@ -2110,18 +1785,35 @@
               "贝洛内"
             ],
             "efficiency": 25,
-            "dynamic_effects": {
-              "type": "operator_presence_count",
-              "base": 25,
-              "per_operator": 5,
-              "operators": [
-                "伺夜"
-              ],
-              "dependency_scope": "facility",
-              "scope": "trading_station",
-              "detail": "家族经营·α：基础25%，伺夜在基建内时额外+5%。"
-            },
-            "priority": 2796,
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "base": 25,
+                "per_operator": 5,
+                "operators": [
+                  "伺夜"
+                ],
+                "dependency_scope": "facility",
+                "scope": "trading_station",
+                "detail": "家族经营·α：基础25%，伺夜在基建内时额外+5%。"
+              },
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
+              }
+            ],
+            "priority": 3094,
             "skill_rule_refs": [
               {
                 "id": "PRTS-TRD-0233",
@@ -2138,6 +1830,10 @@
               {
                 "id": "PRTS-TRD-0313",
                 "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
               }
             ]
           },
@@ -2172,10 +1868,10 @@
             ]
           },
           {
-          "combo": [
-            "黑键/2",
-            "乌有/2"
-          ],
+            "combo": [
+              "黑键/2",
+              "乌有/2"
+            ],
             "control_center": [
               "重岳",
               "令/2",
@@ -2192,139 +1888,139 @@
             "process": [
               "年"
             ],
-          "efficiency": 40,
-          "dynamic_resource_contributions": [
-            {
-              "resource": "human_fireworks",
-              "amount": 20,
-              "key": "uyou_dorm_full_occupancy",
-              "detail": "愿者上钩：默认4间宿舍满员提供20点人间烟火。"
-            },
-            {
-              "resource": "human_fireworks",
-              "per_group_operator": 5,
-              "group": "sui",
-              "scope": "facility",
-              "cap": 25,
-              "key": "human_fireworks_sui_facility",
-              "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
-            },
-            {
-              "resource": "human_fireworks",
-              "per_group_operator": 15,
-              "group": "human_fireworks_flat_providers",
-              "scope": "facility",
-              "cap": 15,
-              "key": "human_fireworks_flat_provider",
-              "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
-            },
-            {
-              "resource": "human_fireworks",
-              "per_group_operator": 30,
-              "group": "human_fireworks_hire_providers",
-              "scope": "hire",
-              "cap": 30,
-              "key": "human_fireworks_hire_mulberry",
-              "detail": "救援队·灾后普查：桑葚在满级办公室时，额外3个招募位提供30点人间烟火。"
-            },
-            {
-              "resource": "perception_information",
-              "amount": 20,
-              "key": "logos_dorm_full_occupancy",
-              "detail": "黑键：默认4宿舍满员提供20点感知信息。"
-            },
-            {
-              "resource": "perception_information",
-              "per_group_operator": 10,
-              "group": "perception_control_providers",
-              "scope": "control_center",
-              "cap": 20,
-              "key": "perception_control_dusk_ling",
-              "detail": "夕/令在控制中枢时各提供10点感知信息。"
-            },
-            {
-              "resource": "memory_fragment",
-              "per_group_operator": 30,
-              "group": "perception_hire_providers",
-              "scope": "hire",
-              "cap": 30,
-              "key": "perception_hire_whisperain",
-              "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
-            },
-            {
-              "resource": "dream",
-              "per_group_operator": 5,
-              "group": "perception_dream_providers",
-              "scope": "dormitory",
-              "cap": 5,
-              "key": "perception_dream_alice",
-              "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
-            },
-            {
-              "resource": "melody",
-              "per_group_operator": 5,
-              "group": "perception_melody_providers",
-              "scope": "dormitory",
-              "cap": 5,
-              "key": "perception_melody_czerny",
-              "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
-            }
-          ],
-          "dynamic_resource_effects": [
-            {
-              "resource": "human_fireworks",
-              "type": "efficiency_per_resource",
-              "per_resource": 1,
-              "cap": 95,
-              "scope": "trading_station",
-              "detail": "愿者上钩：每1点人间烟火+1%订单获取效率，当前模型沿用95%上限口径。"
-            },
-            {
-              "resource": "memory_fragment",
-              "type": "resource_conversion",
-              "key": "memory_fragment_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "dream",
-              "type": "resource_conversion",
-              "key": "dream_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "melody",
-              "type": "resource_conversion",
-              "key": "melody_to_perception_information",
-              "step_size": 1,
-              "output_resource": "perception_information",
-              "output_per_step": 1,
-              "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "perception_information",
-              "type": "resource_conversion",
-              "key": "perception_information_to_silent_resonance",
-              "step_size": 1,
-              "output_resource": "silent_resonance",
-              "output_per_step": 1,
-              "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
-            },
-            {
-              "resource": "silent_resonance",
-              "type": "efficiency_per_step",
-              "step_size": 2,
-              "per_step": 1,
-              "scope": "trading_station",
-              "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
-            }
-          ],
-          "note": "动态：但书+黑键+乌有复用人间烟火与感知信息挂件，并参与跨房间资源共享。",
+            "efficiency": 40,
+            "dynamic_resource_contributions": [
+              {
+                "resource": "human_fireworks",
+                "amount": 20,
+                "key": "uyou_dorm_full_occupancy",
+                "detail": "愿者上钩：默认4间宿舍满员提供20点人间烟火。"
+              },
+              {
+                "resource": "human_fireworks",
+                "per_group_operator": 5,
+                "group": "sui",
+                "scope": "facility",
+                "cap": 25,
+                "key": "human_fireworks_sui_facility",
+                "detail": "知我为我：基建内岁阵营干员按每人5点人间烟火计入，最高25。"
+              },
+              {
+                "resource": "human_fireworks",
+                "per_group_operator": 15,
+                "group": "human_fireworks_flat_providers",
+                "scope": "facility",
+                "cap": 15,
+                "key": "human_fireworks_flat_provider",
+                "detail": "不以物喜/山河远阔/成竹在胸：可用固定来源按15点人间烟火计入，最高15。"
+              },
+              {
+                "resource": "human_fireworks",
+                "per_group_operator": 30,
+                "group": "human_fireworks_hire_providers",
+                "scope": "hire",
+                "cap": 30,
+                "key": "human_fireworks_hire_mulberry",
+                "detail": "救援队·灾后普查：桑葚在满级办公室时，额外3个招募位提供30点人间烟火。"
+              },
+              {
+                "resource": "perception_information",
+                "amount": 20,
+                "key": "logos_dorm_full_occupancy",
+                "detail": "黑键：默认4宿舍满员提供20点感知信息。"
+              },
+              {
+                "resource": "perception_information",
+                "per_group_operator": 10,
+                "group": "perception_control_providers",
+                "scope": "control_center",
+                "cap": 20,
+                "key": "perception_control_dusk_ling",
+                "detail": "夕/令在控制中枢时各提供10点感知信息。"
+              },
+              {
+                "resource": "memory_fragment",
+                "per_group_operator": 30,
+                "group": "perception_hire_providers",
+                "scope": "hire",
+                "cap": 30,
+                "key": "perception_hire_whisperain",
+                "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
+              },
+              {
+                "resource": "dream",
+                "per_group_operator": 5,
+                "group": "perception_dream_providers",
+                "scope": "dormitory",
+                "cap": 5,
+                "key": "perception_dream_alice",
+                "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
+              },
+              {
+                "resource": "melody",
+                "per_group_operator": 5,
+                "group": "perception_melody_providers",
+                "scope": "dormitory",
+                "cap": 5,
+                "key": "perception_melody_czerny",
+                "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
+              }
+            ],
+            "dynamic_resource_effects": [
+              {
+                "resource": "human_fireworks",
+                "type": "efficiency_per_resource",
+                "per_resource": 1,
+                "cap": 95,
+                "scope": "trading_station",
+                "detail": "愿者上钩：每1点人间烟火+1%订单获取效率，当前模型沿用95%上限口径。"
+              },
+              {
+                "resource": "memory_fragment",
+                "type": "resource_conversion",
+                "key": "memory_fragment_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "dream",
+                "type": "resource_conversion",
+                "key": "dream_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "melody",
+                "type": "resource_conversion",
+                "key": "melody_to_perception_information",
+                "step_size": 1,
+                "output_resource": "perception_information",
+                "output_per_step": 1,
+                "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "perception_information",
+                "type": "resource_conversion",
+                "key": "perception_information_to_silent_resonance",
+                "step_size": 1,
+                "output_resource": "silent_resonance",
+                "output_per_step": 1,
+                "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
+              },
+              {
+                "resource": "silent_resonance",
+                "type": "efficiency_per_step",
+                "step_size": 2,
+                "per_step": 1,
+                "scope": "trading_station",
+                "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
+              }
+            ],
+            "note": "动态：但书+黑键+乌有复用人间烟火与感知信息挂件，并参与跨房间资源共享。",
             "priority": 2260,
             "skill_rule_refs": [
               {
@@ -2513,7 +2209,7 @@
               }
             ],
             "note": "动态：但书+黑键+伺夜，伺夜按40%，黑键按无声共鸣链读取挂件。",
-            "priority": 2420,
+            "priority": 2760,
             "skill_ref_holder_exemptions": [
               {
                 "id": "PRTS-DORM-0357",
@@ -2584,6 +2280,27 @@
               {
                 "id": "PRTS-HR-0533",
                 "hash": "sha256:8051fa5685bee2cfdd78601b0b5ab492d94d445e902776c89749731b24e7860b"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
@@ -2722,197 +2439,6 @@
               {
                 "id": "PRTS-TRD-0300",
                 "hash": "sha256:fc227efa59911a52848d3a357d80e0689854522a1cd2c73edc98fff57b46f181"
-              },
-              {
-                "id": "PRTS-TRD-0302",
-                "hash": "sha256:67ed9d18946c8a3cccbd32690e99fff05bf8b6e809c7108f226a161d914cb502"
-              },
-              {
-                "id": "PRTS-TRD-0304",
-                "hash": "sha256:a5c9c82f05296ef2c7c77b78b2584d913e1c6c2f9e837c6fb0458a5ac295b485"
-              },
-              {
-                "id": "PRTS-TRD-0311",
-                "hash": "sha256:bdb14ee11470395fdf091be8fde7833cd183277ea602099a5d03797ac79a4d60"
-              },
-              {
-                "id": "PRTS-TRD-0313",
-                "hash": "sha256:e3939f2276da0dade9bbd3af0dce7af92b4e440332185bffcde72243fa63c650"
-              },
-              {
-                "id": "PRTS-DORM-0357",
-                "hash": "sha256:1922de3d0e9eab77876c128bbecd8d02124977b684ccdc527e6fffcf14a6d937"
-              },
-              {
-                "id": "PRTS-DORM-0364",
-                "hash": "sha256:17f6549eb6a60ab61200de6726171b42ec4cf8b07b7c4c198c4f114d40d94176"
-              },
-              {
-                "id": "PRTS-DORM-0365",
-                "hash": "sha256:80dbc335ff8c09e5457b68fdb56af917950a9235db11318c4f0b215a78f9074e"
-              },
-              {
-                "id": "PRTS-DORM-0373",
-                "hash": "sha256:b827bbd79cac86d5e652a3be1c351e65bc572eab0de211a7b579ec4803ab5eda"
-              },
-              {
-                "id": "PRTS-DORM-0374",
-                "hash": "sha256:eb39c551ad5fc57d01e4a047e8e489770f49cd832b24926fd6ab038dbcecef55"
-              },
-              {
-                "id": "PRTS-HR-0532",
-                "hash": "sha256:85d5653a888945a31abf2e47058ef2332f3a7def53bfaa985d7c71a97e059ab5"
-              },
-              {
-                "id": "PRTS-HR-0533",
-                "hash": "sha256:8051fa5685bee2cfdd78601b0b5ab492d94d445e902776c89749731b24e7860b"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "黑键/2",
-              "伺夜/2"
-            ],
-            "control_center": [
-              "八幡海铃/2",
-              "夕",
-              "令/2"
-            ],
-            "hire": [
-              "絮雨/2"
-            ],
-            "dormitory": [
-              "车尔尼/2",
-              "爱丽丝/2"
-            ],
-            "efficiency": 45,
-            "dynamic_resource_contributions": [
-              {
-                "resource": "perception_information",
-                "amount": 20,
-                "key": "logos_dorm_full_occupancy",
-                "detail": "黑键：默认4宿舍满员提供20点感知信息。"
-              },
-              {
-                "resource": "perception_information",
-                "per_group_operator": 10,
-                "group": "perception_control_providers",
-                "scope": "control_center",
-                "cap": 20,
-                "key": "perception_control_dusk_ling",
-                "detail": "夕/令在控制中枢时各提供10点感知信息。"
-              },
-              {
-                "resource": "memory_fragment",
-                "per_group_operator": 30,
-                "group": "perception_hire_providers",
-                "scope": "hire",
-                "cap": 30,
-                "key": "perception_hire_whisperain",
-                "detail": "絮雨在办公室时，默认满级办公室4招募位提供30点记忆碎片。"
-              },
-              {
-                "resource": "dream",
-                "per_group_operator": 5,
-                "group": "perception_dream_providers",
-                "scope": "dormitory",
-                "cap": 5,
-                "key": "perception_dream_alice",
-                "detail": "爱丽丝在宿舍时，默认5级宿舍提供5层梦境。"
-              },
-              {
-                "resource": "melody",
-                "per_group_operator": 5,
-                "group": "perception_melody_providers",
-                "scope": "dormitory",
-                "cap": 5,
-                "key": "perception_melody_czerny",
-                "detail": "车尔尼在宿舍时，默认5级宿舍提供5个小节。"
-              }
-            ],
-            "dynamic_resource_effects": [
-              {
-                "resource": "memory_fragment",
-                "type": "resource_conversion",
-                "key": "memory_fragment_to_perception_information",
-                "step_size": 1,
-                "output_resource": "perception_information",
-                "output_per_step": 1,
-                "detail": "每1点记忆碎片转化为1点感知信息；该转化不影响原本中间产物数目。"
-              },
-              {
-                "resource": "dream",
-                "type": "resource_conversion",
-                "key": "dream_to_perception_information",
-                "step_size": 1,
-                "output_resource": "perception_information",
-                "output_per_step": 1,
-                "detail": "每1层梦境转化为1点感知信息；该转化不影响原本中间产物数目。"
-              },
-              {
-                "resource": "melody",
-                "type": "resource_conversion",
-                "key": "melody_to_perception_information",
-                "step_size": 1,
-                "output_resource": "perception_information",
-                "output_per_step": 1,
-                "detail": "每1个小节转化为1点感知信息；该转化不影响原本中间产物数目。"
-              },
-              {
-                "resource": "perception_information",
-                "type": "resource_conversion",
-                "key": "perception_information_to_silent_resonance",
-                "step_size": 1,
-                "output_resource": "silent_resonance",
-                "output_per_step": 1,
-                "detail": "每1点感知信息转化为1点无声共鸣；该转化不影响原本中间产物数目。"
-              },
-              {
-                "resource": "silent_resonance",
-                "type": "efficiency_per_step",
-                "step_size": 2,
-                "per_step": 1,
-                "scope": "trading_station",
-                "detail": "黑键精二：每2点无声共鸣+1%订单获取效率。"
-              }
-            ],
-            "note": "动态：但书+黑键+伺夜+八幡海铃，伺夜按45%，黑键按无声共鸣链读取挂件。",
-            "priority": 2760,
-            "skill_ref_holder_exemptions": [
-              {
-                "id": "PRTS-DORM-0357",
-                "reason": "global_dynamic_resource_source"
-              }
-            ],
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-CC-0074",
-                "hash": "sha256:0fb67cf7068e5f7a9c29a924ebcabc0b30a0766e9915ccf68328ec062eed5024"
-              },
-              {
-                "id": "PRTS-CC-0075",
-                "hash": "sha256:5a820e82b00725021e4c57074ab1e49005bcb86cbe2ee964f2b5cc2527983434"
-              },
-              {
-                "id": "PRTS-CC-0076",
-                "hash": "sha256:54f82c39aee06ff330065300bb61476c215f7547928334051c6a87b4340f5930"
-              },
-              {
-                "id": "PRTS-CC-0077",
-                "hash": "sha256:dbfc3d562c3a3c292c62e05434715a2ef90b863aa8caf76e7a15f45652d61597"
-              },
-              {
-                "id": "PRTS-TRD-0290",
-                "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
               },
               {
                 "id": "PRTS-TRD-0302",
@@ -3107,48 +2633,6 @@
           },
           {
             "combo": [
-              "德克萨斯",
-              "拉普兰德/2"
-            ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 62,
-            "priority": 3541,
-            "order_limit_delta": 4,
-            "mood_consumption_delta": {
-              "德克萨斯": 0.3,
-              "拉普兰德": -0.1
-            },
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0006",
-                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0244",
-                "hash": "sha256:f721b69c8c6362262d4ef5844d46d565961c203b2a830d103c91a89f0a0081d8"
-              },
-              {
-                "id": "PRTS-TRD-0245",
-                "hash": "sha256:930c54dbaf2cce198d5a95e6f2b9119efeb548cc25e88b75af599c12f9f58545"
-              },
-              {
-                "id": "PRTS-TRD-0298",
-                "hash": "sha256:77d10d2eed25e73963a00ec343b72fbf247f9457f1e60f8a6b705ceb5507e839"
-              },
-              {
-                "id": "PRTS-TRD-0299",
-                "hash": "sha256:07d49b6631c278ef77c78cffce733a99c61407b4cddfd68b83cf12dddbead5f6"
-              }
-            ]
-          },
-          {
-            "combo": [
               "锏/2"
             ],
             "control_center": [
@@ -3190,7 +2674,7 @@
               "拉普兰德/2"
             ],
             "efficiency": 57,
-            "priority": 3409,
+            "priority": 3541,
             "order_limit_delta": 4,
             "mood_consumption_delta": {
               "德克萨斯": 0.3,
@@ -3212,6 +2696,27 @@
               {
                 "id": "PRTS-TRD-0299",
                 "hash": "sha256:07d49b6631c278ef77c78cffce733a99c61407b4cddfd68b83cf12dddbead5f6"
+              },
+              {
+                "id": "PRTS-CC-0006",
+                "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
@@ -3349,10 +2854,7 @@
               "德克萨斯",
               "拉普兰德/2"
             ],
-            "control_center": [
-              "八幡海铃/2"
-            ],
-            "efficiency": 86,
+            "efficiency": 81,
             "priority": 4341,
             "order_limit_delta": 4,
             "mood_consumption_delta": {
@@ -3361,51 +2863,37 @@
             },
             "skill_rule_refs": [
               {
+                "id": "PRTS-TRD-0244",
+                "hash": "sha256:f721b69c8c6362262d4ef5844d46d565961c203b2a830d103c91a89f0a0081d8"
+              },
+              {
+                "id": "PRTS-TRD-0245",
+                "hash": "sha256:930c54dbaf2cce198d5a95e6f2b9119efeb548cc25e88b75af599c12f9f58545"
+              },
+              {
+                "id": "PRTS-TRD-0298",
+                "hash": "sha256:77d10d2eed25e73963a00ec343b72fbf247f9457f1e60f8a6b705ceb5507e839"
+              },
+              {
                 "id": "PRTS-CC-0006",
                 "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-              },
-              {
-                "id": "PRTS-CC-0007",
-                "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-              },
-              {
-                "id": "PRTS-TRD-0244",
-                "hash": "sha256:f721b69c8c6362262d4ef5844d46d565961c203b2a830d103c91a89f0a0081d8"
-              },
-              {
-                "id": "PRTS-TRD-0245",
-                "hash": "sha256:930c54dbaf2cce198d5a95e6f2b9119efeb548cc25e88b75af599c12f9f58545"
-              },
-              {
-                "id": "PRTS-TRD-0298",
-                "hash": "sha256:77d10d2eed25e73963a00ec343b72fbf247f9457f1e60f8a6b705ceb5507e839"
               }
-            ]
-          },
-          {
-            "combo": [
-              "德克萨斯",
-              "拉普兰德/2"
             ],
-            "efficiency": 81,
-            "priority": 4209,
-            "order_limit_delta": 4,
-            "mood_consumption_delta": {
-              "德克萨斯": 0.3,
-              "拉普兰德": -0.1
-            },
-            "skill_rule_refs": [
+            "dynamic_effects": [
               {
-                "id": "PRTS-TRD-0244",
-                "hash": "sha256:f721b69c8c6362262d4ef5844d46d565961c203b2a830d103c91a89f0a0081d8"
-              },
-              {
-                "id": "PRTS-TRD-0245",
-                "hash": "sha256:930c54dbaf2cce198d5a95e6f2b9119efeb548cc25e88b75af599c12f9f58545"
-              },
-              {
-                "id": "PRTS-TRD-0298",
-                "hash": "sha256:77d10d2eed25e73963a00ec343b72fbf247f9457f1e60f8a6b705ceb5507e839"
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 5,
+                "operators": [
+                  "八幡海铃"
+                ],
+                "dependency_scope": "control_center",
+                "scope": "trading_station",
+                "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+                "operator_elite_requirements": {
+                  "八幡海铃": 2
+                }
               }
             ]
           },
@@ -3545,114 +3033,12 @@
         {
           "combo": [
             "推进之王",
-            "摩根/2"
-          ],
-          "control_center": [
-            "戴菲恩/2"
-          ],
-          "efficiency": 95,
-          "priority": 4715,
-          "skill_rule_refs": [
-            {
-              "id": "PRTS-CC-0042",
-              "hash": "sha256:c17fedabb8cc82658be2dbee03830b187ff248a849aa4e04b4dd4228565a4c98"
-            },
-            {
-              "id": "PRTS-TRD-0257",
-              "hash": "sha256:9641d20858aee9707328f444401bbcd6bb530bd996e08a72f0c4b5fe4c08cfb0"
-            }
-          ]
-        },
-        {
-          "combo": [
-            "贝洛内/2",
-            "伺夜/2"
-          ],
-          "control_center": [
-            "八幡海铃/2"
-          ],
-          "efficiency": 90,
-          "priority": 4597,
-          "order_limit_delta": 2,
-          "mood_consumption_delta": {
-            "贝洛内": -0.1
-          },
-          "skill_rule_refs": [
-            {
-              "id": "PRTS-CC-0006",
-              "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-            },
-            {
-              "id": "PRTS-CC-0007",
-              "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-            },
-            {
-              "id": "PRTS-TRD-0234",
-              "hash": "sha256:1d5ac3d3f64b0d9f05a27f715d461919d07576ae8a60b208e8509f0560ccf571"
-            },
-            {
-              "id": "PRTS-TRD-0242",
-              "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-            },
-            {
-              "id": "PRTS-TRD-0290",
-              "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
-            }
-          ]
-        },
-        {
-          "combo": [
-            "贝洛内",
-            "伺夜/2"
-          ],
-          "control_center": [
-            "八幡海铃/2"
-          ],
-          "efficiency": 80,
-          "priority": 4596,
-          "order_limit_delta": 2,
-          "mood_consumption_delta": {
-            "贝洛内": -0.1
-          },
-          "skill_rule_refs": [
-            {
-              "id": "PRTS-CC-0006",
-              "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-            },
-            {
-              "id": "PRTS-CC-0007",
-              "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-            },
-            {
-              "id": "PRTS-TRD-0233",
-              "hash": "sha256:a087f6fceed5aea95e36c276f874dfb13df6205c0be2600e243b2dd22f28899e"
-            },
-            {
-              "id": "PRTS-TRD-0242",
-              "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-            },
-            {
-              "id": "PRTS-TRD-0290",
-              "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
-            }
-          ]
-        },
-        {
-          "combo": [
-            "推进之王",
             "摩根/2",
             "维娜·维多利亚/2"
           ],
-          "control_center": [
-            "戴菲恩/2"
-          ],
-          "efficiency": 135,
+          "efficiency": 105,
           "priority": 4465,
           "skill_rule_refs": [
-            {
-              "id": "PRTS-CC-0042",
-              "hash": "sha256:c17fedabb8cc82658be2dbee03830b187ff248a849aa4e04b4dd4228565a4c98"
-            },
             {
               "id": "PRTS-TRD-0235",
               "hash": "sha256:6d8cf4f30b23337669b479317818df183d4be146cb114e98dc2423bfabb8d119"
@@ -3660,6 +3046,27 @@
             {
               "id": "PRTS-TRD-0257",
               "hash": "sha256:9641d20858aee9707328f444401bbcd6bb530bd996e08a72f0c4b5fe4c08cfb0"
+            },
+            {
+              "id": "PRTS-CC-0042",
+              "hash": "sha256:c17fedabb8cc82658be2dbee03830b187ff248a849aa4e04b4dd4228565a4c98"
+            }
+          ],
+          "dynamic_effects": [
+            {
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 30,
+              "operators": [
+                "戴菲恩"
+              ],
+              "dependency_scope": "control_center",
+              "scope": "trading_station",
+              "detail": "戴菲恩进驻控制中枢时，本组合内格拉斯哥帮干员合计额外+30%订单获取效率。",
+              "operator_elite_requirements": {
+                "戴菲恩": 2
+              }
             }
           ]
         },
@@ -3669,7 +3076,7 @@
             "伺夜/2"
           ],
           "efficiency": 80,
-          "priority": 4132,
+          "priority": 4597,
           "order_limit_delta": 2,
           "mood_consumption_delta": {
             "贝洛内": -0.1
@@ -3686,6 +3093,27 @@
             {
               "id": "PRTS-TRD-0290",
               "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
+            },
+            {
+              "id": "PRTS-CC-0006",
+              "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+            }
+          ],
+          "dynamic_effects": [
+            {
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 10,
+              "operators": [
+                "八幡海铃"
+              ],
+              "dependency_scope": "control_center",
+              "scope": "trading_station",
+              "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+10%订单获取效率。",
+              "operator_elite_requirements": {
+                "八幡海铃": 2
+              }
             }
           ]
         },
@@ -3695,7 +3123,7 @@
             "伺夜/2"
           ],
           "efficiency": 70,
-          "priority": 4131,
+          "priority": 4596,
           "order_limit_delta": 2,
           "mood_consumption_delta": {
             "贝洛内": -0.1
@@ -3712,6 +3140,27 @@
             {
               "id": "PRTS-TRD-0290",
               "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
+            },
+            {
+              "id": "PRTS-CC-0006",
+              "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+            }
+          ],
+          "dynamic_effects": [
+            {
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 10,
+              "operators": [
+                "八幡海铃"
+              ],
+              "dependency_scope": "control_center",
+              "scope": "trading_station",
+              "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+10%订单获取效率。",
+              "operator_elite_requirements": {
+                "八幡海铃": 2
+              }
             }
           ]
         },
@@ -3743,11 +3192,32 @@
             "摩根/2"
           ],
           "efficiency": 75,
-          "priority": 3750,
+          "priority": 4715,
           "skill_rule_refs": [
             {
               "id": "PRTS-TRD-0257",
               "hash": "sha256:9641d20858aee9707328f444401bbcd6bb530bd996e08a72f0c4b5fe4c08cfb0"
+            },
+            {
+              "id": "PRTS-CC-0042",
+              "hash": "sha256:c17fedabb8cc82658be2dbee03830b187ff248a849aa4e04b4dd4228565a4c98"
+            }
+          ],
+          "dynamic_effects": [
+            {
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 20,
+              "operators": [
+                "戴菲恩"
+              ],
+              "dependency_scope": "control_center",
+              "scope": "trading_station",
+              "detail": "戴菲恩进驻控制中枢时，本组合内格拉斯哥帮干员合计额外+20%订单获取效率。",
+              "operator_elite_requirements": {
+                "戴菲恩": 2
+              }
             }
           ]
         },
@@ -3759,6 +3229,7 @@
           "efficiency": 75,
           "note": "订单上限+3",
           "priority": 3750,
+          "order_limit_delta": 3,
           "skill_rule_refs": [
             {
               "id": "PRTS-TRD-0249",
@@ -3775,10 +3246,7 @@
             "德克萨斯",
             "拉普兰德"
           ],
-          "control_center": [
-            "八幡海铃/2"
-          ],
-          "efficiency": 70,
+          "efficiency": 65,
           "priority": 3531,
           "order_limit_delta": 2,
           "mood_consumption_delta": {
@@ -3787,43 +3255,33 @@
           },
           "skill_rule_refs": [
             {
+              "id": "PRTS-TRD-0243",
+              "hash": "sha256:eea7a75deb7c97505f8225b23c2c7b47d83ce0dba8cdf4b2116548b11099805c"
+            },
+            {
+              "id": "PRTS-TRD-0245",
+              "hash": "sha256:930c54dbaf2cce198d5a95e6f2b9119efeb548cc25e88b75af599c12f9f58545"
+            },
+            {
               "id": "PRTS-CC-0006",
               "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-            },
-            {
-              "id": "PRTS-CC-0007",
-              "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-            },
-            {
-              "id": "PRTS-TRD-0243",
-              "hash": "sha256:eea7a75deb7c97505f8225b23c2c7b47d83ce0dba8cdf4b2116548b11099805c"
-            },
-            {
-              "id": "PRTS-TRD-0245",
-              "hash": "sha256:930c54dbaf2cce198d5a95e6f2b9119efeb548cc25e88b75af599c12f9f58545"
             }
-          ]
-        },
-        {
-          "combo": [
-            "德克萨斯",
-            "拉普兰德"
           ],
-          "efficiency": 65,
-          "priority": 3316,
-          "order_limit_delta": 2,
-          "mood_consumption_delta": {
-            "德克萨斯": 0.3,
-            "拉普兰德": -0.1
-          },
-          "skill_rule_refs": [
+          "dynamic_effects": [
             {
-              "id": "PRTS-TRD-0243",
-              "hash": "sha256:eea7a75deb7c97505f8225b23c2c7b47d83ce0dba8cdf4b2116548b11099805c"
-            },
-            {
-              "id": "PRTS-TRD-0245",
-              "hash": "sha256:930c54dbaf2cce198d5a95e6f2b9119efeb548cc25e88b75af599c12f9f58545"
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 5,
+              "operators": [
+                "八幡海铃"
+              ],
+              "dependency_scope": "control_center",
+              "scope": "trading_station",
+              "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+              "operator_elite_requirements": {
+                "八幡海铃": 2
+              }
             }
           ]
         },
@@ -3982,23 +3440,33 @@
           "combo": [
             "伺夜/2"
           ],
-          "control_center": [
-            "八幡海铃/2"
-          ],
-          "efficiency": 45,
+          "efficiency": 40,
           "priority": 4465,
           "skill_rule_refs": [
             {
-              "id": "PRTS-CC-0006",
-              "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-            },
-            {
-              "id": "PRTS-CC-0007",
-              "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-            },
-            {
               "id": "PRTS-TRD-0290",
               "hash": "sha256:467515b53d6dc9e722b582b501e0d6e428586b07ff80beff33c396d7d75aee64"
+            },
+            {
+              "id": "PRTS-CC-0006",
+              "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
+            }
+          ],
+          "dynamic_effects": [
+            {
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 5,
+              "operators": [
+                "八幡海铃"
+              ],
+              "dependency_scope": "control_center",
+              "scope": "trading_station",
+              "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+              "operator_elite_requirements": {
+                "八幡海铃": 2
+              }
             }
           ]
         },
@@ -4093,84 +3561,6 @@
             {
               "id": "PRTS-TRD-0239",
               "hash": "sha256:c285c0bea097c1630125f293ba0e774b51fffb830c63432276f49dad0efafc2a"
-            }
-          ]
-        },
-        {
-          "combo": [
-            "贝洛内/2"
-          ],
-          "control_center": [
-            "八幡海铃/2"
-          ],
-          "efficiency": 35,
-          "dynamic_effects": {
-            "type": "operator_presence_count",
-            "base": 35,
-            "per_operator": 10,
-            "operators": [
-              "伺夜"
-            ],
-            "dependency_scope": "facility",
-            "scope": "trading_station",
-            "detail": "家族经营·β：基础35%，伺夜在基建内时额外+10%。"
-          },
-          "priority": 3597,
-          "skill_rule_refs": [
-            {
-              "id": "PRTS-CC-0006",
-              "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-            },
-            {
-              "id": "PRTS-CC-0007",
-              "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-            },
-            {
-              "id": "PRTS-TRD-0234",
-              "hash": "sha256:1d5ac3d3f64b0d9f05a27f715d461919d07576ae8a60b208e8509f0560ccf571"
-            },
-            {
-              "id": "PRTS-TRD-0242",
-              "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
-            }
-          ]
-        },
-        {
-          "combo": [
-            "贝洛内"
-          ],
-          "control_center": [
-            "八幡海铃/2"
-          ],
-          "efficiency": 30,
-          "dynamic_effects": {
-            "type": "operator_presence_count",
-            "base": 30,
-            "per_operator": 5,
-            "operators": [
-              "伺夜"
-            ],
-            "dependency_scope": "facility",
-            "scope": "trading_station",
-            "detail": "家族经营·α：基础30%，伺夜在基建内时额外+5%。"
-          },
-          "priority": 3596,
-          "skill_rule_refs": [
-            {
-              "id": "PRTS-CC-0006",
-              "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
-            },
-            {
-              "id": "PRTS-CC-0007",
-              "hash": "sha256:d13f5b85b1ebbd4a063ee97755d6786652eaf2579a92345f56e9e7444ad48d92"
-            },
-            {
-              "id": "PRTS-TRD-0233",
-              "hash": "sha256:a087f6fceed5aea95e36c276f874dfb13df6205c0be2600e243b2dd22f28899e"
-            },
-            {
-              "id": "PRTS-TRD-0242",
-              "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
             }
           ]
         },
@@ -4392,7 +3782,6 @@
             "维娜·维多利亚",
             "渡桥/2",
             "瑰盐/2",
-            "新约能天使/2",
             "空/2"
           ],
           "efficiency": 30,
@@ -4412,10 +3801,6 @@
             {
               "id": "PRTS-TRD-0236",
               "hash": "sha256:deaeda7d3e6d8bd1c2b2170efd2d2179bcd58f22a33320a457ea42be8132823d"
-            },
-            {
-              "id": "PRTS-TRD-0255",
-              "hash": "sha256:052373b55b0df01c0dfb8f817cb363472390ee5567e84a0ea1f9a480c3718175"
             },
             {
               "id": "PRTS-TRD-0256",
@@ -4448,19 +3833,36 @@
             "贝洛内/2"
           ],
           "efficiency": 30,
-          "dynamic_effects": {
-            "type": "operator_presence_count",
-            "base": 30,
-            "per_operator": 10,
-            "operators": [
-              "伺夜"
-            ],
-            "dependency_scope": "facility",
-            "scope": "trading_station",
-            "detail": "家族经营·β：基础30%，伺夜在基建内时额外+10%。"
-          },
+          "dynamic_effects": [
+            {
+              "type": "operator_presence_count",
+              "base": 30,
+              "per_operator": 10,
+              "operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "家族经营·β：基础30%，伺夜在基建内时额外+10%。"
+            },
+            {
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 5,
+              "operators": [
+                "八幡海铃"
+              ],
+              "dependency_scope": "control_center",
+              "scope": "trading_station",
+              "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+              "operator_elite_requirements": {
+                "八幡海铃": 2
+              }
+            }
+          ],
           "apply_each": true,
-          "priority": 3172,
+          "priority": 3597,
           "skill_rule_refs": [
             {
               "id": "PRTS-TRD-0234",
@@ -4469,6 +3871,10 @@
             {
               "id": "PRTS-TRD-0242",
               "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
+            },
+            {
+              "id": "PRTS-CC-0006",
+              "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
             }
           ]
         },
@@ -4477,19 +3883,36 @@
             "贝洛内"
           ],
           "efficiency": 25,
-          "dynamic_effects": {
-            "type": "operator_presence_count",
-            "base": 25,
-            "per_operator": 5,
-            "operators": [
-              "伺夜"
-            ],
-            "dependency_scope": "facility",
-            "scope": "trading_station",
-            "detail": "家族经营·α：基础25%，伺夜在基建内时额外+5%。"
-          },
+          "dynamic_effects": [
+            {
+              "type": "operator_presence_count",
+              "base": 25,
+              "per_operator": 5,
+              "operators": [
+                "伺夜"
+              ],
+              "dependency_scope": "facility",
+              "scope": "trading_station",
+              "detail": "家族经营·α：基础25%，伺夜在基建内时额外+5%。"
+            },
+            {
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 5,
+              "operators": [
+                "八幡海铃"
+              ],
+              "dependency_scope": "control_center",
+              "scope": "trading_station",
+              "detail": "八幡海铃进驻控制中枢时，本组合内适用的叙拉古干员合计额外+5%订单获取效率。",
+              "operator_elite_requirements": {
+                "八幡海铃": 2
+              }
+            }
+          ],
           "apply_each": true,
-          "priority": 3171,
+          "priority": 3596,
           "skill_rule_refs": [
             {
               "id": "PRTS-TRD-0233",
@@ -4498,6 +3921,10 @@
             {
               "id": "PRTS-TRD-0242",
               "hash": "sha256:ba992d8519a8f51dfc2e765635018386e90e8044aac769a860b879f67d05885f"
+            },
+            {
+              "id": "PRTS-CC-0006",
+              "hash": "sha256:94ceeb2bda831f8983f36b51709ad1916462701e6c41a09fb811675d468bc930"
             }
           ]
         },
@@ -4557,7 +3984,6 @@
         },
         {
           "combo": [
-            "焰狐龙梓兰/2",
             "可颂",
             "能天使",
             "拜松",
@@ -4588,10 +4014,6 @@
             {
               "id": "PRTS-TRD-0275",
               "hash": "sha256:0137e2eda16271c41ed39d4d9cdfb0f60ad3375816dc7593b1773848192e481b"
-            },
-            {
-              "id": "PRTS-TRD-0281",
-              "hash": "sha256:4c8effcd9563fee93134b0e48c80403c66888c01209f60d1a72204d9311ade0b"
             },
             {
               "id": "PRTS-TRD-0301",
@@ -5202,6 +4624,79 @@
         },
         {
           "combo": [
+            "新约能天使/2"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：同城加急单：同个贸易站中每有1名拉特兰干员，订单获取效率+15%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0255",
+              "hash": "sha256:052373b55b0df01c0dfb8f817cb363472390ee5567e84a0ea1f9a480c3718175"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "operator_group_presence_count",
+            "base": 0,
+            "per_operator": 15,
+            "group": "laterano",
+            "cap": 3,
+            "dependency_scope": "room",
+            "scope": "trading_station",
+            "detail": "进驻贸易站时，同个贸易站中每有1名拉特兰干员，当前贸易站订单获取效率+15%"
+          }
+        },
+        {
+          "combo": [
+            "摩根/2"
+          ],
+          "efficiency": 0,
+          "priority": 100,
+          "note": "PRTS补全：帮派指南针：同个贸易站中每有1名格拉斯哥帮干员，订单获取效率+20%；推进之王特例由显式组合规则建模",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0257",
+              "hash": "sha256:9641d20858aee9707328f444401bbcd6bb530bd996e08a72f0c4b5fe4c08cfb0"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "operator_group_presence_count",
+            "base": 0,
+            "per_operator": 20,
+            "group": "glasgow",
+            "cap": 3,
+            "dependency_scope": "room",
+            "scope": "trading_station",
+            "detail": "进驻贸易站时，同个贸易站中每有1名格拉斯哥帮干员，当前贸易站订单获取效率+20%"
+          }
+        },
+        {
+          "combo": [
+            "焰狐龙梓兰/2"
+          ],
+          "efficiency": 0,
+          "order_limit_delta": 3,
+          "priority": 100,
+          "note": "PRTS补全：队长的自觉：订单上限+3，每名同房泡影国狩猎小队干员使订单效率+20%",
+          "skill_rule_refs": [
+            {
+              "id": "PRTS-TRD-0281",
+              "hash": "sha256:4c8effcd9563fee93134b0e48c80403c66888c01209f60d1a72204d9311ade0b"
+            }
+          ],
+          "dynamic_effects": {
+            "type": "operator_group_presence_count",
+            "base": 0,
+            "per_operator": 20,
+            "group": "orchid_hunting_team",
+            "cap": 2,
+            "dependency_scope": "room",
+            "scope": "trading_station",
+            "detail": "进驻贸易站时，每有一个泡影国狩猎小队干员进驻当前贸易站，订单获取效率+20%"
+          }
+        },
+        {
+          "combo": [
             "风絮/2"
           ],
           "efficiency": 0,
@@ -5565,10 +5060,7 @@
             "杰西卡"
           ],
           "product": "Pure Gold",
-          "control_center": [
-            "涤火杰西卡/2"
-          ],
-          "efficiency": 96,
+          "efficiency": 81,
           "priority": 3198,
           "mood_consumption_delta": {
             "杏仁": -0.15
@@ -5589,6 +5081,23 @@
             {
               "id": "PRTS-MFG-0179",
               "hash": "sha256:9279efb82e2ed6663ae1c67c6bdcee44945b128b14610b643b7582348177a488"
+            }
+          ],
+          "dynamic_effects": [
+            {
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 15,
+              "operators": [
+                "涤火杰西卡"
+              ],
+              "operator_elite_requirements": {
+                "涤火杰西卡": 2
+              },
+              "dependency_scope": "control_center",
+              "scope": "manufacturing_station",
+              "detail": "涤火杰西卡进驻控制中枢时，三名黑钢国际干员合计额外+15%生产力。"
             }
           ]
         }
@@ -6172,10 +5681,7 @@
               "香草",
               "杰西卡"
             ],
-            "control_center": [
-              "涤火杰西卡/2"
-            ],
-            "efficiency": 70,
+            "efficiency": 60,
             "priority": 3132,
             "skill_rule_refs": [
               {
@@ -6189,6 +5695,23 @@
               {
                 "id": "PRTS-MFG-0196",
                 "hash": "sha256:7c097d5706b6ef7b244d240b482ab350612ef0725a8a2c8671478ca26056b416"
+              }
+            ],
+            "dynamic_effects": [
+              {
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 10,
+                "operators": [
+                  "涤火杰西卡"
+                ],
+                "operator_elite_requirements": {
+                  "涤火杰西卡": 2
+                },
+                "dependency_scope": "control_center",
+                "scope": "manufacturing_station",
+                "detail": "涤火杰西卡进驻控制中枢时，香草与杰西卡合计额外+10%生产力。"
               }
             ]
           },
@@ -6437,103 +5960,53 @@
               "远牙/2",
               "野鬃/2"
             ],
-            "control_center": [
-              "薇薇安娜/2",
-              "焰尾/2"
-            ],
-            "efficiency": 42,
+            "efficiency": 25,
             "apply_each": true,
             "priority": 4130,
             "skill_rule_refs": [
               {
+                "id": "PRTS-MFG-0177",
+                "hash": "sha256:7ce5a48fc85d1325157ca567164f02ed22b19c123463eb3949c2ed62d6cf138b"
+              },
+              {
                 "id": "PRTS-CC-0017",
                 "hash": "sha256:a41bf6a495bf619be6e8f0f6168b4ab2df749a0c348707d70936534724025f61"
               },
               {
                 "id": "PRTS-CC-0046",
                 "hash": "sha256:993173a1544ad6d8ef28b6165e8b3edd23de160fbd176d12efab6b9ff3eafb31"
-              },
-              {
-                "id": "PRTS-CC-0059",
-                "hash": "sha256:d5b055b6b922f0eb04a490a2356a2f14bae0c5ace1a63e04a71123a8515fd5da"
-              },
-              {
-                "id": "PRTS-CC-0062",
-                "hash": "sha256:c62b6177ab148e198ae4779773d5c0f9769d028a055d804de9a19d223f5d2196"
-              },
-              {
-                "id": "PRTS-MFG-0177",
-                "hash": "sha256:7ce5a48fc85d1325157ca567164f02ed22b19c123463eb3949c2ed62d6cf138b"
               }
-            ]
-          },
-          {
-            "combo": [
-              "灰毫/2",
-              "远牙/2",
-              "野鬃/2"
             ],
-            "control_center": [
-              "薇薇安娜/2"
-            ],
-            "efficiency": 35,
-            "apply_each": true,
-            "priority": 3465,
-            "skill_rule_refs": [
+            "dynamic_effects": [
               {
-                "id": "PRTS-CC-0017",
-                "hash": "sha256:a41bf6a495bf619be6e8f0f6168b4ab2df749a0c348707d70936534724025f61"
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 7,
+                "operators": [
+                  "薇薇安娜"
+                ],
+                "operator_elite_requirements": {
+                  "薇薇安娜": 2
+                },
+                "dependency_scope": "control_center",
+                "scope": "manufacturing_station",
+                "detail": "薇薇安娜进驻控制中枢时，每名骑士干员额外+7%生产力。"
               },
               {
-                "id": "PRTS-CC-0059",
-                "hash": "sha256:d5b055b6b922f0eb04a490a2356a2f14bae0c5ace1a63e04a71123a8515fd5da"
-              },
-              {
-                "id": "PRTS-MFG-0177",
-                "hash": "sha256:7ce5a48fc85d1325157ca567164f02ed22b19c123463eb3949c2ed62d6cf138b"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "灰毫/2",
-              "远牙/2",
-              "野鬃/2"
-            ],
-            "control_center": [
-              "焰尾/2"
-            ],
-            "efficiency": 32,
-            "apply_each": true,
-            "priority": 3165,
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-CC-0046",
-                "hash": "sha256:993173a1544ad6d8ef28b6165e8b3edd23de160fbd176d12efab6b9ff3eafb31"
-              },
-              {
-                "id": "PRTS-CC-0062",
-                "hash": "sha256:c62b6177ab148e198ae4779773d5c0f9769d028a055d804de9a19d223f5d2196"
-              },
-              {
-                "id": "PRTS-MFG-0177",
-                "hash": "sha256:7ce5a48fc85d1325157ca567164f02ed22b19c123463eb3949c2ed62d6cf138b"
-              }
-            ]
-          },
-          {
-            "combo": [
-              "灰毫/2",
-              "远牙/2",
-              "野鬃/2"
-            ],
-            "efficiency": 25,
-            "apply_each": true,
-            "priority": 2500,
-            "skill_rule_refs": [
-              {
-                "id": "PRTS-MFG-0177",
-                "hash": "sha256:7ce5a48fc85d1325157ca567164f02ed22b19c123463eb3949c2ed62d6cf138b"
+                "type": "operator_presence_count",
+                "additive": true,
+                "base": 0,
+                "per_operator": 10,
+                "operators": [
+                  "焰尾"
+                ],
+                "operator_elite_requirements": {
+                  "焰尾": 2
+                },
+                "dependency_scope": "control_center",
+                "scope": "manufacturing_station",
+                "detail": "焰尾进驻控制中枢时，每名红松骑士团干员生产作战记录额外+10%生产力。"
               }
             ]
           }
@@ -6584,33 +6057,6 @@
             {
               "id": "PRTS-MFG-0160",
               "hash": "sha256:449db3f1e4537e2ff6411cec390165cbd5a0c746abc352c134b95da5d0a24493"
-            }
-          ]
-        },
-        {
-          "combo": [
-            "砾/1"
-          ],
-          "control_center": [
-            "薇薇安娜/2"
-          ],
-          "efficiency": 42,
-          "product": [
-            "Pure Gold"
-          ],
-          "priority": 4245,
-          "skill_rule_refs": [
-            {
-              "id": "PRTS-CC-0017",
-              "hash": "sha256:a41bf6a495bf619be6e8f0f6168b4ab2df749a0c348707d70936534724025f61"
-            },
-            {
-              "id": "PRTS-CC-0059",
-              "hash": "sha256:d5b055b6b922f0eb04a490a2356a2f14bae0c5ace1a63e04a71123a8515fd5da"
-            },
-            {
-              "id": "PRTS-MFG-0155",
-              "hash": "sha256:a0b0ca26362ec762e6eeb4fd9bd12f701e931771633b9a5b17e8815fba6c23b2"
             }
           ]
         },
@@ -6937,11 +6383,32 @@
           "product": [
             "Pure Gold"
           ],
-          "priority": 3580,
+          "priority": 4245,
           "skill_rule_refs": [
             {
               "id": "PRTS-MFG-0155",
               "hash": "sha256:a0b0ca26362ec762e6eeb4fd9bd12f701e931771633b9a5b17e8815fba6c23b2"
+            },
+            {
+              "id": "PRTS-CC-0017",
+              "hash": "sha256:a41bf6a495bf619be6e8f0f6168b4ab2df749a0c348707d70936534724025f61"
+            }
+          ],
+          "dynamic_effects": [
+            {
+              "type": "operator_presence_count",
+              "additive": true,
+              "base": 0,
+              "per_operator": 7,
+              "operators": [
+                "薇薇安娜"
+              ],
+              "operator_elite_requirements": {
+                "薇薇安娜": 2
+              },
+              "dependency_scope": "control_center",
+              "scope": "manufacturing_station",
+              "detail": "薇薇安娜进驻控制中枢时，砾作为骑士干员额外+7%生产力。"
             }
           ]
         },
@@ -11427,6 +10894,10 @@
       "ignored_dynamic_rules": [
         "进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15，如果目标是莱欧斯小队干员，则恢复效果额外+0.15（同种效果取最高）"
       ],
+      "unmodeled_effects": [
+        "莱欧斯小队目标额外恢复+0.15"
+      ],
+      "unmodeled_reason": "target_operator_group_membership_not_modeled",
       "description": "进驻宿舍时，该宿舍内所有干员的心情每小时恢复+0.15，如果目标是莱欧斯小队干员，则恢复效果额外+0.15（同种效果取最高）",
       "skill_rule_refs": [
         {
@@ -12356,6 +11827,10 @@
       "ignored_dynamic_rules": [
         "进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高），如果目标是怪物猎人小队成员和泡影国狩猎小队，则恢复效果额外+0.45"
       ],
+      "unmodeled_effects": [
+        "怪物猎人小队成员和泡影国狩猎小队目标额外恢复+0.45"
+      ],
+      "unmodeled_reason": "target_operator_group_membership_not_modeled",
       "description": "进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高），如果目标是怪物猎人小队成员和泡影国狩猎小队，则恢复效果额外+0.45",
       "skill_rule_refs": [
         {
@@ -12616,12 +12091,11 @@
         {
           "condition": "拉特兰干员",
           "bonus": 0.45,
-          "exact_target": null
+          "exact_target": null,
+          "target_group": "laterano"
         }
       ],
-      "ignored_dynamic_rules": [
-        "进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高），如果目标是拉特兰干员，则恢复效果额外+0.45"
-      ],
+      "ignored_dynamic_rules": [],
       "description": "进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高），如果目标是拉特兰干员，则恢复效果额外+0.45",
       "skill_rule_refs": [
         {
@@ -12650,6 +12124,10 @@
       "ignored_dynamic_rules": [
         "进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高），如果目标是萨米干员，则恢复效果额外+0.45"
       ],
+      "unmodeled_effects": [
+        "萨米干员目标额外恢复+0.45"
+      ],
+      "unmodeled_reason": "target_operator_group_membership_not_modeled",
       "description": "进驻宿舍时，使该宿舍内除自身以外心情未满的某个干员每小时恢复+0.55（同种效果取最高），如果目标是萨米干员，则恢复效果额外+0.45",
       "skill_rule_refs": [
         {
