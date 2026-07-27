@@ -73,7 +73,7 @@ jobs:
           node scripts/release-artifact.mjs create --kind public --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --run-url "$GITHUB_RUN_URL"
           node scripts/release-artifact.mjs verify --kind public --sha "$GITHUB_SHA"
           mkdir -p .release-packages/public
-          tar -C .release-staging/public -czf .release-packages/public/public.tgz dist server build-manifest.json changelog-release.json changelog-release.md
+          tar -C .release-staging/public -czf .release-packages/public/public.tgz dist server scripts build-manifest.json changelog-release.json changelog-release.md
           (cd .release-packages/public && sha256sum public.tgz > public.tgz.sha256)
 
       - name: Upload public artifact

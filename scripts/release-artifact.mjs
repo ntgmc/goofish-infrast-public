@@ -182,7 +182,7 @@ async function collectArtifactSurfaceFiles(base, kind) {
     files.push(...await walkIfPresent(join(base, recursiveRoot)))
   }
   files.push(...await walkIfPresent(join(base, 'server/dist')))
-  for (const path of ['changelog-release.json', 'changelog-release.md']) {
+  for (const path of definition.required) {
     try {
       await readFile(join(base, path))
       files.push(join(base, path))

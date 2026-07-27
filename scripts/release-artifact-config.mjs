@@ -8,6 +8,7 @@ export const ARTIFACT_KINDS = Object.freeze({
       'server/dist/migrate.js.map',
       'server/dist/routes.js',
       'server/dist/routes.js.map',
+      'scripts/check-public-http-smoke.mjs',
       'changelog-release.json',
       'changelog-release.md',
     ]),
