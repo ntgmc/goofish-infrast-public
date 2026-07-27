@@ -13,6 +13,8 @@ import { ensureDatabaseSchema } from './schema'
 
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 const MAINTENANCE_LOCK_KEY = 1_743_861_291
+const MODEL_RECALIBRATION_ADMIN = `system:${BEHAVIOR_RISK_MODEL_VERSION}`
+const MODEL_RECALIBRATION_NOTE = `评分模型升级至 ${BEHAVIOR_RISK_MODEL_VERSION}，旧待复核单已自动归档并按新模型重算。`
 
 export type BehaviorRiskEventInput = {
   eventKey?: string | null
@@ -141,6 +143,7 @@ export async function runBehaviorRiskEvaluation(now = new Date()): Promise<{ cas
     const evaluations = evaluateBehaviorRiskEvents(eventResult.rows, now).filter((evaluation) => evaluation.createCase)
     await client.query('begin')
     try {
+      await archiveLegacyPendingCases(client, now)
       for (const evaluation of evaluations) {
         await upsertEvaluation(client, evaluation, eventResult.rows, now)
       }
@@ -256,6 +259,45 @@ export async function reviewBehaviorRiskCase(input: BehaviorRiskReviewInput): Pr
   })
 }
 
+async function archiveLegacyPendingCases(client: PoolClient, now: Date): Promise<void> {
+  const legacyCases = await client.query<CaseRow>(
+    `select * from behavior_risk_cases
+      where status = 'pending' and model_version <> $1
+      order by created_at, id
+      for update`,
+    [BEHAVIOR_RISK_MODEL_VERSION],
+  )
+  for (const caseRow of legacyCases.rows) {
+    const members = await client.query<{ user_id: string; evidence_json: Record<string, unknown> }>(
+      'select user_id, evidence_json from behavior_risk_case_members where case_id = $1 order by user_id',
+      [caseRow.id],
+    )
+    const snapshot = {
+      id: caseRow.id,
+      score: caseRow.score,
+      categories: caseRow.categories_json,
+      rules: caseRow.rules_json,
+      model_version: caseRow.model_version,
+      members: members.rows,
+    }
+    await client.query(
+      `insert into behavior_risk_review_audit
+        (id, case_id, admin_username, outcome, note, actions_json, case_snapshot_json, created_at, expires_at)
+       values ($1, $2, $3, 'dismiss', $4, '[]'::jsonb, $5::jsonb, $6, $7)`,
+      [
+        randomUUID(), caseRow.id, MODEL_RECALIBRATION_ADMIN, MODEL_RECALIBRATION_NOTE,
+        JSON.stringify(snapshot), now.toISOString(), caseRow.expires_at,
+      ],
+    )
+    await client.query(
+      `update behavior_risk_cases
+          set status = 'dismissed', reviewed_at = $2, reviewed_by = $3, updated_at = $2
+        where id = $1`,
+      [caseRow.id, now.toISOString(), MODEL_RECALIBRATION_ADMIN],
+    )
+  }
+}
+
 async function upsertEvaluation(
   client: PoolClient,
   evaluation: BehaviorRiskEvaluation,
@@ -326,7 +368,6 @@ function summarizeMemberEvidence(events: StoredEventRow[]): Record<string, unkno
     return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value) ? value : null
   })
   return {
-    account_label: `${events[0]?.user_id?.slice(0, 8) ?? 'unknown'}…`,
     counts,
     first_seen_at: events[0]?.occurred_at ?? null,
     last_seen_at: events.at(-1)?.occurred_at ?? null,
@@ -344,13 +385,23 @@ async function buildAdminCase(caseRow: CaseRow): Promise<Record<string, unknown>
     [caseRow.id],
   )
   const userIds = members.rows.map((member) => member.user_id)
-  const profiles = userIds.length > 0
-    ? await query<{ id: string; user_id: string; kind: string; status: string }>(
-      `select id, user_id, coalesce(record_json->>'kind', 'cdk') as kind, status
-         from user_game_accounts where user_id = any($1::text[]) order by user_id, created_at`,
-      [userIds],
-    )
-    : { rows: [] as Array<{ id: string; user_id: string; kind: string; status: string }> }
+  const [accounts, profiles] = userIds.length > 0
+    ? await Promise.all([
+      query<{ id: string; email: string }>(
+        'select id, email from user_accounts where id = any($1::text[]) order by id',
+        [userIds],
+      ),
+      query<{ id: string; user_id: string; display_name: string; kind: string; status: string }>(
+        `select id, user_id, display_name, coalesce(record_json->>'kind', 'cdk') as kind, status
+           from user_game_accounts where user_id = any($1::text[]) order by user_id, created_at`,
+        [userIds],
+      ),
+    ])
+    : [
+      { rows: [] as Array<{ id: string; email: string }> },
+      { rows: [] as Array<{ id: string; user_id: string; display_name: string; kind: string; status: string }> },
+    ]
+  const emailsByUserId = new Map(accounts.rows.map((account) => [account.id, account.email]))
   return {
     id: caseRow.id,
     status: caseRow.status,
@@ -363,16 +414,21 @@ async function buildAdminCase(caseRow: CaseRow): Promise<Record<string, unknown>
     expires_at: toIso(caseRow.expires_at),
     reviewed_at: caseRow.reviewed_at ? toIso(caseRow.reviewed_at) : null,
     reviewed_by: caseRow.reviewed_by,
-    members: members.rows.map((member) => ({
-      user_id: member.user_id,
-      ...member.evidence_json,
-      profiles: profiles.rows.filter((profile) => profile.user_id === member.user_id).map((profile) => ({
-        profile_id: profile.id,
-        profile_label: `${profile.id.slice(0, 8)}…`,
-        kind: profile.kind,
-        status: profile.status,
-      })),
-    })),
+    members: members.rows.map((member) => {
+      const evidence = { ...member.evidence_json }
+      delete evidence.account_label
+      return {
+        user_id: member.user_id,
+        ...evidence,
+        account_email: emailsByUserId.get(member.user_id) ?? null,
+        profiles: profiles.rows.filter((profile) => profile.user_id === member.user_id).map((profile) => ({
+          profile_id: profile.id,
+          profile_label: profile.display_name,
+          kind: profile.kind,
+          status: profile.status,
+        })),
+      }
+    }),
   }
 }
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { BEHAVIOR_RISK_MODEL_VERSION } from '../behavior-risk/scoring'
 import { closePool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
 import {
@@ -24,9 +25,10 @@ afterAll(async () => {
 })
 
 describe('behavior risk PostgreSQL store', () => {
-  it('creates a masked review case and applies only selected member actions with audit', async () => {
+  it('returns searchable member identities and applies only selected member actions with audit', async () => {
     const first = await seedAccount('first')
     const second = await seedAccount('second')
+    const third = await seedAccount('third')
     const now = new Date('2026-07-25T12:00:00.000Z')
     try {
       await Promise.all([
@@ -34,6 +36,8 @@ describe('behavior risk PostgreSQL store', () => {
         insert('bind:first', 'bind', first, now, 25, { uidHmac: 'uid-hmac-first' }),
         insert('register:second', 'register', second, now, 28),
         insert('bind:second', 'bind', second, now, 24, { uidHmac: 'uid-hmac-second' }),
+        insert('register:third', 'register', third, now, 27),
+        insert('bind:third', 'bind', third, now, 23, { uidHmac: 'uid-hmac-third' }),
       ])
       await runBehaviorRiskEvaluation(now)
 
@@ -41,12 +45,28 @@ describe('behavior risk PostgreSQL store', () => {
       expect(pending.cases).toHaveLength(1)
       const riskCase = pending.cases[0] as {
         id: string
-        members: Array<{ user_id: string; account_label: string; uid_prefixes: string[] }>
+        model_version: string
+        members: Array<{
+          user_id: string
+          account_email: string | null
+          uid_prefixes: string[]
+          profiles: Array<{ profile_id: string; profile_label: string }>
+        }>
       }
-      expect(riskCase.members).toHaveLength(2)
-      expect(JSON.stringify(riskCase)).not.toContain(first.email)
+      expect(riskCase.model_version).toBe(BEHAVIOR_RISK_MODEL_VERSION)
+      expect(riskCase.members).toHaveLength(3)
+      expect(riskCase.members.find((member) => member.user_id === first.userId)).toMatchObject({
+        account_email: first.email,
+        profiles: [{ profile_id: first.profileId, profile_label: 'first' }],
+      })
+      expect(riskCase.members.find((member) => member.user_id === second.userId)?.account_email).toBe(second.email)
+      expect(riskCase.members.find((member) => member.user_id === third.userId)?.account_email).toBe(third.email)
       expect(JSON.stringify(riskCase)).not.toContain('raw-uid')
-      expect(riskCase.members.every((member) => member.account_label.endsWith('…'))).toBe(true)
+
+      await query('delete from user_accounts where id = $1', [third.userId])
+      const afterDeletion = await listBehaviorRiskCases({ status: 'pending' })
+      const deletedMember = (afterDeletion.cases[0] as typeof riskCase).members.find((member) => member.user_id === third.userId)
+      expect(deletedMember).toMatchObject({ account_email: null, profiles: [] })
 
       await expect(reviewBehaviorRiskCase({
         caseId: riskCase.id,
@@ -81,10 +101,12 @@ describe('behavior risk PostgreSQL store', () => {
 
       const firstStatus = await query<{ status: string }>('select status from user_game_accounts where id = $1', [first.profileId])
       const secondStatus = await query<{ status: string }>('select status from user_accounts where id = $1', [second.userId])
+      const thirdStatus = await query<{ status: string }>('select status from user_accounts where id = $1', [third.userId])
       const sessions = await query<{ total: string }>('select count(*)::text as total from user_sessions where user_id = $1', [second.userId])
       const audits = await query<{ total: string }>('select count(*)::text as total from behavior_risk_review_audit where case_id = $1', [riskCase.id])
       expect(firstStatus.rows[0]?.status).toBe('frozen')
       expect(secondStatus.rows[0]?.status).toBe('frozen')
+      expect(thirdStatus.rows).toHaveLength(0)
       expect(Number(sessions.rows[0]?.total)).toBe(0)
       expect(Number(audits.rows[0]?.total)).toBe(1)
 
@@ -94,7 +116,7 @@ describe('behavior risk PostgreSQL store', () => {
     } finally {
       await query('delete from behavior_risk_cases')
       await query('delete from behavior_risk_events')
-      await query('delete from user_accounts where id = any($1::text[])', [[first.userId, second.userId]])
+      await query('delete from user_accounts where id = any($1::text[])', [[first.userId, second.userId, third.userId]])
     }
   })
 
@@ -106,6 +128,109 @@ describe('behavior risk PostgreSQL store', () => {
       expect(first).toBe(true)
       expect(second).toBe(false)
     } finally {
+      await query('delete from behavior_risk_events where user_id = $1', [account.userId])
+      await query('delete from user_accounts where id = $1', [account.userId])
+    }
+  })
+
+  it('archives legacy pending cases with audit before recalculating qualifying v1.2 risk', async () => {
+    const first = await seedAccount('legacy-first')
+    const second = await seedAccount('legacy-second')
+    const third = await seedAccount('legacy-third')
+    const stale = await seedAccount('legacy-stale')
+    const now = new Date('2026-07-25T12:00:00.000Z')
+    const legacyCaseId = randomUUID()
+    const staleCaseId = randomUUID()
+    try {
+      await seedLegacyPendingCase(legacyCaseId, first.userId, now)
+      await seedLegacyPendingCase(staleCaseId, stale.userId, now)
+      await Promise.all([
+        insert('legacy:bind:first', 'bind', first, now, 30, { uidHmac: 'legacy-uid-first' }),
+        insert('legacy:bind:second', 'bind', second, now, 20, { uidHmac: 'legacy-uid-second' }),
+        insert('legacy:bind:third', 'bind', third, now, 10, { uidHmac: 'legacy-uid-third' }),
+      ])
+
+      await runBehaviorRiskEvaluation(now)
+
+      const pending = await listBehaviorRiskCases({ status: 'pending' })
+      const dismissed = await listBehaviorRiskCases({ status: 'dismissed' })
+      expect(pending.cases).toHaveLength(1)
+      expect(pending.cases[0]).toMatchObject({ model_version: BEHAVIOR_RISK_MODEL_VERSION, score: 55 })
+      expect(JSON.stringify(pending.cases[0])).not.toContain(stale.userId)
+      expect(dismissed.cases.find((riskCase) => riskCase.id === legacyCaseId)).toMatchObject({
+        status: 'dismissed',
+        model_version: 'behavior-risk-v1.1.0',
+        reviewed_by: `system:${BEHAVIOR_RISK_MODEL_VERSION}`,
+      })
+      expect(dismissed.cases.find((riskCase) => riskCase.id === staleCaseId)).toMatchObject({
+        status: 'dismissed',
+        model_version: 'behavior-risk-v1.1.0',
+        reviewed_by: `system:${BEHAVIOR_RISK_MODEL_VERSION}`,
+      })
+
+      const audit = await query<{
+        admin_username: string
+        outcome: string
+        note: string
+        actions_json: unknown[]
+        case_snapshot_json: { model_version: string; members: Array<{ user_id: string }> }
+      }>(
+        `select admin_username, outcome, note, actions_json, case_snapshot_json
+           from behavior_risk_review_audit where case_id = $1`,
+        [legacyCaseId],
+      )
+      expect(audit.rows).toHaveLength(1)
+      expect(audit.rows[0]).toMatchObject({
+        admin_username: `system:${BEHAVIOR_RISK_MODEL_VERSION}`,
+        outcome: 'dismiss',
+        actions_json: [],
+        case_snapshot_json: {
+          model_version: 'behavior-risk-v1.1.0',
+          members: [{ user_id: first.userId }],
+        },
+      })
+      expect(audit.rows[0]?.note).toContain(BEHAVIOR_RISK_MODEL_VERSION)
+    } finally {
+      await query('delete from behavior_risk_cases')
+      await query('delete from behavior_risk_events')
+      await query('delete from user_accounts where id = any($1::text[])', [[first.userId, second.userId, third.userId, stale.userId]])
+    }
+  })
+
+  it('rolls back legacy-case archival when the audit write fails', async () => {
+    const account = await seedAccount('legacy-rollback')
+    const now = new Date('2026-07-25T12:00:00.000Z')
+    const legacyCaseId = randomUUID()
+    try {
+      await seedLegacyPendingCase(legacyCaseId, account.userId, now)
+      await query(`create function fail_behavior_risk_recalibration_audit() returns trigger as $$
+        begin
+          if new.admin_username like 'system:behavior-risk-%' then
+            raise exception 'forced recalibration audit failure';
+          end if;
+          return new;
+        end;
+      $$ language plpgsql`)
+      await query(`create trigger fail_behavior_risk_recalibration_audit
+        before insert on behavior_risk_review_audit
+        for each row execute function fail_behavior_risk_recalibration_audit()`)
+
+      await expect(runBehaviorRiskEvaluation(now)).rejects.toThrow('forced recalibration audit failure')
+
+      const legacyCase = await query<{ status: string; reviewed_at: Date | null; reviewed_by: string | null }>(
+        'select status, reviewed_at, reviewed_by from behavior_risk_cases where id = $1',
+        [legacyCaseId],
+      )
+      const audits = await query<{ total: string }>(
+        'select count(*)::text as total from behavior_risk_review_audit where case_id = $1',
+        [legacyCaseId],
+      )
+      expect(legacyCase.rows[0]).toMatchObject({ status: 'pending', reviewed_at: null, reviewed_by: null })
+      expect(Number(audits.rows[0]?.total)).toBe(0)
+    } finally {
+      await query('drop trigger if exists fail_behavior_risk_recalibration_audit on behavior_risk_review_audit')
+      await query('drop function if exists fail_behavior_risk_recalibration_audit()')
+      await query('delete from behavior_risk_cases')
       await query('delete from behavior_risk_events where user_id = $1', [account.userId])
       await query('delete from user_accounts where id = $1', [account.userId])
     }
@@ -152,7 +277,7 @@ describe('behavior risk PostgreSQL store', () => {
         score: number
         members: Array<{ operator_fingerprint_prefixes: string[] }>
       }
-      expect(riskCase.score).toBe(70)
+      expect(riskCase.score).toBe(55)
       expect(riskCase.members[0]?.operator_fingerprint_prefixes).toEqual(['aaaaaaaaaaaa', 'bbbbbbbbbbbb'])
 
       const userStatus = await query<{ status: string }>('select status from user_accounts where id = $1', [account.userId])
@@ -190,6 +315,29 @@ function insert(
 }
 
 type SeededAccount = { userId: string; profileId: string; email: string }
+
+async function seedLegacyPendingCase(caseId: string, userId: string, now: Date): Promise<void> {
+  const expiresAt = new Date(now.getTime() + 30 * 86_400_000).toISOString()
+  const rules = [{
+    code: 'export_velocity',
+    category: 'export',
+    score: 20,
+    explanation: '旧模型导出速度证据。',
+    evidence: { distinct_output_count: 2 },
+  }]
+  await query(
+    `insert into behavior_risk_cases
+      (id, group_key, evidence_key, status, score, categories_json, rules_json, model_version,
+       first_seen_at, last_seen_at, expires_at, created_at, updated_at)
+     values ($1, $2, $3, 'pending', 20, $4::jsonb, $5::jsonb, 'behavior-risk-v1.1.0', $6, $6, $7, $6, $6)`,
+    [caseId, `legacy-group:${caseId}`, `legacy-evidence:${caseId}`, JSON.stringify(['export']), JSON.stringify(rules), now.toISOString(), expiresAt],
+  )
+  await query(
+    `insert into behavior_risk_case_members (case_id, user_id, evidence_json, created_at, updated_at)
+     values ($1, $2, $3::jsonb, $4, $4)`,
+    [caseId, userId, JSON.stringify({ account_label: `${userId.slice(0, 8)}…`, output_prefixes: ['legacy-output'] }), now.toISOString()],
+  )
+}
 
 async function seedAccount(label: string): Promise<SeededAccount> {
   const userId = randomUUID()

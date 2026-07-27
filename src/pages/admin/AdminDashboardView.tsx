@@ -461,7 +461,7 @@ export default function AdminDashboardView() {
                         ) : appUsers.map((item) => (
                           <tr key={item.id} className="hover:bg-surface-2/50">
                             <td className="px-4 py-4 font-medium text-ink-primary">{item.email}</td>
-                            <td className="px-4 py-4"><UserStatusPill status={item.status} /></td>
+                            <td className="px-4 py-4"><UserStatusPill status={item.status} emailVerifiedAt={item.email_verified_at} /></td>
                             <td className="px-4 py-4 text-ink-secondary">{formatAdminProfileAccess(item.profile_access)}</td>
                             <td className="px-4 py-4 text-ink-secondary">{item.profile_count}</td>
                             <td className="px-4 py-4 text-xs text-ink-muted">{formatDate(item.updated_at)}</td>

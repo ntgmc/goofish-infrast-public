@@ -26,13 +26,19 @@ export function StatusPill({ status }: { status: CdkStatus }) {
   return <span className={`tool-status ${className}`}>{statusLabels[status]}</span>
 }
 
-export function UserStatusPill({ status }: { status: AppUserStatus }) {
-  const className = status === 'active'
-    ? 'tool-status--success'
-    : status === 'frozen'
-      ? 'tool-status--warning'
-      : 'tool-status--error'
-  return <span className={`tool-status ${className}`}>{appUserStatusLabels[status]}</span>
+export function getAppUserStatusLabel(status: AppUserStatus, emailVerifiedAt?: string | null): string {
+  return status === 'active' && emailVerifiedAt === null ? '未验证' : appUserStatusLabels[status]
+}
+
+export function UserStatusPill({ status, emailVerifiedAt }: { status: AppUserStatus; emailVerifiedAt?: string | null }) {
+  const className = status === 'active' && emailVerifiedAt === null
+    ? 'tool-status--warning'
+    : status === 'active'
+      ? 'tool-status--success'
+      : status === 'frozen'
+        ? 'tool-status--warning'
+        : 'tool-status--error'
+  return <span className={`tool-status ${className}`}>{getAppUserStatusLabel(status, emailVerifiedAt)}</span>
 }
 
 export function SmallButton({ children, onClick, loading, tone = 'default', autoFocus = false }: { children: string; onClick: () => void; loading?: boolean; tone?: 'default' | 'success' | 'danger'; autoFocus?: boolean }) {
