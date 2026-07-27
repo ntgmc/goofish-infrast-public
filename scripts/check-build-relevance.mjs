@@ -48,6 +48,7 @@ const buildRelevantScripts = new Set([
   'scripts/generate-data.mjs',
   'scripts/changelog-lib.mjs',
   'scripts/generate-changelog.mjs',
+  'scripts/pr-changelog-analysis-lib.mjs',
   'scripts/pr-changelog-lib.mjs',
   'scripts/record-pr-changelog.mjs',
   'scripts/deploy-production-atomic.sh',

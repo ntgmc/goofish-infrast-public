@@ -27,7 +27,7 @@ jobs:
     name: Analyze and Record Chinese Changelog
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout trusted main workflow code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -48,5 +48,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL || 'https://api.krill-ai.net/codex/v1' }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.6-luna' }}
+          CHANGELOG_CHUNK_MAX_CHARS: ${{ vars.CHANGELOG_CHUNK_MAX_CHARS || '24000' }}
+          CHANGELOG_ANALYSIS_CONCURRENCY: ${{ vars.CHANGELOG_ANALYSIS_CONCURRENCY || '3' }}
+          CHANGELOG_GITHUB_READ_CONCURRENCY: ${{ vars.CHANGELOG_GITHUB_READ_CONCURRENCY || '5' }}
           CHANGELOG_BOT_LOGIN: ${{ vars.CHANGELOG_BOT_LOGIN || 'github-actions[bot]' }}
         run: node scripts/record-pr-changelog.mjs
