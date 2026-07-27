@@ -115,8 +115,6 @@ export const authCopy = {
   // src/components/AuthForm.tsx
   components_AuthForm_036: "仅支持常用公共邮箱；不支持企业、自建、临时或别名邮箱。",
   // src/components/AuthForm.tsx
-  components_AuthForm_037: "注册仅支持常用公共邮箱，不支持企业、自建或临时邮箱。",
-  // src/components/AuthForm.tsx
   components_AuthForm_038: "注册不支持邮箱别名。请移除“+”；Gmail 请同时移除用户名中的“.”。",
   // src/components/AuthForm.tsx
   components_AuthForm_039: "邮箱域名可能有误，请使用建议地址。",
