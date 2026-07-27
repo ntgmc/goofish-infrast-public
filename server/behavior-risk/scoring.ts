@@ -1,4 +1,5 @@
-export const BEHAVIOR_RISK_MODEL_VERSION = 'behavior-risk-v1.1.0'
+export const BEHAVIOR_RISK_MODEL_VERSION = 'behavior-risk-v1.2.0'
+export const MULTI_IDENTITY_THRESHOLD = 3
 
 export type BehaviorRiskEventType =
   | 'register'
@@ -62,16 +63,41 @@ export type BehaviorRiskEvaluation = {
   expiresAt: string
 }
 
-const HOUR_MS = 60 * 60 * 1000
+type IdentifiedEvent = BehaviorRiskEvent & { user_id: string }
+
+type EnvironmentCohort = {
+  key: string
+  type: 'browser' | 'network-ua'
+  signalPrefix: string
+  events: IdentifiedEvent[]
+}
+
+type RapidPath = {
+  userId: string
+  registeredAt: number
+  boundAt: number
+  generatedAt: number
+  exportedAt: number
+  durationMs: number
+  signature: string
+}
+
+const MINUTE_MS = 60 * 1000
+const HOUR_MS = 60 * MINUTE_MS
 const DAY_MS = 24 * HOUR_MS
-const RAPID_PATH_MS = 30 * 60 * 1000
+const ENVIRONMENT_BURST_MS = DAY_MS
+const ENVIRONMENT_ASSOCIATION_MS = 7 * DAY_MS
+const RAPID_PATH_MS = 30 * MINUTE_MS
+const OPERATOR_ANOMALY_MS = DAY_MS
+const POST_EXPORT_DORMANCY_MS = 14 * DAY_MS
+const CASE_SCORE_THRESHOLD = 50
 
 export function evaluateBehaviorRiskEvents(
   input: BehaviorRiskEvent[],
   now = new Date(),
 ): BehaviorRiskEvaluation[] {
   const events = input
-    .filter((event): event is BehaviorRiskEvent & { user_id: string } => Boolean(event.user_id) && Number.isFinite(Date.parse(event.occurred_at)))
+    .filter((event): event is IdentifiedEvent => Boolean(event.user_id) && Number.isFinite(Date.parse(event.occurred_at)))
     .sort((left, right) => Date.parse(left.occurred_at) - Date.parse(right.occurred_at))
   if (events.length === 0) return []
 
@@ -79,11 +105,8 @@ export function evaluateBehaviorRiskEvents(
   return components.map((userIds) => evaluateGroup(events.filter((event) => userIds.includes(event.user_id)), userIds, now))
 }
 
-function buildAssociatedAccountGroups(
-  events: Array<BehaviorRiskEvent & { user_id: string }>,
-  now: Date,
-): string[][] {
-  const recent = events.filter((event) => now.getTime() - Date.parse(event.occurred_at) <= 7 * DAY_MS)
+function buildAssociatedAccountGroups(events: IdentifiedEvent[], now: Date): string[][] {
+  const recent = within(events, now, ENVIRONMENT_ASSOCIATION_MS)
   const userIds = [...new Set(events.map((event) => event.user_id))]
   const parent = new Map(userIds.map((userId) => [userId, userId]))
   const find = (userId: string): string => {
@@ -99,21 +122,11 @@ function buildAssociatedAccountGroups(
     if (leftRoot !== rightRoot) parent.set(rightRoot, leftRoot)
   }
 
-  const byEnvironment = new Map<string, Set<string>>()
-  for (const event of recent) {
-    const keys = [
-      event.browser_hmac ? `browser:${event.browser_hmac}` : null,
-      event.network_hmac && event.ua_hmac ? `network-ua:${event.network_hmac}:${event.ua_hmac}` : null,
-    ].filter((value): value is string => Boolean(value))
-    for (const key of keys) {
-      const members = byEnvironment.get(key) ?? new Set<string>()
-      members.add(event.user_id)
-      byEnvironment.set(key, members)
-    }
-  }
-  for (const members of byEnvironment.values()) {
-    const [first, ...rest] = [...members]
-    if (first) for (const member of rest) union(first, member)
+  for (const cohort of environmentCohorts(recent)) {
+    const members = [...new Set(cohort.events.map((event) => event.user_id))]
+    if (members.length < MULTI_IDENTITY_THRESHOLD) continue
+    const [first, ...rest] = members
+    for (const member of rest) union(first, member)
   }
 
   const grouped = new Map<string, string[]>()
@@ -124,103 +137,110 @@ function buildAssociatedAccountGroups(
   return [...grouped.values()].map((members) => members.sort())
 }
 
-function evaluateGroup(
-  events: Array<BehaviorRiskEvent & { user_id: string }>,
-  userIds: string[],
-  now: Date,
-): BehaviorRiskEvaluation {
+function evaluateGroup(events: IdentifiedEvent[], userIds: string[], now: Date): BehaviorRiskEvaluation {
   const rules: BehaviorRiskRule[] = []
-  const recent24h = within(events, now, DAY_MS)
-  const recent7d = within(events, now, 7 * DAY_MS)
+  const recent24h = within(events, now, OPERATOR_ANOMALY_MS)
+  const recent7d = within(events, now, ENVIRONMENT_ASSOCIATION_MS)
   const accountEvents = new Map(userIds.map((userId) => [userId, events.filter((event) => event.user_id === userId)]))
 
-  const burst = findEnvironmentAccountBurst(recent24h)
-  if (burst) rules.push(rule('environment_account_burst', 'environment', 35, '同一浏览器环境或网络与浏览器组合在 24 小时内关联多个账号。', burst))
+  const browserCluster = findBrowserIdentityCluster(recent7d)
+  const environmentMultiUid = browserCluster ? null : findEnvironmentMultiUid(recent7d)
+  const environmentBurst = browserCluster || environmentMultiUid
+    ? null
+    : findEnvironmentAccountBurst(within(events, now, ENVIRONMENT_BURST_MS))
+  if (browserCluster) {
+    rules.push(rule(
+      'browser_identity_cluster',
+      'environment',
+      55,
+      '同一浏览器实例在 7 天内关联至少三个账号和三个档案标识。',
+      browserCluster,
+    ))
+  } else if (environmentMultiUid) {
+    rules.push(rule(
+      'environment_multi_uid',
+      'environment',
+      35,
+      '同一关联环境在 7 天内绑定至少三个账号和三个档案标识。',
+      environmentMultiUid,
+    ))
+  } else if (environmentBurst) {
+    rules.push(rule(
+      'environment_account_burst',
+      'environment',
+      25,
+      '同一浏览器环境或网络与浏览器组合在 24 小时内关联至少三个新账号。',
+      environmentBurst,
+    ))
+  }
 
   const rapidPaths = [...accountEvents.entries()]
     .map(([userId, userEvents]) => findRapidPath(userId, userEvents))
     .filter((value): value is RapidPath => Boolean(value))
-  if (rapidPaths.length > 0) {
-    rules.push(rule('rapid_service_path', 'service_path', 30, '新账号在 30 分钟内完成绑定、生成和完整导出，期间缺少正常调整行为。', {
-      account_count: rapidPaths.length,
-      shortest_minutes: Math.min(...rapidPaths.map((path) => Math.round(path.durationMs / 60_000))),
-    }))
-  }
-
-  const environmentUids = new Set(recent7d.map((event) => event.uid_hmac).filter(Boolean))
-  const hasSharedEnvironment = userIds.length >= 2 && hasEnvironmentAssociation(recent7d)
-  if (hasSharedEnvironment && environmentUids.size >= 2) {
-    rules.push(rule('environment_multi_uid', 'identity', 35, '同一关联环境在 7 天内绑定多个档案标识。', {
-      account_count: userIds.length,
-      uid_count: environmentUids.size,
-      uid_prefixes: prefixes(environmentUids),
-    }))
+  const cadence = findCohortCadence(rapidPaths, recent7d)
+  if (cadence) {
+    rules.push(rule(
+      'cohort_cadence',
+      'service_path',
+      35,
+      '同一关联环境中的至少三个账号具有高度一致的页面路径和操作节奏。',
+      cadence,
+    ))
+  } else if (rapidPaths.length > 0) {
+    rules.push(rule(
+      'rapid_service_path',
+      'service_path',
+      20,
+      '新账号在 30 分钟内完成绑定、生成和完整导出，期间缺少正常调整行为。',
+      {
+        account_count: rapidPaths.length,
+        shortest_minutes: Math.min(...rapidPaths.map((path) => Math.round(path.durationMs / MINUTE_MS))),
+      },
+    ))
   }
 
   const multiUidAccounts = [...accountEvents.entries()]
-    .map(([userId, userEvents]) => ({ userId, uids: new Set(within(userEvents, now, 7 * DAY_MS).map((event) => event.uid_hmac).filter(Boolean)) }))
-    .filter((entry) => entry.uids.size >= 2)
+    .map(([userId, userEvents]) => ({
+      userId,
+      uids: new Set(within(userEvents, now, ENVIRONMENT_ASSOCIATION_MS).map((event) => event.uid_hmac).filter(Boolean)),
+    }))
+    .filter((entry) => entry.uids.size >= MULTI_IDENTITY_THRESHOLD)
   if (multiUidAccounts.length > 0) {
-    rules.push(rule('account_multi_uid', 'identity', 30, '单个账号在 7 天内绑定多个档案标识。', {
+    rules.push(rule('account_multi_uid', 'identity', 20, '单个账号在 7 天内绑定至少三个档案标识。', {
       account_count: multiUidAccounts.length,
       max_uid_count: Math.max(...multiUidAccounts.map((entry) => entry.uids.size)),
     }))
   }
 
-  const exportVelocity = [...accountEvents.entries()]
-    .map(([userId, userEvents]) => ({ userId, evidence: findExportVelocity(userEvents) }))
-    .filter((entry): entry is { userId: string; evidence: Record<string, unknown> } => Boolean(entry.evidence))
-  if (exportVelocity.length > 0) {
-    rules.push(rule('export_velocity', 'export', 20, '账号在短时间内连续导出多份不同完整结果。', {
-      account_count: exportVelocity.length,
-      samples: exportVelocity.slice(0, 5).map((entry) => entry.evidence),
-    }))
-  }
-
-  const cadence = findCohortCadence(rapidPaths)
-  if (cadence) rules.push(rule('cohort_cadence', 'cadence', 30, '关联账号具有高度一致的页面路径和绑定、生成、导出节奏。', cadence))
-
   const operatorAnomalies = recent24h.filter((event) => event.event_type === 'operator_data_anomaly')
-  if (operatorAnomalies.length > 0) {
-    const fingerprints = operatorFingerprintHashes(operatorAnomalies)
-    rules.push(rule('operator_data_anomaly', 'operator_data', 20, '账号提交的干员快照与已确认基线存在回退或异常差异。', {
-      event_count: operatorAnomalies.length,
-      account_count: new Set(operatorAnomalies.map((event) => event.user_id)).size,
-      anomaly_types: [...new Set(operatorAnomalies.map((event) => event.structure_summary?.anomaly_type).filter((value): value is string => typeof value === 'string'))],
-      fingerprint_prefixes: [...fingerprints].slice(0, 10).map((value) => value.slice(0, 12)),
-    }))
+  const operatorFingerprints = operatorFingerprintHashes(operatorAnomalies)
+  const repeatedOperatorAnomaly = operatorAnomalies.length >= 3 && operatorFingerprints.size >= 2
+  if (repeatedOperatorAnomaly) {
+    rules.push(rule(
+      'operator_data_anomaly_repeated',
+      'operator_data',
+      55,
+      '关联账号组在 24 小时内提交至少三次、涉及多个不同指纹的异常干员快照。',
+      operatorAnomalyEvidence(operatorAnomalies, operatorFingerprints),
+    ))
+  } else if (operatorAnomalies.length > 0) {
+    rules.push(rule(
+      'operator_data_anomaly',
+      'operator_data',
+      20,
+      '账号提交的干员快照与已确认基线存在回退或异常差异。',
+      operatorAnomalyEvidence(operatorAnomalies, operatorFingerprints),
+    ))
   }
 
   const dormant = rapidPaths.filter((path) => isDormantAfterExport(accountEvents.get(path.userId) ?? [], path, now))
   if (dormant.length > 0) {
-    rules.push(rule('post_export_dormancy', 'dormancy', 15, '快速导出后 14 天内未再出现登录、页面或工作区活动。', {
+    rules.push(rule('post_export_dormancy', 'dormancy', 10, '快速导出后 14 天内未再出现登录、页面或工作区活动。', {
       account_count: dormant.length,
     }))
   }
 
-  const strongBrowser = findStrongBrowserSignal(recent7d)
-  const strongAccount = multiUidAccounts.some(({ userId }) => hasShortOutputBurst(accountEvents.get(userId) ?? []))
-  const strongCadence = Boolean(cadence && rapidPaths.length >= 2 && hasSharedEnvironment)
-  const strongOperator = operatorAnomalies.length >= 3 && operatorFingerprintHashes(operatorAnomalies).size >= 2
-  const strongSignal = Boolean(strongBrowser || strongAccount || strongCadence || strongOperator)
-  if (strongSignal) {
-    rules.push(rule('strong_composite', 'strong_composite', 50, strongBrowser
-      ? '同一浏览器实例关联多个账号和多个档案标识。'
-      : strongAccount
-        ? '单个账号短期处理多个档案并导出多份不同结果。'
-        : strongCadence
-          ? '同一关联环境中的多个账号完成高度一致的快速路径。'
-          : '关联账号组在 24 小时内提交至少三次、涉及多个不同指纹的异常干员快照。', {
-      kind: strongBrowser
-        ? 'browser_accounts_uids'
-        : strongAccount
-          ? 'account_uids_outputs'
-          : strongCadence
-            ? 'environment_rapid_cadence'
-            : 'operator_anomaly_fingerprints',
-    }))
-  }
-
+  const strongSignal = Boolean(browserCluster || repeatedOperatorAnomaly)
   const score = Math.min(100, rules.reduce((sum, item) => sum + item.score, 0))
   const categories = [...new Set(rules.map((item) => item.category))]
   const firstSeenAt = events[0]?.occurred_at ?? now.toISOString()
@@ -231,22 +251,12 @@ function evaluateGroup(
     score,
     categories,
     rules,
-    createCase: score >= 50 && (categories.length >= 2 || strongSignal),
+    createCase: score >= CASE_SCORE_THRESHOLD && (strongSignal || categories.length >= 2),
     strongSignal,
     firstSeenAt,
     lastSeenAt,
     expiresAt,
   }
-}
-
-type RapidPath = {
-  userId: string
-  registeredAt: number
-  boundAt: number
-  generatedAt: number
-  exportedAt: number
-  durationMs: number
-  signature: string
 }
 
 function findRapidPath(userId: string, events: BehaviorRiskEvent[]): RapidPath | null {
@@ -268,69 +278,115 @@ function findRapidPath(userId: string, events: BehaviorRiskEvent[]): RapidPath |
     const pathEvents = windowEvents.filter((event) => event.event_type === 'page_view' || ['bind', 'generate', 'export'].includes(event.event_type))
     const signature = pathEvents.map((event) => {
       const step = event.event_type === 'page_view' ? `page:${event.page_category ?? 'other'}` : event.event_type
-      return `${step}:${Math.floor((Date.parse(event.occurred_at) - registeredAt) / (5 * 60_000))}`
+      return `${step}:${Math.floor((Date.parse(event.occurred_at) - registeredAt) / (5 * MINUTE_MS))}`
     }).join('>')
     return { userId, registeredAt, boundAt, generatedAt, exportedAt, durationMs: exportedAt - registeredAt, signature }
   }
   return null
 }
 
-function findEnvironmentAccountBurst(events: BehaviorRiskEvent[]): Record<string, unknown> | null {
-  const candidates = new Map<string, BehaviorRiskEvent[]>()
-  for (const event of events.filter((item) => item.event_type === 'register' || item.event_type === 'activation')) {
-    const keys = [
-      event.browser_hmac ? `browser:${event.browser_hmac}` : null,
-      event.network_hmac && event.ua_hmac ? `network-ua:${event.network_hmac}:${event.ua_hmac}` : null,
-    ].filter((value): value is string => Boolean(value))
-    for (const key of keys) candidates.set(key, [...(candidates.get(key) ?? []), event])
-  }
-  for (const [key, matching] of candidates) {
-    const accounts = new Set(matching.map((event) => event.user_id).filter(Boolean))
-    if (accounts.size >= 2) return { environment_type: key.split(':', 1)[0], account_count: accounts.size, signal_prefix: key.split(':').at(-1)?.slice(0, 12) }
+function findBrowserIdentityCluster(events: IdentifiedEvent[]): Record<string, unknown> | null {
+  for (const cohort of environmentCohorts(events).filter((candidate) => candidate.type === 'browser')) {
+    const accounts = new Set(cohort.events.map((event) => event.user_id))
+    const uids = new Set(cohort.events.map((event) => event.uid_hmac).filter(Boolean))
+    if (accounts.size >= MULTI_IDENTITY_THRESHOLD && uids.size >= MULTI_IDENTITY_THRESHOLD) {
+      return environmentEvidence(cohort, accounts, uids)
+    }
   }
   return null
 }
 
-function findExportVelocity(events: BehaviorRiskEvent[]): Record<string, unknown> | null {
-  const exports = events.filter((event) => event.event_type === 'export' && event.output_hash)
-  if (hasDistinctInWindow(exports, 2, HOUR_MS)) return { window: '1h', distinct_output_count: maxDistinctInWindow(exports, HOUR_MS) }
-  if (hasDistinctInWindow(exports, 5, DAY_MS)) return { window: '24h', distinct_output_count: maxDistinctInWindow(exports, DAY_MS) }
+function findEnvironmentMultiUid(events: IdentifiedEvent[]): Record<string, unknown> | null {
+  for (const cohort of environmentCohorts(events)) {
+    const accounts = new Set(cohort.events.map((event) => event.user_id))
+    const uids = new Set(cohort.events.map((event) => event.uid_hmac).filter(Boolean))
+    if (accounts.size >= MULTI_IDENTITY_THRESHOLD && uids.size >= MULTI_IDENTITY_THRESHOLD) {
+      return environmentEvidence(cohort, accounts, uids)
+    }
+  }
   return null
 }
 
-function findCohortCadence(paths: RapidPath[]): Record<string, unknown> | null {
+function findEnvironmentAccountBurst(events: IdentifiedEvent[]): Record<string, unknown> | null {
+  const registrations = events.filter((event) => event.event_type === 'register' || event.event_type === 'activation')
+  for (const cohort of environmentCohorts(registrations)) {
+    const accounts = new Set(cohort.events.map((event) => event.user_id))
+    if (accounts.size >= MULTI_IDENTITY_THRESHOLD) {
+      return {
+        environment_type: cohort.type,
+        account_count: accounts.size,
+        signal_prefix: cohort.signalPrefix,
+      }
+    }
+  }
+  return null
+}
+
+function findCohortCadence(paths: RapidPath[], events: IdentifiedEvent[]): Record<string, unknown> | null {
   const signatures = new Map<string, RapidPath[]>()
   for (const path of paths) signatures.set(path.signature, [...(signatures.get(path.signature) ?? []), path])
+  const cohorts = environmentCohorts(events)
   for (const [signature, matching] of signatures) {
-    if (matching.length >= 2) return { account_count: matching.length, timing_signature: signature }
+    const matchingUserIds = new Set(matching.map((path) => path.userId))
+    if (matchingUserIds.size < MULTI_IDENTITY_THRESHOLD) continue
+    for (const cohort of cohorts) {
+      const associatedAccounts = new Set(cohort.events.map((event) => event.user_id).filter((userId) => matchingUserIds.has(userId)))
+      if (associatedAccounts.size >= MULTI_IDENTITY_THRESHOLD) {
+        return {
+          environment_type: cohort.type,
+          signal_prefix: cohort.signalPrefix,
+          account_count: associatedAccounts.size,
+          timing_signature: signature,
+        }
+      }
+    }
   }
   return null
 }
 
-function findStrongBrowserSignal(events: BehaviorRiskEvent[]): boolean {
-  const browsers = new Map<string, BehaviorRiskEvent[]>()
+function environmentCohorts(events: IdentifiedEvent[]): EnvironmentCohort[] {
+  const cohorts = new Map<string, EnvironmentCohort>()
   for (const event of events) {
-    if (event.browser_hmac) browsers.set(event.browser_hmac, [...(browsers.get(event.browser_hmac) ?? []), event])
+    for (const signal of environmentSignals(event)) {
+      const cohort = cohorts.get(signal.key) ?? { ...signal, events: [] }
+      cohort.events.push(event)
+      cohorts.set(signal.key, cohort)
+    }
   }
-  return [...browsers.values()].some((matching) => (
-    new Set(matching.map((event) => event.user_id).filter(Boolean)).size >= 2
-    && new Set(matching.map((event) => event.uid_hmac).filter(Boolean)).size >= 2
-  ))
+  return [...cohorts.values()]
 }
 
-function hasEnvironmentAssociation(events: BehaviorRiskEvent[]): boolean {
-  const signals = new Map<string, Set<string>>()
-  for (const event of events) {
-    const keys = [event.browser_hmac, event.network_hmac && event.ua_hmac ? `${event.network_hmac}:${event.ua_hmac}` : null].filter(Boolean) as string[]
-    for (const key of keys) signals.set(key, new Set([...(signals.get(key) ?? []), ...(event.user_id ? [event.user_id] : [])]))
+function environmentSignals(event: BehaviorRiskEvent): Array<Omit<EnvironmentCohort, 'events'>> {
+  const signals: Array<Omit<EnvironmentCohort, 'events'>> = []
+  if (event.browser_hmac) {
+    signals.push({
+      key: `browser:${event.browser_hmac}`,
+      type: 'browser',
+      signalPrefix: event.browser_hmac.slice(0, 12),
+    })
   }
-  return [...signals.values()].some((members) => members.size >= 2)
+  if (event.network_hmac && event.ua_hmac) {
+    signals.push({
+      key: `network-ua:${event.network_hmac}:${event.ua_hmac}`,
+      type: 'network-ua',
+      signalPrefix: `${event.network_hmac.slice(0, 6)}:${event.ua_hmac.slice(0, 6)}`,
+    })
+  }
+  return signals
 }
 
-function hasShortOutputBurst(events: BehaviorRiskEvent[]): boolean {
-  const recentUidCount = new Set(events.filter((event) => event.event_type === 'bind').map((event) => event.uid_hmac).filter(Boolean)).size
-  const exports = events.filter((event) => event.event_type === 'export' && event.output_hash)
-  return recentUidCount >= 2 && hasDistinctInWindow(exports, 2, HOUR_MS)
+function environmentEvidence(
+  cohort: EnvironmentCohort,
+  accounts: Set<string>,
+  uids: Set<string | null>,
+): Record<string, unknown> {
+  return {
+    environment_type: cohort.type,
+    signal_prefix: cohort.signalPrefix,
+    account_count: accounts.size,
+    uid_count: uids.size,
+    uid_prefixes: prefixes(uids),
+  }
 }
 
 function operatorFingerprintHashes(events: BehaviorRiskEvent[]): Set<string> {
@@ -340,29 +396,21 @@ function operatorFingerprintHashes(events: BehaviorRiskEvent[]): Set<string> {
   }))
 }
 
+function operatorAnomalyEvidence(events: IdentifiedEvent[], fingerprints: Set<string>): Record<string, unknown> {
+  return {
+    event_count: events.length,
+    account_count: new Set(events.map((event) => event.user_id)).size,
+    anomaly_types: [...new Set(events.map((event) => event.structure_summary?.anomaly_type).filter((value): value is string => typeof value === 'string'))],
+    fingerprint_prefixes: [...fingerprints].slice(0, 10).map((value) => value.slice(0, 12)),
+  }
+}
+
 function isDormantAfterExport(events: BehaviorRiskEvent[], path: RapidPath, now: Date): boolean {
-  if (now.getTime() - path.exportedAt < 14 * DAY_MS) return false
+  if (now.getTime() - path.exportedAt < POST_EXPORT_DORMANCY_MS) return false
   return !events.some((event) => (
     Date.parse(event.occurred_at) > path.exportedAt
     && (event.event_type === 'login' || event.event_type === 'page_view' || event.event_type === 'workspace_save')
   ))
-}
-
-function hasDistinctInWindow(events: BehaviorRiskEvent[], threshold: number, windowMs: number): boolean {
-  return maxDistinctInWindow(events, windowMs) >= threshold
-}
-
-function maxDistinctInWindow(events: BehaviorRiskEvent[], windowMs: number): number {
-  let maximum = 0
-  for (let start = 0; start < events.length; start += 1) {
-    const startTime = Date.parse(events[start].occurred_at)
-    const hashes = new Set<string>()
-    for (let end = start; end < events.length && Date.parse(events[end].occurred_at) - startTime <= windowMs; end += 1) {
-      if (events[end].output_hash) hashes.add(events[end].output_hash!)
-    }
-    maximum = Math.max(maximum, hashes.size)
-  }
-  return maximum
 }
 
 function firstTime(events: BehaviorRiskEvent[], eventType: BehaviorRiskEventType, after: number | null): number | null {
