@@ -442,6 +442,7 @@ function toAdminAppUser(user: UserAccountRecord, profiles: UserGameAccountRecord
   return {
     id: user.id,
     email: user.email,
+    email_verified_at: user.email_verified_at,
     permission: user.permission,
     status: user.status,
     cdk_order_hash: user.cdk_order_hash,

@@ -1,6 +1,6 @@
 import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, permissionLabels, appUserStatusLabels } from '../contracts'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
-import { DetailItem, StatusPill, UserStatusPill, SmallButton, formatDate, getAdminProfileAccessLabel, formatAdminProfileAccess, formatOperatorValue } from '../shared/helpers'
+import { DetailItem, StatusPill, UserStatusPill, SmallButton, formatDate, getAdminProfileAccessLabel, formatAdminProfileAccess, formatOperatorValue, getAppUserStatusLabel } from '../shared/helpers'
 
 export interface UserDetailPanelProps {
   detail: AdminUserDetail;
@@ -54,7 +54,7 @@ function UserDetailPanel({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="admin-user-detail-title" className="break-all text-lg font-semibold text-ink-primary">{user.email}</h2>
-            <UserStatusPill status={user.status} />
+            <UserStatusPill status={user.status} emailVerifiedAt={user.email_verified_at} />
             <span className="tool-status tool-status--current">{formatAdminProfileAccess(user.profile_access)}</span>
           </div>
           <p className="mt-2 break-all text-sm text-ink-muted">用户 ID：{user.id}</p>
@@ -69,7 +69,7 @@ function UserDetailPanel({
 
       <div className="p-4">
         <dl className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-          <DetailItem label="账号状态" value={appUserStatusLabels[user.status]} />
+          <DetailItem label="账号状态" value={getAppUserStatusLabel(user.status, user.email_verified_at)} />
           <DetailItem label="档案数量" value={String(detail.profiles.length)} />
           <DetailItem label="CDK 订单标识" value={user.cdk_order_hash || '-'} />
           <DetailItem label="创建时间" value={formatDate(user.created_at)} />
