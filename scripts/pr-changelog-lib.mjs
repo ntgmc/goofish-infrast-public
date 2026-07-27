@@ -37,30 +37,30 @@ export function normalizeManualSummary(value) {
   return summary ? validateManualSummary(summary) : null
 }
 
-function normalizeDeepSeekResult(value) {
-  if (!isRecord(value)) throw new Error('DeepSeek 未返回 JSON 对象')
+function normalizeModelResult(value) {
+  if (!isRecord(value)) throw new Error('OpenAI 未返回 JSON 对象')
 
-  const summary = normalizeChineseText(value.summary, 'DeepSeek 总结', 2000)
+  const summary = normalizeChineseText(value.summary, 'OpenAI 总结', 2000)
   const publicSections = normalizeSections(value.public_sections, PUBLIC_SECTION_KINDS, 'public_sections')
   const internalSections = normalizeSections(value.internal_sections, INTERNAL_SECTION_KINDS, 'internal_sections')
   const itemCount = countSectionItems(publicSections) + countSectionItems(internalSections)
-  if (itemCount === 0) throw new Error('DeepSeek 必须返回至少一个 changelog 分类条目')
+  if (itemCount === 0) throw new Error('OpenAI 必须返回至少一个 changelog 分类条目')
   return { summary, publicSections, internalSections }
 }
 
-export function createPrChangelogPayload({ pullRequestNumber, headSha, manualSummary, deepseekResult, generatedAt, model }) {
+export function createPrChangelogPayload({ pullRequestNumber, headSha, manualSummary, modelResult, generatedAt, model }) {
   const pullRequest = Number(pullRequestNumber)
   if (!Number.isInteger(pullRequest) || pullRequest < 1) throw new Error('PR 编号必须是正整数')
 
   const normalizedHeadSha = String(headSha ?? '').trim().toLowerCase()
   if (!SHA_PATTERN.test(normalizedHeadSha)) throw new Error('PR head SHA 必须是完整的 40 位提交 SHA')
 
-  const normalizedResult = normalizeDeepSeekResult(deepseekResult)
+  const normalizedResult = normalizeModelResult(modelResult)
   const timestamp = new Date(String(generatedAt ?? ''))
   if (Number.isNaN(timestamp.getTime())) throw new Error('changelog 生成时间无效')
 
   const normalizedModel = String(model ?? '').trim()
-  if (!normalizedModel) throw new Error('DeepSeek 模型名称不能为空')
+  if (!normalizedModel) throw new Error('OpenAI 模型名称不能为空')
 
   return {
     schema_version: 2,
@@ -92,7 +92,7 @@ export function renderPrChangelogBlock(payload) {
     '> 此区域由 `Record PR Changelog` 工作流生成；PR 更新后需重新运行。',
     '',
     ...manualSummaryLines,
-    '### DeepSeek 分析',
+    '### OpenAI 分析',
     '',
     validated.deepseek_summary,
     '',
@@ -191,7 +191,7 @@ export function buildPullRequestDiffContext(files, maxLength = 60000) {
   return chunks.join('\n') || '[PR 未返回可分析的文件差异]'
 }
 
-export function buildDeepSeekMessages({ title, body, manualSummary, diffContext }) {
+export function buildOpenAIMessages({ title, body, manualSummary, diffContext }) {
   const normalizedManualSummary = normalizeManualSummary(manualSummary)
   return [
     {
@@ -233,7 +233,7 @@ function validatePayload(value) {
     pullRequestNumber: value.pull_request,
     headSha: value.head_sha,
     manualSummary: value.manual_summary,
-    deepseekResult: {
+    modelResult: {
       summary: value.deepseek_summary,
       public_sections: publicSections,
       internal_sections: internalSections,
@@ -244,15 +244,15 @@ function validatePayload(value) {
 }
 
 function normalizeSections(value, allowedKinds, fieldName) {
-  if (!Array.isArray(value)) throw new Error(`DeepSeek ${fieldName} 必须是数组`)
+  if (!Array.isArray(value)) throw new Error(`OpenAI ${fieldName} 必须是数组`)
 
   const grouped = new Map(allowedKinds.map((kind) => [kind, []]))
   for (const section of value) {
     if (!isRecord(section) || !allowedKinds.includes(section.kind) || !Array.isArray(section.items)) {
-      throw new Error('DeepSeek 返回了无效的 changelog 分类')
+      throw new Error('OpenAI 返回了无效的 changelog 分类')
     }
     for (const item of section.items) {
-      const normalized = normalizeChineseText(item, 'DeepSeek changelog 条目', 500)
+      const normalized = normalizeChineseText(item, 'OpenAI changelog 条目', 500)
       const items = grouped.get(section.kind)
       if (!items.includes(normalized)) items.push(normalized)
     }

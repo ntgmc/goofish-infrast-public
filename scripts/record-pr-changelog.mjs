@@ -1,6 +1,7 @@
 import { appendFile } from 'node:fs/promises'
+import OpenAI from 'openai'
 import {
-  buildDeepSeekMessages,
+  buildOpenAIMessages,
   buildPullRequestDiffContext,
   createPrChangelogPayload,
   normalizeManualSummary,
@@ -9,17 +10,18 @@ import {
 
 const repository = requireEnvironment('GITHUB_REPOSITORY')
 const githubToken = requireEnvironment('GITHUB_TOKEN')
-const deepseekApiKey = requireEnvironment('DEEPSEEK_API_KEY')
+const openaiApiKey = requireEnvironment('OPENAI_API_KEY')
 const pullRequestNumber = parsePullRequestNumber(requireEnvironment('PR_NUMBER'))
 const manualSummary = normalizeManualSummary(process.env.MANUAL_CHANGELOG_SUMMARY)
 const githubApiUrl = String(process.env.GITHUB_API_URL ?? 'https://api.github.com').replace(/\/$/, '')
-const deepseekApiUrl = String(process.env.DEEPSEEK_API_URL ?? 'https://api.deepseek.com').replace(/\/$/, '')
-const deepseekModel = String(process.env.DEEPSEEK_MODEL ?? 'deepseek-v4-pro').trim()
+const openaiBaseUrl = String(process.env.OPENAI_BASE_URL ?? 'https://api.krill-ai.net/codex/v1').replace(/\/$/, '')
+const openaiModel = String(process.env.OPENAI_MODEL ?? 'gpt-5.6-luna').trim()
 const changelogBotLogin = String(process.env.CHANGELOG_BOT_LOGIN ?? 'github-actions[bot]').trim()
 const [owner, repo] = repository.split('/')
+const openai = new OpenAI({ apiKey: openaiApiKey, baseURL: openaiBaseUrl })
 
 if (!owner || !repo) throw new Error('GITHUB_REPOSITORY 必须使用 owner/repo 格式')
-if (!deepseekModel) throw new Error('DEEPSEEK_MODEL 不能为空')
+if (!openaiModel) throw new Error('OPENAI_MODEL 不能为空')
 if (!changelogBotLogin) throw new Error('CHANGELOG_BOT_LOGIN 不能为空')
 
 let statusSha = null
@@ -31,28 +33,28 @@ try {
   if (!pullRequest.head?.sha) throw new Error(`PR #${pullRequestNumber} 缺少 head SHA`)
   statusSha = pullRequest.head.sha
 
-  await writeCommitStatus('pending', '正在由 DeepSeek 分析 PR 变更')
+  await writeCommitStatus('pending', '正在由 OpenAI 分析 PR 变更')
 
   const files = await listPullRequestFiles()
   const diffContext = buildPullRequestDiffContext(files)
-  const messages = buildDeepSeekMessages({
+  const messages = buildOpenAIMessages({
     title: pullRequest.title,
     body: removeGeneratedChangelogBlock(pullRequest.body),
     manualSummary,
     diffContext,
   })
-  const deepseekResult = await requestDeepSeek(messages)
+  const openaiResult = await requestOpenAI(messages)
   const payload = createPrChangelogPayload({
     pullRequestNumber,
     headSha: statusSha,
     manualSummary,
-    deepseekResult,
+    modelResult: openaiResult,
     generatedAt: new Date().toISOString(),
-    model: deepseekModel,
+    model: openaiModel,
   })
   const block = renderPrChangelogBlock(payload)
   await writeChangelogComment(block)
-  await writeCommitStatus('success', 'DeepSeek changelog 总结已记录')
+  await writeCommitStatus('success', 'OpenAI changelog 总结已记录')
   await writeStepSummary(payload, files.length)
   console.log(`Recorded Chinese changelog summary for PR #${pullRequestNumber}.`)
 } catch (error) {
@@ -104,15 +106,13 @@ async function writeChangelogComment(body) {
   })
 }
 
-async function requestDeepSeek(messages) {
-  const requestUrl = `${deepseekApiUrl}/chat/completions`
+async function requestOpenAI(messages) {
+  const requestUrl = `${openaiBaseUrl}/chat/completions`
   const requestBody = {
-    model: deepseekModel,
+    model: openaiModel,
     messages,
-    response_format: { type: 'json_object' },
-    temperature: 0.2,
   }
-  console.log('[record-pr-changelog] DeepSeek 完整请求：')
+  console.log('[record-pr-changelog] OpenAI 完整请求：')
   console.log(JSON.stringify({
     url: requestUrl,
     method: 'POST',
@@ -123,37 +123,25 @@ async function requestDeepSeek(messages) {
     body: requestBody,
   }, null, 2))
 
-  const response = await fetch(requestUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${deepseekApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
-  })
-  const responseText = await response.text()
-  console.log(`[record-pr-changelog] DeepSeek 完整响应：HTTP ${response.status} ${response.statusText}\n${responseText}`)
-
-  let responseBody
+  let completion
   try {
-    responseBody = JSON.parse(responseText)
-  } catch {
-    responseBody = null
+    completion = await openai.chat.completions.create(requestBody)
+  } catch (error) {
+    const status = error instanceof OpenAI.APIError ? `HTTP ${error.status}` : '未知状态'
+    throw new Error(`OpenAI API 请求失败：${status}`, { cause: error })
   }
-  if (!response.ok) {
-    throw new Error(`DeepSeek API 请求失败：HTTP ${response.status} ${response.statusText}`)
-  }
+  console.log(`[record-pr-changelog] OpenAI 完整响应：\n${JSON.stringify(completion, null, 2)}`)
 
-  const content = responseBody?.choices?.[0]?.message?.content
-  if (!content) throw new Error('DeepSeek API 未返回总结内容')
+  const content = completion.choices[0]?.message?.content
+  if (!content) throw new Error('OpenAI API 未返回总结内容')
 
   const normalizedContent = String(content).replace(/^```(?:json)?\s*|\s*```$/gi, '').trim()
   let parsed
   try {
     parsed = JSON.parse(normalizedContent)
   } catch {
-    console.error(`[record-pr-changelog] DeepSeek 原始响应：\n${normalizedContent}`)
-    throw new Error('DeepSeek 返回内容不是有效 JSON')
+    console.error(`[record-pr-changelog] OpenAI 原始响应：\n${normalizedContent}`)
+    throw new Error('OpenAI 返回内容不是有效 JSON')
   }
 
   return parsed
@@ -203,7 +191,7 @@ async function writeCommitStatus(state, description) {
     method: 'POST',
     body: {
       state,
-      context: 'changelog/deepseek-summary',
+      context: 'changelog/openai-summary',
       description,
       target_url: `${process.env.GITHUB_SERVER_URL}/${repository}/actions/runs/${process.env.GITHUB_RUN_ID}`,
     },
@@ -217,7 +205,7 @@ async function writeStepSummary(payload, fileCount) {
     `## PR #${payload.pull_request} Changelog 已记录`,
     '',
     `- 分析文件：${fileCount}`,
-    `- DeepSeek 模型：${payload.model}`,
+    `- OpenAI 模型：${payload.model}`,
     `- 网站公开条目：${countItems(payload.public_sections)}`,
     `- 仓库内部条目：${countItems(payload.internal_sections)}`,
     `- Head SHA：\`${payload.head_sha}\``,
