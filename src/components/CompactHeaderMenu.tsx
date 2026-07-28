@@ -10,6 +10,7 @@ type CompactHeaderMenuItem =
       onSelect: () => void
       current?: boolean
       badge?: string
+      badgeLabel?: string
       disabled?: boolean
       intent?: 'default' | 'danger'
       tourTarget?: string
@@ -21,6 +22,7 @@ type CompactHeaderMenuItem =
       to: string
       current?: boolean
       badge?: string
+      badgeLabel?: string
       disabled?: boolean
       intent?: 'default' | 'danger'
     }
@@ -32,6 +34,8 @@ type CompactHeaderMenuItem =
 interface CompactHeaderMenuProps {
   ariaLabel: string
   triggerLabel?: string
+  triggerBadge?: string
+  triggerBadgeLabel?: string
   triggerVariant?: 'label' | 'icon'
   items: CompactHeaderMenuItem[]
   metadata?: {
@@ -48,6 +52,8 @@ const itemClassName = 'relative flex min-h-11 w-full cursor-pointer select-none 
 export default function CompactHeaderMenu({
   ariaLabel,
   triggerLabel,
+  triggerBadge,
+  triggerBadgeLabel,
   triggerVariant = 'label',
   items,
   metadata,
@@ -71,6 +77,11 @@ export default function CompactHeaderMenu({
           ) : (
             <>
               <span className="truncate">{triggerLabel}</span>
+              {triggerBadge && (
+                <span aria-label={triggerBadgeLabel} className="tool-status shrink-0 px-1.5 py-0.5 text-[11px]">
+                  {triggerBadge}
+                </span>
+              )}
               <ChevronDown aria-hidden="true" className="size-4 shrink-0" />
             </>
           )}
@@ -97,16 +108,27 @@ export default function CompactHeaderMenu({
             const content = (
               <>
                 <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                {item.badge && <span className="tool-status shrink-0 px-1.5 py-0.5 text-[11px]">{item.badge}</span>}
+                {item.badge && (
+                  <span aria-label={item.badgeLabel} className="tool-status shrink-0 px-1.5 py-0.5 text-[11px]">
+                    {item.badge}
+                  </span>
+                )}
                 {item.current && <Check aria-hidden="true" className="size-4 shrink-0 text-brand-500" />}
               </>
             )
             const className = `${itemClassName} ${item.intent === 'danger' ? 'text-error data-[highlighted]:text-error' : ''}`
+            const ariaLabel = item.badgeLabel ? `${item.label} ${item.badgeLabel}` : undefined
 
             if (item.type === 'link' && !item.disabled) {
               return (
                 <DropdownMenu.Item key={item.id} asChild className={className}>
-                  <Link to={item.to} aria-current={item.current ? 'page' : undefined}>{content}</Link>
+                  <Link
+                    to={item.to}
+                    aria-label={ariaLabel}
+                    aria-current={item.current ? 'page' : undefined}
+                  >
+                    {content}
+                  </Link>
                 </DropdownMenu.Item>
               )
             }
@@ -115,6 +137,7 @@ export default function CompactHeaderMenu({
               <DropdownMenu.Item
                 key={item.id}
                 disabled={item.disabled}
+                aria-label={ariaLabel}
                 aria-current={item.current ? 'page' : undefined}
                 data-tour-target={item.type === 'button' ? item.tourTarget : undefined}
                 onSelect={item.type === 'button' ? item.onSelect : undefined}

@@ -101,11 +101,12 @@ export async function saveRegistrationWithAdminInvitation(
   saveUser: (client: PoolClient) => Promise<void>,
   invitation: ValidatedAdminRegistrationInvitation,
   userId: string,
+  now = new Date(),
 ): Promise<void> {
   await ensureSchema()
   await withTransaction(async (client) => {
     await saveUser(client)
-    await consumeAdminRegistrationInvitationInTransaction(client, invitation, userId)
+    await consumeAdminRegistrationInvitationInTransaction(client, invitation, userId, now)
   })
 }
 

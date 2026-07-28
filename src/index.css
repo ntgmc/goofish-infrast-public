@@ -760,6 +760,11 @@ dialog[open] > * {
   transform-origin: top right;
 }
 
+.admin-toast {
+  animation: config-validation-toast 180ms ease-out both;
+  transform-origin: top right;
+}
+
 @keyframes config-validation-toast {
   from {
     opacity: 0;

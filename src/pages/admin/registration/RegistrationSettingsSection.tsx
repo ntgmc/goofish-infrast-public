@@ -3,6 +3,7 @@ import { adminApiJson } from '../../../lib/admin-api-client'
 import type { BrevoEmailStats, RegistrationSettings } from '../../../lib/types'
 import { copy } from '../../../copy/index'
 import AdminRegistrationInvitationsPanel from './AdminRegistrationInvitationsPanel'
+import { AdminToast } from '../shared/AdminToast'
 
 const DEFAULT_SETTINGS: RegistrationSettings = {
   version: 4,
@@ -123,7 +124,7 @@ export default function RegistrationSettingsSection() {
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
       {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
-      {notice && <div className="tool-alert tool-alert--success" role="status" aria-live="polite">{notice}</div>}
+      {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
       <section className="tool-panel p-5 sm:p-6" aria-labelledby="admin-brevo-stats-title">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>

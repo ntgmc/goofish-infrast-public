@@ -109,9 +109,10 @@ describe('WorkspaceSetupPage CDK paths', () => {
     renderWorkspace()
 
     const accountActions = screen.getByRole('navigation', { name: '账号操作' })
-    expect(accountActions).toHaveClass('flex-col', 'gap-3')
+    expect(accountActions).toHaveClass('grid-cols-2', 'gap-2')
     expect(within(accountActions).getByRole('button', { name: '返回账号列表' })).toBeInTheDocument()
     expect(within(accountActions).getByRole('button', { name: '退出登录' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: '返回账号列表' })).toHaveLength(1)
   })
 
   it('switches sections and preserves account actions in the compact menu', async () => {

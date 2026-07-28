@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { itemIconPath } from '../../../lib/inventory-contracts'
 import type { ExpiryPolicy, GiftPackContentInput, ItemDefinition, OnboardingTaskCode } from '../../../lib/inventory-contracts'
+import { AdminToast } from '../shared/AdminToast'
 
 type GiftVersion = { id: string; item_code: string; version: number; status: 'draft' | 'published' | 'retired'; contents: GiftPackContentInput[] }
 type TaskConfig = { task_code: OnboardingTaskCode; version: number; enabled: boolean; rewards_json: GiftPackContentInput[] }
@@ -125,7 +126,7 @@ export default function InventoryAdminSection() {
         <h2 className="mt-2 text-xl font-semibold text-ink-primary">道具与礼包</h2>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-ink-secondary">系统效果代码不可编辑；礼包和新人任务发布后形成不可变版本。图标目前全部使用受控占位图，后续只需替换图标键映射。</p>
         {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
-        {notice && <div className="tool-alert tool-alert--success mt-4" role="status">{notice}</div>}
+        {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
       </section>
 
       <nav className="tool-panel overflow-x-auto p-2" aria-label="道具与礼包管理分区">

@@ -77,8 +77,8 @@ describe('administrator registration invitations PostgreSQL store', () => {
     const second = userRecord('second@example.test', now)
 
     const results = await Promise.allSettled([
-      saveRegistrationWithAdminInvitation((client) => saveUserAccountInTransaction(client, first), validated, first.id),
-      saveRegistrationWithAdminInvitation((client) => saveUserAccountInTransaction(client, second), validated, second.id),
+      saveRegistrationWithAdminInvitation((client) => saveUserAccountInTransaction(client, first), validated, first.id, now),
+      saveRegistrationWithAdminInvitation((client) => saveUserAccountInTransaction(client, second), validated, second.id, now),
     ])
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
     expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1)

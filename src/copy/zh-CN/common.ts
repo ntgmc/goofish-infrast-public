@@ -194,7 +194,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_069: "游戏内轮换按两班生成，菲亚梅塔不会参与计算。",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_070: "菲亚梅塔按固定 8-8-8 换班节奏计算目标。",
+  components_ConfigEditor_070: "菲亚梅塔仅支持固定 8-8-8 或 12-12-12 换班节奏。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_071: "无人机",
   // src/components/ConfigEditor.tsx
@@ -225,6 +225,26 @@ export const commonCopy = {
   components_ConfigEditor_084: "使用短横线或逗号分隔，例如 12-6-6、12-12-12（12 小时一换）或 24-24-24（一天一换）。至少 3 班；长班会优先作为高效率班。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_085: "龙门币，赤金，龙门币",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_086: "换班策略",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_087: "一天3换（8小时一换）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_088: "一天2换（12小时一换）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_089: "一天1换（24小时一换）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_090: "自动变间隔换班",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_091: "自定义",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_092: "自动搜索 3–4 班的实际间隔；生成结果后会固定为可复现的班次数组。",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_093: "选择固定换班频率、自动变间隔换班或自定义班次。",
+  // src/components/InputNumber.tsx
+  components_InputNumber_001: "减少",
+  // src/components/InputNumber.tsx
+  components_InputNumber_002: "增加",
   // src/components/DeferredFeatureMenu.tsx
   components_DeferredFeatureMenu_001: "仓库价值分析器",
   // src/components/DeferredFeatureMenu.tsx
@@ -607,6 +627,10 @@ export const commonCopy = {
   pages_tool_AccountDashboard_014: "移动端账号导航",
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_015: "正在载入...",
+  // src/pages/tool/AccountDashboard.tsx
+  pages_tool_AccountDashboard_016: "返回首页",
+  // src/pages/tool/AccountDashboard.tsx
+  pages_tool_AccountDashboard_017: "账号操作",
   // src/pages/tool/useToolSession.ts
   pages_tool_useToolSession_001: "确认登录信息失败",
   // src/pages/tool/useToolSession.ts

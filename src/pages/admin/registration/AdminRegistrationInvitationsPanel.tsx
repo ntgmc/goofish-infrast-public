@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AdminRegistrationInvitation, AdminRegistrationInvitationStatus } from '../../../lib/types'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { copy } from '../../../copy/index'
+import { AdminToast } from '../shared/AdminToast'
 
 type StatusFilter = AdminRegistrationInvitationStatus | 'all'
 
@@ -120,7 +121,7 @@ export default function AdminRegistrationInvitationsPanel() {
       </div>
 
       {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
-      {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
+      {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
 
       {generated && (
         <div className="tool-inset mt-5 space-y-4 p-4" role="status" aria-live="polite">

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import {
+  isFiammettaShiftHoursSupported,
   isValidShiftHours,
+  isVariableShiftScheduleEnabled,
   normalizeConfig,
   normalizeDormitoryRule,
   normalizeScheduleMode,
@@ -9,6 +11,7 @@ import {
 import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
 import { copy } from '../copy/index'
+import InputNumber from './InputNumber'
 
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
@@ -34,6 +37,27 @@ export const DORMITORY_RULE_LABELS: Record<string, string> = {
   fixed: copy.common.components_ConfigEditor_009,
   maa_autofill: copy.common.components_ConfigEditor_010,
 }
+
+const VARIABLE_SHIFT_SCHEDULE_DEFAULTS = {
+  enable: true,
+  enabled: true,
+  max_shifts: 4,
+  shift_step_minutes: 60,
+  min_low_hours: 3,
+  beam_width: 4,
+  trace_variable_shifts: false,
+  trace_mood_cycle: false,
+} satisfies NonNullable<LicenseConfig['variable_shift_schedule']>
+
+const SHIFT_SCHEDULE_OPTIONS = [
+  { id: '8x3', label: copy.common.components_ConfigEditor_087, hours: [8, 8, 8] },
+  { id: '12x3', label: copy.common.components_ConfigEditor_088, hours: [12, 12, 12] },
+  { id: '24x3', label: copy.common.components_ConfigEditor_089, hours: [24, 24, 24] },
+  { id: 'variable', label: copy.common.components_ConfigEditor_090 },
+  { id: 'custom', label: copy.common.components_ConfigEditor_091 },
+] as const
+
+type ShiftScheduleChoice = typeof SHIFT_SCHEDULE_OPTIONS[number]['id']
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: copy.common.components_ConfigEditor_011,
@@ -174,6 +198,9 @@ export default function ConfigEditor({
   const droneTargets = formatDroneTargetsInput(config.drones?.targets ?? [])
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
+  const isScheduleModeSelected = (mode: 'maa' | 'rotation') => mode === 'maa' ? !rotationMode : scheduleMode === mode
+  const variableShiftMode = isVariableShiftScheduleEnabled(config)
+  const fiammettaShiftHoursSupported = !variableShiftMode && isFiammettaShiftHoursSupported(config.shift_hours)
   const validationMessage = validation.ok === false ? validation.message : null
   const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
   const orundumPlanning = normalizeOrundumPlanning(config)
@@ -310,13 +337,13 @@ export default function ConfigEditor({
                     <button
                       key={mode}
                       type="button"
-                      aria-pressed={scheduleMode === mode}
+                      aria-pressed={isScheduleModeSelected(mode)}
                       onClick={() => onUpdate((next) => {
                         next.schedule_mode = mode
                         applyCounts(next)
                       })}
                       className={`tool-secondary-action min-h-11 px-3 text-sm ${
-                        scheduleMode === mode
+                        isScheduleModeSelected(mode)
                           ? 'tool-option-selected'
                           : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
                       }`}
@@ -362,54 +389,66 @@ export default function ConfigEditor({
           </div>
         </div>
       ) : (
-      <div className="grid gap-5 pt-5 lg:grid-cols-2">
+      <div className="space-y-5 pt-5">
         <div className="tool-inset bg-surface-2/60 p-4">
-          <div className="mb-4">
-            <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_042}</h3>
-            <p className="mt-1 text-xs text-ink-muted">{copy.common.components_ConfigEditor_043}{config.layout}</p>
-          </div>
-          {canEdit ? (
-            <div className="grid grid-cols-2 gap-3">
-              <CounterField
-                label={copy.common.components_ConfigEditor_044}
-                value={config.trading_stations_count}
-                min={1}
-                max={5}
-                onChange={(value) => setStationCounts(value, 6 - value)}
-              />
-              <CounterField
-                label={copy.common.components_ConfigEditor_045}
-                value={config.manufacturing_stations_count}
-                min={1}
-                max={5}
-                onChange={(value) => setStationCounts(6 - value, value)}
-              />
-            </div>
-          ) : (
-            <dl className="grid grid-cols-2 gap-3 text-sm">
-              <ReadOnlyMetric label={copy.common.components_ConfigEditor_046} value={config.trading_stations_count} />
-              <ReadOnlyMetric label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
-            </dl>
-          )}
-        </div>
+          <div className="grid gap-5 lg:grid-cols-[minmax(14rem,0.85fr)_minmax(0,2.15fr)]">
+            <section aria-labelledby="config-room-layout-heading">
+              <div className="mb-4">
+                <h3 id="config-room-layout-heading" className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_042}</h3>
+                <p className="mt-1 text-xs text-ink-muted">{copy.common.components_ConfigEditor_043}{config.layout}</p>
+              </div>
+              {canEdit ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                  <CounterField
+                    id="trading-stations-count"
+                    label={copy.common.components_ConfigEditor_044}
+                    value={config.trading_stations_count}
+                    min={1}
+                    max={5}
+                    onChange={(value) => setStationCounts(value, 6 - value)}
+                  />
+                  <CounterField
+                    id="manufacturing-stations-count"
+                    label={copy.common.components_ConfigEditor_045}
+                    value={config.manufacturing_stations_count}
+                    min={1}
+                    max={5}
+                    onChange={(value) => setStationCounts(6 - value, value)}
+                  />
+                </div>
+              ) : (
+                <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1">
+                  <ReadOnlyMetric label={copy.common.components_ConfigEditor_046} value={config.trading_stations_count} />
+                  <ReadOnlyMetric label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
+                </dl>
+              )}
+            </section>
 
-        <div className="tool-inset bg-surface-2/60 p-4">
-          <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_048}</h3>
-          <div className="mt-4 space-y-4">
-            <ProductGroupEditor
-              label={copy.common.components_ConfigEditor_049}
-              products={tradingProducts}
-              counts={config.product_requirements.trading_stations}
-              canEdit={canEdit}
-              onChange={(product, value) => setProductCount('trading_stations', product, value)}
-            />
-            <ProductGroupEditor
-              label={copy.common.components_ConfigEditor_050}
-              products={manufacturingProducts}
-              counts={config.product_requirements.manufacturing_stations}
-              canEdit={canEdit}
-              onChange={(product, value) => setProductCount('manufacturing_stations', product, value)}
-            />
+            <section
+              aria-labelledby="config-product-counts-heading"
+              className="border-t border-surface-3/60 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0"
+            >
+              <h3 id="config-product-counts-heading" className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_048}</h3>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <ProductGroupEditor
+                  label={copy.common.components_ConfigEditor_049}
+                  products={tradingProducts}
+                  counts={config.product_requirements.trading_stations}
+                  canEdit={canEdit}
+                  onChange={(product, value) => setProductCount('trading_stations', product, value)}
+                />
+                <ProductGroupEditor
+                  label={copy.common.components_ConfigEditor_050}
+                  products={manufacturingProducts}
+                  counts={config.product_requirements.manufacturing_stations}
+                  canEdit={canEdit}
+                  onChange={(product, value) => setProductCount('manufacturing_stations', product, value)}
+                />
+              </div>
+            </section>
+          </div>
+
+          <div className="mt-5 border-t border-surface-3/60 pt-5">
             <IntermediateInventoryEditor
               canEdit={canEdit}
               inventory={intermediateInventory}
@@ -419,7 +458,7 @@ export default function ConfigEditor({
           </div>
         </div>
 
-        <div className="tool-inset bg-surface-2/60 p-4 lg:col-span-2">
+        <div className="tool-inset bg-surface-2/60 p-4">
           <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_051}</h3>
           <div className="mt-4 space-y-4">
             {showOrundumPlanning && (
@@ -467,14 +506,14 @@ export default function ConfigEditor({
                   <button
                     key={mode}
                     type="button"
-                    aria-pressed={scheduleMode === mode}
+                    aria-pressed={isScheduleModeSelected(mode)}
                     disabled={false}
                     onClick={() => onUpdate((next) => {
                       next.schedule_mode = mode
                       applyCounts(next)
                     })}
                     className={`tool-secondary-action min-h-11 px-3 text-sm ${
-                      scheduleMode === mode
+                      isScheduleModeSelected(mode)
                         ? 'tool-option-selected'
                         : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
                     }`}
@@ -489,10 +528,24 @@ export default function ConfigEditor({
             {!rotationMode && (
               <ShiftHoursEditor
                 value={config.shift_hours}
+                variableMode={variableShiftMode}
                 canEdit={canEdit}
+                onSelectVariable={() => onUpdate((next) => {
+                  next.schedule_mode = 'variable'
+                  next.shift_hours = [8, 8, 8]
+                  next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
+                  next.variable_shift_schedule = {
+                    ...(next.variable_shift_schedule ?? {}),
+                    ...VARIABLE_SHIFT_SCHEDULE_DEFAULTS,
+                  }
+                  applyCounts(next)
+                })}
                 onChange={(hours) => onUpdate((next) => {
                   next.schedule_mode = 'maa'
                   next.shift_hours = hours
+                  if (!isFiammettaShiftHoursSupported(hours)) {
+                    next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
+                  }
                   next.variable_shift_schedule = {
                     ...(next.variable_shift_schedule ?? {}),
                     enable: false,
@@ -537,8 +590,8 @@ export default function ConfigEditor({
             <span>{copy.common.components_ConfigEditor_068}</span>
               <input
                 type="checkbox"
-                checked={!rotationMode && (config.Fiammetta?.enable ?? false)}
-                disabled={!canEdit || rotationMode}
+                checked={!rotationMode && fiammettaShiftHoursSupported && (config.Fiammetta?.enable ?? false)}
+                disabled={!canEdit || rotationMode || !fiammettaShiftHoursSupported}
                 onChange={(event) => onUpdate((next) => {
                   next.Fiammetta = { enable: event.currentTarget.checked }
                   applyCounts(next)
@@ -549,7 +602,7 @@ export default function ConfigEditor({
             {rotationMode ? (
               <p className="tool-inset px-3 py-2 text-xs leading-5 text-ink-muted">
                 {copy.common.components_ConfigEditor_069}</p>
-            ) : config.Fiammetta?.enable && (
+            ) : (!fiammettaShiftHoursSupported || config.Fiammetta?.enable) && (
               <p className="tool-alert tool-alert--warning px-3 py-2 text-xs leading-5">
                 {copy.common.components_ConfigEditor_070}</p>
             )}
@@ -707,7 +760,7 @@ function IntermediateInventoryEditor({
   return (
     <div>
       <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_077}</p>
-      <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         <IntermediateInventoryField
           label={copy.common.components_ConfigEditor_078}
           product="Originium Shard"
@@ -797,17 +850,24 @@ function IntermediateInventoryField({
 
 function ShiftHoursEditor({
   value,
+  variableMode,
   canEdit,
+  onSelectVariable,
   onChange,
 }: {
   value: LicenseConfig['shift_hours'];
+  variableMode: boolean;
   canEdit: boolean;
+  onSelectVariable: () => void;
   onChange: (hours: number[]) => void;
 }) {
   const normalized = parseShiftHours(value) ?? [8, 8, 8]
   const formatted = normalized.join('-')
   const [draftValue, setDraftValue] = useState(formatted)
   const [error, setError] = useState<string | null>(null)
+  const [customSelected, setCustomSelected] = useState(false)
+  const inferredChoice = variableMode ? 'variable' : inferShiftScheduleChoice(normalized)
+  const selectedChoice: ShiftScheduleChoice = customSelected ? 'custom' : inferredChoice
 
   useEffect(() => {
     setDraftValue(formatted)
@@ -823,44 +883,100 @@ function ShiftHoursEditor({
     }
     setError(null)
     setDraftValue(parsed.join('-'))
-    if (parsed.some((hours, index) => Math.abs(hours - (normalized[index] ?? -1)) > 0.0001)
+    if (variableMode
+      || parsed.some((hours, index) => Math.abs(hours - (normalized[index] ?? -1)) > 0.0001)
       || parsed.length !== normalized.length) {
       onChange(parsed)
     }
   }
 
+  const selectChoice = (choice: typeof SHIFT_SCHEDULE_OPTIONS[number]) => {
+    if (!canEdit) return
+    if (choice.id === 'custom') {
+      setCustomSelected(true)
+      return
+    }
+    setCustomSelected(false)
+    if (choice.id === 'variable') {
+      onSelectVariable()
+      return
+    }
+    onChange([...choice.hours])
+  }
+
   return (
     <div>
-      <label htmlFor="config-shift-hours" className="mb-2 block text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_082}</label>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          id="config-shift-hours"
-          type="text"
-          inputMode="decimal"
-          value={draftValue}
-          disabled={!canEdit}
-          aria-invalid={Boolean(error)}
-          aria-describedby="config-shift-hours-help"
-          onChange={(event) => setDraftValue(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') commitDraft()
-          }}
-          className="tool-field min-w-0 flex-1 tabular-nums"
-        />
-        {canEdit && (
+      <p id="config-shift-schedule-label" className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_086}</p>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-5" role="group" aria-labelledby="config-shift-schedule-label">
+        {SHIFT_SCHEDULE_OPTIONS.map((choice) => (
           <button
+            key={choice.id}
             type="button"
-            onClick={commitDraft}
-            className="tool-secondary-action"
+            aria-pressed={selectedChoice === choice.id}
+            disabled={!canEdit}
+            onClick={() => selectChoice(choice)}
+            className={`tool-secondary-action min-h-11 whitespace-normal px-2 py-2 text-xs leading-5 disabled:cursor-not-allowed disabled:text-ink-muted sm:text-sm ${
+              selectedChoice === choice.id
+                ? 'tool-option-selected'
+                : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
+            }`}
           >
-            {copy.common.components_ConfigEditor_083}</button>
-        )}
+            {choice.label}
+          </button>
+        ))}
       </div>
-      <p id="config-shift-hours-help" role={error ? 'alert' : undefined} className={`mt-2 text-xs leading-5 ${error ? 'text-error' : 'text-ink-muted'}`}>
-        {error ?? copy.common.components_ConfigEditor_084}
-      </p>
+      {selectedChoice === 'custom' && (
+        <div className="mt-3">
+          <label htmlFor="config-shift-hours" className="mb-2 block text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_082}</label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              id="config-shift-hours"
+              type="text"
+              inputMode="decimal"
+              value={draftValue}
+              disabled={!canEdit}
+              aria-invalid={Boolean(error)}
+              aria-describedby="config-shift-hours-help"
+              onChange={(event) => setDraftValue(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitDraft()
+              }}
+              className="tool-field min-w-0 flex-1 tabular-nums"
+            />
+            {canEdit && (
+              <button
+                type="button"
+                onClick={commitDraft}
+                className="tool-secondary-action"
+              >
+                {copy.common.components_ConfigEditor_083}</button>
+            )}
+          </div>
+          <p id="config-shift-hours-help" role={error ? 'alert' : undefined} className={`mt-2 text-xs leading-5 ${error ? 'text-error' : 'text-ink-muted'}`}>
+            {error ?? copy.common.components_ConfigEditor_084}
+          </p>
+        </div>
+      )}
+      {selectedChoice !== 'custom' && (
+        <p className="mt-2 text-xs leading-5 text-ink-muted">
+          {selectedChoice === 'variable'
+            ? copy.common.components_ConfigEditor_092
+            : copy.common.components_ConfigEditor_093}
+        </p>
+      )}
     </div>
   )
+}
+
+function inferShiftScheduleChoice(hours: number[]): ShiftScheduleChoice {
+  for (const choice of SHIFT_SCHEDULE_OPTIONS) {
+    if (!('hours' in choice)) continue
+    if (choice.hours.length === hours.length
+      && choice.hours.every((value, index) => Math.abs(value - hours[index]!) <= 0.0001)) {
+      return choice.id
+    }
+  }
+  return 'custom'
 }
 
 function DroneTargetsInput({
@@ -907,56 +1023,33 @@ function DroneTargetsInput({
 }
 
 function CounterField({
+  id,
   label,
   value,
   min,
   max,
   onChange,
 }: {
+  id: string;
   label: string;
   value: number;
   min: number;
   max: number;
   onChange: (value: number) => void;
 }) {
-  const [draftValue, setDraftValue] = useState(() => String(value))
-
-  useEffect(() => {
-    setDraftValue(String(value))
-  }, [value])
-
-  const commitDraft = () => {
-    const nextValue = Number(draftValue)
-    if (!Number.isFinite(nextValue)) {
-      setDraftValue(String(value))
-      return
-    }
-    const boundedValue = Math.max(min, Math.min(max, Math.round(nextValue)))
-    if (boundedValue !== value) {
-      onChange(boundedValue)
-    } else {
-      setDraftValue(String(value))
-    }
-  }
-
   return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-medium text-ink-muted">{label}</span>
-      <input
-        type="number"
+    <div>
+      <label htmlFor={id} className="mb-2 block text-xs font-medium text-ink-muted">{label}</label>
+      <InputNumber
+        id={id}
+        label={label}
+        value={value}
         min={min}
         max={max}
-        value={draftValue}
-        onChange={(event) => setDraftValue(event.currentTarget.value)}
-        onBlur={commitDraft}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.currentTarget.blur()
-          }
-        }}
-        className="number-input-clean tool-field"
+        onChange={onChange}
+        className="w-full"
       />
-    </label>
+    </div>
   )
 }
 
@@ -985,19 +1078,20 @@ function ProductGroupEditor({
   return (
     <div>
       <p className="mb-2 text-xs font-medium text-ink-muted">{label}</p>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+      <div className="grid gap-2">
         {products.map((product) => (
-        <label key={product} className="tool-inset flex items-center justify-between gap-3 px-3 py-2 text-sm">
+        <div key={product} className="tool-inset flex items-center justify-between gap-3 px-3 py-2 text-sm">
           <span className="text-ink-secondary">{PRODUCT_LABELS[product] ?? product}</span>
           {canEdit ? (
             <ProductCountInput
+              label={PRODUCT_LABELS[product] ?? product}
               value={counts[product] ?? 0}
               onChange={(value) => onChange(product, value)}
             />
           ) : (
             <span className="font-semibold text-ink-primary">{counts[product] ?? 0}</span>
           )}
-          </label>
+          </div>
         ))}
       </div>
     </div>
@@ -1005,46 +1099,22 @@ function ProductGroupEditor({
 }
 
 function ProductCountInput({
+  label,
   value,
   onChange,
 }: {
+  label: string;
   value: number;
   onChange: (value: number) => void;
 }) {
-  const [draftValue, setDraftValue] = useState(() => String(value))
-
-  useEffect(() => {
-    setDraftValue(String(value))
-  }, [value])
-
-  const commitDraft = () => {
-    const nextValue = Number(draftValue)
-    if (!Number.isFinite(nextValue)) {
-      setDraftValue(String(value))
-      return
-    }
-    const boundedValue = Math.max(0, Math.min(6, Math.round(nextValue)))
-    if (boundedValue !== value) {
-      onChange(boundedValue)
-    } else {
-      setDraftValue(String(value))
-    }
-  }
-
   return (
-    <input
-      type="number"
+    <InputNumber
+      label={label}
+      value={value}
       min={0}
       max={6}
-      value={draftValue}
-      onChange={(event) => setDraftValue(event.currentTarget.value)}
-      onBlur={commitDraft}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          event.currentTarget.blur()
-        }
-      }}
-      className="number-input-clean tool-field w-16 px-3 py-1 text-right"
+      onChange={onChange}
+      className="w-36 max-w-full shrink-0"
     />
   )
 }

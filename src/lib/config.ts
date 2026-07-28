@@ -72,6 +72,12 @@ export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' | 'vari
   return 'maa'
 }
 
+export function isVariableShiftScheduleEnabled(config: Pick<LicenseConfig, 'schedule_mode' | 'variable_shift_schedule'>): boolean {
+  return normalizeScheduleMode(config.schedule_mode) === 'variable'
+    || config.variable_shift_schedule?.enable === true
+    || config.variable_shift_schedule?.enabled === true
+}
+
 export function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' {
   const ruleText = String(rule ?? 'fixed').trim().toLowerCase()
   return ['maa_autofill', 'maa-autofill', 'autofill', 'auto', copy.domain.lib_config_025, copy.domain.lib_config_026].includes(ruleText)
@@ -102,6 +108,12 @@ export function isValidShiftHours(hours: number[]): boolean {
   return fixedInterval && FIXED_MAA_SHIFT_INTERVALS.some((interval) => Math.abs(hours[0]! - interval) <= 0.0001)
 }
 
+export function isFiammettaShiftHoursSupported(value: unknown): boolean {
+  const hours = parseShiftHours(value)
+  if (!hours || hours.length !== 3) return false
+  return [8, 12].some((interval) => hours.every((hour) => Math.abs(hour - interval) <= 0.0001))
+}
+
 function sumCounts(counts: Record<string, number> | undefined): number {
   return Object.values(counts ?? {}).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0)
 }
@@ -123,6 +135,9 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
   next.desc = next.desc || `${next.layout}${copy.domain.lib_config_027}`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
+  if (isVariableShiftScheduleEnabled(next) || !isFiammettaShiftHoursSupported(next.shift_hours)) {
+    next.Fiammetta = { ...next.Fiammetta, enable: false }
+  }
   next.drones = {
     enable: next.drones?.enable ?? false,
     auto: next.drones?.auto ?? false,

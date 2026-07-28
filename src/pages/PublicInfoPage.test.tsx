@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router'
 import App from '../App'
 import LandingPage from './LandingPage'
 import { type PublicInfoPageKind } from './PublicInfoPage'
-import { SUPPORT_QQ_GROUP_URL } from '../components/PublicFooter'
+import { GITHUB_REPOSITORY_URL, SUPPORT_QQ_GROUP_URL } from '../components/PublicFooter'
 import { ThemeProvider } from '../lib/theme'
 import { DEFAULT_SITE_FEATURES } from '../lib/site-features'
 import * as siteFeatureContext from '../lib/site-feature-context'
@@ -48,6 +48,16 @@ describe('public information pages', () => {
     expect(supportLink).toHaveAttribute('href', SUPPORT_QQ_GROUP_URL)
     expect(supportLink).toHaveAttribute('target', '_blank')
     expect(supportLink).toHaveAttribute('rel', 'noopener noreferrer')
+
+    const githubLink = screen.getByRole('link', { name: 'GitHub 开源仓库' })
+    expect(githubLink).toHaveAttribute('href', GITHUB_REPOSITORY_URL)
+    expect(githubLink).toHaveAttribute('target', '_blank')
+    expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(githubLink).toHaveAttribute('title', 'GitHub 开源仓库')
+
+    const githubIcon = githubLink.querySelector('svg')
+    expect(githubIcon).toBeInTheDocument()
+    expect(githubIcon).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('keeps FAQ, support, and home links in the compact public menu', async () => {

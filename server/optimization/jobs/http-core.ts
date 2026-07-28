@@ -1,4 +1,5 @@
 import type { LicenseConfig } from "../../../src/lib/types";
+import { isFiammettaShiftHoursSupported, isVariableShiftScheduleEnabled } from '../../../src/lib/config';
 import type { OptimizeConfigPermission } from './shared';
 import { hasCapability } from '../../../src/lib/product-catalog';
 import { enforceLayoutOptimizationMode } from '../layout-policy';
@@ -14,6 +15,10 @@ export function sanitizeConfigForPublicOptimize(
   permission: OptimizeConfigPermission,
 ): LicenseConfig {
   const next = structuredClone(config);
+  if (next.Fiammetta?.enable && (isVariableShiftScheduleEnabled(next)
+    || (next.shift_hours !== undefined && !isFiammettaShiftHoursSupported(next.shift_hours)))) {
+    next.Fiammetta = { ...next.Fiammetta, enable: false };
+  }
   const layoutCostConstrained = enforceLayoutOptimizationMode(next);
 
   if (permission === "free_preview" || !hasCapability({ permission }, 'edit_full_config')) {
