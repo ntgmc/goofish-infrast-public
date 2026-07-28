@@ -11,6 +11,30 @@ import AccountDashboard from './AccountDashboard'
 afterEach(() => cleanup())
 
 describe('AccountDashboard route navigation', () => {
+  it('renders announcement unread counts as badges instead of parentheses', async () => {
+    window.localStorage.setItem(tourStorageKey('dashboard-overview', 1), 'done')
+    const user = userEvent.setup()
+    const router = createMemoryRouter([
+      { path: '/tool/*', element: <DashboardRouteHarness announcementUnreadCount={3} /> },
+    ], { initialEntries: ['/tool/profiles'] })
+
+    render(<RouterProvider router={router} />)
+
+    const desktopAnnouncement = screen.getByRole('button', { name: '公告 3 未读' })
+    expect(within(desktopAnnouncement).getByLabelText('3 未读')).toHaveClass('tool-status')
+    expect(screen.queryByText('(3)')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
+    const mobileAnnouncement = screen.getByRole('menuitem', { name: '公告 3 未读' })
+    expect(within(mobileAnnouncement).getByLabelText('3 未读')).toHaveClass('tool-status')
+    await user.click(mobileAnnouncement)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/announcements'))
+    const heading = screen.getByRole('heading', { name: '公告' })
+    expect(within(heading.parentElement!).getByLabelText('3 未读')).toHaveClass('tool-status')
+    expect(within(screen.getByRole('button', { name: '打开栏目菜单，3 未读' })).getByLabelText('3 未读')).toHaveClass('tool-status')
+  })
+
   it('shows the first-run overview without changing the current dashboard route', async () => {
     window.localStorage.removeItem(tourStorageKey('dashboard-overview', 1))
     const user = userEvent.setup()
@@ -81,7 +105,7 @@ describe('AccountDashboard route navigation', () => {
   })
 })
 
-function DashboardRouteHarness() {
+function DashboardRouteHarness({ announcementUnreadCount = 0 }: { announcementUnreadCount?: number }) {
   const location = useLocation()
   const navigate = useNavigate()
   const route = resolveToolRoute(location.pathname)
@@ -97,7 +121,7 @@ function DashboardRouteHarness() {
       profiles={[]}
       activeProfile={null}
       announcement={null}
-      announcementUnreadCount={0}
+      announcementUnreadCount={announcementUnreadCount}
       openingProfileId={null}
       workspaceLoadError={null}
       section={route.section}

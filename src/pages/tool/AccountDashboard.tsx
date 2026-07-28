@@ -72,9 +72,13 @@ export default function AccountDashboard({
     redeem: copy.common.pages_tool_AccountDashboard_003,
     invitations: copy.common.pages_tool_AccountDashboard_004,
     inventory: copy.inventory.nav,
-    announcements: `${copy.common.pages_tool_AccountDashboard_005}${announcementUnreadCount > 0 ? ` (${announcementUnreadCount})` : ''}`,
+    announcements: copy.common.pages_tool_AccountDashboard_005,
     settings: copy.common.pages_tool_AccountDashboard_006,
   }
+  const announcementBadge = announcementUnreadCount > 0 ? String(announcementUnreadCount) : undefined
+  const announcementBadgeLabel = announcementBadge
+    ? `${announcementBadge} ${copy.dashboard.pages_tool_dashboard_AnnouncementsSection_008}`
+    : undefined
   const sections = (Object.keys(labels) as DashboardSection[]).filter((key) => {
     if (key === 'profiles') return features.profiles
     if (key === 'tools') return features.tools
@@ -110,11 +114,17 @@ export default function AccountDashboard({
                 type="button"
                 onClick={() => onSectionChange(key)}
                 data-tour-target={`dashboard-nav-${key}`}
+                aria-label={key === 'announcements' && announcementBadgeLabel
+                  ? `${labels[key]} ${announcementBadgeLabel}`
+                  : undefined}
                 aria-current={section === key ? 'page' : undefined}
-                className="tool-nav-link flex w-full items-center px-3 text-left text-sm font-medium"
+                className="tool-nav-link flex w-full items-center gap-2 px-3 text-left text-sm font-medium"
               >
                 {section === key && <MotionNavIndicator layoutId="dashboard-active" />}
-                <span className="relative z-10">{labels[key]}</span>
+                <span className="relative z-10 min-w-0 flex-1 truncate">{labels[key]}</span>
+                {key === 'announcements' && announcementBadge && (
+                  <AnnouncementUnreadBadge value={announcementBadge} label={announcementBadgeLabel!} />
+                )}
               </button>
             ))}
           </nav>
@@ -140,8 +150,12 @@ export default function AccountDashboard({
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <BrandLogo size="sm" />
               <CompactHeaderMenu
-                ariaLabel={copy.common.components_CompactHeaderMenu_001}
+                ariaLabel={section === 'announcements' && announcementBadgeLabel
+                  ? `${copy.common.components_CompactHeaderMenu_001}，${announcementBadgeLabel}`
+                  : copy.common.components_CompactHeaderMenu_001}
                 triggerLabel={labels[section]}
+                triggerBadge={section === 'announcements' ? announcementBadge : undefined}
+                triggerBadgeLabel={section === 'announcements' ? announcementBadgeLabel : undefined}
                 align="start"
                 tourTargets={sections.map((key) => `dashboard-nav-${key}`)}
                 className="min-w-0 flex-1 justify-between"
@@ -154,6 +168,8 @@ export default function AccountDashboard({
                     type: 'button' as const,
                     id: key,
                     label: labels[key],
+                    badge: key === 'announcements' ? announcementBadge : undefined,
+                    badgeLabel: key === 'announcements' ? announcementBadgeLabel : undefined,
                     current: section === key,
                     tourTarget: `dashboard-nav-${key}`,
                     onSelect: () => onSectionChange(key),
@@ -172,7 +188,12 @@ export default function AccountDashboard({
             <div className="flex min-w-0 items-start gap-3">
               <div className="min-w-0">
                 <p className="section-index">{copy.common.pages_tool_AccountDashboard_010}</p>
-                <h1 className="display-title mt-1 text-xl text-ink-primary">{labels[section]}</h1>
+                <div className="mt-1 flex items-center gap-2">
+                  <h1 className="display-title text-xl text-ink-primary">{labels[section]}</h1>
+                  {section === 'announcements' && announcementBadge && (
+                    <AnnouncementUnreadBadge value={announcementBadge} label={announcementBadgeLabel!} />
+                  )}
+                </div>
                 <p className="mt-1 text-sm text-ink-muted">
                   {activeProfile ? `${copy.common.pages_tool_AccountDashboard_011}${activeProfile.display_name}` : copy.common.pages_tool_AccountDashboard_012}
                 </p>
@@ -218,6 +239,14 @@ export default function AccountDashboard({
         onSkip={dashboardTour.skip}
       />
     </div>
+  )
+}
+
+function AnnouncementUnreadBadge({ value, label }: { value: string; label: string }) {
+  return (
+    <span aria-label={label} className="tool-status relative z-10 shrink-0 px-1.5 py-0.5 text-[11px]">
+      {value}
+    </span>
   )
 }
 
