@@ -96,4 +96,17 @@ describe('sanitizeConfigForPublicOptimize layout cost policy', () => {
 
     expect(sanitized.Fiammetta?.enable).toBe(true)
   })
+
+  it.each([
+    { schedule_mode: 'variable' },
+    { schedule_mode: 'maa', variable_shift_schedule: { enable: true } },
+  ])('disables Fiammetta for automatic variable shifts', (variableConfig) => {
+    const sanitized = sanitizeConfigForPublicOptimize({
+      ...CONFIG_PRESETS['243'],
+      shift_hours: [8, 8, 8],
+      ...variableConfig,
+    }, 'advanced')
+
+    expect(sanitized.Fiammetta?.enable).toBe(false)
+  })
 })

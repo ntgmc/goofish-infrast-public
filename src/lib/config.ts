@@ -72,6 +72,12 @@ export function normalizeScheduleMode(mode: unknown): 'maa' | 'rotation' | 'vari
   return 'maa'
 }
 
+export function isVariableShiftScheduleEnabled(config: Pick<LicenseConfig, 'schedule_mode' | 'variable_shift_schedule'>): boolean {
+  return normalizeScheduleMode(config.schedule_mode) === 'variable'
+    || config.variable_shift_schedule?.enable === true
+    || config.variable_shift_schedule?.enabled === true
+}
+
 export function normalizeDormitoryRule(rule: unknown): 'fixed' | 'maa_autofill' {
   const ruleText = String(rule ?? 'fixed').trim().toLowerCase()
   return ['maa_autofill', 'maa-autofill', 'autofill', 'auto', copy.domain.lib_config_025, copy.domain.lib_config_026].includes(ruleText)
@@ -129,7 +135,7 @@ export function normalizeConfig(config: LicenseConfig): LicenseConfig {
   next.layout = next.layout || `${next.trading_stations_count}-${next.manufacturing_stations_count}-3`
   next.desc = next.desc || `${next.layout}${copy.domain.lib_config_027}`
   next.Fiammetta = next.Fiammetta ?? { enable: false }
-  if (!isFiammettaShiftHoursSupported(next.shift_hours)) {
+  if (isVariableShiftScheduleEnabled(next) || !isFiammettaShiftHoursSupported(next.shift_hours)) {
     next.Fiammetta = { ...next.Fiammetta, enable: false }
   }
   next.drones = {

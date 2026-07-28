@@ -40,4 +40,17 @@ describe('shift hour normalization', () => {
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [...hours] })
     expect(config.Fiammetta?.enable).toBe(enabled)
   })
+
+  it.each([
+    { schedule_mode: 'variable' },
+    { schedule_mode: 'maa', variable_shift_schedule: { enable: true } },
+    { schedule_mode: 'maa', variable_shift_schedule: { enabled: true } },
+  ])('disables Fiammetta for automatic variable shifts', (variableConfig) => {
+    const config = normalizeConfig({
+      ...CONFIG_PRESETS['243'],
+      shift_hours: [8, 8, 8],
+      ...variableConfig,
+    })
+    expect(config.Fiammetta?.enable).toBe(false)
+  })
 })

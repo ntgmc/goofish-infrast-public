@@ -225,6 +225,22 @@ export const commonCopy = {
   components_ConfigEditor_084: "使用短横线或逗号分隔，例如 12-6-6、12-12-12（12 小时一换）或 24-24-24（一天一换）。至少 3 班；长班会优先作为高效率班。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_085: "龙门币，赤金，龙门币",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_086: "换班策略",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_087: "一天3换（8小时一换）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_088: "一天2换（12小时一换）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_089: "一天1换（24小时一换）",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_090: "自动变间隔换班",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_091: "自定义",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_092: "自动搜索 3–4 班的实际间隔；生成结果后会固定为可复现的班次数组。",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_093: "选择固定换班频率、自动变间隔换班或自定义班次。",
   // src/components/DeferredFeatureMenu.tsx
   components_DeferredFeatureMenu_001: "仓库价值分析器",
   // src/components/DeferredFeatureMenu.tsx

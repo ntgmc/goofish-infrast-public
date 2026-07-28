@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   isFiammettaShiftHoursSupported,
   isValidShiftHours,
+  isVariableShiftScheduleEnabled,
   normalizeConfig,
   normalizeDormitoryRule,
   normalizeScheduleMode,
@@ -35,6 +36,27 @@ export const DORMITORY_RULE_LABELS: Record<string, string> = {
   fixed: copy.common.components_ConfigEditor_009,
   maa_autofill: copy.common.components_ConfigEditor_010,
 }
+
+const VARIABLE_SHIFT_SCHEDULE_DEFAULTS = {
+  enable: true,
+  enabled: true,
+  max_shifts: 4,
+  shift_step_minutes: 60,
+  min_low_hours: 3,
+  beam_width: 4,
+  trace_variable_shifts: false,
+  trace_mood_cycle: false,
+} satisfies NonNullable<LicenseConfig['variable_shift_schedule']>
+
+const SHIFT_SCHEDULE_OPTIONS = [
+  { id: '8x3', label: copy.common.components_ConfigEditor_087, hours: [8, 8, 8] },
+  { id: '12x3', label: copy.common.components_ConfigEditor_088, hours: [12, 12, 12] },
+  { id: '24x3', label: copy.common.components_ConfigEditor_089, hours: [24, 24, 24] },
+  { id: 'variable', label: copy.common.components_ConfigEditor_090 },
+  { id: 'custom', label: copy.common.components_ConfigEditor_091 },
+] as const
+
+type ShiftScheduleChoice = typeof SHIFT_SCHEDULE_OPTIONS[number]['id']
 
 export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: copy.common.components_ConfigEditor_011,
@@ -175,7 +197,9 @@ export default function ConfigEditor({
   const droneTargets = formatDroneTargetsInput(config.drones?.targets ?? [])
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
-  const fiammettaShiftHoursSupported = isFiammettaShiftHoursSupported(config.shift_hours)
+  const isScheduleModeSelected = (mode: 'maa' | 'rotation') => mode === 'maa' ? !rotationMode : scheduleMode === mode
+  const variableShiftMode = isVariableShiftScheduleEnabled(config)
+  const fiammettaShiftHoursSupported = !variableShiftMode && isFiammettaShiftHoursSupported(config.shift_hours)
   const validationMessage = validation.ok === false ? validation.message : null
   const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
   const orundumPlanning = normalizeOrundumPlanning(config)
@@ -312,13 +336,13 @@ export default function ConfigEditor({
                     <button
                       key={mode}
                       type="button"
-                      aria-pressed={scheduleMode === mode}
+                      aria-pressed={isScheduleModeSelected(mode)}
                       onClick={() => onUpdate((next) => {
                         next.schedule_mode = mode
                         applyCounts(next)
                       })}
                       className={`tool-secondary-action min-h-11 px-3 text-sm ${
-                        scheduleMode === mode
+                        isScheduleModeSelected(mode)
                           ? 'tool-option-selected'
                           : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
                       }`}
@@ -469,14 +493,14 @@ export default function ConfigEditor({
                   <button
                     key={mode}
                     type="button"
-                    aria-pressed={scheduleMode === mode}
+                    aria-pressed={isScheduleModeSelected(mode)}
                     disabled={false}
                     onClick={() => onUpdate((next) => {
                       next.schedule_mode = mode
                       applyCounts(next)
                     })}
                     className={`tool-secondary-action min-h-11 px-3 text-sm ${
-                      scheduleMode === mode
+                      isScheduleModeSelected(mode)
                         ? 'tool-option-selected'
                         : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
                     }`}
@@ -491,7 +515,18 @@ export default function ConfigEditor({
             {!rotationMode && (
               <ShiftHoursEditor
                 value={config.shift_hours}
+                variableMode={variableShiftMode}
                 canEdit={canEdit}
+                onSelectVariable={() => onUpdate((next) => {
+                  next.schedule_mode = 'variable'
+                  next.shift_hours = [8, 8, 8]
+                  next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
+                  next.variable_shift_schedule = {
+                    ...(next.variable_shift_schedule ?? {}),
+                    ...VARIABLE_SHIFT_SCHEDULE_DEFAULTS,
+                  }
+                  applyCounts(next)
+                })}
                 onChange={(hours) => onUpdate((next) => {
                   next.schedule_mode = 'maa'
                   next.shift_hours = hours
@@ -802,17 +837,24 @@ function IntermediateInventoryField({
 
 function ShiftHoursEditor({
   value,
+  variableMode,
   canEdit,
+  onSelectVariable,
   onChange,
 }: {
   value: LicenseConfig['shift_hours'];
+  variableMode: boolean;
   canEdit: boolean;
+  onSelectVariable: () => void;
   onChange: (hours: number[]) => void;
 }) {
   const normalized = parseShiftHours(value) ?? [8, 8, 8]
   const formatted = normalized.join('-')
   const [draftValue, setDraftValue] = useState(formatted)
   const [error, setError] = useState<string | null>(null)
+  const [customSelected, setCustomSelected] = useState(false)
+  const inferredChoice = variableMode ? 'variable' : inferShiftScheduleChoice(normalized)
+  const selectedChoice: ShiftScheduleChoice = customSelected ? 'custom' : inferredChoice
 
   useEffect(() => {
     setDraftValue(formatted)
@@ -828,44 +870,100 @@ function ShiftHoursEditor({
     }
     setError(null)
     setDraftValue(parsed.join('-'))
-    if (parsed.some((hours, index) => Math.abs(hours - (normalized[index] ?? -1)) > 0.0001)
+    if (variableMode
+      || parsed.some((hours, index) => Math.abs(hours - (normalized[index] ?? -1)) > 0.0001)
       || parsed.length !== normalized.length) {
       onChange(parsed)
     }
   }
 
+  const selectChoice = (choice: typeof SHIFT_SCHEDULE_OPTIONS[number]) => {
+    if (!canEdit) return
+    if (choice.id === 'custom') {
+      setCustomSelected(true)
+      return
+    }
+    setCustomSelected(false)
+    if (choice.id === 'variable') {
+      onSelectVariable()
+      return
+    }
+    onChange([...choice.hours])
+  }
+
   return (
     <div>
-      <label htmlFor="config-shift-hours" className="mb-2 block text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_082}</label>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          id="config-shift-hours"
-          type="text"
-          inputMode="decimal"
-          value={draftValue}
-          disabled={!canEdit}
-          aria-invalid={Boolean(error)}
-          aria-describedby="config-shift-hours-help"
-          onChange={(event) => setDraftValue(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') commitDraft()
-          }}
-          className="tool-field min-w-0 flex-1 tabular-nums"
-        />
-        {canEdit && (
+      <p id="config-shift-schedule-label" className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_086}</p>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-5" role="group" aria-labelledby="config-shift-schedule-label">
+        {SHIFT_SCHEDULE_OPTIONS.map((choice) => (
           <button
+            key={choice.id}
             type="button"
-            onClick={commitDraft}
-            className="tool-secondary-action"
+            aria-pressed={selectedChoice === choice.id}
+            disabled={!canEdit}
+            onClick={() => selectChoice(choice)}
+            className={`tool-secondary-action min-h-11 whitespace-normal px-2 py-2 text-xs leading-5 disabled:cursor-not-allowed disabled:text-ink-muted sm:text-sm ${
+              selectedChoice === choice.id
+                ? 'tool-option-selected'
+                : 'border-transparent bg-transparent text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'
+            }`}
           >
-            {copy.common.components_ConfigEditor_083}</button>
-        )}
+            {choice.label}
+          </button>
+        ))}
       </div>
-      <p id="config-shift-hours-help" role={error ? 'alert' : undefined} className={`mt-2 text-xs leading-5 ${error ? 'text-error' : 'text-ink-muted'}`}>
-        {error ?? copy.common.components_ConfigEditor_084}
-      </p>
+      {selectedChoice === 'custom' && (
+        <div className="mt-3">
+          <label htmlFor="config-shift-hours" className="mb-2 block text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_082}</label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              id="config-shift-hours"
+              type="text"
+              inputMode="decimal"
+              value={draftValue}
+              disabled={!canEdit}
+              aria-invalid={Boolean(error)}
+              aria-describedby="config-shift-hours-help"
+              onChange={(event) => setDraftValue(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitDraft()
+              }}
+              className="tool-field min-w-0 flex-1 tabular-nums"
+            />
+            {canEdit && (
+              <button
+                type="button"
+                onClick={commitDraft}
+                className="tool-secondary-action"
+              >
+                {copy.common.components_ConfigEditor_083}</button>
+            )}
+          </div>
+          <p id="config-shift-hours-help" role={error ? 'alert' : undefined} className={`mt-2 text-xs leading-5 ${error ? 'text-error' : 'text-ink-muted'}`}>
+            {error ?? copy.common.components_ConfigEditor_084}
+          </p>
+        </div>
+      )}
+      {selectedChoice !== 'custom' && (
+        <p className="mt-2 text-xs leading-5 text-ink-muted">
+          {selectedChoice === 'variable'
+            ? copy.common.components_ConfigEditor_092
+            : copy.common.components_ConfigEditor_093}
+        </p>
+      )}
     </div>
   )
+}
+
+function inferShiftScheduleChoice(hours: number[]): ShiftScheduleChoice {
+  for (const choice of SHIFT_SCHEDULE_OPTIONS) {
+    if (!('hours' in choice)) continue
+    if (choice.hours.length === hours.length
+      && choice.hours.every((value, index) => Math.abs(value - hours[index]!) <= 0.0001)) {
+      return choice.id
+    }
+  }
+  return 'custom'
 }
 
 function DroneTargetsInput({

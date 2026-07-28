@@ -21,6 +21,7 @@ describe('ConfigEditor shift patterns', () => {
       />,
     )
 
+    await user.click(screen.getByRole('button', { name: '自定义' }))
     const input = screen.getByLabelText('MAA 换班间隔')
     expect(input).toHaveValue('8-8-8')
     await user.clear(input)
@@ -50,6 +51,7 @@ describe('ConfigEditor shift patterns', () => {
       />,
     )
 
+    await user.click(screen.getByRole('button', { name: '自定义' }))
     const input = screen.getByLabelText('MAA 换班间隔')
     await user.clear(input)
     await user.type(input, '12-12')
@@ -60,9 +62,9 @@ describe('ConfigEditor shift patterns', () => {
   })
 
   it.each([
-    ['12-12-12', [12, 12, 12], true],
-    ['24-24-24', [24, 24, 24], false],
-  ] as const)('applies the fixed MAA interval %s', async (inputValue, expectedHours, fiammettaEnabled) => {
+    ['一天2换（12小时一换）', [12, 12, 12], true],
+    ['一天1换（24小时一换）', [24, 24, 24], false],
+  ] as const)('applies the fixed MAA interval %s', async (optionLabel, expectedHours, fiammettaEnabled) => {
     const user = userEvent.setup()
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [8, 8, 8] })
     const onUpdate = vi.fn()
@@ -75,10 +77,7 @@ describe('ConfigEditor shift patterns', () => {
       />,
     )
 
-    const input = screen.getByLabelText('MAA 换班间隔')
-    await user.clear(input)
-    await user.type(input, inputValue)
-    await user.click(screen.getByRole('button', { name: '应用间隔' }))
+    await user.click(screen.getByRole('button', { name: optionLabel }))
 
     const mutate = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
     const next = cloneConfig(config)
@@ -86,6 +85,77 @@ describe('ConfigEditor shift patterns', () => {
     expect(next.shift_hours).toEqual(expectedHours)
     expect(next.Fiammetta?.enable).toBe(fiammettaEnabled)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('offers five schedule choices and enables automatic variable shifts', async () => {
+    const user = userEvent.setup()
+    const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [8, 8, 8] })
+    const onUpdate = vi.fn()
+    render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '一天3换（8小时一换）' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '一天2换（12小时一换）' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '一天1换（24小时一换）' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '自动变间隔换班' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '自定义' })).toBeEnabled()
+    expect(screen.queryByLabelText('MAA 换班间隔')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '自动变间隔换班' }))
+
+    const mutate = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
+    const next = cloneConfig(config)
+    mutate?.(next)
+    expect(next.schedule_mode).toBe('variable')
+    expect(next.shift_hours).toEqual([8, 8, 8])
+    expect(next.Fiammetta?.enable).toBe(false)
+    expect(next.variable_shift_schedule).toEqual(expect.objectContaining({
+      enable: true,
+      enabled: true,
+      max_shifts: 4,
+      shift_step_minutes: 60,
+      min_low_hours: 3,
+      beam_width: 4,
+    }))
+  })
+
+  it('leaves automatic variable mode when applying a custom pattern', async () => {
+    const user = userEvent.setup()
+    const config = normalizeConfig({
+      ...CONFIG_PRESETS['243'],
+      schedule_mode: 'variable',
+      shift_hours: [8, 8, 8],
+      variable_shift_schedule: { enable: true },
+    })
+    const onUpdate = vi.fn()
+    render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    const maaModeButton = screen.getByRole('button', { name: 'MAA 排班表' })
+    expect(maaModeButton).toHaveAttribute('aria-pressed', 'true')
+    expect(maaModeButton).toHaveClass('tool-option-selected')
+    expect(screen.getByRole('button', { name: '自动变间隔换班' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: '自定义' }))
+    expect(screen.getByLabelText('MAA 换班间隔')).toHaveValue('8-8-8')
+    await user.click(screen.getByRole('button', { name: '应用间隔' }))
+
+    const mutate = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
+    const next = cloneConfig(config)
+    mutate?.(next)
+    expect(next.schedule_mode).toBe('maa')
+    expect(next.variable_shift_schedule).toEqual(expect.objectContaining({ enable: false, enabled: false }))
   })
 
   it('disables Fiammetta for unsupported shift patterns', () => {
