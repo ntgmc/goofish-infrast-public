@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiJson } from '../../../lib/api-client'
+import { AdminToast } from '../shared/AdminToast'
 
 type RiskStatus = 'pending' | 'dismissed' | 'actioned' | 'all'
 type MemberAction = 'none' | 'freeze_account' | 'freeze_profile'
@@ -147,12 +148,8 @@ export default function BehaviorRiskPanel() {
         </label>
       </div>
 
-      {(error || notice) && (
-        <div className="space-y-2 px-4 pt-4" aria-live="polite">
-          {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
-          {notice && <div className="tool-alert tool-alert--success" role="status">{notice}</div>}
-        </div>
-      )}
+      {error && <div className="space-y-2 px-4 pt-4"><div className="tool-alert tool-alert--error" role="alert">{error}</div></div>}
+      {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
 
       <div className="divide-y divide-surface-3" aria-busy={loading}>
         {loading && <div className="p-4 text-sm text-ink-muted">正在加载行为复核单…</div>}

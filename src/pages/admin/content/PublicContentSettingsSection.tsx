@@ -9,6 +9,7 @@ import {
 } from '../../../lib/public-content'
 import { usePublicContent } from '../../../lib/public-content-context'
 import { SortableMasterDetailList } from '../shared/SortableMasterDetailList'
+import { AdminToast } from '../shared/AdminToast'
 
 type TabId = 'qq' | 'faq' | 'pricing' | 'thanks'
 type EditSettings = (updater: (draft: PublicContentSettingsV1) => void) => void
@@ -101,7 +102,7 @@ export default function PublicContentSettingsSection() {
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.publicContent.admin_description}</p>
         <div className="tool-alert mt-4" role="note">{copy.publicContent.admin_display_only_warning}</div>
         {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
-        {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
+        {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
       </section>
 
       <div className="tool-panel p-3">

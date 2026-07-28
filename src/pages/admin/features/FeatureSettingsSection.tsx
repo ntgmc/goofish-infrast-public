@@ -3,6 +3,7 @@ import { adminApiJson } from '../../../lib/admin-api-client'
 import type { SiteFeatureKey, SiteFeatureSettingsV1, SiteFeatures } from '../../../lib/site-features'
 import { DEFAULT_SITE_FEATURE_SETTINGS, computeEffectiveSiteFeatures } from '../../../lib/site-features'
 import { copy } from '../../../copy/index'
+import { AdminToast } from '../shared/AdminToast'
 
 type FeatureSettingsResponse = {
   settings?: SiteFeatureSettingsV1
@@ -83,7 +84,7 @@ export default function FeatureSettingsSection() {
         <h2 className="mt-2 text-lg font-semibold text-ink-primary">{copy.features.admin_title}</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.features.admin_description}</p>
         {error && <div className="tool-alert tool-alert--error mt-5" role="alert">{error}</div>}
-        {notice && <div className="tool-alert tool-alert--success mt-5" role="status">{notice}</div>}
+        {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
       </section>
 
       {GROUPS.map((group) => (

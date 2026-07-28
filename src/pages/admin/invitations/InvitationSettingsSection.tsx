@@ -10,6 +10,7 @@ import type {
   InvitationRewardRule,
   InvitationSettings,
 } from '../../../lib/types'
+import { AdminToast } from '../shared/AdminToast'
 
 const DEFAULT_SETTINGS: InvitationSettings = {
   version: 2,
@@ -124,7 +125,7 @@ export default function InvitationSettingsSection() {
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
       {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
-      {notice && <div className="tool-alert tool-alert--success" role="status" aria-live="polite">{notice}</div>}
+      {notice && <AdminToast message={notice} onDismiss={() => setNotice(null)} />}
 
       <section className="tool-panel p-5 sm:p-6" aria-labelledby="admin-invitation-title">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
