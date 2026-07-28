@@ -117,7 +117,7 @@ goofish-public-<sha>
   public.tgz.sha256
 ```
 
-公共制品包含 Web、API、迁移和路由入口。验证器拒绝 worker/combined 入口、私有源码路径以及包含私有 `sourcesContent` 的 sourcemap。
+公共制品包含 Web、API、迁移和路由入口，以及由部署流程调用的公共 HTTPS smoke runner。验证器拒绝 worker/combined 入口、私有源码路径以及包含私有 `sourcesContent` 的 sourcemap。
 
 ## 通用部署安全基线
 
