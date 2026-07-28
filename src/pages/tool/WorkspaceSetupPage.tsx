@@ -245,7 +245,7 @@ export default function WorkspaceSetupPage({
             ))}
           </nav>
         </LayoutGroup>
-        <nav className="absolute bottom-5 left-4 right-4 flex flex-col gap-3" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_018_account_actions}>
+        <nav className="absolute bottom-5 left-4 right-4 grid grid-cols-2 gap-2" aria-label={copy.workspace.pages_tool_WorkspaceSetupPage_018_account_actions}>
           <button type="button" onClick={onBack} className="tool-secondary-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_017}</button>
           <button type="button" onClick={onLogout} className="tool-secondary-action w-full">{copy.workspace.pages_tool_WorkspaceSetupPage_018}</button>
         </nav>
@@ -296,7 +296,6 @@ export default function WorkspaceSetupPage({
                 {copy.workspace.pages_tool_WorkspaceSetupPage_tour_001}
               </button>
               <ThemeSwitcher />
-              <button type="button" onClick={onBack} className="tool-secondary-action">{copy.workspace.pages_tool_WorkspaceSetupPage_021}</button>
             </div>
           </div>
         </header>

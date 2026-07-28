@@ -1,5 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
+import { Link } from 'react-router'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
@@ -119,10 +120,18 @@ export default function AccountDashboard({
           </nav>
         </LayoutGroup>
 
-        <div className="absolute inset-x-4 bottom-5 border-t border-surface-3 pt-4">
+        <nav
+          className={`absolute inset-x-4 bottom-5 grid gap-2 border-t border-surface-3 pt-4 ${section === 'profiles' ? 'grid-cols-2' : 'grid-cols-1'}`}
+          aria-label={copy.common.pages_tool_AccountDashboard_017}
+        >
+          {section === 'profiles' && (
+            <Link to="/" className="tool-secondary-action w-full">
+              {copy.common.pages_tool_AccountDashboard_016}
+            </Link>
+          )}
           <button type="button" onClick={onLogout} className="tool-secondary-action w-full">
             {copy.common.pages_tool_AccountDashboard_009}</button>
-        </div>
+        </nav>
       </aside>
 
       <main className="lg:pl-64" tabIndex={-1} data-route-focus>
@@ -151,6 +160,7 @@ export default function AccountDashboard({
                   })),
                   { type: 'separator' as const, id: 'actions' },
                   { type: 'button' as const, id: 'tour', label: copy.dashboard.pages_tool_AccountDashboard_tour_001, onSelect: replayTour },
+                  ...(section === 'profiles' ? [{ type: 'link' as const, id: 'home', label: copy.common.pages_tool_AccountDashboard_016, to: '/' }] : []),
                   { type: 'button' as const, id: 'logout', label: copy.common.pages_tool_AccountDashboard_013, intent: 'danger' as const, onSelect: onLogout },
                 ]}
               />

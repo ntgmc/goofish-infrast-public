@@ -607,6 +607,10 @@ export const commonCopy = {
   pages_tool_AccountDashboard_014: "移动端账号导航",
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_015: "正在载入...",
+  // src/pages/tool/AccountDashboard.tsx
+  pages_tool_AccountDashboard_016: "返回首页",
+  // src/pages/tool/AccountDashboard.tsx
+  pages_tool_AccountDashboard_017: "账号操作",
   // src/pages/tool/useToolSession.ts
   pages_tool_useToolSession_001: "确认登录信息失败",
   // src/pages/tool/useToolSession.ts

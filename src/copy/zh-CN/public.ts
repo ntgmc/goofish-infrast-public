@@ -465,4 +465,6 @@ export const publicCopy = {
   components_PublicFooter_013: "致谢",
   // src/components/PublicFooter.tsx
   components_PublicFooter_014: "更新日志",
+  // src/components/PublicFooter.tsx
+  components_PublicFooter_015: "GitHub 开源仓库",
 } as const
