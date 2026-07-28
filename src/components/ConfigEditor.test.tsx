@@ -33,6 +33,7 @@ describe('ConfigEditor shift patterns', () => {
     mutate?.(next)
     expect(next.shift_hours).toEqual([12, 6, 6])
     expect(next.schedule_mode).toBe('maa')
+    expect(next.Fiammetta?.enable).toBe(false)
     expect(next.variable_shift_schedule).toEqual(expect.objectContaining({ enable: false, enabled: false }))
   })
 
@@ -59,9 +60,9 @@ describe('ConfigEditor shift patterns', () => {
   })
 
   it.each([
-    ['12-12-12', [12, 12, 12]],
-    ['24-24-24', [24, 24, 24]],
-  ] as const)('applies the fixed MAA interval %s', async (inputValue, expectedHours) => {
+    ['12-12-12', [12, 12, 12], true],
+    ['24-24-24', [24, 24, 24], false],
+  ] as const)('applies the fixed MAA interval %s', async (inputValue, expectedHours, fiammettaEnabled) => {
     const user = userEvent.setup()
     const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [8, 8, 8] })
     const onUpdate = vi.fn()
@@ -83,7 +84,25 @@ describe('ConfigEditor shift patterns', () => {
     const next = cloneConfig(config)
     mutate?.(next)
     expect(next.shift_hours).toEqual(expectedHours)
+    expect(next.Fiammetta?.enable).toBe(fiammettaEnabled)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('disables Fiammetta for unsupported shift patterns', () => {
+    const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [12, 6, 6] })
+
+    render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('checkbox', { name: '菲亚梅塔' })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: '菲亚梅塔' })).not.toBeChecked()
+    expect(screen.getByText('菲亚梅塔仅支持固定 8-8-8 或 12-12-12 换班节奏。')).toBeInTheDocument()
   })
 
   it('keeps the orundum budget explanation collapsed until requested', async () => {

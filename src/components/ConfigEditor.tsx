@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  isFiammettaShiftHoursSupported,
   isValidShiftHours,
   normalizeConfig,
   normalizeDormitoryRule,
@@ -174,6 +175,7 @@ export default function ConfigEditor({
   const droneTargets = formatDroneTargetsInput(config.drones?.targets ?? [])
   const scheduleMode = normalizeScheduleMode(config.schedule_mode)
   const rotationMode = scheduleMode === 'rotation'
+  const fiammettaShiftHoursSupported = isFiammettaShiftHoursSupported(config.shift_hours)
   const validationMessage = validation.ok === false ? validation.message : null
   const intermediateInventory = normalizeIntermediateInventory(config.intermediate_inventory)
   const orundumPlanning = normalizeOrundumPlanning(config)
@@ -493,6 +495,9 @@ export default function ConfigEditor({
                 onChange={(hours) => onUpdate((next) => {
                   next.schedule_mode = 'maa'
                   next.shift_hours = hours
+                  if (!isFiammettaShiftHoursSupported(hours)) {
+                    next.Fiammetta = { ...(next.Fiammetta ?? { enable: false }), enable: false }
+                  }
                   next.variable_shift_schedule = {
                     ...(next.variable_shift_schedule ?? {}),
                     enable: false,
@@ -537,8 +542,8 @@ export default function ConfigEditor({
             <span>{copy.common.components_ConfigEditor_068}</span>
               <input
                 type="checkbox"
-                checked={!rotationMode && (config.Fiammetta?.enable ?? false)}
-                disabled={!canEdit || rotationMode}
+                checked={!rotationMode && fiammettaShiftHoursSupported && (config.Fiammetta?.enable ?? false)}
+                disabled={!canEdit || rotationMode || !fiammettaShiftHoursSupported}
                 onChange={(event) => onUpdate((next) => {
                   next.Fiammetta = { enable: event.currentTarget.checked }
                   applyCounts(next)
@@ -549,7 +554,7 @@ export default function ConfigEditor({
             {rotationMode ? (
               <p className="tool-inset px-3 py-2 text-xs leading-5 text-ink-muted">
                 {copy.common.components_ConfigEditor_069}</p>
-            ) : config.Fiammetta?.enable && (
+            ) : (!fiammettaShiftHoursSupported || config.Fiammetta?.enable) && (
               <p className="tool-alert tool-alert--warning px-3 py-2 text-xs leading-5">
                 {copy.common.components_ConfigEditor_070}</p>
             )}

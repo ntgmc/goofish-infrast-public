@@ -29,4 +29,15 @@ describe('shift hour normalization', () => {
     expect(parseShiftHours([6, 12, 6])).toEqual([12, 6, 6])
     expect(normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [6, 6, 12] }).shift_hours).toEqual([12, 6, 6])
   })
+
+  it.each([
+    [[8, 8, 8], true],
+    [[12, 12, 12], true],
+    [[6, 6, 6, 6], false],
+    [[24, 24, 24], false],
+    [[12, 6, 6], false],
+  ] as const)('sets Fiammetta availability for %j', (hours, enabled) => {
+    const config = normalizeConfig({ ...CONFIG_PRESETS['243'], shift_hours: [...hours] })
+    expect(config.Fiammetta?.enable).toBe(enabled)
+  })
 })

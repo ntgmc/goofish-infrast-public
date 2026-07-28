@@ -194,7 +194,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_069: "游戏内轮换按两班生成，菲亚梅塔不会参与计算。",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_070: "菲亚梅塔按固定 8-8-8 换班节奏计算目标。",
+  components_ConfigEditor_070: "菲亚梅塔仅支持固定 8-8-8 或 12-12-12 换班节奏。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_071: "无人机",
   // src/components/ConfigEditor.tsx

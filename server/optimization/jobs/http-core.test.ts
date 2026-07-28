@@ -75,4 +75,25 @@ describe('sanitizeConfigForPublicOptimize layout cost policy', () => {
     expect(sanitized.optimization_mode).toBe('fast')
     expect(sanitized.optimizer_search).toMatchObject({ optimization_mode: 'fast', beam: true })
   })
+
+  it.each([
+    [[8, 8, 8], true],
+    [[12, 12, 12], true],
+    [[6, 6, 6, 6], false],
+    [[24, 24, 24], false],
+    [[12, 6, 6], false],
+  ] as const)('enforces Fiammetta availability for %j', (shiftHours, enabled) => {
+    const sanitized = sanitizeConfigForPublicOptimize({
+      ...CONFIG_PRESETS['243'],
+      shift_hours: [...shiftHours],
+    }, 'advanced')
+
+    expect(sanitized.Fiammetta?.enable).toBe(enabled)
+  })
+
+  it('preserves Fiammetta when shift hours use the default 8-8-8 pattern', () => {
+    const sanitized = sanitizeConfigForPublicOptimize(CONFIG_PRESETS['243'], 'advanced')
+
+    expect(sanitized.Fiammetta?.enable).toBe(true)
+  })
 })
