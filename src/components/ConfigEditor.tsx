@@ -11,6 +11,7 @@ import {
 import { BASE_DAILY_SANITY_BUDGET, MONTHLY_CARD_DAILY_SANITY_BONUS, normalizeOrundumPlanning } from '../lib/orundum-economy'
 import type { IntermediateProduct, LicenseConfig, PermissionMode } from '../lib/types'
 import { copy } from '../copy/index'
+import InputNumber from './InputNumber'
 
 
 type ProductGroup = 'trading_stations' | 'manufacturing_stations'
@@ -388,54 +389,66 @@ export default function ConfigEditor({
           </div>
         </div>
       ) : (
-      <div className="grid gap-5 pt-5 lg:grid-cols-2">
+      <div className="space-y-5 pt-5">
         <div className="tool-inset bg-surface-2/60 p-4">
-          <div className="mb-4">
-            <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_042}</h3>
-            <p className="mt-1 text-xs text-ink-muted">{copy.common.components_ConfigEditor_043}{config.layout}</p>
-          </div>
-          {canEdit ? (
-            <div className="grid grid-cols-2 gap-3">
-              <CounterField
-                label={copy.common.components_ConfigEditor_044}
-                value={config.trading_stations_count}
-                min={1}
-                max={5}
-                onChange={(value) => setStationCounts(value, 6 - value)}
-              />
-              <CounterField
-                label={copy.common.components_ConfigEditor_045}
-                value={config.manufacturing_stations_count}
-                min={1}
-                max={5}
-                onChange={(value) => setStationCounts(6 - value, value)}
-              />
-            </div>
-          ) : (
-            <dl className="grid grid-cols-2 gap-3 text-sm">
-              <ReadOnlyMetric label={copy.common.components_ConfigEditor_046} value={config.trading_stations_count} />
-              <ReadOnlyMetric label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
-            </dl>
-          )}
-        </div>
+          <div className="grid gap-5 lg:grid-cols-[minmax(14rem,0.85fr)_minmax(0,2.15fr)]">
+            <section aria-labelledby="config-room-layout-heading">
+              <div className="mb-4">
+                <h3 id="config-room-layout-heading" className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_042}</h3>
+                <p className="mt-1 text-xs text-ink-muted">{copy.common.components_ConfigEditor_043}{config.layout}</p>
+              </div>
+              {canEdit ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                  <CounterField
+                    id="trading-stations-count"
+                    label={copy.common.components_ConfigEditor_044}
+                    value={config.trading_stations_count}
+                    min={1}
+                    max={5}
+                    onChange={(value) => setStationCounts(value, 6 - value)}
+                  />
+                  <CounterField
+                    id="manufacturing-stations-count"
+                    label={copy.common.components_ConfigEditor_045}
+                    value={config.manufacturing_stations_count}
+                    min={1}
+                    max={5}
+                    onChange={(value) => setStationCounts(6 - value, value)}
+                  />
+                </div>
+              ) : (
+                <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1">
+                  <ReadOnlyMetric label={copy.common.components_ConfigEditor_046} value={config.trading_stations_count} />
+                  <ReadOnlyMetric label={copy.common.components_ConfigEditor_047} value={config.manufacturing_stations_count} />
+                </dl>
+              )}
+            </section>
 
-        <div className="tool-inset bg-surface-2/60 p-4">
-          <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_048}</h3>
-          <div className="mt-4 space-y-4">
-            <ProductGroupEditor
-              label={copy.common.components_ConfigEditor_049}
-              products={tradingProducts}
-              counts={config.product_requirements.trading_stations}
-              canEdit={canEdit}
-              onChange={(product, value) => setProductCount('trading_stations', product, value)}
-            />
-            <ProductGroupEditor
-              label={copy.common.components_ConfigEditor_050}
-              products={manufacturingProducts}
-              counts={config.product_requirements.manufacturing_stations}
-              canEdit={canEdit}
-              onChange={(product, value) => setProductCount('manufacturing_stations', product, value)}
-            />
+            <section
+              aria-labelledby="config-product-counts-heading"
+              className="border-t border-surface-3/60 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0"
+            >
+              <h3 id="config-product-counts-heading" className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_048}</h3>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <ProductGroupEditor
+                  label={copy.common.components_ConfigEditor_049}
+                  products={tradingProducts}
+                  counts={config.product_requirements.trading_stations}
+                  canEdit={canEdit}
+                  onChange={(product, value) => setProductCount('trading_stations', product, value)}
+                />
+                <ProductGroupEditor
+                  label={copy.common.components_ConfigEditor_050}
+                  products={manufacturingProducts}
+                  counts={config.product_requirements.manufacturing_stations}
+                  canEdit={canEdit}
+                  onChange={(product, value) => setProductCount('manufacturing_stations', product, value)}
+                />
+              </div>
+            </section>
+          </div>
+
+          <div className="mt-5 border-t border-surface-3/60 pt-5">
             <IntermediateInventoryEditor
               canEdit={canEdit}
               inventory={intermediateInventory}
@@ -445,7 +458,7 @@ export default function ConfigEditor({
           </div>
         </div>
 
-        <div className="tool-inset bg-surface-2/60 p-4 lg:col-span-2">
+        <div className="tool-inset bg-surface-2/60 p-4">
           <h3 className="font-semibold text-ink-primary">{copy.common.components_ConfigEditor_051}</h3>
           <div className="mt-4 space-y-4">
             {showOrundumPlanning && (
@@ -747,7 +760,7 @@ function IntermediateInventoryEditor({
   return (
     <div>
       <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_077}</p>
-      <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         <IntermediateInventoryField
           label={copy.common.components_ConfigEditor_078}
           product="Originium Shard"
@@ -1010,56 +1023,33 @@ function DroneTargetsInput({
 }
 
 function CounterField({
+  id,
   label,
   value,
   min,
   max,
   onChange,
 }: {
+  id: string;
   label: string;
   value: number;
   min: number;
   max: number;
   onChange: (value: number) => void;
 }) {
-  const [draftValue, setDraftValue] = useState(() => String(value))
-
-  useEffect(() => {
-    setDraftValue(String(value))
-  }, [value])
-
-  const commitDraft = () => {
-    const nextValue = Number(draftValue)
-    if (!Number.isFinite(nextValue)) {
-      setDraftValue(String(value))
-      return
-    }
-    const boundedValue = Math.max(min, Math.min(max, Math.round(nextValue)))
-    if (boundedValue !== value) {
-      onChange(boundedValue)
-    } else {
-      setDraftValue(String(value))
-    }
-  }
-
   return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-medium text-ink-muted">{label}</span>
-      <input
-        type="number"
+    <div>
+      <label htmlFor={id} className="mb-2 block text-xs font-medium text-ink-muted">{label}</label>
+      <InputNumber
+        id={id}
+        label={label}
+        value={value}
         min={min}
         max={max}
-        value={draftValue}
-        onChange={(event) => setDraftValue(event.currentTarget.value)}
-        onBlur={commitDraft}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.currentTarget.blur()
-          }
-        }}
-        className="number-input-clean tool-field"
+        onChange={onChange}
+        className="w-full"
       />
-    </label>
+    </div>
   )
 }
 
@@ -1088,19 +1078,20 @@ function ProductGroupEditor({
   return (
     <div>
       <p className="mb-2 text-xs font-medium text-ink-muted">{label}</p>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+      <div className="grid gap-2">
         {products.map((product) => (
-        <label key={product} className="tool-inset flex items-center justify-between gap-3 px-3 py-2 text-sm">
+        <div key={product} className="tool-inset flex items-center justify-between gap-3 px-3 py-2 text-sm">
           <span className="text-ink-secondary">{PRODUCT_LABELS[product] ?? product}</span>
           {canEdit ? (
             <ProductCountInput
+              label={PRODUCT_LABELS[product] ?? product}
               value={counts[product] ?? 0}
               onChange={(value) => onChange(product, value)}
             />
           ) : (
             <span className="font-semibold text-ink-primary">{counts[product] ?? 0}</span>
           )}
-          </label>
+          </div>
         ))}
       </div>
     </div>
@@ -1108,46 +1099,22 @@ function ProductGroupEditor({
 }
 
 function ProductCountInput({
+  label,
   value,
   onChange,
 }: {
+  label: string;
   value: number;
   onChange: (value: number) => void;
 }) {
-  const [draftValue, setDraftValue] = useState(() => String(value))
-
-  useEffect(() => {
-    setDraftValue(String(value))
-  }, [value])
-
-  const commitDraft = () => {
-    const nextValue = Number(draftValue)
-    if (!Number.isFinite(nextValue)) {
-      setDraftValue(String(value))
-      return
-    }
-    const boundedValue = Math.max(0, Math.min(6, Math.round(nextValue)))
-    if (boundedValue !== value) {
-      onChange(boundedValue)
-    } else {
-      setDraftValue(String(value))
-    }
-  }
-
   return (
-    <input
-      type="number"
+    <InputNumber
+      label={label}
+      value={value}
       min={0}
       max={6}
-      value={draftValue}
-      onChange={(event) => setDraftValue(event.currentTarget.value)}
-      onBlur={commitDraft}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          event.currentTarget.blur()
-        }
-      }}
-      className="number-input-clean tool-field w-16 px-3 py-1 text-right"
+      onChange={onChange}
+      className="w-36 max-w-full shrink-0"
     />
   )
 }

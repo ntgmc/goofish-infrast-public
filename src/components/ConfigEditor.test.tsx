@@ -199,3 +199,56 @@ describe('ConfigEditor shift patterns', () => {
     expect(screen.getByText(/当前可用理智预算为/)).toBeInTheDocument()
   })
 })
+
+describe('ConfigEditor number inputs', () => {
+  it('groups room and product settings in one responsive workbench region', () => {
+    const config = normalizeConfig(CONFIG_PRESETS['243'])
+    render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={vi.fn()}
+      />,
+    )
+
+    const roomRegion = screen.getByRole('region', { name: '房间结构' })
+    const productRegion = screen.getByRole('region', { name: '产物数量' })
+    expect(roomRegion.parentElement).toBe(productRegion.parentElement)
+    expect(productRegion).toHaveClass('lg:border-l')
+  })
+
+  it('uses InputNumber controls for room and product counts', async () => {
+    const user = userEvent.setup()
+    const config = normalizeConfig(CONFIG_PRESETS['243'])
+    const onUpdate = vi.fn()
+    render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    expect(screen.getByRole('spinbutton', { name: '贸易站' })).toHaveValue(2)
+    expect(screen.getByRole('button', { name: '减少贸易站' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: '增加贸易站' }))
+
+    const updateRoomCounts = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
+    const roomConfig = cloneConfig(config)
+    updateRoomCounts?.(roomConfig)
+    expect(roomConfig.trading_stations_count).toBe(3)
+    expect(roomConfig.manufacturing_stations_count).toBe(3)
+    expect(roomConfig.layout).toBe('3-3-3')
+
+    expect(screen.getByRole('spinbutton', { name: '龙门币' })).toHaveValue(2)
+    await user.click(screen.getByRole('button', { name: '增加龙门币' }))
+
+    const updateProductCount = onUpdate.mock.calls[onUpdate.mock.calls.length - 1]?.[0] as ((value: typeof config) => void) | undefined
+    const productConfig = cloneConfig(config)
+    updateProductCount?.(productConfig)
+    expect(productConfig.product_requirements.trading_stations.LMD).toBe(3)
+    expect(screen.getByRole('button', { name: '减少合成玉' })).toBeDisabled()
+  })
+})

@@ -241,6 +241,10 @@ export const commonCopy = {
   components_ConfigEditor_092: "自动搜索 3–4 班的实际间隔；生成结果后会固定为可复现的班次数组。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_093: "选择固定换班频率、自动变间隔换班或自定义班次。",
+  // src/components/InputNumber.tsx
+  components_InputNumber_001: "减少",
+  // src/components/InputNumber.tsx
+  components_InputNumber_002: "增加",
   // src/components/DeferredFeatureMenu.tsx
   components_DeferredFeatureMenu_001: "仓库价值分析器",
   // src/components/DeferredFeatureMenu.tsx
