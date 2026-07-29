@@ -11,6 +11,7 @@ import {
   getCdkRecordStore,
   isProfileCdkRecord,
   jsonResponse,
+  setOperatorBaselineByAdmin,
   type CdkRecord,
 } from './license-utils'
 import {
@@ -167,6 +168,19 @@ export default async (req: Request): Promise<Response> => {
         }
 
         if (body.action === 'clear_profile_skland_binding') {
+          if (profile.cdk_key) {
+            const cdk = await (await getCdkRecordStore()).get(profile.cdk_key)
+            if (cdk && isProfileCdkRecord(cdk) && (cdk.status === 'used' || cdk.status === 'frozen')) {
+              const reset = await setOperatorBaselineByAdmin(cdk, {
+                source: 'next_import',
+                reason: '管理员清除森空岛绑定，等待下次有效导入建立新干员基线。',
+                unfreeze: false,
+                eventType: 'admin_operator_baseline_reset',
+                reviewed: false,
+              })
+              if (!reset) return jsonResponse({ error: '重置关联 CDK 的干员基线失败，绑定未清除。' }, 409)
+            }
+          }
           const updated = await saveProfilePatch(profile, {
             skland_binding: null,
             skland_pending_binding: null,

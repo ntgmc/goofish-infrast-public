@@ -83,6 +83,12 @@ export interface AdminCdkRecord {
 export interface AdminCdkDetail extends AdminCdkRecord {
   baseline_operator_count?: number | null;
   latest_operator_count?: number | null;
+  operator_baseline_options?: Array<{
+    source: 'latest' | 'workspace' | 'next_import';
+    available: boolean;
+    owned_count: number | null;
+    updated_at: string | null;
+  }>;
   risk_events?: Array<{ at: string; type: string; reason: string; detail?: Record<string, unknown> | null }>;
   linked_account?: { account_id: string; profile_id: string } | null;
 }

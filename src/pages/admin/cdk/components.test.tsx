@@ -21,6 +21,11 @@ const detail: AdminCdkDetail = {
   operator_count: 12,
   config_desc: '测试配置',
   risk_events: [],
+  operator_baseline_options: [
+    { source: 'latest', available: true, owned_count: 10, updated_at: null },
+    { source: 'workspace', available: true, owned_count: 12, updated_at: '2026-07-15T02:00:00.000Z' },
+    { source: 'next_import', available: true, owned_count: null, updated_at: null },
+  ],
 }
 
 beforeEach(() => {
@@ -70,9 +75,39 @@ describe('CdkDetailDialog', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
+
+  it('selects a trusted baseline source and submits only the source and review reason', async () => {
+    const user = userEvent.setup()
+    const onPatch = vi.fn(async () => undefined)
+    vi.spyOn(window, 'prompt').mockReturnValue('已核验工作区干员')
+    render(<DialogHarness onPatch={onPatch} />)
+    await user.click(screen.getByRole('button', { name: '打开 CDK 详情' }))
+
+    const select = screen.getByRole('combobox', { name: '新干员基线' })
+    expect(screen.getByRole('option', { name: /最近提交快照.*拥有 10/ })).toBeEnabled()
+    expect(screen.getByRole('option', { name: /当前档案工作区.*拥有 12/ })).toBeEnabled()
+    expect(screen.getByRole('option', { name: '清空并等待下次有效导入' })).toBeEnabled()
+    await user.selectOptions(select, 'workspace')
+    await user.click(screen.getByRole('button', { name: '应用新基线' }))
+
+    expect(onPatch).toHaveBeenCalledWith(detail, 'set_operator_baseline', undefined, {
+      baseline_source: 'workspace',
+      reason: '已核验工作区干员',
+    })
+  })
+
+  it('does not submit a baseline change when the review note is cancelled', async () => {
+    const user = userEvent.setup()
+    const onPatch = vi.fn(async () => undefined)
+    vi.spyOn(window, 'prompt').mockReturnValue(null)
+    render(<DialogHarness onPatch={onPatch} />)
+    await user.click(screen.getByRole('button', { name: '打开 CDK 详情' }))
+    await user.click(screen.getByRole('button', { name: '应用新基线' }))
+    expect(onPatch).not.toHaveBeenCalled()
+  })
 })
 
-function DialogHarness() {
+function DialogHarness({ onPatch = async () => undefined }: { onPatch?: CdkDetailDialogProps['onPatch'] }) {
   const [open, setOpen] = useState(false)
   const noop = async () => undefined
   return (
@@ -83,7 +118,7 @@ function DialogHarness() {
           detail={detail}
           busyAction={null}
           onClose={() => setOpen(false)}
-          onPatch={noop}
+          onPatch={onPatch}
           onUpdateNote={noop}
           onSetPermission={noop}
         />
@@ -91,3 +126,5 @@ function DialogHarness() {
     </>
   )
 }
+
+type CdkDetailDialogProps = Parameters<typeof CdkDetailDialog>[0]

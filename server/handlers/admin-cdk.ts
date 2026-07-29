@@ -12,11 +12,15 @@ import {
   hashCdk,
   jsonResponse,
   acceptLatestOperatorBaselineAndUnfreeze,
+  buildOperatorFingerprint,
   requireEnv,
+  setOperatorBaselineByAdmin,
   unfreezeCdkRecord,
+  validateOperators,
   type CdkRecord,
   type CdkStatus,
   type CdkType,
+  type OperatorBaselineSource,
   type AdminCdkPageOptions,
   type AdminCdkPageResult,
 } from './license-utils'
@@ -24,6 +28,7 @@ import { AdminPaginationError, buildAdminPagination, parseAdminPageRequest } fro
 import { buildAdminCdkOpsSummary } from './admin-cdk-summary'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
+import { getProfileById, getProfileWorkspace } from '../storage/user-store'
 
 type CdkStatusFilter = CdkStatus | 'all'
 
@@ -198,7 +203,7 @@ async function handleList(req: Request): Promise<Response> {
       const store = await getCdkRecordStore()
       const record = await store.get(`cdk/${detailCodeHash}.json`)
       if (!record) return jsonResponse({ error: 'CDK not found.' }, 404)
-      return jsonResponse({ cdk: toAdminCdkDetail(record) })
+      return jsonResponse({ cdk: await toAdminCdkDetail(record) })
     }
 
     if (url.searchParams.get('view') === 'summary') {
@@ -235,7 +240,7 @@ async function handleList(req: Request): Promise<Response> {
 async function handlePatch(req: Request): Promise<Response> {
   try {
     const body = await getValidatedJson(req, requestSchemas.adminCdkPatch)
-    const { code_hash, action, permission, order_note, reason } = body
+    const { code_hash, action, permission, order_note, reason, baseline_source } = body
 
     const authentication = await authenticateAdminRequest(req)
     if (!authentication.ok) return authentication.response
@@ -245,6 +250,7 @@ async function handlePatch(req: Request): Promise<Response> {
       && action !== 'unfreeze'
       && action !== 'update_note'
       && action !== 'set_permission'
+      && action !== 'set_operator_baseline'
       && action !== 'accept_operator_baseline_and_unfreeze'
     ) {
       return jsonResponse({ error: 'Unsupported action.' }, 400)
@@ -261,21 +267,38 @@ async function handlePatch(req: Request): Promise<Response> {
       return jsonResponse({ error: 'CDK not found.' }, 404)
     }
 
-    if (action === 'accept_operator_baseline_and_unfreeze') {
+    if (action === 'set_operator_baseline' || action === 'accept_operator_baseline_and_unfreeze') {
       const reviewReason = typeof reason === 'string' ? reason.trim().slice(0, 500) : ''
       if (!reviewReason) return jsonResponse({ error: '售后核验备注不能为空。' }, 400)
-      if (existing.status === 'revoked') return jsonResponse({ error: '已撤销授权不能恢复。' }, 409)
+      if (!isProfileCdkRecord(existing)) return jsonResponse({ error: '只有档案 CDK 可以设置干员基线。' }, 409)
       if (existing.status !== 'used' && existing.status !== 'frozen') {
         return jsonResponse({ error: '只有已使用或已冻结授权可以执行售后恢复。' }, 409)
       }
-      const updated = await acceptLatestOperatorBaselineAndUnfreeze(existing, reviewReason)
-      if (!updated) return jsonResponse({ error: '授权没有可接受的最新干员快照。' }, 409)
+      const source: OperatorBaselineSource | null = action === 'accept_operator_baseline_and_unfreeze'
+        ? 'latest'
+        : baseline_source ?? null
+      if (!source) return jsonResponse({ error: '请选择新的干员基线来源。' }, 400)
+      const workspaceBaseline = source === 'workspace' ? await resolveWorkspaceBaseline(existing) : null
+      if (source === 'workspace' && !workspaceBaseline) {
+        return jsonResponse({ error: '关联档案没有可用的工作区干员数据。' }, 409)
+      }
+      const updated = action === 'accept_operator_baseline_and_unfreeze'
+        ? await acceptLatestOperatorBaselineAndUnfreeze(existing, reviewReason)
+        : await setOperatorBaselineByAdmin(existing, {
+            source,
+            reason: reviewReason,
+            unfreeze: true,
+            ...(workspaceBaseline && { fingerprint: workspaceBaseline.fingerprint }),
+          })
+      if (!updated) {
+        return jsonResponse({ error: source === 'latest' ? '授权没有可接受的最新干员快照。' : '更新干员基线失败。' }, 409)
+      }
       return jsonResponse({
         recovered: true,
         action,
         cdk_id: existing.code_hash.slice(0, 12),
         status: updated.status,
-        cdk: toAdminCdkDetail(updated),
+        cdk: await toAdminCdkDetail(updated),
       })
     }
 
@@ -283,7 +306,7 @@ async function handlePatch(req: Request): Promise<Response> {
       const note = typeof order_note === 'string' && order_note.trim() ? order_note.trim().slice(0, 500) : null
       const updated = await store.mutate(key, (current) => ({ ...current, order_note: note })) ?? existing
       if (updated.status === 'revoked') return jsonResponse({ error: '已撤销授权不能修改备注。' }, 409)
-      return jsonResponse({ updated: true, cdk: toAdminCdkDetail(updated) })
+      return jsonResponse({ updated: true, cdk: await toAdminCdkDetail(updated) })
     }
 
     if (action === 'set_permission') {
@@ -300,7 +323,7 @@ async function handlePatch(req: Request): Promise<Response> {
         updated: true,
         cdk_id: existing.code_hash.slice(0, 12),
         permission: updated.permission,
-        cdk: toAdminCdkDetail(updated),
+        cdk: await toAdminCdkDetail(updated),
       })
     }
 
@@ -458,7 +481,7 @@ function summarizeRiskEvent(event: NonNullable<CdkRecord['risk_events']>[number]
   }
 }
 
-function toAdminCdkDetail(record: CdkRecord) {
+async function toAdminCdkDetail(record: CdkRecord) {
   return {
     ...toAdminCdkRecord(record),
     revoked_at: record.revoked_at ?? null,
@@ -473,6 +496,50 @@ function toAdminCdkDetail(record: CdkRecord) {
     linked_account: record.account_id && record.profile_id
       ? { account_id: record.account_id, profile_id: record.profile_id }
       : null,
+    ...(isProfileCdkRecord(record) && {
+      operator_baseline_options: await buildOperatorBaselineOptions(record),
+    }),
+  }
+}
+
+async function buildOperatorBaselineOptions(record: CdkRecord) {
+  const workspace = await resolveWorkspaceBaseline(record)
+  return [
+    {
+      source: 'latest' as const,
+      available: Boolean(record.latest_operator_fingerprint),
+      owned_count: record.latest_operator_fingerprint?.owned_count ?? null,
+      updated_at: null,
+    },
+    {
+      source: 'workspace' as const,
+      available: Boolean(workspace),
+      owned_count: workspace?.fingerprint.owned_count ?? null,
+      updated_at: workspace?.updatedAt ?? null,
+    },
+    {
+      source: 'next_import' as const,
+      available: true,
+      owned_count: null,
+      updated_at: null,
+    },
+  ]
+}
+
+async function resolveWorkspaceBaseline(record: CdkRecord) {
+  if (!record.account_id || !record.profile_id) return null
+  const profile = await getProfileById(record.profile_id)
+  if (
+    !profile
+    || profile.user_id !== record.account_id
+    || profile.cdk_code_hash !== record.code_hash
+  ) return null
+  const workspace = await getProfileWorkspace(profile.id)
+  const operators = validateOperators(workspace?.operators)
+  if (!operators.ok) return null
+  return {
+    fingerprint: buildOperatorFingerprint(operators.operators),
+    updatedAt: workspace?.updated_at ?? null,
   }
 }
 

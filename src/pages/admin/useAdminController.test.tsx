@@ -3,6 +3,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FormEvent } from 'react'
 import type { Announcement, AnnouncementAdminResponse } from '../../lib/types'
+import type { AdminProfileSummary, AdminUserDetail } from './contracts'
 import {
   announcementDraftStorageKey,
   readAnnouncementDraft,
@@ -156,6 +157,25 @@ describe('useAdminController announcement drafts', () => {
     expect(result.current.announcementDraftDirty).toBe(false)
     expect(result.current.notice).toContain('已重新载入线上公告')
     expect(window.localStorage.getItem(announcementDraftStorageKey('alice'))).toBeNull()
+  })
+
+  it('warns that clearing a Skland binding also resets the operator baseline', async () => {
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    const profile = { id: 'profile-1', display_name: 'B 账号' } as AdminProfileSummary
+    act(() => result.current.setSelectedUserDetail({ user: { id: 'user-1' } } as AdminUserDetail))
+
+    await act(async () => result.current.handleClearProfileSklandBinding(profile))
+
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('旧干员基线也会重置'))
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('下一次有效导入将自动成为新基线'))
+    expect(adminApi.json).toHaveBeenCalledWith('/api/admin/users', expect.objectContaining({
+      method: 'PATCH',
+      json: expect.objectContaining({
+        action: 'clear_profile_skland_binding',
+        profile_id: 'profile-1',
+      }),
+    }))
   })
 })
 

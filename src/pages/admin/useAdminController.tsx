@@ -539,6 +539,14 @@ export function useAdminController() {
         })
         if (data.cdk) {
           setSelectedCdkDetail(data.cdk)
+          const selectedUserId = selectedUserDetail?.user.id
+          if (selectedUserId && selectedUserId === data.cdk.linked_account?.account_id) {
+            const userData = await apiJson<{ detail?: AdminUserDetail }>(
+              `/api/admin/users?user_id=${encodeURIComponent(selectedUserId)}`,
+              { fallbackMessage: '刷新用户详情失败' },
+            )
+            if (userData.detail) setSelectedUserDetail(userData.detail)
+          }
         } else if (selectedCdkDetail?.code_hash === record.code_hash) {
           const detailData = await apiJson<{ cdk?: AdminCdkDetail }>(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}`, {
             fallbackMessage: '加载 CDK 详情失败',
@@ -775,7 +783,7 @@ export function useAdminController() {
     }
 
   const handleClearProfileSklandBinding = async (profile: AdminProfileSummary) => {
-      if (!window.confirm(`确认清空档案「${profile.display_name}」的森空岛绑定和风控计数？`)) return
+      if (!window.confirm(`确认清空档案「${profile.display_name}」的森空岛绑定和风控计数？关联 CDK 的旧干员基线也会重置，下一次有效导入将自动成为新基线。`)) return
       await patchUserProfile(profile, 'clear_profile_skland_binding')
     }
 

@@ -36,6 +36,17 @@ export interface OperatorFingerprint {
   operators: Record<string, { name: string; own: boolean; elite: number; rarity: number }>;
 }
 
+export type OperatorBaselineSource = 'latest' | 'workspace' | 'next_import'
+
+interface AdminOperatorBaselineOptions {
+  source: OperatorBaselineSource;
+  reason: string;
+  fingerprint?: OperatorFingerprint;
+  unfreeze: boolean;
+  eventType?: 'admin_operator_baseline_changed' | 'admin_operator_baseline_reset';
+  reviewed?: boolean;
+}
+
 export interface RiskEvent {
   at: string;
   type: string;
@@ -695,26 +706,68 @@ export async function unfreezeCdkRecord(record: CdkRecord): Promise<CdkRecord> {
   }), { allowedStatuses: ['frozen'] })) ?? record
 }
 
-export async function acceptLatestOperatorBaselineAndUnfreeze(record: CdkRecord, reason: string): Promise<CdkRecord | null> {
-  if (!record.latest_operator_fingerprint) return null
+export async function setOperatorBaselineByAdmin(
+  record: CdkRecord,
+  options: AdminOperatorBaselineOptions,
+): Promise<CdkRecord | null> {
+  if (options.source === 'latest' && !record.latest_operator_fingerprint) return null
+  if (options.source === 'workspace' && !options.fingerprint) return null
   const at = new Date().toISOString()
   const store = await getCdkRecordStore()
-  return (await store.mutate(`cdk/${record.code_hash}.json`, (current) => {
-    if (!current.latest_operator_fingerprint) return current
-    return {
-      ...current,
-      status: 'used',
-      frozen_at: null,
-      freeze_reason: null,
-      baseline_operator_fingerprint: current.latest_operator_fingerprint,
-      risk_events: [...(current.risk_events ?? []), {
-        at,
-        type: 'admin_operator_baseline_accepted',
-        reason,
-        detail: { reviewed: true, fingerprint_hash: current.latest_operator_fingerprint.hash },
-      }].slice(-20),
+  let sourceUnavailable = false
+  const updated = await store.mutate(`cdk/${record.code_hash}.json`, (current) => {
+    const previousBaseline = current.baseline_operator_fingerprint
+    const previousLatest = current.latest_operator_fingerprint
+    const selected = options.source === 'latest'
+      ? current.latest_operator_fingerprint
+      : options.source === 'workspace'
+        ? options.fingerprint
+        : null
+    if (options.source !== 'next_import' && !selected) {
+      sourceUnavailable = true
+      return current
     }
-  }, { allowedStatuses: ['used', 'frozen'] })) ?? record
+
+    const next: CdkRecord = { ...current }
+    if (selected) {
+      next.baseline_operator_fingerprint = selected
+      next.latest_operator_fingerprint = selected
+    } else {
+      delete next.baseline_operator_fingerprint
+      delete next.latest_operator_fingerprint
+    }
+    if (options.unfreeze) {
+      next.status = 'used'
+      next.frozen_at = null
+      next.freeze_reason = null
+    }
+    next.risk_events = [...(current.risk_events ?? []), {
+      at,
+      type: options.eventType ?? 'admin_operator_baseline_changed',
+      reason: options.reason,
+      detail: {
+        reviewed: options.reviewed ?? true,
+        source: options.source,
+        previous_baseline_hash: previousBaseline?.hash ?? null,
+        previous_baseline_owned_count: previousBaseline?.owned_count ?? null,
+        previous_latest_hash: previousLatest?.hash ?? null,
+        previous_latest_owned_count: previousLatest?.owned_count ?? null,
+        selected_fingerprint_hash: selected?.hash ?? null,
+        selected_owned_count: selected?.owned_count ?? null,
+      },
+    }].slice(-20)
+    return next
+  }, { allowedStatuses: ['used', 'frozen'] })
+  if (sourceUnavailable || !updated || (updated.status !== 'used' && updated.status !== 'frozen')) return null
+  return updated
+}
+
+export async function acceptLatestOperatorBaselineAndUnfreeze(record: CdkRecord, reason: string): Promise<CdkRecord | null> {
+  return setOperatorBaselineByAdmin(record, {
+    source: 'latest',
+    reason,
+    unfreeze: true,
+  })
 }
 
 export function validateOperators(value: unknown): { ok: true; operators: LicenseOperator[] } | { ok: false; message: string } {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { GeneratedPermission, StatusFilter, CdkTypeFilter, PermissionFilter, BinaryFilter, CdkTableFilters, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, PaginationMeta, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, SmallButton, formatDate, getNextProductPermission, formatNullableNumber, formatRiskDetail } from '../shared/helpers'
@@ -165,10 +166,19 @@ function CdkDetailPanel({
   onSetPermission,
 }: CdkDetailPanelProps) {
   const nextPermission = detail.cdk_type === 'profile' ? getNextProductPermission(detail.permission) : null
-  const runReviewedAction = (action: 'accept_operator_baseline_and_unfreeze', prompt: string) => {
-    const reason = window.prompt(prompt)
+  const baselineOptions = detail.operator_baseline_options ?? []
+  const [baselineSource, setBaselineSource] = useState<'latest' | 'workspace' | 'next_import'>(
+    baselineOptions.find((option) => option.available)?.source ?? 'next_import',
+  )
+  const selectedBaseline = baselineOptions.find((option) => option.source === baselineSource)
+  const setOperatorBaseline = () => {
+    if (!selectedBaseline?.available) return
+    const reason = window.prompt('请输入干员数据核验备注。选择具体快照会同时更新初始和最近基线；清空基线则等待下次有效导入自动重建。')
     if (!reason?.trim()) return
-    void onPatch(detail, action, undefined, { reason: reason.trim() })
+    void onPatch(detail, 'set_operator_baseline', undefined, {
+      baseline_source: baselineSource,
+      reason: reason.trim(),
+    })
   }
   return (
     <section className="tool-panel overflow-hidden">
@@ -186,7 +196,6 @@ function CdkDetailPanel({
           {detail.cdk_type === 'profile' && detail.status !== 'revoked' && <SmallButton onClick={() => void onSetPermission(detail)} loading={busyAction === `set_permission:${detail.code_hash}`}>改授权</SmallButton>}
           {nextPermission && detail.status !== 'frozen' && detail.status !== 'revoked' && <SmallButton onClick={() => void onPatch(detail, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${detail.code_hash}`}>升级</SmallButton>}
           {detail.status === 'frozen' && <SmallButton onClick={() => void onPatch(detail, 'unfreeze')} loading={busyAction === `unfreeze:${detail.code_hash}`} tone="success">解冻</SmallButton>}
-          {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => runReviewedAction('accept_operator_baseline_and_unfreeze', '请输入干员数据核验备注。该操作会接受最新异常快照为新基线；如授权处于冻结状态，也会一并解冻。')} loading={busyAction === `accept_operator_baseline_and_unfreeze:${detail.code_hash}`} tone="success">接受干员基线</SmallButton>}
           {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => void onPatch(detail, 'revoke')} loading={busyAction === `revoke:${detail.code_hash}`} tone="danger">撤销</SmallButton>}
           <SmallButton onClick={onClose} autoFocus>关闭</SmallButton>
         </div>
@@ -198,7 +207,7 @@ function CdkDetailPanel({
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <DetailItem label="订单标识" value={detail.license_order_hash || '-'} />
             <DetailItem label="工作区干员" value={formatNullableNumber(detail.operator_count)} />
-            <DetailItem label="初始干员数" value={formatNullableNumber(detail.baseline_operator_count)} />
+            <DetailItem label="当前基线干员" value={formatNullableNumber(detail.baseline_operator_count)} />
             <DetailItem label="最近干员数" value={formatNullableNumber(detail.latest_operator_count)} />
             <DetailItem label="排班生成" value={String(detail.schedule_generate_count ?? 0)} />
             <DetailItem label="配置摘要" value={detail.config_desc || '-'} />
@@ -207,6 +216,35 @@ function CdkDetailPanel({
             <DetailItem label="冻结时间" value={formatDate(detail.frozen_at ?? null)} />
             <DetailItem label="撤销时间" value={formatDate(detail.revoked_at)} />
           </dl>
+          {(detail.status === 'used' || detail.status === 'frozen') && baselineOptions.length > 0 && (
+            <div className="tool-inset mt-4 p-3">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-ink-muted">新干员基线</span>
+                <select
+                  aria-label="新干员基线"
+                  className="tool-field"
+                  value={baselineSource}
+                  onChange={(event) => setBaselineSource(event.currentTarget.value as typeof baselineSource)}
+                >
+                  {baselineOptions.map((option) => (
+                    <option key={option.source} value={option.source} disabled={!option.available}>
+                      {formatOperatorBaselineOption(option)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="mt-2 text-xs leading-5 text-ink-muted">
+                选择快照会同步更新初始和最近基线；选择等待下次导入会清空旧基线。冻结授权在人工应用后会一并恢复。
+              </p>
+              <div className="mt-3">
+                <SmallButton
+                  onClick={setOperatorBaseline}
+                  loading={busyAction === `set_operator_baseline:${detail.code_hash}`}
+                  tone="success"
+                >应用新基线</SmallButton>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="tool-inset p-4">
@@ -242,6 +280,15 @@ function CdkDetailPanel({
       </div>
     </section>
   )
+}
+
+function formatOperatorBaselineOption(option: NonNullable<AdminCdkDetail['operator_baseline_options']>[number]): string {
+  const count = option.owned_count === null ? '' : `（拥有 ${option.owned_count}）`
+  const updatedAt = option.updated_at ? ` · ${formatDate(option.updated_at)}` : ''
+  const unavailable = option.available ? '' : '（不可用）'
+  if (option.source === 'latest') return `最近提交快照${count}${unavailable}`
+  if (option.source === 'workspace') return `当前档案工作区${count}${updatedAt}${unavailable}`
+  return '清空并等待下次有效导入'
 }
 
 export function RiskSettingsPanel({

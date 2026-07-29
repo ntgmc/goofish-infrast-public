@@ -61,10 +61,11 @@ export const requestSchemas = {
   }),
   adminCdkPatch: strict({
     code_hash: optionalString(64),
-    action: optionalString(32),
+    action: optionalString(64),
     permission: optionalString(32),
     order_note: optionalString(500),
     reason: optionalString(500),
+    baseline_source: z.enum(['latest', 'workspace', 'next_import']).optional(),
   }),
   adminCdkDelete: strict({ code_hash: shortString(64) }),
   adminOptimization: strict({ action: shortString(32), id: shortString(128), reason: shortString(500) }),
