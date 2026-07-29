@@ -28,6 +28,7 @@ import {
 const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const
 export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = listAdminIssuablePermissions()
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
+export type CdkType = 'profile' | 'balance' | 'item'
 
 export interface OperatorFingerprint {
   hash: string;
@@ -91,10 +92,8 @@ const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
 
 installUnhandledRejectionLogger()
 
-export interface CdkRecord {
-  version: 1;
+interface CdkRecordBase {
   code_hash: string;
-  permission: RawPermissionMode;
   status: CdkStatus;
   created_at: string;
   used_at: string | null;
@@ -111,6 +110,26 @@ export interface CdkRecord {
   risk_events?: RiskEvent[];
   account_id?: string | null;
   profile_id?: string | null;
+}
+
+export type LegacyProfileCdkRecord = CdkRecordBase & { version: 1; cdk_type?: undefined; permission: RawPermissionMode; balance_amount?: null }
+export type ProfileCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'profile'; permission: RawPermissionMode; balance_amount: null }
+export type BalanceCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'balance'; permission: null; balance_amount: string }
+export type ItemCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'item'; permission: null; balance_amount: null }
+export type CdkRecord = LegacyProfileCdkRecord | ProfileCdkRecord | BalanceCdkRecord | ItemCdkRecord
+
+export function getCdkType(record: CdkRecord): CdkType {
+  return record.cdk_type ?? 'profile'
+}
+
+export function getCdkBalanceAmount(record: CdkRecord): string | null {
+  return getCdkType(record) === 'balance' && typeof record.balance_amount === 'string'
+    ? record.balance_amount
+    : null
+}
+
+export function isProfileCdkRecord(record: CdkRecord): record is LegacyProfileCdkRecord | ProfileCdkRecord {
+  return getCdkType(record) === 'profile'
 }
 
 export interface CdkRecordStore {
@@ -133,6 +152,7 @@ export interface AdminCdkPageOptions {
   search: string;
   status: CdkStatus | 'all';
   permission: ProductPermissionMode | 'all';
+  cdkType: CdkType | 'all';
   risk: 'all' | 'yes' | 'no';
   generated: 'all' | 'yes' | 'no';
   riskOnly?: boolean;

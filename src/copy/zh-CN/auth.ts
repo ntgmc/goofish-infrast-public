@@ -33,6 +33,8 @@ export const authCopy = {
   api_cdk_frozen: "CDK 已被冻结。",
   api_cdk_revoked: "CDK 已被撤销。",
   api_cdk_already_redeemed: "CDK 已被使用或正在兑换中。",
+  api_cdk_type_mismatch: "该 CDK 请登录后前往积分页兑换。",
+  api_cdk_type_unavailable: "道具 CDK 暂未开放。",
   api_idempotency_conflict: "当前请求标识已用于其他兑换请求。",
   api_free_profile_skland_required: "免费个人排班档案必须通过森空岛登录领取。",
   api_free_profile_required: "缺少免费个人排班档案。",

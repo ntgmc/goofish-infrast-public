@@ -12,6 +12,7 @@ import { featuresCopy } from './zh-CN/features'
 import { publicContentCopy } from './zh-CN/public-content'
 import { personalUseCopy } from './zh-CN/personal-use'
 import { inventoryCopy } from './zh-CN/inventory'
+import { balanceCopy } from './zh-CN/balance'
 
 export const CURRENT_LOCALE = 'zh-CN' as const
 
@@ -30,4 +31,5 @@ export const copy = {
   publicContent: publicContentCopy,
   personalUse: personalUseCopy,
   inventory: inventoryCopy,
+  balance: balanceCopy,
 } as const

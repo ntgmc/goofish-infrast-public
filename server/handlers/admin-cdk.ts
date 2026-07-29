@@ -1,9 +1,13 @@
 import type { ProductPermissionMode } from '../../src/lib/types'
+import { normalizePointsAmount } from '../../src/lib/balance-contracts'
 import { getPermissionRank, normalizeRuntimePermission } from '../../src/lib/product-catalog'
 import { authenticateAdminRequest } from './admin-auth'
 import {
   CDK_PRODUCT_PERMISSIONS,
   generateCdk,
+  getCdkBalanceAmount,
+  getCdkType,
+  isProfileCdkRecord,
   getCdkRecordStore,
   hashCdk,
   jsonResponse,
@@ -12,6 +16,7 @@ import {
   unfreezeCdkRecord,
   type CdkRecord,
   type CdkStatus,
+  type CdkType,
   type AdminCdkPageOptions,
   type AdminCdkPageResult,
 } from './license-utils'
@@ -44,15 +49,29 @@ export default async (req: Request): Promise<Response> => {
 
   try {
     const body = await getValidatedJson(req, requestSchemas.adminCdkCreate)
-    const { permission, order_note, count } = body
+    const { permission, order_note, count, cdk_type, amount } = body
     const hashSecret = requireEnv('CDK_HASH_SECRET')
 
     const authentication = await authenticateAdminRequest(req)
     if (!authentication.ok) return authentication.response
-    if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
-      return jsonResponse({ error: 'CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
+    const cdkType = (cdk_type ?? 'profile') as CdkType
+    if (cdkType === 'item') return jsonResponse({ error: '道具 CDK 暂未开放。', code: 'cdk_type_unavailable' }, 400)
+    if (cdkType === 'profile' && amount !== undefined) {
+      return jsonResponse({ error: '档案 CDK 不能设置积分面额。', code: 'cdk_payload_mismatch' }, 400)
     }
-    const cdkPermission = permission as ProductPermissionMode
+    if (cdkType === 'balance' && permission !== undefined) {
+      return jsonResponse({ error: '余额 CDK 不能设置档案权限。', code: 'cdk_payload_mismatch' }, 400)
+    }
+    const cdkPermission = cdkType === 'profile' && permission && (CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)
+      ? permission as ProductPermissionMode
+      : null
+    const balanceAmount = cdkType === 'balance' ? normalizePointsAmount(amount) : null
+    if (cdkType === 'profile' && !cdkPermission) {
+      return jsonResponse({ error: '档案 CDK 权限必须是 recommended、growth、advanced 或 ultimate。' }, 400)
+    }
+    if (cdkType === 'balance' && !balanceAmount) {
+      return jsonResponse({ error: '余额 CDK 面额必须是 0.01 到 1000000.00 之间、最多两位小数的字符串。' }, 400)
+    }
 
     const store = await getCdkRecordStore()
     const batchCount = normalizeCreateCount(count)
@@ -66,13 +85,23 @@ export default async (req: Request): Promise<Response> => {
       createdAt,
       hashSecret,
       orderNote,
+      cdkType,
       permission: cdkPermission,
+      balanceAmount,
     })
     const response = {
-      permission: cdkPermission,
+      cdk_type: cdkType,
+      ...(cdkPermission ? { permission: cdkPermission } : {}),
+      ...(balanceAmount ? { amount: balanceAmount } : {}),
       created_at: createdAt,
       count: createdCdks.length,
-      cdks: createdCdks.map(({ code }) => ({ code, permission: cdkPermission, created_at: createdAt })),
+      cdks: createdCdks.map(({ code }) => ({
+        code,
+        cdk_type: cdkType,
+        ...(cdkPermission ? { permission: cdkPermission } : {}),
+        ...(balanceAmount ? { amount: balanceAmount } : {}),
+        created_at: createdAt,
+      })),
     }
 
     return jsonResponse(batchCount === 1 ? { code: createdCdks[0]?.code, ...response } : response)
@@ -92,7 +121,9 @@ interface CreateCdkBatchOptions {
   createdAt: string;
   hashSecret: string;
   orderNote: string | null;
-  permission: ProductPermissionMode;
+  cdkType: 'profile' | 'balance';
+  permission: ProductPermissionMode | null;
+  balanceAmount: string | null;
 }
 
 function normalizeCreateCount(value: unknown): number | null {
@@ -113,11 +144,10 @@ async function createCdkBatch(
     const generated = await generateUniqueCdk(store, options.hashSecret, generatedHashes)
     generatedHashes.add(generated.codeHash)
 
-    const record: CdkRecord = {
-      version: 1,
+    const base = {
+      version: 2 as const,
       code_hash: generated.codeHash,
-      permission: options.permission,
-      status: 'unused',
+      status: 'unused' as const,
       created_at: options.createdAt,
       used_at: null,
       revoked_at: null,
@@ -127,6 +157,9 @@ async function createCdkBatch(
       config_desc: null,
       schedule_generate_count: 0,
     }
+    const record: CdkRecord = options.cdkType === 'balance'
+      ? { ...base, cdk_type: 'balance', permission: null, balance_amount: options.balanceAmount! }
+      : { ...base, cdk_type: 'profile', permission: options.permission!, balance_amount: null }
     await store.create(`cdk/${generated.codeHash}.json`, record)
     created.push(generated)
   }
@@ -177,16 +210,18 @@ async function handleList(req: Request): Promise<Response> {
     const request = parseAdminPageRequest(url)
     const status = normalizeStatusFilter(req.headers.get('X-Cdk-Status'), req.url)
     const permission = normalizePermissionFilter(url.searchParams.get('permission'))
+    const cdkType = normalizeCdkTypeFilter(url.searchParams.get('cdk_type'))
     const risk = normalizeBinaryFilter(url.searchParams.get('risk'), 'risk')
     const generated = normalizeBinaryFilter(url.searchParams.get('generated'), 'generated')
     const riskOnly = url.searchParams.get('view') === 'risk'
     const store = await getCdkRecordStore()
     const result = store.listAdminPage
-      ? await store.listAdminPage({ ...request, status, permission, risk, generated, riskOnly })
-      : paginateMemoryRecords(await store.list('cdk/'), { ...request, status, permission, risk, generated, riskOnly })
+      ? await store.listAdminPage({ ...request, status, permission, cdkType, risk, generated, riskOnly })
+      : paginateMemoryRecords(await store.list('cdk/'), { ...request, status, permission, cdkType, risk, generated, riskOnly })
 
     return jsonResponse({
       status,
+      cdk_type: cdkType,
       cdks: result.records.map(toAdminCdkRecord),
       pagination: buildAdminPagination(result.page, request.pageSize, result.total),
     })
@@ -252,13 +287,14 @@ async function handlePatch(req: Request): Promise<Response> {
     }
 
     if (action === 'set_permission') {
+      if (!isProfileCdkRecord(existing)) return jsonResponse({ error: '只有档案 CDK 可以调整权限。' }, 409)
       if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
         return jsonResponse({ error: '目标 CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
       }
       if (existing.status === 'revoked') {
         return jsonResponse({ error: '已撤销授权不能调整权限。' }, 409)
       }
-      const updated = await store.mutate(key, (current) => ({ ...current, permission: permission as ProductPermissionMode })) ?? existing
+      const updated = await store.mutate(key, (current) => isProfileCdkRecord(current) ? { ...current, permission: permission as ProductPermissionMode } : null) ?? existing
       if (updated.status === 'revoked') return jsonResponse({ error: '已撤销授权不能调整权限。' }, 409)
       return jsonResponse({
         updated: true,
@@ -269,6 +305,7 @@ async function handlePatch(req: Request): Promise<Response> {
     }
 
     if (action === 'unfreeze') {
+      if (!isProfileCdkRecord(existing)) return jsonResponse({ error: '只有档案 CDK 支持风控解冻。' }, 409)
       if (existing.status === 'revoked') {
         return jsonResponse({ error: '已撤销授权不能解冻。' }, 409)
       }
@@ -290,6 +327,7 @@ async function handlePatch(req: Request): Promise<Response> {
     }
 
     if (action === 'upgrade') {
+      if (!isProfileCdkRecord(existing)) return jsonResponse({ error: '只有档案 CDK 可以升级权限。' }, 409)
       if (!permission || !(CDK_PRODUCT_PERMISSIONS as string[]).includes(permission)) {
         return jsonResponse({ error: '目标 CDK 类型必须是 recommended、growth、advanced 或 ultimate。' }, 400)
       }
@@ -305,7 +343,7 @@ async function handlePatch(req: Request): Promise<Response> {
         return jsonResponse({ error: '只能升级到更高等级的授权。' }, 409)
       }
 
-      const updated = await store.mutate(key, (current) => ({ ...current, permission: nextPermission })) ?? existing
+      const updated = await store.mutate(key, (current) => isProfileCdkRecord(current) ? { ...current, permission: nextPermission } : null) ?? existing
       if (updated.status === 'revoked') return jsonResponse({ error: '已撤销授权不能升级。' }, 409)
       return jsonResponse({
         upgraded: true,
@@ -389,7 +427,9 @@ function toAdminCdkRecord(record: CdkRecord) {
   return {
     code_hash: record.code_hash,
     cdk_id: record.code_hash.slice(0, 12),
+    cdk_type: getCdkType(record),
     permission: record.permission,
+    amount: getCdkBalanceAmount(record),
     status: record.status,
     created_at: record.created_at,
     used_at: record.used_at,
@@ -466,6 +506,12 @@ function normalizePermissionFilter(value: string | null): ProductPermissionMode 
   throw new AdminPaginationError('permission 筛选值无效。')
 }
 
+function normalizeCdkTypeFilter(value: string | null): CdkType | 'all' {
+  if (!value || value === 'all') return 'all'
+  if (value === 'profile' || value === 'balance' || value === 'item') return value
+  throw new AdminPaginationError('cdk_type 筛选值无效。')
+}
+
 function normalizeBinaryFilter(value: string | null, field: string): 'all' | 'yes' | 'no' {
   if (!value || value === 'all') return 'all'
   if (value === 'yes' || value === 'no') return value
@@ -479,6 +525,7 @@ function paginateMemoryRecords(records: CdkRecord[], options: AdminCdkPageOption
     const generated = (record.schedule_generate_count ?? 0) > 0
     if (options.status !== 'all' && record.status !== options.status) return false
     if (options.permission !== 'all' && record.permission !== options.permission) return false
+    if (options.cdkType !== 'all' && getCdkType(record) !== options.cdkType) return false
     if (options.riskOnly && !hasRisk) return false
     if (options.risk !== 'all' && hasRisk !== (options.risk === 'yes')) return false
     if (options.generated !== 'all' && generated !== (options.generated === 'yes')) return false

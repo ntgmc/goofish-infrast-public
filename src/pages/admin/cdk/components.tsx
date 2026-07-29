@@ -1,4 +1,4 @@
-import { GeneratedPermission, StatusFilter, PermissionFilter, BinaryFilter, CdkTableFilters, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, PaginationMeta, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
+import { GeneratedPermission, StatusFilter, CdkTypeFilter, PermissionFilter, BinaryFilter, CdkTableFilters, AdminCdkRecord, AdminCdkDetail, RiskControlSettings, RiskControlSettingsPatch, PaginationMeta, permissionLabels, statusLabels, cdkProductPermissions } from '../contracts'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, SmallButton, formatDate, getNextProductPermission, formatNullableNumber, formatRiskDetail } from '../shared/helpers'
 import { AnimatedValue, RevealItem } from '../../../components/MotionPrimitives'
@@ -58,6 +58,15 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
           </div>
         </label>
         <label className="block">
+          <span className="mb-1.5 block text-xs font-medium text-ink-muted">CDK 类型</span>
+          <select value={filters.cdk_type} onChange={(event) => onFilterChange({ cdk_type: event.currentTarget.value as CdkTypeFilter })} className="tool-field">
+            <option value="all">全部类型</option>
+            <option value="profile">档案兑换</option>
+            <option value="balance">余额兑换</option>
+            <option value="item">道具（预留）</option>
+          </select>
+        </label>
+        <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">权限</span>
           <select value={filters.permission} onChange={(event) => onFilterChange({ permission: event.currentTarget.value as PermissionFilter })} className="tool-field">
             <option value="all">全部权限</option>
@@ -85,12 +94,12 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
             {records.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">{search ? '没有匹配的 CDK，请调整搜索条件。' : '当前筛选没有记录。'}</td></tr>
             ) : records.map((record) => {
-              const nextPermission = getNextProductPermission(record.permission)
+              const nextPermission = record.cdk_type === 'profile' ? getNextProductPermission(record.permission) : null
               return (
                 <tr key={record.code_hash} className="hover:bg-surface-2/50">
                     <td className="px-4 py-4 align-top"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label={`选择 CDK ${record.cdk_id}`} checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
                     <td className="px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
-                    <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{permissionLabels[record.permission]}</div></td>
+                    <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{record.cdk_type === 'balance' ? `余额 ${record.amount} 积分` : record.cdk_type === 'item' ? '道具（预留）' : permissionLabels[record.permission!]}</div></td>
                     <td className="px-4 py-4 align-top text-ink-secondary">
                       <div>{record.operator_count ?? '-'} 干员 / 生成 {record.schedule_generate_count ?? 0}</div>
                       <div className="mt-1 text-xs text-ink-muted">风险 {record.risk_event_count ?? 0}</div>
@@ -155,7 +164,7 @@ function CdkDetailPanel({
   onUpdateNote,
   onSetPermission,
 }: CdkDetailPanelProps) {
-  const nextPermission = getNextProductPermission(detail.permission)
+  const nextPermission = detail.cdk_type === 'profile' ? getNextProductPermission(detail.permission) : null
   const runReviewedAction = (action: 'accept_operator_baseline_and_unfreeze', prompt: string) => {
     const reason = window.prompt(prompt)
     if (!reason?.trim()) return
@@ -168,13 +177,13 @@ function CdkDetailPanel({
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="admin-cdk-detail-title" className="font-mono text-base font-semibold text-ink-primary">{detail.cdk_id}</h2>
             <StatusPill status={detail.status} />
-            <span className="tool-status tool-status--current">{permissionLabels[detail.permission]}</span>
+            <span className="tool-status tool-status--current">{detail.cdk_type === 'balance' ? `余额 ${detail.amount} 积分` : detail.cdk_type === 'item' ? '道具（预留）' : permissionLabels[detail.permission!]}</span>
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">订单备注：{detail.order_note || '-'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <SmallButton onClick={() => void onUpdateNote(detail)} loading={busyAction === `update_note:${detail.code_hash}`}>改备注</SmallButton>
-          {detail.status !== 'revoked' && <SmallButton onClick={() => void onSetPermission(detail)} loading={busyAction === `set_permission:${detail.code_hash}`}>改授权</SmallButton>}
+          {detail.cdk_type === 'profile' && detail.status !== 'revoked' && <SmallButton onClick={() => void onSetPermission(detail)} loading={busyAction === `set_permission:${detail.code_hash}`}>改授权</SmallButton>}
           {nextPermission && detail.status !== 'frozen' && detail.status !== 'revoked' && <SmallButton onClick={() => void onPatch(detail, 'upgrade', nextPermission)} loading={busyAction === `upgrade:${detail.code_hash}`}>升级</SmallButton>}
           {detail.status === 'frozen' && <SmallButton onClick={() => void onPatch(detail, 'unfreeze')} loading={busyAction === `unfreeze:${detail.code_hash}`} tone="success">解冻</SmallButton>}
           {(detail.status === 'used' || detail.status === 'frozen') && <SmallButton onClick={() => runReviewedAction('accept_operator_baseline_and_unfreeze', '请输入干员数据核验备注。该操作会接受最新异常快照为新基线；如授权处于冻结状态，也会一并解冻。')} loading={busyAction === `accept_operator_baseline_and_unfreeze:${detail.code_hash}`} tone="success">接受干员基线</SmallButton>}

@@ -18,6 +18,7 @@ const ToolsSection = lazy(() => import('./dashboard/ToolsSection'))
 const RedeemSection = lazy(() => import('./dashboard/RedeemSection'))
 const InvitationsSection = lazy(() => import('./dashboard/InvitationsSection'))
 const InventorySection = lazy(() => import('./dashboard/InventorySection'))
+const BalanceSection = lazy(() => import('./dashboard/BalanceSection'))
 const AnnouncementsSection = lazy(() => import('./dashboard/AnnouncementsSection'))
 const SettingsSection = lazy(() => import('./dashboard/SettingsSection'))
 
@@ -72,6 +73,7 @@ export default function AccountDashboard({
     redeem: copy.common.pages_tool_AccountDashboard_003,
     invitations: copy.common.pages_tool_AccountDashboard_004,
     inventory: copy.inventory.nav,
+    balance: copy.balance.nav,
     announcements: copy.common.pages_tool_AccountDashboard_005,
     settings: copy.common.pages_tool_AccountDashboard_006,
   }
@@ -226,6 +228,7 @@ export default function AccountDashboard({
               {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}
               {section === 'invitations' && <InvitationsSection />}
               {section === 'inventory' && <InventorySection />}
+              {section === 'balance' && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
               {section === 'announcements' && <AnnouncementsSection />}
               {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} />}
             </Suspense>

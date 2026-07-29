@@ -1453,6 +1453,9 @@ function memoryLicenseUtilsModuleFixed() {
     export async function getCdkRecordStore() {
       return { get: async (key) => store.cdks.get(key) ?? null }
     }
+    export function isProfileCdkRecord(record) {
+      return (record.cdk_type ?? 'profile') === 'profile'
+    }
     export async function getRiskControlSettings() {
       return { operator_data_risk_enabled: true, updated_at: null }
     }

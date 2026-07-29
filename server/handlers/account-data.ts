@@ -6,6 +6,7 @@ import { clearSessionCookie, jsonResponse, normalizeEmail, requireUserSession, t
 import { verifyPasswordHash } from '../security/password'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
+import { normalizeStoredPoints } from '../../src/lib/balance-contracts'
 
 export default async function accountDataHandler(req: Request): Promise<Response> {
   const pathname = new URL(req.url).pathname
@@ -37,6 +38,8 @@ async function exportData(userId: string): Promise<Response> {
     onboardingTasks,
     distributionRecipients,
     inventoryAdminAudit,
+    balanceAccount,
+    balanceTransactions,
   ] = await Promise.all([
     getUserById(userId),
     Promise.all(profiles.map((profile) => getProfileWorkspace(profile.id))),
@@ -71,6 +74,9 @@ async function exportData(userId: string): Promise<Response> {
              from inventory_admin_audit
             where target_id = $1 or before_json->>'user_id' = $1 or after_json->>'user_id' = $1
             order by created_at asc`, [userId]),
+    query<{ available: string }>('select available::text from user_balance_accounts where user_id = $1', [userId]),
+    query(`select id, kind, amount::text, balance_after::text, reference_type, reference_id, created_at
+             from user_balance_transactions where user_id = $1 order by created_at asc, id asc`, [userId]),
   ])
   const safeProfiles = profiles.map((profile) => {
     const { skland_binding, skland_pending_binding, ...rest } = profile
@@ -100,6 +106,15 @@ async function exportData(userId: string): Promise<Response> {
       onboarding_tasks: onboardingTasks.rows,
       distribution_recipients: distributionRecipients.rows,
       admin_audit_links: inventoryAdminAudit.rows,
+    },
+    balance: {
+      currency: 'points',
+      available: normalizeStoredPoints(balanceAccount.rows[0]?.available ?? '0'),
+      transactions: balanceTransactions.rows.map((transaction) => ({
+        ...transaction,
+        amount: normalizeStoredPoints((transaction as { amount?: unknown }).amount),
+        balance_after: normalizeStoredPoints((transaction as { balance_after?: unknown }).balance_after),
+      })),
     },
     deletion_request: deletion.rows[0] ?? null,
   }, null, 2), {

@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
-import type { CdkRecord, CdkRecordStore } from '../handlers/license-utils'
+import { getCdkBalanceAmount, getCdkType, type CdkRecord, type CdkRecordStore } from '../handlers/license-utils'
 
 let schemaReady: Promise<void> | null = null
 
@@ -20,10 +20,11 @@ export async function claimCdkRecord(client: PoolClient, key: string): Promise<C
 export async function completeCdkRedemption(client: PoolClient, key: string, record: CdkRecord): Promise<void> {
   const result = await client.query(
     `update cdk_records
-     set status = 'used', permission = $2, license_order_hash = $3, record_json = $4::jsonb,
+     set status = 'used', cdk_type = $2, permission = $3, balance_amount = $4::numeric,
+         license_order_hash = $5, record_json = $6::jsonb,
          record_revision = record_revision + 1, updated_at = now()
      where key = $1 and status = 'claiming'`,
-    [key, record.permission, record.license_order_hash, JSON.stringify(record)],
+    [key, getCdkType(record), record.permission, getCdkBalanceAmount(record), record.license_order_hash, JSON.stringify(record)],
   )
   if (result.rowCount !== 1) throw new Error('CDK redemption claim was lost before completion')
 }
@@ -41,14 +42,17 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
     create: async (key, record) => {
       await ensureSchema()
       const result = await query(
-        `insert into cdk_records (key, code_hash, status, permission, license_order_hash, record_json, created_at, updated_at)
-         values ($1, $2, $3, $4, $5, $6::jsonb, $7, now())
+        `insert into cdk_records
+          (key, code_hash, cdk_type, status, permission, balance_amount, license_order_hash, record_json, created_at, updated_at)
+         values ($1, $2, $3, $4, $5, $6::numeric, $7, $8::jsonb, $9, now())
          on conflict (key) do nothing`,
         [
           key,
           record.code_hash,
+          getCdkType(record),
           record.status,
           record.permission,
+          getCdkBalanceAmount(record),
           record.license_order_hash,
           JSON.stringify(record),
           record.created_at || null,
@@ -83,11 +87,13 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
 
         const result = await query<{ record_json: CdkRecord }>(
           `update cdk_records
-           set status = $2, permission = $3, license_order_hash = $4, record_json = $5::jsonb,
+           set status = $2, cdk_type = $3, permission = $4, balance_amount = $5::numeric,
+               license_order_hash = $6, record_json = $7::jsonb,
                record_revision = record_revision + 1, updated_at = now()
-           where key = $1 and record_revision = $6 and status <> 'revoked'
+           where key = $1 and record_revision = $8 and status <> 'revoked'
            returning record_json`,
-          [key, next.status, next.permission, next.license_order_hash, JSON.stringify(next), current.record_revision],
+          [key, next.status, getCdkType(next), next.permission, getCdkBalanceAmount(next), next.license_order_hash,
+            JSON.stringify(next), current.record_revision],
         )
         if (result.rowCount === 1) return result.rows[0]?.record_json ?? null
       }
@@ -163,6 +169,7 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
       }
       if (options.status !== 'all') conditions.push(`status = ${add(options.status)}`)
       if (options.permission !== 'all') conditions.push(`permission = ${add(options.permission)}`)
+      if (options.cdkType !== 'all') conditions.push(`cdk_type = ${add(options.cdkType)}`)
       if (options.search) {
         const search = add(`%${options.search.toLowerCase()}%`)
         conditions.push(`(

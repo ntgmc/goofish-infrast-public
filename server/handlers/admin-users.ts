@@ -9,6 +9,7 @@ import { PasswordWorkCapacityError } from '../security/password'
 import {
   CDK_PRODUCT_PERMISSIONS,
   getCdkRecordStore,
+  isProfileCdkRecord,
   jsonResponse,
   type CdkRecord,
 } from './license-utils'
@@ -291,8 +292,10 @@ async function syncLinkedCdkPermission(profile: UserGameAccountRecord, permissio
   if (!profile.cdk_key) return
   const store = await getCdkRecordStore()
   const record = await store.get(profile.cdk_key)
-  if (!record) return
-  await store.mutate(profile.cdk_key, (current) => ({ ...current, permission }))
+  if (!record || !isProfileCdkRecord(record)) return
+  await store.mutate(profile.cdk_key, (current) => (
+    isProfileCdkRecord(current) ? { ...current, permission } : current
+  ))
 }
 
 async function buildAdminUserDetail(user: UserAccountRecord) {

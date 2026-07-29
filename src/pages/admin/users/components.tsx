@@ -1,3 +1,6 @@
+import { useState, type FormEvent } from 'react'
+import type { AdminBalanceTransaction, BalancePage } from '../../../lib/balance-contracts'
+import { normalizePointsAmount } from '../../../lib/balance-contracts'
 import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, permissionLabels, appUserStatusLabels } from '../contracts'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, UserStatusPill, SmallButton, formatDate, getAdminProfileAccessLabel, formatAdminProfileAccess, formatOperatorValue, getAppUserStatusLabel } from '../shared/helpers'
@@ -7,6 +10,8 @@ export interface UserDetailPanelProps {
   busyAction: string | null;
   operatorDataByProfileId: Record<string, AdminProfileOperatorData>;
   expandedOperatorProfileId: string | null;
+  balance: BalancePage<AdminBalanceTransaction> | null;
+  balanceLoading: boolean;
   onClose: () => void;
   onUpdateProfile: (profile: AdminProfileSummary) => Promise<void>;
   onSetProfileStatus: (profile: AdminProfileSummary) => Promise<void>;
@@ -16,6 +21,8 @@ export interface UserDetailPanelProps {
   onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
   onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
   onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
+  onAdjustBalance: (operation: 'credit' | 'debit', amount: string, reason: string, idempotencyKey: string) => Promise<boolean>;
+  onLoadMoreBalance: () => Promise<void>;
   onFreezeUser: (user: AppUserSummary) => Promise<void>;
   onUnfreezeUser: (user: AppUserSummary) => Promise<void>;
   onDeleteUser: (user: AppUserSummary) => Promise<void>;
@@ -34,6 +41,8 @@ function UserDetailPanel({
   busyAction,
   operatorDataByProfileId,
   expandedOperatorProfileId,
+  balance,
+  balanceLoading,
   onClose,
   onUpdateProfile,
   onSetProfileStatus,
@@ -43,6 +52,8 @@ function UserDetailPanel({
   onClearWorkspace,
   onViewOperators,
   onDownloadOperators,
+  onAdjustBalance,
+  onLoadMoreBalance,
   onFreezeUser,
   onUnfreezeUser,
   onDeleteUser,
@@ -76,6 +87,14 @@ function UserDetailPanel({
           <DetailItem label="更新时间" value={formatDate(user.updated_at)} />
         </dl>
 
+        <UserBalanceCard
+          balance={balance}
+          loading={balanceLoading}
+          busy={busyAction === `user-balance:${user.id}`}
+          onAdjust={onAdjustBalance}
+          onLoadMore={onLoadMoreBalance}
+        />
+
         <PersonalUseDeclarations declarations={detail.personal_use_declarations} />
 
         <div className="mt-5 space-y-4">
@@ -102,6 +121,137 @@ function UserDetailPanel({
       </div>
     </section>
   )
+}
+
+function UserBalanceCard({
+  balance,
+  loading,
+  busy,
+  onAdjust,
+  onLoadMore,
+}: {
+  balance: BalancePage<AdminBalanceTransaction> | null;
+  loading: boolean;
+  busy: boolean;
+  onAdjust: UserDetailPanelProps['onAdjustBalance'];
+  onLoadMore: UserDetailPanelProps['onLoadMoreBalance'];
+}) {
+  const [operation, setOperation] = useState<'credit' | 'debit'>('credit')
+  const [amount, setAmount] = useState('')
+  const [reason, setReason] = useState('')
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
+  const [validationError, setValidationError] = useState<string | null>(null)
+
+  const resetRequestIdentity = () => setIdempotencyKey(crypto.randomUUID())
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    const normalizedAmount = normalizePointsAmount(amount)
+    const normalizedReason = reason.trim()
+    if (!normalizedAmount) {
+      setValidationError('积分金额必须是 0.01 到 1000000.00 之间、最多两位小数的字符串。')
+      return
+    }
+    if (!normalizedReason || normalizedReason.length > 500) {
+      setValidationError('调整原因必填，长度不能超过 500 个字符。')
+      return
+    }
+    setValidationError(null)
+    const succeeded = await onAdjust(operation, normalizedAmount, normalizedReason, idempotencyKey)
+    if (!succeeded) return
+    setAmount('')
+    setReason('')
+    resetRequestIdentity()
+  }
+
+  return (
+    <section className="tool-inset mt-5 p-4" aria-labelledby="admin-user-balance-title">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h3 id="admin-user-balance-title" className="text-sm font-semibold text-ink-primary">积分余额</h3>
+          <p className="mt-2 text-3xl font-semibold tabular-nums text-ink-primary">{balance?.balance.available ?? '0.00'}</p>
+          <p className="mt-1 text-xs text-ink-muted">站内积分，不支持提现或转移</p>
+        </div>
+        <span className="tool-status">{balance?.transactions.length ?? 0} 条已加载流水</span>
+      </div>
+
+      <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[140px_180px_1fr_auto]" noValidate>
+        <label>
+          <span className="mb-1.5 block text-xs font-medium text-ink-muted">操作</span>
+          <select
+            value={operation}
+            onChange={(event) => { setOperation(event.currentTarget.value as 'credit' | 'debit'); resetRequestIdentity() }}
+            className="tool-field"
+          >
+            <option value="credit">增加积分</option>
+            <option value="debit">扣减积分</option>
+          </select>
+        </label>
+        <label>
+          <span className="mb-1.5 block text-xs font-medium text-ink-muted">金额</span>
+          <input
+            value={amount}
+            onChange={(event) => { setAmount(event.currentTarget.value); resetRequestIdentity() }}
+            inputMode="decimal"
+            placeholder="例如 12.30"
+            className="tool-field"
+          />
+        </label>
+        <label>
+          <span className="mb-1.5 block text-xs font-medium text-ink-muted">内部原因（必填）</span>
+          <input
+            value={reason}
+            onChange={(event) => { setReason(event.currentTarget.value); resetRequestIdentity() }}
+            maxLength={500}
+            placeholder="仅管理员审计可见"
+            className="tool-field"
+          />
+        </label>
+        <button type="submit" disabled={busy} className={operation === 'debit' ? 'tool-danger-action self-end' : 'tool-primary-action self-end'}>
+          {busy ? '处理中…' : operation === 'debit' ? '扣减' : '增加'}
+        </button>
+      </form>
+      {validationError && <p className="mt-2 text-sm text-error" role="alert">{validationError}</p>}
+
+      <div className="mt-5 overflow-x-auto">
+        <table className="min-w-full text-left text-xs text-ink-secondary">
+          <thead className="border-b border-surface-3 text-ink-muted">
+            <tr>
+              <th className="px-2 py-2 font-medium">类型</th>
+              <th className="px-2 py-2 font-medium">变动</th>
+              <th className="px-2 py-2 font-medium">余额</th>
+              <th className="px-2 py-2 font-medium">管理员 / 原因</th>
+              <th className="px-2 py-2 font-medium">引用</th>
+              <th className="px-2 py-2 font-medium">时间</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-surface-3">
+            {(balance?.transactions ?? []).map((transaction) => (
+              <tr key={transaction.id}>
+                <td className="px-2 py-2">{adminBalanceKindLabel(transaction.kind)}</td>
+                <td className={`px-2 py-2 font-mono font-medium ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? transaction.amount : `+${transaction.amount}`}</td>
+                <td className="px-2 py-2 font-mono">{transaction.balance_after}</td>
+                <td className="max-w-72 px-2 py-2"><div>{transaction.admin_username ?? '-'}</div><div className="truncate text-ink-muted" title={transaction.reason ?? undefined}>{transaction.reason ?? '-'}</div></td>
+                <td className="max-w-52 px-2 py-2 font-mono text-ink-muted"><div>{transaction.reference_type}</div><div className="truncate" title={transaction.reference_id}>{transaction.reference_id}</div></td>
+                <td className="whitespace-nowrap px-2 py-2">{formatDate(transaction.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!balance?.transactions.length && <p className="py-6 text-center text-sm text-ink-muted">暂无积分流水。</p>}
+      </div>
+      {balance?.next_cursor && (
+        <button type="button" onClick={() => void onLoadMore()} disabled={loading} className="tool-secondary-action mt-3 text-sm">
+          {loading ? '加载中…' : '加载更多'}
+        </button>
+      )}
+    </section>
+  )
+}
+
+function adminBalanceKindLabel(kind: AdminBalanceTransaction['kind']): string {
+  if (kind === 'cdk_credit') return '余额 CDK'
+  if (kind === 'admin_debit') return '管理员扣减'
+  return '管理员发放'
 }
 
 function PersonalUseDeclarations({ declarations }: { declarations: AdminUserDetail['personal_use_declarations'] }) {

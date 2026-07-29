@@ -59,7 +59,7 @@ export async function recordScheduleGenerate(
       reason_code: context.reason_code,
       duration_ms: Date.now() - timing.submittedAt,
       ...(timing.attemptStartedAt !== undefined && { compute_duration_ms: Date.now() - timing.attemptStartedAt }),
-      permission: context.permission ?? cdkRecord?.permission,
+      permission: context.permission ?? cdkRecord?.permission ?? undefined,
       profile_id: context.profile_id,
       cdk_status: context.cdk_status ?? cdkRecord?.status,
       source: context.source ?? "optimize",

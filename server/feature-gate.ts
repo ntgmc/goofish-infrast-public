@@ -33,6 +33,7 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/user/announcements') return ['login', 'announcements']
   if (pathname === '/api/user/profiles/preview') return ['free_preview']
   if (pathname === '/api/user/profiles/redeem') return ['cdk_redemption']
+  if (pathname === '/api/user/balance/redeem') return ['cdk_redemption']
   if (pathname === '/api/user/profiles/depot-value') return ['profiles', 'depot_value']
   if (pathname === '/api/user/profiles' || pathname === '/api/user/status') return ['profiles']
   if (pathname === '/api/user/workspace/free-schedule/confirm') return ['schedule_generation']

@@ -274,6 +274,7 @@ function memoryLicenseUtilsModule() {
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, updated_at: null } }
     export async function incrementCdkScheduleGenerateCount() {}
     export function normalizePermissionMode(permission) { return permission ?? 'growth' }
+    export function isProfileCdkRecord(record) { return (record.cdk_type ?? 'profile') === 'profile' }
     export async function recordOperatorFingerprint(record) { return record }
     export async function recordSoftBlockedRiskEvent() { return { message: 'blocked', frozen: false } }
     export function resolveConfigForPermission(_permission, config) { return { ok: true, config } }

@@ -9,7 +9,9 @@ import { CdkDetailDialog } from './components'
 const detail: AdminCdkDetail = {
   code_hash: 'hash-1',
   cdk_id: 'CDK-DETAIL-001',
+  cdk_type: 'profile',
   permission: 'recommended',
+  amount: null,
   status: 'used',
   created_at: '2026-07-15T00:00:00.000Z',
   used_at: '2026-07-15T01:00:00.000Z',

@@ -80,10 +80,10 @@ const scheduleAttempts = scheduleGenerates + scheduleFailures
 export function buildCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummary {
   const permissionMap = new Map<Permission, CdkPermissionDistribution>()
   for (const permission of cdkProductPermissions) {
-    permissionMap.set(permission, { permission, total: 0, unused: 0, used: 0, frozen: 0, revoked: 0 })
+    permissionMap.set(permission, { permission, total: 0, unused: 0, claiming: 0, used: 0, frozen: 0, revoked: 0 })
   }
   const statusMap = new Map<CdkStatus, CdkStatusDistribution>(
-    (['unused', 'used', 'frozen', 'revoked'] as CdkStatus[]).map((status) => [status, { status, total: 0 }]),
+    (['unused', 'claiming', 'used', 'frozen', 'revoked'] as CdkStatus[]).map((status) => [status, { status, total: 0 }]),
   )
   const reasonMap = new Map<string, RiskReasonStats>()
   const trendMap = new Map<string, RiskTrendDay>()
@@ -91,11 +91,13 @@ export function buildCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummary {
   let escalations = 0
 
   for (const record of records) {
-    const permission = normalizeProductPermission(record.permission) ?? record.permission
-    const distribution = permissionMap.get(permission) ?? { permission, total: 0, unused: 0, used: 0, frozen: 0, revoked: 0 }
-    distribution.total += 1
-    distribution[record.status] += 1
-    permissionMap.set(permission, distribution)
+    if (record.cdk_type === 'profile' && record.permission) {
+      const permission = normalizeProductPermission(record.permission) ?? record.permission
+      const distribution = permissionMap.get(permission) ?? { permission, total: 0, unused: 0, claiming: 0, used: 0, frozen: 0, revoked: 0 }
+      distribution.total += 1
+      distribution[record.status] += 1
+      permissionMap.set(permission, distribution)
+    }
 
     const statusDistribution = statusMap.get(record.status)
     if (statusDistribution) statusDistribution.total += 1
@@ -135,6 +137,10 @@ export function buildCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummary {
   }
 
   return {
+    type_distribution: (['profile', 'balance', 'item'] as const).map((cdk_type) => ({
+      cdk_type,
+      total: records.filter((record) => record.cdk_type === cdk_type).length,
+    })),
     permission_distribution: [...permissionMap.values()].filter((item) => item.total > 0),
     status_distribution: [...statusMap.values()],
     risk_reasons: [...reasonMap.values()].sort((left, right) => {
@@ -451,7 +457,7 @@ export function inputClassName(hasError: boolean): string {
   return `${base} ${state}`
 }
 
-export function getNextProductPermission(permission: Permission): GeneratedPermission | null {
+export function getNextProductPermission(permission: Permission | null): GeneratedPermission | null {
   const current = permission === 'basic' ? 'growth' : permission === 'premium' ? 'advanced' : cdkProductPermissions.includes(permission as GeneratedPermission) ? permission as GeneratedPermission : null
   if (!current) return null
   return cdkProductPermissions.find((item) => cdkProductPermissionRank[item] === cdkProductPermissionRank[current] + 1) ?? null
@@ -472,18 +478,25 @@ export function normalizeGeneratedCdks(data: AdminCdkCreateResponse): GeneratedC
   const cdks = Array.isArray(data.cdks)
     ? data.cdks
       .map((item) => {
+        const cdkType = item.cdk_type === 'balance' ? 'balance' : 'profile'
         const permission = typeof item.permission === 'string' ? normalizeProductPermission(item.permission) : null
-        if (typeof item.code !== 'string' || !item.code.trim() || !permission || typeof item.created_at !== 'string') return null
-        return { code: item.code, permission, created_at: item.created_at }
+        const amount = typeof item.amount === 'string' ? item.amount : undefined
+        if (typeof item.code !== 'string' || !item.code.trim() || typeof item.created_at !== 'string') return null
+        if (cdkType === 'profile' && !permission) return null
+        if (cdkType === 'balance' && !amount) return null
+        return { code: item.code, cdk_type: cdkType, ...(permission ? { permission } : {}), ...(amount ? { amount } : {}), created_at: item.created_at }
       })
       .filter((item): item is GeneratedCdk => Boolean(item))
     : []
 
   if (cdks.length > 0) return cdks
 
+  const cdkType = data.cdk_type === 'balance' ? 'balance' : 'profile'
   const permission = typeof data.permission === 'string' ? normalizeProductPermission(data.permission) : null
-  if (typeof data.code === 'string' && data.code.trim() && permission && typeof data.created_at === 'string') {
-    return [{ code: data.code, permission, created_at: data.created_at }]
+  const amount = typeof data.amount === 'string' ? data.amount : undefined
+  if (typeof data.code === 'string' && data.code.trim() && typeof data.created_at === 'string'
+    && ((cdkType === 'profile' && permission) || (cdkType === 'balance' && amount))) {
+    return [{ code: data.code, cdk_type: cdkType, ...(permission ? { permission } : {}), ...(amount ? { amount } : {}), created_at: data.created_at }]
   }
   return []
 }
@@ -606,8 +619,8 @@ export function buildCurrentOpsReportCsv(report: ReturnType<typeof buildCurrentO
 
 export function buildGeneratedCdkCsv(cdks: GeneratedCdk[]): string {
   const rows = [
-    ['code', 'permission', 'permission_label', 'created_at'],
-    ...cdks.map((item) => [item.code, item.permission, permissionLabels[item.permission], item.created_at]),
+    ['code', 'cdk_type', 'permission', 'permission_label', 'amount', 'created_at'],
+    ...cdks.map((item) => [item.code, item.cdk_type, item.permission ?? '', item.permission ? permissionLabels[item.permission] : '', item.amount ?? '', item.created_at]),
   ]
   return rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
 }

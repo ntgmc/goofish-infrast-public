@@ -3,18 +3,20 @@ import { cdkProductPermissions } from '../../src/pages/admin/contracts'
 
 export function buildAdminCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummary {
   const permissionMap = new Map<Permission, CdkPermissionDistribution>()
-  for (const permission of cdkProductPermissions) permissionMap.set(permission, { permission, total: 0, unused: 0, used: 0, frozen: 0, revoked: 0 })
-  const statuses: CdkStatus[] = ['unused', 'used', 'frozen', 'revoked']
+  for (const permission of cdkProductPermissions) permissionMap.set(permission, { permission, total: 0, unused: 0, claiming: 0, used: 0, frozen: 0, revoked: 0 })
+  const statuses: CdkStatus[] = ['unused', 'claiming', 'used', 'frozen', 'revoked']
   const statusMap = new Map<CdkStatus, CdkStatusDistribution>(statuses.map((status) => [status, { status, total: 0 }]))
   const reasonMap = new Map<string, RiskReasonStats>()
   const trendMap = new Map<string, RiskTrendDay>()
   let softBlocks = 0
   let escalations = 0
   for (const record of records) {
-    const distribution = permissionMap.get(record.permission) ?? { permission: record.permission, total: 0, unused: 0, used: 0, frozen: 0, revoked: 0 }
-    distribution.total += 1
-    distribution[record.status] += 1
-    permissionMap.set(record.permission, distribution)
+    if (record.cdk_type === 'profile' && record.permission) {
+      const distribution = permissionMap.get(record.permission) ?? { permission: record.permission, total: 0, unused: 0, claiming: 0, used: 0, frozen: 0, revoked: 0 }
+      distribution.total += 1
+      distribution[record.status] += 1
+      permissionMap.set(record.permission, distribution)
+    }
     const status = statusMap.get(record.status)
     if (status) status.total += 1
     for (const event of record.risk_events ?? []) {
@@ -42,6 +44,10 @@ export function buildAdminCdkOpsSummary(records: AdminCdkRecord[]): CdkOpsSummar
     days.push(trendMap.get(date) ?? { date, soft_blocks: 0, freezes: 0, escalations: 0, total: 0 })
   }
   return {
+    type_distribution: (['profile', 'balance', 'item'] as const).map((cdk_type) => ({
+      cdk_type,
+      total: records.filter((record) => record.cdk_type === cdk_type).length,
+    })),
     permission_distribution: [...permissionMap.values()].filter((item) => item.total > 0),
     status_distribution: [...statusMap.values()],
     risk_reasons: [...reasonMap.values()].sort((left, right) => right.count - left.count || (Date.parse(right.last_seen_at ?? '') || 0) - (Date.parse(left.last_seen_at ?? '') || 0)),

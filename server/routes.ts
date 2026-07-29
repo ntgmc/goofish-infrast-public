@@ -10,6 +10,7 @@ import adminOptimizationHandler from './handlers/admin-optimization'
 import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
 import adminItemsHandler from './handlers/admin-items'
+import adminBalanceHandler from './handlers/admin-balance'
 import announcementHandler from './handlers/announcement'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
@@ -24,6 +25,7 @@ import userBehaviorRiskHandler from './handlers/user-behavior-risk'
 import userInvitationsHandler from './handlers/user-invitations'
 import userRewardsHandler from './handlers/user-rewards'
 import userInventoryHandler from './handlers/user-inventory'
+import userBalanceHandler from './handlers/user-balance'
 import userResultsHandler from './handlers/user-results'
 import personalUseDeclarationHandler from './handlers/personal-use-declaration'
 import accountDataHandler from './handlers/account-data'
@@ -51,6 +53,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
   ['/api/admin/items', adminItemsHandler as unknown as ApiHandler],
   ['/api/admin/inventory', adminItemsHandler as unknown as ApiHandler],
+  ['/api/admin/balance', adminBalanceHandler as unknown as ApiHandler],
   ['/api/auth/register', authHandler as unknown as ApiHandler],
   ['/api/auth/registration-settings', authHandler as unknown as ApiHandler],
   ['/api/auth/login', authHandler as unknown as ApiHandler],
@@ -96,6 +99,8 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/rewards', userRewardsHandler as unknown as ApiHandler],
   ['/api/user/inventory', userInventoryHandler as unknown as ApiHandler],
+  ['/api/user/balance', userBalanceHandler as unknown as ApiHandler],
+  ['/api/user/balance/redeem', userBalanceHandler as unknown as ApiHandler],
   ['/api/user/onboarding-tasks', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/onboarding-tasks/claim', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/maa-export', userResultsHandler as unknown as ApiHandler],

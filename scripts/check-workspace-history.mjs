@@ -1443,6 +1443,7 @@ function memoryLicenseUtilsModule() {
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, updated_at: null } }
     export async function incrementCdkScheduleGenerateCount() {}
     export function normalizePermissionMode(permission) { return permission ?? 'advanced' }
+    export function isProfileCdkRecord(record) { return (record.cdk_type ?? 'profile') === 'profile' }
     export async function recordOperatorFingerprint(record, fingerprint) {
       const key = 'cdk/' + record.code_hash + '.json'
       const next = { ...record, baseline_operator_fingerprint: record.baseline_operator_fingerprint ?? fingerprint, latest_operator_fingerprint: fingerprint }

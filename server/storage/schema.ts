@@ -12,8 +12,10 @@ const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS cdk_records (
   key TEXT PRIMARY KEY,
   code_hash TEXT NOT NULL,
+  cdk_type TEXT NOT NULL DEFAULT 'profile',
   status TEXT NOT NULL,
-  permission TEXT NOT NULL,
+  permission TEXT,
+  balance_amount NUMERIC(20,2),
   license_order_hash TEXT,
   record_json JSONB NOT NULL,
   record_revision INTEGER NOT NULL DEFAULT 0,
@@ -26,6 +28,17 @@ CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_status_created ON cdk_records(s
 CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_permission_created ON cdk_records(permission, created_at DESC, key ASC);
 CREATE INDEX IF NOT EXISTS idx_cdk_records_license_order_hash ON cdk_records(license_order_hash);
 ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS record_revision INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS cdk_type TEXT NOT NULL DEFAULT 'profile';
+ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS balance_amount NUMERIC(20,2);
+ALTER TABLE cdk_records ALTER COLUMN permission DROP NOT NULL;
+UPDATE cdk_records SET cdk_type = 'profile' WHERE cdk_type IS NULL;
+CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_type_created ON cdk_records(cdk_type, created_at DESC, key ASC);
+ALTER TABLE cdk_records DROP CONSTRAINT IF EXISTS cdk_records_type_payload_check;
+ALTER TABLE cdk_records ADD CONSTRAINT cdk_records_type_payload_check CHECK (
+  (cdk_type = 'profile' AND permission IS NOT NULL AND balance_amount IS NULL)
+  OR (cdk_type = 'balance' AND permission IS NULL AND balance_amount BETWEEN 0.01 AND 1000000.00)
+  OR (cdk_type = 'item' AND permission IS NULL AND balance_amount IS NULL)
+);
 DO $$
 DECLARE conflict_details TEXT;
 BEGIN
@@ -311,6 +324,32 @@ BEGIN
         updated_at = greatest(updated_at, created_at);
   END IF;
 END $$;
+
+CREATE TABLE IF NOT EXISTS user_balance_accounts (
+  user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
+  available NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (available >= 0),
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_balance_transactions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('cdk_credit', 'admin_credit', 'admin_debit')),
+  amount NUMERIC(20,2) NOT NULL CHECK (amount <> 0),
+  balance_after NUMERIC(20,2) NOT NULL CHECK (balance_after >= 0),
+  reference_type TEXT NOT NULL,
+  reference_id TEXT NOT NULL,
+  idempotency_key TEXT,
+  admin_username TEXT,
+  reason TEXT,
+  request_hash TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (reference_type, reference_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_balance_transactions_user_created
+  ON user_balance_transactions(user_id, created_at DESC, id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_balance_transactions_idempotency
+  ON user_balance_transactions(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS invitation_codes (
@@ -1163,6 +1202,8 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'public_content_settings',
   'personal_use_declaration_versions',
   'personal_use_declaration_acceptances',
+  'user_balance_accounts',
+  'user_balance_transactions',
 ])
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'

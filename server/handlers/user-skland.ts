@@ -31,6 +31,7 @@ import {
   buildOperatorFingerprint,
   getCdkRecordStore,
   getRiskControlSettings,
+  isProfileCdkRecord,
   normalizePermissionMode,
   recordOperatorFingerprint,
   resolveConfigForPermission,
@@ -868,7 +869,7 @@ async function saveSklandImport(
   if (profile.cdk_key) {
     const cdkStore = await getCdkRecordStore()
     const cdkRecord = await cdkStore.get(profile.cdk_key)
-    if (cdkRecord?.status === 'used' && normalizePermissionMode(cdkRecord.permission) === 'advanced') {
+    if (cdkRecord && isProfileCdkRecord(cdkRecord) && cdkRecord.status === 'used' && normalizePermissionMode(cdkRecord.permission) === 'advanced') {
       const riskSettings = await getRiskControlSettings()
       if (riskSettings.operator_data_risk_enabled) {
         await recordOperatorFingerprint(cdkRecord, buildOperatorFingerprint(operatorsCheck.operators))

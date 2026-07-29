@@ -232,11 +232,20 @@ export function CdkDistributionPanel({ items }: { items: UsageCdkDistributionIte
 }
 
 export function CdkRecordDistributionPanel({ summary }: { summary: CdkOpsSummary }) {
+  const typeLabels = { profile: '档案兑换', balance: '余额兑换', item: '道具（预留）' } as const
   return (
     <section className="tool-panel p-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-base font-semibold text-ink-primary">CDK 权限与状态分布</h2>
         <span className="text-xs text-ink-muted">基于当前 CDK 记录</span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {summary.type_distribution.map((item) => (
+          <div key={item.cdk_type} className="tool-inset flex items-center justify-between gap-3 p-3">
+            <span className="text-sm text-ink-secondary">{typeLabels[item.cdk_type]}</span>
+            <span className="text-lg font-semibold text-ink-primary">{item.total}</span>
+          </div>
+        ))}
       </div>
       <div className="mt-4 grid gap-5 xl:grid-cols-[1fr_0.75fr]">
         <div className="overflow-x-auto">
