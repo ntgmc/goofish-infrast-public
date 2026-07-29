@@ -539,14 +539,7 @@ export function useAdminController() {
         })
         if (data.cdk) {
           setSelectedCdkDetail(data.cdk)
-          const selectedUserId = selectedUserDetail?.user.id
-          if (selectedUserId && selectedUserId === data.cdk.linked_account?.account_id) {
-            const userData = await apiJson<{ detail?: AdminUserDetail }>(
-              `/api/admin/users?user_id=${encodeURIComponent(selectedUserId)}`,
-              { fallbackMessage: '刷新用户详情失败' },
-            )
-            if (userData.detail) setSelectedUserDetail(userData.detail)
-          }
+          if (selectedUserDetail && selectedUserDetail.user.id === data.cdk.linked_account?.account_id) await loadUserDetail(selectedUserDetail.user)
         } else if (selectedCdkDetail?.code_hash === record.code_hash) {
           const detailData = await apiJson<{ cdk?: AdminCdkDetail }>(`/api/admin/cdk?code_hash=${encodeURIComponent(record.code_hash)}`, {
             fallbackMessage: '加载 CDK 详情失败',
@@ -560,7 +553,6 @@ export function useAdminController() {
         setBusyAction(null)
       }
     }
-
   const deleteCdk = async (record: AdminCdkRecord) => {
       if (record.status !== 'unused') return
       if (!window.confirm(`确认删除未使用 CDK ${record.cdk_id}？`)) return
