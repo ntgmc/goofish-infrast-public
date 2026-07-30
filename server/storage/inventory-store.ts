@@ -18,6 +18,7 @@ import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
 import { getProfileWorkspace, isDepotValueProfile, listProfilesForUser } from './user-store'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY, isFreePreviewLimitedCdkActivityActive } from '../free-preview-trial'
+import { upsertItemGrantNotificationInTransaction } from './notification-store'
 
 const PROFILE_CAPACITY_LIMITS = Object.freeze({
   plan: { base: WORKSPACE_SAVED_CONFIG_LIMIT, maximum: 20, entitlement: 'plan_slots' },
@@ -219,8 +220,8 @@ export async function grantItemInTransaction(client: PoolClient, input: GrantInp
   const expiresAt = input.expiresAt !== undefined
     ? normalizeAbsoluteExpiry(input.expiresAt, now)
     : validityDays > 0 ? new Date(Date.parse(now) + validityDays * 86_400_000).toISOString() : null
-  const definition = await client.query<{ kind: string; issuance_enabled: boolean }>(
-    'select kind, issuance_enabled from item_definitions where code = $1',
+  const definition = await client.query<{ kind: string; issuance_enabled: boolean; name: string; icon_key: string }>(
+    'select kind, issuance_enabled, name, icon_key from item_definitions where code = $1',
     [input.itemCode],
   )
   const item = definition.rows[0]
@@ -266,6 +267,18 @@ export async function grantItemInTransaction(client: PoolClient, input: GrantInp
     referenceType: input.sourceType,
     referenceId: input.sourceId,
     metadata: input.metadata ?? {},
+    now,
+  })
+  await upsertItemGrantNotificationInTransaction(client, {
+    userId: input.userId,
+    grantId: actualId,
+    sourceType: input.sourceType,
+    sourceId: input.sourceId,
+    itemCode: input.itemCode,
+    itemName: item.name,
+    iconKey: item.icon_key,
+    quantity,
+    expiresAt,
     now,
   })
   return actualId

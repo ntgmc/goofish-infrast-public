@@ -7,6 +7,7 @@ import { AnimatedPresenceRegion, MotionNavIndicator } from '../../../components/
 import ThemeSwitcher from '../../../components/ThemeSwitcher'
 import { OPTIMIZE_SECTIONS, type OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
+import { NotificationBell } from '../../../components/NotificationCenter'
 
 
 export default function OptimizeShell({
@@ -102,6 +103,7 @@ export default function OptimizeShell({
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {compactHeaderActions}
+              <NotificationBell iconOnly />
               <ThemeSwitcher iconOnly />
               <DeferredFeatureMenu iconOnly />
             </div>
@@ -123,6 +125,7 @@ export default function OptimizeShell({
                 {copy.optimize.pages_tool_optimize_tour_001}
               </button>
               {headerActions}
+              <NotificationBell />
               <ThemeSwitcher />
               <DeferredFeatureMenu />
             </div>

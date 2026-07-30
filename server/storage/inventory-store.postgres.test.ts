@@ -12,6 +12,7 @@ import {
   grantFreePreviewLimitedVoucher,
   getProfileCapacityLimits,
   grantItem,
+  grantItemInTransaction,
   listInventory,
   refundReservedItemsInTransaction,
   reserveItemsInTransaction,
@@ -177,6 +178,66 @@ describe('PostgreSQL unified inventory', () => {
       permission: 'growth',
       temporary_permission: { permission: 'advanced', ends_at: '2026-08-19T16:00:00.000Z' },
     })
+  })
+
+  it('creates, aggregates, reopens, and deduplicates item grant notifications', async () => {
+    const { userId } = await seedUserProfile()
+    const sourceId = randomUUID()
+    const firstGrant = {
+      userId, itemCode: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' as const },
+      sourceType: 'notification_test', sourceId, recipientRole: 'first', now: '2026-07-30T00:00:00.000Z',
+    }
+    await grantItem(firstGrant)
+    await grantItem({
+      userId, itemCode: 'plan_capacity_certificate', quantity: 2, expiry: { mode: 'relative_days', days: 30 },
+      sourceType: 'notification_test', sourceId, recipientRole: 'second', now: '2026-07-30T00:00:01.000Z',
+    })
+
+    const grouped = await query<{ id: string; payload_json: { items: Array<{ item_code: string; quantity: number; grant_ids: string[] }> } }>(
+      `select id, payload_json from user_notifications
+        where user_id = $1 and source_type = 'notification_test' and source_id = $2`,
+      [userId, sourceId],
+    )
+    expect(grouped.rows).toHaveLength(1)
+    expect(grouped.rows[0]?.payload_json.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ item_code: 'priority_compute_coupon', quantity: 1 }),
+      expect.objectContaining({ item_code: 'plan_capacity_certificate', quantity: 2 }),
+    ]))
+
+    await query('update user_notifications set read_at = now() where id = $1', [grouped.rows[0]!.id])
+    await grantItem({ ...firstGrant, quantity: 3, recipientRole: 'third', now: '2026-07-30T00:00:02.000Z' })
+    expect(await grantItem({ ...firstGrant, quantity: 3, recipientRole: 'third', now: '2026-07-30T00:00:02.000Z' })).toBeNull()
+
+    const reopened = await query<{ read_at: string | null; payload_json: { items: Array<{ item_code: string; quantity: number; grant_ids: string[] }> } }>(
+      'select read_at, payload_json from user_notifications where id = $1', [grouped.rows[0]!.id],
+    )
+    expect(reopened.rows[0]?.read_at).toBeNull()
+    expect(reopened.rows[0]?.payload_json.items.find((item) => item.item_code === 'priority_compute_coupon')).toMatchObject({
+      quantity: 4,
+      grant_ids: expect.arrayContaining([expect.any(String), expect.any(String)]),
+    })
+  })
+
+  it('rolls back the grant, ledger, and notification together', async () => {
+    const { userId } = await seedUserProfile()
+    const sourceId = randomUUID()
+
+    await expect(withTransaction(async (client) => {
+      await grantItemInTransaction(client, {
+        userId, itemCode: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' },
+        sourceType: 'notification_rollback', sourceId, recipientRole: 'test',
+      })
+      throw new Error('force rollback')
+    })).rejects.toThrow('force rollback')
+
+    const counts = await query<{ grants: string; ledger: string; notifications: string }>(
+      `select
+        (select count(*) from reward_grants where user_id = $1 and source_id = $2)::text as grants,
+        (select count(*) from inventory_ledger where user_id = $1 and reference_id = $2)::text as ledger,
+        (select count(*) from user_notifications where user_id = $1 and source_id = $2)::text as notifications`,
+      [userId, sourceId],
+    )
+    expect(counts.rows[0]).toEqual({ grants: '0', ledger: '0', notifications: '0' })
   })
 
   it('recovers only stale campaign claims after a worker interruption', async () => {

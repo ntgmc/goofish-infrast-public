@@ -7,6 +7,7 @@ import { verifyPasswordHash } from '../security/password'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import { normalizeStoredPoints } from '../../src/lib/balance-contracts'
+import { exportUserNotifications } from '../storage/notification-store'
 
 export default async function accountDataHandler(req: Request): Promise<Response> {
   const pathname = new URL(req.url).pathname
@@ -39,6 +40,7 @@ async function exportData(userId: string): Promise<Response> {
     distributionRecipients,
     balanceAccount,
     balanceTransactions,
+    notifications,
   ] = await Promise.all([
     getUserById(userId),
     Promise.all(profiles.map((profile) => getProfileWorkspace(profile.id))),
@@ -72,6 +74,7 @@ async function exportData(userId: string): Promise<Response> {
     query<{ available: string }>('select available::text from user_balance_accounts where user_id = $1', [userId]),
     query(`select id, kind, amount::text, balance_after::text, reference_type, reference_id, created_at
              from user_balance_transactions where user_id = $1 order by created_at asc, id asc`, [userId]),
+    exportUserNotifications(userId),
   ])
   const safeProfiles = profiles.map((profile) => {
     const { skland_binding, skland_pending_binding, ...rest } = profile
@@ -83,7 +86,7 @@ async function exportData(userId: string): Promise<Response> {
   })
   const publicUser = user ? { id: user.id, email: user.email, permission: user.permission, status: user.status, created_at: user.created_at, updated_at: user.updated_at } : null
   return new Response(JSON.stringify({
-    version: 2,
+    version: 3,
     exported_at: new Date().toISOString(),
     user: publicUser,
     profiles: safeProfiles,
@@ -110,6 +113,7 @@ async function exportData(userId: string): Promise<Response> {
         balance_after: normalizeStoredPoints((transaction as { balance_after?: unknown }).balance_after),
       })),
     },
+    notifications,
     deletion_request: deletion.rows[0] ?? null,
   }, null, 2), {
     headers: { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': 'attachment; filename="maa-personal-data.json"', 'Cache-Control': 'no-store' },

@@ -130,6 +130,10 @@ export const requestSchemas = {
     source: optionalString(120),
   }),
   userAnnouncement: strict({ announcement_id: optionalString(128), all: z.boolean().optional() }),
+  userNotification: z.union([
+    strict({ notification_id: shortString(128) }),
+    strict({ all: z.literal(true) }),
+  ]),
   personalUseDeclarationConfirmation: strict({
     action: z.enum(['free_preview_claim', 'generated_result_export']),
     profile_id: optionalString(128),
@@ -356,6 +360,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
   ['/api/depot-value', route({ POST: json('depot', z.unknown()) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) })],
+  ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],
   ['/api/user/profiles/depot-value', route({ POST: none() })],
   ['/api/user/profiles/preview', route({ POST: json('standard', requestSchemas.profilePreview) })],

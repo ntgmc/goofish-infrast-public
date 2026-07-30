@@ -17,6 +17,7 @@ import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
 import depotValueHandler from './handlers/depot-value'
 import optimizationHandler from './handlers/optimization'
 import userAnnouncementsHandler from './handlers/user-announcements'
+import userNotificationsHandler from './handlers/user-notifications'
 import userProfilesHandler from './handlers/user-profiles'
 import userSklandHandler from './handlers/user-skland'
 import userStatusHandler from './handlers/user-status'
@@ -77,6 +78,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/depot-value', depotValueHandler as unknown as ApiHandler],
   ['/api/user/announcements', userAnnouncementsHandler as unknown as ApiHandler],
+  ['/api/user/notifications', userNotificationsHandler as unknown as ApiHandler],
   ['/api/user/profiles', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/depot-value', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/preview', userProfilesHandler as unknown as ApiHandler],

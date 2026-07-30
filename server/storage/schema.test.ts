@@ -40,6 +40,7 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_accounts/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_transactions/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_notifications/)
     expect(combinedSchema).toMatch(/cdk_records_type_payload_check/)
     expect(combinedSchema).toMatch(/cdk_type = 'balance'/)
     expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS item_code/)
@@ -153,6 +154,7 @@ describe('database schema ownership', () => {
     expect(workerRequirements).not.toEqual(expect.arrayContaining([
       { table_name: 'feature_settings', column_name: 'key' },
       { table_name: 'public_content_settings', column_name: 'key' },
+      { table_name: 'user_notifications', column_name: 'payload_json' },
     ]))
 
     queryMock.mockClear()
@@ -165,6 +167,7 @@ describe('database schema ownership', () => {
       { table_name: 'feature_settings', column_name: 'record_json' },
       { table_name: 'public_content_settings', column_name: 'key' },
       { table_name: 'public_content_settings', column_name: 'record_json' },
+      { table_name: 'user_notifications', column_name: 'payload_json' },
     ]))
   })
 

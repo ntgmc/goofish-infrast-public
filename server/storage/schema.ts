@@ -798,6 +798,27 @@ CREATE TABLE IF NOT EXISTS user_announcement_reads (
   PRIMARY KEY (user_id, announcement_id)
 );
 
+-- goofish:migration-phase
+CREATE TABLE IF NOT EXISTS user_notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  action_kind TEXT,
+  payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  read_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (user_id, type, source_type, source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_notifications_user_updated
+  ON user_notifications(user_id, updated_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_user_notifications_user_unread
+  ON user_notifications(user_id, updated_at DESC, id DESC) WHERE read_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS depot_value_samples (
   uid_hash TEXT PRIMARY KEY,
   total_equivalent_sanity NUMERIC NOT NULL,
@@ -1263,6 +1284,7 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'personal_use_declaration_acceptances',
   'user_balance_accounts',
   'user_balance_transactions',
+  'user_notifications',
 ])
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'

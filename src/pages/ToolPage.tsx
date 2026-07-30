@@ -23,6 +23,7 @@ import { copy } from '../copy/index'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import type { SiteFeatures } from '../lib/site-features'
 import FeatureUnavailablePage from '../components/FeatureUnavailablePage'
+import { NotificationCenterProvider } from '../components/NotificationCenter'
 
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
@@ -99,7 +100,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     const requiredFeature = dashboardFeature(route.section, features)
     if (requiredFeature) return <FeatureUnavailablePage feature={requiredFeature} />
     return (
-      <>
+      <NotificationCenterProvider userId={user.id}>
         {features.announcements && <AnnouncementPopup announcements={popups} />}
         <AccountDashboard
           user={user}
@@ -120,7 +121,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
           }}
           features={features}
         />
-      </>
+      </NotificationCenterProvider>
     )
   }
 
@@ -132,7 +133,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     if (!features.profiles) return <FeatureUnavailablePage feature="profiles" />
     if (route.section === 'cdk' && !features.cdk_redemption) return <FeatureUnavailablePage feature="cdk_redemption" />
     return (
-      <>
+      <NotificationCenterProvider userId={user.id}>
         {features.announcements && <AnnouncementPopup announcements={popups} />}
         <WorkspaceSetupPage
           user={user}
@@ -150,7 +151,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
           onRedeemNewProfile={() => navigate(dashboardPath('redeem'))}
           onLogout={handleLogout}
         />
-      </>
+      </NotificationCenterProvider>
     )
   }
 
@@ -167,7 +168,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
   }
 
   return (
-    <>
+    <NotificationCenterProvider userId={user.id}>
       {features.announcements && <AnnouncementPopup announcements={popups} />}
       <Suspense fallback={<SessionLoader label={copy.common.pages_ToolPage_002} />}>
         <OptimizePage
@@ -192,7 +193,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
           onProfileUpgraded={applyAuthPayload}
         />
       </Suspense>
-    </>
+    </NotificationCenterProvider>
   )
 }
 

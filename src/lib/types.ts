@@ -806,6 +806,37 @@ export interface UserAnnouncementRead {
   read_at: string | null;
 }
 
+export interface UserNotificationItemGrantDetail {
+  item_code: string;
+  name: string;
+  icon_key: string;
+  quantity: number;
+  expires_at: string | null;
+}
+
+export type UserNotificationPayload = {
+  kind: 'item_grant';
+  items: UserNotificationItemGrantDetail[];
+};
+
+export interface UserNotification {
+  id: string;
+  type: 'item_grant';
+  title: string;
+  body: string;
+  action: { kind: 'inventory' } | null;
+  payload: UserNotificationPayload;
+  read_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserNotificationPage {
+  notifications: UserNotification[];
+  unread_count: number;
+  next_cursor: string | null;
+}
+
 export interface AuthMeResponse {
   user: AuthUser | null;
   profiles?: UserGameAccount[];

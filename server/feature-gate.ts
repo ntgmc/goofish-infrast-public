@@ -31,6 +31,7 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
 
   if (pathname === '/api/user/data/credential/clear') return ['profiles']
   if (pathname === '/api/user/announcements') return ['login', 'announcements']
+  if (pathname === '/api/user/notifications') return ['login']
   if (pathname === '/api/user/profiles/preview') return ['free_preview']
   if (pathname === '/api/user/profiles/redeem') return ['cdk_redemption']
   if (pathname === '/api/user/cdk/redeem') return ['cdk_redemption']

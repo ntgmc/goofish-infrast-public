@@ -11,6 +11,7 @@ import type { DashboardSection } from '../../lib/app-routes'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import { copy } from '../../copy/index'
 import { DEFAULT_SITE_FEATURES, type SiteFeatures } from '../../lib/site-features'
+import { NotificationBell } from '../../components/NotificationCenter'
 
 
 const ProfilesSection = lazy(() => import('./dashboard/ProfilesSection'))
@@ -183,7 +184,10 @@ export default function AccountDashboard({
                 ]}
               />
             </div>
-            <ThemeSwitcher iconOnly />
+            <div className="flex shrink-0 items-center gap-2">
+              <NotificationBell iconOnly />
+              <ThemeSwitcher iconOnly />
+            </div>
           </div>
 
           <div className="mx-auto hidden max-w-7xl items-center justify-between gap-4 lg:flex">
@@ -209,6 +213,7 @@ export default function AccountDashboard({
               >
                 {copy.dashboard.pages_tool_AccountDashboard_tour_001}
               </button>
+              <NotificationBell />
               <ThemeSwitcher />
             </div>
           </div>
