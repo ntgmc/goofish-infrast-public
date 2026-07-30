@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { FREE_PREVIEW_ADVANCED_TRIAL } from '../free-preview-trial'
+import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY } from '../free-preview-trial'
 import { InventoryError } from '../storage/inventory-store'
 import userResultsHandler from './user-results'
 
@@ -72,7 +72,7 @@ const exportBody = {
 
 beforeEach(() => {
   vi.useFakeTimers()
-  vi.setSystemTime(new Date(FREE_PREVIEW_ADVANCED_TRIAL.startsAt))
+  vi.setSystemTime(new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt))
   vi.clearAllMocks()
   mocks.requireUserSession.mockResolvedValue({
     user: { id: 'user-1' },
@@ -130,7 +130,17 @@ describe('MAA JSON export entitlement', () => {
   })
 
   it('lets an active advanced free preview export without consuming a trial coupon', async () => {
-    mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+    mocks.getProfileForUser.mockResolvedValue({
+      ...profile('free_preview', 'growth'),
+      temporary_permission: {
+        source: 'limited_profile_voucher',
+        activity_id: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.id,
+        permission: 'advanced',
+        starts_at: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt,
+        ends_at: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt,
+        operation_id: 'limited-operation-1',
+      },
+    })
 
     const response = await userResultsHandler(exportRequest())
 
@@ -140,7 +150,7 @@ describe('MAA JSON export entitlement', () => {
   })
 
   it('consumes a trial coupon for an ordinary free preview after the advanced trial', async () => {
-    vi.setSystemTime(new Date(FREE_PREVIEW_ADVANCED_TRIAL.endsAt))
+    vi.setSystemTime(new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt))
     mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
 
     const response = await userResultsHandler(exportRequest())
@@ -154,7 +164,7 @@ describe('MAA JSON export entitlement', () => {
   })
 
   it('preserves the inventory error when an ordinary free preview has no coupon', async () => {
-    vi.setSystemTime(new Date(FREE_PREVIEW_ADVANCED_TRIAL.endsAt))
+    vi.setSystemTime(new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt))
     mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
     mocks.consumeInventoryItemImmediately.mockRejectedValue(new InventoryError(
       'item_unavailable',
@@ -182,7 +192,7 @@ describe('MAA JSON export entitlement', () => {
   })
 
   it('does not return an error after consuming a coupon when behavior tracking fails', async () => {
-    vi.setSystemTime(new Date(FREE_PREVIEW_ADVANCED_TRIAL.endsAt))
+    vi.setSystemTime(new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt))
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
     mocks.recordTrackedExportBehaviorEvent.mockRejectedValue(new Error('tracking unavailable'))
@@ -228,7 +238,7 @@ describe('MAA JSON export entitlement', () => {
   })
 
   it('rejects complete-result downloads without the advanced capability', async () => {
-    vi.setSystemTime(new Date(FREE_PREVIEW_ADVANCED_TRIAL.endsAt))
+    vi.setSystemTime(new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt))
     mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
 
     const response = await userResultsHandler(exportRequest('full-result-export'))

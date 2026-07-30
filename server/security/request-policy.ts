@@ -53,16 +53,20 @@ export const requestSchemas = {
   profileId: strict({ profile_id: shortString(128) }),
   deletionToken: strict({ token: shortString(512) }),
   adminCdkCreate: strict({
+    cdk_type: z.enum(['profile', 'balance', 'item']).optional(),
     permission: optionalString(32),
+    amount: optionalString(32),
+    item_code: z.enum(['lifetime_profile_voucher', 'limited_profile_voucher']).optional(),
     order_note: optionalString(500),
     count: z.number().int().min(1).max(100).optional(),
   }),
   adminCdkPatch: strict({
     code_hash: optionalString(64),
-    action: optionalString(32),
+    action: optionalString(64),
     permission: optionalString(32),
     order_note: optionalString(500),
     reason: optionalString(500),
+    baseline_source: z.enum(['latest', 'workspace', 'next_import']).optional(),
   }),
   adminCdkDelete: strict({ code_hash: shortString(64) }),
   adminOptimization: strict({ action: shortString(32), id: shortString(128), reason: shortString(500) }),
@@ -126,6 +130,10 @@ export const requestSchemas = {
     source: optionalString(120),
   }),
   userAnnouncement: strict({ announcement_id: optionalString(128), all: z.boolean().optional() }),
+  userNotification: z.union([
+    strict({ notification_id: shortString(128) }),
+    strict({ all: z.literal(true) }),
+  ]),
   personalUseDeclarationConfirmation: strict({
     action: z.enum(['free_preview_claim', 'generated_result_export']),
     profile_id: optionalString(128),
@@ -136,6 +144,13 @@ export const requestSchemas = {
     display_name: optionalString(40),
     note: optionalString(500),
     profile_id: optionalString(128),
+  }),
+  cdkRedeem: strict({
+    cdk: shortString(256),
+    display_name: optionalString(40),
+    note: optionalString(500),
+    profile_id: optionalString(128),
+    idempotency_key: shortString(200),
   }),
   profilePatch: strict({ profile_id: shortString(128), display_name: optionalString(40), note: optionalString(500) }),
   userWorkspace: strict({
@@ -169,6 +184,13 @@ export const requestSchemas = {
   freePreviewScanComplete: strict({ scan_id: shortString(256), display_name: optionalString(40), note: optionalString(500) }),
   freePreviewSelection: strict({ selection_id: shortString(256), uid: shortString(128) }),
   freePreviewConfirmation: strict({ confirmation_id: shortString(256) }),
+  lifetimeVoucherScanComplete: strict({ scan_id: shortString(256) }),
+  lifetimeVoucherCredential: strict({
+    credential_text: z.string().min(1).max(16 * 1024),
+    source: z.enum(['manual', 'bookmarklet']).optional(),
+  }),
+  lifetimeVoucherSelection: strict({ selection_id: shortString(256), uid: shortString(128) }),
+  lifetimeVoucherConfirmation: strict({ confirmation_id: shortString(256), idempotency_key: shortString(200) }),
   optimizationJob: z.discriminatedUnion('kind', [
     strict({
       kind: z.literal('schedule'),
@@ -208,6 +230,17 @@ export const requestSchemas = {
     quantity: z.literal(1),
     profile_id: optionalString(128),
     gift_pack_version_id: optionalString(128),
+    idempotency_key: shortString(200),
+  }),
+  balanceRedeem: strict({
+    cdk: shortString(256),
+    idempotency_key: shortString(200),
+  }),
+  adminBalanceAdjust: strict({
+    user_id: shortString(128),
+    operation: z.enum(['credit', 'debit']),
+    amount: shortString(32),
+    reason: shortString(500),
     idempotency_key: shortString(200),
   }),
   onboardingTaskClaim: strict({
@@ -278,6 +311,10 @@ const SKLAND_PATHS: Record<string, z.ZodType> = {
   '/api/user/skland/free-preview/login/confirm': requestSchemas.freePreviewConfirmation,
   '/api/user/skland/free-preview/credential/preview': requestSchemas.freePreviewCredential,
   '/api/user/skland/free-preview/account/select': requestSchemas.freePreviewSelection,
+  '/api/user/skland/lifetime-voucher/login/complete': requestSchemas.lifetimeVoucherScanComplete,
+  '/api/user/skland/lifetime-voucher/login/confirm': requestSchemas.lifetimeVoucherConfirmation,
+  '/api/user/skland/lifetime-voucher/credential/preview': requestSchemas.lifetimeVoucherCredential,
+  '/api/user/skland/lifetime-voucher/account/select': requestSchemas.lifetimeVoucherSelection,
 }
 
 const ROUTE_POLICIES = new Map<string, RoutePolicy>([
@@ -285,7 +322,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/health/live', route({ GET: none() })],
   ['/api/health/ready', route({ GET: none() })],
   ['/api/data', route({ GET: none() })],
-  ['/api/admin/cdk', route({ GET: none(), POST: json('admin', requestSchemas.adminCdkCreate), PATCH: json('admin', requestSchemas.adminCdkPatch), DELETE: json('admin', requestSchemas.adminCdkDelete) }, ['code_hash', 'view', 'permission', 'risk', 'generated', 'status', 'page', 'page_size', 'search'])],
+  ['/api/admin/cdk', route({ GET: none(), POST: json('admin', requestSchemas.adminCdkCreate), PATCH: json('admin', requestSchemas.adminCdkPatch), DELETE: json('admin', requestSchemas.adminCdkDelete) }, ['code_hash', 'view', 'permission', 'cdk_type', 'risk', 'generated', 'status', 'page', 'page_size', 'search'])],
   ['/api/admin/risk-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRiskSettings), PATCH: json('admin', requestSchemas.adminRiskSettings) })],
   ['/api/admin/behavior-risk', route({ GET: none(), POST: json('admin', requestSchemas.adminBehaviorRiskReview) }, ['status', 'page', 'page_size'])],
   ['/api/admin/invitation-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminInvitationSettings), PATCH: json('admin', requestSchemas.adminInvitationSettings) })],
@@ -300,6 +337,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/optimization', route({ GET: none(), POST: json('admin', requestSchemas.adminOptimization) }, ['view', 'status', 'limit', 'id'])],
   ['/api/admin/session', route({ GET: none(), POST: json('auth', requestSchemas.adminSession), DELETE: none() })],
   ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'search'])],
+  ['/api/admin/balance', route({ GET: none(), POST: json('admin', requestSchemas.adminBalanceAdjust) }, ['user_id', 'cursor', 'limit'])],
   ['/api/auth/register', route({ POST: json('auth', requestSchemas.authRegister) })],
   ['/api/auth/registration-settings', route({ GET: none() })],
   ['/api/auth/login', route({ POST: json('auth', requestSchemas.authLogin) })],
@@ -322,6 +360,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
   ['/api/depot-value', route({ POST: json('depot', z.unknown()) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) })],
+  ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],
   ['/api/user/profiles/depot-value', route({ POST: none() })],
   ['/api/user/profiles/preview', route({ POST: json('standard', requestSchemas.profilePreview) })],
@@ -334,6 +373,9 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/invitations/code', route({ POST: none() })],
   ['/api/user/rewards', route({ GET: none() })],
   ['/api/user/inventory', route({ GET: none(), POST: json('standard', requestSchemas.inventoryUse) })],
+  ['/api/user/cdk/redeem', route({ POST: json('standard', requestSchemas.cdkRedeem) })],
+  ['/api/user/balance', route({ GET: none() }, ['cursor', 'limit'])],
+  ['/api/user/balance/redeem', route({ POST: json('standard', requestSchemas.balanceRedeem) })],
   ['/api/user/onboarding-tasks', route({ GET: none() })],
   ['/api/user/onboarding-tasks/claim', route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })],
   ['/api/user/maa-export', route({ POST: json('standard', requestSchemas.maaExport) })],
@@ -345,6 +387,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/optimization/jobs', route({ GET: none(), POST: json('compute', requestSchemas.optimizationJob) }, ['profile_id', 'limit', 'before'])],
   ['/api/optimization/reorder-checks', route({ POST: json('compute', requestSchemas.reorderCheck) })],
   ['/api/user/skland/free-preview/login/start', route({ POST: none() })],
+  ['/api/user/skland/lifetime-voucher/login/start', route({ POST: none() })],
   ...Object.entries(SKLAND_PATHS).map(([path, schema]) => [path, route({ POST: json('credential', schema) })] as [string, RoutePolicy]),
 ])
 

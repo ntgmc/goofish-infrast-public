@@ -25,7 +25,7 @@ export default function AdminDashboardView() {
   const navigate = useNavigate()
   const activeSection = resolveAdminSection(location.pathname)
   const setActiveSection = (section: AdminSection) => navigate(adminPath(section))
-  const { cdkSearchInput, setCdkSearchInput, setCdkPage, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, setUserPage, setUserPageSize, userPagination, usersLoading, setRiskPage, setRiskPageSize, riskPagination, riskLoading, permission, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, announcementDraftStatus, announcementDraftSavedAt, announcementDraftRestored, announcementDraftConflict, announcementDraftError, announcementDraftDirty, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, clearNotice, summary, cdkOpsSummary, cdkFilters, visibleRecords, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleDiscardAnnouncementDraft, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, reorderAnnouncements, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser } = useAdminController()
+  const { cdkSearchInput, setCdkSearchInput, setCdkPage, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, setUserPage, setUserPageSize, userPagination, usersLoading, setRiskPage, setRiskPageSize, riskPagination, riskLoading, permission, cdkType, setCdkType, setCdkTypeFilter, balanceAmount, setBalanceAmount, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, announcementDraftStatus, announcementDraftSavedAt, announcementDraftRestored, announcementDraftConflict, announcementDraftError, announcementDraftDirty, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, selectedUserBalance, setSelectedUserBalance, userBalanceLoading, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, clearNotice, summary, cdkOpsSummary, cdkFilters, visibleRecords, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleDiscardAnnouncementDraft, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, reorderAnnouncements, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleLoadMoreUserBalance, handleAdjustUserBalance, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser } = useAdminController()
 
   if (!activeSection) return <Navigate to={fallbackAdminPath()} replace />
 
@@ -262,13 +262,30 @@ export default function AdminDashboardView() {
         {activeSection === 'cdk' && (
           <section className="space-y-5">
             <form onSubmit={handleGenerateCdk} className="tool-panel p-5">
-              <div className="grid gap-4 lg:grid-cols-[220px_140px_1fr_auto] lg:items-end">
+              <div className="grid gap-4 lg:grid-cols-[180px_220px_140px_1fr_auto] lg:items-end">
                 <label>
+                  <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK 类型</span>
+                  <select value={cdkType} onChange={(event) => setCdkType(event.currentTarget.value as 'profile' | 'balance' | 'item')} className="tool-field">
+                    <option value="profile">档案兑换</option>
+                    <option value="balance">余额兑换</option>
+                    <option value="item">道具兑换</option>
+                  </select>
+                </label>
+                {cdkType === 'profile' ? <label>
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">授权类型</span>
                   <select value={permission} onChange={(event) => setPermission(event.currentTarget.value as GeneratedPermission)} className="tool-field">
                     {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
                   </select>
-                </label>
+                </label> : cdkType === 'balance' ? <label>
+                  <span className="mb-2 block text-sm font-medium text-ink-secondary">积分面额</span>
+                  <input value={balanceAmount} onChange={(event) => setBalanceAmount(event.currentTarget.value)} inputMode="decimal" pattern="\d+(\.\d{1,2})?" className="tool-field" required />
+                </label> : <label>
+                  <span className="mb-2 block text-sm font-medium text-ink-secondary">道具类型</span>
+                  <select name="item_code" className="tool-field" defaultValue="lifetime_profile_voucher">
+                    <option value="lifetime_profile_voucher">终身版兑换 CDK</option>
+                    <option value="limited_profile_voucher" disabled={Date.now() < Date.parse('2026-07-17T04:00:00.000Z') || Date.now() >= Date.parse('2026-08-19T16:00:00.000Z')}>限时 CDK（2026-08-20 00:00 到期）</option>
+                  </select>
+                </label>}
                 <label>
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">生成数量</span>
                   <input type="number" min={1} max={MAX_CDK_BATCH_COUNT} step={1} value={cdkCount} onChange={(event) => setCdkCount(event.currentTarget.value)} className="tool-field" />
@@ -284,7 +301,7 @@ export default function AdminDashboardView() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-ink-primary">已生成 {generatedCodes.length} 个 CDK</div>
-                      <div className="mt-1 text-xs text-ink-muted">{permissionLabels[generatedCodes[0].permission]} · {formatDate(generatedCodes[0].created_at)}</div>
+                      <div className="mt-1 text-xs text-ink-muted">{generatedCodes[0].cdk_type === 'balance' ? `余额 ${generatedCodes[0].amount} 积分` : generatedCodes[0].cdk_type === 'item' ? `${generatedCodes[0].item_name ?? generatedCodes[0].item_code}${generatedCodes[0].item_expires_at ? ` · ${formatDate(generatedCodes[0].item_expires_at)} 到期` : ''}` : permissionLabels[generatedCodes[0].permission!]} · {formatDate(generatedCodes[0].created_at)}</div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={handleCopyGeneratedCdks} className="tool-secondary-action">{generatedCodes.length === 1 ? '复制 CDK' : '复制全部'}</button>
@@ -316,6 +333,7 @@ export default function AdminDashboardView() {
                   onPageSizeChange={(size) => { setCdkPageSize(size); setCdkPage(1) }}
                   onFilterChange={(patch) => {
                     if (patch.status) setStatusFilter(patch.status)
+                    if (patch.cdk_type) setCdkTypeFilter(patch.cdk_type)
                     if (patch.permission) setPermissionFilter(patch.permission)
                     if (patch.risk) setRiskFilter(patch.risk)
                     if (patch.generated) setGeneratedFilter(patch.generated)
@@ -484,11 +502,14 @@ export default function AdminDashboardView() {
                 {selectedUserDetail && (
                   <UserDetailDialog
                     detail={selectedUserDetail}
+                    balance={selectedUserBalance}
+                    balanceLoading={userBalanceLoading}
                     busyAction={busyAction}
                     operatorDataByProfileId={operatorDataByProfileId}
                     expandedOperatorProfileId={expandedOperatorProfileId}
                     onClose={() => {
                       setSelectedUserDetail(null)
+                      setSelectedUserBalance(null)
                       setOperatorDataByProfileId({})
                       setExpandedOperatorProfileId(null)
                     }}
@@ -500,6 +521,8 @@ export default function AdminDashboardView() {
                     onClearWorkspace={handleClearProfileWorkspace}
                     onViewOperators={handleViewProfileOperators}
                     onDownloadOperators={handleDownloadProfileOperators}
+                    onAdjustBalance={handleAdjustUserBalance}
+                    onLoadMoreBalance={handleLoadMoreUserBalance}
                     onFreezeUser={handleFreezeAppUser}
                     onUnfreezeUser={handleUnfreezeAppUser}
                     onDeleteUser={handleDeleteAppUser}

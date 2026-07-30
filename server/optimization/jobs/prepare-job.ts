@@ -1,6 +1,6 @@
 import type { LicenseFile } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
-import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getCdkRecordStore, getRiskControlSettings, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
+import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getCdkRecordStore, getRiskControlSettings, isProfileCdkRecord, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
 import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, updateProfileWorkspaceAtomically } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
@@ -148,7 +148,7 @@ export async function prepareOptimizeJob(
       return fail({ error: '当前套餐不包含场景对比实验室。' }, 403);
     }
 
-    if (checkedCdkRecord && normalizePermissionMode(checkedCdkRecord.permission) === 'advanced') {
+    if (checkedCdkRecord && isProfileCdkRecord(checkedCdkRecord) && normalizePermissionMode(checkedCdkRecord.permission) === 'advanced') {
       const riskSettings = await getRiskControlSettings();
       if (riskSettings.operator_data_risk_enabled) {
         const operatorRisk = evaluateOperatorRisk(checkedCdkRecord, operators);

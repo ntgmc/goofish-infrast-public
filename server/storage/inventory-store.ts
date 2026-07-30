@@ -17,6 +17,8 @@ import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '..
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
 import { getProfileWorkspace, isDepotValueProfile, listProfilesForUser } from './user-store'
+import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY, isFreePreviewLimitedCdkActivityActive } from '../free-preview-trial'
+import { upsertItemGrantNotificationInTransaction } from './notification-store'
 
 const PROFILE_CAPACITY_LIMITS = Object.freeze({
   plan: { base: WORKSPACE_SAVED_CONFIG_LIMIT, maximum: 20, entitlement: 'plan_slots' },
@@ -93,6 +95,7 @@ type GrantInput = {
   itemCode: string
   quantity: number
   expiry: ExpiryPolicy
+  expiresAt?: string | null
   sourceType: string
   sourceId: string
   recipientRole: string
@@ -106,6 +109,7 @@ let schemaReady: Promise<void> | null = null
 
 export async function listInventory(userId: string, now = new Date()): Promise<InventoryResponse> {
   await ensureSchema()
+  await grantFreePreviewLimitedVoucher(userId, now)
   const nowIso = now.toISOString()
   const [rows, events, capacities] = await Promise.all([
     query<{
@@ -166,7 +170,13 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
       expiry_buckets: Array.isArray(row.expiry_buckets) ? row.expiry_buckets : [],
       actions: item.kind === 'gift_pack'
         ? ['open']
-        : item.kind === 'capacity_upgrade' ? ['use'] : ['context_only'],
+        : item.kind === 'capacity_upgrade'
+          ? ['use']
+          : item.kind === 'license_voucher' && item.effect_code === 'bind_lifetime_profile'
+            ? ['bind']
+            : item.kind === 'license_voucher' && item.effect_code === 'activate_limited_profile'
+              ? ['use']
+              : ['context_only'],
     }
   })
 
@@ -207,9 +217,11 @@ export async function grantItemInTransaction(client: PoolClient, input: GrantInp
   const quantity = normalizeQuantity(input.quantity)
   const now = input.now ?? new Date().toISOString()
   const validityDays = input.expiry.mode === 'relative_days' ? input.expiry.days : 0
-  const expiresAt = validityDays > 0 ? new Date(Date.parse(now) + validityDays * 86_400_000).toISOString() : null
-  const definition = await client.query<{ kind: string; issuance_enabled: boolean }>(
-    'select kind, issuance_enabled from item_definitions where code = $1',
+  const expiresAt = input.expiresAt !== undefined
+    ? normalizeAbsoluteExpiry(input.expiresAt, now)
+    : validityDays > 0 ? new Date(Date.parse(now) + validityDays * 86_400_000).toISOString() : null
+  const definition = await client.query<{ kind: string; issuance_enabled: boolean; name: string; icon_key: string }>(
+    'select kind, issuance_enabled, name, icon_key from item_definitions where code = $1',
     [input.itemCode],
   )
   const item = definition.rows[0]
@@ -255,6 +267,18 @@ export async function grantItemInTransaction(client: PoolClient, input: GrantInp
     referenceType: input.sourceType,
     referenceId: input.sourceId,
     metadata: input.metadata ?? {},
+    now,
+  })
+  await upsertItemGrantNotificationInTransaction(client, {
+    userId: input.userId,
+    grantId: actualId,
+    sourceType: input.sourceType,
+    sourceId: input.sourceId,
+    itemCode: input.itemCode,
+    itemName: item.name,
+    iconKey: item.icon_key,
+    quantity,
+    expiresAt,
     now,
   })
   return actualId
@@ -365,7 +389,7 @@ export async function refundReservedItemsInTransaction(
   }
 }
 
-export async function useInventoryItem(userId: string, input: ItemUseRequest): Promise<Record<string, unknown>> {
+export async function useInventoryItem(userId: string, input: ItemUseRequest, operationNow = new Date()): Promise<Record<string, unknown>> {
   await ensureSchema()
   const requestHash = createHash('sha256').update(JSON.stringify(input)).digest('hex')
   return withTransaction(async (client) => {
@@ -379,7 +403,7 @@ export async function useInventoryItem(userId: string, input: ItemUseRequest): P
       return existing.rows[0].response_json
     }
     const operationId = randomUUID()
-    const now = new Date().toISOString()
+    const now = operationNow.toISOString()
     await client.query(
       `insert into inventory_operations (id, user_id, idempotency_key, operation_type, request_hash, created_at)
        values ($1, $2, $3, 'use_item', $4, $5)`,
@@ -396,6 +420,8 @@ export async function useInventoryItem(userId: string, input: ItemUseRequest): P
     } else if (item.kind === 'capacity_upgrade') {
       if (!input.profile_id) throw new InventoryError('profile_required', '请选择要扩容的账号档案。', 400)
       response = await applyCapacityUpgradeInTransaction(client, userId, input.item_code, item.effect_code, input.profile_id, operationId, now)
+    } else if (item.kind === 'license_voucher' && item.effect_code === 'activate_limited_profile') {
+      response = await activateLimitedProfileInTransaction(client, userId, input.item_code, operationId, now)
     } else {
       throw new InventoryError('context_only_item', '该道具只能在对应功能中使用。', 409)
     }
@@ -405,6 +431,90 @@ export async function useInventoryItem(userId: string, input: ItemUseRequest): P
     )
     return response
   })
+}
+
+export async function grantFreePreviewLimitedVoucher(userId: string, now = new Date()): Promise<string | null> {
+  if (!isFreePreviewLimitedCdkActivityActive(now)) return null
+  await ensureSchema()
+  return withTransaction(async (client) => {
+    const eligible = await client.query(
+      `select 1 from user_game_accounts
+        where user_id = $1 and status = 'active'
+          and record_json->>'kind' = 'free_preview'
+          and record_json->'skland_binding' is not null
+        limit 1`,
+      [userId],
+    )
+    if (!eligible.rowCount) return null
+    return grantItemInTransaction(client, {
+      userId,
+      itemCode: 'limited_profile_voucher',
+      quantity: 1,
+      expiry: { mode: 'never' },
+      expiresAt: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt,
+      sourceType: 'free_preview_activity',
+      sourceId: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.id,
+      recipientRole: 'participant',
+      metadata: { activity_id: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.id },
+      now: now.toISOString(),
+    })
+  })
+}
+
+async function activateLimitedProfileInTransaction(
+  client: PoolClient,
+  userId: string,
+  itemCode: string,
+  operationId: string,
+  now: string,
+): Promise<Record<string, unknown>> {
+  const nowDate = new Date(now)
+  if (!isFreePreviewLimitedCdkActivityActive(nowDate)) {
+    throw new InventoryError('limited_cdk_activity_inactive', '限时 CDK 活动尚未开始或已经结束。', 409)
+  }
+  const selected = await client.query<{ id: string; record_json: import('./user-store').UserGameAccountRecord }>(
+    `select id, record_json from user_game_accounts
+      where user_id = $1 and status = 'active'
+        and record_json->>'kind' = 'free_preview'
+        and record_json->'skland_binding' is not null
+      order by created_at asc
+      for update limit 1`,
+    [userId],
+  )
+  const row = selected.rows[0]
+  if (!row) throw new InventoryError('free_preview_profile_required', '没有可使用限时 CDK 的已绑定免费预览档案。', 409)
+  const current = row.record_json
+  if (current.temporary_permission
+    && new Date(current.temporary_permission.ends_at).getTime() > nowDate.getTime()) {
+    throw new InventoryError('limited_permission_already_active', '当前免费预览档案已经激活限时高级权限。', 409)
+  }
+  await reserveItemsInTransaction(client, userId, [itemCode], 'inventory_operation', operationId, row.id, now)
+  const next = {
+    ...current,
+    temporary_permission: {
+      source: 'limited_profile_voucher' as const,
+      activity_id: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.id,
+      permission: 'advanced' as const,
+      starts_at: now,
+      ends_at: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt,
+      operation_id: operationId,
+    },
+    updated_at: now,
+  }
+  await client.query(
+    `update user_game_accounts set record_json = $3::jsonb, updated_at = $4
+      where id = $1 and user_id = $2`,
+    [row.id, userId, JSON.stringify(next), now],
+  )
+  await commitReservedItemsInTransaction(client, 'inventory_operation', operationId, now)
+  return {
+    operation_id: operationId,
+    item_code: itemCode,
+    profile_id: row.id,
+    permission: 'advanced',
+    starts_at: now,
+    ends_at: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt,
+  }
 }
 
 export async function markOnboardingTaskComplete(userId: string, taskCode: OnboardingTaskCode, now = new Date().toISOString()): Promise<void> {
@@ -719,6 +829,15 @@ function stackId(itemCode: string, versionId: string | null): string {
 function normalizeQuantity(value: number): number {
   if (!Number.isInteger(value) || value < 1 || value > 10000) throw new InventoryError('quantity_invalid', '道具数量必须是 1 到 10000 之间的整数。', 400)
   return value
+}
+
+function normalizeAbsoluteExpiry(value: string | null, now: string): string | null {
+  if (value === null) return null
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp) || timestamp <= Date.parse(now)) {
+    throw new InventoryError('expiry_invalid', '道具绝对到期时间无效或已经过期。', 400)
+  }
+  return new Date(timestamp).toISOString()
 }
 
 function taskCopy(code: OnboardingTaskCode): { title: string; description: string } {

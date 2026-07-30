@@ -1881,6 +1881,8 @@ function userRegistrationLicenseUtilsMock() {
       }
     }
     export function getCdkRecordStore() { return { get: async () => null } }
+    export function getCdkType(record) { return record.cdk_type ?? 'profile' }
+    export function isProfileCdkRecord(record) { return getCdkType(record) === 'profile' }
     export function normalizeCode(value) { return value.trim().toUpperCase() }
     export function normalizePermissionMode(value) { return value }
     export function getFreePreviewDefaultConfig() { return {} }
@@ -2188,6 +2190,8 @@ function userLicenseUtilsMock() {
   return `
     export async function findCdkRecordByCode() { return null }
     export function getCdkRecordStore() { return { get: async () => null } }
+    export function getCdkType(record) { return record.cdk_type ?? 'profile' }
+    export function isProfileCdkRecord(record) { return getCdkType(record) === 'profile' }
     export function hashCdk(value) { return value }
     export function normalizeCode(value) { return value }
     export function normalizePermissionMode(value) { return value }

@@ -223,6 +223,7 @@ export function createPostgresUsageEventStore(): UsageEventStore {
                 1 as cdk_redeems
          from cdk_records
          where record_json->>'used_at' is not null
+           and cdk_type = 'profile'
            and ((record_json->>'used_at')::timestamptz at time zone 'UTC')::date between $1::date and $2::date
          union all
          select to_char(claimed_at at time zone 'UTC', 'YYYY-MM-DD') as date,

@@ -1,4 +1,5 @@
 import { getProfileForUser, isDepotValueProfile, isFreePreviewProfile } from '../storage/user-store'
+import { getEffectiveProfilePermission } from '../free-preview-trial'
 import { getCdkRecordStore } from './license-utils'
 import { jsonResponse, requireUserSession, toPublicUser } from './user-auth'
 
@@ -15,7 +16,7 @@ export default async (req: Request): Promise<Response> => {
     if (isFreePreviewProfile(profile)) {
       return jsonResponse({
         user: toPublicUser(auth.user),
-        permission: profile.permission,
+        permission: getEffectiveProfilePermission(profile),
         permission_label: '免费预览',
         status: profile.status,
         risk_status: 'ok',

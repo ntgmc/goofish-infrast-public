@@ -8,13 +8,17 @@ export type Permission = RawPermissionMode
 
 export type GeneratedPermission = ProductPermissionMode
 
-export type CdkStatus = 'unused' | 'used' | 'frozen' | 'revoked'
+export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
+export type CdkType = 'profile' | 'balance' | 'item'
+type ItemCdkCode = 'lifetime_profile_voucher' | 'limited_profile_voucher'
 
 export type AppUserStatus = 'active' | 'frozen' | 'revoked'
 
 export type StatusFilter = CdkStatus | 'all'
 
 export type PermissionFilter = GeneratedPermission | 'all'
+
+export type CdkTypeFilter = CdkType | 'all'
 
 export type BinaryFilter = 'all' | 'yes' | 'no'
 
@@ -31,6 +35,7 @@ export const EMPTY_PAGINATION: PaginationMeta = { page: 1, page_size: 25, total:
 
 export interface CdkTableFilters {
   status: StatusFilter;
+  cdk_type: CdkTypeFilter;
   permission: PermissionFilter;
   risk: BinaryFilter;
   generated: BinaryFilter;
@@ -38,13 +43,23 @@ export interface CdkTableFilters {
 
 export interface GeneratedCdk {
   code: string;
-  permission: GeneratedPermission;
+  cdk_type: CdkType;
+  permission?: GeneratedPermission;
+  amount?: string;
+  item_code?: ItemCdkCode;
+  item_name?: string;
+  item_expires_at?: string | null;
   created_at: string;
 }
 
 export interface AdminCdkCreateResponse {
   code?: string;
+  cdk_type?: CdkType;
   permission?: GeneratedPermission;
+  amount?: string;
+  item_code?: ItemCdkCode;
+  item_name?: string;
+  item_expires_at?: string | null;
   created_at?: string;
   count?: number;
   cdks?: Array<Partial<GeneratedCdk>>;
@@ -53,7 +68,12 @@ export interface AdminCdkCreateResponse {
 export interface AdminCdkRecord {
   code_hash: string;
   cdk_id: string;
-  permission: Permission;
+  cdk_type: CdkType;
+  permission: Permission | null;
+  amount: string | null;
+  item_code?: ItemCdkCode | null;
+  item_name?: string | null;
+  item_expires_at?: string | null;
   status: CdkStatus;
   created_at: string;
   used_at: string | null;
@@ -73,6 +93,12 @@ export interface AdminCdkRecord {
 export interface AdminCdkDetail extends AdminCdkRecord {
   baseline_operator_count?: number | null;
   latest_operator_count?: number | null;
+  operator_baseline_options?: Array<{
+    source: 'latest' | 'workspace' | 'next_import';
+    available: boolean;
+    owned_count: number | null;
+    updated_at: string | null;
+  }>;
   risk_events?: Array<{ at: string; type: string; reason: string; detail?: Record<string, unknown> | null }>;
   linked_account?: { account_id: string; profile_id: string } | null;
 }
@@ -190,6 +216,7 @@ export interface CdkPermissionDistribution {
   permission: Permission;
   total: number;
   unused: number;
+  claiming: number;
   used: number;
   frozen: number;
   revoked: number;
@@ -197,6 +224,11 @@ export interface CdkPermissionDistribution {
 
 export interface CdkStatusDistribution {
   status: CdkStatus;
+  total: number;
+}
+
+interface CdkTypeDistribution {
+  cdk_type: CdkType;
   total: number;
 }
 
@@ -217,6 +249,7 @@ export interface RiskTrendDay {
 }
 
 export interface CdkOpsSummary {
+  type_distribution: CdkTypeDistribution[];
   permission_distribution: CdkPermissionDistribution[];
   status_distribution: CdkStatusDistribution[];
   risk_reasons: RiskReasonStats[];
@@ -457,6 +490,7 @@ export const permissionLabels = new Proxy({} as Record<Permission, string>, {
 
 export const statusLabels: Record<CdkStatus, string> = {
   unused: '未使用',
+  claiming: '兑换中',
   used: '已使用',
   frozen: '已冻结',
   revoked: '已撤销',

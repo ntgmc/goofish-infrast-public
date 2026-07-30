@@ -26,10 +26,10 @@ const optimizeHandler = await bundleHandler('server/handlers/optimization.ts', [
   'registerOptimizerPort(optimizerPort);',
 ])
 const profilesHandler = await bundleHandler('server/handlers/user-profiles.ts')
-const { FREE_PREVIEW_ADVANCED_TRIAL } = await bundleHandler('server/free-preview-trial.ts')
+const { FREE_PREVIEW_LIMITED_CDK_ACTIVITY } = await bundleHandler('server/free-preview-trial.ts')
 
 const NativeDate = Date
-let smokeNow = NativeDate.parse(FREE_PREVIEW_ADVANCED_TRIAL.startsAt) - 24 * 60 * 60 * 1000
+let smokeNow = NativeDate.parse(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt) - 24 * 60 * 60 * 1000
 globalThis.Date = class SmokeDate extends NativeDate {
   constructor(...args) {
     super(...(args.length === 0 ? [smokeNow] : args))
@@ -491,9 +491,19 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
 
 async function assertFreePreviewTrialWorkspaceLimits() {
   const previousNow = smokeNow
-  smokeNow = NativeDate.parse(FREE_PREVIEW_ADVANCED_TRIAL.startsAt)
+  smokeNow = NativeDate.parse(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt)
   try {
-    const preview = seedFreePreviewProfile('preview-trial-bound', { bound: true })
+    const preview = seedFreePreviewProfile('preview-trial-bound', {
+      bound: true,
+      temporaryPermission: {
+        source: 'limited_profile_voucher',
+        activity_id: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.id,
+        permission: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.effectivePermission,
+        starts_at: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt,
+        ends_at: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt,
+        operation_id: 'preview-trial-operation',
+      },
+    })
     store.workspaces.set(preview.id, {
       ...emptyWorkspace(preview.id),
       operators: sampleOperators,
@@ -1443,6 +1453,7 @@ function memoryLicenseUtilsModule() {
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, updated_at: null } }
     export async function incrementCdkScheduleGenerateCount() {}
     export function normalizePermissionMode(permission) { return permission ?? 'advanced' }
+    export function isProfileCdkRecord(record) { return (record.cdk_type ?? 'profile') === 'profile' }
     export async function recordOperatorFingerprint(record, fingerprint) {
       const key = 'cdk/' + record.code_hash + '.json'
       const next = { ...record, baseline_operator_fingerprint: record.baseline_operator_fingerprint ?? fingerprint, latest_operator_fingerprint: fingerprint }
@@ -1709,7 +1720,7 @@ function memoryOptimizerPortModule() {
   `
 }
 
-function seedFreePreviewProfile(id, { bound }) {
+function seedFreePreviewProfile(id, { bound, temporaryPermission = null }) {
   const now = new Date().toISOString()
   const profile = {
     version: 1,
@@ -1736,6 +1747,7 @@ function seedFreePreviewProfile(id, { bound }) {
     } : null,
     skland_pending_binding: null,
     skland_risk: null,
+    temporary_permission: temporaryPermission,
     created_at: now,
     updated_at: now,
   }

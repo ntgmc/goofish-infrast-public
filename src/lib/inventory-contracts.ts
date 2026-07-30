@@ -9,10 +9,12 @@ const SYSTEM_ITEM_CODES = [
   'result_archive_folder',
   'maa_export_trial_coupon',
   'newcomer_supply_pack',
+  'lifetime_profile_voucher',
+  'limited_profile_voucher',
 ] as const
 
 export type SystemItemCode = typeof SYSTEM_ITEM_CODES[number]
-type ItemKind = 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'cosmetic' | 'badge'
+type ItemKind = 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'cosmetic' | 'badge' | 'license_voucher'
 type ItemEffectCode =
   | 'priority_compute'
   | 'reorder_check'
@@ -24,6 +26,8 @@ type ItemEffectCode =
   | 'result_archive_capacity'
   | 'maa_export_trial'
   | 'open_gift_pack'
+  | 'bind_lifetime_profile'
+  | 'activate_limited_profile'
 
 export type ExpiryPolicy =
   | { mode: 'never' }
@@ -55,7 +59,7 @@ export interface InventoryStack {
   permanent: number
   next_expiry_at: string | null
   expiry_buckets: InventoryExpiryBucket[]
-  actions: Array<'use' | 'open' | 'context_only'>
+  actions: Array<'use' | 'open' | 'bind' | 'context_only'>
 }
 
 export interface ProfileCapacitySummary {
@@ -144,6 +148,8 @@ export const ITEM_ICON_PATHS: Record<string, string> = {
   maa_export_trial_coupon: '/assets/items/maa-export-trial-coupon.png',
   newcomer_supply_pack: '/assets/items/newcomer-supply-pack.png',
   generic_gift_pack: '/assets/items/generic-gift-pack.png',
+  lifetime_profile_voucher: '/assets/items/lifetime-profile-voucher.png',
+  limited_profile_voucher: '/assets/items/limited-profile-voucher.png',
 }
 
 export function itemIconPath(iconKey: string): string {

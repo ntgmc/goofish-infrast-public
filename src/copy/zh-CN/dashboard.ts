@@ -179,7 +179,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_006: "免费个人排班",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_007: "免费个人排班会展示完整游戏内轮换队列，但不提供 MAA JSON 下载、原始数据、高级分析、批量导出或商用授权。",
+  pages_tool_dashboard_RedeemSection_007: "免费个人排班会展示完整游戏内轮换队列，但不提供 MAA JSON 下载、原始数据、高级分析、批量导出或商用授权。活动期间首次绑定森空岛后会赠送一张限时 CDK 道具，需在背包主动使用，高级权限于 2026 年 8 月 20 日 00:00 结束。",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_008: "档案名称",
   // src/pages/tool/dashboard/RedeemSection.tsx

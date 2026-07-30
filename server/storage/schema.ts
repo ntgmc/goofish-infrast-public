@@ -12,8 +12,12 @@ const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS cdk_records (
   key TEXT PRIMARY KEY,
   code_hash TEXT NOT NULL,
+  cdk_type TEXT NOT NULL DEFAULT 'profile',
   status TEXT NOT NULL,
-  permission TEXT NOT NULL,
+  permission TEXT,
+  balance_amount NUMERIC(20,2),
+  item_code TEXT,
+  item_expires_at TIMESTAMPTZ,
   license_order_hash TEXT,
   record_json JSONB NOT NULL,
   record_revision INTEGER NOT NULL DEFAULT 0,
@@ -26,6 +30,23 @@ CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_status_created ON cdk_records(s
 CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_permission_created ON cdk_records(permission, created_at DESC, key ASC);
 CREATE INDEX IF NOT EXISTS idx_cdk_records_license_order_hash ON cdk_records(license_order_hash);
 ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS record_revision INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS cdk_type TEXT NOT NULL DEFAULT 'profile';
+ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS balance_amount NUMERIC(20,2);
+ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS item_code TEXT;
+ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS item_expires_at TIMESTAMPTZ;
+ALTER TABLE cdk_records ALTER COLUMN permission DROP NOT NULL;
+UPDATE cdk_records SET cdk_type = 'profile' WHERE cdk_type IS NULL;
+CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_type_created ON cdk_records(cdk_type, created_at DESC, key ASC);
+ALTER TABLE cdk_records DROP CONSTRAINT IF EXISTS cdk_records_type_payload_check;
+ALTER TABLE cdk_records ADD CONSTRAINT cdk_records_type_payload_check CHECK (
+  (cdk_type = 'profile' AND permission IS NOT NULL AND balance_amount IS NULL AND item_code IS NULL AND item_expires_at IS NULL)
+  OR (cdk_type = 'balance' AND permission IS NULL AND balance_amount BETWEEN 0.01 AND 1000000.00 AND item_code IS NULL AND item_expires_at IS NULL)
+  OR (cdk_type = 'item' AND permission IS NULL AND balance_amount IS NULL AND (
+      (item_code IS NULL AND item_expires_at IS NULL)
+      OR (item_code = 'lifetime_profile_voucher' AND item_expires_at IS NULL)
+      OR (item_code = 'limited_profile_voucher' AND item_expires_at = '2026-08-19T16:00:00.000Z'::timestamptz)
+  ))
+);
 DO $$
 DECLARE conflict_details TEXT;
 BEGIN
@@ -312,6 +333,32 @@ BEGIN
   END IF;
 END $$;
 
+CREATE TABLE IF NOT EXISTS user_balance_accounts (
+  user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
+  available NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (available >= 0),
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_balance_transactions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('cdk_credit', 'admin_credit', 'admin_debit')),
+  amount NUMERIC(20,2) NOT NULL CHECK (amount <> 0),
+  balance_after NUMERIC(20,2) NOT NULL CHECK (balance_after >= 0),
+  reference_type TEXT NOT NULL,
+  reference_id TEXT NOT NULL,
+  idempotency_key TEXT,
+  admin_username TEXT,
+  reason TEXT,
+  request_hash TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (reference_type, reference_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_balance_transactions_user_created
+  ON user_balance_transactions(user_id, created_at DESC, id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_balance_transactions_idempotency
+  ON user_balance_transactions(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS invitation_codes (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
@@ -541,6 +588,16 @@ CREATE TABLE IF NOT EXISTS free_preview_pending_claims (
 CREATE INDEX IF NOT EXISTS idx_free_preview_pending_claims_user_id ON free_preview_pending_claims(user_id);
 CREATE INDEX IF NOT EXISTS idx_free_preview_pending_claims_expires_at ON free_preview_pending_claims(expires_at);
 
+CREATE TABLE IF NOT EXISTS lifetime_voucher_pending_bindings (
+  confirmation_id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  record_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lifetime_voucher_pending_user_id ON lifetime_voucher_pending_bindings(user_id);
+CREATE INDEX IF NOT EXISTS idx_lifetime_voucher_pending_expires_at ON lifetime_voucher_pending_bindings(expires_at);
+
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS user_workspaces (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
@@ -741,6 +798,27 @@ CREATE TABLE IF NOT EXISTS user_announcement_reads (
   PRIMARY KEY (user_id, announcement_id)
 );
 
+-- goofish:migration-phase
+CREATE TABLE IF NOT EXISTS user_notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  action_kind TEXT,
+  payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  read_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (user_id, type, source_type, source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_notifications_user_updated
+  ON user_notifications(user_id, updated_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_user_notifications_user_unread
+  ON user_notifications(user_id, updated_at DESC, id DESC) WHERE read_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS depot_value_samples (
   uid_hash TEXT PRIMARY KEY,
   total_equivalent_sanity NUMERIC NOT NULL,
@@ -855,8 +933,11 @@ CREATE TABLE IF NOT EXISTS item_definitions (
   issuance_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
-  CHECK (kind IN ('consumable', 'capacity_upgrade', 'gift_pack', 'cosmetic', 'badge'))
+  CHECK (kind IN ('consumable', 'capacity_upgrade', 'gift_pack', 'cosmetic', 'badge', 'license_voucher'))
 );
+ALTER TABLE item_definitions DROP CONSTRAINT IF EXISTS item_definitions_kind_check;
+ALTER TABLE item_definitions ADD CONSTRAINT item_definitions_kind_check
+  CHECK (kind IN ('consumable', 'capacity_upgrade', 'gift_pack', 'cosmetic', 'badge', 'license_voucher'));
 
 CREATE TABLE IF NOT EXISTS gift_pack_versions (
   id TEXT PRIMARY KEY,
@@ -1139,8 +1220,46 @@ VALUES
   ('history_capacity_certificate', 'capacity_upgrade', 'history_capacity', '历史档案扩容证', '指定档案的滚动结果历史槽位永久增加 1。', 'history_capacity_certificate', true, true, now(), now()),
   ('result_archive_folder', 'capacity_upgrade', 'result_archive_capacity', '结果封存夹', '指定档案的结果封存区永久增加 1 个槽位。', 'result_archive_folder', true, true, now(), now()),
   ('maa_export_trial_coupon', 'consumable', 'maa_export_trial', 'MAA 导出体验券', '导出一次指定排班结果。', 'maa_export_trial_coupon', true, true, now(), now()),
-  ('newcomer_supply_pack', 'gift_pack', 'open_gift_pack', '新人补给包', '内容由后台配置的新人礼包。', 'newcomer_supply_pack', true, true, now(), now())
+  ('newcomer_supply_pack', 'gift_pack', 'open_gift_pack', '新人补给包', '内容由后台配置的新人礼包。', 'newcomer_supply_pack', true, true, now(), now()),
+  ('lifetime_profile_voucher', 'license_voucher', 'bind_lifetime_profile', '终身版兑换 CDK', '绑定森空岛账号后创建或升级为终身高级档案，最终成功时才消耗。', 'lifetime_profile_voucher', true, true, now(), now()),
+  ('limited_profile_voucher', 'license_voucher', 'activate_limited_profile', '限时 CDK', '用于已绑定森空岛的免费预览档案，高级权限持续至 2026 年 8 月 20 日 00:00。', 'limited_profile_voucher', true, true, now(), now())
 ON CONFLICT (code) DO NOTHING;
+
+-- goofish:migration-phase
+INSERT INTO reward_grants
+  (id, user_id, reward_type, source_type, source_id, recipient_role, original_quantity, remaining_quantity,
+   validity_days, expires_at, metadata_json, created_at)
+SELECT 'free-preview-limited-cdk-2026:' || profile.user_id,
+       profile.user_id,
+       'limited_profile_voucher',
+       'free_preview_activity',
+       'free-preview-limited-cdk-2026',
+       'participant',
+       1, 1, 0, '2026-08-19T16:00:00.000Z'::timestamptz,
+       jsonb_build_object('activity_id', 'free-preview-limited-cdk-2026'),
+       now()
+FROM (
+  SELECT DISTINCT ON (user_id) user_id
+  FROM user_game_accounts
+  WHERE status = 'active'
+    AND record_json->>'kind' = 'free_preview'
+    AND record_json->'skland_binding' IS NOT NULL
+  ORDER BY user_id, created_at ASC
+) profile
+WHERE now() >= '2026-07-17T04:00:00.000Z'::timestamptz
+  AND now() < '2026-08-19T16:00:00.000Z'::timestamptz
+ON CONFLICT (user_id, reward_type, source_type, source_id, recipient_role) DO NOTHING;
+
+INSERT INTO inventory_ledger
+  (id, user_id, item_code, event_type, quantity, grant_id, reference_type, reference_id, metadata_json, created_at)
+SELECT 'free-preview-limited-cdk-2026:ledger:' || reward_grant.user_id,
+       reward_grant.user_id, reward_grant.reward_type, 'grant', 1, reward_grant.id,
+       reward_grant.source_type, reward_grant.source_id, reward_grant.metadata_json, reward_grant.created_at
+FROM reward_grants reward_grant
+WHERE reward_grant.reward_type = 'limited_profile_voucher'
+  AND reward_grant.source_type = 'free_preview_activity'
+  AND reward_grant.source_id = 'free-preview-limited-cdk-2026'
+ON CONFLICT (user_id, item_code, event_type, reference_type, reference_id) DO NOTHING;
 
 INSERT INTO onboarding_task_versions (id, task_code, version, enabled, rewards_json, created_at)
 VALUES
@@ -1163,6 +1282,9 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'public_content_settings',
   'personal_use_declaration_versions',
   'personal_use_declaration_acceptances',
+  'user_balance_accounts',
+  'user_balance_transactions',
+  'user_notifications',
 ])
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'

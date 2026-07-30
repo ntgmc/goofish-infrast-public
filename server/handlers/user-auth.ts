@@ -52,6 +52,8 @@ import { validateRegistrationEmailForRegistration } from '../security/registrati
 import { authCopy } from '../../src/copy/zh-CN/auth'
 import {
   findCdkRecordByCode,
+  getCdkType,
+  isProfileCdkRecord,
   getCdkRecordStore,
   normalizeCode,
   normalizePermissionMode,
@@ -434,6 +436,7 @@ export async function redeemProfileCdk(
   const cdkMatch = await findCdkRecordByCode(normalizedCode)
   if (!cdkMatch) return { ok: false, status: 404, message: authCopy.api_cdk_not_found }
   const { codeHash, key: cdkKey, record: cdkRecord } = cdkMatch
+  if (!isProfileCdkRecord(cdkRecord)) return profileCdkTypeFailure(cdkRecord)
   if (!idempotencyKey && cdkRecord.status === 'frozen') return { ok: false, status: 409, message: authCopy.api_cdk_frozen }
   if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: authCopy.api_cdk_revoked }
   const now = new Date().toISOString()
@@ -447,6 +450,7 @@ export async function redeemProfileCdk(
       idempotencyScope: `profile:${user.id}`,
       requestHash: createRequestHash({ codeHash, displayName, note }),
       complete: async (client, cdkRecord) => {
+        if (!isProfileCdkRecord(cdkRecord)) throw new Error(authCopy.api_cdk_type_mismatch)
         const permission = normalizePermissionMode(cdkRecord.permission)
         const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profileId)
         const profile: UserGameAccountRecord = {
@@ -531,6 +535,7 @@ export async function upgradePreviewProfileWithCdk(
   const cdkMatch = await findCdkRecordByCode(normalizedCode)
   if (!cdkMatch) return { ok: false, status: 404, message: authCopy.api_cdk_not_found }
   const { codeHash, key: cdkKey, record: cdkRecord } = cdkMatch
+  if (!isProfileCdkRecord(cdkRecord)) return profileCdkTypeFailure(cdkRecord)
   if (!idempotencyKey && cdkRecord.status === 'frozen') return { ok: false, status: 409, message: authCopy.api_cdk_frozen }
   if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: authCopy.api_cdk_revoked }
   const now = new Date().toISOString()
@@ -543,6 +548,7 @@ export async function upgradePreviewProfileWithCdk(
       idempotencyScope: `profile-upgrade:${user.id}:${profile.id}`,
       requestHash: createRequestHash({ codeHash, profileId: profile.id, displayName, note }),
       complete: async (client, cdkRecord) => {
+        if (!isProfileCdkRecord(cdkRecord)) throw new Error(authCopy.api_cdk_type_mismatch)
         const locked = await client.query<{ record_json: UserGameAccountRecord }>(
           'select record_json from user_game_accounts where id = $1 and user_id = $2 for update', [profile.id, user.id],
         )
@@ -579,7 +585,8 @@ async function redeemRegistrationCdk(
 ): Promise<{ ok: true; profile: UserGameAccountRecord } | { ok: false; status: number; message: string; code?: string }> {
   const cdkMatch = await findCdkRecordByCode(normalizeCode(codeValue))
   if (!cdkMatch) return { ok: false, status: 404, message: authCopy.api_cdk_not_found }
-  const { codeHash, key: cdkKey } = cdkMatch
+  const { codeHash, key: cdkKey, record: cdkRecord } = cdkMatch
+  if (!isProfileCdkRecord(cdkRecord)) return profileCdkTypeFailure(cdkRecord)
   const now = new Date().toISOString()
   const profileId = randomUUID()
   try {
@@ -589,6 +596,7 @@ async function redeemRegistrationCdk(
       idempotencyScope: `register:${user.email}`,
       requestHash: requestHash ?? createRequestHash({ codeHash, email: user.email }),
       complete: async (client, cdkRecord) => {
+        if (!isProfileCdkRecord(cdkRecord)) throw new Error(authCopy.api_cdk_type_mismatch)
         const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profileId)
         const permission = normalizePermissionMode(cdkRecord.permission)
         const boundUser: UserAccountRecord = {
@@ -622,6 +630,13 @@ async function redeemRegistrationCdk(
 function normalizeIdempotencyKey(value: string | null | undefined): string | null {
   const key = value?.trim() ?? ''
   return key && key.length <= 200 ? key : null
+}
+
+function profileCdkTypeFailure(record: CdkRecord): { ok: false; status: number; message: string; code: string } {
+  if (getCdkType(record) === 'item') {
+    return { ok: false, status: 409, message: authCopy.api_cdk_type_unavailable, code: 'cdk_type_mismatch' }
+  }
+  return { ok: false, status: 409, message: authCopy.api_cdk_type_mismatch, code: 'cdk_type_mismatch' }
 }
 
 function redemptionFailure(error: unknown): { ok: false; status: number; message: string; code?: string } {
@@ -968,7 +983,8 @@ function normalizeProfileNote(value: unknown): string {
 async function getCdkRecordForProfile(profile: UserGameAccountRecord): Promise<CdkRecord | null> {
   if (!profile.cdk_key) return null
   const store = await getCdkRecordStore()
-  return store.get(profile.cdk_key)
+  const record = await store.get(profile.cdk_key)
+  return record && isProfileCdkRecord(record) ? record : null
 }
 
 function isAnnouncement(value: unknown): value is Announcement {

@@ -77,8 +77,84 @@ const recovered = await licenseUtils.acceptLatestOperatorBaselineAndUnfreeze(rec
 if (!recovered || recovered.status !== 'used' || recovered.baseline_operator_fingerprint?.hash !== recovered.latest_operator_fingerprint?.hash) {
   throw new Error('reviewed recovery should accept the latest operator snapshot and unfreeze the record')
 }
-if (recovered.risk_events?.at(-1)?.type !== 'admin_operator_baseline_accepted') {
+if (recovered.risk_events?.at(-1)?.type !== 'admin_operator_baseline_changed') {
   throw new Error('reviewed recovery should append an audit event')
+}
+
+const fewerOperators = baselineOperators
+const moreOperators = [
+  ...baselineOperators,
+  { id: 'char_003', name: '普通干员 A', own: true, elite: 1, rarity: 3 },
+  { id: 'char_004', name: '普通干员 B', own: true, elite: 1, rarity: 3 },
+  { id: 'char_005', name: '普通干员 C', own: true, elite: 1, rarity: 3 },
+]
+let rollbackRecord = createRecord('operator-rollback')
+await store.create(`cdk/${rollbackRecord.code_hash}.json`, rollbackRecord)
+rollbackRecord = await licenseUtils.recordOperatorFingerprint(
+  rollbackRecord,
+  licenseUtils.buildOperatorFingerprint(moreOperators),
+)
+const rollbackRisk = licenseUtils.evaluateOperatorRisk(rollbackRecord, fewerOperators)
+if (rollbackRisk.ok || rollbackRisk.event.type !== 'operator_count_regression') {
+  throw new Error('operator risk should reject a B to A owned-count rollback')
+}
+const blockedRollback = await licenseUtils.recordSoftBlockedRiskEvent(
+  rollbackRecord,
+  rollbackRisk.event,
+  licenseUtils.formatOperatorRiskBlockMessage(rollbackRisk.event.reason),
+  rollbackRisk.fingerprint,
+)
+rollbackRecord = blockedRollback.record
+
+const latestSelected = await licenseUtils.setOperatorBaselineByAdmin(rollbackRecord, {
+  source: 'latest',
+  reason: 'verified rollback snapshot',
+  unfreeze: true,
+})
+if (
+  !latestSelected
+  || latestSelected.baseline_operator_fingerprint?.hash !== rollbackRisk.fingerprint.hash
+  || latestSelected.latest_operator_fingerprint?.hash !== rollbackRisk.fingerprint.hash
+) {
+  throw new Error('latest selection should replace both operator fingerprints')
+}
+
+const workspaceFingerprint = licenseUtils.buildOperatorFingerprint(moreOperators)
+const workspaceSelected = await licenseUtils.setOperatorBaselineByAdmin(latestSelected, {
+  source: 'workspace',
+  reason: 'verified workspace snapshot',
+  fingerprint: workspaceFingerprint,
+  unfreeze: true,
+})
+if (
+  !workspaceSelected
+  || workspaceSelected.baseline_operator_fingerprint?.hash !== workspaceFingerprint.hash
+  || workspaceSelected.latest_operator_fingerprint?.hash !== workspaceFingerprint.hash
+) {
+  throw new Error('workspace selection should replace both operator fingerprints')
+}
+
+const reset = await licenseUtils.setOperatorBaselineByAdmin(workspaceSelected, {
+  source: 'next_import',
+  reason: 'binding cleared',
+  unfreeze: false,
+  eventType: 'admin_operator_baseline_reset',
+  reviewed: false,
+})
+if (!reset || reset.baseline_operator_fingerprint || reset.latest_operator_fingerprint) {
+  throw new Error('next-import selection should remove both operator fingerprints')
+}
+if (reset.risk_events?.at(-1)?.type !== 'admin_operator_baseline_reset') {
+  throw new Error('baseline reset should append its audit event')
+}
+const afterReset = licenseUtils.evaluateOperatorRisk(reset, fewerOperators)
+if (!afterReset.ok) throw new Error('reset baseline should accept the next valid A snapshot')
+const rebuilt = await licenseUtils.recordOperatorFingerprint(reset, afterReset.fingerprint)
+if (
+  rebuilt.baseline_operator_fingerprint?.hash !== afterReset.fingerprint.hash
+  || rebuilt.latest_operator_fingerprint?.hash !== afterReset.fingerprint.hash
+) {
+  throw new Error('next valid snapshot should rebuild baseline and latest together')
 }
 
 console.log('license risk smoke check ok')

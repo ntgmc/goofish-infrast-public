@@ -10,12 +10,14 @@ import adminOptimizationHandler from './handlers/admin-optimization'
 import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
 import adminItemsHandler from './handlers/admin-items'
+import adminBalanceHandler from './handlers/admin-balance'
 import announcementHandler from './handlers/announcement'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
 import depotValueHandler from './handlers/depot-value'
 import optimizationHandler from './handlers/optimization'
 import userAnnouncementsHandler from './handlers/user-announcements'
+import userNotificationsHandler from './handlers/user-notifications'
 import userProfilesHandler from './handlers/user-profiles'
 import userSklandHandler from './handlers/user-skland'
 import userStatusHandler from './handlers/user-status'
@@ -24,6 +26,8 @@ import userBehaviorRiskHandler from './handlers/user-behavior-risk'
 import userInvitationsHandler from './handlers/user-invitations'
 import userRewardsHandler from './handlers/user-rewards'
 import userInventoryHandler from './handlers/user-inventory'
+import userBalanceHandler from './handlers/user-balance'
+import userCdkHandler from './handlers/user-cdk'
 import userResultsHandler from './handlers/user-results'
 import personalUseDeclarationHandler from './handlers/personal-use-declaration'
 import accountDataHandler from './handlers/account-data'
@@ -51,6 +55,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/users', adminUsersHandler as unknown as ApiHandler],
   ['/api/admin/items', adminItemsHandler as unknown as ApiHandler],
   ['/api/admin/inventory', adminItemsHandler as unknown as ApiHandler],
+  ['/api/admin/balance', adminBalanceHandler as unknown as ApiHandler],
   ['/api/auth/register', authHandler as unknown as ApiHandler],
   ['/api/auth/registration-settings', authHandler as unknown as ApiHandler],
   ['/api/auth/login', authHandler as unknown as ApiHandler],
@@ -73,10 +78,12 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/usage-stats', usageStatsHandler as unknown as ApiHandler],
   ['/api/depot-value', depotValueHandler as unknown as ApiHandler],
   ['/api/user/announcements', userAnnouncementsHandler as unknown as ApiHandler],
+  ['/api/user/notifications', userNotificationsHandler as unknown as ApiHandler],
   ['/api/user/profiles', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/depot-value', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/preview', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/redeem', userProfilesHandler as unknown as ApiHandler],
+  ['/api/user/cdk/redeem', userCdkHandler as unknown as ApiHandler],
   ['/api/user/skland/login/start', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/login/complete', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/login/confirm', userSklandHandler as unknown as ApiHandler],
@@ -87,6 +94,11 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/skland/free-preview/login/confirm', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/free-preview/credential/preview', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/free-preview/account/select', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/lifetime-voucher/login/start', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/lifetime-voucher/login/complete', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/lifetime-voucher/login/confirm', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/lifetime-voucher/credential/preview', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/lifetime-voucher/account/select', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/import/refresh', userSklandHandler as unknown as ApiHandler],
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],
@@ -96,6 +108,8 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/rewards', userRewardsHandler as unknown as ApiHandler],
   ['/api/user/inventory', userInventoryHandler as unknown as ApiHandler],
+  ['/api/user/balance', userBalanceHandler as unknown as ApiHandler],
+  ['/api/user/balance/redeem', userBalanceHandler as unknown as ApiHandler],
   ['/api/user/onboarding-tasks', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/onboarding-tasks/claim', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/maa-export', userResultsHandler as unknown as ApiHandler],

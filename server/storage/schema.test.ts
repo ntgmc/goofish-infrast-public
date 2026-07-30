@@ -38,6 +38,21 @@ describe('database schema ownership', () => {
     expect(schemaStatements.every((statement) => !statement.includes('goofish:migration-phase'))).toBe(true)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS security_rate_limit_buckets/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_accounts/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_transactions/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_notifications/)
+    expect(combinedSchema).toMatch(/cdk_records_type_payload_check/)
+    expect(combinedSchema).toMatch(/cdk_type = 'balance'/)
+    expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS item_code/)
+    expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS item_expires_at/)
+    expect(combinedSchema).toMatch(/lifetime_profile_voucher/)
+    expect(combinedSchema).toMatch(/limited_profile_voucher/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS lifetime_voucher_pending_bindings/)
+    expect(combinedSchema).toMatch(/free-preview-limited-cdk-2026/)
+    expect(combinedSchema).toMatch(/UNIQUE \(reference_type, reference_id\)/)
+    expect(combinedSchema.indexOf('ADD COLUMN IF NOT EXISTS cdk_type')).toBeLessThan(
+      combinedSchema.indexOf('idx_cdk_records_admin_type_created'),
+    )
     expect(combinedSchema).toMatch(/WITH workspace_retention AS/)
     expect(combinedSchema).toMatch(/trimmed_workspace_history AS/)
     expect(combinedSchema).toMatch(/jsonb_array_elements\(record_json->'saved_configs'\) WITH ORDINALITY/)
@@ -139,6 +154,7 @@ describe('database schema ownership', () => {
     expect(workerRequirements).not.toEqual(expect.arrayContaining([
       { table_name: 'feature_settings', column_name: 'key' },
       { table_name: 'public_content_settings', column_name: 'key' },
+      { table_name: 'user_notifications', column_name: 'payload_json' },
     ]))
 
     queryMock.mockClear()
@@ -151,6 +167,7 @@ describe('database schema ownership', () => {
       { table_name: 'feature_settings', column_name: 'record_json' },
       { table_name: 'public_content_settings', column_name: 'key' },
       { table_name: 'public_content_settings', column_name: 'record_json' },
+      { table_name: 'user_notifications', column_name: 'payload_json' },
     ]))
   })
 

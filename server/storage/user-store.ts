@@ -18,6 +18,7 @@ import type {
   WorkspaceResultHistoryItem,
   WorkspaceSavedConfig,
   FreePreviewTrial,
+  TemporaryProfilePermission,
 } from '../../src/lib/types'
 import {
   WORKSPACE_RESULT_HISTORY_LIMIT,
@@ -61,6 +62,7 @@ export interface UserGameAccountRecord {
   skland_binding?: SklandBindingRecord | null
   skland_pending_binding?: SklandPendingBindingRecord | null
   skland_risk?: SklandRiskRecord | null
+  temporary_permission?: TemporaryProfilePermission | null
   created_at: string
   updated_at: string
 }
@@ -153,6 +155,32 @@ export interface FreePreviewPendingConfirmationRecord extends FreePreviewPending
 export type FreePreviewPendingClaimRecord =
   | FreePreviewPendingAccountSelectionRecord
   | FreePreviewPendingConfirmationRecord
+
+interface LifetimeVoucherPendingBindingBase {
+  confirmation_id: string
+  user_id: string
+  encrypted_cred: string
+  created_at: string
+  expires_at: string
+}
+
+export interface LifetimeVoucherPendingAccountSelectionRecord extends LifetimeVoucherPendingBindingBase {
+  stage: 'account_selection'
+  accounts: SklandPendingAccountOption[]
+  source?: 'manual' | 'bookmarklet'
+}
+
+export interface LifetimeVoucherPendingConfirmationRecord extends LifetimeVoucherPendingBindingBase {
+  stage: 'confirmation'
+  uid: string
+  nickname: string
+  channel_name: string
+  operator_count: number
+}
+
+export type LifetimeVoucherPendingBindingRecord =
+  | LifetimeVoucherPendingAccountSelectionRecord
+  | LifetimeVoucherPendingConfirmationRecord
 
 export interface UserSessionRecord {
   version: 1
@@ -638,6 +666,38 @@ export async function getFreePreviewPendingClaim(
 export async function deleteFreePreviewPendingClaim(userId: string, confirmationId: string): Promise<void> {
   await ensureSchema()
   await query('delete from free_preview_pending_claims where user_id = $1 and confirmation_id = $2', [userId, confirmationId])
+}
+
+export async function saveLifetimeVoucherPendingBinding(binding: LifetimeVoucherPendingBindingRecord): Promise<void> {
+  await ensureSchema()
+  await query(
+    `insert into lifetime_voucher_pending_bindings
+      (confirmation_id, user_id, expires_at, record_json, created_at)
+     values ($1, $2, $3, $4::jsonb, $5)
+     on conflict (confirmation_id) do update set
+      user_id = excluded.user_id,
+      expires_at = excluded.expires_at,
+      record_json = excluded.record_json,
+      created_at = excluded.created_at`,
+    [binding.confirmation_id, binding.user_id, binding.expires_at, JSON.stringify(binding), binding.created_at],
+  )
+}
+
+export async function getLifetimeVoucherPendingBinding(
+  userId: string,
+  confirmationId: string,
+): Promise<LifetimeVoucherPendingBindingRecord | null> {
+  await ensureSchema()
+  const result = await query<{ record_json: LifetimeVoucherPendingBindingRecord }>(
+    'select record_json from lifetime_voucher_pending_bindings where user_id = $1 and confirmation_id = $2',
+    [userId, confirmationId],
+  )
+  return result.rows[0]?.record_json ?? null
+}
+
+export async function deleteLifetimeVoucherPendingBinding(userId: string, confirmationId: string): Promise<void> {
+  await ensureSchema()
+  await query('delete from lifetime_voucher_pending_bindings where user_id = $1 and confirmation_id = $2', [userId, confirmationId])
 }
 
 export async function getOrCreateDepotValueProfile(user: UserAccountRecord): Promise<UserGameAccountRecord> {

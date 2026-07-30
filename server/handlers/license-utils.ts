@@ -28,11 +28,24 @@ import {
 const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const
 export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = listAdminIssuablePermissions()
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
+export type CdkType = 'profile' | 'balance' | 'item'
+export type ItemCdkCode = 'lifetime_profile_voucher' | 'limited_profile_voucher'
 
 export interface OperatorFingerprint {
   hash: string;
   owned_count: number;
   operators: Record<string, { name: string; own: boolean; elite: number; rarity: number }>;
+}
+
+export type OperatorBaselineSource = 'latest' | 'workspace' | 'next_import'
+
+interface AdminOperatorBaselineOptions {
+  source: OperatorBaselineSource;
+  reason: string;
+  fingerprint?: OperatorFingerprint;
+  unfreeze: boolean;
+  eventType?: 'admin_operator_baseline_changed' | 'admin_operator_baseline_reset';
+  reviewed?: boolean;
 }
 
 export interface RiskEvent {
@@ -91,10 +104,8 @@ const MANUFACTURING_PRODUCTS = ['Pure Gold', 'Battle Record', 'Originium Shard']
 
 installUnhandledRejectionLogger()
 
-export interface CdkRecord {
-  version: 1;
+interface CdkRecordBase {
   code_hash: string;
-  permission: RawPermissionMode;
   status: CdkStatus;
   created_at: string;
   used_at: string | null;
@@ -111,6 +122,40 @@ export interface CdkRecord {
   risk_events?: RiskEvent[];
   account_id?: string | null;
   profile_id?: string | null;
+}
+
+export type LegacyProfileCdkRecord = CdkRecordBase & { version: 1; cdk_type?: undefined; permission: RawPermissionMode; balance_amount?: null }
+export type ProfileCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'profile'; permission: RawPermissionMode; balance_amount: null }
+export type BalanceCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'balance'; permission: null; balance_amount: string }
+export type LegacyItemCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'item'; permission: null; balance_amount: null; item_code?: null; item_expires_at?: null }
+export type ItemCdkRecord = CdkRecordBase & { version: 3; cdk_type: 'item'; permission: null; balance_amount: null; item_code: ItemCdkCode; item_expires_at: string | null }
+export type CdkRecord = LegacyProfileCdkRecord | ProfileCdkRecord | BalanceCdkRecord | LegacyItemCdkRecord | ItemCdkRecord
+
+export function getCdkType(record: CdkRecord): CdkType {
+  return record.cdk_type ?? 'profile'
+}
+
+export function getCdkBalanceAmount(record: CdkRecord): string | null {
+  return getCdkType(record) === 'balance' && typeof record.balance_amount === 'string'
+    ? record.balance_amount
+    : null
+}
+
+export function getCdkItemCode(record: CdkRecord): ItemCdkCode | null {
+  if (getCdkType(record) !== 'item') return null
+  return record.item_code === 'lifetime_profile_voucher' || record.item_code === 'limited_profile_voucher'
+    ? record.item_code
+    : null
+}
+
+export function getCdkItemExpiresAt(record: CdkRecord): string | null {
+  return getCdkType(record) === 'item' && typeof record.item_expires_at === 'string'
+    ? record.item_expires_at
+    : null
+}
+
+export function isProfileCdkRecord(record: CdkRecord): record is LegacyProfileCdkRecord | ProfileCdkRecord {
+  return getCdkType(record) === 'profile'
 }
 
 export interface CdkRecordStore {
@@ -133,6 +178,7 @@ export interface AdminCdkPageOptions {
   search: string;
   status: CdkStatus | 'all';
   permission: ProductPermissionMode | 'all';
+  cdkType: CdkType | 'all';
   risk: 'all' | 'yes' | 'no';
   generated: 'all' | 'yes' | 'no';
   riskOnly?: boolean;
@@ -675,26 +721,68 @@ export async function unfreezeCdkRecord(record: CdkRecord): Promise<CdkRecord> {
   }), { allowedStatuses: ['frozen'] })) ?? record
 }
 
-export async function acceptLatestOperatorBaselineAndUnfreeze(record: CdkRecord, reason: string): Promise<CdkRecord | null> {
-  if (!record.latest_operator_fingerprint) return null
+export async function setOperatorBaselineByAdmin(
+  record: CdkRecord,
+  options: AdminOperatorBaselineOptions,
+): Promise<CdkRecord | null> {
+  if (options.source === 'latest' && !record.latest_operator_fingerprint) return null
+  if (options.source === 'workspace' && !options.fingerprint) return null
   const at = new Date().toISOString()
   const store = await getCdkRecordStore()
-  return (await store.mutate(`cdk/${record.code_hash}.json`, (current) => {
-    if (!current.latest_operator_fingerprint) return current
-    return {
-      ...current,
-      status: 'used',
-      frozen_at: null,
-      freeze_reason: null,
-      baseline_operator_fingerprint: current.latest_operator_fingerprint,
-      risk_events: [...(current.risk_events ?? []), {
-        at,
-        type: 'admin_operator_baseline_accepted',
-        reason,
-        detail: { reviewed: true, fingerprint_hash: current.latest_operator_fingerprint.hash },
-      }].slice(-20),
+  let sourceUnavailable = false
+  const updated = await store.mutate(`cdk/${record.code_hash}.json`, (current) => {
+    const previousBaseline = current.baseline_operator_fingerprint
+    const previousLatest = current.latest_operator_fingerprint
+    const selected = options.source === 'latest'
+      ? current.latest_operator_fingerprint
+      : options.source === 'workspace'
+        ? options.fingerprint
+        : null
+    if (options.source !== 'next_import' && !selected) {
+      sourceUnavailable = true
+      return current
     }
-  }, { allowedStatuses: ['used', 'frozen'] })) ?? record
+
+    const next: CdkRecord = { ...current }
+    if (selected) {
+      next.baseline_operator_fingerprint = selected
+      next.latest_operator_fingerprint = selected
+    } else {
+      delete next.baseline_operator_fingerprint
+      delete next.latest_operator_fingerprint
+    }
+    if (options.unfreeze) {
+      next.status = 'used'
+      next.frozen_at = null
+      next.freeze_reason = null
+    }
+    next.risk_events = [...(current.risk_events ?? []), {
+      at,
+      type: options.eventType ?? 'admin_operator_baseline_changed',
+      reason: options.reason,
+      detail: {
+        reviewed: options.reviewed ?? true,
+        source: options.source,
+        previous_baseline_hash: previousBaseline?.hash ?? null,
+        previous_baseline_owned_count: previousBaseline?.owned_count ?? null,
+        previous_latest_hash: previousLatest?.hash ?? null,
+        previous_latest_owned_count: previousLatest?.owned_count ?? null,
+        selected_fingerprint_hash: selected?.hash ?? null,
+        selected_owned_count: selected?.owned_count ?? null,
+      },
+    }].slice(-20)
+    return next
+  }, { allowedStatuses: ['used', 'frozen'] })
+  if (sourceUnavailable || !updated || (updated.status !== 'used' && updated.status !== 'frozen')) return null
+  return updated
+}
+
+export async function acceptLatestOperatorBaselineAndUnfreeze(record: CdkRecord, reason: string): Promise<CdkRecord | null> {
+  return setOperatorBaselineByAdmin(record, {
+    source: 'latest',
+    reason,
+    unfreeze: true,
+  })
 }
 
 export function validateOperators(value: unknown): { ok: true; operators: LicenseOperator[] } | { ok: false; message: string } {

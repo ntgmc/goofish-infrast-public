@@ -20,6 +20,12 @@ type BoardSlot = {
   row?: RoomRow;
 }
 
+type FiammettaTarget = {
+  key: string;
+  planLabel: string;
+  target: string;
+}
+
 const ROOM_TONE: Record<string, string> = {
   trading: 'border-brand-500/35 bg-brand-500/10',
   manufacture: 'border-warning/35 bg-warning/10',
@@ -43,6 +49,7 @@ export default function ResultBoard({
   planTimes?: string;
 }) {
   const groups = buildBoardRoomGroups(prepared.plans, isRotationMode)
+  const fiammettaTargets = isRotationMode ? [] : buildFiammettaTargets(prepared.plans)
   const modeLabel = isRotationMode ? copy.domain.components_result_panel_ResultBoard_001 : copy.domain.components_result_panel_ResultBoard_002
   const queueLabel = planTimes ?? `${prepared.detailStats.planCount}${copy.domain.components_result_panel_ResultBoard_003}${isRotationMode ? copy.domain.components_result_panel_ResultBoard_004 : copy.domain.components_result_panel_ResultBoard_005}`
 
@@ -55,9 +62,14 @@ export default function ResultBoard({
             <p className="mt-1 text-xs leading-5 text-ink-muted">
               {copy.domain.components_result_panel_ResultBoard_006}</p>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs">
+          <div className="flex flex-wrap gap-2 text-xs md:justify-end">
             <span className="tool-status">{queueLabel}</span>
             <span className="tool-status">{groups.length} {copy.domain.components_result_panel_ResultBoard_007}</span>
+            {fiammettaTargets.map((item) => (
+              <span key={item.key} className="tool-status tool-status--warning">
+                {item.planLabel} · {copy.domain.components_result_panel_ResultBoard_017}{item.target}
+              </span>
+            ))}
           </div>
         </div>
       </div>
@@ -110,6 +122,21 @@ export default function ResultBoard({
       </div>
     </section>
   )
+}
+
+function buildFiammettaTargets(plans: PreparedPlan[]): FiammettaTarget[] {
+  return plans.flatMap((plan, index) => {
+    if (plan.Fiammetta?.enable !== true) return []
+    const target = typeof plan.Fiammetta.target === 'string' ? plan.Fiammetta.target.trim() : ''
+    if (!target) return []
+
+    const name = typeof plan.name === 'string' ? plan.name.trim() : ''
+    return [{
+      key: `fiammetta-${index}`,
+      planLabel: name || `${copy.domain.components_result_panel_ResultBoard_016}${index + 1}`,
+      target,
+    }]
+  })
 }
 
 function buildBoardRoomGroups(plans: PreparedPlan[], isRotationMode: boolean): BoardRoomGroup[] {

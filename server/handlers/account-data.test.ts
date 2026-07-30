@@ -3,19 +3,29 @@ import accountDataHandler from './account-data'
 
 const mocks = vi.hoisted(() => ({
   getProfileForUser: vi.fn(),
+  getProfileWorkspace: vi.fn(),
+  getUserById: vi.fn(),
+  listProfilesForUser: vi.fn(),
+  query: vi.fn(),
+  listPersonalUseDeclarationAcceptancesForUser: vi.fn(),
   saveUserProfile: vi.fn(),
   requireUserSession: vi.fn(),
+  exportUserNotifications: vi.fn(),
 }))
 
 vi.mock('../storage/user-store', () => ({
   getProfileForUser: mocks.getProfileForUser,
-  getProfileWorkspace: vi.fn(),
-  getUserById: vi.fn(),
-  listProfilesForUser: vi.fn(),
+  getProfileWorkspace: mocks.getProfileWorkspace,
+  getUserById: mocks.getUserById,
+  listProfilesForUser: mocks.listProfilesForUser,
   saveUserProfile: mocks.saveUserProfile,
 }))
 
-vi.mock('../storage/postgres', () => ({ query: vi.fn() }))
+vi.mock('../storage/postgres', () => ({ query: mocks.query }))
+vi.mock('../storage/notification-store', () => ({ exportUserNotifications: mocks.exportUserNotifications }))
+vi.mock('../storage/personal-use-declaration-store', () => ({
+  listPersonalUseDeclarationAcceptancesForUser: mocks.listPersonalUseDeclarationAcceptancesForUser,
+}))
 vi.mock('../account-data-lifecycle', () => ({ cancelAccountDeletion: vi.fn(), requestAccountDeletion: vi.fn() }))
 vi.mock('../security/password', () => ({ verifyPasswordHash: vi.fn() }))
 vi.mock('./user-auth', () => ({
@@ -42,6 +52,11 @@ const binding = {
 
 beforeEach(() => {
   mocks.requireUserSession.mockResolvedValue({ user: { id: 'user-1', email: 'user@example.test' } })
+  mocks.query.mockResolvedValue({ rows: [] })
+  mocks.listProfilesForUser.mockResolvedValue([])
+  mocks.getUserById.mockResolvedValue(null)
+  mocks.listPersonalUseDeclarationAcceptancesForUser.mockResolvedValue([])
+  mocks.exportUserNotifications.mockResolvedValue([])
   mocks.getProfileForUser.mockResolvedValue({
     id: 'profile-1',
     user_id: 'user-1',
@@ -93,5 +108,25 @@ describe('account data Skland controls', () => {
 
     expect(response.status).toBe(404)
     await expect(response.json()).resolves.toEqual({ error: 'API route not found' })
+  })
+
+  it('exports public inventory history without internal administrator audit data', async () => {
+    const response = await accountDataHandler(new Request('http://localhost/api/user/data/export'))
+    const body = await response.json() as { inventory: Record<string, unknown> }
+
+    expect(response.status).toBe(200)
+    expect(body.inventory).not.toHaveProperty('admin_audit_links')
+    expect(mocks.query.mock.calls.some(([statement]) => String(statement).includes('inventory_admin_audit'))).toBe(false)
+  })
+
+  it('exports public notifications without internal source or grant identifiers', async () => {
+    mocks.exportUserNotifications.mockResolvedValue([{ id: 'notification-1', type: 'item_grant' }])
+    const response = await accountDataHandler(new Request('http://localhost/api/user/data/export'))
+    const body = await response.json() as { version: number; notifications: Array<Record<string, unknown>> }
+
+    expect(body.version).toBe(3)
+    expect(body.notifications).toEqual([{ id: 'notification-1', type: 'item_grant' }])
+    expect(body.notifications[0]).not.toHaveProperty('source_type')
+    expect(body.notifications[0]).not.toHaveProperty('grant_id')
   })
 })

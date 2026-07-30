@@ -9,8 +9,10 @@ import {
 } from './admin-inventory-store'
 import {
   getItemBalance,
+  grantFreePreviewLimitedVoucher,
   getProfileCapacityLimits,
   grantItem,
+  grantItemInTransaction,
   listInventory,
   refundReservedItemsInTransaction,
   reserveItemsInTransaction,
@@ -134,6 +136,110 @@ describe('PostgreSQL unified inventory', () => {
     expect(await getItemBalance(userId, 'plan_capacity_certificate')).toBe(1)
   })
 
+  it('lists lifetime and limited vouchers with their dedicated actions and fixed expiry', async () => {
+    const { userId } = await seedUserProfile()
+    const now = new Date('2026-07-30T00:00:00.000Z')
+    await grantItem({
+      userId, itemCode: 'lifetime_profile_voucher', quantity: 1, expiry: { mode: 'never' },
+      sourceType: 'test', sourceId: 'lifetime', recipientRole: 'test', now: now.toISOString(),
+    })
+    await grantItem({
+      userId, itemCode: 'limited_profile_voucher', quantity: 1, expiry: { mode: 'never' },
+      expiresAt: '2026-08-19T16:00:00.000Z', sourceType: 'test', sourceId: 'limited', recipientRole: 'test', now: now.toISOString(),
+    })
+
+    const inventory = await listInventory(userId, now)
+    expect(inventory.stacks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ item: expect.objectContaining({ code: 'lifetime_profile_voucher' }), actions: ['bind'], permanent: 1 }),
+      expect.objectContaining({ item: expect.objectContaining({ code: 'limited_profile_voucher' }), actions: ['use'], next_expiry_at: expect.anything() }),
+    ]))
+  })
+
+  it('grants the activity voucher once and activates temporary advanced permission atomically', async () => {
+    const { userId, profileId } = await seedFreePreviewProfile()
+    const now = new Date('2026-07-30T00:00:00.000Z')
+
+    expect(await grantFreePreviewLimitedVoucher(userId, now)).toBeTruthy()
+    expect(await grantFreePreviewLimitedVoucher(userId, now)).toBeNull()
+    expect(await getItemBalance(userId, 'limited_profile_voucher', now)).toBe(1)
+
+    const operation = await useInventoryItem(userId, {
+      item_code: 'limited_profile_voucher', quantity: 1, idempotency_key: randomUUID(),
+    }, now)
+    expect(operation).toMatchObject({
+      item_code: 'limited_profile_voucher', profile_id: profileId, permission: 'advanced',
+      ends_at: '2026-08-19T16:00:00.000Z',
+    })
+    expect(await getItemBalance(userId, 'limited_profile_voucher', now)).toBe(0)
+    const profile = await query<{ record_json: { permission: string; temporary_permission: { permission: string; ends_at: string } } }>(
+      'select record_json from user_game_accounts where id = $1', [profileId],
+    )
+    expect(profile.rows[0]?.record_json).toMatchObject({
+      permission: 'growth',
+      temporary_permission: { permission: 'advanced', ends_at: '2026-08-19T16:00:00.000Z' },
+    })
+  })
+
+  it('creates, aggregates, reopens, and deduplicates item grant notifications', async () => {
+    const { userId } = await seedUserProfile()
+    const sourceId = randomUUID()
+    const firstGrant = {
+      userId, itemCode: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' as const },
+      sourceType: 'notification_test', sourceId, recipientRole: 'first', now: '2026-07-30T00:00:00.000Z',
+    }
+    await grantItem(firstGrant)
+    await grantItem({
+      userId, itemCode: 'plan_capacity_certificate', quantity: 2, expiry: { mode: 'relative_days', days: 30 },
+      sourceType: 'notification_test', sourceId, recipientRole: 'second', now: '2026-07-30T00:00:01.000Z',
+    })
+
+    const grouped = await query<{ id: string; payload_json: { items: Array<{ item_code: string; quantity: number; grant_ids: string[] }> } }>(
+      `select id, payload_json from user_notifications
+        where user_id = $1 and source_type = 'notification_test' and source_id = $2`,
+      [userId, sourceId],
+    )
+    expect(grouped.rows).toHaveLength(1)
+    expect(grouped.rows[0]?.payload_json.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ item_code: 'priority_compute_coupon', quantity: 1 }),
+      expect.objectContaining({ item_code: 'plan_capacity_certificate', quantity: 2 }),
+    ]))
+
+    await query('update user_notifications set read_at = now() where id = $1', [grouped.rows[0]!.id])
+    await grantItem({ ...firstGrant, quantity: 3, recipientRole: 'third', now: '2026-07-30T00:00:02.000Z' })
+    expect(await grantItem({ ...firstGrant, quantity: 3, recipientRole: 'third', now: '2026-07-30T00:00:02.000Z' })).toBeNull()
+
+    const reopened = await query<{ read_at: string | null; payload_json: { items: Array<{ item_code: string; quantity: number; grant_ids: string[] }> } }>(
+      'select read_at, payload_json from user_notifications where id = $1', [grouped.rows[0]!.id],
+    )
+    expect(reopened.rows[0]?.read_at).toBeNull()
+    expect(reopened.rows[0]?.payload_json.items.find((item) => item.item_code === 'priority_compute_coupon')).toMatchObject({
+      quantity: 4,
+      grant_ids: expect.arrayContaining([expect.any(String), expect.any(String)]),
+    })
+  })
+
+  it('rolls back the grant, ledger, and notification together', async () => {
+    const { userId } = await seedUserProfile()
+    const sourceId = randomUUID()
+
+    await expect(withTransaction(async (client) => {
+      await grantItemInTransaction(client, {
+        userId, itemCode: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' },
+        sourceType: 'notification_rollback', sourceId, recipientRole: 'test',
+      })
+      throw new Error('force rollback')
+    })).rejects.toThrow('force rollback')
+
+    const counts = await query<{ grants: string; ledger: string; notifications: string }>(
+      `select
+        (select count(*) from reward_grants where user_id = $1 and source_id = $2)::text as grants,
+        (select count(*) from inventory_ledger where user_id = $1 and reference_id = $2)::text as ledger,
+        (select count(*) from user_notifications where user_id = $1 and source_id = $2)::text as notifications`,
+      [userId, sourceId],
+    )
+    expect(counts.rows[0]).toEqual({ grants: '0', ledger: '0', notifications: '0' })
+  })
+
   it('recovers only stale campaign claims after a worker interruption', async () => {
     const { userId } = await seedUserProfile()
     const campaignId = randomUUID()
@@ -175,4 +281,31 @@ async function seedUserProfile(): Promise<{ userId: string; profileId: string }>
     [profileId, userId, JSON.stringify({ id: profileId, user_id: userId, kind: 'cdk', permission: 'advanced', status: 'active', display_name: 'Inventory test' }), now],
   )
   return { userId, profileId }
+}
+
+async function seedFreePreviewProfile(): Promise<{ userId: string; profileId: string }> {
+  const seeded = await seedUserProfile()
+  const now = '2026-07-30T00:00:00.000Z'
+  const record = {
+    version: 1,
+    id: seeded.profileId,
+    user_id: seeded.userId,
+    kind: 'free_preview',
+    permission: 'growth',
+    status: 'active',
+    display_name: '免费预览',
+    skland_binding: {
+      uid: `uid-${seeded.profileId}`,
+      nickname: 'Test',
+      channel_name: 'Official',
+      bound_at: now,
+      last_imported_at: now,
+      encrypted_cred: 'encrypted',
+    },
+  }
+  await query(
+    `update user_game_accounts set permission = 'growth', record_json = $2::jsonb, updated_at = $3 where id = $1`,
+    [seeded.profileId, JSON.stringify(record), now],
+  )
+  return seeded
 }

@@ -43,6 +43,26 @@ describe('feature gate', () => {
     await expect(gated?.json()).resolves.toMatchObject({ feature: 'login' })
   })
 
+  it('uses the existing CDK and inventory feature switches for voucher flows', async () => {
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ cdk_redemption: false }))
+    const redeem = await enforceFeatureGate(new Request('http://localhost/api/user/cdk/redeem', { method: 'POST' }))
+    await expect(redeem?.json()).resolves.toMatchObject({ feature: 'cdk_redemption' })
+
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ inventory: false }))
+    const bind = await enforceFeatureGate(new Request('http://localhost/api/user/skland/lifetime-voucher/login/start', { method: 'POST' }))
+    await expect(bind?.json()).resolves.toMatchObject({ feature: 'inventory' })
+  })
+
+  it('keeps personal notifications independent from announcements and inventory', async () => {
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ announcements: false, inventory: false }))
+    await expect(enforceFeatureGate(new Request('http://localhost/api/user/notifications'))).resolves.toBeNull()
+    expect((await enforceFeatureGate(new Request('http://localhost/api/user/announcements')))?.status).toBe(503)
+
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ login: false }))
+    const gated = await enforceFeatureGate(new Request('http://localhost/api/user/notifications'))
+    await expect(gated?.json()).resolves.toMatchObject({ feature: 'login' })
+  })
+
   it('fails closed when settings cannot be read and lets preflight pass', async () => {
     getSiteFeatureSettings.mockRejectedValue(new Error('database unavailable'))
     const response = await enforceFeatureGate(new Request('http://localhost/api/auth/login', { method: 'POST' }))

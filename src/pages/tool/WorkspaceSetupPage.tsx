@@ -17,6 +17,7 @@ import { countOwnedOperators, formatDate, getEffectiveProfilePermission, getProf
 import { copy } from '../../copy/index'
 import { hasCapability } from '../../lib/product-catalog'
 import { useSiteFeatures } from '../../lib/site-feature-context'
+import { NotificationBell } from '../../components/NotificationCenter'
 
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
@@ -280,7 +281,10 @@ export default function WorkspaceSetupPage({
                 ]}
               />
             </div>
-            <ThemeSwitcher iconOnly />
+            <div className="flex shrink-0 items-center gap-2">
+              <NotificationBell iconOnly />
+              <ThemeSwitcher iconOnly />
+            </div>
           </div>
 
           <div className="mx-auto hidden max-w-7xl items-center justify-between gap-4 lg:flex">
@@ -295,6 +299,7 @@ export default function WorkspaceSetupPage({
               <button type="button" onClick={setupTour.start} className="tool-secondary-action">
                 {copy.workspace.pages_tool_WorkspaceSetupPage_tour_001}
               </button>
+              <NotificationBell />
               <ThemeSwitcher />
             </div>
           </div>

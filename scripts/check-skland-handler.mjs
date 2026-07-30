@@ -728,6 +728,7 @@ async function assertUnbindRouteRemoved() {
 
 async function assertFreePreviewScanClaim() {
   const profileCountBefore = store.profiles.size
+  const voucherGrantCountBefore = store.limitedVoucherGrantCalls.length
   setFetchMode('blank-default-uid')
   const start = await callSkland('/api/user/skland/free-preview/login/start', {})
   if (start.status !== 200 || start.body.scan_id !== 'scan-1' || !start.body.qr_data_url?.startsWith('data:image/png;base64,')) {
@@ -775,6 +776,10 @@ async function assertFreePreviewScanClaim() {
   const profileId = confirm.body.active_profile.id
   if (store.workspaces.get(profileId)?.operators?.length !== 2) {
     throw new Error('免费档案扫码确认：干员未写入工作区')
+  }
+  const voucherGrantCall = store.limitedVoucherGrantCalls.at(-1)
+  if (store.limitedVoucherGrantCalls.length !== voucherGrantCountBefore + 1 || voucherGrantCall?.userId !== store.user.id) {
+    throw new Error('免费档案扫码确认：未触发限时 CDK 道具发放')
   }
   const entitlement = {
     first_generated_at: '2026-01-01T00:00:00.000Z',
@@ -1154,6 +1159,8 @@ function createMemoryStore() {
     cdks: new Map(),
     freePreviewClaims: new Map(),
     freePreviewPendingClaims: new Map(),
+    lifetimeVoucherPendingBindings: new Map(),
+    limitedVoucherGrantCalls: [],
     personalUseAcceptance: {
       declaration_id: 'personal_use_v1',
       declaration_version: 'V1.0',
@@ -1210,6 +1217,10 @@ function memoryStorePlugin() {
         path: 'memory-personal-use-declaration-store',
         namespace: 'skland-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])inventory-store(\.ts)?$/ }, () => ({
+        path: 'memory-inventory-store',
+        namespace: 'skland-smoke',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'skland-smoke' }, (args) => ({
         contents: args.path === 'memory-user-store'
           ? memoryUserStoreModule()
@@ -1223,7 +1234,9 @@ function memoryStorePlugin() {
                   ? `export class RateLimitStoreError extends Error {}`
                   : args.path === 'memory-personal-use-declaration-store'
                     ? memoryPersonalUseDeclarationStoreModule()
-                    : memoryLicenseUtilsModuleFixed(),
+                    : args.path === 'memory-inventory-store'
+                      ? memoryInventoryStoreModule()
+                      : memoryLicenseUtilsModuleFixed(),
         loader: 'js',
       }))
     },
@@ -1235,6 +1248,28 @@ function memoryUsageStatsModule() {
     export async function recordUsageEvent() {}
     export async function countSuccessfulUsageEventsForProfileInRange() { return 0 }
     export async function getScheduleGenerateDurationStatsByBucket() { return { p95_ms: 0, sample_count: 0 } }
+  `
+}
+
+function memoryInventoryStoreModule() {
+  return `
+    const store = globalThis.__sklandHandlerSmokeStore
+    export class InventoryError extends Error {
+      constructor(code, message, status = 409) {
+        super(message)
+        this.name = 'InventoryError'
+        this.code = code
+        this.status = status
+      }
+    }
+    export async function getItemBalance() { return 0 }
+    export async function grantFreePreviewLimitedVoucher(userId, now) {
+      store.limitedVoucherGrantCalls.push({ userId, now: now.toISOString() })
+      return 'limited-voucher-grant-' + store.limitedVoucherGrantCalls.length
+    }
+    export async function markOnboardingTaskComplete() {}
+    export async function reserveItemsInTransaction() { return [] }
+    export async function commitReservedItemsInTransaction() {}
   `
 }
 
@@ -1276,6 +1311,12 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
       store.workspaces.set(profileId, next)
       return next
     }
+    export async function updateProfileWorkspaceInTransaction(_client, profileId, updater) {
+      const current = store.workspaces.get(profileId) ?? null
+      const next = normalizeWorkspace(await updater(current ? normalizeWorkspace(current) : null))
+      store.workspaces.set(profileId, next)
+      return next
+    }
     export async function saveUserProfile(profile) {
       store.profiles.set(profile.id, profile)
     }
@@ -1310,6 +1351,17 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
     export async function deleteFreePreviewPendingClaim(userId, confirmationId) {
       const pending = store.freePreviewPendingClaims.get(confirmationId)
       if (pending?.user_id === userId) store.freePreviewPendingClaims.delete(confirmationId)
+    }
+    export async function saveLifetimeVoucherPendingBinding(binding) {
+      store.lifetimeVoucherPendingBindings.set(binding.confirmation_id, binding)
+    }
+    export async function getLifetimeVoucherPendingBinding(userId, confirmationId) {
+      const pending = store.lifetimeVoucherPendingBindings.get(confirmationId)
+      return pending?.user_id === userId ? pending : null
+    }
+    export async function deleteLifetimeVoucherPendingBinding(userId, confirmationId) {
+      const pending = store.lifetimeVoucherPendingBindings.get(confirmationId)
+      if (pending?.user_id === userId) store.lifetimeVoucherPendingBindings.delete(confirmationId)
     }
     function normalizeWorkspace(workspace) {
       return { ...emptyWorkspace(workspace.profile_id), ...workspace, saved_configs: Array.isArray(workspace.saved_configs) ? workspace.saved_configs.slice(0, 20) : [], result_history: Array.isArray(workspace.result_history) ? workspace.result_history.slice(0, 10) : [] }
@@ -1452,6 +1504,27 @@ function memoryLicenseUtilsModuleFixed() {
     }
     export async function getCdkRecordStore() {
       return { get: async (key) => store.cdks.get(key) ?? null }
+    }
+    export function isProfileCdkRecord(record) {
+      return (record.cdk_type ?? 'profile') === 'profile'
+    }
+    export function getCdkType(record) {
+      return record.cdk_type ?? 'profile'
+    }
+    export function getCdkBalanceAmount(record) {
+      return getCdkType(record) === 'balance' && typeof record.balance_amount === 'string'
+        ? record.balance_amount
+        : null
+    }
+    export function getCdkItemCode(record) {
+      return getCdkType(record) === 'item' && typeof record.item_code === 'string'
+        ? record.item_code
+        : null
+    }
+    export function getCdkItemExpiresAt(record) {
+      return getCdkType(record) === 'item' && typeof record.item_expires_at === 'string'
+        ? record.item_expires_at
+        : null
     }
     export async function getRiskControlSettings() {
       return { operator_data_risk_enabled: true, updated_at: null }

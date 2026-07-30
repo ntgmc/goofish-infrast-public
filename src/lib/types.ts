@@ -743,6 +743,15 @@ export interface UserGameAccount {
   created_at: string;
 }
 
+export interface TemporaryProfilePermission {
+  source: 'limited_profile_voucher';
+  activity_id: string;
+  permission: 'advanced';
+  starts_at: string;
+  ends_at: string;
+  operation_id: string;
+}
+
 export interface FreePreviewTrial {
   id: string;
   starts_at: string;
@@ -795,6 +804,37 @@ export type WorkspaceSavedConfigAction =
 export interface UserAnnouncementRead {
   announcement: Announcement;
   read_at: string | null;
+}
+
+export interface UserNotificationItemGrantDetail {
+  item_code: string;
+  name: string;
+  icon_key: string;
+  quantity: number;
+  expires_at: string | null;
+}
+
+export type UserNotificationPayload = {
+  kind: 'item_grant';
+  items: UserNotificationItemGrantDetail[];
+};
+
+export interface UserNotification {
+  id: string;
+  type: 'item_grant';
+  title: string;
+  body: string;
+  action: { kind: 'inventory' } | null;
+  payload: UserNotificationPayload;
+  read_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserNotificationPage {
+  notifications: UserNotification[];
+  unread_count: number;
+  next_cursor: string | null;
 }
 
 export interface AuthMeResponse {

@@ -11,6 +11,7 @@ import type { DashboardSection } from '../../lib/app-routes'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../lib/types'
 import { copy } from '../../copy/index'
 import { DEFAULT_SITE_FEATURES, type SiteFeatures } from '../../lib/site-features'
+import { NotificationBell } from '../../components/NotificationCenter'
 
 
 const ProfilesSection = lazy(() => import('./dashboard/ProfilesSection'))
@@ -18,6 +19,7 @@ const ToolsSection = lazy(() => import('./dashboard/ToolsSection'))
 const RedeemSection = lazy(() => import('./dashboard/RedeemSection'))
 const InvitationsSection = lazy(() => import('./dashboard/InvitationsSection'))
 const InventorySection = lazy(() => import('./dashboard/InventorySection'))
+const BalanceSection = lazy(() => import('./dashboard/BalanceSection'))
 const AnnouncementsSection = lazy(() => import('./dashboard/AnnouncementsSection'))
 const SettingsSection = lazy(() => import('./dashboard/SettingsSection'))
 
@@ -72,6 +74,7 @@ export default function AccountDashboard({
     redeem: copy.common.pages_tool_AccountDashboard_003,
     invitations: copy.common.pages_tool_AccountDashboard_004,
     inventory: copy.inventory.nav,
+    balance: copy.balance.nav,
     announcements: copy.common.pages_tool_AccountDashboard_005,
     settings: copy.common.pages_tool_AccountDashboard_006,
   }
@@ -181,7 +184,10 @@ export default function AccountDashboard({
                 ]}
               />
             </div>
-            <ThemeSwitcher iconOnly />
+            <div className="flex shrink-0 items-center gap-2">
+              <NotificationBell iconOnly />
+              <ThemeSwitcher iconOnly />
+            </div>
           </div>
 
           <div className="mx-auto hidden max-w-7xl items-center justify-between gap-4 lg:flex">
@@ -207,6 +213,7 @@ export default function AccountDashboard({
               >
                 {copy.dashboard.pages_tool_AccountDashboard_tour_001}
               </button>
+              <NotificationBell />
               <ThemeSwitcher />
             </div>
           </div>
@@ -223,9 +230,10 @@ export default function AccountDashboard({
             <Suspense fallback={<SectionFallback />}>
               {section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} />}
               {section === 'tools' && <ToolsSection />}
-              {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}
+              {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
               {section === 'invitations' && <InvitationsSection />}
-              {section === 'inventory' && <InventorySection />}
+              {section === 'inventory' && <InventorySection onPayload={onPayload} />}
+              {section === 'balance' && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
               {section === 'announcements' && <AnnouncementsSection />}
               {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} />}
             </Suspense>
