@@ -10,6 +10,7 @@ export type GeneratedPermission = ProductPermissionMode
 
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
 export type CdkType = 'profile' | 'balance' | 'item'
+export type ItemCdkCode = 'lifetime_profile_voucher' | 'limited_profile_voucher'
 
 export type AppUserStatus = 'active' | 'frozen' | 'revoked'
 
@@ -42,9 +43,12 @@ export interface CdkTableFilters {
 
 export interface GeneratedCdk {
   code: string;
-  cdk_type: 'profile' | 'balance';
+  cdk_type: CdkType;
   permission?: GeneratedPermission;
   amount?: string;
+  item_code?: ItemCdkCode;
+  item_name?: string;
+  item_expires_at?: string | null;
   created_at: string;
 }
 
@@ -53,6 +57,9 @@ export interface AdminCdkCreateResponse {
   cdk_type?: CdkType;
   permission?: GeneratedPermission;
   amount?: string;
+  item_code?: ItemCdkCode;
+  item_name?: string;
+  item_expires_at?: string | null;
   created_at?: string;
   count?: number;
   cdks?: Array<Partial<GeneratedCdk>>;
@@ -64,6 +71,9 @@ export interface AdminCdkRecord {
   cdk_type: CdkType;
   permission: Permission | null;
   amount: string | null;
+  item_code?: ItemCdkCode | null;
+  item_name?: string | null;
+  item_expires_at?: string | null;
   status: CdkStatus;
   created_at: string;
   used_at: string | null;

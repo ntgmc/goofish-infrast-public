@@ -24,7 +24,7 @@ export default async function userBalanceHandler(req: Request): Promise<Response
       const match = await findCdkRecordByCode(normalizeCode(body.cdk))
       if (!match) return jsonResponse({ error: 'CDK 不存在。', code: 'cdk_not_found' }, 404)
       const cdkType = getCdkType(match.record)
-      if (cdkType === 'item') return jsonResponse({ error: '道具 CDK 暂未开放。', code: 'cdk_type_unavailable' }, 409)
+      if (cdkType === 'item') return jsonResponse({ error: '该 CDK 是道具兑换码，请前往兑换页使用。', code: 'cdk_type_mismatch', target: '/tool/redeem' }, 409)
       if (cdkType !== 'balance') return jsonResponse({ error: '该 CDK 只能用于兑换档案。', code: 'cdk_type_mismatch' }, 409)
       const amount = normalizePointsAmount(getCdkBalanceAmount(match.record))
       if (!amount) return jsonResponse({ error: '余额 CDK 面额无效。', code: 'invalid_cdk_amount' }, 409)

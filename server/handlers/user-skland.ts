@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from 'node:crypto'
+import { createHash, createHmac, randomUUID } from 'node:crypto'
 import QRCode from 'qrcode'
 import type { AuthSuccessResponse, LicenseConfig, SklandCredentialInvalidReason } from '../../src/lib/types'
 import {
@@ -8,25 +8,33 @@ import {
   deleteFreePreviewPendingClaim,
   getFreePreviewClaim,
   getFreePreviewPendingClaim,
+  getLifetimeVoucherPendingBinding,
   getProfileForUser,
   isDepotValueProfile,
   isFreePreviewProfile,
   listProfilesForUser,
   updateProfileWorkspaceAtomically,
+  updateProfileWorkspaceInTransaction,
+  deleteLifetimeVoucherPendingBinding,
   saveFreePreviewPendingClaim,
   saveUserProfile,
+  saveLifetimeVoucherPendingBinding,
   type FreePreviewClaimRecord,
   type FreePreviewPendingAccountSelectionRecord,
   type FreePreviewPendingClaimRecord,
   type FreePreviewPendingConfirmationRecord,
+  type LifetimeVoucherPendingAccountSelectionRecord,
+  type LifetimeVoucherPendingBindingRecord,
+  type LifetimeVoucherPendingConfirmationRecord,
   type SklandBindingRecord,
   type SklandPendingAccountSelectionRecord,
   type SklandPendingBindingRecord,
   type SklandPendingConfirmationRecord,
   type UserGameAccountRecord,
 } from '../storage/user-store'
-import { markOnboardingTaskComplete } from '../storage/inventory-store'
-import { hasDatabaseUrl } from '../storage/postgres'
+import { commitReservedItemsInTransaction, getItemBalance, grantFreePreviewLimitedVoucher, InventoryError, markOnboardingTaskComplete, reserveItemsInTransaction } from '../storage/inventory-store'
+import { hasDatabaseUrl, query, withTransaction } from '../storage/postgres'
+import { saveProfileInTransaction } from '../storage/cdk-redemption'
 import {
   buildOperatorFingerprint,
   getCdkRecordStore,
@@ -119,6 +127,58 @@ export default async (req: Request): Promise<Response> => {
     rateLimit.attempt.retainFailure()
 
     const pathname = new URL(req.url).pathname
+    if (pathname.endsWith('/lifetime-voucher/login/start')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      if (await getItemBalance(auth.user.id, 'lifetime_profile_voucher') < 1) {
+        return jsonResponse({ error: '背包中没有可用的终身版兑换 CDK。', code: 'item_unavailable' }, 409)
+      }
+      const scan = await createHypergryphScan()
+      return jsonResponse({
+        scan_id: scan.scanId,
+        qr_data_url: await QRCode.toDataURL(scan.scanUrl, { width: 300, margin: 2, errorCorrectionLevel: 'M' }),
+        expires_at: scan.expiresAt,
+      })
+    }
+
+    if (pathname.endsWith('/lifetime-voucher/login/complete')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const body = await readJsonBody(req)
+      if (typeof body.scan_id !== 'string' || !body.scan_id.trim()) return jsonResponse({ error: 'Missing scan_id.' }, 400)
+      const scanCode = await getScanCode(body.scan_id.trim())
+      if (!scanCode) return jsonResponse({ status: 'pending' }, 202)
+      const accountToken = await getHypergryphTokenByScanCode(scanCode)
+      return createPendingLifetimeVoucherBinding(auth.user, await getCredByHypergryphToken(accountToken))
+    }
+
+    if (pathname.endsWith('/lifetime-voucher/credential/preview')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const body = await readJsonBody(req)
+      const cred = extractSklandCredential(body.credential_text)
+      if (!cred) return jsonResponse({ error: '缺少森空岛凭据。' }, 400)
+      return createPendingLifetimeVoucherBinding(auth.user, cred, normalizeCredentialSource(body.source))
+    }
+
+    if (pathname.endsWith('/lifetime-voucher/account/select')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const body = await readJsonBody(req)
+      if (typeof body.selection_id !== 'string' || !body.selection_id.trim()) return jsonResponse({ error: '缺少 selection_id。' }, 400)
+      if (typeof body.uid !== 'string' || !body.uid.trim()) return jsonResponse({ error: '请选择要导入的森空岛账号。' }, 400)
+      return selectLifetimeVoucherAccount(auth.user, body.selection_id.trim(), body.uid.trim())
+    }
+
+    if (pathname.endsWith('/lifetime-voucher/login/confirm')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      ensureSklandCredentialSecret()
+      const body = await readJsonBody(req)
+      if (typeof body.confirmation_id !== 'string' || !body.confirmation_id.trim()) return jsonResponse({ error: 'Missing confirmation_id.' }, 400)
+      if (typeof body.idempotency_key !== 'string' || !body.idempotency_key.trim()) return jsonResponse({ error: 'Missing idempotency_key.' }, 400)
+      return confirmLifetimeVoucherBinding(auth.user, body.confirmation_id.trim(), body.idempotency_key.trim(), req, auth.tokenHash)
+    }
+
     if (pathname.endsWith('/free-preview/login/start')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
       ensureSklandCredentialSecret()
@@ -359,6 +419,9 @@ export default async (req: Request): Promise<Response> => {
         { 'Retry-After': '1', 'Cache-Control': 'no-store' },
       )
     }
+    if (error instanceof InventoryError) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
     console.error('user skland error:', error instanceof Error ? error.message : error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     if (message.includes('SKLAND_CREDENTIAL_SECRET')) {
@@ -392,6 +455,191 @@ async function recordSklandImport(
   } catch (error) {
     console.warn('usage stats skland import skipped:', error)
   }
+}
+
+async function createPendingLifetimeVoucherBinding(
+  user: AuthPayloadUser,
+  cred: string,
+  source?: CredentialSource,
+): Promise<Response> {
+  if (await getItemBalance(user.id, 'lifetime_profile_voucher') < 1) {
+    return jsonResponse({ error: '背包中没有可用的终身版兑换 CDK。', code: 'item_unavailable' }, 409)
+  }
+  const accounts = await listSklandArknightsBindingsByCred(cred)
+  const now = new Date()
+  const confirmationId = randomUUID()
+  const createdAt = now.toISOString()
+  const expiresAt = new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString()
+  if (accounts.length > 1) {
+    await saveLifetimeVoucherPendingBinding({
+      stage: 'account_selection', confirmation_id: confirmationId, user_id: user.id, accounts,
+      encrypted_cred: encryptSklandCredential(cred), ...(source && { source }), created_at: createdAt, expires_at: expiresAt,
+    })
+    return accountSelectionResponse(confirmationId, accounts, '请选择要绑定或升级为终身版的明日方舟账号。')
+  }
+  return createLifetimeVoucherConfirmation(user, cred, accounts[0].uid, { confirmationId, createdAt, expiresAt })
+}
+
+async function selectLifetimeVoucherAccount(user: AuthPayloadUser, selectionId: string, uid: string): Promise<Response> {
+  const pending = await getLifetimeVoucherPendingBinding(user.id, selectionId)
+  if (!isLifetimeVoucherAccountSelectionPending(pending) || Date.now() > Date.parse(pending.expires_at)) {
+    await deleteLifetimeVoucherPendingBinding(user.id, selectionId)
+    return jsonResponse({ error: '森空岛账号选择已失效，请重新授权。' }, 400)
+  }
+  if (!pending.accounts.some((account) => account.uid === uid)) return jsonResponse({ error: '所选森空岛账号无效。' }, 400)
+  const cred = decryptSklandCredential(pending.encrypted_cred)
+  const currentAccounts = await listSklandArknightsBindingsByCred(cred)
+  if (!currentAccounts.some((account) => account.uid === uid)) {
+    await deleteLifetimeVoucherPendingBinding(user.id, selectionId)
+    return jsonResponse({ error: '所选账号已不在森空岛绑定列表中，请重新授权。' }, 400)
+  }
+  return createLifetimeVoucherConfirmation(user, cred, uid, {
+    confirmationId: pending.confirmation_id,
+    createdAt: pending.created_at,
+    expiresAt: pending.expires_at,
+  })
+}
+
+async function createLifetimeVoucherConfirmation(
+  user: AuthPayloadUser,
+  cred: string,
+  uid: string,
+  options: { confirmationId: string; createdAt: string; expiresAt: string },
+): Promise<Response> {
+  const imported = await importSklandOperatorsByCred(cred, { uid })
+  const operatorsCheck = validateOperators(imported.operators)
+  if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
+  await saveLifetimeVoucherPendingBinding({
+    stage: 'confirmation', confirmation_id: options.confirmationId, user_id: user.id,
+    uid: imported.binding.uid, nickname: imported.binding.nickname, channel_name: imported.binding.channel_name,
+    operator_count: operatorsCheck.operators.length, encrypted_cred: encryptSklandCredential(cred),
+    created_at: options.createdAt, expires_at: options.expiresAt,
+  })
+  return jsonResponse({
+    status: 'confirm_required',
+    confirmation_id: options.confirmationId,
+    skland_preview: toSklandPreview(imported.binding, operatorsCheck.operators.length),
+    warning: '确认后将创建终身档案；同 UID 的免费预览档案会原地升级。只有最终保存成功后才消耗道具。',
+  })
+}
+
+async function confirmLifetimeVoucherBinding(
+  user: AuthPayloadUser,
+  confirmationId: string,
+  idempotencyKey: string,
+  req: Request,
+  sessionTokenHash: string,
+): Promise<Response> {
+  const requestHash = createHash('sha256').update(JSON.stringify({ userId: user.id, confirmationId })).digest('hex')
+  const replay = await query<{ request_hash: string; response_json: LifetimeVoucherOperationResponse | null }>(
+    'select request_hash, response_json from inventory_operations where user_id = $1 and idempotency_key = $2',
+    [user.id, idempotencyKey],
+  )
+  if (replay.rows[0]) {
+    if (replay.rows[0].request_hash !== requestHash) return jsonResponse({ error: '幂等键已被其他请求使用。', code: 'idempotency_conflict' }, 409)
+    if (!replay.rows[0].response_json) return jsonResponse({ error: '终身版绑定正在处理中。', code: 'operation_in_progress' }, 409)
+    const previous = replay.rows[0].response_json
+    return jsonResponse({ ...(await buildPayloadWithImport(user, previous.profile_id, previous.imported)), replayed: true })
+  }
+  const pending = await getLifetimeVoucherPendingBinding(user.id, confirmationId)
+  if (!isLifetimeVoucherConfirmationPending(pending) || Date.now() > Date.parse(pending.expires_at)) {
+    await deleteLifetimeVoucherPendingBinding(user.id, confirmationId)
+    return jsonResponse({ error: '终身版绑定确认已过期，请重新登录森空岛。' }, 400)
+  }
+  const cred = decryptSklandCredential(pending.encrypted_cred)
+  const imported = await importSklandOperatorsByCred(cred, { uid: pending.uid, includeInventory: true })
+  const operatorsCheck = validateOperators(imported.operators)
+  if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
+  const result = await withTransaction(async (client): Promise<LifetimeVoucherOperationResponse> => {
+    const operationId = randomUUID()
+    const now = imported.importedAt
+    const inserted = await client.query(
+      `insert into inventory_operations (id, user_id, idempotency_key, operation_type, request_hash, created_at)
+       values ($1, $2, $3, 'bind_lifetime_profile', $4, $5)
+       on conflict (user_id, idempotency_key) do nothing`,
+      [operationId, user.id, idempotencyKey, requestHash, now],
+    )
+    if (!inserted.rowCount) throw new InventoryError('operation_in_progress', '终身版绑定正在处理中。', 409)
+    const uidProfiles = await client.query<{ record_json: UserGameAccountRecord }>(
+      `select record_json from user_game_accounts
+        where record_json->'skland_binding'->>'uid' = $1
+        order by created_at asc for update`,
+      [imported.binding.uid],
+    )
+    const foreign = uidProfiles.rows.find((row) => row.record_json.user_id !== user.id)
+    if (foreign) throw new InventoryError('skland_uid_owned', '该森空岛 UID 已绑定其他网站账号。', 409)
+    const currentUserProfiles = uidProfiles.rows.map((row) => row.record_json)
+    const nonPreview = currentUserProfiles.find((profile) => !isFreePreviewProfile(profile))
+    if (nonPreview) throw new InventoryError('skland_uid_already_bound', '该森空岛 UID 已经绑定终身档案。', 409)
+    const existingPreview = currentUserProfiles.find((profile) => isFreePreviewProfile(profile))
+    const profileId = existingPreview?.id ?? randomUUID()
+    const currentWorkspace = existingPreview
+      ? await updateProfileWorkspaceInTransaction(client, profileId, (workspace) => workspace ?? emptyWorkspace(profileId))
+      : emptyWorkspace(profileId)
+    const baseProfile: UserGameAccountRecord = existingPreview ?? {
+      version: 1, id: profileId, user_id: user.id, kind: 'cdk', cdk_key: null, cdk_code_hash: null,
+      cdk_order_hash: null, permission: 'advanced', status: 'active', display_name: imported.binding.nickname || '终身档案',
+      note: '使用终身版兑换 CDK 绑定。', created_at: now, updated_at: now,
+    }
+    const nextProfile: UserGameAccountRecord = {
+      ...baseProfile,
+      kind: 'cdk', permission: 'advanced', status: 'active', temporary_permission: null,
+      skland_binding: {
+        uid: imported.binding.uid, nickname: imported.binding.nickname, channel_name: imported.binding.channel_name,
+        bound_at: existingPreview?.skland_binding?.bound_at ?? now, last_imported_at: now,
+        encrypted_cred: encryptSklandCredential(cred), credential_status: 'available',
+        credential_invalid_at: null, credential_invalid_reason: null,
+      },
+      skland_pending_binding: null,
+      skland_risk: { uid_mismatch_count: 0, last_mismatch_uid: null, last_mismatch_nickname: null, last_mismatch_at: null },
+      updated_at: now,
+    }
+    const configResult = resolveSklandImportConfig(nextProfile, currentWorkspace.config, imported.intermediateInventory)
+    await saveProfileInTransaction(client, nextProfile)
+    await updateProfileWorkspaceInTransaction(client, profileId, () => ({
+      ...currentWorkspace, profile_id: profileId, operators: operatorsCheck.operators,
+      config: configResult.config ?? currentWorkspace.config, elite_overrides: {}, last_result: null, updated_at: now,
+    }))
+    await reserveItemsInTransaction(client, user.id, ['lifetime_profile_voucher'], 'inventory_operation', operationId, profileId, now)
+    await commitReservedItemsInTransaction(client, 'inventory_operation', operationId, now)
+    const response: LifetimeVoucherOperationResponse = {
+      profile_id: profileId,
+      imported: {
+        status: 'imported', ...imported.binding, operator_count: operatorsCheck.operators.length, imported_at: now,
+        ...(imported.intermediateInventory && { intermediate_inventory: imported.intermediateInventory }),
+        inventory_synced: Boolean(imported.intermediateInventory && configResult.config),
+        config_saved: Boolean(configResult.config),
+        ...(configResult.warning || imported.inventoryWarning
+          ? { inventory_warning: [imported.inventoryWarning, configResult.warning].filter(Boolean).join(' ') }
+          : {}),
+      },
+    }
+    await client.query('update inventory_operations set response_json = $2::jsonb, completed_at = $3 where id = $1', [operationId, JSON.stringify(response), now])
+    return response
+  })
+  const postCommitTasks = await Promise.allSettled([
+    deleteLifetimeVoucherPendingBinding(user.id, confirmationId),
+    markOnboardingTaskComplete(user.id, 'bind_skland', result.imported.imported_at),
+    recordRequestBehaviorEvent({ req, eventType: 'bind', userId: user.id, sessionTokenHash, profileId: result.profile_id, uid: result.imported.uid }),
+  ])
+  for (const task of postCommitTasks) {
+    if (task.status === 'rejected') console.warn('lifetime voucher post-commit task skipped:', task.reason)
+  }
+  return jsonResponse({ ...(await buildPayloadWithImport(user, result.profile_id, result.imported)), replayed: false })
+}
+
+type LifetimeVoucherOperationResponse = { profile_id: string; imported: SklandImportSummary }
+
+function isLifetimeVoucherAccountSelectionPending(
+  pending: LifetimeVoucherPendingBindingRecord | null,
+): pending is LifetimeVoucherPendingAccountSelectionRecord {
+  return pending?.stage === 'account_selection'
+}
+
+function isLifetimeVoucherConfirmationPending(
+  pending: LifetimeVoucherPendingBindingRecord | null,
+): pending is LifetimeVoucherPendingConfirmationRecord {
+  return pending?.stage === 'confirmation'
 }
 
 async function createPendingFreePreviewClaimFromCred(
@@ -915,6 +1163,13 @@ async function saveSklandImport(
       await markOnboardingTaskComplete(userId, 'bind_skland', imported.importedAt)
     } catch (error) {
       console.warn('bind_skland onboarding progress skipped:', error)
+    }
+  }
+  if (isFreePreviewProfile(profile)) {
+    try {
+      await grantFreePreviewLimitedVoucher(userId, new Date(imported.importedAt))
+    } catch (error) {
+      console.warn('free preview limited CDK grant skipped; inventory reconciliation will retry:', error)
     }
   }
 

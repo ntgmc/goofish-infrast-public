@@ -9,6 +9,7 @@ import {
 } from './admin-inventory-store'
 import {
   getItemBalance,
+  grantFreePreviewLimitedVoucher,
   getProfileCapacityLimits,
   grantItem,
   listInventory,
@@ -134,6 +135,50 @@ describe('PostgreSQL unified inventory', () => {
     expect(await getItemBalance(userId, 'plan_capacity_certificate')).toBe(1)
   })
 
+  it('lists lifetime and limited vouchers with their dedicated actions and fixed expiry', async () => {
+    const { userId } = await seedUserProfile()
+    const now = new Date('2026-07-30T00:00:00.000Z')
+    await grantItem({
+      userId, itemCode: 'lifetime_profile_voucher', quantity: 1, expiry: { mode: 'never' },
+      sourceType: 'test', sourceId: 'lifetime', recipientRole: 'test', now: now.toISOString(),
+    })
+    await grantItem({
+      userId, itemCode: 'limited_profile_voucher', quantity: 1, expiry: { mode: 'never' },
+      expiresAt: '2026-08-19T16:00:00.000Z', sourceType: 'test', sourceId: 'limited', recipientRole: 'test', now: now.toISOString(),
+    })
+
+    const inventory = await listInventory(userId, now)
+    expect(inventory.stacks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ item: expect.objectContaining({ code: 'lifetime_profile_voucher' }), actions: ['bind'], permanent: 1 }),
+      expect.objectContaining({ item: expect.objectContaining({ code: 'limited_profile_voucher' }), actions: ['use'], next_expiry_at: expect.anything() }),
+    ]))
+  })
+
+  it('grants the activity voucher once and activates temporary advanced permission atomically', async () => {
+    const { userId, profileId } = await seedFreePreviewProfile()
+    const now = new Date('2026-07-30T00:00:00.000Z')
+
+    expect(await grantFreePreviewLimitedVoucher(userId, now)).toBeTruthy()
+    expect(await grantFreePreviewLimitedVoucher(userId, now)).toBeNull()
+    expect(await getItemBalance(userId, 'limited_profile_voucher', now)).toBe(1)
+
+    const operation = await useInventoryItem(userId, {
+      item_code: 'limited_profile_voucher', quantity: 1, idempotency_key: randomUUID(),
+    }, now)
+    expect(operation).toMatchObject({
+      item_code: 'limited_profile_voucher', profile_id: profileId, permission: 'advanced',
+      ends_at: '2026-08-19T16:00:00.000Z',
+    })
+    expect(await getItemBalance(userId, 'limited_profile_voucher', now)).toBe(0)
+    const profile = await query<{ record_json: { permission: string; temporary_permission: { permission: string; ends_at: string } } }>(
+      'select record_json from user_game_accounts where id = $1', [profileId],
+    )
+    expect(profile.rows[0]?.record_json).toMatchObject({
+      permission: 'growth',
+      temporary_permission: { permission: 'advanced', ends_at: '2026-08-19T16:00:00.000Z' },
+    })
+  })
+
   it('recovers only stale campaign claims after a worker interruption', async () => {
     const { userId } = await seedUserProfile()
     const campaignId = randomUUID()
@@ -175,4 +220,31 @@ async function seedUserProfile(): Promise<{ userId: string; profileId: string }>
     [profileId, userId, JSON.stringify({ id: profileId, user_id: userId, kind: 'cdk', permission: 'advanced', status: 'active', display_name: 'Inventory test' }), now],
   )
   return { userId, profileId }
+}
+
+async function seedFreePreviewProfile(): Promise<{ userId: string; profileId: string }> {
+  const seeded = await seedUserProfile()
+  const now = '2026-07-30T00:00:00.000Z'
+  const record = {
+    version: 1,
+    id: seeded.profileId,
+    user_id: seeded.userId,
+    kind: 'free_preview',
+    permission: 'growth',
+    status: 'active',
+    display_name: '免费预览',
+    skland_binding: {
+      uid: `uid-${seeded.profileId}`,
+      nickname: 'Test',
+      channel_name: 'Official',
+      bound_at: now,
+      last_imported_at: now,
+      encrypted_cred: 'encrypted',
+    },
+  }
+  await query(
+    `update user_game_accounts set permission = 'growth', record_json = $2::jsonb, updated_at = $3 where id = $1`,
+    [seeded.profileId, JSON.stringify(record), now],
+  )
+  return seeded
 }

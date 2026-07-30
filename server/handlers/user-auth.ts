@@ -634,7 +634,7 @@ function normalizeIdempotencyKey(value: string | null | undefined): string | nul
 
 function profileCdkTypeFailure(record: CdkRecord): { ok: false; status: number; message: string; code: string } {
   if (getCdkType(record) === 'item') {
-    return { ok: false, status: 409, message: authCopy.api_cdk_type_unavailable, code: 'cdk_type_unavailable' }
+    return { ok: false, status: 409, message: authCopy.api_cdk_type_unavailable, code: 'cdk_type_mismatch' }
   }
   return { ok: false, status: 409, message: authCopy.api_cdk_type_mismatch, code: 'cdk_type_mismatch' }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { AuthSuccessResponse } from '../../../lib/types'
 import { apiJson } from '../../../lib/api-client'
 import GuidedTour, { useFirstRunTour, type TourDefinition } from '../../../components/GuidedTour'
@@ -10,7 +10,11 @@ import { usePersonalUseDeclaration } from '../../../hooks/usePersonalUseDeclarat
 
 type AddAccountMode = 'cdk' | 'preview'
 
-export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoStartTour = true }: { onRedeemed: (payload: AuthSuccessResponse) => void; tourReplayToken?: number; autoStartTour?: boolean }) {
+type CdkRedeemResponse =
+  | { redemption_type: 'profile'; auth: AuthSuccessResponse }
+  | { redemption_type: 'inventory'; item: { code: string; name: string; quantity: 1; expires_at: string | null } }
+
+export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourReplayToken = 0, autoStartTour = true }: { onRedeemed: (payload: AuthSuccessResponse) => void; onInventoryRedeemed?: (itemName: string) => void; tourReplayToken?: number; autoStartTour?: boolean }) {
   const { features } = useSiteFeatures()
   const [mode, setMode] = useState<AddAccountMode>(() => features.cdk_redemption ? 'cdk' : 'preview')
   const [cdk, setCdk] = useState('')
@@ -19,6 +23,7 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [claimDialogOpen, setClaimDialogOpen] = useState(false)
+  const idempotencyKeyRef = useRef(crypto.randomUUID())
   const { guard: guardPersonalUseDeclaration, declarationDialog } = usePersonalUseDeclaration({
     enabled: true,
     onError: setError,
@@ -56,15 +61,17 @@ export default function RedeemSection({ onRedeemed, tourReplayToken = 0, autoSta
     setLoading(true)
     setError(null)
     try {
-      const data = await apiJson<AuthSuccessResponse>('/api/user/profiles/redeem', {
+      const data = await apiJson<CdkRedeemResponse>('/api/user/cdk/redeem', {
         method: 'POST',
-        json: { cdk, display_name: displayName, note },
+        json: { cdk, display_name: displayName, note, idempotency_key: idempotencyKeyRef.current },
         fallbackMessage: copy.dashboard.pages_tool_dashboard_RedeemSection_001,
       })
       setCdk('')
       setDisplayName('')
       setNote('')
-      onRedeemed(data)
+      idempotencyKeyRef.current = crypto.randomUUID()
+      if (data.redemption_type === 'profile') onRedeemed(data.auth)
+      else onInventoryRedeemed?.(data.item.name)
     } catch (caught) {
       setError((caught as Error).message)
     } finally {

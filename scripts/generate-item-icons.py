@@ -22,7 +22,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 ITEM_ASSET_DIR = ROOT / "public" / "assets" / "items"
-CHROMA_KEY_SCRIPT = Path.home() / ".codex" / "skills" / ".system" / "imagegen" / "scripts" / "remove_chroma_key.py"
+CHROMA_KEY_RELATIVE_PATH = Path("skills") / ".system" / "imagegen" / "scripts" / "remove_chroma_key.py"
 DEFAULT_BASE_URL = "https://api.krill-ai.net/v1"
 DEFAULT_MODEL = "gpt-image-2"
 FINAL_SIZE = 256
@@ -155,6 +155,24 @@ ICON_SPECS = (
         avoid_extra="古代宝箱、木箱、旅行箱、军用弹药箱、现实纸箱、礼物蝴蝶结、真实快递包装、角色、人物、新人文字、欢迎语、星星、皇冠、翅膀、火焰、闪电爆炸、粒子喷射、复杂电路板、华丽符文、强烈霓虹光晕、厚重 3D 倒角、方形底板。",
     ),
     IconSpec(
+        code="lifetime_profile_voucher",
+        filename="lifetime-profile-voucher.png",
+        asset_type="website backpack game UI permanent account-license voucher icon",
+        primary_request="为网页背包系统绘制一枚“终身版兑换 CDK”游戏道具图标。用户先把它放入背包，之后绑定森空岛账号并创建或升级终身档案。第一视觉含义是“科技票券凭证 + 永久有效 + 账号绑定”。",
+        subject="画面中只有一张独立的现代科技票券或权限凭证：完整矩形剪影、四角略微切角、两侧带简洁半圆票根缺口、边缘略厚。票券中央放置一个极其清晰、粗壮、连续的无限符号；无限符号后方或内部只允许保留一个极简的圆形账号连接节点，表达绑定但不能画人物头像。无限符号使用高亮青蓝核心与克制金色边缘。",
+        focus_rule="无限符号必须是绝对主视觉并在 40×40 像素下仍清晰；账号连接节点只能作为第二层级，票券轮廓作为稳定外形。",
+        avoid_extra="现金、纸币、银行卡、信用卡、会员卡、现实身份证、护照、登机牌、二维码、序列号、日期、文字、数字、人物头像、锁链、婚戒、沙漏、时钟、日历、皇冠、翅膀、魔法卷轴、复杂电路板、密集装饰、方形底板。",
+    ),
+    IconSpec(
+        code="limited_profile_voucher",
+        filename="limited-profile-voucher.png",
+        asset_type="website backpack game UI time-limited account-license voucher icon",
+        primary_request="为网页背包系统绘制一枚“限时 CDK”游戏道具图标。它用于给已绑定森空岛的免费预览档案临时激活高级权限，并在活动结束时失效。第一视觉含义是“科技票券凭证 + 明确限时 + 倒计时”。",
+        subject="画面中只有一张与终身版同系列的现代科技票券：完整矩形剪影、四角略微切角、两侧带简洁半圆票根缺口、边缘略厚。票券中央放置一个大而简洁的圆形倒计时环或时钟轮廓，只有两根粗短指针；圆环右上方留出一个小型缺口与单一高亮节点，暗示时间正在流逝。使用高亮青蓝核心、深皇家蓝主体和少量暖金色边缘。",
+        focus_rule="圆形倒计时环必须是绝对主视觉并在 40×40 像素下仍清晰；指针和单一高亮节点是第二层级，不能出现可读数字或日期。",
+        avoid_extra="现金、纸币、银行卡、信用卡、现实身份证、护照、登机牌、二维码、序列号、文字、数字、具体日期、日历页、沙漏、闹钟铃铛、人物头像、无限符号、皇冠、翅膀、魔法卷轴、复杂电路板、密集装饰、方形底板。",
+    ),
+    IconSpec(
         code="generic_gift_pack",
         filename="generic-gift-pack.png",
         asset_type="website backpack game UI configurable gift-pack item icon",
@@ -184,6 +202,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--only", action="append", choices=[spec.code for spec in ICON_SPECS], help="Generate only one item code. Repeat to select multiple icons.")
     parser.add_argument("--dry-run", action="store_true", help="Show the planned output files without calling the image API.")
+    parser.add_argument("--check-helper", action="store_true", help="Resolve and print the chroma-key helper path without calling the image API.")
     parser.add_argument("--force", action="store_true", help="Regenerate an existing final asset.")
     parser.add_argument("--base-url", default=os.environ.get("KRILL_AI_BASE_URL", DEFAULT_BASE_URL), help="OpenAI-compatible API base URL.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Image generation model.")
@@ -204,6 +223,39 @@ def create_client(base_url: str) -> OpenAI:
     return OpenAI(base_url=base_url, api_key=api_key)
 
 
+def resolve_chroma_key_script() -> Path:
+    codex_roots: list[Path] = []
+    configured_home = os.environ.get("CODEX_HOME")
+    if configured_home:
+        codex_roots.append(Path(configured_home).expanduser())
+    codex_roots.append(Path.home() / ".codex")
+
+    mount_root = Path("/mnt")
+    if mount_root.is_dir():
+        for drive in sorted(mount_root.iterdir()):
+            users_root = drive / "Users"
+            if not users_root.is_dir():
+                continue
+            try:
+                codex_roots.extend(user_home / ".codex" for user_home in sorted(users_root.iterdir()))
+            except OSError:
+                continue
+
+    checked: list[Path] = []
+    seen: set[Path] = set()
+    for codex_root in codex_roots:
+        candidate = codex_root / CHROMA_KEY_RELATIVE_PATH
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        checked.append(candidate)
+        if candidate.is_file():
+            return candidate
+
+    checked_paths = "\n  - ".join(str(path) for path in checked)
+    raise RuntimeError(f"Chroma-key helper was not found. Checked:\n  - {checked_paths}")
+
+
 def decode_image(response: object) -> bytes:
     data = getattr(response, "data", None)
     if not data:
@@ -214,14 +266,11 @@ def decode_image(response: object) -> bytes:
     return base64.b64decode(encoded)
 
 
-def remove_chroma_and_validate(source: Path, destination: Path, force: bool) -> dict[str, object]:
-    if not CHROMA_KEY_SCRIPT.is_file():
-        raise RuntimeError(f"Chroma-key helper was not found: {CHROMA_KEY_SCRIPT}")
-
+def remove_chroma_and_validate(source: Path, destination: Path, force: bool, chroma_key_script: Path) -> dict[str, object]:
     destination.parent.mkdir(parents=True, exist_ok=True)
     chroma_command = [
         sys.executable,
-        str(CHROMA_KEY_SCRIPT),
+        str(chroma_key_script),
         "--input",
         str(source),
         "--out",
@@ -271,7 +320,7 @@ def remove_chroma_and_validate(source: Path, destination: Path, force: bool) -> 
     }
 
 
-def generate_one(client: OpenAI, spec: IconSpec, model: str, force: bool) -> None:
+def generate_one(client: OpenAI, spec: IconSpec, model: str, force: bool, chroma_key_script: Path) -> None:
     destination = ITEM_ASSET_DIR / spec.filename
     if destination.exists() and not force:
         print(f"SKIP {spec.code}: {destination.relative_to(ROOT)} already exists")
@@ -287,13 +336,16 @@ def generate_one(client: OpenAI, spec: IconSpec, model: str, force: bool) -> Non
     with tempfile.TemporaryDirectory(prefix=f"{spec.code}-") as temp_dir:
         source = Path(temp_dir) / f"{spec.code}-source.png"
         source.write_bytes(decode_image(response))
-        metadata = remove_chroma_and_validate(source, destination, force)
+        metadata = remove_chroma_and_validate(source, destination, force, chroma_key_script)
     print(f"READY {spec.code}: {metadata}")
 
 
 def main() -> int:
     args = parse_args()
     specs = selected_specs(args.only)
+    if args.check_helper:
+        print(f"CHROMA {resolve_chroma_key_script()}")
+        return 0
     if args.dry_run:
         for spec in specs:
             destination = ITEM_ASSET_DIR / spec.filename
@@ -301,9 +353,10 @@ def main() -> int:
             print(f"{action.upper():7} {spec.code:32} {destination.relative_to(ROOT)}")
         return 0
 
+    chroma_key_script = resolve_chroma_key_script()
     client = create_client(args.base_url)
     for spec in specs:
-        generate_one(client, spec, args.model, args.force)
+        generate_one(client, spec, args.model, args.force, chroma_key_script)
     return 0
 
 

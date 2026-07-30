@@ -4,6 +4,9 @@ import adminCdkHandler from './admin-cdk'
 const mocks = vi.hoisted(() => ({
   authenticateAdminRequest: vi.fn(),
   buildOperatorFingerprint: vi.fn(),
+  createCdk: vi.fn(),
+  generateCdk: vi.fn(),
+  hashCdk: vi.fn(),
   getCdk: vi.fn(),
   getProfileById: vi.fn(),
   getProfileWorkspace: vi.fn(),
@@ -17,17 +20,19 @@ vi.mock('./license-utils', () => ({
   CDK_PRODUCT_PERMISSIONS: ['recommended', 'growth', 'advanced', 'ultimate'],
   acceptLatestOperatorBaselineAndUnfreeze: vi.fn(),
   buildOperatorFingerprint: mocks.buildOperatorFingerprint,
-  generateCdk: vi.fn(),
+  generateCdk: mocks.generateCdk,
   getCdkBalanceAmount: vi.fn(() => null),
   getCdkType: (record: { cdk_type?: string }) => record.cdk_type ?? 'profile',
-  getCdkRecordStore: vi.fn(async () => ({ get: mocks.getCdk })),
-  hashCdk: vi.fn(),
+  getCdkItemCode: (record: { item_code?: string | null }) => record.item_code ?? null,
+  getCdkItemExpiresAt: (record: { item_expires_at?: string | null }) => record.item_expires_at ?? null,
+  getCdkRecordStore: vi.fn(async () => ({ get: mocks.getCdk, create: mocks.createCdk })),
+  hashCdk: mocks.hashCdk,
   isProfileCdkRecord: (record: { cdk_type?: string }) => (record.cdk_type ?? 'profile') === 'profile',
   jsonResponse: (body: unknown, status = 200) => new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json' },
   }),
-  requireEnv: vi.fn(),
+  requireEnv: vi.fn(() => 'test-secret'),
   setOperatorBaselineByAdmin: mocks.setOperatorBaselineByAdmin,
   unfreezeCdkRecord: vi.fn(),
   validateOperators: mocks.validateOperators,
@@ -65,6 +70,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.authenticateAdminRequest.mockResolvedValue({ ok: true })
   mocks.getCdk.mockResolvedValue(record)
+  mocks.generateCdk.mockReturnValue('ITEM-CDK-CODE')
+  mocks.hashCdk.mockReturnValue(codeHash)
+  mocks.createCdk.mockResolvedValue(undefined)
   mocks.getProfileById.mockResolvedValue({
     id: record.profile_id,
     user_id: record.account_id,
@@ -135,6 +143,45 @@ describe('admin CDK operator baseline controls', () => {
   })
 })
 
+describe('admin item CDK generation', () => {
+  it('creates a version 3 lifetime voucher CDK', async () => {
+    mocks.getCdk.mockResolvedValue(null)
+    const response = await adminCdkHandler(createRequest({
+      cdk_type: 'item',
+      item_code: 'lifetime_profile_voucher',
+      count: 1,
+    }))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      code: 'ITEM-CDK-CODE',
+      cdk_type: 'item',
+      item_code: 'lifetime_profile_voucher',
+      item_name: '终身版兑换 CDK',
+      item_expires_at: null,
+    })
+    expect(mocks.createCdk).toHaveBeenCalledWith(`cdk/${codeHash}.json`, expect.objectContaining({
+      version: 3,
+      cdk_type: 'item',
+      item_code: 'lifetime_profile_voucher',
+      item_expires_at: null,
+      permission: null,
+      balance_amount: null,
+    }))
+  })
+
+  it('rejects mixed item and balance payloads', async () => {
+    const response = await adminCdkHandler(createRequest({
+      cdk_type: 'item',
+      item_code: 'limited_profile_voucher',
+      amount: '10.00',
+    }))
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'cdk_payload_mismatch' })
+    expect(mocks.createCdk).not.toHaveBeenCalled()
+  })
+})
+
 function baselineRequest(source: 'latest' | 'workspace' | 'next_import') {
   return new Request('http://localhost/api/admin/cdk', {
     method: 'PATCH',
@@ -145,5 +192,13 @@ function baselineRequest(source: 'latest' | 'workspace' | 'next_import') {
       baseline_source: source,
       reason: '已核验工作区',
     }),
+  })
+}
+
+function createRequest(body: Record<string, unknown>) {
+  return new Request('http://localhost/api/admin/cdk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   })
 }

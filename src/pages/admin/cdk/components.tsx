@@ -100,7 +100,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
                 <tr key={record.code_hash} className="hover:bg-surface-2/50">
                     <td className="px-4 py-4 align-top"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label={`选择 CDK ${record.cdk_id}`} checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
                     <td className="px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
-                    <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{record.cdk_type === 'balance' ? `余额 ${record.amount} 积分` : record.cdk_type === 'item' ? '道具（预留）' : permissionLabels[record.permission!]}</div></td>
+                    <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{record.cdk_type === 'balance' ? `余额 ${record.amount} 积分` : record.cdk_type === 'item' ? itemCdkLabel(record) : permissionLabels[record.permission!]}</div></td>
                     <td className="px-4 py-4 align-top text-ink-secondary">
                       <div>{record.operator_count ?? '-'} 干员 / 生成 {record.schedule_generate_count ?? 0}</div>
                       <div className="mt-1 text-xs text-ink-muted">风险 {record.risk_event_count ?? 0}</div>
@@ -187,7 +187,7 @@ function CdkDetailPanel({
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="admin-cdk-detail-title" className="font-mono text-base font-semibold text-ink-primary">{detail.cdk_id}</h2>
             <StatusPill status={detail.status} />
-            <span className="tool-status tool-status--current">{detail.cdk_type === 'balance' ? `余额 ${detail.amount} 积分` : detail.cdk_type === 'item' ? '道具（预留）' : permissionLabels[detail.permission!]}</span>
+            <span className="tool-status tool-status--current">{detail.cdk_type === 'balance' ? `余额 ${detail.amount} 积分` : detail.cdk_type === 'item' ? itemCdkLabel(detail) : permissionLabels[detail.permission!]}</span>
           </div>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">订单备注：{detail.order_note || '-'}</p>
         </div>
@@ -388,4 +388,11 @@ return <RevealItem className={`tool-inset p-4 ${tone === 'warning' ? 'border-war
 <div className="text-2xl font-semibold tabular-nums text-ink-primary"><AnimatedValue value={String(value)} /></div>
 <div className="mt-1 text-sm text-ink-muted">{label}</div>
 </RevealItem>
+}
+
+function itemCdkLabel(record: AdminCdkRecord): string {
+  const name = record.item_name ?? '旧版道具记录'
+  if (!record.item_expires_at) return name
+  if (record.status === 'unused' && Date.now() >= Date.parse(record.item_expires_at)) return `${name} · 兑换期限已过`
+  return `${name} · ${formatDate(record.item_expires_at)} 到期`
 }

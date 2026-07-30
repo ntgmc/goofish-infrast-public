@@ -1,7 +1,9 @@
 import { Dialog } from 'radix-ui'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import { copy } from '../../../copy/index'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
+import SklandBindingDialog, { type SklandPayload } from '../../../components/SklandBindingDialog'
+import type { AuthSuccessResponse } from '../../../lib/types'
 import {
   itemIconPath,
   type InventoryResponse,
@@ -10,10 +12,10 @@ import {
   type ProfileCapacitySummary,
 } from '../../../lib/inventory-contracts'
 
-type Category = 'all' | 'consumable' | 'capacity_upgrade' | 'gift_pack'
+type Category = 'all' | 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'license_voucher'
 type UseResponse = { rewards?: Array<{ item_code: string; quantity: number; expires_at: string | null }> }
 
-export default function InventorySection() {
+export default function InventorySection({ onPayload }: { onPayload: (payload: AuthSuccessResponse) => void }) {
   const [inventory, setInventory] = useState<InventoryResponse | null>(null)
   const [tasks, setTasks] = useState<OnboardingTaskView[]>([])
   const [selected, setSelected] = useState<InventoryStack | null>(null)
@@ -25,6 +27,8 @@ export default function InventorySection() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [rewards, setRewards] = useState<UseResponse['rewards']>(undefined)
+  const [lifetimeDialogOpen, setLifetimeDialogOpen] = useState(false)
+  const itemIdempotencyKeyRef = useRef(crypto.randomUUID())
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,9 +67,10 @@ export default function InventorySection() {
           quantity: 1,
           ...(profileId && { profile_id: profileId }),
           ...(selected.gift_pack_version_id && { gift_pack_version_id: selected.gift_pack_version_id }),
-          idempotency_key: crypto.randomUUID(),
+          idempotency_key: itemIdempotencyKeyRef.current,
         },
       })
+      itemIdempotencyKeyRef.current = crypto.randomUUID()
       setRewards(response.rewards)
       setNotice(copy.inventory.operation_done)
       setSelected(null)
@@ -98,7 +103,17 @@ export default function InventorySection() {
 
   const selectedCapacity = selected ? capacityForItem(selected.item.code, profileId, inventory?.capacities ?? []) : null
   const canUseSelected = selected?.item.kind === 'gift_pack'
+    || selected?.actions.includes('bind')
+    || (selected?.item.kind === 'license_voucher' && selected.actions.includes('use'))
     || (selected?.item.kind === 'capacity_upgrade' && Boolean(selectedCapacity) && selectedCapacity!.limit < selectedCapacity!.maximum)
+
+  const handleLifetimePayload = (payload: SklandPayload) => {
+    if (!payload.user) return
+    setLifetimeDialogOpen(false)
+    setNotice(copy.inventory.lifetime_bound)
+    onPayload(payload)
+    void load()
+  }
 
   return (
     <div className="space-y-5">
@@ -130,7 +145,7 @@ export default function InventorySection() {
       <section className="tool-panel p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-2" role="group" aria-label={copy.inventory.title}>
-            {(['all', 'consumable', 'capacity_upgrade', 'gift_pack'] as Category[]).map((value) => (
+            {(['all', 'license_voucher', 'consumable', 'capacity_upgrade', 'gift_pack'] as Category[]).map((value) => (
               <button key={value} type="button" onClick={() => setCategory(value)} className={category === value ? 'tool-primary-action' : 'tool-secondary-action'}>
                 {categoryLabel(value)}
               </button>
@@ -145,7 +160,7 @@ export default function InventorySection() {
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((stack) => (
               <button key={stack.stack_id} type="button" onClick={() => { setSelected(stack); setProfileId('') }} className="tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
-                <img src={itemIconPath(stack.item.icon_key)} alt="" width={64} height={64} className="mx-auto h-16 w-16 object-contain" />
+                <img src={itemIconPath(stack.item.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="mx-auto h-16 w-16 object-contain" />
                 <strong className="mt-3 block truncate text-sm text-ink-primary">{stack.item.name}</strong>
                 <span className="mt-1 block text-xs text-ink-secondary">{copy.inventory.quantity} × {stack.quantity}</span>
                 <span className="mt-1 block truncate text-[11px] text-ink-muted">{stack.next_expiry_at ? `${copy.inventory.expires}${formatDate(stack.next_expiry_at)}` : copy.inventory.permanent}</span>
@@ -161,7 +176,7 @@ export default function InventorySection() {
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[85dvh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-surface-3 bg-surface-1 p-5 shadow-2xl focus:outline-none sm:p-6">
             {selected && <>
               <div className="flex gap-4">
-                <img src={itemIconPath(selected.item.icon_key)} alt="" width={64} height={64} className="h-16 w-16 object-contain" />
+                <img src={itemIconPath(selected.item.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="h-16 w-16 object-contain" />
                 <div className="min-w-0"><Dialog.Title className="text-lg font-semibold text-ink-primary">{selected.item.name}</Dialog.Title><Dialog.Description className="mt-1 text-sm leading-6 text-ink-secondary">{selected.item.description}</Dialog.Description></div>
               </div>
               <h4 className="mt-5 text-sm font-semibold text-ink-primary">{copy.inventory.batches}</h4>
@@ -177,9 +192,16 @@ export default function InventorySection() {
                 {selectedCapacity && <div className="tool-inset mt-3 grid grid-cols-3 gap-2 p-3 text-center text-xs"><span>{copy.inventory.current}<strong className="mt-1 block text-sm">{selectedCapacity.limit}</strong></span><span>{copy.inventory.after_use}<strong className="mt-1 block text-sm">{Math.min(selectedCapacity.maximum, selectedCapacity.limit + 1)}</strong></span><span>{copy.inventory.maximum}<strong className="mt-1 block text-sm">{selectedCapacity.maximum}</strong></span></div>}
               </>}
               {selected.actions.includes('context_only') && <div className="tool-alert mt-5">{copy.inventory.context_only}</div>}
+              {selected.item.code === 'lifetime_profile_voucher' && <div className="tool-alert mt-5">{copy.inventory.lifetime_use_help}</div>}
+              {selected.item.code === 'limited_profile_voucher' && <div className="tool-alert mt-5">{copy.inventory.limited_use_help}</div>}
               <div className="mt-6 flex justify-end gap-3">
                 <Dialog.Close className="tool-secondary-action">{copy.inventory.close}</Dialog.Close>
-                {!selected.actions.includes('context_only') && <button type="button" disabled={busy || !canUseSelected} onClick={() => void runItemAction()} className="tool-primary-action">{busy ? copy.inventory.processing : selected.item.kind === 'gift_pack' ? copy.inventory.open : copy.inventory.use}</button>}
+                {!selected.actions.includes('context_only') && <button type="button" disabled={busy || !canUseSelected} onClick={() => {
+                  if (selected.actions.includes('bind')) {
+                    setSelected(null)
+                    setLifetimeDialogOpen(true)
+                  } else void runItemAction()
+                }} className="tool-primary-action">{busy ? copy.inventory.processing : selected.actions.includes('bind') ? copy.inventory.bind_and_use : selected.item.kind === 'gift_pack' ? copy.inventory.open : copy.inventory.use}</button>}
               </div>
             </>}
           </Dialog.Content>
@@ -187,6 +209,13 @@ export default function InventorySection() {
       </Dialog.Root>
 
       {rewards && rewards.length > 0 && <section className="tool-panel p-5" aria-live="polite"><h3 className="text-base font-semibold text-ink-primary">{copy.inventory.rewards_received}</h3><ul className="mt-3 grid gap-2 sm:grid-cols-2">{rewards.map((reward) => <li key={reward.item_code} className="tool-inset p-3 text-sm text-ink-secondary">{reward.item_code} × {reward.quantity} · {reward.expires_at ? formatDate(reward.expires_at) : copy.inventory.permanent}</li>)}</ul></section>}
+      <SklandBindingDialog
+        open={lifetimeDialogOpen}
+        profile={null}
+        context="lifetime_voucher_use"
+        onOpenChange={setLifetimeDialogOpen}
+        onPayload={handleLifetimePayload}
+      />
     </div>
   )
 }
@@ -195,6 +224,7 @@ function categoryLabel(category: Category): string {
   if (category === 'consumable') return copy.inventory.consumable
   if (category === 'capacity_upgrade') return copy.inventory.capacity
   if (category === 'gift_pack') return copy.inventory.packs
+  if (category === 'license_voucher') return copy.inventory.license_vouchers
   return copy.inventory.all
 }
 
@@ -209,4 +239,9 @@ function capacityForItem(code: string, profileId: string, profiles: ProfileCapac
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+
+function fallbackItemIcon(event: SyntheticEvent<HTMLImageElement>): void {
+  event.currentTarget.onerror = null
+  event.currentTarget.src = itemIconPath('placeholder')
 }

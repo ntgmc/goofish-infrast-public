@@ -130,7 +130,17 @@ describe('MAA JSON export entitlement', () => {
   })
 
   it('lets an active advanced free preview export without consuming a trial coupon', async () => {
-    mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+    mocks.getProfileForUser.mockResolvedValue({
+      ...profile('free_preview', 'growth'),
+      temporary_permission: {
+        source: 'limited_profile_voucher',
+        activity_id: FREE_PREVIEW_ADVANCED_TRIAL.id,
+        permission: 'advanced',
+        starts_at: FREE_PREVIEW_ADVANCED_TRIAL.startsAt,
+        ends_at: FREE_PREVIEW_ADVANCED_TRIAL.endsAt,
+        operation_id: 'limited-operation-1',
+      },
+    })
 
     const response = await userResultsHandler(exportRequest())
 

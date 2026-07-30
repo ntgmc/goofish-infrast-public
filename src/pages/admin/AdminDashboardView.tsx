@@ -265,10 +265,10 @@ export default function AdminDashboardView() {
               <div className="grid gap-4 lg:grid-cols-[180px_220px_140px_1fr_auto] lg:items-end">
                 <label>
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK 类型</span>
-                  <select value={cdkType} onChange={(event) => setCdkType(event.currentTarget.value as 'profile' | 'balance')} className="tool-field">
+                  <select value={cdkType} onChange={(event) => setCdkType(event.currentTarget.value as 'profile' | 'balance' | 'item')} className="tool-field">
                     <option value="profile">档案兑换</option>
                     <option value="balance">余额兑换</option>
-                    <option value="item" disabled>道具兑换（预留）</option>
+                    <option value="item">道具兑换</option>
                   </select>
                 </label>
                 {cdkType === 'profile' ? <label>
@@ -276,9 +276,15 @@ export default function AdminDashboardView() {
                   <select value={permission} onChange={(event) => setPermission(event.currentTarget.value as GeneratedPermission)} className="tool-field">
                     {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
                   </select>
-                </label> : <label>
+                </label> : cdkType === 'balance' ? <label>
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">积分面额</span>
                   <input value={balanceAmount} onChange={(event) => setBalanceAmount(event.currentTarget.value)} inputMode="decimal" pattern="\d+(\.\d{1,2})?" className="tool-field" required />
+                </label> : <label>
+                  <span className="mb-2 block text-sm font-medium text-ink-secondary">道具类型</span>
+                  <select name="item_code" className="tool-field" defaultValue="lifetime_profile_voucher">
+                    <option value="lifetime_profile_voucher">终身版兑换 CDK</option>
+                    <option value="limited_profile_voucher" disabled={Date.now() < Date.parse('2026-07-17T04:00:00.000Z') || Date.now() >= Date.parse('2026-08-19T16:00:00.000Z')}>限时 CDK（2026-08-20 00:00 到期）</option>
+                  </select>
                 </label>}
                 <label>
                   <span className="mb-2 block text-sm font-medium text-ink-secondary">生成数量</span>
@@ -295,7 +301,7 @@ export default function AdminDashboardView() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-ink-primary">已生成 {generatedCodes.length} 个 CDK</div>
-                      <div className="mt-1 text-xs text-ink-muted">{generatedCodes[0].cdk_type === 'balance' ? `余额 ${generatedCodes[0].amount} 积分` : permissionLabels[generatedCodes[0].permission!]} · {formatDate(generatedCodes[0].created_at)}</div>
+                      <div className="mt-1 text-xs text-ink-muted">{generatedCodes[0].cdk_type === 'balance' ? `余额 ${generatedCodes[0].amount} 积分` : generatedCodes[0].cdk_type === 'item' ? `${generatedCodes[0].item_name ?? generatedCodes[0].item_code}${generatedCodes[0].item_expires_at ? ` · ${formatDate(generatedCodes[0].item_expires_at)} 到期` : ''}` : permissionLabels[generatedCodes[0].permission!]} · {formatDate(generatedCodes[0].created_at)}</div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={handleCopyGeneratedCdks} className="tool-secondary-action">{generatedCodes.length === 1 ? '复制 CDK' : '复制全部'}</button>

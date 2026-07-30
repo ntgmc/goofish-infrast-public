@@ -19,6 +19,8 @@ export const workspaceCopy = {
   components_SklandBindingDialog_009: "先确认游戏 UID，确认后才会创建免费档案并导入干员。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_010: "先预览游戏昵称和 UID，确认后才会保存绑定并导入干员。",
+  components_SklandBindingDialog_lifetime_title: "绑定终身版档案",
+  components_SklandBindingDialog_lifetime_description: "选择并确认森空岛账号。只有最终导入和档案保存成功后才会消耗终身版兑换 CDK。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_011: "关闭森空岛导入",
   // src/components/SklandBindingDialog.tsx

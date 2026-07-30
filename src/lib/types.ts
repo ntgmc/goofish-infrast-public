@@ -743,6 +743,15 @@ export interface UserGameAccount {
   created_at: string;
 }
 
+export interface TemporaryProfilePermission {
+  source: 'limited_profile_voucher';
+  activity_id: string;
+  permission: 'advanced';
+  starts_at: string;
+  ends_at: string;
+  operation_id: string;
+}
+
 export interface FreePreviewTrial {
   id: string;
   starts_at: string;

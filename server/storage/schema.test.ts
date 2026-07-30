@@ -42,6 +42,12 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_transactions/)
     expect(combinedSchema).toMatch(/cdk_records_type_payload_check/)
     expect(combinedSchema).toMatch(/cdk_type = 'balance'/)
+    expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS item_code/)
+    expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS item_expires_at/)
+    expect(combinedSchema).toMatch(/lifetime_profile_voucher/)
+    expect(combinedSchema).toMatch(/limited_profile_voucher/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS lifetime_voucher_pending_bindings/)
+    expect(combinedSchema).toMatch(/free-preview-limited-cdk-2026/)
     expect(combinedSchema).toMatch(/UNIQUE \(reference_type, reference_id\)/)
     expect(combinedSchema.indexOf('ADD COLUMN IF NOT EXISTS cdk_type')).toBeLessThan(
       combinedSchema.indexOf('idx_cdk_records_admin_type_created'),

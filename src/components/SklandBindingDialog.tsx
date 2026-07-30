@@ -9,7 +9,7 @@ export type { SklandPayload } from '../hooks/useSklandBinding'
 type SklandBindingDialogProps = {
   open: boolean
   profile: UserGameAccount | null
-  context?: 'workspace' | 'depot' | 'free_preview_claim'
+  context?: 'workspace' | 'depot' | 'free_preview_claim' | 'lifetime_voucher_use'
   claimProfileMeta?: {
     displayName?: string
     note?: string
@@ -41,7 +41,8 @@ export default function SklandBindingDialog({
 }: SklandBindingDialogProps) {
   const isDepot = context === 'depot'
   const isFreePreviewClaim = context === 'free_preview_claim'
-  const canStartWithoutProfile = isFreePreviewClaim
+  const isLifetimeVoucherUse = context === 'lifetime_voucher_use'
+  const canStartWithoutProfile = isFreePreviewClaim || isLifetimeVoucherUse
   const {
     sklandLogin,
     busy,
@@ -82,12 +83,16 @@ export default function SklandBindingDialog({
   const currentStep = stepForStatus(sklandLogin.status)
   const hasError = sklandLogin.status === 'error' || sklandLogin.status === 'account_mismatch' || sklandLogin.status === 'frozen'
   const confirmDisabled = busy || sklandLogin.status !== 'confirm_required' || !sklandLogin.confirmationId
-  const title = isFreePreviewClaim ? copy.workspace.components_SklandBindingDialog_006 : copy.workspace.components_SklandBindingDialog_007
+  const title = isFreePreviewClaim
+    ? copy.workspace.components_SklandBindingDialog_006
+    : isLifetimeVoucherUse ? copy.workspace.components_SklandBindingDialog_lifetime_title : copy.workspace.components_SklandBindingDialog_007
   const description = isDepot
     ? copy.workspace.components_SklandBindingDialog_008
     : isFreePreviewClaim
       ? copy.workspace.components_SklandBindingDialog_009
-      : copy.workspace.components_SklandBindingDialog_010
+      : isLifetimeVoucherUse
+        ? copy.workspace.components_SklandBindingDialog_lifetime_description
+        : copy.workspace.components_SklandBindingDialog_010
 
   const handleDialogKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape') {

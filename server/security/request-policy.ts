@@ -56,6 +56,7 @@ export const requestSchemas = {
     cdk_type: z.enum(['profile', 'balance', 'item']).optional(),
     permission: optionalString(32),
     amount: optionalString(32),
+    item_code: z.enum(['lifetime_profile_voucher', 'limited_profile_voucher']).optional(),
     order_note: optionalString(500),
     count: z.number().int().min(1).max(100).optional(),
   }),
@@ -140,6 +141,13 @@ export const requestSchemas = {
     note: optionalString(500),
     profile_id: optionalString(128),
   }),
+  cdkRedeem: strict({
+    cdk: shortString(256),
+    display_name: optionalString(40),
+    note: optionalString(500),
+    profile_id: optionalString(128),
+    idempotency_key: shortString(200),
+  }),
   profilePatch: strict({ profile_id: shortString(128), display_name: optionalString(40), note: optionalString(500) }),
   userWorkspace: strict({
     profile_id: shortString(128),
@@ -172,6 +180,13 @@ export const requestSchemas = {
   freePreviewScanComplete: strict({ scan_id: shortString(256), display_name: optionalString(40), note: optionalString(500) }),
   freePreviewSelection: strict({ selection_id: shortString(256), uid: shortString(128) }),
   freePreviewConfirmation: strict({ confirmation_id: shortString(256) }),
+  lifetimeVoucherScanComplete: strict({ scan_id: shortString(256) }),
+  lifetimeVoucherCredential: strict({
+    credential_text: z.string().min(1).max(16 * 1024),
+    source: z.enum(['manual', 'bookmarklet']).optional(),
+  }),
+  lifetimeVoucherSelection: strict({ selection_id: shortString(256), uid: shortString(128) }),
+  lifetimeVoucherConfirmation: strict({ confirmation_id: shortString(256), idempotency_key: shortString(200) }),
   optimizationJob: z.discriminatedUnion('kind', [
     strict({
       kind: z.literal('schedule'),
@@ -292,6 +307,10 @@ const SKLAND_PATHS: Record<string, z.ZodType> = {
   '/api/user/skland/free-preview/login/confirm': requestSchemas.freePreviewConfirmation,
   '/api/user/skland/free-preview/credential/preview': requestSchemas.freePreviewCredential,
   '/api/user/skland/free-preview/account/select': requestSchemas.freePreviewSelection,
+  '/api/user/skland/lifetime-voucher/login/complete': requestSchemas.lifetimeVoucherScanComplete,
+  '/api/user/skland/lifetime-voucher/login/confirm': requestSchemas.lifetimeVoucherConfirmation,
+  '/api/user/skland/lifetime-voucher/credential/preview': requestSchemas.lifetimeVoucherCredential,
+  '/api/user/skland/lifetime-voucher/account/select': requestSchemas.lifetimeVoucherSelection,
 }
 
 const ROUTE_POLICIES = new Map<string, RoutePolicy>([
@@ -349,6 +368,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/invitations/code', route({ POST: none() })],
   ['/api/user/rewards', route({ GET: none() })],
   ['/api/user/inventory', route({ GET: none(), POST: json('standard', requestSchemas.inventoryUse) })],
+  ['/api/user/cdk/redeem', route({ POST: json('standard', requestSchemas.cdkRedeem) })],
   ['/api/user/balance', route({ GET: none() }, ['cursor', 'limit'])],
   ['/api/user/balance/redeem', route({ POST: json('standard', requestSchemas.balanceRedeem) })],
   ['/api/user/onboarding-tasks', route({ GET: none() })],
@@ -362,6 +382,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/optimization/jobs', route({ GET: none(), POST: json('compute', requestSchemas.optimizationJob) }, ['profile_id', 'limit', 'before'])],
   ['/api/optimization/reorder-checks', route({ POST: json('compute', requestSchemas.reorderCheck) })],
   ['/api/user/skland/free-preview/login/start', route({ POST: none() })],
+  ['/api/user/skland/lifetime-voucher/login/start', route({ POST: none() })],
   ...Object.entries(SKLAND_PATHS).map(([path, schema]) => [path, route({ POST: json('credential', schema) })] as [string, RoutePolicy]),
 ])
 

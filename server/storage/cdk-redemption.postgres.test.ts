@@ -9,6 +9,7 @@ import { createPostgresUsageEventStore } from './usage-store'
 import { emptyWorkspace, type UserGameAccountRecord } from './user-store'
 import { isProfileCdkRecord, type CdkRecord, type LegacyProfileCdkRecord } from '../handlers/license-utils'
 import { adjustBalance, applyBalanceChangeInTransaction, BalanceError, createBalanceRequestHash } from './balance-store'
+import { getItemBalance, grantItemInTransaction } from './inventory-store'
 
 let container: StartedPostgreSqlContainer
 
@@ -237,6 +238,56 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     expect((await query<{ status: string }>('select status from cdk_records where key = $1', [key])).rows[0]?.status).toBe('unused')
   })
 
+  it('grants exactly one item under concurrent redemption of the same item CDK', async () => {
+    const userId = await seedUser()
+    const { key, codeHash } = await seedItemCdk('lifetime_profile_voucher', null)
+    const attempt = () => redeemCdkAtomically({
+      key,
+      idempotencyScope: `item:${userId}`,
+      requestHash: createRequestHash({ codeHash, userId }),
+      complete: async (client, record) => {
+        if (record.cdk_type !== 'item' || record.version !== 3) throw new Error('expected item CDK')
+        await grantItemInTransaction(client, {
+          userId, itemCode: record.item_code, quantity: 1, expiry: { mode: 'never' }, expiresAt: record.item_expires_at,
+          sourceType: 'item_cdk', sourceId: codeHash, recipientRole: 'redeemer',
+        })
+        return {
+          record: { ...record, status: 'used' as const, used_at: new Date().toISOString(), account_id: userId },
+          response: { item_code: record.item_code },
+        }
+      },
+    })
+
+    const results = await Promise.allSettled([attempt(), attempt()])
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
+    expect(results.filter((result) => result.status === 'rejected' && result.reason instanceof CdkAlreadyRedeemedError)).toHaveLength(1)
+    expect(await getItemBalance(userId, 'lifetime_profile_voucher')).toBe(1)
+    expect((await query<{ count: string }>(
+      `select count(*)::text as count from inventory_ledger
+        where user_id = $1 and item_code = 'lifetime_profile_voucher' and event_type = 'grant'`, [userId],
+    )).rows[0]?.count).toBe('1')
+  })
+
+  it('rolls back an item grant when item CDK completion fails', async () => {
+    const userId = await seedUser()
+    const { key, codeHash } = await seedItemCdk('lifetime_profile_voucher', null)
+    await expect(redeemCdkAtomically({
+      key,
+      idempotencyScope: `item-rollback:${userId}`,
+      requestHash: createRequestHash({ codeHash, userId }),
+      complete: async (client, record) => {
+        if (record.cdk_type !== 'item' || record.version !== 3) throw new Error('expected item CDK')
+        await grantItemInTransaction(client, {
+          userId, itemCode: record.item_code, quantity: 1, expiry: { mode: 'never' },
+          sourceType: 'item_cdk', sourceId: codeHash, recipientRole: 'redeemer',
+        })
+        throw new Error('injected item failure')
+      },
+    })).rejects.toThrow('injected item failure')
+    expect(await getItemBalance(userId, 'lifetime_profile_voucher')).toBe(0)
+    expect((await query<{ status: string }>('select status from cdk_records where key = $1', [key])).rows[0]?.status).toBe('unused')
+  })
+
   it('serializes concurrent admin adjustments and preserves idempotent responses', async () => {
     const userId = await seedUser()
     const initial = await adjustBalance({
@@ -384,5 +435,31 @@ async function seedBalanceCdk(amount: string): Promise<{ key: string; codeHash: 
      values ($1,$2,'balance',$3,null,$4::numeric,null,$5::jsonb,now(),now())`,
     [key, codeHash, record.status, amount, JSON.stringify(record)],
   )
+  return { key, codeHash }
+}
+
+async function seedItemCdk(
+  itemCode: 'lifetime_profile_voucher' | 'limited_profile_voucher',
+  itemExpiresAt: string | null,
+): Promise<{ key: string; codeHash: string }> {
+  const codeHash = randomUUID().replaceAll('-', '')
+  const key = `cdk/${codeHash}.json`
+  const record: CdkRecord = {
+    version: 3,
+    cdk_type: 'item',
+    code_hash: codeHash,
+    permission: null,
+    balance_amount: null,
+    item_code: itemCode,
+    item_expires_at: itemExpiresAt,
+    status: 'unused',
+    created_at: new Date().toISOString(),
+    used_at: null,
+    order_note: null,
+    license_order_hash: null,
+    operator_count: null,
+    config_desc: null,
+  }
+  await createPostgresCdkRecordStore().create(key, record)
   return { key, codeHash }
 }

@@ -26,6 +26,7 @@ import userInvitationsHandler from './handlers/user-invitations'
 import userRewardsHandler from './handlers/user-rewards'
 import userInventoryHandler from './handlers/user-inventory'
 import userBalanceHandler from './handlers/user-balance'
+import userCdkHandler from './handlers/user-cdk'
 import userResultsHandler from './handlers/user-results'
 import personalUseDeclarationHandler from './handlers/personal-use-declaration'
 import accountDataHandler from './handlers/account-data'
@@ -80,6 +81,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/profiles/depot-value', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/preview', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/redeem', userProfilesHandler as unknown as ApiHandler],
+  ['/api/user/cdk/redeem', userCdkHandler as unknown as ApiHandler],
   ['/api/user/skland/login/start', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/login/complete', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/login/confirm', userSklandHandler as unknown as ApiHandler],
@@ -90,6 +92,11 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/skland/free-preview/login/confirm', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/free-preview/credential/preview', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/free-preview/account/select', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/lifetime-voucher/login/start', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/lifetime-voucher/login/complete', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/lifetime-voucher/login/confirm', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/lifetime-voucher/credential/preview', userSklandHandler as unknown as ApiHandler],
+  ['/api/user/skland/lifetime-voucher/account/select', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/import/refresh', userSklandHandler as unknown as ApiHandler],
   ['/api/user/status', userStatusHandler as unknown as ApiHandler],
   ['/api/user/workspace', userWorkspaceHandler as unknown as ApiHandler],

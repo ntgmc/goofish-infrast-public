@@ -29,6 +29,7 @@ const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const
 export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = listAdminIssuablePermissions()
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
 export type CdkType = 'profile' | 'balance' | 'item'
+export type ItemCdkCode = 'lifetime_profile_voucher' | 'limited_profile_voucher'
 
 export interface OperatorFingerprint {
   hash: string;
@@ -126,8 +127,9 @@ interface CdkRecordBase {
 export type LegacyProfileCdkRecord = CdkRecordBase & { version: 1; cdk_type?: undefined; permission: RawPermissionMode; balance_amount?: null }
 export type ProfileCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'profile'; permission: RawPermissionMode; balance_amount: null }
 export type BalanceCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'balance'; permission: null; balance_amount: string }
-export type ItemCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'item'; permission: null; balance_amount: null }
-export type CdkRecord = LegacyProfileCdkRecord | ProfileCdkRecord | BalanceCdkRecord | ItemCdkRecord
+export type LegacyItemCdkRecord = CdkRecordBase & { version: 2; cdk_type: 'item'; permission: null; balance_amount: null; item_code?: null; item_expires_at?: null }
+export type ItemCdkRecord = CdkRecordBase & { version: 3; cdk_type: 'item'; permission: null; balance_amount: null; item_code: ItemCdkCode; item_expires_at: string | null }
+export type CdkRecord = LegacyProfileCdkRecord | ProfileCdkRecord | BalanceCdkRecord | LegacyItemCdkRecord | ItemCdkRecord
 
 export function getCdkType(record: CdkRecord): CdkType {
   return record.cdk_type ?? 'profile'
@@ -136,6 +138,19 @@ export function getCdkType(record: CdkRecord): CdkType {
 export function getCdkBalanceAmount(record: CdkRecord): string | null {
   return getCdkType(record) === 'balance' && typeof record.balance_amount === 'string'
     ? record.balance_amount
+    : null
+}
+
+export function getCdkItemCode(record: CdkRecord): ItemCdkCode | null {
+  if (getCdkType(record) !== 'item') return null
+  return record.item_code === 'lifetime_profile_voucher' || record.item_code === 'limited_profile_voucher'
+    ? record.item_code
+    : null
+}
+
+export function getCdkItemExpiresAt(record: CdkRecord): string | null {
+  return getCdkType(record) === 'item' && typeof record.item_expires_at === 'string'
+    ? record.item_expires_at
     : null
 }
 

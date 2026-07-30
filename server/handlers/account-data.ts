@@ -37,7 +37,6 @@ async function exportData(userId: string): Promise<Response> {
     profileEntitlements,
     onboardingTasks,
     distributionRecipients,
-    inventoryAdminAudit,
     balanceAccount,
     balanceTransactions,
   ] = await Promise.all([
@@ -70,10 +69,6 @@ async function exportData(userId: string): Promise<Response> {
              from inventory_distribution_recipients recipient
              join inventory_distribution_campaigns campaign on campaign.id = recipient.campaign_id
             where recipient.user_id = $1 order by campaign.created_at asc`, [userId]),
-    query(`select id, admin_username, action, target_type, target_id, reason, before_json, after_json, created_at
-             from inventory_admin_audit
-            where target_id = $1 or before_json->>'user_id' = $1 or after_json->>'user_id' = $1
-            order by created_at asc`, [userId]),
     query<{ available: string }>('select available::text from user_balance_accounts where user_id = $1', [userId]),
     query(`select id, kind, amount::text, balance_after::text, reference_type, reference_id, created_at
              from user_balance_transactions where user_id = $1 order by created_at asc, id asc`, [userId]),
@@ -105,7 +100,6 @@ async function exportData(userId: string): Promise<Response> {
       profile_entitlements: profileEntitlements.rows,
       onboarding_tasks: onboardingTasks.rows,
       distribution_recipients: distributionRecipients.rows,
-      admin_audit_links: inventoryAdminAudit.rows,
     },
     balance: {
       currency: 'points',

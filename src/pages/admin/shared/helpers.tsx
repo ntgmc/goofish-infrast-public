@@ -478,25 +478,28 @@ export function normalizeGeneratedCdks(data: AdminCdkCreateResponse): GeneratedC
   const cdks = Array.isArray(data.cdks)
     ? data.cdks
       .map((item) => {
-        const cdkType = item.cdk_type === 'balance' ? 'balance' : 'profile'
+        const cdkType = item.cdk_type === 'balance' ? 'balance' : item.cdk_type === 'item' ? 'item' : 'profile'
         const permission = typeof item.permission === 'string' ? normalizeProductPermission(item.permission) : null
         const amount = typeof item.amount === 'string' ? item.amount : undefined
+        const itemCode = item.item_code === 'lifetime_profile_voucher' || item.item_code === 'limited_profile_voucher' ? item.item_code : undefined
         if (typeof item.code !== 'string' || !item.code.trim() || typeof item.created_at !== 'string') return null
         if (cdkType === 'profile' && !permission) return null
         if (cdkType === 'balance' && !amount) return null
-        return { code: item.code, cdk_type: cdkType, ...(permission ? { permission } : {}), ...(amount ? { amount } : {}), created_at: item.created_at }
+        if (cdkType === 'item' && !itemCode) return null
+        return { code: item.code, cdk_type: cdkType, ...(permission ? { permission } : {}), ...(amount ? { amount } : {}), ...(itemCode ? { item_code: itemCode, item_name: item.item_name, item_expires_at: item.item_expires_at } : {}), created_at: item.created_at }
       })
       .filter((item): item is GeneratedCdk => Boolean(item))
     : []
 
   if (cdks.length > 0) return cdks
 
-  const cdkType = data.cdk_type === 'balance' ? 'balance' : 'profile'
+  const cdkType = data.cdk_type === 'balance' ? 'balance' : data.cdk_type === 'item' ? 'item' : 'profile'
   const permission = typeof data.permission === 'string' ? normalizeProductPermission(data.permission) : null
   const amount = typeof data.amount === 'string' ? data.amount : undefined
+  const itemCode = data.item_code === 'lifetime_profile_voucher' || data.item_code === 'limited_profile_voucher' ? data.item_code : undefined
   if (typeof data.code === 'string' && data.code.trim() && typeof data.created_at === 'string'
-    && ((cdkType === 'profile' && permission) || (cdkType === 'balance' && amount))) {
-    return [{ code: data.code, cdk_type: cdkType, ...(permission ? { permission } : {}), ...(amount ? { amount } : {}), created_at: data.created_at }]
+    && ((cdkType === 'profile' && permission) || (cdkType === 'balance' && amount) || (cdkType === 'item' && itemCode))) {
+    return [{ code: data.code, cdk_type: cdkType, ...(permission ? { permission } : {}), ...(amount ? { amount } : {}), ...(itemCode ? { item_code: itemCode, item_name: data.item_name, item_expires_at: data.item_expires_at } : {}), created_at: data.created_at }]
   }
   return []
 }
@@ -619,8 +622,8 @@ export function buildCurrentOpsReportCsv(report: ReturnType<typeof buildCurrentO
 
 export function buildGeneratedCdkCsv(cdks: GeneratedCdk[]): string {
   const rows = [
-    ['code', 'cdk_type', 'permission', 'permission_label', 'amount', 'created_at'],
-    ...cdks.map((item) => [item.code, item.cdk_type, item.permission ?? '', item.permission ? permissionLabels[item.permission] : '', item.amount ?? '', item.created_at]),
+    ['code', 'cdk_type', 'permission', 'permission_label', 'amount', 'item_code', 'item_name', 'item_expires_at', 'created_at'],
+    ...cdks.map((item) => [item.code, item.cdk_type, item.permission ?? '', item.permission ? permissionLabels[item.permission] : '', item.amount ?? '', item.item_code ?? '', item.item_name ?? '', item.item_expires_at ?? '', item.created_at]),
   ]
   return rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
 }

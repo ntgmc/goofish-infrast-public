@@ -225,9 +225,9 @@ export default function AccountDashboard({
             <Suspense fallback={<SectionFallback />}>
               {section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} />}
               {section === 'tools' && <ToolsSection />}
-              {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} />}
+              {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
               {section === 'invitations' && <InvitationsSection />}
-              {section === 'inventory' && <InventorySection />}
+              {section === 'inventory' && <InventorySection onPayload={onPayload} />}
               {section === 'balance' && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
               {section === 'announcements' && <AnnouncementsSection />}
               {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} />}

@@ -88,7 +88,7 @@ export function useAdminController() {
   const [riskSettings, setRiskSettings] = useState<RiskControlSettings>(DEFAULT_RISK_SETTINGS)
 
   const [permission, setPermission] = useState<GeneratedPermission>('growth')
-  const [cdkType, setCdkType] = useState<Extract<CdkType, 'profile' | 'balance'>>('profile')
+  const [cdkType, setCdkType] = useState<CdkType>('profile')
   const [balanceAmount, setBalanceAmount] = useState('100.00')
 
   const [orderNote, setOrderNote] = useState('')
@@ -417,7 +417,7 @@ export function useAdminController() {
           method: 'POST',
           json: {
             cdk_type: cdkType,
-            ...(cdkType === 'profile' ? { permission } : { amount: balanceAmount }),
+            ...(cdkType === 'profile' ? { permission } : cdkType === 'balance' ? { amount: balanceAmount } : { item_code: new FormData(event.currentTarget as HTMLFormElement).get('item_code') }),
             order_note: orderNote,
             count: batchCount,
           },
