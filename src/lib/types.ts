@@ -814,7 +814,7 @@ export interface UserNotificationItemGrantDetail {
   expires_at: string | null;
 }
 
-export type UserNotificationPayload = {
+type UserNotificationPayload = {
   kind: 'item_grant';
   items: UserNotificationItemGrantDetail[];
 };
