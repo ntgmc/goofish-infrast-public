@@ -10,7 +10,7 @@ export type GeneratedPermission = ProductPermissionMode
 
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
 export type CdkType = 'profile' | 'balance' | 'item'
-export type ItemCdkCode = 'lifetime_profile_voucher' | 'limited_profile_voucher'
+type ItemCdkCode = 'lifetime_profile_voucher' | 'limited_profile_voucher'
 
 export type AppUserStatus = 'active' | 'frozen' | 'revoked'
 

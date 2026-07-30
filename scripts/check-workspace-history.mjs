@@ -26,10 +26,10 @@ const optimizeHandler = await bundleHandler('server/handlers/optimization.ts', [
   'registerOptimizerPort(optimizerPort);',
 ])
 const profilesHandler = await bundleHandler('server/handlers/user-profiles.ts')
-const { FREE_PREVIEW_ADVANCED_TRIAL } = await bundleHandler('server/free-preview-trial.ts')
+const { FREE_PREVIEW_LIMITED_CDK_ACTIVITY } = await bundleHandler('server/free-preview-trial.ts')
 
 const NativeDate = Date
-let smokeNow = NativeDate.parse(FREE_PREVIEW_ADVANCED_TRIAL.startsAt) - 24 * 60 * 60 * 1000
+let smokeNow = NativeDate.parse(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt) - 24 * 60 * 60 * 1000
 globalThis.Date = class SmokeDate extends NativeDate {
   constructor(...args) {
     super(...(args.length === 0 ? [smokeNow] : args))
@@ -491,7 +491,7 @@ async function assertFreePreviewWorkspaceAndOptimizeLimits() {
 
 async function assertFreePreviewTrialWorkspaceLimits() {
   const previousNow = smokeNow
-  smokeNow = NativeDate.parse(FREE_PREVIEW_ADVANCED_TRIAL.startsAt)
+  smokeNow = NativeDate.parse(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt)
   try {
     const preview = seedFreePreviewProfile('preview-trial-bound', { bound: true })
     store.workspaces.set(preview.id, {

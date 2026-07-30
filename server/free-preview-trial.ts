@@ -7,9 +7,6 @@ export const FREE_PREVIEW_LIMITED_CDK_ACTIVITY = {
   effectivePermission: 'advanced' as const,
 }
 
-/** @deprecated Use FREE_PREVIEW_LIMITED_CDK_ACTIVITY. */
-export const FREE_PREVIEW_ADVANCED_TRIAL = FREE_PREVIEW_LIMITED_CDK_ACTIVITY
-
 type TrialProfile = {
   kind?: UserGameAccountKind
   temporary_permission?: TemporaryProfilePermission | null

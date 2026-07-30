@@ -1,4 +1,4 @@
-export const SYSTEM_ITEM_CODES = [
+const SYSTEM_ITEM_CODES = [
   'priority_compute_coupon',
   'reorder_check_coupon',
   'scenario_simulation_coupon',
@@ -14,7 +14,7 @@ export const SYSTEM_ITEM_CODES = [
 ] as const
 
 export type SystemItemCode = typeof SYSTEM_ITEM_CODES[number]
-export type ItemKind = 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'cosmetic' | 'badge' | 'license_voucher'
+type ItemKind = 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'cosmetic' | 'badge' | 'license_voucher'
 type ItemEffectCode =
   | 'priority_compute'
   | 'reorder_check'
