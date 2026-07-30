@@ -493,7 +493,17 @@ async function assertFreePreviewTrialWorkspaceLimits() {
   const previousNow = smokeNow
   smokeNow = NativeDate.parse(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt)
   try {
-    const preview = seedFreePreviewProfile('preview-trial-bound', { bound: true })
+    const preview = seedFreePreviewProfile('preview-trial-bound', {
+      bound: true,
+      temporaryPermission: {
+        source: 'limited_profile_voucher',
+        activity_id: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.id,
+        permission: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.effectivePermission,
+        starts_at: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt,
+        ends_at: FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt,
+        operation_id: 'preview-trial-operation',
+      },
+    })
     store.workspaces.set(preview.id, {
       ...emptyWorkspace(preview.id),
       operators: sampleOperators,
@@ -1710,7 +1720,7 @@ function memoryOptimizerPortModule() {
   `
 }
 
-function seedFreePreviewProfile(id, { bound }) {
+function seedFreePreviewProfile(id, { bound, temporaryPermission = null }) {
   const now = new Date().toISOString()
   const profile = {
     version: 1,
@@ -1737,6 +1747,7 @@ function seedFreePreviewProfile(id, { bound }) {
     } : null,
     skland_pending_binding: null,
     skland_risk: null,
+    temporary_permission: temporaryPermission,
     created_at: now,
     updated_at: now,
   }

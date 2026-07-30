@@ -728,6 +728,7 @@ async function assertUnbindRouteRemoved() {
 
 async function assertFreePreviewScanClaim() {
   const profileCountBefore = store.profiles.size
+  const voucherGrantCountBefore = store.limitedVoucherGrantCalls.length
   setFetchMode('blank-default-uid')
   const start = await callSkland('/api/user/skland/free-preview/login/start', {})
   if (start.status !== 200 || start.body.scan_id !== 'scan-1' || !start.body.qr_data_url?.startsWith('data:image/png;base64,')) {
@@ -775,6 +776,10 @@ async function assertFreePreviewScanClaim() {
   const profileId = confirm.body.active_profile.id
   if (store.workspaces.get(profileId)?.operators?.length !== 2) {
     throw new Error('免费档案扫码确认：干员未写入工作区')
+  }
+  const voucherGrantCall = store.limitedVoucherGrantCalls.at(-1)
+  if (store.limitedVoucherGrantCalls.length !== voucherGrantCountBefore + 1 || voucherGrantCall?.userId !== store.user.id) {
+    throw new Error('免费档案扫码确认：未触发限时 CDK 道具发放')
   }
   const entitlement = {
     first_generated_at: '2026-01-01T00:00:00.000Z',
@@ -1155,6 +1160,7 @@ function createMemoryStore() {
     freePreviewClaims: new Map(),
     freePreviewPendingClaims: new Map(),
     lifetimeVoucherPendingBindings: new Map(),
+    limitedVoucherGrantCalls: [],
     personalUseAcceptance: {
       declaration_id: 'personal_use_v1',
       declaration_version: 'V1.0',
@@ -1211,6 +1217,10 @@ function memoryStorePlugin() {
         path: 'memory-personal-use-declaration-store',
         namespace: 'skland-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])inventory-store(\.ts)?$/ }, () => ({
+        path: 'memory-inventory-store',
+        namespace: 'skland-smoke',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'skland-smoke' }, (args) => ({
         contents: args.path === 'memory-user-store'
           ? memoryUserStoreModule()
@@ -1224,7 +1234,9 @@ function memoryStorePlugin() {
                   ? `export class RateLimitStoreError extends Error {}`
                   : args.path === 'memory-personal-use-declaration-store'
                     ? memoryPersonalUseDeclarationStoreModule()
-                    : memoryLicenseUtilsModuleFixed(),
+                    : args.path === 'memory-inventory-store'
+                      ? memoryInventoryStoreModule()
+                      : memoryLicenseUtilsModuleFixed(),
         loader: 'js',
       }))
     },
@@ -1236,6 +1248,28 @@ function memoryUsageStatsModule() {
     export async function recordUsageEvent() {}
     export async function countSuccessfulUsageEventsForProfileInRange() { return 0 }
     export async function getScheduleGenerateDurationStatsByBucket() { return { p95_ms: 0, sample_count: 0 } }
+  `
+}
+
+function memoryInventoryStoreModule() {
+  return `
+    const store = globalThis.__sklandHandlerSmokeStore
+    export class InventoryError extends Error {
+      constructor(code, message, status = 409) {
+        super(message)
+        this.name = 'InventoryError'
+        this.code = code
+        this.status = status
+      }
+    }
+    export async function getItemBalance() { return 0 }
+    export async function grantFreePreviewLimitedVoucher(userId, now) {
+      store.limitedVoucherGrantCalls.push({ userId, now: now.toISOString() })
+      return 'limited-voucher-grant-' + store.limitedVoucherGrantCalls.length
+    }
+    export async function markOnboardingTaskComplete() {}
+    export async function reserveItemsInTransaction() { return [] }
+    export async function commitReservedItemsInTransaction() {}
   `
 }
 
