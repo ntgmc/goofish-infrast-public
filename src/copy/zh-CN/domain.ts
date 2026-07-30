@@ -75,6 +75,10 @@ export const domainCopy = {
   components_result_panel_ResultBoard_014: "班",
   // src/components/result-panel/ResultBoard.tsx
   components_result_panel_ResultBoard_015: "多产物",
+  // src/components/result-panel/ResultBoard.tsx
+  components_result_panel_ResultBoard_016: "班次 ",
+  // src/components/result-panel/ResultBoard.tsx
+  components_result_panel_ResultBoard_017: "菲亚梅塔 → ",
   // src/components/result-panel/ResultDetail.tsx
   components_result_panel_ResultDetail_001: "预设队列",
   // src/components/result-panel/ResultDetail.tsx
