@@ -299,10 +299,9 @@ describe('email delivery-backed tokens', () => {
     expect(await getRecentEmailVerificationTokenForUser(user.id, new Date(now.getTime() - 300_000).toISOString()))
       .toMatchObject({ id: uncertainToken.id, delivery_id: uncertainDelivery })
     expect(await verifyUserEmailWithToken(failedToken.token_hash, now)).toBeNull()
-    expect(await verifyUserEmailWithToken(uncertainToken.token_hash, now)).toMatchObject({
-      id: user.id,
-      email_verified_at: now.toISOString(),
-    })
+    const verified = await verifyUserEmailWithToken(uncertainToken.token_hash, now)
+    expect(verified).toMatchObject({ id: user.id })
+    expect(Date.parse(verified?.email_verified_at ?? '')).toBe(now.getTime())
   })
 })
 
@@ -524,12 +523,12 @@ async function seedMaintenanceSessions(userId: string, now: Date): Promise<void>
     `insert into user_sessions
       (id, user_id, token_hash, record_json, created_at, last_seen_at, expires_at)
      select 'maintenance-session-' || item,
-            $1,
+            $1::text,
             'maintenance-session-hash-' || item,
             jsonb_build_object(
               'version', 1,
               'id', 'maintenance-session-' || item,
-              'user_id', $1,
+              'user_id', $1::text,
               'token_hash', 'maintenance-session-hash-' || item,
               'created_at', ($2::timestamptz - interval '1 day')::text,
               'last_seen_at', ($2::timestamptz - interval '1 day')::text,

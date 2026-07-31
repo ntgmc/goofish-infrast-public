@@ -35,7 +35,6 @@ import {
   RegistrationEmailConflictError,
   type UserAccountRecord,
   type UserGameAccountRecord,
-  type UserWorkspaceRecord,
   type UserSessionRecord,
 } from '../storage/user-store'
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
