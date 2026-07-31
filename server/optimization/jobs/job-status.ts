@@ -2,7 +2,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import type { LicenseConfig, OptimizeEstimateBucket, OptimizeResult } from "../../../src/lib/types";
 import { SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT } from '../../../src/lib/scenario-comparison';
 import type { OptimizationFailureSnapshot, OptimizationJobListItem, OptimizationJobListResponse, OptimizationJobSnapshot } from "../../../src/lib/optimization-contracts";
-import { getScheduleGenerateDurationStatsByBucket } from "../../handlers/usage-stats";
+import { getScheduleGenerateDurationStatsByBucket, recordUsageEvent } from "../../handlers/usage-stats";
 import { getProfileForUser } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobRecord } from "../../storage/optimize-job-store";
@@ -52,6 +52,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       reward_user_id: prepared.rewardUserId ?? null,
       use_priority_coupon: prepared.usePriorityCoupon === true,
       reward_item_codes: prepared.rewardItemCodes ?? [],
+      billing: prepared.billing ?? null,
     };
     // Third-party test stores predating atomic admission remain read-only test
     // doubles; production and the built-in memory store always implement admitJob.
@@ -80,6 +81,17 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
     }, 202);
   } catch (error) {
     if (error instanceof OptimizeJobAdmissionError) {
+      if (prepared.billing && (error.code === 'insufficient_balance'
+        || error.code === 'commercial_queue_capacity_exceeded'
+        || error.code === 'commercial_submission_rate_exceeded')) {
+        await recordUsageEvent('metered_billing', {
+          status: 'failure',
+          reason_code: error.code,
+          source: prepared.billing.quote.billing_kind,
+        }, `admission:${requestHash}:${error.code}`).catch((trackingError) => {
+          console.warn('metered billing admission metric skipped:', trackingError)
+        });
+      }
       return jsonResponse({ error: error.message, code: error.code }, error.status);
     }
     throw error;
@@ -237,6 +249,7 @@ function formatOptimizationJobSnapshot(
     cancellationRequested: Boolean(job.cancel_requested_at),
     canCancel: job.status === 'queued' || job.status === 'running',
     canRetry: job.status === 'failed' || job.status === 'cancelled' || job.status === 'dead_lettered',
+    billing: job.billing_json,
   };
   if (status === 'succeeded') {
     return { ...base, status, result: job.result_json as OptimizeResult };

@@ -20,6 +20,7 @@ const RedeemSection = lazy(() => import('./dashboard/RedeemSection'))
 const InvitationsSection = lazy(() => import('./dashboard/InvitationsSection'))
 const InventorySection = lazy(() => import('./dashboard/InventorySection'))
 const BalanceSection = lazy(() => import('./dashboard/BalanceSection'))
+const CommercialProfilesSection = lazy(() => import('./dashboard/CommercialProfilesSection'))
 const AnnouncementsSection = lazy(() => import('./dashboard/AnnouncementsSection'))
 const SettingsSection = lazy(() => import('./dashboard/SettingsSection'))
 
@@ -70,6 +71,7 @@ export default function AccountDashboard({
   }), [])
   const labels: Record<DashboardSection, string> = {
     profiles: copy.common.pages_tool_AccountDashboard_001,
+    commercial: copy.metered.commercial_nav,
     tools: copy.common.pages_tool_AccountDashboard_002,
     redeem: copy.common.pages_tool_AccountDashboard_003,
     invitations: copy.common.pages_tool_AccountDashboard_004,
@@ -84,6 +86,7 @@ export default function AccountDashboard({
     : undefined
   const sections = (Object.keys(labels) as DashboardSection[]).filter((key) => {
     if (key === 'profiles') return features.profiles
+    if (key === 'commercial') return features.metered_billing
     if (key === 'tools') return features.tools
     if (key === 'redeem') return features.cdk_redemption || features.free_preview
     if (key === 'invitations') return features.invitations
@@ -228,7 +231,8 @@ export default function AccountDashboard({
           )}
           <AnimatedPresenceRegion motionKey={section}>
             <Suspense fallback={<SectionFallback />}>
-              {section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} />}
+              {section === 'profiles' && <ProfilesSection profiles={profiles} openingProfileId={openingProfileId} onOpen={onOpenProfile} onEdit={onPayload} meteredEnabled={features.metered_billing} />}
+              {section === 'commercial' && <CommercialProfilesSection onOpen={onOpenProfile} />}
               {section === 'tools' && <ToolsSection />}
               {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
               {section === 'invitations' && <InvitationsSection />}

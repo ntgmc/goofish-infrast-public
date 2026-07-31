@@ -1,0 +1,98 @@
+import { productPolicies } from './product-catalog'
+import type { UserGameAccountKind } from './types'
+
+export type MeteredBillingKind = Extract<UserGameAccountKind, 'metered_personal' | 'metered_commercial'>
+export type CommercialTierLevel = 1 | 2 | 3 | 4
+
+export interface CommercialTierSummary {
+  eligible: boolean
+  level: CommercialTierLevel | null
+  threshold_points: string
+  discount_bps: number
+  charge_points: string
+  next_threshold_points: string | null
+  points_to_next_level: string | null
+}
+
+export interface MeteredScheduleQuote {
+  pricing_version: string
+  billing_kind: MeteredBillingKind
+  list_price: string
+  tier: CommercialTierLevel | null
+  discount_bps: number
+  charge: string
+}
+
+const policy = productPolicies.metered_billing
+
+export function getCommercialTierSummary(
+  lifetimeCredited: string,
+  debt = '0.00',
+): CommercialTierSummary {
+  const creditedMinor = pointsToMinor(lifetimeCredited)
+  const debtMinor = pointsToMinor(debt)
+  const tiers = policy.commercial.tiers
+  const matched = [...tiers].reverse().find((tier) => creditedMinor >= pointsToMinor(tier.threshold_points)) ?? null
+  const next = tiers.find((tier) => creditedMinor < pointsToMinor(tier.threshold_points)) ?? null
+  const listPriceMinor = pointsToMinor(policy.commercial.list_price_points)
+  const discountBps = matched?.discount_bps ?? 0
+  return {
+    eligible: matched !== null && debtMinor === 0n,
+    level: matched ? matched.level as CommercialTierLevel : null,
+    threshold_points: tiers[0]!.threshold_points,
+    discount_bps: discountBps,
+    charge_points: minorToPoints(applyDiscount(listPriceMinor, discountBps)),
+    next_threshold_points: next?.threshold_points ?? null,
+    points_to_next_level: next
+      ? minorToPoints(pointsToMinor(next.threshold_points) - creditedMinor)
+      : null,
+  }
+}
+
+export function getMeteredScheduleQuote(
+  billingKind: MeteredBillingKind,
+  lifetimeCredited = '0.00',
+  debt = '0.00',
+): MeteredScheduleQuote {
+  if (billingKind === 'metered_personal') {
+    return {
+      pricing_version: policy.pricing_version,
+      billing_kind: billingKind,
+      list_price: policy.personal.main_schedule_points,
+      tier: null,
+      discount_bps: 0,
+      charge: policy.personal.main_schedule_points,
+    }
+  }
+  const tier = getCommercialTierSummary(lifetimeCredited, debt)
+  return {
+    pricing_version: policy.pricing_version,
+    billing_kind: billingKind,
+    list_price: policy.commercial.list_price_points,
+    tier: tier.level,
+    discount_bps: tier.discount_bps,
+    charge: tier.charge_points,
+  }
+}
+
+export function getMeteredBillingPolicy() {
+  return policy
+}
+
+export function pointsToMinor(value: string): bigint {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value)
+  if (!match) throw new Error(`Invalid points amount: ${value}`)
+  return BigInt(match[1]!) * 100n + BigInt((match[2] ?? '').padEnd(2, '0'))
+}
+
+function minorToPoints(value: bigint): string {
+  if (value < 0n) throw new Error('Points amount cannot be negative.')
+  return `${value / 100n}.${String(value % 100n).padStart(2, '0')}`
+}
+
+function applyDiscount(value: bigint, discountBps: number): bigint {
+  if (!Number.isInteger(discountBps) || discountBps < 0 || discountBps > 10_000) {
+    throw new Error('Invalid discount basis points.')
+  }
+  return (value * BigInt(10_000 - discountBps) + 5_000n) / 10_000n
+}

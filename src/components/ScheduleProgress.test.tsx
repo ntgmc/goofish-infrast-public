@@ -62,6 +62,26 @@ describe('ScheduleProgress motion', () => {
     expect(screen.queryByText('正在取消任务')).not.toBeInTheDocument()
   })
 
+  it('shows reserved, settled, and released billing snapshots', () => {
+    const billing = {
+      billing_kind: 'metered_personal' as const,
+      pricing_version: '2026-07-31-v1',
+      list_price: '600.00',
+      tier: null,
+      discount_bps: 0,
+      charge: '600.00',
+    }
+    const { rerender } = render(<ScheduleProgress progress={createProgress({ billing: { ...billing, status: 'reserved' } })} />)
+    expect(screen.getByText('已预留 600.00 积分')).toBeInTheDocument()
+
+    rerender(<ScheduleProgress progress={createProgress({ completedAt: NOW, estimatePhase: 'completed', billing: { ...billing, status: 'settled' } })} />)
+    expect(screen.getByText('已扣除 600.00 积分')).toBeInTheDocument()
+
+    rerender(<ScheduleProgress progress={createProgress({ estimatePhase: 'failed', billing: { ...billing, status: 'released' } })} />)
+    expect(screen.getByText('预留已释放：600.00 积分')).toBeInTheDocument()
+    expect(screen.getByText('任务未完成')).toBeInTheDocument()
+  })
+
   it('keeps the real suggestion stage visible even when the ETA percentage is above 92%', () => {
     render(<ScheduleProgress progress={createProgress({
       startedAt: NOW - 20_000,

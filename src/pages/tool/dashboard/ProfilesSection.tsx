@@ -3,6 +3,7 @@ import type { AuthSuccessResponse, UserGameAccount } from '../../../lib/types'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import { formatDate, getProfileAccessLabel, isFreePreviewProfile } from '../tool-utils'
 import { copy } from '../../../copy/index'
+import { usePersonalUseDeclaration } from '../../../hooks/usePersonalUseDeclaration'
 
 
 
@@ -11,21 +12,51 @@ export default function ProfilesSection({
   openingProfileId,
   onOpen,
   onEdit,
+  meteredEnabled = false,
 }: {
   profiles: UserGameAccount[]
   openingProfileId: string | null
   onOpen: (profile: UserGameAccount) => void
   onEdit: (payload: AuthSuccessResponse) => void
+  meteredEnabled?: boolean
 }) {
+  const [meteredBusy, setMeteredBusy] = useState(false)
+  const [meteredError, setMeteredError] = useState<string | null>(null)
+  const { guard: guardPersonalUseDeclaration, declarationDialog } = usePersonalUseDeclaration({
+    enabled: meteredEnabled,
+    onError: setMeteredError,
+  })
+  const submitMetered = async (profileId?: string) => {
+    setMeteredBusy(true); setMeteredError(null)
+    try {
+      await apiJson('/api/user/profiles/metered-personal', {
+        method: 'POST', json: profileId ? { profile_id: profileId } : {},
+        fallbackMessage: copy.metered.personal_profiles.open_failed,
+      })
+      onEdit(await apiJson<AuthSuccessResponse>('/api/user/profiles'))
+    } catch (caught) { setMeteredError(getApiErrorMessage(caught, copy.metered.personal_profiles.open_failed)) }
+    finally { setMeteredBusy(false) }
+  }
+  const createMetered = (profileId?: string) => {
+    void guardPersonalUseDeclaration(
+      'metered_personal_create',
+      () => submitMetered(profileId),
+      profileId ?? null,
+    )
+  }
   if (profiles.length === 0) {
     return (
-<section className="tool-panel p-6">
+<><section className="tool-panel p-6">
 <h2 className="text-lg font-semibold text-ink-primary">{copy.dashboard.pages_tool_dashboard_ProfilesSection_001}</h2>
 <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.dashboard.pages_tool_dashboard_ProfilesSection_002}</p>
-</section>
+{meteredEnabled && <button type="button" disabled={meteredBusy} onClick={() => createMetered()} className="tool-primary-action mt-4">{copy.metered.personal_profiles.create}</button>}
+{meteredError && <div className="tool-alert tool-alert--error mt-3">{meteredError}</div>}
+</section>{declarationDialog}</>
     )
   }
   return (
+    <div className="space-y-4">
+      {meteredEnabled && <section className="tool-panel p-5 sm:p-6"><h2 className="font-semibold text-ink-primary">{copy.metered.personal_profiles.title}</h2><p className="mt-2 text-sm text-ink-secondary">{copy.metered.personal_profiles.description}</p>{!profiles.some((profile) => profile.kind === 'metered_personal') && <button type="button" disabled={meteredBusy} onClick={() => createMetered()} className="tool-secondary-action mt-4">{copy.metered.personal_profiles.create}</button>}{meteredError && <div className="tool-alert tool-alert--error mt-3">{meteredError}</div>}</section>}
     <section className="grid gap-4 xl:grid-cols-2">
       {profiles.map((profile, index) => (
         <ProfileCard
@@ -35,9 +66,12 @@ export default function ProfilesSection({
           opening={openingProfileId === profile.id}
           onOpen={() => onOpen(profile)}
           onSaved={onEdit}
+          onConvert={() => createMetered(profile.id)}
+          meteredEnabled={meteredEnabled}
+          converting={meteredBusy}
         />
       ))}
-    </section>
+    </section>{declarationDialog}</div>
   )
 }
 
@@ -47,12 +81,18 @@ function ProfileCard({
   opening,
   onOpen,
   onSaved,
+  onConvert,
+  converting,
+  meteredEnabled,
 }: {
   profile: UserGameAccount
   fallbackName: string
   opening: boolean
   onOpen: () => void
   onSaved: (payload: AuthSuccessResponse) => void
+  onConvert: () => void
+  converting: boolean
+  meteredEnabled: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [displayName, setDisplayName] = useState(profile.display_name || fallbackName)
@@ -97,6 +137,7 @@ function ProfileCard({
         </button>
       </div>
       <button type="button" onClick={() => setEditing((value) => !value)} className="tool-secondary-action mt-4 px-3 text-sm" aria-expanded={editing}>{copy.dashboard.pages_tool_dashboard_ProfilesSection_011}</button>
+      {meteredEnabled && isFreePreviewProfile(profile) && <button type="button" onClick={onConvert} disabled={converting} className="tool-secondary-action ml-2 mt-4 px-3 text-sm">{copy.metered.personal_profiles.convert}</button>}
       {editing && (
         <div className="tool-inset mt-4 space-y-3 p-4">
           {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}

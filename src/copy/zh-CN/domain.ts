@@ -167,24 +167,6 @@ export const domainCopy = {
   components_result_panel_ResultMetrics_033: "理智",
   // src/components/result-panel/ResultMetrics.tsx
   components_result_panel_ResultMetrics_034: "中间产物库存：",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_035: "\r\n        MAA 默认基准：总效率 ",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_036: "%，龙门币 ",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_037: "/日，赤金净变动 ",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_038: "/日\r\n        ",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_039: "；搓玉对比：合成玉 ",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_040: "/日，长期 ",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_041: "/日，机会成本 ",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_042: " 理智/日",
-  // src/components/result-panel/ResultMetrics.tsx
-  components_result_panel_ResultMetrics_043: "；模拟提示 ",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_001: "排班模式",
   // src/components/result-panel/ResultPanel.tsx

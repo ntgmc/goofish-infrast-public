@@ -63,6 +63,7 @@ export const PERMISSION_LABELS: Record<PermissionMode, string> = {
   recommended: copy.common.components_ConfigEditor_011,
   growth: copy.common.components_ConfigEditor_012,
   advanced: copy.common.components_ConfigEditor_013,
+  metered_advanced: copy.metered.permission_label,
   ultimate: copy.common.components_ConfigEditor_014,
   admin: copy.common.components_ConfigEditor_015,
 }

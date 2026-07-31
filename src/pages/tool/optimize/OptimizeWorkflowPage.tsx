@@ -14,6 +14,7 @@ import { getProfileAccessLabel } from '../tool-utils'
 import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
 import { copy } from '../../../copy/index'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
+import { apiJson } from '../../../lib/api-client'
 
 
 export default function OptimizeWorkflowPage(props: Props) {
@@ -156,7 +157,7 @@ export default function OptimizeWorkflowPage(props: Props) {
           />
   
           {section === 'overview' && (
-            <OverviewSection
+            <><MeteredBillingNotice profile={profile} profileId={props.profileId} /><OverviewSection
               activeConfig={activeConfig}
               configChanged={configChanged}
               showConfigDetails={userCanEditConfig}
@@ -224,7 +225,7 @@ export default function OptimizeWorkflowPage(props: Props) {
               onViewHistory={handleViewHistory}
               onUseHistoryConfig={handleUseHistoryConfig}
               onDownloadHistory={handleDownloadHistory}
-            />
+            /></>
           )}
   
           {section === 'plans' && (
@@ -319,4 +320,17 @@ export default function OptimizeWorkflowPage(props: Props) {
         {declarationDialog}
       </OptimizeShell>
     )
+}
+
+function MeteredBillingNotice({ profile, profileId }: { profile: Props['profile']; profileId: string }) {
+  const [quote, setQuote] = useState<{ charge: string; available: string; sufficient: boolean; tier: number | null } | null>(null)
+  useEffect(() => {
+    if (profile.kind !== 'metered_personal' && profile.kind !== 'metered_commercial') return
+    void apiJson<{ charge: string; available: string; sufficient: boolean; tier: number | null }>(`/api/user/billing/quote?profile_id=${encodeURIComponent(profileId)}&operation=main_schedule`)
+      .then(setQuote).catch(() => setQuote(null))
+  }, [profile.kind, profileId])
+  if (profile.kind !== 'metered_personal' && profile.kind !== 'metered_commercial') return null
+  return <div className={`tool-alert mb-4 ${quote?.sufficient === false ? 'tool-alert--error' : 'tool-alert--warning'}`} role="status">
+    {quote ? copy.metered.quote.summary(quote.charge, quote.available, quote.tier, quote.sufficient) : copy.metered.quote.loading}
+  </div>
 }

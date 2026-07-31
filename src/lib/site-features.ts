@@ -7,6 +7,7 @@ export const SITE_FEATURE_KEYS = [
   'cdk_redemption',
   'free_preview',
   'schedule_generation',
+  'metered_billing',
   'depot_value',
   'skland',
   'invitations',
@@ -24,6 +25,10 @@ export interface SiteFeatureSettingsV1 {
   updated_at: string | null
 }
 
+export type AdminSiteFeatureSettingsV1 = SiteFeatureSettingsV1 & {
+  revision: number
+}
+
 export const DEFAULT_SITE_FEATURES: SiteFeatures = Object.freeze({
   site: true,
   registration: true,
@@ -33,6 +38,7 @@ export const DEFAULT_SITE_FEATURES: SiteFeatures = Object.freeze({
   cdk_redemption: true,
   free_preview: true,
   schedule_generation: true,
+  metered_billing: false,
   depot_value: true,
   skland: true,
   invitations: true,
@@ -52,7 +58,7 @@ export function normalizeSiteFeatureSettings(value: unknown): SiteFeatureSetting
   const storedFeatures = isRecord(source.features) ? source.features : {}
   const features = Object.fromEntries(SITE_FEATURE_KEYS.map((key) => [
     key,
-    typeof storedFeatures[key] === 'boolean' ? storedFeatures[key] : true,
+    typeof storedFeatures[key] === 'boolean' ? storedFeatures[key] : key !== 'metered_billing',
   ])) as unknown as SiteFeatures
   return {
     version: 1,
@@ -76,6 +82,7 @@ export function computeEffectiveSiteFeatures(settings: SiteFeatureSettingsV1): S
     cdk_redemption: profiles && raw.cdk_redemption,
     free_preview: profiles && raw.free_preview,
     schedule_generation: profiles && raw.schedule_generation,
+    metered_billing: profiles && raw.schedule_generation && raw.metered_billing,
     depot_value: tools && raw.depot_value,
     skland: profiles && raw.skland,
     invitations: login && raw.invitations,

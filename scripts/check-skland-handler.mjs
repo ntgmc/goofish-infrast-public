@@ -23,6 +23,7 @@ const handler = handlerModule.default ?? handlerModule
 await assertMissingSecret()
 await assertInvalidProfile()
 await assertFrozenProfile()
+await assertArchivedProfile()
 await assertLoginStart()
 await assertPendingComplete()
 await assertCompleteRequiresConfirmation()
@@ -81,6 +82,14 @@ async function assertFrozenProfile() {
   const result = await callSkland('/api/user/skland/login/start', { profile_id: 'frozen-profile' })
   if (result.status !== 400 || result.body.error !== '森空岛请求无效或服务暂不可用。') {
     throw new Error(`frozen profile: expected sanitized unavailable-profile error, got ${result.status}`)
+  }
+}
+
+async function assertArchivedProfile() {
+  seedProfile({ id: 'archived-profile', status: 'active', archivedAt: '2026-07-31T00:00:00.000Z' })
+  const result = await callSkland('/api/user/skland/login/start', { profile_id: 'archived-profile' })
+  if (result.status !== 409 || result.body.code !== 'profile_archived') {
+    throw new Error(`archived profile: expected profile_archived conflict, got ${result.status}`)
   }
 }
 
@@ -914,7 +923,7 @@ async function callSkland(path, body, init = {}) {
   return { status: response.status, body: await response.json() }
 }
 
-function seedProfile({ id, status }) {
+function seedProfile({ id, status, archivedAt = null }) {
   const now = '2026-01-01T00:00:00.000Z'
   const cdkKey = `cdk/${id}`
   store.profiles.set(id, {
@@ -927,6 +936,7 @@ function seedProfile({ id, status }) {
     permission: 'advanced',
     kind: 'cdk',
     status,
+    archived_at: archivedAt,
     display_name: id,
     note: '',
     skland_binding: null,
@@ -1325,6 +1335,11 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
     }
     export function isFreePreviewProfile(profile) {
       return profile?.kind === 'free_preview'
+    }
+    export function normalizeProfileKind(profile) {
+      return ['free_preview', 'depot_value', 'metered_personal', 'metered_commercial'].includes(profile?.kind)
+        ? profile.kind
+        : 'cdk'
     }
     export async function getFreePreviewClaim(uidHash) {
       return store.freePreviewClaims.get(uidHash) ?? null

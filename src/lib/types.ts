@@ -100,10 +100,11 @@ export interface OrundumRoi {
 
 type LegacyPermissionMode = 'basic' | 'premium';
 export type ProductPermissionMode = 'recommended' | 'growth' | 'advanced' | 'ultimate';
+type MeteredPermissionMode = 'metered_advanced';
 type InternalPermissionMode = 'admin';
-export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | InternalPermissionMode;
-export type PermissionMode = ProductPermissionMode | InternalPermissionMode;
-export type UserGameAccountKind = 'cdk' | 'free_preview' | 'depot_value';
+export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | MeteredPermissionMode | InternalPermissionMode;
+export type PermissionMode = ProductPermissionMode | MeteredPermissionMode | InternalPermissionMode;
+export type UserGameAccountKind = 'cdk' | 'free_preview' | 'depot_value' | 'metered_personal' | 'metered_commercial';
 
 export interface LicenseFile {
   version: 1 | 2;
@@ -201,6 +202,7 @@ export interface OptimizeJobAccepted {
   calculation_stage_updated_at: string | null;
   upgrade_suggestions_requested: boolean;
   upgrade_suggestions_allowed: boolean;
+  billing?: import('./optimization-contracts').OptimizationBillingSnapshot | null;
   poll_token?: string;
 }
 
@@ -227,6 +229,7 @@ export interface OptimizeJobStatusResponse {
   calculation_stage_updated_at: string | null;
   upgrade_suggestions_requested: boolean;
   upgrade_suggestions_allowed: boolean;
+  billing?: import('./optimization-contracts').OptimizationBillingSnapshot | null;
   result?: OptimizeResult;
   error?: string;
   error_code?: string;
@@ -734,6 +737,7 @@ export interface UserGameAccount {
   permission: PermissionMode;
   trial?: FreePreviewTrial | null;
   status: 'active' | 'frozen' | 'revoked';
+  archived_at?: string | null;
   cdk_order_hash: string | null;
   display_name: string;
   note: string;

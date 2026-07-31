@@ -5,6 +5,13 @@ import { getSku, productPolicies } from './product-catalog'
 export const PUBLIC_CONTENT_VERSION = 1 as const
 export const PUBLIC_CONTENT_DEFAULTS_REVISION = 2 as const
 export const PUBLIC_PRICING_PLAN_IDS = ['free_preview', 'single_account_lifetime'] as const
+export const PUBLIC_CONTENT_LIMITS = Object.freeze({
+  faqItems: 50,
+  pricingDisclosures: 30,
+  pricingComparisonRows: 50,
+  thanksSections: 12,
+  thanksEntries: 50,
+})
 
 const identifier = z.string().trim().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/)
 const text = (max: number) => z.string().trim().min(1).max(max)
@@ -55,7 +62,7 @@ const thanksSectionSchema = z.strictObject({
   id: identifier,
   heading: text(120),
   intro: text(1000),
-  entries: z.array(thanksEntrySchema).max(50).superRefine((entries, context) => addDuplicateIdIssues(entries, context)),
+  entries: z.array(thanksEntrySchema).max(PUBLIC_CONTENT_LIMITS.thanksEntries).superRefine((entries, context) => addDuplicateIdIssues(entries, context)),
 })
 
 export const publicContentDraftSchema = z.strictObject({
@@ -71,7 +78,7 @@ export const publicContentDraftSchema = z.strictObject({
     intro: text(1000),
     cta_heading: text(120),
     cta_body: text(1000),
-    items: z.array(faqItemSchema).max(50).superRefine((items, context) => addDuplicateIdIssues(items, context)),
+    items: z.array(faqItemSchema).max(PUBLIC_CONTENT_LIMITS.faqItems).superRefine((items, context) => addDuplicateIdIssues(items, context)),
   }),
   pricing: z.strictObject({
     eyebrow: text(80),
@@ -82,9 +89,9 @@ export const publicContentDraftSchema = z.strictObject({
       single_account_lifetime: pricingPlanSchema,
     }),
     policy_heading: text(120),
-    disclosures: z.array(text(500)).max(30),
+    disclosures: z.array(text(500)).max(PUBLIC_CONTENT_LIMITS.pricingDisclosures),
     comparison_heading: text(120),
-    comparison_rows: z.array(comparisonRowSchema).max(50).superRefine((items, context) => addDuplicateIdIssues(items, context)),
+    comparison_rows: z.array(comparisonRowSchema).max(PUBLIC_CONTENT_LIMITS.pricingComparisonRows).superRefine((items, context) => addDuplicateIdIssues(items, context)),
     support_heading: text(120),
     support_body: text(1000),
   }),
@@ -92,7 +99,7 @@ export const publicContentDraftSchema = z.strictObject({
     eyebrow: text(80),
     title: text(80),
     intro: text(1000),
-    sections: z.array(thanksSectionSchema).max(12).superRefine((items, context) => addDuplicateIdIssues(items, context)),
+    sections: z.array(thanksSectionSchema).max(PUBLIC_CONTENT_LIMITS.thanksSections).superRefine((items, context) => addDuplicateIdIssues(items, context)),
   }),
 })
 
@@ -101,6 +108,9 @@ export type PublicContentSettingsV1 = PublicContentDraftV1 & {
   version: typeof PUBLIC_CONTENT_VERSION
   defaults_revision: typeof PUBLIC_CONTENT_DEFAULTS_REVISION
   updated_at: string | null
+}
+export type AdminPublicContentSettingsV1 = PublicContentSettingsV1 & {
+  revision: number
 }
 const freePreview = getSku('free_preview')
 const singleAccountLifetime = getSku('single_account_lifetime')
@@ -220,7 +230,13 @@ export function parsePublicContentDraft(value: unknown): PublicContentDraftV1 {
 }
 
 export function normalizePublicContentSettings(value: unknown): PublicContentSettingsV1 {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return cloneDefaultPublicContentSettings()
+  return resolvePublicContentSettings(value).content
+}
+
+export function resolvePublicContentSettings(value: unknown): { content: PublicContentSettingsV1; isFallback: boolean } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { content: cloneDefaultPublicContentSettings(), isFallback: true }
+  }
   const source = value as Record<string, unknown>
   const parsed = publicContentDraftSchema.safeParse({
     qq_group: source.qq_group,
@@ -228,13 +244,18 @@ export function normalizePublicContentSettings(value: unknown): PublicContentSet
     pricing: source.pricing,
     thanks: source.thanks,
   })
-  if (!parsed.success || source.version !== PUBLIC_CONTENT_VERSION) return cloneDefaultPublicContentSettings()
+  if (!parsed.success || source.version !== PUBLIC_CONTENT_VERSION) {
+    return { content: cloneDefaultPublicContentSettings(), isFallback: true }
+  }
   const storedDefaultsRevision = normalizeDefaultsRevision(source.defaults_revision)
   return {
-    version: PUBLIC_CONTENT_VERSION,
-    defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
-    ...(storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION ? migrateLegacyDefaultCredits(parsed.data) : parsed.data),
-    updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
+    content: {
+      version: PUBLIC_CONTENT_VERSION,
+      defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION,
+      ...(storedDefaultsRevision < PUBLIC_CONTENT_DEFAULTS_REVISION ? migrateLegacyDefaultCredits(parsed.data) : parsed.data),
+      updated_at: typeof source.updated_at === 'string' ? source.updated_at : null,
+    },
+    isFallback: false,
   }
 }
 

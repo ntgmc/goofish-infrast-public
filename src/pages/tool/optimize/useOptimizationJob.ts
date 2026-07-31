@@ -127,12 +127,13 @@ export function useOptimizationJob({
         latestJob = status
         consecutivePollFailures = 0
         if (status.status === 'succeeded') {
+          updateProgress(status)
           if (!status.result) throw new Error(copy.optimize.pages_tool_optimize_useOptimizationJob_002)
           clearActiveOptimizeJob(storageKey)
           return status.result
         }
         if (status.status === 'failed' || status.status === 'cancelled' || status.status === 'dead_lettered') {
-          if (status.status === 'cancelled') updateProgress(status)
+          updateProgress(status)
           clearActiveOptimizeJob(storageKey)
           throw new OptimizationJobTerminalError(status, copy.optimize.pages_tool_optimize_useOptimizationJob_003)
         }

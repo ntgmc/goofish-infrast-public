@@ -32,6 +32,7 @@ const siteFeatureShape = Object.fromEntries(
   SITE_FEATURE_KEYS.map((key) => [key, z.boolean()]),
 ) as Record<SiteFeatureKey, z.ZodBoolean>
 const siteFeaturesSchema = strict(siteFeatureShape)
+const expectedRevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)
 
 export const requestSchemas = {
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
@@ -82,8 +83,8 @@ export const requestSchemas = {
     admin_invite_email_reserve: z.number().int().min(0).max(300),
     password_reset_email_reserve: z.number().int().min(0).max(300),
   }),
-  adminFeatureSettings: strict({ features: siteFeaturesSchema }),
-  adminPublicContent: publicContentDraftSchema,
+  adminFeatureSettings: strict({ features: siteFeaturesSchema, expected_revision: expectedRevisionSchema }),
+  adminPublicContent: publicContentDraftSchema.extend({ expected_revision: expectedRevisionSchema }),
   adminRegistrationInvitationCreate: strict({}),
   adminRegistrationInvitationPatch: strict({
     invitation_id: shortString(128),
@@ -135,7 +136,7 @@ export const requestSchemas = {
     strict({ all: z.literal(true) }),
   ]),
   personalUseDeclarationConfirmation: strict({
-    action: z.enum(['free_preview_claim', 'generated_result_export']),
+    action: z.enum(['free_preview_claim', 'metered_personal_create', 'generated_result_export']),
     profile_id: optionalString(128),
   }),
   profilePreview: strict({ display_name: optionalString(40), note: optionalString(500) }),
@@ -153,6 +154,13 @@ export const requestSchemas = {
     idempotency_key: shortString(200),
   }),
   profilePatch: strict({ profile_id: shortString(128), display_name: optionalString(40), note: optionalString(500) }),
+  meteredPersonalProfile: strict({ profile_id: optionalString(128), display_name: optionalString(40), note: optionalString(500) }),
+  commercialProfileCreate: strict({ display_name: optionalString(40), note: optionalString(500) }),
+  commercialProfilePatch: strict({
+    profile_id: shortString(128), action: z.enum(['update', 'archive', 'restore']),
+    display_name: optionalString(40), note: optionalString(500),
+  }),
+  commercialProfileDelete: strict({ profile_id: shortString(128), confirm_permanent_delete: z.literal(true) }),
   userWorkspace: strict({
     profile_id: shortString(128),
     operators: optionalUnknown,
@@ -206,6 +214,8 @@ export const requestSchemas = {
         'newcomer_supply_pack',
       ])).max(3).optional(),
       historySource: z.enum(['generated', 'applied_suggestions']).optional(),
+      pricing_version: optionalString(64),
+      accepted_max_points: optionalString(32),
     }),
     strict({
       kind: z.literal('scenario_comparison'),
@@ -238,10 +248,18 @@ export const requestSchemas = {
   }),
   adminBalanceAdjust: strict({
     user_id: shortString(128),
-    operation: z.enum(['credit', 'debit']),
+    operation: z.enum(['credit', 'debit', 'reverse_credit']),
     amount: shortString(32),
     reason: shortString(500),
     idempotency_key: shortString(200),
+    original_transaction_id: optionalString(128),
+  }),
+  adminCommercial: strict({
+    user_id: shortString(128),
+    active_profile_limit: z.number().int().min(1).max(100000).optional(),
+    total_profile_limit: z.number().int().min(1).max(100000).optional(),
+    suspended: z.boolean().optional(),
+    reason: optionalString(500),
   }),
   onboardingTaskClaim: strict({
     task_code: z.enum(['welcome_inventory', 'bind_skland', 'first_main_schedule']).optional(),
@@ -338,6 +356,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/session', route({ GET: none(), POST: json('auth', requestSchemas.adminSession), DELETE: none() })],
   ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'search'])],
   ['/api/admin/balance', route({ GET: none(), POST: json('admin', requestSchemas.adminBalanceAdjust) }, ['user_id', 'cursor', 'limit'])],
+  ['/api/admin/commercial', route({ GET: none(), POST: json('admin', requestSchemas.adminCommercial) }, ['user_id', 'summary'])],
   ['/api/auth/register', route({ POST: json('auth', requestSchemas.authRegister) })],
   ['/api/auth/registration-settings', route({ GET: none() })],
   ['/api/auth/login', route({ POST: json('auth', requestSchemas.authLogin) })],
@@ -365,6 +384,13 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/profiles/depot-value', route({ POST: none() })],
   ['/api/user/profiles/preview', route({ POST: json('standard', requestSchemas.profilePreview) })],
   ['/api/user/profiles/redeem', route({ POST: json('standard', requestSchemas.profileRedeem) })],
+  ['/api/user/profiles/metered-personal', route({ POST: json('standard', requestSchemas.meteredPersonalProfile) })],
+  ['/api/user/commercial/profiles', route({
+    GET: none(), POST: json('standard', requestSchemas.commercialProfileCreate),
+    PATCH: json('standard', requestSchemas.commercialProfilePatch),
+    DELETE: json('standard', requestSchemas.commercialProfileDelete),
+  }, ['state', 'q', 'cursor', 'limit'])],
+  ['/api/user/billing/quote', route({ GET: none() }, ['profile_id', 'operation'])],
   ['/api/user/status', route({ GET: none() }, ['profile_id'])],
   ['/api/user/workspace', route({ GET: none(), POST: json('compute', requestSchemas.userWorkspace), PATCH: json('compute', requestSchemas.userWorkspace) }, ['profile_id'])],
   ['/api/user/workspace/free-schedule/confirm', route({ POST: json('standard', requestSchemas.userWorkspace) })],

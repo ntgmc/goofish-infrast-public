@@ -4,6 +4,9 @@ export const balanceCopy = {
   title: '积分余额',
   description: '积分为永久站内虚拟资产，不等同现金，不支持提现或转让。',
   available: '当前可用',
+  reserved: '任务预留',
+  debt: '待追偿',
+  lifetime_credited: '累计获得积分',
   unit: '积分',
   redeem_title: '兑换余额 CDK',
   redeem_description: '输入余额 CDK 后，积分会立即进入当前登录账号。',
@@ -20,4 +23,7 @@ export const balanceCopy = {
   cdk_credit: '余额 CDK 兑换',
   admin_credit: '管理员发放',
   admin_debit: '管理员扣减',
+  schedule_debit: '成功主排班',
+  admin_credit_reversal: '管理员资格冲正',
+  debt_repayment: '待追偿抵扣',
 } as const

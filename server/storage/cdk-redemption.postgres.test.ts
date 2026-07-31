@@ -1,14 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { closePool, query } from './postgres'
+import { closePool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { CdkAlreadyRedeemedError, createRequestHash, redeemCdkAtomically, saveProfileInTransaction, saveWorkspaceInTransaction } from './cdk-redemption'
 import { createPostgresCdkRecordStore } from './cdk-store'
 import { createPostgresUsageEventStore } from './usage-store'
 import { emptyWorkspace, type UserGameAccountRecord } from './user-store'
 import { isProfileCdkRecord, type CdkRecord, type LegacyProfileCdkRecord } from '../handlers/license-utils'
-import { adjustBalance, applyBalanceChangeInTransaction, BalanceError, createBalanceRequestHash } from './balance-store'
+import { adjustBalance, applyBalanceChangeInTransaction, BalanceError, createBalanceRequestHash, getBalanceSummary, releaseScheduleBalanceInTransaction, reserveScheduleBalanceInTransaction, reverseQualificationCredit, settleScheduleBalanceInTransaction } from './balance-store'
+import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
+import { createCommercialProfile, createOrConvertMeteredPersonal, deleteCommercialProfile, patchCommercialProfile, updateCommercialAccount } from './metered-profile-store'
 import { getItemBalance, grantItemInTransaction } from './inventory-store'
 
 let container: StartedPostgreSqlContainer
@@ -348,6 +350,95 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     })).rejects.toBeInstanceOf(BalanceError)
     expect((await query<{ count: string }>('select count(*)::text as count from user_balance_transactions where user_id = $1', [userId])).rows[0]?.count).toBe(transactionCount)
     expect((await query<{ available: string }>('select available::text from user_balance_accounts where user_id = $1', [userId])).rows[0]?.available).toBe('21.00')
+  })
+
+  it('tracks post-launch qualification credits, admin reversals, debt, and automatic repayment', async () => {
+    const userId = await seedUser()
+    const credited = await adjustBalance({
+      userId, kind: 'admin_credit', amount: '10000.00', referenceType: 'admin_adjustment',
+      referenceId: randomUUID(), idempotencyKey: 'qualification-credit', adminUsername: 'root', reason: 'commercial activation',
+    })
+    expect(credited.balance.commercial).toMatchObject({ eligible: true, level: 1, charge_points: '900.00' })
+    await adjustBalance({
+      userId, kind: 'admin_debit', amount: '10000.00', referenceType: 'admin_adjustment',
+      referenceId: randomUUID(), idempotencyKey: 'normal-spend', adminUsername: 'root', reason: 'normal debit does not affect tier',
+    })
+    expect((await getBalanceSummary(userId)).commercial.level).toBe(1)
+
+    const reversed = await reverseQualificationCredit({
+      userId, originalTransactionId: credited.transaction.id, amount: '1000.00',
+      reason: 'fraud correction', idempotencyKey: 'qualification-reversal', adminUsername: 'root',
+    })
+    expect(reversed.balance).toMatchObject({ available: '0.00', debt: '1000.00', lifetime_credited: '9000.00' })
+    expect(reversed.balance.commercial.eligible).toBe(false)
+    const partiallyReversedAgain = await reverseQualificationCredit({
+      userId, originalTransactionId: credited.transaction.id, amount: '500.00',
+      reason: 'second fraud correction', idempotencyKey: 'qualification-second-reversal', adminUsername: 'root',
+    })
+    expect(partiallyReversedAgain.balance).toMatchObject({ available: '0.00', debt: '1500.00', lifetime_credited: '8500.00' })
+    await expect(reverseQualificationCredit({
+      userId, originalTransactionId: credited.transaction.id, amount: '9000.00',
+      reason: 'too much', idempotencyKey: 'qualification-over-reversal', adminUsername: 'root',
+    })).rejects.toMatchObject({ code: 'reversal_exceeds_credit' })
+
+    await adjustBalance({
+      userId, kind: 'admin_credit', amount: '400.00', referenceType: 'admin_adjustment',
+      referenceId: randomUUID(), idempotencyKey: 'debt-repayment-credit', adminUsername: 'root', reason: 'future credit',
+    })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '0.00', debt: '1100.00', lifetime_credited: '8900.00' })
+    expect((await query<{ count: string }>("select count(*)::text as count from user_balance_transactions where user_id = $1 and kind = 'debt_repayment'", [userId])).rows[0]?.count).toBe('1')
+    expect((await query<{ count: string }>("select count(*)::text as count from user_balance_qualification_ledger where user_id = $1 and delta < 0", [userId])).rows[0]?.count).toBe('2')
+  })
+
+  it('serializes schedule reservations and settles or releases each job exactly once', async () => {
+    const userId = await seedUser()
+    await adjustBalance({
+      userId, kind: 'admin_credit', amount: '1200.00', referenceType: 'admin_adjustment',
+      referenceId: randomUUID(), idempotencyKey: 'reservation-funding', adminUsername: 'root', reason: 'reservation test',
+    })
+    const quote = getMeteredScheduleQuote('metered_personal')
+    const jobIds = [randomUUID(), randomUUID(), randomUUID()]
+    const reserve = (jobId: string) => withTransaction((client) => reserveScheduleBalanceInTransaction(client, {
+      jobId, userId, profileId: 'metered-profile', quote,
+    }))
+    const firstTwo = await Promise.all([reserve(jobIds[0]!), reserve(jobIds[1]!)])
+    expect(firstTwo.map((item) => item.status)).toEqual(['reserved', 'reserved'])
+    await expect(reserve(jobIds[2]!)).rejects.toMatchObject({ code: 'insufficient_balance' })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '0.00', reserved: '1200.00' })
+
+    await withTransaction((client) => settleScheduleBalanceInTransaction(client, jobIds[0]!))
+    await withTransaction((client) => settleScheduleBalanceInTransaction(client, jobIds[0]!))
+    await withTransaction((client) => releaseScheduleBalanceInTransaction(client, jobIds[1]!))
+    await withTransaction((client) => releaseScheduleBalanceInTransaction(client, jobIds[1]!))
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '600.00', reserved: '0.00' })
+    expect((await query<{ count: string }>("select count(*)::text as count from user_balance_transactions where user_id = $1 and kind = 'schedule_debit'", [userId])).rows[0]?.count).toBe('1')
+  })
+
+  it('enforces lifetime personal and transactional commercial profile limits', async () => {
+    const personalUserId = await seedUser()
+    const personalAttempts = await Promise.allSettled([
+      createOrConvertMeteredPersonal({ userId: personalUserId, displayName: '个人 A' }),
+      createOrConvertMeteredPersonal({ userId: personalUserId, displayName: '个人 B' }),
+    ])
+    expect(personalAttempts.filter((item) => item.status === 'fulfilled')).toHaveLength(2)
+    expect((await query<{ count: string }>("select count(*)::text as count from user_game_accounts where user_id = $1 and kind = 'metered_personal'", [personalUserId])).rows[0]?.count).toBe('1')
+    expect((await query<{ count: string }>("select count(*)::text as count from user_profile_workspaces where profile_id = (select profile_id from metered_personal_claims where user_id = $1)", [personalUserId])).rows[0]?.count).toBe('1')
+
+    const commercialUserId = await seedUser()
+    await adjustBalance({
+      userId: commercialUserId, kind: 'admin_credit', amount: '10000.00', referenceType: 'admin_adjustment',
+      referenceId: randomUUID(), idempotencyKey: 'commercial-profile-funding', adminUsername: 'root', reason: 'activate commercial',
+    })
+    await updateCommercialAccount({ userId: commercialUserId, activeLimit: 1, totalLimit: 2 })
+    const first = await createCommercialProfile({ userId: commercialUserId, displayName: '商用一号' })
+    expect((await query<{ count: string }>('select count(*)::text as count from user_profile_workspaces where profile_id = $1', [first.profile.id])).rows[0]?.count).toBe('1')
+    await expect(createCommercialProfile({ userId: commercialUserId, displayName: '并发越限' })).rejects.toMatchObject({ code: 'active_profile_limit' })
+    await patchCommercialProfile({ userId: commercialUserId, profileId: first.profile.id, action: 'archive' })
+    const second = await createCommercialProfile({ userId: commercialUserId, displayName: '商用二号' })
+    await expect(createCommercialProfile({ userId: commercialUserId, displayName: '总量越限' })).rejects.toMatchObject({ code: 'total_profile_limit' })
+    await deleteCommercialProfile({ userId: commercialUserId, profileId: first.profile.id, confirmed: true })
+    await expect(patchCommercialProfile({ userId: commercialUserId, profileId: second.profile.id, action: 'archive' })).resolves.toBeTruthy()
+    await expect(createCommercialProfile({ userId: commercialUserId, displayName: '删除释放总量' })).resolves.toBeTruthy()
   })
 
   it('deletes balance accounts and transactions with the user', async () => {

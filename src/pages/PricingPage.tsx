@@ -6,11 +6,15 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy/index'
 import { PUBLIC_PRICING_PLAN_IDS } from '../lib/public-content'
 import { usePublicContent } from '../lib/public-content-context'
+import { getMeteredBillingPolicy } from '../lib/metered-billing'
+import { useSiteFeatures } from '../lib/site-feature-context'
 
 export default function PricingPage() {
   const { content } = usePublicContent()
   const pricing = content.pricing
   const plans = PUBLIC_PRICING_PLAN_IDS.map((id) => ({ id, ...pricing.plans[id] }))
+  const featureState = useSiteFeatures()
+  const metered = getMeteredBillingPolicy()
   return (
     <main className="tool-page" tabIndex={-1} data-route-focus>
       <div className="public-shell">
@@ -54,6 +58,26 @@ export default function PricingPage() {
               </article>
             ))}
           </div>
+        </section>
+
+        <section className="border-b border-surface-4 py-8" aria-labelledby="metered-pricing-title">
+          <h2 id="metered-pricing-title" className="text-xl font-semibold text-ink-primary">{copy.metered.pricing.title}</h2>
+          {featureState.status === 'loading' ? (
+            <p className="mt-4 text-sm text-ink-secondary" role="status">{copy.metered.pricing.checking_availability}</p>
+          ) : featureState.status === 'ready' && featureState.features.metered_billing ? (
+            <>
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <article className="tool-panel p-5"><h3 className="font-semibold text-ink-primary">{copy.metered.pricing.personal_title}</h3><p className="mt-3 text-3xl font-semibold text-brand-400">{copy.metered.pricing.personal_price(metered.personal.main_schedule_points)}</p><p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.metered.pricing.personal_description}</p></article>
+                <article className="tool-panel p-5"><h3 className="font-semibold text-ink-primary">{copy.metered.pricing.commercial_title}</h3><p className="mt-3 text-3xl font-semibold text-brand-400">{copy.metered.pricing.commercial_price}</p><p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.metered.pricing.commercial_description}</p></article>
+              </div>
+              <p className="mt-4 text-sm leading-7 text-ink-secondary">{copy.metered.pricing.capabilities}</p>
+            </>
+          ) : (
+            <div className="tool-alert mt-4" role="note">
+              <strong className="block text-sm text-ink-primary">{copy.metered.pricing.unavailable}</strong>
+              {featureState.status === 'error' && <span className="mt-1 block text-sm text-ink-secondary">{copy.metered.pricing.availability_unavailable}</span>}
+            </div>
+          )}
         </section>
 
         <section className="border-b border-surface-4 py-8" aria-labelledby="pricing-policy-title">

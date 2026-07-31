@@ -24,6 +24,15 @@ const accepted: OptimizeJobAccepted = {
   calculation_stage_updated_at: null,
   upgrade_suggestions_requested: true,
   upgrade_suggestions_allowed: true,
+  billing: {
+    status: 'reserved',
+    billing_kind: 'metered_personal',
+    pricing_version: '2026-07-31-v1',
+    list_price: '600.00',
+    tier: null,
+    discount_bps: 0,
+    charge: '600.00',
+  },
 }
 
 describe('optimization job persistence', () => {
@@ -84,6 +93,7 @@ describe('optimization progress mapping', () => {
     expect(progress.jobId).toBe('job-1')
     expect(progress.queueStatus).toBe('queued')
     expect(progress.estimatedRemainingMs).toBe(10_000)
+    expect(progress.billing).toMatchObject({ status: 'reserved', charge: '600.00' })
   })
 
   it('wakes a long poll when an external terminal update arrives', async () => {

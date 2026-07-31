@@ -14,6 +14,7 @@ import { personalUseCopy } from './zh-CN/personal-use'
 import { inventoryCopy } from './zh-CN/inventory'
 import { balanceCopy } from './zh-CN/balance'
 import { notificationsCopy } from './zh-CN/notifications'
+import { meteredCopy } from './zh-CN/metered'
 
 export const CURRENT_LOCALE = 'zh-CN' as const
 
@@ -34,4 +35,5 @@ export const copy = {
   inventory: inventoryCopy,
   balance: balanceCopy,
   notifications: notificationsCopy,
+  metered: meteredCopy,
 } as const

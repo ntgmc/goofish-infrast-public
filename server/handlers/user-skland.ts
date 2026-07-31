@@ -32,6 +32,7 @@ import {
   type SklandPendingConfirmationRecord,
   type UserGameAccountRecord,
 } from '../storage/user-store'
+import { isLifetimeVoucherUpgradeableProfile } from './lifetime-voucher-profile-policy'
 import { commitReservedItemsInTransaction, getItemBalance, grantFreePreviewLimitedVoucher, InventoryError, markOnboardingTaskComplete, reserveItemsInTransaction } from '../storage/inventory-store'
 import { hasDatabaseUrl, query, withTransaction } from '../storage/postgres'
 import { saveProfileInTransaction } from '../storage/cdk-redemption'
@@ -107,6 +108,13 @@ interface SklandPreview {
   nickname: string
   channel_name: string
   operator_count: number
+}
+
+class SklandProfileError extends Error {
+  constructor(readonly code: 'profile_archived', message: string, readonly status: 409) {
+    super(message)
+    this.name = 'SklandProfileError'
+  }
 }
 
 export default async (req: Request): Promise<Response> => {
@@ -412,6 +420,9 @@ export default async (req: Request): Promise<Response> => {
 
     return jsonResponse({ error: 'API route not found' }, 404)
   } catch (error) {
+    if (error instanceof SklandProfileError) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
     if (error instanceof RateLimitStoreError) {
       return jsonResponse(
         { error: 'Credential service is temporarily unavailable.' },
@@ -519,7 +530,7 @@ async function createLifetimeVoucherConfirmation(
     status: 'confirm_required',
     confirmation_id: options.confirmationId,
     skland_preview: toSklandPreview(imported.binding, operatorsCheck.operators.length),
-    warning: '确认后将创建终身档案；同 UID 的免费预览档案会原地升级。只有最终保存成功后才消耗道具。',
+    warning: '确认后将创建终身档案；同 UID 的免费预览或个人按次档案会原地升级。只有最终保存成功后才消耗道具。',
   })
 }
 
@@ -569,14 +580,14 @@ async function confirmLifetimeVoucherBinding(
     const foreign = uidProfiles.rows.find((row) => row.record_json.user_id !== user.id)
     if (foreign) throw new InventoryError('skland_uid_owned', '该森空岛 UID 已绑定其他网站账号。', 409)
     const currentUserProfiles = uidProfiles.rows.map((row) => row.record_json)
-    const nonPreview = currentUserProfiles.find((profile) => !isFreePreviewProfile(profile))
-    if (nonPreview) throw new InventoryError('skland_uid_already_bound', '该森空岛 UID 已经绑定终身档案。', 409)
-    const existingPreview = currentUserProfiles.find((profile) => isFreePreviewProfile(profile))
-    const profileId = existingPreview?.id ?? randomUUID()
-    const currentWorkspace = existingPreview
+    const nonUpgradeable = currentUserProfiles.find((profile) => !isLifetimeVoucherUpgradeableProfile(profile))
+    if (nonUpgradeable) throw new InventoryError('skland_uid_already_bound', '该森空岛 UID 已经绑定其他终身或商用档案。', 409)
+    const existingProfile = currentUserProfiles.find(isLifetimeVoucherUpgradeableProfile)
+    const profileId = existingProfile?.id ?? randomUUID()
+    const currentWorkspace = existingProfile
       ? await updateProfileWorkspaceInTransaction(client, profileId, (workspace) => workspace ?? emptyWorkspace(profileId))
       : emptyWorkspace(profileId)
-    const baseProfile: UserGameAccountRecord = existingPreview ?? {
+    const baseProfile: UserGameAccountRecord = existingProfile ?? {
       version: 1, id: profileId, user_id: user.id, kind: 'cdk', cdk_key: null, cdk_code_hash: null,
       cdk_order_hash: null, permission: 'advanced', status: 'active', display_name: imported.binding.nickname || '终身档案',
       note: '使用终身版兑换 CDK 绑定。', created_at: now, updated_at: now,
@@ -586,7 +597,7 @@ async function confirmLifetimeVoucherBinding(
       kind: 'cdk', permission: 'advanced', status: 'active', temporary_permission: null,
       skland_binding: {
         uid: imported.binding.uid, nickname: imported.binding.nickname, channel_name: imported.binding.channel_name,
-        bound_at: existingPreview?.skland_binding?.bound_at ?? now, last_imported_at: now,
+        bound_at: existingProfile?.skland_binding?.bound_at ?? now, last_imported_at: now,
         encrypted_cred: encryptSklandCredential(cred), credential_status: 'available',
         credential_invalid_at: null, credential_invalid_reason: null,
       },
@@ -1103,6 +1114,7 @@ async function saveSklandImport(
   cred: string,
   uid: string,
 ): Promise<SklandImportSummary> {
+  if (profile.archived_at) throw new Error('归档档案不能更新森空岛绑定或工作区。')
   const imported = await importSklandOperatorsByCred(cred, { uid, includeInventory: true })
   const operatorsCheck = validateOperators(imported.operators)
   if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
@@ -1293,6 +1305,7 @@ function credentialInvalidReason(error: unknown): SklandCredentialInvalidReason 
 
 async function requireActiveProfile(userId: string, profileId: unknown): Promise<UserGameAccountRecord> {
   const profile = await requireProfile(userId, profileId)
+  if (profile.archived_at) throw new SklandProfileError('profile_archived', '归档档案不能更新森空岛绑定或工作区。', 409)
   if (profile.status !== 'active') throw new Error('账号档案状态不可用。')
   return profile
 }

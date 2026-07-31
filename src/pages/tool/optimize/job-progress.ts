@@ -153,6 +153,7 @@ export function mergeOptimizeJobProgress(
     attemptCount: 'attempt_count' in next ? next.attempt_count : undefined,
     nextAttemptAt: 'next_attempt_at' in next ? next.next_attempt_at : undefined,
     cancellationRequested: 'cancellation_requested' in next ? next.cancellation_requested : false,
+    billing: next.billing ?? (sameJob ? current?.billing ?? null : null),
   }
 }
 

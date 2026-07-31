@@ -57,6 +57,7 @@ export interface UserGameAccountRecord {
   cdk_order_hash: string | null
   permission: PermissionMode
   status: 'active' | 'frozen' | 'revoked'
+  archived_at?: string | null
   display_name: string
   note: string
   skland_binding?: SklandBindingRecord | null
@@ -560,8 +561,8 @@ export async function saveUserProfile(profile: UserGameAccountRecord): Promise<v
   await ensureSchema()
   await query(
     `insert into user_game_accounts
-      (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note, record_json, created_at, updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12)
+      (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note, kind, archived_at, record_json, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14)
      on conflict (id) do update set
       cdk_key = excluded.cdk_key,
       cdk_code_hash = excluded.cdk_code_hash,
@@ -570,6 +571,8 @@ export async function saveUserProfile(profile: UserGameAccountRecord): Promise<v
       status = excluded.status,
       display_name = excluded.display_name,
       note = excluded.note,
+      kind = excluded.kind,
+      archived_at = excluded.archived_at,
       record_json = excluded.record_json,
       updated_at = excluded.updated_at`,
     [
@@ -582,6 +585,8 @@ export async function saveUserProfile(profile: UserGameAccountRecord): Promise<v
       profile.status,
       profile.display_name,
       profile.note,
+      normalizeProfileKind(profile),
+      profile.archived_at ?? null,
       JSON.stringify(profile),
       profile.created_at,
       profile.updated_at,
@@ -1121,6 +1126,7 @@ export function toPublicProfile(
     permission: profile.permission,
     trial,
     status: profile.status,
+    archived_at: profile.archived_at ?? null,
     cdk_order_hash: profile.cdk_order_hash,
     display_name: profile.display_name,
     note: profile.note,
@@ -1249,8 +1255,9 @@ function normalizeSklandCredentialInvalidReason(value: unknown): SklandCredentia
 }
 
 export function normalizeProfileKind(profile: Pick<UserGameAccountRecord, 'kind'>): UserGameAccountKind {
-  if (profile.kind === 'free_preview') return 'free_preview'
-  return profile.kind === 'depot_value' ? 'depot_value' : 'cdk'
+  if (profile.kind === 'free_preview' || profile.kind === 'depot_value'
+    || profile.kind === 'metered_personal' || profile.kind === 'metered_commercial') return profile.kind
+  return 'cdk'
 }
 
 export function isDepotValueProfile(profile: Pick<UserGameAccountRecord, 'kind'>): boolean {

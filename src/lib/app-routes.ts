@@ -1,4 +1,4 @@
-export const DASHBOARD_SECTIONS = ['profiles', 'tools', 'redeem', 'invitations', 'inventory', 'balance', 'announcements', 'settings'] as const
+export const DASHBOARD_SECTIONS = ['profiles', 'commercial', 'tools', 'redeem', 'invitations', 'inventory', 'balance', 'announcements', 'settings'] as const
 export type DashboardSection = typeof DASHBOARD_SECTIONS[number]
 
 export const WORKSPACE_SETUP_SECTIONS = ['operators', 'config', 'cdk'] as const
@@ -17,6 +17,7 @@ export type ToolRoute =
 
 const dashboardPaths: Record<DashboardSection, string> = {
   profiles: '/tool/profiles',
+  commercial: '/tool/commercial',
   tools: '/tool/tools',
   redeem: '/tool/redeem',
   invitations: '/tool/invitations',

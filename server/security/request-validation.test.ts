@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SITE_FEATURES } from '../../src/lib/site-features'
+import { DEFAULT_PUBLIC_CONTENT_DRAFT } from '../../src/lib/public-content'
 import { getRegisteredApiRoutes } from '../routes'
 import { inspectIncomingRequest } from './http-boundary'
 import { getAllowedMethods, getRoutePolicy, requestSchemas } from './request-policy'
@@ -113,6 +114,8 @@ describe('request validation boundary', () => {
       ...base,
       kind: 'schedule',
       includeUpgradeSuggestions: true,
+      pricing_version: '2026-07-31-v1',
+      accepted_max_points: '600.00',
     }).success).toBe(true)
     expect(requestSchemas.optimizationJob.safeParse({ ...base, kind: 'schedule' }).success).toBe(false)
     expect(requestSchemas.optimizationJob.safeParse({
@@ -131,12 +134,48 @@ describe('request validation boundary', () => {
   it('keeps the strict admin feature schema aligned with the shared feature contract', () => {
     expect(requestSchemas.adminFeatureSettings.safeParse({
       features: DEFAULT_SITE_FEATURES,
+      expected_revision: 0,
     }).success).toBe(true)
     expect(requestSchemas.adminFeatureSettings.safeParse({
       features: Object.fromEntries(Object.entries(DEFAULT_SITE_FEATURES).filter(([key]) => key !== 'inventory')),
+      expected_revision: 0,
     }).success).toBe(false)
     expect(requestSchemas.adminFeatureSettings.safeParse({
       features: { ...DEFAULT_SITE_FEATURES, unknown_feature: true },
+      expected_revision: 0,
+    }).success).toBe(false)
+    expect(requestSchemas.adminFeatureSettings.safeParse({ features: DEFAULT_SITE_FEATURES }).success).toBe(false)
+    expect(requestSchemas.adminFeatureSettings.safeParse({ features: DEFAULT_SITE_FEATURES, expected_revision: -1 }).success).toBe(false)
+    expect(requestSchemas.adminFeatureSettings.safeParse({ features: DEFAULT_SITE_FEATURES, expected_revision: 1.5 }).success).toBe(false)
+    expect(requestSchemas.adminFeatureSettings.safeParse({
+      features: DEFAULT_SITE_FEATURES,
+      expected_revision: 0,
+      unknown_field: true,
+    }).success).toBe(false)
+  })
+
+  it('requires a safe optimistic-lock revision for public content writes', () => {
+    expect(requestSchemas.adminPublicContent.safeParse({
+      ...DEFAULT_PUBLIC_CONTENT_DRAFT,
+      expected_revision: 0,
+    }).success).toBe(true)
+    expect(requestSchemas.adminPublicContent.safeParse(DEFAULT_PUBLIC_CONTENT_DRAFT).success).toBe(false)
+    expect(requestSchemas.adminPublicContent.safeParse({
+      ...DEFAULT_PUBLIC_CONTENT_DRAFT,
+      expected_revision: -1,
+    }).success).toBe(false)
+    expect(requestSchemas.adminPublicContent.safeParse({
+      ...DEFAULT_PUBLIC_CONTENT_DRAFT,
+      expected_revision: 1.5,
+    }).success).toBe(false)
+    expect(requestSchemas.adminPublicContent.safeParse({
+      ...DEFAULT_PUBLIC_CONTENT_DRAFT,
+      expected_revision: Number.MAX_SAFE_INTEGER + 1,
+    }).success).toBe(false)
+    expect(requestSchemas.adminPublicContent.safeParse({
+      ...DEFAULT_PUBLIC_CONTENT_DRAFT,
+      expected_revision: 0,
+      unknown_field: true,
     }).success).toBe(false)
   })
 })

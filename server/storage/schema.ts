@@ -90,14 +90,19 @@ CREATE TABLE IF NOT EXISTS registration_settings (
 CREATE TABLE IF NOT EXISTS feature_settings (
   key TEXT PRIMARY KEY,
   record_json JSONB NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
+  updated_at TIMESTAMPTZ NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1)
 );
 
 CREATE TABLE IF NOT EXISTS public_content_settings (
   key TEXT PRIMARY KEY,
   record_json JSONB NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
+  updated_at TIMESTAMPTZ NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1)
 );
+
+ALTER TABLE feature_settings ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1);
+ALTER TABLE public_content_settings ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1);
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS brevo_email_deliveries (
@@ -195,6 +200,7 @@ CREATE INDEX IF NOT EXISTS idx_optimize_jobs_lock_expires_at ON optimize_jobs(lo
 CREATE TABLE IF NOT EXISTS optimization_submissions (
   id TEXT PRIMARY KEY,
   owner_key TEXT NOT NULL,
+  billing_user_id TEXT,
   created_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_optimization_submissions_owner_created_at
@@ -336,13 +342,32 @@ END $$;
 CREATE TABLE IF NOT EXISTS user_balance_accounts (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
   available NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (available >= 0),
+  reserved NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (reserved >= 0 AND reserved <= available),
+  lifetime_credited NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (lifetime_credited >= 0),
+  qualification_reversed NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (qualification_reversed >= 0 AND qualification_reversed <= lifetime_credited),
+  debt NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (debt >= 0),
   updated_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE user_balance_accounts ADD COLUMN IF NOT EXISTS reserved NUMERIC(20,2) NOT NULL DEFAULT 0;
+ALTER TABLE user_balance_accounts ADD COLUMN IF NOT EXISTS lifetime_credited NUMERIC(20,2) NOT NULL DEFAULT 0;
+ALTER TABLE user_balance_accounts ADD COLUMN IF NOT EXISTS qualification_reversed NUMERIC(20,2) NOT NULL DEFAULT 0;
+ALTER TABLE user_balance_accounts ADD COLUMN IF NOT EXISTS debt NUMERIC(20,2) NOT NULL DEFAULT 0;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_balance_accounts_reserved_check') THEN
+    ALTER TABLE user_balance_accounts ADD CONSTRAINT user_balance_accounts_reserved_check
+      CHECK (reserved >= 0 AND reserved <= available);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_balance_accounts_lifetime_check') THEN
+    ALTER TABLE user_balance_accounts ADD CONSTRAINT user_balance_accounts_lifetime_check
+      CHECK (lifetime_credited >= 0 AND qualification_reversed >= 0 AND qualification_reversed <= lifetime_credited AND debt >= 0);
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS user_balance_transactions (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('cdk_credit', 'admin_credit', 'admin_debit')),
+  kind TEXT NOT NULL CHECK (kind IN ('cdk_credit', 'admin_credit', 'admin_debit', 'schedule_debit', 'admin_credit_reversal', 'debt_repayment')),
   amount NUMERIC(20,2) NOT NULL CHECK (amount <> 0),
   balance_after NUMERIC(20,2) NOT NULL CHECK (balance_after >= 0),
   reference_type TEXT NOT NULL,
@@ -351,13 +376,61 @@ CREATE TABLE IF NOT EXISTS user_balance_transactions (
   admin_username TEXT,
   reason TEXT,
   request_hash TEXT,
-  created_at TIMESTAMPTZ NOT NULL,
-  UNIQUE (reference_type, reference_id)
+  created_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_user_balance_transactions_user_created
   ON user_balance_transactions(user_id, created_at DESC, id DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_balance_transactions_idempotency
   ON user_balance_transactions(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+ALTER TABLE user_balance_transactions
+  DROP CONSTRAINT IF EXISTS user_balance_transactions_reference_type_reference_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_balance_transactions_reference
+  ON user_balance_transactions(reference_type, reference_id)
+  WHERE kind <> 'admin_credit_reversal';
+ALTER TABLE user_balance_transactions DROP CONSTRAINT IF EXISTS user_balance_transactions_kind_check;
+ALTER TABLE user_balance_transactions ADD CONSTRAINT user_balance_transactions_kind_check CHECK (
+  kind IN ('cdk_credit', 'admin_credit', 'admin_debit', 'schedule_debit', 'admin_credit_reversal', 'debt_repayment')
+);
+
+CREATE TABLE IF NOT EXISTS user_balance_qualification_ledger (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  balance_transaction_id TEXT NOT NULL REFERENCES user_balance_transactions(id) ON DELETE CASCADE,
+  delta NUMERIC(20,2) NOT NULL CHECK (delta <> 0),
+  reason TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL,
+  UNIQUE (user_id, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_user_balance_qualification_user_created
+  ON user_balance_qualification_ledger(user_id, created_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS user_balance_reservations (
+  id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL UNIQUE,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  profile_id TEXT NOT NULL,
+  billing_kind TEXT NOT NULL CHECK (billing_kind IN ('metered_personal', 'metered_commercial')),
+  pricing_version TEXT NOT NULL,
+  tier INTEGER CHECK (tier BETWEEN 1 AND 4),
+  list_price NUMERIC(20,2) NOT NULL CHECK (list_price > 0),
+  discount_bps INTEGER NOT NULL CHECK (discount_bps BETWEEN 0 AND 10000),
+  amount NUMERIC(20,2) NOT NULL CHECK (amount > 0),
+  status TEXT NOT NULL CHECK (status IN ('reserved', 'consumed', 'released')),
+  created_at TIMESTAMPTZ NOT NULL,
+  settled_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_user_balance_reservations_user_status
+  ON user_balance_reservations(user_id, status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS commercial_account_limits (
+  user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
+  active_profile_limit INTEGER NOT NULL DEFAULT 100 CHECK (active_profile_limit > 0),
+  total_profile_limit INTEGER NOT NULL DEFAULT 1000 CHECK (total_profile_limit >= active_profile_limit),
+  suspended_at TIMESTAMPTZ,
+  suspension_reason TEXT,
+  updated_at TIMESTAMPTZ NOT NULL
+);
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS invitation_codes (
@@ -555,6 +628,29 @@ BEGIN
 END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_game_accounts_cdk_code_hash
   ON user_game_accounts(cdk_code_hash) WHERE cdk_code_hash IS NOT NULL;
+ALTER TABLE user_game_accounts ADD COLUMN IF NOT EXISTS kind TEXT;
+ALTER TABLE user_game_accounts ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+UPDATE user_game_accounts
+   SET kind = CASE
+     WHEN record_json->>'kind' IN ('cdk', 'free_preview', 'depot_value', 'metered_personal', 'metered_commercial')
+       THEN record_json->>'kind'
+     ELSE 'cdk'
+   END
+ WHERE kind IS NULL;
+ALTER TABLE user_game_accounts ALTER COLUMN kind SET DEFAULT 'cdk';
+ALTER TABLE user_game_accounts ALTER COLUMN kind SET NOT NULL;
+ALTER TABLE user_game_accounts DROP CONSTRAINT IF EXISTS user_game_accounts_kind_check;
+ALTER TABLE user_game_accounts ADD CONSTRAINT user_game_accounts_kind_check
+  CHECK (kind IN ('cdk', 'free_preview', 'depot_value', 'metered_personal', 'metered_commercial'));
+CREATE INDEX IF NOT EXISTS idx_user_game_accounts_commercial_page
+  ON user_game_accounts(user_id, archived_at, created_at DESC, id DESC)
+  WHERE kind = 'metered_commercial';
+
+CREATE TABLE IF NOT EXISTS metered_personal_claims (
+  user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
+  profile_id TEXT NOT NULL,
+  claimed_at TIMESTAMPTZ NOT NULL
+);
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS cdk_redemption_idempotency (
@@ -859,6 +955,9 @@ UPDATE usage_events SET profile_id = record_json->>'profile_id' WHERE profile_id
 
 -- goofish:migration-phase
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS profile_id TEXT;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS billing_user_id TEXT;
+ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS billing_json JSONB;
+ALTER TABLE optimization_submissions ADD COLUMN IF NOT EXISTS billing_user_id TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS failure_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS worker_id TEXT;
 ALTER TABLE optimize_jobs ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ;
@@ -877,6 +976,9 @@ WHERE status = 'queued' AND attempt_count = 0
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_dispatch_ready ON optimize_jobs(status, next_attempt_at, priority DESC, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_queue_expires_at ON optimize_jobs(expires_at) WHERE status = 'queued';
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_profile_id ON optimize_jobs(profile_id);
+CREATE INDEX IF NOT EXISTS idx_optimize_jobs_billing_user_status ON optimize_jobs(billing_user_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_optimization_submissions_billing_user_created
+  ON optimization_submissions(billing_user_id, created_at DESC) WHERE billing_user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_optimize_jobs_worker_status ON optimize_jobs(worker_id, status);
 INSERT INTO optimize_job_attempts
   (job_id, attempt_no, worker_id, lock_token, status, started_at, heartbeat_at)
@@ -1282,8 +1384,8 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'public_content_settings',
   'personal_use_declaration_versions',
   'personal_use_declaration_acceptances',
-  'user_balance_accounts',
-  'user_balance_transactions',
+  'user_balance_qualification_ledger',
+  'commercial_account_limits',
   'user_notifications',
 ])
 

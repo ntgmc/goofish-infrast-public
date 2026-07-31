@@ -11,6 +11,7 @@ import adminSessionHandler from './handlers/admin-session'
 import adminUsersHandler from './handlers/admin-users'
 import adminItemsHandler from './handlers/admin-items'
 import adminBalanceHandler from './handlers/admin-balance'
+import adminCommercialHandler from './handlers/admin-commercial'
 import announcementHandler from './handlers/announcement'
 import authHandler from './handlers/auth'
 import { EFFICIENCY_DATA, EFFICIENCY_DATA_METADATA } from './handlers/data'
@@ -19,6 +20,8 @@ import optimizationHandler from './handlers/optimization'
 import userAnnouncementsHandler from './handlers/user-announcements'
 import userNotificationsHandler from './handlers/user-notifications'
 import userProfilesHandler from './handlers/user-profiles'
+import userMeteredProfilesHandler from './handlers/user-metered-profiles'
+import userBillingHandler from './handlers/user-billing'
 import userSklandHandler from './handlers/user-skland'
 import userStatusHandler from './handlers/user-status'
 import userWorkspaceHandler from './handlers/user-workspace'
@@ -56,6 +59,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/items', adminItemsHandler as unknown as ApiHandler],
   ['/api/admin/inventory', adminItemsHandler as unknown as ApiHandler],
   ['/api/admin/balance', adminBalanceHandler as unknown as ApiHandler],
+  ['/api/admin/commercial', adminCommercialHandler as unknown as ApiHandler],
   ['/api/auth/register', authHandler as unknown as ApiHandler],
   ['/api/auth/registration-settings', authHandler as unknown as ApiHandler],
   ['/api/auth/login', authHandler as unknown as ApiHandler],
@@ -83,6 +87,9 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/profiles/depot-value', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/preview', userProfilesHandler as unknown as ApiHandler],
   ['/api/user/profiles/redeem', userProfilesHandler as unknown as ApiHandler],
+  ['/api/user/profiles/metered-personal', userMeteredProfilesHandler as unknown as ApiHandler],
+  ['/api/user/commercial/profiles', userMeteredProfilesHandler as unknown as ApiHandler],
+  ['/api/user/billing/quote', userBillingHandler as unknown as ApiHandler],
   ['/api/user/cdk/redeem', userCdkHandler as unknown as ApiHandler],
   ['/api/user/skland/login/start', userSklandHandler as unknown as ApiHandler],
   ['/api/user/skland/login/complete', userSklandHandler as unknown as ApiHandler],

@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { AdminBalanceTransaction, BalancePage } from '../../../lib/balance-contracts'
 import { normalizePointsAmount } from '../../../lib/balance-contracts'
 import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, permissionLabels, appUserStatusLabels } from '../contracts'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, UserStatusPill, SmallButton, formatDate, getAdminProfileAccessLabel, formatAdminProfileAccess, formatOperatorValue, getAppUserStatusLabel } from '../shared/helpers'
+import { adminApiJson } from '../../../lib/admin-api-client'
 
 export interface UserDetailPanelProps {
   detail: AdminUserDetail;
@@ -21,7 +22,7 @@ export interface UserDetailPanelProps {
   onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
   onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
   onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
-  onAdjustBalance: (operation: 'credit' | 'debit', amount: string, reason: string, idempotencyKey: string) => Promise<boolean>;
+  onAdjustBalance: (operation: 'credit' | 'debit' | 'reverse_credit', amount: string, reason: string, idempotencyKey: string, originalTransactionId?: string) => Promise<boolean>;
   onLoadMoreBalance: () => Promise<void>;
   onFreezeUser: (user: AppUserSummary) => Promise<void>;
   onUnfreezeUser: (user: AppUserSummary) => Promise<void>;
@@ -88,6 +89,7 @@ function UserDetailPanel({
         </dl>
 
         <UserBalanceCard
+          userId={user.id}
           balance={balance}
           loading={balanceLoading}
           busy={busyAction === `user-balance:${user.id}`}
@@ -124,19 +126,22 @@ function UserDetailPanel({
 }
 
 function UserBalanceCard({
+  userId,
   balance,
   loading,
   busy,
   onAdjust,
   onLoadMore,
 }: {
+  userId: string;
   balance: BalancePage<AdminBalanceTransaction> | null;
   loading: boolean;
   busy: boolean;
   onAdjust: UserDetailPanelProps['onAdjustBalance'];
   onLoadMore: UserDetailPanelProps['onLoadMoreBalance'];
 }) {
-  const [operation, setOperation] = useState<'credit' | 'debit'>('credit')
+  const [operation, setOperation] = useState<'credit' | 'debit' | 'reverse_credit'>('credit')
+  const [originalTransactionId, setOriginalTransactionId] = useState('')
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
@@ -155,8 +160,12 @@ function UserBalanceCard({
       setValidationError('调整原因必填，长度不能超过 500 个字符。')
       return
     }
+    if (operation === 'reverse_credit' && !originalTransactionId.trim()) {
+      setValidationError('资格冲正必须填写原正向积分交易 ID。')
+      return
+    }
     setValidationError(null)
-    const succeeded = await onAdjust(operation, normalizedAmount, normalizedReason, idempotencyKey)
+    const succeeded = await onAdjust(operation, normalizedAmount, normalizedReason, idempotencyKey, originalTransactionId.trim() || undefined)
     if (!succeeded) return
     setAmount('')
     setReason('')
@@ -169,7 +178,8 @@ function UserBalanceCard({
         <div>
           <h3 id="admin-user-balance-title" className="text-sm font-semibold text-ink-primary">积分余额</h3>
           <p className="mt-2 text-3xl font-semibold tabular-nums text-ink-primary">{balance?.balance.available ?? '0.00'}</p>
-          <p className="mt-1 text-xs text-ink-muted">站内积分，不支持提现或转移</p>
+          <p className="mt-1 text-xs text-ink-muted">可用 {balance?.balance.available ?? '0.00'} · 预留 {balance?.balance.reserved ?? '0.00'} · 待追偿 {balance?.balance.debt ?? '0.00'}</p>
+          <p className="mt-1 text-xs text-ink-muted">累计获得 {balance?.balance.lifetime_credited ?? '0.00'} · 资格冲正 {balance?.balance.qualification_reversed ?? '0.00'} · {balance?.balance.commercial?.eligible ? `商用 Lv${balance.balance.commercial.level}` : '商用未生效'}</p>
         </div>
         <span className="tool-status">{balance?.transactions.length ?? 0} 条已加载流水</span>
       </div>
@@ -179,13 +189,18 @@ function UserBalanceCard({
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">操作</span>
           <select
             value={operation}
-            onChange={(event) => { setOperation(event.currentTarget.value as 'credit' | 'debit'); resetRequestIdentity() }}
+            onChange={(event) => { setOperation(event.currentTarget.value as 'credit' | 'debit' | 'reverse_credit'); resetRequestIdentity() }}
             className="tool-field"
           >
             <option value="credit">增加积分</option>
             <option value="debit">扣减积分</option>
+            <option value="reverse_credit">资格冲正</option>
           </select>
         </label>
+        {operation === 'reverse_credit' && <label className="lg:col-span-2">
+          <span className="mb-1.5 block text-xs font-medium text-ink-muted">原正向交易 ID</span>
+          <input value={originalTransactionId} onChange={(event) => { setOriginalTransactionId(event.currentTarget.value); resetRequestIdentity() }} className="tool-field font-mono" />
+        </label>}
         <label>
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">金额</span>
           <input
@@ -206,8 +221,8 @@ function UserBalanceCard({
             className="tool-field"
           />
         </label>
-        <button type="submit" disabled={busy} className={operation === 'debit' ? 'tool-danger-action self-end' : 'tool-primary-action self-end'}>
-          {busy ? '处理中…' : operation === 'debit' ? '扣减' : '增加'}
+        <button type="submit" disabled={busy} className={operation === 'credit' ? 'tool-primary-action self-end' : 'tool-danger-action self-end'}>
+          {busy ? '处理中…' : operation === 'credit' ? '增加' : operation === 'debit' ? '扣减' : '冲正'}
         </button>
       </form>
       {validationError && <p className="mt-2 text-sm text-error" role="alert">{validationError}</p>}
@@ -244,13 +259,49 @@ function UserBalanceCard({
           {loading ? '加载中…' : '加载更多'}
         </button>
       )}
+      <CommercialAdminControls userId={userId} />
     </section>
   )
+}
+
+function CommercialAdminControls({ userId }: { userId: string }) {
+  type Limits = { active: number; total: number; active_limit: number; total_limit: number; suspended: boolean; suspension_reason: string | null }
+  const [limits, setLimits] = useState<Limits | null>(null)
+  const [activeLimit, setActiveLimit] = useState('100')
+  const [totalLimit, setTotalLimit] = useState('1000')
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const load = async () => {
+    const data = await adminApiJson<{ limits: Limits }>(`/api/admin/commercial?user_id=${encodeURIComponent(userId)}`)
+    setLimits(data.limits); setActiveLimit(String(data.limits.active_limit)); setTotalLimit(String(data.limits.total_limit)); setReason(data.limits.suspension_reason ?? '')
+  }
+  useEffect(() => { void load().catch(() => undefined) }, [userId])
+  const save = async (suspended = limits?.suspended ?? false) => {
+    setBusy(true); setError(null)
+    try {
+      const data = await adminApiJson<{ limits: Limits }>('/api/admin/commercial', {
+        method: 'POST', json: { user_id: userId, active_profile_limit: Number(activeLimit), total_profile_limit: Number(totalLimit), suspended, reason },
+      })
+      setLimits(data.limits)
+    } catch (caught) { setError((caught as Error).message) }
+    finally { setBusy(false) }
+  }
+  return <div className="mt-5 border-t border-surface-3 pt-4">
+    <h4 className="text-sm font-semibold text-ink-primary">商用账户控制</h4>
+    <p className="mt-1 text-xs text-ink-muted">档案用量：活跃 {limits?.active ?? 0} / {limits?.active_limit ?? 100}，总量 {limits?.total ?? 0} / {limits?.total_limit ?? 1000}；状态：{limits?.suspended ? '已暂停' : '正常'}</p>
+    <div className="mt-3 grid gap-2 sm:grid-cols-3"><input aria-label="商用活跃档案上限" value={activeLimit} onChange={(event) => setActiveLimit(event.currentTarget.value)} className="tool-field" inputMode="numeric" /><input aria-label="商用档案总量上限" value={totalLimit} onChange={(event) => setTotalLimit(event.currentTarget.value)} className="tool-field" inputMode="numeric" /><input aria-label="暂停原因" value={reason} onChange={(event) => setReason(event.currentTarget.value)} className="tool-field" placeholder="暂停时填写原因" /></div>
+    <div className="mt-3 flex gap-2"><button type="button" disabled={busy} onClick={() => void save()} className="tool-secondary-action">保存限额</button><button type="button" disabled={busy} onClick={() => void save(!limits?.suspended)} className={limits?.suspended ? 'tool-primary-action' : 'tool-danger-action'}>{limits?.suspended ? '恢复商用' : '暂停商用'}</button></div>
+    {error && <p className="mt-2 text-sm text-error">{error}</p>}
+  </div>
 }
 
 function adminBalanceKindLabel(kind: AdminBalanceTransaction['kind']): string {
   if (kind === 'cdk_credit') return '余额 CDK'
   if (kind === 'admin_debit') return '管理员扣减'
+  if (kind === 'schedule_debit') return '成功主排班'
+  if (kind === 'admin_credit_reversal') return '资格冲正'
+  if (kind === 'debt_repayment') return '待追偿抵扣'
   return '管理员发放'
 }
 

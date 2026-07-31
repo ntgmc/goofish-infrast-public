@@ -1,18 +1,27 @@
-import { useCallback, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type FormEvent } from 'react'
 import { copy } from '../../../copy/index'
+import { ApiError } from '../../../lib/api-client'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import {
+  PUBLIC_CONTENT_LIMITS,
   PUBLIC_PRICING_PLAN_IDS,
-  parsePublicContentDraft,
+  publicContentDraftSchema,
+  type AdminPublicContentSettingsV1,
   type PublicContentDraftV1,
   type PublicContentSettingsV1,
 } from '../../../lib/public-content'
-import { usePublicContent } from '../../../lib/public-content-context'
 import { SortableMasterDetailList } from '../shared/SortableMasterDetailList'
 import { AdminToast } from '../shared/AdminToast'
 
 type TabId = 'qq' | 'faq' | 'pricing' | 'thanks'
-type EditSettings = (updater: (draft: PublicContentSettingsV1) => void) => void
+type EditSettings = (updater: (draft: AdminPublicContentSettingsV1) => void) => void
+type FieldErrors = Record<string, string>
+
+const ValidationContext = createContext<{
+  fieldErrors: FieldErrors
+  focusPath: string | null
+  clearFieldError: (path: string) => void
+}>({ fieldErrors: {}, focusPath: null, clearFieldError: () => undefined })
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'qq', label: copy.publicContent.admin_tab_qq },
@@ -22,11 +31,14 @@ const TABS: Array<{ id: TabId; label: string }> = [
 ]
 
 export default function PublicContentSettingsSection() {
-  const { refresh } = usePublicContent()
-  const [settings, setSettings] = useState<PublicContentSettingsV1 | null>(null)
+  const [settings, setSettings] = useState<AdminPublicContentSettingsV1 | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('qq')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [conflict, setConflict] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [focusPath, setFocusPath] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -35,11 +47,15 @@ export default function PublicContentSettingsSection() {
     setError(null)
     setNotice(null)
     try {
-      const data = await adminApiJson<{ settings?: PublicContentSettingsV1 }>('/api/admin/public-content', {
+      const data = await adminApiJson<{ settings?: AdminPublicContentSettingsV1 }>('/api/admin/public-content', {
         fallbackMessage: copy.publicContent.admin_load_failed,
       })
       if (!data.settings) throw new Error(copy.publicContent.admin_load_failed)
       setSettings(data.settings)
+      setDirty(false)
+      setConflict(false)
+      setFieldErrors({})
+      setFocusPath(null)
     } catch (caught) {
       setSettings(null)
       setError((caught as Error).message)
@@ -57,27 +73,49 @@ export default function PublicContentSettingsSection() {
       updater(next)
       return next
     })
+    setDirty(true)
+    setConflict(false)
     setNotice(null)
   }
 
-  const save = async () => {
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
     if (!settings) return
-    setSaving(true)
     setError(null)
     setNotice(null)
+    const parsed = publicContentDraftSchema.safeParse(toDraft(settings))
+    if (!parsed.success) {
+      const nextErrors = issuesToFieldErrors(parsed.error.issues)
+      const firstIssuePath = parsed.error.issues[0]?.path.map(String) ?? []
+      const firstPath = firstIssuePath.join('.')
+      const firstTarget = issueTargetPath(firstIssuePath)
+      setFieldErrors(nextErrors)
+      setFocusPath(firstPath)
+      setActiveTab(tabForValidationPath(firstPath))
+      focusValidationTarget(firstTarget)
+      return
+    }
+    setFieldErrors({})
+    setFocusPath(null)
+    setSaving(true)
     try {
-      const draft = parsePublicContentDraft(toDraft(settings))
-      const data = await adminApiJson<{ settings?: PublicContentSettingsV1 }>('/api/admin/public-content', {
+      const data = await adminApiJson<{ settings?: AdminPublicContentSettingsV1 }>('/api/admin/public-content', {
         method: 'PUT',
-        json: draft,
+        json: { ...parsed.data, expected_revision: settings.revision },
         fallbackMessage: copy.publicContent.admin_save_failed,
       })
       if (!data.settings) throw new Error(copy.publicContent.admin_save_failed)
       setSettings(data.settings)
+      setDirty(false)
+      setConflict(false)
       setNotice(copy.publicContent.admin_saved)
-      await refresh()
     } catch (caught) {
-      setError((caught as Error).message || copy.publicContent.validation_invalid)
+      if (caught instanceof ApiError && caught.status === 409) {
+        setConflict(true)
+        setError(copy.publicContent.admin_conflict)
+      } else {
+        setError((caught as Error).message || copy.publicContent.validation_invalid)
+      }
     } finally {
       setSaving(false)
     }
@@ -94,8 +132,23 @@ export default function PublicContentSettingsSection() {
     )
   }
 
+  const clearFieldError = (path: string) => {
+    setFieldErrors((current) => {
+      if (!current[path]) return current
+      const next = { ...current }
+      delete next[path]
+      return next
+    })
+  }
+
+  const reload = () => {
+    if (dirty && !window.confirm(copy.publicContent.admin_discard_confirm)) return
+    void load()
+  }
+
   return (
-    <div className="space-y-5">
+    <ValidationContext.Provider value={{ fieldErrors, focusPath, clearFieldError }}>
+    <form noValidate onSubmit={save} className="space-y-5">
       <section className="tool-panel p-5 sm:p-6">
         <p className="tool-eyebrow">{copy.publicContent.admin_nav}</p>
         <h2 className="mt-2 text-lg font-semibold text-ink-primary">{copy.publicContent.admin_title}</h2>
@@ -138,13 +191,16 @@ export default function PublicContentSettingsSection() {
       </section>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => void save()} disabled={saving} className="tool-primary-action">
+        <button type="submit" disabled={saving} className="tool-primary-action">
           {saving ? copy.publicContent.admin_saving : copy.publicContent.admin_save}
         </button>
-        <button type="button" onClick={() => void load()} disabled={saving} className="tool-secondary-action">{copy.publicContent.admin_reload}</button>
+        <button type="button" onClick={reload} disabled={saving} className="tool-secondary-action">
+          {conflict ? copy.publicContent.admin_reload_online : copy.publicContent.admin_reload}
+        </button>
         {settings.updated_at && <span className="text-xs text-ink-muted">{copy.publicContent.admin_updated_at}{new Date(settings.updated_at).toLocaleString('zh-CN')}</span>}
       </div>
-    </div>
+    </form>
+    </ValidationContext.Provider>
   )
 }
 
@@ -152,19 +208,26 @@ function QqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit:
   return (
     <EditorPanel title={copy.publicContent.admin_tab_qq} description={copy.publicContent.admin_qq_description}>
       <div className="grid gap-4 md:grid-cols-2">
-        <TextField id="public-content-qq-name" label={copy.publicContent.admin_qq_name} value={settings.qq_group.name} maxLength={80} onChange={(value) => edit((next) => { next.qq_group.name = value })} />
-        <TextField id="public-content-qq-number" label={copy.publicContent.admin_qq_number} value={settings.qq_group.number} maxLength={12} inputMode="numeric" onChange={(value) => edit((next) => { next.qq_group.number = value })} />
-        <TextField id="public-content-qq-label" label={copy.publicContent.admin_qq_link_label} value={settings.qq_group.link_label} maxLength={80} onChange={(value) => edit((next) => { next.qq_group.link_label = value })} />
-        <TextField id="public-content-qq-url" label={copy.publicContent.admin_qq_url} value={settings.qq_group.join_url} maxLength={2048} type="url" onChange={(value) => edit((next) => { next.qq_group.join_url = value })} />
+        <TextField path="qq_group.name" id="public-content-qq-name" label={copy.publicContent.admin_qq_name} value={settings.qq_group.name} maxLength={80} onChange={(value) => edit((next) => { next.qq_group.name = value })} />
+        <TextField path="qq_group.number" id="public-content-qq-number" label={copy.publicContent.admin_qq_number} value={settings.qq_group.number} maxLength={12} inputMode="numeric" onChange={(value) => edit((next) => { next.qq_group.number = value })} />
+        <TextField path="qq_group.link_label" id="public-content-qq-label" label={copy.publicContent.admin_qq_link_label} value={settings.qq_group.link_label} maxLength={80} onChange={(value) => edit((next) => { next.qq_group.link_label = value })} />
+        <TextField path="qq_group.join_url" id="public-content-qq-url" label={copy.publicContent.admin_qq_url} value={settings.qq_group.join_url} maxLength={2048} type="url" onChange={(value) => edit((next) => { next.qq_group.join_url = value })} />
       </div>
     </EditorPanel>
   )
 }
 
 function FaqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit: EditSettings }) {
-  const [selectedId, setSelectedId] = useSelectedId(settings.faq.items.map((item) => item.id))
-  const selectedIndex = settings.faq.items.findIndex((item) => item.id === selectedId)
+  const { focusPath } = useContext(ValidationContext)
+  const itemSelectionIds = masterSelectionIds(settings.faq.items)
+  const [selectedId, setSelectedId] = useSelectedId(itemSelectionIds)
+  const selectedIndex = itemSelectionIds.indexOf(selectedId ?? '')
   const selected = selectedIndex >= 0 ? settings.faq.items[selectedIndex] : null
+
+  useEffect(() => {
+    const index = validationArrayIndex(focusPath, 'faq.items')
+    if (index !== null && itemSelectionIds[index]) setSelectedId(itemSelectionIds[index])
+  }, [focusPath, itemSelectionIds, setSelectedId])
 
   const addItem = () => {
     const id = newId('faq')
@@ -174,7 +237,7 @@ function FaqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit
 
   const deleteSelected = () => {
     if (selectedIndex < 0) return
-    const nextSelected = selectionAfterDelete(settings.faq.items, selectedIndex)
+    const nextSelected = selectionAfterDelete(itemSelectionIds, selectedIndex)
     edit((next) => { next.faq.items.splice(selectedIndex, 1) })
     setSelectedId(nextSelected)
   }
@@ -184,13 +247,13 @@ function FaqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit
       <EditorPanel title={copy.publicContent.admin_tab_faq}>
         <PageFields prefix="faq" page={settings.faq} edit={(field, value) => edit((next) => { next.faq[field] = value })} />
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <TextField id="faq-cta-heading" label={copy.publicContent.admin_faq_cta_heading} value={settings.faq.cta_heading} maxLength={120} onChange={(value) => edit((next) => { next.faq.cta_heading = value })} />
-          <TextareaField id="faq-cta-body" label={copy.publicContent.admin_faq_cta_body} value={settings.faq.cta_body} maxLength={1000} onChange={(value) => edit((next) => { next.faq.cta_body = value })} />
+          <TextField path="faq.cta_heading" id="faq-cta-heading" label={copy.publicContent.admin_faq_cta_heading} value={settings.faq.cta_heading} maxLength={120} onChange={(value) => edit((next) => { next.faq.cta_heading = value })} />
+          <TextareaField path="faq.cta_body" id="faq-cta-body" label={copy.publicContent.admin_faq_cta_body} value={settings.faq.cta_body} maxLength={1000} onChange={(value) => edit((next) => { next.faq.cta_body = value })} />
         </div>
       </EditorPanel>
-      <EditorPanel title={copy.publicContent.admin_faq_items} description={copy.publicContent.admin_list_order_help} action={<button type="button" className="tool-secondary-action" onClick={addItem}>{copy.publicContent.admin_add_faq}</button>}>
+      <EditorPanel title={copy.publicContent.admin_faq_items} description={copy.publicContent.admin_list_order_help} action={<CollectionAddAction path="faq.items" count={settings.faq.items.length} limit={PUBLIC_CONTENT_LIMITS.faqItems} label={copy.publicContent.admin_add_faq} onAdd={addItem} />}>
         <SortableMasterDetailList
-          items={settings.faq.items.map((item) => ({ id: item.id, title: item.question, description: item.answer }))}
+          items={settings.faq.items.map((item, index) => ({ id: itemSelectionIds[index], title: item.question, description: item.answer }))}
           selectedId={selectedId}
           onSelect={setSelectedId}
           onReorder={(from, to) => edit((next) => { next.faq.items = moveItem(next.faq.items, from, to) })}
@@ -199,8 +262,8 @@ function FaqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit
             <div className="tool-inset p-5">
               <ListActions index={selectedIndex} length={settings.faq.items.length} onMove={(target) => edit((next) => { next.faq.items = moveItem(next.faq.items, selectedIndex, target) })} onDelete={deleteSelected} />
               <div className="mt-4 grid gap-4">
-                <TextField id={`faq-question-${selected.id}`} label={copy.publicContent.admin_question} value={selected.question} maxLength={160} onChange={(value) => edit((next) => { next.faq.items[selectedIndex].question = value })} />
-                <TextareaField id={`faq-answer-${selected.id}`} label={copy.publicContent.admin_answer} value={selected.answer} maxLength={4000} onChange={(value) => edit((next) => { next.faq.items[selectedIndex].answer = value })} />
+                <TextField path={`faq.items.${selectedIndex}.question`} id={`faq-question-${selected.id}`} label={copy.publicContent.admin_question} value={selected.question} maxLength={160} onChange={(value) => edit((next) => { next.faq.items[selectedIndex].question = value })} />
+                <TextareaField path={`faq.items.${selectedIndex}.answer`} id={`faq-answer-${selected.id}`} label={copy.publicContent.admin_answer} value={selected.answer} maxLength={4000} onChange={(value) => edit((next) => { next.faq.items[selectedIndex].answer = value })} />
                 <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-ink-secondary">
                   <input type="checkbox" checked={selected.action === 'qq_group'} onChange={(event) => edit((next) => { next.faq.items[selectedIndex].action = event.currentTarget.checked ? 'qq_group' : 'none' })} className="h-4 w-4 accent-brand-600" />
                   {copy.publicContent.admin_show_qq_action}
@@ -215,13 +278,26 @@ function FaqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit
 }
 
 function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit: EditSettings }) {
+  const { focusPath } = useContext(ValidationContext)
   const disclosureIds = settings.pricing.disclosures.map((_item, index) => `disclosure-${index}`)
   const [selectedDisclosureId, setSelectedDisclosureId] = useSelectedId(disclosureIds)
   const selectedDisclosureIndex = disclosureIds.indexOf(selectedDisclosureId ?? '')
   const selectedDisclosure = selectedDisclosureIndex >= 0 ? settings.pricing.disclosures[selectedDisclosureIndex] : null
-  const [selectedComparisonId, setSelectedComparisonId] = useSelectedId(settings.pricing.comparison_rows.map((row) => row.id))
-  const selectedComparisonIndex = settings.pricing.comparison_rows.findIndex((row) => row.id === selectedComparisonId)
+  const comparisonSelectionIds = masterSelectionIds(settings.pricing.comparison_rows)
+  const [selectedComparisonId, setSelectedComparisonId] = useSelectedId(comparisonSelectionIds)
+  const selectedComparisonIndex = comparisonSelectionIds.indexOf(selectedComparisonId ?? '')
   const selectedComparison = selectedComparisonIndex >= 0 ? settings.pricing.comparison_rows[selectedComparisonIndex] : null
+
+  useEffect(() => {
+    const disclosureIndex = validationArrayIndex(focusPath, 'pricing.disclosures')
+    if (disclosureIndex !== null && settings.pricing.disclosures[disclosureIndex] !== undefined) {
+      setSelectedDisclosureId(`disclosure-${disclosureIndex}`)
+    }
+    const comparisonIndex = validationArrayIndex(focusPath, 'pricing.comparison_rows')
+    if (comparisonIndex !== null && comparisonSelectionIds[comparisonIndex]) {
+      setSelectedComparisonId(comparisonSelectionIds[comparisonIndex])
+    }
+  }, [comparisonSelectionIds, focusPath, setSelectedComparisonId, setSelectedDisclosureId, settings.pricing.disclosures])
 
   const addDisclosure = () => {
     const index = settings.pricing.disclosures.length
@@ -245,7 +321,7 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
 
   const deleteComparison = () => {
     if (selectedComparisonIndex < 0) return
-    const nextSelected = selectionAfterDelete(settings.pricing.comparison_rows, selectedComparisonIndex)
+    const nextSelected = selectionAfterDelete(comparisonSelectionIds, selectedComparisonIndex)
     edit((next) => { next.pricing.comparison_rows.splice(selectedComparisonIndex, 1) })
     setSelectedComparisonId(nextSelected)
   }
@@ -263,21 +339,21 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
               <fieldset key={planId} className="tool-inset p-4">
                 <legend className="px-2 text-base font-semibold text-ink-primary">{plan.label}</legend>
                 <div className="grid gap-4">
-                  <TextField id={`${planId}-label`} label={copy.publicContent.admin_plan_label} value={plan.label} maxLength={80} onChange={(value) => edit((next) => { next.pricing.plans[planId].label = value })} />
+                  <TextField path={`pricing.plans.${planId}.label`} id={`${planId}-label`} label={copy.publicContent.admin_plan_label} value={plan.label} maxLength={80} onChange={(value) => edit((next) => { next.pricing.plans[planId].label = value })} />
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <TextField id={`${planId}-badge`} label={copy.publicContent.admin_plan_badge} value={plan.badge} maxLength={40} onChange={(value) => edit((next) => { next.pricing.plans[planId].badge = value })} />
-                    <TextField id={`${planId}-price`} label={copy.publicContent.admin_plan_price} value={plan.display_price} maxLength={40} onChange={(value) => edit((next) => { next.pricing.plans[planId].display_price = value })} />
+                    <TextField path={`pricing.plans.${planId}.badge`} id={`${planId}-badge`} label={copy.publicContent.admin_plan_badge} value={plan.badge} maxLength={40} onChange={(value) => edit((next) => { next.pricing.plans[planId].badge = value })} />
+                    <TextField path={`pricing.plans.${planId}.display_price`} id={`${planId}-price`} label={copy.publicContent.admin_plan_price} value={plan.display_price} maxLength={40} onChange={(value) => edit((next) => { next.pricing.plans[planId].display_price = value })} />
                   </div>
-                  <TextareaField id={`${planId}-summary`} label={copy.publicContent.admin_plan_summary} value={plan.summary} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.plans[planId].summary = value })} />
-                  <TextareaField id={`${planId}-scope`} label={copy.publicContent.admin_plan_scope} value={plan.account_scope} maxLength={500} onChange={(value) => edit((next) => { next.pricing.plans[planId].account_scope = value })} />
+                  <TextareaField path={`pricing.plans.${planId}.summary`} id={`${planId}-summary`} label={copy.publicContent.admin_plan_summary} value={plan.summary} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.plans[planId].summary = value })} />
+                  <TextareaField path={`pricing.plans.${planId}.account_scope`} id={`${planId}-scope`} label={copy.publicContent.admin_plan_scope} value={plan.account_scope} maxLength={500} onChange={(value) => edit((next) => { next.pricing.plans[planId].account_scope = value })} />
                 </div>
               </fieldset>
             )
           })}
         </div>
       </EditorPanel>
-      <EditorPanel title={copy.publicContent.admin_disclosures} description={copy.publicContent.admin_list_order_help} action={<button type="button" className="tool-secondary-action" onClick={addDisclosure}>{copy.publicContent.admin_add_disclosure}</button>}>
-        <TextField id="pricing-policy-heading" label={copy.publicContent.admin_policy_heading} value={settings.pricing.policy_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.policy_heading = value })} />
+      <EditorPanel title={copy.publicContent.admin_disclosures} description={copy.publicContent.admin_list_order_help} action={<CollectionAddAction path="pricing.disclosures" count={settings.pricing.disclosures.length} limit={PUBLIC_CONTENT_LIMITS.pricingDisclosures} label={copy.publicContent.admin_add_disclosure} onAdd={addDisclosure} />}>
+        <TextField path="pricing.policy_heading" id="pricing-policy-heading" label={copy.publicContent.admin_policy_heading} value={settings.pricing.policy_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.policy_heading = value })} />
         <div className="mt-4">
           <SortableMasterDetailList
             items={settings.pricing.disclosures.map((item, index) => ({ id: `disclosure-${index}`, title: item }))}
@@ -300,18 +376,18 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
                   onDelete={deleteDisclosure}
                 />
                 <div className="mt-4">
-                  <TextareaField id={`pricing-disclosure-${selectedDisclosureIndex}`} label={`${copy.publicContent.admin_disclosures} ${selectedDisclosureIndex + 1}`} value={selectedDisclosure} maxLength={500} onChange={(value) => edit((next) => { next.pricing.disclosures[selectedDisclosureIndex] = value })} />
+                  <TextareaField path={`pricing.disclosures.${selectedDisclosureIndex}`} id={`pricing-disclosure-${selectedDisclosureIndex}`} label={`${copy.publicContent.admin_disclosures} ${selectedDisclosureIndex + 1}`} value={selectedDisclosure} maxLength={500} onChange={(value) => edit((next) => { next.pricing.disclosures[selectedDisclosureIndex] = value })} />
                 </div>
               </div>
             ) : <EmptyDetail />}
           />
         </div>
       </EditorPanel>
-      <EditorPanel title={copy.publicContent.admin_comparison_rows} description={copy.publicContent.admin_list_order_help} action={<button type="button" className="tool-secondary-action" onClick={addComparison}>{copy.publicContent.admin_add_comparison}</button>}>
-        <TextField id="pricing-comparison-heading" label={copy.publicContent.admin_comparison_heading} value={settings.pricing.comparison_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.comparison_heading = value })} />
+      <EditorPanel title={copy.publicContent.admin_comparison_rows} description={copy.publicContent.admin_list_order_help} action={<CollectionAddAction path="pricing.comparison_rows" count={settings.pricing.comparison_rows.length} limit={PUBLIC_CONTENT_LIMITS.pricingComparisonRows} label={copy.publicContent.admin_add_comparison} onAdd={addComparison} />}>
+        <TextField path="pricing.comparison_heading" id="pricing-comparison-heading" label={copy.publicContent.admin_comparison_heading} value={settings.pricing.comparison_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.comparison_heading = value })} />
         <div className="mt-4">
           <SortableMasterDetailList
-            items={settings.pricing.comparison_rows.map((row) => ({ id: row.id, title: row.feature, description: `${row.free_preview} / ${row.single_account_lifetime}` }))}
+            items={settings.pricing.comparison_rows.map((row, index) => ({ id: comparisonSelectionIds[index], title: row.feature, description: `${row.free_preview} / ${row.single_account_lifetime}` }))}
             selectedId={selectedComparisonId}
             onSelect={setSelectedComparisonId}
             onReorder={(from, to) => edit((next) => { next.pricing.comparison_rows = moveItem(next.pricing.comparison_rows, from, to) })}
@@ -320,10 +396,10 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
               <div className="tool-inset p-5">
                 <ListActions index={selectedComparisonIndex} length={settings.pricing.comparison_rows.length} onMove={(target) => edit((next) => { next.pricing.comparison_rows = moveItem(next.pricing.comparison_rows, selectedComparisonIndex, target) })} onDelete={deleteComparison} />
                 <div className="mt-4 grid gap-4">
-                  <TextField id={`comparison-feature-${selectedComparison.id}`} label={copy.publicContent.admin_feature_name} value={selectedComparison.feature} maxLength={120} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].feature = value })} />
+                  <TextField path={`pricing.comparison_rows.${selectedComparisonIndex}.feature`} id={`comparison-feature-${selectedComparison.id}`} label={copy.publicContent.admin_feature_name} value={selectedComparison.feature} maxLength={120} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].feature = value })} />
                   <div className="grid gap-4 lg:grid-cols-2">
-                    <TextareaField id={`comparison-free-${selectedComparison.id}`} label={copy.publicContent.admin_free_preview} value={selectedComparison.free_preview} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].free_preview = value })} />
-                    <TextareaField id={`comparison-paid-${selectedComparison.id}`} label={copy.publicContent.admin_single_lifetime} value={selectedComparison.single_account_lifetime} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].single_account_lifetime = value })} />
+                    <TextareaField path={`pricing.comparison_rows.${selectedComparisonIndex}.free_preview`} id={`comparison-free-${selectedComparison.id}`} label={copy.publicContent.admin_free_preview} value={selectedComparison.free_preview} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].free_preview = value })} />
+                    <TextareaField path={`pricing.comparison_rows.${selectedComparisonIndex}.single_account_lifetime`} id={`comparison-paid-${selectedComparison.id}`} label={copy.publicContent.admin_single_lifetime} value={selectedComparison.single_account_lifetime} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.comparison_rows[selectedComparisonIndex].single_account_lifetime = value })} />
                   </div>
                 </div>
               </div>
@@ -333,8 +409,8 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
       </EditorPanel>
       <EditorPanel title={copy.publicContent.admin_support_heading}>
         <div className="grid gap-4 md:grid-cols-2">
-          <TextField id="pricing-support-heading" label={copy.publicContent.admin_support_heading} value={settings.pricing.support_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.support_heading = value })} />
-          <TextareaField id="pricing-support-body" label={copy.publicContent.admin_support_body} value={settings.pricing.support_body} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.support_body = value })} />
+          <TextField path="pricing.support_heading" id="pricing-support-heading" label={copy.publicContent.admin_support_heading} value={settings.pricing.support_heading} maxLength={120} onChange={(value) => edit((next) => { next.pricing.support_heading = value })} />
+          <TextareaField path="pricing.support_body" id="pricing-support-body" label={copy.publicContent.admin_support_body} value={settings.pricing.support_body} maxLength={1000} onChange={(value) => edit((next) => { next.pricing.support_body = value })} />
         </div>
       </EditorPanel>
     </>
@@ -342,9 +418,16 @@ function PricingEditor({ settings, edit }: { settings: PublicContentSettingsV1; 
 }
 
 function ThanksEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit: EditSettings }) {
-  const [selectedSectionId, setSelectedSectionId] = useSelectedId(settings.thanks.sections.map((section) => section.id))
-  const selectedSectionIndex = settings.thanks.sections.findIndex((section) => section.id === selectedSectionId)
+  const { focusPath } = useContext(ValidationContext)
+  const sectionSelectionIds = masterSelectionIds(settings.thanks.sections)
+  const [selectedSectionId, setSelectedSectionId] = useSelectedId(sectionSelectionIds)
+  const selectedSectionIndex = sectionSelectionIds.indexOf(selectedSectionId ?? '')
   const selectedSection = selectedSectionIndex >= 0 ? settings.thanks.sections[selectedSectionIndex] : null
+
+  useEffect(() => {
+    const index = validationArrayIndex(focusPath, 'thanks.sections')
+    if (index !== null && sectionSelectionIds[index]) setSelectedSectionId(sectionSelectionIds[index])
+  }, [focusPath, sectionSelectionIds, setSelectedSectionId])
 
   const addSection = () => {
     const id = newId('section')
@@ -354,7 +437,7 @@ function ThanksEditor({ settings, edit }: { settings: PublicContentSettingsV1; e
 
   const deleteSection = () => {
     if (selectedSectionIndex < 0) return
-    const nextSelected = selectionAfterDelete(settings.thanks.sections, selectedSectionIndex)
+    const nextSelected = selectionAfterDelete(sectionSelectionIds, selectedSectionIndex)
     edit((next) => { next.thanks.sections.splice(selectedSectionIndex, 1) })
     setSelectedSectionId(nextSelected)
   }
@@ -364,16 +447,16 @@ function ThanksEditor({ settings, edit }: { settings: PublicContentSettingsV1; e
       <EditorPanel title={copy.publicContent.admin_tab_thanks}>
         <PageFields prefix="thanks" page={settings.thanks} edit={(field, value) => edit((next) => { next.thanks[field] = value })} />
       </EditorPanel>
-      <EditorPanel title={copy.publicContent.admin_thanks_sections} description={copy.publicContent.admin_list_order_help} action={<button type="button" className="tool-secondary-action" onClick={addSection}>{copy.publicContent.admin_add_section}</button>}>
+      <EditorPanel title={copy.publicContent.admin_thanks_sections} description={copy.publicContent.admin_list_order_help} action={<CollectionAddAction path="thanks.sections" count={settings.thanks.sections.length} limit={PUBLIC_CONTENT_LIMITS.thanksSections} label={copy.publicContent.admin_add_section} onAdd={addSection} />}>
         <SortableMasterDetailList
-          items={settings.thanks.sections.map((section) => ({ id: section.id, title: section.heading, description: section.intro, meta: `${section.entries.length} ${copy.publicContent.admin_entries}` }))}
+          items={settings.thanks.sections.map((section, index) => ({ id: sectionSelectionIds[index], title: section.heading, description: section.intro, meta: `${section.entries.length} ${copy.publicContent.admin_entries}` }))}
           selectedId={selectedSectionId}
           onSelect={setSelectedSectionId}
           onReorder={(from, to) => edit((next) => { next.thanks.sections = moveItem(next.thanks.sections, from, to) })}
           ariaLabel={copy.publicContent.admin_thanks_sections}
           detail={selectedSection ? (
             <ThanksSectionDetail
-              key={selectedSection.id}
+              key={selectedSectionId}
               section={selectedSection}
               sectionIndex={selectedSectionIndex}
               sectionCount={settings.thanks.sections.length}
@@ -396,9 +479,16 @@ function ThanksSectionDetail({ section, sectionIndex, sectionCount, edit, onMove
   onMoveSection: (target: number) => void
   onDeleteSection: () => void
 }) {
-  const [selectedEntryId, setSelectedEntryId] = useSelectedId(section.entries.map((entry) => entry.id))
-  const selectedEntryIndex = section.entries.findIndex((entry) => entry.id === selectedEntryId)
+  const { focusPath } = useContext(ValidationContext)
+  const entrySelectionIds = masterSelectionIds(section.entries)
+  const [selectedEntryId, setSelectedEntryId] = useSelectedId(entrySelectionIds)
+  const selectedEntryIndex = entrySelectionIds.indexOf(selectedEntryId ?? '')
   const selectedEntry = selectedEntryIndex >= 0 ? section.entries[selectedEntryIndex] : null
+
+  useEffect(() => {
+    const index = validationArrayIndex(focusPath, `thanks.sections.${sectionIndex}.entries`)
+    if (index !== null && entrySelectionIds[index]) setSelectedEntryId(entrySelectionIds[index])
+  }, [entrySelectionIds, focusPath, sectionIndex, setSelectedEntryId])
 
   const addEntry = () => {
     const id = newId('entry')
@@ -408,7 +498,7 @@ function ThanksSectionDetail({ section, sectionIndex, sectionCount, edit, onMove
 
   const deleteEntry = () => {
     if (selectedEntryIndex < 0) return
-    const nextSelected = selectionAfterDelete(section.entries, selectedEntryIndex)
+    const nextSelected = selectionAfterDelete(entrySelectionIds, selectedEntryIndex)
     edit((next) => { next.thanks.sections[sectionIndex].entries.splice(selectedEntryIndex, 1) })
     setSelectedEntryId(nextSelected)
   }
@@ -417,16 +507,16 @@ function ThanksSectionDetail({ section, sectionIndex, sectionCount, edit, onMove
     <div className="tool-inset p-5">
       <ListActions index={sectionIndex} length={sectionCount} onMove={onMoveSection} onDelete={onDeleteSection} />
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <TextField id={`thanks-heading-${section.id}`} label={copy.publicContent.admin_section_heading} value={section.heading} maxLength={120} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].heading = value })} />
-        <TextareaField id={`thanks-intro-${section.id}`} label={copy.publicContent.admin_section_intro} value={section.intro} maxLength={1000} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].intro = value })} />
+        <TextField path={`thanks.sections.${sectionIndex}.heading`} id={`thanks-heading-${section.id}`} label={copy.publicContent.admin_section_heading} value={section.heading} maxLength={120} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].heading = value })} />
+        <TextareaField path={`thanks.sections.${sectionIndex}.intro`} id={`thanks-intro-${section.id}`} label={copy.publicContent.admin_section_intro} value={section.intro} maxLength={1000} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].intro = value })} />
       </div>
       <div className="mt-6 flex items-center justify-between gap-3 border-t border-surface-3 pt-5">
         <h3 className="text-sm font-semibold text-ink-primary">{copy.publicContent.admin_entries}</h3>
-        <button type="button" className="tool-secondary-action px-3 text-sm" onClick={addEntry}>{copy.publicContent.admin_add_entry}</button>
+        <CollectionAddAction path={`thanks.sections.${sectionIndex}.entries`} count={section.entries.length} limit={PUBLIC_CONTENT_LIMITS.thanksEntries} label={copy.publicContent.admin_add_entry} onAdd={addEntry} compact />
       </div>
       <div className="mt-3">
         <SortableMasterDetailList
-          items={section.entries.map((entry) => ({ id: entry.id, title: entry.name, description: entry.description }))}
+          items={section.entries.map((entry, index) => ({ id: entrySelectionIds[index], title: entry.name, description: entry.description }))}
           selectedId={selectedEntryId}
           onSelect={setSelectedEntryId}
           onReorder={(from, to) => edit((next) => { next.thanks.sections[sectionIndex].entries = moveItem(next.thanks.sections[sectionIndex].entries, from, to) })}
@@ -435,11 +525,11 @@ function ThanksSectionDetail({ section, sectionIndex, sectionCount, edit, onMove
             <div className="rounded-xl border border-surface-3 p-4">
               <ListActions index={selectedEntryIndex} length={section.entries.length} onMove={(target) => edit((next) => { next.thanks.sections[sectionIndex].entries = moveItem(next.thanks.sections[sectionIndex].entries, selectedEntryIndex, target) })} onDelete={deleteEntry} />
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <TextField id={`thanks-name-${selectedEntry.id}`} label={copy.publicContent.admin_entry_name} value={selectedEntry.name} maxLength={120} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].name = value })} />
-                <TextField id={`thanks-url-${selectedEntry.id}`} label={copy.publicContent.admin_entry_url} value={selectedEntry.url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].url = value })} />
-                <TextField id={`thanks-avatar-url-${selectedEntry.id}`} label={copy.publicContent.admin_entry_avatar_url} value={selectedEntry.avatar_url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].avatar_url = value })} />
+                <TextField path={`thanks.sections.${sectionIndex}.entries.${selectedEntryIndex}.name`} id={`thanks-name-${selectedEntry.id}`} label={copy.publicContent.admin_entry_name} value={selectedEntry.name} maxLength={120} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].name = value })} />
+                <TextField path={`thanks.sections.${sectionIndex}.entries.${selectedEntryIndex}.url`} id={`thanks-url-${selectedEntry.id}`} label={copy.publicContent.admin_entry_url} value={selectedEntry.url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].url = value })} />
+                <TextField path={`thanks.sections.${sectionIndex}.entries.${selectedEntryIndex}.avatar_url`} id={`thanks-avatar-url-${selectedEntry.id}`} label={copy.publicContent.admin_entry_avatar_url} value={selectedEntry.avatar_url} maxLength={2048} type="url" required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].avatar_url = value })} />
                 <div className="md:col-span-2">
-                  <TextareaField id={`thanks-description-${selectedEntry.id}`} label={copy.publicContent.admin_entry_description} value={selectedEntry.description} maxLength={1000} required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].description = value })} />
+                  <TextareaField path={`thanks.sections.${sectionIndex}.entries.${selectedEntryIndex}.description`} id={`thanks-description-${selectedEntry.id}`} label={copy.publicContent.admin_entry_description} value={selectedEntry.description} maxLength={1000} required={false} onChange={(value) => edit((next) => { next.thanks.sections[sectionIndex].entries[selectedEntryIndex].description = value })} />
                 </div>
               </div>
             </div>
@@ -457,10 +547,10 @@ function PageFields({ prefix, page, edit }: {
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <TextField id={`${prefix}-eyebrow`} label={copy.publicContent.admin_page_eyebrow} value={page.eyebrow} maxLength={80} onChange={(value) => edit('eyebrow', value)} />
-      <TextField id={`${prefix}-title`} label={copy.publicContent.admin_page_title} value={page.title} maxLength={80} onChange={(value) => edit('title', value)} />
+      <TextField path={`${prefix}.eyebrow`} id={`${prefix}-eyebrow`} label={copy.publicContent.admin_page_eyebrow} value={page.eyebrow} maxLength={80} onChange={(value) => edit('eyebrow', value)} />
+      <TextField path={`${prefix}.title`} id={`${prefix}-title`} label={copy.publicContent.admin_page_title} value={page.title} maxLength={80} onChange={(value) => edit('title', value)} />
       <div className="md:col-span-2">
-        <TextareaField id={`${prefix}-intro`} label={copy.publicContent.admin_page_intro} value={page.intro} maxLength={1000} onChange={(value) => edit('intro', value)} />
+        <TextareaField path={`${prefix}.intro`} id={`${prefix}-intro`} label={copy.publicContent.admin_page_intro} value={page.intro} maxLength={1000} onChange={(value) => edit('intro', value)} />
       </div>
     </div>
   )
@@ -481,23 +571,65 @@ function EditorPanel({ title, description, action, children }: { title: string; 
   )
 }
 
-function TextField({ id, label, value, maxLength, onChange, type = 'text', inputMode, required = true }: {
-  id: string; label: string; value: string; maxLength: number; onChange: (value: string) => void; type?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']; required?: boolean
+function TextField({ path, id, label, value, maxLength, onChange, type = 'text', inputMode, required = true }: {
+  path: string; id: string; label: string; value: string; maxLength: number; onChange: (value: string) => void; type?: string; inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']; required?: boolean
 }) {
+  const { fieldErrors, clearFieldError } = useContext(ValidationContext)
+  const error = fieldErrors[path]
+  const errorId = `${id}-error`
   return (
     <label htmlFor={id} className="block">
       <span className="mb-2 block text-sm font-medium text-ink-secondary">{label}{required && <RequiredMark />}</span>
-      <input id={id} value={value} type={type} inputMode={inputMode} maxLength={maxLength} required={required} onChange={(event) => onChange(event.currentTarget.value)} className="tool-field" />
+      <input id={id} data-validation-path={path} value={value} type={type} inputMode={inputMode} maxLength={maxLength} required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => { clearFieldError(path); onChange(event.currentTarget.value) }} className="tool-field" />
+      {error && <p id={errorId} className="mt-1.5 text-sm text-error" role="alert">{error}</p>}
     </label>
   )
 }
 
-function TextareaField({ id, label, value, maxLength, required = true, onChange }: { id: string; label: string; value: string; maxLength: number; required?: boolean; onChange: (value: string) => void }) {
+function TextareaField({ path, id, label, value, maxLength, required = true, onChange }: { path: string; id: string; label: string; value: string; maxLength: number; required?: boolean; onChange: (value: string) => void }) {
+  const { fieldErrors, clearFieldError } = useContext(ValidationContext)
+  const error = fieldErrors[path]
+  const errorId = `${id}-error`
   return (
     <label htmlFor={id} className="block">
       <span className="mb-2 block text-sm font-medium text-ink-secondary">{label}{required && <RequiredMark />}</span>
-      <textarea id={id} value={value} maxLength={maxLength} required={required} rows={4} onChange={(event) => onChange(event.currentTarget.value)} className="tool-field min-h-28 resize-y" />
+      <textarea id={id} data-validation-path={path} value={value} maxLength={maxLength} required={required} rows={4} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(event) => { clearFieldError(path); onChange(event.currentTarget.value) }} className="tool-field min-h-28 resize-y" />
+      {error && <p id={errorId} className="mt-1.5 text-sm text-error" role="alert">{error}</p>}
     </label>
+  )
+}
+
+function CollectionAddAction({ path, count, limit, label, onAdd, compact = false }: {
+  path: string
+  count: number
+  limit: number
+  label: string
+  onAdd: () => void
+  compact?: boolean
+}) {
+  const { fieldErrors, clearFieldError } = useContext(ValidationContext)
+  const reachedLimit = count >= limit
+  const error = fieldErrors[path]
+  const description = error ?? (reachedLimit ? copy.publicContent.admin_limit_reached(limit) : null)
+  const descriptionId = `${path.replace(/\./g, '-')}-collection-error`
+  return (
+    <div className="text-right">
+      <button
+        type="button"
+        data-validation-path={path}
+        disabled={reachedLimit}
+        aria-invalid={Boolean(error)}
+        aria-describedby={description ? descriptionId : undefined}
+        className={`tool-secondary-action ${compact ? 'px-3 text-sm' : ''}`}
+        onClick={() => {
+          clearFieldError(path)
+          onAdd()
+        }}
+      >
+        {label}
+      </button>
+      {description && <p id={descriptionId} className="mt-1 text-xs text-error" role={error ? 'alert' : undefined}>{description}</p>}
+    </div>
   )
 }
 
@@ -519,6 +651,60 @@ function EmptyDetail() {
   return <div className="tool-inset border-dashed p-6 text-sm text-ink-muted">{copy.publicContent.admin_select_item}</div>
 }
 
+function issuesToFieldErrors(issues: ReadonlyArray<{ path: PropertyKey[]; message: string; code: string }>): FieldErrors {
+  const errors: FieldErrors = {}
+  for (const issue of issues) {
+    const path = issue.path.map(String)
+    const target = issueTargetPath(path)
+    if (!errors[target]) {
+      errors[target] = issue.code === 'custom' && path[path.length - 1] === 'id'
+        ? copy.publicContent.admin_duplicate_id
+        : issue.message
+    }
+  }
+  return errors
+}
+
+function issueTargetPath(path: string[]): string {
+  if (path[path.length - 1] !== 'id') return path.join('.') || 'public-content-form'
+  let itemIndex = -1
+  for (let index = path.length - 1; index >= 0; index -= 1) {
+    if (/^\d+$/.test(path[index])) {
+      itemIndex = index
+      break
+    }
+  }
+  return itemIndex >= 0 ? path.slice(0, itemIndex).join('.') : path.join('.')
+}
+
+function tabForValidationPath(path: string): TabId {
+  if (path.startsWith('faq.')) return 'faq'
+  if (path.startsWith('pricing.')) return 'pricing'
+  if (path.startsWith('thanks.')) return 'thanks'
+  return 'qq'
+}
+
+function validationArrayIndex(path: string | null, prefix: string): number | null {
+  if (!path?.startsWith(`${prefix}.`)) return null
+  const value = path.slice(prefix.length + 1).split('.')[0]
+  return /^\d+$/.test(value) ? Number(value) : null
+}
+
+function focusValidationTarget(path: string): void {
+  let attempts = 0
+  const focus = () => {
+    const target = Array.from(document.querySelectorAll<HTMLElement>('[data-validation-path]'))
+      .find((element) => element.dataset.validationPath === path)
+    if (target) {
+      target.focus()
+      return
+    }
+    attempts += 1
+    if (attempts < 8) window.setTimeout(focus, 16)
+  }
+  window.setTimeout(focus, 0)
+}
+
 function useSelectedId(ids: string[]): [string | null, (id: string | null) => void] {
   const [selectedId, setSelectedId] = useState<string | null>(() => ids[0] ?? null)
   useEffect(() => {
@@ -528,11 +714,23 @@ function useSelectedId(ids: string[]): [string | null, (id: string | null) => vo
   return [selectedId, setSelectedId]
 }
 
-function selectionAfterDelete<T extends { id: string }>(items: T[], deletedIndex: number): string | null {
-  if (items.length <= 1) return null
-  return items[Math.min(deletedIndex + 1, items.length - 1)]?.id
-    ?? items[Math.max(0, deletedIndex - 1)]?.id
+function selectionAfterDelete(ids: string[], deletedIndex: number): string | null {
+  if (ids.length <= 1) return null
+  return ids[Math.min(deletedIndex + 1, ids.length - 1)]
+    ?? ids[Math.max(0, deletedIndex - 1)]
     ?? null
+}
+
+function masterSelectionIds(items: Array<{ id: string }>): string[] {
+  const totals = new Map<string, number>()
+  const occurrences = new Map<string, number>()
+  for (const item of items) totals.set(item.id, (totals.get(item.id) ?? 0) + 1)
+  return items.map((item) => {
+    if (totals.get(item.id) === 1) return item.id
+    const occurrence = occurrences.get(item.id) ?? 0
+    occurrences.set(item.id, occurrence + 1)
+    return `${item.id}::duplicate-${occurrence}`
+  })
 }
 
 function moveItem<T>(items: T[], from: number, to: number): T[] {

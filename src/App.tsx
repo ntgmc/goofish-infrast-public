@@ -15,7 +15,7 @@ import { ThemeProvider } from './lib/theme'
 import { SiteFeatureProvider } from './lib/site-feature-context'
 import { FeatureRoute } from './components/FeatureUnavailablePage'
 import AccountSafetyPage from './pages/AccountSafetyPage'
-import { PublicContentProvider } from './lib/public-content-context'
+import PublicContentRoute from './components/PublicContentRoute'
 import { apiVoid } from './lib/api-client'
 import { categorizeBehaviorRiskPath } from './lib/behavior-risk-client'
 
@@ -34,11 +34,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <SiteFeatureProvider>
-        <PublicContentProvider>
-          <MotionConfig reducedMotion="user" transition={{ duration: motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
-            <AppContent />
-          </MotionConfig>
-        </PublicContentProvider>
+        <MotionConfig reducedMotion="user" transition={{ duration: motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
+          <AppContent />
+        </MotionConfig>
       </SiteFeatureProvider>
     </ThemeProvider>
   )
@@ -63,21 +61,23 @@ function AppContent() {
       <RouteLifecycle />
       <AnimatedPresenceRegion motionKey={routeGroup} page>
         <Routes location={location}>
-          <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
+          <Route element={<PublicContentRoute />}>
+            <Route path="/" element={<LandingPage onStart={() => navigate('/tool/profiles')} />} />
+            <Route path="/changelog" element={<LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage>} />
+            <Route path="/faq" element={<LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage>} />
+            <Route path="/support" element={<LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage>} />
+            <Route path="/pricing" element={<LazyPage fallback={copy.common.App_012}><PricingPage /></LazyPage>} />
+            <Route path="/thanks" element={<LazyPage fallback={copy.common.App_013}><ThanksPage /></LazyPage>} />
+            <Route path="/privacy" element={<LazyPage fallback={copy.common.App_005}><PublicInfoPage page="privacy" /></LazyPage>} />
+            <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
+            <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
+          </Route>
           <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/cancel-account-deletion" element={<CancelAccountDeletionPage />} />
           <Route path="/account-safety" element={<AccountSafetyPage />} />
           <Route path="/announcements" element={<FeatureRoute feature="announcements"><LazyPage fallback={copy.common.App_002}><AnnouncementsPage /></LazyPage></FeatureRoute>} />
-          <Route path="/changelog" element={<LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage>} />
-          <Route path="/faq" element={<LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage>} />
-          <Route path="/support" element={<LazyPage fallback={copy.common.App_004}><PublicInfoPage page="support" /></LazyPage>} />
-          <Route path="/pricing" element={<LazyPage fallback={copy.common.App_012}><PricingPage /></LazyPage>} />
-          <Route path="/thanks" element={<LazyPage fallback={copy.common.App_013}><ThanksPage /></LazyPage>} />
-          <Route path="/privacy" element={<LazyPage fallback={copy.common.App_005}><PublicInfoPage page="privacy" /></LazyPage>} />
-          <Route path="/terms" element={<LazyPage fallback={copy.common.App_006}><PublicInfoPage page="terms" /></LazyPage>} />
-          <Route path="/disclaimer" element={<LazyPage fallback={copy.common.App_007}><PublicInfoPage page="disclaimer" /></LazyPage>} />
           <Route path="/tools/depot-value" element={<FeatureRoute feature="depot_value"><LazyPage fallback={copy.common.App_009}><DepotValuePage /></LazyPage></FeatureRoute>} />
           <Route path="/admin/setup" element={<LazyPage fallback={copy.common.App_010}><AdminSetupPage /></LazyPage>} />
           <Route path="/admin/*" element={<LazyPage fallback={copy.common.App_011}><AdminPage /></LazyPage>} />

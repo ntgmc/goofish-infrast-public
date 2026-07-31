@@ -32,7 +32,8 @@ export function getEffectiveProfilePermission(profile: UserGameAccount): Permiss
 }
 
 export function isSchedulableProfile(profile: UserGameAccount): boolean {
-  return profile.kind === 'cdk' || profile.kind === 'free_preview'
+  return !profile.archived_at && (profile.kind === 'cdk' || profile.kind === 'free_preview'
+    || profile.kind === 'metered_personal' || profile.kind === 'metered_commercial')
 }
 
 export function getProfileAccessLabel(profile: UserGameAccount): string {

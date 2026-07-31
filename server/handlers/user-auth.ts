@@ -87,6 +87,7 @@ import {
   validateAdminRegistrationInvitation,
   type ValidatedAdminRegistrationInvitation,
 } from '../storage/admin-registration-invitation-store'
+import { selectAuthPayloadProfiles } from './auth-payload-profiles'
 
 const SESSION_COOKIE = 'maa_session'
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
@@ -521,7 +522,7 @@ export async function upgradePreviewProfileWithCdk(
   }
   const profile = await getProfileForUser(user.id, profileIdValue.trim())
   if (!profile) return { ok: false, status: 404, message: authCopy.api_profile_not_found }
-  if (!idempotencyKey && !isFreePreviewProfile(profile)) {
+  if (!idempotencyKey && !isFreePreviewProfile(profile) && profile.kind !== 'metered_personal') {
     return { ok: false, status: 400, message: authCopy.api_free_profile_upgrade_only }
   }
   if (!idempotencyKey && profile.status !== 'active') {
@@ -553,7 +554,7 @@ export async function upgradePreviewProfileWithCdk(
           'select record_json from user_game_accounts where id = $1 and user_id = $2 for update', [profile.id, user.id],
         )
         const current = locked.rows[0]?.record_json
-        if (!current || !isFreePreviewProfile(current) || current.status !== 'active') throw new Error('档案当前不可用。')
+        if (!current || (!isFreePreviewProfile(current) && current.kind !== 'metered_personal') || current.status !== 'active') throw new Error('档案当前不可用。')
         const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, current.id)
         const upgraded: UserGameAccountRecord = {
           ...current, kind: 'cdk', cdk_key: cdkKey, cdk_code_hash: codeHash, cdk_order_hash: cdkOrderHash,
@@ -687,9 +688,10 @@ export async function logoutRequest(req: Request): Promise<void> {
 
 export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?: string | null): Promise<AuthSuccessResponse> {
   await settleInvitationForActivatedUser(user.id)
-  const records = await migrateLegacyUserIfNeeded(user)
+  const allRecords = await migrateLegacyUserIfNeeded(user)
+  const { records, activeProfileRecord, workspaceProfileIds } = selectAuthPayloadProfiles(allRecords, activeProfileId)
   const [workspaces, announcementUnreadCount] = await Promise.all([
-    listProfileWorkspaces(records.map((profile) => profile.id)),
+    listProfileWorkspaces(workspaceProfileIds),
     getAnnouncementUnreadCount(user.id),
   ])
   for (const profile of records) {
@@ -704,10 +706,6 @@ export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?
   const publicProfiles: UserGameAccount[] = records.map((profile) => (
     toPublicProfile(profile, workspaces.get(profile.id) ?? null, getFreePreviewTrial(profile))
   ))
-  const defaultActiveProfile = records.find((profile) => profile.kind !== 'depot_value') ?? records[0] ?? null
-  const activeProfileRecord = activeProfileId
-    ? records.find((profile) => profile.id === activeProfileId) ?? defaultActiveProfile
-    : defaultActiveProfile
   const activeWorkspace = activeProfileRecord ? workspaces.get(activeProfileRecord.id) ?? null : null
   return {
     user: toPublicUser(user),

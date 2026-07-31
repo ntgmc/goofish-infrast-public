@@ -40,6 +40,9 @@ async function exportData(userId: string): Promise<Response> {
     distributionRecipients,
     balanceAccount,
     balanceTransactions,
+    qualificationLedger,
+    balanceReservations,
+    commercialLimits,
     notifications,
   ] = await Promise.all([
     getUserById(userId),
@@ -71,9 +74,16 @@ async function exportData(userId: string): Promise<Response> {
              from inventory_distribution_recipients recipient
              join inventory_distribution_campaigns campaign on campaign.id = recipient.campaign_id
             where recipient.user_id = $1 order by campaign.created_at asc`, [userId]),
-    query<{ available: string }>('select available::text from user_balance_accounts where user_id = $1', [userId]),
+    query<{ available: string; reserved: string; lifetime_credited: string; qualification_reversed: string; debt: string }>('select available::text, reserved::text, lifetime_credited::text, qualification_reversed::text, debt::text from user_balance_accounts where user_id = $1', [userId]),
     query(`select id, kind, amount::text, balance_after::text, reference_type, reference_id, created_at
              from user_balance_transactions where user_id = $1 order by created_at asc, id asc`, [userId]),
+    query(`select id, balance_transaction_id, delta::text, reason, created_at
+             from user_balance_qualification_ledger where user_id = $1 order by created_at asc`, [userId]),
+    query(`select job_id, profile_id, billing_kind, pricing_version, tier, list_price::text,
+                  discount_bps, amount::text, status, created_at, settled_at
+             from user_balance_reservations where user_id = $1 order by created_at asc`, [userId]),
+    query(`select active_profile_limit, total_profile_limit, suspended_at, suspension_reason, updated_at
+             from commercial_account_limits where user_id = $1`, [userId]),
     exportUserNotifications(userId),
   ])
   const safeProfiles = profiles.map((profile) => {
@@ -107,12 +117,19 @@ async function exportData(userId: string): Promise<Response> {
     balance: {
       currency: 'points',
       available: normalizeStoredPoints(balanceAccount.rows[0]?.available ?? '0'),
+      reserved: normalizeStoredPoints(balanceAccount.rows[0]?.reserved ?? '0'),
+      lifetime_credited: normalizeStoredPoints(balanceAccount.rows[0]?.lifetime_credited ?? '0'),
+      qualification_reversed: normalizeStoredPoints(balanceAccount.rows[0]?.qualification_reversed ?? '0'),
+      debt: normalizeStoredPoints(balanceAccount.rows[0]?.debt ?? '0'),
       transactions: balanceTransactions.rows.map((transaction) => ({
         ...transaction,
         amount: normalizeStoredPoints((transaction as { amount?: unknown }).amount),
         balance_after: normalizeStoredPoints((transaction as { balance_after?: unknown }).balance_after),
       })),
+      qualification_ledger: qualificationLedger.rows,
+      reservations: balanceReservations.rows,
     },
+    commercial_account: commercialLimits.rows[0] ?? null,
     notifications,
     deletion_request: deletion.rows[0] ?? null,
   }, null, 2), {

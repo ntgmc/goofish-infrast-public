@@ -3,10 +3,22 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+const featureState = vi.hoisted(() => ({
+  status: 'ready' as 'loading' | 'ready' | 'error',
+  meteredBilling: true,
+}))
+vi.mock('../lib/site-feature-context', () => ({
+  useSiteFeatures: () => ({ status: featureState.status, features: { metered_billing: featureState.meteredBilling }, updatedAt: null, retry: vi.fn() }),
+}))
 import PricingPage from './PricingPage'
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  featureState.status = 'ready'
+  featureState.meteredBilling = true
+})
 
 describe('PricingPage', () => {
   it('renders the two public SKUs and full disclosure policy', () => {
@@ -39,5 +51,23 @@ describe('PricingPage', () => {
     const menu = screen.getByRole('menu')
     expect(within(menu).getByRole('menuitem', { name: '联系客服' })).toHaveAttribute('href', '/support')
     expect(within(menu).getByRole('menuitem', { name: '返回首页' })).toHaveAttribute('href', '/')
+  })
+
+  it('hides metered prices and capabilities when metered billing is closed', () => {
+    featureState.meteredBilling = false
+    render(<MemoryRouter><PricingPage /></MemoryRouter>)
+    expect(screen.getByText('暂未开放')).toBeInTheDocument()
+    expect(screen.queryByText('600–900 积分/次')).not.toBeInTheDocument()
+    expect(screen.queryByText(/按次档案包含高级版单次结果/)).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['loading', '正在确认按次计费开放状态…'],
+    ['error', '暂时无法确认按次计费开放状态'],
+  ] as const)('fails closed while feature state is %s', (status, message) => {
+    featureState.status = status
+    render(<MemoryRouter><PricingPage /></MemoryRouter>)
+    expect(screen.getByText(new RegExp(message))).toBeInTheDocument()
+    expect(screen.queryByText('600–900 积分/次')).not.toBeInTheDocument()
   })
 })
