@@ -8,6 +8,7 @@ import {
   shutdownOptimizeQueueMaintenance,
 } from './optimize-queue-maintenance'
 import { initializeBehaviorRiskMaintenance, shutdownBehaviorRiskMaintenance } from './behavior-risk-maintenance'
+import { initializeAuthDataMaintenance, shutdownAuthDataMaintenance } from './auth-data-maintenance'
 import {
   registerOptimizerPort,
   type OptimizerPort,
@@ -29,6 +30,7 @@ export function createCombinedProcessHooks(optimizerPort: OptimizerPort): ApiPro
       try {
         shutdownOptimizeQueueMaintenance()
         shutdownBehaviorRiskMaintenance()
+        shutdownAuthDataMaintenance()
       } finally {
         releaseOptimizerPort()
       }
@@ -42,6 +44,7 @@ export function createCombinedProcessHooks(optimizerPort: OptimizerPort): ApiPro
       try {
         await initializeOptimizeQueueMaintenance()
         await initializeBehaviorRiskMaintenance()
+        await initializeAuthDataMaintenance()
         await initializeOptimizeJobProcessing()
       } catch (error) {
         await stop(0).catch(() => undefined)

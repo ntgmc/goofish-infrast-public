@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import type { UserAccountRecord, UserGameAccountRecord, UserWorkspaceRecord } from './user-store'
-import { emptyWorkspace } from './user-store'
+import { emptyWorkspace, insertUserAccountForRegistrationInTransaction } from './user-store'
 import { claimCdkRecord, completeCdkRedemption } from './cdk-store'
 import { withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
@@ -24,6 +24,7 @@ export async function redeemCdkAtomically<T>(options: {
   idempotencyKey?: string | null
   idempotencyScope: string
   requestHash: string
+  prepare?: (client: PoolClient) => Promise<void>
   complete: (client: PoolClient, record: CdkRecord) => Promise<{ record: CdkRecord; response: T }>
 }): Promise<{ response: T; replayed: boolean }> {
   await ensureDatabaseSchema()
@@ -50,6 +51,7 @@ export async function redeemCdkAtomically<T>(options: {
       }
     }
 
+    await options.prepare?.(client)
     const claimed = await claimCdkRecord(client, options.key)
     if (!claimed) throw new CdkAlreadyRedeemedError('CDK has already been used.')
     const completed = await options.complete(client, claimed)
@@ -66,16 +68,41 @@ export async function redeemCdkAtomically<T>(options: {
 }
 
 export async function saveUserAccountInTransaction(client: PoolClient, user: UserAccountRecord): Promise<void> {
-  await client.query(
-    `insert into user_accounts
-      (id, email, password_hash, salt, iterations, permission, status, cdk_key, cdk_code_hash, cdk_order_hash, email_verified_at, record_json, created_at, updated_at)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14)
-     on conflict (id) do update set email=excluded.email, password_hash=excluded.password_hash, salt=excluded.salt,
-       iterations=excluded.iterations, permission=excluded.permission, status=excluded.status, cdk_key=excluded.cdk_key,
-       cdk_code_hash=excluded.cdk_code_hash, cdk_order_hash=excluded.cdk_order_hash, email_verified_at=excluded.email_verified_at,
-       record_json=excluded.record_json, updated_at=excluded.updated_at`,
-    [user.id, user.email, user.password_hash, user.salt, user.iterations, user.permission, user.status, user.cdk_key, user.cdk_code_hash, user.cdk_order_hash, user.email_verified_at, JSON.stringify(user), user.created_at, user.updated_at],
+  await insertUserAccountForRegistrationInTransaction(client, user)
+}
+
+export async function updateRegisteredUserCdkInTransaction(
+  client: PoolClient,
+  user: UserAccountRecord,
+): Promise<void> {
+  const patch = {
+    permission: user.permission,
+    cdk_key: user.cdk_key,
+    cdk_code_hash: user.cdk_code_hash,
+    cdk_order_hash: user.cdk_order_hash,
+    updated_at: user.updated_at,
+  }
+  const updated = await client.query(
+    `update user_accounts
+        set permission = $3,
+            cdk_key = $4,
+            cdk_code_hash = $5,
+            cdk_order_hash = $6,
+            record_json = record_json || $7::jsonb,
+            updated_at = $8
+      where id = $1 and email = $2`,
+    [
+      user.id,
+      user.email,
+      user.permission,
+      user.cdk_key,
+      user.cdk_code_hash,
+      user.cdk_order_hash,
+      JSON.stringify(patch),
+      user.updated_at,
+    ],
   )
+  if (updated.rowCount !== 1) throw new Error('Registered user disappeared during CDK redemption.')
 }
 
 export async function saveProfileInTransaction(client: PoolClient, profile: UserGameAccountRecord): Promise<void> {

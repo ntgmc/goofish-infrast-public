@@ -17,11 +17,14 @@ import { copy } from '../../copy/index'
 
 export type WorkspacePatch = Partial<UserWorkspace> & { saved_config_action?: WorkspaceSavedConfigAction }
 export type ConfigSyncStatus = 'idle' | 'pending' | 'saving' | 'failed'
+export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error'
 
 const CONFIG_SAVE_DEBOUNCE_MS = 600
 
 export function useToolSession(requestedProfileId?: string | null) {
-  const [authLoading, setAuthLoading] = useState(true)
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
+  const [authError, setAuthError] = useState<Error | null>(null)
+  const [authRequestVersion, setAuthRequestVersion] = useState(0)
   const [user, setUser] = useState<AuthUser | null>(null)
   const [profiles, setProfiles] = useState<UserGameAccount[]>([])
   const [activeProfile, setActiveProfile] = useState<UserGameAccount | null>(null)
@@ -81,10 +84,20 @@ export function useToolSession(requestedProfileId?: string | null) {
 
   const applyAuthPayload = useCallback((payload: AuthSuccessResponse | null) => {
     applyAuthPayloadInternal(payload)
+    setAuthError(null)
+    setAuthStatus(payload ? 'authenticated' : 'anonymous')
   }, [applyAuthPayloadInternal])
+
+  const retryAuth = useCallback(() => {
+    setAuthError(null)
+    setAuthStatus('loading')
+    setAuthRequestVersion((current) => current + 1)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
+    setAuthError(null)
+    setAuthStatus('loading')
 
     void apiJsonOrNull<AnnouncementPublicResponse>('/api/announcement')
       .then((data) => {
@@ -100,23 +113,23 @@ export function useToolSession(requestedProfileId?: string | null) {
     void apiJson<Partial<AuthSuccessResponse> & { user: AuthUser | null }>(authUrl, { fallbackMessage: copy.common.pages_tool_useToolSession_001 })
       .then((data) => {
         if (cancelled) return
-        if (!data.user) {
+        if (data.user === null) {
           applyAuthPayload(null)
           return
         }
+        if (!data.user) throw new Error(copy.common.pages_tool_useToolSession_001)
         applyAuthPayload(data as AuthSuccessResponse)
       })
-      .catch(() => {
-        if (!cancelled) applyAuthPayload(null)
-      })
-      .finally(() => {
-        if (!cancelled) setAuthLoading(false)
+      .catch((caught: unknown) => {
+        if (cancelled) return
+        setAuthError(caught instanceof Error ? caught : new Error(copy.common.pages_tool_useToolSession_001))
+        setAuthStatus('error')
       })
 
     return () => {
       cancelled = true
     }
-  }, [applyAuthPayload, requestedProfileId])
+  }, [applyAuthPayload, authRequestVersion, requestedProfileId])
 
   useEffect(() => () => {
     pendingConfigRef.current = null
@@ -238,7 +251,10 @@ export function useToolSession(requestedProfileId?: string | null) {
   const activeCdkProfile = activeProfile && isSchedulableProfile(activeProfile) ? activeProfile : cdkProfiles[0] ?? null
 
   return {
-    authLoading,
+    authStatus,
+    authError,
+    retryAuth,
+    authLoading: authStatus === 'loading',
     user,
     profiles,
     activeProfile,

@@ -204,6 +204,7 @@ export interface UserWorkspaceRecord {
   result_history: WorkspaceResultHistoryItem[]
   archived_results: WorkspaceResultHistoryItem[]
   free_schedule_entitlement: FreeScheduleEntitlement | null
+  free_preview_normalized_activity_id?: string | null
   updated_at: string
 }
 
@@ -231,6 +232,7 @@ export interface PasswordResetTokenRecord {
   id: string
   user_id: string
   token_hash: string
+  delivery_id: string | null
   expires_at: string
   used_at: string | null
   created_at: string
@@ -240,9 +242,56 @@ export interface EmailVerificationTokenRecord {
   id: string
   user_id: string
   token_hash: string
+  delivery_id: string | null
   expires_at: string
   used_at: string | null
   created_at: string
+}
+
+export class RegistrationEmailConflictError extends Error {
+  constructor() {
+    super('Registration email already exists.')
+    this.name = 'RegistrationEmailConflictError'
+  }
+}
+
+export async function insertUserAccountForRegistration(user: UserAccountRecord): Promise<void> {
+  await ensureSchema()
+  await withTransaction((client) => insertUserAccountForRegistrationInTransaction(client, user))
+}
+
+export async function insertUserAccountForRegistrationInTransaction(
+  client: PoolClient,
+  user: UserAccountRecord,
+): Promise<void> {
+  await client.query(
+    "select pg_advisory_xact_lock(hashtextextended('registration-email:' || $1, 0))",
+    [user.email],
+  )
+  const inserted = await client.query(
+    `insert into user_accounts
+      (id, email, password_hash, salt, iterations, permission, status, cdk_key, cdk_code_hash, cdk_order_hash, email_verified_at, record_json, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14)
+     on conflict (email) do nothing
+     returning id`,
+    [
+      user.id,
+      user.email,
+      user.password_hash,
+      user.salt,
+      user.iterations,
+      user.permission,
+      user.status,
+      user.cdk_key,
+      user.cdk_code_hash,
+      user.cdk_order_hash,
+      user.email_verified_at,
+      JSON.stringify(user),
+      user.created_at,
+      user.updated_at,
+    ],
+  )
+  if (inserted.rowCount !== 1) throw new RegistrationEmailConflictError()
 }
 
 export async function getUserByEmail(email: string): Promise<UserAccountRecord | null> {
@@ -423,23 +472,35 @@ export async function savePasswordResetToken(token: PasswordResetTokenRecord): P
   await ensureSchema()
   await query(
     `insert into password_reset_tokens
-      (id, user_id, token_hash, expires_at, used_at, created_at)
-      values ($1, $2, $3, $4, $5, $6)
+      (id, user_id, token_hash, delivery_id, expires_at, used_at, created_at)
+      values ($1, $2, $3, $4, $5, $6, $7)
       on conflict (id) do update set
         token_hash = excluded.token_hash,
+        delivery_id = excluded.delivery_id,
         expires_at = excluded.expires_at,
         used_at = excluded.used_at,
         created_at = excluded.created_at`,
-    [token.id, token.user_id, token.token_hash, token.expires_at, token.used_at, token.created_at],
+    [
+      token.id,
+      token.user_id,
+      token.token_hash,
+      token.delivery_id,
+      token.expires_at,
+      token.used_at,
+      token.created_at,
+    ],
   )
 }
 
 export async function getPasswordResetTokenByHash(tokenHash: string): Promise<PasswordResetTokenRecord | null> {
   await ensureSchema()
   const result = await query<PasswordResetTokenRecord>(
-    `select id, user_id, token_hash, expires_at, used_at, created_at
-      from password_reset_tokens
-      where token_hash = $1`,
+    `select token.id, token.user_id, token.token_hash, token.delivery_id,
+            token.expires_at, token.used_at, token.created_at
+       from password_reset_tokens token
+       left join brevo_email_deliveries delivery on delivery.id = token.delivery_id
+      where token.token_hash = $1
+        and (token.delivery_id is null or delivery.status in ('reserved', 'sent', 'uncertain'))`,
     [tokenHash],
   )
   return result.rows[0] ?? null
@@ -451,82 +512,122 @@ export async function getRecentPasswordResetTokenForUser(
 ): Promise<PasswordResetTokenRecord | null> {
   await ensureSchema()
   const result = await query<PasswordResetTokenRecord>(
-    `select id, user_id, token_hash, expires_at, used_at, created_at
-      from password_reset_tokens
-      where user_id = $1 and created_at >= $2
-      order by created_at desc
+    `select token.id, token.user_id, token.token_hash, token.delivery_id,
+            token.expires_at, token.used_at, token.created_at
+       from password_reset_tokens token
+       left join brevo_email_deliveries delivery on delivery.id = token.delivery_id
+      where token.user_id = $1
+        and token.created_at >= $2
+        and token.used_at is null
+        and token.expires_at > current_timestamp
+        and (token.delivery_id is null or delivery.status in ('reserved', 'sent', 'uncertain'))
+      order by token.created_at desc
       limit 1`,
     [userId, since],
   )
   return result.rows[0] ?? null
 }
 
-export async function resetUserPasswordWithToken(
-  tokenHash: string,
-  passwordHash: PasswordHashRecord,
-  claimedAt: Date,
-): Promise<UserAccountRecord | null> {
+export interface UpdateUserPasswordAtomicallyInput {
+  userId: string
+  expectedPasswordHash: string
+  replacement: PasswordHashRecord
+  updatedAt: Date
+  resetTokenHash?: string
+  keepSessionTokenHash?: string
+}
+
+export type UpdateUserPasswordAtomicallyResult =
+  | { ok: true; user: UserAccountRecord }
+  | { ok: false; reason: 'reset_token_invalid' | 'password_update_conflict' }
+
+class PasswordLifecycleConflictError extends Error {
+  constructor(readonly reason: 'reset_token_invalid' | 'password_update_conflict') {
+    super(reason)
+    this.name = 'PasswordLifecycleConflictError'
+  }
+}
+
+export async function updateUserPasswordAtomically(
+  input: UpdateUserPasswordAtomicallyInput,
+): Promise<UpdateUserPasswordAtomicallyResult> {
   await ensureSchema()
-  const client = await getPool().connect()
-  const claimedAtIso = claimedAt.toISOString()
+  const updatedAt = input.updatedAt.toISOString()
   try {
-    await client.query('begin')
-    const claimed = await client.query<{ id: string; user_id: string }>(
-      `update password_reset_tokens
-       set used_at = $2
-       where token_hash = $1
-         and used_at is null
-         and expires_at > $2
-       returning id, user_id`,
-      [tokenHash, claimedAtIso],
-    )
-    if (claimed.rowCount === 0) {
-      await client.query('rollback')
-      return null
-    }
-    if (claimed.rowCount !== 1 || !claimed.rows[0]) {
-      throw new Error('Password reset token claim affected an unexpected number of rows.')
-    }
+    return await withTransaction(async (client) => {
+      if (input.resetTokenHash) {
+        const claimed = await client.query(
+          `update password_reset_tokens
+              set used_at = $3
+            where token_hash = $1
+              and user_id = $2
+              and used_at is null
+              and expires_at > $3
+              and (
+                delivery_id is null
+                or exists (
+                  select 1
+                    from brevo_email_deliveries delivery
+                   where delivery.id = password_reset_tokens.delivery_id
+                     and delivery.status in ('reserved', 'sent', 'uncertain')
+                )
+              )`,
+          [input.resetTokenHash, input.userId, updatedAt],
+        )
+        if (claimed.rowCount !== 1) throw new PasswordLifecycleConflictError('reset_token_invalid')
+      }
 
-    const passwordPatch = {
-      ...passwordHash,
-      updated_at: claimedAtIso,
-    }
-    const updated = await client.query<{ record_json: UserAccountRecord }>(
-      `update user_accounts
-       set password_hash = $2,
-           salt = $3,
-           iterations = $4,
-           record_json = record_json || $5::jsonb,
-           updated_at = $6
-       where id = $1
-         and status = 'active'
-       returning record_json`,
-      [
-        claimed.rows[0].user_id,
-        passwordHash.password_hash,
-        passwordHash.salt,
-        passwordHash.iterations,
-        JSON.stringify(passwordPatch),
-        claimedAtIso,
-      ],
-    )
-    if (updated.rowCount === 0) {
-      await client.query('rollback')
-      return null
-    }
-    if (updated.rowCount !== 1 || !updated.rows[0]) {
-      throw new Error('Password reset user update affected an unexpected number of rows.')
-    }
+      const passwordPatch = {
+        password_hash: input.replacement.password_hash,
+        salt: input.replacement.salt,
+        iterations: input.replacement.iterations,
+        password_algorithm: input.replacement.password_algorithm,
+        updated_at: updatedAt,
+      }
+      const updated = await client.query<{ record_json: UserAccountRecord }>(
+        `update user_accounts
+            set password_hash = $3,
+                salt = $4,
+                iterations = $5,
+                record_json = record_json || $6::jsonb,
+                updated_at = $7
+          where id = $1
+            and password_hash = $2
+            and status = 'active'
+        returning record_json`,
+        [
+          input.userId,
+          input.expectedPasswordHash,
+          input.replacement.password_hash,
+          input.replacement.salt,
+          input.replacement.iterations,
+          JSON.stringify(passwordPatch),
+          updatedAt,
+        ],
+      )
+      if (updated.rowCount !== 1 || !updated.rows[0]) {
+        throw new PasswordLifecycleConflictError('password_update_conflict')
+      }
 
-    await client.query('delete from user_sessions where user_id = $1', [claimed.rows[0].user_id])
-    await client.query('commit')
-    return updated.rows[0].record_json
+      await client.query(
+        'update password_reset_tokens set used_at = $2 where user_id = $1 and used_at is null',
+        [input.userId, updatedAt],
+      )
+      if (input.keepSessionTokenHash) {
+        await client.query(
+          'delete from user_sessions where user_id = $1 and token_hash <> $2',
+          [input.userId, input.keepSessionTokenHash],
+        )
+      } else {
+        await client.query('delete from user_sessions where user_id = $1', [input.userId])
+      }
+      return { ok: true, user: updated.rows[0].record_json }
+    })
   } catch (error) {
-    await client.query('rollback')
+    if (error instanceof PasswordLifecycleConflictError) {
+      return { ok: false, reason: error.reason }
+    }
     throw error
-  } finally {
-    client.release()
   }
 }
 
@@ -899,9 +1000,17 @@ export async function saveEmailVerificationToken(token: EmailVerificationTokenRe
   await ensureSchema()
   await query(
     `insert into email_verification_tokens
-      (id, user_id, token_hash, expires_at, used_at, created_at)
-     values ($1, $2, $3, $4, $5, $6)`,
-    [token.id, token.user_id, token.token_hash, token.expires_at, token.used_at, token.created_at],
+      (id, user_id, token_hash, delivery_id, expires_at, used_at, created_at)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      token.id,
+      token.user_id,
+      token.token_hash,
+      token.delivery_id,
+      token.expires_at,
+      token.used_at,
+      token.created_at,
+    ],
   )
 }
 
@@ -916,10 +1025,16 @@ export async function getRecentEmailVerificationTokenForUser(
 ): Promise<EmailVerificationTokenRecord | null> {
   await ensureSchema()
   const result = await query<EmailVerificationTokenRecord>(
-    `select id, user_id, token_hash, expires_at, used_at, created_at
-       from email_verification_tokens
-      where user_id = $1 and created_at >= $2
-      order by created_at desc
+    `select token.id, token.user_id, token.token_hash, token.delivery_id,
+            token.expires_at, token.used_at, token.created_at
+       from email_verification_tokens token
+       left join brevo_email_deliveries delivery on delivery.id = token.delivery_id
+      where token.user_id = $1
+        and token.created_at >= $2
+        and token.used_at is null
+        and token.expires_at > current_timestamp
+        and (token.delivery_id is null or delivery.status in ('reserved', 'sent', 'uncertain'))
+      order by token.created_at desc
       limit 1`,
     [userId, since],
   )
@@ -936,6 +1051,15 @@ export async function verifyUserEmailWithToken(tokenHash: string, verifiedAt: Da
         where token_hash = $1
           and used_at is null
           and expires_at > $2
+          and (
+            delivery_id is null
+            or exists (
+              select 1
+                from brevo_email_deliveries delivery
+               where delivery.id = email_verification_tokens.delivery_id
+                 and delivery.status in ('reserved', 'sent', 'uncertain')
+            )
+          )
       returning user_id`,
       [tokenHash, verifiedAtIso],
     )
@@ -1050,6 +1174,7 @@ export function emptyWorkspace(profileId: string): UserWorkspaceRecord {
     result_history: [],
     archived_results: [],
     free_schedule_entitlement: null,
+    free_preview_normalized_activity_id: null,
     updated_at: new Date().toISOString(),
   }
 }
@@ -1148,7 +1273,7 @@ export function toPublicProfile(
   }
 }
 
-function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null | undefined): UserWorkspaceRecord | null {
+export function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null | undefined): UserWorkspaceRecord | null {
   if (!workspace) return null
   return {
     version: 1,
@@ -1161,6 +1286,9 @@ function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null | undefi
     result_history: normalizeResultHistory((workspace as { result_history?: unknown }).result_history),
     archived_results: normalizeResultHistory((workspace as { archived_results?: unknown }).archived_results),
     free_schedule_entitlement: normalizeFreeScheduleEntitlement((workspace as { free_schedule_entitlement?: unknown }).free_schedule_entitlement),
+    free_preview_normalized_activity_id: typeof workspace.free_preview_normalized_activity_id === 'string'
+      ? workspace.free_preview_normalized_activity_id
+      : null,
     updated_at: typeof workspace.updated_at === 'string' ? workspace.updated_at : new Date().toISOString(),
   }
 }

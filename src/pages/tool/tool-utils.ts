@@ -1,6 +1,7 @@
 import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, UserGameAccount } from '../../lib/types'
 import { copy, CURRENT_LOCALE } from '../../copy/index'
 import { getPermissionProfile, normalizeRuntimePermission } from '../../lib/product-catalog'
+import { AUTH_PASSWORD_MAX_LENGTH, AUTH_PASSWORD_MIN_LENGTH } from '../../lib/auth-constraints'
 
 
 export function createAccountLicense(profile: UserGameAccount, operators: LicenseOperator[], config: LicenseConfig): LicenseFile {
@@ -66,7 +67,8 @@ export function parseOperatorsText(text: string): LicenseOperator[] {
 
 export function validatePasswordInput(value: string): string | null {
   if (!value) return copy.workspace.pages_tool_tool_utils_016
-  if (value.length < 8) return copy.workspace.pages_tool_tool_utils_017
+  if (value.length < AUTH_PASSWORD_MIN_LENGTH) return copy.workspace.pages_tool_tool_utils_017
+  if (value.length > AUTH_PASSWORD_MAX_LENGTH) return copy.workspace.pages_tool_tool_utils_018
   return null
 }
 

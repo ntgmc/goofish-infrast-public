@@ -489,6 +489,8 @@ export const workspaceCopy = {
   pages_tool_tool_utils_016: "请输入密码",
   // src/pages/tool/tool-utils.ts
   pages_tool_tool_utils_017: "密码至少需要 8 位",
+  // src/pages/tool/tool-utils.ts
+  pages_tool_tool_utils_018: "密码不能超过 128 位",
   // src/pages/tool/workspace/WorkspaceConfigSection.tsx
   pages_tool_workspace_WorkspaceConfigSection_001: "保存后，下次打开这个账号会自动带上这套配置。",
   // src/pages/tool/WorkspaceSetupPage.tsx

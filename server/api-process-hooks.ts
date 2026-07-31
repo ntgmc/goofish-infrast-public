@@ -3,9 +3,19 @@ import {
   initializeOptimizeQueueMaintenance,
   shutdownOptimizeQueueMaintenance,
 } from './optimize-queue-maintenance'
+import { initializeAuthDataMaintenance, shutdownAuthDataMaintenance } from './auth-data-maintenance'
 
 export const apiOnlyProcessHooks: ApiProcessHooks = {
-  initialize: initializeOptimizeQueueMaintenance,
-  drain: async () => shutdownOptimizeQueueMaintenance(),
-  forceDrain: shutdownOptimizeQueueMaintenance,
+  initialize: async () => {
+    await initializeOptimizeQueueMaintenance()
+    await initializeAuthDataMaintenance()
+  },
+  drain: async () => {
+    shutdownAuthDataMaintenance()
+    shutdownOptimizeQueueMaintenance()
+  },
+  forceDrain: () => {
+    shutdownAuthDataMaintenance()
+    shutdownOptimizeQueueMaintenance()
+  },
 }

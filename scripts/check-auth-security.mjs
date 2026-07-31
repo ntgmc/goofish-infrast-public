@@ -23,6 +23,7 @@ try {
   await assertUserPasswordMigration(passwordModule)
   await assertRegistrationCdkTransaction()
   await assertRegistrationBrevoQuotaPolicies()
+  await assertResendVerificationEnumerationSafety()
   await assertUserSessionTouchAndAuthPayload()
   await assertUserSessionStorage()
   await assertAtomicPasswordResetHandler()
@@ -272,16 +273,22 @@ async function assertRegistrationCdkTransaction() {
   assert.equal(registered.ok, true, 'a new user should be able to register with a valid CDK')
   assert.deepEqual(
     globalThis.__authSecurityRegistrationTransactionTrace.map(({ operation }) => operation),
-    ['account', 'profile', 'workspace'],
-    'CDK registration should persist the account, profile, and workspace inside the redemption transaction',
+    ['account', 'account-cdk', 'profile', 'workspace'],
+    'CDK registration should insert the account before claiming the CDK and patch only CDK fields afterward',
   )
-  const [accountWrite, profileWrite, workspaceWrite] = globalThis.__authSecurityRegistrationTransactionTrace
+  const [accountWrite, accountCdkWrite, profileWrite, workspaceWrite] = globalThis.__authSecurityRegistrationTransactionTrace
   assert.equal(accountWrite.value.id, registered.user.id)
-  assert.equal(accountWrite.value.cdk_key, 'cdk/valid')
+  assert.equal(accountWrite.value.cdk_key, null)
+  assert.equal(accountCdkWrite.value.id, registered.user.id)
+  assert.equal(accountCdkWrite.value.cdk_key, 'cdk/valid')
   assert.equal(profileWrite.value.user_id, registered.user.id)
   assert.equal(profileWrite.value.cdk_key, 'cdk/valid')
   assert.equal(workspaceWrite.value.profile_id, profileWrite.value.id)
-  assert.equal(globalThis.__authSecurityRegistrationAccountSyncs.length, 1)
+  assert.equal(
+    globalThis.__authSecurityRegistrationAccountSyncs.length,
+    0,
+    'registration must not perform a full account save after the CDK transaction',
+  )
   assert.equal(
     globalThis.__authSecurityRegistrationSessions.length,
     0,
@@ -307,6 +314,9 @@ async function assertRegistrationBrevoQuotaPolicies() {
     globalThis.__authSecurityRegistrationAccountSyncs = []
     globalThis.__authSecurityRegistrationSessions = []
     globalThis.__authSecurityVerificationTokens = []
+    globalThis.__authSecurityExistingRegistrationUsers = new Map()
+    globalThis.__authSecurityRecentVerificationToken = null
+    globalThis.__authSecurityEmailSendFailure = false
   }
 
   reset({ email_verification_required: true, invite_code_required: false, brevo_quota_action: 'pause_registration' }, false)
@@ -373,6 +383,10 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.equal(globalThis.__authSecurityVerificationTokens.length, 0)
   assert.equal(globalThis.__authSecurityEmailSendCalls, 0)
 
+  globalThis.__authSecurityExistingRegistrationUsers.set('paused-existing@qq.com', { id: 'existing-user' })
+  const pausedExisting = await userAuth.registerUser('paused-existing@qq.com', 'valid-password')
+  assert.deepEqual(pausedExisting, paused, 'quota exhaustion must not reveal whether the email already exists')
+
   reset({ email_verification_required: true, invite_code_required: false, brevo_quota_action: 'allow_unverified_registration' }, true)
   const bypassed = await userAuth.registerUser('bypassed@qq.com', 'valid-password')
   assert.equal(bypassed.ok, true)
@@ -388,6 +402,15 @@ async function assertRegistrationBrevoQuotaPolicies() {
   assert.equal(globalThis.__authSecurityVerificationTokens.length, 1)
   assert.equal(globalThis.__authSecurityEmailSendCalls, 1)
 
+  reset({ email_verification_required: true, invite_code_required: false, brevo_quota_action: 'pause_registration' }, false)
+  globalThis.__authSecurityEmailSendFailure = true
+  const deliveryFailed = await userAuth.registerUser('delivery-failed@qq.com', 'valid-password')
+  assert.equal(deliveryFailed.ok, true)
+  assert.equal(deliveryFailed.verificationRequired, true)
+  assert.equal(globalThis.__authSecurityVerificationTokens.length, 1)
+  assert.equal(globalThis.__authSecurityVerificationTokens[0].delivery_id, 'reservation')
+  assert.equal(globalThis.__authSecurityEmailReleaseCalls, 1)
+
   reset({ email_verification_required: false, invite_code_required: false, brevo_quota_action: 'pause_registration' }, true)
   const verificationDisabled = await userAuth.registerUser('disabled@qq.com', 'valid-password')
   assert.equal(verificationDisabled.ok, true)
@@ -396,6 +419,83 @@ async function assertRegistrationBrevoQuotaPolicies() {
 
   delete globalThis.__authSecurityRegistrationSettings
   delete globalThis.__authSecurityBrevoQuotaReached
+}
+
+async function assertResendVerificationEnumerationSafety() {
+  const userAuth = await bundleInlineModule(
+    "export { resendEmailVerification } from './server/handlers/user-auth.ts'",
+    'user-resend-verification',
+    [userRegistrationCdkPlugin()],
+  )
+  process.env.PUBLIC_APP_URL = 'https://example.test'
+  const pendingUser = {
+    version: 1,
+    id: 'pending-user',
+    email: 'pending@qq.com',
+    password_hash: 'password-hash',
+    salt: 'password-salt',
+    iterations: 2,
+    password_algorithm: 'argon2id',
+    permission: 'growth',
+    status: 'active',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    email_verified_at: null,
+    created_at: '2026-07-31T00:00:00.000Z',
+    updated_at: '2026-07-31T00:00:00.000Z',
+  }
+  const reset = () => {
+    globalThis.__authSecurityExistingRegistrationUsers = new Map()
+    globalThis.__authSecurityRecentVerificationToken = null
+    globalThis.__authSecurityBrevoQuotaReached = false
+    globalThis.__authSecurityEmailSendFailure = false
+    globalThis.__authSecurityEmailReserveCalls = 0
+    globalThis.__authSecurityEmailReleaseCalls = 0
+    globalThis.__authSecurityEmailSendCalls = 0
+    globalThis.__authSecurityVerificationTokens = []
+  }
+  const results = []
+
+  reset()
+  results.push(await userAuth.resendEmailVerification('missing@qq.com'))
+  assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
+
+  reset()
+  globalThis.__authSecurityExistingRegistrationUsers.set('verified@qq.com', {
+    ...pendingUser,
+    email: 'verified@qq.com',
+    email_verified_at: '2026-07-31T00:00:00.000Z',
+  })
+  results.push(await userAuth.resendEmailVerification('verified@qq.com'))
+  assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
+
+  reset()
+  globalThis.__authSecurityExistingRegistrationUsers.set(pendingUser.email, pendingUser)
+  globalThis.__authSecurityRecentVerificationToken = { id: 'recent-token' }
+  results.push(await userAuth.resendEmailVerification(pendingUser.email))
+  assert.equal(globalThis.__authSecurityEmailReserveCalls, 0)
+
+  reset()
+  globalThis.__authSecurityExistingRegistrationUsers.set(pendingUser.email, pendingUser)
+  globalThis.__authSecurityBrevoQuotaReached = true
+  results.push(await userAuth.resendEmailVerification(pendingUser.email))
+  assert.equal(globalThis.__authSecurityEmailReserveCalls, 1)
+
+  reset()
+  globalThis.__authSecurityExistingRegistrationUsers.set(pendingUser.email, pendingUser)
+  globalThis.__authSecurityEmailSendFailure = true
+  results.push(await userAuth.resendEmailVerification(pendingUser.email))
+  assert.equal(globalThis.__authSecurityEmailSendCalls, 1)
+  assert.equal(globalThis.__authSecurityVerificationTokens.length, 1)
+  assert.equal(globalThis.__authSecurityVerificationTokens[0].delivery_id, 'reservation')
+  assert.equal(globalThis.__authSecurityEmailReleaseCalls, 1)
+
+  assert(results.every((result) => JSON.stringify(result) === JSON.stringify(results[0])))
+  assert.deepEqual(results[0], {
+    ok: true,
+    message: '如果账号符合条件，请按照发送至注册邮箱的验证说明完成注册。',
+  })
 }
 
 async function assertUserSessionTouchAndAuthPayload() {
@@ -583,7 +683,7 @@ async function assertUserSessionStorage() {
 
 async function assertAtomicPasswordResetHandler() {
   const userAuth = await bundleInlineModule(
-    "export { resetPasswordWithToken } from './server/handlers/user-auth.ts'",
+    "export { resetPasswordWithToken, resetUserPasswordByAdmin } from './server/handlers/user-auth.ts'",
     'atomic-password-reset-handler',
     [passwordResetAuthPlugin()],
   )
@@ -626,15 +726,17 @@ async function assertAtomicPasswordResetHandler() {
   assert.deepEqual(success, { ok: true })
   assert.deepEqual(globalThis.__authSecurityResetSequence, ['token-preflight', 'user-preflight', 'hash', 'transaction'])
   assert.equal(globalThis.__authSecurityResetCalls.length, 1)
-  assert.match(globalThis.__authSecurityResetCalls[0].tokenHash, /^[a-f0-9]{64}$/)
-  assert.notEqual(globalThis.__authSecurityResetCalls[0].tokenHash, 'raw-reset-token')
-  assert.deepEqual(globalThis.__authSecurityResetCalls[0].passwordHash, {
+  assert.match(globalThis.__authSecurityResetCalls[0].resetTokenHash, /^[a-f0-9]{64}$/)
+  assert.notEqual(globalThis.__authSecurityResetCalls[0].resetTokenHash, 'raw-reset-token')
+  assert.equal(globalThis.__authSecurityResetCalls[0].userId, activeUser.id)
+  assert.equal(globalThis.__authSecurityResetCalls[0].expectedPasswordHash, activeUser.password_hash)
+  assert.deepEqual(globalThis.__authSecurityResetCalls[0].replacement, {
     password_hash: 'new-password-hash',
     salt: 'new-password-salt',
     iterations: 2,
     password_algorithm: 'argon2id',
   })
-  assert(globalThis.__authSecurityResetCalls[0].claimedAt instanceof Date)
+  assert(globalThis.__authSecurityResetCalls[0].updatedAt instanceof Date)
 
   resetHandlerState({ __authSecurityResetMode: 'concurrent' })
   const concurrent = await Promise.all([
@@ -683,11 +785,37 @@ async function assertAtomicPasswordResetHandler() {
     message: '重置链接无效或已过期。',
   })
   assert.deepEqual(globalThis.__authSecurityResetSequence, ['token-preflight', 'user-preflight', 'hash', 'transaction'])
+
+  resetHandlerState({ __authSecurityResetUser: { ...activeUser, status: 'frozen' } })
+  const frozenAdminReset = await userAuth.resetUserPasswordByAdmin(
+    globalThis.__authSecurityResetUser,
+    'StrongResetPassword!2026',
+  )
+  assert.deepEqual(frozenAdminReset, {
+    ok: false,
+    status: 409,
+    message: '账号状态或密码已发生变化，请刷新后重试。',
+    code: 'password_update_conflict',
+  })
+  assert.deepEqual(globalThis.__authSecurityResetSequence, [])
+
+  resetHandlerState({ __authSecurityResetMode: 'password-conflict' })
+  const concurrentAdminReset = await userAuth.resetUserPasswordByAdmin(
+    activeUser,
+    'StrongResetPassword!2026',
+  )
+  assert.deepEqual(concurrentAdminReset, {
+    ok: false,
+    status: 409,
+    message: '账号状态或密码已发生变化，请刷新后重试。',
+    code: 'password_update_conflict',
+  })
+  assert.deepEqual(globalThis.__authSecurityResetSequence, ['hash', 'transaction'])
 }
 
 async function assertAtomicPasswordResetStorage() {
   const userStore = await bundleInlineModule(
-    "export { resetUserPasswordWithToken } from './server/storage/user-store.ts'",
+    "export { updateUserPasswordAtomically } from './server/storage/user-store.ts'",
     'atomic-password-reset-storage',
     [passwordResetStoragePlugin()],
   )
@@ -716,112 +844,114 @@ async function assertAtomicPasswordResetStorage() {
   }
   const resetStorageState = (overrides = {}) => {
     globalThis.__authSecurityPasswordResetDb = {
-      token: {
+      tokens: [{
         id: 'reset-token-1',
         user_id: baseUser.id,
         token_hash: 'reset-token-hash',
         expires_at: '2026-07-10T12:01:00.000Z',
         used_at: null,
-      },
+        delivery_status: 'sent',
+      }, {
+        id: 'reset-token-2',
+        user_id: baseUser.id,
+        token_hash: 'other-reset-token-hash',
+        expires_at: '2026-07-10T12:02:00.000Z',
+        used_at: null,
+        delivery_status: 'uncertain',
+      }],
       user: structuredClone(baseUser),
-      sessions: ['session-1', 'session-2'],
+      sessions: [{ token_hash: 'keep-session' }, { token_hash: 'other-session' }],
     }
     globalThis.__authSecurityPasswordResetTrace = []
     globalThis.__authSecurityPasswordResetReleased = 0
     globalThis.__authSecurityPasswordResetFailure = null
-    globalThis.__authSecurityPasswordResetClaimRowCount = null
-    globalThis.__authSecurityPasswordResetUserRowCount = null
     globalThis.__authSecurityPasswordResetClaimSql = null
     Object.assign(globalThis, overrides)
   }
 
   resetStorageState()
-  const updated = await userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt)
-  assert(updated)
-  assert.deepEqual(globalThis.__authSecurityPasswordResetTrace, ['begin', 'claim', 'update-user', 'delete-sessions', 'commit', 'release'])
+  const updated = await userStore.updateUserPasswordAtomically({
+    userId: baseUser.id,
+    expectedPasswordHash: baseUser.password_hash,
+    replacement: passwordHash,
+    updatedAt: claimedAt,
+    resetTokenHash: 'reset-token-hash',
+  })
+  assert.equal(updated.ok, true)
+  assert.deepEqual(globalThis.__authSecurityPasswordResetTrace, [
+    'begin', 'claim', 'update-user', 'invalidate-tokens', 'delete-sessions', 'commit', 'release',
+  ])
   assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /update password_reset_tokens/i)
   assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /token_hash = \$1/i)
+  assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /user_id = \$2/i)
   assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /used_at is null/i)
-  assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /expires_at > \$2/i)
-  assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /returning id, user_id/i)
-  assert.deepEqual(globalThis.__authSecurityPasswordResetClaimSql.values, ['reset-token-hash', claimedAt.toISOString()])
-  assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, claimedAt.toISOString())
+  assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /expires_at > \$3/i)
+  assert.match(globalThis.__authSecurityPasswordResetClaimSql.text, /delivery.status in/i)
+  assert.deepEqual(globalThis.__authSecurityPasswordResetClaimSql.values, [
+    'reset-token-hash', baseUser.id, claimedAt.toISOString(),
+  ])
+  assert(globalThis.__authSecurityPasswordResetDb.tokens.every((token) => token.used_at === claimedAt.toISOString()))
   assert.deepEqual(globalThis.__authSecurityPasswordResetDb.sessions, [])
-  assert.equal(updated.email, baseUser.email)
-  assert.equal(updated.permission, baseUser.permission)
-  assert.equal(updated.password_hash, passwordHash.password_hash)
-  assert.equal(updated.salt, passwordHash.salt)
-  assert.equal(updated.iterations, passwordHash.iterations)
-  assert.equal(updated.password_algorithm, passwordHash.password_algorithm)
-  assert.equal(updated.updated_at, claimedAt.toISOString())
+  assert.equal(updated.user.email, baseUser.email)
+  assert.equal(updated.user.permission, baseUser.permission)
+  assert.equal(updated.user.password_hash, passwordHash.password_hash)
+  assert.equal(updated.user.password_algorithm, passwordHash.password_algorithm)
   assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, passwordHash.password_hash)
   assert.equal(globalThis.__authSecurityPasswordResetReleased, 1)
 
-  const second = await userStore.resetUserPasswordWithToken('reset-token-hash', {
-    ...passwordHash,
-    password_hash: 'losing-password-hash',
-  }, claimedAt)
-  assert.equal(second, null)
-  assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, passwordHash.password_hash)
-  assert.equal(globalThis.__authSecurityPasswordResetReleased, 2)
-
-  for (const tokenOverride of [
-    { used_at: claimedAt.toISOString() },
-    { expires_at: claimedAt.toISOString() },
-    { token_hash: 'different-token-hash' },
-  ]) {
-    resetStorageState()
-    Object.assign(globalThis.__authSecurityPasswordResetDb.token, tokenOverride)
-    const rejected = await userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt)
-    assert.equal(rejected, null)
-    assert.deepEqual(globalThis.__authSecurityPasswordResetTrace, ['begin', 'claim', 'rollback', 'release'])
-    assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, baseUser.password_hash)
-    assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, tokenOverride.used_at ?? null)
-  }
-
-  for (const status of ['frozen', 'revoked']) {
-    resetStorageState()
-    globalThis.__authSecurityPasswordResetDb.user.status = status
-    const rejected = await userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt)
-    assert.equal(rejected, null)
-    assert.deepEqual(globalThis.__authSecurityPasswordResetTrace, ['begin', 'claim', 'update-user', 'rollback', 'release'])
-    assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, null)
-    assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, baseUser.password_hash)
-  }
-
   resetStorageState()
-  globalThis.__authSecurityPasswordResetDb.user = null
-  const missingUser = await userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt)
-  assert.equal(missingUser, null)
-  assert.deepEqual(globalThis.__authSecurityPasswordResetTrace, ['begin', 'claim', 'update-user', 'rollback', 'release'])
-  assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, null)
+  const selfChanged = await userStore.updateUserPasswordAtomically({
+    userId: baseUser.id,
+    expectedPasswordHash: baseUser.password_hash,
+    replacement: passwordHash,
+    updatedAt: claimedAt,
+    keepSessionTokenHash: 'keep-session',
+  })
+  assert.equal(selfChanged.ok, true)
+  assert.deepEqual(globalThis.__authSecurityPasswordResetDb.sessions, [{ token_hash: 'keep-session' }])
+  assert(globalThis.__authSecurityPasswordResetDb.tokens.every((token) => token.used_at === claimedAt.toISOString()))
 
-  for (const failure of ['update-user', 'delete-sessions', 'commit']) {
+  for (const conflict of ['invalid-token', 'stale-password', 'frozen']) {
+    resetStorageState()
+    const input = {
+      userId: baseUser.id,
+      expectedPasswordHash: conflict === 'stale-password' ? 'stale-hash' : baseUser.password_hash,
+      replacement: passwordHash,
+      updatedAt: claimedAt,
+      ...(conflict === 'invalid-token' ? { resetTokenHash: 'missing-token' } : {}),
+    }
+    if (conflict === 'frozen') globalThis.__authSecurityPasswordResetDb.user.status = 'frozen'
+    const rejected = await userStore.updateUserPasswordAtomically(input)
+    assert.deepEqual(rejected, {
+      ok: false,
+      reason: conflict === 'invalid-token' ? 'reset_token_invalid' : 'password_update_conflict',
+    })
+    assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, baseUser.password_hash)
+    assert(globalThis.__authSecurityPasswordResetDb.tokens.every((token) => token.used_at === null))
+    assert.deepEqual(globalThis.__authSecurityPasswordResetDb.sessions, [
+      { token_hash: 'keep-session' }, { token_hash: 'other-session' },
+    ])
+  }
+
+  for (const failure of ['update-user', 'invalidate-tokens', 'delete-sessions', 'commit']) {
     resetStorageState({ __authSecurityPasswordResetFailure: failure })
     await assert.rejects(
-      userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt),
+      userStore.updateUserPasswordAtomically({
+        userId: baseUser.id,
+        expectedPasswordHash: baseUser.password_hash,
+        replacement: passwordHash,
+        updatedAt: claimedAt,
+        resetTokenHash: 'reset-token-hash',
+      }),
       new RegExp(`Injected ${failure} failure`),
     )
-    assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, null)
+    assert(globalThis.__authSecurityPasswordResetDb.tokens.every((token) => token.used_at === null))
     assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, baseUser.password_hash)
-    assert.deepEqual(globalThis.__authSecurityPasswordResetDb.sessions, ['session-1', 'session-2'])
+    assert.deepEqual(globalThis.__authSecurityPasswordResetDb.sessions, [
+      { token_hash: 'keep-session' }, { token_hash: 'other-session' },
+    ])
     assert.equal(globalThis.__authSecurityPasswordResetTrace.at(-1), 'release')
   }
-
-  resetStorageState({ __authSecurityPasswordResetClaimRowCount: 2 })
-  await assert.rejects(
-    userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt),
-    /token claim affected an unexpected number of rows/i,
-  )
-  assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, null)
-
-  resetStorageState({ __authSecurityPasswordResetUserRowCount: 2 })
-  await assert.rejects(
-    userStore.resetUserPasswordWithToken('reset-token-hash', passwordHash, claimedAt),
-    /user update affected an unexpected number of rows/i,
-  )
-  assert.equal(globalThis.__authSecurityPasswordResetDb.token.used_at, null)
-  assert.equal(globalThis.__authSecurityPasswordResetDb.user.password_hash, baseUser.password_hash)
 }
 
 function legacyUserRecord(email, password) {
@@ -951,7 +1081,8 @@ async function assertUserLoginRateLimits() {
   assert.deepEqual(await registrationAccepted.json(), {
     accepted: true,
     verification_required: true,
-    message: '已发送注册验证邮件，请检查您的收件箱，并在邮件中确认。',
+    message: '如果账号符合注册条件，请按照发送至该邮箱的验证说明完成注册。',
+    resend_after_seconds: 300,
   })
   assert.equal(globalThis.__authSecurityRegisterCalls, 1)
 
@@ -973,6 +1104,32 @@ async function assertUserLoginRateLimits() {
     error: '今日邮件发送额度已用尽，注册已暂停，请明日再试。',
     code: 'brevo_daily_limit_reached',
     retry_after_seconds: 7_200,
+  })
+
+  const resendResponses = []
+  for (const [index, result] of [
+    { ok: true, message: 'missing' },
+    { ok: true, message: 'verified' },
+    { ok: true, message: 'cooldown' },
+    { ok: true, message: 'quota' },
+    { ok: true, message: 'delivery-failed' },
+  ].entries()) {
+    globalThis.__authSecurityResendResult = result
+    const response = await authHandler.default(new Request('http://local/api/auth/resend-verification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Goofish-Client-IP': `192.0.2.${40 + index}` },
+      body: JSON.stringify({ email: `resend-${index}@qq.com` }),
+    }))
+    resendResponses.push({ status: response.status, body: await response.json() })
+  }
+  assert(resendResponses.every((response) => JSON.stringify(response) === JSON.stringify(resendResponses[0])))
+  assert.deepEqual(resendResponses[0], {
+    status: 202,
+    body: {
+      accepted: true,
+      message: '如果账号符合条件，请按照发送至注册邮箱的说明操作。',
+      resend_after_seconds: 300,
+    },
   })
 
   globalThis.__authSecuritySession = { user: { id: 'user-1' } }
@@ -1650,7 +1807,7 @@ function userAuthMock() {
     }
     export async function logoutRequest() {}
     export async function requestPasswordReset() { return { ok: true } }
-    export async function resendEmailVerification() { return { ok: true, message: 'ok' } }
+    export async function resendEmailVerification() { return globalThis.__authSecurityResendResult ?? { ok: true, message: 'ok' } }
     export async function resetPasswordWithToken() { return { ok: false, status: 400, message: 'unused' } }
     export async function verifyEmailWithToken() { return { ok: false, status: 400, message: 'unused' } }
     export async function changeUserPassword() { return { ok: false, status: 400, message: 'unused' } }
@@ -1739,8 +1896,13 @@ function adminSessionStoreMock() {
 
 function userStoreMigrationMock() {
   return `
+    export class RegistrationEmailConflictError extends Error {}
+    export async function insertUserAccountForRegistration() {}
+    export async function updateUserPasswordAtomically() { return { ok: false, reason: 'password_update_conflict' } }
     export async function deleteEmailVerificationTokenByHash() {}
-    export async function getRecentEmailVerificationTokenForUser() { return null }
+    export async function getRecentEmailVerificationTokenForUser() {
+      return globalThis.__authSecurityRecentVerificationToken ?? null
+    }
     export async function saveEmailVerificationToken() {}
     export async function verifyUserEmailWithToken() { return null }
     export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
@@ -1802,14 +1964,23 @@ function userStoreMigrationMock() {
 
 function userRegistrationCdkStoreMock() {
   return `
+    export class RegistrationEmailConflictError extends Error {}
+    export async function insertUserAccountForRegistration(user) {
+      globalThis.__authSecurityRegistrationAccountSyncs.push(structuredClone(user))
+    }
+    export async function updateUserPasswordAtomically() { return { ok: false, reason: 'password_update_conflict' } }
     export async function deleteEmailVerificationTokenByHash() {}
-    export async function getRecentEmailVerificationTokenForUser() { return null }
+    export async function getRecentEmailVerificationTokenForUser() {
+      return globalThis.__authSecurityRecentVerificationToken ?? null
+    }
     export async function saveEmailVerificationToken(token) {
       if (globalThis.__authSecurityVerificationTokens) globalThis.__authSecurityVerificationTokens.push(structuredClone(token))
     }
     export async function verifyUserEmailWithToken() { return null }
     export async function updateProfileWorkspaceAtomically(_profileId, updater) { return updater(null) }
-    export async function getUserByEmail() { return null }
+    export async function getUserByEmail(email) {
+      return globalThis.__authSecurityExistingRegistrationUsers?.get(email) ?? null
+    }
     export async function saveUserAccount(user) {
       globalThis.__authSecurityRegistrationAccountSyncs.push(structuredClone(user))
     }
@@ -1897,6 +2068,7 @@ function userRegistrationCdkRedemptionMock() {
     export function createRequestHash(value) { return JSON.stringify(value) }
     export async function hasCompletedIdempotentRedemption() { return false }
     export async function redeemCdkAtomically(options) {
+      await options.prepare?.({ id: 'registration-client' })
       const completed = await options.complete({ id: 'registration-client' }, {
         status: 'unused',
         permission: 'growth',
@@ -1909,6 +2081,9 @@ function userRegistrationCdkRedemptionMock() {
     export async function saveUserAccountInTransaction(client, value) {
       globalThis.__authSecurityRegistrationTransactionTrace.push({ operation: 'account', client, value: structuredClone(value) })
     }
+    export async function updateRegisteredUserCdkInTransaction(client, value) {
+      globalThis.__authSecurityRegistrationTransactionTrace.push({ operation: 'account-cdk', client, value: structuredClone(value) })
+    }
     export async function saveProfileInTransaction(client, value) {
       globalThis.__authSecurityRegistrationTransactionTrace.push({ operation: 'profile', client, value: structuredClone(value) })
     }
@@ -1920,6 +2095,9 @@ function userRegistrationCdkRedemptionMock() {
 
 function userSessionAuthStoreMock() {
   return `
+    export class RegistrationEmailConflictError extends Error {}
+    export async function insertUserAccountForRegistration() {}
+    export async function updateUserPasswordAtomically() { return { ok: false, reason: 'password_update_conflict' } }
     export async function deleteEmailVerificationTokenByHash() {}
     export async function getRecentEmailVerificationTokenForUser() { return null }
     export async function saveEmailVerificationToken() {}
@@ -2010,6 +2188,8 @@ function userSessionPostgresMock() {
 
 function passwordResetAuthStoreMock() {
   return `
+    export class RegistrationEmailConflictError extends Error {}
+    export async function insertUserAccountForRegistration() {}
     export async function deleteEmailVerificationTokenByHash() {}
     export async function getRecentEmailVerificationTokenForUser() { return null }
     export async function saveEmailVerificationToken() {}
@@ -2023,15 +2203,16 @@ function passwordResetAuthStoreMock() {
       globalThis.__authSecurityResetSequence.push('user-preflight')
       return globalThis.__authSecurityResetUser
     }
-    export async function resetUserPasswordWithToken(tokenHash, passwordHash, claimedAt) {
+    export async function updateUserPasswordAtomically(input) {
       globalThis.__authSecurityResetSequence.push('transaction')
-      globalThis.__authSecurityResetCalls.push({ tokenHash, passwordHash, claimedAt })
-      if (globalThis.__authSecurityResetMode === 'expire-during-hash') return null
+      globalThis.__authSecurityResetCalls.push(input)
+      if (globalThis.__authSecurityResetMode === 'expire-during-hash') return { ok: false, reason: 'reset_token_invalid' }
+      if (globalThis.__authSecurityResetMode === 'password-conflict') return { ok: false, reason: 'password_update_conflict' }
       if (globalThis.__authSecurityResetMode === 'concurrent') {
-        if (globalThis.__authSecurityResetClaimed) return null
+        if (globalThis.__authSecurityResetClaimed) return { ok: false, reason: 'reset_token_invalid' }
         globalThis.__authSecurityResetClaimed = true
       }
-      return { ...globalThis.__authSecurityResetUser, ...passwordHash }
+      return { ok: true, user: { ...globalThis.__authSecurityResetUser, ...input.replacement } }
     }
     export async function deleteSessionByTokenHash() {}
     export async function deleteSessionsForUser() {}
@@ -2121,20 +2302,19 @@ function passwordResetPostgresMock() {
                 snapshot = null
                 return { rows: [], rowCount: null }
               }
-              if (/update password_reset_tokens/i.test(text)) {
+              if (/update password_reset_tokens/i.test(text) && /where token_hash/i.test(text)) {
                 globalThis.__authSecurityPasswordResetTrace.push('claim')
                 globalThis.__authSecurityPasswordResetClaimSql = { text, values }
                 const db = globalThis.__authSecurityPasswordResetDb
-                const token = db.token
+                const token = db.tokens.find((candidate) => candidate.token_hash === values[0])
                 const eligible = token
-                  && token.token_hash === values[0]
+                  && token.user_id === values[1]
                   && token.used_at === null
-                  && Date.parse(token.expires_at) > Date.parse(values[1])
+                  && Date.parse(token.expires_at) > Date.parse(values[2])
+                  && (!token.delivery_status || ['reserved', 'sent', 'uncertain'].includes(token.delivery_status))
                 if (!eligible) return { rows: [], rowCount: 0 }
-                token.used_at = values[1]
-                const rowCount = globalThis.__authSecurityPasswordResetClaimRowCount ?? 1
-                const row = { id: token.id, user_id: token.user_id }
-                return { rows: rowCount === 2 ? [row, row] : [row], rowCount }
+                token.used_at = values[2]
+                return { rows: [], rowCount: 1 }
               }
               if (/update user_accounts/i.test(text)) {
                 globalThis.__authSecurityPasswordResetTrace.push('update-user')
@@ -2142,29 +2322,47 @@ function passwordResetPostgresMock() {
                   throw new Error('Injected update-user failure')
                 }
                 const db = globalThis.__authSecurityPasswordResetDb
-                if (!db.user || db.user.id !== values[0] || db.user.status !== 'active') {
+                if (!db.user || db.user.id !== values[0]
+                  || db.user.password_hash !== values[1]
+                  || db.user.status !== 'active') {
                   return { rows: [], rowCount: 0 }
                 }
-                const patch = JSON.parse(values[4])
+                const patch = JSON.parse(values[5])
                 db.user = {
                   ...db.user,
-                  password_hash: values[1],
-                  salt: values[2],
-                  iterations: values[3],
+                  password_hash: values[2],
+                  salt: values[3],
+                  iterations: values[4],
                   ...patch,
-                  updated_at: values[5],
+                  updated_at: values[6],
                 }
-                const rowCount = globalThis.__authSecurityPasswordResetUserRowCount ?? 1
                 const row = { record_json: structuredClone(db.user) }
-                return { rows: rowCount === 2 ? [row, row] : [row], rowCount }
+                return { rows: [row], rowCount: 1 }
+              }
+              if (/update password_reset_tokens/i.test(text) && /where user_id/i.test(text)) {
+                globalThis.__authSecurityPasswordResetTrace.push('invalidate-tokens')
+                if (globalThis.__authSecurityPasswordResetFailure === 'invalidate-tokens') {
+                  throw new Error('Injected invalidate-tokens failure')
+                }
+                let rowCount = 0
+                for (const token of globalThis.__authSecurityPasswordResetDb.tokens) {
+                  if (token.user_id === values[0] && token.used_at === null) {
+                    token.used_at = values[1]
+                    rowCount += 1
+                  }
+                }
+                return { rows: [], rowCount }
               }
               if (/delete from user_sessions/i.test(text)) {
                 globalThis.__authSecurityPasswordResetTrace.push('delete-sessions')
                 if (globalThis.__authSecurityPasswordResetFailure === 'delete-sessions') {
                   throw new Error('Injected delete-sessions failure')
                 }
-                globalThis.__authSecurityPasswordResetDb.sessions = []
-                return { rows: [], rowCount: 2 }
+                const sessions = globalThis.__authSecurityPasswordResetDb.sessions
+                globalThis.__authSecurityPasswordResetDb.sessions = text.includes('token_hash <>')
+                  ? sessions.filter((session) => session.token_hash === values[1])
+                  : []
+                return { rows: [], rowCount: sessions.length - globalThis.__authSecurityPasswordResetDb.sessions.length }
               }
               throw new Error('Unexpected password reset transaction query: ' + text)
             },
@@ -2209,6 +2407,7 @@ function cdkRedemptionMock() {
     export async function hasCompletedIdempotentRedemption() { return false }
     export async function redeemCdkAtomically() { throw new Error('redeem should not run in this check') }
     export async function saveUserAccountInTransaction() {}
+    export async function updateRegisteredUserCdkInTransaction() {}
     export async function saveProfileInTransaction() {}
     export async function saveWorkspaceInTransaction() {}
   `
@@ -2278,6 +2477,7 @@ function emailMock() {
     export async function sendPasswordResetEmail() {}
     export async function sendEmailVerificationEmail() {
       globalThis.__authSecurityEmailSendCalls = (globalThis.__authSecurityEmailSendCalls ?? 0) + 1
+      if (globalThis.__authSecurityEmailSendFailure) throw new Error('simulated email delivery failure')
     }
   `
 }

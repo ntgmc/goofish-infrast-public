@@ -107,4 +107,37 @@ describe('RegistrationSettingsSection', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('两类邮件预留总和不能超过 300')
     expect(adminApiJson.mock.calls.some(([, options]) => options?.method === 'PUT')).toBe(false)
   })
+
+  it('does not render editable controls until the first load succeeds', async () => {
+    let settingsAttempts = 0
+    adminApiJson.mockImplementation(async (url: string) => {
+      if (url.startsWith('/api/admin/registration-invitations')) {
+        return { invitations: [], pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 } }
+      }
+      settingsAttempts += 1
+      if (settingsAttempts === 1) throw new Error('注册设置加载失败')
+      return {
+        settings: {
+          version: 4,
+          email_verification_required: true,
+          invite_code_required: false,
+          brevo_quota_action: 'pause_registration',
+          admin_invite_email_reserve: 20,
+          password_reset_email_reserve: 10,
+          updated_at: null,
+        },
+        email_stats: emailStats,
+      }
+    })
+    const user = userEvent.setup()
+    render(<RegistrationSettingsSection />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('注册设置加载失败')
+    expect(screen.queryByRole('button', { name: '保存注册设置' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: '注册时要求验证邮箱' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '重新载入' }))
+    expect(await screen.findByRole('button', { name: '保存注册设置' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: '注册时要求验证邮箱' })).toBeChecked()
+  })
 })

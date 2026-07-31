@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getProfileWorkspace: vi.fn(),
   getUserById: vi.fn(),
   listProfilesForUser: vi.fn(),
+  resetUserPasswordByAdmin: vi.fn(),
   saveUserProfile: vi.fn(),
   setOperatorBaselineByAdmin: vi.fn(),
 }))
@@ -53,7 +54,7 @@ vi.mock('../storage/user-store', () => ({
   toPublicProfile: (profile: unknown) => profile,
 }))
 
-vi.mock('./user-auth', () => ({ resetUserPasswordByAdmin: vi.fn() }))
+vi.mock('./user-auth', () => ({ resetUserPasswordByAdmin: mocks.resetUserPasswordByAdmin }))
 vi.mock('../storage/personal-use-declaration-store', () => ({
   listPersonalUseDeclarationAcceptancesForUser: vi.fn(async () => []),
 }))
@@ -110,6 +111,7 @@ beforeEach(() => {
   mocks.getCdk.mockResolvedValue(cdk)
   mocks.setOperatorBaselineByAdmin.mockResolvedValue({ ...cdk, baseline_operator_fingerprint: undefined, latest_operator_fingerprint: undefined })
   mocks.saveUserProfile.mockResolvedValue(undefined)
+  mocks.resetUserPasswordByAdmin.mockResolvedValue({ ok: true, user })
   mocks.listProfilesForUser.mockImplementation(async () => [
     mocks.saveUserProfile.mock.calls.at(-1)?.[0] ?? profile,
   ])
@@ -155,6 +157,33 @@ describe('admin user Skland binding reset', () => {
     expect(mocks.getCdk).not.toHaveBeenCalled()
     expect(mocks.setOperatorBaselineByAdmin).not.toHaveBeenCalled()
     expect(mocks.saveUserProfile).toHaveBeenCalled()
+  })
+})
+
+describe('admin user password reset', () => {
+  it('returns a stable conflict when the account is not active or changes concurrently', async () => {
+    mocks.resetUserPasswordByAdmin.mockResolvedValue({
+      ok: false,
+      status: 409,
+      message: '账号状态或密码已发生变化，请刷新后重试。',
+      code: 'password_update_conflict',
+    })
+
+    const response = await adminUsersHandler(new Request('http://localhost/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'reset_password',
+        user_id: user.id,
+        new_password: 'StrongReplacementPassword!2026',
+      }),
+    }))
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toEqual({
+      error: '账号状态或密码已发生变化，请刷新后重试。',
+      code: 'password_update_conflict',
+    })
   })
 })
 

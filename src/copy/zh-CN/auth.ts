@@ -3,7 +3,7 @@ export const authCopy = {
   api_method_not_allowed: "请求方法不受支持。",
   api_route_not_found: "接口不存在。",
   api_internal_error: "服务器内部错误，请稍后重试。",
-  api_registration_accepted: "已发送注册验证邮件，请检查您的收件箱，并在邮件中确认。",
+  api_registration_accepted: "如果账号符合注册条件，请按照发送至该邮箱的验证说明完成注册。",
   api_registration_completed: "注册成功，请使用邮箱和密码登录。",
   api_registration_brevo_limit_reached: "今日邮件发送额度已用尽，注册已暂停，请明日再试。",
   api_registration_brevo_reserve_reached: "当前注册验证邮件已达到预留边界，注册已暂停，请明日再试。",
@@ -28,6 +28,7 @@ export const authCopy = {
   api_account_inactive: "账号当前不可用。",
   api_email_not_verified: "请先验证邮箱后再登录。",
   api_current_password_invalid: "当前密码不正确。",
+  api_password_update_conflict: "账号状态或密码已发生变化，请刷新后重试。",
   api_cdk_required: "请输入 CDK。",
   api_cdk_not_found: "CDK 不存在。",
   api_cdk_frozen: "CDK 已被冻结。",
@@ -41,8 +42,8 @@ export const authCopy = {
   api_profile_not_found: "档案不存在。",
   api_free_profile_upgrade_only: "只有免费个人排班档案可以原地升级。",
   api_profile_unavailable: "档案当前不可用。",
-  api_email_verification_sent: "请检查邮箱并点击验证链接完成注册。",
-  api_email_verification_resend: "如果该账号仍需验证，验证邮件已发送，请检查收件箱。",
+  api_email_verification_sent: "如果账号符合条件，请按照发送至注册邮箱的验证说明完成注册。",
+  api_email_verification_resend: "如果账号符合条件，请按照发送至注册邮箱的验证说明完成注册。",
   api_email_verification_invalid: "验证链接无效或已过期。",
   // src/components/AuthForm.tsx
   components_AuthForm_001: "发送重置邮件失败，请稍后重试",
@@ -99,11 +100,11 @@ export const authCopy = {
   // src/components/AuthForm.tsx
   components_AuthForm_027: "请输入有效的 10 位推荐码或 16 位管理员邀请码",
   // src/components/AuthForm.tsx
-  components_AuthForm_028: "验证邮件已发送，请检查收件箱并点击链接完成注册。",
+  components_AuthForm_028: "如果账号符合条件，请按照发送至注册邮箱的验证说明完成注册。",
   // src/components/AuthForm.tsx
   components_AuthForm_029: "重新发送验证邮件失败，请稍后重试",
   // src/components/AuthForm.tsx
-  components_AuthForm_030: "如果该账号仍需验证，验证邮件已发送，请检查收件箱。",
+  components_AuthForm_030: "如果账号符合条件，请按照发送至注册邮箱的验证说明完成注册。",
   // src/components/AuthForm.tsx
   components_AuthForm_031: "重新发送验证邮件",
   // src/components/AuthForm.tsx
@@ -124,6 +125,12 @@ export const authCopy = {
   components_AuthForm_040: "建议地址：",
   // src/components/AuthForm.tsx
   components_AuthForm_041: "使用",
+  // src/components/AuthForm.tsx
+  components_AuthForm_042: "邮箱不能超过 254 个字符",
+  // src/components/AuthForm.tsx
+  components_AuthForm_043: "密码不能超过 128 位",
+  // src/components/AuthForm.tsx
+  components_AuthForm_044: "秒后可重新发送",
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_001: "验证链接无效或已过期。",
   // src/pages/VerifyEmailPage.tsx
@@ -186,6 +193,8 @@ export const authCopy = {
   pages_ResetPasswordPage_014: "请输入密码",
   // src/pages/ResetPasswordPage.tsx
   pages_ResetPasswordPage_015: "密码至少需要 8 位",
+  // src/pages/ResetPasswordPage.tsx
+  pages_ResetPasswordPage_016: "密码不能超过 128 位",
   // src/pages/tool/AuthPage.tsx
   pages_tool_AuthPage_001: "账号入口",
   // src/pages/tool/AuthPage.tsx

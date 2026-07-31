@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import SettingsSection from './SettingsSection'
 
@@ -30,5 +31,20 @@ describe('SettingsSection privacy controls', () => {
     expect(screen.getByRole('button', { name: '清除凭据' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '解绑森空岛' })).not.toBeInTheDocument()
     expect(screen.getByText(/不会解除游戏账号绑定/)).toBeInTheDocument()
+  })
+
+  it('limits all change-password fields and reports oversized passwords', async () => {
+    const user = userEvent.setup()
+    render(<SettingsSection profiles={[]} onLogout={vi.fn()} />)
+    const oldPassword = screen.getByLabelText('当前密码', { selector: '#settings-old-password' })
+    const newPassword = screen.getByLabelText('新密码')
+    const confirmation = screen.getByLabelText('确认新密码')
+
+    for (const field of [oldPassword, newPassword, confirmation]) {
+      expect(field).toHaveAttribute('maxlength', '128')
+      fireEvent.change(field, { target: { value: 'p'.repeat(129) } })
+    }
+    await user.click(screen.getByRole('button', { name: '修改密码' }))
+    expect(screen.getAllByText('密码不能超过 128 位')).toHaveLength(3)
   })
 })

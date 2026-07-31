@@ -28,7 +28,8 @@ import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import { RateLimitStoreError } from '../security/persistent-rate-limit'
 import { authCopy } from '../../src/copy/zh-CN/auth'
-import { BrevoDailyQuotaExceededError } from './email'
+import { AUTH_RESEND_COOLDOWN_SECONDS } from '../../src/lib/auth-constraints'
+import type { RecoveryAcceptedResponse, RegistrationAcceptedResponse } from '../../src/lib/types'
 import { getRegistrationSettings } from '../storage/registration-settings-store'
 import { requireSiteFeatures } from '../feature-gate'
 import { recordRequestBehaviorEvent } from '../behavior-risk/service'
@@ -73,10 +74,6 @@ export default async (req: Request): Promise<Response> => {
       if (!registrationLimit.allowed) return loginRateLimitResponse(registrationLimit.retryAfterSeconds)
       registrationLimit.attempt.retainFailure()
       const registered = await registerUser(body.email, body.password, body.cdk, req.headers.get('Idempotency-Key'), body.invite_code)
-      if (!registered.ok && registered.code === 'registration_accepted') {
-        await recordRegister('success', startedAt)
-        return registrationAcceptedResponse(true)
-      }
       if (!registered.ok) {
         await recordRegister('failure', startedAt)
         const quotaLimited = (
@@ -91,13 +88,15 @@ export default async (req: Request): Promise<Response> => {
         }, registered.status, quotaLimited ? rateLimitHeaders(registered.retryAfterSeconds!) : {})
       }
       await recordRegister('success', startedAt)
-      await recordRequestBehaviorEvent({
-        req,
-        eventType: 'register',
-        userId: registered.user.id,
-        eventKey: `register:${registered.user.id}`,
-        occurredAt: new Date(startedAt),
-      })
+      if (registered.user) {
+        await recordRequestBehaviorEvent({
+          req,
+          eventType: 'register',
+          userId: registered.user.id,
+          eventKey: `register:${registered.user.id}`,
+          occurredAt: new Date(startedAt),
+        })
+      }
       return registrationAcceptedResponse(registered.verificationRequired)
     }
 
@@ -192,19 +191,8 @@ export default async (req: Request): Promise<Response> => {
       )
       if (!recoveryLimit.allowed) return loginRateLimitResponse(recoveryLimit.retryAfterSeconds)
       recoveryLimit.attempt.retainFailure()
-      try {
-        await resendEmailVerification(body.email)
-        return recoveryAcceptedResponse()
-      } catch (error) {
-        if (error instanceof BrevoDailyQuotaExceededError) {
-          return jsonResponse({
-            error: authCopy.api_brevo_limit_reached,
-            code: error.code,
-            retry_after_seconds: error.retryAfterSeconds,
-          }, 503, rateLimitHeaders(error.retryAfterSeconds))
-        }
-        return jsonResponse({ error: authCopy.api_verification_email_send_failed, code: 'verification_email_send_failed' }, 503)
-      }
+      await resendEmailVerification(body.email)
+      return recoveryAcceptedResponse()
     }
 
     if (pathname.endsWith('/change-password')) {
@@ -217,7 +205,7 @@ export default async (req: Request): Promise<Response> => {
       const changed = await changeUserPassword(auth.user, body.old_password, body.new_password, auth.tokenHash)
       if (!changed.ok) {
         passwordLimit.attempt.retainFailure()
-        return jsonResponse({ error: changed.message }, changed.status)
+        return jsonResponse({ error: changed.message, ...(changed.code && { code: changed.code }) }, changed.status)
       }
       await passwordLimit.attempt.refund()
       return jsonResponse(await buildAuthPayload(changed.user))
@@ -241,18 +229,22 @@ export default async (req: Request): Promise<Response> => {
 }
 
 function registrationAcceptedResponse(verificationRequired: boolean): Response {
-  return jsonResponse({
+  const response: RegistrationAcceptedResponse = {
     accepted: true,
     verification_required: verificationRequired,
     message: verificationRequired ? authCopy.api_registration_accepted : authCopy.api_registration_completed,
-  }, 202)
+    resend_after_seconds: verificationRequired ? AUTH_RESEND_COOLDOWN_SECONDS : null,
+  }
+  return jsonResponse(response, 202)
 }
 
 function recoveryAcceptedResponse(): Response {
-  return jsonResponse({
+  const response: RecoveryAcceptedResponse = {
     accepted: true,
     message: authCopy.api_recovery_accepted,
-  }, 202)
+    resend_after_seconds: AUTH_RESEND_COOLDOWN_SECONDS,
+  }
+  return jsonResponse(response, 202)
 }
 
 function methodNotAllowedResponse(): Response {

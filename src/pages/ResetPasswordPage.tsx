@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { apiVoid } from '../lib/api-client'
 import { copy } from '../copy/index'
 import ThemeSwitcher from '../components/ThemeSwitcher'
+import { AUTH_PASSWORD_MAX_LENGTH, AUTH_PASSWORD_MIN_LENGTH } from '../lib/auth-constraints'
 
 
 type FieldErrors = Record<string, string>
@@ -24,7 +25,10 @@ export default function ResetPasswordPage() {
     const passwordError = validatePasswordInput(password)
     if (passwordError) nextErrors.password = passwordError
     if (!confirmPassword) nextErrors.confirmPassword = copy.auth.pages_ResetPasswordPage_002
-    if (password && confirmPassword && password !== confirmPassword) {
+    else if (confirmPassword.length > AUTH_PASSWORD_MAX_LENGTH) {
+      nextErrors.confirmPassword = copy.auth.pages_ResetPasswordPage_016
+    }
+    else if (password && password !== confirmPassword) {
       nextErrors.confirmPassword = copy.auth.pages_ResetPasswordPage_003
     }
     setFieldErrors(nextErrors)
@@ -69,6 +73,7 @@ export default function ResetPasswordPage() {
               <input
                 type="password"
                 value={password}
+                maxLength={AUTH_PASSWORD_MAX_LENGTH}
                 onChange={(event) => {
                   setPassword(event.currentTarget.value)
                   clearFieldError(setFieldErrors, 'password')
@@ -88,6 +93,7 @@ export default function ResetPasswordPage() {
               <input
                 type="password"
                 value={confirmPassword}
+                maxLength={AUTH_PASSWORD_MAX_LENGTH}
                 onChange={(event) => {
                   setConfirmPassword(event.currentTarget.value)
                   clearFieldError(setFieldErrors, 'confirmPassword')
@@ -117,7 +123,8 @@ export default function ResetPasswordPage() {
 
 function validatePasswordInput(value: string): string | null {
   if (!value) return copy.auth.pages_ResetPasswordPage_014
-  if (value.length < 8) return copy.auth.pages_ResetPasswordPage_015
+  if (value.length < AUTH_PASSWORD_MIN_LENGTH) return copy.auth.pages_ResetPasswordPage_015
+  if (value.length > AUTH_PASSWORD_MAX_LENGTH) return copy.auth.pages_ResetPasswordPage_016
   return null
 }
 

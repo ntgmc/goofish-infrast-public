@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import {
+  AUTH_EMAIL_MAX_LENGTH,
+  AUTH_PASSWORD_MAX_LENGTH,
+  AUTH_PASSWORD_MIN_LENGTH,
+} from '../../src/lib/auth-constraints'
 import { publicContentDraftSchema } from '../../src/lib/public-content'
 import { SITE_FEATURE_KEYS, type SiteFeatureKey } from '../../src/lib/site-features'
 
@@ -37,20 +42,26 @@ const expectedRevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEG
 export const requestSchemas = {
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
   authRegister: strict({
-    email: shortString(254),
-    password: z.string().min(8).max(128),
+    email: shortString(AUTH_EMAIL_MAX_LENGTH),
+    password: z.string().min(AUTH_PASSWORD_MIN_LENGTH).max(AUTH_PASSWORD_MAX_LENGTH),
     cdk: optionalString(256),
     invite_code: optionalString(128),
   }),
-  authLogin: strict({ email: shortString(254), password: z.string().max(128) }),
-  authEmail: strict({ email: shortString(254) }),
-  authReset: strict({ token: shortString(512), new_password: z.string().min(8).max(128) }),
+  authLogin: strict({ email: shortString(AUTH_EMAIL_MAX_LENGTH), password: z.string().max(AUTH_PASSWORD_MAX_LENGTH) }),
+  authEmail: strict({ email: shortString(AUTH_EMAIL_MAX_LENGTH) }),
+  authReset: strict({
+    token: shortString(512),
+    new_password: z.string().min(AUTH_PASSWORD_MIN_LENGTH).max(AUTH_PASSWORD_MAX_LENGTH),
+  }),
   authToken: strict({ token: shortString(512) }),
   authChangePassword: strict({
-    old_password: z.string().max(128),
-    new_password: z.string().min(8).max(128),
+    old_password: z.string().max(AUTH_PASSWORD_MAX_LENGTH),
+    new_password: z.string().min(AUTH_PASSWORD_MIN_LENGTH).max(AUTH_PASSWORD_MAX_LENGTH),
   }),
-  accountDelete: strict({ email: shortString(254), password: z.string().max(128) }),
+  accountDelete: strict({
+    email: shortString(AUTH_EMAIL_MAX_LENGTH),
+    password: z.string().max(AUTH_PASSWORD_MAX_LENGTH),
+  }),
   profileId: strict({ profile_id: shortString(128) }),
   deletionToken: strict({ token: shortString(512) }),
   adminCdkCreate: strict({
@@ -110,9 +121,9 @@ export const requestSchemas = {
   adminUserPatch: strict({
     action: shortString(64),
     user_id: optionalString(128),
-    email: optionalString(254),
-    confirm_email: optionalString(254),
-    new_password: z.string().max(128).optional(),
+    email: optionalString(AUTH_EMAIL_MAX_LENGTH),
+    confirm_email: optionalString(AUTH_EMAIL_MAX_LENGTH),
+    new_password: z.string().max(AUTH_PASSWORD_MAX_LENGTH).optional(),
     profile_id: optionalString(128),
     display_name: optionalString(40),
     note: optionalString(500),

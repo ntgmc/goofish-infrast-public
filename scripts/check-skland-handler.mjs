@@ -1298,6 +1298,7 @@ function memoryPersonalUseDeclarationStoreModule() {
 function memoryUserStoreModule() {
   return `
     const store = globalThis.__sklandHandlerSmokeStore
+    export async function insertUserAccountForRegistrationInTransaction() {}
 export function emptyWorkspace(profileId) {
 return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], free_schedule_entitlement: null, updated_at: new Date().toISOString() }
 }

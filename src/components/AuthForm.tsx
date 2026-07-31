@@ -1,5 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import type { AuthSuccessResponse } from '../lib/types'
+import type { AuthSuccessResponse, RecoveryAcceptedResponse, RegistrationAcceptedResponse } from '../lib/types'
+import {
+  AUTH_EMAIL_MAX_LENGTH,
+  AUTH_PASSWORD_MAX_LENGTH,
+  AUTH_PASSWORD_MIN_LENGTH,
+  AUTH_RESEND_COOLDOWN_SECONDS,
+} from '../lib/auth-constraints'
 import { ApiError, apiJson } from '../lib/api-client'
 import {
   validateRegistrationEmail,
@@ -13,12 +19,6 @@ type AuthMode = 'login' | 'register' | 'forgot'
 type FieldErrors = Record<string, string>
 type EmailInputValidation = { message: string | null; suggestedEmail: string | null }
 type RegistrationEmailApiError = { message: string; suggestedEmail: string | null }
-type RegistrationAcceptedResponse = {
-  accepted: true
-  message: string
-  verification_required?: boolean
-}
-
 type AuthFormProps = {
   onAuthenticated: (payload: AuthSuccessResponse) => void
   allowCdk?: boolean
@@ -49,6 +49,7 @@ export default function AuthForm({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null)
   const [showVerificationResend, setShowVerificationResend] = useState(false)
+  const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0)
 
   useEffect(() => {
     if (mode !== 'register' || inviteCodeRequired !== null) return
@@ -71,6 +72,14 @@ export default function AuthForm({
     if (mode !== 'register') setEmailSuggestion(null)
   }, [mode])
 
+  useEffect(() => {
+    if (resendCooldownSeconds <= 0) return
+    const timer = window.setTimeout(() => {
+      setResendCooldownSeconds((current) => Math.max(0, current - 1))
+    }, 1000)
+    return () => window.clearTimeout(timer)
+  }, [resendCooldownSeconds])
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     const nextErrors: FieldErrors = {}
@@ -89,7 +98,7 @@ export default function AuthForm({
     setNotice(null)
     try {
       if (mode === 'forgot') {
-        const data = await apiJson<{ message?: string }>('/api/auth/forgot-password', {
+        const data = await apiJson<RecoveryAcceptedResponse>('/api/auth/forgot-password', {
           method: 'POST',
           json: { email },
           fallbackMessage: copy.auth.components_AuthForm_001,
@@ -112,6 +121,9 @@ export default function AuthForm({
       if ('accepted' in data) {
         setNotice(data.message || copy.auth.components_AuthForm_028)
         setShowVerificationResend(data.verification_required !== false)
+        setResendCooldownSeconds(data.verification_required !== false
+          ? normalizeCooldownSeconds(data.resend_after_seconds)
+          : 0)
         return
       }
       if (!data.user) throw new Error(mode === 'login' ? copy.auth.components_AuthForm_005 : copy.auth.components_AuthForm_006)
@@ -149,12 +161,13 @@ export default function AuthForm({
     setError(null)
     setNotice(null)
     try {
-      const data = await apiJson<{ message?: string }>('/api/auth/resend-verification', {
+      const data = await apiJson<RecoveryAcceptedResponse>('/api/auth/resend-verification', {
         method: 'POST',
         json: { email },
         fallbackMessage: copy.auth.components_AuthForm_029,
       })
       setNotice(data.message || copy.auth.components_AuthForm_030)
+      setResendCooldownSeconds(normalizeCooldownSeconds(data.resend_after_seconds))
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -202,8 +215,8 @@ export default function AuthForm({
     <form onSubmit={handleSubmit} noValidate className={compact ? 'space-y-4' : 'tool-panel space-y-5 p-6 sm:p-8'}>
       <div>
         <div className="tool-inset grid grid-cols-2 p-1" role="group" aria-label={copy.auth.components_AuthForm_007}>
-          <button type="button" disabled={!features.login} aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null); setEmailSuggestion(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${mode === 'login' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{features.login ? copy.auth.components_AuthForm_008 : `${copy.auth.components_AuthForm_008} · ${copy.features.paused}`}</button>
-          <button type="button" disabled={!features.registration} aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null); setEmailSuggestion(null); setShowVerificationResend(false) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${mode === 'register' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{features.registration ? copy.auth.components_AuthForm_009 : `${copy.auth.components_AuthForm_009} · ${copy.features.paused}`}</button>
+          <button type="button" disabled={!features.login} aria-pressed={mode === 'login'} onClick={() => { setMode('login'); setError(null); setNotice(null); setEmailSuggestion(null); setShowVerificationResend(false); setResendCooldownSeconds(0) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${mode === 'login' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{features.login ? copy.auth.components_AuthForm_008 : `${copy.auth.components_AuthForm_008} · ${copy.features.paused}`}</button>
+          <button type="button" disabled={!features.registration} aria-pressed={mode === 'register'} onClick={() => { setMode('register'); setError(null); setNotice(null); setEmailSuggestion(null); setShowVerificationResend(false); setResendCooldownSeconds(0) }} className={`min-h-11 rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-50 ${mode === 'register' ? 'bg-primary text-primary-foreground' : 'text-ink-secondary'}`}>{features.registration ? copy.auth.components_AuthForm_009 : `${copy.auth.components_AuthForm_009} · ${copy.features.paused}`}</button>
         </div>
 
         {intro && <p className="mt-4 text-sm leading-6 text-ink-secondary">{intro}</p>}
@@ -220,9 +233,12 @@ export default function AuthForm({
           id={compact ? 'depot-auth-email' : 'auth-email'}
           type="email"
           value={email}
+          maxLength={AUTH_EMAIL_MAX_LENGTH}
           onChange={(event) => {
             setEmail(event.currentTarget.value)
             setEmailSuggestion(null)
+            setShowVerificationResend(false)
+            setResendCooldownSeconds(0)
             clearFieldError('email')
           }}
           onFocus={() => clearFieldError('email')}
@@ -252,6 +268,7 @@ export default function AuthForm({
             id={compact ? 'depot-auth-password' : 'auth-password'}
             type="password"
             value={password}
+            maxLength={AUTH_PASSWORD_MAX_LENGTH}
             onChange={(event) => {
               setPassword(event.currentTarget.value)
               clearFieldError('password')
@@ -299,23 +316,27 @@ export default function AuthForm({
       )}
 
       {mode === 'login' && (
-        <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
+        <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}); setShowVerificationResend(false); setResendCooldownSeconds(0) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
           {copy.auth.components_AuthForm_017}</button>
       )}
       {mode === 'forgot' && (
-        <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null); setFieldErrors({}) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
+        <button type="button" onClick={() => { setMode('login'); setError(null); setNotice(null); setFieldErrors({}); setShowVerificationResend(false); setResendCooldownSeconds(0) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
           {copy.auth.components_AuthForm_018}</button>
       )}
 
       {mode !== 'forgot' && !features.login && (
-        <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
+        <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}); setShowVerificationResend(false); setResendCooldownSeconds(0) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
           {copy.features.recovery}
         </button>
       )}
 
       {showVerificationResend && mode !== 'forgot' && (
-        <button type="button" disabled={loading} onClick={() => void resendVerification()} className="tool-secondary-action min-h-11 w-full px-4 text-sm">
-          {loading ? copy.auth.components_AuthForm_019 : copy.auth.components_AuthForm_031}
+        <button type="button" disabled={loading || resendCooldownSeconds > 0} onClick={() => void resendVerification()} className="tool-secondary-action min-h-11 w-full px-4 text-sm">
+          {loading
+            ? copy.auth.components_AuthForm_019
+            : resendCooldownSeconds > 0
+              ? `${resendCooldownSeconds} ${copy.auth.components_AuthForm_044}`
+              : copy.auth.components_AuthForm_031}
         </button>
       )}
 
@@ -329,6 +350,7 @@ export default function AuthForm({
 function validateEmailInput(value: string): string | null {
   const email = value.trim()
   if (!email) return copy.auth.components_AuthForm_023
+  if (email.length > AUTH_EMAIL_MAX_LENGTH) return copy.auth.components_AuthForm_042
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return copy.auth.components_AuthForm_024
   return null
 }
@@ -357,8 +379,15 @@ function registrationEmailValidationMessage(result: Exclude<RegistrationEmailVal
 
 function validatePasswordInput(value: string): string | null {
   if (!value) return copy.auth.components_AuthForm_025
-  if (value.length < 8) return copy.auth.components_AuthForm_026
+  if (value.length < AUTH_PASSWORD_MIN_LENGTH) return copy.auth.components_AuthForm_026
+  if (value.length > AUTH_PASSWORD_MAX_LENGTH) return copy.auth.components_AuthForm_043
   return null
+}
+
+function normalizeCooldownSeconds(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.ceil(value)
+    : AUTH_RESEND_COOLDOWN_SECONDS
 }
 
 function validateInviteCodeInput(value: string, required: boolean): string | null {

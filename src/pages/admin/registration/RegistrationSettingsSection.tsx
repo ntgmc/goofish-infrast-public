@@ -5,56 +5,14 @@ import { copy } from '../../../copy/index'
 import AdminRegistrationInvitationsPanel from './AdminRegistrationInvitationsPanel'
 import { AdminToast } from '../shared/AdminToast'
 
-const DEFAULT_SETTINGS: RegistrationSettings = {
-  version: 4,
-  email_verification_required: true,
-  invite_code_required: false,
-  brevo_quota_action: 'pause_registration',
-  admin_invite_email_reserve: 0,
-  password_reset_email_reserve: 0,
-  updated_at: null,
-}
-
-const EMPTY_EMAIL_STATS: BrevoEmailStats = {
-  timezone: 'UTC',
-  daily_limit: 300,
-  official_quota: {
-    status: 'unavailable',
-    reported_remaining_count: null,
-    reported_used_count: null,
-    external_used_offset: 0,
-    synced_at: null,
-    last_attempt_at: null,
-  },
-  today: {
-    date: '',
-    sent_count: 0,
-    reserved_count: 0,
-    uncertain_count: 0,
-    failed_count: 0,
-    local_quota_used_count: 0,
-    quota_used_count: 0,
-    remaining_count: 300,
-    limit_reached: false,
-    by_purpose: {
-      email_verification: 0,
-      admin_invite_verification: 0,
-      password_reset: 0,
-      account_deletion_cancellation: 0,
-      account_deletion_receipt: 0,
-    },
-  },
-  days: [],
-}
-
 type RegistrationSettingsResponse = {
-  settings?: RegistrationSettings
-  email_stats?: BrevoEmailStats
+  settings: RegistrationSettings
+  email_stats: BrevoEmailStats
 }
 
 export default function RegistrationSettingsSection() {
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
-  const [emailStats, setEmailStats] = useState(EMPTY_EMAIL_STATS)
+  const [settings, setSettings] = useState<RegistrationSettings | null>(null)
+  const [emailStats, setEmailStats] = useState<BrevoEmailStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -67,8 +25,9 @@ export default function RegistrationSettingsSection() {
       const data = await adminApiJson<RegistrationSettingsResponse>('/api/admin/registration-settings', {
         fallbackMessage: copy.admin.registration_load_failed,
       })
-      setSettings({ ...DEFAULT_SETTINGS, ...data.settings })
-      setEmailStats(data.email_stats ?? EMPTY_EMAIL_STATS)
+      if (!data.settings || !data.email_stats) throw new Error(copy.admin.registration_load_failed)
+      setSettings(data.settings)
+      setEmailStats(data.email_stats)
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -80,6 +39,7 @@ export default function RegistrationSettingsSection() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (!settings || !emailStats || loading || saving) return
     if (!validReserve(settings.admin_invite_email_reserve) || !validReserve(settings.password_reset_email_reserve)) {
       setError(null)
       return
@@ -103,8 +63,9 @@ export default function RegistrationSettingsSection() {
         },
         fallbackMessage: copy.admin.registration_save_failed,
       })
-      setSettings({ ...DEFAULT_SETTINGS, ...(data.settings ?? settings) })
-      setEmailStats(data.email_stats ?? emailStats)
+      if (!data.settings || !data.email_stats) throw new Error(copy.admin.registration_save_failed)
+      setSettings(data.settings)
+      setEmailStats(data.email_stats)
       setNotice(copy.admin.registration_saved)
     } catch (caught) {
       setError((caught as Error).message)
@@ -113,7 +74,20 @@ export default function RegistrationSettingsSection() {
     }
   }
 
-  if (loading) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.admin.registration_loading}</div>
+  if (loading && (!settings || !emailStats)) {
+    return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.admin.registration_loading}</div>
+  }
+
+  if (!settings || !emailStats) {
+    return (
+      <section className="tool-panel p-6" aria-live="polite">
+        {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
+        <button type="button" onClick={() => void load()} className="tool-secondary-action mt-4">
+          {copy.admin.registration_reload}
+        </button>
+      </section>
+    )
+  }
 
   const standardCapacity = Math.max(0, emailStats.today.remaining_count - settings.admin_invite_email_reserve - settings.password_reset_email_reserve)
   const adminInviteCapacity = Math.max(0, emailStats.today.remaining_count - settings.password_reset_email_reserve)
@@ -232,7 +206,9 @@ export default function RegistrationSettingsSection() {
                 checked={settings.email_verification_required}
                 onChange={(event) => {
                   const emailVerificationRequired = event.currentTarget.checked
-                  setSettings((current) => ({ ...current, email_verification_required: emailVerificationRequired }))
+                  setSettings((current) => current
+                    ? { ...current, email_verification_required: emailVerificationRequired }
+                    : current)
                 }}
                 className="h-4 w-4 accent-brand-600"
               />
@@ -244,7 +220,7 @@ export default function RegistrationSettingsSection() {
                 checked={settings.invite_code_required}
                 onChange={(event) => {
                   const inviteCodeRequired = event.currentTarget.checked
-                  setSettings((current) => ({ ...current, invite_code_required: inviteCodeRequired }))
+                  setSettings((current) => current ? { ...current, invite_code_required: inviteCodeRequired } : current)
                 }}
                 className="h-4 w-4 accent-brand-600"
               />
@@ -267,7 +243,9 @@ export default function RegistrationSettingsSection() {
               value={settings.admin_invite_email_reserve}
               describedBy="registration-reserve-help registration-reserve-error"
               invalid={!validReserve(settings.admin_invite_email_reserve)}
-              onChange={(value) => setSettings((current) => ({ ...current, admin_invite_email_reserve: value }))}
+              onChange={(value) => setSettings((current) => current
+                ? { ...current, admin_invite_email_reserve: value }
+                : current)}
             />
             <ReserveInput
               id="password-reset-email-reserve"
@@ -275,7 +253,9 @@ export default function RegistrationSettingsSection() {
               value={settings.password_reset_email_reserve}
               describedBy="registration-reserve-help registration-reserve-error"
               invalid={!validReserve(settings.password_reset_email_reserve)}
-              onChange={(value) => setSettings((current) => ({ ...current, password_reset_email_reserve: value }))}
+              onChange={(value) => setSettings((current) => current
+                ? { ...current, password_reset_email_reserve: value }
+                : current)}
             />
           </div>
           <p className={`mt-3 text-sm ${!reservesInRange || !reserveTotalValid ? 'text-error' : 'text-ink-muted'}`} role="status" aria-live="polite">
@@ -295,7 +275,9 @@ export default function RegistrationSettingsSection() {
               name="brevo-quota-action"
               value="pause_registration"
               checked={settings.brevo_quota_action === 'pause_registration'}
-              onChange={() => setSettings((current) => ({ ...current, brevo_quota_action: 'pause_registration' }))}
+              onChange={() => setSettings((current) => current
+                ? { ...current, brevo_quota_action: 'pause_registration' }
+                : current)}
               className="mt-1 h-4 w-4 accent-brand-600"
             />
             <span><strong className="block text-ink-primary">{copy.admin.registration_quota_pause}</strong>{copy.admin.registration_quota_pause_help}</span>
@@ -306,7 +288,9 @@ export default function RegistrationSettingsSection() {
               name="brevo-quota-action"
               value="allow_unverified_registration"
               checked={settings.brevo_quota_action === 'allow_unverified_registration'}
-              onChange={() => setSettings((current) => ({ ...current, brevo_quota_action: 'allow_unverified_registration' }))}
+              onChange={() => setSettings((current) => current
+                ? { ...current, brevo_quota_action: 'allow_unverified_registration' }
+                : current)}
               className="mt-1 h-4 w-4 accent-brand-600"
             />
             <span><strong className="block text-ink-primary">{copy.admin.registration_quota_allow}</strong>{copy.admin.registration_quota_allow_help}</span>
@@ -316,8 +300,8 @@ export default function RegistrationSettingsSection() {
           <div className="tool-alert tool-alert--error mt-4" role="note">{copy.admin.registration_quota_warning}</div>
         )}
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button type="submit" disabled={saving} className="tool-primary-action">{saving ? copy.admin.registration_saving : copy.admin.registration_save}</button>
-          <button type="button" disabled={saving} onClick={() => void load()} className="tool-secondary-action">{copy.admin.registration_reload}</button>
+          <button type="submit" disabled={saving || loading} className="tool-primary-action">{saving ? copy.admin.registration_saving : copy.admin.registration_save}</button>
+          <button type="button" disabled={saving || loading} onClick={() => void load()} className="tool-secondary-action">{copy.admin.registration_reload}</button>
           <span className="text-xs text-ink-muted">
             {copy.admin.registration_updated}{settings.updated_at ? new Date(settings.updated_at).toLocaleString('zh-CN') : copy.admin.registration_default}
           </span>

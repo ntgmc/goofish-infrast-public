@@ -571,32 +571,63 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
 
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
+  delivery_id TEXT REFERENCES brevo_email_deliveries(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE password_reset_tokens ADD COLUMN IF NOT EXISTS delivery_id TEXT;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'password_reset_tokens_delivery_id_fkey'
+       AND conrelid = 'password_reset_tokens'::regclass
+  ) THEN
+    ALTER TABLE password_reset_tokens
+      ADD CONSTRAINT password_reset_tokens_delivery_id_fkey
+      FOREIGN KEY (delivery_id) REFERENCES brevo_email_deliveries(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_created_at ON password_reset_tokens(created_at);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_delivery_id ON password_reset_tokens(delivery_id);
 
 CREATE TABLE IF NOT EXISTS email_verification_tokens (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
+  delivery_id TEXT REFERENCES brevo_email_deliveries(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE email_verification_tokens ADD COLUMN IF NOT EXISTS delivery_id TEXT;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'email_verification_tokens_delivery_id_fkey'
+       AND conrelid = 'email_verification_tokens'::regclass
+  ) THEN
+    ALTER TABLE email_verification_tokens
+      ADD CONSTRAINT email_verification_tokens_delivery_id_fkey
+      FOREIGN KEY (delivery_id) REFERENCES brevo_email_deliveries(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_token_hash ON email_verification_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_expires_at ON email_verification_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_created_at ON email_verification_tokens(created_at);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_delivery_id ON email_verification_tokens(delivery_id);
 
 CREATE TABLE IF NOT EXISTS user_game_accounts (
   id TEXT PRIMARY KEY,

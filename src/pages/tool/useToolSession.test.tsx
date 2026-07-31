@@ -28,6 +28,13 @@ function jsonResponse(value: unknown): Response {
   return new Response(JSON.stringify(value), { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
 
+function errorResponse(status: number): Response {
+  return new Response(JSON.stringify({ error: `auth failure ${status}` }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 describe('useToolSession config synchronization', () => {
   beforeEach(() => vi.useRealTimers())
   afterEach(() => {
@@ -51,6 +58,87 @@ describe('useToolSession config synchronization', () => {
     await waitFor(() => expect(result.current.authLoading).toBe(false))
     expect(requestedUrls).toContain('/api/auth/me?profile_id=profile-2')
     expect(result.current.activeProfile?.id).toBe('profile-2')
+    expect(result.current.authStatus).toBe('authenticated')
+  })
+
+  it('treats only a successful null-user response as anonymous', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      if (url === '/api/auth/me') return jsonResponse({
+        user: null,
+        profiles: [],
+        active_profile: null,
+        workspace: null,
+      })
+      throw new Error(`Unexpected request: ${url}`)
+    }))
+
+    const { result } = renderHook(() => useToolSession())
+    await waitFor(() => expect(result.current.authStatus).toBe('anonymous'))
+    expect(result.current.authError).toBeNull()
+    expect(result.current.user).toBeNull()
+  })
+
+  it('rejects a successful response that omits the user field', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/announcement') return new Response(null, { status: 204 })
+      return jsonResponse({ profiles: [], active_profile: null, workspace: null })
+    }))
+
+    const { result } = renderHook(() => useToolSession())
+    await waitFor(() => expect(result.current.authStatus).toBe('error'))
+    expect(result.current.authError).toBeInstanceOf(Error)
+    expect(result.current.user).toBeNull()
+  })
+
+  it.each([401, 500, 503])('enters auth error for an HTTP %s response', async (status) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/announcement') return new Response(null, { status: 204 })
+      return errorResponse(status)
+    }))
+
+    const { result } = renderHook(() => useToolSession())
+    await waitFor(() => expect(result.current.authStatus).toBe('error'))
+    expect(result.current.authError).toBeInstanceOf(Error)
+    expect(result.current.user).toBeNull()
+  })
+
+  it('enters auth error for a network failure', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/announcement') return new Response(null, { status: 204 })
+      throw new TypeError('network offline')
+    }))
+
+    const { result } = renderHook(() => useToolSession())
+    await waitFor(() => expect(result.current.authStatus).toBe('error'))
+    expect(result.current.authError?.message).toContain('network offline')
+  })
+
+  it('preserves an authenticated snapshot on failure and restores it after retry', async () => {
+    let authRequest = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      authRequest += 1
+      if (authRequest === 1) return jsonResponse(authPayload(baseConfig))
+      if (authRequest === 2) return errorResponse(503)
+      return jsonResponse(authPayload({ ...baseConfig, desc: 'restored' }))
+    }))
+
+    const { result } = renderHook(() => useToolSession())
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    const originalUser = result.current.user
+
+    act(() => result.current.retryAuth())
+    await waitFor(() => expect(result.current.authStatus).toBe('error'))
+    expect(result.current.user).toBe(originalUser)
+    expect(result.current.workspace?.config?.desc).toBe('base')
+
+    act(() => result.current.retryAuth())
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    expect(result.current.authError).toBeNull()
+    expect(result.current.workspace?.config?.desc).toBe('restored')
   })
 
   it('debounces edits and sends only the latest config snapshot', async () => {
