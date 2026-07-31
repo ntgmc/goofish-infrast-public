@@ -11,7 +11,7 @@ import { isProfileCdkRecord, type CdkRecord, type LegacyProfileCdkRecord } from 
 import { adjustBalance, applyBalanceChangeInTransaction, BalanceError, createBalanceRequestHash, getBalanceSummary, releaseScheduleBalanceInTransaction, reserveScheduleBalanceInTransaction, reverseQualificationCredit, settleScheduleBalanceInTransaction } from './balance-store'
 import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
 import { createCommercialProfile, createOrConvertMeteredPersonal, deleteCommercialProfile, patchCommercialProfile, updateCommercialAccount } from './metered-profile-store'
-import { getItemBalance, grantItemInTransaction } from './inventory-store'
+import { createLifetimeProfileForJsonImport, getItemBalance, grantItemInTransaction } from './inventory-store'
 
 let container: StartedPostgreSqlContainer
 
@@ -288,6 +288,48 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     })).rejects.toThrow('injected item failure')
     expect(await getItemBalance(userId, 'lifetime_profile_voucher')).toBe(0)
     expect((await query<{ status: string }>('select status from cdk_records where key = $1', [key])).rows[0]?.status).toBe('unused')
+  })
+
+  it('creates one JSON-ready lifetime profile and consumes one voucher idempotently', async () => {
+    const userId = await seedUser()
+    await withTransaction((client) => grantItemInTransaction(client, {
+      userId,
+      itemCode: 'lifetime_profile_voucher',
+      quantity: 1,
+      expiry: { mode: 'never' },
+      sourceType: 'test',
+      sourceId: randomUUID(),
+      recipientRole: 'owner',
+    }))
+
+    const first = await createLifetimeProfileForJsonImport({
+      userId,
+      idempotencyKey: 'lifetime-json-profile',
+      displayName: 'JSON 终身档案',
+      note: '手动导入',
+    })
+    const replay = await createLifetimeProfileForJsonImport({
+      userId,
+      idempotencyKey: 'lifetime-json-profile',
+      displayName: 'JSON 终身档案',
+      note: '手动导入',
+    })
+
+    expect(first.replayed).toBe(false)
+    expect(replay).toEqual({ profileId: first.profileId, replayed: true })
+    expect(await getItemBalance(userId, 'lifetime_profile_voucher')).toBe(0)
+    const profile = await query<{ record_json: UserGameAccountRecord }>(
+      'select record_json from user_game_accounts where id = $1 and user_id = $2',
+      [first.profileId, userId],
+    )
+    expect(profile.rows[0]?.record_json).toMatchObject({
+      kind: 'cdk',
+      permission: 'advanced',
+      display_name: 'JSON 终身档案',
+      note: '手动导入',
+    })
+    expect(profile.rows[0]?.record_json.skland_binding).toBeUndefined()
+    expect((await query('select 1 from user_profile_workspaces where profile_id = $1', [first.profileId])).rowCount).toBe(1)
   })
 
   it('serializes concurrent admin adjustments and preserves idempotent responses', async () => {

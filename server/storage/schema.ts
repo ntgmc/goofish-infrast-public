@@ -1354,9 +1354,15 @@ VALUES
   ('result_archive_folder', 'capacity_upgrade', 'result_archive_capacity', '结果封存夹', '指定档案的结果封存区永久增加 1 个槽位。', 'result_archive_folder', true, true, now(), now()),
   ('maa_export_trial_coupon', 'consumable', 'maa_export_trial', 'MAA 导出体验券', '导出一次指定排班结果。', 'maa_export_trial_coupon', true, true, now(), now()),
   ('newcomer_supply_pack', 'gift_pack', 'open_gift_pack', '新人补给包', '内容由后台配置的新人礼包。', 'newcomer_supply_pack', true, true, now(), now()),
-  ('lifetime_profile_voucher', 'license_voucher', 'bind_lifetime_profile', '终身版兑换 CDK', '绑定森空岛账号后创建或升级为终身高级档案，最终成功时才消耗。', 'lifetime_profile_voucher', true, true, now(), now()),
+  ('lifetime_profile_voucher', 'license_voucher', 'bind_lifetime_profile', '终身版兑换 CDK', '可通过 JSON 创建终身高级档案，或绑定森空岛账号后创建或升级；最终成功时才消耗。', 'lifetime_profile_voucher', true, true, now(), now()),
   ('limited_profile_voucher', 'license_voucher', 'activate_limited_profile', '限时 CDK', '用于已绑定森空岛的免费预览档案，高级权限持续至 2026 年 8 月 20 日 00:00。', 'limited_profile_voucher', true, true, now(), now())
 ON CONFLICT (code) DO NOTHING;
+
+UPDATE item_definitions
+SET description = '可通过 JSON 创建终身高级档案，或绑定森空岛账号后创建或升级；最终成功时才消耗。',
+    updated_at = now()
+WHERE code = 'lifetime_profile_voucher'
+  AND description IS DISTINCT FROM '可通过 JSON 创建终身高级档案，或绑定森空岛账号后创建或升级；最终成功时才消耗。';
 
 -- goofish:migration-phase
 INSERT INTO reward_grants

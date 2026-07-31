@@ -210,6 +210,11 @@ export const requestSchemas = {
   }),
   lifetimeVoucherSelection: strict({ selection_id: shortString(256), uid: shortString(128) }),
   lifetimeVoucherConfirmation: strict({ confirmation_id: shortString(256), idempotency_key: shortString(200) }),
+  lifetimeVoucherProfileCreate: strict({
+    idempotency_key: shortString(200),
+    display_name: optionalString(40),
+    note: optionalString(500),
+  }),
   optimizationJob: z.discriminatedUnion('kind', [
     strict({
       kind: z.literal('schedule'),
@@ -410,6 +415,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/invitations/code', route({ POST: none() })],
   ['/api/user/rewards', route({ GET: none() })],
   ['/api/user/inventory', route({ GET: none(), POST: json('standard', requestSchemas.inventoryUse) })],
+  ['/api/user/inventory/lifetime-profile', route({ POST: json('standard', requestSchemas.lifetimeVoucherProfileCreate) })],
   ['/api/user/cdk/redeem', route({ POST: json('standard', requestSchemas.cdkRedeem) })],
   ['/api/user/balance', route({ GET: none() }, ['cursor', 'limit'])],
   ['/api/user/balance/redeem', route({ POST: json('standard', requestSchemas.balanceRedeem) })],

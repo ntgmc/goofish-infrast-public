@@ -115,6 +115,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/rewards', userRewardsHandler as unknown as ApiHandler],
   ['/api/user/inventory', userInventoryHandler as unknown as ApiHandler],
+  ['/api/user/inventory/lifetime-profile', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/balance', userBalanceHandler as unknown as ApiHandler],
   ['/api/user/balance/redeem', userBalanceHandler as unknown as ApiHandler],
   ['/api/user/onboarding-tasks', userInventoryHandler as unknown as ApiHandler],

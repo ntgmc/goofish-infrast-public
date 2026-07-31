@@ -15,13 +15,21 @@ import {
 type Category = 'all' | 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'license_voucher'
 type UseResponse = { rewards?: Array<{ item_code: string; quantity: number; expires_at: string | null }> }
 
-export default function InventorySection({ onPayload }: { onPayload: (payload: AuthSuccessResponse) => void }) {
+export default function InventorySection({
+  onPayload,
+  onLifetimeProfileCreated,
+}: {
+  onPayload: (payload: AuthSuccessResponse) => void
+  onLifetimeProfileCreated?: () => void
+}) {
   const [inventory, setInventory] = useState<InventoryResponse | null>(null)
   const [tasks, setTasks] = useState<OnboardingTaskView[]>([])
   const [selected, setSelected] = useState<InventoryStack | null>(null)
   const [category, setCategory] = useState<Category>('all')
   const [search, setSearch] = useState('')
   const [profileId, setProfileId] = useState('')
+  const [lifetimeDisplayName, setLifetimeDisplayName] = useState('')
+  const [lifetimeNote, setLifetimeNote] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -99,6 +107,36 @@ export default function InventorySection({ onPayload }: { onPayload: (payload: A
     }
   }
 
+  const createLifetimeProfileWithJson = async () => {
+    if (selected?.item.code !== 'lifetime_profile_voucher') return
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const response = await apiJson<AuthSuccessResponse>('/api/user/inventory/lifetime-profile', {
+        method: 'POST',
+        json: {
+          idempotency_key: itemIdempotencyKeyRef.current,
+          ...(lifetimeDisplayName.trim() && { display_name: lifetimeDisplayName.trim() }),
+          ...(lifetimeNote.trim() && { note: lifetimeNote.trim() }),
+        },
+        fallbackMessage: copy.inventory.lifetime_create_failed,
+      })
+      itemIdempotencyKeyRef.current = crypto.randomUUID()
+      setSelected(null)
+      setLifetimeDisplayName('')
+      setLifetimeNote('')
+      setNotice(copy.inventory.lifetime_json_created)
+      onPayload(response)
+      if (onLifetimeProfileCreated) onLifetimeProfileCreated()
+      else await load()
+    } catch (caught) {
+      setError(getApiErrorMessage(caught, copy.inventory.lifetime_create_failed))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (loading && !inventory) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.inventory.loading}</div>
 
   const selectedCapacity = selected ? capacityForItem(selected.item.code, profileId, inventory?.capacities ?? []) : null
@@ -112,7 +150,8 @@ export default function InventorySection({ onPayload }: { onPayload: (payload: A
     setLifetimeDialogOpen(false)
     setNotice(copy.inventory.lifetime_bound)
     onPayload(payload)
-    void load()
+    if (onLifetimeProfileCreated) onLifetimeProfileCreated()
+    else void load()
   }
 
   return (
@@ -159,7 +198,7 @@ export default function InventorySection({ onPayload }: { onPayload: (payload: A
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {filtered.map((stack) => (
-              <button key={stack.stack_id} type="button" onClick={() => { setSelected(stack); setProfileId('') }} className="tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
+              <button key={stack.stack_id} type="button" onClick={() => { setSelected(stack); setProfileId(''); setLifetimeDisplayName(''); setLifetimeNote('') }} className="tool-inset min-w-0 p-4 text-left transition hover:border-brand-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
                 <img src={itemIconPath(stack.item.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="mx-auto h-16 w-16 object-contain" />
                 <strong className="mt-3 block truncate text-sm text-ink-primary">{stack.item.name}</strong>
                 <span className="mt-1 block text-xs text-ink-secondary">{copy.inventory.quantity} × {stack.quantity}</span>
@@ -192,16 +231,30 @@ export default function InventorySection({ onPayload }: { onPayload: (payload: A
                 {selectedCapacity && <div className="tool-inset mt-3 grid grid-cols-3 gap-2 p-3 text-center text-xs"><span>{copy.inventory.current}<strong className="mt-1 block text-sm">{selectedCapacity.limit}</strong></span><span>{copy.inventory.after_use}<strong className="mt-1 block text-sm">{Math.min(selectedCapacity.maximum, selectedCapacity.limit + 1)}</strong></span><span>{copy.inventory.maximum}<strong className="mt-1 block text-sm">{selectedCapacity.maximum}</strong></span></div>}
               </>}
               {selected.actions.includes('context_only') && <div className="tool-alert mt-5">{copy.inventory.context_only}</div>}
-              {selected.item.code === 'lifetime_profile_voucher' && <div className="tool-alert mt-5">{copy.inventory.lifetime_use_help}</div>}
+              {selected.item.code === 'lifetime_profile_voucher' && <>
+                <div className="tool-alert mt-5">{copy.inventory.lifetime_use_help}</div>
+                <div className="tool-inset mt-4 space-y-3 p-4">
+                  <div>
+                    <label htmlFor="lifetime-profile-name" className="block text-sm font-medium text-ink-primary">{copy.inventory.lifetime_profile_name}</label>
+                    <input id="lifetime-profile-name" className="tool-field mt-2 w-full" maxLength={40} value={lifetimeDisplayName} onChange={(event) => setLifetimeDisplayName(event.currentTarget.value)} placeholder={copy.inventory.lifetime_profile_name_placeholder} />
+                  </div>
+                  <div>
+                    <label htmlFor="lifetime-profile-note" className="block text-sm font-medium text-ink-primary">{copy.inventory.lifetime_profile_note}</label>
+                    <textarea id="lifetime-profile-note" className="tool-field mt-2 w-full resize-y" maxLength={500} rows={2} value={lifetimeNote} onChange={(event) => setLifetimeNote(event.currentTarget.value)} placeholder={copy.inventory.lifetime_profile_note_placeholder} />
+                  </div>
+                </div>
+              </>}
               {selected.item.code === 'limited_profile_voucher' && <div className="tool-alert mt-5">{copy.inventory.limited_use_help}</div>}
-              <div className="mt-6 flex justify-end gap-3">
+              <div className="mt-6 flex flex-wrap justify-end gap-3">
                 <Dialog.Close className="tool-secondary-action">{copy.inventory.close}</Dialog.Close>
-                {!selected.actions.includes('context_only') && <button type="button" disabled={busy || !canUseSelected} onClick={() => {
-                  if (selected.actions.includes('bind')) {
-                    setSelected(null)
-                    setLifetimeDialogOpen(true)
-                  } else void runItemAction()
-                }} className="tool-primary-action">{busy ? copy.inventory.processing : selected.actions.includes('bind') ? copy.inventory.bind_and_use : selected.item.kind === 'gift_pack' ? copy.inventory.open : copy.inventory.use}</button>}
+                {selected.item.code === 'lifetime_profile_voucher' ? <>
+                  <button type="button" disabled={busy || !canUseSelected} onClick={() => void createLifetimeProfileWithJson()} className="tool-secondary-action">
+                    {busy ? copy.inventory.processing : copy.inventory.create_with_json}
+                  </button>
+                  <button type="button" disabled={busy || !canUseSelected} onClick={() => { setSelected(null); setLifetimeDialogOpen(true) }} className="tool-primary-action">
+                    {copy.inventory.bind_and_use}
+                  </button>
+                </> : !selected.actions.includes('context_only') && <button type="button" disabled={busy || !canUseSelected} onClick={() => void runItemAction()} className="tool-primary-action">{busy ? copy.inventory.processing : selected.item.kind === 'gift_pack' ? copy.inventory.open : copy.inventory.use}</button>}
               </div>
             </>}
           </Dialog.Content>
