@@ -25,6 +25,10 @@ export interface SiteFeatureSettingsV1 {
   updated_at: string | null
 }
 
+export type AdminSiteFeatureSettingsV1 = SiteFeatureSettingsV1 & {
+  revision: number
+}
+
 export const DEFAULT_SITE_FEATURES: SiteFeatures = Object.freeze({
   site: true,
   registration: true,

@@ -90,14 +90,19 @@ CREATE TABLE IF NOT EXISTS registration_settings (
 CREATE TABLE IF NOT EXISTS feature_settings (
   key TEXT PRIMARY KEY,
   record_json JSONB NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
+  updated_at TIMESTAMPTZ NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1)
 );
 
 CREATE TABLE IF NOT EXISTS public_content_settings (
   key TEXT PRIMARY KEY,
   record_json JSONB NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
+  updated_at TIMESTAMPTZ NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1)
 );
+
+ALTER TABLE feature_settings ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1);
+ALTER TABLE public_content_settings ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1);
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS brevo_email_deliveries (

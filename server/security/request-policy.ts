@@ -32,6 +32,7 @@ const siteFeatureShape = Object.fromEntries(
   SITE_FEATURE_KEYS.map((key) => [key, z.boolean()]),
 ) as Record<SiteFeatureKey, z.ZodBoolean>
 const siteFeaturesSchema = strict(siteFeatureShape)
+const expectedRevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)
 
 export const requestSchemas = {
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
@@ -82,8 +83,8 @@ export const requestSchemas = {
     admin_invite_email_reserve: z.number().int().min(0).max(300),
     password_reset_email_reserve: z.number().int().min(0).max(300),
   }),
-  adminFeatureSettings: strict({ features: siteFeaturesSchema }),
-  adminPublicContent: publicContentDraftSchema,
+  adminFeatureSettings: strict({ features: siteFeaturesSchema, expected_revision: expectedRevisionSchema }),
+  adminPublicContent: publicContentDraftSchema.extend({ expected_revision: expectedRevisionSchema }),
   adminRegistrationInvitationCreate: strict({}),
   adminRegistrationInvitationPatch: strict({
     invitation_id: shortString(128),

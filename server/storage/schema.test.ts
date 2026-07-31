@@ -161,7 +161,9 @@ describe('database schema ownership', () => {
     ]))
     expect(workerRequirements).not.toEqual(expect.arrayContaining([
       { table_name: 'feature_settings', column_name: 'key' },
+      { table_name: 'feature_settings', column_name: 'revision' },
       { table_name: 'public_content_settings', column_name: 'key' },
+      { table_name: 'public_content_settings', column_name: 'revision' },
       { table_name: 'user_notifications', column_name: 'payload_json' },
     ]))
 
@@ -173,8 +175,10 @@ describe('database schema ownership', () => {
     expect(apiRequirements).toEqual(expect.arrayContaining([
       { table_name: 'feature_settings', column_name: 'key' },
       { table_name: 'feature_settings', column_name: 'record_json' },
+      { table_name: 'feature_settings', column_name: 'revision' },
       { table_name: 'public_content_settings', column_name: 'key' },
       { table_name: 'public_content_settings', column_name: 'record_json' },
+      { table_name: 'public_content_settings', column_name: 'revision' },
       { table_name: 'user_notifications', column_name: 'payload_json' },
     ]))
   })

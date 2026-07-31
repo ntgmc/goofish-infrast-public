@@ -1,4 +1,4 @@
-import type { SiteFeatureSettingsV1, SiteFeatures } from '../../src/lib/site-features'
+import type { AdminSiteFeatureSettingsV1, SiteFeatureSettingsV1, SiteFeatures } from '../../src/lib/site-features'
 import {
   DEFAULT_SITE_FEATURE_SETTINGS,
   SITE_FEATURE_KEYS,
@@ -6,6 +6,7 @@ import {
 } from '../../src/lib/site-features'
 import { query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import { SettingsConflictError } from './settings-conflict'
 
 const FEATURE_SETTINGS_KEY = 'global'
 let schemaReady: Promise<void> | null = null
@@ -27,29 +28,44 @@ export function validateSiteFeatures(value: unknown): SiteFeatures {
   return features
 }
 
-export async function getSiteFeatureSettings(): Promise<SiteFeatureSettingsV1> {
+export async function getSiteFeatureSettings(): Promise<AdminSiteFeatureSettingsV1> {
   await ensureSchema()
-  const result = await query<{ record_json: SiteFeatureSettingsV1 }>(
-    'select record_json from feature_settings where key = $1',
+  const result = await query<{ record_json: SiteFeatureSettingsV1; revision: number }>(
+    'select record_json, revision from feature_settings where key = $1',
     [FEATURE_SETTINGS_KEY],
   )
-  return normalizeSiteFeatureSettings(result.rows[0]?.record_json)
+  const row = result.rows[0]
+  return { ...normalizeSiteFeatureSettings(row?.record_json), revision: row?.revision ?? 0 }
 }
 
-export async function saveSiteFeatureSettings(features: SiteFeatures): Promise<SiteFeatureSettingsV1> {
+export async function saveSiteFeatureSettings(features: SiteFeatures, expectedRevision: number): Promise<AdminSiteFeatureSettingsV1> {
   await ensureSchema()
   const saved: SiteFeatureSettingsV1 = {
     version: 1,
     features: { ...features },
     updated_at: new Date().toISOString(),
   }
-  await query(
-    `insert into feature_settings (key, record_json, updated_at)
-     values ($1, $2::jsonb, now())
-     on conflict (key) do update set record_json = excluded.record_json, updated_at = now()`,
-    [FEATURE_SETTINGS_KEY, JSON.stringify(saved)],
+  const result = await query<{ revision: number }>(
+    `with updated as (
+       update feature_settings
+       set record_json = $2::jsonb, updated_at = $3::timestamptz, revision = revision + 1
+       where key = $1 and revision = $4
+       returning revision
+     ), inserted as (
+       insert into feature_settings (key, record_json, updated_at, revision)
+       select $1, $2::jsonb, $3::timestamptz, 1
+       where $4 = 0 and not exists (select 1 from feature_settings where key = $1)
+       on conflict (key) do nothing
+       returning revision
+     )
+     select revision from updated
+     union all
+     select revision from inserted`,
+    [FEATURE_SETTINGS_KEY, JSON.stringify(saved), saved.updated_at, expectedRevision],
   )
-  return saved
+  const revision = result.rows[0]?.revision
+  if (revision === undefined) throw new SettingsConflictError()
+  return { ...saved, revision }
 }
 
 async function ensureSchema(): Promise<void> {

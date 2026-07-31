@@ -1,35 +1,41 @@
 import { useCallback, useEffect, useState } from 'react'
+import { ApiError } from '../../../lib/api-client'
 import { adminApiJson } from '../../../lib/admin-api-client'
-import type { SiteFeatureKey, SiteFeatureSettingsV1, SiteFeatures } from '../../../lib/site-features'
-import { DEFAULT_SITE_FEATURE_SETTINGS, computeEffectiveSiteFeatures } from '../../../lib/site-features'
+import type { AdminSiteFeatureSettingsV1, SiteFeatureKey, SiteFeatures } from '../../../lib/site-features'
+import { computeEffectiveSiteFeatures } from '../../../lib/site-features'
 import { copy } from '../../../copy/index'
 import { AdminToast } from '../shared/AdminToast'
 
 type FeatureSettingsResponse = {
-  settings?: SiteFeatureSettingsV1
+  settings?: AdminSiteFeatureSettingsV1
   effective_features?: SiteFeatures
 }
 
 const GROUPS: Array<{ label: string; features: SiteFeatureKey[] }> = [
   { label: copy.features.admin_groups.site, features: ['site'] },
   { label: copy.features.admin_groups.account, features: ['registration', 'login', 'profiles', 'cdk_redemption', 'free_preview', 'skland'] },
-  { label: copy.features.admin_groups.scheduling, features: ['schedule_generation'] },
+  { label: copy.features.admin_groups.scheduling, features: ['schedule_generation', 'metered_billing'] },
   { label: copy.features.admin_groups.tools, features: ['tools', 'depot_value'] },
   { label: copy.features.admin_groups.community, features: ['invitations', 'inventory', 'onboarding_tasks', 'announcements'] },
 ]
 
 export default function FeatureSettingsSection() {
-  const [settings, setSettings] = useState<SiteFeatureSettingsV1>(DEFAULT_SITE_FEATURE_SETTINGS)
-  const [effective, setEffective] = useState<SiteFeatures>(() => computeEffectiveSiteFeatures(DEFAULT_SITE_FEATURE_SETTINGS))
+  const [settings, setSettings] = useState<AdminSiteFeatureSettingsV1 | null>(null)
+  const [effective, setEffective] = useState<SiteFeatures | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [conflict, setConflict] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const applyResponse = useCallback((data: FeatureSettingsResponse) => {
-    const nextSettings = data.settings ?? DEFAULT_SITE_FEATURE_SETTINGS
+    if (!data.settings) throw new Error(copy.features.admin_load_failed)
+    const nextSettings = data.settings
     setSettings(nextSettings)
     setEffective(data.effective_features ?? computeEffectiveSiteFeatures(nextSettings))
+    setDirty(false)
+    setConflict(false)
   }, [])
 
   const load = useCallback(async () => {
@@ -50,32 +56,55 @@ export default function FeatureSettingsSection() {
 
   const toggle = (feature: SiteFeatureKey, checked: boolean) => {
     setSettings((current) => {
+      if (!current) return current
       const next = { ...current, features: { ...current.features, [feature]: checked } }
       setEffective(computeEffectiveSiteFeatures(next))
       return next
     })
+    setDirty(true)
+    setConflict(false)
     setNotice(null)
   }
 
   const save = async () => {
+    if (!settings) return
     setSaving(true)
     setError(null)
     setNotice(null)
     try {
       applyResponse(await adminApiJson<FeatureSettingsResponse>('/api/admin/feature-settings', {
         method: 'PUT',
-        json: { features: settings.features },
+        json: { features: settings.features, expected_revision: settings.revision },
         fallbackMessage: copy.features.admin_save_failed,
       }))
       setNotice(copy.features.admin_saved)
     } catch (caught) {
-      setError((caught as Error).message)
+      if (caught instanceof ApiError && caught.status === 409) {
+        setConflict(true)
+        setError(copy.features.admin_conflict)
+      } else {
+        setError((caught as Error).message)
+      }
     } finally {
       setSaving(false)
     }
   }
 
   if (loading) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.features.admin_loading}</div>
+
+  const reload = () => {
+    if (dirty && !window.confirm(copy.features.admin_discard_confirm)) return
+    void load()
+  }
+
+  if (!settings || !effective) {
+    return (
+      <section className="tool-panel p-5 sm:p-6">
+        {error && <div className="tool-alert tool-alert--error" role="alert">{error}</div>}
+        <button type="button" onClick={() => void load()} className="tool-secondary-action mt-4">{copy.features.admin_reload}</button>
+      </section>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -98,6 +127,7 @@ export default function FeatureSettingsSection() {
                 <label key={feature} className="tool-inset flex cursor-pointer items-start gap-3 p-4">
                   <input
                     type="checkbox"
+                    name={feature}
                     checked={rawEnabled}
                     onChange={(event) => toggle(feature, event.currentTarget.checked)}
                     className="mt-1 h-4 w-4 accent-brand-600"
@@ -119,7 +149,9 @@ export default function FeatureSettingsSection() {
         <button type="button" onClick={() => void save()} disabled={saving} className="tool-primary-action">
           {saving ? copy.features.admin_saving : copy.features.admin_save}
         </button>
-        <button type="button" onClick={() => void load()} disabled={saving} className="tool-secondary-action">{copy.features.admin_reload}</button>
+        <button type="button" onClick={reload} disabled={saving} className="tool-secondary-action">
+          {conflict ? copy.features.admin_reload_online : copy.features.admin_reload}
+        </button>
         {settings.updated_at && <span className="self-center text-xs text-ink-muted">{copy.features.admin_updated_at}{new Date(settings.updated_at).toLocaleString('zh-CN')}</span>}
       </div>
     </div>

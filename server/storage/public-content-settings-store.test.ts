@@ -8,6 +8,7 @@ vi.mock('./postgres', () => ({ query: queryMock }))
 vi.mock('./schema', () => ({ ensureDatabaseSchema }))
 
 import { getPublicContentSettings, savePublicContentSettings } from './public-content-settings-store'
+import { SettingsConflictError } from './settings-conflict'
 
 describe('public content settings store', () => {
   beforeEach(() => {
@@ -18,18 +19,37 @@ describe('public content settings store', () => {
   it('returns defaults without writing when no row exists', async () => {
     queryMock.mockResolvedValue({ rows: [] })
     const settings = await getPublicContentSettings()
-    expect(settings).toMatchObject({ version: 1, defaults_revision: 2, updated_at: null, qq_group: { number: '891655477' } })
+    expect(settings).toMatchObject({ version: 1, defaults_revision: 2, revision: 0, updated_at: null, qq_group: { number: '891655477' } })
     expect(queryMock).toHaveBeenCalledTimes(1)
   })
 
   it('validates, timestamps, and upserts the complete document', async () => {
-    queryMock.mockResolvedValue({ rows: [] })
-    const settings = await savePublicContentSettings(structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT))
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ revision: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ revision: 2 }] })
+    const settings = await savePublicContentSettings(structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT), 0)
     expect(settings.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T/)
-    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('insert into public_content_settings'), [
+    expect(settings.revision).toBe(1)
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('revision = revision + 1'), [
       'global',
       expect.stringContaining('"version":1'),
+      expect.any(String),
+      0,
     ])
+
+    const updated = await savePublicContentSettings(structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT), 1)
+    expect(updated.revision).toBe(2)
+    expect(queryMock).toHaveBeenLastCalledWith(expect.stringContaining('revision = revision + 1'), [
+      'global',
+      expect.stringContaining('"version":1'),
+      expect.any(String),
+      1,
+    ])
+  })
+
+  it('rejects a stale revision without overwriting the document', async () => {
+    queryMock.mockResolvedValue({ rows: [] })
+    await expect(savePublicContentSettings(structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT), 4)).rejects.toBeInstanceOf(SettingsConflictError)
   })
 
   it('returns upgraded built-in credits to the management API for an older stored default', async () => {
@@ -43,11 +63,12 @@ describe('public content settings store', () => {
       url: '',
       avatar_url: '',
     }
-    queryMock.mockResolvedValue({ rows: [{ record_json: stored }] })
+    queryMock.mockResolvedValue({ rows: [{ record_json: stored, revision: 7 }] })
 
     const settings = await getPublicContentSettings()
 
     expect(settings.defaults_revision).toBe(2)
+    expect(settings.revision).toBe(7)
     expect(settings.thanks.sections[1].entries[0]).toMatchObject({
       id: 'ntgmc',
       name: 'ntgmc',

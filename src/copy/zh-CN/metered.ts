@@ -10,6 +10,9 @@ export const meteredCopy = {
     commercial_price: '600–900 积分/次',
     commercial_description: '累计获得 10,000 积分自动解锁。Lv1–Lv4 实扣依次为 900 / 800 / 700 / 600 积分；最低价不低于个人按次价。默认 100 个活跃、1,000 个总档案。',
     capabilities: '按次档案包含高级版单次结果、MAA JSON、完整计算 JSON、练度建议和 ROI，但不包含场景对比实验室或 trusted 优化器选项。档案仅可处理已获授权的数据，不得转售 MaaTool 账号或 CDK，档案和积分不可转让。',
+    checking_availability: '正在确认按次计费开放状态…',
+    unavailable: '暂未开放',
+    availability_unavailable: '暂时无法确认按次计费开放状态，当前按未开放处理。',
   },
   balance: {
     redeem_failed: '兑换积分失败。',
