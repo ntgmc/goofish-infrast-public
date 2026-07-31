@@ -100,7 +100,7 @@ export interface OrundumRoi {
 
 type LegacyPermissionMode = 'basic' | 'premium';
 export type ProductPermissionMode = 'recommended' | 'growth' | 'advanced' | 'ultimate';
-export type MeteredPermissionMode = 'metered_advanced';
+type MeteredPermissionMode = 'metered_advanced';
 type InternalPermissionMode = 'admin';
 export type RawPermissionMode = LegacyPermissionMode | ProductPermissionMode | MeteredPermissionMode | InternalPermissionMode;
 export type PermissionMode = ProductPermissionMode | MeteredPermissionMode | InternalPermissionMode;
