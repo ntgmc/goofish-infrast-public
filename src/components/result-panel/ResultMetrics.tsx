@@ -89,16 +89,6 @@ export default function ResultMetrics({
           <span className="font-medium text-ink-primary">{copy.domain.components_result_panel_ResultMetrics_034}</span>{intermediateDepletionSummary}
         </div>
       )}
-      {showMaaDefaultComparison && maaDefaultComparison ? (
-      <div className="border-t border-surface-3/60 px-5 pb-5 pt-3 text-xs leading-5 text-ink-secondary sm:px-6">
-        {copy.domain.components_result_panel_ResultMetrics_035}{formatAmount(maaDefaultComparison.baselineTotalEfficiency)}{copy.domain.components_result_panel_ResultMetrics_036}{formatAmount(maaDefaultComparison.baselineLmd)}{copy.domain.components_result_panel_ResultMetrics_037}{formatSigned(maaDefaultComparison.baselineGoldNet)}{copy.domain.components_result_panel_ResultMetrics_038}{orundumEconomy && maaDefaultComparison.orundumEconomyDelta
-          ? `${copy.domain.components_result_panel_ResultMetrics_039}${formatSigned(maaDefaultComparison.orundumEconomyDelta.daily_orundum_gain)}${copy.domain.components_result_panel_ResultMetrics_040}${formatSigned(maaDefaultComparison.orundumEconomyDelta.sustainable_orundum_gain)}${copy.domain.components_result_panel_ResultMetrics_041}${formatSigned(maaDefaultComparison.orundumEconomyDelta.opportunity_cost_delta)}${copy.domain.components_result_panel_ResultMetrics_042}`
-          : ''}
-        {maaDefaultComparison.warnings.length > 0
-          ? `${copy.domain.components_result_panel_ResultMetrics_043}${maaDefaultComparison.warnings.slice(0, 3).join('、')}`
-            : ''}
-        </div>
-      ) : null}
     </section>
   )
 }
