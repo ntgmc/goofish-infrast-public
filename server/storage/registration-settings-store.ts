@@ -29,6 +29,20 @@ export const DEFAULT_REGISTRATION_SETTINGS: RegistrationSettingsV4 = {
   updated_at: null,
 }
 
+export interface RegistrationSettingsValidationIssue {
+  path: keyof RegistrationSettingsPatch | 'settings'
+  message: string
+}
+
+export class RegistrationSettingsValidationError extends Error {
+  readonly code = 'invalid_registration_settings'
+
+  constructor(readonly issues: RegistrationSettingsValidationIssue[]) {
+    super(issues.map((issue) => issue.message).join('；') || '注册设置无效。')
+    this.name = 'RegistrationSettingsValidationError'
+  }
+}
+
 let schemaReady: Promise<void> | null = null
 
 export function normalizeRegistrationSettings(value: unknown): RegistrationSettingsV4 {
@@ -54,20 +68,43 @@ export function normalizeRegistrationSettings(value: unknown): RegistrationSetti
 }
 
 export function validateRegistrationSettingsPatch(value: unknown): RegistrationSettingsPatch {
-  if (!value || typeof value !== 'object') throw new Error('注册设置必须是对象。')
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new RegistrationSettingsValidationError([{ path: 'settings', message: '注册设置必须是对象。' }])
+  }
   const source = value as Record<string, unknown>
-  if (typeof source.email_verification_required !== 'boolean') throw new Error('邮箱验证设置必须是布尔值。')
-  if (typeof source.invite_code_required !== 'boolean') throw new Error('仅邀请注册设置必须是布尔值。')
-  if (!isBrevoQuotaAction(source.brevo_quota_action)) throw new Error('Brevo 配额处理方式无效。')
-  const adminInviteReserve = requireReserve(source.admin_invite_email_reserve, '管理员邀请邮件预留')
-  const passwordResetReserve = requireReserve(source.password_reset_email_reserve, '密码重置邮件预留')
-  if (adminInviteReserve + passwordResetReserve > 300) throw new Error('两类邮件预留总和不能超过 300。')
+  const issues: RegistrationSettingsValidationIssue[] = []
+  if (typeof source.email_verification_required !== 'boolean') {
+    issues.push({ path: 'email_verification_required', message: '邮箱验证设置必须是布尔值。' })
+  }
+  if (typeof source.invite_code_required !== 'boolean') {
+    issues.push({ path: 'invite_code_required', message: '仅邀请注册设置必须是布尔值。' })
+  }
+  if (!isBrevoQuotaAction(source.brevo_quota_action)) {
+    issues.push({ path: 'brevo_quota_action', message: 'Brevo 配额处理方式无效。' })
+  }
+  const adminInviteReserve = validateReserve(
+    source.admin_invite_email_reserve,
+    'admin_invite_email_reserve',
+    '管理员邀请邮件预留',
+    issues,
+  )
+  const passwordResetReserve = validateReserve(
+    source.password_reset_email_reserve,
+    'password_reset_email_reserve',
+    '密码重置邮件预留',
+    issues,
+  )
+  if (adminInviteReserve !== null && passwordResetReserve !== null
+    && adminInviteReserve + passwordResetReserve > 300) {
+    issues.push({ path: 'password_reset_email_reserve', message: '两类邮件预留总和不能超过 300。' })
+  }
+  if (issues.length > 0) throw new RegistrationSettingsValidationError(issues)
   return {
-    email_verification_required: source.email_verification_required,
-    invite_code_required: source.invite_code_required,
-    brevo_quota_action: source.brevo_quota_action,
-    admin_invite_email_reserve: adminInviteReserve,
-    password_reset_email_reserve: passwordResetReserve,
+    email_verification_required: source.email_verification_required as boolean,
+    invite_code_required: source.invite_code_required as boolean,
+    brevo_quota_action: source.brevo_quota_action as BrevoQuotaAction,
+    admin_invite_email_reserve: adminInviteReserve!,
+    password_reset_email_reserve: passwordResetReserve!,
   }
 }
 
@@ -104,9 +141,15 @@ function integerInRange(value: unknown, min: number, max: number, fallback: numb
   return Number.isInteger(value) && Number(value) >= min && Number(value) <= max ? Number(value) : fallback
 }
 
-function requireReserve(value: unknown, label: string): number {
+function validateReserve(
+  value: unknown,
+  path: 'admin_invite_email_reserve' | 'password_reset_email_reserve',
+  label: string,
+  issues: RegistrationSettingsValidationIssue[],
+): number | null {
   if (!Number.isInteger(value) || Number(value) < 0 || Number(value) > 300) {
-    throw new Error(`${label}必须是 0 到 300 之间的整数。`)
+    issues.push({ path, message: `${label}必须是 0 到 300 之间的整数。` })
+    return null
   }
   return Number(value)
 }

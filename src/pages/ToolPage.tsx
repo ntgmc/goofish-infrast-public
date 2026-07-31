@@ -46,6 +46,8 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
   const requestedProfileId = new URLSearchParams(location.search).get('profile_id')
   useToolVisitReporter(Boolean(route))
   const {
+    authStatus,
+    retryAuth,
     authLoading,
     user,
     activeProfile,
@@ -76,6 +78,25 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
 
   if (authLoading) {
     return <SessionLoader label={copy.common.pages_ToolPage_001} />
+  }
+
+  if (authStatus === 'error') {
+    return (
+      <main className="tool-shell flex min-h-dvh items-center justify-center px-4 py-8" tabIndex={-1} data-route-focus>
+        <section className="tool-panel w-full max-w-lg p-6 sm:p-8" aria-labelledby="auth-service-error-title">
+          <p className="section-index">{copy.auth.pages_VerifyEmailPage_004}</p>
+          <h1 id="auth-service-error-title" className="display-title mt-2 text-2xl text-ink-primary">
+            {copy.common.pages_ToolPage_003}
+          </h1>
+          <div className="tool-alert tool-alert--error mt-5" role="alert">
+            {copy.common.pages_ToolPage_004}
+          </div>
+          <button type="button" onClick={retryAuth} className="tool-primary-action mt-6 min-h-11 w-full">
+            {copy.common.pages_ToolPage_005}
+          </button>
+        </section>
+      </main>
+    )
   }
 
   if (!user) {

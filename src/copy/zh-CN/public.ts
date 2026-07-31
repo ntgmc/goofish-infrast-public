@@ -430,7 +430,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_085: "免费档案和单账号终身版有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，一个游戏 UID 全站只能领取一次，可生成并查看完整游戏内轮换；轻量 MAA JSON 仅可按有效高级体验期或导出体验券规则下载，不提供完整计算数据和高级分析。单账号终身版同样绑定一个游戏 UID，增加长期重新生成、轻量 MAA JSON 导出、完整计算 JSON、练度建议、自定义配置和场景对比等能力。具体权益与限制以价格与权益页为准。",
+  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，一个游戏 UID 全站只能领取一次，可生成并查看完整游戏内轮换；轻量 MAA JSON 仅可按有效高级体验期或导出体验券规则下载，不提供完整计算数据和高级分析。单账号终身版可选择森空岛导入或 MAA 干员 JSON 初始化，增加长期重新生成、轻量 MAA JSON 导出、完整计算 JSON、练度建议、自定义配置和场景对比等能力。具体权益与限制以价格与权益页为准。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_087: "森空岛授权后会立即保存账号吗？",
   // src/pages/PublicInfoPage.tsx
@@ -450,7 +450,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_095: "绑定后可以自行更换游戏 UID 吗？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_096: "不可以自行更换。免费档案和单账号终身版都绑定确认时选择的游戏 UID。预览阶段发现角色不对时请不要确认，返回后重新选择；已经绑定或被异常拦截时，请通过 MaaTool 官方 QQ 群申请人工核验，不要重复尝试绑定其他账号。",
+  pages_PublicInfoPage_096: "不可以自行更换。免费档案绑定确认时选择的游戏 UID；单账号终身版无论使用森空岛还是 JSON 初始化，都仅用于同一个游戏账号。预览阶段发现角色不对时请不要确认，返回后重新选择；已经绑定或被异常拦截时，请通过 MaaTool 官方 QQ 群申请人工核验，不要重复尝试导入其他账号。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_097: "MaaTool 如何保护账号和授权数据？",
   // src/pages/PublicInfoPage.tsx

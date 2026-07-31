@@ -1,6 +1,7 @@
 import type { ItemUseRequest, OnboardingTaskCode } from '../../src/lib/inventory-contracts'
 import {
   claimOnboardingTask,
+  createLifetimeProfileForJsonImport,
   InventoryError,
   listInventory,
   listOnboardingTasks,
@@ -9,7 +10,7 @@ import {
 import { getValidatedJson } from '../security/request-validation'
 import { requestSchemas } from '../security/request-policy'
 import { getReorderCheckQuota } from '../optimization/jobs/entitlements'
-import { jsonResponse, requireUserSession } from './user-auth'
+import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 
 export default async function userInventoryHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -30,6 +31,21 @@ export default async function userInventoryHandler(req: Request): Promise<Respon
       if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
       const body = await getValidatedJson(req, requestSchemas.inventoryUse) as ItemUseRequest
       return jsonResponse(await useInventoryItem(auth.user.id, body))
+    }
+
+    if (path === '/api/user/inventory/lifetime-profile') {
+      if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
+      const body = await getValidatedJson(req, requestSchemas.lifetimeVoucherProfileCreate)
+      const created = await createLifetimeProfileForJsonImport({
+        userId: auth.user.id,
+        idempotencyKey: body.idempotency_key,
+        displayName: body.display_name,
+        note: body.note,
+      })
+      return jsonResponse({
+        ...(await buildAuthPayload(auth.user, created.profileId)),
+        replayed: created.replayed,
+      }, 201)
     }
 
     if (path === '/api/user/onboarding-tasks') {

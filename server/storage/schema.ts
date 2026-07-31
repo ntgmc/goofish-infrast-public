@@ -571,32 +571,63 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
 
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
+  delivery_id TEXT REFERENCES brevo_email_deliveries(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE password_reset_tokens ADD COLUMN IF NOT EXISTS delivery_id TEXT;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'password_reset_tokens_delivery_id_fkey'
+       AND conrelid = 'password_reset_tokens'::regclass
+  ) THEN
+    ALTER TABLE password_reset_tokens
+      ADD CONSTRAINT password_reset_tokens_delivery_id_fkey
+      FOREIGN KEY (delivery_id) REFERENCES brevo_email_deliveries(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_created_at ON password_reset_tokens(created_at);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_delivery_id ON password_reset_tokens(delivery_id);
 
 CREATE TABLE IF NOT EXISTS email_verification_tokens (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
+  delivery_id TEXT REFERENCES brevo_email_deliveries(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   used_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE email_verification_tokens ADD COLUMN IF NOT EXISTS delivery_id TEXT;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'email_verification_tokens_delivery_id_fkey'
+       AND conrelid = 'email_verification_tokens'::regclass
+  ) THEN
+    ALTER TABLE email_verification_tokens
+      ADD CONSTRAINT email_verification_tokens_delivery_id_fkey
+      FOREIGN KEY (delivery_id) REFERENCES brevo_email_deliveries(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_token_hash ON email_verification_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_expires_at ON email_verification_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_created_at ON email_verification_tokens(created_at);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_delivery_id ON email_verification_tokens(delivery_id);
 
 CREATE TABLE IF NOT EXISTS user_game_accounts (
   id TEXT PRIMARY KEY,
@@ -1323,9 +1354,15 @@ VALUES
   ('result_archive_folder', 'capacity_upgrade', 'result_archive_capacity', '结果封存夹', '指定档案的结果封存区永久增加 1 个槽位。', 'result_archive_folder', true, true, now(), now()),
   ('maa_export_trial_coupon', 'consumable', 'maa_export_trial', 'MAA 导出体验券', '导出一次指定排班结果。', 'maa_export_trial_coupon', true, true, now(), now()),
   ('newcomer_supply_pack', 'gift_pack', 'open_gift_pack', '新人补给包', '内容由后台配置的新人礼包。', 'newcomer_supply_pack', true, true, now(), now()),
-  ('lifetime_profile_voucher', 'license_voucher', 'bind_lifetime_profile', '终身版兑换 CDK', '绑定森空岛账号后创建或升级为终身高级档案，最终成功时才消耗。', 'lifetime_profile_voucher', true, true, now(), now()),
+  ('lifetime_profile_voucher', 'license_voucher', 'bind_lifetime_profile', '终身版兑换 CDK', '可通过 JSON 创建终身高级档案，或绑定森空岛账号后创建或升级；最终成功时才消耗。', 'lifetime_profile_voucher', true, true, now(), now()),
   ('limited_profile_voucher', 'license_voucher', 'activate_limited_profile', '限时 CDK', '用于已绑定森空岛的免费预览档案，高级权限持续至 2026 年 8 月 20 日 00:00。', 'limited_profile_voucher', true, true, now(), now())
 ON CONFLICT (code) DO NOTHING;
+
+UPDATE item_definitions
+SET description = '可通过 JSON 创建终身高级档案，或绑定森空岛账号后创建或升级；最终成功时才消耗。',
+    updated_at = now()
+WHERE code = 'lifetime_profile_voucher'
+  AND description IS DISTINCT FROM '可通过 JSON 创建终身高级档案，或绑定森空岛账号后创建或升级；最终成功时才消耗。';
 
 -- goofish:migration-phase
 INSERT INTO reward_grants

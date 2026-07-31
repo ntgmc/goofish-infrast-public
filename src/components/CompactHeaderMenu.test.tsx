@@ -66,6 +66,19 @@ describe('CompactHeaderMenu', () => {
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
     expect(trigger).toHaveFocus()
   })
+
+  it('constrains the menu to the live mobile viewport after scrolling', async () => {
+    const user = userEvent.setup()
+    renderMenu()
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 720 })
+    window.dispatchEvent(new Event('scroll'))
+
+    await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
+
+    expect(screen.getByRole('menu')).toHaveStyle({
+      maxHeight: 'min(32rem, calc(100dvh - 5rem), var(--radix-dropdown-menu-content-available-height))',
+    })
+  })
 })
 
 function renderMenu({

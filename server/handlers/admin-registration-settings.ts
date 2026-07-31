@@ -1,6 +1,7 @@
 import { authenticateAdminRequest } from './admin-auth'
 import {
   getRegistrationSettings,
+  RegistrationSettingsValidationError,
   saveRegistrationSettings,
   validateRegistrationSettingsPatch,
 } from '../storage/registration-settings-store'
@@ -28,7 +29,14 @@ export default async function adminRegistrationSettingsHandler(req: Request): Pr
       await refreshBrevoOfficialQuotaIfStale()
       return jsonResponse({ settings, email_stats: await getBrevoEmailStats() })
     } catch (error) {
-      return jsonResponse({ error: error instanceof Error ? error.message : '注册设置无效。' }, 400)
+      if (error instanceof RegistrationSettingsValidationError) {
+        return jsonResponse({
+          error: '注册设置无效。',
+          code: error.code,
+          issues: error.issues,
+        }, 400)
+      }
+      throw error
     }
   } catch (error) {
     console.error('admin registration settings error:', error)

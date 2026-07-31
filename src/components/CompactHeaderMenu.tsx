@@ -89,10 +89,13 @@ export default function CompactHeaderMenu({
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
+          side="bottom"
           align={align}
           sideOffset={8}
           collisionPadding={16}
-          className="z-50 max-h-[min(32rem,calc(100vh-2rem))] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
+          sticky="always"
+          style={{ maxHeight: 'min(32rem, calc(100dvh - 5rem), var(--radix-dropdown-menu-content-available-height))' }}
+          className="z-50 w-[min(18rem,calc(100vw-2rem))] overscroll-contain overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
         >
           {metadata && (
             <DropdownMenu.Label className="border-b border-surface-3 px-3 py-2.5">

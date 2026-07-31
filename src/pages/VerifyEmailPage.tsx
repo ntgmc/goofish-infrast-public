@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import type { AuthSuccessResponse } from '../lib/types'
 import { apiJson } from '../lib/api-client'
@@ -6,31 +6,60 @@ import { copy } from '../copy/index'
 
 type VerificationState = 'loading' | 'success' | 'error'
 
+const inFlightVerificationRequests = new Map<string, Promise<AuthSuccessResponse>>()
+
+function requestEmailVerification(token: string): Promise<AuthSuccessResponse> {
+  const existing = inFlightVerificationRequests.get(token)
+  if (existing) return existing
+  const request = apiJson<AuthSuccessResponse>('/api/auth/verify-email', {
+    method: 'POST',
+    json: { token },
+    fallbackMessage: copy.auth.pages_VerifyEmailPage_001,
+  })
+  inFlightVerificationRequests.set(token, request)
+  void request.then(
+    () => {
+      if (inFlightVerificationRequests.get(token) === request) inFlightVerificationRequests.delete(token)
+    },
+    () => {
+      if (inFlightVerificationRequests.get(token) === request) inFlightVerificationRequests.delete(token)
+    },
+  )
+  return request
+}
+
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const token = searchParams.get('token')?.trim() ?? ''
   const [state, setState] = useState<VerificationState>(token ? 'loading' : 'error')
   const [error, setError] = useState<string | null>(token ? null : copy.auth.pages_VerifyEmailPage_001)
+  const attemptRef = useRef(0)
 
-  const verify = useCallback(async () => {
+  const verify = useCallback((isCancelled: () => boolean = () => false) => {
     if (!token) return
+    const attempt = ++attemptRef.current
     setState('loading')
     setError(null)
-    try {
-      await apiJson<AuthSuccessResponse>('/api/auth/verify-email', {
-        method: 'POST',
-        json: { token },
-        fallbackMessage: copy.auth.pages_VerifyEmailPage_001,
-      })
-      setState('success')
-    } catch (caught) {
-      setError((caught as Error).message)
-      setState('error')
-    }
-  }, [navigate, token])
+    void requestEmailVerification(token).then(
+      () => {
+        if (isCancelled() || attemptRef.current !== attempt) return
+        setState('success')
+      },
+      (caught: unknown) => {
+        if (isCancelled() || attemptRef.current !== attempt) return
+        setError(caught instanceof Error ? caught.message : copy.auth.pages_VerifyEmailPage_001)
+        setState('error')
+      },
+    )
+  }, [token])
 
-  useEffect(() => { if (token) void verify() }, [token, verify])
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    verify(() => cancelled)
+    return () => { cancelled = true }
+  }, [token, verify])
   useEffect(() => {
     if (state !== 'success') return
     const timer = window.setTimeout(() => navigate('/tool/profiles', { replace: true }), 500)
@@ -49,7 +78,7 @@ export default function VerifyEmailPage() {
         {state === 'error' && error && <div className="tool-alert tool-alert--error mt-6" role="alert">{error}</div>}
 
         {state === 'error' && token && (
-          <button type="button" onClick={() => void verify()} className="tool-primary-action mt-6 min-h-11 w-full">
+          <button type="button" onClick={() => verify()} className="tool-primary-action mt-6 min-h-11 w-full">
             {copy.auth.pages_VerifyEmailPage_007}
           </button>
         )}

@@ -3,6 +3,7 @@ import { apiVoid } from '../../../lib/api-client'
 import { inputClassName, validatePasswordInput } from '../tool-utils'
 import type { UserGameAccount } from '../../../lib/types'
 import { copy } from '../../../copy/index'
+import { AUTH_EMAIL_MAX_LENGTH, AUTH_PASSWORD_MAX_LENGTH } from '../../../lib/auth-constraints'
 
 
 type FieldErrors = Record<string, string>
@@ -29,6 +30,9 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
     if (oldPasswordError) nextErrors.oldPassword = oldPasswordError
     if (newPasswordError) nextErrors.newPassword = newPasswordError
     if (!confirmPassword) nextErrors.confirmPassword = copy.dashboard.pages_tool_dashboard_SettingsSection_001
+    else if (confirmPassword.length > AUTH_PASSWORD_MAX_LENGTH) {
+      nextErrors.confirmPassword = copy.workspace.pages_tool_tool_utils_018
+    }
     else if (newPassword && newPassword !== confirmPassword) nextErrors.confirmPassword = copy.dashboard.pages_tool_dashboard_SettingsSection_002
     setFieldErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
@@ -99,6 +103,7 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
           id="settings-old-password"
           type="password"
           value={oldPassword}
+          maxLength={AUTH_PASSWORD_MAX_LENGTH}
           onChange={(event) => {
             setOldPassword(event.currentTarget.value)
             clearFieldError('oldPassword')
@@ -116,6 +121,7 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
           id="settings-new-password"
           type="password"
           value={newPassword}
+          maxLength={AUTH_PASSWORD_MAX_LENGTH}
           onChange={(event) => {
             setNewPassword(event.currentTarget.value)
             clearFieldError('newPassword')
@@ -134,6 +140,7 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
           id="settings-confirm-password"
           type="password"
           value={confirmPassword}
+          maxLength={AUTH_PASSWORD_MAX_LENGTH}
           onChange={(event) => {
             setConfirmPassword(event.currentTarget.value)
             clearFieldError('confirmPassword')
@@ -167,11 +174,11 @@ export default function SettingsSection({ profiles, onLogout }: { profiles: User
         <p className="mt-1 text-sm text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_030}</p>
         <label className="mt-3 block" htmlFor="settings-delete-email">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_031}</span>
-          <input id="settings-delete-email" value={deleteEmail} onChange={(event) => setDeleteEmail(event.currentTarget.value)} autoComplete="email" className="tool-field" />
+          <input id="settings-delete-email" value={deleteEmail} maxLength={AUTH_EMAIL_MAX_LENGTH} onChange={(event) => setDeleteEmail(event.currentTarget.value)} autoComplete="email" className="tool-field" />
         </label>
         <label className="mt-3 block" htmlFor="settings-delete-password">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.dashboard.pages_tool_dashboard_SettingsSection_032}</span>
-          <input id="settings-delete-password" value={deletePassword} onChange={(event) => setDeletePassword(event.currentTarget.value)} type="password" autoComplete="current-password" className="tool-field" />
+          <input id="settings-delete-password" value={deletePassword} maxLength={AUTH_PASSWORD_MAX_LENGTH} onChange={(event) => setDeletePassword(event.currentTarget.value)} type="password" autoComplete="current-password" className="tool-field" />
         </label>
         <button type="button" onClick={() => void requestDeletion()} disabled={privacyLoading !== null || !deleteEmail || !deletePassword} className="tool-danger-action mt-4">{privacyLoading === 'delete' ? copy.dashboard.pages_tool_dashboard_SettingsSection_033 : copy.dashboard.pages_tool_dashboard_SettingsSection_034}</button>
       </div>

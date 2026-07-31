@@ -857,6 +857,19 @@ export interface AuthSuccessResponse {
   announcement_unread_count?: number;
 }
 
+export interface RegistrationAcceptedResponse {
+  accepted: true;
+  verification_required: boolean;
+  message: string;
+  resend_after_seconds: number | null;
+}
+
+export interface RecoveryAcceptedResponse {
+  accepted: true;
+  message: string;
+  resend_after_seconds: number;
+}
+
 export type InvitationRewardRecipient = 'inviter' | 'invitee';
 
 export type InvitationExpiryPolicy =

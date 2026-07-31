@@ -4,16 +4,20 @@ const {
   initializeJobProcessing,
   initializeQueueMaintenance,
   initializeBehaviorMaintenance,
+  initializeAuthMaintenance,
   shutdownJobProcessing,
   shutdownQueueMaintenance,
   shutdownBehaviorMaintenance,
+  shutdownAuthMaintenance,
 } = vi.hoisted(() => ({
   initializeJobProcessing: vi.fn(async () => undefined),
   initializeQueueMaintenance: vi.fn(async () => undefined),
   initializeBehaviorMaintenance: vi.fn(async () => undefined),
+  initializeAuthMaintenance: vi.fn(async () => undefined),
   shutdownJobProcessing: vi.fn(async () => undefined),
   shutdownQueueMaintenance: vi.fn(),
   shutdownBehaviorMaintenance: vi.fn(),
+  shutdownAuthMaintenance: vi.fn(),
 }))
 
 vi.mock('./optimize-job-runner', () => ({
@@ -27,6 +31,10 @@ vi.mock('./optimize-queue-maintenance', () => ({
 vi.mock('./behavior-risk-maintenance', () => ({
   initializeBehaviorRiskMaintenance: initializeBehaviorMaintenance,
   shutdownBehaviorRiskMaintenance: shutdownBehaviorMaintenance,
+}))
+vi.mock('./auth-data-maintenance', () => ({
+  initializeAuthDataMaintenance: initializeAuthMaintenance,
+  shutdownAuthDataMaintenance: shutdownAuthMaintenance,
 }))
 
 import { apiOnlyProcessHooks } from './api-process-hooks'
@@ -47,13 +55,15 @@ const optimizerPort: OptimizerPort = {
 }
 
 describe('API process hook compositions', () => {
-  it('keeps the API-only lifecycle limited to queue maintenance', async () => {
+  it('runs queue and authentication maintenance in the API-only lifecycle', async () => {
     await apiOnlyProcessHooks.initialize()
     await apiOnlyProcessHooks.drain()
     await apiOnlyProcessHooks.forceDrain()
 
     expect(initializeQueueMaintenance).toHaveBeenCalledOnce()
+    expect(initializeAuthMaintenance).toHaveBeenCalledOnce()
     expect(shutdownQueueMaintenance).toHaveBeenCalledTimes(2)
+    expect(shutdownAuthMaintenance).toHaveBeenCalledTimes(2)
     expect(initializeJobProcessing).not.toHaveBeenCalled()
     expect(shutdownJobProcessing).not.toHaveBeenCalled()
   })
@@ -67,6 +77,7 @@ describe('API process hook compositions', () => {
 
     expect(initializeQueueMaintenance).toHaveBeenCalledOnce()
     expect(initializeBehaviorMaintenance).toHaveBeenCalledOnce()
+    expect(initializeAuthMaintenance).toHaveBeenCalledOnce()
     expect(initializeJobProcessing).toHaveBeenCalledOnce()
     expect(initializeQueueMaintenance.mock.invocationCallOrder[0])
       .toBeLessThan(initializeJobProcessing.mock.invocationCallOrder[0]!)
@@ -82,6 +93,7 @@ describe('API process hook compositions', () => {
     expect(shutdownJobProcessing).toHaveBeenCalledWith()
     expect(shutdownQueueMaintenance).toHaveBeenCalledOnce()
     expect(shutdownBehaviorMaintenance).toHaveBeenCalledOnce()
+    expect(shutdownAuthMaintenance).toHaveBeenCalledOnce()
     expect(shutdownJobProcessing.mock.invocationCallOrder[0])
       .toBeLessThan(shutdownQueueMaintenance.mock.invocationCallOrder[0]!)
     expect(getRegisteredOptimizerPort()).toBeNull()
@@ -95,6 +107,7 @@ describe('API process hook compositions', () => {
 
     expect(shutdownJobProcessing).toHaveBeenCalledWith(0)
     expect(shutdownQueueMaintenance).toHaveBeenCalledOnce()
+    expect(shutdownAuthMaintenance).toHaveBeenCalledOnce()
     expect(shutdownJobProcessing.mock.invocationCallOrder[0])
       .toBeLessThan(shutdownQueueMaintenance.mock.invocationCallOrder[0]!)
     expect(getRegisteredOptimizerPort()).toBeNull()
@@ -109,6 +122,7 @@ describe('API process hook compositions', () => {
     expect(shutdownJobProcessing).toHaveBeenCalledWith(0)
     expect(shutdownQueueMaintenance).toHaveBeenCalledOnce()
     expect(shutdownBehaviorMaintenance).toHaveBeenCalledOnce()
+    expect(shutdownAuthMaintenance).toHaveBeenCalledOnce()
     expect(getRegisteredOptimizerPort()).toBeNull()
   })
 })

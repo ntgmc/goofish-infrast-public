@@ -1,10 +1,13 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } from '../../src/lib/types'
-import { WORKSPACE_SAVED_CONFIG_MAX_LIMIT } from '../../src/lib/workspace-limits'
+import {
+  AUTH_EMAIL_MAX_LENGTH,
+  AUTH_PASSWORD_MAX_LENGTH,
+  AUTH_PASSWORD_MIN_LENGTH,
+  AUTH_RESEND_COOLDOWN_SECONDS,
+} from '../../src/lib/auth-constraints'
 import {
   deleteSessionByTokenHash,
-  deleteEmailVerificationTokenByHash,
-  deleteSessionsForUser,
   emptyWorkspace,
   getAnnouncementReads,
   getPasswordResetTokenByHash,
@@ -14,29 +17,28 @@ import {
   getSessionByTokenHash,
   getUserByEmail,
   getUserById,
+  insertUserAccountForRegistration,
   listProfileWorkspaces,
   listProfilesForUser,
   migrateLegacyUserIfNeeded,
-  resetUserPasswordWithToken,
   savePasswordResetToken,
   saveEmailVerificationToken,
-  updateProfileWorkspaceAtomically,
-  saveUserAccount,
   saveUserProfile,
   saveUserSession,
   isFreePreviewProfile,
   toPublicProfile,
   toPublicWorkspace,
   touchSession,
+  updateUserPasswordAtomically,
   verifyUserEmailWithToken,
   upgradeUserPasswordHash,
+  RegistrationEmailConflictError,
   type UserAccountRecord,
   type UserGameAccountRecord,
-  type UserWorkspaceRecord,
   type UserSessionRecord,
 } from '../storage/user-store'
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
-import { getFreePreviewTrial, hasFreePreviewTrialEnded } from '../free-preview-trial'
+import { getFreePreviewTrial } from '../free-preview-trial'
 import { createPasswordHash, verifyPasswordHash, verifyPasswordHashOrDummy } from '../security/password'
 import {
   BrevoDailyQuotaExceededError,
@@ -57,8 +59,6 @@ import {
   getCdkRecordStore,
   normalizeCode,
   normalizePermissionMode,
-  getFreePreviewDefaultConfig,
-  resolveFreePreviewConfig,
   type CdkRecord,
 } from './license-utils'
 import {
@@ -67,6 +67,7 @@ import {
   createRequestHash,
   redeemCdkAtomically,
   saveUserAccountInTransaction,
+  updateRegisteredUserCdkInTransaction,
   saveProfileInTransaction,
   saveWorkspaceInTransaction,
 } from '../storage/cdk-redemption'
@@ -88,6 +89,7 @@ import {
   type ValidatedAdminRegistrationInvitation,
 } from '../storage/admin-registration-invitation-store'
 import { selectAuthPayloadProfiles } from './auth-payload-profiles'
+import { projectExpiredFreePreviewWorkspace } from '../free-preview-workspace'
 
 const SESSION_COOKIE = 'maa_session'
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
@@ -96,9 +98,9 @@ export const USER_SESSION_TOUCH_INTERVAL_MS = 10 * 60 * 1000
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ANNOUNCEMENT_KEY = 'current.json'
 const PASSWORD_RESET_DEFAULT_TTL_MINUTES = 30
-const PASSWORD_RESET_RESEND_WINDOW_MS = 1000 * 60 * 5
+const PASSWORD_RESET_RESEND_WINDOW_MS = AUTH_RESEND_COOLDOWN_SECONDS * 1000
 const EMAIL_VERIFICATION_DEFAULT_TTL_HOURS = 24
-const EMAIL_VERIFICATION_RESEND_WINDOW_MS = 1000 * 60 * 5
+const EMAIL_VERIFICATION_RESEND_WINDOW_MS = AUTH_RESEND_COOLDOWN_SECONDS * 1000
 
 export interface AuthContext {
   user: UserAccountRecord
@@ -122,13 +124,13 @@ export function jsonResponse(body: unknown, status = 200, headers: Record<string
 export function normalizeEmail(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const email = value.trim().toLowerCase()
-  return EMAIL_PATTERN.test(email) && email.length <= 254 ? email : null
+  return EMAIL_PATTERN.test(email) && email.length <= AUTH_EMAIL_MAX_LENGTH ? email : null
 }
 
 function validatePassword(value: unknown): { ok: true; password: string } | { ok: false; message: string } {
   if (typeof value !== 'string') return { ok: false, message: authCopy.api_password_type_invalid }
-  if (value.length < 8) return { ok: false, message: authCopy.api_password_too_short }
-  if (value.length > 128) return { ok: false, message: authCopy.api_password_too_long }
+  if (value.length < AUTH_PASSWORD_MIN_LENGTH) return { ok: false, message: authCopy.api_password_too_short }
+  if (value.length > AUTH_PASSWORD_MAX_LENGTH) return { ok: false, message: authCopy.api_password_too_long }
   return { ok: true, password: value }
 }
 
@@ -139,8 +141,8 @@ export async function registerUser(
   idempotencyKey?: string | null,
   inviteCodeValue?: unknown,
 ): Promise<
-  | { ok: true; user: UserAccountRecord; verificationRequired: false }
-  | { ok: true; user: UserAccountRecord; verificationRequired: true; message: string; resendAfterSeconds: number }
+  | { ok: true; user: UserAccountRecord | null; verificationRequired: false }
+  | { ok: true; user: UserAccountRecord | null; verificationRequired: true; message: string; resendAfterSeconds: number }
   | { ok: false; status: number; message: string; code?: string; retryAfterSeconds?: number; suggestedEmail?: string }
 > {
   const emailCheck = validateRegistrationEmailForRegistration(emailValue)
@@ -151,11 +153,6 @@ export async function registerUser(
   const registrationSettings = await getRegistrationSettings()
   if (registrationSettings.invite_code_required && (typeof inviteCodeValue !== 'string' || !inviteCodeValue.trim())) {
     return { ok: false, status: 400, message: authCopy.api_invite_code_required, code: 'invite_code_required' }
-  }
-  const existing = await getUserByEmail(email)
-  if (existing) {
-    await verifyPasswordHashOrDummy(passwordCheck.password, null)
-    return { ok: false, status: 202, message: authCopy.api_registration_accepted, code: 'registration_accepted' }
   }
   const normalizedInviteCode = typeof inviteCodeValue === 'string' ? inviteCodeValue.trim().toUpperCase() : null
   let invitation: ValidatedInvitationCode | null = null
@@ -205,6 +202,9 @@ export async function registerUser(
       : null
     const now = new Date().toISOString()
     const passwordHash = await createPasswordHash(passwordCheck.password)
+    const existing = await getUserByEmail(email)
+    if (existing) return acceptedRegistrationResult(null, verificationRequired)
+
     const user: UserAccountRecord = {
       version: 1,
       id: randomUUID(),
@@ -222,32 +222,23 @@ export async function registerUser(
       created_at: now,
       updated_at: now,
     }
-    if (typeof cdkValue === 'string' && cdkValue.trim()) {
-      const redeemed = await redeemRegistrationCdk(
-        user,
-        cdkValue,
-        normalizedIdempotencyKey,
-        registrationRequestHash!,
-        invitation,
-        adminInvitation,
-      )
-      if (!redeemed.ok) return redeemed
-      const primary = {
-        ...user,
-        permission: redeemed.profile.permission,
-        cdk_key: redeemed.profile.cdk_key,
-        cdk_code_hash: redeemed.profile.cdk_code_hash,
-        cdk_order_hash: redeemed.profile.cdk_order_hash,
-        updated_at: new Date().toISOString(),
-      }
-      await saveUserAccount(primary)
-      user.permission = primary.permission
-      user.cdk_key = primary.cdk_key
-      user.cdk_code_hash = primary.cdk_code_hash
-      user.cdk_order_hash = primary.cdk_order_hash
-      user.updated_at = primary.updated_at
-    } else {
-      try {
+    try {
+      if (typeof cdkValue === 'string' && cdkValue.trim()) {
+        const redeemed = await redeemRegistrationCdk(
+          user,
+          cdkValue,
+          normalizedIdempotencyKey,
+          registrationRequestHash!,
+          invitation,
+          adminInvitation,
+        )
+        if (!redeemed.ok) return redeemed
+        user.permission = redeemed.profile.permission
+        user.cdk_key = redeemed.profile.cdk_key
+        user.cdk_code_hash = redeemed.profile.cdk_code_hash
+        user.cdk_order_hash = redeemed.profile.cdk_order_hash
+        user.updated_at = redeemed.profile.updated_at
+      } else {
         if (adminInvitation) {
           await saveRegistrationWithAdminInvitation(
             (client) => saveUserAccountInTransaction(client, user),
@@ -257,24 +248,26 @@ export async function registerUser(
         } else if (invitation) {
           await saveRegistrationWithInvitation(user, invitation)
         } else {
-          await saveUserAccount(user)
+          await insertUserAccountForRegistration(user)
         }
-      } catch (error) {
-        if (error instanceof AdminRegistrationInvitationError) {
-          return { ok: false, status: 400, message: error.message, code: error.code }
-        }
-        throw error
       }
+    } catch (error) {
+      if (error instanceof RegistrationEmailConflictError) {
+        return acceptedRegistrationResult(null, verificationRequired)
+      }
+      if (error instanceof AdminRegistrationInvitationError) {
+        return { ok: false, status: 400, message: error.message, code: error.code }
+      }
+      throw error
     }
 
     if (verificationRequired) {
       try {
         await issueEmailVerification(user, emailReservation ?? undefined)
       } catch (error) {
-        console.error('registration verification email error:', error)
-        return { ok: false, status: 503, message: authCopy.api_verification_email_send_failed, code: 'verification_email_send_failed' }
+        console.warn('registration verification email delivery failed:', safeErrorName(error))
       }
-      return verificationRequiredResult(user)
+      return acceptedRegistrationResult(user, true)
     }
 
     return { ok: true, user, verificationRequired: false }
@@ -315,6 +308,7 @@ export async function loginUser(
 
   await migrateLegacyUserIfNeeded(user)
   const session = await createSession(user.id)
+  scheduleInvitationSettlement(user.id)
   return { ok: true, user, cookie: session.cookie }
 }
 
@@ -323,7 +317,10 @@ export async function changeUserPassword(
   oldPasswordValue: unknown,
   newPasswordValue: unknown,
   keepTokenHash: string,
-): Promise<{ ok: true; user: UserAccountRecord } | { ok: false; status: number; message: string }> {
+): Promise<
+  | { ok: true; user: UserAccountRecord }
+  | { ok: false; status: number; message: string; code?: 'password_update_conflict' }
+> {
   if (typeof oldPasswordValue !== 'string') {
     return { ok: false, status: 401, message: authCopy.api_current_password_invalid }
   }
@@ -333,20 +330,58 @@ export async function changeUserPassword(
   }
   const nextPassword = validatePassword(newPasswordValue)
   if (!nextPassword.ok) return { ok: false, status: 400, message: nextPassword.message }
-  const updated = await setUserPassword(user, nextPassword.password)
-  await deleteSessionsForUser(user.id, keepTokenHash)
-  return { ok: true, user: updated }
+  const replacement = await createPasswordHash(nextPassword.password)
+  const updated = await updateUserPasswordAtomically({
+    userId: user.id,
+    expectedPasswordHash: user.password_hash,
+    replacement,
+    updatedAt: new Date(),
+    keepSessionTokenHash: keepTokenHash,
+  })
+  if (!updated.ok) {
+    return {
+      ok: false,
+      status: 409,
+      message: authCopy.api_password_update_conflict,
+      code: 'password_update_conflict',
+    }
+  }
+  return updated
 }
 
 export async function resetUserPasswordByAdmin(
   user: UserAccountRecord,
   newPasswordValue: unknown,
-): Promise<{ ok: true; user: UserAccountRecord } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; user: UserAccountRecord }
+  | { ok: false; status: number; message: string; code?: 'password_update_conflict' }
+> {
   const nextPassword = validatePassword(newPasswordValue)
-  if (!nextPassword.ok) return { ok: false, message: nextPassword.message }
-  const updated = await setUserPassword(user, nextPassword.password)
-  await deleteSessionsForUser(user.id)
-  return { ok: true, user: updated }
+  if (!nextPassword.ok) return { ok: false, status: 400, message: nextPassword.message }
+  if (user.status !== 'active') {
+    return {
+      ok: false,
+      status: 409,
+      message: authCopy.api_password_update_conflict,
+      code: 'password_update_conflict',
+    }
+  }
+  const replacement = await createPasswordHash(nextPassword.password)
+  const updated = await updateUserPasswordAtomically({
+    userId: user.id,
+    expectedPasswordHash: user.password_hash,
+    replacement,
+    updatedAt: new Date(),
+  })
+  if (!updated.ok) {
+    return {
+      ok: false,
+      status: 409,
+      message: authCopy.api_password_update_conflict,
+      code: 'password_update_conflict',
+    }
+  }
+  return updated
 }
 
 export async function requestPasswordReset(emailValue: unknown): Promise<{ ok: true; message: string }> {
@@ -371,6 +406,7 @@ export async function requestPasswordReset(emailValue: unknown): Promise<{ ok: t
         id: randomUUID(),
         user_id: user.id,
         token_hash: hashPasswordResetToken(token),
+        delivery_id: reservation.id,
         expires_at: expiresAt,
         used_at: null,
         created_at: now.toISOString(),
@@ -414,8 +450,14 @@ export async function resetPasswordWithToken(
   if (!nextPassword.ok) return { ok: false, status: 400, message: nextPassword.message }
 
   const passwordHash = await createPasswordHash(nextPassword.password)
-  const updated = await resetUserPasswordWithToken(tokenHash, passwordHash, new Date())
-  if (!updated) return { ok: false, status: 400, message: authCopy.api_password_reset_invalid }
+  const updated = await updateUserPasswordAtomically({
+    userId: user.id,
+    expectedPasswordHash: user.password_hash,
+    replacement: passwordHash,
+    updatedAt: new Date(),
+    resetTokenHash: tokenHash,
+  })
+  if (!updated.ok) return { ok: false, status: 400, message: authCopy.api_password_reset_invalid }
   return { ok: true }
 }
 
@@ -596,6 +638,7 @@ async function redeemRegistrationCdk(
       idempotencyKey: normalizeIdempotencyKey(idempotencyKey),
       idempotencyScope: `register:${user.email}`,
       requestHash: requestHash ?? createRequestHash({ codeHash, email: user.email }),
+      prepare: (client) => saveUserAccountInTransaction(client, user),
       complete: async (client, cdkRecord) => {
         if (!isProfileCdkRecord(cdkRecord)) throw new Error(authCopy.api_cdk_type_mismatch)
         const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, profileId)
@@ -607,7 +650,7 @@ async function redeemRegistrationCdk(
           version: 1, id: profileId, user_id: user.id, kind: 'cdk', cdk_key: cdkKey, cdk_code_hash: codeHash,
           cdk_order_hash: cdkOrderHash, permission, status: 'active', display_name: '账号 1', note: '', created_at: now, updated_at: now,
         }
-        await saveUserAccountInTransaction(client, boundUser)
+        await updateRegisteredUserCdkInTransaction(client, boundUser)
         if (invitation) await saveInvitationInTransaction(client, user.id, invitation)
         if (adminInvitation) await consumeAdminRegistrationInvitationInTransaction(client, adminInvitation, user.id)
         await saveProfileInTransaction(client, profile)
@@ -624,6 +667,7 @@ async function redeemRegistrationCdk(
     })
     return { ok: true, profile: redeemed.response }
   } catch (error) {
+    if (error instanceof RegistrationEmailConflictError) throw error
     return redemptionFailure(error)
   }
 }
@@ -687,7 +731,6 @@ export async function logoutRequest(req: Request): Promise<void> {
 }
 
 export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?: string | null): Promise<AuthSuccessResponse> {
-  await settleInvitationForActivatedUser(user.id)
   const allRecords = await migrateLegacyUserIfNeeded(user)
   const { records, activeProfileRecord, workspaceProfileIds } = selectAuthPayloadProfiles(allRecords, activeProfileId)
   const [workspaces, announcementUnreadCount] = await Promise.all([
@@ -696,12 +739,8 @@ export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?
   ])
   for (const profile of records) {
     const workspace = workspaces.get(profile.id) ?? null
-    if (!workspace || !hasFreePreviewTrialEnded(profile)) continue
-    const current = await updateProfileWorkspaceAtomically(profile.id, (latestWorkspace) => {
-      const latest = latestWorkspace ?? emptyWorkspace(profile.id)
-      return normalizeExpiredFreePreviewWorkspace(profile, latest) ?? latest
-    })
-    workspaces.set(profile.id, current)
+    if (!workspace) continue
+    workspaces.set(profile.id, projectExpiredFreePreviewWorkspace(profile, workspace).workspace)
   }
   const publicProfiles: UserGameAccount[] = records.map((profile) => (
     toPublicProfile(profile, workspaces.get(profile.id) ?? null, getFreePreviewTrial(profile))
@@ -730,6 +769,7 @@ export async function verifyEmailWithToken(
   const user = await verifyUserEmailWithToken(hashEmailVerificationToken(tokenValue.trim()), new Date())
   if (!user) return { ok: false, status: 400, message: authCopy.api_email_verification_invalid }
   const session = await createSession(user.id)
+  scheduleInvitationSettlement(user.id)
   return { ok: true, user, cookie: session.cookie }
 }
 
@@ -743,41 +783,9 @@ export async function resendEmailVerification(emailValue: unknown): Promise<{ ok
     }
     await issueEmailVerification(user)
   } catch (error) {
-    console.error('resend verification email error:', error)
-    throw error
+    console.warn('resend verification email delivery skipped:', safeErrorName(error))
   }
   return { ok: true, message: authCopy.api_email_verification_resend }
-}
-
-function normalizeExpiredFreePreviewWorkspace(
-  profile: UserGameAccountRecord,
-  workspace: UserWorkspaceRecord | null,
-): UserWorkspaceRecord | null {
-  if (!workspace || !hasFreePreviewTrialEnded(profile)) return null
-  const currentConfigNeedsDowngrade = Boolean(workspace.config && !resolveFreePreviewConfig(workspace.config).ok)
-  const archivedConfig = currentConfigNeedsDowngrade ? JSON.stringify(workspace.config) : null
-  const savedConfigs = workspace.saved_configs.map((item) => (
-    resolveFreePreviewConfig(item.config).ok ? item : { ...item, read_only: true }
-  ))
-  const savedConfigsChanged = savedConfigs.some((item, index) => item.read_only !== workspace.saved_configs[index]?.read_only)
-  if (archivedConfig && !savedConfigs.some((item) => item.read_only && JSON.stringify(item.config) === archivedConfig)) {
-    savedConfigs.unshift({
-      id: randomUUID(),
-      name: '体验期高级配置（只读）',
-      config: workspace.config,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      last_used_at: null,
-      read_only: true,
-    })
-  }
-  if (!currentConfigNeedsDowngrade && !savedConfigsChanged) return null
-  return {
-    ...workspace,
-    config: currentConfigNeedsDowngrade ? getFreePreviewDefaultConfig() : workspace.config,
-    saved_configs: savedConfigs.slice(0, WORKSPACE_SAVED_CONFIG_MAX_LIMIT),
-    updated_at: new Date().toISOString(),
-  }
 }
 
 export function toPublicUser(user: UserAccountRecord): AuthUser {
@@ -793,9 +801,20 @@ export function toPublicUser(user: UserAccountRecord): AuthUser {
 }
 
 async function getAnnouncementUnreadCount(userId: string): Promise<number> {
-  const announcements = await getActiveAnnouncements()
-  const readIds = new Set((await getAnnouncementReads(userId)).map((read) => read.announcement_id))
-  return announcements.filter((announcement) => !readIds.has(announcement.id)).length
+  try {
+    const announcements = await getActiveAnnouncements()
+    const readIds = new Set((await getAnnouncementReads(userId)).map((read) => read.announcement_id))
+    return announcements.filter((announcement) => !readIds.has(announcement.id)).length
+  } catch (error) {
+    console.warn('announcement unread count unavailable:', safeErrorName(error))
+    return 0
+  }
+}
+
+function scheduleInvitationSettlement(userId: string): void {
+  void settleInvitationForActivatedUser(userId).catch((error) => {
+    console.warn('invitation activation settlement deferred:', safeErrorName(error))
+  })
 }
 
 export async function getActiveAnnouncements(): Promise<Announcement[]> {
@@ -808,20 +827,6 @@ export async function getActiveAnnouncements(): Promise<Announcement[]> {
 
 export function clearSessionCookie(): string {
   return `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secureCookieSuffix()}`
-}
-
-async function setUserPassword(user: UserAccountRecord, password: string): Promise<UserAccountRecord> {
-  const passwordHash = await createPasswordHash(password)
-  const updated: UserAccountRecord = {
-    ...user,
-    password_hash: passwordHash.password_hash,
-    salt: passwordHash.salt,
-    iterations: passwordHash.iterations,
-    password_algorithm: passwordHash.password_algorithm,
-    updated_at: new Date().toISOString(),
-  }
-  await saveUserAccount(updated)
-  return updated
 }
 
 async function tryUpgradeUserPasswordHash(
@@ -881,35 +886,36 @@ function hashEmailVerificationToken(token: string): string {
 
 async function issueEmailVerification(
   user: UserAccountRecord,
-  reservation?: BrevoEmailReservation,
+  suppliedReservation?: BrevoEmailReservation,
 ): Promise<void> {
   const resendSince = new Date(Date.now() - EMAIL_VERIFICATION_RESEND_WINDOW_MS).toISOString()
   if (await getRecentEmailVerificationTokenForUser(user.id, resendSince)) return
 
-  const token = randomBytes(32).toString('base64url')
-  const now = new Date()
-  const expiresHours = getEmailVerificationTtlHours()
-  const purpose = reservation?.purpose === 'admin_invite_verification'
-    || (!reservation && await userRegisteredWithAdminInvitation(user.id))
+  const purpose = suppliedReservation?.purpose === 'admin_invite_verification'
+    || (!suppliedReservation && await userRegisteredWithAdminInvitation(user.id))
     ? 'admin_invite_verification'
     : 'email_verification'
-  await saveEmailVerificationToken({
-    id: randomUUID(),
-    user_id: user.id,
-    token_hash: hashEmailVerificationToken(token),
-    expires_at: new Date(now.getTime() + expiresHours * 60 * 60 * 1000).toISOString(),
-    used_at: null,
-    created_at: now.toISOString(),
-  })
+  const reservation = suppliedReservation ?? await reserveEmailVerificationDelivery(purpose)
   try {
+    const token = randomBytes(32).toString('base64url')
+    const now = new Date()
+    const expiresHours = getEmailVerificationTtlHours()
+    await saveEmailVerificationToken({
+      id: randomUUID(),
+      user_id: user.id,
+      token_hash: hashEmailVerificationToken(token),
+      delivery_id: reservation.id,
+      expires_at: new Date(now.getTime() + expiresHours * 60 * 60 * 1000).toISOString(),
+      used_at: null,
+      created_at: now.toISOString(),
+    })
     await sendEmailVerificationEmail({
       email: user.email,
       verificationUrl: buildEmailVerificationUrl(token),
       expiresHours,
     }, reservation, purpose)
-  } catch (error) {
-    await deleteEmailVerificationTokenByHash(hashEmailVerificationToken(token))
-    throw error
+  } finally {
+    if (!suppliedReservation) await safelyReleaseEmailReservation(reservation)
   }
 }
 
@@ -921,7 +927,8 @@ async function safelyReleaseEmailReservation(reservation: BrevoEmailReservation)
   }
 }
 
-function verificationRequiredResult(user: UserAccountRecord) {
+function acceptedRegistrationResult(user: UserAccountRecord | null, verificationRequired: boolean) {
+  if (!verificationRequired) return { ok: true as const, user, verificationRequired: false as const }
   return {
     ok: true as const,
     user,
@@ -929,6 +936,10 @@ function verificationRequiredResult(user: UserAccountRecord) {
     message: authCopy.api_email_verification_sent,
     resendAfterSeconds: EMAIL_VERIFICATION_RESEND_WINDOW_MS / 1000,
   }
+}
+
+function safeErrorName(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error
 }
 
 function buildEmailVerificationUrl(token: string): string {

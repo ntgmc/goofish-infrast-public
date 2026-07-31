@@ -92,10 +92,21 @@ describe('ToolPage route guards', () => {
   })
 
   it('keeps a requested deep link while the user is signed out', async () => {
-    const router = renderToolRoute('/tool/setup/config', { user: null })
+    const router = renderToolRoute('/tool/setup/config', { authStatus: 'anonymous', user: null })
 
     expect(await screen.findByRole('heading', { name: 'MAA 基建排班工作台' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/tool/setup/config')
+  })
+
+  it('shows an authentication retry page instead of the login form when restoration fails', async () => {
+    const retryAuth = vi.fn()
+    const user = userEvent.setup()
+    renderToolRoute('/tool/profiles', { authStatus: 'error', retryAuth })
+
+    expect(await screen.findByRole('heading', { name: '认证服务暂时不可用' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'MAA 基建排班工作台' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '重新确认登录状态' }))
+    expect(retryAuth).toHaveBeenCalledOnce()
   })
 
   it('replaces protected routes with profiles when no schedulable profile is active', async () => {
@@ -159,6 +170,9 @@ function renderCurrentSession(path: string) {
 
 function createSession(overrides: Record<string, unknown> = {}) {
   return {
+    authStatus: 'authenticated',
+    authError: null,
+    retryAuth: vi.fn(),
     authLoading: false,
     user: { id: 'user-1', email: 'test@example.com' } as AuthUser,
     profiles: [],

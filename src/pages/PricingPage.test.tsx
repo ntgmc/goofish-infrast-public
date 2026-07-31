@@ -38,7 +38,7 @@ describe('PricingPage', () => {
     const supportPageLink = contactLinks.find((link) => link.getAttribute('href') === '/support')
     expect(supportPageLink).toHaveClass('hidden', 'items-center', 'sm:inline-flex')
     const table = screen.getByRole('table')
-    expect(within(table).getByText('支持，保存到同一账号工作区')).toBeInTheDocument()
+    expect(within(table).getByText('支持，可选绑定并保存到同一账号工作区')).toBeInTheDocument()
     expect(within(table).getByText('更换游戏账号')).toBeInTheDocument()
     expect(within(table).getByText('不支持自行更换；需人工核验')).toBeInTheDocument()
   })

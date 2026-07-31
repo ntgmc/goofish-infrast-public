@@ -16,7 +16,7 @@ import {
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
-import { getProfileWorkspace, isDepotValueProfile, listProfilesForUser } from './user-store'
+import { emptyWorkspace, getProfileWorkspace, isDepotValueProfile, listProfilesForUser, updateProfileWorkspaceInTransaction, type UserGameAccountRecord } from './user-store'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY, isFreePreviewLimitedCdkActivityActive } from '../free-preview-trial'
 import { upsertItemGrantNotificationInTransaction } from './notification-store'
 
@@ -88,6 +88,95 @@ export class ItemUnavailableError extends InventoryError {
   constructor(readonly itemCode: string) {
     super('item_unavailable', `没有可用的${itemCode}。`, 409)
   }
+}
+
+export async function createLifetimeProfileForJsonImport(input: {
+  userId: string
+  idempotencyKey: string
+  displayName?: string
+  note?: string
+  now?: Date
+}): Promise<{ profileId: string; replayed: boolean }> {
+  await ensureSchema()
+  const displayName = normalizeProfileText(input.displayName, 40) || '终身档案'
+  const note = normalizeProfileText(input.note, 500)
+  const requestHash = createHash('sha256').update(JSON.stringify({
+    action: 'create_lifetime_profile_for_json_import',
+    displayName,
+    note,
+  })).digest('hex')
+
+  return withTransaction(async (client) => {
+    const operationId = randomUUID()
+    const now = (input.now ?? new Date()).toISOString()
+    const inserted = await client.query(
+      `insert into inventory_operations (id, user_id, idempotency_key, operation_type, request_hash, created_at)
+       values ($1, $2, $3, 'create_lifetime_profile', $4, $5)
+       on conflict (user_id, idempotency_key) do nothing`,
+      [operationId, input.userId, input.idempotencyKey, requestHash, now],
+    )
+    if (!inserted.rowCount) {
+      const existing = await client.query<{ request_hash: string; response_json: { profile_id?: unknown } | null }>(
+        'select request_hash, response_json from inventory_operations where user_id = $1 and idempotency_key = $2 for update',
+        [input.userId, input.idempotencyKey],
+      )
+      const previous = existing.rows[0]
+      if (!previous || previous.request_hash !== requestHash) {
+        throw new InventoryError('idempotency_conflict', '幂等键已被其他请求使用。', 409)
+      }
+      if (!previous.response_json || typeof previous.response_json.profile_id !== 'string') {
+        throw new InventoryError('operation_in_progress', '终身版档案正在创建中。', 409)
+      }
+      return { profileId: previous.response_json.profile_id, replayed: true }
+    }
+
+    const profileId = randomUUID()
+    const profile: UserGameAccountRecord = {
+      version: 1,
+      id: profileId,
+      user_id: input.userId,
+      kind: 'cdk',
+      cdk_key: null,
+      cdk_code_hash: null,
+      cdk_order_hash: null,
+      permission: 'advanced',
+      status: 'active',
+      display_name: displayName,
+      note,
+      created_at: now,
+      updated_at: now,
+    }
+    await client.query(
+      `insert into user_game_accounts
+        (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note,
+         kind, archived_at, record_json, created_at, updated_at)
+       values ($1, $2, null, null, null, $3, $4, $5, $6, $7, null, $8::jsonb, $9, $9)`,
+      [profile.id, profile.user_id, profile.permission, profile.status, profile.display_name,
+        profile.note, profile.kind, JSON.stringify(profile), profile.created_at],
+    )
+    await updateProfileWorkspaceInTransaction(client, profileId, () => emptyWorkspace(profileId))
+    await reserveItemsInTransaction(
+      client,
+      input.userId,
+      ['lifetime_profile_voucher'],
+      'inventory_operation',
+      operationId,
+      profileId,
+      now,
+    )
+    await commitReservedItemsInTransaction(client, 'inventory_operation', operationId, now)
+    const response = {
+      operation_id: operationId,
+      item_code: 'lifetime_profile_voucher',
+      profile_id: profileId,
+      import_mode: 'json',
+    }
+    await client.query(
+      'update inventory_operations set response_json = $3::jsonb, completed_at = $4 where id = $1 and user_id = $2',
+      [operationId, input.userId, JSON.stringify(response), now],
+    )
+    return { profileId, replayed: false }
+  })
 }
 
 type GrantInput = {
@@ -824,6 +913,10 @@ function capacity(
 
 function stackId(itemCode: string, versionId: string | null): string {
   return versionId ? `${itemCode}:${versionId}` : itemCode
+}
+
+function normalizeProfileText(value: string | undefined, maxLength: number): string {
+  return typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 }
 
 function normalizeQuantity(value: number): number {

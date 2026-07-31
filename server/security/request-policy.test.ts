@@ -39,3 +39,17 @@ describe('admin CDK baseline request policy', () => {
     }).success).toBe(false)
   })
 })
+
+describe('lifetime voucher JSON profile request policy', () => {
+  it('accepts profile metadata and rejects unknown fields', () => {
+    expect(requestSchemas.lifetimeVoucherProfileCreate.safeParse({
+      idempotency_key: 'lifetime-json-request',
+      display_name: 'JSON 终身档案',
+      note: '手动导入',
+    }).success).toBe(true)
+    expect(requestSchemas.lifetimeVoucherProfileCreate.safeParse({
+      idempotency_key: 'lifetime-json-request',
+      skland_uid: 'unauthorized-client-value',
+    }).success).toBe(false)
+  })
+})

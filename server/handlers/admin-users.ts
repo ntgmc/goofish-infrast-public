@@ -197,7 +197,9 @@ export default async (req: Request): Promise<Response> => {
 
       if (body.action === 'reset_password') {
         const reset = await resetUserPasswordByAdmin(target, body.new_password)
-        if (!reset.ok) return jsonResponse({ error: reset.message }, 400)
+        if (!reset.ok) {
+          return jsonResponse({ error: reset.message, ...(reset.code && { code: reset.code }) }, reset.status)
+        }
         return jsonResponse({ ok: true, user: toAdminAppUser(reset.user), detail: await buildAdminUserDetail(reset.user) })
       }
 

@@ -129,7 +129,7 @@
       "forbidden_information": ["密码", "完整 CDK", "二维码", "Cookie", "森空岛凭据"]
     },
     "public_disclosures": [
-      "单账号终身版仅绑定一个游戏 UID，不支持自行更换游戏账号。",
+      "单账号终身版档案仅用于一个游戏账号，可选择森空岛导入或 MAA 干员 JSON 初始化；绑定森空岛 UID 后不支持自行更换。",
       "长期更新指在服务持续提供且授权正常的前提下维护同一账号，不表示可以任意换号。",
       "干员归属、练度或干员池出现异常变化时可能先拦截；重复异常可能冻结档案。",
       "干员数据误拦截需要通过 MaaTool 官方 QQ 群人工核验。",
@@ -137,7 +137,7 @@
       "商用主排班按成功任务计费；MaaTool 账号、CDK、档案和积分均不可转让或转售。"
     ],
     "public_feature_comparison": [
-      { "feature": "森空岛导入干员数据", "free_preview": "支持，必须绑定 UID", "single_account_lifetime": "支持，保存到同一账号工作区" },
+      { "feature": "森空岛导入干员数据", "free_preview": "支持，必须绑定 UID", "single_account_lifetime": "支持，可选绑定并保存到同一账号工作区" },
       { "feature": "MAA 干员识别文件导入", "free_preview": "不支持手动上传干员", "single_account_lifetime": "支持，受干员数据风控规则约束" },
       { "feature": "完整个人游戏内轮换队列", "free_preview": "支持，受免费完整排班权益限制", "single_account_lifetime": "支持，可长期重新生成" },
       { "feature": "MAA JSON 下载", "free_preview": "高级体验期或导出体验券可用", "single_account_lifetime": "支持，仅包含 MAA 执行所需排班数据" },

@@ -105,6 +105,33 @@ describe('WorkspaceSetupPage CDK paths', () => {
     expect(onSynced).not.toHaveBeenCalled()
   })
 
+  it('allows commercial profiles to start with JSON instead of a Skland binding', async () => {
+    const user = userEvent.setup()
+    const onSynced = vi.fn()
+    const payload = createPayload()
+    apiJsonMock.mockResolvedValue(payload)
+    const { container } = renderWorkspace({
+      profile: createCommercialProfile(),
+      onSynced,
+    })
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')
+    expect(input).not.toBeDisabled()
+
+    await user.upload(input!, new File([JSON.stringify([
+      { id: 'char_002_amiya', name: '阿米娅', own: true, elite: 2, rarity: 4 },
+    ])], 'commercial.json', { type: 'application/json' }))
+
+    await waitFor(() => expect(apiJsonMock).toHaveBeenCalledWith('/api/user/workspace', {
+      method: 'PATCH',
+      json: {
+        profile_id: 'commercial-profile',
+        operators: [{ id: 'char_002_amiya', name: '阿米娅', own: true, elite: 2, rarity: 4 }],
+      },
+      fallbackMessage: '导入干员数据失败，请稍后重试',
+    }))
+    expect(onSynced).toHaveBeenCalledWith(payload)
+  })
+
   it('separates the desktop account actions in one bottom navigation group', () => {
     renderWorkspace()
 
@@ -274,6 +301,16 @@ function createAdvancedProfile(): UserGameAccount {
     kind: 'cdk',
     permission: 'advanced',
     display_name: '高级档案',
+  }
+}
+
+function createCommercialProfile(): UserGameAccount {
+  return {
+    ...createAdvancedProfile(),
+    id: 'commercial-profile',
+    kind: 'metered_commercial',
+    permission: 'metered_advanced',
+    display_name: '商用账号',
   }
 }
 

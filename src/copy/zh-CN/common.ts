@@ -597,6 +597,12 @@ export const commonCopy = {
   pages_ToolPage_001: "正在确认登录信息...",
   // src/pages/ToolPage.tsx
   pages_ToolPage_002: "正在载入排班工具...",
+  // src/pages/ToolPage.tsx
+  pages_ToolPage_003: "认证服务暂时不可用",
+  // src/pages/ToolPage.tsx
+  pages_ToolPage_004: "暂时无法确认登录状态。为保护账号数据，页面不会切换到登录状态，请稍后重试。",
+  // src/pages/ToolPage.tsx
+  pages_ToolPage_005: "重新确认登录状态",
   // src/pages/tool/AccountDashboard.tsx
   pages_tool_AccountDashboard_001: "游戏账号",
   // src/pages/tool/AccountDashboard.tsx
