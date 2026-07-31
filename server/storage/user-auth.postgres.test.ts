@@ -266,7 +266,7 @@ describe('registration email serialization', () => {
 
 describe('email delivery-backed tokens', () => {
   it('rejects failed password deliveries while retaining uncertain deliveries and their cooldown', async () => {
-    const now = new Date('2026-07-31T10:00:00.000Z')
+    const now = new Date()
     const user = await seedUser('password-delivery@example.test', now)
     const failedDelivery = await seedDelivery('password_reset', 'failed', now)
     const uncertainDelivery = await seedDelivery('password_reset', 'uncertain', now)
@@ -289,7 +289,7 @@ describe('email delivery-backed tokens', () => {
   })
 
   it('rejects failed verification deliveries and accepts uncertain deliveries', async () => {
-    const now = new Date('2026-07-31T11:00:00.000Z')
+    const now = new Date()
     const user = await seedUser('verification-delivery@example.test', now)
     const failedDelivery = await seedDelivery('email_verification', 'failed', now)
     const uncertainDelivery = await seedDelivery('email_verification', 'uncertain', now)
@@ -589,8 +589,8 @@ async function seedFreePreviewWorkspaces(userId: string, count: number): Promise
     `insert into user_game_accounts
       (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note,
        kind, archived_at, record_json, created_at, updated_at)
-     select $1 || '-free-preview-' || item,
-            $1,
+     select $1::text || '-free-preview-' || item,
+            $1::text,
             null,
             null,
             null,
@@ -602,8 +602,8 @@ async function seedFreePreviewWorkspaces(userId: string, count: number): Promise
             null,
             jsonb_build_object(
               'version', 1,
-              'id', $1 || '-free-preview-' || item,
-              'user_id', $1,
+              'id', $1::text || '-free-preview-' || item,
+              'user_id', $1::text,
               'kind', 'free_preview',
               'cdk_key', null,
               'cdk_code_hash', null,
@@ -614,31 +614,31 @@ async function seedFreePreviewWorkspaces(userId: string, count: number): Promise
               'note', '',
               'temporary_permission', jsonb_build_object(
                 'source', 'limited_profile_voucher',
-                'activity_id', $2,
+                'activity_id', $2::text,
                 'permission', 'advanced',
-                'starts_at', $3,
-                'ends_at', $4,
+                'starts_at', $3::text,
+                'ends_at', $4::text,
                 'operation_id', 'maintenance-test'
               ),
-              'created_at', $3,
-              'updated_at', $3
+              'created_at', $3::text,
+              'updated_at', $3::text
             ),
-            $3,
-            $3
+            $3::timestamptz,
+            $3::timestamptz
        from generate_series(1, $5::integer) item`,
     [userId, FREE_PREVIEW_LIMITED_CDK_ACTIVITY.id, createdAt, endsAt, count],
   )
   await query(
     `insert into user_profile_workspaces
       (profile_id, operators_json, config_json, elite_overrides_json, last_result_json, record_json, updated_at)
-     select $1 || '-free-preview-' || item,
+     select $1::text || '-free-preview-' || item,
             null,
             null,
             '{}'::jsonb,
             null,
             jsonb_build_object(
               'version', 1,
-              'profile_id', $1 || '-free-preview-' || item,
+              'profile_id', $1::text || '-free-preview-' || item,
               'operators', null,
               'config', null,
               'elite_overrides', '{}'::jsonb,
@@ -648,9 +648,9 @@ async function seedFreePreviewWorkspaces(userId: string, count: number): Promise
               'archived_results', '[]'::jsonb,
               'free_schedule_entitlement', null,
               'free_preview_normalized_activity_id', null,
-              'updated_at', $2
+              'updated_at', $2::text
             ),
-            $2
+            $2::timestamptz
        from generate_series(1, $3::integer) item`,
     [userId, createdAt, count],
   )
