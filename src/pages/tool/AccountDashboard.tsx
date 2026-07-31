@@ -239,7 +239,7 @@ export default function AccountDashboard({
               {section === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} />}
               {section === 'balance' && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
               {section === 'announcements' && <AnnouncementsSection />}
-              {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} />}
+              {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} />}
             </Suspense>
           </AnimatedPresenceRegion>
         </div>

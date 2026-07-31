@@ -1,6 +1,6 @@
 import { createHash, createHmac } from 'node:crypto'
 import type { PoolClient } from 'pg'
-import { getPool, query, withTransaction } from './postgres'
+import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { markPersonalUseDeclarationAcceptancesDeleted } from './personal-use-declaration-store'
 import type { PasswordAlgorithm, PasswordHashRecord } from '../security/password'
@@ -360,50 +360,95 @@ export async function saveUserAccount(user: UserAccountRecord): Promise<void> {
 
 export async function deleteUserAccount(userId: string): Promise<void> {
   await ensureSchema()
-  const client = await getPool().connect()
-  try {
-    await client.query('begin')
-    const profileRows = await client.query<{ record_json: UserGameAccountRecord }>('select record_json from user_game_accounts where user_id = $1', [userId])
-    const sampleSecret = process.env.DEPOT_SAMPLE_HASH_SECRET?.trim()
-    if (!sampleSecret) throw new Error('DEPOT_SAMPLE_HASH_SECRET is not configured')
-    const sampleHashes = profileRows.rows
-      .map((row) => row.record_json.skland_binding?.uid)
-      .filter((uid): uid is string => Boolean(uid))
-      .map((uid) => createHmac('sha256', sampleSecret).update(`skland:${uid}`).digest('hex'))
-    await client.query('delete from depot_value_samples where contributor_profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
-    if (sampleHashes.length > 0) await client.query('delete from depot_value_samples where uid_hash = any($1)', [sampleHashes])
-    await client.query('delete from usage_events where user_id = $1 or profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
-    await client.query("delete from optimization_idempotency where owner_key in (select 'profile:' || id from user_game_accounts where user_id = $1)", [userId])
-    await client.query("delete from optimization_submissions where owner_key in (select 'profile:' || id from user_game_accounts where user_id = $1)", [userId])
-    await client.query("delete from optimize_jobs where profile_id in (select id from user_game_accounts where user_id = $1) or owner_key in (select 'profile:' || id from user_game_accounts where user_id = $1)", [userId])
-    await client.query('delete from free_preview_pending_claims where user_id = $1', [userId])
-    await client.query('delete from free_preview_claims where user_id = $1 or profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
-    await client.query(
-      'delete from user_profile_workspaces where profile_id in (select id from user_game_accounts where user_id = $1)',
-      [userId],
-    )
-    await client.query('delete from user_workspaces where user_id = $1', [userId])
-    await client.query('delete from user_announcement_reads where user_id = $1', [userId])
-    await client.query('delete from user_sessions where user_id = $1', [userId])
-    await markPersonalUseDeclarationAcceptancesDeleted(client, userId)
-    const deletedTargetHash = `deleted_user:${createHash('sha256').update(userId).digest('hex').slice(0, 16)}`
-    await client.query(
-      `update inventory_admin_audit
-          set target_id = case when target_id = $1 then $2 else target_id end,
-              before_json = case when before_json is null then null else jsonb_build_object('deleted_target', true, 'target_hash', $2) end,
-              after_json = case when after_json is null then null else jsonb_build_object('deleted_target', true, 'target_hash', $2) end
-        where target_id = $1 or before_json->>'user_id' = $1 or after_json->>'user_id' = $1`,
-      [userId, deletedTargetHash],
-    )
-    await client.query('delete from user_game_accounts where user_id = $1', [userId])
-    await client.query('delete from user_accounts where id = $1', [userId])
-    await client.query('commit')
-  } catch (error) {
-    await client.query('rollback')
-    throw error
-  } finally {
-    client.release()
-  }
+  await withTransaction((client) => deleteUserAccountInTransaction(client, userId))
+}
+
+export async function deleteUserAccountInTransaction(client: PoolClient, userId: string): Promise<void> {
+  const profileRows = await client.query<{ record_json: UserGameAccountRecord }>('select record_json from user_game_accounts where user_id = $1', [userId])
+  const sampleSecret = process.env.DEPOT_SAMPLE_HASH_SECRET?.trim()
+  if (!sampleSecret) throw new Error('DEPOT_SAMPLE_HASH_SECRET is not configured')
+  const sampleHashes = profileRows.rows
+    .map((row) => row.record_json.skland_binding?.uid)
+    .filter((uid): uid is string => Boolean(uid))
+    .map((uid) => createHmac('sha256', sampleSecret).update(`skland:${uid}`).digest('hex'))
+  await client.query('delete from depot_value_samples where contributor_profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
+  if (sampleHashes.length > 0) await client.query('delete from depot_value_samples where uid_hash = any($1)', [sampleHashes])
+  await client.query('delete from usage_events where user_id = $1 or profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
+  await client.query(
+    `delete from optimization_dead_letters
+      where profile_id in (select id from user_game_accounts where user_id = $1)
+         or owner_key in (
+           select owner_prefix || id
+             from user_game_accounts
+             cross join (values ('profile:'), ('reorder-job:')) as owner(owner_prefix)
+            where user_id = $1
+         )
+         or job_id in (
+           select id from optimize_jobs
+            where billing_user_id = $1
+               or profile_id in (select id from user_game_accounts where user_id = $1)
+         )`,
+    [userId],
+  )
+  await client.query(
+    `delete from optimization_idempotency
+      where owner_key in (
+        select owner_prefix || id
+          from user_game_accounts
+          cross join (values ('profile:'), ('reorder-job:')) as owner(owner_prefix)
+         where user_id = $1
+      )
+         or job_id in (
+           select id from optimize_jobs
+            where billing_user_id = $1
+               or profile_id in (select id from user_game_accounts where user_id = $1)
+         )`,
+    [userId],
+  )
+  await client.query(
+    `delete from optimization_submissions
+      where billing_user_id = $1
+         or owner_key in (
+           select owner_prefix || id
+             from user_game_accounts
+             cross join (values ('profile:'), ('reorder-job:')) as owner(owner_prefix)
+            where user_id = $1
+         )`,
+    [userId],
+  )
+  await client.query(
+    `delete from optimize_jobs
+      where billing_user_id = $1
+         or profile_id in (select id from user_game_accounts where user_id = $1)
+         or owner_key in (
+           select owner_prefix || id
+             from user_game_accounts
+             cross join (values ('profile:'), ('reorder-job:')) as owner(owner_prefix)
+            where user_id = $1
+         )`,
+    [userId],
+  )
+  await client.query('delete from free_preview_pending_claims where user_id = $1', [userId])
+  await client.query('delete from free_preview_claims where user_id = $1 or profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
+  await client.query(
+    'delete from user_profile_workspaces where profile_id in (select id from user_game_accounts where user_id = $1)',
+    [userId],
+  )
+  await client.query('delete from user_workspaces where user_id = $1', [userId])
+  await client.query('delete from user_announcement_reads where user_id = $1', [userId])
+  await client.query('delete from user_sessions where user_id = $1', [userId])
+  await markPersonalUseDeclarationAcceptancesDeleted(client, userId)
+  const deletedTargetHash = `deleted_user:${createHash('sha256').update(userId).digest('hex').slice(0, 16)}`
+  await client.query(
+    `update inventory_admin_audit
+        set target_id = case when target_id = $1 then $2 else target_id end,
+            before_json = case when before_json is null then null else jsonb_build_object('deleted_target', true, 'target_hash', $2) end,
+            after_json = case when after_json is null then null else jsonb_build_object('deleted_target', true, 'target_hash', $2) end
+      where target_id = $1 or before_json->>'user_id' = $1 or after_json->>'user_id' = $1`,
+    [userId, deletedTargetHash],
+  )
+  await client.query('delete from user_game_accounts where user_id = $1', [userId])
+  await client.query('delete from user_accounts where id = $1', [userId])
 }
 
 export async function saveUserSession(session: UserSessionRecord): Promise<void> {

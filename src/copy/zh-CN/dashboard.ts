@@ -250,6 +250,9 @@ export const dashboardCopy = {
   pages_tool_dashboard_SettingsSection_034: "发起注销请求",
   // src/pages/tool/dashboard/SettingsSection.tsx
   pages_tool_dashboard_SettingsSection_035: "清除凭据只会撤销森空岛授权，不会解除游戏账号绑定；重新授权时必须使用相同的森空岛 UID。",
+  pages_tool_dashboard_SettingsSection_036: "森空岛凭据已清除。游戏账号身份仍保留。",
+  pages_tool_dashboard_SettingsSection_037: "凭据已清除，但刷新账户状态失败；重新载入页面即可同步最新状态。",
+  pages_tool_dashboard_SettingsSection_038: "森空岛凭据已清除；需要再次导入时请重新授权相同 UID。",
   // src/pages/tool/dashboard/ToolsSection.tsx
   pages_tool_dashboard_ToolsSection_001: "仓库价值分析器",
   // src/pages/tool/dashboard/ToolsSection.tsx

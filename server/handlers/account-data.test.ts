@@ -2,22 +2,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import accountDataHandler from './account-data'
 
 const mocks = vi.hoisted(() => ({
+  cancelAccountDeletion: vi.fn(),
+  clearSessionCookie: vi.fn(),
   getProfileForUser: vi.fn(),
-  getProfileWorkspace: vi.fn(),
   getUserById: vi.fn(),
   listProfilesForUser: vi.fn(),
+  listProfileWorkspaces: vi.fn(),
+  normalizeEmail: vi.fn(),
+  PasswordWorkCapacityError: class PasswordWorkCapacityError extends Error {},
   query: vi.fn(),
+  requestAccountDeletion: vi.fn(),
   listPersonalUseDeclarationAcceptancesForUser: vi.fn(),
   saveUserProfile: vi.fn(),
   requireUserSession: vi.fn(),
   exportUserNotifications: vi.fn(),
+  verifyPasswordHash: vi.fn(),
 }))
 
 vi.mock('../storage/user-store', () => ({
   getProfileForUser: mocks.getProfileForUser,
-  getProfileWorkspace: mocks.getProfileWorkspace,
   getUserById: mocks.getUserById,
   listProfilesForUser: mocks.listProfilesForUser,
+  listProfileWorkspaces: mocks.listProfileWorkspaces,
   saveUserProfile: mocks.saveUserProfile,
 }))
 
@@ -26,15 +32,22 @@ vi.mock('../storage/notification-store', () => ({ exportUserNotifications: mocks
 vi.mock('../storage/personal-use-declaration-store', () => ({
   listPersonalUseDeclarationAcceptancesForUser: mocks.listPersonalUseDeclarationAcceptancesForUser,
 }))
-vi.mock('../account-data-lifecycle', () => ({ cancelAccountDeletion: vi.fn(), requestAccountDeletion: vi.fn() }))
-vi.mock('../security/password', () => ({ verifyPasswordHash: vi.fn() }))
+vi.mock('../account-data-lifecycle', () => ({
+  AccountDeletionStateError: class AccountDeletionStateError extends Error {},
+  cancelAccountDeletion: mocks.cancelAccountDeletion,
+  requestAccountDeletion: mocks.requestAccountDeletion,
+}))
+vi.mock('../security/password', () => ({
+  PasswordWorkCapacityError: mocks.PasswordWorkCapacityError,
+  verifyPasswordHash: mocks.verifyPasswordHash,
+}))
 vi.mock('./user-auth', () => ({
-  clearSessionCookie: vi.fn(),
-  normalizeEmail: vi.fn(),
+  clearSessionCookie: mocks.clearSessionCookie,
+  normalizeEmail: mocks.normalizeEmail,
   requireUserSession: mocks.requireUserSession,
-  jsonResponse: (body: unknown, status = 200) => new Response(status === 204 ? null : JSON.stringify(body), {
+  jsonResponse: (body: unknown, status = 200, headers: Record<string, string> = {}) => new Response(status === 204 ? null : JSON.stringify(body), {
     status,
-    headers: status === 204 ? undefined : { 'Content-Type': 'application/json' },
+    headers: status === 204 ? headers : { 'Content-Type': 'application/json', ...headers },
   }),
 }))
 
@@ -54,9 +67,17 @@ beforeEach(() => {
   mocks.requireUserSession.mockResolvedValue({ user: { id: 'user-1', email: 'user@example.test' } })
   mocks.query.mockResolvedValue({ rows: [] })
   mocks.listProfilesForUser.mockResolvedValue([])
+  mocks.listProfileWorkspaces.mockResolvedValue(new Map())
   mocks.getUserById.mockResolvedValue(null)
   mocks.listPersonalUseDeclarationAcceptancesForUser.mockResolvedValue([])
   mocks.exportUserNotifications.mockResolvedValue([])
+  mocks.clearSessionCookie.mockReturnValue('session=; Max-Age=0')
+  mocks.normalizeEmail.mockImplementation((value: unknown) => typeof value === 'string' ? value.trim().toLowerCase() : null)
+  mocks.verifyPasswordHash.mockResolvedValue({ verified: true })
+  mocks.requestAccountDeletion.mockResolvedValue({
+    scheduledFor: '2026-08-07T00:00:00.000Z',
+    cancellationEmail: 'queued',
+  })
   mocks.getProfileForUser.mockResolvedValue({
     id: 'profile-1',
     user_id: 'user-1',
@@ -95,7 +116,7 @@ describe('account data Skland controls', () => {
     }))
 
     expect(response.status).toBe(404)
-    await expect(response.json()).resolves.toEqual({ error: 'API route not found' })
+    await expect(response.json()).resolves.toEqual({ error: 'API route not found', code: 'route_not_found' })
     expect(mocks.saveUserProfile).not.toHaveBeenCalled()
   })
 
@@ -107,7 +128,7 @@ describe('account data Skland controls', () => {
     }))
 
     expect(response.status).toBe(404)
-    await expect(response.json()).resolves.toEqual({ error: 'API route not found' })
+    await expect(response.json()).resolves.toEqual({ error: 'API route not found', code: 'route_not_found' })
   })
 
   it('exports public inventory history without internal administrator audit data', async () => {
@@ -124,9 +145,91 @@ describe('account data Skland controls', () => {
     const response = await accountDataHandler(new Request('http://localhost/api/user/data/export'))
     const body = await response.json() as { version: number; notifications: Array<Record<string, unknown>> }
 
-    expect(body.version).toBe(3)
+    expect(body.version).toBe(4)
     expect(body.notifications).toEqual([{ id: 'notification-1', type: 'item_grant' }])
     expect(body.notifications[0]).not.toHaveProperty('source_type')
     expect(body.notifications[0]).not.toHaveProperty('grant_id')
+  })
+
+  it('uses one batch workspace query and exports the V4 coverage additions', async () => {
+    mocks.listProfilesForUser.mockResolvedValue([
+      { id: 'profile-1', skland_binding: null, skland_pending_binding: null },
+      { id: 'profile-2', skland_binding: null, skland_pending_binding: null },
+    ])
+    mocks.listProfileWorkspaces.mockResolvedValue(new Map([
+      ['profile-2', { profile_id: 'profile-2' }],
+      ['profile-1', { profile_id: 'profile-1' }],
+    ]))
+    mocks.query.mockImplementation(async (statement: string) => {
+      if (statement.includes('from optimization_submissions')) {
+        return { rows: [{ id: 'submission-1', owner_key: 'reorder-job:profile-1' }] }
+      }
+      if (statement.includes('from optimization_idempotency')) {
+        return { rows: [{ owner_key: 'reorder-job:profile-1', request_hash: 'request-hash' }] }
+      }
+      if (statement.includes('from invitation_codes')) return { rows: [{ code: 'ABCDEFGH' }] }
+      if (statement.includes('from invitations')) return { rows: [{ id: 'invitation-1', role: 'inviter' }] }
+      if (statement.includes('from user_workspaces')) return { rows: [{ record_json: { version: 1 } }] }
+      return { rows: [] }
+    })
+
+    const response = await accountDataHandler(new Request('http://localhost/api/user/data/export'))
+    const body = await response.json() as Record<string, any>
+
+    expect(response.status).toBe(200)
+    expect(mocks.listProfileWorkspaces).toHaveBeenCalledOnce()
+    expect(mocks.listProfileWorkspaces).toHaveBeenCalledWith(['profile-1', 'profile-2'])
+    expect(body.workspaces.map((workspace: { profile_id: string }) => workspace.profile_id))
+      .toEqual(['profile-1', 'profile-2'])
+    expect(body.optimization_submissions).toEqual([
+      { id: 'submission-1', owner_key: 'reorder-job:profile-1' },
+    ])
+    expect(body.optimization_idempotency[0]).toMatchObject({ request_hash: 'request-hash' })
+    expect(body.invitation_code).toEqual({ code: 'ABCDEFGH' })
+    expect(body.invitations).toEqual([{ id: 'invitation-1', role: 'inviter' }])
+    expect(body.legacy_workspace).toEqual({ version: 1 })
+    expect(body.coverage.optimization_submissions).toEqual({
+      disposition: 'export',
+      field: 'optimization_submissions',
+    })
+    expect(body.coverage.user_sessions).toMatchObject({ disposition: 'exclude' })
+  })
+
+  it('returns stable lifecycle response codes and the accepted deletion deadline', async () => {
+    const unauthenticated = await accountDataHandler(new Request('http://localhost/api/user/data/export'))
+    mocks.requireUserSession.mockResolvedValueOnce(null)
+    const nextUnauthenticated = await accountDataHandler(new Request('http://localhost/api/user/data/export'))
+    expect(unauthenticated.status).toBe(200)
+    expect(nextUnauthenticated.status).toBe(401)
+    await expect(nextUnauthenticated.json()).resolves.toMatchObject({ code: 'authentication_required' })
+
+    const response = await accountDataHandler(new Request('http://localhost/api/user/data/delete-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'user@example.test', password: 'password' }),
+    }))
+
+    expect(response.status).toBe(202)
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      scheduled_for: '2026-08-07T00:00:00.000Z',
+      cancellation_email: 'queued',
+    })
+  })
+
+  it('returns a stable retry contract when password verification capacity is saturated', async () => {
+    mocks.verifyPasswordHash.mockRejectedValueOnce(new mocks.PasswordWorkCapacityError('busy'))
+    const response = await accountDataHandler(new Request('http://localhost/api/user/data/delete-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'user@example.test', password: 'password' }),
+    }))
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get('Retry-After')).toBe('1')
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'password_service_busy',
+      retry_after_seconds: 1,
+    })
   })
 })

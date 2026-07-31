@@ -1054,3 +1054,69 @@ export interface InvitationRecordSummary {
 export type DepotValueProfileResponse = AuthSuccessResponse & {
   depot_profile: UserGameAccount;
 };
+
+export interface AccountDeletionAccepted {
+  ok: true;
+  scheduled_for: string;
+  cancellation_email: 'queued' | 'sent' | 'delayed';
+}
+
+export type PersonalDataExportRecord = Record<string, unknown>;
+
+export interface PersonalDataExportV4 {
+  version: 4;
+  exported_at: string;
+  coverage: Record<string, {
+    disposition: 'export' | 'exclude';
+    field?: string;
+    reason?: string;
+  }>;
+  user: {
+    id: string;
+    email: string;
+    permission: PermissionMode;
+    status: AuthUser['status'];
+    created_at: string;
+    updated_at: string;
+  } | null;
+  profiles: PersonalDataExportRecord[];
+  workspaces: Array<UserWorkspace | null>;
+  legacy_workspace: PersonalDataExportRecord | null;
+  usage_events: unknown[];
+  optimize_jobs: PersonalDataExportRecord[];
+  optimize_job_attempts: PersonalDataExportRecord[];
+  optimization_job_effects: PersonalDataExportRecord[];
+  optimization_submissions: PersonalDataExportRecord[];
+  optimization_idempotency: PersonalDataExportRecord[];
+  depot_samples: PersonalDataExportRecord[];
+  invitation_code: PersonalDataExportRecord | null;
+  invitations: PersonalDataExportRecord[];
+  profile_entitlements: PersonalDataExportRecord[];
+  entitlement_ledger: PersonalDataExportRecord[];
+  metered_personal_claim: PersonalDataExportRecord | null;
+  announcement_reads: PersonalDataExportRecord[];
+  personal_use_declarations: unknown[];
+  inventory: {
+    grants: PersonalDataExportRecord[];
+    consumptions: PersonalDataExportRecord[];
+    ledger: PersonalDataExportRecord[];
+    operations: PersonalDataExportRecord[];
+    profile_entitlements: PersonalDataExportRecord[];
+    onboarding_tasks: PersonalDataExportRecord[];
+    distribution_recipients: PersonalDataExportRecord[];
+  };
+  balance: {
+    currency: 'points';
+    available: string;
+    reserved: string;
+    lifetime_credited: string;
+    qualification_reversed: string;
+    debt: string;
+    transactions: PersonalDataExportRecord[];
+    qualification_ledger: PersonalDataExportRecord[];
+    reservations: PersonalDataExportRecord[];
+  };
+  commercial_account: PersonalDataExportRecord | null;
+  notifications: unknown[];
+  deletion_request: PersonalDataExportRecord | null;
+}

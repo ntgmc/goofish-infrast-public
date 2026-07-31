@@ -34,9 +34,32 @@ export async function apiVoid(url: string, init: ApiRequestInit = {}): Promise<v
   await request(url, init)
 }
 
+export async function apiBlob(url: string, init: ApiRequestInit = {}): Promise<Blob> {
+  const response = await request(url, init)
+  return await response.blob()
+}
+
 export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message
   return fallback
+}
+
+export function getApiErrorCode(error: unknown): string | null {
+  if (!(error instanceof ApiError) || !error.data || typeof error.data !== 'object') return null
+  const directCode = 'code' in error.data ? (error.data as { code?: unknown }).code : undefined
+  if (typeof directCode === 'string') return directCode
+  const structuredError = 'error' in error.data ? (error.data as { error?: unknown }).error : undefined
+  if (!structuredError || typeof structuredError !== 'object' || !('code' in structuredError)) return null
+  const nestedCode = (structuredError as { code?: unknown }).code
+  return typeof nestedCode === 'string' ? nestedCode : null
+}
+
+export function getApiRetryAfterSeconds(error: unknown): number | null {
+  if (!(error instanceof ApiError) || !error.data || typeof error.data !== 'object') return null
+  const value = 'retry_after_seconds' in error.data
+    ? (error.data as { retry_after_seconds?: unknown }).retry_after_seconds
+    : undefined
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.ceil(value) : null
 }
 
 async function request(url: string, init: ApiRequestInit): Promise<Response> {

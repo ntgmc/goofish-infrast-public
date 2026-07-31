@@ -528,9 +528,68 @@ CREATE TABLE IF NOT EXISTS account_deletion_requests (
   user_id TEXT NOT NULL UNIQUE REFERENCES user_accounts(id) ON DELETE CASCADE,
   cancel_token_hash TEXT NOT NULL UNIQUE,
   scheduled_for TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'failed')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  lease_token TEXT,
+  lease_expires_at TIMESTAMPTZ,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_scheduled_for ON account_deletion_requests(scheduled_for);
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS lease_token TEXT;
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS last_error TEXT;
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'account_deletion_requests_status_check'
+       AND conrelid = 'account_deletion_requests'::regclass
+  ) THEN
+    ALTER TABLE account_deletion_requests
+      ADD CONSTRAINT account_deletion_requests_status_check
+      CHECK (status IN ('pending', 'processing', 'failed'));
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'account_deletion_requests_attempts_check'
+       AND conrelid = 'account_deletion_requests'::regclass
+  ) THEN
+    ALTER TABLE account_deletion_requests
+      ADD CONSTRAINT account_deletion_requests_attempts_check CHECK (attempts >= 0);
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_due
+  ON account_deletion_requests(status, next_attempt_at, scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_lease
+  ON account_deletion_requests(lease_expires_at) WHERE status = 'processing';
+
+CREATE TABLE IF NOT EXISTS account_deletion_email_outbox (
+  id TEXT PRIMARY KEY,
+  deletion_request_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('cancellation', 'receipt')),
+  recipient_email TEXT NOT NULL,
+  payload_json JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'dead_letter')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_attempt_at TIMESTAMPTZ NOT NULL,
+  lease_token TEXT,
+  lease_expires_at TIMESTAMPTZ,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  delete_after TIMESTAMPTZ NOT NULL,
+  UNIQUE (deletion_request_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_account_deletion_email_outbox_due
+  ON account_deletion_email_outbox(status, next_attempt_at, created_at);
+CREATE INDEX IF NOT EXISTS idx_account_deletion_email_outbox_cleanup
+  ON account_deletion_email_outbox(delete_after);
 
 CREATE TABLE IF NOT EXISTS personal_use_declaration_versions (
   declaration_id TEXT PRIMARY KEY,

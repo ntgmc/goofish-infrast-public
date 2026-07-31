@@ -53,3 +53,20 @@ describe('lifetime voucher JSON profile request policy', () => {
     }).success).toBe(false)
   })
 })
+
+describe('account deletion request policy', () => {
+  it('requires a valid email and non-empty bounded password', () => {
+    expect(requestSchemas.accountDelete.safeParse({
+      email: 'user@example.test',
+      password: 'current-password',
+    }).success).toBe(true)
+    expect(requestSchemas.accountDelete.safeParse({
+      email: 'not-an-email',
+      password: 'current-password',
+    }).success).toBe(false)
+    expect(requestSchemas.accountDelete.safeParse({
+      email: 'user@example.test',
+      password: '',
+    }).success).toBe(false)
+  })
+})

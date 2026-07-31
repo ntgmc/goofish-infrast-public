@@ -24,6 +24,24 @@ afterEach(async () => {
 })
 
 describe('API process lifecycle', () => {
+  it('fails fast in production when account deletion cannot hash depot identities', () => {
+    const previousNodeEnv = process.env.NODE_ENV
+    const previousPublicAppUrl = process.env.PUBLIC_APP_URL
+    const previousDepotSecret = process.env.DEPOT_SAMPLE_HASH_SECRET
+    process.env.NODE_ENV = 'production'
+    process.env.PUBLIC_APP_URL = 'https://example.test'
+    delete process.env.DEPOT_SAMPLE_HASH_SECRET
+
+    try {
+      expect(() => createApiProcess(createHooks(), createDependencies().values))
+        .toThrow('DEPOT_SAMPLE_HASH_SECRET is required in production')
+    } finally {
+      restoreEnvironment('NODE_ENV', previousNodeEnv)
+      restoreEnvironment('PUBLIC_APP_URL', previousPublicAppUrl)
+      restoreEnvironment('DEPOT_SAMPLE_HASH_SECRET', previousDepotSecret)
+    }
+  })
+
   it('runs initialization before listening and drains shared resources in order', async () => {
     const hooks = createHooks()
     const dependencies = createDependencies()
@@ -125,4 +143,9 @@ function closeServer(server: Server): Promise<void> {
   return new Promise((resolveClose, rejectClose) => {
     server.close((error) => error ? rejectClose(error) : resolveClose())
   })
+}
+
+function restoreEnvironment(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name]
+  else process.env[name] = value
 }

@@ -59,8 +59,8 @@ export const requestSchemas = {
     new_password: z.string().min(AUTH_PASSWORD_MIN_LENGTH).max(AUTH_PASSWORD_MAX_LENGTH),
   }),
   accountDelete: strict({
-    email: shortString(AUTH_EMAIL_MAX_LENGTH),
-    password: z.string().max(AUTH_PASSWORD_MAX_LENGTH),
+    email: z.string().email().max(AUTH_EMAIL_MAX_LENGTH),
+    password: z.string().min(1).max(AUTH_PASSWORD_MAX_LENGTH),
   }),
   profileId: strict({ profile_id: shortString(128) }),
   deletionToken: strict({ token: shortString(512) }),
