@@ -1259,6 +1259,11 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
     export function isFreePreviewProfile(profile) {
       return profile?.kind === 'free_preview'
     }
+    export function normalizeProfileKind(profile) {
+      return ['free_preview', 'depot_value', 'metered_personal', 'metered_commercial'].includes(profile?.kind)
+        ? profile.kind
+        : 'cdk'
+    }
     export async function saveProfileWorkspace(workspace) {
       store.workspaces.set(workspace.profile_id, normalizeWorkspace(workspace))
     }
@@ -1267,6 +1272,12 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
     }
     export async function updateProfileWorkspaceAtomically(profileId, updater) {
       const next = normalizeWorkspace(updater(store.workspaces.get(profileId) ?? null))
+      if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
+      store.workspaces.set(profileId, next)
+      return next
+    }
+    export async function updateProfileWorkspaceInTransaction(_client, profileId, updater) {
+      const next = normalizeWorkspace(await updater(store.workspaces.get(profileId) ?? null))
       if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
       store.workspaces.set(profileId, next)
       return next

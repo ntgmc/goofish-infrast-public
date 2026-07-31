@@ -81,12 +81,13 @@ export async function saveUserAccountInTransaction(client: PoolClient, user: Use
 export async function saveProfileInTransaction(client: PoolClient, profile: UserGameAccountRecord): Promise<void> {
   await client.query(
     `insert into user_game_accounts
-      (id,user_id,cdk_key,cdk_code_hash,cdk_order_hash,permission,status,display_name,note,record_json,created_at,updated_at)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12)
+      (id,user_id,cdk_key,cdk_code_hash,cdk_order_hash,permission,status,display_name,note,kind,archived_at,record_json,created_at,updated_at)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14)
      on conflict (id) do update set cdk_key=excluded.cdk_key, cdk_code_hash=excluded.cdk_code_hash,
        cdk_order_hash=excluded.cdk_order_hash, permission=excluded.permission, status=excluded.status, display_name=excluded.display_name,
-       note=excluded.note, record_json=excluded.record_json, updated_at=excluded.updated_at`,
-    [profile.id, profile.user_id, profile.cdk_key, profile.cdk_code_hash, profile.cdk_order_hash, profile.permission, profile.status, profile.display_name, profile.note, JSON.stringify(profile), profile.created_at, profile.updated_at],
+       note=excluded.note, kind=excluded.kind, archived_at=excluded.archived_at, record_json=excluded.record_json, updated_at=excluded.updated_at`,
+    [profile.id, profile.user_id, profile.cdk_key, profile.cdk_code_hash, profile.cdk_order_hash, profile.permission, profile.status,
+      profile.display_name, profile.note, profile.kind ?? 'cdk', profile.archived_at ?? null, JSON.stringify(profile), profile.created_at, profile.updated_at],
   )
 }
 

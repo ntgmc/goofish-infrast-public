@@ -37,10 +37,10 @@ beforeEach(() => {
   mocks.isFreePreviewProfile.mockReturnValue(true)
   mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', user_id: 'user-1', kind: 'free_preview' })
   mocks.confirm.mockResolvedValue({
-    declaration_id: 'personal_use_v1',
-    declaration_version: 'V1.0',
+    declaration_id: 'personal_use_v1_1',
+    declaration_version: 'V1.1',
     action: 'generated_result_export',
-    accepted_at: '2026-07-23T10:00:00.000Z',
+    accepted_at: '2026-07-31T10:00:00.000Z',
   })
 })
 
@@ -53,12 +53,12 @@ describe('personal use declaration endpoint', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       accepted: false,
-      declaration: { id: 'personal_use_v1', version: 'V1.0' },
+      declaration: { id: 'personal_use_v1_1', version: 'V1.1' },
     })
     expect(mocks.getProfileForUser).toHaveBeenCalledWith('user-1', 'profile-1')
   })
 
-  it('only records result export confirmation for the caller\'s free preview profile', async () => {
+  it('records result export confirmation for the caller\'s personal-use profile', async () => {
     const response = await personalUseDeclarationHandler(new Request('http://localhost/api/user/personal-use-declaration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -70,8 +70,23 @@ describe('personal use declaration endpoint', () => {
     await expect(response.json()).resolves.toMatchObject({ accepted: true })
   })
 
-  it('rejects attempts to attach generated-result confirmation to a non-free profile', async () => {
+  it('accepts a personal metered profile without treating it as commercial use', async () => {
     mocks.isFreePreviewProfile.mockReturnValue(false)
+    mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', user_id: 'user-1', kind: 'metered_personal' })
+
+    const response = await personalUseDeclarationHandler(new Request('http://localhost/api/user/personal-use-declaration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'generated_result_export', profile_id: 'profile-1' }),
+    }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.confirm).toHaveBeenCalledWith('user-1', 'generated_result_export', '203.0.113.8', 'profile-1')
+  })
+
+  it('rejects attempts to attach personal-use confirmation to a commercial profile', async () => {
+    mocks.isFreePreviewProfile.mockReturnValue(false)
+    mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', user_id: 'user-1', kind: 'metered_commercial' })
 
     const response = await personalUseDeclarationHandler(new Request('http://localhost/api/user/personal-use-declaration', {
       method: 'POST',

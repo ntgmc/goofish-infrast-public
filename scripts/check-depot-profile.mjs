@@ -193,6 +193,11 @@ function memoryUserStoreModule() {
     export function isFreePreviewProfile(profile) {
       return profile?.kind === 'free_preview'
     }
+    export function normalizeProfileKind(profile) {
+      return ['free_preview', 'depot_value', 'metered_personal', 'metered_commercial'].includes(profile?.kind)
+        ? profile.kind
+        : 'cdk'
+    }
     export async function listProfilesForUser(userId) {
       return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
     }
@@ -204,6 +209,12 @@ function memoryUserStoreModule() {
     }
     export async function updateProfileWorkspaceAtomically(profileId, updater) {
       const next = updater(store.workspaces.get(profileId) ?? null)
+      if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
+      store.workspaces.set(profileId, next)
+      return next
+    }
+    export async function updateProfileWorkspaceInTransaction(_client, profileId, updater) {
+      const next = await updater(store.workspaces.get(profileId) ?? null)
       if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
       store.workspaces.set(profileId, next)
       return next

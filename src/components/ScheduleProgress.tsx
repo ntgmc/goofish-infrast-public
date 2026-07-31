@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { AnimatedValue } from './MotionPrimitives'
 import type { OptimizeCalculationStage, OptimizeJobPriority, OptimizeResult } from '../lib/types'
+import type { OptimizationBillingSnapshot } from '../lib/optimization-contracts'
 import { copy } from '../copy/index'
 
 
@@ -36,6 +37,7 @@ export interface ScheduleProgressState {
   attemptCount?: number;
   nextAttemptAt?: string | null;
   cancellationRequested?: boolean;
+  billing?: OptimizationBillingSnapshot | null;
 }
 
 interface Props {
@@ -44,7 +46,7 @@ interface Props {
   variant?: 'embedded' | 'focus';
 }
 
-type TaskStatus = 'preparing' | 'queued' | 'retrying' | 'cancelling' | 'cancelled' | 'running' | 'overdue' | 'finishing' | 'completed'
+type TaskStatus = 'preparing' | 'queued' | 'retrying' | 'cancelling' | 'cancelled' | 'failed' | 'running' | 'overdue' | 'finishing' | 'completed'
 type StepVisualState = 'done' | 'active' | 'pending' | 'failed'
 type TaskStepRole = 'submit' | 'queue' | 'schedule' | 'suggestions' | 'persist'
 type TaskStepDefinition = { label: string; detail: string; role: TaskStepRole }
@@ -101,6 +103,9 @@ export default function ScheduleProgress({ progress, className = '', variant = '
             <h3 className={`${compact ? 'mt-2 text-base' : 'mt-3 text-lg'} font-semibold text-ink-primary`}>{task.title}</h3>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-secondary">{task.detail}</p>
             {task.adjustmentLabel && <p className="mt-3 tool-status tool-status--current max-w-full">{task.adjustmentLabel}</p>}
+            {progress.billing && <p className={`mt-3 tool-status max-w-full ${progress.billing.status === 'settled' ? 'tool-status--current' : progress.billing.status === 'released' ? 'tool-status--warning' : ''}`}>
+              {formatBillingStatus(progress.billing)}
+            </p>}
           </div>
           <div className="shrink-0 text-left sm:text-right">
             <p className="text-xs font-medium text-ink-muted">{task.meterLabel}</p>
@@ -117,7 +122,7 @@ export default function ScheduleProgress({ progress, className = '', variant = '
           aria-valuetext={task.ariaText}
         >
           <motion.div
-            className={`schedule-progress-fill h-full origin-left rounded-full ${task.status === 'cancelled' ? 'bg-surface-4' : 'bg-brand-500'}`}
+            className={`schedule-progress-fill h-full origin-left rounded-full ${task.status === 'cancelled' ? 'bg-surface-4' : task.status === 'failed' ? 'bg-error' : 'bg-brand-500'}`}
             initial={false}
             animate={{ scaleX: Math.max(0, Math.min(1, rawPercent / 100)) }}
             transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: 'linear' }}
@@ -371,6 +376,7 @@ function getTaskView(progress: ScheduleProgressState, percent: number, now: numb
 
 function getTaskStatus(progress: ScheduleProgressState, percent: number, now: number): TaskStatus {
   if (progress.estimatePhase === 'cancelled') return 'cancelled'
+  if (progress.estimatePhase === 'failed') return 'failed'
   if (progress.cancellationRequested) return 'cancelling'
   if (progress.executionPhase === 'retry_wait') return 'retrying'
   if (!progress.completedAt && progress.observedRunning && getCurrentRemainingMs(progress, now) === 0) return 'overdue'
@@ -387,6 +393,7 @@ function getTaskStatus(progress: ScheduleProgressState, percent: number, now: nu
 
 function getStatusTitle(progress: ScheduleProgressState, status: TaskStatus): string {
   if (status === 'cancelled') return copy.common.components_ScheduleProgress_106
+  if (status === 'failed') return copy.metered.progress.failed_title
   if (status === 'cancelling') return copy.common.components_ScheduleProgress_101
   if (status === 'retrying') return copy.common.components_ScheduleProgress_102
   if (status === 'completed') return progress.mode === 'generate' ? copy.common.components_ScheduleProgress_050 : progress.mode === 'scenario' ? copy.common.components_ScheduleProgress_051 : copy.common.components_ScheduleProgress_052
@@ -418,6 +425,9 @@ function getStatusDetail(
   estimateContext: string,
 ): string {
   if (status === 'cancelled') return copy.common.components_ScheduleProgress_107
+  if (status === 'failed') return progress.billing?.status === 'released'
+    ? copy.metered.progress.failed_released
+    : copy.metered.progress.failed
   if (status === 'cancelling') return copy.common.components_ScheduleProgress_103
   if (status === 'retrying') {
     const attempt = Math.max(1, progress.attemptCount ?? 1)
@@ -436,6 +446,7 @@ function getStatusDetail(
 
 function getQueueLabel(progress: ScheduleProgressState, aheadCount: number | null): string {
   if (progress.estimatePhase === 'cancelled') return copy.common.components_ScheduleProgress_109
+  if (progress.estimatePhase === 'failed') return copy.metered.progress.ended
   if (progress.observedRunning || progress.queueStatus === 'running') return copy.common.components_ScheduleProgress_071
   if (progress.completedAt || progress.estimatePhase === 'completed') return copy.common.components_ScheduleProgress_072
   if (aheadCount === null) return progress.queueStatus === 'queued' ? copy.common.components_ScheduleProgress_073 : copy.common.components_ScheduleProgress_074
@@ -452,12 +463,13 @@ function getEstimateContext(progress: ScheduleProgressState, aheadCount: number 
 
 function getAdjustmentLabel(progress: ScheduleProgressState, status: TaskStatus): string | undefined {
   if (status === 'cancelled') return copy.common.components_ScheduleProgress_110
+  if (status === 'failed') return undefined
   if (status === 'overdue') return copy.common.components_ScheduleProgress_080
   return progress.estimateAdjustment
 }
 
 function getRemainingLabel(progress: ScheduleProgressState, status: TaskStatus, now: number): string {
-  if (status === 'cancelled' || progress.estimatePhase === 'cancelled') return copy.common.components_ScheduleProgress_108
+  if (status === 'cancelled' || progress.estimatePhase === 'cancelled' || status === 'failed') return copy.common.components_ScheduleProgress_108
   if (progress.completedAt || progress.estimatePhase === 'completed') return copy.common.components_ScheduleProgress_081
   if (status === 'overdue' || progress.estimatePhase === 'overdue' || progress.estimatedRemainingMs === null) return copy.common.components_ScheduleProgress_082
   if (status === 'finishing') return copy.common.components_ScheduleProgress_083
@@ -494,6 +506,7 @@ function getRemainingAriaLabel(progress: ScheduleProgressState, remainingLabel: 
 
 function getMeterLabel(status: TaskStatus): string {
   if (status === 'cancelled') return 'Cancelled'
+  if (status === 'failed') return 'Failed'
   if (status === 'retrying') return 'Retry'
   if (status === 'cancelling') return 'Cancel'
   if (status === 'queued') return 'Queued'
@@ -508,6 +521,13 @@ function getStepState(progress: ScheduleProgressState, status: TaskStatus, index
   if (status === 'completed') {
     if (progress.upgradeSuggestionsStatus === 'failed' && steps[index]?.role === 'suggestions') return 'failed'
     return 'done'
+  }
+  if (status === 'failed') {
+    const failedRole = getCalculationStageRole(progress, progress.calculationStage)
+    const failedIndex = failedRole ? steps.findIndex((step) => step.role === failedRole) : progress.observedRunning ? 2 : 1
+    if (index < failedIndex) return 'done'
+    if (index === failedIndex) return 'failed'
+    return 'pending'
   }
   const stageRole = getCalculationStageRole(progress, progress.calculationStage)
   const stageIndex = stageRole ? steps.findIndex((step) => step.role === stageRole) : -1
@@ -526,6 +546,12 @@ function getStepState(progress: ScheduleProgressState, status: TaskStatus, index
   if (index < activeIndex) return 'done'
   if (index === activeIndex) return 'active'
   return 'pending'
+}
+
+function formatBillingStatus(billing: OptimizationBillingSnapshot): string {
+  if (billing.status === 'settled') return copy.metered.progress.settled(billing.charge, billing.tier)
+  if (billing.status === 'released') return copy.metered.progress.released(billing.charge, billing.tier)
+  return copy.metered.progress.reserved(billing.charge, billing.tier)
 }
 
 function getCalculationStageRole(

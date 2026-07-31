@@ -147,6 +147,7 @@ function toLegacyJobView(job: OptimizationJobSnapshot, pollToken?: string): Opti
     cancellation_requested: job.cancellationRequested,
     can_cancel: job.canCancel,
     can_retry: job.canRetry,
+    billing: job.billing ?? null,
     ...(pollToken && { poll_token: pollToken }),
   }
   if (job.status === 'succeeded') return { ...common, status: job.status, result: job.result }

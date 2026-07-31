@@ -40,6 +40,13 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_accounts/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_transactions/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_qualification_ledger/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_reservations/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS commercial_account_limits/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS metered_personal_claims/)
+    expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS billing_user_id/)
+    expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS billing_json/)
+    expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS reserved/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_notifications/)
     expect(combinedSchema).toMatch(/cdk_records_type_payload_check/)
     expect(combinedSchema).toMatch(/cdk_type = 'balance'/)
@@ -49,7 +56,8 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/limited_profile_voucher/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS lifetime_voucher_pending_bindings/)
     expect(combinedSchema).toMatch(/free-preview-limited-cdk-2026/)
-    expect(combinedSchema).toMatch(/UNIQUE \(reference_type, reference_id\)/)
+    expect(combinedSchema).toMatch(/uq_user_balance_transactions_reference/)
+    expect(combinedSchema).toMatch(/WHERE kind <> 'admin_credit_reversal'/)
     expect(combinedSchema.indexOf('ADD COLUMN IF NOT EXISTS cdk_type')).toBeLessThan(
       combinedSchema.indexOf('idx_cdk_records_admin_type_created'),
     )

@@ -11,6 +11,10 @@ import {
   refundReservedItemsInTransaction,
   reserveItemsInTransaction,
 } from './inventory-store'
+import type { MeteredScheduleQuote } from '../../src/lib/metered-billing'
+import type { OptimizationBillingSnapshot } from '../../src/lib/optimization-contracts'
+import { getMeteredBillingPolicy } from '../../src/lib/metered-billing'
+import { BalanceError, releaseScheduleBalanceInTransaction, reserveScheduleBalanceInTransaction, settleScheduleBalanceInTransaction } from './balance-store'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
@@ -23,6 +27,8 @@ export interface OptimizeJobRecord<TPayload = unknown, TResult = unknown> {
   priority: number
   owner_key: string
   profile_id: string | null
+  billing_user_id: string | null
+  billing_json: OptimizationBillingSnapshot | null
   permission: string | null
   source: string
   payload_json: TPayload
@@ -70,11 +76,12 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
     windowKey: string
     limit: number
   } | null
+  billing?: { userId: string; quote: MeteredScheduleQuote } | null
 }
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'reorder_check_quota_exceeded',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'reorder_check_quota_exceeded' | 'insufficient_balance',
     readonly status: 409 | 429,
     message: string,
   ) {
@@ -103,6 +110,7 @@ export interface OptimizeJobStore {
   recoverExpiredAttempts: (nowIso: string, maxFailures: number) => Promise<number>
   expireQueuedJobs: (nowIso: string) => Promise<number>
   cleanupOldJobs: (beforeIso: string) => Promise<void>
+  reconcileBilling?: () => Promise<{ settled: number; released: number; anomalies: number }>
 }
 
 export interface OptimizationDeadLetterRecord {
@@ -192,8 +200,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       const now = input.created_at ?? new Date().toISOString()
       const result = await query<OptimizeJobRow>([
         'insert into optimize_jobs',
-        '  (id, status, priority, owner_key, profile_id, permission, source, payload_json, result_json, error_message, attempt_count, lock_token, lock_expires_at, next_attempt_at, expires_at, created_at, started_at, finished_at, updated_at)',
-        'values ($1, $2, $3, $4, $5, $6, $7, $8, null, null, 0, null, null, $9, $10, $9, null, null, $9)',
+        '  (id, status, priority, owner_key, profile_id, billing_user_id, billing_json, permission, source, payload_json, result_json, error_message, attempt_count, lock_token, lock_expires_at, next_attempt_at, expires_at, created_at, started_at, finished_at, updated_at)',
+        'values ($1, $2, $3, $4, $5, null, null, $6, $7, $8, null, null, 0, null, null, $9, $10, $9, null, null, $9)',
         'returning *',
       ].join(' '), [input.id, 'queued', input.priority, input.owner_key, input.profile_id ?? null, input.permission, input.source, input.payload_json, now, queueExpiresAt(now)])
       return fromRow(result.rows[0])
@@ -260,6 +268,25 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         )
         if (Number(submitted.rows[0]?.count ?? 0) >= limits.perHour) {
           throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
+        }
+        if (input.billing?.quote.billing_kind === 'metered_commercial') {
+          const commercialPolicy = getMeteredBillingPolicy().commercial
+          const commercial = await client.query<{ running: string; queued: string; submitted: string }>(
+            `select
+              (select count(*) from optimize_jobs where billing_user_id = $1 and status = 'running')::text as running,
+              (select count(*) from optimize_jobs where billing_user_id = $1 and status = 'queued')::text as queued,
+              (select count(*) from optimization_submissions where billing_user_id = $1
+                and created_at >= now() - interval '1 hour')::text as submitted`,
+            [input.billing.userId],
+          )
+          const usage = commercial.rows[0]
+          if (Number(usage?.running ?? 0) >= commercialPolicy.max_running_jobs
+            || Number(usage?.queued ?? 0) >= commercialPolicy.max_queued_jobs) {
+            throw new OptimizeJobAdmissionError('commercial_queue_capacity_exceeded', 429, '商用账户的优化队列已满，请稍后重试。')
+          }
+          if (Number(usage?.submitted ?? 0) >= commercialPolicy.max_submissions_per_hour) {
+            throw new OptimizeJobAdmissionError('commercial_submission_rate_exceeded', 429, '商用账户每小时最多接纳 30 个新任务。')
+          }
         }
 
         if (input.reorderCheckQuota) {
@@ -331,12 +358,30 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           }
         }
 
+        const billingSnapshot: OptimizationBillingSnapshot | null = input.billing ? {
+          status: 'reserved', ...input.billing.quote,
+        } : null
         const inserted = await client.query<OptimizeJobRow>([
           'insert into optimize_jobs',
-          '  (id, status, priority, owner_key, profile_id, permission, source, payload_json, result_json, error_message, attempt_count, lock_token, lock_expires_at, next_attempt_at, expires_at, created_at, started_at, finished_at, updated_at)',
-          'values ($1, $2, $3, $4, $5, $6, $7, $8, null, null, 0, null, null, $9, $10, $9, null, null, $9)',
+          '  (id, status, priority, owner_key, profile_id, billing_user_id, billing_json, permission, source, payload_json, result_json, error_message, attempt_count, lock_token, lock_expires_at, next_attempt_at, expires_at, created_at, started_at, finished_at, updated_at)',
+          'values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, null, null, 0, null, null, $11, $12, $11, null, null, $11)',
           'returning *',
-        ].join(' '), [input.id, 'queued', input.priority, input.owner_key, input.profile_id ?? null, input.permission, input.source, input.payload_json, now, queueExpiresAt(now)])
+        ].join(' '), [input.id, 'queued', input.priority, input.owner_key, input.profile_id ?? null,
+          input.billing?.userId ?? null, billingSnapshot ? JSON.stringify(billingSnapshot) : null,
+          input.permission, input.source, input.payload_json, now, queueExpiresAt(now)])
+        if (input.billing) {
+          try {
+            await reserveScheduleBalanceInTransaction(client, {
+              jobId: input.id, userId: input.billing.userId,
+              profileId: input.profile_id!, quote: input.billing.quote, now,
+            })
+          } catch (error) {
+            if (error instanceof BalanceError && error.code === 'insufficient_balance') {
+              throw new OptimizeJobAdmissionError('insufficient_balance', 409, error.message)
+            }
+            throw error
+          }
+        }
         if (input.reorderCheckQuota) {
           await client.query(
             `insert into entitlement_ledger
@@ -345,7 +390,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             [randomUUID(), input.reorderCheckQuota.profileId, input.id, input.reorderCheckQuota.windowKey, now],
           )
         }
-        await client.query('insert into optimization_submissions (id, owner_key, created_at) values ($1, $2, $3)', [randomUUID(), input.owner_key, now])
+        await client.query('insert into optimization_submissions (id, owner_key, billing_user_id, created_at) values ($1, $2, $3, $4)', [randomUUID(), input.owner_key, input.billing?.userId ?? null, now])
         await client.query(
           `insert into optimization_idempotency (owner_key, idempotency_key, request_hash, status, job_id, created_at, updated_at)
            values ($1, $2, $3, 'accepted', $4, $5, $5)`,
@@ -405,6 +450,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         '  select id from optimize_jobs',
         '  where status = $6 and cancel_requested_at is null and failure_count < $4 and (next_attempt_at is null or next_attempt_at <= $5)',
         "  and not exists (select 1 from optimize_jobs running where running.owner_key = optimize_jobs.owner_key and running.status = 'running')",
+        "  and (coalesce(billing_json->>'billing_kind', '') <> 'metered_commercial'",
+        "       or (select count(*) from optimize_jobs account_running where account_running.billing_user_id = optimize_jobs.billing_user_id and account_running.status = 'running') < 2)",
         forceStandard ? '  and priority < 10' : '',
         '  order by priority desc, created_at asc',
         '  limit 1',
@@ -500,6 +547,10 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           [id, now],
         )
         await commitReservedItemsInTransaction(client, 'optimization_job', id, now)
+        const billing = await settleScheduleBalanceInTransaction(client, id, now)
+        if (billing) {
+          await client.query("update optimize_jobs set billing_json = jsonb_set(billing_json, '{status}', '\"settled\"'::jsonb) where id = $1", [id])
+        }
         const completedJob = completed.rows[0]
         if (isReorderCheckPayload(completedJob?.payload_json)
           && completedJob?.profile_id
@@ -540,6 +591,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         )
         await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
         await releaseQueuedEntitlementInTransaction(client, id, failed.rows[0]?.payload_json, now)
+        await releaseMeteredBillingInTransaction(client, id, now)
         return true
       })
     },
@@ -580,6 +632,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
           await releaseQueuedEntitlementInTransaction(client, id, updatedJob.payload_json, now)
           await createDeadLetterInTransaction(client, updatedJob, failureKind, errorMessage, now)
+          await releaseMeteredBillingInTransaction(client, id, now)
         }
         return status
       })
@@ -624,6 +677,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           )
           await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
           await releaseQueuedEntitlementInTransaction(client, id, current.payload_json, now)
+          await releaseMeteredBillingInTransaction(client, id, now)
           return cancelled.rows[0] ? fromRow(cancelled.rows[0]) : current
         }
         if (current.status === 'running' && !current.cancel_requested_at) {
@@ -659,6 +713,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         )
         await refundReservedItemsInTransaction(client, 'optimization_job', id, now)
         await releaseQueuedEntitlementInTransaction(client, id, cancelled.rows[0]?.payload_json, now)
+        await releaseMeteredBillingInTransaction(client, id, now)
         return true
       })
     },
@@ -735,6 +790,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             await refundReservedItemsInTransaction(client, 'optimization_job', job.id, nowIso)
             await releaseQueuedEntitlementInTransaction(client, job.id, job.payload_json, nowIso)
             await createDeadLetterInTransaction(client, job, failureKind, job.error_message || errorMessage, nowIso)
+            await releaseMeteredBillingInTransaction(client, job.id, nowIso)
           }
         }
         return recovered.rowCount ?? recovered.rows.length
@@ -755,6 +811,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         for (const job of expired.rows) {
           await refundReservedItemsInTransaction(client, 'optimization_job', job.id, nowIso)
           await releaseQueuedEntitlementInTransaction(client, job.id, job.payload_json, nowIso)
+          await releaseMeteredBillingInTransaction(client, job.id, nowIso)
         }
         return expired.rowCount ?? expired.rows.length
       })
@@ -764,7 +821,63 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
       await withTransaction(async (client) => {
         await client.query('delete from optimization_submissions where created_at < $1', [beforeIso])
         await client.query('delete from optimization_idempotency where updated_at < $1', [beforeIso])
-        await client.query('delete from optimize_jobs where status = any($2) and updated_at < $1', [beforeIso, ['succeeded', 'failed', 'cancelled']])
+        await client.query(
+          `delete from user_balance_reservations reservation using optimize_jobs job
+            where reservation.job_id = job.id and reservation.status <> 'reserved'
+              and job.status = any($2) and job.updated_at < $1`,
+          [beforeIso, ['succeeded', 'failed', 'cancelled']],
+        )
+        await client.query(
+          `delete from optimize_jobs job where status = any($2) and updated_at < $1
+             and not exists (select 1 from user_balance_reservations reservation
+               where reservation.job_id = job.id and reservation.status = 'reserved')`,
+          [beforeIso, ['succeeded', 'failed', 'cancelled']],
+        )
+      })
+    },
+    reconcileBilling: async () => {
+      await ensureSchema()
+      return withTransaction(async (client) => {
+        const now = new Date().toISOString()
+        const pending = await client.query<{ job_id: string; status: OptimizeJobStatus }>(
+          `select reservation.job_id, job.status
+             from user_balance_reservations reservation
+             inner join optimize_jobs job on job.id = reservation.job_id
+            where reservation.status = 'reserved'
+              and job.status in ('succeeded', 'failed', 'cancelled', 'dead_lettered')
+            order by reservation.created_at asc limit 100 for update of reservation skip locked`,
+        )
+        let settled = 0
+        let released = 0
+        for (const row of pending.rows) {
+          if (row.status === 'succeeded') {
+            await settleScheduleBalanceInTransaction(client, row.job_id, now)
+            await client.query("update optimize_jobs set billing_json = jsonb_set(billing_json, '{status}', '\"settled\"'::jsonb) where id = $1", [row.job_id])
+            settled += 1
+          } else {
+            await releaseMeteredBillingInTransaction(client, row.job_id, now)
+            released += 1
+          }
+        }
+        const anomalies = await client.query<{ count: string }>(
+          `select count(*)::text as count from (
+             select reservation.id
+               from user_balance_reservations reservation
+               left join optimize_jobs job on job.id = reservation.job_id
+              where job.id is null
+                 or (reservation.status = 'consumed' and job.status <> 'succeeded')
+                 or (reservation.status = 'released' and job.status = 'succeeded')
+             union all
+             select account.user_id
+               from user_balance_accounts account
+               left join (
+                 select user_id, sum(amount) as expected from user_balance_reservations
+                  where status = 'reserved' group by user_id
+               ) projection on projection.user_id = account.user_id
+              where account.reserved <> coalesce(projection.expected, 0)
+           ) inconsistent`,
+        )
+        return { settled, released, anomalies: Number(anomalies.rows[0]?.count ?? 0) }
       })
     },
   }
@@ -792,6 +905,8 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         priority: input.priority,
         owner_key: input.owner_key,
         profile_id: input.profile_id ?? null,
+        billing_user_id: null,
+        billing_json: null,
         permission: input.permission,
         source: input.source,
         payload_json: clone(input.payload_json),
@@ -844,6 +959,18 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         throw new OptimizeJobAdmissionError('queue_capacity_exceeded', 429, '当前账号的优化队列已满，请稍后重试。')
       }
       const now = Date.now()
+      let commercialSubmission: { key: string; recent: number[] } | null = null
+      if (input.billing?.quote.billing_kind === 'metered_commercial') {
+        const accountJobs = [...records.values()].filter((job) => job.billing_user_id === input.billing?.userId)
+        const accountKey = `commercial:${input.billing.userId}`
+        const accountRecent = (submissions.get(accountKey) ?? []).filter((time) => time >= now - 60 * 60_000)
+        if (accountJobs.filter((job) => job.status === 'running').length >= 2
+          || accountJobs.filter((job) => job.status === 'queued').length >= 8) {
+          throw new OptimizeJobAdmissionError('commercial_queue_capacity_exceeded', 429, '商用账户的优化队列已满，请稍后重试。')
+        }
+        if (accountRecent.length >= 30) throw new OptimizeJobAdmissionError('commercial_submission_rate_exceeded', 429, '商用账户每小时最多接纳 30 个新任务。')
+        commercialSubmission = { key: accountKey, recent: accountRecent }
+      }
       const recent = (submissions.get(input.owner_key) ?? []).filter((time) => time >= now - 60 * 60_000)
       if (recent.length >= (free ? 2 : 12)) {
         throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
@@ -859,9 +986,23 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       }
       recent.push(now)
       submissions.set(input.owner_key, recent)
+      if (commercialSubmission) {
+        commercialSubmission.recent.push(now)
+        submissions.set(commercialSubmission.key, commercialSubmission.recent)
+      }
       const job = await (async () => {
         const value = await Promise.resolve({ ...input, created_at: input.created_at ?? new Date(now).toISOString() })
-        const record: OptimizeJobRecord = { id: value.id, status: 'queued', priority: value.priority, owner_key: value.owner_key, profile_id: value.profile_id ?? null, permission: value.permission, source: value.source, payload_json: clone(value.payload_json), result_json: null, error_message: null, failure_kind: null, public_error_code: null, attempt_count: 0, failure_count: 0, worker_id: null, heartbeat_at: null, lock_token: null, lock_expires_at: null, next_attempt_at: value.created_at!, expires_at: queueExpiresAt(value.created_at!), cancel_requested_at: null, execution_stage: null, stage_updated_at: null, created_at: value.created_at!, started_at: null, finished_at: null, updated_at: value.created_at! }
+        const record: OptimizeJobRecord = {
+          id: value.id, status: 'queued', priority: value.priority, owner_key: value.owner_key,
+          profile_id: value.profile_id ?? null, billing_user_id: value.billing?.userId ?? null,
+          billing_json: value.billing ? { status: 'reserved', ...value.billing.quote } : null,
+          permission: value.permission, source: value.source, payload_json: clone(value.payload_json),
+          result_json: null, error_message: null, failure_kind: null, public_error_code: null,
+          attempt_count: 0, failure_count: 0, worker_id: null, heartbeat_at: null, lock_token: null,
+          lock_expires_at: null, next_attempt_at: value.created_at!, expires_at: queueExpiresAt(value.created_at!),
+          cancel_requested_at: null, execution_stage: null, stage_updated_at: null, created_at: value.created_at!,
+          started_at: null, finished_at: null, updated_at: value.created_at!,
+        }
         records.set(record.id, record)
         return record
       })()
@@ -894,10 +1035,18 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
     claimNextJob: async (workerId, lockToken, lockExpiresAt, maxFailures, maxGlobalRunning = Number.MAX_SAFE_INTEGER) => {
       const nowMs = Date.now()
       const runningOwners = new Set([...records.values()].filter((job) => job.status === 'running').map((job) => job.owner_key))
+      const commercialRunning = new Map<string, number>()
+      for (const job of records.values()) {
+        if (job.status === 'running' && job.billing_json?.billing_kind === 'metered_commercial' && job.billing_user_id) {
+          commercialRunning.set(job.billing_user_id, (commercialRunning.get(job.billing_user_id) ?? 0) + 1)
+        }
+      }
       if (runningOwners.size >= maxGlobalRunning) return null
       const next = [...records.values()]
         .filter((job) => job.status === 'queued' && !job.cancel_requested_at && job.failure_count < maxFailures
-          && !runningOwners.has(job.owner_key) && (!job.next_attempt_at || Date.parse(job.next_attempt_at) <= nowMs))
+          && !runningOwners.has(job.owner_key)
+          && (job.billing_json?.billing_kind !== 'metered_commercial' || !job.billing_user_id || (commercialRunning.get(job.billing_user_id) ?? 0) < 2)
+          && (!job.next_attempt_at || Date.parse(job.next_attempt_at) <= nowMs))
         .sort((a, b) => b.priority - a.priority || Date.parse(a.created_at) - Date.parse(b.created_at))[0]
       if (!next) return null
       const now = new Date().toISOString()
@@ -946,6 +1095,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || job.cancel_requested_at) return false
       const now = new Date().toISOString()
       job.status = 'succeeded'
+      if (job.billing_json) job.billing_json = { ...job.billing_json, status: 'settled' }
       const reservation = reorderReservations.get(id)
       if (reservation?.status === 'reserved') reservation.status = 'consumed'
       if (isReorderCheckPayload(job.payload_json)
@@ -981,6 +1131,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || job.cancel_requested_at) return false
       const now = new Date().toISOString()
       job.status = 'failed'
+      if (job.billing_json) job.billing_json = { ...job.billing_json, status: 'released' }
       job.failure_count += 1
       job.error_message = errorMessage
       job.failure_kind = 'application_error'
@@ -1026,7 +1177,10 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         attempt.failure_kind = failureKind
         attempt.heartbeat_at = now
       }
-      if (job.status === 'dead_lettered') releaseReorderReservation(id)
+      if (job.status === 'dead_lettered') {
+        releaseReorderReservation(id)
+        if (job.billing_json) job.billing_json = { ...job.billing_json, status: 'released' }
+      }
       return job.status
     },
     releaseInterruptedAttempt: async (id, attemptNo, workerId, lockToken) => {
@@ -1066,6 +1220,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         job.expires_at = null
         job.finished_at = now
         job.updated_at = now
+        if (job.billing_json) job.billing_json = { ...job.billing_json, status: 'released' }
         releaseReorderReservation(id)
       } else if (job.status === 'running' && !job.cancel_requested_at) {
         job.cancel_requested_at = now
@@ -1078,6 +1233,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || !job.cancel_requested_at) return false
       const now = new Date().toISOString()
       job.status = 'cancelled'
+      if (job.billing_json) job.billing_json = { ...job.billing_json, status: 'released' }
       job.error_message = '任务已由用户取消。'
       job.failure_kind = null
       job.public_error_code = 'cancelled_by_user'
@@ -1127,6 +1283,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
           job.failure_kind = failureKind
           job.public_error_code = 'execution_retries_exhausted'
           job.finished_at = nowIso
+          if (job.billing_json) job.billing_json = { ...job.billing_json, status: 'released' }
           releaseReorderReservation(job.id)
         } else {
           job.status = 'queued'
@@ -1151,6 +1308,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         job.expires_at = null
         job.finished_at = nowIso
         job.updated_at = nowIso
+        if (job.billing_json) job.billing_json = { ...job.billing_json, status: 'released' }
         releaseReorderReservation(job.id)
       }
       return expired
@@ -1161,6 +1319,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         if ((job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled') && Date.parse(job.updated_at) < before) records.delete(id)
       }
     },
+    reconcileBilling: async () => ({ settled: 0, released: 0, anomalies: 0 }),
   }
 }
 
@@ -1581,6 +1740,7 @@ export async function replayOptimizationDeadLetter(id: string, replayedBy: strin
     const originalResult = await client.query<OptimizeJobRow>('select * from optimize_jobs where id = $1 for update', [letter.job_id])
     const original = originalResult.rows[0] ? fromRow(originalResult.rows[0]) : null
     if (!original || original.status !== 'dead_lettered') return null
+    if (original.billing_json) return null
     if (isLegacyStandaloneSuggestionJob(original.source, original.payload_json)) return null
     const now = new Date().toISOString()
     const replayedId = randomUUID()
@@ -1729,6 +1889,15 @@ async function releaseQueuedEntitlementInTransaction(client: PoolClient, jobId: 
      where profile_id = $1`,
     [profileId, nowIso],
   )
+}
+
+async function releaseMeteredBillingInTransaction(client: PoolClient, jobId: string, nowIso: string): Promise<void> {
+  if (await releaseScheduleBalanceInTransaction(client, jobId, nowIso)) {
+    await client.query(
+      "update optimize_jobs set billing_json = jsonb_set(billing_json, '{status}', '\"released\"'::jsonb) where id = $1",
+      [jobId],
+    )
+  }
 }
 
 function isReorderCheckPayload(value: unknown): boolean {

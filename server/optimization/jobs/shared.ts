@@ -3,6 +3,7 @@ import { type CdkRecord } from "../../handlers/license-utils"
 import type { UsageReasonCode } from "../../storage/usage-store";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store"
 import type { ScenarioComparisonFactors } from '../../../src/lib/scenario-comparison'
+import type { MeteredScheduleQuote } from '../../../src/lib/metered-billing'
 
 export const UPGRADE_MAX_SIMULATIONS = 24;
 
@@ -164,6 +165,7 @@ export type PreparedOptimizeJob = {
   usePriorityCoupon?: boolean;
   rewardItemCodes?: string[];
   behaviorIdentity?: { userId: string; sessionTokenHash: string };
+  billing?: { userId: string; quote: MeteredScheduleQuote } | null;
 };
 
 export type OptimizeConfigPermission = PermissionMode | "free_preview";

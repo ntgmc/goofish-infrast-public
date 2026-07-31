@@ -4,7 +4,7 @@ import { DEFAULT_SITE_FEATURE_SETTINGS } from '../src/lib/site-features'
 const { getSiteFeatureSettings } = vi.hoisted(() => ({ getSiteFeatureSettings: vi.fn() }))
 vi.mock('./storage/feature-settings-store', () => ({ getSiteFeatureSettings }))
 
-import { enforceFeatureGate, requireSiteFeatures } from './feature-gate'
+import { enforceFeatureGate, requireMeteredBillingFeature, requireSiteFeatures } from './feature-gate'
 
 describe('feature gate', () => {
   beforeEach(() => {
@@ -19,6 +19,21 @@ describe('feature gate', () => {
 
     await expect(enforceFeatureGate(new Request('http://localhost/api/optimization/jobs'))).resolves.toBeNull()
     await expect(enforceFeatureGate(new Request('http://localhost/api/optimization/jobs/job-1/cancel', { method: 'POST' }))).resolves.toBeNull()
+  })
+
+  it('applies the metered billing switch only to metered profile admissions', async () => {
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ metered_billing: false }))
+
+    const personal = await requireMeteredBillingFeature('metered_personal')
+    await expect(personal?.json()).resolves.toMatchObject({
+      code: 'feature_disabled',
+      feature: 'metered_billing',
+    })
+    expect((await requireMeteredBillingFeature('metered_commercial'))?.status).toBe(503)
+    await expect(requireMeteredBillingFeature('cdk')).resolves.toBeNull()
+
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ metered_billing: true }))
+    await expect(requireMeteredBillingFeature('metered_personal')).resolves.toBeNull()
   })
 
   it('blocks ordinary sessions while keeping recovery, logout, privacy and admin routes open', async () => {

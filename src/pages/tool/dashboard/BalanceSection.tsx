@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { copy } from '../../../copy/index'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import type { BalancePage, PublicBalanceTransaction } from '../../../lib/balance-contracts'
+import { getMeteredBillingPolicy } from '../../../lib/metered-billing'
+
+const meteredPolicy = getMeteredBillingPolicy()
 
 type RedeemResponse = {
   balance: { currency: 'points'; available: string }
@@ -53,14 +56,14 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
       const response = await apiJson<RedeemResponse>('/api/user/balance/redeem', {
         method: 'POST',
         json: { cdk: request.cdk, idempotency_key: request.key },
-        fallbackMessage: '兑换积分失败。',
+        fallbackMessage: copy.metered.balance.redeem_failed,
       })
       setCdk('')
       setPending(null)
       setNotice(`${copy.balance.redeem_success}：+${response.cdk.amount} ${copy.balance.unit}`)
       await load()
     } catch (caught) {
-      setError(getApiErrorMessage(caught, '兑换积分失败。可直接重试，系统不会重复入账。'))
+      setError(getApiErrorMessage(caught, copy.metered.balance.redeem_retry))
     } finally {
       setRedeeming(false)
     }
@@ -74,10 +77,26 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
         <p className="tool-eyebrow">{copy.balance.eyebrow}</p>
         <h2 className="mt-2 text-xl font-semibold text-ink-primary">{copy.balance.title}</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.balance.description}</p>
-        <div className="tool-inset mt-5 p-5">
-          <span className="text-sm text-ink-secondary">{copy.balance.available}</span>
-          <strong className="mt-2 block text-3xl font-semibold tabular-nums text-ink-primary">{page?.balance.available ?? '0.00'}</strong>
-          <span className="mt-1 block text-xs text-ink-muted">{copy.balance.unit}</span>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          {([
+            [copy.balance.available, page?.balance.available ?? '0.00'],
+            [copy.balance.reserved, page?.balance.reserved ?? '0.00'],
+            [copy.balance.debt, page?.balance.debt ?? '0.00'],
+          ] as const).map(([label, value]) => <div key={label} className="tool-inset p-5">
+            <span className="text-sm text-ink-secondary">{label}</span>
+            <strong className="mt-2 block text-2xl font-semibold tabular-nums text-ink-primary">{value}</strong>
+            <span className="mt-1 block text-xs text-ink-muted">{copy.balance.unit}</span>
+          </div>)}
+        </div>
+        <div className="tool-inset mt-3 p-5 text-sm text-ink-secondary">
+          <div className="flex justify-between gap-4"><span>{copy.balance.lifetime_credited}</span><strong className="tabular-nums text-ink-primary">{page?.balance.lifetime_credited ?? '0.00'}</strong></div>
+          <div className="mt-2 flex justify-between gap-4"><span>{copy.metered.balance.personal_price_label}</span><strong className="text-ink-primary">{copy.metered.balance.personal_price_value(meteredPolicy.personal.main_schedule_points)}</strong></div>
+          {page?.balance.commercial && <><div className="mt-2 flex justify-between gap-4"><span>{copy.metered.balance.commercial_label}</span><strong className="text-right text-ink-primary">{page.balance.debt !== '0.00'
+            ? copy.metered.balance.commercial_debt(page.balance.commercial.level, page.balance.debt ?? '0.00')
+            : page.balance.commercial.eligible
+              ? copy.metered.balance.commercial_eligible(page.balance.commercial.level, page.balance.commercial.charge_points)
+              : copy.metered.balance.commercial_locked(page.balance.commercial.points_to_next_level ?? page.balance.commercial.threshold_points ?? '10000.00')}</strong></div>
+          {page.balance.commercial.eligible && page.balance.commercial.next_threshold_points && <div className="mt-2 flex justify-between gap-4"><span>{copy.metered.balance.next_level_label}</span><strong className="text-right text-ink-primary">{copy.metered.balance.next_level(page.balance.commercial.points_to_next_level, page.balance.commercial.next_threshold_points)}</strong></div>}</>}
         </div>
         {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error} {!page && <button type="button" className="ml-2 underline" onClick={() => void load()}>{copy.balance.retry}</button>}</div>}
         {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
@@ -104,7 +123,7 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
             {page!.transactions.map((transaction) => (
               <li key={transaction.id} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div><strong className="text-sm text-ink-primary">{transactionLabel(transaction.kind)}</strong><span className="mt-1 block text-xs text-ink-muted">{formatDate(transaction.created_at)}</span></div>
-                <div className="text-left sm:text-right"><strong className={`tabular-nums ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? transaction.amount : `+${transaction.amount}`}</strong><span className="mt-1 block text-xs text-ink-muted">余额 {transaction.balance_after}</span></div>
+                <div className="text-left sm:text-right"><strong className={`tabular-nums ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? transaction.amount : `+${transaction.amount}`}</strong><span className="mt-1 block text-xs text-ink-muted">{copy.metered.balance.transaction_balance(transaction.balance_after)}</span></div>
               </li>
             ))}
           </ul>

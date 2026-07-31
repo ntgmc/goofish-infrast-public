@@ -1,6 +1,6 @@
 import { personalUseCopy } from '../copy/zh-CN/personal-use'
 
-export type PersonalUseDeclarationAction = 'free_preview_claim' | 'generated_result_export'
+export type PersonalUseDeclarationAction = 'free_preview_claim' | 'metered_personal_create' | 'generated_result_export'
 
 export type PersonalUseDeclarationSection = {
   id: string
@@ -10,9 +10,9 @@ export type PersonalUseDeclarationSection = {
 }
 
 export const PERSONAL_USE_DECLARATION = Object.freeze({
-  id: 'personal_use_v1',
-  version: 'V1.0',
-  effectiveDate: '2026-07-23',
+  id: 'personal_use_v1_1',
+  version: 'V1.1',
+  effectiveDate: '2026-07-31',
   title: personalUseCopy.declaration_title,
   sections: personalUseCopy.sections as readonly PersonalUseDeclarationSection[],
 })

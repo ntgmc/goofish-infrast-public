@@ -1,10 +1,23 @@
 export const POINTS_CURRENCY = 'points' as const
 
-export type BalanceTransactionKind = 'cdk_credit' | 'admin_credit' | 'admin_debit'
+import type { CommercialTierSummary } from './metered-billing'
 
-interface BalanceSummary {
+export type BalanceTransactionKind =
+  | 'cdk_credit'
+  | 'admin_credit'
+  | 'admin_debit'
+  | 'schedule_debit'
+  | 'admin_credit_reversal'
+  | 'debt_repayment'
+
+export interface BalanceSummary {
   currency: typeof POINTS_CURRENCY
   available: string
+  reserved: string
+  lifetime_credited: string
+  qualification_reversed: string
+  debt: string
+  commercial: CommercialTierSummary
 }
 
 export interface PublicBalanceTransaction {

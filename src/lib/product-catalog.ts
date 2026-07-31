@@ -1,9 +1,9 @@
 import catalogJson from '../../product/catalog.json'
-import type { RawPermissionMode, UserGameAccountKind } from './types'
+import type { ProductPermissionMode, RawPermissionMode, UserGameAccountKind } from './types'
 
 export type CapabilityId = keyof typeof catalogJson.capabilities
 export type RuntimePermission = keyof typeof catalogJson.runtime_permissions
-export type ProductPermission = Exclude<RuntimePermission, 'admin'>
+export type ProductPermission = ProductPermissionMode
 export type SkuId = keyof typeof catalogJson.skus
 export type ProductPolicy = typeof catalogJson.policies
 

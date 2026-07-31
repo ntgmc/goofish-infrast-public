@@ -22,6 +22,12 @@ export async function requireSiteFeatures(features: readonly SiteFeatureKey[]): 
   }
 }
 
+export function requireMeteredBillingFeature(profileKind: string): Promise<Response | null> {
+  return profileKind === 'metered_personal' || profileKind === 'metered_commercial'
+    ? requireSiteFeatures(['metered_billing'])
+    : Promise.resolve(null)
+}
+
 function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/auth/register') return ['registration']
   if (pathname === '/api/auth/login' || pathname === '/api/auth/me') return ['login']
@@ -37,6 +43,8 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/user/cdk/redeem') return ['cdk_redemption']
   if (pathname === '/api/user/balance/redeem') return ['cdk_redemption']
   if (pathname === '/api/user/profiles/depot-value') return ['profiles', 'depot_value']
+  if (pathname === '/api/user/profiles/metered-personal' || pathname === '/api/user/commercial/profiles'
+    || pathname === '/api/user/billing/quote') return ['profiles', 'schedule_generation', 'metered_billing']
   if (pathname === '/api/user/profiles' || pathname === '/api/user/status') return ['profiles']
   if (pathname === '/api/user/workspace/free-schedule/confirm') return ['schedule_generation']
   if (pathname === '/api/user/workspace') return ['profiles']

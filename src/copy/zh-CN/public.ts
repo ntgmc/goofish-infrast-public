@@ -290,7 +290,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_031: "用户义务",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_032: "你应对自己的账号、CDK、游戏数据和操作行为负责，仅使用自己有权处理的数据，不得共享、转售、破解、干扰或以其他方式滥用本服务。",
+  pages_PublicInfoPage_032: "你应对自己的账号、CDK、游戏数据和操作行为负责，仅使用自己有权处理的数据，不得共享、转售、破解、干扰或以其他方式滥用本服务。免费预览与个人按次档案仅限本人非商业使用；商用账户可使用商用档案处理数据权利人已授权的多个 UID，按成功主排班计费，但不得转售 MaaTool 账号或 CDK，账号、档案和积分均不可转让。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_033: "请妥善保管密码、CDK 与森空岛授权信息。因用户主动泄露、设备失控或违反本协议造成的损失，应由用户自行承担。",
   // src/pages/PublicInfoPage.tsx

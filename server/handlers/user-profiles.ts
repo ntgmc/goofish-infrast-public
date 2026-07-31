@@ -49,7 +49,7 @@ export default async (req: Request): Promise<Response> => {
     }
 
     if (req.method === 'GET') {
-      const profiles = await listProfilesForUser(auth.user.id)
+      const profiles = (await listProfilesForUser(auth.user.id)).filter((profile) => profile.kind !== 'metered_commercial')
       return jsonResponse({
         user: toPublicUser(auth.user),
         profiles: await Promise.all(profiles.map(async (profile) => (
@@ -75,6 +75,7 @@ export default async (req: Request): Promise<Response> => {
       }
       const profile = await getProfileForUser(auth.user.id, body.profile_id)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
+      if (profile.archived_at) return jsonResponse({ error: '归档档案只能通过商用档案管理页恢复后修改。', code: 'profile_archived' }, 409)
       const displayName = normalizeDisplayName(body.display_name)
       const note = normalizeNote(body.note)
       const updated = {

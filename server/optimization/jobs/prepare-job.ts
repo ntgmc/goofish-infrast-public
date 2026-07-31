@@ -1,7 +1,7 @@
 import type { LicenseFile } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
 import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getCdkRecordStore, getRiskControlSettings, isProfileCdkRecord, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
-import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, updateProfileWorkspaceAtomically } from "../../storage/user-store";
+import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, normalizeProfileKind, updateProfileWorkspaceAtomically } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
 import type { ScheduleUsageContext, OptimizeJobSource, PreparedOptimizeJob, OptimizeConfigPermission, FreeScheduleGenerateDecision } from './shared';
@@ -18,6 +18,11 @@ import { requestSchemas } from '../../security/request-policy';
 import { getValidatedJson } from '../../security/request-validation';
 import { formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
 import { recordOperatorDataAnomalyBehaviorEvent } from '../../behavior-risk/service';
+import { getBalanceSummary } from '../../storage/balance-store';
+import { getMeteredScheduleQuote, pointsToMinor, type MeteredScheduleQuote } from '../../../src/lib/metered-billing';
+import { normalizePointsAmount } from '../../../src/lib/balance-contracts';
+import { getCommercialLimits } from '../../storage/metered-profile-store';
+import { requireMeteredBillingFeature } from '../../feature-gate';
 
 export async function prepareOptimizeJob(
   req: Request,
@@ -81,6 +86,7 @@ export async function prepareOptimizeJob(
     let activeProfileUid: string | null = null;
     let isPreviewProfile = false;
     let isPreviewTrial = false;
+    let meteredBilling: { userId: string; quote: MeteredScheduleQuote } | null = null;
 
     {
       activeProfileId = profile_id;
@@ -96,6 +102,36 @@ export async function prepareOptimizeJob(
       if (isDepotValueProfile(profile)) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
         return fail({ error: '仓库分析档案不能用于生成排班。' }, 403);
+      }
+      const profileKind = normalizeProfileKind(profile);
+      const meteredFeatureGate = await requireMeteredBillingFeature(profileKind);
+      if (meteredFeatureGate) return { ok: false, response: meteredFeatureGate };
+      if (profile.archived_at) {
+        scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
+        return fail({ error: '归档档案不能提交任务。', code: 'profile_archived' }, 409);
+      }
+      if ((profileKind === 'metered_personal' || profileKind === 'metered_commercial') && isScenarioComparison) {
+        scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
+        return fail({ error: '按次计费档案不开放场景对比实验室。', code: 'capability_not_available' }, 403);
+      }
+      if (profileKind === 'metered_personal' || profileKind === 'metered_commercial') {
+        const balance = await getBalanceSummary(auth.user.id);
+        if (pointsToMinor(balance.debt) > 0n) {
+          return fail({ error: '账户存在待追偿积分，结清前不能提交新任务。', code: 'debt_outstanding' }, 409);
+        }
+        if (profileKind === 'metered_commercial' && !balance.commercial.eligible) {
+          return fail({ error: '商用资格未生效或账户存在待追偿，暂不能提交新任务。', code: 'commercial_not_eligible' }, 409);
+        }
+        if (profileKind === 'metered_commercial' && (await getCommercialLimits(auth.user.id)).suspended) {
+          return fail({ error: '商用账户已暂停，暂不能提交新任务。', code: 'commercial_suspended' }, 409);
+        }
+        const quote = getMeteredScheduleQuote(profileKind, balance.lifetime_credited, balance.debt);
+        const accepted = body.kind === 'schedule' ? normalizePointsAmount(body.accepted_max_points) : null;
+        if (body.kind !== 'schedule' || body.pricing_version !== quote.pricing_version || !accepted
+          || pointsToMinor(quote.charge) > pointsToMinor(accepted)) {
+          return fail({ error: '计价版本或本次价格已变化，请刷新报价后重新确认。', code: 'pricing_changed', quote }, 409);
+        }
+        meteredBilling = { userId: auth.user.id, quote };
       }
       isPreviewProfile = isFreePreviewProfile(profile);
       activeProfileUid = profile.skland_binding?.uid ?? null;
@@ -301,6 +337,7 @@ export async function prepareOptimizeJob(
           ...(requestedItems.has('additional_recompute_coupon') ? ['additional_recompute_coupon'] : []),
         ],
         behaviorIdentity: { userId: auth.user.id, sessionTokenHash: auth.tokenHash },
+        billing: meteredBilling,
         payload: createPersistedOptimizeJobPayload({
           submittedAt,
           operators,

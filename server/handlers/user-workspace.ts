@@ -66,6 +66,7 @@ export default async (req: Request): Promise<Response> => {
     const profile = await getProfileForUser(auth.user.id, body.profile_id)
     if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
     if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案不能保存排班工作区。' }, 403)
+    if (profile.archived_at) return jsonResponse({ error: '归档档案不能写入工作区。', code: 'profile_archived' }, 409)
     if (profile.status !== 'active') return jsonResponse({ error: '账号档案状态不可用。' }, 403)
 
     const isPreviewProfile = isFreePreviewProfile(profile)

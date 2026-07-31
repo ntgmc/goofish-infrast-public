@@ -16,7 +16,9 @@ export default async function personalUseDeclarationHandler(req: Request): Promi
       const profileId = new URL(req.url).searchParams.get('profile_id')
       if (profileId) {
         const profile = await getProfileForUser(auth.user.id, profileId)
-        if (!profile || !isFreePreviewProfile(profile)) return jsonResponse({ error: '该操作仅适用于免费预览档案。' }, 403)
+        if (!profile || (!isFreePreviewProfile(profile) && profile.kind !== 'metered_personal')) {
+          return jsonResponse({ error: '该操作仅适用于免费预览或个人按次档案。' }, 403)
+        }
       }
       const effective = isCurrentPersonalUseDeclarationEffective()
       const acceptance = effective ? await getPersonalUseDeclarationAcceptance(auth.user.id) : null
@@ -28,10 +30,16 @@ export default async function personalUseDeclarationHandler(req: Request): Promi
       const action = body.action as PersonalUseDeclarationAction
       const profileId = body.profile_id ?? null
       if (action === 'free_preview_claim' && profileId) return jsonResponse({ error: '领取免费权益时不应提交 profile_id。' }, 400)
+      if (action === 'metered_personal_create' && profileId) {
+        const profile = await getProfileForUser(auth.user.id, profileId)
+        if (!profile || !isFreePreviewProfile(profile)) return jsonResponse({ error: '只能将免费预览档案转换为个人按次档案。' }, 403)
+      }
       if (action === 'generated_result_export') {
         if (!profileId) return jsonResponse({ error: '缺少 profile_id。' }, 400)
         const profile = await getProfileForUser(auth.user.id, profileId)
-        if (!profile || !isFreePreviewProfile(profile)) return jsonResponse({ error: '该操作仅适用于免费预览档案。' }, 403)
+        if (!profile || (!isFreePreviewProfile(profile) && profile.kind !== 'metered_personal')) {
+          return jsonResponse({ error: '该操作仅适用于免费预览或个人按次档案。' }, 403)
+        }
       }
       if (!isCurrentPersonalUseDeclarationEffective()) {
         return jsonResponse({ declaration: toPublicPersonalUseDeclaration(), accepted: true, effective: false })

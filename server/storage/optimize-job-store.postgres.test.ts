@@ -17,6 +17,8 @@ import {
   settleInvitationForActivatedUser,
 } from './invitation-store'
 import { getFreeScheduleEntitlement } from './reorder-admission'
+import { adjustBalance, getBalanceSummary } from './balance-store'
+import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
 
 let container: PostgreSqlContainer
 const legacyJobId = randomUUID()
@@ -804,6 +806,51 @@ describe('PostgreSQL optimization job admission', () => {
     expect((await query<{ count: string }>('select count(*)::text as count from optimization_submissions where owner_key = $1', [admitted.job.owner_key])).rows[0]?.count).toBe('0')
   })
 
+  it('reserves metered points atomically, settles success, and releases terminal failure', async () => {
+    const store = createPostgresOptimizeJobStore()
+    const { userId, profileId } = await seedMeteredProfile()
+    await adjustBalance({
+      userId, kind: 'admin_credit', amount: '1200.00', referenceType: 'admin_adjustment',
+      referenceId: randomUUID(), idempotencyKey: `fund:${userId}`, adminUsername: 'root', reason: 'metered test',
+    })
+    const quote = getMeteredScheduleQuote('metered_personal')
+    const first = await store.admitJob(input({
+      priority: 500_000, owner_key: `profile:${profileId}`, profile_id: profileId,
+      permission: 'metered_advanced', billing: { userId, quote },
+    }))
+    expect(first.job.billing_json).toMatchObject({ status: 'reserved', charge: '600.00' })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '600.00', reserved: '600.00' })
+    const claimed = await store.claimNextJob('billing-success-worker', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 2, 100)
+    expect(claimed?.id).toBe(first.job.id)
+    await store.completeAttempt(claimed!.id, claimed!.attempt_count, claimed!.worker_id!, claimed!.lock_token!, { ok: true })
+    expect((await store.getJob(first.job.id))?.billing_json?.status).toBe('settled')
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '600.00', reserved: '0.00' })
+
+    const second = await store.admitJob(input({
+      priority: 500_001, owner_key: `profile:${profileId}`, profile_id: profileId,
+      permission: 'metered_advanced', billing: { userId, quote },
+    }))
+    const failedClaim = await store.claimNextJob('billing-failure-worker', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 2, 100)
+    expect(failedClaim?.id).toBe(second.job.id)
+    await store.failAttempt(failedClaim!.id, failedClaim!.attempt_count, failedClaim!.worker_id!, failedClaim!.lock_token!, 'expected failure')
+    expect((await store.getJob(second.job.id))?.billing_json?.status).toBe('released')
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '600.00', reserved: '0.00' })
+    expect((await query<{ count: string }>("select count(*)::text as count from user_balance_transactions where user_id = $1 and kind = 'schedule_debit'", [userId])).rows[0]?.count).toBe('1')
+
+    const pending = await store.admitJob(input({
+      priority: 500_002, owner_key: `profile:${profileId}`, profile_id: profileId,
+      permission: 'metered_advanced', billing: { userId, quote },
+    }))
+    await query("update optimize_jobs set status = 'failed', updated_at = now() - interval '2 days' where id = $1", [pending.job.id])
+    await store.cleanupOldJobs(new Date(Date.now() - 24 * 60 * 60_000).toISOString())
+    expect(await store.getJob(pending.job.id)).not.toBeNull()
+    expect((await query<{ status: string }>('select status from user_balance_reservations where job_id = $1', [pending.job.id])).rows[0]?.status).toBe('reserved')
+    await store.reconcileBilling?.()
+    await query("update optimize_jobs set updated_at = now() - interval '2 days' where id = $1", [pending.job.id])
+    await store.cleanupOldJobs(new Date(Date.now() - 24 * 60 * 60_000).toISOString())
+    expect(await store.getJob(pending.job.id)).toBeNull()
+  })
+
   it('preserves both concurrent workspace updates under the profile lock', async () => {
     const profileId = await seedProfile()
     await saveWorkspace(emptyWorkspace(profileId))
@@ -852,6 +899,28 @@ async function seedProfile(): Promise<string> {
     [profileId, userId, JSON.stringify({ id: profileId, user_id: userId })],
   )
   return profileId
+}
+
+async function seedMeteredProfile(): Promise<{ userId: string; profileId: string }> {
+  const userId = randomUUID()
+  const profileId = randomUUID()
+  await query(
+    `insert into user_accounts (id, email, password_hash, salt, iterations, permission, status, record_json, created_at, updated_at)
+     values ($1, $2, 'hash', 'salt', 1, 'growth', 'active', $3::jsonb, now(), now())`,
+    [userId, `${userId}@example.test`, JSON.stringify({ id: userId })],
+  )
+  const profile = {
+    version: 1, id: profileId, user_id: userId, kind: 'metered_personal', permission: 'metered_advanced',
+    status: 'active', display_name: 'Metered', note: '', cdk_key: null, cdk_code_hash: null,
+    cdk_order_hash: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+  }
+  await query(
+    `insert into user_game_accounts
+      (id, user_id, permission, status, display_name, note, kind, record_json, created_at, updated_at)
+     values ($1, $2, 'metered_advanced', 'active', 'Metered', '', 'metered_personal', $3::jsonb, now(), now())`,
+    [profileId, userId, JSON.stringify(profile)],
+  )
+  return { userId, profileId }
 }
 
 function shanghaiMonthKey(value: string): string {

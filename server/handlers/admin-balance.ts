@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { normalizePointsAmount } from '../../src/lib/balance-contracts'
-import { adjustBalance, BalanceError, createBalanceRequestHash, getAdminBalancePage } from '../storage/balance-store'
+import { adjustBalance, BalanceError, createBalanceRequestHash, getAdminBalancePage, reverseQualificationCredit } from '../storage/balance-store'
 import { getUserById } from '../storage/user-store'
 import { getValidatedJson } from '../security/request-validation'
 import { requestSchemas } from '../security/request-policy'
@@ -26,6 +26,18 @@ export default async function adminBalanceHandler(req: Request): Promise<Respons
     if (!amount) return jsonResponse({ error: '积分金额必须是 0.01 到 1000000.00 之间、最多两位小数的字符串。', code: 'invalid_amount' }, 400)
     const reason = body.reason.trim()
     if (!reason) return jsonResponse({ error: '积分调整原因不能为空。', code: 'invalid_reason' }, 400)
+    if (body.operation === 'reverse_credit') {
+      const originalTransactionId = body.original_transaction_id?.trim() ?? ''
+      if (!originalTransactionId) return jsonResponse({ error: '资格冲正必须指定原正向积分交易。', code: 'invalid_reversal' }, 400)
+      return jsonResponse(await reverseQualificationCredit({
+        userId: body.user_id,
+        originalTransactionId,
+        amount,
+        reason,
+        idempotencyKey: body.idempotency_key,
+        adminUsername: authentication.username,
+      }))
+    }
     const referenceId = randomUUID()
     const requestHash = createBalanceRequestHash({
       userId: body.user_id,

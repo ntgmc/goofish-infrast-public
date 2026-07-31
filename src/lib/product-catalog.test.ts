@@ -24,6 +24,7 @@ describe('product catalog', () => {
     expect(listAdminIssuablePermissions()).toEqual(['recommended', 'growth', 'advanced', 'ultimate'])
     expect(getPermissionProfile('ultimate').public).toBe(false)
     expect(getPermissionProfile('admin').admin_issuable).toBe(false)
+    expect(getPermissionProfile('metered_advanced')).toMatchObject({ admin_issuable: false, public: false })
   })
 
   it('normalizes legacy permission aliases', () => {
@@ -35,6 +36,8 @@ describe('product catalog', () => {
     expect(hasCapability({ permission: 'recommended' }, 'view_upgrade_suggestions')).toBe(false)
     expect(hasCapability({ permission: 'growth' }, 'view_upgrade_suggestions')).toBe(true)
     expect(hasCapability({ permission: 'advanced' }, 'run_scenario_comparison')).toBe(true)
+    expect(hasCapability({ permission: 'metered_advanced' }, 'run_scenario_comparison')).toBe(false)
+    expect(hasCapability({ permission: 'metered_advanced' }, 'export_full_result_json')).toBe(true)
     expect(hasCapability({ permission: 'advanced' }, 'export_full_result_json')).toBe(true)
     expect(hasCapability({ permission: 'ultimate' }, 'export_full_result_json')).toBe(true)
     expect(hasCapability({ permission: 'admin' }, 'export_full_result_json')).toBe(true)

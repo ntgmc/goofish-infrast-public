@@ -6,6 +6,7 @@ import type { PersonalUseDeclarationAction } from '../lib/personal-use-declarati
 
 type PendingOperation = {
   action: PersonalUseDeclarationAction
+  profileId: string | null
   run: () => void | Promise<void>
 }
 
@@ -26,13 +27,17 @@ export function usePersonalUseDeclaration({
   const [submitting, setSubmitting] = useState(false)
   const pendingRef = useRef<PendingOperation | null>(null)
 
-  const guard = useCallback(async (action: PersonalUseDeclarationAction, run: () => void | Promise<void>) => {
+  const guard = useCallback(async (
+    action: PersonalUseDeclarationAction,
+    run: () => void | Promise<void>,
+    operationProfileId: string | null = profileId ?? null,
+  ) => {
     if (!enabled) {
       await run()
       return
     }
     try {
-      const query = profileId ? `?profile_id=${encodeURIComponent(profileId)}` : ''
+      const query = operationProfileId ? `?profile_id=${encodeURIComponent(operationProfileId)}` : ''
       const status = await apiJson<DeclarationStatus>(`/api/user/personal-use-declaration${query}`, {
         fallbackMessage: copy.personalUse.confirmation_status_load_failed,
       })
@@ -40,7 +45,7 @@ export function usePersonalUseDeclaration({
         await run()
         return
       }
-      pendingRef.current = { action, run }
+      pendingRef.current = { action, profileId: operationProfileId, run }
       setOpen(true)
     } catch (error) {
       onError(error instanceof Error && error.message ? error.message : copy.personalUse.confirmation_status_load_failed)
@@ -62,7 +67,7 @@ export function usePersonalUseDeclaration({
         method: 'POST',
         json: {
           action: pending.action,
-          ...(profileId ? { profile_id: profileId } : {}),
+          ...(pending.profileId ? { profile_id: pending.profileId } : {}),
         },
         fallbackMessage: copy.personalUse.confirmation_submit_failed,
       })
@@ -74,7 +79,7 @@ export function usePersonalUseDeclaration({
     } finally {
       setSubmitting(false)
     }
-  }, [onError, profileId, submitting])
+  }, [onError, submitting])
 
   return {
     guard,

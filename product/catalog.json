@@ -40,6 +40,13 @@
       "public": false,
       "capabilities": ["generate_full_schedule", "export_maa_json", "export_full_result_json", "view_upgrade_suggestions", "view_upgrade_roi", "view_full_data", "view_raw_results", "edit_full_config", "run_scenario_comparison"]
     },
+    "metered_advanced": {
+      "label": "积分按次高级版",
+      "admin_rank": 2,
+      "admin_issuable": false,
+      "public": false,
+      "capabilities": ["generate_full_schedule", "export_maa_json", "export_full_result_json", "view_upgrade_suggestions", "view_upgrade_roi", "view_full_data", "view_raw_results", "edit_full_config"]
+    },
     "ultimate": {
       "label": "Admin卡",
       "admin_rank": 3,
@@ -81,6 +88,27 @@
     "ultimate_internal": { "label": "Admin卡", "public": false, "price": null, "display_price": null, "account_scope": "内部发放", "runtime_permission": "ultimate", "summary": "内部卡种", "audience": "内部使用" }
   },
   "policies": {
+    "metered_billing": {
+      "pricing_version": "2026-07-31-v1",
+      "personal": {
+        "main_schedule_points": "600.00",
+        "profile_limit": 1
+      },
+      "commercial": {
+        "list_price_points": "1000.00",
+        "default_active_profile_limit": 100,
+        "default_total_profile_limit": 1000,
+        "max_running_jobs": 2,
+        "max_queued_jobs": 8,
+        "max_submissions_per_hour": 30,
+        "tiers": [
+          { "level": 1, "threshold_points": "10000.00", "discount_bps": 1000 },
+          { "level": 2, "threshold_points": "30000.00", "discount_bps": 2000 },
+          { "level": 3, "threshold_points": "50000.00", "discount_bps": 3000 },
+          { "level": 4, "threshold_points": "100000.00", "discount_bps": 4000 }
+        ]
+      }
+    },
     "free_preview": {
       "revision_window_hours": 24,
       "revision_limit": 3,
@@ -104,7 +132,9 @@
       "单账号终身版仅绑定一个游戏 UID，不支持自行更换游戏账号。",
       "长期更新指在服务持续提供且授权正常的前提下维护同一账号，不表示可以任意换号。",
       "干员归属、练度或干员池出现异常变化时可能先拦截；重复异常可能冻结档案。",
-      "干员数据误拦截需要通过 MaaTool 官方 QQ 群人工核验。"
+      "干员数据误拦截需要通过 MaaTool 官方 QQ 群人工核验。",
+      "个人按次档案仅限本人非商业使用；商用档案仅可处理数据权利人已授权的数据。",
+      "商用主排班按成功任务计费；MaaTool 账号、CDK、档案和积分均不可转让或转售。"
     ],
     "public_feature_comparison": [
       { "feature": "森空岛导入干员数据", "free_preview": "支持，必须绑定 UID", "single_account_lifetime": "支持，保存到同一账号工作区" },

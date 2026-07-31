@@ -5,6 +5,7 @@ import { deleteUserAccount, getUserById, type UserAccountRecord } from './storag
 import { purgeExpiredPersonalUseDeclarationAcceptances } from './storage/personal-use-declaration-store'
 import { sendAccountDeletionCancellationEmail, sendAccountDeletionReceiptEmail } from './handlers/email'
 import { recordAccountDeletedBehaviorEvent } from './behavior-risk/service'
+import { releaseScheduleBalanceInTransaction } from './storage/balance-store'
 
 const DELETION_DELAY_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -57,15 +58,26 @@ export async function requestAccountDeletion(user: UserAccountRecord): Promise<{
        )`,
       [user.id],
     )
-    await client.query(
+    const cancelledJobs = await client.query<{ id: string }>(
       `update optimize_jobs set status = 'failed', error_message = '账号已请求注销，任务已取消。',
          payload_json = payload_json - 'activeProfile', worker_id = null, heartbeat_at = null,
          lock_token = null, lock_expires_at = null,
          finished_at = now(), updated_at = now()
-       where profile_id in (select id from user_game_accounts where user_id = $1)
-          or owner_key in (select 'profile:' || id from user_game_accounts where user_id = $1)`,
+       where (profile_id in (select id from user_game_accounts where user_id = $1)
+          or owner_key in (select 'profile:' || id from user_game_accounts where user_id = $1))
+         and status in ('queued', 'running')
+       returning id`,
       [user.id],
     )
+    for (const job of cancelledJobs.rows) await releaseScheduleBalanceInTransaction(client, job.id)
+    const remainingReservations = await client.query<{ job_id: string }>(
+      `select job_id from user_balance_reservations
+        where user_id = $1 and status = 'reserved' for update`,
+      [user.id],
+    )
+    for (const reservation of remainingReservations.rows) {
+      await releaseScheduleBalanceInTransaction(client, reservation.job_id)
+    }
     await client.query('commit')
   } catch (error) {
     await client.query('rollback')
