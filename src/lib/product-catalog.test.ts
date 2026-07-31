@@ -7,6 +7,7 @@ import {
   listPublicSkus,
   normalizeRuntimePermission,
   productPolicies,
+  resolveRuntimePermission,
 } from './product-catalog'
 
 describe('product catalog', () => {
@@ -30,6 +31,12 @@ describe('product catalog', () => {
   it('normalizes legacy permission aliases', () => {
     expect(normalizeRuntimePermission('basic')).toBe('growth')
     expect(normalizeRuntimePermission('premium')).toBe('advanced')
+  })
+
+  it('fails closed for missing or unknown permission values', () => {
+    expect(normalizeRuntimePermission(undefined)).toBe('recommended')
+    expect(resolveRuntimePermission('corrupted-permission')).toBeNull()
+    expect(hasCapability({ permission: 'corrupted-permission' as never }, 'view_upgrade_suggestions')).toBe(false)
   })
 
   it('evaluates static and contextual capabilities', () => {

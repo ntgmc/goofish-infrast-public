@@ -27,11 +27,15 @@ export default async function userCdkHandler(req: Request): Promise<Response> {
     const match = await findCdkRecordByCode(normalizeCode(body.cdk))
     if (!match) return jsonResponse({ error: 'CDK 不存在。', code: 'cdk_not_found' }, 404)
     const cdkType = getCdkType(match.record)
+    const targetsExistingProfile = typeof body.profile_id === 'string' && Boolean(body.profile_id.trim())
+    if (targetsExistingProfile && cdkType !== 'profile') {
+      return jsonResponse({ error: '当前 CDK 不能用于升级档案。', code: 'cdk_type_mismatch' }, 409)
+    }
     if (cdkType === 'balance') {
       return jsonResponse({ error: '该 CDK 是积分兑换码，请前往积分页兑换。', code: 'cdk_type_mismatch', target: '/tool/balance' }, 409)
     }
     if (cdkType === 'profile') {
-      const redeemed = typeof body.profile_id === 'string' && body.profile_id.trim()
+      const redeemed = targetsExistingProfile
         ? await upgradePreviewProfileWithCdk(auth.user, body.profile_id, body.cdk, body.display_name, body.note, body.idempotency_key)
         : await redeemProfileCdk(auth.user, body.cdk, body.display_name, body.note, body.idempotency_key)
       if (!redeemed.ok) return jsonResponse({ error: redeemed.message, code: 'profile_cdk_redeem_failed' }, redeemed.status)

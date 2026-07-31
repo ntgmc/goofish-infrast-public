@@ -19,6 +19,13 @@ vi.mock('../../handlers/license-utils', () => ({
   resolveConfigForPermission: (_permission: string, config: unknown) => ({ ok: true, config }),
   resolveFreePreviewConfig: (config: unknown) => ({ ok: true, config }),
 }))
+vi.mock('../../handlers/profile-authorization', () => ({
+  resolveProfileAuthorization: vi.fn(async () => ({
+    ok: true,
+    permission: 'growth',
+    cdkRecord: null,
+  })),
+}))
 vi.mock('../../free-preview-trial', () => ({ isFreePreviewTrialActive: vi.fn(() => false) }))
 vi.mock('../../lifecycle', () => ({ getServiceLifecycleState: vi.fn(() => 'running') }))
 vi.mock('../../optimize-job-signals', () => ({ requestOptimizeJobProcessing: mocks.requestProcessing }))

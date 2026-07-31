@@ -5,6 +5,7 @@ import { ADMIN_SESSION_EXPIRED_EVENT, adminApiJson as apiJson, adminApiVoid as a
 import { GeneratedPermission, CdkType, CdkTypeFilter, StatusFilter, PermissionFilter, BinaryFilter, FieldErrors, CdkTableFilters, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, UsageRangeMode, UsageStatsResponse, RiskControlSettings, RiskControlSettingsPatch, AdminUserSummary, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, PaginationMeta, CdkOpsSummary, EMPTY_PAGINATION, DEFAULT_RISK_SETTINGS, permissionLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, buildSummary, buildCdkOpsSummary, buildUsageStatsQuery, getDateOffsetString, normalizeUsageStats, normalizeRiskSettings, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, isAppUserStatus, buildCurrentOpsReport, buildCurrentOpsReportCsv, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp, omitProfileOperatorData } from './modules'
 import { useAnnouncementDraft } from './announcements/useAnnouncementDraft'
 import { createAdminUserBalanceActions, fetchAdminUserBalance } from './users/balance-actions'
+import { revokeSelectedCdks } from './cdk/bulk-actions'
 
 export function useAdminController() {
   const [adminUsername, setAdminUsername] = useState<string | null>(null)
@@ -610,12 +611,11 @@ export function useAdminController() {
       await patchCdk(record, 'set_permission', permissionValue)
     }
 
-  const handleBulkRevoke = async () => {
-      const targets = selectedRecords.filter((record) => record.status === 'used' || record.status === 'frozen')
-      if (targets.length === 0 || !window.confirm(`确认撤销 ${targets.length} 个授权？`)) return
-      for (const record of targets) await patchCdk(record, 'revoke')
-      setSelectedCdkHashes([])
-    }
+  const handleBulkRevoke = () => revokeSelectedCdks({
+      records: selectedRecords, selectedDetailHash: selectedCdkDetail?.code_hash ?? null,
+      setBusyAction, setNotice, setError, setSelectedHashes: setSelectedCdkHashes,
+      clearSelectedDetail: () => setSelectedCdkDetail(null), refresh: refreshAdminData,
+    })
 
   const loadUserDetail = async (user: AppUserSummary) => {
       setBusyAction(`user-detail:${user.id}`)

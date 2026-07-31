@@ -6,6 +6,8 @@ import {
 } from '../../src/lib/auth-constraints'
 import { publicContentDraftSchema } from '../../src/lib/public-content'
 import { SITE_FEATURE_KEYS, type SiteFeatureKey } from '../../src/lib/site-features'
+import { listAdminIssuablePermissions } from '../../src/lib/product-catalog'
+import type { ProductPermissionMode } from '../../src/lib/types'
 
 export const REQUEST_BODY_LIMITS = Object.freeze({
   none: 0,
@@ -38,6 +40,9 @@ const siteFeatureShape = Object.fromEntries(
 ) as Record<SiteFeatureKey, z.ZodBoolean>
 const siteFeaturesSchema = strict(siteFeatureShape)
 const expectedRevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)
+const adminPermissionSchema = z.enum(
+  listAdminIssuablePermissions() as [ProductPermissionMode, ...ProductPermissionMode[]],
+)
 
 export const requestSchemas = {
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
@@ -66,7 +71,7 @@ export const requestSchemas = {
   deletionToken: strict({ token: shortString(512) }),
   adminCdkCreate: strict({
     cdk_type: z.enum(['profile', 'balance', 'item']).optional(),
-    permission: optionalString(32),
+    permission: adminPermissionSchema.optional(),
     amount: optionalString(32),
     item_code: z.enum(['lifetime_profile_voucher', 'limited_profile_voucher']).optional(),
     order_note: optionalString(500),
@@ -74,8 +79,17 @@ export const requestSchemas = {
   }),
   adminCdkPatch: strict({
     code_hash: optionalString(64),
-    action: optionalString(64),
-    permission: optionalString(32),
+    code_hashes: z.array(shortString(64)).min(1).max(100).optional(),
+    action: z.enum([
+      'revoke',
+      'upgrade',
+      'unfreeze',
+      'update_note',
+      'set_permission',
+      'set_operator_baseline',
+      'accept_operator_baseline_and_unfreeze',
+    ]),
+    permission: adminPermissionSchema.optional(),
     order_note: optionalString(500),
     reason: optionalString(500),
     baseline_source: z.enum(['latest', 'workspace', 'next_import']).optional(),
@@ -164,7 +178,13 @@ export const requestSchemas = {
     profile_id: optionalString(128),
     idempotency_key: shortString(200),
   }),
-  profilePatch: strict({ profile_id: shortString(128), display_name: optionalString(40), note: optionalString(500) }),
+  profilePatch: strict({
+    profile_id: shortString(128),
+    display_name: optionalString(40),
+    note: optionalString(500),
+  }).refine((body) => body.display_name !== undefined || body.note !== undefined, {
+    message: 'At least one profile metadata field is required.',
+  }),
   meteredPersonalProfile: strict({ profile_id: optionalString(128), display_name: optionalString(40), note: optionalString(500) }),
   commercialProfileCreate: strict({ display_name: optionalString(40), note: optionalString(500) }),
   commercialProfilePatch: strict({

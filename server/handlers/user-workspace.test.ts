@@ -46,6 +46,13 @@ vi.mock('./user-auth', () => ({
   }),
   requireUserSession: mocks.requireUserSession,
 }))
+vi.mock('./profile-authorization', () => ({
+  resolveProfileAuthorization: vi.fn(async (profile: { permission: string }) => ({
+    ok: true,
+    permission: profile.permission,
+    cdkRecord: null,
+  })),
+}))
 
 vi.mock('../security/request-policy', () => ({ requestSchemas: { userWorkspace: {} } }))
 vi.mock('../security/request-validation', () => ({ getValidatedJson: mocks.getValidatedJson }))

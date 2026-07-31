@@ -1,7 +1,7 @@
 import { getProfileForUser, isDepotValueProfile, isFreePreviewProfile } from '../storage/user-store'
-import { getEffectiveProfilePermission } from '../free-preview-trial'
-import { getCdkRecordStore } from './license-utils'
+import { getPermissionProfile } from '../../src/lib/product-catalog'
 import { jsonResponse, requireUserSession, toPublicUser } from './user-auth'
+import { resolveProfileAuthorization } from './profile-authorization'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -11,30 +11,19 @@ export default async (req: Request): Promise<Response> => {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
     const profileId = new URL(req.url).searchParams.get('profile_id')
+    if (profileId !== null && (!profileId.trim() || profileId.length > 128)) {
+      return jsonResponse({ error: 'profile_id 格式无效。', code: 'profile_id_invalid' }, 400)
+    }
     const profile = profileId ? await getProfileForUser(auth.user.id, profileId) : auth.activeProfile
     if (!profile) return jsonResponse({ error: '请先兑换或选择 CDK 档案。' }, 404)
-    if (isFreePreviewProfile(profile)) {
-      return jsonResponse({
-        user: toPublicUser(auth.user),
-        permission: getEffectiveProfilePermission(profile),
-        permission_label: '免费预览',
-        status: profile.status,
-        risk_status: 'ok',
-      })
-    }
     if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有 CDK 授权状态。' }, 403)
-    const cdkRecord = profile.cdk_key ? await (await getCdkRecordStore()).get(profile.cdk_key) : null
-    if (profile.status === 'frozen' || cdkRecord?.status === 'frozen') {
-      return jsonResponse({ error: cdkRecord?.freeze_reason || '账号授权已冻结，请联系卖家。' }, 403)
-    }
-    if (profile.status === 'revoked' || cdkRecord?.status === 'revoked') {
-      return jsonResponse({ error: '账号授权已撤销，请联系卖家。' }, 403)
-    }
+    const authorization = await resolveProfileAuthorization(profile)
+    if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
     return jsonResponse({
       user: toPublicUser(auth.user),
-      permission: profile.permission,
-      permission_label: profile.permission,
-      status: cdkRecord?.status ?? profile.status,
+      permission: authorization.permission,
+      permission_label: isFreePreviewProfile(profile) ? '免费预览' : getPermissionProfile(authorization.permission).label,
+      status: authorization.cdkRecord?.status ?? profile.status,
       risk_status: 'ok',
     })
   } catch (error) {

@@ -24,6 +24,7 @@ import { useInventoryBalances } from './useInventoryBalances'
 import { copy } from '../../../copy/index'
 import { hasCapability } from '../../../lib/product-catalog'
 import { usePersonalUseDeclaration } from '../../../hooks/usePersonalUseDeclaration'
+import { upgradeProfileWithCdk } from '../profile-redemption'
 
 type BillingQuote = { pricing_version: string; charge: string; available: string; sufficient: boolean; tier: number | null; discount_bps: number }
 
@@ -134,6 +135,13 @@ export function useOptimizeWorkflow(props: Props) {
   const [upgradeLoading, setUpgradeLoading] = useState(false)
 
   const [upgradeError, setUpgradeError] = useState<string | null>(null)
+
+  const upgradeRequestRef = useRef<{ cdk: string; idempotencyKey: string } | null>(null)
+
+  const handleUpgradeCdkChange = useCallback((value: string) => {
+    upgradeRequestRef.current = null
+    setUpgradeCdk(value)
+  }, [])
 
   const { balance: priorityCouponBalance, selected: usePriorityCoupon, setSelected: setUsePriorityCoupon, refresh: refreshRewardBalance } = usePriorityCouponState(profileId)
   const { balances: itemBalances, capacity: profileCapacity, reorderQuota, refresh: refreshInventory } = useInventoryBalances(profileId)
@@ -306,6 +314,7 @@ export function useOptimizeWorkflow(props: Props) {
       setFreeScheduleConfirming(false)
       setFreeScheduleConfirmError(null)
       setLastGeneratedSignature(null)
+      upgradeRequestRef.current = null
       setUpgradeCdk('')
       setUpgradeError(null)
       setUseTrainingDiagnosisCoupon(false)
@@ -753,14 +762,21 @@ export function useOptimizeWorkflow(props: Props) {
   const handleUpgradePreviewProfile = useCallback(async (event: FormEvent) => {
       event.preventDefault()
       if (!isPreviewProfile || upgradeLoading) return
+      const normalizedCdk = upgradeCdk.trim()
+      const pendingRequest = upgradeRequestRef.current?.cdk === normalizedCdk
+        ? upgradeRequestRef.current
+        : { cdk: normalizedCdk, idempotencyKey: crypto.randomUUID() }
+      upgradeRequestRef.current = pendingRequest
       setUpgradeLoading(true)
       setUpgradeError(null)
       try {
-        const data = await apiJson<AuthSuccessResponse>('/api/user/profiles/redeem', {
-          method: 'POST',
-          json: { profile_id: profileId, cdk: upgradeCdk },
+        const data = await upgradeProfileWithCdk({
+          profileId,
+          cdk: upgradeCdk,
+          idempotencyKey: pendingRequest.idempotencyKey,
           fallbackMessage: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_023,
         })
+        upgradeRequestRef.current = null
         setUpgradeCdk('')
         onProfileUpgraded(data)
       } catch (error) {
@@ -770,5 +786,5 @@ export function useOptimizeWorkflow(props: Props) {
       }
     }, [isPreviewProfile, onProfileUpgraded, profileId, upgradeCdk, upgradeLoading])
 
-  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isPreviewProfile, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults: workspace?.archived_results ?? [], latestWorkspaceResult, freeScheduleGenerateBlockedReason: effectiveFreeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog }
+  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk: handleUpgradeCdkChange, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isPreviewProfile, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults: workspace?.archived_results ?? [], latestWorkspaceResult, freeScheduleGenerateBlockedReason: effectiveFreeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog }
 }

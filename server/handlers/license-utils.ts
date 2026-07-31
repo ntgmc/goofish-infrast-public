@@ -161,13 +161,14 @@ export function isProfileCdkRecord(record: CdkRecord): record is LegacyProfileCd
 export interface CdkRecordStore {
   get: (key: string) => Promise<CdkRecord | null>;
   create: (key: string, record: CdkRecord) => Promise<void>;
+  createBatch: (entries: Array<{ key: string; record: CdkRecord }>) => Promise<void>;
   mutate: (
     key: string,
     mutate: (current: CdkRecord) => CdkRecord | null,
     options?: { allowedStatuses?: CdkStatus[] },
   ) => Promise<CdkRecord | null>;
   incrementScheduleGenerateCount: (key: string, jobId?: string) => Promise<boolean>;
-  delete: (key: string) => Promise<void>;
+  deleteUnused: (key: string) => Promise<boolean>;
   list: (prefix: string) => Promise<CdkRecord[]>;
   listAdminPage?: (options: AdminCdkPageOptions) => Promise<AdminCdkPageResult>;
 }

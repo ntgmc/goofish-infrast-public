@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { hasCapability } from '../../src/lib/product-catalog'
 import type { WorkspaceResultHistoryItem } from '../../src/lib/types'
-import { getEffectiveProfilePermission } from '../free-preview-trial'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, stableJsonStringify } from '../security/request-validation'
 import {
@@ -23,6 +22,7 @@ import { jsonResponse, requireUserSession } from './user-auth'
 import { recordTrackedExportBehaviorEvent } from '../behavior-risk/service'
 import { getPersonalUseDeclarationAcceptance } from '../storage/personal-use-declaration-store'
 import { buildMaaExportPayload } from '../optimization/jobs/maa-export'
+import { resolveProfileAuthorization } from './profile-authorization'
 
 export default async function userResultsHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -38,9 +38,11 @@ export default async function userResultsHandler(req: Request): Promise<Response
       const profile = await getProfileForUser(auth.user.id, body.profile_id)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班结果。' }, 403)
+      const authorization = await resolveProfileAuthorization(profile)
+      if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
       if (!hasCapability({
         kind: profile.kind,
-        permission: getEffectiveProfilePermission(profile),
+        permission: authorization.permission,
       }, 'export_full_result_json')) {
         return jsonResponse({
           error: '当前档案不支持下载完整计算数据。',
@@ -78,6 +80,8 @@ export default async function userResultsHandler(req: Request): Promise<Response
       const profile = await getProfileForUser(auth.user.id, body.profile_id)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班结果。' }, 403)
+      const authorization = await resolveProfileAuthorization(profile)
+      if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
       const workspace = await getProfileWorkspace(profile.id)
       const historyItem = findHistoryItem(workspace?.result_history ?? [], workspace?.archived_results ?? [], body.result_id)
       if (!historyItem) return jsonResponse({ error: '排班结果不存在。' }, 404)
@@ -87,7 +91,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
       const isFreePreview = isFreePreviewProfile(profile)
       const canExportWithoutCoupon = !isFreePreview || hasCapability({
         kind: profile.kind,
-        permission: getEffectiveProfilePermission(profile),
+        permission: authorization.permission,
       }, 'export_maa_json')
       const recordExportBehavior = () => recordTrackedExportBehaviorEvent({
         req,
@@ -126,6 +130,8 @@ export default async function userResultsHandler(req: Request): Promise<Response
     const profile = await getProfileForUser(auth.user.id, body.profile_id)
     if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
     if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班结果。' }, 403)
+    const authorization = await resolveProfileAuthorization(profile)
+    if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
     const limits = await getProfileCapacityLimits(profile.id)
     const requestHash = createHash('sha256').update(stableJsonStringify({
       profile_id: body.profile_id,

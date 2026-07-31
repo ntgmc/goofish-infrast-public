@@ -740,6 +740,38 @@ export async function saveUserProfile(profile: UserGameAccountRecord): Promise<v
   )
 }
 
+export async function updateUserProfileMetadata(
+  userId: string,
+  profileId: string,
+  patch: { displayName?: string; note?: string },
+): Promise<UserGameAccountRecord | null> {
+  await ensureSchema()
+  if (patch.displayName === undefined && patch.note === undefined) {
+    throw new Error('Profile metadata update requires at least one field.')
+  }
+  const updatedAt = new Date().toISOString()
+  const result = await query<{ record_json: UserGameAccountRecord }>(
+    `update user_game_accounts
+        set display_name = coalesce($3, display_name),
+            note = coalesce($4, note),
+            updated_at = $5::timestamptz,
+            record_json = record_json
+              || jsonb_strip_nulls(jsonb_build_object('display_name', $3::text, 'note', $4::text))
+              || $6::jsonb
+      where id = $1 and user_id = $2
+      returning record_json`,
+    [
+      profileId,
+      userId,
+      patch.displayName ?? null,
+      patch.note ?? null,
+      updatedAt,
+      JSON.stringify({ updated_at: updatedAt }),
+    ],
+  )
+  return result.rows[0]?.record_json ?? null
+}
+
 export async function getFreePreviewClaim(uidHash: string): Promise<FreePreviewClaimRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: FreePreviewClaimRecord }>(

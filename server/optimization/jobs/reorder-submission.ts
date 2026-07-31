@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { CreateReorderCheckRequest } from '../../../src/lib/optimization-contracts'
-import { formatRiskFreezeMessage, resolveConfigForPermission, resolveFreePreviewConfig } from '../../handlers/license-utils'
+import { resolveConfigForPermission, resolveFreePreviewConfig } from '../../handlers/license-utils'
+import { resolveProfileAuthorization } from '../../handlers/profile-authorization'
 import { requireUserSession } from '../../handlers/user-auth'
 import { isFreePreviewTrialActive } from '../../free-preview-trial'
 import { getServiceLifecycleState } from '../../lifecycle'
@@ -56,13 +57,11 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
       return jsonResponse({ error: '重排检测仅面向免费个人排班档案开放。' }, 403)
     }
     const isPreviewTrial = isFreePreviewTrialActive(profile)
-    if (profile.status === 'revoked') {
-      await recordReorderCheckEvent('failure', 'cdk_revoked', startedAt, profileIdForUsage)
-      return jsonResponse({ error: '档案授权已被撤销。' }, 403)
-    }
-    if (profile.status === 'frozen') {
-      await recordReorderCheckEvent('failure', 'cdk_frozen', startedAt, profileIdForUsage)
-      return jsonResponse({ error: formatRiskFreezeMessage('档案授权已被冻结。') }, 403)
+    const authorization = await resolveProfileAuthorization(profile)
+    if (!authorization.ok) {
+      const reason = authorization.code.includes('revoked') ? 'cdk_revoked' : authorization.code.includes('frozen') ? 'cdk_frozen' : 'permission_denied'
+      await recordReorderCheckEvent('failure', reason, startedAt, profileIdForUsage)
+      return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
     }
     if (!profile.skland_binding) {
       await recordReorderCheckEvent('failure', 'permission_denied', startedAt, profileIdForUsage)

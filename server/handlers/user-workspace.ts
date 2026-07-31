@@ -14,10 +14,8 @@ import {
 import {
   evaluateOperatorRisk,
   formatOperatorRiskBlockMessage,
-  getCdkRecordStore,
   getRiskControlSettings,
   isProfileCdkRecord,
-  normalizePermissionMode,
   recordOperatorFingerprint,
   recordSoftBlockedRiskEvent,
   resolveConfigForPermission,
@@ -26,7 +24,8 @@ import {
   validateOperators,
 } from './license-utils'
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
-import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
+import { isFreePreviewTrialActive } from '../free-preview-trial'
+import { resolveProfileAuthorization } from './profile-authorization'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import { getProfileCapacityLimits } from '../storage/inventory-store'
@@ -50,6 +49,8 @@ export default async (req: Request): Promise<Response> => {
       const profile = await getProfileForUser(auth.user.id, profileId)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班工作区。' }, 403)
+      const authorization = await resolveProfileAuthorization(profile)
+      if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
       const capacityLimits = await getWorkspaceCapacityLimits(profile.id)
       const workspace = await getProfileWorkspace(profile.id)
       return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(workspace, capacityLimits) })
@@ -67,11 +68,12 @@ export default async (req: Request): Promise<Response> => {
     if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
     if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案不能保存排班工作区。' }, 403)
     if (profile.archived_at) return jsonResponse({ error: '归档档案不能写入工作区。', code: 'profile_archived' }, 409)
-    if (profile.status !== 'active') return jsonResponse({ error: '账号档案状态不可用。' }, 403)
+    const authorization = await resolveProfileAuthorization(profile)
+    if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
 
     const isPreviewProfile = isFreePreviewProfile(profile)
     const isPreviewTrial = isFreePreviewTrialActive(profile)
-    const effectivePermission = getEffectiveProfilePermission(profile)
+    const effectivePermission = authorization.permission
     const isRestrictedPreview = isPreviewProfile && !isPreviewTrial
     const capacityLimits = await getWorkspaceCapacityLimits(profile.id)
     if (isPreviewProfile && !profile.skland_binding) {
@@ -136,10 +138,9 @@ export default async (req: Request): Promise<Response> => {
       }
     }
 
-    if (operatorsValue && profile.cdk_key) {
-      const cdkStore = await getCdkRecordStore()
-      const cdkRecord = await cdkStore.get(profile.cdk_key)
-      if (cdkRecord && isProfileCdkRecord(cdkRecord) && cdkRecord.status === 'used' && normalizePermissionMode(cdkRecord.permission) === 'advanced') {
+    if (operatorsValue) {
+      const cdkRecord = authorization.cdkRecord
+      if (cdkRecord && isProfileCdkRecord(cdkRecord) && authorization.permission === 'advanced') {
         const riskSettings = await getRiskControlSettings()
         if (riskSettings.operator_data_risk_enabled) {
           const operatorRisk = evaluateOperatorRisk(cdkRecord, operatorsValue)

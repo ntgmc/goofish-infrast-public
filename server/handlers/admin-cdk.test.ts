@@ -4,10 +4,12 @@ import adminCdkHandler from './admin-cdk'
 const mocks = vi.hoisted(() => ({
   authenticateAdminRequest: vi.fn(),
   buildOperatorFingerprint: vi.fn(),
-  createCdk: vi.fn(),
   generateCdk: vi.fn(),
   hashCdk: vi.fn(),
   getCdk: vi.fn(),
+  createCdkBatch: vi.fn(),
+  deleteUnusedCdk: vi.fn(),
+  mutateCdk: vi.fn(),
   getProfileById: vi.fn(),
   getProfileWorkspace: vi.fn(),
   setOperatorBaselineByAdmin: vi.fn(),
@@ -25,7 +27,12 @@ vi.mock('./license-utils', () => ({
   getCdkType: (record: { cdk_type?: string }) => record.cdk_type ?? 'profile',
   getCdkItemCode: (record: { item_code?: string | null }) => record.item_code ?? null,
   getCdkItemExpiresAt: (record: { item_expires_at?: string | null }) => record.item_expires_at ?? null,
-  getCdkRecordStore: vi.fn(async () => ({ get: mocks.getCdk, create: mocks.createCdk })),
+  getCdkRecordStore: vi.fn(async () => ({
+    get: mocks.getCdk,
+    createBatch: mocks.createCdkBatch,
+    deleteUnused: mocks.deleteUnusedCdk,
+    mutate: mocks.mutateCdk,
+  })),
   hashCdk: mocks.hashCdk,
   isProfileCdkRecord: (record: { cdk_type?: string }) => (record.cdk_type ?? 'profile') === 'profile',
   jsonResponse: (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -72,7 +79,9 @@ beforeEach(() => {
   mocks.getCdk.mockResolvedValue(record)
   mocks.generateCdk.mockReturnValue('ITEM-CDK-CODE')
   mocks.hashCdk.mockReturnValue(codeHash)
-  mocks.createCdk.mockResolvedValue(undefined)
+  mocks.createCdkBatch.mockResolvedValue(undefined)
+  mocks.deleteUnusedCdk.mockResolvedValue(true)
+  mocks.mutateCdk.mockImplementation(async (_key, mutate) => mutate(record))
   mocks.getProfileById.mockResolvedValue({
     id: record.profile_id,
     user_id: record.account_id,
@@ -160,14 +169,17 @@ describe('admin item CDK generation', () => {
       item_name: '终身版兑换 CDK',
       item_expires_at: null,
     })
-    expect(mocks.createCdk).toHaveBeenCalledWith(`cdk/${codeHash}.json`, expect.objectContaining({
-      version: 3,
-      cdk_type: 'item',
-      item_code: 'lifetime_profile_voucher',
-      item_expires_at: null,
-      permission: null,
-      balance_amount: null,
-    }))
+    expect(mocks.createCdkBatch).toHaveBeenCalledWith([{
+      key: `cdk/${codeHash}.json`,
+      record: expect.objectContaining({
+        version: 3,
+        cdk_type: 'item',
+        item_code: 'lifetime_profile_voucher',
+        item_expires_at: null,
+        permission: null,
+        balance_amount: null,
+      }),
+    }])
   })
 
   it('rejects mixed item and balance payloads', async () => {
@@ -178,7 +190,35 @@ describe('admin item CDK generation', () => {
     }))
     expect(response.status).toBe(400)
     expect(await response.json()).toMatchObject({ code: 'cdk_payload_mismatch' })
-    expect(mocks.createCdk).not.toHaveBeenCalled()
+    expect(mocks.createCdkBatch).not.toHaveBeenCalled()
+  })
+})
+
+describe('admin CDK atomic lifecycle operations', () => {
+  it('returns stable per-item results for a batch revoke', async () => {
+    const secondHash = 'b'.repeat(64)
+    const response = await adminCdkHandler(new Request('http://localhost/api/admin/cdk', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'revoke', code_hashes: [codeHash, secondHash] }),
+    }))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ succeeded: 2, failed: 0 })
+    expect(mocks.mutateCdk).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports a conflict when the conditional delete loses a redemption race', async () => {
+    mocks.getCdk.mockResolvedValue({ ...record, status: 'unused' })
+    mocks.deleteUnusedCdk.mockResolvedValue(false)
+    const response = await adminCdkHandler(new Request('http://localhost/api/admin/cdk', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code_hash: codeHash }),
+    }))
+
+    expect(response.status).toBe(409)
+    expect(mocks.deleteUnusedCdk).toHaveBeenCalledWith(`cdk/${codeHash}.json`)
   })
 })
 

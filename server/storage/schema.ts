@@ -36,7 +36,28 @@ ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS item_code TEXT;
 ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS item_expires_at TIMESTAMPTZ;
 ALTER TABLE cdk_records ALTER COLUMN permission DROP NOT NULL;
 UPDATE cdk_records SET cdk_type = 'profile' WHERE cdk_type IS NULL;
+UPDATE cdk_records
+   SET permission = CASE permission WHEN 'basic' THEN 'growth' WHEN 'premium' THEN 'advanced' ELSE 'recommended' END,
+       record_json = record_json || jsonb_build_object(
+         'permission', CASE permission WHEN 'basic' THEN 'growth' WHEN 'premium' THEN 'advanced' ELSE 'recommended' END
+       )
+ WHERE cdk_type = 'profile'
+   AND (permission IS NULL OR permission NOT IN ('recommended', 'growth', 'advanced', 'ultimate'));
+UPDATE cdk_records
+   SET status = 'revoked',
+       record_json = record_json || jsonb_build_object('status', 'revoked')
+ WHERE status NOT IN ('unused', 'claiming', 'used', 'frozen', 'revoked');
+UPDATE cdk_records
+   SET record_json = record_json || jsonb_build_object('permission', permission, 'status', status);
 CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_type_created ON cdk_records(cdk_type, created_at DESC, key ASC);
+ALTER TABLE cdk_records DROP CONSTRAINT IF EXISTS cdk_records_permission_check;
+ALTER TABLE cdk_records ADD CONSTRAINT cdk_records_permission_check CHECK (
+  (cdk_type = 'profile' AND permission IN ('recommended', 'growth', 'advanced', 'ultimate'))
+  OR (cdk_type IN ('balance', 'item') AND permission IS NULL)
+);
+ALTER TABLE cdk_records DROP CONSTRAINT IF EXISTS cdk_records_status_check;
+ALTER TABLE cdk_records ADD CONSTRAINT cdk_records_status_check
+  CHECK (status IN ('unused', 'claiming', 'used', 'frozen', 'revoked'));
 ALTER TABLE cdk_records DROP CONSTRAINT IF EXISTS cdk_records_type_payload_check;
 ALTER TABLE cdk_records ADD CONSTRAINT cdk_records_type_payload_check CHECK (
   (cdk_type = 'profile' AND permission IS NOT NULL AND balance_amount IS NULL AND item_code IS NULL AND item_expires_at IS NULL)
@@ -720,6 +741,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_user_game_accounts_cdk_code_hash
   ON user_game_accounts(cdk_code_hash) WHERE cdk_code_hash IS NOT NULL;
 ALTER TABLE user_game_accounts ADD COLUMN IF NOT EXISTS kind TEXT;
 ALTER TABLE user_game_accounts ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+UPDATE user_game_accounts
+   SET permission = CASE permission WHEN 'basic' THEN 'growth' WHEN 'premium' THEN 'advanced' ELSE 'recommended' END,
+       record_json = record_json || jsonb_build_object(
+         'permission', CASE permission WHEN 'basic' THEN 'growth' WHEN 'premium' THEN 'advanced' ELSE 'recommended' END
+       )
+ WHERE permission NOT IN ('recommended', 'growth', 'advanced', 'metered_advanced', 'ultimate', 'admin');
+UPDATE user_game_accounts
+   SET status = 'revoked',
+       record_json = record_json || jsonb_build_object('status', 'revoked')
+ WHERE status NOT IN ('active', 'frozen', 'revoked');
+UPDATE user_game_accounts
+   SET record_json = record_json || jsonb_build_object('permission', permission, 'status', status);
+ALTER TABLE user_game_accounts DROP CONSTRAINT IF EXISTS user_game_accounts_permission_check;
+ALTER TABLE user_game_accounts ADD CONSTRAINT user_game_accounts_permission_check
+  CHECK (permission IN ('recommended', 'growth', 'advanced', 'metered_advanced', 'ultimate', 'admin'));
+ALTER TABLE user_game_accounts DROP CONSTRAINT IF EXISTS user_game_accounts_status_check;
+ALTER TABLE user_game_accounts ADD CONSTRAINT user_game_accounts_status_check
+  CHECK (status IN ('active', 'frozen', 'revoked'));
 UPDATE user_game_accounts
    SET kind = CASE
      WHEN record_json->>'kind' IN ('cdk', 'free_preview', 'depot_value', 'metered_personal', 'metered_commercial')

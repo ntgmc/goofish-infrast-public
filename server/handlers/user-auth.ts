@@ -471,9 +471,7 @@ export async function redeemProfileCdk(
   | { ok: true; profile: UserGameAccountRecord }
   | { ok: false; status: number; message: string }
 > {
-  if (typeof codeValue !== 'string' || !codeValue.trim()) {
   if (typeof codeValue !== 'string' || !codeValue.trim()) return { ok: false, status: 400, message: authCopy.api_cdk_required }
-  }
 
   const normalizedCode = normalizeCode(codeValue)
   const cdkMatch = await findCdkRecordByCode(normalizedCode)
@@ -484,14 +482,15 @@ export async function redeemProfileCdk(
   if (!idempotencyKey && cdkRecord.status === 'revoked') return { ok: false, status: 409, message: authCopy.api_cdk_revoked }
   const now = new Date().toISOString()
   const profileId = randomUUID()
-  const displayName = normalizeProfileDisplayName(displayNameValue) || await nextDefaultProfileName(user.id)
+  const requestedDisplayName = normalizeProfileDisplayName(displayNameValue)
+  const displayName = requestedDisplayName || await nextDefaultProfileName(user.id)
   const note = normalizeProfileNote(noteValue)
   try {
     const redeemed = await redeemCdkAtomically({
       key: cdkKey,
       idempotencyKey: normalizeIdempotencyKey(idempotencyKey),
       idempotencyScope: `profile:${user.id}`,
-      requestHash: createRequestHash({ codeHash, displayName, note }),
+      requestHash: createRequestHash({ codeHash, displayName: requestedDisplayName || null, note }),
       complete: async (client, cdkRecord) => {
         if (!isProfileCdkRecord(cdkRecord)) throw new Error(authCopy.api_cdk_type_mismatch)
         const permission = normalizePermissionMode(cdkRecord.permission)

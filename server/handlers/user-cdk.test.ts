@@ -82,6 +82,22 @@ describe('user CDK redemption', () => {
     expect(mocks.redeemCdkAtomically).not.toHaveBeenCalled()
   })
 
+  it('does not consume an item CDK submitted for a profile upgrade', async () => {
+    mocks.getValidatedJson.mockResolvedValue({
+      cdk: 'item-code',
+      idempotency_key: 'request-1',
+      profile_id: 'preview-profile',
+    })
+    mocks.findCdkRecordByCode.mockResolvedValue({ key: 'cdk/item.json', codeHash: itemRecord.code_hash, record: itemRecord })
+
+    const response = await userCdkHandler(request())
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ code: 'cdk_type_mismatch' })
+    expect(mocks.redeemCdkAtomically).not.toHaveBeenCalled()
+    expect(mocks.grantItemInTransaction).not.toHaveBeenCalled()
+  })
+
   it('grants a version 3 item inside the CDK completion callback', async () => {
     const match = { key: 'cdk/item.json', codeHash: itemRecord.code_hash, record: itemRecord }
     mocks.findCdkRecordByCode.mockResolvedValue(match)

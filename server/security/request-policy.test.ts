@@ -15,6 +15,17 @@ describe('admin CDK baseline request policy', () => {
     }
   })
 
+  it('accepts bounded unique-shape batch revoke payloads and rejects unknown actions', () => {
+    expect(requestSchemas.adminCdkPatch.safeParse({
+      action: 'revoke',
+      code_hashes: [codeHash, 'b'.repeat(64)],
+    }).success).toBe(true)
+    expect(requestSchemas.adminCdkPatch.safeParse({
+      action: 'arbitrary_action',
+      code_hash: codeHash,
+    }).success).toBe(false)
+  })
+
   it('accepts the legacy action name longer than 32 characters', () => {
     expect(requestSchemas.adminCdkPatch.safeParse({
       code_hash: codeHash,
@@ -68,5 +79,13 @@ describe('account deletion request policy', () => {
       email: 'user@example.test',
       password: '',
     }).success).toBe(false)
+  })
+})
+
+describe('profile metadata request policy', () => {
+  it('requires at least one metadata field', () => {
+    expect(requestSchemas.profilePatch.safeParse({ profile_id: 'profile-1' }).success).toBe(false)
+    expect(requestSchemas.profilePatch.safeParse({ profile_id: 'profile-1', display_name: '新名称' }).success).toBe(true)
+    expect(requestSchemas.profilePatch.safeParse({ profile_id: 'profile-1', note: '' }).success).toBe(true)
   })
 })

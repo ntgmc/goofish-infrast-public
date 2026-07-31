@@ -63,6 +63,13 @@ vi.mock('./user-auth', () => ({
   }),
   requireUserSession: mocks.requireUserSession,
 }))
+vi.mock('./profile-authorization', () => ({
+  resolveProfileAuthorization: vi.fn(async (profile: { permission: string; temporary_permission?: { permission?: string } }) => ({
+    ok: true,
+    permission: profile.temporary_permission?.permission ?? profile.permission,
+    cdkRecord: null,
+  })),
+}))
 
 const exportBody = {
   profile_id: 'profile-1',

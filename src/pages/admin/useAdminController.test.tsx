@@ -177,6 +177,38 @@ describe('useAdminController announcement drafts', () => {
       }),
     }))
   })
+
+  it('revokes selected CDKs with one batch request', async () => {
+    const firstHash = 'a'.repeat(64)
+    const secondHash = 'b'.repeat(64)
+    const records = [adminCdkRecord(firstHash), adminCdkRecord(secondHash)]
+    const originalImplementation = adminApi.json.getMockImplementation()!
+    adminApi.json.mockImplementation(async (url: string, init?: { method?: string; json?: unknown }) => {
+      if (url === '/api/admin/cdk' && init?.method === 'PATCH') {
+        return {
+          succeeded: 2,
+          failed: 0,
+          results: records.map((record) => ({ code_hash: record.code_hash, ok: true })),
+        }
+      }
+      if (url.startsWith('/api/admin/cdk?') && !url.includes('view=summary') && !url.includes('view=risk')) {
+        return { cdks: records, pagination: { page: 1, page_size: 25, total: 2, total_pages: 1 } }
+      }
+      return originalImplementation(url, init)
+    })
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    await waitFor(() => expect(result.current.visibleRecords).toHaveLength(2))
+    act(() => result.current.setSelectedCdkHashes([firstHash, secondHash]))
+
+    await act(async () => result.current.handleBulkRevoke())
+
+    const batchCalls = adminApi.json.mock.calls.filter(([url, init]) => url === '/api/admin/cdk' && init?.method === 'PATCH')
+    expect(batchCalls).toHaveLength(1)
+    expect(batchCalls[0]?.[1]).toMatchObject({
+      json: { action: 'revoke', code_hashes: [firstHash, secondHash] },
+    })
+  })
 })
 
 async function waitForHydration(result: { current: ReturnType<typeof useAdminController> }) {
@@ -211,5 +243,23 @@ function createAnnouncement(
     body,
     created_at: updatedAt,
     updated_at: updatedAt,
+  }
+}
+
+function adminCdkRecord(codeHash: string) {
+  return {
+    code_hash: codeHash,
+    cdk_id: codeHash.slice(0, 12),
+    cdk_type: 'profile' as const,
+    permission: 'growth' as const,
+    amount: null,
+    status: 'used' as const,
+    created_at: '2026-01-01T00:00:00.000Z',
+    used_at: '2026-01-02T00:00:00.000Z',
+    revoked_at: null,
+    order_note: null,
+    license_order_hash: null,
+    operator_count: null,
+    config_desc: null,
   }
 }

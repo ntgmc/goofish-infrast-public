@@ -18,6 +18,7 @@ import { copy } from '../../copy/index'
 import { hasCapability } from '../../lib/product-catalog'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import { NotificationBell } from '../../components/NotificationCenter'
+import { upgradeProfileWithCdk } from './profile-redemption'
 
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
@@ -421,19 +422,27 @@ function ProfileCdkPaths({
   const [upgradeCdk, setUpgradeCdk] = useState('')
   const [upgradeLoading, setUpgradeLoading] = useState(false)
   const [upgradeError, setUpgradeError] = useState<string | null>(null)
+  const upgradeRequestRef = useRef<{ cdk: string; idempotencyKey: string } | null>(null)
   const isPreviewProfile = isFreePreviewProfile(profile)
 
   const handleUpgrade = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!isPreviewProfile || upgradeLoading) return
+    const normalizedCdk = upgradeCdk.trim()
+    const pendingRequest = upgradeRequestRef.current?.cdk === normalizedCdk
+      ? upgradeRequestRef.current
+      : { cdk: normalizedCdk, idempotencyKey: crypto.randomUUID() }
+    upgradeRequestRef.current = pendingRequest
     setUpgradeLoading(true)
     setUpgradeError(null)
     try {
-      const data = await apiJson<AuthSuccessResponse>('/api/user/profiles/redeem', {
-        method: 'POST',
-        json: { profile_id: profile.id, cdk: upgradeCdk },
+      const data = await upgradeProfileWithCdk({
+        profileId: profile.id,
+        cdk: upgradeCdk,
+        idempotencyKey: pendingRequest.idempotencyKey,
         fallbackMessage: copy.workspace.pages_tool_WorkspaceSetupPage_048,
       })
+      upgradeRequestRef.current = null
       setUpgradeCdk('')
       onUpgraded(data)
     } catch (caught) {
@@ -463,8 +472,12 @@ function ProfileCdkPaths({
             <input
               id="workspace-upgrade-cdk"
               value={upgradeCdk}
-              onChange={(event) => setUpgradeCdk(event.currentTarget.value)}
+              onChange={(event) => {
+                upgradeRequestRef.current = null
+                setUpgradeCdk(event.currentTarget.value)
+              }}
               className="tool-field mt-2 font-mono uppercase tracking-wide"
+              maxLength={256}
               autoCapitalize="characters"
               autoComplete="off"
               spellCheck={false}
