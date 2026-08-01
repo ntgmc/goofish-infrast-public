@@ -1,7 +1,10 @@
 import { z } from 'zod'
 import type { ScenarioComparisonResult } from '../../../src/lib/scenario-comparison'
 import type { OptimizeResult, ReorderCheckResult } from '../../../src/lib/types'
-import { licenseConfigSchema, licenseOperatorsSchema } from '../../../src/lib/workspace-validation'
+import {
+  extensibleLicenseConfigSchema,
+  extensibleLicenseOperatorsSchema,
+} from '../../../src/lib/workspace-validation'
 import type {
   OptimizationJobPayload,
   OptimizeJobPayload,
@@ -165,7 +168,7 @@ const scenarioComparisonResultSchema: z.ZodType<ScenarioComparisonResult> = z.ob
   points: z.array(z.object({
     id: boundedString(256),
     label: boundedString(1_000),
-    config: licenseConfigSchema,
+    config: extensibleLicenseConfigSchema,
     layout: z.enum(['153', '243', '333']),
     productionPlan: scenarioProductionPlanSchema,
     scheduleMode: z.enum(['maa', 'rotation']),
@@ -224,7 +227,7 @@ const workspaceHistoryItemSchema = z.strictObject({
   id: boundedString(128),
   name: boundedString(1_000),
   created_at: boundedString(128),
-  config: licenseConfigSchema.nullable(),
+  config: extensibleLicenseConfigSchema.nullable(),
   result: optimizeResultSchema,
   operator_count: z.number().int().min(0).max(500),
   source: z.enum(['generated', 'applied_suggestions', 'legacy']),
@@ -233,8 +236,8 @@ const workspaceHistoryItemSchema = z.strictObject({
 const schedulePayloadSchema: z.ZodType<OptimizeJobPayload> = z.strictObject({
   version: z.literal(3),
   submittedAt: z.number().int().nonnegative(),
-  operators: licenseOperatorsSchema,
-  effectiveConfig: licenseConfigSchema,
+  operators: extensibleLicenseOperatorsSchema,
+  effectiveConfig: extensibleLicenseConfigSchema,
   scheduleUsageBase: scheduleUsageContextSchema,
   activeProfileId: z.string().max(128).nullable(),
   isPreviewProfile: z.boolean(),
@@ -254,8 +257,8 @@ const scenarioPayloadSchema: z.ZodType<ScenarioComparisonJobPayload> = z.strictO
   version: z.literal(3),
   kind: z.literal('scenario_comparison'),
   submittedAt: z.number().int().nonnegative(),
-  operators: licenseOperatorsSchema,
-  effectiveConfig: licenseConfigSchema,
+  operators: extensibleLicenseOperatorsSchema,
+  effectiveConfig: extensibleLicenseConfigSchema,
   activeProfileId: boundedString(128),
   factors: scenarioComparisonFactorsSchema,
   estimate: optimizeDurationEstimateSchema,
@@ -265,8 +268,8 @@ const reorderPayloadSchema: z.ZodType<ReorderCheckJobPayload> = z.strictObject({
   version: z.literal(3),
   kind: z.literal('reorder_check'),
   submittedAt: z.number().int().nonnegative(),
-  operators: licenseOperatorsSchema,
-  effectiveConfig: licenseConfigSchema,
+  operators: extensibleLicenseOperatorsSchema,
+  effectiveConfig: extensibleLicenseConfigSchema,
   activeProfileId: boundedString(128),
   isPreviewTrial: z.boolean(),
   baseline: workspaceHistoryItemSchema,
@@ -323,6 +326,7 @@ function assertJsonSafe(value: unknown, context: z.RefinementCtx): void {
       continue
     }
     for (const [key, item] of Object.entries(current.value)) {
+      if (item === undefined) continue
       pending.push({ value: item, path: [...current.path, key], depth: current.depth + 1 })
     }
   }

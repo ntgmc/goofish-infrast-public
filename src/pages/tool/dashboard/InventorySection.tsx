@@ -2,6 +2,7 @@ import { Dialog } from 'radix-ui'
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import { copy } from '../../../copy/index'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 import SklandBindingDialog, { type SklandPayload } from '../../../components/SklandBindingDialog'
 import type { AuthSuccessResponse } from '../../../lib/types'
 import {
@@ -37,14 +38,18 @@ export default function InventorySection({
   const [rewards, setRewards] = useState<UseResponse['rewards']>(undefined)
   const [lifetimeDialogOpen, setLifetimeDialogOpen] = useState(false)
   const itemIdempotencyKeyRef = useRef(crypto.randomUUID())
+  const { features } = useSiteFeatures()
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
+      const onboardingTasks = features.onboarding_tasks
+        ? apiJson<{ tasks: OnboardingTaskView[] }>('/api/user/onboarding-tasks').catch(() => ({ tasks: [] }))
+        : Promise.resolve({ tasks: [] })
       const [nextInventory, nextTasks] = await Promise.all([
         apiJson<InventoryResponse>('/api/user/inventory'),
-        apiJson<{ tasks: OnboardingTaskView[] }>('/api/user/onboarding-tasks'),
+        onboardingTasks,
       ])
       setInventory(nextInventory)
       setTasks(nextTasks.tasks ?? [])
@@ -53,7 +58,7 @@ export default function InventorySection({
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [features.onboarding_tasks])
 
   useEffect(() => { void load() }, [load])
 

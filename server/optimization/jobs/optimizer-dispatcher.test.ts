@@ -58,14 +58,54 @@ describe('optimization job dispatcher', () => {
     expect(port.executeScenarioComparison).not.toHaveBeenCalled()
     expect(port.executeReorderCheck).not.toHaveBeenCalled()
   })
+
+  it('accepts undefined object properties that JSON serialization safely omits', async () => {
+    const result = {
+      ...scheduleResult(),
+      schedule_mode: undefined,
+      plans: [{
+        name: 'Plan 1',
+        drones: undefined,
+        rooms: {
+          trading: [{
+            operators: ['Operator'],
+            mood: { Operator: { start: 24, end: undefined } },
+          }],
+        },
+      }],
+    }
+    const port = fakePort({ executeSchedule: vi.fn(async () => result) })
+
+    await expect(executeOptimizationJobWithPort(job(schedulePayload()), context, port))
+      .resolves.toEqual(result)
+  })
+
+  it('still rejects non-finite optimizer result values', async () => {
+    const port = fakePort({
+      executeSchedule: vi.fn(async () => ({
+        ...scheduleResult(),
+        total_efficiency: Number.POSITIVE_INFINITY,
+      })),
+    })
+
+    await expect(executeOptimizationJobWithPort(job(schedulePayload()), context, port))
+      .rejects.toMatchObject({
+        failure: {
+          code: 'invalid_optimizer_result',
+          kind: 'validation',
+          retryable: false,
+        },
+      })
+  })
 })
 
-function fakePort(): OptimizerPort {
+function fakePort(overrides: Partial<OptimizerPort> = {}): OptimizerPort {
   return {
     version: OPTIMIZER_PORT_VERSION,
     executeSchedule: vi.fn(async () => scheduleResult()),
     executeScenarioComparison: vi.fn(async () => scenarioResult()),
     executeReorderCheck: vi.fn(async () => reorderResult()),
+    ...overrides,
   }
 }
 

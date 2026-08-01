@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { InventoryResponse, ItemUseRequest } from '../../../lib/inventory-contracts'
 import InventorySection from './InventorySection'
 
-const mocks = vi.hoisted(() => ({ apiJson: vi.fn() }))
+const mocks = vi.hoisted(() => ({ apiJson: vi.fn(), onboardingTasksEnabled: true }))
 
 vi.mock('../../../lib/api-client', () => ({
   apiJson: mocks.apiJson,
@@ -13,6 +13,10 @@ vi.mock('../../../lib/api-client', () => ({
 }))
 
 vi.mock('../../../components/SklandBindingDialog', () => ({ default: () => null }))
+
+vi.mock('../../../lib/site-feature-context', () => ({
+  useSiteFeatures: () => ({ features: { onboarding_tasks: mocks.onboardingTasksEnabled } }),
+}))
 
 const inventory: InventoryResponse = {
   stacks: [{
@@ -69,9 +73,38 @@ const lifetimeInventory: InventoryResponse = {
 afterEach(() => {
   cleanup()
   mocks.apiJson.mockReset()
+  mocks.onboardingTasksEnabled = true
 })
 
 describe('InventorySection idempotent item use', () => {
+  it('loads inventory without requesting onboarding tasks when the feature is disabled', async () => {
+    mocks.onboardingTasksEnabled = false
+    mocks.apiJson.mockImplementation(async (path: string) => {
+      if (path === '/api/user/inventory') return inventory
+      throw new Error(`unexpected request: ${path}`)
+    })
+
+    render(<InventorySection onPayload={vi.fn()} />)
+
+    expect(await screen.findByRole('button', { name: /限时 CDK/ })).toBeInTheDocument()
+    expect(mocks.apiJson).not.toHaveBeenCalledWith('/api/user/onboarding-tasks')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps inventory available when onboarding tasks cannot be loaded', async () => {
+    mocks.apiJson.mockImplementation(async (path: string) => {
+      if (path === '/api/user/onboarding-tasks') throw new Error('该功能当前未开放。')
+      if (path === '/api/user/inventory') return inventory
+      throw new Error(`unexpected request: ${path}`)
+    })
+
+    render(<InventorySection onPayload={vi.fn()} />)
+
+    expect(await screen.findByRole('button', { name: /限时 CDK/ })).toBeInTheDocument()
+    expect(screen.queryByText('该功能当前未开放。')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('reuses the key after an unknown failure and rotates it only after success', async () => {
     const itemRequests: ItemUseRequest[] = []
     mocks.apiJson.mockImplementation(async (path: string, options?: { method?: string; json?: ItemUseRequest }) => {
