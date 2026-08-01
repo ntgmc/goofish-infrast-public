@@ -46,6 +46,13 @@ vi.mock('./user-auth', () => ({
   }),
   requireUserSession: mocks.requireUserSession,
 }))
+vi.mock('./profile-authorization', () => ({
+  resolveProfileAuthorization: vi.fn(async (profile: { permission: string }) => ({
+    ok: true,
+    permission: profile.permission,
+    cdkRecord: null,
+  })),
+}))
 
 vi.mock('../security/request-policy', () => ({ requestSchemas: { userWorkspace: {} } }))
 vi.mock('../security/request-validation', () => ({ getValidatedJson: mocks.getValidatedJson }))
@@ -104,6 +111,34 @@ describe('saved workspace configuration limit', () => {
     expect(saveResponse.status).toBe(200)
     expect(workspace.saved_configs).toHaveLength(3)
     expect(workspace.saved_configs[0]?.name).toBe('配置 4')
+  })
+
+  it.each(['delete', 'touch'] as const)('returns 404 when %s targets a missing configuration', async (type) => {
+    mocks.getValidatedJson.mockResolvedValue({
+      profile_id: 'profile-1',
+      saved_config_action: { type, id: 'missing-config' },
+    })
+
+    const response = await workspaceHandler(patchRequest())
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({ error: '方案不存在。' })
+  })
+})
+
+describe('workspace elite overrides', () => {
+  it('rejects overrides for operators outside the current workspace', async () => {
+    workspace.operators = [{ id: 'char_001', name: '测试干员', own: true, elite: 1, rarity: 5 }]
+    mocks.getValidatedJson.mockResolvedValue({
+      profile_id: 'profile-1',
+      elite_overrides: { char_unknown: 2 },
+    })
+
+    const response = await workspaceHandler(patchRequest())
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({ error: '精英覆盖中的干员 char_unknown 不属于当前工作区。' })
+    expect(workspace.elite_overrides).toEqual({})
   })
 })
 

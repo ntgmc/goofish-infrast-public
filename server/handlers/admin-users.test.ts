@@ -57,6 +57,7 @@ vi.mock('../storage/user-store', () => ({
 vi.mock('./user-auth', () => ({ resetUserPasswordByAdmin: mocks.resetUserPasswordByAdmin }))
 vi.mock('../storage/personal-use-declaration-store', () => ({
   listPersonalUseDeclarationAcceptancesForUser: vi.fn(async () => []),
+  listPersonalUseDeclarationUsageEventsForUser: vi.fn(async () => []),
 }))
 vi.mock('../behavior-risk/service', () => ({ recordAccountDeletedBehaviorEvent: vi.fn() }))
 

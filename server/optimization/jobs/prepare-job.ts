@@ -1,6 +1,7 @@
 import type { LicenseFile } from "../../../src/lib/types";
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
-import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, formatRiskFreezeMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getCdkRecordStore, getRiskControlSettings, isProfileCdkRecord, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
+import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getRiskControlSettings, isProfileCdkRecord, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
+import { resolveProfileAuthorization } from '../../handlers/profile-authorization';
 import { getWorkspace, emptyWorkspace, getProfileForUser, isDepotValueProfile, isFreePreviewProfile, normalizeProfileKind, updateProfileWorkspaceAtomically } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store";
@@ -11,7 +12,7 @@ import { recordScheduleGenerate, scheduleFailure, resolveFreeScheduleGenerateDec
 import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammettaEnabled, resolveOptimizeDurationEstimate } from './job-status';
 import { buildScenarioComparisonEstimate } from './job-status';
 import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
-import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../../free-preview-trial';
+import { isFreePreviewTrialActive } from '../../free-preview-trial';
 import { hasCapability } from '../../../src/lib/product-catalog';
 import { getFreeScheduleEntitlement } from '../../storage/reorder-admission';
 import { requestSchemas } from '../../security/request-policy';
@@ -86,6 +87,7 @@ export async function prepareOptimizeJob(
     let activeProfileUid: string | null = null;
     let isPreviewProfile = false;
     let isPreviewTrial = false;
+    let personalUseAudit: PreparedOptimizeJob['personalUseAudit'];
     let meteredBilling: { userId: string; quote: MeteredScheduleQuote } | null = null;
 
     {
@@ -104,12 +106,31 @@ export async function prepareOptimizeJob(
         return fail({ error: '仓库分析档案不能用于生成排班。' }, 403);
       }
       const profileKind = normalizeProfileKind(profile);
+      if (profileKind === 'free_preview' || profileKind === 'metered_personal') {
+        personalUseAudit = { userId: auth.user.id, profileId: activeProfileId };
+      }
       const meteredFeatureGate = await requireMeteredBillingFeature(profileKind);
       if (meteredFeatureGate) return { ok: false, response: meteredFeatureGate };
       if (profile.archived_at) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
         return fail({ error: '归档档案不能提交任务。', code: 'profile_archived' }, 409);
       }
+      const authorization = await resolveProfileAuthorization(profile);
+      if (!authorization.ok) {
+        const reason = authorization.code.includes('revoked')
+          ? 'cdk_revoked'
+          : authorization.code.includes('frozen')
+            ? 'cdk_frozen'
+            : 'permission_denied';
+        scheduleUsage = scheduleFailure(reason, {
+          profile_id: activeProfileId,
+          permission: profile.permission,
+          cdk_status: profile.status,
+          source: 'account_profile',
+        });
+        return fail({ error: authorization.message, code: authorization.code }, authorization.status);
+      }
+      checkedCdkRecord = authorization.cdkRecord;
       if ((profileKind === 'metered_personal' || profileKind === 'metered_commercial') && isScenarioComparison) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
         return fail({ error: '按次计费档案不开放场景对比实验室。', code: 'capability_not_available' }, 403);
@@ -140,26 +161,12 @@ export async function prepareOptimizeJob(
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: 'free_preview', source: 'free_preview' });
         return fail({ error: '免费个人排班档案必须先绑定森空岛后才能生成排班。' }, 403);
       }
-      const cdkStore = await getCdkRecordStore();
-      checkedCdkRecord = profile.cdk_key ? await cdkStore.get(profile.cdk_key) : null;
-      if (checkedCdkRecord?.status === 'revoked' || profile.status === 'revoked') {
-        scheduleUsage = scheduleFailure('cdk_revoked', { profile_id: activeProfileId, permission: profile.permission, cdk_status: checkedCdkRecord?.status ?? profile.status, source: 'account_profile' });
-        return fail({ error: 'Account authorization has been revoked.' }, 403);
-      }
-      if (checkedCdkRecord?.status === 'frozen' || profile.status === 'frozen') {
-        scheduleUsage = scheduleFailure('cdk_frozen', { profile_id: activeProfileId, permission: profile.permission, cdk_status: checkedCdkRecord?.status ?? profile.status, source: 'account_profile' });
-        return fail({
-          error: checkedCdkRecord?.status === 'frozen'
-            ? formatRiskFreezeMessage(checkedCdkRecord.freeze_reason || 'Account authorization is frozen.')
-            : '当前档案暂时不可用，请联系支持人员核验或恢复。',
-        }, 403);
-      }
       effectiveLicense = {
         version: 2,
         order_hash: profile.cdk_order_hash || profile.id.slice(0, 16),
         operators,
         config,
-        permission: getEffectiveProfilePermission(profile),
+        permission: authorization.permission,
         issued_at: profile.created_at,
         sig: 'account-' + profile.id,
       };
@@ -253,6 +260,7 @@ export async function prepareOptimizeJob(
           rewardUserId: useScenarioCoupon ? auth.user.id : null,
           usePriorityCoupon: false,
           rewardItemCodes: useScenarioCoupon ? ['scenario_simulation_coupon'] : [],
+          personalUseAudit,
           payload: {
             version: 3,
             kind: 'scenario_comparison',
@@ -337,6 +345,7 @@ export async function prepareOptimizeJob(
           ...(requestedItems.has('additional_recompute_coupon') ? ['additional_recompute_coupon'] : []),
         ],
         behaviorIdentity: { userId: auth.user.id, sessionTokenHash: auth.tokenHash },
+        personalUseAudit,
         billing: meteredBilling,
         payload: createPersistedOptimizeJobPayload({
           submittedAt,

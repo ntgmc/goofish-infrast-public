@@ -166,8 +166,12 @@ export function reservePasswordChangeAttempt(clientIp: string): AuthRateLimitDec
   return authRateLimiter.reserve([authScope('password-change-ip', clientIp, 10, AUTH_WINDOW_MS)])
 }
 
-export function reserveSklandAttempt(userId: string): AuthRateLimitDecision {
-  return authRateLimiter.reserve([authScope('skland-user', userId, 30, SKLAND_WINDOW_MS)])
+export function reserveSklandAttempt(
+  userId: string,
+  bucket: 'external' | 'poll' = 'external',
+): AuthRateLimitDecision {
+  const limit = bucket === 'poll' ? 60 : 30
+  return authRateLimiter.reserve([authScope(`skland-${bucket}-user`, userId, limit, SKLAND_WINDOW_MS)])
 }
 
 function authScope(namespace: string, identity: string, limit: number, windowMs = AUTH_WINDOW_MS): RateLimitScope {

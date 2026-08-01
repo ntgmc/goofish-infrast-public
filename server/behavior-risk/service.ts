@@ -1,10 +1,12 @@
 import { createHash, createHmac } from 'node:crypto'
+import type { PoolClient } from 'pg'
 import type { OptimizeResult } from '../../src/lib/types'
 import { getRequestClientIp } from '../security/client-ip'
 import { hasDatabaseUrl } from '../storage/postgres'
 import {
   getTrackedGenerationEvent,
   insertBehaviorRiskEvent,
+  insertBehaviorRiskEventInTransaction,
   runBehaviorRiskEvaluation,
   type BehaviorRiskEventInput,
 } from '../storage/behavior-risk-store'
@@ -38,8 +40,26 @@ export async function recordRequestBehaviorEvent(input: {
 }): Promise<boolean> {
   const keyring = getBehaviorRiskKeyring()
   if (!keyring || !hasDatabaseUrl()) return false
+  return safelyInsert(buildRequestBehaviorRiskEvent(input, keyring), shouldEvaluateImmediately(input.eventType))
+}
+
+export async function recordRequestBehaviorEventInTransaction(
+  client: Pick<PoolClient, 'query'>,
+  input: Parameters<typeof recordRequestBehaviorEvent>[0],
+): Promise<boolean> {
+  const keyring = getBehaviorRiskKeyring()
+  if (!keyring || !hasDatabaseUrl()) return false
+  const inserted = await insertBehaviorRiskEventInTransaction(client, buildRequestBehaviorRiskEvent(input, keyring))
+  if (inserted && shouldEvaluateImmediately(input.eventType)) queueBehaviorRiskEvaluation()
+  return inserted
+}
+
+function buildRequestBehaviorRiskEvent(
+  input: Parameters<typeof recordRequestBehaviorEvent>[0],
+  keyring: { secret: string; version: string },
+): BehaviorRiskEventInput {
   const signals = requestSignals(input.req, input.sessionTokenHash ?? null, keyring)
-  return safelyInsert({
+  return {
     eventKey: input.eventKey,
     eventType: input.eventType,
     userId: input.userId,
@@ -56,7 +76,7 @@ export async function recordRequestBehaviorEvent(input: {
     occurredAt: input.occurredAt,
     keyVersion: keyring.version,
     ...signals,
-  }, shouldEvaluateImmediately(input.eventType))
+  }
 }
 
 export async function recordAuthenticatedRequestBehaviorEvent(input: {

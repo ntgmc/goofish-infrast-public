@@ -16,9 +16,7 @@ import {
 } from './optimization/jobs/optimizer-port'
 import { createMemoryOptimizeJobStore } from './storage/optimize-job-store'
 
-let executeSchedule: (context: OptimizeExecutionContext) => Promise<unknown> = async (context) => ({
-  completedJobId: context.jobId,
-})
+let executeSchedule: (context: OptimizeExecutionContext) => Promise<unknown> = async (context) => scheduleResult(context.jobId)
 let unregisterOptimizerPort: (() => void) | null = null
 
 afterAll(async () => {
@@ -40,10 +38,10 @@ describe('optimization dispatcher startup recovery', () => {
     const store = createMemoryOptimizeJobStore()
     globalThis.__maaOptimizeJobStoreForTesting = store
     unregisterOptimizerPort = registerOptimizerPort(fakePort())
-    executeSchedule = async (context) => ({ completedJobId: context.jobId })
+    executeSchedule = async (context) => scheduleResult(context.jobId)
 
-    const expired = await store.createJob(input())
-    const queued = await store.createJob(input())
+    const expired = await store.createJob(input('00000000-0000-4000-8000-000000000001'))
+    const queued = await store.createJob(input('ffffffff-ffff-4fff-bfff-ffffffffffff'))
     await store.claimNextJob(
       'old-worker',
       'old-lock',
@@ -51,23 +49,26 @@ describe('optimization dispatcher startup recovery', () => {
       2,
     )
 
-    await initializeOptimizeJobProcessing()
+    try {
+      await initializeOptimizeJobProcessing()
 
-    await waitFor(async () => (await store.getJob(expired.id))?.status === 'succeeded')
+      await waitFor(async () => (await store.getJob(expired.id))?.status === 'succeeded')
 
-    await expect(store.getJob(expired.id)).resolves.toMatchObject({
-      status: 'succeeded',
-      attempt_count: 2,
-      failure_count: 1,
-      result_json: { completedJobId: expired.id },
-    })
-    await expect(store.getJob(queued.id)).resolves.toMatchObject({
-      status: 'succeeded',
-      attempt_count: 1,
-      failure_count: 0,
-      result_json: { completedJobId: queued.id },
-    })
-    delete process.env.OPTIMIZE_RETRY_BASE_MS
+      await expect(store.getJob(expired.id)).resolves.toMatchObject({
+        status: 'succeeded',
+        attempt_count: 2,
+        failure_count: 1,
+        result_json: { completedJobId: expired.id },
+      })
+      await expect(store.getJob(queued.id)).resolves.toMatchObject({
+        status: 'succeeded',
+        attempt_count: 1,
+        failure_count: 0,
+        result_json: { completedJobId: queued.id },
+      })
+    } finally {
+      delete process.env.OPTIMIZE_RETRY_BASE_MS
+    }
   })
 
   it('enforces the hard timeout for inline execution', async () => {
@@ -92,7 +93,7 @@ describe('optimization dispatcher startup recovery', () => {
         public_error_code: 'execution_retries_exhausted',
       })
     } finally {
-      executeSchedule = async (context) => ({ completedJobId: context.jobId })
+      executeSchedule = async (context) => scheduleResult(context.jobId)
       delete process.env.OPTIMIZE_JOB_HARD_TIMEOUT_MS
       delete process.env.OPTIMIZE_JOB_MAX_ATTEMPTS
     }
@@ -166,7 +167,7 @@ describe('optimization dispatcher startup recovery', () => {
     await expect(store.getJob(job.id)).resolves.toMatchObject({
       status: 'succeeded',
       execution_stage: 'completed',
-      result_json: { ok: true },
+      result_json: { title: 'result' },
     })
 
     delete process.env.OPTIMIZE_FORCE_WORKER_THREADS_FOR_TESTING
@@ -197,14 +198,59 @@ describe('optimization dispatcher startup recovery', () => {
   })
 })
 
-function input() {
+function input(id = randomUUID()) {
   return {
-    id: randomUUID(),
+    id,
     priority: 10,
     owner_key: `license:${randomUUID()}`,
     permission: 'growth',
     source: 'account_profile',
-    payload_json: { version: 3 },
+    payload_json: {
+      version: 3,
+      submittedAt: 1,
+      operators: [{ id: 'op-1', name: 'Operator', own: true, elite: 2, rarity: 6 }],
+      effectiveConfig: {
+        layout: '243',
+        desc: 'test',
+        schedule_mode: 'maa',
+        trading_stations_count: 2,
+        manufacturing_stations_count: 4,
+        product_requirements: {
+          trading_stations: { lmd: 2 },
+          manufacturing_stations: { pure_gold: 4 },
+        },
+      },
+      scheduleUsageBase: {},
+      activeProfileId: null,
+      isPreviewProfile: false,
+      isPreviewTrial: false,
+      freeScheduleDecision: null,
+      estimate: {
+        estimated_duration_ms: 2_000,
+        estimate_bucket: 'maa_plain',
+        estimate_source: 'fallback_p95',
+        estimate_sample_count: 0,
+      },
+      request: {
+        include_upgrade_suggestions: false,
+        upgrade_suggestions_allowed: false,
+      },
+      configPermission: 'growth',
+      cdkUsageRef: null,
+    },
+  }
+}
+
+function scheduleResult(completedJobId: string) {
+  return {
+    author: 'test',
+    title: 'result',
+    description: 'result',
+    buildingType: 2,
+    planTimes: '8h',
+    plans: [],
+    raw_results: [],
+    completedJobId,
   }
 }
 

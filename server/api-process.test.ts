@@ -24,6 +24,52 @@ afterEach(async () => {
 })
 
 describe('API process lifecycle', () => {
+  it('fails fast in production when account deletion cannot hash depot identities', () => {
+    const previousNodeEnv = process.env.NODE_ENV
+    const previousPublicAppUrl = process.env.PUBLIC_APP_URL
+    const previousDepotSecret = process.env.DEPOT_SAMPLE_HASH_SECRET
+    process.env.NODE_ENV = 'production'
+    process.env.PUBLIC_APP_URL = 'https://example.test'
+    delete process.env.DEPOT_SAMPLE_HASH_SECRET
+
+    try {
+      expect(() => createApiProcess(createHooks(), createDependencies().values))
+        .toThrow('DEPOT_SAMPLE_HASH_SECRET is required in production')
+    } finally {
+      restoreEnvironment('NODE_ENV', previousNodeEnv)
+      restoreEnvironment('PUBLIC_APP_URL', previousPublicAppUrl)
+      restoreEnvironment('DEPOT_SAMPLE_HASH_SECRET', previousDepotSecret)
+    }
+  })
+
+  it('fails fast in production when Skland secrets are missing or unstable', () => {
+    const names = [
+      'NODE_ENV',
+      'PUBLIC_APP_URL',
+      'DEPOT_SAMPLE_HASH_SECRET',
+      'SKLAND_CREDENTIAL_SECRET',
+      'FREE_PREVIEW_UID_HASH_SECRET',
+    ] as const
+    const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]))
+    process.env.NODE_ENV = 'production'
+    process.env.PUBLIC_APP_URL = 'https://example.test'
+    process.env.DEPOT_SAMPLE_HASH_SECRET = 'stable-depot-hash-secret'
+    process.env.FREE_PREVIEW_UID_HASH_SECRET = 'stable-free-preview-hmac-secret-at-least-32'
+    delete process.env.SKLAND_CREDENTIAL_SECRET
+
+    try {
+      expect(() => createApiProcess(createHooks(), createDependencies().values))
+        .toThrow('森空岛服务配置无效，请联系管理员。')
+
+      process.env.SKLAND_CREDENTIAL_SECRET = 'stable-skland-credential-secret'
+      process.env.FREE_PREVIEW_UID_HASH_SECRET = 'too-short'
+      expect(() => createApiProcess(createHooks(), createDependencies().values))
+        .toThrow('森空岛服务配置无效，请联系管理员。')
+    } finally {
+      for (const name of names) restoreEnvironment(name, previous[name])
+    }
+  })
+
   it('runs initialization before listening and drains shared resources in order', async () => {
     const hooks = createHooks()
     const dependencies = createDependencies()
@@ -125,4 +171,9 @@ function closeServer(server: Server): Promise<void> {
   return new Promise((resolveClose, rejectClose) => {
     server.close((error) => error ? rejectClose(error) : resolveClose())
   })
+}
+
+function restoreEnvironment(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name]
+  else process.env[name] = value
 }

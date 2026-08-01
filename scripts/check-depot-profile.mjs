@@ -129,6 +129,10 @@ function memoryStorePlugin() {
         path: 'memory-usage-stats',
         namespace: 'depot-profile-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])optimize-job-store(\.ts)?$/ }, () => ({
+        path: 'memory-optimize-job-store',
+        namespace: 'depot-profile-smoke',
+      }))
       build.onLoad({ filter: /.*/, namespace: 'depot-profile-smoke' }, (args) => ({
         contents: args.path === 'memory-user-store'
           ? memoryUserStoreModule()
@@ -136,6 +140,8 @@ function memoryStorePlugin() {
             ? memoryLicenseUtilsModule()
             : args.path === 'memory-usage-stats'
               ? memoryUsageStatsModule()
+              : args.path === 'memory-optimize-job-store'
+                ? memoryOptimizeJobStoreModule()
             : memoryUserAuthModule(),
         loader: 'js',
       }))
@@ -184,6 +190,9 @@ function memoryUserStoreModule() {
     export async function getProfileWorkspace(profileId) {
       return store.workspaces.get(profileId) ?? null
     }
+    export async function getProfileWorkspaceForUpdateInTransaction(_client, profileId) {
+      return store.workspaces.get(profileId) ?? null
+    }
     export async function getWorkspace(profileId) {
       return store.workspaces.get(profileId) ?? null
     }
@@ -200,6 +209,24 @@ function memoryUserStoreModule() {
     }
     export async function listProfilesForUser(userId) {
       return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
+    }
+    export async function listProfileWorkspaces(profileIds) {
+      return new Map(profileIds.flatMap((profileId) => {
+        const workspace = store.workspaces.get(profileId)
+        return workspace ? [[profileId, workspace]] : []
+      }))
+    }
+    export async function updateUserProfileMetadata(userId, profileId, patch) {
+      const profile = store.profiles.get(profileId)
+      if (profile?.user_id !== userId) return null
+      const updated = {
+        ...profile,
+        ...(patch.displayName === undefined ? {} : { display_name: patch.displayName }),
+        ...(patch.note === undefined ? {} : { note: patch.note }),
+        updated_at: new Date().toISOString(),
+      }
+      store.profiles.set(profileId, updated)
+      return updated
     }
     export async function saveProfileWorkspace(workspace) {
       store.workspaces.set(workspace.profile_id, workspace)
@@ -281,6 +308,23 @@ function memoryLicenseUtilsModule() {
     export function formatOperatorRiskBlockMessage() { return 'blocked' }
     export function formatRiskFreezeMessage(message) { return message }
     export function getPermissionMode(license) { return license?.permission ?? 'growth' }
+    export function getCdkType(record) { return record?.cdk_type ?? 'profile' }
+    export function getCdkBalanceAmount(record) {
+      return getCdkType(record) === 'balance' && typeof record?.balance_amount === 'string'
+        ? record.balance_amount
+        : null
+    }
+    export function getCdkItemCode(record) {
+      if (getCdkType(record) !== 'item') return null
+      return record?.item_code === 'lifetime_profile_voucher' || record?.item_code === 'limited_profile_voucher'
+        ? record.item_code
+        : null
+    }
+    export function getCdkItemExpiresAt(record) {
+      return getCdkType(record) === 'item' && typeof record?.item_expires_at === 'string'
+        ? record.item_expires_at
+        : null
+    }
     export async function getCdkRecordStore() { return { get: async () => null, mutate: async () => null } }
     export async function getRiskControlSettings() { return { operator_data_risk_enabled: true, updated_at: null } }
     export async function incrementCdkScheduleGenerateCount() {}
@@ -293,6 +337,25 @@ function memoryLicenseUtilsModule() {
     export function requireEnv() { return 'secret' }
     export function validateConfig(config) { return { ok: true, config } }
     export function validateOperators(operators) { return { ok: true, operators: Array.isArray(operators) ? operators : [] } }
+  `
+}
+
+function memoryOptimizeJobStoreModule() {
+  return `
+    export class OptimizeJobAdmissionError extends Error {
+      constructor(code, status, message) {
+        super(message)
+        this.code = code
+        this.status = status
+        this.name = 'OptimizeJobAdmissionError'
+      }
+    }
+    export function isOptimizeJobAdmissionError(error) {
+      return error instanceof OptimizeJobAdmissionError
+    }
+    export function getOptimizeJobStore() {
+      return { findIdempotentJob: async () => null }
+    }
   `
 }
 

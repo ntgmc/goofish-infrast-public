@@ -15,6 +15,8 @@ import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
 import { copy } from '../../../copy/index'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { apiJson } from '../../../lib/api-client'
+import { fetchOptimizationJobSnapshot } from './optimization-api'
+import type { OptimizeResult, WorkspaceResultHistoryItem } from '../../../lib/types'
 
 
 export default function OptimizeWorkflowPage(props: Props) {
@@ -152,6 +154,33 @@ export default function OptimizeWorkflowPage(props: Props) {
             onOpenScenario={() => {
               closeTaskCenter()
               setSection('lab')
+            }}
+            onOpenResult={(job) => {
+              void (async () => {
+                const resultId = job.historyResultId ?? job.id
+                const stored = [...resultHistory, ...archivedResults].find((item) => item.id === resultId)
+                if (stored) {
+                  closeTaskCenter()
+                  handleViewHistory(stored)
+                  return
+                }
+                const snapshot = await fetchOptimizationJobSnapshot<OptimizeResult>(
+                  job.id,
+                  copy.optimize.pages_tool_optimize_OptimizationTaskCenter_038,
+                )
+                if (snapshot.status !== 'succeeded') throw new Error(copy.optimize.pages_tool_optimize_OptimizationTaskCenter_038)
+                const transientHistoryItem: WorkspaceResultHistoryItem = {
+                  id: resultId,
+                  name: `排班结果 ${new Date(job.timestamps.submittedAt).toLocaleString()}`,
+                  created_at: job.timestamps.finishedAt ?? job.timestamps.submittedAt,
+                  config: null,
+                  result: snapshot.result,
+                  operator_count: mergedOperators.filter((operator) => operator.own !== false).length,
+                  source: 'generated',
+                }
+                closeTaskCenter()
+                handleViewHistory(transientHistoryItem)
+              })().catch((error) => window.alert(error instanceof Error ? error.message : copy.optimize.pages_tool_optimize_OptimizationTaskCenter_038))
             }}
             retryEnabled={features.schedule_generation}
           />

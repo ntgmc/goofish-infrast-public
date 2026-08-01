@@ -4,10 +4,11 @@ import {
   getProfileForUser,
   getProfileWorkspace,
   isDepotValueProfile,
+  listProfileWorkspaces,
   listProfilesForUser,
   saveProfileWorkspace,
-  saveUserProfile,
   toPublicProfile,
+  updateUserProfileMetadata,
 } from '../storage/user-store'
 import {
   buildAuthPayload,
@@ -50,11 +51,12 @@ export default async (req: Request): Promise<Response> => {
 
     if (req.method === 'GET') {
       const profiles = (await listProfilesForUser(auth.user.id)).filter((profile) => profile.kind !== 'metered_commercial')
+      const workspaces = await listProfileWorkspaces(profiles.map((profile) => profile.id))
       return jsonResponse({
         user: toPublicUser(auth.user),
-        profiles: await Promise.all(profiles.map(async (profile) => (
-          toPublicProfile(profile, await getProfileWorkspace(profile.id), getFreePreviewTrial(profile))
-        ))),
+        profiles: profiles.map((profile) => (
+          toPublicProfile(profile, workspaces.get(profile.id) ?? null, getFreePreviewTrial(profile))
+        )),
       })
     }
 
@@ -76,15 +78,16 @@ export default async (req: Request): Promise<Response> => {
       const profile = await getProfileForUser(auth.user.id, body.profile_id)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (profile.archived_at) return jsonResponse({ error: '归档档案只能通过商用档案管理页恢复后修改。', code: 'profile_archived' }, 409)
-      const displayName = normalizeDisplayName(body.display_name)
-      const note = normalizeNote(body.note)
-      const updated = {
-        ...profile,
-        display_name: displayName || profile.display_name || '账号',
-        note,
-        updated_at: new Date().toISOString(),
+      const metadataPatch: { displayName?: string; note?: string } = {}
+      if (body.display_name !== undefined) {
+        metadataPatch.displayName = normalizeDisplayName(body.display_name) || profile.display_name || '账号'
       }
-      await saveUserProfile(updated)
+      if (body.note !== undefined) metadataPatch.note = normalizeNote(body.note)
+      if (metadataPatch.displayName === undefined && metadataPatch.note === undefined) {
+        return jsonResponse({ error: '请至少提交一个需要修改的档案字段。' }, 400)
+      }
+      const updated = await updateUserProfileMetadata(auth.user.id, profile.id, metadataPatch)
+      if (!updated) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (!isDepotValueProfile(updated) && !(await getProfileWorkspace(updated.id))) {
         await saveProfileWorkspace(emptyWorkspace(updated.id))
       }

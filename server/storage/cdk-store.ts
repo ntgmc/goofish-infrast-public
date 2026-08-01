@@ -1,7 +1,17 @@
 import type { PoolClient } from 'pg'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
-import { getCdkBalanceAmount, getCdkItemCode, getCdkItemExpiresAt, getCdkType, type CdkRecord, type CdkRecordStore } from '../handlers/license-utils'
+import {
+  getCdkBalanceAmount,
+  getCdkItemCode,
+  getCdkItemExpiresAt,
+  getCdkType,
+  isProfileCdkRecord,
+  type CdkRecord,
+  type CdkRecordStore,
+  type OperatorFingerprint,
+} from '../handlers/license-utils'
+import { normalizeRuntimePermission } from '../../src/lib/product-catalog'
 
 let schemaReady: Promise<void> | null = null
 
@@ -18,15 +28,51 @@ export async function claimCdkRecord(client: PoolClient, key: string): Promise<C
 }
 
 export async function completeCdkRedemption(client: PoolClient, key: string, record: CdkRecord): Promise<void> {
+  const storedRecord = normalizeCdkRecordForPersistence(record)
   const result = await client.query(
     `update cdk_records
      set status = 'used', cdk_type = $2, permission = $3, balance_amount = $4::numeric,
          item_code = $5, item_expires_at = $6, license_order_hash = $7, record_json = $8::jsonb,
          record_revision = record_revision + 1, updated_at = now()
      where key = $1 and status = 'claiming'`,
-    [key, getCdkType(record), record.permission, getCdkBalanceAmount(record), getCdkItemCode(record), getCdkItemExpiresAt(record), record.license_order_hash, JSON.stringify(record)],
+    [key, getCdkType(storedRecord), storedRecord.permission, getCdkBalanceAmount(storedRecord), getCdkItemCode(storedRecord), getCdkItemExpiresAt(storedRecord), storedRecord.license_order_hash, JSON.stringify(storedRecord)],
   )
   if (result.rowCount !== 1) throw new Error('CDK redemption claim was lost before completion')
+}
+
+export async function recordOperatorFingerprintInTransaction(
+  client: PoolClient,
+  record: CdkRecord,
+  fingerprint: OperatorFingerprint,
+): Promise<CdkRecord> {
+  const key = `cdk/${record.code_hash}.json`
+  const selected = await client.query<{ record_json: CdkRecord }>(
+    "select record_json from cdk_records where key = $1 and status = 'used' for update",
+    [key],
+  )
+  const current = selected.rows[0]?.record_json
+  if (!current) return record
+  const baseline = current.baseline_operator_fingerprint ?? fingerprint
+  if (
+    current.baseline_operator_fingerprint?.hash === baseline.hash
+    && current.latest_operator_fingerprint?.hash === fingerprint.hash
+  ) return current
+  const next = normalizeCdkRecordForPersistence({
+    ...current,
+    baseline_operator_fingerprint: baseline,
+    latest_operator_fingerprint: fingerprint,
+  })
+  const updated = await client.query<{ record_json: CdkRecord }>(
+    `update cdk_records
+     set record_json = $2::jsonb, record_revision = record_revision + 1, updated_at = now()
+     where key = $1 and status = 'used'
+     returning record_json`,
+    [key, JSON.stringify(next)],
+  )
+  if (updated.rowCount !== 1 || !updated.rows[0]) {
+    throw new Error('CDK record changed before its operator fingerprint could be updated')
+  }
+  return updated.rows[0].record_json
 }
 
 export function createPostgresCdkRecordStore(): CdkRecordStore {
@@ -41,32 +87,22 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
     },
     create: async (key, record) => {
       await ensureSchema()
-      const result = await query(
-        `insert into cdk_records
-          (key, code_hash, cdk_type, status, permission, balance_amount, item_code, item_expires_at, license_order_hash, record_json, created_at, updated_at)
-         values ($1, $2, $3, $4, $5, $6::numeric, $7, $8, $9, $10::jsonb, $11, now())
-         on conflict (key) do nothing`,
-        [
-          key,
-          record.code_hash,
-          getCdkType(record),
-          record.status,
-          record.permission,
-          getCdkBalanceAmount(record),
-          getCdkItemCode(record),
-          getCdkItemExpiresAt(record),
-          record.license_order_hash,
-          JSON.stringify(record),
-          record.created_at || null,
-        ],
-      )
-      if (result.rowCount !== 1) throw new Error('CDK record already exists')
+      await insertCdkRecord({ query }, key, record)
+    },
+    createBatch: async (entries) => {
+      if (entries.length === 0) return
+      await ensureSchema()
+      await withTransaction(async (client) => {
+        for (const entry of entries) {
+          await insertCdkRecord(client, entry.key, entry.record)
+        }
+      })
     },
     mutate: async (key, mutate, options) => {
       await ensureSchema()
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const selected = await query<{ record_json: CdkRecord; record_revision: number }>(
-          'select record_json, record_revision from cdk_records where key = $1',
+      return withTransaction(async (client) => {
+        const selected = await client.query<{ record_json: CdkRecord }>(
+          'select record_json from cdk_records where key = $1 for update',
           [key],
         )
         const current = selected.rows[0]
@@ -74,32 +110,34 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
         if (current.record_json.status === 'revoked') return current.record_json
         if (options?.allowedStatuses && !options.allowedStatuses.includes(current.record_json.status)) return current.record_json
 
-        const next = mutate(current.record_json)
-        if (!next) return current.record_json
-        if (next.status !== current.record_json.status) {
+        const mutated = mutate(current.record_json)
+        if (!mutated) return current.record_json
+        if (mutated.status !== current.record_json.status) {
           const isValidTransition = (
-            (current.record_json.status === 'used' && next.status === 'frozen')
-            || (current.record_json.status === 'frozen' && next.status === 'used')
-            || ((current.record_json.status === 'used' || current.record_json.status === 'frozen') && next.status === 'revoked')
+            (current.record_json.status === 'used' && mutated.status === 'frozen')
+            || (current.record_json.status === 'frozen' && mutated.status === 'used')
+            || ((current.record_json.status === 'used' || current.record_json.status === 'frozen') && mutated.status === 'revoked')
           ) && options?.allowedStatuses?.includes(current.record_json.status)
           if (!isValidTransition) {
             throw new Error('CDK status transition requires an explicit allowed source status')
           }
         }
 
-        const result = await query<{ record_json: CdkRecord }>(
+        const next = normalizeCdkRecordForPersistence(mutated)
+        const result = await client.query<{ record_json: CdkRecord }>(
           `update cdk_records
            set status = $2, cdk_type = $3, permission = $4, balance_amount = $5::numeric,
                item_code = $6, item_expires_at = $7, license_order_hash = $8, record_json = $9::jsonb,
                record_revision = record_revision + 1, updated_at = now()
-           where key = $1 and record_revision = $10 and status <> 'revoked'
+           where key = $1 and status <> 'revoked'
            returning record_json`,
           [key, next.status, getCdkType(next), next.permission, getCdkBalanceAmount(next), getCdkItemCode(next),
-            getCdkItemExpiresAt(next), next.license_order_hash, JSON.stringify(next), current.record_revision],
+            getCdkItemExpiresAt(next), next.license_order_hash, JSON.stringify(next)],
         )
-        if (result.rowCount === 1) return result.rows[0]?.record_json ?? null
-      }
-      throw new Error('CDK record changed too frequently to update safely')
+        if (result.rowCount !== 1 || !result.rows[0]) throw new Error('CDK record changed before it could be updated')
+        await syncLinkedProfileAuthorization(client, key, next)
+        return result.rows[0].record_json
+      })
     },
     incrementScheduleGenerateCount: async (key, jobId) => {
       await ensureSchema()
@@ -149,9 +187,10 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
       )
       return result.rowCount === 1
     },
-    delete: async (key) => {
+    deleteUnused: async (key) => {
       await ensureSchema()
-      await query('delete from cdk_records where key = $1', [key])
+      const result = await query("delete from cdk_records where key = $1 and status = 'unused' returning key", [key])
+      return result.rowCount === 1
     },
     list: async (prefix) => {
       await ensureSchema()
@@ -201,6 +240,52 @@ export function createPostgresCdkRecordStore(): CdkRecordStore {
       return { records: result.rows.map((row) => row.record_json), total, page, totalPages }
     },
   }
+}
+
+async function insertCdkRecord(client: Pick<PoolClient, 'query'>, key: string, record: CdkRecord): Promise<void> {
+  const storedRecord = normalizeCdkRecordForPersistence(record)
+  const result = await client.query(
+    `insert into cdk_records
+      (key, code_hash, cdk_type, status, permission, balance_amount, item_code, item_expires_at, license_order_hash, record_json, created_at, updated_at)
+     values ($1, $2, $3, $4, $5, $6::numeric, $7, $8, $9, $10::jsonb, $11, now())
+     on conflict (key) do nothing`,
+    [
+      key,
+      storedRecord.code_hash,
+      getCdkType(storedRecord),
+      storedRecord.status,
+      storedRecord.permission,
+      getCdkBalanceAmount(storedRecord),
+      getCdkItemCode(storedRecord),
+      getCdkItemExpiresAt(storedRecord),
+      storedRecord.license_order_hash,
+      JSON.stringify(storedRecord),
+      storedRecord.created_at || null,
+    ],
+  )
+  if (result.rowCount !== 1) throw new Error('CDK record already exists')
+}
+
+function normalizeCdkRecordForPersistence(record: CdkRecord): CdkRecord {
+  if (!isProfileCdkRecord(record)) return record
+  return { ...record, permission: normalizeRuntimePermission(record.permission) }
+}
+
+async function syncLinkedProfileAuthorization(client: PoolClient, cdkKey: string, record: CdkRecord): Promise<void> {
+  if (!isProfileCdkRecord(record) || !['used', 'frozen', 'revoked'].includes(record.status)) return
+  const permission = normalizeRuntimePermission(record.permission)
+  const status = record.status === 'used' ? 'active' : record.status
+  const updatedAt = new Date().toISOString()
+  const patch = JSON.stringify({ permission, status, updated_at: updatedAt })
+  await client.query(
+    `update user_game_accounts
+        set permission = $2,
+            status = $3,
+            updated_at = $4,
+            record_json = record_json || $5::jsonb
+      where cdk_key = $1`,
+    [cdkKey, permission, status, updatedAt, patch],
+  )
 }
 
 function ensureSchema(): Promise<void> {

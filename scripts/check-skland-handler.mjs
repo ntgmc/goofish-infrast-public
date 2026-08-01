@@ -10,7 +10,7 @@ const store = createMemoryStore()
 globalThis.__sklandHandlerSmokeStore = store
 process.env.SKLAND_CREDENTIAL_SECRET = 'check-skland-handler-secret'
 process.env.DEPOT_SAMPLE_HASH_SECRET = 'check-depot-sample-secret'
-process.env.FREE_PREVIEW_UID_HASH_SECRET = 'check-free-preview-secret'
+process.env.FREE_PREVIEW_UID_HASH_SECRET = 'check-free-preview-secret-at-least-32-characters'
 const originalConsoleError = console.error
 console.error = (...args) => {
   if (String(args[0] ?? '').startsWith('user skland error:')) return
@@ -36,6 +36,7 @@ await assertEncodedCredentialPreview()
 await assertInvalidCredentialPreview()
 await assertOversizedCredentialPreview()
 await assertConfirmImport()
+await assertProfileImportTransactionRollback()
 await assertNoConfigImportCreatesDefaultConfig()
 await assertInventoryFailureStillImportsOperators()
 await assertDepotValueConfirmDoesNotWriteWorkspace()
@@ -60,7 +61,7 @@ async function assertMissingSecret() {
   process.env.SKLAND_CREDENTIAL_SECRET = previous
   if (
     result.status !== 503
-    || result.body.error !== '森空岛凭据服务尚未配置，请联系管理员。'
+    || result.body.error !== '森空岛服务配置无效，请联系管理员。'
     || result.body.code !== 'skland_service_not_configured'
     || result.body.recovery_action !== 'contact_support'
     || JSON.stringify(result.body).includes('SKLAND_CREDENTIAL_SECRET')
@@ -72,16 +73,16 @@ async function assertMissingSecret() {
 async function assertInvalidProfile() {
   seedProfile({ id: 'profile-1', status: 'active' })
   const result = await callSkland('/api/user/skland/login/start', { profile_id: 'missing-profile' })
-  if (result.status !== 400 || !result.body.error) {
-    throw new Error(`invalid profile: expected 400 error, got ${result.status}`)
+  if (result.status !== 404 || result.body.code !== 'profile_not_found') {
+    throw new Error(`invalid profile: expected 404 profile_not_found, got ${result.status}`)
   }
 }
 
 async function assertFrozenProfile() {
   seedProfile({ id: 'frozen-profile', status: 'frozen' })
   const result = await callSkland('/api/user/skland/login/start', { profile_id: 'frozen-profile' })
-  if (result.status !== 400 || result.body.error !== '森空岛请求无效或服务暂不可用。') {
-    throw new Error(`frozen profile: expected sanitized unavailable-profile error, got ${result.status}`)
+  if (result.status !== 409 || result.body.code !== 'profile_unavailable') {
+    throw new Error(`frozen profile: expected profile_unavailable conflict, got ${result.status}`)
   }
 }
 
@@ -245,6 +246,7 @@ async function assertMultiAccountSelection() {
   const confirm = await callSkland('/api/user/skland/login/confirm', {
     profile_id: 'profile-multi',
     confirmation_id: preview.body.confirmation_id,
+    idempotency_key: 'profile-multi-confirm',
   })
   if (confirm.status !== 200 || confirm.body.active_profile?.skland_binding?.uid !== '87654321') {
     throw new Error(`multi-account selection: final binding did not preserve selected uid ${confirm.status}: ${JSON.stringify(confirm.body)}`)
@@ -297,6 +299,7 @@ async function assertMultiAccountSelection() {
   const depotConfirm = await callSkland('/api/user/skland/login/confirm', {
     profile_id: 'depot-multi',
     confirmation_id: depotPreview.body.confirmation_id,
+    idempotency_key: 'depot-multi-confirm',
   })
   if (depotConfirm.status !== 200 || depotConfirm.body.active_profile?.skland_binding?.uid !== '87654321') {
     throw new Error('multi-account depot selection: selected uid was not saved')
@@ -351,6 +354,7 @@ async function assertManualCredentialConfirm() {
   const result = await callSkland('/api/user/skland/login/confirm', {
     profile_id: 'profile-manual',
     confirmation_id: pending.confirmation_id,
+    idempotency_key: 'profile-manual-confirm',
   })
   assertNoSecretLeak(result.body, 'manual credential confirm response')
   if (result.status !== 200 || result.body.skland_import?.operator_count !== 2) {
@@ -424,6 +428,7 @@ async function assertConfirmImport() {
   const result = await callSkland('/api/user/skland/login/confirm', {
     profile_id: 'profile-1',
     confirmation_id: confirmationId,
+    idempotency_key: 'profile-1-confirm',
   })
   assertNoSecretLeak(result.body, 'confirm import response')
   if (result.status !== 200 || result.body.skland_import?.operator_count !== 2) {
@@ -479,6 +484,54 @@ async function assertConfirmImport() {
   if (Object.keys(workspace.elite_overrides ?? {}).length !== 0 || workspace.last_result !== null) {
     throw new Error('confirm import: workspace transient fields were not cleared')
   }
+  const fetchCountBeforeReplay = store.fetchCalls.length
+  const replay = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-1',
+    confirmation_id: confirmationId,
+    idempotency_key: 'profile-1-confirm',
+  })
+  if (replay.status !== 200 || replay.body.replayed !== true || replay.body.skland_import?.uid !== '12345678') {
+    throw new Error(`confirm import replay: expected saved response, got ${replay.status}`)
+  }
+  if (store.fetchCalls.length !== fetchCountBeforeReplay) {
+    throw new Error('confirm import replay: must not call upstream after pending was consumed')
+  }
+}
+
+async function assertProfileImportTransactionRollback() {
+  seedProfile({ id: 'profile-transaction-rollback', status: 'active' })
+  setFetchMode('complete')
+  const preview = await callSkland('/api/user/skland/credential/preview', {
+    profile_id: 'profile-transaction-rollback',
+    credential_text: 'manual-skland-cred',
+    source: 'manual',
+  })
+  const profileBefore = structuredClone(store.profiles.get('profile-transaction-rollback'))
+  const workspaceBefore = structuredClone(store.workspaces.get('profile-transaction-rollback'))
+  store.failNextProfileSave = true
+  const failed = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-transaction-rollback',
+    confirmation_id: preview.body.confirmation_id,
+    idempotency_key: 'profile-transaction-rollback-confirm',
+  })
+  if (failed.status !== 500 || failed.body.code !== 'skland_internal_error') {
+    throw new Error(`profile transaction rollback: expected injected 500, got ${failed.status}`)
+  }
+  if (
+    JSON.stringify(store.profiles.get('profile-transaction-rollback')) !== JSON.stringify(profileBefore)
+    || JSON.stringify(store.workspaces.get('profile-transaction-rollback')) !== JSON.stringify(workspaceBefore)
+    || store.inventoryOperations.has(`${store.user.id}:profile-transaction-rollback-confirm`)
+  ) {
+    throw new Error('profile transaction rollback: partial profile/workspace/operation state escaped rollback')
+  }
+  const retried = await callSkland('/api/user/skland/login/confirm', {
+    profile_id: 'profile-transaction-rollback',
+    confirmation_id: preview.body.confirmation_id,
+    idempotency_key: 'profile-transaction-rollback-confirm',
+  })
+  if (retried.status !== 200 || retried.body.skland_import?.uid !== '12345678') {
+    throw new Error(`profile transaction rollback: stable-key retry failed with ${retried.status}`)
+  }
 }
 
 async function assertNoConfigImportCreatesDefaultConfig() {
@@ -496,6 +549,7 @@ async function assertNoConfigImportCreatesDefaultConfig() {
   const result = await callSkland('/api/user/skland/login/confirm', {
     profile_id: 'profile-no-config',
     confirmation_id: preview.body.confirmation_id,
+    idempotency_key: 'profile-no-config-confirm',
   })
   if (result.status !== 200) {
     throw new Error(`no config import: expected success, got ${result.status}`)
@@ -522,6 +576,7 @@ async function assertInventoryFailureStillImportsOperators() {
   const result = await callSkland('/api/user/skland/login/confirm', {
     profile_id: 'profile-inventory-fail',
     confirmation_id: preview.body.confirmation_id,
+    idempotency_key: 'profile-inventory-fail-confirm',
   })
   if (result.status !== 200 || result.body.skland_import?.operator_count !== 2) {
     throw new Error(`inventory failure import: expected operator import success, got ${result.status}`)
@@ -561,6 +616,7 @@ async function assertDepotValueConfirmDoesNotWriteWorkspace() {
   const result = await callSkland('/api/user/skland/login/confirm', {
     profile_id: 'depot-profile',
     confirmation_id: preview.body.confirmation_id,
+    idempotency_key: 'depot-profile-confirm',
   })
   assertNoSecretLeak(result.body, 'depot confirm response')
   if (result.status !== 200 || !result.body.active_profile?.skland_binding) {
@@ -620,7 +676,7 @@ async function assertRefreshTransientFailurePreservesBinding() {
   setFetchMode('temporary-fail')
   const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-1' })
   assertNoSecretLeak(result.body, 'refresh transient failure response')
-  if (result.status !== 400 || result.body.code !== 'skland_refresh_failed' || result.body.recovery_action !== 'retry') {
+  if (result.status !== 502 || result.body.code !== 'skland_upstream_failed' || result.body.recovery_action !== 'retry') {
     throw new Error(`refresh transient failure: expected retry error, got ${result.status}`)
   }
   const binding = store.profiles.get('profile-1')?.skland_binding
@@ -670,6 +726,7 @@ async function assertMatchingRebindResetsRisk() {
   const confirm = await callSkland('/api/user/skland/login/confirm', {
     profile_id: 'profile-1',
     confirmation_id: complete.body.confirmation_id,
+    idempotency_key: 'profile-1-rebind-confirm',
   })
   if (confirm.status !== 200 || store.profiles.get('profile-1')?.skland_risk?.uid_mismatch_count !== 0) {
     throw new Error('matching rebind: expected risk counter reset after confirm')
@@ -708,7 +765,7 @@ async function assertRepeatedMismatchFreezesProfile() {
     throw new Error(`repeated mismatch: expected frozen profile, got ${result.status}`)
   }
   const blocked = await callSkland('/api/user/skland/login/start', { profile_id: 'profile-1' })
-  if (blocked.status !== 400 || blocked.body.error !== '森空岛请求无效或服务暂不可用。') {
+  if (blocked.status !== 409 || blocked.body.code !== 'profile_unavailable') {
     throw new Error('repeated mismatch: frozen profile should block future Skland operations')
   }
 }
@@ -720,11 +777,12 @@ async function assertSchemaChangeError() {
   await callSkland('/api/user/skland/login/confirm', {
     profile_id: 'schema-profile',
     confirmation_id: store.profiles.get('schema-profile')?.skland_pending_binding?.confirmation_id,
+    idempotency_key: 'schema-profile-confirm',
   })
   setFetchMode('bad-info')
   const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'schema-profile' })
-  if (result.status !== 400 || result.body.error !== '森空岛刷新失败，请稍后重试。') {
-    throw new Error(`schema change: expected clear operator data error, got ${result.status}`)
+  if (result.status !== 502 || result.body.code !== 'skland_upstream_failed' || result.body.recovery_action !== 'retry') {
+    throw new Error(`schema change: expected retryable upstream error, got ${result.status}`)
   }
 }
 
@@ -738,6 +796,8 @@ async function assertUnbindRouteRemoved() {
 async function assertFreePreviewScanClaim() {
   const profileCountBefore = store.profiles.size
   const voucherGrantCountBefore = store.limitedVoucherGrantCalls.length
+  const declarationUsageCountBefore = store.personalUseDeclarationUsageEvents.length
+  const behaviorRiskEventCountBefore = store.behaviorRiskEvents.length
   setFetchMode('blank-default-uid')
   const start = await callSkland('/api/user/skland/free-preview/login/start', {})
   if (start.status !== 200 || start.body.scan_id !== 'scan-1' || !start.body.qr_data_url?.startsWith('data:image/png;base64,')) {
@@ -763,6 +823,7 @@ async function assertFreePreviewScanClaim() {
   store.personalUseAcceptance = null
   const blocked = await callSkland('/api/user/skland/free-preview/login/confirm', {
     confirmation_id: complete.body.confirmation_id,
+    idempotency_key: 'free-scan-confirm',
   })
   if (blocked.status !== 428 || blocked.body.code !== 'personal_use_confirmation_required') {
     throw new Error(`免费档案扫码确认：缺少个人使用确认时应被拒绝，实际 ${blocked.status}`)
@@ -770,10 +831,17 @@ async function assertFreePreviewScanClaim() {
   if (store.profiles.size !== profileCountBefore) {
     throw new Error('免费档案扫码确认：缺少个人使用确认时不应创建档案')
   }
+  if (
+    store.personalUseDeclarationUsageEvents.length !== declarationUsageCountBefore
+    || store.behaviorRiskEvents.length !== behaviorRiskEventCountBefore
+  ) {
+    throw new Error('免费档案扫码确认：缺少个人使用确认时不应写入审计事件')
+  }
   store.personalUseAcceptance = personalUseAcceptance
 
   const confirm = await callSkland('/api/user/skland/free-preview/login/confirm', {
     confirmation_id: complete.body.confirmation_id,
+    idempotency_key: 'free-scan-confirm',
   })
   assertNoSecretLeak(confirm.body, '免费档案扫码确认响应')
   if (confirm.status !== 200 || confirm.body.active_profile?.kind !== 'free_preview') {
@@ -781,6 +849,37 @@ async function assertFreePreviewScanClaim() {
   }
   if (confirm.body.active_profile?.skland_binding?.uid !== '130761348' || confirm.body.skland_import?.operator_count !== 2) {
     throw new Error('免费档案扫码确认：缺少绑定或导入摘要')
+  }
+  const declarationUsage = store.personalUseDeclarationUsageEvents.at(-1)
+  if (
+    store.personalUseDeclarationUsageEvents.length !== declarationUsageCountBefore + 1
+    || declarationUsage?.userId !== store.user.id
+    || declarationUsage?.profileId !== confirm.body.active_profile.id
+    || declarationUsage?.action !== 'free_preview_claim'
+  ) {
+    throw new Error('免费档案扫码确认：未写入一次准确的个人使用声明审计事件')
+  }
+  const behaviorRiskEvent = store.behaviorRiskEvents.at(-1)
+  if (
+    store.behaviorRiskEvents.length !== behaviorRiskEventCountBefore + 1
+    || behaviorRiskEvent?.eventType !== 'bind'
+    || behaviorRiskEvent?.userId !== store.user.id
+    || behaviorRiskEvent?.profileId !== confirm.body.active_profile.id
+  ) {
+    throw new Error('免费档案扫码确认：未在事务内写入一次准确的绑定风险事件')
+  }
+  const replay = await callSkland('/api/user/skland/free-preview/login/confirm', {
+    confirmation_id: complete.body.confirmation_id,
+    idempotency_key: 'free-scan-confirm',
+  })
+  if (replay.status !== 200 || replay.body.replayed !== true || replay.body.active_profile?.id !== confirm.body.active_profile?.id) {
+    throw new Error(`免费档案扫码确认：幂等响应重放失败 ${replay.status}`)
+  }
+  if (
+    store.personalUseDeclarationUsageEvents.length !== declarationUsageCountBefore + 1
+    || store.behaviorRiskEvents.length !== behaviorRiskEventCountBefore + 1
+  ) {
+    throw new Error('免费档案扫码确认：幂等响应重放不应重复写入审计事件')
   }
   const profileId = confirm.body.active_profile.id
   if (store.workspaces.get(profileId)?.operators?.length !== 2) {
@@ -845,6 +944,7 @@ async function assertFreePreviewMultiAccountSelection() {
     }
     const confirm = await callSkland('/api/user/skland/free-preview/login/confirm', {
       confirmation_id: preview.body.confirmation_id,
+      idempotency_key: 'free-multi-confirm',
     })
     if (confirm.status !== 200 || confirm.body.active_profile?.skland_binding?.uid !== '12345678') {
       throw new Error(`免费档案多账号选择：最终绑定 UID 无效 ${confirm.status}`)
@@ -879,6 +979,7 @@ async function assertFreePreviewCredentialClaimAndUidUniqueness() {
 
     const confirm = await callSkland('/api/user/skland/free-preview/login/confirm', {
       confirmation_id: preview.body.confirmation_id,
+      idempotency_key: 'free-credential-confirm',
     })
     assertNoSecretLeak(confirm.body, '免费档案凭据确认响应')
     if (confirm.status !== 200 || confirm.body.active_profile?.kind !== 'free_preview') {
@@ -1170,12 +1271,24 @@ function createMemoryStore() {
     freePreviewClaims: new Map(),
     freePreviewPendingClaims: new Map(),
     lifetimeVoucherPendingBindings: new Map(),
+    inventoryOperations: new Map(),
+    failNextProfileSave: false,
     limitedVoucherGrantCalls: [],
     personalUseAcceptance: {
+      id: 'personal-use-acceptance-1',
+      user_id: 'user-1',
       declaration_id: 'personal_use_v1',
       declaration_version: 'V1.0',
+      content_hash: 'a'.repeat(64),
+      action: 'free_preview_claim',
+      client_ip: '127.0.0.1',
+      accepted_at: '2026-01-01T00:00:00.000Z',
       profile_id: null,
+      account_deleted_at: null,
+      retain_until: null,
     },
+    personalUseDeclarationUsageEvents: [],
+    behaviorRiskEvents: [],
     fetchCalls: [],
   }
 }
@@ -1223,8 +1336,16 @@ function memoryStorePlugin() {
         path: 'memory-persistent-rate-limit',
         namespace: 'skland-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])postgres(\.ts)?$/ }, () => ({
+        path: 'memory-postgres',
+        namespace: 'skland-smoke',
+      }))
       build.onResolve({ filter: /(^|[\\/])personal-use-declaration-store(\.ts)?$/ }, () => ({
         path: 'memory-personal-use-declaration-store',
+        namespace: 'skland-smoke',
+      }))
+      build.onResolve({ filter: /(^|[\\/])behavior-risk[\\/]service(\.ts)?$/ }, () => ({
+        path: 'memory-behavior-risk-service',
         namespace: 'skland-smoke',
       }))
       build.onResolve({ filter: /(^|[\\/])inventory-store(\.ts)?$/ }, () => ({
@@ -1242,8 +1363,12 @@ function memoryStorePlugin() {
                 ? `export async function reserveSklandAttemptLayered() { return { allowed: true, attempt: { retainFailure() {} } } }`
                 : args.path === 'memory-persistent-rate-limit'
                   ? `export class RateLimitStoreError extends Error {}`
+                  : args.path === 'memory-postgres'
+                    ? memoryPostgresModule()
                   : args.path === 'memory-personal-use-declaration-store'
                     ? memoryPersonalUseDeclarationStoreModule()
+                    : args.path === 'memory-behavior-risk-service'
+                      ? memoryBehaviorRiskServiceModule()
                     : args.path === 'memory-inventory-store'
                       ? memoryInventoryStoreModule()
                       : memoryLicenseUtilsModuleFixed(),
@@ -1258,6 +1383,127 @@ function memoryUsageStatsModule() {
     export async function recordUsageEvent() {}
     export async function countSuccessfulUsageEventsForProfileInRange() { return 0 }
     export async function getScheduleGenerateDurationStatsByBucket() { return { p95_ms: 0, sample_count: 0 } }
+  `
+}
+
+function memoryPostgresModule() {
+  return `
+    const store = globalThis.__sklandHandlerSmokeStore
+    const result = (rows = [], rowCount = rows.length) => ({ rows, rowCount })
+
+    export function hasDatabaseUrl() { return false }
+    export function getPool() { return { query: execute } }
+    export async function query(text, values = []) { return execute(text, values) }
+    export async function withTransaction(work) {
+      const snapshot = {
+        profiles: structuredClone([...store.profiles]),
+        workspaces: structuredClone([...store.workspaces]),
+        freePreviewClaims: structuredClone([...store.freePreviewClaims]),
+        freePreviewPendingClaims: structuredClone([...store.freePreviewPendingClaims]),
+        lifetimeVoucherPendingBindings: structuredClone([...store.lifetimeVoucherPendingBindings]),
+        inventoryOperations: structuredClone([...store.inventoryOperations]),
+        personalUseAcceptance: structuredClone(store.personalUseAcceptance),
+        personalUseDeclarationUsageEvents: structuredClone(store.personalUseDeclarationUsageEvents),
+        behaviorRiskEvents: structuredClone(store.behaviorRiskEvents),
+      }
+      try {
+        return await work({ query: execute })
+      } catch (error) {
+        restore(store.profiles, snapshot.profiles)
+        restore(store.workspaces, snapshot.workspaces)
+        restore(store.freePreviewClaims, snapshot.freePreviewClaims)
+        restore(store.freePreviewPendingClaims, snapshot.freePreviewPendingClaims)
+        restore(store.lifetimeVoucherPendingBindings, snapshot.lifetimeVoucherPendingBindings)
+        restore(store.inventoryOperations, snapshot.inventoryOperations)
+        store.personalUseAcceptance = snapshot.personalUseAcceptance
+        restoreArray(store.personalUseDeclarationUsageEvents, snapshot.personalUseDeclarationUsageEvents)
+        restoreArray(store.behaviorRiskEvents, snapshot.behaviorRiskEvents)
+        throw error
+      }
+    }
+
+    async function execute(text, values = []) {
+      const sql = text.replace(/\\s+/g, ' ').trim().toLowerCase()
+      if (sql.startsWith('select request_hash, response_json from inventory_operations')) {
+        const operation = store.inventoryOperations.get(values[0] + ':' + values[1])
+        return result(operation ? [{ request_hash: operation.request_hash, response_json: operation.response_json }] : [])
+      }
+      if (sql.startsWith('insert into inventory_operations')) {
+        const key = values[1] + ':' + values[2]
+        if (store.inventoryOperations.has(key)) return result([], 0)
+        store.inventoryOperations.set(key, {
+          id: values[0], user_id: values[1], idempotency_key: values[2], operation_type: values[3],
+          request_hash: values[4], response_json: null, created_at: values[5], completed_at: null,
+        })
+        return result([], 1)
+      }
+      if (sql.startsWith('update inventory_operations set response_json')) {
+        const operation = [...store.inventoryOperations.values()].find((item) => item.id === values[0])
+        if (!operation) return result([], 0)
+        operation.response_json = JSON.parse(values[1])
+        operation.completed_at = values[2]
+        return result([], 1)
+      }
+      if (sql.includes('pg_advisory_xact_lock')) return result([{ pg_advisory_xact_lock: null }], 1)
+      if (sql.startsWith('select record_json from user_game_accounts where id =')) {
+        const profile = store.profiles.get(values[0])
+        return result(profile && profile.user_id === values[1] ? [{ record_json: profile }] : [])
+      }
+      if (sql.startsWith('select record_json from user_game_accounts') && sql.includes("kind = 'free_preview'")) {
+        return result([...store.profiles.values()]
+          .filter((profile) => profile.user_id === values[0] && profile.kind === 'free_preview')
+          .map((record_json) => ({ record_json })))
+      }
+      if (sql.startsWith('select record_json from user_game_accounts') && sql.includes("skland_binding'->>'uid'")) {
+        return result([...store.profiles.values()]
+          .filter((profile) => profile.skland_binding?.uid === values[0])
+          .map((record_json) => ({ record_json })))
+      }
+      if (sql.startsWith('insert into user_game_accounts')) {
+        if (store.failNextProfileSave) {
+          store.failNextProfileSave = false
+          throw new Error('injected profile save failure')
+        }
+        const profile = JSON.parse(values[11])
+        store.profiles.set(profile.id, profile)
+        return result([], 1)
+      }
+      if (sql.startsWith('insert into free_preview_claims')) {
+        if (store.freePreviewClaims.has(values[0])) return result([], 0)
+        store.freePreviewClaims.set(values[0], JSON.parse(values[4]))
+        return result([], 1)
+      }
+      if (sql.startsWith('select profile_id from free_preview_claims')) {
+        const claim = store.freePreviewClaims.get(values[0])
+        return result(claim ? [{ profile_id: claim.profile_id }] : [])
+      }
+      if (sql.startsWith('select record_json from free_preview_pending_claims')) {
+        const pending = store.freePreviewPendingClaims.get(values[1])
+        return result(pending?.user_id === values[0] ? [{ record_json: pending }] : [])
+      }
+      if (sql.startsWith('delete from free_preview_pending_claims')) {
+        const pending = store.freePreviewPendingClaims.get(values[1])
+        if (pending?.user_id !== values[0]) return result([], 0)
+        store.freePreviewPendingClaims.delete(values[1])
+        return result([], 1)
+      }
+      if (sql.startsWith('delete from lifetime_voucher_pending_bindings')) {
+        const pending = store.lifetimeVoucherPendingBindings.get(values[1])
+        if (pending?.user_id !== values[0]) return result([], 0)
+        store.lifetimeVoucherPendingBindings.delete(values[1])
+        return result([], 1)
+      }
+      throw new Error('unexpected postgres query: ' + sql)
+    }
+
+    function restore(target, entries) {
+      target.clear()
+      for (const [key, value] of entries) target.set(key, value)
+    }
+
+    function restoreArray(target, items) {
+      target.splice(0, target.length, ...items)
+    }
   `
 }
 
@@ -1289,8 +1535,25 @@ function memoryPersonalUseDeclarationStoreModule() {
     export async function getPersonalUseDeclarationAcceptance() {
       return store.personalUseAcceptance
     }
-    export async function attachPersonalUseDeclarationAcceptanceToProfile(_userId, profileId) {
+    export async function attachPersonalUseDeclarationAcceptanceToProfileInTransaction(_client, _userId, profileId) {
       if (store.personalUseAcceptance) store.personalUseAcceptance.profile_id = profileId
+    }
+    export async function recordPersonalUseDeclarationUsageInTransaction(_client, input) {
+      store.personalUseDeclarationUsageEvents.push(input)
+      return input
+    }
+  `
+}
+
+function memoryBehaviorRiskServiceModule() {
+  return `
+    const store = globalThis.__sklandHandlerSmokeStore
+    export async function recordAuthenticatedRequestBehaviorEvent() { return false }
+    export async function recordRequestBehaviorEvent() { return false }
+    export async function recordRequestBehaviorEventInTransaction(_client, input) {
+      const { req: _req, ...event } = input
+      store.behaviorRiskEvents.push(event)
+      return true
     }
   `
 }

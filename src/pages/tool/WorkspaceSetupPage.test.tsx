@@ -132,6 +132,51 @@ describe('WorkspaceSetupPage CDK paths', () => {
     expect(onSynced).toHaveBeenCalledWith(payload)
   })
 
+  it('shows all three intermediate materials after a Skland refresh', async () => {
+    const user = userEvent.setup()
+    const profile: UserGameAccount = {
+      ...createAdvancedProfile(),
+      skland_binding: {
+        uid: '12345678',
+        nickname: '材料博士',
+        channel_name: '官服',
+        bound_at: '2026-08-01T00:00:00.000Z',
+        last_imported_at: '2026-08-01T00:00:00.000Z',
+        credential_status: 'available',
+        credential_invalid_at: null,
+        credential_invalid_reason: null,
+      },
+    }
+    apiJsonMock.mockResolvedValue({
+      ...createPayload(),
+      profiles: [profile],
+      active_profile: profile,
+      skland_import: {
+        status: 'imported',
+        uid: '12345678',
+        nickname: '材料博士',
+        channel_name: '官服',
+        operator_count: 2,
+        imported_at: '2026-08-01T00:01:00.000Z',
+        intermediate_inventory: {
+          'Pure Gold': 12,
+          'Originium Shard': 3,
+          'Orirock Cube': 45,
+        },
+        inventory_synced: true,
+        config_saved: true,
+      },
+    })
+
+    renderWorkspace({ profile, workspace: createAdvancedWorkspace() })
+    await user.click(screen.getByRole('button', { name: '刷新森空岛数据' }))
+
+    const notice = await screen.findByRole('status')
+    expect(notice).toHaveTextContent('赤金 12')
+    expect(notice).toHaveTextContent('源石碎片 3')
+    expect(notice).toHaveTextContent('固源岩 45')
+  })
+
   it('separates the desktop account actions in one bottom navigation group', () => {
     renderWorkspace()
 
@@ -167,7 +212,7 @@ describe('WorkspaceSetupPage CDK paths', () => {
     const user = userEvent.setup()
     const onSynced = vi.fn()
     const payload = createPayload()
-    apiJsonMock.mockResolvedValue(payload)
+    apiJsonMock.mockResolvedValue({ redemption_type: 'profile', auth: payload })
 
     renderWorkspace({ onSynced })
     expect(screen.queryByRole('heading', { name: '档案与 CDK' })).not.toBeInTheDocument()
@@ -176,12 +221,36 @@ describe('WorkspaceSetupPage CDK paths', () => {
     await user.type(screen.getByLabelText('升级 CDK'), 'test-cdk')
     await user.click(screen.getByRole('button', { name: '升级当前免费档案' }))
 
-    await waitFor(() => expect(apiJsonMock).toHaveBeenCalledWith('/api/user/profiles/redeem', {
+    await waitFor(() => expect(apiJsonMock).toHaveBeenCalledWith('/api/user/cdk/redeem', {
       method: 'POST',
-      json: { profile_id: 'preview-profile', cdk: 'test-cdk' },
+      json: {
+        profile_id: 'preview-profile',
+        cdk: 'test-cdk',
+        idempotency_key: expect.any(String),
+      },
       fallbackMessage: '免费档案升级失败，请稍后重试',
     }))
     expect(onSynced).toHaveBeenCalledWith(payload)
+  })
+
+  it('reuses the upgrade idempotency key after an unknown result', async () => {
+    const user = userEvent.setup()
+    const payload = createPayload()
+    apiJsonMock
+      .mockRejectedValueOnce(new Error('网络响应中断'))
+      .mockResolvedValueOnce({ redemption_type: 'profile', auth: payload })
+
+    renderWorkspace()
+    await openCdkTab(user)
+    await user.type(screen.getByLabelText('升级 CDK'), 'retry-cdk')
+    await user.click(screen.getByRole('button', { name: '升级当前免费档案' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('网络响应中断')
+    await user.click(screen.getByRole('button', { name: '升级当前免费档案' }))
+
+    await waitFor(() => expect(apiJsonMock).toHaveBeenCalledTimes(2))
+    const requests = apiJsonMock.mock.calls.map((call) => call[1]?.json as { idempotency_key?: string })
+    expect(requests[0]?.idempotency_key).toBeTruthy()
+    expect(requests[1]?.idempotency_key).toBe(requests[0]?.idempotency_key)
   })
 
   it('offers paths to redeem a new profile and purchase a CDK', async () => {

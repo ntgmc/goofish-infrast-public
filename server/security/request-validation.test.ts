@@ -107,8 +107,17 @@ describe('request validation boundary', () => {
   it('accepts only the merged schedule request contract', () => {
     const base = {
       identity: { type: 'profile', profileId: 'profile-1' },
-      operators: [],
-      config: {},
+      operators: [{ id: 'op-1', name: 'Operator', own: true, elite: 2, rarity: 6 }],
+      config: {
+        layout: '243',
+        desc: 'test',
+        trading_stations_count: 2,
+        manufacturing_stations_count: 4,
+        product_requirements: {
+          trading_stations: { lmd: 2 },
+          manufacturing_stations: { pure_gold: 4 },
+        },
+      },
     }
     expect(requestSchemas.optimizationJob.safeParse({
       ...base,

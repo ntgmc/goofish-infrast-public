@@ -205,4 +205,57 @@ describe('useToolSession config synchronization', () => {
     expect((result.current.configOverride ?? result.current.license?.config)?.desc).toBe('latest')
     expect(workspaceRequests).toEqual([first, latest])
   })
+
+  it('ignores a workspace mutation response after switching profiles', async () => {
+    let resolveWorkspacePatch!: (response: Response) => void
+    const delayedWorkspacePatch = new Promise<Response>((resolve) => { resolveWorkspacePatch = resolve })
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/announcement') return Promise.resolve(new Response(null, { status: 204 }))
+      if (url === '/api/auth/me?profile_id=profile-1') return Promise.resolve(jsonResponse(authPayload(baseConfig, 'profile-1')))
+      if (url === '/api/auth/me?profile_id=profile-2') return Promise.resolve(jsonResponse(authPayload({ ...baseConfig, desc: 'profile-2' }, 'profile-2')))
+      if (url === '/api/user/workspace') return delayedWorkspacePatch
+      throw new Error(`Unexpected request: ${url}`)
+    }))
+
+    const { result, rerender } = renderHook(
+      ({ profileId }) => useToolSession(profileId),
+      { initialProps: { profileId: 'profile-1' } },
+    )
+    await waitFor(() => expect(result.current.activeProfile?.id).toBe('profile-1'))
+    let mutation!: Promise<AuthSuccessResponse | void>
+    act(() => {
+      mutation = result.current.persistWorkspacePatch({ elite_overrides: {} })
+    })
+
+    rerender({ profileId: 'profile-2' })
+    await waitFor(() => expect(result.current.activeProfile?.id).toBe('profile-2'))
+    await act(async () => {
+      resolveWorkspacePatch(jsonResponse(authPayload({ ...baseConfig, desc: 'late-profile-1' }, 'profile-1')))
+      await mutation
+    })
+
+    expect(result.current.activeProfile?.id).toBe('profile-2')
+    expect(result.current.workspace?.config?.desc).toBe('profile-2')
+  })
+
+  it('keeps an elite override draft and rejects when persistence fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/announcement') return new Response(null, { status: 204 })
+      if (url === '/api/auth/me') return jsonResponse(authPayload(baseConfig))
+      if (url === '/api/user/workspace') return errorResponse(500)
+      throw new Error(`Unexpected request: ${url}`)
+    }))
+
+    const { result } = renderHook(() => useToolSession())
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    let save!: Promise<void>
+    act(() => {
+      save = result.current.setEliteOverrides({ char_001: 2 })
+    })
+
+    await expect(save).rejects.toThrow('auth failure 500')
+    expect(result.current.eliteOverrides).toEqual({ char_001: 2 })
+  })
 })

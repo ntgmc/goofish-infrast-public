@@ -4,10 +4,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { CdkAlreadyRedeemedError, createRequestHash, redeemCdkAtomically, saveProfileInTransaction, saveWorkspaceInTransaction } from './cdk-redemption'
-import { createPostgresCdkRecordStore } from './cdk-store'
+import { claimCdkRecord, createPostgresCdkRecordStore } from './cdk-store'
 import { createPostgresUsageEventStore } from './usage-store'
-import { emptyWorkspace, type UserGameAccountRecord } from './user-store'
-import { isProfileCdkRecord, type CdkRecord, type LegacyProfileCdkRecord } from '../handlers/license-utils'
+import {
+  emptyWorkspace,
+  saveUserProfile,
+  updateUserProfileMetadata,
+  type UserAccountRecord,
+  type UserGameAccountRecord,
+} from './user-store'
+import { hashCdk, isProfileCdkRecord, type CdkRecord, type LegacyProfileCdkRecord } from '../handlers/license-utils'
+import { redeemProfileCdk } from '../handlers/user-auth'
 import { adjustBalance, applyBalanceChangeInTransaction, BalanceError, createBalanceRequestHash, getBalanceSummary, releaseScheduleBalanceInTransaction, reserveScheduleBalanceInTransaction, reverseQualificationCredit, settleScheduleBalanceInTransaction } from './balance-store'
 import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
 import { createCommercialProfile, createOrConvertMeteredPersonal, deleteCommercialProfile, patchCommercialProfile, updateCommercialAccount } from './metered-profile-store'
@@ -91,6 +98,160 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     expect((await run('request-a')).replayed).toBe(false)
     expect(await run('request-a')).toEqual({ response: { profile_id: 'profile-a' }, replayed: true })
     await expect(run('request-b')).rejects.toMatchObject({ name: 'IdempotencyConflictError' })
+  })
+
+  it('replays a default-named profile redemption after the profile count changes', async () => {
+    const previousSecret = process.env.CDK_HASH_SECRET
+    process.env.CDK_HASH_SECRET = 'profile-replay-test-secret'
+    try {
+      const userId = await seedUser()
+      const now = new Date().toISOString()
+      const user: UserAccountRecord = {
+        version: 1,
+        id: userId,
+        email: `${userId}@example.test`,
+        password_hash: 'hash',
+        salt: 'salt',
+        iterations: 1,
+        permission: 'growth',
+        status: 'active',
+        cdk_key: null,
+        cdk_code_hash: null,
+        cdk_order_hash: null,
+        email_verified_at: now,
+        created_at: now,
+        updated_at: now,
+      }
+      const code = `REPLAY-${randomUUID()}`
+      const codeHash = hashCdk(code, process.env.CDK_HASH_SECRET)
+      const key = `cdk/${codeHash}.json`
+      await createPostgresCdkRecordStore().create(key, {
+        version: 2,
+        cdk_type: 'profile',
+        code_hash: codeHash,
+        permission: 'growth',
+        balance_amount: null,
+        status: 'unused',
+        created_at: now,
+        used_at: null,
+        order_note: null,
+        license_order_hash: null,
+        operator_count: null,
+        config_desc: null,
+      })
+
+      const first = await redeemProfileCdk(user, code, undefined, undefined, 'default-name-replay')
+      const replay = await redeemProfileCdk(user, code, undefined, undefined, 'default-name-replay')
+
+      expect(first).toMatchObject({ ok: true, profile: { display_name: '账号 1' } })
+      expect(replay).toMatchObject({ ok: true, profile: { id: first.ok ? first.profile.id : '' } })
+    } finally {
+      if (previousSecret === undefined) delete process.env.CDK_HASH_SECRET
+      else process.env.CDK_HASH_SECRET = previousSecret
+    }
+  })
+
+  it('rolls back every CDK in a failed batch create', async () => {
+    const store = createPostgresCdkRecordStore()
+    const codeHash = randomUUID().replaceAll('-', '')
+    const key = `cdk/${codeHash}.json`
+    const record: LegacyProfileCdkRecord = {
+      version: 1,
+      code_hash: codeHash,
+      permission: 'growth',
+      status: 'unused',
+      created_at: new Date().toISOString(),
+      used_at: null,
+      order_note: null,
+      license_order_hash: null,
+      operator_count: null,
+      config_desc: null,
+    }
+
+    await expect(store.createBatch([{ key, record }, { key, record }])).rejects.toThrow('CDK record already exists')
+    expect((await query('select 1 from cdk_records where key = $1', [key])).rowCount).toBe(0)
+  })
+
+  it('keeps conditional delete and redemption claim mutually exclusive', async () => {
+    const store = createPostgresCdkRecordStore()
+    const key = await seedCdk()
+    const [claimed, deleted] = await Promise.all([
+      withTransaction((client) => claimCdkRecord(client, key)),
+      store.deleteUnused(key),
+    ])
+
+    expect(Boolean(claimed)).not.toBe(deleted)
+    const remaining = await query<{ status: string }>('select status from cdk_records where key = $1', [key])
+    expect(deleted ? remaining.rowCount : remaining.rows[0]?.status).toBe(deleted ? 0 : 'claiming')
+  })
+
+  it('synchronizes linked profile authorization in the same CDK mutation', async () => {
+    const store = createPostgresCdkRecordStore()
+    const userId = await seedUser()
+    const key = await seedUsedCdk({ permission: 'ultimate' })
+    const cdk = await store.get(key)
+    const now = new Date().toISOString()
+    const profileId = randomUUID()
+    await saveUserProfile({
+      version: 1,
+      id: profileId,
+      user_id: userId,
+      kind: 'cdk',
+      cdk_key: key,
+      cdk_code_hash: cdk!.code_hash,
+      cdk_order_hash: cdk!.license_order_hash,
+      permission: 'ultimate',
+      status: 'active',
+      display_name: '同步档案',
+      note: '',
+      created_at: now,
+      updated_at: now,
+    })
+
+    await store.mutate(key, (current) => isProfileCdkRecord(current) ? { ...current, permission: 'recommended' } : null)
+    expect((await query<{ permission: string; record_json: UserGameAccountRecord }>(
+      'select permission, record_json from user_game_accounts where id = $1', [profileId],
+    )).rows[0]).toMatchObject({ permission: 'recommended', record_json: { permission: 'recommended', status: 'active' } })
+
+    await store.mutate(key, (current) => ({ ...current, status: 'revoked', revoked_at: new Date().toISOString() }), { allowedStatuses: ['used'] })
+    expect((await query<{ status: string; record_json: UserGameAccountRecord }>(
+      'select status, record_json from user_game_accounts where id = $1', [profileId],
+    )).rows[0]).toMatchObject({ status: 'revoked', record_json: { permission: 'recommended', status: 'revoked' } })
+  })
+
+  it('updates profile metadata without overwriting concurrent binding fields', async () => {
+    const userId = await seedUser()
+    const profileId = randomUUID()
+    const now = new Date().toISOString()
+    await saveUserProfile({
+      version: 1,
+      id: profileId,
+      user_id: userId,
+      kind: 'free_preview',
+      cdk_key: null,
+      cdk_code_hash: null,
+      cdk_order_hash: null,
+      permission: 'growth',
+      status: 'active',
+      display_name: '旧名称',
+      note: '保留备注',
+      created_at: now,
+      updated_at: now,
+    })
+
+    await Promise.all([
+      updateUserProfileMetadata(userId, profileId, { displayName: '新名称' }),
+      query(
+        `update user_game_accounts
+            set record_json = record_json || $2::jsonb
+          where id = $1`,
+        [profileId, JSON.stringify({ skland_risk: { status: 'reviewed' } })],
+      ),
+    ])
+    const saved = (await query<{ record_json: UserGameAccountRecord & { skland_risk?: { status: string } } }>(
+      'select record_json from user_game_accounts where id = $1', [profileId],
+    )).rows[0]?.record_json
+    expect(saved).toMatchObject({ display_name: '新名称', note: '保留备注', skland_risk: { status: 'reviewed' } })
   })
 
   it('rolls back profile and workspace when completion fails', async () => {

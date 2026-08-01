@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
 import {
   AUTH_EMAIL_MAX_LENGTH,
   AUTH_PASSWORD_MAX_LENGTH,
@@ -6,6 +7,15 @@ import {
 } from '../../src/lib/auth-constraints'
 import { publicContentDraftSchema } from '../../src/lib/public-content'
 import { SITE_FEATURE_KEYS, type SiteFeatureKey } from '../../src/lib/site-features'
+import { listAdminIssuablePermissions } from '../../src/lib/product-catalog'
+import type { ProductPermissionMode } from '../../src/lib/types'
+import {
+  eliteOverridesSchema,
+  licenseConfigSchema,
+  licenseOperatorsSchema,
+  workspaceSavedConfigActionSchema,
+} from '../../src/lib/workspace-validation'
+import { scenarioComparisonFactorsSchema } from '../optimization/jobs/runtime-contracts'
 
 export const REQUEST_BODY_LIMITS = Object.freeze({
   none: 0,
@@ -38,6 +48,9 @@ const siteFeatureShape = Object.fromEntries(
 ) as Record<SiteFeatureKey, z.ZodBoolean>
 const siteFeaturesSchema = strict(siteFeatureShape)
 const expectedRevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)
+const adminPermissionSchema = z.enum(
+  listAdminIssuablePermissions() as [ProductPermissionMode, ...ProductPermissionMode[]],
+)
 
 export const requestSchemas = {
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
@@ -59,14 +72,14 @@ export const requestSchemas = {
     new_password: z.string().min(AUTH_PASSWORD_MIN_LENGTH).max(AUTH_PASSWORD_MAX_LENGTH),
   }),
   accountDelete: strict({
-    email: shortString(AUTH_EMAIL_MAX_LENGTH),
-    password: z.string().max(AUTH_PASSWORD_MAX_LENGTH),
+    email: z.string().email().max(AUTH_EMAIL_MAX_LENGTH),
+    password: z.string().min(1).max(AUTH_PASSWORD_MAX_LENGTH),
   }),
   profileId: strict({ profile_id: shortString(128) }),
   deletionToken: strict({ token: shortString(512) }),
   adminCdkCreate: strict({
     cdk_type: z.enum(['profile', 'balance', 'item']).optional(),
-    permission: optionalString(32),
+    permission: adminPermissionSchema.optional(),
     amount: optionalString(32),
     item_code: z.enum(['lifetime_profile_voucher', 'limited_profile_voucher']).optional(),
     order_note: optionalString(500),
@@ -74,8 +87,17 @@ export const requestSchemas = {
   }),
   adminCdkPatch: strict({
     code_hash: optionalString(64),
-    action: optionalString(64),
-    permission: optionalString(32),
+    code_hashes: z.array(shortString(64)).min(1).max(100).optional(),
+    action: z.enum([
+      'revoke',
+      'upgrade',
+      'unfreeze',
+      'update_note',
+      'set_permission',
+      'set_operator_baseline',
+      'accept_operator_baseline_and_unfreeze',
+    ]),
+    permission: adminPermissionSchema.optional(),
     order_note: optionalString(500),
     reason: optionalString(500),
     baseline_source: z.enum(['latest', 'workspace', 'next_import']).optional(),
@@ -147,8 +169,10 @@ export const requestSchemas = {
     strict({ all: z.literal(true) }),
   ]),
   personalUseDeclarationConfirmation: strict({
-    action: z.enum(['free_preview_claim', 'metered_personal_create', 'generated_result_export']),
+    action: z.enum(PERSONAL_USE_DECLARATION_ACTIONS),
     profile_id: optionalString(128),
+    declaration_id: shortString(128),
+    content_hash: z.string().regex(/^[a-f0-9]{64}$/),
   }),
   profilePreview: strict({ display_name: optionalString(40), note: optionalString(500) }),
   profileRedeem: strict({
@@ -164,7 +188,13 @@ export const requestSchemas = {
     profile_id: optionalString(128),
     idempotency_key: shortString(200),
   }),
-  profilePatch: strict({ profile_id: shortString(128), display_name: optionalString(40), note: optionalString(500) }),
+  profilePatch: strict({
+    profile_id: shortString(128),
+    display_name: optionalString(40),
+    note: optionalString(500),
+  }).refine((body) => body.display_name !== undefined || body.note !== undefined, {
+    message: 'At least one profile metadata field is required.',
+  }),
   meteredPersonalProfile: strict({ profile_id: optionalString(128), display_name: optionalString(40), note: optionalString(500) }),
   commercialProfileCreate: strict({ display_name: optionalString(40), note: optionalString(500) }),
   commercialProfilePatch: strict({
@@ -174,12 +204,19 @@ export const requestSchemas = {
   commercialProfileDelete: strict({ profile_id: shortString(128), confirm_permanent_delete: z.literal(true) }),
   userWorkspace: strict({
     profile_id: shortString(128),
-    operators: optionalUnknown,
-    config: optionalUnknown,
-    elite_overrides: optionalUnknown,
-    last_result: optionalUnknown,
-    saved_config_action: optionalUnknown,
-    result_history_id: optionalString(128),
+    operators: licenseOperatorsSchema.nullable().optional(),
+    config: licenseConfigSchema.nullable().optional(),
+    elite_overrides: eliteOverridesSchema.optional(),
+    saved_config_action: workspaceSavedConfigActionSchema.optional(),
+  }).refine((body) => (
+    body.operators !== undefined
+    || body.config !== undefined
+    || body.elite_overrides !== undefined
+    || body.saved_config_action !== undefined
+  ), { message: 'At least one workspace mutation field is required.' }),
+  workspaceFreeScheduleConfirm: strict({
+    profile_id: shortString(128),
+    result_history_id: shortString(128),
   }),
   behaviorRiskEngagement: strict({
     page_category: z.enum(['landing', 'auth', 'profiles', 'workspace', 'optimizer', 'result', 'account', 'public_info', 'other']),
@@ -192,7 +229,12 @@ export const requestSchemas = {
     source: z.enum(['manual', 'bookmarklet']).optional(),
   }),
   sklandSelection: strict({ profile_id: shortString(128), selection_id: shortString(256), uid: shortString(128) }),
-  sklandConfirmation: strict({ profile_id: shortString(128), confirmation_id: shortString(256) }),
+  sklandPendingCancel: strict({ profile_id: shortString(128), pending_id: shortString(256) }),
+  sklandConfirmation: strict({
+    profile_id: shortString(128),
+    confirmation_id: shortString(256),
+    idempotency_key: shortString(200),
+  }),
   freePreviewScan: strict({ scan_id: shortString(256) }),
   freePreviewCredential: strict({
     credential_text: z.string().min(1).max(16 * 1024),
@@ -202,7 +244,8 @@ export const requestSchemas = {
   }),
   freePreviewScanComplete: strict({ scan_id: shortString(256), display_name: optionalString(40), note: optionalString(500) }),
   freePreviewSelection: strict({ selection_id: shortString(256), uid: shortString(128) }),
-  freePreviewConfirmation: strict({ confirmation_id: shortString(256) }),
+  profilelessSklandPendingCancel: strict({ pending_id: shortString(256) }),
+  freePreviewConfirmation: strict({ confirmation_id: shortString(256), idempotency_key: shortString(200) }),
   lifetimeVoucherScanComplete: strict({ scan_id: shortString(256) }),
   lifetimeVoucherCredential: strict({
     credential_text: z.string().min(1).max(16 * 1024),
@@ -219,8 +262,8 @@ export const requestSchemas = {
     strict({
       kind: z.literal('schedule'),
       identity: strict({ type: z.literal('profile'), profileId: shortString(128) }),
-      operators: z.array(z.unknown()).max(2000),
-      config: z.unknown(),
+      operators: licenseOperatorsSchema,
+      config: licenseConfigSchema,
       includeUpgradeSuggestions: z.boolean(),
       use_priority_coupon: z.boolean().optional(),
       use_items: z.array(z.enum([
@@ -236,9 +279,9 @@ export const requestSchemas = {
     strict({
       kind: z.literal('scenario_comparison'),
       identity: strict({ type: z.literal('profile'), profileId: shortString(128) }),
-      operators: z.array(z.unknown()).max(2000),
-      config: z.unknown(),
-      factors: optionalUnknown,
+      operators: licenseOperatorsSchema,
+      config: licenseConfigSchema,
+      factors: scenarioComparisonFactorsSchema,
       use_items: z.array(z.enum([
         'priority_compute_coupon', 'reorder_check_coupon', 'scenario_simulation_coupon',
         'training_diagnosis_coupon', 'additional_recompute_coupon', 'plan_capacity_certificate',
@@ -248,7 +291,7 @@ export const requestSchemas = {
     }),
   ]),
   reorderCheck: strict({
-    profileId: shortString(128), config: z.unknown(), baselineHistoryId: optionalString(128),
+    profileId: shortString(128), config: licenseConfigSchema, baselineHistoryId: optionalString(128),
     use_items: z.array(z.literal('reorder_check_coupon')).max(1).optional(),
   }),
   inventoryUse: strict({
@@ -340,15 +383,18 @@ const SKLAND_PATHS: Record<string, z.ZodType> = {
   '/api/user/skland/login/confirm': requestSchemas.sklandConfirmation,
   '/api/user/skland/credential/preview': requestSchemas.sklandCredential,
   '/api/user/skland/account/select': requestSchemas.sklandSelection,
+  '/api/user/skland/pending/cancel': requestSchemas.sklandPendingCancel,
   '/api/user/skland/import/refresh': requestSchemas.sklandProfile,
   '/api/user/skland/free-preview/login/complete': requestSchemas.freePreviewScanComplete,
   '/api/user/skland/free-preview/login/confirm': requestSchemas.freePreviewConfirmation,
   '/api/user/skland/free-preview/credential/preview': requestSchemas.freePreviewCredential,
   '/api/user/skland/free-preview/account/select': requestSchemas.freePreviewSelection,
+  '/api/user/skland/free-preview/pending/cancel': requestSchemas.profilelessSklandPendingCancel,
   '/api/user/skland/lifetime-voucher/login/complete': requestSchemas.lifetimeVoucherScanComplete,
   '/api/user/skland/lifetime-voucher/login/confirm': requestSchemas.lifetimeVoucherConfirmation,
   '/api/user/skland/lifetime-voucher/credential/preview': requestSchemas.lifetimeVoucherCredential,
   '/api/user/skland/lifetime-voucher/account/select': requestSchemas.lifetimeVoucherSelection,
+  '/api/user/skland/lifetime-voucher/pending/cancel': requestSchemas.profilelessSklandPendingCancel,
 }
 
 const ROUTE_POLICIES = new Map<string, RoutePolicy>([
@@ -409,7 +455,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/billing/quote', route({ GET: none() }, ['profile_id', 'operation'])],
   ['/api/user/status', route({ GET: none() }, ['profile_id'])],
   ['/api/user/workspace', route({ GET: none(), POST: json('compute', requestSchemas.userWorkspace), PATCH: json('compute', requestSchemas.userWorkspace) }, ['profile_id'])],
-  ['/api/user/workspace/free-schedule/confirm', route({ POST: json('standard', requestSchemas.userWorkspace) })],
+  ['/api/user/workspace/free-schedule/confirm', route({ POST: json('standard', requestSchemas.workspaceFreeScheduleConfirm) })],
   ['/api/user/behavior-risk/engagement', route({ POST: json('standard', requestSchemas.behaviorRiskEngagement) })],
   ['/api/user/invitations', route({ GET: none() }, ['cursor', 'limit'])],
   ['/api/user/invitations/code', route({ POST: none() })],

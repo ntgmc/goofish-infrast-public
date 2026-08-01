@@ -1,10 +1,9 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto'
 import QRCode from 'qrcode'
+import type { PoolClient } from 'pg'
 import type { AuthSuccessResponse, LicenseConfig, SklandCredentialInvalidReason } from '../../src/lib/types'
 import {
   emptyWorkspace,
-  claimFreePreviewUid,
-  deleteFreePreviewClaim,
   deleteFreePreviewPendingClaim,
   getFreePreviewClaim,
   getFreePreviewPendingClaim,
@@ -13,7 +12,6 @@ import {
   isDepotValueProfile,
   isFreePreviewProfile,
   listProfilesForUser,
-  updateProfileWorkspaceAtomically,
   updateProfileWorkspaceInTransaction,
   deleteLifetimeVoucherPendingBinding,
   saveFreePreviewPendingClaim,
@@ -56,7 +54,6 @@ import {
   createHypergryphScan,
   decryptSklandCredential,
   encryptSklandCredential,
-  ensureSklandCredentialSecret,
   getCredByHypergryphToken,
   getHypergryphTokenByScanCode,
   getScanCode,
@@ -74,10 +71,25 @@ import { recordUsageEvent } from './usage-stats'
 import type { UsageReasonCode } from '../storage/usage-store'
 import { CURRENT_PERSONAL_USE_DECLARATION, isCurrentPersonalUseDeclarationEffective } from '../personal-use-declaration'
 import {
-  attachPersonalUseDeclarationAcceptanceToProfile,
+  attachPersonalUseDeclarationAcceptanceToProfileInTransaction,
   getPersonalUseDeclarationAcceptance,
+  recordPersonalUseDeclarationUsageInTransaction,
 } from '../storage/personal-use-declaration-store'
-import { recordAuthenticatedRequestBehaviorEvent, recordRequestBehaviorEvent } from '../behavior-risk/service'
+import { getRequestClientIp } from '../security/client-ip'
+import {
+  recordAuthenticatedRequestBehaviorEvent,
+  recordRequestBehaviorEvent,
+  recordRequestBehaviorEventInTransaction,
+} from '../behavior-risk/service'
+import {
+  lockSklandUidProfilesInTransaction,
+  recordSklandUidMismatchInTransaction,
+} from '../storage/skland-binding-store'
+import {
+  ensureSklandServiceConfiguration,
+  getFreePreviewUidHashSecret,
+  SklandConfigurationError,
+} from '../skland-config'
 
 const PENDING_BINDING_TTL_MS = 10 * 60 * 1000
 const UID_MISMATCH_FREEZE_THRESHOLD = 3
@@ -102,6 +114,7 @@ const DEFAULT_SKLAND_CONFIG: LicenseConfig = {
 type HandlerResponse = AuthSuccessResponse & { skland_import?: SklandImportSummary }
 type AuthPayloadUser = Parameters<typeof buildAuthPayload>[0]
 type CredentialSource = 'manual' | 'bookmarklet'
+type SklandRequestContext = { req: Request; sessionTokenHash: string }
 
 interface SklandPreview {
   uid: string
@@ -117,6 +130,18 @@ class SklandProfileError extends Error {
   }
 }
 
+class SklandHttpError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status: 400 | 404 | 409,
+    readonly recoveryAction?: 'retry' | 'rebind' | 'bind_first',
+  ) {
+    super(message)
+    this.name = 'SklandHttpError'
+  }
+}
+
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
@@ -124,7 +149,11 @@ export default async (req: Request): Promise<Response> => {
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
-    const rateLimit = await reserveSklandAttemptLayered(auth.user.id)
+    const pathname = new URL(req.url).pathname
+    const rateLimit = await reserveSklandAttemptLayered(
+      auth.user.id,
+      pathname.endsWith('/login/complete') || pathname.endsWith('/pending/cancel') ? 'poll' : 'external',
+    )
     if (!rateLimit.allowed) {
       return jsonResponse(
         { error: `森空岛请求过于频繁，请 ${rateLimit.retryAfterSeconds} 秒后重试。`, code: 'rate_limited' },
@@ -134,10 +163,40 @@ export default async (req: Request): Promise<Response> => {
     }
     rateLimit.attempt.retainFailure()
 
-    const pathname = new URL(req.url).pathname
+    if (pathname.endsWith('/lifetime-voucher/pending/cancel')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      const body = await readJsonBody(req)
+      if (typeof body.pending_id !== 'string' || !body.pending_id.trim()) {
+        return jsonResponse({ error: 'Missing pending_id.' }, 400)
+      }
+      await deleteLifetimeVoucherPendingBinding(auth.user.id, body.pending_id.trim())
+      return jsonResponse(null, 204)
+    }
+
+    if (pathname.endsWith('/free-preview/pending/cancel')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      const body = await readJsonBody(req)
+      if (typeof body.pending_id !== 'string' || !body.pending_id.trim()) {
+        return jsonResponse({ error: 'Missing pending_id.' }, 400)
+      }
+      await deleteFreePreviewPendingClaim(auth.user.id, body.pending_id.trim())
+      return jsonResponse(null, 204)
+    }
+
+    if (pathname.endsWith('/pending/cancel')) {
+      if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+      const body = await readJsonBody(req)
+      const profile = await requireProfile(auth.user.id, body.profile_id)
+      if (typeof body.pending_id !== 'string' || !body.pending_id.trim()) {
+        return jsonResponse({ error: 'Missing pending_id.' }, 400)
+      }
+      await clearProfileSklandPendingBinding(auth.user.id, profile.id, body.pending_id.trim())
+      return jsonResponse(null, 204)
+    }
+
     if (pathname.endsWith('/lifetime-voucher/login/start')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       if (await getItemBalance(auth.user.id, 'lifetime_profile_voucher') < 1) {
         return jsonResponse({ error: '背包中没有可用的终身版兑换 CDK。', code: 'item_unavailable' }, 409)
       }
@@ -151,45 +210,45 @@ export default async (req: Request): Promise<Response> => {
 
     if (pathname.endsWith('/lifetime-voucher/login/complete')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       if (typeof body.scan_id !== 'string' || !body.scan_id.trim()) return jsonResponse({ error: 'Missing scan_id.' }, 400)
       const scanCode = await getScanCode(body.scan_id.trim())
       if (!scanCode) return jsonResponse({ status: 'pending' }, 202)
       const accountToken = await getHypergryphTokenByScanCode(scanCode)
-      return createPendingLifetimeVoucherBinding(auth.user, await getCredByHypergryphToken(accountToken))
+      return await createPendingLifetimeVoucherBinding(auth.user, await getCredByHypergryphToken(accountToken))
     }
 
     if (pathname.endsWith('/lifetime-voucher/credential/preview')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       const cred = extractSklandCredential(body.credential_text)
       if (!cred) return jsonResponse({ error: '缺少森空岛凭据。' }, 400)
-      return createPendingLifetimeVoucherBinding(auth.user, cred, normalizeCredentialSource(body.source))
+      return await createPendingLifetimeVoucherBinding(auth.user, cred, normalizeCredentialSource(body.source))
     }
 
     if (pathname.endsWith('/lifetime-voucher/account/select')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       if (typeof body.selection_id !== 'string' || !body.selection_id.trim()) return jsonResponse({ error: '缺少 selection_id。' }, 400)
       if (typeof body.uid !== 'string' || !body.uid.trim()) return jsonResponse({ error: '请选择要导入的森空岛账号。' }, 400)
-      return selectLifetimeVoucherAccount(auth.user, body.selection_id.trim(), body.uid.trim())
+      return await selectLifetimeVoucherAccount(auth.user, body.selection_id.trim(), body.uid.trim())
     }
 
     if (pathname.endsWith('/lifetime-voucher/login/confirm')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       if (typeof body.confirmation_id !== 'string' || !body.confirmation_id.trim()) return jsonResponse({ error: 'Missing confirmation_id.' }, 400)
       if (typeof body.idempotency_key !== 'string' || !body.idempotency_key.trim()) return jsonResponse({ error: 'Missing idempotency_key.' }, 400)
-      return confirmLifetimeVoucherBinding(auth.user, body.confirmation_id.trim(), body.idempotency_key.trim(), req, auth.tokenHash)
+      return await confirmLifetimeVoucherBinding(auth.user, body.confirmation_id.trim(), body.idempotency_key.trim(), req, auth.tokenHash)
     }
 
     if (pathname.endsWith('/free-preview/login/start')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const scan = await createHypergryphScan()
       const qrDataUrl = await QRCode.toDataURL(scan.scanUrl, {
         width: 300,
@@ -205,7 +264,7 @@ export default async (req: Request): Promise<Response> => {
 
     if (pathname.endsWith('/free-preview/login/complete')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       if (typeof body.scan_id !== 'string' || !body.scan_id.trim()) {
         return jsonResponse({ error: 'Missing scan_id.' }, 400)
@@ -215,22 +274,22 @@ export default async (req: Request): Promise<Response> => {
 
       const accountToken = await getHypergryphTokenByScanCode(scanCode)
       const cred = await getCredByHypergryphToken(accountToken)
-      return createPendingFreePreviewClaimFromCred(auth.user, cred, body.display_name, body.note)
+      return await createPendingFreePreviewClaimFromCred(auth.user, cred, body.display_name, body.note)
     }
 
     if (pathname.endsWith('/free-preview/credential/preview')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       const source = normalizeCredentialSource(body.source)
       const cred = extractSklandCredential(body.credential_text)
       if (!cred) return jsonResponse({ error: '缺少森空岛凭据。' }, 400)
-      return createPendingFreePreviewClaimFromCred(auth.user, cred, body.display_name, body.note, source)
+      return await createPendingFreePreviewClaimFromCred(auth.user, cred, body.display_name, body.note, source)
     }
 
     if (pathname.endsWith('/free-preview/account/select')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       if (typeof body.selection_id !== 'string' || !body.selection_id.trim()) {
         return jsonResponse({ error: '缺少 selection_id。' }, 400)
@@ -238,22 +297,31 @@ export default async (req: Request): Promise<Response> => {
       if (typeof body.uid !== 'string' || !body.uid.trim()) {
         return jsonResponse({ error: '请选择要导入的森空岛账号。' }, 400)
       }
-      return selectFreePreviewAccount(auth.user, body.selection_id.trim(), body.uid.trim())
+      return await selectFreePreviewAccount(auth.user, body.selection_id.trim(), body.uid.trim())
     }
 
     if (pathname.endsWith('/free-preview/login/confirm')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       if (typeof body.confirmation_id !== 'string' || !body.confirmation_id.trim()) {
         return jsonResponse({ error: 'Missing confirmation_id.' }, 400)
       }
-      return confirmFreePreviewClaim(auth.user, body.confirmation_id.trim(), req, auth.tokenHash)
+      if (typeof body.idempotency_key !== 'string' || !body.idempotency_key.trim()) {
+        return jsonResponse({ error: 'Missing idempotency_key.' }, 400)
+      }
+      return await confirmFreePreviewClaim(
+        auth.user,
+        body.confirmation_id.trim(),
+        body.idempotency_key.trim(),
+        req,
+        auth.tokenHash,
+      )
     }
 
     if (pathname.endsWith('/login/start')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       await requireActiveProfile(auth.user.id, body.profile_id)
       const scan = await createHypergryphScan()
@@ -271,7 +339,7 @@ export default async (req: Request): Promise<Response> => {
 
     if (pathname.endsWith('/login/complete')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       if (typeof body.scan_id !== 'string' || !body.scan_id.trim()) {
@@ -282,23 +350,23 @@ export default async (req: Request): Promise<Response> => {
 
       const accountToken = await getHypergryphTokenByScanCode(scanCode)
       const cred = await getCredByHypergryphToken(accountToken)
-      return createPendingSklandBindingFromCred(auth.user, profile, cred)
+      return await createPendingSklandBindingFromCred(auth.user, profile, cred, undefined, { req, sessionTokenHash: auth.tokenHash })
     }
 
     if (pathname.endsWith('/credential/preview')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       const source = normalizeCredentialSource(body.source)
       const cred = extractSklandCredential(body.credential_text)
       if (!cred) return jsonResponse({ error: '缺少森空岛凭据。' }, 400)
-      return createPendingSklandBindingFromCred(auth.user, profile, cred, source)
+      return await createPendingSklandBindingFromCred(auth.user, profile, cred, source, { req, sessionTokenHash: auth.tokenHash })
     }
 
     if (pathname.endsWith('/account/select')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       if (typeof body.selection_id !== 'string' || !body.selection_id.trim()) {
@@ -307,73 +375,40 @@ export default async (req: Request): Promise<Response> => {
       if (typeof body.uid !== 'string' || !body.uid.trim()) {
         return jsonResponse({ error: '请选择要导入的森空岛账号。' }, 400)
       }
-      return selectSklandAccount(auth.user, profile, body.selection_id.trim(), body.uid.trim())
+      return await selectSklandAccount(
+        auth.user,
+        profile,
+        body.selection_id.trim(),
+        body.uid.trim(),
+        { req, sessionTokenHash: auth.tokenHash },
+      )
     }
 
     if (pathname.endsWith('/login/confirm')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
-      const profile = await requireActiveProfile(auth.user.id, body.profile_id)
+      const profile = await requireProfile(auth.user.id, body.profile_id)
       if (typeof body.confirmation_id !== 'string' || !body.confirmation_id.trim()) {
         return jsonResponse({ error: '缺少 confirmation_id。' }, 400)
       }
-      const pending = profile.skland_pending_binding
-      if (!isSklandConfirmationPending(pending) || pending.confirmation_id !== body.confirmation_id.trim()) {
-        await recordSklandImport('failure', 'skland_confirm_invalid', startedAt, profile.id, 'login_confirm')
-        return jsonResponse({ error: '森空岛绑定确认已失效，请重新登录森空岛。' }, 400)
+      if (typeof body.idempotency_key !== 'string' || !body.idempotency_key.trim()) {
+        return jsonResponse({ error: '缺少 idempotency_key。' }, 400)
       }
-      if (Date.now() > Date.parse(pending.expires_at)) {
-        await saveUserProfile({ ...profile, skland_pending_binding: null, updated_at: new Date().toISOString() })
-        await recordSklandImport('failure', 'skland_pending_expired', startedAt, profile.id, 'login_confirm')
-        return jsonResponse({ error: '森空岛绑定确认已过期，请重新登录森空岛。' }, 400)
-      }
-      if (profile.skland_binding?.uid && profile.skland_binding.uid !== pending.uid) {
-        await recordSklandImport('failure', 'skland_account_mismatch', startedAt, profile.id, 'login_confirm')
-        return jsonResponse({ error: '森空岛账号与当前绑定账号不一致，请重新登录森空岛。' }, 409)
-      }
-
-      if (isDepotValueProfile(profile)) {
-        const payload = await saveDepotValueSklandBinding(auth.user, profile)
-        await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'bind', profileId: profile.id, uid: pending.uid })
-        return jsonResponse(payload)
-      }
-
-      if (isFreePreviewProfile(profile)) {
-        const claim = await claimFreePreviewProfileUid(auth.user.id, profile, pending, new Date().toISOString())
-        if (!claim.ok) {
-          await recordSklandImport('failure', 'permission_denied', startedAt, profile.id, 'login_confirm')
-          return jsonResponse({ error: claim.message, code: 'free_preview_uid_claimed' }, 409)
-        }
-      }
-
-      let imported: SklandImportSummary
-      try {
-        imported = await saveSklandImport(auth.user.id, profile, decryptSklandCredential(pending.encrypted_cred), pending.uid)
-      } catch (error) {
-        if (isFreePreviewProfile(profile)) await deleteFreePreviewClaim(hashFreePreviewUid(pending.uid), profile.id)
-        throw error
-      }
-      await recordSklandImport('success', 'ok', startedAt, profile.id, 'login_confirm')
-      const behaviorDeclaration = isFreePreviewProfile(profile)
-        ? await getPersonalUseDeclarationAcceptance(auth.user.id).catch(() => null)
-        : null
-      await recordAuthenticatedRequestBehaviorEvent({
+      return await confirmProfileSklandBinding({
+        user: auth.user,
+        profile,
+        confirmationId: body.confirmation_id.trim(),
+        idempotencyKey: body.idempotency_key.trim(),
         req,
         auth,
-        eventType: 'bind',
-        profileId: profile.id,
-        uid: imported.uid,
-        activityClaimedAt: isFreePreviewProfile(profile) ? profile.created_at : null,
-        declarationVersion: behaviorDeclaration?.declaration_version,
-        declarationAcceptedAt: behaviorDeclaration?.accepted_at,
+        startedAt,
       })
-      return jsonResponse(await buildPayloadWithImport(auth.user, profile.id, imported))
     }
 
     if (pathname.endsWith('/import/refresh')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      ensureSklandCredentialSecret()
+      ensureSklandServiceConfiguration()
       const body = await readJsonBody(req)
       const profile = await requireActiveProfile(auth.user.id, body.profile_id)
       if (isDepotValueProfile(profile)) {
@@ -410,18 +445,28 @@ export default async (req: Request): Promise<Response> => {
           }, 400)
         }
         await recordSklandImport('failure', 'skland_refresh_failed', startedAt, profile.id, 'refresh')
-        return jsonResponse({
-          error: '森空岛刷新失败，请稍后重试。',
-          code: 'skland_refresh_failed',
-          recovery_action: 'retry',
-        }, 400)
+        throw caught
       }
     }
 
     return jsonResponse({ error: 'API route not found' }, 404)
   } catch (error) {
+    if (error instanceof SklandConfigurationError) {
+      return jsonResponse({
+        error: error.message,
+        code: error.code,
+        recovery_action: 'contact_support',
+      }, 503, { 'Cache-Control': 'no-store' })
+    }
     if (error instanceof SklandProfileError) {
       return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
+    if (error instanceof SklandHttpError) {
+      return jsonResponse({
+        error: error.message,
+        code: error.code,
+        ...(error.recoveryAction && { recovery_action: error.recoveryAction }),
+      }, error.status)
     }
     if (error instanceof RateLimitStoreError) {
       return jsonResponse(
@@ -434,17 +479,28 @@ export default async (req: Request): Promise<Response> => {
       return jsonResponse({ error: error.message, code: error.code }, error.status)
     }
     console.error('user skland error:', error instanceof Error ? error.message : error)
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    if (message.includes('SKLAND_CREDENTIAL_SECRET')) {
+    if (error instanceof SklandClientError) {
+      if (error.code === 'credential_invalid' || error.code === 'credential_format_invalid') {
+        return jsonResponse({ error: error.message, code: 'skland_credential_invalid', recovery_action: 'rebind' }, 400)
+      }
       return jsonResponse({
-        error: '森空岛凭据服务尚未配置，请联系管理员。',
-        code: 'skland_service_not_configured',
-        recovery_action: 'contact_support',
-      }, 503, { 'Cache-Control': 'no-store' })
+        error: '鹰角或森空岛服务暂不可用，请稍后重试。',
+        code: 'skland_upstream_failed',
+        recovery_action: 'retry',
+      }, 502)
+    }
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      return jsonResponse({
+        error: '鹰角或森空岛服务请求超时，请稍后重试。',
+        code: 'skland_upstream_timeout',
+        recovery_action: 'retry',
+      }, 504)
     }
     return jsonResponse({
-      error: '森空岛请求无效或服务暂不可用。',
-    }, 400)
+      error: '森空岛服务处理请求时发生内部错误。',
+      code: 'skland_internal_error',
+      recovery_action: 'retry',
+    }, 500)
   }
 }
 
@@ -466,6 +522,361 @@ async function recordSklandImport(
   } catch (error) {
     console.warn('usage stats skland import skipped:', error)
   }
+}
+
+async function clearProfileSklandPendingBinding(userId: string, profileId: string, pendingId: string): Promise<void> {
+  await withTransaction(async (client) => {
+    const locked = await client.query<{ record_json: UserGameAccountRecord }>(
+      'select record_json from user_game_accounts where id = $1 and user_id = $2 for update',
+      [profileId, userId],
+    )
+    const profile = locked.rows[0]?.record_json
+    if (!profile || profile.skland_pending_binding?.confirmation_id !== pendingId) return
+    await saveProfileInTransaction(client, {
+      ...profile,
+      skland_pending_binding: null,
+      updated_at: new Date().toISOString(),
+    })
+  })
+}
+
+type SklandConfirmationOperationResponse = {
+  profile_id: string
+  imported?: SklandImportSummary
+}
+
+type PreparedSklandImport = {
+  binding: SklandBindingSummary
+  operators: Extract<ReturnType<typeof validateOperators>, { ok: true }>['operators']
+  intermediateInventory?: IntermediateInventory
+  inventoryWarning?: string
+  importedAt: string
+}
+
+async function getSklandConfirmationReplay(
+  userId: string,
+  idempotencyKey: string,
+  requestHash: string,
+): Promise<SklandConfirmationOperationResponse | null> {
+  const replay = await query<{
+    request_hash: string
+    response_json: SklandConfirmationOperationResponse | null
+  }>(
+    'select request_hash, response_json from inventory_operations where user_id = $1 and idempotency_key = $2',
+    [userId, idempotencyKey],
+  )
+  const row = replay.rows[0]
+  if (!row) return null
+  if (row.request_hash !== requestHash) {
+    throw new SklandHttpError('idempotency_conflict', '幂等键已被其他请求使用。', 409)
+  }
+  if (!row.response_json) {
+    throw new SklandHttpError('operation_in_progress', '森空岛绑定正在处理中。', 409, 'retry')
+  }
+  return row.response_json
+}
+
+async function beginSklandConfirmationOperation(
+  client: PoolClient,
+  input: {
+    userId: string
+    idempotencyKey: string
+    requestHash: string
+    operationType: 'bind_skland_profile' | 'claim_free_preview'
+    now: string
+  },
+): Promise<string> {
+  const operationId = randomUUID()
+  const inserted = await client.query(
+    `insert into inventory_operations
+      (id, user_id, idempotency_key, operation_type, request_hash, created_at)
+     values ($1, $2, $3, $4, $5, $6)
+     on conflict (user_id, idempotency_key) do nothing`,
+    [operationId, input.userId, input.idempotencyKey, input.operationType, input.requestHash, input.now],
+  )
+  if (!inserted.rowCount) {
+    throw new SklandHttpError('operation_in_progress', '森空岛绑定正在处理中。', 409, 'retry')
+  }
+  return operationId
+}
+
+async function completeSklandConfirmationOperation(
+  client: PoolClient,
+  operationId: string,
+  response: SklandConfirmationOperationResponse,
+  now: string,
+): Promise<void> {
+  await client.query(
+    'update inventory_operations set response_json = $2::jsonb, completed_at = $3 where id = $1',
+    [operationId, JSON.stringify(response), now],
+  )
+}
+
+function createSklandConfirmationRequestHash(
+  scope: 'profile' | 'free_preview' | 'lifetime_voucher',
+  userId: string,
+  confirmationId: string,
+  profileId?: string,
+): string {
+  return createHash('sha256')
+    .update(JSON.stringify({ scope, userId, confirmationId, profileId: profileId ?? null }))
+    .digest('hex')
+}
+
+async function prepareSklandImport(
+  profile: UserGameAccountRecord,
+  cred: string,
+  uid: string,
+): Promise<PreparedSklandImport> {
+  if (profile.archived_at) throw new SklandProfileError('profile_archived', '归档档案不能更新森空岛绑定或工作区。', 409)
+  const imported = await importSklandOperatorsByCred(cred, { uid, includeInventory: true })
+  const operatorsCheck = validateOperators(imported.operators)
+  if (!operatorsCheck.ok) {
+    throw new SklandHttpError('skland_operator_data_invalid', operatorsCheck.message, 400)
+  }
+  if (profile.skland_binding?.uid && profile.skland_binding.uid !== imported.binding.uid) {
+    throw new SklandHttpError('skland_account_mismatch', '森空岛账号与当前档案绑定的 UID 不一致。', 409, 'rebind')
+  }
+
+  return {
+    binding: imported.binding,
+    operators: operatorsCheck.operators,
+    intermediateInventory: imported.intermediateInventory,
+    inventoryWarning: imported.inventoryWarning,
+    importedAt: imported.importedAt,
+  }
+}
+
+async function persistPreparedSklandImportInTransaction(
+  client: PoolClient,
+  userId: string,
+  profileId: string,
+  cred: string,
+  prepared: PreparedSklandImport,
+): Promise<SklandImportSummary> {
+  const locked = await client.query<{ record_json: UserGameAccountRecord }>(
+    `select record_json from user_game_accounts
+      where id = $1 and user_id = $2
+      for update`,
+    [profileId, userId],
+  )
+  const profile = locked.rows[0]?.record_json
+  if (!profile) throw new SklandHttpError('profile_not_found', '账号档案不存在。', 404)
+  if (profile.archived_at) throw new SklandProfileError('profile_archived', '归档档案不能更新森空岛绑定或工作区。', 409)
+  if (profile.status !== 'active') throw new SklandHttpError('profile_unavailable', '账号档案状态不可用。', 409)
+  if (profile.skland_binding?.uid && profile.skland_binding.uid !== prepared.binding.uid) {
+    throw new SklandHttpError('skland_account_mismatch', '森空岛账号与当前档案绑定的 UID 不一致。', 409, 'rebind')
+  }
+
+  if (isFreePreviewProfile(profile)) {
+    const uidHash = hashFreePreviewUid(prepared.binding.uid)
+    const claim = buildFreePreviewClaim(uidHash, userId, profile.id, prepared.binding, prepared.importedAt)
+    const inserted = await client.query(
+      `insert into free_preview_claims (uid_hash, user_id, profile_id, claimed_at, record_json)
+       values ($1, $2, $3, $4, $5::jsonb)
+       on conflict (uid_hash) do nothing`,
+      [claim.uid_hash, claim.user_id, claim.profile_id, claim.claimed_at, JSON.stringify(claim)],
+    )
+    if (!inserted.rowCount) {
+      const existing = await client.query<{ profile_id: string }>(
+        'select profile_id from free_preview_claims where uid_hash = $1 for update',
+        [uidHash],
+      )
+      if (existing.rows[0]?.profile_id !== profile.id) {
+        throw new SklandHttpError('free_preview_uid_claimed', '该森空岛 UID 已经领取过免费个人排班档案。', 409)
+      }
+    }
+  }
+
+  let configResult: ReturnType<typeof resolveSklandImportConfig> = { config: null }
+  await updateProfileWorkspaceInTransaction(client, profile.id, (existingWorkspace) => {
+    configResult = resolveSklandImportConfig(profile, existingWorkspace?.config ?? null, prepared.intermediateInventory)
+    return {
+      ...(existingWorkspace ?? emptyWorkspace(profile.id)),
+      operators: prepared.operators,
+      config: configResult.config ?? existingWorkspace?.config ?? null,
+      elite_overrides: {},
+      last_result: null,
+      updated_at: prepared.importedAt,
+    }
+  })
+
+  const existingBinding = profile.skland_binding
+  await saveProfileInTransaction(client, {
+    ...profile,
+    skland_binding: {
+      uid: prepared.binding.uid,
+      nickname: prepared.binding.nickname,
+      channel_name: prepared.binding.channel_name,
+      bound_at: existingBinding?.bound_at ?? prepared.importedAt,
+      last_imported_at: prepared.importedAt,
+      encrypted_cred: shouldReuseEncryptedCred(existingBinding, cred)
+        ? existingBinding.encrypted_cred
+        : encryptSklandCredential(cred),
+      credential_status: 'available',
+      credential_invalid_at: null,
+      credential_invalid_reason: null,
+    },
+    skland_pending_binding: null,
+    skland_risk: { uid_mismatch_count: 0, last_mismatch_uid: null, last_mismatch_nickname: null, last_mismatch_at: null },
+    updated_at: prepared.importedAt,
+  })
+
+  return {
+    status: 'imported',
+    ...prepared.binding,
+    operator_count: prepared.operators.length,
+    imported_at: prepared.importedAt,
+    ...(prepared.intermediateInventory && { intermediate_inventory: prepared.intermediateInventory }),
+    inventory_synced: Boolean(prepared.intermediateInventory && configResult.config),
+    config_saved: Boolean(configResult.config),
+    ...(configResult.warning || prepared.inventoryWarning
+      ? { inventory_warning: [prepared.inventoryWarning, configResult.warning].filter(Boolean).join(' ') }
+      : {}),
+  }
+}
+
+async function runSklandImportPostCommit(
+  userId: string,
+  profile: UserGameAccountRecord,
+  prepared: PreparedSklandImport,
+): Promise<void> {
+  const tasks: Promise<unknown>[] = []
+  if (hasDatabaseUrl()) tasks.push(markOnboardingTaskComplete(userId, 'bind_skland', prepared.importedAt))
+  if (isFreePreviewProfile(profile)) tasks.push(grantFreePreviewLimitedVoucher(userId, new Date(prepared.importedAt)))
+  if (profile.cdk_key) tasks.push(recordSklandOperatorFingerprint(profile, prepared.operators))
+  const results = await Promise.allSettled(tasks)
+  for (const result of results) {
+    if (result.status === 'rejected') console.warn('skland import post-commit task skipped:', result.reason)
+  }
+}
+
+async function recordSklandOperatorFingerprint(
+  profile: UserGameAccountRecord,
+  operators: PreparedSklandImport['operators'],
+): Promise<void> {
+  if (!profile.cdk_key) return
+  const cdkStore = await getCdkRecordStore()
+  const cdkRecord = await cdkStore.get(profile.cdk_key)
+  if (!cdkRecord || !isProfileCdkRecord(cdkRecord) || cdkRecord.status !== 'used') return
+  if (normalizePermissionMode(cdkRecord.permission) !== 'advanced') return
+  const riskSettings = await getRiskControlSettings()
+  if (!riskSettings.operator_data_risk_enabled) return
+  await recordOperatorFingerprint(cdkRecord, buildOperatorFingerprint(operators))
+}
+
+async function confirmProfileSklandBinding(input: {
+  user: AuthPayloadUser
+  profile: UserGameAccountRecord
+  confirmationId: string
+  idempotencyKey: string
+  req: Request
+  auth: NonNullable<Awaited<ReturnType<typeof requireUserSession>>>
+  startedAt: number
+}): Promise<Response> {
+  const requestHash = createSklandConfirmationRequestHash(
+    'profile',
+    input.user.id,
+    input.confirmationId,
+    input.profile.id,
+  )
+  const replay = await getSklandConfirmationReplay(input.user.id, input.idempotencyKey, requestHash)
+  if (replay) {
+    const payload = replay.imported
+      ? await buildPayloadWithImport(input.user, replay.profile_id, replay.imported)
+      : await buildAuthPayload(input.user, replay.profile_id)
+    return jsonResponse({ ...payload, replayed: true })
+  }
+
+  const pending = input.profile.skland_pending_binding
+  if (!isSklandConfirmationPending(pending) || pending.confirmation_id !== input.confirmationId) {
+    await recordSklandImport('failure', 'skland_confirm_invalid', input.startedAt, input.profile.id, 'login_confirm')
+    throw new SklandHttpError('skland_confirm_invalid', '森空岛绑定确认已失效，请重新登录森空岛。', 400, 'rebind')
+  }
+  if (Date.now() > Date.parse(pending.expires_at)) {
+    await clearProfileSklandPendingBinding(input.user.id, input.profile.id, input.confirmationId)
+    await recordSklandImport('failure', 'skland_pending_expired', input.startedAt, input.profile.id, 'login_confirm')
+    throw new SklandHttpError('skland_pending_expired', '森空岛绑定确认已过期，请重新登录森空岛。', 400, 'rebind')
+  }
+  if (input.profile.skland_binding?.uid && input.profile.skland_binding.uid !== pending.uid) {
+    await recordSklandImport('failure', 'skland_account_mismatch', input.startedAt, input.profile.id, 'login_confirm')
+    throw new SklandHttpError('skland_account_mismatch', '森空岛账号与当前绑定账号不一致，请重新登录森空岛。', 409, 'rebind')
+  }
+
+  const now = new Date().toISOString()
+  let operationResponse: SklandConfirmationOperationResponse
+  if (isDepotValueProfile(input.profile)) {
+    operationResponse = await withTransaction(async (client) => {
+      const operationId = await beginSklandConfirmationOperation(client, {
+        userId: input.user.id,
+        idempotencyKey: input.idempotencyKey,
+        requestHash,
+        operationType: 'bind_skland_profile',
+        now,
+      })
+      const locked = await client.query<{ record_json: UserGameAccountRecord }>(
+        'select record_json from user_game_accounts where id = $1 and user_id = $2 for update',
+        [input.profile.id, input.user.id],
+      )
+      const current = locked.rows[0]?.record_json
+      const currentPending = current?.skland_pending_binding
+      if (!current || !isSklandConfirmationPending(currentPending) || currentPending.confirmation_id !== input.confirmationId) {
+        throw new SklandHttpError('skland_confirm_invalid', '森空岛绑定确认已失效，请重新登录森空岛。', 400, 'rebind')
+      }
+      if (current.archived_at) {
+        throw new SklandProfileError('profile_archived', '归档档案不能更新森空岛绑定或工作区。', 409)
+      }
+      if (current.status !== 'active') {
+        throw new SklandHttpError('profile_unavailable', '账号档案状态不可用。', 409)
+      }
+      await saveProfileInTransaction(client, buildDepotValueSklandProfile(current, currentPending, now))
+      const response = { profile_id: current.id }
+      await completeSklandConfirmationOperation(client, operationId, response, now)
+      return response
+    })
+  } else {
+    const cred = decryptSklandCredential(pending.encrypted_cred)
+    const prepared = await prepareSklandImport(input.profile, cred, pending.uid)
+    operationResponse = await withTransaction(async (client) => {
+      const operationId = await beginSklandConfirmationOperation(client, {
+        userId: input.user.id,
+        idempotencyKey: input.idempotencyKey,
+        requestHash,
+        operationType: 'bind_skland_profile',
+        now: prepared.importedAt,
+      })
+      const imported = await persistPreparedSklandImportInTransaction(
+        client,
+        input.user.id,
+        input.profile.id,
+        cred,
+        prepared,
+      )
+      const response = { profile_id: input.profile.id, imported }
+      await completeSklandConfirmationOperation(client, operationId, response, prepared.importedAt)
+      return response
+    })
+    await runSklandImportPostCommit(input.user.id, input.profile, prepared)
+  }
+
+  await recordSklandImport('success', 'ok', input.startedAt, input.profile.id, 'login_confirm')
+  const behaviorDeclaration = isFreePreviewProfile(input.profile)
+    ? await getPersonalUseDeclarationAcceptance(input.user.id).catch(() => null)
+    : null
+  await recordAuthenticatedRequestBehaviorEvent({
+    req: input.req,
+    auth: input.auth,
+    eventType: 'bind',
+    profileId: input.profile.id,
+    uid: pending.uid,
+    activityClaimedAt: isFreePreviewProfile(input.profile) ? input.profile.created_at : null,
+    declarationVersion: behaviorDeclaration?.declaration_version,
+    declarationAcceptedAt: behaviorDeclaration?.accepted_at,
+  })
+  const payload = operationResponse.imported
+    ? await buildPayloadWithImport(input.user, operationResponse.profile_id, operationResponse.imported)
+    : await buildAuthPayload(input.user, operationResponse.profile_id)
+  return jsonResponse({ ...payload, replayed: false })
 }
 
 async function createPendingLifetimeVoucherBinding(
@@ -541,7 +952,7 @@ async function confirmLifetimeVoucherBinding(
   req: Request,
   sessionTokenHash: string,
 ): Promise<Response> {
-  const requestHash = createHash('sha256').update(JSON.stringify({ userId: user.id, confirmationId })).digest('hex')
+  const requestHash = createSklandConfirmationRequestHash('lifetime_voucher', user.id, confirmationId)
   const replay = await query<{ request_hash: string; response_json: LifetimeVoucherOperationResponse | null }>(
     'select request_hash, response_json from inventory_operations where user_id = $1 and idempotency_key = $2',
     [user.id, idempotencyKey],
@@ -571,15 +982,10 @@ async function confirmLifetimeVoucherBinding(
       [operationId, user.id, idempotencyKey, requestHash, now],
     )
     if (!inserted.rowCount) throw new InventoryError('operation_in_progress', '终身版绑定正在处理中。', 409)
-    const uidProfiles = await client.query<{ record_json: UserGameAccountRecord }>(
-      `select record_json from user_game_accounts
-        where record_json->'skland_binding'->>'uid' = $1
-        order by created_at asc for update`,
-      [imported.binding.uid],
-    )
-    const foreign = uidProfiles.rows.find((row) => row.record_json.user_id !== user.id)
+    const uidProfiles = await lockSklandUidProfilesInTransaction(client, imported.binding.uid)
+    const foreign = uidProfiles.find((profile) => profile.user_id !== user.id)
     if (foreign) throw new InventoryError('skland_uid_owned', '该森空岛 UID 已绑定其他网站账号。', 409)
-    const currentUserProfiles = uidProfiles.rows.map((row) => row.record_json)
+    const currentUserProfiles = uidProfiles
     const nonUpgradeable = currentUserProfiles.find((profile) => !isLifetimeVoucherUpgradeableProfile(profile))
     if (nonUpgradeable) throw new InventoryError('skland_uid_already_bound', '该森空岛 UID 已经绑定其他终身或商用档案。', 409)
     const existingProfile = currentUserProfiles.find(isLifetimeVoucherUpgradeableProfile)
@@ -625,11 +1031,14 @@ async function confirmLifetimeVoucherBinding(
           : {}),
       },
     }
+    await client.query(
+      'delete from lifetime_voucher_pending_bindings where user_id = $1 and confirmation_id = $2',
+      [user.id, confirmationId],
+    )
     await client.query('update inventory_operations set response_json = $2::jsonb, completed_at = $3 where id = $1', [operationId, JSON.stringify(response), now])
     return response
   })
   const postCommitTasks = await Promise.allSettled([
-    deleteLifetimeVoucherPendingBinding(user.id, confirmationId),
     markOnboardingTaskComplete(user.id, 'bind_skland', result.imported.imported_at),
     recordRequestBehaviorEvent({ req, eventType: 'bind', userId: user.id, sessionTokenHash, profileId: result.profile_id, uid: result.imported.uid }),
   ])
@@ -792,16 +1201,26 @@ async function createPendingFreePreviewConfirmationFromCred(
 async function confirmFreePreviewClaim(
   user: AuthPayloadUser,
   confirmationId: string,
+  idempotencyKey: string,
   req: Request,
   sessionTokenHash: string,
 ): Promise<Response> {
+  const requestHash = createSklandConfirmationRequestHash('free_preview', user.id, confirmationId)
+  const replay = await getSklandConfirmationReplay(user.id, idempotencyKey, requestHash)
+  if (replay?.imported) {
+    return jsonResponse({
+      ...(await buildPayloadWithImport(user, replay.profile_id, replay.imported)),
+      replayed: true,
+    })
+  }
+
   const pending = await getFreePreviewPendingClaim(user.id, confirmationId)
   if (!isFreePreviewConfirmationPending(pending)) {
-    return jsonResponse({ error: '免费个人排班确认已过期，请重新登录森空岛。' }, 400)
+    throw new SklandHttpError('skland_confirm_invalid', '免费个人排班确认已过期，请重新登录森空岛。', 400, 'rebind')
   }
   if (Date.now() > Date.parse(pending.expires_at)) {
     await deleteFreePreviewPendingClaim(user.id, confirmationId)
-    return jsonResponse({ error: '免费个人排班确认已过期，请重新登录森空岛。' }, 400)
+    throw new SklandHttpError('skland_pending_expired', '免费个人排班确认已过期，请重新登录森空岛。', 400, 'rebind')
   }
 
   const personalUseDeclarationEffective = isCurrentPersonalUseDeclarationEffective()
@@ -819,15 +1238,14 @@ async function confirmFreePreviewClaim(
   const profiles = await listProfilesForUser(user.id)
   const existingPreview = profiles.find((profile) => isFreePreviewProfile(profile))
   if (existingPreview?.skland_binding) {
-    await deleteFreePreviewPendingClaim(user.id, confirmationId)
     return jsonResponse({ error: '当前网站账号已经领取过免费个人排班档案。', code: 'free_preview_already_claimed' }, 409)
   }
   if (existingPreview && existingPreview.status !== 'active') {
     return jsonResponse({ error: '免费个人排班档案当前不可用。' }, 403)
   }
 
-  const now = new Date().toISOString()
-  const profile: UserGameAccountRecord = existingPreview ?? {
+  const preparedAt = new Date().toISOString()
+  const candidateProfile: UserGameAccountRecord = existingPreview ?? {
     version: 1,
     id: randomUUID(),
     user_id: user.id,
@@ -842,50 +1260,87 @@ async function confirmFreePreviewClaim(
     skland_binding: null,
     skland_pending_binding: null,
     skland_risk: null,
-    created_at: now,
-    updated_at: now,
+    created_at: preparedAt,
+    updated_at: preparedAt,
   }
-  const uidHash = hashFreePreviewUid(pending.uid)
-  const claim = await claimFreePreviewUid(buildFreePreviewClaim(uidHash, user.id, profile.id, pending, now))
-  if (!claim.ok && claim.claim?.profile_id !== profile.id) {
-    return jsonResponse({ error: '该森空岛 UID 已经领取过免费个人排班档案。', code: 'free_preview_uid_claimed' }, 409)
-  }
-
-  try {
-    if (!existingPreview) await saveUserProfile(profile)
-    await attachPersonalUseDeclarationAcceptanceToProfile(user.id, profile.id)
-    const imported = await saveSklandImport(user.id, profile, decryptSklandCredential(pending.encrypted_cred), pending.uid)
-    await deleteFreePreviewPendingClaim(user.id, confirmationId)
-    await recordRequestBehaviorEvent({
+  const cred = decryptSklandCredential(pending.encrypted_cred)
+  const prepared = await prepareSklandImport(candidateProfile, cred, pending.uid)
+  const result = await withTransaction(async (client): Promise<Required<SklandConfirmationOperationResponse>> => {
+    const operationId = await beginSklandConfirmationOperation(client, {
+      userId: user.id,
+      idempotencyKey,
+      requestHash,
+      operationType: 'claim_free_preview',
+      now: prepared.importedAt,
+    })
+    await client.query("select pg_advisory_xact_lock(hashtextextended('skland-free-preview-user:' || $1, 0))", [user.id])
+    const pendingResult = await client.query<{ record_json: FreePreviewPendingClaimRecord }>(
+      `select record_json from free_preview_pending_claims
+        where user_id = $1 and confirmation_id = $2
+        for update`,
+      [user.id, confirmationId],
+    )
+    const currentPending = pendingResult.rows[0]?.record_json
+    if (!isFreePreviewConfirmationPending(currentPending) || Date.now() > Date.parse(currentPending.expires_at)) {
+      throw new SklandHttpError('skland_pending_expired', '免费个人排班确认已过期，请重新登录森空岛。', 400, 'rebind')
+    }
+    const existing = await client.query<{ record_json: UserGameAccountRecord }>(
+      `select record_json from user_game_accounts
+        where user_id = $1 and kind = 'free_preview'
+        order by created_at asc
+        for update`,
+      [user.id],
+    )
+    const currentProfile = existing.rows[0]?.record_json ?? candidateProfile
+    if (currentProfile.skland_binding) {
+      throw new SklandHttpError('free_preview_already_claimed', '当前网站账号已经领取过免费个人排班档案。', 409)
+    }
+    if (currentProfile.status !== 'active') {
+      throw new SklandHttpError('profile_unavailable', '免费个人排班档案当前不可用。', 409)
+    }
+    if (!existing.rows[0]) await saveProfileInTransaction(client, currentProfile)
+    await attachPersonalUseDeclarationAcceptanceToProfileInTransaction(client, user.id, currentProfile.id)
+    await recordPersonalUseDeclarationUsageInTransaction(client, {
+      userId: user.id,
+      profileId: currentProfile.id,
+      action: 'free_preview_claim',
+      clientIp: getRequestClientIp(req),
+      occurredAt: new Date(prepared.importedAt),
+    })
+    const imported = await persistPreparedSklandImportInTransaction(
+      client,
+      user.id,
+      currentProfile.id,
+      cred,
+      prepared,
+    )
+    await recordRequestBehaviorEventInTransaction(client, {
       req,
       eventType: 'bind',
+      eventKey: `free-preview-claim:${user.id}:${idempotencyKey}`,
       userId: user.id,
       sessionTokenHash,
-      profileId: profile.id,
+      profileId: currentProfile.id,
       uid: imported.uid,
-      activityClaimedAt: now,
+      activityClaimedAt: currentProfile.created_at,
       declarationVersion: personalUseAcceptance?.declaration_version,
       declarationAcceptedAt: personalUseAcceptance?.accepted_at,
+      occurredAt: new Date(prepared.importedAt),
     })
-    return jsonResponse(await buildPayloadWithImport(user, profile.id, imported))
-  } catch (error) {
-    if (!existingPreview) await deleteFreePreviewClaim(uidHash, profile.id)
-    throw error
-  }
-}
+    await client.query(
+      'delete from free_preview_pending_claims where user_id = $1 and confirmation_id = $2',
+      [user.id, confirmationId],
+    )
+    const response = { profile_id: currentProfile.id, imported }
+    await completeSklandConfirmationOperation(client, operationId, response, prepared.importedAt)
+    return response
+  })
 
-async function claimFreePreviewProfileUid(
-  userId: string,
-  profile: UserGameAccountRecord,
-  binding: Pick<SklandBindingSummary, 'uid' | 'nickname' | 'channel_name'>,
-  claimedAt: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const uidHash = hashFreePreviewUid(binding.uid)
-  const claim = await claimFreePreviewUid(buildFreePreviewClaim(uidHash, userId, profile.id, binding, claimedAt))
-  if (!claim.ok && claim.claim?.profile_id !== profile.id) {
-    return { ok: false, message: '该森空岛 UID 已经领取过免费个人排班档案。' }
-  }
-  return { ok: true }
+  await runSklandImportPostCommit(user.id, candidateProfile, prepared)
+  return jsonResponse({
+    ...(await buildPayloadWithImport(user, result.profile_id, result.imported)),
+    replayed: false,
+  })
 }
 
 function buildFreePreviewClaim(
@@ -906,15 +1361,13 @@ function buildFreePreviewClaim(
   }
 }
 
-async function saveDepotValueSklandBinding(
-  user: AuthPayloadUser,
+function buildDepotValueSklandProfile(
   profile: UserGameAccountRecord,
-): Promise<AuthSuccessResponse> {
-  const pending = profile.skland_pending_binding
-  if (!isSklandConfirmationPending(pending)) throw new Error('森空岛绑定确认已失效，请重新登录森空岛。')
-  const now = new Date().toISOString()
+  pending: SklandPendingConfirmationRecord,
+  now: string,
+): UserGameAccountRecord {
   const existingBinding = profile.skland_binding
-  await saveUserProfile({
+  return {
     ...profile,
     skland_binding: {
       uid: pending.uid,
@@ -930,8 +1383,7 @@ async function saveDepotValueSklandBinding(
     skland_pending_binding: null,
     skland_risk: { uid_mismatch_count: 0, last_mismatch_uid: null, last_mismatch_nickname: null, last_mismatch_at: null },
     updated_at: now,
-  })
-  return buildAuthPayload(user, profile.id)
+  }
 }
 
 async function createPendingSklandBindingFromCred(
@@ -939,19 +1391,20 @@ async function createPendingSklandBindingFromCred(
   profile: UserGameAccountRecord,
   cred: string,
   source?: CredentialSource,
+  requestContext?: SklandRequestContext,
 ): Promise<Response> {
   const accounts = await listSklandArknightsBindingsByCred(cred)
   const existingUid = profile.skland_binding?.uid
   if (existingUid) {
     const matchingAccount = accounts.find((account) => account.uid === existingUid)
     if (matchingAccount) {
-      return createPendingSklandConfirmationFromCred(user, profile, cred, matchingAccount.uid, source)
+      return createPendingSklandConfirmationFromCred(user, profile, cred, matchingAccount.uid, source, undefined, requestContext)
     }
     const fallbackAccount = accounts.find((account) => account.is_default) ?? accounts[0]
     const imported = await importSklandOperatorsByCred(cred, { uid: fallbackAccount.uid })
     const operatorsCheck = validateOperators(imported.operators)
     if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
-    return handleAccountMismatch(user, profile, toSklandPreview(imported.binding, operatorsCheck.operators.length))
+    return handleAccountMismatch(user, profile, toSklandPreview(imported.binding, operatorsCheck.operators.length), requestContext)
   }
 
   const now = new Date()
@@ -978,11 +1431,15 @@ async function createPendingSklandBindingFromCred(
     )
   }
 
-  return createPendingSklandConfirmationFromCred(user, profile, cred, accounts[0].uid, source, {
-    confirmationId,
-    createdAt,
-    expiresAt,
-  })
+  return createPendingSklandConfirmationFromCred(
+    user,
+    profile,
+    cred,
+    accounts[0].uid,
+    source,
+    { confirmationId, createdAt, expiresAt },
+    requestContext,
+  )
 }
 
 async function selectSklandAccount(
@@ -990,6 +1447,7 @@ async function selectSklandAccount(
   profile: UserGameAccountRecord,
   selectionId: string,
   uid: string,
+  requestContext?: SklandRequestContext,
 ): Promise<Response> {
   const pending = profile.skland_pending_binding
   if (!isSklandAccountSelectionPending(pending) || pending.confirmation_id !== selectionId) {
@@ -1015,7 +1473,7 @@ async function selectSklandAccount(
     confirmationId: pending.confirmation_id,
     createdAt: pending.created_at,
     expiresAt: pending.expires_at,
-  })
+  }, requestContext)
 }
 
 async function createPendingSklandConfirmationFromCred(
@@ -1025,6 +1483,7 @@ async function createPendingSklandConfirmationFromCred(
   uid: string,
   source?: CredentialSource,
   pendingOptions?: { confirmationId: string; createdAt: string; expiresAt: string },
+  requestContext?: SklandRequestContext,
 ): Promise<Response> {
   const imported = await importSklandOperatorsByCred(cred, { uid })
   const operatorsCheck = validateOperators(imported.operators)
@@ -1032,7 +1491,7 @@ async function createPendingSklandConfirmationFromCred(
   const preview = toSklandPreview(imported.binding, operatorsCheck.operators.length)
 
   if (profile.skland_binding?.uid && profile.skland_binding.uid !== imported.binding.uid) {
-    return handleAccountMismatch(user, profile, preview)
+    return handleAccountMismatch(user, profile, preview, requestContext)
   }
   if (isFreePreviewProfile(profile)) {
     const existingClaim = await getFreePreviewClaim(hashFreePreviewUid(imported.binding.uid))
@@ -1075,23 +1534,32 @@ async function handleAccountMismatch(
   user: AuthPayloadUser,
   profile: UserGameAccountRecord,
   preview: SklandPreview,
+  requestContext?: SklandRequestContext,
 ): Promise<Response> {
   const now = new Date().toISOString()
-  const previousRisk = profile.skland_risk
-  const mismatchCount = (previousRisk?.uid_mismatch_count ?? 0) + 1
-  const nextProfile: UserGameAccountRecord = {
-    ...profile,
-    status: mismatchCount >= UID_MISMATCH_FREEZE_THRESHOLD ? 'frozen' : profile.status,
-    skland_pending_binding: null,
-    skland_risk: {
-      uid_mismatch_count: mismatchCount,
-      last_mismatch_uid: preview.uid,
-      last_mismatch_nickname: preview.nickname,
-      last_mismatch_at: now,
-    },
-    updated_at: now,
+  const nextProfile = await withTransaction((client) => recordSklandUidMismatchInTransaction(client, {
+    userId: user.id,
+    profileId: profile.id,
+    uid: preview.uid,
+    nickname: preview.nickname,
+    freezeThreshold: UID_MISMATCH_FREEZE_THRESHOLD,
+    now,
+  }))
+  if (!nextProfile) throw new SklandHttpError('profile_not_found', '账号档案不存在。', 404)
+  if (requestContext) {
+    try {
+      await recordRequestBehaviorEvent({
+        req: requestContext.req,
+        eventType: 'bind',
+        userId: user.id,
+        sessionTokenHash: requestContext.sessionTokenHash,
+        profileId: profile.id,
+        uid: preview.uid,
+      })
+    } catch (error) {
+      console.warn('skland mismatch audit event skipped:', error)
+    }
   }
-  await saveUserProfile(nextProfile)
 
   if (nextProfile.status === 'frozen') {
     return jsonResponse({
@@ -1114,89 +1582,16 @@ async function saveSklandImport(
   cred: string,
   uid: string,
 ): Promise<SklandImportSummary> {
-  if (profile.archived_at) throw new Error('归档档案不能更新森空岛绑定或工作区。')
-  const imported = await importSklandOperatorsByCred(cred, { uid, includeInventory: true })
-  const operatorsCheck = validateOperators(imported.operators)
-  if (!operatorsCheck.ok) throw new Error(operatorsCheck.message)
-  if (profile.skland_binding?.uid && profile.skland_binding.uid !== imported.binding.uid) {
-    throw new Error('森空岛账号与当前档案绑定的 UID 不一致。')
-  }
-  if (isFreePreviewProfile(profile)) {
-    const claim = await claimFreePreviewProfileUid(userId, profile, imported.binding, imported.importedAt)
-    if (!claim.ok) throw new Error(claim.message)
-  }
-
-  if (profile.cdk_key) {
-    const cdkStore = await getCdkRecordStore()
-    const cdkRecord = await cdkStore.get(profile.cdk_key)
-    if (cdkRecord && isProfileCdkRecord(cdkRecord) && cdkRecord.status === 'used' && normalizePermissionMode(cdkRecord.permission) === 'advanced') {
-      const riskSettings = await getRiskControlSettings()
-      if (riskSettings.operator_data_risk_enabled) {
-        await recordOperatorFingerprint(cdkRecord, buildOperatorFingerprint(operatorsCheck.operators))
-      }
-    }
-  }
-
-  let configResult: ReturnType<typeof resolveSklandImportConfig> = { config: null }
-  await updateProfileWorkspaceAtomically(profile.id, (existingWorkspace) => {
-    configResult = resolveSklandImportConfig(profile, existingWorkspace?.config ?? null, imported.intermediateInventory)
-    return {
-      ...(existingWorkspace ?? emptyWorkspace(profile.id)),
-      operators: operatorsCheck.operators,
-      config: configResult.config ?? existingWorkspace?.config ?? null,
-      elite_overrides: {},
-      last_result: null,
-      updated_at: imported.importedAt,
-    }
-  })
-
-  const existingBinding = profile.skland_binding
-  await saveUserProfile({
-    ...profile,
-    skland_binding: {
-      uid: imported.binding.uid,
-      nickname: imported.binding.nickname,
-      channel_name: imported.binding.channel_name,
-      bound_at: existingBinding?.bound_at ?? imported.importedAt,
-      last_imported_at: imported.importedAt,
-      encrypted_cred: shouldReuseEncryptedCred(existingBinding, cred)
-        ? existingBinding.encrypted_cred
-        : encryptSklandCredential(cred),
-      credential_status: 'available',
-      credential_invalid_at: null,
-      credential_invalid_reason: null,
-    },
-    skland_pending_binding: null,
-    skland_risk: { uid_mismatch_count: 0, last_mismatch_uid: null, last_mismatch_nickname: null, last_mismatch_at: null },
-    updated_at: imported.importedAt,
-  })
-  if (hasDatabaseUrl()) {
-    try {
-      await markOnboardingTaskComplete(userId, 'bind_skland', imported.importedAt)
-    } catch (error) {
-      console.warn('bind_skland onboarding progress skipped:', error)
-    }
-  }
-  if (isFreePreviewProfile(profile)) {
-    try {
-      await grantFreePreviewLimitedVoucher(userId, new Date(imported.importedAt))
-    } catch (error) {
-      console.warn('free preview limited CDK grant skipped; inventory reconciliation will retry:', error)
-    }
-  }
-
-  return {
-    status: 'imported',
-    ...imported.binding,
-    operator_count: operatorsCheck.operators.length,
-    imported_at: imported.importedAt,
-    ...(imported.intermediateInventory && { intermediate_inventory: imported.intermediateInventory }),
-    inventory_synced: Boolean(imported.intermediateInventory && configResult.config),
-    config_saved: Boolean(configResult.config),
-    ...(configResult.warning || imported.inventoryWarning
-      ? { inventory_warning: [imported.inventoryWarning, configResult.warning].filter(Boolean).join(' ') }
-      : {}),
-  }
+  const prepared = await prepareSklandImport(profile, cred, uid)
+  const imported = await withTransaction((client) => persistPreparedSklandImportInTransaction(
+    client,
+    userId,
+    profile.id,
+    cred,
+    prepared,
+  ))
+  await runSklandImportPostCommit(userId, profile, prepared)
+  return imported
 }
 
 function resolveSklandImportConfig(
@@ -1306,14 +1701,16 @@ function credentialInvalidReason(error: unknown): SklandCredentialInvalidReason 
 async function requireActiveProfile(userId: string, profileId: unknown): Promise<UserGameAccountRecord> {
   const profile = await requireProfile(userId, profileId)
   if (profile.archived_at) throw new SklandProfileError('profile_archived', '归档档案不能更新森空岛绑定或工作区。', 409)
-  if (profile.status !== 'active') throw new Error('账号档案状态不可用。')
+  if (profile.status !== 'active') throw new SklandHttpError('profile_unavailable', '账号档案状态不可用。', 409)
   return profile
 }
 
 async function requireProfile(userId: string, profileId: unknown): Promise<UserGameAccountRecord> {
-  if (typeof profileId !== 'string' || !profileId.trim()) throw new Error('缺少 profile_id。')
+  if (typeof profileId !== 'string' || !profileId.trim()) {
+    throw new SklandHttpError('invalid_request', '缺少 profile_id。', 400)
+  }
   const profile = await getProfileForUser(userId, profileId.trim())
-  if (!profile) throw new Error('账号档案不存在。')
+  if (!profile) throw new SklandHttpError('profile_not_found', '账号档案不存在。', 404)
   return profile
 }
 
@@ -1364,9 +1761,7 @@ function isFreePreviewConfirmationPending(
 }
 
 function hashFreePreviewUid(uid: string): string {
-  const secret = process.env.FREE_PREVIEW_UID_HASH_SECRET?.trim()
-  if (!secret) throw new Error('FREE_PREVIEW_UID_HASH_SECRET is not configured')
-  return createHmac('sha256', secret)
+  return createHmac('sha256', getFreePreviewUidHashSecret())
     .update(`skland:${uid.trim()}`)
     .digest('hex')
 }

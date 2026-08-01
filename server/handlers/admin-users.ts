@@ -39,7 +39,10 @@ import { resetUserPasswordByAdmin } from './user-auth'
 import type { ProductPermissionMode } from '../../src/lib/types'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
-import { listPersonalUseDeclarationAcceptancesForUser } from '../storage/personal-use-declaration-store'
+import {
+  listPersonalUseDeclarationAcceptancesForUser,
+  listPersonalUseDeclarationUsageEventsForUser,
+} from '../storage/personal-use-declaration-store'
 import { recordAccountDeletedBehaviorEvent } from '../behavior-risk/service'
 
 export default async (req: Request): Promise<Response> => {
@@ -315,14 +318,13 @@ async function syncLinkedCdkPermission(profile: UserGameAccountRecord, permissio
 }
 
 async function buildAdminUserDetail(user: UserAccountRecord) {
-  const [profiles, personalUseDeclarations] = await Promise.all([
+  const [profiles, personalUseDeclarations, personalUseUsageEvents] = await Promise.all([
     listProfilesForUser(user.id),
     listPersonalUseDeclarationAcceptancesForUser(user.id),
+    listPersonalUseDeclarationUsageEventsForUser(user.id),
   ])
-  return {
-    user: { ...toAdminAppUser(user, profiles), profile_count: profiles.length },
-    profiles: await Promise.all(profiles.map((profile) => buildAdminProfileSummary(profile))),
-    personal_use_declarations: personalUseDeclarations.map((acceptance) => ({
+  const personalUseAudit = [
+    ...personalUseDeclarations.map((acceptance) => ({
       profile_id: acceptance.profile_id,
       declaration_id: acceptance.declaration_id,
       declaration_version: acceptance.declaration_version,
@@ -332,6 +334,21 @@ async function buildAdminUserDetail(user: UserAccountRecord) {
       account_deleted_at: acceptance.account_deleted_at,
       retain_until: acceptance.retain_until,
     })),
+    ...personalUseUsageEvents.map((event) => ({
+      profile_id: event.profile_id,
+      declaration_id: event.declaration_id,
+      declaration_version: event.declaration_version,
+      action: event.action,
+      client_ip: event.client_ip,
+      accepted_at: event.occurred_at,
+      account_deleted_at: event.account_deleted_at,
+      retain_until: event.retain_until,
+    })),
+  ].sort((left, right) => right.accepted_at.localeCompare(left.accepted_at))
+  return {
+    user: { ...toAdminAppUser(user, profiles), profile_count: profiles.length },
+    profiles: await Promise.all(profiles.map((profile) => buildAdminProfileSummary(profile))),
+    personal_use_declarations: personalUseAudit,
   }
 }
 

@@ -1,6 +1,7 @@
 import type { Server } from 'node:http'
 import {
   type AccountDeletionWorkerController,
+  getAccountDeletionConfigurationHealth,
   startAccountDeletionWorker,
 } from './account-data-lifecycle'
 import { createApiServer } from './http-server'
@@ -11,6 +12,7 @@ import {
   markServiceStopped,
 } from './lifecycle'
 import { closePool } from './storage/postgres'
+import { ensureSklandServiceConfiguration } from './skland-config'
 
 export type ApiProcessHooks = {
   initialize: () => Promise<void>
@@ -155,4 +157,8 @@ function validateProductionBoundaryConfig(listenHost: string): void {
   if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) {
     throw new Error('PUBLIC_APP_URL must be an HTTPS origin without credentials, path, query, or fragment')
   }
+  if (!getAccountDeletionConfigurationHealth().ok) {
+    throw new Error('DEPOT_SAMPLE_HASH_SECRET is required in production')
+  }
+  ensureSklandServiceConfiguration()
 }

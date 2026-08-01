@@ -32,8 +32,8 @@ describe('optimization queue maintenance', () => {
       onCancellationRequested: vi.fn(),
     })
 
-    const expired = await store.createJob(input())
-    const queued = await store.createJob(input())
+    const expired = await store.createJob(input('00000000-0000-4000-8000-000000000001'))
+    const queued = await store.createJob(input('ffffffff-ffff-4fff-bfff-ffffffffffff'))
     await store.claimNextJob(
       'old-worker',
       'old-lock',
@@ -88,9 +88,9 @@ describe('optimization queue maintenance', () => {
   })
 })
 
-function input() {
+function input(id = randomUUID()) {
   return {
-    id: randomUUID(),
+    id,
     priority: 10,
     owner_key: `license:${randomUUID()}`,
     permission: 'growth',

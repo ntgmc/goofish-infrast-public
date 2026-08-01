@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
-import type { Announcement, AuthSuccessResponse, AuthUser, LicenseConfig, LicenseOperator, UserGameAccount, UserWorkspace } from '../../lib/types'
+import type { Announcement, AuthSuccessResponse, AuthUser, IntermediateProduct, LicenseConfig, LicenseOperator, UserGameAccount, UserWorkspace } from '../../lib/types'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
@@ -18,12 +18,12 @@ import { copy } from '../../copy/index'
 import { hasCapability } from '../../lib/product-catalog'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import { NotificationBell } from '../../components/NotificationCenter'
+import { upgradeProfileWithCdk } from './profile-redemption'
 
 
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
 
 export type { WorkspaceSetupSection } from '../../lib/app-routes'
-type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 type SklandRefreshNotice = {
   kind: 'success' | 'error'
   message: string
@@ -421,19 +421,27 @@ function ProfileCdkPaths({
   const [upgradeCdk, setUpgradeCdk] = useState('')
   const [upgradeLoading, setUpgradeLoading] = useState(false)
   const [upgradeError, setUpgradeError] = useState<string | null>(null)
+  const upgradeRequestRef = useRef<{ cdk: string; idempotencyKey: string } | null>(null)
   const isPreviewProfile = isFreePreviewProfile(profile)
 
   const handleUpgrade = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!isPreviewProfile || upgradeLoading) return
+    const normalizedCdk = upgradeCdk.trim()
+    const pendingRequest = upgradeRequestRef.current?.cdk === normalizedCdk
+      ? upgradeRequestRef.current
+      : { cdk: normalizedCdk, idempotencyKey: crypto.randomUUID() }
+    upgradeRequestRef.current = pendingRequest
     setUpgradeLoading(true)
     setUpgradeError(null)
     try {
-      const data = await apiJson<AuthSuccessResponse>('/api/user/profiles/redeem', {
-        method: 'POST',
-        json: { profile_id: profile.id, cdk: upgradeCdk },
+      const data = await upgradeProfileWithCdk({
+        profileId: profile.id,
+        cdk: upgradeCdk,
+        idempotencyKey: pendingRequest.idempotencyKey,
         fallbackMessage: copy.workspace.pages_tool_WorkspaceSetupPage_048,
       })
+      upgradeRequestRef.current = null
       setUpgradeCdk('')
       onUpgraded(data)
     } catch (caught) {
@@ -463,8 +471,12 @@ function ProfileCdkPaths({
             <input
               id="workspace-upgrade-cdk"
               value={upgradeCdk}
-              onChange={(event) => setUpgradeCdk(event.currentTarget.value)}
+              onChange={(event) => {
+                upgradeRequestRef.current = null
+                setUpgradeCdk(event.currentTarget.value)
+              }}
               className="tool-field mt-2 font-mono uppercase tracking-wide"
+              maxLength={256}
               autoCapitalize="characters"
               autoComplete="off"
               spellCheck={false}
@@ -670,14 +682,18 @@ function sklandPayloadFromError(caught: unknown): Partial<SklandPayload> | null 
 function formatSklandImportNotice(imported: NonNullable<SklandPayload['skland_import']>, verb: string): string {
   const base = `${verb} ${imported.operator_count}${copy.workspace.pages_tool_WorkspaceSetupPage_082}${imported.nickname}`
   if (imported.inventory_synced && imported.intermediate_inventory) {
-    return `${base}${copy.workspace.pages_tool_WorkspaceSetupPage_083}${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}${copy.workspace.pages_tool_WorkspaceSetupPage_084}`
+    return `${base}${copy.workspace.pages_tool_WorkspaceSetupPage_083}${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}、${formatInventoryAmount('Orirock Cube', imported.intermediate_inventory['Orirock Cube'])}${copy.workspace.pages_tool_WorkspaceSetupPage_084}`
   }
   if (imported.inventory_warning) return `${base}${copy.workspace.pages_tool_WorkspaceSetupPage_085}`
   return base
 }
 
 function formatInventoryAmount(product: IntermediateProduct, value: number | undefined): string {
-  const label = product === 'Pure Gold' ? copy.workspace.pages_tool_WorkspaceSetupPage_086 : copy.workspace.pages_tool_WorkspaceSetupPage_087
+  const label = product === 'Pure Gold'
+    ? copy.workspace.pages_tool_WorkspaceSetupPage_086
+    : product === 'Originium Shard'
+      ? copy.workspace.pages_tool_WorkspaceSetupPage_087
+      : copy.common.components_ConfigEditor_080
   const count = Number(value ?? 0)
   return `${label} ${Number.isFinite(count) ? count : 0}`
 }

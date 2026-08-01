@@ -1,12 +1,16 @@
 import { resolveAppRole, type AppRole } from '../process-role'
 import { query } from './postgres'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
+import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 
 const MIGRATION_PHASE_SEPARATOR = '-- goofish:migration-phase'
 const RETRIABLE_MIGRATION_CODES = new Set(['40P01', '40001', '55P03'])
 const MIGRATION_PHASE_MAX_ATTEMPTS = 5
 const MIGRATION_RETRY_BASE_MS = 1_000
+const PERSONAL_USE_DECLARATION_ACTION_SQL = PERSONAL_USE_DECLARATION_ACTIONS
+  .map((action) => `'${action}'`)
+  .join(', ')
 
 const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS cdk_records (
@@ -36,7 +40,28 @@ ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS item_code TEXT;
 ALTER TABLE cdk_records ADD COLUMN IF NOT EXISTS item_expires_at TIMESTAMPTZ;
 ALTER TABLE cdk_records ALTER COLUMN permission DROP NOT NULL;
 UPDATE cdk_records SET cdk_type = 'profile' WHERE cdk_type IS NULL;
+UPDATE cdk_records
+   SET permission = CASE permission WHEN 'basic' THEN 'growth' WHEN 'premium' THEN 'advanced' ELSE 'recommended' END,
+       record_json = record_json || jsonb_build_object(
+         'permission', CASE permission WHEN 'basic' THEN 'growth' WHEN 'premium' THEN 'advanced' ELSE 'recommended' END
+       )
+ WHERE cdk_type = 'profile'
+   AND (permission IS NULL OR permission NOT IN ('recommended', 'growth', 'advanced', 'ultimate'));
+UPDATE cdk_records
+   SET status = 'revoked',
+       record_json = record_json || jsonb_build_object('status', 'revoked')
+ WHERE status NOT IN ('unused', 'claiming', 'used', 'frozen', 'revoked');
+UPDATE cdk_records
+   SET record_json = record_json || jsonb_build_object('permission', permission, 'status', status);
 CREATE INDEX IF NOT EXISTS idx_cdk_records_admin_type_created ON cdk_records(cdk_type, created_at DESC, key ASC);
+ALTER TABLE cdk_records DROP CONSTRAINT IF EXISTS cdk_records_permission_check;
+ALTER TABLE cdk_records ADD CONSTRAINT cdk_records_permission_check CHECK (
+  (cdk_type = 'profile' AND permission IN ('recommended', 'growth', 'advanced', 'ultimate'))
+  OR (cdk_type IN ('balance', 'item') AND permission IS NULL)
+);
+ALTER TABLE cdk_records DROP CONSTRAINT IF EXISTS cdk_records_status_check;
+ALTER TABLE cdk_records ADD CONSTRAINT cdk_records_status_check
+  CHECK (status IN ('unused', 'claiming', 'used', 'frozen', 'revoked'));
 ALTER TABLE cdk_records DROP CONSTRAINT IF EXISTS cdk_records_type_payload_check;
 ALTER TABLE cdk_records ADD CONSTRAINT cdk_records_type_payload_check CHECK (
   (cdk_type = 'profile' AND permission IS NOT NULL AND balance_amount IS NULL AND item_code IS NULL AND item_expires_at IS NULL)
@@ -528,9 +553,68 @@ CREATE TABLE IF NOT EXISTS account_deletion_requests (
   user_id TEXT NOT NULL UNIQUE REFERENCES user_accounts(id) ON DELETE CASCADE,
   cancel_token_hash TEXT NOT NULL UNIQUE,
   scheduled_for TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'failed')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  lease_token TEXT,
+  lease_expires_at TIMESTAMPTZ,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_scheduled_for ON account_deletion_requests(scheduled_for);
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS lease_token TEXT;
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS last_error TEXT;
+ALTER TABLE account_deletion_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'account_deletion_requests_status_check'
+       AND conrelid = 'account_deletion_requests'::regclass
+  ) THEN
+    ALTER TABLE account_deletion_requests
+      ADD CONSTRAINT account_deletion_requests_status_check
+      CHECK (status IN ('pending', 'processing', 'failed'));
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'account_deletion_requests_attempts_check'
+       AND conrelid = 'account_deletion_requests'::regclass
+  ) THEN
+    ALTER TABLE account_deletion_requests
+      ADD CONSTRAINT account_deletion_requests_attempts_check CHECK (attempts >= 0);
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_due
+  ON account_deletion_requests(status, next_attempt_at, scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_lease
+  ON account_deletion_requests(lease_expires_at) WHERE status = 'processing';
+
+CREATE TABLE IF NOT EXISTS account_deletion_email_outbox (
+  id TEXT PRIMARY KEY,
+  deletion_request_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('cancellation', 'receipt')),
+  recipient_email TEXT NOT NULL,
+  payload_json JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'dead_letter')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_attempt_at TIMESTAMPTZ NOT NULL,
+  lease_token TEXT,
+  lease_expires_at TIMESTAMPTZ,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  delete_after TIMESTAMPTZ NOT NULL,
+  UNIQUE (deletion_request_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_account_deletion_email_outbox_due
+  ON account_deletion_email_outbox(status, next_attempt_at, created_at);
+CREATE INDEX IF NOT EXISTS idx_account_deletion_email_outbox_cleanup
+  ON account_deletion_email_outbox(delete_after);
 
 CREATE TABLE IF NOT EXISTS personal_use_declaration_versions (
   declaration_id TEXT PRIMARY KEY,
@@ -548,16 +632,57 @@ CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances (
   declaration_id TEXT NOT NULL REFERENCES personal_use_declaration_versions(declaration_id),
   declaration_version TEXT NOT NULL,
   content_hash TEXT NOT NULL,
-  action TEXT NOT NULL CHECK (action IN ('free_preview_claim', 'generated_result_export')),
+  action TEXT NOT NULL CONSTRAINT personal_use_declaration_acceptances_action_check
+    CHECK (action IN (${PERSONAL_USE_DECLARATION_ACTION_SQL})),
   client_ip TEXT NOT NULL,
   accepted_at TIMESTAMPTZ NOT NULL,
   account_deleted_at TIMESTAMPTZ,
   retain_until TIMESTAMPTZ,
   UNIQUE (user_id, declaration_id)
 );
+ALTER TABLE personal_use_declaration_acceptances
+  DROP CONSTRAINT IF EXISTS personal_use_declaration_acceptances_action_check;
+ALTER TABLE personal_use_declaration_acceptances
+  ADD CONSTRAINT personal_use_declaration_acceptances_action_check
+  CHECK (action IN (${PERSONAL_USE_DECLARATION_ACTION_SQL}));
 CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_user ON personal_use_declaration_acceptances(user_id, accepted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_profile ON personal_use_declaration_acceptances(profile_id, accepted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_retention ON personal_use_declaration_acceptances(retain_until) WHERE retain_until IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS personal_use_declaration_usage_events (
+  id TEXT PRIMARY KEY,
+  acceptance_id TEXT NOT NULL REFERENCES personal_use_declaration_acceptances(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL,
+  profile_id TEXT,
+  declaration_id TEXT NOT NULL,
+  declaration_version TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  action TEXT NOT NULL CONSTRAINT personal_use_declaration_usage_events_action_check
+    CHECK (action IN (${PERSONAL_USE_DECLARATION_ACTION_SQL})),
+  client_ip TEXT NOT NULL,
+  acceptance_accepted_at TIMESTAMPTZ NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  account_deleted_at TIMESTAMPTZ,
+  retain_until TIMESTAMPTZ
+);
+ALTER TABLE personal_use_declaration_usage_events ADD COLUMN IF NOT EXISTS acceptance_accepted_at TIMESTAMPTZ;
+UPDATE personal_use_declaration_usage_events event
+   SET acceptance_accepted_at = acceptance.accepted_at
+  FROM personal_use_declaration_acceptances acceptance
+ WHERE event.acceptance_id = acceptance.id
+   AND event.acceptance_accepted_at IS NULL;
+ALTER TABLE personal_use_declaration_usage_events ALTER COLUMN acceptance_accepted_at SET NOT NULL;
+ALTER TABLE personal_use_declaration_usage_events
+  DROP CONSTRAINT IF EXISTS personal_use_declaration_usage_events_action_check;
+ALTER TABLE personal_use_declaration_usage_events
+  ADD CONSTRAINT personal_use_declaration_usage_events_action_check
+  CHECK (action IN (${PERSONAL_USE_DECLARATION_ACTION_SQL}));
+CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_usage_user
+  ON personal_use_declaration_usage_events(user_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_usage_profile
+  ON personal_use_declaration_usage_events(profile_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_usage_retention
+  ON personal_use_declaration_usage_events(retain_until) WHERE retain_until IS NOT NULL;
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS user_sessions (
@@ -661,6 +786,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_user_game_accounts_cdk_code_hash
   ON user_game_accounts(cdk_code_hash) WHERE cdk_code_hash IS NOT NULL;
 ALTER TABLE user_game_accounts ADD COLUMN IF NOT EXISTS kind TEXT;
 ALTER TABLE user_game_accounts ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+UPDATE user_game_accounts
+   SET permission = CASE permission WHEN 'basic' THEN 'growth' WHEN 'premium' THEN 'advanced' ELSE 'recommended' END,
+       record_json = record_json || jsonb_build_object(
+         'permission', CASE permission WHEN 'basic' THEN 'growth' WHEN 'premium' THEN 'advanced' ELSE 'recommended' END
+       )
+ WHERE permission NOT IN ('recommended', 'growth', 'advanced', 'metered_advanced', 'ultimate', 'admin');
+UPDATE user_game_accounts
+   SET status = 'revoked',
+       record_json = record_json || jsonb_build_object('status', 'revoked')
+ WHERE status NOT IN ('active', 'frozen', 'revoked');
+UPDATE user_game_accounts
+   SET record_json = record_json || jsonb_build_object('permission', permission, 'status', status);
+ALTER TABLE user_game_accounts DROP CONSTRAINT IF EXISTS user_game_accounts_permission_check;
+ALTER TABLE user_game_accounts ADD CONSTRAINT user_game_accounts_permission_check
+  CHECK (permission IN ('recommended', 'growth', 'advanced', 'metered_advanced', 'ultimate', 'admin'));
+ALTER TABLE user_game_accounts DROP CONSTRAINT IF EXISTS user_game_accounts_status_check;
+ALTER TABLE user_game_accounts ADD CONSTRAINT user_game_accounts_status_check
+  CHECK (status IN ('active', 'frozen', 'revoked'));
 UPDATE user_game_accounts
    SET kind = CASE
      WHEN record_json->>'kind' IN ('cdk', 'free_preview', 'depot_value', 'metered_personal', 'metered_commercial')
@@ -1421,6 +1564,7 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'public_content_settings',
   'personal_use_declaration_versions',
   'personal_use_declaration_acceptances',
+  'personal_use_declaration_usage_events',
   'user_balance_qualification_ledger',
   'commercial_account_limits',
   'user_notifications',
@@ -1472,6 +1616,7 @@ export async function migrateDatabaseSchema(): Promise<void> {
   for (const [index, phase] of migrationPhases.entries()) {
     await runMigrationPhase(phase.sql, phase.values ?? [], index + 1, migrationPhases.length)
   }
+  await validateCurrentPersonalUseDeclarationVersion()
 }
 
 async function runMigrationPhase(
@@ -1527,12 +1672,39 @@ export async function validateRuntimeDatabaseSchema(): Promise<void> {
     [JSON.stringify(requiredColumns)],
   )
 
-  if (missing.rows.length === 0) return
-  const missingNames = missing.rows.map((row) => `${row.table_name}.${row.column_name}`).join(', ')
-  throw new Error(
-    `Runtime database schema is incompatible; missing required columns: ${missingNames}. ` +
-    'Apply database migrations before starting production API or Worker processes.',
+  if (missing.rows.length > 0) {
+    const missingNames = missing.rows.map((row) => `${row.table_name}.${row.column_name}`).join(', ')
+    throw new Error(
+      `Runtime database schema is incompatible; missing required columns: ${missingNames}. ` +
+      'Apply database migrations before starting production API or Worker processes.',
+    )
+  }
+  if (resolveAppRole() !== 'worker') await validateCurrentPersonalUseDeclarationVersion()
+}
+
+async function validateCurrentPersonalUseDeclarationVersion(): Promise<void> {
+  const result = await query<{
+    display_version: string
+    effective_date: string
+    content_text: string
+    content_hash: string
+  }>(
+    `select display_version, effective_date::text, content_text, content_hash
+       from personal_use_declaration_versions
+      where declaration_id = $1`,
+    [CURRENT_PERSONAL_USE_DECLARATION.id],
   )
+  const stored = result.rows[0]
+  if (!stored
+    || stored.display_version !== CURRENT_PERSONAL_USE_DECLARATION.version
+    || stored.effective_date !== CURRENT_PERSONAL_USE_DECLARATION.effectiveDate
+    || stored.content_text !== CURRENT_PERSONAL_USE_DECLARATION.content
+    || stored.content_hash !== CURRENT_PERSONAL_USE_DECLARATION.contentHash) {
+    throw new Error(
+      `Stored personal-use declaration ${CURRENT_PERSONAL_USE_DECLARATION.id} does not match the immutable runtime document. ` +
+      'Publish changed content under a new declaration ID before starting the service.',
+    )
+  }
 }
 
 function runtimeSchemaRequirements(role: AppRole): Array<{ table_name: string; column_name: string }> {

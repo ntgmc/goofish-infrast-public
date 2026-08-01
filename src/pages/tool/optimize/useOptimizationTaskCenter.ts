@@ -15,6 +15,7 @@ export interface OptimizationTaskCenterController {
   activeCount: number;
   attentionCount: number;
   loading: boolean;
+  refreshing: boolean;
   loadingMore: boolean;
   error: string | null;
   notice: string | null;
@@ -34,12 +35,16 @@ export function useOptimizationTaskCenter(
   const [jobs, setJobs] = useState<OptimizationJobListItem[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busyJobId, setBusyJobId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [notificationsEnabled, setNotificationsEnabledState] = useState(optimizationNotificationsEnabled)
   const requestSequenceRef = useRef(0)
+  const requestControllerRef = useRef<AbortController | null>(null)
+  const refreshTimerRef = useRef<number | null>(null)
+  const hasLoadedRef = useRef(false)
 
   const activeCount = useMemo(
     () => jobs.filter((job) => job.status === 'queued' || job.status === 'running').length,
@@ -52,22 +57,47 @@ export function useOptimizationTaskCenter(
 
   const load = useCallback(async (cursor: string | null = null, append = false) => {
     const requestSequence = ++requestSequenceRef.current
-    append ? setLoadingMore(true) : setLoading(true)
+    requestControllerRef.current?.abort()
+    const controller = new AbortController()
+    requestControllerRef.current = controller
+    if (append) {
+      setRefreshing(false)
+      setLoadingMore(true)
+    } else {
+      setLoadingMore(false)
+      if (hasLoadedRef.current) setRefreshing(true)
+      else setLoading(true)
+    }
     try {
-      const response = await listOptimizationJobs(profileId, cursor ?? undefined)
+      const response = await listOptimizationJobs(profileId, cursor ?? undefined, controller.signal)
       if (requestSequence !== requestSequenceRef.current) return
       setJobs((current) => append ? dedupeJobs([...current, ...response.jobs]) : response.jobs)
       setNextCursor(response.nextCursor)
       setError(null)
+      hasLoadedRef.current = true
     } catch (caught) {
       if (requestSequence !== requestSequenceRef.current) return
+      if (caught instanceof DOMException && caught.name === 'AbortError') return
       setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_OptimizationTaskCenter_028)
     } finally {
       if (requestSequence === requestSequenceRef.current) {
-        append ? setLoadingMore(false) : setLoading(false)
+        requestControllerRef.current = null
+        if (append) setLoadingMore(false)
+        else {
+          setLoading(false)
+          setRefreshing(false)
+        }
       }
     }
   }, [profileId])
+
+  const queueRefresh = useCallback(() => {
+    if (refreshTimerRef.current !== null) return
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null
+      void load()
+    }, 250)
+  }, [load])
 
   const refresh = useCallback(async () => load(), [load])
   const loadMore = useCallback(async () => {
@@ -75,22 +105,35 @@ export function useOptimizationTaskCenter(
   }, [load, nextCursor])
 
   useEffect(() => {
+    requestControllerRef.current?.abort()
+    if (refreshTimerRef.current !== null) {
+      window.clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
     requestSequenceRef.current += 1
+    hasLoadedRef.current = false
     setJobs([])
     setNextCursor(null)
     setNotice(null)
+    setRefreshing(false)
+    setLoadingMore(false)
     void load()
   }, [load, profileId])
 
   useEffect(() => subscribeOptimizationJobUpdates((event) => {
-    if (event.profileId === profileId) void load()
-  }), [load, profileId])
+    if (event.profileId === profileId) queueRefresh()
+  }), [profileId, queueRefresh])
 
   useEffect(() => {
     const intervalMs = dialogOpen || activeCount > 0 ? 10_000 : 30_000
-    const timer = window.setInterval(() => void load(), intervalMs)
+    const timer = window.setInterval(queueRefresh, intervalMs)
     return () => window.clearInterval(timer)
-  }, [activeCount, dialogOpen, load])
+  }, [activeCount, dialogOpen, queueRefresh])
+
+  useEffect(() => () => {
+    requestControllerRef.current?.abort()
+    if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current)
+  }, [])
 
   useEffect(() => {
     setOptimizationAppBadge(activeCount)
@@ -124,6 +167,7 @@ export function useOptimizationTaskCenter(
     activeCount,
     attentionCount,
     loading,
+    refreshing,
     loadingMore,
     error,
     notice,

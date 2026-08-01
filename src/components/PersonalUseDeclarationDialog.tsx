@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { copy } from '../copy/index'
+import type { PublicPersonalUseDeclaration } from '../lib/personal-use-declaration'
 
 const FOCUSABLE_SELECTOR = [
   'button:not([disabled])',
@@ -12,21 +13,28 @@ const FOCUSABLE_SELECTOR = [
 export default function PersonalUseDeclarationDialog({
   open,
   submitting,
+  declaration,
   onClose,
   onConfirm,
 }: {
   open: boolean
   submitting: boolean
+  declaration: PublicPersonalUseDeclaration | null
   onClose: () => void
   onConfirm: () => void
 }) {
   const [confirmed, setConfirmed] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
+  const submittingRef = useRef(submitting)
+  submittingRef.current = submitting
+
+  useEffect(() => {
+    if (open) setConfirmed(false)
+  }, [declaration?.contentHash, declaration?.id, open])
 
   useEffect(() => {
     if (!open) return
-    setConfirmed(false)
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -34,7 +42,7 @@ export default function PersonalUseDeclarationDialog({
       dialogRef.current?.querySelector<HTMLElement>('input')?.focus()
     })
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !submitting) onClose()
+      if (event.key === 'Escape' && !submittingRef.current) onClose()
     }
     document.addEventListener('keydown', handleEscape)
     return () => {
@@ -46,9 +54,9 @@ export default function PersonalUseDeclarationDialog({
         if (returnFocusTarget?.isConnected) returnFocusTarget.focus()
       })
     }
-  }, [onClose, open, submitting])
+  }, [onClose, open])
 
-  if (!open) return null
+  if (!open || !declaration) return null
 
   return (
     <div
@@ -89,6 +97,9 @@ export default function PersonalUseDeclarationDialog({
           </span>
           <div>
             <h2 id="personal-use-declaration-title" className="text-lg font-semibold text-ink-primary">{copy.personalUse.confirmation_title}</h2>
+            <p className="mt-1 text-xs font-medium text-ink-muted">
+              {declaration.title} · {declaration.version} · 生效日期：{declaration.effectiveDate}
+            </p>
             <p id="personal-use-declaration-description" className="mt-3 text-sm leading-6 text-ink-secondary">{copy.personalUse.confirmation_intro}</p>
             <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.personalUse.confirmation_commitment}</p>
             <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.personalUse.confirmation_consequence}</p>
@@ -106,9 +117,24 @@ export default function PersonalUseDeclarationDialog({
           <span>{copy.personalUse.confirmation_checkbox}</span>
         </label>
 
-        <a href="/terms#personal-use-declaration" className="mt-4 inline-flex text-sm font-medium text-brand-500 underline underline-offset-4 hover:text-brand-400">
-          {copy.personalUse.confirmation_view_terms}
-        </a>
+        <details className="tool-inset mt-4 p-3 text-sm text-ink-secondary">
+          <summary className="cursor-pointer font-medium text-brand-500 underline underline-offset-4 hover:text-brand-400">
+            {copy.personalUse.confirmation_view_terms}
+          </summary>
+          <div className="mt-4 space-y-4">
+            {declaration.sections.map((section) => (
+              <section key={section.id} aria-labelledby={`dialog-${section.id}`}>
+                <h3 id={`dialog-${section.id}`} className="font-semibold text-ink-primary">{section.heading}</h3>
+                {section.paragraphs.map((paragraph) => <p key={paragraph} className="mt-2 leading-6">{paragraph}</p>)}
+                {section.items.length > 0 && (
+                  <ul className="mt-2 list-disc space-y-1 pl-5 leading-6">
+                    {section.items.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                )}
+              </section>
+            ))}
+          </div>
+        </details>
 
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button type="button" className="tool-secondary-action" disabled={submitting} onClick={onClose}>{copy.personalUse.confirmation_cancel}</button>

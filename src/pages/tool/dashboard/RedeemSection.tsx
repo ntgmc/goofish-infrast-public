@@ -123,7 +123,8 @@ export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourRep
         {mode === 'cdk' ? (
           <label className="mt-5 block" data-tour-target="dashboard-redeem-cdk">
             <span className="mb-2 block text-sm font-medium text-ink-secondary">CDK</span>
-            <input value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} className="tool-field font-mono uppercase tracking-wide" required />
+            <input aria-label="CDK" value={cdk} onChange={(event) => setCdk(event.currentTarget.value)} maxLength={256} className="tool-field font-mono uppercase tracking-wide" required />
+            <span aria-hidden="true" className="mt-1 block text-xs text-ink-tertiary">{cdk.length}/256</span>
           </label>
         ) : (
           <div className="tool-alert tool-alert--warning mt-5">
@@ -132,11 +133,13 @@ export default function RedeemSection({ onRedeemed, onInventoryRedeemed, tourRep
 
         <label className="mt-4 block">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.dashboard.pages_tool_dashboard_RedeemSection_008}</span>
-          <input value={displayName} onChange={(event) => setDisplayName(event.currentTarget.value)} className="tool-field" placeholder={mode === 'preview' ? copy.dashboard.pages_tool_dashboard_RedeemSection_009 : copy.dashboard.pages_tool_dashboard_RedeemSection_010} />
+          <input aria-label={copy.dashboard.pages_tool_dashboard_RedeemSection_008} value={displayName} onChange={(event) => setDisplayName(event.currentTarget.value)} maxLength={40} className="tool-field" placeholder={mode === 'preview' ? copy.dashboard.pages_tool_dashboard_RedeemSection_009 : copy.dashboard.pages_tool_dashboard_RedeemSection_010} />
+          <span aria-hidden="true" className="mt-1 block text-xs text-ink-tertiary">{displayName.length}/40</span>
         </label>
         <label className="mt-4 block">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.dashboard.pages_tool_dashboard_RedeemSection_011}</span>
-          <textarea value={note} onChange={(event) => setNote(event.currentTarget.value)} rows={4} className="tool-field resize-y" placeholder={copy.dashboard.pages_tool_dashboard_RedeemSection_012} />
+          <textarea aria-label={copy.dashboard.pages_tool_dashboard_RedeemSection_011} value={note} onChange={(event) => setNote(event.currentTarget.value)} maxLength={500} rows={4} className="tool-field resize-y" placeholder={copy.dashboard.pages_tool_dashboard_RedeemSection_012} />
+          <span aria-hidden="true" className="mt-1 block text-xs text-ink-tertiary">{note.length}/500</span>
         </label>
         <button type="submit" disabled={loading} className="tool-primary-action mt-5">
           {loading ? copy.dashboard.pages_tool_dashboard_RedeemSection_013 : mode === 'preview' ? copy.dashboard.pages_tool_dashboard_RedeemSection_014 : copy.dashboard.pages_tool_dashboard_RedeemSection_015}

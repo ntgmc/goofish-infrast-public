@@ -48,8 +48,18 @@ export function reservePasswordChangeAttemptLayered(clientIp: string, userId: st
   return reserveLayered(reservePasswordChangeAttempt(clientIp), 'password-change-user', userId, 5, AUTH_WINDOW_MS)
 }
 
-export function reserveSklandAttemptLayered(userId: string): Promise<LayeredRateLimitDecision> {
-  return reserveLayered(reserveSklandAttempt(userId), 'skland-user', userId, 30, SKLAND_WINDOW_MS)
+export function reserveSklandAttemptLayered(
+  userId: string,
+  bucket: 'external' | 'poll' = 'external',
+): Promise<LayeredRateLimitDecision> {
+  const limit = bucket === 'poll' ? 60 : 30
+  return reserveLayered(
+    reserveSklandAttempt(userId, bucket),
+    `skland-${bucket}-user`,
+    userId,
+    limit,
+    SKLAND_WINDOW_MS,
+  )
 }
 
 async function reserveLayered(

@@ -78,16 +78,29 @@ describe('OptimizationTaskCenter', () => {
     render(<Harness controller={controller({ jobs: [failedScheduleJob()], attentionCount: 1 })} onRetry={onRetry} />)
     await user.click(screen.getByRole('button', { name: '打开异步任务中心，1 个任务需要关注' }))
 
-    await user.click(screen.getByRole('button', { name: '重新提交' }))
+    await user.click(screen.getByRole('button', { name: '按当前配置重新生成' }))
 
     expect(onRetry).toHaveBeenCalledOnce()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  it('opens a persisted successful schedule result from the task list', async () => {
+    const user = userEvent.setup()
+    const onOpenResult = vi.fn()
+    render(<Harness controller={controller({ jobs: [successfulScheduleJob()] })} onOpenResult={onOpenResult} />)
+    await user.click(screen.getByRole('button', { name: '打开异步任务中心' }))
+
+    await user.click(screen.getByRole('button', { name: '查看结果' }))
+
+    expect(onOpenResult).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })
 
-function Harness({ controller: taskController, onRetry = vi.fn() }: {
+function Harness({ controller: taskController, onRetry = vi.fn(), onOpenResult = vi.fn() }: {
   controller: OptimizationTaskCenterController;
   onRetry?: () => void;
+  onOpenResult?: () => void;
 }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -108,6 +121,10 @@ function Harness({ controller: taskController, onRetry = vi.fn() }: {
           onRetry()
         }}
         onOpenScenario={close}
+        onOpenResult={() => {
+          close()
+          onOpenResult()
+        }}
       />
     </>
   )
@@ -119,6 +136,7 @@ function controller(overrides: Partial<OptimizationTaskCenterController> = {}): 
     activeCount: 0,
     attentionCount: 0,
     loading: false,
+    refreshing: false,
     loadingMore: false,
     error: null,
     notice: null,
@@ -155,4 +173,16 @@ function failedScheduleJob(): OptimizationJobListItem {
     resultAvailable: false,
     error: { code: 'application_error', message: '任务失败', retryable: true, recoveryAction: 'retry', attemptCount: 1, supportReference: 'OPT-12345678' },
   }
+}
+
+function successfulScheduleJob(): OptimizationJobListItem {
+  return {
+    ...failedScheduleJob(),
+    id: 'successful-job-id',
+    status: 'succeeded',
+    failureCount: 0,
+    canRetry: false,
+    resultAvailable: true,
+    historyResultId: 'successful-job-id',
+  } as unknown as OptimizationJobListItem
 }

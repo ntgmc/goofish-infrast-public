@@ -14,10 +14,14 @@ export interface CapabilitySubject {
 
 export const productPolicies: ProductPolicy = catalogJson.policies
 
-export function normalizeRuntimePermission(permission: RawPermissionMode | null | undefined): RuntimePermission {
+export function resolveRuntimePermission(permission: RawPermissionMode | string | null | undefined): RuntimePermission | null {
   if (permission === 'basic' || permission === 'premium') return catalogJson.legacy_aliases[permission] as RuntimePermission
   if (permission && permission in catalogJson.runtime_permissions) return permission as RuntimePermission
-  return 'growth'
+  return null
+}
+
+export function normalizeRuntimePermission(permission: RawPermissionMode | null | undefined): RuntimePermission {
+  return resolveRuntimePermission(permission) ?? 'recommended'
 }
 
 export function getSku(id: SkuId) {

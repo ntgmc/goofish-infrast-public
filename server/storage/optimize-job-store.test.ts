@@ -7,6 +7,33 @@ afterEach(() => {
 })
 
 describe('optimization job attempt lifecycle', () => {
+  it('replays a legacy raw-body idempotency hash after canonical hashing is deployed', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const ownerKey = `profile:${randomUUID()}`
+    const firstInput = admissionInput(ownerKey, 'account_profile')
+    const admitted = await store.admitJob(firstInput)
+    const canonicalHash = randomUUID()
+
+    await expect(store.admitJob({
+      ...firstInput,
+      id: randomUUID(),
+      request_hash: canonicalHash,
+      legacy_request_hash: firstInput.request_hash,
+    })).resolves.toMatchObject({ replayed: true, job: { id: admitted.job.id } })
+    await expect(store.findIdempotentJob(
+      ownerKey,
+      firstInput.idempotency_key,
+      canonicalHash,
+      firstInput.request_hash,
+    )).resolves.toMatchObject({ id: admitted.job.id })
+    await expect(store.findIdempotentJob(
+      ownerKey,
+      firstInput.idempotency_key,
+      canonicalHash,
+      'different-legacy-hash',
+    )).rejects.toMatchObject({ code: 'idempotency_conflict' })
+  })
+
   it('upgrades the legacy 30-minute environment value to 24 hours', async () => {
     vi.stubEnv('OPTIMIZE_QUEUE_MAX_AGE_MS', String(30 * 60_000))
     const store = createMemoryOptimizeJobStore()
@@ -138,7 +165,34 @@ describe('optimization job attempt lifecycle', () => {
       'lock-a',
       'invalid input',
     )).resolves.toBe(true)
-    await expect(terminalStore.getJob(terminalJob.id)).resolves.toMatchObject({ status: 'failed', failure_count: 1 })
+    await expect(terminalStore.getJob(terminalJob.id)).resolves.toMatchObject({
+      status: 'failed',
+      failure_count: 1,
+      error_message: '优化任务失败，请检查输入后重试。',
+      public_error_code: 'application_error',
+    })
+  })
+
+  it('uses the id tiebreaker consistently for queue rank, claiming, and composite pagination', async () => {
+    const store = createMemoryOptimizeJobStore()
+    const createdAt = '2026-07-31T00:00:00.000Z'
+    for (const id of ['job-a', 'job-b', 'job-c']) {
+      await store.createJob({
+        ...input(),
+        id,
+        profile_id: 'profile-1',
+        created_at: createdAt,
+      })
+    }
+
+    const firstPage = await store.listJobsByProfile('profile-1', 2)
+    expect(firstPage.map((entry) => [entry.job.id, entry.queuePosition])).toEqual([
+      ['job-c', 3],
+      ['job-b', 2],
+    ])
+    const secondPage = await store.listJobsByProfile('profile-1', 2, { createdAt, id: 'job-b' })
+    expect(secondPage.map((entry) => entry.job.id)).toEqual(['job-a'])
+    await expect(store.claimNextJob('worker-a', 'lock-a', future(), 2)).resolves.toMatchObject({ id: 'job-a' })
   })
 })
 

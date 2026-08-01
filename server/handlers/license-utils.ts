@@ -16,6 +16,7 @@ import {
   productPolicies,
 } from '../../src/lib/product-catalog'
 import { createPostgresCdkRecordStore } from '../storage/cdk-store'
+import { licenseConfigSchema, licenseOperatorsSchema } from '../../src/lib/workspace-validation'
 import {
   createPostgresRiskControlSettingsStore,
   DEFAULT_RISK_CONTROL_SETTINGS,
@@ -25,7 +26,6 @@ import {
   type RiskControlSettingsStore,
 } from '../storage/risk-settings-store'
 
-const REQUIRED_OPERATOR_KEYS = ['id', 'name', 'own', 'elite', 'rarity'] as const
 export const CDK_PRODUCT_PERMISSIONS: ProductPermissionMode[] = listAdminIssuablePermissions()
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
 export type CdkType = 'profile' | 'balance' | 'item'
@@ -161,13 +161,14 @@ export function isProfileCdkRecord(record: CdkRecord): record is LegacyProfileCd
 export interface CdkRecordStore {
   get: (key: string) => Promise<CdkRecord | null>;
   create: (key: string, record: CdkRecord) => Promise<void>;
+  createBatch: (entries: Array<{ key: string; record: CdkRecord }>) => Promise<void>;
   mutate: (
     key: string,
     mutate: (current: CdkRecord) => CdkRecord | null,
     options?: { allowedStatuses?: CdkStatus[] },
   ) => Promise<CdkRecord | null>;
   incrementScheduleGenerateCount: (key: string, jobId?: string) => Promise<boolean>;
-  delete: (key: string) => Promise<void>;
+  deleteUnused: (key: string) => Promise<boolean>;
   list: (prefix: string) => Promise<CdkRecord[]>;
   listAdminPage?: (options: AdminCdkPageOptions) => Promise<AdminCdkPageResult>;
 }
@@ -505,9 +506,9 @@ export async function findCdkRecordByCode(code: string, hashSecrets = getCdkHash
   return null
 }
 
-export async function incrementCdkScheduleGenerateCount(record: Pick<CdkRecord, 'code_hash'>, jobId?: string): Promise<void> {
+export async function incrementCdkScheduleGenerateCount(record: Pick<CdkRecord, 'code_hash'>, jobId?: string): Promise<boolean> {
   const store = await getCdkRecordStore()
-  await store.incrementScheduleGenerateCount(`cdk/${record.code_hash}.json`, jobId)
+  return store.incrementScheduleGenerateCount(`cdk/${record.code_hash}.json`, jobId)
 }
 
 const SOFT_BLOCK_WINDOW_MS = productPolicies.risk.soft_block_window_hours * 60 * 60 * 1000
@@ -786,36 +787,17 @@ export async function acceptLatestOperatorBaselineAndUnfreeze(record: CdkRecord,
 }
 
 export function validateOperators(value: unknown): { ok: true; operators: LicenseOperator[] } | { ok: false; message: string } {
-  if (!Array.isArray(value) || value.length === 0) {
-    return { ok: false, message: '干员数据不能为空。' }
-  }
-  for (const [index, raw] of value.entries()) {
-    if (!raw || typeof raw !== 'object') {
-      return { ok: false, message: `第 ${index + 1} 个干员不是对象。` }
-    }
-    const op = raw as Record<string, unknown>
-    const missing = REQUIRED_OPERATOR_KEYS.filter((key) => !(key in op))
-    if (missing.length > 0) {
-      return { ok: false, message: `干员 ${String(op.name ?? index + 1)} 缺少字段: ${missing.join(', ')}。` }
-    }
-    if (typeof op.id !== 'string' || typeof op.name !== 'string' || typeof op.own !== 'boolean') {
-      return { ok: false, message: `干员 ${String(op.name ?? index + 1)} 的 id/name/own 格式不正确。` }
-    }
-    if (!Number.isFinite(op.elite) || !Number.isFinite(op.rarity)) {
-      return { ok: false, message: `干员 ${op.name} 的 elite/rarity 必须是数字。` }
-    }
-  }
-  return { ok: true, operators: value as LicenseOperator[] }
+  const parsed = licenseOperatorsSchema.safeParse(value)
+  if (!parsed.success) return { ok: false, message: formatWorkspaceValidationMessage('干员数据', parsed.error.issues[0]?.message) }
+  return { ok: true, operators: parsed.data }
 }
 
 export function validateConfig(value: unknown): { ok: true; config: LicenseConfig } | { ok: false; message: string } {
-  if (!value || typeof value !== 'object') {
-    return { ok: false, message: '基建配置不能为空。' }
-  }
-  const config = value as LicenseConfig
-  config.dormitory_rule = normalizeDormitoryRule(config.dormitory_rule)
-  if (!config.layout || !config.product_requirements) {
-    return { ok: false, message: '基建配置缺少 layout 或 product_requirements。' }
+  const parsed = licenseConfigSchema.safeParse(value)
+  if (!parsed.success) return { ok: false, message: formatWorkspaceValidationMessage('基建配置', parsed.error.issues[0]?.message) }
+  const config: LicenseConfig = {
+    ...parsed.data,
+    dormitory_rule: normalizeDormitoryRule(parsed.data.dormitory_rule),
   }
   if (
     !Number.isInteger(config.trading_stations_count) ||
@@ -846,6 +828,10 @@ export function validateConfig(value: unknown): { ok: true; config: LicenseConfi
     return { ok: false, message: '启用无人机时至少需要一个加速目标。' }
   }
   return { ok: true, config }
+}
+
+function formatWorkspaceValidationMessage(subject: string, detail: string | undefined): string {
+  return detail ? `${subject}不正确：${detail}` : `${subject}不正确。`
 }
 
 function isCountRecord(value: unknown): value is Record<string, number> {

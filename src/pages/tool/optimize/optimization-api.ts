@@ -1,6 +1,5 @@
 import { apiJson } from '../../../lib/api-client'
-import type { CreateOptimizationJobRequest, CreateOptimizationJobResponse, CreateReorderCheckJobResponse, CreateReorderCheckRequest, OptimizationJobListResponse, OptimizationJobMutationResponse, OptimizationJobSnapshot, ReorderCheckJobSnapshot } from '../../../lib/optimization-contracts'
-import type { ReorderCheckResult } from '../../../lib/types'
+import type { CreateOptimizationJobRequest, CreateOptimizationJobResponse, CreateReorderCheckJobResponse, CreateReorderCheckRequest, OptimizationJobListResponse, OptimizationJobMutationResponse, OptimizationJobSnapshot } from '../../../lib/optimization-contracts'
 import type { OptimizeJobAccepted, OptimizeJobStatusResponse } from '../../../lib/types'
 import { copy } from '../../../copy/index'
 
@@ -46,10 +45,11 @@ export async function fetchOptimizationJobSnapshot<TResult = import('../../../li
   )
 }
 
-export async function listOptimizationJobs(profileId: string, before?: string): Promise<OptimizationJobListResponse> {
+export async function listOptimizationJobs(profileId: string, before?: string, signal?: AbortSignal): Promise<OptimizationJobListResponse> {
   const params = new URLSearchParams({ profile_id: profileId, limit: '50' })
   if (before) params.set('before', before)
   return await apiJson<OptimizationJobListResponse>(`/api/optimization/jobs?${params.toString()}`, {
+    signal,
     fallbackMessage: copy.optimize.pages_tool_optimize_optimization_api_001,
   })
 }
@@ -62,25 +62,18 @@ export async function cancelOptimizationJob(jobId: string): Promise<Optimization
   return response.job
 }
 
-export async function requestReorderCheck(
+export async function submitReorderCheckJob(
   request: CreateReorderCheckRequest,
   fallbackMessage: string,
-  idempotencyKey = crypto.randomUUID(),
-): Promise<ReorderCheckResult> {
-  const response = await apiJson<CreateReorderCheckJobResponse>('/api/optimization/reorder-checks', {
+  idempotencyKey: string = crypto.randomUUID(),
+): Promise<CreateReorderCheckJobResponse> {
+  return await apiJson<CreateReorderCheckJobResponse>('/api/optimization/reorder-checks', {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
     json: request,
     signal: AbortSignal.timeout(OPTIMIZE_SUBMIT_TIMEOUT_MS),
     fallbackMessage,
   })
-  let job: ReorderCheckJobSnapshot = response.job
-  while (job.status === 'queued' || job.status === 'running') {
-    await delay(job.pollAfterMs)
-    job = await fetchOptimizationJobSnapshot<ReorderCheckResult>(job.id, fallbackMessage, response.pollToken)
-  }
-  if (job.status === 'succeeded') return job.result
-  throw new Error(job.error.message || fallbackMessage)
 }
 
 export async function requestMaaExport(profileId: string, resultId: string): Promise<void> {
@@ -109,10 +102,6 @@ function downloadJsonPayload(response: { result: unknown; filename: string }, fa
   link.download = response.filename || fallbackFilename
   link.click()
   URL.revokeObjectURL(url)
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)))
 }
 
 function toLegacyJobView(job: OptimizationJobSnapshot, pollToken?: string): OptimizeJobStatusResponse {

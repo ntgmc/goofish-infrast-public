@@ -1,4 +1,9 @@
-import { isCurrentPersonalUseDeclarationEffective, toPublicPersonalUseDeclaration, type PersonalUseDeclarationAction } from '../personal-use-declaration'
+import {
+  CURRENT_PERSONAL_USE_DECLARATION,
+  isCurrentPersonalUseDeclarationEffective,
+  toPublicPersonalUseDeclaration,
+  type PersonalUseDeclarationAction,
+} from '../personal-use-declaration'
 import { getRequestClientIp } from '../security/client-ip'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
@@ -29,16 +34,27 @@ export default async function personalUseDeclarationHandler(req: Request): Promi
       const body = await getValidatedJson(req, requestSchemas.personalUseDeclarationConfirmation)
       const action = body.action as PersonalUseDeclarationAction
       const profileId = body.profile_id ?? null
+      if (body.declaration_id !== CURRENT_PERSONAL_USE_DECLARATION.id
+        || body.content_hash !== CURRENT_PERSONAL_USE_DECLARATION.contentHash) {
+        return jsonResponse({
+          error: '个人使用声明已更新，请阅读当前版本后重新确认。',
+          code: 'personal_use_declaration_changed',
+          declaration: toPublicPersonalUseDeclaration(),
+        }, 409)
+      }
       if (action === 'free_preview_claim' && profileId) return jsonResponse({ error: '领取免费权益时不应提交 profile_id。' }, 400)
       if (action === 'metered_personal_create' && profileId) {
         const profile = await getProfileForUser(auth.user.id, profileId)
         if (!profile || !isFreePreviewProfile(profile)) return jsonResponse({ error: '只能将免费预览档案转换为个人按次档案。' }, 403)
       }
-      if (action === 'generated_result_export') {
+      if (action === 'generated_result_export' || action === 'optimization_generate' || action === 'reorder_check') {
         if (!profileId) return jsonResponse({ error: '缺少 profile_id。' }, 400)
         const profile = await getProfileForUser(auth.user.id, profileId)
         if (!profile || (!isFreePreviewProfile(profile) && profile.kind !== 'metered_personal')) {
           return jsonResponse({ error: '该操作仅适用于免费预览或个人按次档案。' }, 403)
+        }
+        if (action === 'reorder_check' && !isFreePreviewProfile(profile)) {
+          return jsonResponse({ error: '调序检查仅适用于免费预览档案。' }, 403)
         }
       }
       if (!isCurrentPersonalUseDeclarationEffective()) {
@@ -55,10 +71,17 @@ export default async function personalUseDeclarationHandler(req: Request): Promi
   }
 }
 
-function toPublicAcceptance(acceptance: { declaration_id: string; declaration_version: string; action: PersonalUseDeclarationAction; accepted_at: string }) {
+function toPublicAcceptance(acceptance: {
+  declaration_id: string
+  declaration_version: string
+  content_hash: string
+  action: PersonalUseDeclarationAction
+  accepted_at: string
+}) {
   return {
     declaration_id: acceptance.declaration_id,
     declaration_version: acceptance.declaration_version,
+    content_hash: acceptance.content_hash,
     action: acceptance.action,
     accepted_at: acceptance.accepted_at,
   }

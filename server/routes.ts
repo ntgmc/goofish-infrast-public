@@ -41,6 +41,7 @@ import { enforceFeatureGate } from './feature-gate'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
 import { getServiceLifecycleState, isServiceReady } from './lifecycle'
+import { getAccountDeletionConfigurationHealth } from './account-data-lifecycle'
 
 type ApiHandler = (req: Request) => Promise<Response>
 
@@ -184,7 +185,8 @@ async function handleReadiness(): Promise<Response> {
     }, 503)
   }
   const database = await checkPostgresHealth()
-  const ok = hasDatabaseUrl() && database.ok
+  const accountDeletion = getAccountDeletionConfigurationHealth()
+  const ok = hasDatabaseUrl() && database.ok && accountDeletion.ok
   return jsonResponse(
     {
       ok,
@@ -193,6 +195,7 @@ async function handleReadiness(): Promise<Response> {
         type: 'postgres',
         ok: database.ok,
       },
+      account_deletion: accountDeletion,
     },
     ok ? 200 : 503,
   )

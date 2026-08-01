@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { hasCapability } from '../../src/lib/product-catalog'
 import type { WorkspaceResultHistoryItem } from '../../src/lib/types'
-import { getEffectiveProfilePermission } from '../free-preview-trial'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, stableJsonStringify } from '../security/request-validation'
 import {
@@ -21,8 +20,13 @@ import {
 import { withTransaction } from '../storage/postgres'
 import { jsonResponse, requireUserSession } from './user-auth'
 import { recordTrackedExportBehaviorEvent } from '../behavior-risk/service'
-import { getPersonalUseDeclarationAcceptance } from '../storage/personal-use-declaration-store'
+import {
+  PersonalUseDeclarationRequiredError,
+  recordPersonalUseDeclarationUsage,
+} from '../storage/personal-use-declaration-store'
 import { buildMaaExportPayload } from '../optimization/jobs/maa-export'
+import { resolveProfileAuthorization } from './profile-authorization'
+import { getRequestClientIp } from '../security/client-ip'
 
 export default async function userResultsHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -38,9 +42,11 @@ export default async function userResultsHandler(req: Request): Promise<Response
       const profile = await getProfileForUser(auth.user.id, body.profile_id)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班结果。' }, 403)
+      const authorization = await resolveProfileAuthorization(profile)
+      if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
       if (!hasCapability({
         kind: profile.kind,
-        permission: getEffectiveProfilePermission(profile),
+        permission: authorization.permission,
       }, 'export_full_result_json')) {
         return jsonResponse({
           error: '当前档案不支持下载完整计算数据。',
@@ -51,7 +57,14 @@ export default async function userResultsHandler(req: Request): Promise<Response
       const historyItem = findHistoryItem(workspace?.result_history ?? [], workspace?.archived_results ?? [], body.result_id)
       if (!historyItem) return jsonResponse({ error: '排班结果不存在。' }, 404)
       const result = JSON.parse(JSON.stringify(historyItem.result)) as Record<string, unknown>
-      const behaviorDeclaration = await getPersonalUseDeclarationAcceptance(auth.user.id).catch(() => null)
+      const behaviorDeclaration = isFreePreviewProfile(profile) || profile.kind === 'metered_personal'
+        ? await recordPersonalUseDeclarationUsage({
+            userId: auth.user.id,
+            profileId: profile.id,
+            action: 'generated_result_export',
+            clientIp: getRequestClientIp(req),
+          })
+        : null
       await recordTrackedExportBehaviorEvent({
         req,
         auth,
@@ -62,7 +75,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
         eventKey: `full-result-export:${auth.user.id}:${body.idempotency_key}`,
         activityClaimedAt: isFreePreviewProfile(profile) ? profile.created_at : null,
         declarationVersion: behaviorDeclaration?.declaration_version,
-        declarationAcceptedAt: behaviorDeclaration?.accepted_at,
+        declarationAcceptedAt: behaviorDeclaration?.acceptance_accepted_at,
       }).catch((error) => {
         console.warn('Full result export behavior event skipped:', error instanceof Error ? error.message : 'unknown error')
         return false
@@ -78,16 +91,25 @@ export default async function userResultsHandler(req: Request): Promise<Response
       const profile = await getProfileForUser(auth.user.id, body.profile_id)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班结果。' }, 403)
+      const authorization = await resolveProfileAuthorization(profile)
+      if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
       const workspace = await getProfileWorkspace(profile.id)
       const historyItem = findHistoryItem(workspace?.result_history ?? [], workspace?.archived_results ?? [], body.result_id)
       if (!historyItem) return jsonResponse({ error: '排班结果不存在。' }, 404)
       if (historyItem.result.schedule_mode === 'rotation') return jsonResponse({ error: '轮班制结果不能导出为 MAA JSON。' }, 409)
       const result = buildMaaExportPayload(historyItem.result)
-      const behaviorDeclaration = await getPersonalUseDeclarationAcceptance(auth.user.id).catch(() => null)
+      const behaviorDeclaration = isFreePreviewProfile(profile) || profile.kind === 'metered_personal'
+        ? await recordPersonalUseDeclarationUsage({
+            userId: auth.user.id,
+            profileId: profile.id,
+            action: 'generated_result_export',
+            clientIp: getRequestClientIp(req),
+          })
+        : null
       const isFreePreview = isFreePreviewProfile(profile)
       const canExportWithoutCoupon = !isFreePreview || hasCapability({
         kind: profile.kind,
-        permission: getEffectiveProfilePermission(profile),
+        permission: authorization.permission,
       }, 'export_maa_json')
       const recordExportBehavior = () => recordTrackedExportBehaviorEvent({
         req,
@@ -99,7 +121,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
         eventKey: `maa-export:${auth.user.id}:${body.idempotency_key}`,
         activityClaimedAt: isFreePreview ? profile.created_at : null,
         declarationVersion: behaviorDeclaration?.declaration_version,
-        declarationAcceptedAt: behaviorDeclaration?.accepted_at,
+        declarationAcceptedAt: behaviorDeclaration?.acceptance_accepted_at,
       }).catch((error) => {
         console.warn('MAA export behavior event skipped:', error instanceof Error ? error.message : 'unknown error')
         return false
@@ -126,6 +148,8 @@ export default async function userResultsHandler(req: Request): Promise<Response
     const profile = await getProfileForUser(auth.user.id, body.profile_id)
     if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
     if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班结果。' }, 403)
+    const authorization = await resolveProfileAuthorization(profile)
+    if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
     const limits = await getProfileCapacityLimits(profile.id)
     const requestHash = createHash('sha256').update(stableJsonStringify({
       profile_id: body.profile_id,
@@ -177,6 +201,9 @@ export default async function userResultsHandler(req: Request): Promise<Response
     })
     return jsonResponse(response)
   } catch (error) {
+    if (error instanceof PersonalUseDeclarationRequiredError) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
     if (error instanceof InventoryError || error instanceof ResultMutationError) {
       return jsonResponse({ error: error.message, code: error instanceof InventoryError ? error.code : 'result_archive_failed' }, error.status)
     }

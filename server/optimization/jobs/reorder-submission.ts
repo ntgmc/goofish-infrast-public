@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { CreateReorderCheckRequest } from '../../../src/lib/optimization-contracts'
-import { formatRiskFreezeMessage, resolveConfigForPermission, resolveFreePreviewConfig } from '../../handlers/license-utils'
+import { resolveConfigForPermission, resolveFreePreviewConfig } from '../../handlers/license-utils'
+import { resolveProfileAuthorization } from '../../handlers/profile-authorization'
 import { requireUserSession } from '../../handlers/user-auth'
 import { isFreePreviewTrialActive } from '../../free-preview-trial'
 import { getServiceLifecycleState } from '../../lifecycle'
@@ -16,16 +17,20 @@ import { jsonResponse, sanitizeConfigForPublicOptimize } from './http-core'
 import { resolveBaselineHistoryItem } from './reorder-baseline'
 import { recordReorderCheckEvent } from './reorder-telemetry'
 import type { ReorderCheckJobPayload } from './shared'
+import { getRequestClientIp } from '../../security/client-ip'
+import {
+  PersonalUseDeclarationRequiredError,
+  recordPersonalUseDeclarationUsage,
+} from '../../storage/personal-use-declaration-store'
 
 export async function submitReorderCheck(req: Request): Promise<Response> {
   const startedAt = Date.now()
   let profileIdForUsage: string | undefined
   const lifecycleState = getServiceLifecycleState()
   if (lifecycleState === 'draining' || lifecycleState === 'stopped') {
-    return new Response(JSON.stringify({ error: '服务正在重启或排空任务，请稍后重试。', code: 'service_draining' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
-    })
+    const response = jsonResponse({ error: '服务正在重启或排空任务，请稍后重试。', code: 'service_draining' }, 503)
+    response.headers.set('Retry-After', '60')
+    return response
   }
   const idempotencyKey = normalizeIdempotencyKey(req.headers.get('Idempotency-Key'))
   if (!idempotencyKey) return jsonResponse({ error: '缺少或无效的 Idempotency-Key。', code: 'idempotency_key_required' }, 400)
@@ -34,6 +39,7 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     const body = await getValidatedJson(req, requestSchemas.reorderCheck) as CreateReorderCheckRequest
     const useCoupon = body.use_items?.includes('reorder_check_coupon') === true
     const requestHash = createHash('sha256').update(stableJsonStringify(body)).digest('hex')
+    const store = getOptimizeJobStore()
     const activeProfileId = typeof body.profileId === 'string' ? body.profileId.trim() : ''
     if (!activeProfileId || !body.config) {
       await recordReorderCheckEvent('failure', 'validation_failed', startedAt)
@@ -51,18 +57,22 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
       await recordReorderCheckEvent('failure', 'profile_missing', startedAt, profileIdForUsage)
       return jsonResponse({ error: '档案不存在。' }, 404)
     }
+    const replayed = await store.findIdempotentJob(
+      `reorder-job:${activeProfileId}`,
+      idempotencyKey,
+      requestHash,
+    )
+    if (replayed) return jsonResponse({ job: await buildOptimizeJobAccepted(replayed) }, 202)
     if (!isFreePreviewProfile(profile)) {
       await recordReorderCheckEvent('failure', 'permission_denied', startedAt, profileIdForUsage)
       return jsonResponse({ error: '重排检测仅面向免费个人排班档案开放。' }, 403)
     }
     const isPreviewTrial = isFreePreviewTrialActive(profile)
-    if (profile.status === 'revoked') {
-      await recordReorderCheckEvent('failure', 'cdk_revoked', startedAt, profileIdForUsage)
-      return jsonResponse({ error: '档案授权已被撤销。' }, 403)
-    }
-    if (profile.status === 'frozen') {
-      await recordReorderCheckEvent('failure', 'cdk_frozen', startedAt, profileIdForUsage)
-      return jsonResponse({ error: formatRiskFreezeMessage('档案授权已被冻结。') }, 403)
+    const authorization = await resolveProfileAuthorization(profile)
+    if (!authorization.ok) {
+      const reason = authorization.code.includes('revoked') ? 'cdk_revoked' : authorization.code.includes('frozen') ? 'cdk_frozen' : 'permission_denied'
+      await recordReorderCheckEvent('failure', reason, startedAt, profileIdForUsage)
+      return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
     }
     if (!profile.skland_binding) {
       await recordReorderCheckEvent('failure', 'permission_denied', startedAt, profileIdForUsage)
@@ -105,7 +115,13 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     if (useCoupon && (isPreviewTrial || (quota?.remaining ?? 0) > 0)) {
       return jsonResponse({ error: isPreviewTrial ? '试用档案无需使用调序检查券。' : '本月免费调序检查配额尚未用完，不能消耗券。', code: 'item_not_applicable' }, 409)
     }
-    const admitted = await getOptimizeJobStore().admitJob({
+    await recordPersonalUseDeclarationUsage({
+      userId: auth.user.id,
+      profileId: activeProfileId,
+      action: 'reorder_check',
+      clientIp: getRequestClientIp(req),
+    })
+    const admitted = await store.admitJob({
       id: randomUUID(),
       priority: 0,
       owner_key: `reorder-job:${activeProfileId}`,
@@ -126,6 +142,9 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     requestOptimizeJobProcessing()
     return jsonResponse({ job: await buildOptimizeJobAccepted(admitted.job) }, 202)
   } catch (error) {
+    if (error instanceof PersonalUseDeclarationRequiredError) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
     if (isOptimizeJobAdmissionError(error)) {
       await recordReorderCheckEvent(
         'failure',

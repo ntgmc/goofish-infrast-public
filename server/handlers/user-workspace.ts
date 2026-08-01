@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { FreeScheduleEntitlement, OptimizeResult, PermissionMode } from '../../src/lib/types'
+import type { LicenseOperator, PermissionMode } from '../../src/lib/types'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 import {
   emptyWorkspace,
@@ -9,15 +9,14 @@ import {
   isFreePreviewProfile,
   toPublicWorkspace,
   updateProfileWorkspaceAtomically,
+  updateProfileWorkspaceInTransaction,
   type UserWorkspaceRecord,
 } from '../storage/user-store'
 import {
   evaluateOperatorRisk,
   formatOperatorRiskBlockMessage,
-  getCdkRecordStore,
   getRiskControlSettings,
   isProfileCdkRecord,
-  normalizePermissionMode,
   recordOperatorFingerprint,
   recordSoftBlockedRiskEvent,
   resolveConfigForPermission,
@@ -26,15 +25,15 @@ import {
   validateOperators,
 } from './license-utils'
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
-import { getEffectiveProfilePermission, isFreePreviewTrialActive } from '../free-preview-trial'
+import { isFreePreviewTrialActive } from '../free-preview-trial'
+import { resolveProfileAuthorization } from './profile-authorization'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import { getProfileCapacityLimits } from '../storage/inventory-store'
-import { hasDatabaseUrl } from '../storage/postgres'
+import { hasDatabaseUrl, withTransaction } from '../storage/postgres'
 import { recordAuthenticatedRequestBehaviorEvent, recordOperatorDataAnomalyBehaviorEvent } from '../behavior-risk/service'
-
-const FREE_SCHEDULE_REVISION_LIMIT = 3
-const FREE_SCHEDULE_REVISION_WINDOW_HOURS = 24
+import { confirmFreeScheduleEntitlement, FreeScheduleConfirmationError } from '../storage/reorder-admission'
+import { recordOperatorFingerprintInTransaction } from '../storage/cdk-store'
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -50,6 +49,8 @@ export default async (req: Request): Promise<Response> => {
       const profile = await getProfileForUser(auth.user.id, profileId)
       if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
       if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班工作区。' }, 403)
+      const authorization = await resolveProfileAuthorization(profile)
+      if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
       const capacityLimits = await getWorkspaceCapacityLimits(profile.id)
       const workspace = await getProfileWorkspace(profile.id)
       return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(workspace, capacityLimits) })
@@ -59,7 +60,10 @@ export default async (req: Request): Promise<Response> => {
       return jsonResponse({ error: '方法不允许。' }, 405)
     }
 
-    const body = await getValidatedJson(req, requestSchemas.userWorkspace)
+    const isFreeScheduleConfirmRequest = url.pathname.endsWith('/free-schedule/confirm')
+    const body = isFreeScheduleConfirmRequest
+      ? await getValidatedJson(req, requestSchemas.workspaceFreeScheduleConfirm)
+      : await getValidatedJson(req, requestSchemas.userWorkspace)
     if (typeof body.profile_id !== 'string' || !body.profile_id) {
       return jsonResponse({ error: '缺少 profile_id。' }, 400)
     }
@@ -67,41 +71,23 @@ export default async (req: Request): Promise<Response> => {
     if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
     if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案不能保存排班工作区。' }, 403)
     if (profile.archived_at) return jsonResponse({ error: '归档档案不能写入工作区。', code: 'profile_archived' }, 409)
-    if (profile.status !== 'active') return jsonResponse({ error: '账号档案状态不可用。' }, 403)
+    const authorization = await resolveProfileAuthorization(profile)
+    if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
 
     const isPreviewProfile = isFreePreviewProfile(profile)
     const isPreviewTrial = isFreePreviewTrialActive(profile)
-    const effectivePermission = getEffectiveProfilePermission(profile)
+    const effectivePermission = authorization.permission
     const isRestrictedPreview = isPreviewProfile && !isPreviewTrial
     const capacityLimits = await getWorkspaceCapacityLimits(profile.id)
     if (isPreviewProfile && !profile.skland_binding) {
       return jsonResponse({ error: '免费个人排班档案必须先绑定森空岛后才能保存工作区数据。' }, 403)
     }
 
-    if (url.pathname.endsWith('/free-schedule/confirm')) {
+    if (isFreeScheduleConfirmRequest) {
       if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
       if (!isRestrictedPreview) return jsonResponse({ error: '当前档案不需要确认免费方案。' }, 403)
-      const now = new Date().toISOString()
-      const next = await updateProfileWorkspaceAtomically(profile.id, (currentWorkspace) => {
-        const workspace = currentWorkspace ?? emptyWorkspace(profile.id)
-        const historyItem = typeof body.result_history_id === 'string' && body.result_history_id.trim()
-          ? workspace.result_history.find((item) => item.id === body.result_history_id)
-          : workspace.result_history[0]
-        if (!historyItem) throw new WorkspaceMutationError('暂无可确认的免费排班方案。', 409)
-        const current = normalizeFreeScheduleEntitlementForConfirm(workspace.free_schedule_entitlement)
-        return {
-          ...workspace,
-          free_schedule_entitlement: {
-            ...current,
-            first_generated_at: current.first_generated_at ?? historyItem.created_at,
-            revision_count: Math.max(1, current.revision_count),
-            confirmed_at: now,
-            locked_at: now,
-            lock_reason: 'confirmed',
-          },
-          updated_at: now,
-        }
-      })
+      if (!('result_history_id' in body)) return jsonResponse({ error: '缺少 result_history_id。' }, 400)
+      const next = await confirmFreeScheduleEntitlement(profile.id, body.result_history_id)
       await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })
       return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(next, capacityLimits) })
     }
@@ -136,10 +122,10 @@ export default async (req: Request): Promise<Response> => {
       }
     }
 
-    if (operatorsValue && profile.cdk_key) {
-      const cdkStore = await getCdkRecordStore()
-      const cdkRecord = await cdkStore.get(profile.cdk_key)
-      if (cdkRecord && isProfileCdkRecord(cdkRecord) && cdkRecord.status === 'used' && normalizePermissionMode(cdkRecord.permission) === 'advanced') {
+    let acceptedOperatorFingerprint: Parameters<typeof recordOperatorFingerprint> | null = null
+    if (operatorsValue) {
+      const cdkRecord = authorization.cdkRecord
+      if (cdkRecord && isProfileCdkRecord(cdkRecord) && authorization.permission === 'advanced') {
         const riskSettings = await getRiskControlSettings()
         if (riskSettings.operator_data_risk_enabled) {
           const operatorRisk = evaluateOperatorRisk(cdkRecord, operatorsValue)
@@ -162,18 +148,18 @@ export default async (req: Request): Promise<Response> => {
             })
             return jsonResponse({ error: blocked.message }, blocked.frozen ? 403 : 409)
           }
-          await recordOperatorFingerprint(cdkRecord, operatorRisk.fingerprint)
+          acceptedOperatorFingerprint = [cdkRecord, operatorRisk.fingerprint]
         }
       }
     }
 
-    await updateProfileWorkspaceAtomically(profile.id, (currentWorkspace) => {
+    const mutateWorkspace = (currentWorkspace: UserWorkspaceRecord | null) => {
       const workspace: UserWorkspaceRecord = { ...(currentWorkspace ?? emptyWorkspace(profile.id)) }
       if ('operators' in body) workspace.operators = operatorsValue ?? null
       if ('config' in body) workspace.config = configValue ?? null
-      if ('elite_overrides' in body) workspace.elite_overrides = normalizeEliteOverrides(body.elite_overrides)
-      if ('last_result' in body) {
-        workspace.last_result = body.last_result && typeof body.last_result === 'object' ? body.last_result as OptimizeResult : null
+      if ('elite_overrides' in body) {
+        const operators = 'operators' in body ? operatorsValue ?? null : workspace.operators
+        workspace.elite_overrides = validateEliteOverridesForOperators(body.elite_overrides, operators)
       }
       if ('saved_config_action' in body) {
         const savedConfigResult = applySavedConfigAction(workspace, body.saved_config_action, effectivePermission, isRestrictedPreview, capacityLimits.plan)
@@ -182,11 +168,22 @@ export default async (req: Request): Promise<Response> => {
       if ('operators' in body) workspace.last_result = null
       workspace.updated_at = new Date().toISOString()
       return workspace
-    })
+    }
+    if (acceptedOperatorFingerprint && hasDatabaseUrl()) {
+      await withTransaction(async (client) => {
+        await updateProfileWorkspaceInTransaction(client, profile.id, mutateWorkspace)
+        await recordOperatorFingerprintInTransaction(client, ...acceptedOperatorFingerprint!)
+      })
+    } else {
+      await updateProfileWorkspaceAtomically(profile.id, mutateWorkspace)
+      if (acceptedOperatorFingerprint) await recordOperatorFingerprint(...acceptedOperatorFingerprint)
+    }
     await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })
     return jsonResponse(await buildAuthPayload(auth.user, profile.id))
   } catch (error) {
-    if (error instanceof WorkspaceMutationError) return jsonResponse({ error: error.message }, error.status)
+    if (error instanceof WorkspaceMutationError || error instanceof FreeScheduleConfirmationError) {
+      return jsonResponse({ error: error.message }, error.status)
+    }
     console.error('user workspace error:', error)
     return jsonResponse({ error: 'Internal server error' }, 500)
   }
@@ -204,13 +201,17 @@ class WorkspaceMutationError extends Error {
   }
 }
 
-function normalizeEliteOverrides(value: unknown): Record<string, number> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  const normalized: Record<string, number> = {}
-  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof raw === 'number' && Number.isFinite(raw)) normalized[key] = raw
+function validateEliteOverridesForOperators(
+  value: Record<string, number>,
+  operators: LicenseOperator[] | null,
+): Record<string, number> {
+  const operatorIds = new Set((operators ?? []).map((operator) => operator.id))
+  for (const operatorId of Object.keys(value)) {
+    if (!operatorIds.has(operatorId)) {
+      throw new WorkspaceMutationError(`精英覆盖中的干员 ${operatorId} 不属于当前工作区。`, 400)
+    }
   }
-  return normalized
+  return { ...value }
 }
 
 type SavedConfigActionResult =
@@ -288,6 +289,9 @@ function applySavedConfigAction(
   if (rawAction.type === 'delete') {
     const idResult = normalizeActionId(rawAction.id)
     if (!idResult.ok) return idResult
+    if (!workspace.saved_configs.some((item) => item.id === idResult.id)) {
+      return { ok: false, message: '方案不存在。', status: 404 }
+    }
     workspace.saved_configs = workspace.saved_configs.filter((item) => item.id !== idResult.id)
     return { ok: true }
   }
@@ -295,6 +299,9 @@ function applySavedConfigAction(
   if (rawAction.type === 'touch') {
     const idResult = normalizeActionId(rawAction.id)
     if (!idResult.ok) return idResult
+    if (!workspace.saved_configs.some((item) => item.id === idResult.id)) {
+      return { ok: false, message: '方案不存在。', status: 404 }
+    }
     const now = new Date().toISOString()
     workspace.saved_configs = workspace.saved_configs.map((item) => item.id === idResult.id
       ? { ...item, last_used_at: now }
@@ -319,17 +326,4 @@ function normalizeActionId(value: unknown): { ok: true; id: string } | { ok: fal
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-}
-
-function normalizeFreeScheduleEntitlementForConfirm(value: FreeScheduleEntitlement | null | undefined): FreeScheduleEntitlement {
-  return {
-    first_generated_at: typeof value?.first_generated_at === 'string' ? value.first_generated_at : null,
-    revision_count: Math.max(0, Math.floor(Number(value?.revision_count ?? 0))),
-    revision_limit: FREE_SCHEDULE_REVISION_LIMIT,
-    revision_window_hours: FREE_SCHEDULE_REVISION_WINDOW_HOURS,
-    confirmed_at: typeof value?.confirmed_at === 'string' ? value.confirmed_at : null,
-    locked_at: typeof value?.locked_at === 'string' ? value.locked_at : null,
-    lock_reason: value?.lock_reason ?? null,
-    strong_reorder_bonus: value?.strong_reorder_bonus ?? null,
-  }
 }

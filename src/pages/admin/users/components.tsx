@@ -331,7 +331,7 @@ function PersonalUseDeclarations({ declarations }: { declarations: AdminUserDeta
               {declarations.map((declaration) => (
                 <tr key={`${declaration.declaration_id}-${declaration.accepted_at}`}>
                   <td className="px-2 py-2 font-mono">{declaration.declaration_version}</td>
-                  <td className="px-2 py-2">{declaration.action === 'free_preview_claim' ? '领取免费权益' : '导出生成结果'}</td>
+                  <td className="px-2 py-2">{personalUseActionLabel(declaration.action)}</td>
                   <td className="max-w-40 truncate px-2 py-2 font-mono" title={declaration.profile_id ?? undefined}>{declaration.profile_id ?? '-'}</td>
                   <td className="px-2 py-2 font-mono">{declaration.client_ip}</td>
                   <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.accepted_at)}</td>
@@ -344,6 +344,18 @@ function PersonalUseDeclarations({ declarations }: { declarations: AdminUserDeta
       )}
     </section>
   )
+}
+
+const PERSONAL_USE_ACTION_LABELS: Record<AdminUserDetail['personal_use_declarations'][number]['action'], string> = {
+  free_preview_claim: '领取免费权益',
+  metered_personal_create: '创建/转换个人按次档案',
+  generated_result_export: '导出生成结果',
+  optimization_generate: '生成排班结果',
+  reorder_check: '调序检查',
+}
+
+export function personalUseActionLabel(action: AdminUserDetail['personal_use_declarations'][number]['action']): string {
+  return PERSONAL_USE_ACTION_LABELS[action] ?? action
 }
 
 function ProfileDetailCard({

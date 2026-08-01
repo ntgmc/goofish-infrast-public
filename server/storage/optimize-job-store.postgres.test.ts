@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { closePool, getPool, query } from './postgres'
+import { closePool, getPool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import {
   createPostgresOptimizeJobStore,
   getAdminOptimizationQueueSnapshot,
   OptimizeJobAdmissionError,
 } from './optimize-job-store'
-import { emptyWorkspace, getWorkspace, saveWorkspace, updateProfileWorkspaceAtomically } from './user-store'
+import { emptyWorkspace, getWorkspace, saveWorkspace, updateProfileWorkspaceAtomically, updateProfileWorkspaceInTransaction } from './user-store'
 import {
   ensureInvitationCode,
   getRewardBalances,
@@ -16,9 +16,10 @@ import {
   saveInvitationSettings,
   settleInvitationForActivatedUser,
 } from './invitation-store'
-import { getFreeScheduleEntitlement } from './reorder-admission'
+import { confirmFreeScheduleEntitlement, getFreeScheduleEntitlement } from './reorder-admission'
 import { adjustBalance, getBalanceSummary } from './balance-store'
 import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
+import { recordOperatorFingerprintInTransaction } from './cdk-store'
 
 let container: PostgreSqlContainer
 const legacyJobId = randomUUID()
@@ -618,6 +619,53 @@ describe('PostgreSQL optimization job admission', () => {
     })
   })
 
+  it('rejects another free generation after an atomic schedule confirmation', async () => {
+    const profileId = await seedProfile()
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      owner_key: `profile:${profileId}`,
+      source: 'free_preview',
+      free_profile_id: profileId,
+    }))
+    const createdAt = new Date().toISOString()
+    await query("update optimize_jobs set status = 'succeeded', finished_at = now(), updated_at = now() where id = $1", [admitted.job.id])
+    await query(
+      "update entitlement_ledger set status = 'consumed', settled_at = now() where reference_type = 'optimization_job' and reference_id = $1",
+      [admitted.job.id],
+    )
+    await updateProfileWorkspaceAtomically(profileId, (current) => ({
+      ...(current ?? emptyWorkspace(profileId)),
+      result_history: [{
+        id: admitted.job.id,
+        name: '首次免费方案',
+        created_at: createdAt,
+        config: null,
+        result: {} as never,
+        operator_count: 1,
+        source: 'generated',
+      }],
+      updated_at: createdAt,
+    }))
+
+    const confirmed = await confirmFreeScheduleEntitlement(profileId, admitted.job.id, createdAt)
+
+    expect(confirmed.free_schedule_entitlement).toMatchObject({
+      revision_count: 1,
+      confirmed_at: createdAt,
+      locked_at: createdAt,
+      lock_reason: 'confirmed',
+    })
+    expect((await query<{ confirmed_at: string | null; lock_reason: string | null }>(
+      'select confirmed_at, lock_reason from profile_entitlements where profile_id = $1',
+      [profileId],
+    )).rows[0]).toMatchObject({ confirmed_at: expect.anything(), lock_reason: 'confirmed' })
+    await expect(store.admitJob(input({
+      owner_key: `profile:${profileId}`,
+      source: 'free_preview',
+      free_profile_id: profileId,
+    }))).rejects.toMatchObject({ code: 'free_revision_limit_exceeded' })
+  })
+
   it('releases a reserved free entitlement when a started job fails', async () => {
     const profileId = await seedProfile()
     const store = createPostgresOptimizeJobStore()
@@ -869,6 +917,189 @@ describe('PostgreSQL optimization job admission', () => {
 
     await expect(getWorkspace(profileId)).resolves.toMatchObject({ elite_overrides: { alpha: 1, beta: 2 } })
   })
+
+  it('persists a successful schedule into rolling workspace history and a durable effect outbox', async () => {
+    const profileId = await seedProfile()
+    const existingHistory = Array.from({ length: 6 }, (_, index) => ({
+      id: `history-${index}`,
+      name: `History ${index}`,
+      created_at: new Date(Date.parse('2026-07-01T00:00:00.000Z') - index * 1_000).toISOString(),
+      config: formalConfig(),
+      result: formalScheduleResult(`old-${index}`),
+      operator_count: 1,
+      source: 'generated' as const,
+    }))
+    await saveWorkspace({
+      ...emptyWorkspace(profileId),
+      operators: formalOperators(),
+      config: formalConfig(),
+      result_history: existingHistory,
+    })
+    await query(
+      `insert into profile_entitlement_balances (profile_id, entitlement_type, units, updated_at)
+       values ($1, 'history_slots', 1, now())`,
+      [profileId],
+    )
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      priority: 2_100_000_000,
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      source: 'account_profile',
+      payload_json: formalSchedulePayload(profileId),
+    }))
+    const claimed = await store.claimNextJob('schedule-success-worker', 'schedule-success-lock', new Date(Date.now() + 60_000).toISOString(), 2, 100)
+    expect(claimed?.id).toBe(admitted.job.id)
+
+    await expect(store.completeAttempt(
+      claimed!.id,
+      claimed!.attempt_count,
+      'schedule-success-worker',
+      'schedule-success-lock',
+      formalScheduleResult('new-result'),
+    )).resolves.toBe(true)
+
+    const workspace = await getWorkspace(profileId)
+    expect(workspace?.result_history).toHaveLength(6)
+    expect(workspace?.result_history.map((item) => item.id)).toEqual([
+      admitted.job.id,
+      'history-0',
+      'history-1',
+      'history-2',
+      'history-3',
+      'history-4',
+    ])
+    expect(workspace?.last_result).toMatchObject({ title: 'new-result' })
+    expect((await query<{ effect_type: string; status: string | null }>(
+      `select effect_type, metadata_json->>'status' as status
+       from optimization_job_effects where job_id = $1 order by effect_type`,
+      [admitted.job.id],
+    )).rows).toEqual([
+      { effect_type: 'schedule_completion', status: 'pending' },
+      { effect_type: 'workspace_schedule_result', status: null },
+    ])
+    await expect(store.completeAttempt(
+      claimed!.id,
+      claimed!.attempt_count,
+      'schedule-success-worker',
+      'schedule-success-lock',
+      formalScheduleResult('duplicate'),
+    )).resolves.toBe(false)
+    expect((await getWorkspace(profileId))?.result_history).toHaveLength(6)
+  })
+
+  it('rejects an invalid formal optimizer result without charging or persisting success effects', async () => {
+    const { userId, profileId } = await seedMeteredProfile()
+    await adjustBalance({
+      userId,
+      kind: 'admin_credit',
+      amount: '1200.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `invalid-result-fund:${userId}`,
+      adminUsername: 'root',
+      reason: 'invalid result test',
+    })
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      priority: 2_120_000_000,
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      permission: 'metered_advanced',
+      source: 'account_profile',
+      payload_json: formalSchedulePayload(profileId),
+      billing: { userId, quote: getMeteredScheduleQuote('metered_personal') },
+    }))
+    const claimed = await store.claimNextJob('invalid-result-worker', 'invalid-result-lock', new Date(Date.now() + 60_000).toISOString(), 2, 100)
+    expect(claimed?.id).toBe(admitted.job.id)
+
+    await expect(store.completeAttempt(
+      claimed!.id,
+      claimed!.attempt_count,
+      'invalid-result-worker',
+      'invalid-result-lock',
+      { ok: true },
+    )).resolves.toBe(false)
+
+    await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({
+      status: 'failed',
+      failure_kind: 'validation_error',
+      public_error_code: 'invalid_optimizer_result',
+      billing_json: { status: 'released' },
+    })
+    expect(await getBalanceSummary(userId)).toMatchObject({ available: '1200.00', reserved: '0.00' })
+    expect((await query<{ count: string }>(
+      "select count(*)::text as count from user_balance_transactions where user_id = $1 and kind = 'schedule_debit'",
+      [userId],
+    )).rows[0]?.count).toBe('0')
+    expect((await query<{ count: string }>(
+      'select count(*)::text as count from optimization_job_effects where job_id = $1',
+      [admitted.job.id],
+    )).rows[0]?.count).toBe('0')
+    expect((await getWorkspace(profileId))?.result_history ?? []).toHaveLength(0)
+  })
+
+  it('commits and rolls back workspace and operator fingerprint updates together', async () => {
+    const profileId = await seedProfile()
+    const codeHash = randomUUID().replaceAll('-', '')
+    const key = `cdk/${codeHash}.json`
+    const now = new Date().toISOString()
+    const record = {
+      version: 1 as const,
+      code_hash: codeHash,
+      permission: 'advanced' as const,
+      status: 'used' as const,
+      created_at: now,
+      used_at: now,
+      order_note: null,
+      license_order_hash: randomUUID(),
+      operator_count: null,
+      config_desc: null,
+    }
+    const fingerprint = {
+      hash: 'f'.repeat(64),
+      owned_count: 1,
+      operators: { alpha: { name: '测试干员', own: true, elite: 1, rarity: 5 } },
+    }
+    await saveWorkspace(emptyWorkspace(profileId))
+    await query(
+      `insert into cdk_records
+        (key, code_hash, status, permission, license_order_hash, record_json, created_at, updated_at)
+       values ($1, $2, 'used', 'advanced', $3, $4::jsonb, $5, $5)`,
+      [key, codeHash, record.license_order_hash, JSON.stringify(record), now],
+    )
+
+    await expect(withTransaction(async (client) => {
+      await updateProfileWorkspaceInTransaction(client, profileId, (workspace) => ({
+        ...(workspace ?? emptyWorkspace(profileId)),
+        elite_overrides: { alpha: 1 },
+        updated_at: now,
+      }))
+      await recordOperatorFingerprintInTransaction(client, record, fingerprint)
+      throw new Error('injected transaction failure')
+    })).rejects.toThrow('injected transaction failure')
+
+    await expect(getWorkspace(profileId)).resolves.toMatchObject({ elite_overrides: {} })
+    expect((await query<{ record_json: typeof record & { latest_operator_fingerprint?: unknown } }>(
+      'select record_json from cdk_records where key = $1',
+      [key],
+    )).rows[0]?.record_json.latest_operator_fingerprint).toBeUndefined()
+
+    await withTransaction(async (client) => {
+      await updateProfileWorkspaceInTransaction(client, profileId, (workspace) => ({
+        ...(workspace ?? emptyWorkspace(profileId)),
+        elite_overrides: { alpha: 1 },
+        updated_at: now,
+      }))
+      await recordOperatorFingerprintInTransaction(client, record, fingerprint)
+    })
+
+    await expect(getWorkspace(profileId)).resolves.toMatchObject({ elite_overrides: { alpha: 1 } })
+    expect((await query<{ record_json: { latest_operator_fingerprint?: { hash: string } } }>(
+      'select record_json from cdk_records where key = $1',
+      [key],
+    )).rows[0]?.record_json.latest_operator_fingerprint?.hash).toBe(fingerprint.hash)
+  })
 })
 
 function input(overrides: Partial<Parameters<ReturnType<typeof createPostgresOptimizeJobStore>['admitJob']>[0]> = {}) {
@@ -894,11 +1125,45 @@ async function seedProfile(): Promise<string> {
     [userId, `${userId}@example.test`, JSON.stringify({ id: userId })],
   )
   await query(
-    `insert into user_game_accounts (id, user_id, permission, status, display_name, note, record_json, created_at, updated_at)
-     values ($1, $2, 'free_preview', 'active', 'Free', '', $3::jsonb, now(), now())`,
+    `insert into user_game_accounts (id, user_id, permission, status, display_name, note, kind, record_json, created_at, updated_at)
+     values ($1, $2, 'growth', 'active', 'Free', '', 'free_preview', $3::jsonb, now(), now())`,
     [profileId, userId, JSON.stringify({ id: profileId, user_id: userId })],
   )
   return profileId
+}
+
+function formalOperators() {
+  return [{ id: 'op-1', name: 'Operator', own: true, elite: 2, rarity: 6 }]
+}
+
+function formalConfig() {
+  return {
+    layout: '243', desc: 'test', schedule_mode: 'maa', trading_stations_count: 2,
+    manufacturing_stations_count: 4,
+    product_requirements: { trading_stations: { lmd: 2 }, manufacturing_stations: { pure_gold: 4 } },
+  }
+}
+
+function formalSchedulePayload(profileId: string) {
+  return {
+    version: 3,
+    submittedAt: Date.now(),
+    operators: formalOperators(),
+    effectiveConfig: formalConfig(),
+    scheduleUsageBase: { profile_id: profileId, permission: 'growth', source: 'optimize' },
+    activeProfileId: profileId,
+    isPreviewProfile: false,
+    isPreviewTrial: false,
+    freeScheduleDecision: null,
+    estimate: { estimated_duration_ms: 2_000, estimate_bucket: 'maa_plain', estimate_source: 'fallback_p95', estimate_sample_count: 0 },
+    request: { include_upgrade_suggestions: false, upgrade_suggestions_allowed: false, history_source: 'generated' },
+    configPermission: 'growth',
+    cdkUsageRef: null,
+  }
+}
+
+function formalScheduleResult(title: string) {
+  return { author: 'test', title, description: title, buildingType: 2, planTimes: '8h', plans: [], raw_results: [] }
 }
 
 async function seedMeteredProfile(): Promise<{ userId: string; profileId: string }> {
