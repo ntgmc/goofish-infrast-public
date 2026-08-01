@@ -1,7 +1,8 @@
 import type { FreeScheduleEntitlement, LicenseOperator, LicenseConfig, OptimizeResult } from "../../../src/lib/types";
 import { canonicalJson, type CdkRecord, incrementCdkScheduleGenerateCount } from "../../handlers/license-utils";
-import { recordUsageEvent } from "../../handlers/usage-stats";
+import { countSuccessfulUsageEventsForProfileInRange, recordUsageEvent } from "../../handlers/usage-stats";
 import type { UsageReasonCode } from "../../storage/usage-store";
+import { hasDatabaseUrl } from '../../storage/postgres';
 import { countReorderCheckQuota } from '../../storage/reorder-quota-store';
 import type { ReorderCheckQuota, ScheduleUsageContext, FreeScheduleGenerateDecision } from './shared';
 import { FREE_PREVIEW_MODE, FREE_SCHEDULE_REVISION_LIMIT, FREE_SCHEDULE_REVISION_WINDOW_HOURS, SHANGHAI_TIMEZONE, SHANGHAI_UTC_OFFSET_MS } from './shared';
@@ -156,7 +157,14 @@ export function buildReorderCheckQuota(used: number, resetAt: string): ReorderCh
 
 export async function getReorderCheckQuota(profileId: string): Promise<ReorderCheckQuota> {
   const window = getShanghaiMonthWindow();
-  const used = await countReorderCheckQuota(profileId, getShanghaiMonthKey());
+  const used = hasDatabaseUrl()
+    ? await countReorderCheckQuota(profileId, getShanghaiMonthKey())
+    : await countSuccessfulUsageEventsForProfileInRange(
+        "reorder_check",
+        profileId,
+        window.start_at,
+        window.end_at,
+      );
   return buildReorderCheckQuota(used, window.end_at);
 }
 
