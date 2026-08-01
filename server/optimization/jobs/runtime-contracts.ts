@@ -20,6 +20,10 @@ import type {
 const finiteNumber = z.number().finite()
 const boundedString = (maximum: number) => z.string().min(1).max(maximum)
 const nullableFiniteNumber = finiteNumber.nullable()
+const roomEfficiencySchema = z.union([
+  finiteNumber,
+  z.record(boundedString(128), finiteNumber),
+])
 
 const appBuildMetaSchema = z.strictObject({
   frontend_version: boundedString(128),
@@ -93,7 +97,7 @@ const optimizeResultSchema: z.ZodType<OptimizeResult> = z.object({
     rooms: z.record(boundedString(128), z.array(z.object({
       operators: z.array(z.string().max(256)).max(200).optional(),
       product: z.string().max(256).optional(),
-      efficiency: finiteNumber.optional(),
+      efficiency: roomEfficiencySchema.optional(),
       final_efficiency: finiteNumber.optional(),
     }).passthrough()).max(100)),
   }).passthrough()).max(100),

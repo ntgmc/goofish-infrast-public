@@ -564,7 +564,7 @@ interface RoomOverflow {
 export interface ShiftRoom {
   operators?: string[];
   product?: string;
-  efficiency?: number;
+  efficiency?: number | Record<string, number>;
   final_efficiency?: number;
   overflow?: RoomOverflow;
   dynamic_resources?: Record<string, number>;
