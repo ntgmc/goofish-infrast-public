@@ -325,7 +325,7 @@ async function assertOptimizeHistory() {
   })
   const workspace = store.workspaces.get('profile-1')
   if (generated.status !== 200 || !workspace?.last_result || workspace.result_history.length !== 1) {
-    throw new Error(`optimize history: expected stored last_result and one history item, got ${generated.status}`)
+    throw new Error(`optimize history: expected stored last_result and one history item, got ${generated.status}: ${JSON.stringify(generated.body)}`)
   }
   if (workspace.result_history[0].name !== '333 orundum' || workspace.result_history[0].source !== 'generated') {
     throw new Error('optimize history: saved config name/source not used')
@@ -532,6 +532,7 @@ async function assertFreePreviewTrialWorkspaceLimits() {
 
 async function assertFreePreviewModeRoundTrip() {
   const preview = seedFreePreviewProfile('preview-mode-round-trip', { bound: true })
+  const declarationUsageCountBefore = store.personalUseDeclarationUsageEvents.length
   store.workspaces.set(preview.id, {
     ...emptyWorkspace(preview.id),
     operators: sampleOperators,
@@ -566,6 +567,15 @@ async function assertFreePreviewModeRoundTrip() {
   })
   if (generated.status !== 200) {
     throw new Error(`免费档案模式往返：切回 MAA 后生成失败，实际 ${generated.status}`)
+  }
+  const declarationUsage = store.personalUseDeclarationUsageEvents.at(-1)
+  if (
+    store.personalUseDeclarationUsageEvents.length !== declarationUsageCountBefore + 1
+    || declarationUsage?.userId !== store.user.id
+    || declarationUsage?.profileId !== preview.id
+    || declarationUsage?.action !== 'optimization_generate'
+  ) {
+    throw new Error('免费档案模式往返：未写入一次准确的个人使用声明生成审计事件')
   }
 }
 
@@ -752,7 +762,7 @@ function createTestRooms() {
     id,
     name,
     product,
-    operators: [{ id: 'char_002_amiya', name: 'Amiya' }],
+    operators: ['Amiya'],
     final_efficiency: 1.23,
     efficiency: 1.23,
   })
@@ -822,7 +832,7 @@ async function assertFreeConfigPatchStatus(profileId, config, expectedStatus, la
     config,
   }, { method: 'PATCH' })
   if (result.status !== expectedStatus) {
-    throw new Error(`免费档案配置 ${label}：预期 ${expectedStatus}，实际 ${result.status}`)
+    throw new Error(`免费档案配置 ${label}：预期 ${expectedStatus}，实际 ${result.status}: ${JSON.stringify(result.body)}`)
   }
 }
 
@@ -959,7 +969,7 @@ async function assertReorderRecommendationFromBaseline(profileId, baselineResult
     baseline_history_id: historyItem.id,
   })
   if (checked.status !== 200 || checked.body?.recommendation !== expectedRecommendation) {
-    throw new Error(`免费档案重排检测 ${expectedRecommendation}：预期 200 ${expectedRecommendation}，实际 ${checked.status} ${checked.body?.recommendation}`)
+    throw new Error(`免费档案重排检测 ${expectedRecommendation}：预期 200 ${expectedRecommendation}，实际 ${checked.status}: ${JSON.stringify(checked.body)}`)
   }
   assertReorderCheckResult(checked.body, `免费档案重排检测 ${expectedRecommendation}`)
   const bonus = checked.body?.free_schedule_entitlement?.strong_reorder_bonus
@@ -1028,7 +1038,7 @@ function cloneWithRoomOperator(result, roomType, roomIndex, operator) {
   const cloned = JSON.parse(JSON.stringify(result))
   const room = cloned?.plans?.[0]?.rooms?.[roomType]?.[roomIndex]
   if (!room) throw new Error(`test baseline missing ${roomType} room ${roomIndex}`)
-  room.operators = [operator]
+  room.operators = [typeof operator === 'string' ? operator : operator.name ?? operator.id]
   return cloned
 }
 
@@ -1161,6 +1171,10 @@ function memoryStorePlugin() {
         path: 'memory-training-cost',
         namespace: 'workspace-history-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])personal-use-declaration-store(\.ts)?$/ }, () => ({
+        path: 'memory-personal-use-declaration-store',
+        namespace: 'workspace-history-smoke',
+      }))
       build.onResolve({ filter: /workspace-history-optimizer-port(\.ts)?$/ }, () => ({
         path: 'memory-optimizer-port',
         namespace: 'workspace-history-smoke',
@@ -1183,6 +1197,7 @@ function memoryModule(path) {
   if (path === 'memory-license-utils') return memoryLicenseUtilsModule()
   if (path === 'memory-usage-stats') return memoryUsageStatsModule()
   if (path === 'memory-training-cost') return 'export async function attachTrainingCostsToUpgradeSuggestions({ suggestions }) { return suggestions }'
+  if (path === 'memory-personal-use-declaration-store') return memoryPersonalUseDeclarationStoreModule()
   if (path === 'memory-optimizer-port') return memoryOptimizerPortModule()
   return 'export const APP_BUILD_META = { frontend_version: "test", backend_version: "test", data_version: "test", generated_at: "test", source_summary: "test" }'
 }
@@ -1220,6 +1235,31 @@ export async function getScheduleGenerateDurationStatsByBucket(bucket, startAt, 
 `
 }
 
+function memoryPersonalUseDeclarationStoreModule() {
+  return `
+    const store = globalThis.__workspaceHistorySmokeStore
+    export class PersonalUseDeclarationRequiredError extends Error {
+      constructor() {
+        super('请先确认当前版本的个人使用声明。')
+        this.code = 'personal_use_declaration_required'
+        this.status = 428
+      }
+    }
+    export async function recordPersonalUseDeclarationUsage(input) {
+      store.personalUseDeclarationUsageEvents.push(input)
+      return input
+    }
+    export async function requireCurrentPersonalUseAcceptanceInTransaction() {
+      if (!store.personalUseAcceptance) throw new PersonalUseDeclarationRequiredError()
+      return store.personalUseAcceptance
+    }
+    export async function recordPersonalUseDeclarationUsageInTransaction(_client, input) {
+      store.personalUseDeclarationUsageEvents.push(input)
+      return input
+    }
+  `
+}
+
 function memoryUserStoreModule() {
   return `
     const store = globalThis.__workspaceHistorySmokeStore
@@ -1250,6 +1290,9 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
     export async function getProfileWorkspace(profileId) {
       return store.workspaces.get(profileId) ?? null
     }
+    export async function getProfileWorkspaceForUpdateInTransaction(_client, profileId) {
+      return store.workspaces.get(profileId) ?? null
+    }
     export async function getWorkspace(profileId) {
       return store.workspaces.get(profileId) ?? null
     }
@@ -1263,6 +1306,24 @@ return { version: 1, profile_id: profileId, operators: null, config: null, elite
       return ['free_preview', 'depot_value', 'metered_personal', 'metered_commercial'].includes(profile?.kind)
         ? profile.kind
         : 'cdk'
+    }
+    export async function listProfileWorkspaces(profileIds) {
+      return new Map(profileIds.flatMap((profileId) => {
+        const workspace = store.workspaces.get(profileId)
+        return workspace ? [[profileId, normalizeWorkspace(workspace)]] : []
+      }))
+    }
+    export async function updateUserProfileMetadata(userId, profileId, patch) {
+      const profile = store.profiles.get(profileId)
+      if (profile?.user_id !== userId) return null
+      const updated = {
+        ...profile,
+        ...(patch.displayName === undefined ? {} : { display_name: patch.displayName }),
+        ...(patch.note === undefined ? {} : { note: patch.note }),
+        updated_at: new Date().toISOString(),
+      }
+      store.profiles.set(profileId, updated)
+      return updated
     }
     export async function saveProfileWorkspace(workspace) {
       store.workspaces.set(workspace.profile_id, normalizeWorkspace(workspace))
@@ -1449,6 +1510,23 @@ function memoryLicenseUtilsModule() {
     export function formatRiskFreezeMessage(message) { return message }
     export function getPermissionMode(license) { return license?.permission ?? 'advanced' }
     export function getSecretKeyring() { return ['workspace-history-test-secret'] }
+    export function getCdkType(record) { return record?.cdk_type ?? 'profile' }
+    export function getCdkBalanceAmount(record) {
+      return getCdkType(record) === 'balance' && typeof record?.balance_amount === 'string'
+        ? record.balance_amount
+        : null
+    }
+    export function getCdkItemCode(record) {
+      if (getCdkType(record) !== 'item') return null
+      return record?.item_code === 'lifetime_profile_voucher' || record?.item_code === 'limited_profile_voucher'
+        ? record.item_code
+        : null
+    }
+    export function getCdkItemExpiresAt(record) {
+      return getCdkType(record) === 'item' && typeof record?.item_expires_at === 'string'
+        ? record.item_expires_at
+        : null
+    }
     export async function getCdkRecordStore() {
       return {
         get: async (key) => store.cdks.get(key) ?? null,
@@ -1544,8 +1622,6 @@ function memoryLicenseUtilsModule() {
         && drone.enable === true
         && drone.auto === true
         && drone.auto_strategy === 'trading_priority'
-        && !drone.targets
-        && !drone.order
         && !drone.auto_target_product
       return !(presetDrone || inventoryAssist)
     }
@@ -1571,7 +1647,7 @@ function memoryOptimizerPortModule() {
       ],
     }
     function room(id, name, product) {
-      return { id, name, product, operators: [{ id: 'char_002_amiya', name: 'Amiya' }], final_efficiency: 1.23, efficiency: 1.23 }
+      return { id, name, product, operators: ['Amiya'], final_efficiency: 1.23, efficiency: 1.23 }
     }
     function createScheduleResult(payload) {
       const result = {
@@ -1582,7 +1658,10 @@ function memoryOptimizerPortModule() {
           buildingType: 243,
           planTimes: '3 shifts',
           plans: [{ name: 'A', rooms: previewRooms }],
-          raw_results: [{ totalEfficiency: 100, assignmentDetail: [{ room: 'trade-1' }] }],
+          raw_results: [{
+            total_efficiency: 100,
+            assignment_detail: [{ rule: 'fixture', ops: ['Amiya'], eff: 100, workplace: 'trade-1', product: 'LMD' }],
+          }],
           daily_production: {
             manufacturing: { 'Pure Gold': 1 },
             trading: { LMD: 1 },
@@ -1655,8 +1734,8 @@ function memoryOptimizerPortModule() {
       return result?.plans?.[0]?.rooms?.[type]?.[index]?.operators ?? []
     }
     function operatorsMatch(left, right) {
-      return JSON.stringify(left.map((operator) => operator.id ?? operator.name))
-        === JSON.stringify(right.map((operator) => operator.id ?? operator.name))
+      const key = (operator) => typeof operator === 'string' ? operator : operator.id ?? operator.name
+      return JSON.stringify(left.map(key)) === JSON.stringify(right.map(key))
     }
     function createReorderResult(payload) {
       const store = globalThis.__workspaceHistorySmokeStore
@@ -1775,8 +1854,8 @@ function createMemoryStore() {
       id: 'profile-1',
       user_id: 'user-1',
       kind: 'cdk',
-      cdk_key: null,
-      cdk_code_hash: null,
+      cdk_key: 'cdk/profile-1.json',
+      cdk_code_hash: 'profile-1',
       cdk_order_hash: 'order-1',
       permission: 'advanced',
       status: 'active',
@@ -1789,8 +1868,17 @@ function createMemoryStore() {
       updated_at: now,
     }]]),
     workspaces: new Map(),
-    cdks: new Map(),
+    cdks: new Map([['cdk/profile-1.json', {
+      version: 2,
+      cdk_type: 'profile',
+      code_hash: 'profile-1',
+      license_order_hash: 'order-1',
+      permission: 'advanced',
+      status: 'used',
+    }]]),
     usageEvents: [],
+    personalUseAcceptance: { id: 'personal-use-acceptance-1', user_id: 'user-1' },
+    personalUseDeclarationUsageEvents: [],
     profileCounter: 0,
   }
 }

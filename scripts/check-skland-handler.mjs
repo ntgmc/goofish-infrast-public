@@ -796,6 +796,8 @@ async function assertUnbindRouteRemoved() {
 async function assertFreePreviewScanClaim() {
   const profileCountBefore = store.profiles.size
   const voucherGrantCountBefore = store.limitedVoucherGrantCalls.length
+  const declarationUsageCountBefore = store.personalUseDeclarationUsageEvents.length
+  const behaviorRiskEventCountBefore = store.behaviorRiskEvents.length
   setFetchMode('blank-default-uid')
   const start = await callSkland('/api/user/skland/free-preview/login/start', {})
   if (start.status !== 200 || start.body.scan_id !== 'scan-1' || !start.body.qr_data_url?.startsWith('data:image/png;base64,')) {
@@ -829,6 +831,12 @@ async function assertFreePreviewScanClaim() {
   if (store.profiles.size !== profileCountBefore) {
     throw new Error('免费档案扫码确认：缺少个人使用确认时不应创建档案')
   }
+  if (
+    store.personalUseDeclarationUsageEvents.length !== declarationUsageCountBefore
+    || store.behaviorRiskEvents.length !== behaviorRiskEventCountBefore
+  ) {
+    throw new Error('免费档案扫码确认：缺少个人使用确认时不应写入审计事件')
+  }
   store.personalUseAcceptance = personalUseAcceptance
 
   const confirm = await callSkland('/api/user/skland/free-preview/login/confirm', {
@@ -842,12 +850,36 @@ async function assertFreePreviewScanClaim() {
   if (confirm.body.active_profile?.skland_binding?.uid !== '130761348' || confirm.body.skland_import?.operator_count !== 2) {
     throw new Error('免费档案扫码确认：缺少绑定或导入摘要')
   }
+  const declarationUsage = store.personalUseDeclarationUsageEvents.at(-1)
+  if (
+    store.personalUseDeclarationUsageEvents.length !== declarationUsageCountBefore + 1
+    || declarationUsage?.userId !== store.user.id
+    || declarationUsage?.profileId !== confirm.body.active_profile.id
+    || declarationUsage?.action !== 'free_preview_claim'
+  ) {
+    throw new Error('免费档案扫码确认：未写入一次准确的个人使用声明审计事件')
+  }
+  const behaviorRiskEvent = store.behaviorRiskEvents.at(-1)
+  if (
+    store.behaviorRiskEvents.length !== behaviorRiskEventCountBefore + 1
+    || behaviorRiskEvent?.eventType !== 'bind'
+    || behaviorRiskEvent?.userId !== store.user.id
+    || behaviorRiskEvent?.profileId !== confirm.body.active_profile.id
+  ) {
+    throw new Error('免费档案扫码确认：未在事务内写入一次准确的绑定风险事件')
+  }
   const replay = await callSkland('/api/user/skland/free-preview/login/confirm', {
     confirmation_id: complete.body.confirmation_id,
     idempotency_key: 'free-scan-confirm',
   })
   if (replay.status !== 200 || replay.body.replayed !== true || replay.body.active_profile?.id !== confirm.body.active_profile?.id) {
     throw new Error(`免费档案扫码确认：幂等响应重放失败 ${replay.status}`)
+  }
+  if (
+    store.personalUseDeclarationUsageEvents.length !== declarationUsageCountBefore + 1
+    || store.behaviorRiskEvents.length !== behaviorRiskEventCountBefore + 1
+  ) {
+    throw new Error('免费档案扫码确认：幂等响应重放不应重复写入审计事件')
   }
   const profileId = confirm.body.active_profile.id
   if (store.workspaces.get(profileId)?.operators?.length !== 2) {
@@ -1243,10 +1275,20 @@ function createMemoryStore() {
     failNextProfileSave: false,
     limitedVoucherGrantCalls: [],
     personalUseAcceptance: {
+      id: 'personal-use-acceptance-1',
+      user_id: 'user-1',
       declaration_id: 'personal_use_v1',
       declaration_version: 'V1.0',
+      content_hash: 'a'.repeat(64),
+      action: 'free_preview_claim',
+      client_ip: '127.0.0.1',
+      accepted_at: '2026-01-01T00:00:00.000Z',
       profile_id: null,
+      account_deleted_at: null,
+      retain_until: null,
     },
+    personalUseDeclarationUsageEvents: [],
+    behaviorRiskEvents: [],
     fetchCalls: [],
   }
 }
@@ -1302,6 +1344,10 @@ function memoryStorePlugin() {
         path: 'memory-personal-use-declaration-store',
         namespace: 'skland-smoke',
       }))
+      build.onResolve({ filter: /(^|[\\/])behavior-risk[\\/]service(\.ts)?$/ }, () => ({
+        path: 'memory-behavior-risk-service',
+        namespace: 'skland-smoke',
+      }))
       build.onResolve({ filter: /(^|[\\/])inventory-store(\.ts)?$/ }, () => ({
         path: 'memory-inventory-store',
         namespace: 'skland-smoke',
@@ -1321,6 +1367,8 @@ function memoryStorePlugin() {
                     ? memoryPostgresModule()
                   : args.path === 'memory-personal-use-declaration-store'
                     ? memoryPersonalUseDeclarationStoreModule()
+                    : args.path === 'memory-behavior-risk-service'
+                      ? memoryBehaviorRiskServiceModule()
                     : args.path === 'memory-inventory-store'
                       ? memoryInventoryStoreModule()
                       : memoryLicenseUtilsModuleFixed(),
@@ -1355,6 +1403,8 @@ function memoryPostgresModule() {
         lifetimeVoucherPendingBindings: structuredClone([...store.lifetimeVoucherPendingBindings]),
         inventoryOperations: structuredClone([...store.inventoryOperations]),
         personalUseAcceptance: structuredClone(store.personalUseAcceptance),
+        personalUseDeclarationUsageEvents: structuredClone(store.personalUseDeclarationUsageEvents),
+        behaviorRiskEvents: structuredClone(store.behaviorRiskEvents),
       }
       try {
         return await work({ query: execute })
@@ -1366,6 +1416,8 @@ function memoryPostgresModule() {
         restore(store.lifetimeVoucherPendingBindings, snapshot.lifetimeVoucherPendingBindings)
         restore(store.inventoryOperations, snapshot.inventoryOperations)
         store.personalUseAcceptance = snapshot.personalUseAcceptance
+        restoreArray(store.personalUseDeclarationUsageEvents, snapshot.personalUseDeclarationUsageEvents)
+        restoreArray(store.behaviorRiskEvents, snapshot.behaviorRiskEvents)
         throw error
       }
     }
@@ -1448,6 +1500,10 @@ function memoryPostgresModule() {
       target.clear()
       for (const [key, value] of entries) target.set(key, value)
     }
+
+    function restoreArray(target, items) {
+      target.splice(0, target.length, ...items)
+    }
   `
 }
 
@@ -1481,6 +1537,23 @@ function memoryPersonalUseDeclarationStoreModule() {
     }
     export async function attachPersonalUseDeclarationAcceptanceToProfileInTransaction(_client, _userId, profileId) {
       if (store.personalUseAcceptance) store.personalUseAcceptance.profile_id = profileId
+    }
+    export async function recordPersonalUseDeclarationUsageInTransaction(_client, input) {
+      store.personalUseDeclarationUsageEvents.push(input)
+      return input
+    }
+  `
+}
+
+function memoryBehaviorRiskServiceModule() {
+  return `
+    const store = globalThis.__sklandHandlerSmokeStore
+    export async function recordAuthenticatedRequestBehaviorEvent() { return false }
+    export async function recordRequestBehaviorEvent() { return false }
+    export async function recordRequestBehaviorEventInTransaction(_client, input) {
+      const { req: _req, ...event } = input
+      store.behaviorRiskEvents.push(event)
+      return true
     }
   `
 }
