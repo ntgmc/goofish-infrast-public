@@ -1062,7 +1062,7 @@ export interface AccountDeletionAccepted {
   cancellation_email: 'queued' | 'sent' | 'delayed';
 }
 
-export type PersonalDataExportRecord = Record<string, unknown>;
+type PersonalDataExportRecord = Record<string, unknown>;
 
 export interface PersonalDataExportV4 {
   version: 4;

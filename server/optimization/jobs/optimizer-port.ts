@@ -11,9 +11,9 @@ import type {
 } from './shared'
 
 export const OPTIMIZER_PORT_VERSION = 1 as const
-export const OPTIMIZER_FAILURE_PROTOCOL_VERSION = 1 as const
+const OPTIMIZER_FAILURE_PROTOCOL_VERSION = 1 as const
 
-export type OptimizerFailureKind = 'validation' | 'permanent' | 'transient'
+type OptimizerFailureKind = 'validation' | 'permanent' | 'transient'
 
 export interface OptimizerFailure {
   protocolVersion: typeof OPTIMIZER_FAILURE_PROTOCOL_VERSION
