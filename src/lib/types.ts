@@ -13,6 +13,7 @@ type IntermediateInventory = Partial<Record<IntermediateProduct, number>>;
 export interface LicenseConfig {
   layout: string;
   desc: string;
+  mode?: string;
   schedule_mode?: 'maa' | 'rotation' | 'variable' | string;
   dormitory_rule?: 'fixed' | 'maa_autofill' | string;
   shift_hours?: number[] | string;

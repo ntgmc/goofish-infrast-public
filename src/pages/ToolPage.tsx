@@ -70,6 +70,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     workspaceLoadError,
     applyAuthPayload,
     refreshProfileWorkspace,
+    applyWorkspaceSnapshot,
     persistWorkspacePatch,
     handleLogout,
   } = useToolSession(requestedProfileId)
@@ -206,6 +207,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
           flushConfigSave={flushConfigSave}
           retryConfigSave={retryConfigSave}
           onWorkspacePatch={persistWorkspacePatch}
+          onWorkspaceUpdated={applyWorkspaceSnapshot}
           section={route.section}
           onSectionChange={navigateOptimize}
           onReset={() => navigate(profileScopedPath(workspaceSetupPath('operators'), activeProfile.id))}

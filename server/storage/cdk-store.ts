@@ -9,6 +9,7 @@ import {
   isProfileCdkRecord,
   type CdkRecord,
   type CdkRecordStore,
+  type OperatorFingerprint,
 } from '../handlers/license-utils'
 import { normalizeRuntimePermission } from '../../src/lib/product-catalog'
 
@@ -37,6 +38,41 @@ export async function completeCdkRedemption(client: PoolClient, key: string, rec
     [key, getCdkType(storedRecord), storedRecord.permission, getCdkBalanceAmount(storedRecord), getCdkItemCode(storedRecord), getCdkItemExpiresAt(storedRecord), storedRecord.license_order_hash, JSON.stringify(storedRecord)],
   )
   if (result.rowCount !== 1) throw new Error('CDK redemption claim was lost before completion')
+}
+
+export async function recordOperatorFingerprintInTransaction(
+  client: PoolClient,
+  record: CdkRecord,
+  fingerprint: OperatorFingerprint,
+): Promise<CdkRecord> {
+  const key = `cdk/${record.code_hash}.json`
+  const selected = await client.query<{ record_json: CdkRecord }>(
+    "select record_json from cdk_records where key = $1 and status = 'used' for update",
+    [key],
+  )
+  const current = selected.rows[0]?.record_json
+  if (!current) return record
+  const baseline = current.baseline_operator_fingerprint ?? fingerprint
+  if (
+    current.baseline_operator_fingerprint?.hash === baseline.hash
+    && current.latest_operator_fingerprint?.hash === fingerprint.hash
+  ) return current
+  const next = normalizeCdkRecordForPersistence({
+    ...current,
+    baseline_operator_fingerprint: baseline,
+    latest_operator_fingerprint: fingerprint,
+  })
+  const updated = await client.query<{ record_json: CdkRecord }>(
+    `update cdk_records
+     set record_json = $2::jsonb, record_revision = record_revision + 1, updated_at = now()
+     where key = $1 and status = 'used'
+     returning record_json`,
+    [key, JSON.stringify(next)],
+  )
+  if (updated.rowCount !== 1 || !updated.rows[0]) {
+    throw new Error('CDK record changed before its operator fingerprint could be updated')
+  }
+  return updated.rows[0].record_json
 }
 
 export function createPostgresCdkRecordStore(): CdkRecordStore {

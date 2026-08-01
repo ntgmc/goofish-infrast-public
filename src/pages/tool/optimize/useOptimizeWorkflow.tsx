@@ -36,13 +36,14 @@ export interface Props {
   workspace: UserWorkspace | null;
   setLicense: (v: LicenseFile) => void;
   eliteOverrides: Record<string, number>;
-  setEliteOverrides: (v: Record<string, number>) => void;
+  setEliteOverrides: (v: Record<string, number>) => Promise<void>;
   configOverride: LicenseConfig | null;
   setConfigOverride: (v: LicenseConfig | null) => void;
   configSyncStatus: ConfigSyncStatus;
   flushConfigSave: () => void;
   retryConfigSave: () => void;
   onWorkspacePatch: (patch: WorkspacePatch) => Promise<AuthSuccessResponse | void>;
+  onWorkspaceUpdated: (profileId: string, workspace: UserWorkspace) => void;
   section: OptimizeSection;
   onSectionChange: (section: OptimizeSection) => void;
   onReset: () => void;
@@ -65,6 +66,7 @@ export function useOptimizeWorkflow(props: Props) {
   flushConfigSave,
   retryConfigSave,
   onWorkspacePatch,
+  onWorkspaceUpdated,
   section,
   onSectionChange,
   onReset,
@@ -394,6 +396,7 @@ export function useOptimizeWorkflow(props: Props) {
     activeConfig,
     normalizeAllowedConfigOverride,
     onWorkspacePatch,
+    onWorkspaceUpdated,
     setConfigOverride,
     setCurrentResult,
     setFinalResult,
@@ -692,9 +695,9 @@ export function useOptimizeWorkflow(props: Props) {
           }
         }
       }
-      setEliteOverrides(newOverrides)
       setLoading(true)
       try {
+        await setEliteOverrides(newOverrides)
         const quote = await loadBillingQuote()
         const applyPayload: CreateOptimizationJobRequest = {
           kind: 'schedule',

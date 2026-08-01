@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { closePool, getPool, query } from './postgres'
+import { closePool, getPool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import {
   createPostgresOptimizeJobStore,
   getAdminOptimizationQueueSnapshot,
   OptimizeJobAdmissionError,
 } from './optimize-job-store'
-import { emptyWorkspace, getWorkspace, saveWorkspace, updateProfileWorkspaceAtomically } from './user-store'
+import { emptyWorkspace, getWorkspace, saveWorkspace, updateProfileWorkspaceAtomically, updateProfileWorkspaceInTransaction } from './user-store'
 import {
   ensureInvitationCode,
   getRewardBalances,
@@ -16,9 +16,10 @@ import {
   saveInvitationSettings,
   settleInvitationForActivatedUser,
 } from './invitation-store'
-import { getFreeScheduleEntitlement } from './reorder-admission'
+import { confirmFreeScheduleEntitlement, getFreeScheduleEntitlement } from './reorder-admission'
 import { adjustBalance, getBalanceSummary } from './balance-store'
 import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
+import { recordOperatorFingerprintInTransaction } from './cdk-store'
 
 let container: PostgreSqlContainer
 const legacyJobId = randomUUID()
@@ -618,6 +619,53 @@ describe('PostgreSQL optimization job admission', () => {
     })
   })
 
+  it('rejects another free generation after an atomic schedule confirmation', async () => {
+    const profileId = await seedProfile()
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      owner_key: `profile:${profileId}`,
+      source: 'free_preview',
+      free_profile_id: profileId,
+    }))
+    const createdAt = new Date().toISOString()
+    await query("update optimize_jobs set status = 'succeeded', finished_at = now(), updated_at = now() where id = $1", [admitted.job.id])
+    await query(
+      "update entitlement_ledger set status = 'consumed', settled_at = now() where reference_type = 'optimization_job' and reference_id = $1",
+      [admitted.job.id],
+    )
+    await updateProfileWorkspaceAtomically(profileId, (current) => ({
+      ...(current ?? emptyWorkspace(profileId)),
+      result_history: [{
+        id: admitted.job.id,
+        name: '首次免费方案',
+        created_at: createdAt,
+        config: null,
+        result: {} as never,
+        operator_count: 1,
+        source: 'generated',
+      }],
+      updated_at: createdAt,
+    }))
+
+    const confirmed = await confirmFreeScheduleEntitlement(profileId, admitted.job.id, createdAt)
+
+    expect(confirmed.free_schedule_entitlement).toMatchObject({
+      revision_count: 1,
+      confirmed_at: createdAt,
+      locked_at: createdAt,
+      lock_reason: 'confirmed',
+    })
+    expect((await query<{ confirmed_at: string | null; lock_reason: string | null }>(
+      'select confirmed_at, lock_reason from profile_entitlements where profile_id = $1',
+      [profileId],
+    )).rows[0]).toMatchObject({ confirmed_at: expect.anything(), lock_reason: 'confirmed' })
+    await expect(store.admitJob(input({
+      owner_key: `profile:${profileId}`,
+      source: 'free_preview',
+      free_profile_id: profileId,
+    }))).rejects.toMatchObject({ code: 'free_revision_limit_exceeded' })
+  })
+
   it('releases a reserved free entitlement when a started job fails', async () => {
     const profileId = await seedProfile()
     const store = createPostgresOptimizeJobStore()
@@ -869,6 +917,68 @@ describe('PostgreSQL optimization job admission', () => {
 
     await expect(getWorkspace(profileId)).resolves.toMatchObject({ elite_overrides: { alpha: 1, beta: 2 } })
   })
+
+  it('commits and rolls back workspace and operator fingerprint updates together', async () => {
+    const profileId = await seedProfile()
+    const codeHash = randomUUID().replaceAll('-', '')
+    const key = `cdk/${codeHash}.json`
+    const now = new Date().toISOString()
+    const record = {
+      version: 1 as const,
+      code_hash: codeHash,
+      permission: 'advanced' as const,
+      status: 'used' as const,
+      created_at: now,
+      used_at: now,
+      order_note: null,
+      license_order_hash: randomUUID(),
+      operator_count: null,
+      config_desc: null,
+    }
+    const fingerprint = {
+      hash: 'f'.repeat(64),
+      owned_count: 1,
+      operators: { alpha: { name: '测试干员', own: true, elite: 1, rarity: 5 } },
+    }
+    await saveWorkspace(emptyWorkspace(profileId))
+    await query(
+      `insert into cdk_records
+        (key, code_hash, status, permission, license_order_hash, record_json, created_at, updated_at)
+       values ($1, $2, 'used', 'advanced', $3, $4::jsonb, $5, $5)`,
+      [key, codeHash, record.license_order_hash, JSON.stringify(record), now],
+    )
+
+    await expect(withTransaction(async (client) => {
+      await updateProfileWorkspaceInTransaction(client, profileId, (workspace) => ({
+        ...(workspace ?? emptyWorkspace(profileId)),
+        elite_overrides: { alpha: 1 },
+        updated_at: now,
+      }))
+      await recordOperatorFingerprintInTransaction(client, record, fingerprint)
+      throw new Error('injected transaction failure')
+    })).rejects.toThrow('injected transaction failure')
+
+    await expect(getWorkspace(profileId)).resolves.toMatchObject({ elite_overrides: {} })
+    expect((await query<{ record_json: typeof record & { latest_operator_fingerprint?: unknown } }>(
+      'select record_json from cdk_records where key = $1',
+      [key],
+    )).rows[0]?.record_json.latest_operator_fingerprint).toBeUndefined()
+
+    await withTransaction(async (client) => {
+      await updateProfileWorkspaceInTransaction(client, profileId, (workspace) => ({
+        ...(workspace ?? emptyWorkspace(profileId)),
+        elite_overrides: { alpha: 1 },
+        updated_at: now,
+      }))
+      await recordOperatorFingerprintInTransaction(client, record, fingerprint)
+    })
+
+    await expect(getWorkspace(profileId)).resolves.toMatchObject({ elite_overrides: { alpha: 1 } })
+    expect((await query<{ record_json: { latest_operator_fingerprint?: { hash: string } } }>(
+      'select record_json from cdk_records where key = $1',
+      [key],
+    )).rows[0]?.record_json.latest_operator_fingerprint?.hash).toBe(fingerprint.hash)
+  })
 })
 
 function input(overrides: Partial<Parameters<ReturnType<typeof createPostgresOptimizeJobStore>['admitJob']>[0]> = {}) {
@@ -894,8 +1004,8 @@ async function seedProfile(): Promise<string> {
     [userId, `${userId}@example.test`, JSON.stringify({ id: userId })],
   )
   await query(
-    `insert into user_game_accounts (id, user_id, permission, status, display_name, note, record_json, created_at, updated_at)
-     values ($1, $2, 'free_preview', 'active', 'Free', '', $3::jsonb, now(), now())`,
+    `insert into user_game_accounts (id, user_id, permission, status, display_name, note, kind, record_json, created_at, updated_at)
+     values ($1, $2, 'growth', 'active', 'Free', '', 'free_preview', $3::jsonb, now(), now())`,
     [profileId, userId, JSON.stringify({ id: profileId, user_id: userId })],
   )
   return profileId

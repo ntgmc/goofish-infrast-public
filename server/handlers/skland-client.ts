@@ -64,7 +64,7 @@ export async function createHypergryphScan(): Promise<{ scanId: string; scanUrl:
     body: JSON.stringify({ appCode: APP_CODE }),
   })
   if (data.status !== 0 || data.msg !== 'OK' || !isRecord(data.data) || typeof data.data.scanId !== 'string') {
-    throw new Error('生成鹰角扫码登录二维码失败，请稍后重试。')
+    throw new SklandClientError('request_failed', '生成鹰角扫码登录二维码失败，请稍后重试。')
   }
   const scanId = data.data.scanId
   return {
@@ -89,7 +89,7 @@ export async function getHypergryphTokenByScanCode(scanCode: string): Promise<st
     body: JSON.stringify({ scanCode }),
   })
   if (data.status !== 0 || data.msg !== 'OK' || !isRecord(data.data) || typeof data.data.token !== 'string') {
-    throw new Error('鹰角扫码授权已确认，但获取登录凭据失败，请重新扫码。')
+    throw new SklandClientError('request_failed', '鹰角扫码授权已确认，但获取登录凭据失败，请重新扫码。')
   }
   return data.data.token
 }
@@ -104,7 +104,7 @@ export async function getCredByHypergryphToken(token: string): Promise<string> {
     body: JSON.stringify({ appCode: APP_CODE, type: 0, token }),
   })
   if (oauth.msg !== 'OK' || !isRecord(oauth.data) || typeof oauth.data.code !== 'string') {
-    throw new Error('鹰角授权换取森空岛 code 失败，请重新扫码。')
+    throw new SklandClientError('request_failed', '鹰角授权换取森空岛 code 失败，请重新扫码。')
   }
 
   const cred = await fetchJson<ApiEnvelope>(`${SKLAND_BASE}/web/v1/user/auth/generate_cred_by_code`, {
@@ -122,7 +122,7 @@ export async function getCredByHypergryphToken(token: string): Promise<string> {
     body: JSON.stringify({ kind: 1, code: oauth.data.code }),
   })
   if (cred.message !== 'OK' || !isRecord(cred.data) || typeof cred.data.cred !== 'string') {
-    throw new Error('森空岛凭据生成失败，请重新扫码。')
+    throw new SklandClientError('request_failed', '森空岛凭据生成失败，请重新扫码。')
   }
   return cred.data.cred
 }
@@ -182,7 +182,7 @@ async function readIntermediateInventoryForImport(
 function readSklandIntermediateInventory(calInfo: unknown, calPlayer: unknown): IntermediateInventory {
   const itemMeta = createItemMeta(unwrapDataRecord(calInfo).items)
   const playerItems = unwrapDataRecord(calPlayer).items
-  if (!Array.isArray(playerItems)) throw new Error('森空岛养成库存为空或格式异常。')
+  if (!Array.isArray(playerItems)) throw new SklandClientError('request_failed', '森空岛养成库存为空或格式异常。')
 
   const inventory: IntermediateInventory = {
     'Originium Shard': 0,
@@ -217,7 +217,7 @@ export function convertSklandCharactersToOperators(gamePlayerInfo: unknown): Lic
   const chars = getNestedArray(gamePlayerInfo, ['data', 'chars'])
   const charInfoMap = getNestedRecord(gamePlayerInfo, ['data', 'charInfoMap'])
   if (!chars || chars.length === 0) {
-    throw new Error('森空岛返回的干员数据为空，请确认账号已绑定明日方舟角色。')
+    throw new SklandClientError('request_failed', '森空岛返回的干员数据为空，请确认账号已绑定明日方舟角色。')
   }
 
   const operators: LicenseOperator[] = []
@@ -243,7 +243,7 @@ export function convertSklandCharactersToOperators(gamePlayerInfo: unknown): Lic
 
   const uniqueOperators = dedupeSklandOperators(operators)
   if (uniqueOperators.length === 0) {
-    throw new Error('森空岛干员数据无法转换为当前系统格式，请稍后重试。')
+    throw new SklandClientError('request_failed', '森空岛干员数据无法转换为当前系统格式，请稍后重试。')
   }
   return uniqueOperators.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'))
 }
@@ -326,7 +326,7 @@ export class SklandClient {
   async getArknightsBindings(): Promise<SklandAccountOption[]> {
     const data = await this.getSigned<ApiEnvelope>('/api/v1/game/player/binding')
     if (data.code !== 0 || data.message !== 'OK' || !isRecord(data.data) || !Array.isArray(data.data.list)) {
-      throw new Error('读取森空岛绑定角色失败，请重新扫码绑定。')
+      throw new SklandClientError('request_failed', '读取森空岛绑定角色失败，请重新扫码绑定。')
     }
     const accounts: SklandAccountOption[] = []
     const seenUids = new Set<string>()
@@ -355,14 +355,14 @@ export class SklandClient {
         .sort((left, right) => Number(right.account.is_default) - Number(left.account.is_default) || left.index - right.index)
         .map(({ account }) => account)
     }
-    throw new Error('森空岛账号未找到已绑定的明日方舟角色。')
+    throw new SklandClientError('request_failed', '森空岛账号未找到已绑定的明日方舟角色。')
   }
 
   async getGamePlayerInfo(uid: string): Promise<unknown> {
     const query = `uid=${encodeURIComponent(uid)}`
     const data = await this.getSigned<ApiEnvelope>('/api/v1/game/player/info', query)
     if (data.code !== 0 || data.message !== 'OK') {
-      throw new Error('读取森空岛干员数据失败，请稍后重试。')
+      throw new SklandClientError('request_failed', '读取森空岛干员数据失败，请稍后重试。')
     }
     return data
   }
@@ -506,7 +506,7 @@ function getEnvelopeData(envelope: ApiEnvelope, message: string): unknown {
     if (isCredentialInvalidEnvelope(envelope)) {
       throw new SklandClientError('credential_invalid', '森空岛凭据已失效，请重新扫码绑定。')
     }
-    throw new Error(message)
+    throw new SklandClientError('request_failed', message)
   }
   return envelope.data
 }

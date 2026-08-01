@@ -2,6 +2,13 @@ import type { FreeScheduleEntitlement } from '../../src/lib/types'
 import { hasDatabaseUrl, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import { getShanghaiMonthKey } from '../reorder-check-policy'
+import {
+  emptyWorkspace,
+  getProfileWorkspaceForUpdateInTransaction,
+  updateProfileWorkspaceAtomically,
+  updateProfileWorkspaceInTransaction,
+  type UserWorkspaceRecord,
+} from './user-store'
 
 type FreeScheduleEntitlementRow = {
   first_generated_at: string | Date | null
@@ -22,6 +29,11 @@ export async function getFreeScheduleEntitlement(
   await ensureDatabaseSchema()
   return withTransaction(async (client) => {
     await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [`entitlement:${profileId}`])
+    await client.query(
+      `insert into profile_entitlements (profile_id, free_revision_count, updated_at)
+       values ($1, 0, now()) on conflict (profile_id) do nothing`,
+      [profileId],
+    )
     const stale = await client.query<{ revision_count: string; bonus_count: string }>(
       `select
          count(*) filter (where coalesce(job.payload_json #>> '{freeScheduleDecision,mode}', 'revision') <> 'strong_reorder_bonus')::text as revision_count,
@@ -61,8 +73,71 @@ export async function getFreeScheduleEntitlement(
        from profile_entitlements where profile_id = $1`,
       [profileId],
     )
-    return result.rows[0] ? fromFreeScheduleEntitlementRow(result.rows[0]) : fallback ?? null
+    return fromFreeScheduleEntitlementRow(result.rows[0])
   })
+}
+
+export async function confirmFreeScheduleEntitlement(
+  profileId: string,
+  resultHistoryId: string,
+  now = new Date().toISOString(),
+): Promise<UserWorkspaceRecord> {
+  if (!hasDatabaseUrl()) {
+    return updateProfileWorkspaceAtomically(profileId, (currentWorkspace) => {
+      const workspace = currentWorkspace ?? emptyWorkspace(profileId)
+      const historyItem = findWorkspaceHistoryItem(workspace, resultHistoryId)
+      if (!historyItem) throw new FreeScheduleConfirmationError('暂无可确认的免费排班方案。', 409)
+      return {
+        ...workspace,
+        free_schedule_entitlement: confirmedEntitlement(
+          workspace.free_schedule_entitlement,
+          historyItem.created_at,
+          now,
+        ),
+        updated_at: now,
+      }
+    })
+  }
+
+  await ensureDatabaseSchema()
+  return withTransaction(async (client) => {
+    await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [`entitlement:${profileId}`])
+    const workspace = await getProfileWorkspaceForUpdateInTransaction(client, profileId) ?? emptyWorkspace(profileId)
+    const historyItem = findWorkspaceHistoryItem(workspace, resultHistoryId)
+    if (!historyItem) throw new FreeScheduleConfirmationError('暂无可确认的免费排班方案。', 409)
+
+    await client.query(
+      `insert into profile_entitlements (profile_id, free_revision_count, updated_at)
+       values ($1, 0, $2) on conflict (profile_id) do nothing`,
+      [profileId, now],
+    )
+    const updated = await client.query<FreeScheduleEntitlementRow>(
+      `update profile_entitlements
+       set first_generated_at = coalesce(first_generated_at, $2),
+           free_revision_count = greatest(free_revision_count, 1),
+           confirmed_at = $3,
+           locked_at = $3,
+           lock_reason = 'confirmed',
+           updated_at = $3
+       where profile_id = $1
+       returning first_generated_at, free_revision_count, confirmed_at, locked_at, lock_reason,
+                 strong_reorder_bonus_month, strong_reorder_bonus_granted_at, strong_reorder_bonus_used_at`,
+      [profileId, historyItem.created_at, now],
+    )
+    const entitlement = fromFreeScheduleEntitlementRow(updated.rows[0])
+    return updateProfileWorkspaceInTransaction(client, profileId, (currentWorkspace) => ({
+      ...(currentWorkspace ?? emptyWorkspace(profileId)),
+      free_schedule_entitlement: entitlement,
+      updated_at: now,
+    }))
+  })
+}
+
+export class FreeScheduleConfirmationError extends Error {
+  constructor(message: string, readonly status: 409) {
+    super(message)
+    this.name = 'FreeScheduleConfirmationError'
+  }
 }
 
 export function withStrongReorderBonusFallback(
@@ -99,6 +174,29 @@ function fromFreeScheduleEntitlementRow(row: FreeScheduleEntitlementRow | undefi
           used_at: normalizeTimestamp(row.strong_reorder_bonus_used_at),
         }
       : null,
+  }
+}
+
+function findWorkspaceHistoryItem(workspace: UserWorkspaceRecord, resultHistoryId: string) {
+  return workspace.result_history.find((item) => item.id === resultHistoryId)
+    ?? workspace.archived_results.find((item) => item.id === resultHistoryId)
+    ?? null
+}
+
+function confirmedEntitlement(
+  value: FreeScheduleEntitlement | null | undefined,
+  firstGeneratedAt: string,
+  now: string,
+): FreeScheduleEntitlement {
+  return {
+    first_generated_at: value?.first_generated_at ?? firstGeneratedAt,
+    revision_count: Math.max(1, Math.floor(Number(value?.revision_count ?? 0))),
+    revision_limit: 3,
+    revision_window_hours: 24,
+    confirmed_at: now,
+    locked_at: now,
+    lock_reason: 'confirmed',
+    strong_reorder_bonus: value?.strong_reorder_bonus ?? null,
   }
 }
 

@@ -1,5 +1,5 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
-import type { AuthSuccessResponse, LicenseConfig, OptimizeResult, UpgradeSuggestion, WorkspaceResultHistoryItem, WorkspaceSavedConfig, WorkspaceSavedConfigAction } from '../../../lib/types'
+import type { AuthSuccessResponse, LicenseConfig, OptimizeResult, UpgradeSuggestion, UserWorkspace, WorkspaceResultHistoryItem, WorkspaceSavedConfig, WorkspaceSavedConfigAction } from '../../../lib/types'
 import { isMaaJsonDownloadable } from '../../../lib/workspace-history'
 import { normalizeUpgradeSuggestions } from './workflow-utils'
 import type { WorkspacePatch } from '../useToolSession'
@@ -16,6 +16,7 @@ type UseOptimizeWorkspaceOptions = {
   activeConfig: LicenseConfig
   normalizeAllowedConfigOverride: (config: LicenseConfig) => LicenseConfig
   onWorkspacePatch: (patch: WorkspacePatch) => Promise<AuthSuccessResponse | void>
+  onWorkspaceUpdated: (profileId: string, workspace: UserWorkspace) => void
   setConfigOverride: (config: LicenseConfig | null) => void
   setCurrentResult: Setter<OptimizeResult | null>
   setFinalResult: Setter<OptimizeResult | null>
@@ -36,6 +37,7 @@ export function useOptimizeWorkspace({
   activeConfig,
   normalizeAllowedConfigOverride,
   onWorkspacePatch,
+  onWorkspaceUpdated,
   setConfigOverride,
   setCurrentResult,
   setFinalResult,
@@ -157,19 +159,19 @@ export function useOptimizeWorkspace({
     setWorkspaceBusyAction(`${action}:${item.id}`)
     setWorkspaceError(null)
     try {
-      await apiJson('/api/user/result-archive', {
+      const data = await apiJson<{ workspace: UserWorkspace }>('/api/user/result-archive', {
         method: 'POST',
         json: { profile_id: profileId, result_id: item.id, action, idempotency_key: crypto.randomUUID() },
         fallbackMessage: action === 'archive' ? copy.inventory.archive_full : action === 'unarchive' ? copy.inventory.history_full_for_unarchive : copy.inventory.delete_result,
       })
-      await onWorkspacePatch({})
+      onWorkspaceUpdated(profileId, data.workspace)
       setWorkspaceNotice(action === 'archive' ? copy.inventory.archive_done : action === 'unarchive' ? copy.inventory.unarchive_done : copy.inventory.delete_result_done)
     } catch (error) {
       setWorkspaceError((error as Error).message)
     } finally {
       setWorkspaceBusyAction(null)
     }
-  }, [onWorkspacePatch, profileId, setWorkspaceBusyAction, setWorkspaceError, setWorkspaceNotice])
+  }, [onWorkspaceUpdated, profileId, setWorkspaceBusyAction, setWorkspaceError, setWorkspaceNotice])
 
   return {
     handleSaveCurrentConfig,

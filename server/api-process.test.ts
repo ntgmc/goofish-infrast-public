@@ -42,6 +42,34 @@ describe('API process lifecycle', () => {
     }
   })
 
+  it('fails fast in production when Skland secrets are missing or unstable', () => {
+    const names = [
+      'NODE_ENV',
+      'PUBLIC_APP_URL',
+      'DEPOT_SAMPLE_HASH_SECRET',
+      'SKLAND_CREDENTIAL_SECRET',
+      'FREE_PREVIEW_UID_HASH_SECRET',
+    ] as const
+    const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]))
+    process.env.NODE_ENV = 'production'
+    process.env.PUBLIC_APP_URL = 'https://example.test'
+    process.env.DEPOT_SAMPLE_HASH_SECRET = 'stable-depot-hash-secret'
+    process.env.FREE_PREVIEW_UID_HASH_SECRET = 'stable-free-preview-hmac-secret-at-least-32'
+    delete process.env.SKLAND_CREDENTIAL_SECRET
+
+    try {
+      expect(() => createApiProcess(createHooks(), createDependencies().values))
+        .toThrow('森空岛服务配置无效，请联系管理员。')
+
+      process.env.SKLAND_CREDENTIAL_SECRET = 'stable-skland-credential-secret'
+      process.env.FREE_PREVIEW_UID_HASH_SECRET = 'too-short'
+      expect(() => createApiProcess(createHooks(), createDependencies().values))
+        .toThrow('森空岛服务配置无效，请联系管理员。')
+    } finally {
+      for (const name of names) restoreEnvironment(name, previous[name])
+    }
+  })
+
   it('runs initialization before listening and drains shared resources in order', async () => {
     const hooks = createHooks()
     const dependencies = createDependencies()

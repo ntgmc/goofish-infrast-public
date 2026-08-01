@@ -1034,15 +1034,23 @@ export async function updateProfileWorkspaceInTransaction(
   profileId: string,
   updater: (workspace: UserWorkspaceRecord | null) => UserWorkspaceRecord,
 ): Promise<UserWorkspaceRecord> {
+  const current = await getProfileWorkspaceForUpdateInTransaction(client, profileId)
+  const next = normalizeWorkspaceRecord(updater(current))
+  if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
+  await saveProfileWorkspaceWithClient(client, next)
+  return next
+}
+
+export async function getProfileWorkspaceForUpdateInTransaction(
+  client: PoolClient,
+  profileId: string,
+): Promise<UserWorkspaceRecord | null> {
   await lockWorkspaceForUpdate(client, profileId)
   const current = await client.query<{ record_json: UserWorkspaceRecord }>(
     'select record_json from user_profile_workspaces where profile_id = $1',
     [profileId],
   )
-  const next = normalizeWorkspaceRecord(updater(normalizeWorkspaceRecord(current.rows[0]?.record_json ?? null)))
-  if (!next || next.profile_id !== profileId) throw new Error('Workspace update must preserve its profile id.')
-  await saveProfileWorkspaceWithClient(client, next)
-  return next
+  return normalizeWorkspaceRecord(current.rows[0]?.record_json ?? null)
 }
 
 async function lockWorkspaceForUpdate(client: PoolClient, profileId: string): Promise<void> {

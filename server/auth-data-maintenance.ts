@@ -19,6 +19,7 @@ export interface AuthDataMaintenanceResult {
   passwordResetTokens: number
   emailVerificationTokens: number
   freePreviewWorkspaces: number
+  sklandPendingBindings: number
 }
 
 let initialized = false
@@ -47,7 +48,8 @@ export async function runAuthDataMaintenance(now = new Date()): Promise<AuthData
   const passwordResetTokens = await deleteRetainedPasswordResetTokens(tokenRetentionCutoff)
   const emailVerificationTokens = await deleteRetainedEmailVerificationTokens(tokenRetentionCutoff)
   const freePreviewWorkspaces = await persistExpiredFreePreviewWorkspaces(now)
-  return { expiredSessions, passwordResetTokens, emailVerificationTokens, freePreviewWorkspaces }
+  const sklandPendingBindings = await deleteExpiredSklandPendingBindings(nowIso)
+  return { expiredSessions, passwordResetTokens, emailVerificationTokens, freePreviewWorkspaces, sklandPendingBindings }
 }
 
 async function runSafely(): Promise<void> {
@@ -124,6 +126,34 @@ async function deleteRetainedEmailVerificationTokens(cutoff: string): Promise<nu
     [cutoff, TOKEN_BATCH_SIZE],
   )
   return deleted.rowCount ?? 0
+}
+
+async function deleteExpiredSklandPendingBindings(now: string): Promise<number> {
+  return withTransaction(async (client) => {
+    const freePreview = await client.query(
+      'delete from free_preview_pending_claims where expires_at <= $1',
+      [now],
+    )
+    const lifetimeVoucher = await client.query(
+      'delete from lifetime_voucher_pending_bindings where expires_at <= $1',
+      [now],
+    )
+    const profiles = await client.query(
+      `update user_game_accounts
+          set record_json = jsonb_set(
+                record_json || jsonb_build_object('updated_at', $1::text),
+                '{skland_pending_binding}',
+                'null'::jsonb,
+                true
+              ),
+              updated_at = greatest(updated_at, $1::timestamptz)
+        where record_json->'skland_pending_binding' is not null
+          and record_json->'skland_pending_binding' <> 'null'::jsonb
+          and (record_json->'skland_pending_binding'->>'expires_at')::timestamptz <= $1::timestamptz`,
+      [now],
+    )
+    return (freePreview.rowCount ?? 0) + (lifetimeVoucher.rowCount ?? 0) + (profiles.rowCount ?? 0)
+  })
 }
 
 async function persistExpiredFreePreviewWorkspaces(now: Date): Promise<number> {

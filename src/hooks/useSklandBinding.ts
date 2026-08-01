@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AuthSuccessResponse, UserGameAccount } from '../lib/types'
-import { ApiError, apiJson } from '../lib/api-client'
+import type { AuthSuccessResponse, IntermediateProduct, UserGameAccount } from '../lib/types'
+import { ApiError, apiJson, apiVoid } from '../lib/api-client'
 import { copy } from '../copy/index'
 
-
-type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 
 export type SklandPreview = {
   uid: string
@@ -20,7 +18,7 @@ export type SklandAccountOption = {
   is_default: boolean
 }
 
-type SklandRecoveryAction = 'rebind' | 'retry' | 'bind_first' | 'use_depot_analysis'
+type SklandRecoveryAction = 'rebind' | 'retry' | 'bind_first' | 'use_depot_analysis' | 'contact_support'
 
 export type SklandPayload = AuthSuccessResponse & {
   skland_import?: {
@@ -36,7 +34,20 @@ export type SklandPayload = AuthSuccessResponse & {
     inventory_warning?: string
   }
   error?: string
-  code?: 'skland_credential_invalid' | 'skland_refresh_failed' | 'skland_not_bound' | 'skland_depot_refresh_forbidden'
+  code?:
+    | 'skland_credential_invalid'
+    | 'skland_refresh_failed'
+    | 'skland_not_bound'
+    | 'skland_depot_refresh_forbidden'
+    | 'skland_upstream_failed'
+    | 'skland_upstream_timeout'
+    | 'skland_internal_error'
+    | 'skland_service_not_configured'
+    | 'idempotency_conflict'
+    | 'operation_in_progress'
+    | 'free_preview_uid_claimed'
+    | 'free_preview_already_claimed'
+    | 'skland_uid_owned'
   recovery_action?: SklandRecoveryAction
   confirmation_id?: string
   skland_preview?: SklandPreview
@@ -44,6 +55,7 @@ export type SklandPayload = AuthSuccessResponse & {
   skland_accounts?: SklandAccountOption[]
   warning?: string
   status?: string
+  replayed?: boolean
 }
 
 export type SklandImportMode = 'scan' | 'manual' | 'bookmarklet'
@@ -94,6 +106,9 @@ export function useSklandBinding({
   const [busy, setBusy] = useState(false)
   const pollCountRef = useRef(0)
   const startRequestRef = useRef(0)
+  const generationRef = useRef(0)
+  const flowAbortRef = useRef(new AbortController())
+  const openRef = useRef(open)
   const credentialInputRef = useRef<HTMLTextAreaElement>(null)
   const startedForProfileRef = useRef<string | null>(null)
   const idempotencyKeyRef = useRef(crypto.randomUUID())
@@ -104,6 +119,25 @@ export function useSklandBinding({
   const endpointPrefix = isFreePreviewClaim
     ? '/api/user/skland/free-preview'
     : isLifetimeVoucherUse ? '/api/user/skland/lifetime-voucher' : '/api/user/skland'
+
+  openRef.current = open
+
+  const invalidateFlow = useCallback(() => {
+    generationRef.current += 1
+    startRequestRef.current += 1
+    flowAbortRef.current.abort()
+    flowAbortRef.current = new AbortController()
+    return generationRef.current
+  }, [])
+
+  const captureFlow = useCallback(() => ({
+    generation: generationRef.current,
+    signal: flowAbortRef.current.signal,
+  }), [])
+
+  const isCurrentFlow = useCallback((generation: number) => (
+    openRef.current && generationRef.current === generation
+  ), [])
 
   const profilePayload = useCallback(() => (
     isFreePreviewClaim
@@ -183,6 +217,7 @@ export function useSklandBinding({
 
   const completeSklandLogin = useCallback(async (scanId: string) => {
     if ((!profile && !isProfilelessBinding) || busy) return
+    const flow = captureFlow()
     setBusy(true)
     setSklandLogin((current) => ({
       ...current,
@@ -192,9 +227,11 @@ export function useSklandBinding({
     try {
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/login/complete`, {
         method: 'POST',
+        signal: flow.signal,
         json: { ...profilePayload(), scan_id: scanId },
         fallbackMessage: copy.workspace.hooks_useSklandBinding_005,
       })
+      if (!isCurrentFlow(flow.generation)) return
       if (data.status === 'pending') {
         setSklandLogin((current) => ({ ...current, status: 'waiting', message: copy.workspace.hooks_useSklandBinding_006 }))
         return
@@ -208,15 +245,16 @@ export function useSklandBinding({
         message: formatImportedMessage(data, isDepot),
       }))
     } catch (caught) {
+      if (!isCurrentFlow(flow.generation) || isAbortError(caught)) return
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
         message: errorWithRecovery(caught, copy.workspace.hooks_useSklandBinding_008),
       }))
     } finally {
-      setBusy(false)
+      if (isCurrentFlow(flow.generation)) setBusy(false)
     }
-  }, [applyCompletedPayload, busy, endpointPrefix, isDepot, isProfilelessBinding, profile, profilePayload, showPayloadState])
+  }, [applyCompletedPayload, busy, captureFlow, endpointPrefix, isCurrentFlow, isDepot, isProfilelessBinding, profile, profilePayload, showPayloadState])
 
   const startSklandLogin = useCallback(async () => {
     if (!profile && !isProfilelessBinding) {
@@ -227,6 +265,9 @@ export function useSklandBinding({
       }))
       return
     }
+    const generation = invalidateFlow()
+    const flow = { generation, signal: flowAbortRef.current.signal }
+    idempotencyKeyRef.current = crypto.randomUUID()
     const requestId = startRequestRef.current + 1
     startRequestRef.current = requestId
     setBusy(true)
@@ -249,14 +290,17 @@ export function useSklandBinding({
         isProfilelessBinding
           ? {
               method: 'POST',
+              signal: flow.signal,
               fallbackMessage: copy.workspace.hooks_useSklandBinding_011,
             }
           : {
               method: 'POST',
+              signal: flow.signal,
               json: profileReferencePayload(),
               fallbackMessage: copy.workspace.hooks_useSklandBinding_011,
             },
       )
+      if (!isCurrentFlow(flow.generation)) return
       if (!data.scan_id || !data.qr_data_url) throw new Error(copy.workspace.hooks_useSklandBinding_012)
       if (startRequestRef.current !== requestId) return
       setSklandLogin({
@@ -274,16 +318,16 @@ export function useSklandBinding({
       })
       pollCountRef.current = 0
     } catch (caught) {
-      if (startRequestRef.current !== requestId) return
+      if (!isCurrentFlow(flow.generation) || startRequestRef.current !== requestId || isAbortError(caught)) return
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
         message: errorWithRecovery(caught, copy.workspace.hooks_useSklandBinding_014),
       }))
     } finally {
-      if (startRequestRef.current === requestId) setBusy(false)
+      if (isCurrentFlow(flow.generation) && startRequestRef.current === requestId) setBusy(false)
     }
-  }, [endpointPrefix, isProfilelessBinding, profile, profileReferencePayload])
+  }, [endpointPrefix, invalidateFlow, isCurrentFlow, isProfilelessBinding, profile, profileReferencePayload])
 
   const previewCredential = useCallback(async (source: 'manual' | 'bookmarklet') => {
     if (!profile && !isProfilelessBinding) {
@@ -304,28 +348,34 @@ export function useSklandBinding({
       credentialInputRef.current?.focus()
       return
     }
+    const generation = invalidateFlow()
+    const flow = { generation, signal: flowAbortRef.current.signal }
+    idempotencyKeyRef.current = crypto.randomUUID()
     setBusy(true)
     setSklandLogin((current) => ({ ...current, status: 'starting', message: copy.workspace.hooks_useSklandBinding_017 }))
     try {
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/credential/preview`, {
         method: 'POST',
+        signal: flow.signal,
         json: { ...profilePayload(), credential_text: credentialText, source },
         fallbackMessage: copy.workspace.hooks_useSklandBinding_018,
       })
+      if (!isCurrentFlow(flow.generation)) return
       if (!showPayloadState(data, previewFallbackMessage(isDepot))) {
         throw new Error(data.error || copy.workspace.hooks_useSklandBinding_019)
       }
       if (credentialInputRef.current) credentialInputRef.current.value = ''
     } catch (caught) {
+      if (!isCurrentFlow(flow.generation) || isAbortError(caught)) return
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
         message: errorWithRecovery(caught, copy.workspace.hooks_useSklandBinding_020),
       }))
     } finally {
-      setBusy(false)
+      if (isCurrentFlow(flow.generation)) setBusy(false)
     }
-  }, [endpointPrefix, isDepot, isProfilelessBinding, profile, profilePayload, showPayloadState])
+  }, [endpointPrefix, invalidateFlow, isCurrentFlow, isDepot, isProfilelessBinding, profile, profilePayload, showPayloadState])
 
   const selectAccount = useCallback((uid: string) => {
     setSklandLogin((current) => ({ ...current, selectedUid: uid }))
@@ -333,11 +383,13 @@ export function useSklandBinding({
 
   const previewSelectedAccount = useCallback(async () => {
     if ((!profile && !isProfilelessBinding) || !sklandLogin.selectionId || !sklandLogin.selectedUid || busy) return
+    const flow = captureFlow()
     setBusy(true)
     setSklandLogin((current) => ({ ...current, message: copy.workspace.hooks_useSklandBinding_021 }))
     try {
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/account/select`, {
         method: 'POST',
+        signal: flow.signal,
         json: {
           ...profileReferencePayload(),
           selection_id: sklandLogin.selectionId,
@@ -345,22 +397,25 @@ export function useSklandBinding({
         },
         fallbackMessage: copy.workspace.hooks_useSklandBinding_022,
       })
+      if (!isCurrentFlow(flow.generation)) return
       if (!showPayloadState(data, previewFallbackMessage(isDepot))) {
         throw new Error(data.error || copy.workspace.hooks_useSklandBinding_023)
       }
     } catch (caught) {
+      if (!isCurrentFlow(flow.generation) || isAbortError(caught)) return
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
         message: errorWithRecovery(caught, copy.workspace.hooks_useSklandBinding_024),
       }))
     } finally {
-      setBusy(false)
+      if (isCurrentFlow(flow.generation)) setBusy(false)
     }
-  }, [busy, endpointPrefix, isDepot, isProfilelessBinding, profile, profileReferencePayload, showPayloadState, sklandLogin.selectedUid, sklandLogin.selectionId])
+  }, [busy, captureFlow, endpointPrefix, isCurrentFlow, isDepot, isProfilelessBinding, profile, profileReferencePayload, showPayloadState, sklandLogin.selectedUid, sklandLogin.selectionId])
 
   const confirmSklandLogin = useCallback(async () => {
     if ((!profile && !isProfilelessBinding) || !sklandLogin.confirmationId) return
+    const flow = captureFlow()
     setBusy(true)
     setSklandLogin((current) => ({
       ...current,
@@ -370,15 +425,17 @@ export function useSklandBinding({
     try {
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/login/confirm`, {
         method: 'POST',
+        signal: flow.signal,
         json: {
           ...profileReferencePayload(),
           confirmation_id: sklandLogin.confirmationId,
-          ...(isLifetimeVoucherUse && { idempotency_key: idempotencyKeyRef.current }),
+          idempotency_key: idempotencyKeyRef.current,
         },
         fallbackMessage: copy.workspace.hooks_useSklandBinding_027,
       })
+      if (!isCurrentFlow(flow.generation)) return
       if (!data.user) throw new Error(copy.workspace.hooks_useSklandBinding_028)
-      if (isLifetimeVoucherUse) idempotencyKeyRef.current = crypto.randomUUID()
+      idempotencyKeyRef.current = crypto.randomUUID()
       applyCompletedPayload(data)
       setSklandLogin((current) => ({
         ...current,
@@ -391,24 +448,40 @@ export function useSklandBinding({
         message: formatImportedMessage(data, isDepot),
       }))
     } catch (caught) {
+      if (!isCurrentFlow(flow.generation) || isAbortError(caught)) return
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
         message: errorWithRecovery(caught, isDepot ? copy.workspace.hooks_useSklandBinding_029 : copy.workspace.hooks_useSklandBinding_030),
       }))
     } finally {
-      setBusy(false)
+      if (isCurrentFlow(flow.generation)) setBusy(false)
     }
-  }, [applyCompletedPayload, endpointPrefix, isDepot, isLifetimeVoucherUse, isProfilelessBinding, profile, profileReferencePayload, sklandLogin.confirmationId])
+  }, [applyCompletedPayload, captureFlow, endpointPrefix, isCurrentFlow, isDepot, isProfilelessBinding, profile, profileReferencePayload, sklandLogin.confirmationId])
+
+  const cancelPending = useCallback(() => {
+    const pendingId = sklandLogin.confirmationId ?? sklandLogin.selectionId
+    if (!pendingId) return
+    void apiVoid(`${endpointPrefix}/pending/cancel`, {
+      method: 'POST',
+      keepalive: true,
+      json: {
+        ...profileReferencePayload(),
+        pending_id: pendingId,
+      },
+    }).catch(() => undefined)
+  }, [endpointPrefix, profileReferencePayload, sklandLogin.confirmationId, sklandLogin.selectionId])
 
   const close = useCallback(() => {
-    startRequestRef.current += 1
+    cancelPending()
+    invalidateFlow()
     setBusy(false)
     onOpenChange(false)
-  }, [onOpenChange])
+  }, [cancelPending, invalidateFlow, onOpenChange])
 
   const selectMode = useCallback((mode: SklandImportMode) => {
-    startRequestRef.current += 1
+    cancelPending()
+    invalidateFlow()
     setBusy(false)
     setSklandLogin((current) => {
       const keepWaitingScan = mode === 'scan' && current.status === 'waiting' && Boolean(current.scanId && current.qrDataUrl)
@@ -427,13 +500,14 @@ export function useSklandBinding({
       }
     })
     window.setTimeout(() => credentialInputRef.current?.focus(), 0)
-  }, [])
+  }, [cancelPending, invalidateFlow])
 
   const setMessage = useCallback((message: string) => {
     setSklandLogin((current) => ({ ...current, message }))
   }, [])
 
   useEffect(() => {
+    invalidateFlow()
     if (!open) {
       setSklandLogin(createInitialState())
       startedForProfileRef.current = null
@@ -444,7 +518,7 @@ export function useSklandBinding({
       startedForProfileRef.current = startKey
       void startSklandLogin()
     }
-  }, [autoStart, isFreePreviewClaim, open, profile?.id, startSklandLogin])
+  }, [autoStart, context, invalidateFlow, isFreePreviewClaim, open, profile?.id, startSklandLogin])
 
   useEffect(() => {
     if (!open || sklandLogin.mode !== 'scan' || !sklandLogin.scanId || sklandLogin.status !== 'waiting') return
@@ -531,14 +605,22 @@ function formatImportedMessage(data: SklandPayload, isDepot: boolean): string {
 
 function formatSklandInventoryMessage(imported: NonNullable<SklandPayload['skland_import']>): string {
   if (imported.inventory_synced && imported.intermediate_inventory) {
-    return `${copy.workspace.hooks_useSklandBinding_042}${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}${copy.workspace.hooks_useSklandBinding_043}`
+    return `${copy.workspace.hooks_useSklandBinding_042}${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}、${formatInventoryAmount('Orirock Cube', imported.intermediate_inventory['Orirock Cube'])}${copy.workspace.hooks_useSklandBinding_043}`
   }
   if (imported.inventory_warning) return copy.workspace.hooks_useSklandBinding_044
   return ''
 }
 
 function formatInventoryAmount(product: IntermediateProduct, value: number | undefined): string {
-  const label = product === 'Pure Gold' ? copy.workspace.hooks_useSklandBinding_045 : copy.workspace.hooks_useSklandBinding_046
+  const label = product === 'Pure Gold'
+    ? copy.workspace.hooks_useSklandBinding_045
+    : product === 'Originium Shard'
+      ? copy.workspace.hooks_useSklandBinding_046
+      : copy.common.components_ConfigEditor_080
   const count = Number(value ?? 0)
   return `${label} ${Number.isFinite(count) ? count : 0}`
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
 }

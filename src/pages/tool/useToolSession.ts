@@ -6,6 +6,7 @@ import type {
   AuthUser,
   LicenseConfig,
   LicenseFile,
+  LicenseOperator,
   UserGameAccount,
   UserWorkspace,
   WorkspaceSavedConfigAction,
@@ -15,7 +16,12 @@ import { createAccountLicense, isSchedulableProfile } from './tool-utils'
 import { copy } from '../../copy/index'
 
 
-export type WorkspacePatch = Partial<UserWorkspace> & { saved_config_action?: WorkspaceSavedConfigAction }
+export type WorkspacePatch = {
+  operators?: LicenseOperator[] | null
+  config?: LicenseConfig | null
+  elite_overrides?: Record<string, number>
+  saved_config_action?: WorkspaceSavedConfigAction
+}
 export type ConfigSyncStatus = 'idle' | 'pending' | 'saving' | 'failed'
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error'
 
@@ -155,20 +161,23 @@ export function useToolSession(requestedProfileId?: string | null) {
   }, [applyAuthPayload, cancelPendingConfigSave])
 
   const persistWorkspacePatch = useCallback((patch: WorkspacePatch) => {
-    if (!activeProfile) return Promise.reject(new Error(copy.common.pages_tool_useToolSession_004))
+    const targetProfile = activeProfileRef.current
+    if (!targetProfile) return Promise.reject(new Error(copy.common.pages_tool_useToolSession_004))
     const runPatch = async () => {
       const data = await apiJson<AuthSuccessResponse>('/api/user/workspace', {
         method: 'PATCH',
-        json: { ...patch, profile_id: activeProfile.id },
+        json: { ...patch, profile_id: targetProfile.id },
         fallbackMessage: copy.common.pages_tool_useToolSession_005,
       })
-      applyAuthPayloadInternal(data, { preserveConfigDraft: true })
+      if (activeProfileRef.current?.id === targetProfile.id) {
+        applyAuthPayloadInternal(data, { preserveConfigDraft: true })
+      }
       return data
     }
     const request = workspacePatchQueueRef.current.then(runPatch, runPatch)
     workspacePatchQueueRef.current = request.then(() => undefined, () => undefined)
     return request
-  }, [activeProfile, applyAuthPayloadInternal])
+  }, [applyAuthPayloadInternal])
 
   const runPendingConfigSave = useCallback(async () => {
     if (configSaveInFlightRef.current) return
@@ -207,10 +216,20 @@ export function useToolSession(requestedProfileId?: string | null) {
     }
   }, [applyAuthPayloadInternal])
 
-  const setEliteOverrides = useCallback((next: Record<string, number>) => {
+  const setEliteOverrides = useCallback(async (next: Record<string, number>) => {
     setEliteOverridesState(next)
-    void persistWorkspacePatch({ elite_overrides: next }).catch(console.error)
+    await persistWorkspacePatch({ elite_overrides: next })
   }, [persistWorkspacePatch])
+
+  const applyWorkspaceSnapshot = useCallback((profileId: string, nextWorkspace: UserWorkspace) => {
+    const profile = activeProfileRef.current
+    if (!profile || profile.id !== profileId) return
+    setWorkspace(nextWorkspace)
+    setEliteOverridesState(nextWorkspace.elite_overrides ?? {})
+    setLicense(nextWorkspace.operators && nextWorkspace.config
+      ? createAccountLicense(profile, nextWorkspace.operators, nextWorkspace.config)
+      : null)
+  }, [])
 
   const setConfigOverride = useCallback((next: LicenseConfig | null) => {
     setConfigOverrideState(next)
@@ -277,6 +296,7 @@ export function useToolSession(requestedProfileId?: string | null) {
     workspaceLoadError,
     applyAuthPayload,
     refreshProfileWorkspace,
+    applyWorkspaceSnapshot,
     persistWorkspacePatch,
     handleLogout,
   }

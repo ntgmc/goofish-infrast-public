@@ -335,18 +335,21 @@ describe('authentication data maintenance', () => {
       passwordResetTokens: 500,
       emailVerificationTokens: 500,
       freePreviewWorkspaces: 100,
+      sklandPendingBindings: 0,
     })
     expect(await runAuthDataMaintenance(now)).toEqual({
       expiredSessions: 1,
       passwordResetTokens: 1,
       emailVerificationTokens: 1,
       freePreviewWorkspaces: 1,
+      sklandPendingBindings: 0,
     })
     expect(await runAuthDataMaintenance(now)).toEqual({
       expiredSessions: 0,
       passwordResetTokens: 0,
       emailVerificationTokens: 0,
       freePreviewWorkspaces: 0,
+      sklandPendingBindings: 0,
     })
 
     expect(await getSessionByTokenHash('maintenance-session-active')).not.toBeNull()
@@ -354,6 +357,76 @@ describe('authentication data maintenance', () => {
     expect(await countRows('email_verification_tokens', 'token_hash', 'email-verification-retained')).toBe(1)
     const workspace = await getWorkspace(`${user.id}-free-preview-101`)
     expect(workspace?.free_preview_normalized_activity_id).toBe(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.id)
+  })
+
+  it('purges expired encrypted Skland pending state while retaining future records', async () => {
+    const now = new Date('2026-09-30T00:00:00.000Z')
+    const expiredAt = new Date(now.getTime() - 1_000).toISOString()
+    const futureAt = new Date(now.getTime() + 60_000).toISOString()
+    const user = await seedUser('skland-pending-maintenance@example.test', now)
+    const profileId = `${user.id}-skland-pending`
+    const profile = {
+      version: 1,
+      id: profileId,
+      user_id: user.id,
+      kind: 'cdk',
+      cdk_key: null,
+      cdk_code_hash: null,
+      cdk_order_hash: null,
+      permission: 'advanced',
+      status: 'active',
+      display_name: 'Skland pending',
+      note: '',
+      skland_pending_binding: {
+        stage: 'confirmation',
+        confirmation_id: 'profile-expired',
+        uid: '12345678',
+        nickname: 'Doctor',
+        channel_name: '官服',
+        operator_count: 1,
+        encrypted_cred: 'encrypted-profile-pending',
+        created_at: expiredAt,
+        expires_at: expiredAt,
+      },
+      created_at: expiredAt,
+      updated_at: expiredAt,
+    }
+    await query(
+      `insert into user_game_accounts
+        (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note,
+         kind, archived_at, record_json, created_at, updated_at)
+       values ($1, $2, null, null, null, 'advanced', 'active', 'Skland pending', '', 'cdk', null, $3::jsonb, $4, $4)`,
+      [profileId, user.id, JSON.stringify(profile), expiredAt],
+    )
+    for (const [table, prefix] of [
+      ['free_preview_pending_claims', 'free'],
+      ['lifetime_voucher_pending_bindings', 'lifetime'],
+    ] as const) {
+      await query(
+        `insert into ${table} (confirmation_id, user_id, expires_at, record_json, created_at)
+         values
+           ($1::text, $3, $4, jsonb_build_object('confirmation_id', $1::text, 'encrypted_cred', 'expired'), $4),
+           ($2::text, $3, $5, jsonb_build_object('confirmation_id', $2::text, 'encrypted_cred', 'future'), $4)`,
+        [`${prefix}-expired`, `${prefix}-future`, user.id, expiredAt, futureAt],
+      )
+    }
+
+    expect(await runAuthDataMaintenance(now)).toMatchObject({ sklandPendingBindings: 3 })
+    const storedProfile = await query<{ record_json: { skland_pending_binding?: unknown } }>(
+      'select record_json from user_game_accounts where id = $1',
+      [profileId],
+    )
+    expect(storedProfile.rows[0]?.record_json.skland_pending_binding).toBeNull()
+    for (const [table, prefix] of [
+      ['free_preview_pending_claims', 'free'],
+      ['lifetime_voucher_pending_bindings', 'lifetime'],
+    ] as const) {
+      const remaining = await query<{ confirmation_id: string }>(
+        `select confirmation_id from ${table} where user_id = $1 order by confirmation_id`,
+        [user.id],
+      )
+      expect(remaining.rows.map((row) => row.confirmation_id)).toEqual([`${prefix}-future`])
+    }
   })
 })
 
@@ -594,7 +667,7 @@ async function seedFreePreviewWorkspaces(userId: string, count: number): Promise
             null,
             null,
             null,
-            'free_preview',
+            'growth',
             'active',
             'Free preview ' || item,
             '',
@@ -608,7 +681,7 @@ async function seedFreePreviewWorkspaces(userId: string, count: number): Promise
               'cdk_key', null,
               'cdk_code_hash', null,
               'cdk_order_hash', null,
-              'permission', 'free_preview',
+              'permission', 'growth',
               'status', 'active',
               'display_name', 'Free preview ' || item,
               'note', '',

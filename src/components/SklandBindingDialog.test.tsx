@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { UserGameAccount } from '../lib/types'
-import { ApiError, apiJson } from '../lib/api-client'
+import { ApiError, apiJson, apiVoid } from '../lib/api-client'
 import SklandBindingDialog from './SklandBindingDialog'
 
 vi.mock('../lib/api-client', async (importOriginal) => ({
   ...await importOriginal<typeof import('../lib/api-client')>(),
   apiJson: vi.fn(),
+  apiVoid: vi.fn(),
 }))
 
 afterEach(() => {
@@ -210,7 +211,11 @@ describe('SklandBindingDialog accessibility', () => {
       '/api/user/skland/free-preview/login/confirm',
       expect.objectContaining({
         method: 'POST',
-        json: { confirmation_id: 'confirmation-free' },
+        json: {
+          confirmation_id: 'confirmation-free',
+          idempotency_key: expect.any(String),
+        },
+        signal: expect.any(AbortSignal),
       }),
     ))
   })
@@ -237,6 +242,51 @@ describe('SklandBindingDialog accessibility', () => {
 
     expect(await screen.findByText('森空岛请求过于频繁，请 42 秒后重试。')).toBeInTheDocument()
     expect(screen.queryByText(/二维码生成失败/)).not.toBeInTheDocument()
+  })
+
+  it('aborts the active flow and cancels server pending state when closed', async () => {
+    const user = userEvent.setup()
+    vi.mocked(apiVoid).mockResolvedValue(undefined)
+    vi.mocked(apiJson).mockResolvedValueOnce({
+      status: 'confirm_required',
+      confirmation_id: 'confirmation-cancel',
+      skland_preview: {
+        uid: '12345678',
+        nickname: '待取消博士',
+        channel_name: '官服',
+        operator_count: 2,
+      },
+    })
+
+    render(
+      <SklandBindingDialog
+        open
+        profile={null}
+        context="free_preview_claim"
+        onOpenChange={vi.fn()}
+        onPayload={vi.fn()}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: '粘贴凭据' }))
+    await user.type(screen.getByLabelText('森空岛凭据'), 'credential-value')
+    await user.click(screen.getByRole('button', { name: '读取账号预览' }))
+    await screen.findByRole('button', { name: '确认保存并导入' })
+
+    const requestSignal = vi.mocked(apiJson).mock.calls[0]?.[1]?.signal
+    expect(requestSignal).toBeInstanceOf(AbortSignal)
+    expect(requestSignal?.aborted).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: '关闭森空岛导入' }))
+
+    expect(requestSignal?.aborted).toBe(true)
+    expect(vi.mocked(apiVoid)).toHaveBeenCalledWith(
+      '/api/user/skland/free-preview/pending/cancel',
+      expect.objectContaining({
+        method: 'POST',
+        keepalive: true,
+        json: { pending_id: 'confirmation-cancel' },
+      }),
+    )
   })
 })
 

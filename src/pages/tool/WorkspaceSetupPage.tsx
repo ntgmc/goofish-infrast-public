@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutGroup } from 'motion/react'
-import type { Announcement, AuthSuccessResponse, AuthUser, LicenseConfig, LicenseOperator, UserGameAccount, UserWorkspace } from '../../lib/types'
+import type { Announcement, AuthSuccessResponse, AuthUser, IntermediateProduct, LicenseConfig, LicenseOperator, UserGameAccount, UserWorkspace } from '../../lib/types'
 import AnnouncementBanner from '../../components/AnnouncementBanner'
 import BrandLogo from '../../components/BrandLogo'
 import CompactHeaderMenu from '../../components/CompactHeaderMenu'
@@ -24,7 +24,6 @@ import { upgradeProfileWithCdk } from './profile-redemption'
 const WorkspaceConfigSection = lazy(() => import('./workspace/WorkspaceConfigSection'))
 
 export type { WorkspaceSetupSection } from '../../lib/app-routes'
-type IntermediateProduct = 'Originium Shard' | 'Pure Gold'
 type SklandRefreshNotice = {
   kind: 'success' | 'error'
   message: string
@@ -683,14 +682,18 @@ function sklandPayloadFromError(caught: unknown): Partial<SklandPayload> | null 
 function formatSklandImportNotice(imported: NonNullable<SklandPayload['skland_import']>, verb: string): string {
   const base = `${verb} ${imported.operator_count}${copy.workspace.pages_tool_WorkspaceSetupPage_082}${imported.nickname}`
   if (imported.inventory_synced && imported.intermediate_inventory) {
-    return `${base}${copy.workspace.pages_tool_WorkspaceSetupPage_083}${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}${copy.workspace.pages_tool_WorkspaceSetupPage_084}`
+    return `${base}${copy.workspace.pages_tool_WorkspaceSetupPage_083}${formatInventoryAmount('Pure Gold', imported.intermediate_inventory['Pure Gold'])}、${formatInventoryAmount('Originium Shard', imported.intermediate_inventory['Originium Shard'])}、${formatInventoryAmount('Orirock Cube', imported.intermediate_inventory['Orirock Cube'])}${copy.workspace.pages_tool_WorkspaceSetupPage_084}`
   }
   if (imported.inventory_warning) return `${base}${copy.workspace.pages_tool_WorkspaceSetupPage_085}`
   return base
 }
 
 function formatInventoryAmount(product: IntermediateProduct, value: number | undefined): string {
-  const label = product === 'Pure Gold' ? copy.workspace.pages_tool_WorkspaceSetupPage_086 : copy.workspace.pages_tool_WorkspaceSetupPage_087
+  const label = product === 'Pure Gold'
+    ? copy.workspace.pages_tool_WorkspaceSetupPage_086
+    : product === 'Originium Shard'
+      ? copy.workspace.pages_tool_WorkspaceSetupPage_087
+      : copy.common.components_ConfigEditor_080
   const count = Number(value ?? 0)
   return `${label} ${Number.isFinite(count) ? count : 0}`
 }

@@ -8,6 +8,12 @@ import { publicContentDraftSchema } from '../../src/lib/public-content'
 import { SITE_FEATURE_KEYS, type SiteFeatureKey } from '../../src/lib/site-features'
 import { listAdminIssuablePermissions } from '../../src/lib/product-catalog'
 import type { ProductPermissionMode } from '../../src/lib/types'
+import {
+  eliteOverridesSchema,
+  licenseConfigSchema,
+  licenseOperatorsSchema,
+  workspaceSavedConfigActionSchema,
+} from '../../src/lib/workspace-validation'
 
 export const REQUEST_BODY_LIMITS = Object.freeze({
   none: 0,
@@ -194,12 +200,19 @@ export const requestSchemas = {
   commercialProfileDelete: strict({ profile_id: shortString(128), confirm_permanent_delete: z.literal(true) }),
   userWorkspace: strict({
     profile_id: shortString(128),
-    operators: optionalUnknown,
-    config: optionalUnknown,
-    elite_overrides: optionalUnknown,
-    last_result: optionalUnknown,
-    saved_config_action: optionalUnknown,
-    result_history_id: optionalString(128),
+    operators: licenseOperatorsSchema.nullable().optional(),
+    config: licenseConfigSchema.nullable().optional(),
+    elite_overrides: eliteOverridesSchema.optional(),
+    saved_config_action: workspaceSavedConfigActionSchema.optional(),
+  }).refine((body) => (
+    body.operators !== undefined
+    || body.config !== undefined
+    || body.elite_overrides !== undefined
+    || body.saved_config_action !== undefined
+  ), { message: 'At least one workspace mutation field is required.' }),
+  workspaceFreeScheduleConfirm: strict({
+    profile_id: shortString(128),
+    result_history_id: shortString(128),
   }),
   behaviorRiskEngagement: strict({
     page_category: z.enum(['landing', 'auth', 'profiles', 'workspace', 'optimizer', 'result', 'account', 'public_info', 'other']),
@@ -212,7 +225,12 @@ export const requestSchemas = {
     source: z.enum(['manual', 'bookmarklet']).optional(),
   }),
   sklandSelection: strict({ profile_id: shortString(128), selection_id: shortString(256), uid: shortString(128) }),
-  sklandConfirmation: strict({ profile_id: shortString(128), confirmation_id: shortString(256) }),
+  sklandPendingCancel: strict({ profile_id: shortString(128), pending_id: shortString(256) }),
+  sklandConfirmation: strict({
+    profile_id: shortString(128),
+    confirmation_id: shortString(256),
+    idempotency_key: shortString(200),
+  }),
   freePreviewScan: strict({ scan_id: shortString(256) }),
   freePreviewCredential: strict({
     credential_text: z.string().min(1).max(16 * 1024),
@@ -222,7 +240,8 @@ export const requestSchemas = {
   }),
   freePreviewScanComplete: strict({ scan_id: shortString(256), display_name: optionalString(40), note: optionalString(500) }),
   freePreviewSelection: strict({ selection_id: shortString(256), uid: shortString(128) }),
-  freePreviewConfirmation: strict({ confirmation_id: shortString(256) }),
+  profilelessSklandPendingCancel: strict({ pending_id: shortString(256) }),
+  freePreviewConfirmation: strict({ confirmation_id: shortString(256), idempotency_key: shortString(200) }),
   lifetimeVoucherScanComplete: strict({ scan_id: shortString(256) }),
   lifetimeVoucherCredential: strict({
     credential_text: z.string().min(1).max(16 * 1024),
@@ -360,15 +379,18 @@ const SKLAND_PATHS: Record<string, z.ZodType> = {
   '/api/user/skland/login/confirm': requestSchemas.sklandConfirmation,
   '/api/user/skland/credential/preview': requestSchemas.sklandCredential,
   '/api/user/skland/account/select': requestSchemas.sklandSelection,
+  '/api/user/skland/pending/cancel': requestSchemas.sklandPendingCancel,
   '/api/user/skland/import/refresh': requestSchemas.sklandProfile,
   '/api/user/skland/free-preview/login/complete': requestSchemas.freePreviewScanComplete,
   '/api/user/skland/free-preview/login/confirm': requestSchemas.freePreviewConfirmation,
   '/api/user/skland/free-preview/credential/preview': requestSchemas.freePreviewCredential,
   '/api/user/skland/free-preview/account/select': requestSchemas.freePreviewSelection,
+  '/api/user/skland/free-preview/pending/cancel': requestSchemas.profilelessSklandPendingCancel,
   '/api/user/skland/lifetime-voucher/login/complete': requestSchemas.lifetimeVoucherScanComplete,
   '/api/user/skland/lifetime-voucher/login/confirm': requestSchemas.lifetimeVoucherConfirmation,
   '/api/user/skland/lifetime-voucher/credential/preview': requestSchemas.lifetimeVoucherCredential,
   '/api/user/skland/lifetime-voucher/account/select': requestSchemas.lifetimeVoucherSelection,
+  '/api/user/skland/lifetime-voucher/pending/cancel': requestSchemas.profilelessSklandPendingCancel,
 }
 
 const ROUTE_POLICIES = new Map<string, RoutePolicy>([
@@ -429,7 +451,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/billing/quote', route({ GET: none() }, ['profile_id', 'operation'])],
   ['/api/user/status', route({ GET: none() }, ['profile_id'])],
   ['/api/user/workspace', route({ GET: none(), POST: json('compute', requestSchemas.userWorkspace), PATCH: json('compute', requestSchemas.userWorkspace) }, ['profile_id'])],
-  ['/api/user/workspace/free-schedule/confirm', route({ POST: json('standard', requestSchemas.userWorkspace) })],
+  ['/api/user/workspace/free-schedule/confirm', route({ POST: json('standard', requestSchemas.workspaceFreeScheduleConfirm) })],
   ['/api/user/behavior-risk/engagement', route({ POST: json('standard', requestSchemas.behaviorRiskEngagement) })],
   ['/api/user/invitations', route({ GET: none() }, ['cursor', 'limit'])],
   ['/api/user/invitations/code', route({ POST: none() })],

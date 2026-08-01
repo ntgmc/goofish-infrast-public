@@ -60,9 +60,12 @@ export async function confirmPersonalUseDeclaration(
   return acceptance
 }
 
-export async function attachPersonalUseDeclarationAcceptanceToProfile(userId: string, profileId: string): Promise<void> {
-  await ensureDatabaseSchema()
-  await query(
+export async function attachPersonalUseDeclarationAcceptanceToProfileInTransaction(
+  client: Pick<PoolClient, 'query'>,
+  userId: string,
+  profileId: string,
+): Promise<void> {
+  await client.query(
     `update personal_use_declaration_acceptances
      set profile_id = $2
      where user_id = $1

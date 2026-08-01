@@ -12,6 +12,7 @@ import {
   markServiceStopped,
 } from './lifecycle'
 import { closePool } from './storage/postgres'
+import { ensureSklandServiceConfiguration } from './skland-config'
 
 export type ApiProcessHooks = {
   initialize: () => Promise<void>
@@ -159,4 +160,5 @@ function validateProductionBoundaryConfig(listenHost: string): void {
   if (!getAccountDeletionConfigurationHealth().ok) {
     throw new Error('DEPOT_SAMPLE_HASH_SECRET is required in production')
   }
+  ensureSklandServiceConfiguration()
 }

@@ -2,6 +2,73 @@ import { describe, expect, it } from 'vitest'
 import { requestSchemas } from './request-policy'
 
 const codeHash = 'a'.repeat(64)
+const workspaceConfig = {
+  layout: '2-4-3',
+  desc: '测试配置',
+  schedule_mode: 'maa',
+  dormitory_rule: 'fixed',
+  trading_stations_count: 2,
+  manufacturing_stations_count: 4,
+  product_requirements: {
+    trading_stations: { LMD: 2 },
+    manufacturing_stations: { 'Pure Gold': 2, 'Battle Record': 2 },
+  },
+  Fiammetta: { enable: true },
+  drones: { enable: true, auto: true, order: 'pre', targets: ['LMD'] },
+}
+
+describe('workspace request policy', () => {
+  it('accepts bounded workspace mutations and rejects empty or result-writing payloads', () => {
+    expect(requestSchemas.userWorkspace.safeParse({
+      profile_id: 'profile-1',
+      config: workspaceConfig,
+    }).success).toBe(true)
+    expect(requestSchemas.userWorkspace.safeParse({ profile_id: 'profile-1' }).success).toBe(false)
+    expect(requestSchemas.userWorkspace.safeParse({
+      profile_id: 'profile-1',
+      last_result: { forged: true },
+    }).success).toBe(false)
+  })
+
+  it('rejects duplicate, out-of-range, and oversized operator payloads', () => {
+    const operator = { id: 'char_001', name: '测试干员', own: true, elite: 2, rarity: 5 }
+    expect(requestSchemas.userWorkspace.safeParse({
+      profile_id: 'profile-1',
+      operators: [operator, operator],
+    }).success).toBe(false)
+    expect(requestSchemas.userWorkspace.safeParse({
+      profile_id: 'profile-1',
+      operators: [{ ...operator, elite: 3 }],
+    }).success).toBe(false)
+    expect(requestSchemas.userWorkspace.safeParse({
+      profile_id: 'profile-1',
+      operators: Array.from({ length: 501 }, (_, index) => ({ ...operator, id: `char_${index}` })),
+    }).success).toBe(false)
+  })
+
+  it('rejects invalid elite overrides and unknown nested config fields', () => {
+    for (const elite of [-1, 1.5, 3]) {
+      expect(requestSchemas.userWorkspace.safeParse({
+        profile_id: 'profile-1',
+        elite_overrides: { char_001: elite },
+      }).success).toBe(false)
+    }
+    expect(requestSchemas.userWorkspace.safeParse({
+      profile_id: 'profile-1',
+      config: { ...workspaceConfig, untrusted: true },
+    }).success).toBe(false)
+  })
+
+  it('requires an explicit result history id for free schedule confirmation', () => {
+    expect(requestSchemas.workspaceFreeScheduleConfirm.safeParse({
+      profile_id: 'profile-1',
+      result_history_id: 'result-1',
+    }).success).toBe(true)
+    expect(requestSchemas.workspaceFreeScheduleConfirm.safeParse({
+      profile_id: 'profile-1',
+    }).success).toBe(false)
+  })
+})
 
 describe('admin CDK baseline request policy', () => {
   it('accepts the new baseline action and all trusted sources', () => {
@@ -61,6 +128,41 @@ describe('lifetime voucher JSON profile request policy', () => {
     expect(requestSchemas.lifetimeVoucherProfileCreate.safeParse({
       idempotency_key: 'lifetime-json-request',
       skland_uid: 'unauthorized-client-value',
+    }).success).toBe(false)
+  })
+})
+
+describe('Skland confirmation request policy', () => {
+  it('requires stable idempotency keys for profile and free-preview confirmations', () => {
+    expect(requestSchemas.sklandConfirmation.safeParse({
+      profile_id: 'profile-1',
+      confirmation_id: 'confirmation-1',
+      idempotency_key: 'profile-confirm-key',
+    }).success).toBe(true)
+    expect(requestSchemas.sklandConfirmation.safeParse({
+      profile_id: 'profile-1',
+      confirmation_id: 'confirmation-1',
+    }).success).toBe(false)
+    expect(requestSchemas.freePreviewConfirmation.safeParse({
+      confirmation_id: 'confirmation-free',
+      idempotency_key: 'free-confirm-key',
+    }).success).toBe(true)
+    expect(requestSchemas.freePreviewConfirmation.safeParse({
+      confirmation_id: 'confirmation-free',
+    }).success).toBe(false)
+  })
+
+  it('accepts only endpoint-owned pending cancellation fields', () => {
+    expect(requestSchemas.sklandPendingCancel.safeParse({
+      profile_id: 'profile-1',
+      pending_id: 'pending-1',
+    }).success).toBe(true)
+    expect(requestSchemas.profilelessSklandPendingCancel.safeParse({
+      pending_id: 'pending-free',
+    }).success).toBe(true)
+    expect(requestSchemas.profilelessSklandPendingCancel.safeParse({
+      pending_id: 'pending-free',
+      profile_id: 'client-owned-field',
     }).success).toBe(false)
   })
 })
