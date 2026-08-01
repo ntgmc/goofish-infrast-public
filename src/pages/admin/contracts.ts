@@ -436,7 +436,7 @@ export interface AdminUserDetail {
     profile_id: string | null;
     declaration_id: string;
     declaration_version: string;
-    action: 'free_preview_claim' | 'generated_result_export';
+    action: PersonalUseDeclarationUsageAction;
     client_ip: string;
     accepted_at: string;
     account_deleted_at: string | null;
@@ -523,3 +523,4 @@ export const MAX_CDK_BATCH_COUNT = 100
 export const cdkProductPermissionRank = Object.fromEntries(
   cdkProductPermissions.map((permission) => [permission, getPermissionRank(permission)]),
 ) as Record<GeneratedPermission, number>
+import type { PersonalUseDeclarationUsageAction } from '../../lib/personal-use-declaration'

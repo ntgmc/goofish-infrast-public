@@ -16,6 +16,11 @@ import { getServiceLifecycleState } from '../../lifecycle';
 import { getSecretKeyring } from '../../handlers/license-utils';
 import { getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
 import { recordRequestBehaviorEvent } from '../../behavior-risk/service';
+import { getRequestClientIp } from '../../security/client-ip';
+import {
+  PersonalUseDeclarationRequiredError,
+  recordPersonalUseDeclarationUsage,
+} from '../../storage/personal-use-declaration-store';
 
 export async function submitOptimizationJob(req: Request): Promise<Response> {
   const lifecycleState = getServiceLifecycleState();
@@ -36,6 +41,14 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
   const preparedPayload = prepared.payload as { activeProfileId?: string | null; isPreviewTrial?: boolean };
 
   try {
+    if (prepared.personalUseAudit) {
+      await recordPersonalUseDeclarationUsage({
+        userId: prepared.personalUseAudit.userId,
+        profileId: prepared.personalUseAudit.profileId,
+        action: 'optimization_generate',
+        clientIp: getRequestClientIp(req),
+      });
+    }
     const admissionInput = {
       id: randomUUID(),
       priority: prepared.priorityValue,
@@ -80,6 +93,9 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       ...(!admitted.job.owner_key.startsWith('profile:') && { pollToken: createOptimizeJobPollToken(admitted.job) }),
     }, 202);
   } catch (error) {
+    if (error instanceof PersonalUseDeclarationRequiredError) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status);
+    }
     if (error instanceof OptimizeJobAdmissionError) {
       if (prepared.billing && (error.code === 'insufficient_balance'
         || error.code === 'commercial_queue_capacity_exceeded'

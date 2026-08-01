@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 
 const { queryMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),
@@ -18,6 +19,10 @@ import {
 const originalAppRole = process.env.APP_ROLE
 const originalNodeEnv = process.env.NODE_ENV
 
+beforeEach(() => {
+  queryMock.mockImplementation(successfulSchemaQuery)
+})
+
 afterEach(() => {
   vi.useRealTimers()
   queryMock.mockReset()
@@ -27,17 +32,21 @@ afterEach(() => {
 
 describe('database schema ownership', () => {
   it('runs schema DDL only through the explicit migration operation', async () => {
-    queryMock.mockResolvedValue({ rows: [] })
-
     await migrateDatabaseSchema()
 
     const statements = queryMock.mock.calls.map(([statement]) => String(statement))
-    const schemaStatements = statements.slice(0, -1)
+    const schemaStatements = statements.slice(0, -2)
     const combinedSchema = schemaStatements.join('\n')
     expect(schemaStatements.length).toBeGreaterThan(10)
     expect(schemaStatements.every((statement) => !statement.includes('goofish:migration-phase'))).toBe(true)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS security_rate_limit_buckets/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances/)
+    expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS personal_use_declaration_usage_events/)
+    expect(combinedSchema).toMatch(/personal_use_declaration_acceptances_action_check/)
+    expect(combinedSchema).toMatch(/metered_personal_create/)
+    expect(combinedSchema).toMatch(/optimization_generate/)
+    expect(combinedSchema).toMatch(/reorder_check/)
+    expect(combinedSchema).toMatch(/ADD COLUMN IF NOT EXISTS acceptance_accepted_at/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_accounts/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_transactions/)
     expect(combinedSchema).toMatch(/CREATE TABLE IF NOT EXISTS user_balance_qualification_ledger/)
@@ -67,7 +76,8 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/jsonb_array_elements\(record_json->'result_history'\) WITH ORDINALITY/)
     expect(combinedSchema).toMatch(/select 1 from optimize_jobs job/)
     expect(combinedSchema).not.toMatch(/\boptimization_jobs\b/)
-    expect(statements.at(-1)).toMatch(/insert into personal_use_declaration_versions/i)
+    expect(statements.at(-2)).toMatch(/insert into personal_use_declaration_versions/i)
+    expect(statements.at(-1)).toMatch(/select display_version, effective_date::text, content_text, content_hash/i)
   })
 
   it('retries only the migration phase that deadlocked', async () => {
@@ -80,7 +90,7 @@ describe('database schema ownership', () => {
         rewardPhaseAttempts += 1
         if (rewardPhaseAttempts === 1) throw deadlock
       }
-      return { rows: [] }
+      return successfulSchemaQuery(statement)
     })
 
     const migration = migrateDatabaseSchema()
@@ -112,13 +122,11 @@ describe('database schema ownership', () => {
     process.env.APP_ROLE = 'api'
     process.env.NODE_ENV = 'production'
     queryMock.mockRejectedValueOnce(new Error('transient database error'))
-    queryMock.mockResolvedValue({ rows: [] })
-
     await expect(ensureDatabaseSchema()).rejects.toThrow('transient database error')
     await ensureDatabaseSchema()
     await ensureDatabaseSchema()
 
-    expect(queryMock).toHaveBeenCalledTimes(2)
+    expect(queryMock).toHaveBeenCalledTimes(3)
     const [statement, values] = queryMock.mock.calls[1]
     expect(statement).toContain('information_schema.columns')
     expect(statement).not.toMatch(/\b(?:alter|create|drop|truncate)\b/i)
@@ -150,8 +158,6 @@ describe('database schema ownership', () => {
 
   it('does not make dedicated workers depend on API-only tables', async () => {
     process.env.APP_ROLE = 'worker'
-    queryMock.mockResolvedValue({ rows: [] })
-
     await validateRuntimeDatabaseSchema()
 
     const workerRequirements = JSON.parse(queryMock.mock.calls[0][1][0])
@@ -195,4 +201,18 @@ describe('database schema ownership', () => {
 function restoreEnvironment(name: 'APP_ROLE' | 'NODE_ENV', value: string | undefined): void {
   if (value === undefined) delete process.env[name]
   else process.env[name] = value
+}
+
+function successfulSchemaQuery(statement: string): { rows: unknown[] } {
+  if (statement.includes('from personal_use_declaration_versions')) {
+    return {
+      rows: [{
+        display_version: CURRENT_PERSONAL_USE_DECLARATION.version,
+        effective_date: CURRENT_PERSONAL_USE_DECLARATION.effectiveDate,
+        content_text: CURRENT_PERSONAL_USE_DECLARATION.content,
+        content_hash: CURRENT_PERSONAL_USE_DECLARATION.contentHash,
+      }],
+    }
+  }
+  return { rows: [] }
 }

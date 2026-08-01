@@ -87,6 +87,7 @@ export async function prepareOptimizeJob(
     let activeProfileUid: string | null = null;
     let isPreviewProfile = false;
     let isPreviewTrial = false;
+    let personalUseAudit: PreparedOptimizeJob['personalUseAudit'];
     let meteredBilling: { userId: string; quote: MeteredScheduleQuote } | null = null;
 
     {
@@ -105,6 +106,9 @@ export async function prepareOptimizeJob(
         return fail({ error: '仓库分析档案不能用于生成排班。' }, 403);
       }
       const profileKind = normalizeProfileKind(profile);
+      if (profileKind === 'free_preview' || profileKind === 'metered_personal') {
+        personalUseAudit = { userId: auth.user.id, profileId: activeProfileId };
+      }
       const meteredFeatureGate = await requireMeteredBillingFeature(profileKind);
       if (meteredFeatureGate) return { ok: false, response: meteredFeatureGate };
       if (profile.archived_at) {
@@ -256,6 +260,7 @@ export async function prepareOptimizeJob(
           rewardUserId: useScenarioCoupon ? auth.user.id : null,
           usePriorityCoupon: false,
           rewardItemCodes: useScenarioCoupon ? ['scenario_simulation_coupon'] : [],
+          personalUseAudit,
           payload: {
             version: 3,
             kind: 'scenario_comparison',
@@ -340,6 +345,7 @@ export async function prepareOptimizeJob(
           ...(requestedItems.has('additional_recompute_coupon') ? ['additional_recompute_coupon'] : []),
         ],
         behaviorIdentity: { userId: auth.user.id, sessionTokenHash: auth.tokenHash },
+        personalUseAudit,
         billing: meteredBilling,
         payload: createPersistedOptimizeJobPayload({
           submittedAt,

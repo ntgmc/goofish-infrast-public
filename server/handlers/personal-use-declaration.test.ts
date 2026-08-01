@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 import personalUseDeclarationHandler from './personal-use-declaration'
 
 const mocks = vi.hoisted(() => ({
@@ -39,6 +40,7 @@ beforeEach(() => {
   mocks.confirm.mockResolvedValue({
     declaration_id: 'personal_use_v1_1',
     declaration_version: 'V1.1',
+    content_hash: CURRENT_PERSONAL_USE_DECLARATION.contentHash,
     action: 'generated_result_export',
     accepted_at: '2026-07-31T10:00:00.000Z',
   })
@@ -62,7 +64,7 @@ describe('personal use declaration endpoint', () => {
     const response = await personalUseDeclarationHandler(new Request('http://localhost/api/user/personal-use-declaration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'generated_result_export', profile_id: 'profile-1' }),
+      body: JSON.stringify(confirmationBody('generated_result_export', 'profile-1')),
     }))
 
     expect(response.status).toBe(200)
@@ -77,7 +79,7 @@ describe('personal use declaration endpoint', () => {
     const response = await personalUseDeclarationHandler(new Request('http://localhost/api/user/personal-use-declaration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'generated_result_export', profile_id: 'profile-1' }),
+      body: JSON.stringify(confirmationBody('generated_result_export', 'profile-1')),
     }))
 
     expect(response.status).toBe(200)
@@ -91,10 +93,40 @@ describe('personal use declaration endpoint', () => {
     const response = await personalUseDeclarationHandler(new Request('http://localhost/api/user/personal-use-declaration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'generated_result_export', profile_id: 'profile-1' }),
+      body: JSON.stringify(confirmationBody('generated_result_export', 'profile-1')),
     }))
 
     expect(response.status).toBe(403)
     expect(mocks.confirm).not.toHaveBeenCalled()
   })
+
+  it('rejects confirmation for a declaration document the server no longer serves', async () => {
+    const response = await personalUseDeclarationHandler(new Request('http://localhost/api/user/personal-use-declaration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...confirmationBody('optimization_generate', 'profile-1'),
+        content_hash: '0'.repeat(64),
+      }),
+    }))
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'personal_use_declaration_changed',
+      declaration: {
+        id: CURRENT_PERSONAL_USE_DECLARATION.id,
+        contentHash: CURRENT_PERSONAL_USE_DECLARATION.contentHash,
+      },
+    })
+    expect(mocks.confirm).not.toHaveBeenCalled()
+  })
 })
+
+function confirmationBody(action: string, profileId?: string) {
+  return {
+    action,
+    declaration_id: CURRENT_PERSONAL_USE_DECLARATION.id,
+    content_hash: CURRENT_PERSONAL_USE_DECLARATION.contentHash,
+    ...(profileId ? { profile_id: profileId } : {}),
+  }
+}

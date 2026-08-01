@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
 import {
   AUTH_EMAIL_MAX_LENGTH,
   AUTH_PASSWORD_MAX_LENGTH,
@@ -167,8 +168,10 @@ export const requestSchemas = {
     strict({ all: z.literal(true) }),
   ]),
   personalUseDeclarationConfirmation: strict({
-    action: z.enum(['free_preview_claim', 'metered_personal_create', 'generated_result_export']),
+    action: z.enum(PERSONAL_USE_DECLARATION_ACTIONS),
     profile_id: optionalString(128),
+    declaration_id: shortString(128),
+    content_hash: z.string().regex(/^[a-f0-9]{64}$/),
   }),
   profilePreview: strict({ display_name: optionalString(40), note: optionalString(500) }),
   profileRedeem: strict({

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { requestSchemas } from './request-policy'
 
 const codeHash = 'a'.repeat(64)
+const declarationHash = 'b'.repeat(64)
 const workspaceConfig = {
   layout: '2-4-3',
   desc: '测试配置',
@@ -66,6 +67,39 @@ describe('workspace request policy', () => {
     }).success).toBe(true)
     expect(requestSchemas.workspaceFreeScheduleConfirm.safeParse({
       profile_id: 'profile-1',
+    }).success).toBe(false)
+  })
+})
+
+describe('personal-use declaration request policy', () => {
+  it('uses the shared protected-action contract and requires the displayed document identity', () => {
+    for (const action of [
+      'free_preview_claim',
+      'metered_personal_create',
+      'generated_result_export',
+      'optimization_generate',
+      'reorder_check',
+    ]) {
+      expect(requestSchemas.personalUseDeclarationConfirmation.safeParse({
+        action,
+        declaration_id: 'personal_use_v1_1',
+        content_hash: declarationHash,
+      }).success).toBe(true)
+    }
+    expect(requestSchemas.personalUseDeclarationConfirmation.safeParse({
+      action: 'optimization_generate',
+      declaration_id: 'personal_use_v1_1',
+    }).success).toBe(false)
+    expect(requestSchemas.personalUseDeclarationConfirmation.safeParse({
+      action: 'optimization_generate',
+      declaration_id: 'personal_use_v1_1',
+      content_hash: 'not-a-sha256',
+    }).success).toBe(false)
+    expect(requestSchemas.personalUseDeclarationConfirmation.safeParse({
+      action: 'commercial_generate',
+      declaration_id: 'personal_use_v1_1',
+      content_hash: declarationHash,
+      accepted_at: 'client-controlled',
     }).success).toBe(false)
   })
 })

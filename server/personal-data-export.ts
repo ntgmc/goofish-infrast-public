@@ -39,6 +39,7 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   user_announcement_reads: { disposition: 'export', field: 'announcement_reads' },
   account_deletion_requests: { disposition: 'export', field: 'deletion_request' },
   personal_use_declaration_acceptances: { disposition: 'export', field: 'personal_use_declarations' },
+  personal_use_declaration_usage_events: { disposition: 'export', field: 'personal_use_declaration_usage_events' },
   account_deletion_email_outbox: {
     disposition: 'exclude',
     reason: '短期投递队列含撤销令牌和收件地址，发送成功即删除，不作为用户内容复制。',

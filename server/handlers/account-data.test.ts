@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   requestAccountDeletion: vi.fn(),
   listPersonalUseDeclarationAcceptancesForUser: vi.fn(),
+  listPersonalUseDeclarationUsageEventsForUser: vi.fn(),
   saveUserProfile: vi.fn(),
   requireUserSession: vi.fn(),
   exportUserNotifications: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('../storage/postgres', () => ({ query: mocks.query }))
 vi.mock('../storage/notification-store', () => ({ exportUserNotifications: mocks.exportUserNotifications }))
 vi.mock('../storage/personal-use-declaration-store', () => ({
   listPersonalUseDeclarationAcceptancesForUser: mocks.listPersonalUseDeclarationAcceptancesForUser,
+  listPersonalUseDeclarationUsageEventsForUser: mocks.listPersonalUseDeclarationUsageEventsForUser,
 }))
 vi.mock('../account-data-lifecycle', () => ({
   AccountDeletionStateError: class AccountDeletionStateError extends Error {},
@@ -70,6 +72,7 @@ beforeEach(() => {
   mocks.listProfileWorkspaces.mockResolvedValue(new Map())
   mocks.getUserById.mockResolvedValue(null)
   mocks.listPersonalUseDeclarationAcceptancesForUser.mockResolvedValue([])
+  mocks.listPersonalUseDeclarationUsageEventsForUser.mockResolvedValue([])
   mocks.exportUserNotifications.mockResolvedValue([])
   mocks.clearSessionCookie.mockReturnValue('session=; Max-Age=0')
   mocks.normalizeEmail.mockImplementation((value: unknown) => typeof value === 'string' ? value.trim().toLowerCase() : null)

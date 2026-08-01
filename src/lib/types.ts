@@ -1097,6 +1097,7 @@ export interface PersonalDataExportV4 {
   metered_personal_claim: PersonalDataExportRecord | null;
   announcement_reads: PersonalDataExportRecord[];
   personal_use_declarations: unknown[];
+  personal_use_declaration_usage_events: unknown[];
   inventory: {
     grants: PersonalDataExportRecord[];
     consumptions: PersonalDataExportRecord[];

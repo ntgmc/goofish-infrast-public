@@ -3,6 +3,12 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, getPool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
+import {
+  confirmPersonalUseDeclaration,
+  getPersonalUseDeclarationAcceptance,
+  recordPersonalUseDeclarationUsage,
+} from './personal-use-declaration-store'
+import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 
 let container: PostgreSqlContainer
 
@@ -18,6 +24,83 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL schema migration', () => {
+  it('accepts a first metered-personal confirmation and records protected operations', async () => {
+    const userId = randomUUID()
+    const acceptance = await confirmPersonalUseDeclaration(
+      userId,
+      'metered_personal_create',
+      '203.0.113.10',
+      null,
+      new Date('2026-08-01T01:00:00.000Z'),
+    )
+    const usage = await recordPersonalUseDeclarationUsage({
+      userId,
+      profileId: 'profile-metered-1',
+      action: 'optimization_generate',
+      clientIp: '203.0.113.10',
+      occurredAt: new Date('2026-08-01T01:05:00.000Z'),
+    })
+
+    expect(acceptance).toMatchObject({
+      action: 'metered_personal_create',
+      declaration_id: CURRENT_PERSONAL_USE_DECLARATION.id,
+      declaration_version: CURRENT_PERSONAL_USE_DECLARATION.version,
+      content_hash: CURRENT_PERSONAL_USE_DECLARATION.contentHash,
+    })
+    expect(usage).toMatchObject({
+      acceptance_id: acceptance.id,
+      action: 'optimization_generate',
+      profile_id: 'profile-metered-1',
+      acceptance_accepted_at: '2026-08-01T01:00:00.000Z',
+      occurred_at: '2026-08-01T01:05:00.000Z',
+    })
+    await query('delete from personal_use_declaration_acceptances where user_id = $1', [userId])
+  })
+
+  it('fails fast when an existing declaration ID has different immutable content', async () => {
+    await query(
+      'update personal_use_declaration_versions set content_hash = $2 where declaration_id = $1',
+      [CURRENT_PERSONAL_USE_DECLARATION.id, '0'.repeat(64)],
+    )
+    try {
+      await expect(migrateDatabaseSchema()).rejects.toThrow(/does not match the immutable runtime document/)
+    } finally {
+      await query(
+        `update personal_use_declaration_versions
+            set display_version = $2, effective_date = $3, content_text = $4, content_hash = $5
+          where declaration_id = $1`,
+        [
+          CURRENT_PERSONAL_USE_DECLARATION.id,
+          CURRENT_PERSONAL_USE_DECLARATION.version,
+          CURRENT_PERSONAL_USE_DECLARATION.effectiveDate,
+          CURRENT_PERSONAL_USE_DECLARATION.content,
+          CURRENT_PERSONAL_USE_DECLARATION.contentHash,
+        ],
+      )
+    }
+  })
+
+  it('does not treat a mismatched version or hash as a current acceptance', async () => {
+    const userId = randomUUID()
+    await query(
+      `insert into personal_use_declaration_acceptances
+        (id, user_id, profile_id, declaration_id, declaration_version, content_hash, action,
+         client_ip, accepted_at, account_deleted_at, retain_until)
+       values ($1, $2, null, $3, 'V0.9', $4, 'free_preview_claim', '203.0.113.11', now(), null, null)`,
+      [randomUUID(), userId, CURRENT_PERSONAL_USE_DECLARATION.id, '0'.repeat(64)],
+    )
+    try {
+      await expect(getPersonalUseDeclarationAcceptance(userId)).resolves.toBeNull()
+      await expect(confirmPersonalUseDeclaration(
+        userId,
+        'metered_personal_create',
+        '203.0.113.11',
+      )).rejects.toThrow(/当前版本或内容哈希不一致/)
+    } finally {
+      await query('delete from personal_use_declaration_acceptances where user_id = $1', [userId])
+    }
+  })
+
   it('permanently trims existing workspace JSON to the newest 3 configurations and 5 results', async () => {
     const profile = await seedProfile()
     const savedConfigs = Array.from({ length: 4 }, (_, index) => ({ id: `config-${index + 1}` }))
@@ -138,8 +221,8 @@ async function seedProfile(): Promise<{ userId: string; profileId: string }> {
   )
   await query(
     `insert into user_game_accounts (id, user_id, permission, status, display_name, note, record_json, created_at, updated_at)
-     values ($1, $2, 'free_preview', 'active', 'Free', '', $3::jsonb, now(), now())`,
-    [profileId, userId, JSON.stringify({ id: profileId, user_id: userId })],
+     values ($1, $2, 'growth', 'active', 'Free', '', $3::jsonb, now(), now())`,
+    [profileId, userId, JSON.stringify({ id: profileId, user_id: userId, kind: 'free_preview', permission: 'growth' })],
   )
   return { userId, profileId }
 }

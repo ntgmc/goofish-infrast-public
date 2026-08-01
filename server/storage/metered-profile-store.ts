@@ -11,6 +11,10 @@ import {
   type UserGameAccountRecord,
 } from './user-store'
 import { releaseScheduleBalanceInTransaction } from './balance-store'
+import {
+  recordPersonalUseDeclarationUsageInTransaction,
+  requireCurrentPersonalUseAcceptanceInTransaction,
+} from './personal-use-declaration-store'
 
 const policy = getMeteredBillingPolicy()
 
@@ -42,10 +46,25 @@ export async function createOrConvertMeteredPersonal(input: {
   profileId?: string | null
   displayName?: string
   note?: string
+  personalUseClientIp?: string
 }): Promise<UserGameAccount> {
   await ensureDatabaseSchema()
   const result = await withTransaction(async (client) => {
     await client.query('select id from user_accounts where id = $1 for update', [input.userId])
+    if (input.personalUseClientIp) {
+      await requireCurrentPersonalUseAcceptanceInTransaction(client, input.userId)
+    }
+    const complete = async (profile: UserGameAccountRecord, created: boolean) => {
+      if (input.personalUseClientIp) {
+        await recordPersonalUseDeclarationUsageInTransaction(client, {
+          userId: input.userId,
+          profileId: profile.id,
+          action: 'metered_personal_create',
+          clientIp: input.personalUseClientIp,
+        })
+      }
+      return { profile, created }
+    }
     const claimed = await client.query<{ profile_id: string }>(
       'select profile_id from metered_personal_claims where user_id = $1 for update',
       [input.userId],
@@ -57,7 +76,7 @@ export async function createOrConvertMeteredPersonal(input: {
       )
       if (existing.rows[0]?.record_json.kind === 'metered_personal') {
         await ensureProfileWorkspaceInTransaction(client, existing.rows[0].record_json.id)
-        return { profile: existing.rows[0].record_json, created: false }
+        return complete(existing.rows[0].record_json, false)
       }
       throw new MeteredProfileError('personal_profile_already_claimed', '每个账号终身只能创建或转换一个个人按次档案。', 409)
     }
@@ -88,7 +107,7 @@ export async function createOrConvertMeteredPersonal(input: {
         [input.userId, profile.id, now],
       )
       await ensureProfileWorkspaceInTransaction(client, profile.id)
-      return { profile, created: false }
+      return complete(profile, false)
     }
 
     const existing = await client.query<{ id: string }>(
@@ -103,7 +122,7 @@ export async function createOrConvertMeteredPersonal(input: {
       [input.userId, profile.id, now],
     )
     await ensureProfileWorkspaceInTransaction(client, profile.id)
-    return { profile, created: true }
+    return complete(profile, true)
   })
   return toPublicProfile(result.profile, await getProfileWorkspace(result.profile.id))
 }

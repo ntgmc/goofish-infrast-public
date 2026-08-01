@@ -17,6 +17,11 @@ import { jsonResponse, sanitizeConfigForPublicOptimize } from './http-core'
 import { resolveBaselineHistoryItem } from './reorder-baseline'
 import { recordReorderCheckEvent } from './reorder-telemetry'
 import type { ReorderCheckJobPayload } from './shared'
+import { getRequestClientIp } from '../../security/client-ip'
+import {
+  PersonalUseDeclarationRequiredError,
+  recordPersonalUseDeclarationUsage,
+} from '../../storage/personal-use-declaration-store'
 
 export async function submitReorderCheck(req: Request): Promise<Response> {
   const startedAt = Date.now()
@@ -104,6 +109,12 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     if (useCoupon && (isPreviewTrial || (quota?.remaining ?? 0) > 0)) {
       return jsonResponse({ error: isPreviewTrial ? '试用档案无需使用调序检查券。' : '本月免费调序检查配额尚未用完，不能消耗券。', code: 'item_not_applicable' }, 409)
     }
+    await recordPersonalUseDeclarationUsage({
+      userId: auth.user.id,
+      profileId: activeProfileId,
+      action: 'reorder_check',
+      clientIp: getRequestClientIp(req),
+    })
     const admitted = await getOptimizeJobStore().admitJob({
       id: randomUUID(),
       priority: 0,
@@ -125,6 +136,9 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     requestOptimizeJobProcessing()
     return jsonResponse({ job: await buildOptimizeJobAccepted(admitted.job) }, 202)
   } catch (error) {
+    if (error instanceof PersonalUseDeclarationRequiredError) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
     if (isOptimizeJobAdmissionError(error)) {
       await recordReorderCheckEvent(
         'failure',

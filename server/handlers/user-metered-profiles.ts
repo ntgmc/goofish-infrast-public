@@ -9,8 +9,8 @@ import {
   MeteredProfileError,
   patchCommercialProfile,
 } from '../storage/metered-profile-store'
-import { isCurrentPersonalUseDeclarationEffective } from '../personal-use-declaration'
-import { getPersonalUseDeclarationAcceptance } from '../storage/personal-use-declaration-store'
+import { getRequestClientIp } from '../security/client-ip'
+import { PersonalUseDeclarationRequiredError } from '../storage/personal-use-declaration-store'
 
 export default async function userMeteredProfilesHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -20,16 +20,13 @@ export default async function userMeteredProfilesHandler(req: Request): Promise<
     const url = new URL(req.url)
     if (url.pathname.endsWith('/metered-personal')) {
       if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
-      if (isCurrentPersonalUseDeclarationEffective()
-        && !(await getPersonalUseDeclarationAcceptance(auth.user.id))) {
-        return jsonResponse({ error: '请先确认个人使用声明。', code: 'personal_use_declaration_required' }, 403)
-      }
       const body = await getValidatedJson(req, requestSchemas.meteredPersonalProfile)
       return jsonResponse({ profile: await createOrConvertMeteredPersonal({
         userId: auth.user.id,
         profileId: body.profile_id,
         displayName: body.display_name,
         note: body.note,
+        personalUseClientIp: getRequestClientIp(req),
       }) }, 201)
     }
     if (req.method === 'GET') {
@@ -71,6 +68,9 @@ export default async function userMeteredProfilesHandler(req: Request): Promise<
     }
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
+    if (error instanceof PersonalUseDeclarationRequiredError) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
     if (error instanceof MeteredProfileError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     console.error('metered profiles error:', error)
     return jsonResponse({ error: 'Internal server error' }, 500)

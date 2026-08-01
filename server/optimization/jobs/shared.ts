@@ -165,6 +165,7 @@ export type PreparedOptimizeJob = {
   usePriorityCoupon?: boolean;
   rewardItemCodes?: string[];
   behaviorIdentity?: { userId: string; sessionTokenHash: string };
+  personalUseAudit?: { userId: string; profileId: string };
   billing?: { userId: string; quote: MeteredScheduleQuote } | null;
 };
 

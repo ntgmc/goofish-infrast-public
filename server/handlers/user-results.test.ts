@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY } from '../free-preview-trial'
 import { InventoryError } from '../storage/inventory-store'
+import { PersonalUseDeclarationRequiredError } from '../storage/personal-use-declaration-store'
 import userResultsHandler from './user-results'
 
 const mocks = vi.hoisted(() => ({
   consumeInventoryItemImmediately: vi.fn(),
-  getPersonalUseDeclarationAcceptance: vi.fn(),
+  recordPersonalUseDeclarationUsage: vi.fn(),
   getProfileForUser: vi.fn(),
   getProfileWorkspace: vi.fn(),
   getValidatedJson: vi.fn(),
@@ -47,7 +48,15 @@ vi.mock('../behavior-risk/service', () => ({
   recordTrackedExportBehaviorEvent: mocks.recordTrackedExportBehaviorEvent,
 }))
 vi.mock('../storage/personal-use-declaration-store', () => ({
-  getPersonalUseDeclarationAcceptance: mocks.getPersonalUseDeclarationAcceptance,
+  PersonalUseDeclarationRequiredError: class PersonalUseDeclarationRequiredError extends Error {
+    readonly code = 'personal_use_declaration_required'
+    readonly status = 428
+
+    constructor() {
+      super('请先确认当前版本的个人使用声明。')
+    }
+  },
+  recordPersonalUseDeclarationUsage: mocks.recordPersonalUseDeclarationUsage,
 }))
 vi.mock('../security/request-policy', () => ({
   requestSchemas: { maaExport: {}, fullResultExport: {}, resultArchive: {} },
@@ -91,7 +100,10 @@ beforeEach(() => {
     result_history: [{ id: 'result-1', result: optimizerResult() }],
     archived_results: [],
   })
-  mocks.getPersonalUseDeclarationAcceptance.mockResolvedValue(null)
+  mocks.recordPersonalUseDeclarationUsage.mockResolvedValue({
+    declaration_version: 'V1.1',
+    acceptance_accepted_at: '2026-07-31T00:00:00.000Z',
+  })
   mocks.recordTrackedExportBehaviorEvent.mockResolvedValue(true)
   mocks.consumeInventoryItemImmediately.mockImplementation(async (input: { response: Record<string, unknown> }) => ({
     ...input.response,
@@ -153,6 +165,42 @@ describe('MAA JSON export entitlement', () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({ consumed_coupon: false })
+    expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+    expect(mocks.recordPersonalUseDeclarationUsage).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'user-1',
+      profileId: 'profile-1',
+      action: 'generated_result_export',
+    }))
+  })
+
+  it('rejects a personal-use export when the current declaration is not accepted', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+    mocks.recordPersonalUseDeclarationUsage.mockRejectedValue(new PersonalUseDeclarationRequiredError())
+
+    const response = await userResultsHandler(exportRequest())
+
+    expect(response.status).toBe(428)
+    await expect(response.json()).resolves.toEqual({
+      error: '请先确认当前版本的个人使用声明。',
+      code: 'personal_use_declaration_required',
+    })
+    expect(mocks.recordTrackedExportBehaviorEvent).not.toHaveBeenCalled()
+    expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the declaration audit store is unavailable', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+    mocks.recordPersonalUseDeclarationUsage.mockRejectedValue(new Error('database unavailable'))
+
+    const response = await userResultsHandler(exportRequest())
+
+    expect(response.status).toBe(500)
+    await expect(response.json()).resolves.toEqual({
+      error: '导出 MAA JSON 失败，请稍后重试。',
+      code: 'maa_export_failed',
+    })
+    expect(mocks.recordTrackedExportBehaviorEvent).not.toHaveBeenCalled()
     expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
   })
 

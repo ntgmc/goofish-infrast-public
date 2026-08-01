@@ -1,12 +1,16 @@
 import { resolveAppRole, type AppRole } from '../process-role'
 import { query } from './postgres'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
+import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 
 const MIGRATION_PHASE_SEPARATOR = '-- goofish:migration-phase'
 const RETRIABLE_MIGRATION_CODES = new Set(['40P01', '40001', '55P03'])
 const MIGRATION_PHASE_MAX_ATTEMPTS = 5
 const MIGRATION_RETRY_BASE_MS = 1_000
+const PERSONAL_USE_DECLARATION_ACTION_SQL = PERSONAL_USE_DECLARATION_ACTIONS
+  .map((action) => `'${action}'`)
+  .join(', ')
 
 const CREATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS cdk_records (
@@ -628,16 +632,57 @@ CREATE TABLE IF NOT EXISTS personal_use_declaration_acceptances (
   declaration_id TEXT NOT NULL REFERENCES personal_use_declaration_versions(declaration_id),
   declaration_version TEXT NOT NULL,
   content_hash TEXT NOT NULL,
-  action TEXT NOT NULL CHECK (action IN ('free_preview_claim', 'generated_result_export')),
+  action TEXT NOT NULL CONSTRAINT personal_use_declaration_acceptances_action_check
+    CHECK (action IN (${PERSONAL_USE_DECLARATION_ACTION_SQL})),
   client_ip TEXT NOT NULL,
   accepted_at TIMESTAMPTZ NOT NULL,
   account_deleted_at TIMESTAMPTZ,
   retain_until TIMESTAMPTZ,
   UNIQUE (user_id, declaration_id)
 );
+ALTER TABLE personal_use_declaration_acceptances
+  DROP CONSTRAINT IF EXISTS personal_use_declaration_acceptances_action_check;
+ALTER TABLE personal_use_declaration_acceptances
+  ADD CONSTRAINT personal_use_declaration_acceptances_action_check
+  CHECK (action IN (${PERSONAL_USE_DECLARATION_ACTION_SQL}));
 CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_user ON personal_use_declaration_acceptances(user_id, accepted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_profile ON personal_use_declaration_acceptances(profile_id, accepted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_acceptances_retention ON personal_use_declaration_acceptances(retain_until) WHERE retain_until IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS personal_use_declaration_usage_events (
+  id TEXT PRIMARY KEY,
+  acceptance_id TEXT NOT NULL REFERENCES personal_use_declaration_acceptances(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL,
+  profile_id TEXT,
+  declaration_id TEXT NOT NULL,
+  declaration_version TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  action TEXT NOT NULL CONSTRAINT personal_use_declaration_usage_events_action_check
+    CHECK (action IN (${PERSONAL_USE_DECLARATION_ACTION_SQL})),
+  client_ip TEXT NOT NULL,
+  acceptance_accepted_at TIMESTAMPTZ NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  account_deleted_at TIMESTAMPTZ,
+  retain_until TIMESTAMPTZ
+);
+ALTER TABLE personal_use_declaration_usage_events ADD COLUMN IF NOT EXISTS acceptance_accepted_at TIMESTAMPTZ;
+UPDATE personal_use_declaration_usage_events event
+   SET acceptance_accepted_at = acceptance.accepted_at
+  FROM personal_use_declaration_acceptances acceptance
+ WHERE event.acceptance_id = acceptance.id
+   AND event.acceptance_accepted_at IS NULL;
+ALTER TABLE personal_use_declaration_usage_events ALTER COLUMN acceptance_accepted_at SET NOT NULL;
+ALTER TABLE personal_use_declaration_usage_events
+  DROP CONSTRAINT IF EXISTS personal_use_declaration_usage_events_action_check;
+ALTER TABLE personal_use_declaration_usage_events
+  ADD CONSTRAINT personal_use_declaration_usage_events_action_check
+  CHECK (action IN (${PERSONAL_USE_DECLARATION_ACTION_SQL}));
+CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_usage_user
+  ON personal_use_declaration_usage_events(user_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_usage_profile
+  ON personal_use_declaration_usage_events(profile_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_personal_use_declaration_usage_retention
+  ON personal_use_declaration_usage_events(retain_until) WHERE retain_until IS NOT NULL;
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS user_sessions (
@@ -1519,6 +1564,7 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'public_content_settings',
   'personal_use_declaration_versions',
   'personal_use_declaration_acceptances',
+  'personal_use_declaration_usage_events',
   'user_balance_qualification_ledger',
   'commercial_account_limits',
   'user_notifications',
@@ -1570,6 +1616,7 @@ export async function migrateDatabaseSchema(): Promise<void> {
   for (const [index, phase] of migrationPhases.entries()) {
     await runMigrationPhase(phase.sql, phase.values ?? [], index + 1, migrationPhases.length)
   }
+  await validateCurrentPersonalUseDeclarationVersion()
 }
 
 async function runMigrationPhase(
@@ -1625,12 +1672,39 @@ export async function validateRuntimeDatabaseSchema(): Promise<void> {
     [JSON.stringify(requiredColumns)],
   )
 
-  if (missing.rows.length === 0) return
-  const missingNames = missing.rows.map((row) => `${row.table_name}.${row.column_name}`).join(', ')
-  throw new Error(
-    `Runtime database schema is incompatible; missing required columns: ${missingNames}. ` +
-    'Apply database migrations before starting production API or Worker processes.',
+  if (missing.rows.length > 0) {
+    const missingNames = missing.rows.map((row) => `${row.table_name}.${row.column_name}`).join(', ')
+    throw new Error(
+      `Runtime database schema is incompatible; missing required columns: ${missingNames}. ` +
+      'Apply database migrations before starting production API or Worker processes.',
+    )
+  }
+  if (resolveAppRole() !== 'worker') await validateCurrentPersonalUseDeclarationVersion()
+}
+
+async function validateCurrentPersonalUseDeclarationVersion(): Promise<void> {
+  const result = await query<{
+    display_version: string
+    effective_date: string
+    content_text: string
+    content_hash: string
+  }>(
+    `select display_version, effective_date::text, content_text, content_hash
+       from personal_use_declaration_versions
+      where declaration_id = $1`,
+    [CURRENT_PERSONAL_USE_DECLARATION.id],
   )
+  const stored = result.rows[0]
+  if (!stored
+    || stored.display_version !== CURRENT_PERSONAL_USE_DECLARATION.version
+    || stored.effective_date !== CURRENT_PERSONAL_USE_DECLARATION.effectiveDate
+    || stored.content_text !== CURRENT_PERSONAL_USE_DECLARATION.content
+    || stored.content_hash !== CURRENT_PERSONAL_USE_DECLARATION.contentHash) {
+    throw new Error(
+      `Stored personal-use declaration ${CURRENT_PERSONAL_USE_DECLARATION.id} does not match the immutable runtime document. ` +
+      'Publish changed content under a new declaration ID before starting the service.',
+    )
+  }
 }
 
 function runtimeSchemaRequirements(role: AppRole): Array<{ table_name: string; column_name: string }> {

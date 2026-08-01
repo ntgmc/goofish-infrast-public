@@ -20,9 +20,13 @@ import {
 import { withTransaction } from '../storage/postgres'
 import { jsonResponse, requireUserSession } from './user-auth'
 import { recordTrackedExportBehaviorEvent } from '../behavior-risk/service'
-import { getPersonalUseDeclarationAcceptance } from '../storage/personal-use-declaration-store'
+import {
+  PersonalUseDeclarationRequiredError,
+  recordPersonalUseDeclarationUsage,
+} from '../storage/personal-use-declaration-store'
 import { buildMaaExportPayload } from '../optimization/jobs/maa-export'
 import { resolveProfileAuthorization } from './profile-authorization'
+import { getRequestClientIp } from '../security/client-ip'
 
 export default async function userResultsHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
@@ -53,7 +57,14 @@ export default async function userResultsHandler(req: Request): Promise<Response
       const historyItem = findHistoryItem(workspace?.result_history ?? [], workspace?.archived_results ?? [], body.result_id)
       if (!historyItem) return jsonResponse({ error: '排班结果不存在。' }, 404)
       const result = JSON.parse(JSON.stringify(historyItem.result)) as Record<string, unknown>
-      const behaviorDeclaration = await getPersonalUseDeclarationAcceptance(auth.user.id).catch(() => null)
+      const behaviorDeclaration = isFreePreviewProfile(profile) || profile.kind === 'metered_personal'
+        ? await recordPersonalUseDeclarationUsage({
+            userId: auth.user.id,
+            profileId: profile.id,
+            action: 'generated_result_export',
+            clientIp: getRequestClientIp(req),
+          })
+        : null
       await recordTrackedExportBehaviorEvent({
         req,
         auth,
@@ -64,7 +75,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
         eventKey: `full-result-export:${auth.user.id}:${body.idempotency_key}`,
         activityClaimedAt: isFreePreviewProfile(profile) ? profile.created_at : null,
         declarationVersion: behaviorDeclaration?.declaration_version,
-        declarationAcceptedAt: behaviorDeclaration?.accepted_at,
+        declarationAcceptedAt: behaviorDeclaration?.acceptance_accepted_at,
       }).catch((error) => {
         console.warn('Full result export behavior event skipped:', error instanceof Error ? error.message : 'unknown error')
         return false
@@ -87,7 +98,14 @@ export default async function userResultsHandler(req: Request): Promise<Response
       if (!historyItem) return jsonResponse({ error: '排班结果不存在。' }, 404)
       if (historyItem.result.schedule_mode === 'rotation') return jsonResponse({ error: '轮班制结果不能导出为 MAA JSON。' }, 409)
       const result = buildMaaExportPayload(historyItem.result)
-      const behaviorDeclaration = await getPersonalUseDeclarationAcceptance(auth.user.id).catch(() => null)
+      const behaviorDeclaration = isFreePreviewProfile(profile) || profile.kind === 'metered_personal'
+        ? await recordPersonalUseDeclarationUsage({
+            userId: auth.user.id,
+            profileId: profile.id,
+            action: 'generated_result_export',
+            clientIp: getRequestClientIp(req),
+          })
+        : null
       const isFreePreview = isFreePreviewProfile(profile)
       const canExportWithoutCoupon = !isFreePreview || hasCapability({
         kind: profile.kind,
@@ -103,7 +121,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
         eventKey: `maa-export:${auth.user.id}:${body.idempotency_key}`,
         activityClaimedAt: isFreePreview ? profile.created_at : null,
         declarationVersion: behaviorDeclaration?.declaration_version,
-        declarationAcceptedAt: behaviorDeclaration?.accepted_at,
+        declarationAcceptedAt: behaviorDeclaration?.acceptance_accepted_at,
       }).catch((error) => {
         console.warn('MAA export behavior event skipped:', error instanceof Error ? error.message : 'unknown error')
         return false
@@ -183,6 +201,9 @@ export default async function userResultsHandler(req: Request): Promise<Response
     })
     return jsonResponse(response)
   } catch (error) {
+    if (error instanceof PersonalUseDeclarationRequiredError) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
     if (error instanceof InventoryError || error instanceof ResultMutationError) {
       return jsonResponse({ error: error.message, code: error instanceof InventoryError ? error.code : 'result_archive_failed' }, error.status)
     }

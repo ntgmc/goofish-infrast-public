@@ -73,8 +73,14 @@ import { CURRENT_PERSONAL_USE_DECLARATION, isCurrentPersonalUseDeclarationEffect
 import {
   attachPersonalUseDeclarationAcceptanceToProfileInTransaction,
   getPersonalUseDeclarationAcceptance,
+  recordPersonalUseDeclarationUsageInTransaction,
 } from '../storage/personal-use-declaration-store'
-import { recordAuthenticatedRequestBehaviorEvent, recordRequestBehaviorEvent } from '../behavior-risk/service'
+import { getRequestClientIp } from '../security/client-ip'
+import {
+  recordAuthenticatedRequestBehaviorEvent,
+  recordRequestBehaviorEvent,
+  recordRequestBehaviorEventInTransaction,
+} from '../behavior-risk/service'
 import {
   lockSklandUidProfilesInTransaction,
   recordSklandUidMismatchInTransaction,
@@ -1294,6 +1300,13 @@ async function confirmFreePreviewClaim(
     }
     if (!existing.rows[0]) await saveProfileInTransaction(client, currentProfile)
     await attachPersonalUseDeclarationAcceptanceToProfileInTransaction(client, user.id, currentProfile.id)
+    await recordPersonalUseDeclarationUsageInTransaction(client, {
+      userId: user.id,
+      profileId: currentProfile.id,
+      action: 'free_preview_claim',
+      clientIp: getRequestClientIp(req),
+      occurredAt: new Date(prepared.importedAt),
+    })
     const imported = await persistPreparedSklandImportInTransaction(
       client,
       user.id,
@@ -1301,6 +1314,19 @@ async function confirmFreePreviewClaim(
       cred,
       prepared,
     )
+    await recordRequestBehaviorEventInTransaction(client, {
+      req,
+      eventType: 'bind',
+      eventKey: `free-preview-claim:${user.id}:${idempotencyKey}`,
+      userId: user.id,
+      sessionTokenHash,
+      profileId: currentProfile.id,
+      uid: imported.uid,
+      activityClaimedAt: currentProfile.created_at,
+      declarationVersion: personalUseAcceptance?.declaration_version,
+      declarationAcceptedAt: personalUseAcceptance?.accepted_at,
+      occurredAt: new Date(prepared.importedAt),
+    })
     await client.query(
       'delete from free_preview_pending_claims where user_id = $1 and confirmation_id = $2',
       [user.id, confirmationId],
@@ -1311,17 +1337,6 @@ async function confirmFreePreviewClaim(
   })
 
   await runSklandImportPostCommit(user.id, candidateProfile, prepared)
-  await recordRequestBehaviorEvent({
-    req,
-    eventType: 'bind',
-    userId: user.id,
-    sessionTokenHash,
-    profileId: result.profile_id,
-    uid: result.imported.uid,
-    activityClaimedAt: candidateProfile.created_at,
-    declarationVersion: personalUseAcceptance?.declaration_version,
-    declarationAcceptedAt: personalUseAcceptance?.accepted_at,
-  })
   return jsonResponse({
     ...(await buildPayloadWithImport(user, result.profile_id, result.imported)),
     replayed: false,

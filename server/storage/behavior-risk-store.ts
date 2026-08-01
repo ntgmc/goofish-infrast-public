@@ -85,9 +85,16 @@ type CaseRow = {
 
 export async function insertBehaviorRiskEvent(input: BehaviorRiskEventInput): Promise<boolean> {
   await ensureDatabaseSchema()
+  return insertBehaviorRiskEventInTransaction({ query }, input)
+}
+
+export async function insertBehaviorRiskEventInTransaction(
+  client: Pick<PoolClient, 'query'>,
+  input: BehaviorRiskEventInput,
+): Promise<boolean> {
   const occurredAt = input.occurredAt ?? new Date()
   const expiresAt = new Date(occurredAt.getTime() + RETENTION_MS)
-  const result = await query<{ id: string }>(
+  const result = await client.query<{ id: string }>(
     `insert into behavior_risk_events
       (id, event_key, event_type, user_id, profile_id, job_id, browser_hmac, session_hmac, network_hmac, ua_hmac,
        uid_hmac, output_hash, page_category, key_version, model_version, optimizer_version, structure_summary,

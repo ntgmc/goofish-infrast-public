@@ -12,7 +12,8 @@ export const personalUseCopy = {
   confirmation_submitting: '正在确认…',
   confirmation_status_load_failed: '无法读取个人使用声明状态，请稍后重试。',
   confirmation_submit_failed: '确认未完成，请稍后重试。',
-  privacy_acceptance_notice: '当你领取免费预览权益或导出免费档案生成的成果时，平台会记录声明版本、确认时间、账号与档案标识、触发操作类型及客户端 IP。该记录仅用于证明确认链路、处理异常使用和争议沟通；账号存续期间保留，账号注销后再保留一年后删除或去标识化。',
+  confirmation_version_changed: '个人使用声明已更新，请阅读当前版本后重新确认。',
+  privacy_acceptance_notice: '当你领取免费预览权益、创建或转换个人按次档案、生成或调序、导出个人档案成果时，平台会分别记录声明版本、确认时间、账号与档案标识、触发操作类型及客户端 IP。该记录仅用于证明确认链路、处理异常使用和争议沟通；账号存续期间保留，账号注销后再保留一年后删除或去标识化。',
   terms_personal_use_heading: '个人使用声明',
   terms_personal_use_intro: '免费预览、个人按次档案及其生成成果适用下列《个人使用声明》（V1.1 / 生效日期：2026-07-31）；商用档案不适用本声明，改为遵守服务条款中的商用账户规则。该声明仅自该日起适用于之后发生的使用行为，不以新条款单独追溯此前行为。',
   sections: [

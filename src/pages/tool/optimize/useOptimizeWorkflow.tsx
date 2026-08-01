@@ -534,6 +534,7 @@ export function useOptimizeWorkflow(props: Props) {
     }, [activeConfig, loadBillingQuote, mergedOperators, profileId, runOptimizeJob])
 
   const handleReorderCheck = useCallback(async () => {
+      await guardPersonalUseDeclaration('reorder_check', async () => {
       if (!isRestrictedPreview || reorderCheckLoading || loading) return
       if (reorderCheckDisabledReason) {
         setReorderCheckError(reorderCheckDisabledReason)
@@ -561,7 +562,8 @@ export function useOptimizeWorkflow(props: Props) {
         setUseReorderCheckCoupon(false)
         await refreshInventory()
       }
-    }, [activeConfig, isRestrictedPreview, latestWorkspaceResult, loading, profileId, refreshInventory, reorderCheckDisabledReason, reorderCheckLoading, useReorderCheckCoupon])
+      })
+    }, [activeConfig, guardPersonalUseDeclaration, isRestrictedPreview, latestWorkspaceResult, loading, profileId, refreshInventory, reorderCheckDisabledReason, reorderCheckLoading, useReorderCheckCoupon])
 
   const handleConfirmFreeSchedule = useCallback(async () => {
       if (!isPreviewProfile || freeScheduleConfirming || !latestWorkspaceResult) return
@@ -585,6 +587,7 @@ export function useOptimizeWorkflow(props: Props) {
     }, [freeScheduleConfirming, isPreviewProfile, latestWorkspaceResult, profileId])
 
   const handleGenerate = useCallback(async () => {
+      await guardPersonalUseDeclaration('optimization_generate', async () => {
       if (licenseSyncing || loading || optimizeInFlightRef.current) return
       if (hasResult && lastGeneratedSignature === optimizeSignature) return
       if (effectiveFreeScheduleGenerateBlockedReason) {
@@ -660,7 +663,8 @@ export function useOptimizeWorkflow(props: Props) {
           setProgress(null)
         }
       }
-    }, [additionalRecomputeCouponEligible, configValidationMessage, effectiveFreeScheduleGenerateBlockedReason, flushConfigSave, flushPendingLicenseSync, hasResult, itemBalances.training_diagnosis_coupon, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, refreshInventory, refreshRewardBalance, runOptimize, showConfigValidationToast, useAdditionalRecomputeCoupon, usePriorityCoupon, useTrainingDiagnosisCoupon, userCanUseUpgradeFeatures])
+      })
+    }, [additionalRecomputeCouponEligible, configValidationMessage, effectiveFreeScheduleGenerateBlockedReason, flushConfigSave, flushPendingLicenseSync, guardPersonalUseDeclaration, hasResult, itemBalances.training_diagnosis_coupon, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, refreshInventory, refreshRewardBalance, runOptimize, showConfigValidationToast, useAdditionalRecomputeCoupon, usePriorityCoupon, useTrainingDiagnosisCoupon, userCanUseUpgradeFeatures])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
       if (loading || optimizeInFlightRef.current) return

@@ -11,7 +11,10 @@ import {
   saveUserProfile,
 } from '../storage/user-store'
 import { query } from '../storage/postgres'
-import { listPersonalUseDeclarationAcceptancesForUser } from '../storage/personal-use-declaration-store'
+import {
+  listPersonalUseDeclarationAcceptancesForUser,
+  listPersonalUseDeclarationUsageEventsForUser,
+} from '../storage/personal-use-declaration-store'
 import { clearSessionCookie, jsonResponse, normalizeEmail, requireUserSession, type AuthContext } from './user-auth'
 import { PasswordWorkCapacityError, verifyPasswordHash } from '../security/password'
 import { requestSchemas } from '../security/request-policy'
@@ -68,6 +71,7 @@ async function exportData(userId: string): Promise<Response> {
     samples,
     deletion,
     personalUseDeclarations,
+    personalUseUsageEvents,
     invitationCode,
     invitations,
     profileEntitlements,
@@ -148,6 +152,7 @@ async function exportData(userId: string): Promise<Response> {
       [userId],
     ),
     listPersonalUseDeclarationAcceptancesForUser(userId),
+    listPersonalUseDeclarationUsageEventsForUser(userId),
     query('select code, created_at from invitation_codes where user_id = $1', [userId]),
     query(
       `select id,
@@ -261,6 +266,7 @@ async function exportData(userId: string): Promise<Response> {
     metered_personal_claim: meteredPersonalClaim.rows[0] ?? null,
     announcement_reads: announcementReads.rows,
     personal_use_declarations: personalUseDeclarations,
+    personal_use_declaration_usage_events: personalUseUsageEvents,
     inventory: {
       grants: inventoryGrants.rows,
       consumptions: inventoryConsumptions.rows,

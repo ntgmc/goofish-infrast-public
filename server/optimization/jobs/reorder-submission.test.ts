@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   admitJob: vi.fn(),
   requestProcessing: vi.fn(),
   recordEvent: vi.fn(),
+  recordPersonalUseDeclarationUsage: vi.fn(),
   body: {
     profileId: 'profile-1',
     config: { Fiammetta: { enable: false } },
@@ -38,6 +39,17 @@ vi.mock('../../storage/optimize-job-store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../storage/optimize-job-store')>()
   return { ...actual, getOptimizeJobStore: () => ({ admitJob: mocks.admitJob }) }
 })
+vi.mock('../../storage/personal-use-declaration-store', () => ({
+  PersonalUseDeclarationRequiredError: class PersonalUseDeclarationRequiredError extends Error {
+    readonly code = 'personal_use_declaration_required'
+    readonly status = 428
+
+    constructor() {
+      super('请先确认当前版本的个人使用声明。')
+    }
+  },
+  recordPersonalUseDeclarationUsage: mocks.recordPersonalUseDeclarationUsage,
+}))
 vi.mock('../../storage/user-store', () => ({
   getProfileForUser: vi.fn(async () => ({
     id: 'profile-1',
@@ -83,6 +95,7 @@ vi.mock('./http-core', () => ({
 vi.mock('./reorder-telemetry', () => ({ recordReorderCheckEvent: mocks.recordEvent }))
 
 import { OptimizeJobAdmissionError } from '../../storage/optimize-job-store'
+import { PersonalUseDeclarationRequiredError } from '../../storage/personal-use-declaration-store'
 import { submitReorderCheck } from './reorder-submission'
 
 describe('reorder check submission', () => {
@@ -90,6 +103,8 @@ describe('reorder check submission', () => {
     mocks.admitJob.mockReset()
     mocks.requestProcessing.mockReset()
     mocks.recordEvent.mockReset()
+    mocks.recordPersonalUseDeclarationUsage.mockReset()
+    mocks.recordPersonalUseDeclarationUsage.mockResolvedValue({ declaration_version: 'V1.1' })
     mocks.admitJob.mockResolvedValue({ job: { id: 'job-1' }, replayed: false })
   })
 
@@ -112,6 +127,28 @@ describe('reorder check submission', () => {
       }),
     }))
     expect(mocks.requestProcessing).toHaveBeenCalledTimes(1)
+    expect(mocks.recordPersonalUseDeclarationUsage).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'user-1',
+      profileId: 'profile-1',
+      action: 'reorder_check',
+    }))
+    expect(mocks.recordPersonalUseDeclarationUsage.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.admitJob.mock.invocationCallOrder[0]!,
+    )
+  })
+
+  it('rejects an unconfirmed profile before job admission', async () => {
+    mocks.recordPersonalUseDeclarationUsage.mockRejectedValueOnce(new PersonalUseDeclarationRequiredError())
+
+    const response = await submitReorderCheck(request())
+
+    expect(response.status).toBe(428)
+    await expect(response.json()).resolves.toEqual({
+      error: '请先确认当前版本的个人使用声明。',
+      code: 'personal_use_declaration_required',
+    })
+    expect(mocks.admitJob).not.toHaveBeenCalled()
+    expect(mocks.requestProcessing).not.toHaveBeenCalled()
   })
 
   it('returns the monthly quota error before signaling the worker', async () => {
