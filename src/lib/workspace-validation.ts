@@ -20,7 +20,7 @@ const boundedCountRecord = z.record(
   }
 })
 
-const licenseOperatorSchema = z.strictObject({
+const licenseOperatorShape = {
   id: boundedString(128),
   name: boundedString(80),
   own: z.boolean(),
@@ -28,24 +28,34 @@ const licenseOperatorSchema = z.strictObject({
   rarity: z.number().int().min(0).max(6),
   level: z.number().int().min(0).max(100).optional(),
   potential: z.number().int().min(0).max(6).optional(),
-})
+}
 
-export const licenseOperatorsSchema = z.array(licenseOperatorSchema)
+const assertUniqueOperatorIds = (
+  operators: Array<{ id: string }>,
+  context: z.RefinementCtx,
+): void => {
+  const ids = new Set<string>()
+  for (const [index, operator] of operators.entries()) {
+    if (ids.has(operator.id)) {
+      context.addIssue({
+        code: 'custom',
+        path: [index, 'id'],
+        message: '干员 ID 不能重复。',
+      })
+    }
+    ids.add(operator.id)
+  }
+}
+
+export const licenseOperatorsSchema = z.array(z.strictObject(licenseOperatorShape))
   .min(1)
   .max(WORKSPACE_OPERATOR_LIMIT)
-  .superRefine((operators, context) => {
-    const ids = new Set<string>()
-    for (const [index, operator] of operators.entries()) {
-      if (ids.has(operator.id)) {
-        context.addIssue({
-          code: 'custom',
-          path: [index, 'id'],
-          message: '干员 ID 不能重复。',
-        })
-      }
-      ids.add(operator.id)
-    }
-  })
+  .superRefine(assertUniqueOperatorIds)
+
+export const extensibleLicenseOperatorsSchema = z.array(z.object(licenseOperatorShape).passthrough())
+  .min(1)
+  .max(WORKSPACE_OPERATOR_LIMIT)
+  .superRefine(assertUniqueOperatorIds)
 
 const optimizerSearchSchema = z.strictObject({
   optimization_mode: boundedString(32).optional(),
@@ -74,7 +84,7 @@ const intermediateInventorySchema = z.strictObject({
   'Orirock Cube': finiteNumber.min(0).max(1_000_000_000_000).optional(),
 })
 
-export const licenseConfigSchema = z.strictObject({
+const licenseConfigShape = {
   layout: boundedString(32),
   desc: z.string().max(200),
   schedule_mode: boundedString(40).optional(),
@@ -111,7 +121,11 @@ export const licenseConfigSchema = z.strictObject({
   variable_shift_schedule: variableShiftScheduleSchema.optional(),
   intermediate_inventory: intermediateInventorySchema.optional(),
   auto_balance_source: boundedString(40).optional(),
-})
+}
+
+export const licenseConfigSchema = z.strictObject(licenseConfigShape)
+
+export const extensibleLicenseConfigSchema = z.object(licenseConfigShape).passthrough()
 
 export const eliteOverridesSchema = z.record(
   boundedString(128),

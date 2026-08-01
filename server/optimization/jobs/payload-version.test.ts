@@ -10,6 +10,23 @@ describe('persisted optimization payload versions', () => {
     expect(normalizePersistedOptimizationJobPayload(payload)).toEqual(payload)
   })
 
+  it('preserves version 3 operator and config extensions', () => {
+    const payload = schedulePayload()
+    const extendedPayload = {
+      ...payload,
+      operators: payload.operators.map((operator) => ({
+        ...operator,
+        optimizer_metadata: { source: 'legacy-version-3' },
+      })),
+      effectiveConfig: {
+        ...payload.effectiveConfig,
+        optimizer_metadata: { strategy: 'legacy-version-3' },
+      },
+    }
+
+    expect(normalizePersistedOptimizationJobPayload(extendedPayload)).toEqual(extendedPayload)
+  })
+
   it('rejects standalone suggestion payloads', () => {
     expect(() => normalizePersistedOptimizationJobPayload({
       version: 3,
