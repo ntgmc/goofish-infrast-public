@@ -9,7 +9,7 @@ import {
   OptimizeJobPollCancelledError,
   waitForOptimizePoll,
 } from './job-progress'
-import { submitReorderCheckJob } from './optimization-api'
+import { cancelOptimizationJob, submitReorderCheckJob } from './optimization-api'
 
 const REORDER_POINTER_PREFIX = 'maa-optimize-reorder-current-v1:'
 const REORDER_STATE_PREFIX = 'maa-optimize-reorder-job-v1:'
@@ -54,6 +54,14 @@ export async function resumeReorderCheckJob(
   const state = readCurrentReorderJob(profileId)
   if (!state) return null
   return continueReorderJob(state, fallbackMessage, isCancelled)
+}
+
+export async function cancelCurrentReorderCheckJob(profileId: string): Promise<boolean> {
+  const state = readCurrentReorderJob(profileId)
+  if (!state?.job?.canCancel) return false
+  const job = await cancelOptimizationJob(state.job.id) as ReorderCheckJobSnapshot
+  writeReorderState({ ...state, job, updatedAt: Date.now() })
+  return true
 }
 
 async function continueReorderJob(
@@ -107,6 +115,7 @@ async function continueReorderJob(
 
   clearReorderState(state)
   if (job.status === 'succeeded') return job.result
+  if (job.status === 'cancelled') throw new OptimizeJobPollCancelledError()
   throw new Error(job.error.message || fallbackMessage)
 }
 

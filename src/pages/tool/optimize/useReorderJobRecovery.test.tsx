@@ -29,7 +29,7 @@ describe('useReorderJobRecovery', () => {
     }
 
     renderHook(
-      () => useReorderJobRecovery('profile-1', true, refreshInventory, setters),
+      () => useReorderJobRecovery('profile-1', true, refreshInventory, setters, vi.fn()),
       { wrapper: ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode> },
     )
     await flushPromises()
@@ -50,16 +50,16 @@ describe('useReorderJobRecovery', () => {
       setEntitlement: vi.fn(),
     }
     const { result, rerender } = renderHook(
-      ({ profileId }) => useReorderJobRecovery(profileId, true, async () => undefined, setters),
+      ({ profileId }) => useReorderJobRecovery(profileId, true, async () => undefined, setters, vi.fn()),
       { initialProps: { profileId: 'profile-1' } },
     )
-    const previousProfileCancelled = result.current
+    const previousProfileCancelled = result.current.isCancelled
 
     rerender({ profileId: 'profile-2' })
     await act(async () => undefined)
 
     expect(previousProfileCancelled()).toBe(true)
-    expect(result.current()).toBe(false)
+    expect(result.current.isCancelled()).toBe(false)
   })
 })
 

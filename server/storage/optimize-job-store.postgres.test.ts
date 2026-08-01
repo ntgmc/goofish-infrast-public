@@ -20,6 +20,7 @@ import { confirmFreeScheduleEntitlement, getFreeScheduleEntitlement } from './re
 import { adjustBalance, getBalanceSummary } from './balance-store'
 import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
 import { recordOperatorFingerprintInTransaction } from './cdk-store'
+import { getItemBalance, grantItem } from './inventory-store'
 
 let container: PostgreSqlContainer
 const legacyJobId = randomUUID()
@@ -282,13 +283,14 @@ describe('PostgreSQL optimization job admission', () => {
 
   it('consumes reorder quota and grants the strong bonus in the successful attempt transaction', async () => {
     const profileId = await seedProfile()
+    const payload = formalReorderPayload(profileId)
     const store = createPostgresOptimizeJobStore()
     const admitted = await store.admitJob(input({
       priority: 2_000_000_000,
       owner_key: `reorder-job:${randomUUID()}`,
       profile_id: profileId,
       source: 'reorder_check',
-      payload_json: { version: 3, kind: 'reorder_check' },
+      payload_json: payload,
       reorderCheckQuota: {
         profileId,
         windowKey: shanghaiMonthKey(new Date().toISOString()),
@@ -304,7 +306,7 @@ describe('PostgreSQL optimization job admission', () => {
       claimed!.attempt_count,
       'reorder-success-worker',
       lockToken,
-      { recommendation: 'strongly_recommended', quota: { limit: 2, used: 1, remaining: 1 } },
+      formalReorderResult(payload, 'strongly_recommended'),
     )).resolves.toBe(true)
 
     expect((await query<{ status: string }>(
@@ -320,11 +322,94 @@ describe('PostgreSQL optimization job admission', () => {
       status: 'succeeded',
       result_json: {
         recommendation: 'strongly_recommended',
+        quota: { limit: 2, used: 1, remaining: 1, timezone: 'Asia/Shanghai' },
         free_schedule_entitlement: {
           strong_reorder_bonus: { used_at: null },
         },
       },
     })
+    expect((await query<{ effect_type: string }>(
+      `select effect_type from optimization_job_effects
+       where job_id = $1 and effect_type = 'reorder_check_completion'`,
+      [admitted.job.id],
+    )).rows).toEqual([{ effect_type: 'reorder_check_completion' }])
+  })
+
+  it('allows a coupon transaction after two successful ledger-backed reorder checks', async () => {
+    const profileId = await seedProfile()
+    const userId = (await query<{ user_id: string }>(
+      'select user_id from user_game_accounts where id = $1',
+      [profileId],
+    )).rows[0]!.user_id
+    await grantItem({
+      userId,
+      itemCode: 'reorder_check_coupon',
+      quantity: 1,
+      expiry: { mode: 'never' },
+      sourceType: 'test',
+      sourceId: `reorder-coupon:${profileId}`,
+      recipientRole: 'test',
+    })
+    const store = createPostgresOptimizeJobStore()
+    const windowKey = shanghaiMonthKey(new Date().toISOString())
+
+    for (let index = 0; index < 2; index += 1) {
+      const payload = formalReorderPayload(profileId)
+      const admitted = await store.admitJob(input({
+        priority: 2_000_000_000,
+        owner_key: `reorder-job:${profileId}`,
+        profile_id: profileId,
+        source: 'reorder_check',
+        payload_json: payload,
+        reorderCheckQuota: { profileId, windowKey, limit: 2, useCoupon: false },
+      }))
+      await query('update optimize_dispatch_state set prioritized_streak = 0 where id = true')
+      const lockToken = randomUUID()
+      const claimed = await store.claimNextJob(`reorder-quota-worker-${index}`, lockToken, new Date(Date.now() + 60_000).toISOString(), 2, 10)
+      expect(claimed?.id).toBe(admitted.job.id)
+      await expect(store.completeAttempt(
+        admitted.job.id,
+        claimed!.attempt_count,
+        `reorder-quota-worker-${index}`,
+        lockToken,
+        formalReorderResult(payload, 'recommended'),
+      )).resolves.toBe(true)
+    }
+
+    const couponPayload = formalReorderPayload(profileId)
+    const couponJob = await store.admitJob(input({
+      priority: 2_000_000_000,
+      owner_key: `reorder-job:${profileId}`,
+      profile_id: profileId,
+      source: 'reorder_check',
+      payload_json: couponPayload,
+      reward_user_id: userId,
+      reward_item_codes: ['reorder_check_coupon'],
+      reorderCheckQuota: { profileId, windowKey, limit: 2, useCoupon: true },
+    }))
+    await query('update optimize_dispatch_state set prioritized_streak = 0 where id = true')
+    const couponLock = randomUUID()
+    const claimedCoupon = await store.claimNextJob('reorder-coupon-worker', couponLock, new Date(Date.now() + 60_000).toISOString(), 2, 10)
+    expect(claimedCoupon?.id).toBe(couponJob.job.id)
+    await expect(store.completeAttempt(
+      couponJob.job.id,
+      claimedCoupon!.attempt_count,
+      'reorder-coupon-worker',
+      couponLock,
+      formalReorderResult(couponPayload, 'recommended'),
+    )).resolves.toBe(true)
+
+    await expect(store.getJob(couponJob.job.id)).resolves.toMatchObject({
+      status: 'succeeded',
+      result_json: { quota: { used: 2, remaining: 0, timezone: 'Asia/Shanghai' } },
+    })
+    expect((await query<{ count: string }>(
+      `select count(*)::text as count from entitlement_ledger
+       where profile_id = $1 and entitlement_type = 'reorder_check'
+         and window_key = $2 and status = 'consumed'`,
+      [profileId, windowKey],
+    )).rows[0]?.count).toBe('2')
+    await expect(getItemBalance(userId, 'reorder_check_coupon')).resolves.toBe(0)
   })
 
   it('replays an idempotent submit and limits a paid owner to three queued jobs', async () => {
@@ -1164,6 +1249,49 @@ function formalSchedulePayload(profileId: string) {
 
 function formalScheduleResult(title: string) {
   return { author: 'test', title, description: title, buildingType: 2, planTimes: '8h', plans: [], raw_results: [] }
+}
+
+function formalReorderPayload(profileId: string) {
+  return {
+    version: 3 as const,
+    kind: 'reorder_check' as const,
+    submittedAt: Date.now(),
+    operators: formalOperators(),
+    effectiveConfig: formalConfig(),
+    activeProfileId: profileId,
+    isPreviewTrial: false,
+    baseline: {
+      id: `history-${profileId}`,
+      name: 'History',
+      created_at: '2026-07-31T00:00:00.000Z',
+      config: formalConfig(),
+      result: formalScheduleResult('baseline'),
+      operator_count: 1,
+      source: 'generated' as const,
+    },
+    estimate: { estimated_duration_ms: 2_000, estimate_bucket: 'maa_plain' as const, estimate_source: 'fallback_p95' as const, estimate_sample_count: 0 },
+  }
+}
+
+function formalReorderResult(
+  payload: ReturnType<typeof formalReorderPayload>,
+  recommendation: 'recommended' | 'strongly_recommended',
+) {
+  return {
+    recommendation,
+    estimated_gain_range: { min: 1, max: 2, unit: 'equivalent_sanity_per_day' as const, label: '1-2' },
+    changed_room_count: 1,
+    affected_facility_types: ['trading'],
+    key_operators: [],
+    current_plan_usable: true,
+    quota: { limit: 2 as const, used: 0, remaining: 2, reset_at: '2026-08-31T16:00:00.000Z', timezone: 'Asia/Shanghai' as const },
+    baseline: {
+      history_id: payload.baseline.id,
+      created_at: payload.baseline.created_at,
+      name: payload.baseline.name,
+    },
+    reasons: ['存在可验证的房间调整收益。'],
+  }
 }
 
 async function seedMeteredProfile(): Promise<{ userId: string; profileId: string }> {

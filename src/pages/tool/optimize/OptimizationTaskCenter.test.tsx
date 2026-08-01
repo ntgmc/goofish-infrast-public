@@ -121,6 +121,7 @@ function Harness({ controller: taskController, onRetry = vi.fn(), onOpenResult =
           onRetry()
         }}
         onOpenScenario={close}
+        onOpenReorder={close}
         onOpenResult={() => {
           close()
           onOpenResult()

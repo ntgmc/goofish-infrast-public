@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
-import type { FreeScheduleEntitlement, OptimizeCalculationStage, OptimizeResult, WorkspaceResultHistoryItem } from '../../src/lib/types'
+import type { FreeScheduleEntitlement, OptimizeCalculationStage, OptimizeResult, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../src/lib/types'
 import { formatOptimizeJobHardTimeout, getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs } from '../optimize-job-config'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
-import { getShanghaiMonthKey, REORDER_CHECK_MONTHLY_LIMIT } from '../reorder-check-policy'
+import { getShanghaiMonthKey, getShanghaiNextMonthStart, REORDER_CHECK_MONTHLY_LIMIT } from '../reorder-check-policy'
 import {
   commitReservedItemsInTransaction,
   ItemUnavailableError,
@@ -20,6 +20,7 @@ import { emptyWorkspace, updateProfileWorkspaceInTransaction } from './user-stor
 import { limitPreviewOptimizeResult } from '../optimization/jobs/entitlements'
 import { normalizePersistedOptimizationJobPayload, type OptimizationJobPayload, type OptimizeJobPayload } from '../optimization/jobs/shared'
 import { parseOptimizationJobResult } from '../optimization/jobs/runtime-contracts'
+import { countReorderCheckQuotaInTransaction } from './reorder-quota-store'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
@@ -98,13 +99,14 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
     profileId: string
     windowKey: string
     limit: number
+    useCoupon?: boolean
   } | null
   billing?: { userId: string; quote: MeteredScheduleQuote } | null
 }
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'reorder_check_quota_exceeded' | 'insufficient_balance',
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance',
     readonly status: 409 | 429,
     message: string,
   ) {
@@ -314,13 +316,15 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         }
 
         if (input.reorderCheckQuota) {
-          const quota = await client.query<{ count: string }>(
-            `select count(*)::text as count from entitlement_ledger
-             where profile_id = $1 and entitlement_type = 'reorder_check' and window_key = $2
-               and status in ('reserved', 'consumed')`,
-            [input.reorderCheckQuota.profileId, input.reorderCheckQuota.windowKey],
+          const used = await countReorderCheckQuotaInTransaction(
+            client,
+            input.reorderCheckQuota.profileId,
+            input.reorderCheckQuota.windowKey,
           )
-          if (Number(quota.rows[0]?.count ?? 0) >= input.reorderCheckQuota.limit) {
+          if (input.reorderCheckQuota.useCoupon && used < input.reorderCheckQuota.limit) {
+            throw new OptimizeJobAdmissionError('item_not_applicable', 409, '本月免费调序检查配额尚未用完，不能消耗券。')
+          }
+          if (!input.reorderCheckQuota.useCoupon && used >= input.reorderCheckQuota.limit) {
             throw new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月重排检测次数已用完。')
           }
         }
@@ -406,7 +410,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             throw error
           }
         }
-        if (input.reorderCheckQuota) {
+        if (input.reorderCheckQuota && !input.reorderCheckQuota.useCoupon) {
           await client.query(
             `insert into entitlement_ledger
               (id, profile_id, entitlement_type, status, reference_type, reference_id, window_key, created_at)
@@ -627,17 +631,20 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
              and entitlement_type = 'reorder_check' and status = 'reserved'`,
           [id, now],
         )
+        if (formalPayload && 'kind' in formalPayload && formalPayload.kind === 'reorder_check' && selectedJob.profile_id) {
+          resultJson = await persistReorderCompletionInTransaction(
+            client,
+            selectedJob,
+            formalPayload,
+            resultJson as ReorderCheckResult,
+            now,
+          )
+          await client.query('update optimize_jobs set result_json = $2 where id = $1', [id, resultJson])
+        }
         await commitReservedItemsInTransaction(client, 'optimization_job', id, now)
         const billing = await settleScheduleBalanceInTransaction(client, id, now)
         if (billing) {
           await client.query("update optimize_jobs set billing_json = jsonb_set(billing_json, '{status}', '\"settled\"'::jsonb) where id = $1", [id])
-        }
-        if (isReorderCheckPayload(selectedJob.payload_json)
-          && selectedJob.profile_id
-          && isStrongReorderRecommendation(resultJson)) {
-          const entitlement = await grantStrongReorderBonusInTransaction(client, selectedJob.profile_id, now)
-          resultJson = { ...resultJson as Record<string, unknown>, free_schedule_entitlement: entitlement }
-          await client.query('update optimize_jobs set result_json = $2 where id = $1', [id, resultJson])
         }
         await client.query(
           `update optimize_job_attempts set status = 'succeeded', finished_at = $5, heartbeat_at = $5
@@ -906,7 +913,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           `delete from optimization_idempotency idem where idem.updated_at < $1
              and not exists (
                select 1 from optimization_job_effects effect
-               where effect.job_id = idem.job_id and effect.effect_type = 'schedule_completion'
+               where effect.job_id = idem.job_id
                  and coalesce(effect.metadata_json->>'status', 'pending') = 'pending'
              )`,
           [beforeIso],
@@ -922,7 +929,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
              and not exists (select 1 from user_balance_reservations reservation
                where reservation.job_id = job.id and reservation.status = 'reserved')
              and not exists (select 1 from optimization_job_effects effect
-               where effect.job_id = job.id and effect.effect_type = 'schedule_completion'
+               where effect.job_id = job.id
                  and coalesce(effect.metadata_json->>'status', 'pending') = 'pending')`,
           [beforeIso, ['succeeded', 'failed', 'cancelled']],
         )
@@ -1075,7 +1082,10 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
           reservation.profileId === input.reorderCheckQuota?.profileId
           && reservation.windowKey === input.reorderCheckQuota.windowKey
           && (reservation.status === 'reserved' || reservation.status === 'consumed')).length
-        if (used >= input.reorderCheckQuota.limit) {
+        if (input.reorderCheckQuota.useCoupon && used < input.reorderCheckQuota.limit) {
+          throw new OptimizeJobAdmissionError('item_not_applicable', 409, '本月免费调序检查配额尚未用完，不能消耗券。')
+        }
+        if (!input.reorderCheckQuota.useCoupon && used >= input.reorderCheckQuota.limit) {
           throw new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月重排检测次数已用完。')
         }
       }
@@ -1101,7 +1111,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         records.set(record.id, record)
         return record
       })()
-      if (input.reorderCheckQuota) {
+      if (input.reorderCheckQuota && !input.reorderCheckQuota.useCoupon) {
         reorderReservations.set(job.id, {
           profileId: input.reorderCheckQuota.profileId,
           windowKey: input.reorderCheckQuota.windowKey,
@@ -1203,8 +1213,9 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       const job = records.get(id)
       if (!ownsMemoryAttempt(job, attemptNo, workerId, lockToken) || job.cancel_requested_at) return false
       const now = new Date().toISOString()
+      let formalPayload: OptimizationJobPayload | null = null
       try {
-        const formalPayload = normalizeFormalOptimizationJobPayload(job.payload_json)
+        formalPayload = normalizeFormalOptimizationJobPayload(job.payload_json)
         if (formalPayload) resultJson = parseOptimizationJobResult(formalPayload, resultJson)
       } catch {
         job.status = 'failed'
@@ -1226,12 +1237,19 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       if (job.billing_json) job.billing_json = { ...job.billing_json, status: 'settled' }
       const reservation = reorderReservations.get(id)
       if (reservation?.status === 'reserved') reservation.status = 'consumed'
-      if (isReorderCheckPayload(job.payload_json)
-        && isStrongReorderRecommendation(resultJson)
-        && !('free_schedule_entitlement' in resultJson)) {
+      if (formalPayload && 'kind' in formalPayload && formalPayload.kind === 'reorder_check') {
+        const month = getShanghaiMonthKey(new Date(now))
+        const used = [...reorderReservations.values()].filter((candidate) => (
+          candidate.profileId === formalPayload!.activeProfileId
+          && candidate.windowKey === month
+          && (candidate.status === 'reserved' || candidate.status === 'consumed')
+        )).length
         resultJson = {
-          ...resultJson,
-          free_schedule_entitlement: buildMemoryStrongReorderBonus(now),
+          ...resultJson as ReorderCheckResult,
+          quota: buildSettledReorderQuota(used, now),
+          ...(isStrongReorderRecommendation(resultJson)
+            ? { free_schedule_entitlement: buildMemoryStrongReorderBonus(now) }
+            : {}),
         }
       }
       job.result_json = clone(resultJson)
@@ -2094,6 +2112,48 @@ async function persistScheduleCompletionInTransaction(
     [job.id, JSON.stringify({ status: 'pending', attempts: 0 }), nowIso],
   )
   return persistedResult
+}
+
+async function persistReorderCompletionInTransaction(
+  client: PoolClient,
+  job: OptimizeJobRecord,
+  payload: Extract<OptimizationJobPayload, { kind: 'reorder_check' }>,
+  result: ReorderCheckResult,
+  nowIso: string,
+): Promise<ReorderCheckResult> {
+  const used = await countReorderCheckQuotaInTransaction(
+    client,
+    payload.activeProfileId,
+    getShanghaiMonthKey(new Date(nowIso)),
+  )
+  let persistedResult: ReorderCheckResult = {
+    ...result,
+    quota: buildSettledReorderQuota(used, nowIso),
+  }
+  if (isStrongReorderRecommendation(persistedResult)) {
+    persistedResult = {
+      ...persistedResult,
+      free_schedule_entitlement: await grantStrongReorderBonusInTransaction(client, payload.activeProfileId, nowIso),
+    }
+  }
+  await client.query(
+    `insert into optimization_job_effects (job_id, effect_type, metadata_json, applied_at)
+     values ($1, 'reorder_check_completion', $2::jsonb, $3)
+     on conflict (job_id, effect_type) do nothing`,
+    [job.id, JSON.stringify({ status: 'pending', attempts: 0 }), nowIso],
+  )
+  return persistedResult
+}
+
+function buildSettledReorderQuota(used: number, nowIso: string): ReorderCheckResult['quota'] {
+  const normalizedUsed = Math.max(0, Math.floor(used))
+  return {
+    limit: REORDER_CHECK_MONTHLY_LIMIT,
+    used: normalizedUsed,
+    remaining: Math.max(0, REORDER_CHECK_MONTHLY_LIMIT - normalizedUsed),
+    reset_at: getShanghaiNextMonthStart(new Date(nowIso)),
+    timezone: 'Asia/Shanghai',
+  }
 }
 
 async function readFreeScheduleEntitlementInTransaction(

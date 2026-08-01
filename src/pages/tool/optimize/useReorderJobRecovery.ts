@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } fr
 import { copy } from '../../../copy/index'
 import type { FreeScheduleEntitlement, ReorderCheckResult } from '../../../lib/types'
 import { isOptimizeJobPollCancelled } from './job-progress'
-import { resumeReorderCheckJob } from './reorder-job-progress'
+import { cancelCurrentReorderCheckJob, resumeReorderCheckJob } from './reorder-job-progress'
 
 interface ReorderRecoverySetters {
   setLoading: Dispatch<SetStateAction<boolean>>
@@ -16,7 +16,12 @@ export function useReorderJobRecovery(
   enabled: boolean,
   refreshInventory: () => Promise<void>,
   setters: ReorderRecoverySetters,
-): () => boolean {
+  onOpenResult: () => void,
+): {
+  isCancelled: () => boolean
+  cancel: () => Promise<void>
+  openResult: (result: ReorderCheckResult) => void
+} {
   const mountedRef = useRef(true)
   const activeProfileIdRef = useRef(profileId)
   const settersRef = useRef(setters)
@@ -64,5 +69,24 @@ export function useReorderJobRecovery(
     }
   }, [enabled, isCancelled, profileId, refreshInventory])
 
-  return isCancelled
+  const cancel = useCallback(async () => {
+    if (!window.confirm(copy.optimize.pages_tool_optimize_OverviewSection_070)) return
+    try {
+      await cancelCurrentReorderCheckJob(profileId)
+    } catch (error) {
+      settersRef.current.setError(error instanceof Error
+        ? error.message
+        : copy.optimize.pages_tool_optimize_useOptimizeWorkflow_015)
+    }
+  }, [profileId])
+
+  const openResult = useCallback((result: ReorderCheckResult) => {
+    const state = settersRef.current
+    state.setError(null)
+    state.setResult(result)
+    if (result.free_schedule_entitlement) state.setEntitlement(result.free_schedule_entitlement)
+    onOpenResult()
+  }, [onOpenResult])
+
+  return { isCancelled, cancel, openResult }
 }

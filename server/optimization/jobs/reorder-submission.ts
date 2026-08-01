@@ -111,9 +111,8 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
       baseline: baseline.item,
       estimate,
     }
-    const quota = isPreviewTrial ? null : await getReorderCheckQuota(activeProfileId)
-    if (useCoupon && (isPreviewTrial || (quota?.remaining ?? 0) > 0)) {
-      return jsonResponse({ error: isPreviewTrial ? '试用档案无需使用调序检查券。' : '本月免费调序检查配额尚未用完，不能消耗券。', code: 'item_not_applicable' }, 409)
+    if (useCoupon && isPreviewTrial) {
+      return jsonResponse({ error: '试用档案无需使用调序检查券。', code: 'item_not_applicable' }, 409)
     }
     await recordPersonalUseDeclarationUsage({
       userId: auth.user.id,
@@ -133,10 +132,11 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
       request_hash: requestHash,
       reward_user_id: useCoupon ? auth.user.id : null,
       reward_item_codes: useCoupon ? ['reorder_check_coupon'] : [],
-      reorderCheckQuota: isPreviewTrial || useCoupon ? null : {
+      reorderCheckQuota: isPreviewTrial ? null : {
         profileId: activeProfileId,
         windowKey: getShanghaiMonthKey(new Date()),
         limit: REORDER_CHECK_MONTHLY_LIMIT,
+        useCoupon,
       },
     })
     requestOptimizeJobProcessing()

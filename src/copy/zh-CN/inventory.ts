@@ -4,6 +4,7 @@ export const inventoryCopy = {
   title: '背包',
   description: '查看道具批次、有效期和适用入口。需要绑定业务操作的券不能在这里直接消耗。',
   loading: '正在加载背包…',
+  refresh_failed: '道具余额刷新失败，请稍后重试。',
   load_failed: '加载背包失败。',
   empty: '当前分类没有可用道具。',
   search: '按道具名称筛选',

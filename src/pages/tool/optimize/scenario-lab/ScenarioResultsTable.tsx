@@ -18,7 +18,9 @@ export default function ScenarioResultsTable({
   const sorted = useMemo(() => [...points].sort((left, right) => compare(left, right, sort)), [points, sort])
   const changeSort = (key: SortKey) => setSort((current) => ({
     key,
-    direction: current.key === key && current.direction === 'descending' ? 'ascending' : 'descending',
+    direction: current.key === key
+      ? current.direction === 'descending' ? 'ascending' : 'descending'
+      : key === 'opportunity' ? 'ascending' : 'descending',
   }))
 
   return (
@@ -35,7 +37,7 @@ export default function ScenarioResultsTable({
               <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_006} sortKey="orundum" sort={sort} onSort={changeSort} />
               <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_007} />
               <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_008} />
-              <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_009} sortKey="opportunity" sort={sort} onSort={changeSort} />
+              <SortableHeader label={`${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_009}（${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_047}）`} sortKey="opportunity" sort={sort} onSort={changeSort} />
               <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_010} />
               <Header label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_011} />
               <SortableHeader label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioResultsTable_012} sortKey="frontier" sort={sort} onSort={changeSort} />
@@ -144,17 +146,19 @@ function compare(left: ScenarioComparisonPoint, right: ScenarioComparisonPoint, 
   const direction = sort.direction === 'ascending' ? 1 : -1
   const leftMetric = metric(left)
   const rightMetric = metric(right)
-  const values: Record<SortKey, [number, number]> = {
+  const values: Record<SortKey, [number | null, number | null]> = {
     frontier: [left.isFrontier ? 1 : left.verified ? 0.5 : 0, right.isFrontier ? 1 : right.verified ? 0.5 : 0],
     operations: [left.operationsPerDay, right.operationsPerDay],
-    sanity: [leftMetric?.productionSanityPerDay ?? -Infinity, rightMetric?.productionSanityPerDay ?? -Infinity],
-    lmd: [leftMetric?.lmdPerDay ?? -Infinity, rightMetric?.lmdPerDay ?? -Infinity],
-    battle: [leftMetric?.battleRecordPerDay ?? -Infinity, rightMetric?.battleRecordPerDay ?? -Infinity],
-    orundum: [leftMetric?.orundumEconomy?.sustainablePerDay ?? -Infinity, rightMetric?.orundumEconomy?.sustainablePerDay ?? -Infinity],
-    opportunity: [leftMetric?.orundumEconomy?.opportunityCostSanityPerDay ?? Infinity, rightMetric?.orundumEconomy?.opportunityCostSanityPerDay ?? Infinity],
+    sanity: [leftMetric?.productionSanityPerDay ?? null, rightMetric?.productionSanityPerDay ?? null],
+    lmd: [leftMetric?.lmdPerDay ?? null, rightMetric?.lmdPerDay ?? null],
+    battle: [leftMetric?.battleRecordPerDay ?? null, rightMetric?.battleRecordPerDay ?? null],
+    orundum: [leftMetric?.orundumEconomy?.sustainablePerDay ?? null, rightMetric?.orundumEconomy?.sustainablePerDay ?? null],
+    opportunity: [leftMetric?.orundumEconomy?.opportunityCostSanityPerDay ?? null, rightMetric?.orundumEconomy?.opportunityCostSanityPerDay ?? null],
   }
   const [a, b] = values[sort.key]
-  if (a !== b) return (a - b) * direction
+  if (a === null && b !== null) return 1
+  if (b === null && a !== null) return -1
+  if (a !== null && b !== null && a !== b) return (a - b) * direction
   return left.operationsPerDay - right.operationsPerDay || (rightMetric?.productionSanityPerDay ?? 0) - (leftMetric?.productionSanityPerDay ?? 0) || left.id.localeCompare(right.id)
 }
 

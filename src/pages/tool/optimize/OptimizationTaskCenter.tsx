@@ -48,6 +48,7 @@ export default function OptimizationTaskCenterDialog({
   onClose,
   onRetrySchedule,
   onOpenScenario,
+  onOpenReorder,
   onOpenResult = () => undefined,
   retryEnabled = true,
 }: {
@@ -55,7 +56,8 @@ export default function OptimizationTaskCenterDialog({
   controller: OptimizationTaskCenterController;
   onClose: () => void;
   onRetrySchedule: () => void;
-  onOpenScenario: () => void;
+  onOpenScenario: (job: OptimizationJobListItem) => void;
+  onOpenReorder: (job: OptimizationJobListItem) => void;
   onOpenResult?: (job: OptimizationJobListItem) => void;
   retryEnabled?: boolean;
 }) {
@@ -159,7 +161,8 @@ export default function OptimizationTaskCenterDialog({
                 busy={busyJobId === job.id}
                 onCancel={() => void controller.cancel(job)}
                 onRetrySchedule={onRetrySchedule}
-                onOpenScenario={onOpenScenario}
+                onOpenScenario={() => onOpenScenario(job)}
+                onOpenReorder={() => onOpenReorder(job)}
                 onOpenResult={() => onOpenResult(job)}
                 retryEnabled={retryEnabled}
               />
@@ -176,12 +179,13 @@ export default function OptimizationTaskCenterDialog({
   )
 }
 
-function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenResult, retryEnabled }: {
+function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenReorder, onOpenResult, retryEnabled }: {
   job: OptimizationJobListItem;
   busy: boolean;
   onCancel: () => void;
   onRetrySchedule: () => void;
   onOpenScenario: () => void;
+  onOpenReorder: () => void;
   onOpenResult: () => void;
   retryEnabled: boolean;
 }) {
@@ -206,11 +210,12 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenRe
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {job.canCancel && <button type="button" disabled={busy} onClick={onCancel} className="tool-secondary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_020}</button>}
-          {job.status === 'succeeded' && job.kind === 'schedule' && job.resultAvailable && job.historyResultId && (
+          {job.status === 'succeeded' && job.resultAvailable && (job.kind !== 'schedule' || job.historyResultId) && (
             <button type="button" onClick={onOpenResult} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_037}</button>
           )}
           {retryEnabled && job.canRetry && job.kind === 'schedule' && <button type="button" onClick={onRetrySchedule} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_022}</button>}
           {retryEnabled && job.canRetry && job.kind === 'scenario_comparison' && <button type="button" onClick={onOpenScenario} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_023}</button>}
+          {retryEnabled && job.canRetry && job.kind === 'reorder_check' && <button type="button" onClick={onOpenReorder} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_039}</button>}
         </div>
       </div>
     </article>

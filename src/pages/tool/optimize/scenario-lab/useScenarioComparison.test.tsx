@@ -55,6 +55,28 @@ describe('useScenarioComparison', () => {
     expect(result.current.factors.maaSchedules).toEqual(['variable', '8x3'])
   })
 
+  it('clears a corrupted deep session shape and restores safe defaults', () => {
+    const key = 'maa:scenario-lab:v2:profile-corrupt'
+    window.sessionStorage.setItem(key, JSON.stringify({
+      factors: { ...PROFILE_A_FACTORS, layouts: 'broken', droneStrategies: { includes: true } },
+      activeJobId: 123,
+      result: { kind: 'scenario_comparison' },
+    }))
+
+    const { result } = renderHook(() => useScenarioComparison({
+      profileId: 'profile-corrupt',
+      operators: [],
+      config: {} as LicenseConfig,
+    }))
+
+    expect(result.current.factors).toMatchObject({
+      layouts: [{ layout: '243' }],
+      maaSchedules: ['variable', '8x3'],
+      droneStrategies: ['off', 'auto'],
+    })
+    expect(window.sessionStorage.getItem(key)).toBeNull()
+  })
+
   it('preserves the previous account session and restores the next account factors', async () => {
     window.sessionStorage.setItem('maa:scenario-lab:v2:profile-a', JSON.stringify({ factors: PROFILE_A_FACTORS }))
     window.sessionStorage.setItem('maa:scenario-lab:v2:profile-b', JSON.stringify({ factors: PROFILE_B_FACTORS }))

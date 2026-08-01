@@ -28,9 +28,29 @@ describe('ScenarioResultsTable', () => {
     await user.click(within(rows[1]!).getByRole('button'))
     expect(onSelect).toHaveBeenCalledWith('low')
   })
+
+  it('sorts opportunity cost ascending by default and always keeps missing values last', async () => {
+    const user = userEvent.setup()
+    render(<ScenarioResultsTable
+      points={[point('missing', 20, null), point('high-cost', 30, 30), point('low-cost', 40, 5)]}
+      selectedId={null}
+      onSelect={vi.fn()}
+    />)
+
+    const sortButton = screen.getByRole('button', { name: '搓玉成本 理智/龙门币（越低越优）' })
+    await user.click(sortButton)
+    let rows = screen.getAllByRole('row')
+    expect(rows[1]).toHaveTextContent('5 / 1,000')
+    expect(rows[3]).not.toHaveTextContent(/(?:5|30) \/ 1,000/)
+
+    await user.click(sortButton)
+    rows = screen.getAllByRole('row')
+    expect(rows[1]).toHaveTextContent('30 / 1,000')
+    expect(rows[3]).not.toHaveTextContent(/(?:5|30) \/ 1,000/)
+  })
 })
 
-function point(id: string, sustainablePerDay: number): ScenarioComparisonPoint {
+function point(id: string, sustainablePerDay: number, opportunityCost: number | null = 10): ScenarioComparisonPoint {
   return {
     id,
     label: id,
@@ -47,12 +67,12 @@ function point(id: string, sustainablePerDay: number): ScenarioComparisonPoint {
     variableShiftFallback: false,
     droneStrategy: 'off',
     status: 'succeeded',
-    screening: metrics(sustainablePerDay),
+    screening: metrics(sustainablePerDay, opportunityCost),
     isFrontier: false,
   }
 }
 
-function metrics(sustainablePerDay: number): ScenarioMetrics {
+function metrics(sustainablePerDay: number, opportunityCost: number | null): ScenarioMetrics {
   return {
     productionSanityPerDay: 100 + sustainablePerDay,
     totalEfficiency: 0,
@@ -68,11 +88,11 @@ function metrics(sustainablePerDay: number): ScenarioMetrics {
     dronesGeneratedPerDay: 180,
     dronesUsedPerDay: 0,
     dronesDiscardedPerDay: 180,
-    orundumEconomy: {
+    orundumEconomy: opportunityCost === null ? null : {
       sustainablePerDay,
       shortTermPerDay: sustainablePerDay,
       hardLmdCostPerDay: 1_000,
-      opportunityCostSanityPerDay: 10,
+      opportunityCostSanityPerDay: opportunityCost,
       inventoryDepletionDays: null,
       bottleneck: 'trading',
       case: 'capacity_limited',

@@ -17,7 +17,20 @@ export default function ScenarioParetoChart({
   onSelect: (id: string) => void;
 }) {
   const [focusedId, setFocusedId] = useState<string | null>(null)
-  const successful = useMemo(() => points.filter((point) => metric(point)), [points])
+  const successful = useMemo(() => points.filter((point) => {
+    const value = metric(point)
+    return value
+      && Number.isFinite(point.operationsPerDay)
+      && Number.isFinite(value.productionSanityPerDay)
+  }), [points])
+  const invalidPointCount = points.filter((point) => point.status === 'succeeded' && !successful.includes(point)).length
+  const operations = successful.map((point) => point.operationsPerDay)
+  const minOperations = operations.length ? Math.min(...operations) : 0
+  const maxOperations = operations.length ? Math.max(...operations) : 1
+  const operationPadding = minOperations === maxOperations ? 0.5 : Math.max(0.25, (maxOperations - minOperations) * 0.1)
+  const xMin = Math.max(0, minOperations - operationPadding)
+  const xMax = maxOperations + operationPadding
+  const xTicks = buildTicks(xMin, xMax)
   const outputs = successful.map((point) => metric(point)!.productionSanityPerDay)
   const minOutput = outputs.length ? Math.min(...outputs) : 0
   const maxOutput = outputs.length ? Math.max(...outputs) : 1
@@ -29,7 +42,7 @@ export default function ScenarioParetoChart({
     ? `${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_001}${frontier.length}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_002}${frontier[0].operationsPerDay}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_003}${frontier[frontier.length - 1]?.operationsPerDay ?? frontier[0].operationsPerDay}${copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_004}`
     : copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_005
 
-  const x = (operations: number) => PADDING.left + ((operations - 2) / 2) * (WIDTH - PADDING.left - PADDING.right)
+  const x = (value: number) => PADDING.left + ((value - xMin) / Math.max(1, xMax - xMin)) * (WIDTH - PADDING.left - PADDING.right)
   const y = (output: number) => PADDING.top + (1 - (output - yMin) / Math.max(1, yMax - yMin)) * (HEIGHT - PADDING.top - PADDING.bottom)
   const frontierPath = frontier.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(point.operationsPerDay)} ${y(metric(point)!.productionSanityPerDay)}`).join(' ')
 
@@ -38,7 +51,7 @@ export default function ScenarioParetoChart({
       <svg className="h-auto w-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-labelledby="scenario-chart-title scenario-chart-desc">
         <title id="scenario-chart-title">{copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_006}</title>
         <desc id="scenario-chart-desc">{summary} {copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_007}</desc>
-        {[2, 3, 4].map((value) => (
+        {xTicks.map((value) => (
           <g key={value}>
             <line x1={x(value)} x2={x(value)} y1={PADDING.top} y2={HEIGHT - PADDING.bottom} stroke="var(--color-surface-3)" strokeWidth="1" />
             <text x={x(value)} y={HEIGHT - 24} textAnchor="middle" fill="var(--color-ink-muted)" fontSize="12">{value} {copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_008}</text>
@@ -96,6 +109,9 @@ export default function ScenarioParetoChart({
           )
         })}
       </svg>
+      {invalidPointCount > 0 && <p className="tool-alert tool-alert--warning mt-2 text-xs" role="status">
+        {copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_020.replace('{count}', String(invalidPointCount))}
+      </p>}
       <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-xs text-ink-muted" aria-label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_014}>
         <LegendMark shape="circle" className="bg-surface-4" label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_015} />
         <LegendMark shape="circle" className="bg-brand-300" label={copy.optimize.pages_tool_optimize_scenario_lab_ScenarioParetoChart_016} />
@@ -117,4 +133,8 @@ function metric(point: ScenarioComparisonPoint) {
 
 function format(value: number): string {
   return value.toLocaleString(CURRENT_LOCALE, { maximumFractionDigits: 1 })
+}
+
+function buildTicks(minimum: number, maximum: number): number[] {
+  return [...new Set([minimum, (minimum + maximum) / 2, maximum].map((value) => Number(value.toFixed(2))))]
 }
