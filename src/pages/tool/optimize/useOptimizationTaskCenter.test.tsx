@@ -46,6 +46,7 @@ describe('useOptimizationTaskCenter', () => {
     await act(async () => { vi.advanceTimersByTime(29_999) })
     expect(listOptimizationJobs).toHaveBeenCalledTimes(1)
     await act(async () => { vi.advanceTimersByTime(1) })
+    await act(async () => { vi.advanceTimersByTime(250) })
     await flushPromises()
     expect(listOptimizationJobs).toHaveBeenCalledTimes(2)
   })
@@ -56,13 +57,34 @@ describe('useOptimizationTaskCenter', () => {
     rerender({ open: true })
 
     await act(async () => { vi.advanceTimersByTime(10_000) })
+    await act(async () => { vi.advanceTimersByTime(250) })
     await flushPromises()
     expect(listOptimizationJobs).toHaveBeenCalledTimes(2)
 
     rerender({ open: false })
     act(() => broadcastListener?.({ type: 'job-updated', profileId: 'profile-1', jobId: 'job-1', status: 'running', kind: 'schedule', at: Date.now() }))
+    await act(async () => { vi.advanceTimersByTime(250) })
     await flushPromises()
     expect(listOptimizationJobs).toHaveBeenCalledTimes(3)
+  })
+
+  it('drops a queued refresh when the active profile changes', async () => {
+    const { rerender } = renderHook(
+      ({ profileId }) => useOptimizationTaskCenter(profileId, false),
+      { initialProps: { profileId: 'profile-1' } },
+    )
+    await flushPromises()
+
+    act(() => broadcastListener?.({
+      type: 'job-updated', profileId: 'profile-1', jobId: 'job-1', status: 'running', kind: 'schedule', at: Date.now(),
+    }))
+    rerender({ profileId: 'profile-2' })
+    await flushPromises()
+    await act(async () => { vi.advanceTimersByTime(250) })
+    await flushPromises()
+
+    expect(listOptimizationJobs).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(listOptimizationJobs).mock.calls.map(([profileId]) => profileId)).toEqual(['profile-1', 'profile-2'])
   })
 
   it('summarizes active and attention states and updates the app badge', async () => {

@@ -48,6 +48,7 @@ export default function OptimizationTaskCenterDialog({
   onClose,
   onRetrySchedule,
   onOpenScenario,
+  onOpenResult = () => undefined,
   retryEnabled = true,
 }: {
   open: boolean;
@@ -55,11 +56,12 @@ export default function OptimizationTaskCenterDialog({
   onClose: () => void;
   onRetrySchedule: () => void;
   onOpenScenario: () => void;
+  onOpenResult?: (job: OptimizationJobListItem) => void;
   retryEnabled?: boolean;
 }) {
   const dialogRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
-  const { jobs, activeCount, attentionCount, loading, loadingMore, error, notice, busyJobId, notificationsEnabled } = controller
+  const { jobs, activeCount, attentionCount, loading, refreshing, loadingMore, error, notice, busyJobId, notificationsEnabled } = controller
 
   useEffect(() => {
     if (!open) return
@@ -137,7 +139,7 @@ export default function OptimizationTaskCenterDialog({
           <button type="button" onClick={() => void controller.toggleNotifications()} className="tool-secondary-action">
             {notificationsEnabled ? copy.optimize.pages_tool_optimize_OptimizationTaskCenter_007 : copy.optimize.pages_tool_optimize_OptimizationTaskCenter_006}
           </button>
-          <button type="button" onClick={() => void controller.refresh()} disabled={loading} className="tool-secondary-action">
+          <button type="button" onClick={() => void controller.refresh()} disabled={loading || refreshing} className="tool-secondary-action">
             {copy.optimize.pages_tool_optimize_OptimizationTaskCenter_003}
           </button>
         </div>
@@ -158,6 +160,7 @@ export default function OptimizationTaskCenterDialog({
                 onCancel={() => void controller.cancel(job)}
                 onRetrySchedule={onRetrySchedule}
                 onOpenScenario={onOpenScenario}
+                onOpenResult={() => onOpenResult(job)}
                 retryEnabled={retryEnabled}
               />
             ))}
@@ -173,12 +176,13 @@ export default function OptimizationTaskCenterDialog({
   )
 }
 
-function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, retryEnabled }: {
+function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenResult, retryEnabled }: {
   job: OptimizationJobListItem;
   busy: boolean;
   onCancel: () => void;
   onRetrySchedule: () => void;
   onOpenScenario: () => void;
+  onOpenResult: () => void;
   retryEnabled: boolean;
 }) {
   const terminalFailure = job.status === 'failed' || job.status === 'cancelled' || job.status === 'dead_lettered'
@@ -202,6 +206,9 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, retryEna
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {job.canCancel && <button type="button" disabled={busy} onClick={onCancel} className="tool-secondary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_020}</button>}
+          {job.status === 'succeeded' && job.kind === 'schedule' && job.resultAvailable && job.historyResultId && (
+            <button type="button" onClick={onOpenResult} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_037}</button>
+          )}
           {retryEnabled && job.canRetry && job.kind === 'schedule' && <button type="button" onClick={onRetrySchedule} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_022}</button>}
           {retryEnabled && job.canRetry && job.kind === 'scenario_comparison' && <button type="button" onClick={onOpenScenario} className="tool-primary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_023}</button>}
         </div>

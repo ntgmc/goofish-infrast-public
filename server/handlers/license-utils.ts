@@ -506,9 +506,9 @@ export async function findCdkRecordByCode(code: string, hashSecrets = getCdkHash
   return null
 }
 
-export async function incrementCdkScheduleGenerateCount(record: Pick<CdkRecord, 'code_hash'>, jobId?: string): Promise<void> {
+export async function incrementCdkScheduleGenerateCount(record: Pick<CdkRecord, 'code_hash'>, jobId?: string): Promise<boolean> {
   const store = await getCdkRecordStore()
-  await store.incrementScheduleGenerateCount(`cdk/${record.code_hash}.json`, jobId)
+  return store.incrementScheduleGenerateCount(`cdk/${record.code_hash}.json`, jobId)
 }
 
 const SOFT_BLOCK_WINDOW_MS = productPolicies.risk.soft_block_window_hours * 60 * 60 * 1000

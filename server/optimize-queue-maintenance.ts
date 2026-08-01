@@ -3,6 +3,7 @@ import { requestOptimizeJobProcessing } from './optimize-job-signals'
 import { canMaintainOptimizeQueue } from './process-role'
 import { getOptimizeJobStore } from './storage/optimize-job-store'
 import { recordUsageEvent } from './handlers/usage-stats'
+import { processPendingOptimizationJobEffects } from './optimization/jobs/job-effects'
 
 const DEFAULT_CLEANUP_AGE_MS = 24 * 60 * 60 * 1000
 const MAINTENANCE_INTERVAL_MS = 60_000
@@ -39,6 +40,7 @@ async function runQueueMaintenance(): Promise<void> {
     const recovered = await store.recoverExpiredAttempts(now, getOptimizeJobMaxAttempts())
     const expired = await store.expireQueuedJobs(now)
     const billing = await store.reconcileBilling?.()
+    await processPendingOptimizationJobEffects()
     if (billing?.anomalies) {
       console.error(`[billing-reconciliation] detected ${billing.anomalies} reservation/account projection inconsistencies`)
       await recordUsageEvent('metered_billing', {

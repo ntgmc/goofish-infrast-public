@@ -80,6 +80,31 @@ export async function recordScheduleGenerate(
   }
 }
 
+export async function applyScheduleGenerateEffects(
+  cdkRecord: Pick<CdkRecord, 'code_hash'> | null,
+  context: ScheduleUsageContext,
+  timing: { submittedAt: number; attemptStartedAt?: number },
+  jobId: string,
+): Promise<void> {
+  await recordUsageEvent("schedule_generate", {
+    status: context.status,
+    reason_code: context.reason_code,
+    duration_ms: Date.now() - timing.submittedAt,
+    ...(timing.attemptStartedAt !== undefined && { compute_duration_ms: Date.now() - timing.attemptStartedAt }),
+    permission: context.permission,
+    profile_id: context.profile_id,
+    cdk_status: context.cdk_status,
+    source: context.source ?? "optimize",
+    schedule_mode: context.schedule_mode,
+    fiammetta_enabled: context.fiammetta_enabled,
+    estimate_bucket: context.estimate_bucket,
+  }, `optimize-job/${jobId}/schedule-generate`)
+
+  if (!cdkRecord || context.status !== "success") return
+  const applied = await incrementCdkScheduleGenerateCount(cdkRecord, jobId)
+  if (!applied) throw new Error('CDK schedule generation count could not be applied.')
+}
+
 export function scheduleFailure(reasonCode: UsageReasonCode, context: Partial<ScheduleUsageContext> = {}): ScheduleUsageContext {
   return {
     status: "failure",

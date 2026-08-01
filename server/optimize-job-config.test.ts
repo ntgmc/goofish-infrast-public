@@ -4,6 +4,7 @@ import {
   DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS,
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
+  MAX_OPTIMIZE_JOB_ATTEMPTS,
 } from './optimize-job-config'
 
 const originalGlobalWorkerConcurrency = process.env.OPTIMIZE_GLOBAL_WORKER_CONCURRENCY
@@ -45,6 +46,9 @@ describe('optimization job configuration', () => {
 
     process.env.OPTIMIZE_JOB_MAX_ATTEMPTS = '0'
     expect(getOptimizeJobMaxAttempts()).toBe(1)
+
+    process.env.OPTIMIZE_JOB_MAX_ATTEMPTS = '100'
+    expect(getOptimizeJobMaxAttempts()).toBe(MAX_OPTIMIZE_JOB_ATTEMPTS)
 
     process.env.OPTIMIZE_JOB_MAX_ATTEMPTS = 'invalid'
     expect(getOptimizeJobMaxAttempts()).toBe(DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS)

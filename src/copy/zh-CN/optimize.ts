@@ -929,7 +929,7 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizationTaskCenter_019: "场景分析",
   pages_tool_optimize_OptimizationTaskCenter_020: "取消任务",
   pages_tool_optimize_OptimizationTaskCenter_021: "取消请求已提交，执行中的任务会在安全点停止。",
-  pages_tool_optimize_OptimizationTaskCenter_022: "重新提交",
+  pages_tool_optimize_OptimizationTaskCenter_022: "按当前配置重新生成",
   pages_tool_optimize_OptimizationTaskCenter_023: "打开场景实验室",
   pages_tool_optimize_OptimizationTaskCenter_024: "查看更多",
   pages_tool_optimize_OptimizationTaskCenter_025: "次执行",
@@ -944,6 +944,8 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizationTaskCenter_034: "关闭",
   pages_tool_optimize_OptimizationTaskCenter_035: "个任务需要关注",
   pages_tool_optimize_OptimizationTaskCenter_036: "重排检测",
+  pages_tool_optimize_OptimizationTaskCenter_037: "查看结果",
+  pages_tool_optimize_OptimizationTaskCenter_038: "加载任务结果失败，请稍后重试。",
   // src/pages/tool/optimize/optimization-api.ts
   pages_tool_optimize_optimization_api_001: "加载优化任务列表失败。",
   pages_tool_optimize_optimization_api_002: "取消优化任务失败。",

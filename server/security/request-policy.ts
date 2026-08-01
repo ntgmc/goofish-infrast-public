@@ -15,6 +15,7 @@ import {
   licenseOperatorsSchema,
   workspaceSavedConfigActionSchema,
 } from '../../src/lib/workspace-validation'
+import { scenarioComparisonFactorsSchema } from '../optimization/jobs/runtime-contracts'
 
 export const REQUEST_BODY_LIMITS = Object.freeze({
   none: 0,
@@ -261,8 +262,8 @@ export const requestSchemas = {
     strict({
       kind: z.literal('schedule'),
       identity: strict({ type: z.literal('profile'), profileId: shortString(128) }),
-      operators: z.array(z.unknown()).max(2000),
-      config: z.unknown(),
+      operators: licenseOperatorsSchema,
+      config: licenseConfigSchema,
       includeUpgradeSuggestions: z.boolean(),
       use_priority_coupon: z.boolean().optional(),
       use_items: z.array(z.enum([
@@ -278,9 +279,9 @@ export const requestSchemas = {
     strict({
       kind: z.literal('scenario_comparison'),
       identity: strict({ type: z.literal('profile'), profileId: shortString(128) }),
-      operators: z.array(z.unknown()).max(2000),
-      config: z.unknown(),
-      factors: optionalUnknown,
+      operators: licenseOperatorsSchema,
+      config: licenseConfigSchema,
+      factors: scenarioComparisonFactorsSchema,
       use_items: z.array(z.enum([
         'priority_compute_coupon', 'reorder_check_coupon', 'scenario_simulation_coupon',
         'training_diagnosis_coupon', 'additional_recompute_coupon', 'plan_capacity_certificate',
@@ -290,7 +291,7 @@ export const requestSchemas = {
     }),
   ]),
   reorderCheck: strict({
-    profileId: shortString(128), config: z.unknown(), baselineHistoryId: optionalString(128),
+    profileId: shortString(128), config: licenseConfigSchema, baselineHistoryId: optionalString(128),
     use_items: z.array(z.literal('reorder_check_coupon')).max(1).optional(),
   }),
   inventoryUse: strict({

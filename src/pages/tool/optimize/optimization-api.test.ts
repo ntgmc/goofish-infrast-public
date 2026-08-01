@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiJson } from '../../../lib/api-client'
-import { requestReorderCheck } from './optimization-api'
+import { submitReorderCheckJob } from './optimization-api'
 
 vi.mock('../../../lib/api-client', () => ({ apiJson: vi.fn() }))
 
@@ -9,37 +9,22 @@ afterEach(() => {
   vi.mocked(apiJson).mockReset()
 })
 
-describe('requestReorderCheck', () => {
-  it('polls queued and running jobs until the worker result succeeds', async () => {
-    vi.useFakeTimers()
-    const result = { recommendation: 'no_need' }
-    vi.mocked(apiJson)
-      .mockResolvedValueOnce({ job: snapshot('queued') })
-      .mockResolvedValueOnce(snapshot('running'))
-      .mockResolvedValueOnce(snapshot('succeeded', result))
+describe('submitReorderCheckJob', () => {
+  it('submits with the caller-owned idempotency key and returns the accepted snapshot', async () => {
+    const accepted = { job: snapshot('queued') }
+    vi.mocked(apiJson).mockResolvedValueOnce(accepted)
 
-    const request = requestReorderCheck({
+    const response = await submitReorderCheckJob({
       profileId: 'profile-1',
       config: {} as never,
       baselineHistoryId: 'history-1',
-    }, 'failed')
-    await vi.runAllTimersAsync()
+    }, 'failed', 'reorder-key-1')
 
-    await expect(request).resolves.toBe(result)
-    expect(apiJson).toHaveBeenCalledTimes(3)
-    expect(vi.mocked(apiJson).mock.calls[1]?.[0]).toBe('/api/optimization/jobs/job-1')
-  })
-
-  it('surfaces the terminal worker error', async () => {
-    vi.mocked(apiJson).mockResolvedValueOnce({
-      job: snapshot('failed', undefined, 'worker failed'),
-    })
-
-    await expect(requestReorderCheck({
-      profileId: 'profile-1',
-      config: {} as never,
-      baselineHistoryId: 'history-1',
-    }, 'fallback')).rejects.toThrow('worker failed')
+    expect(response).toBe(accepted)
+    expect(apiJson).toHaveBeenCalledWith('/api/optimization/reorder-checks', expect.objectContaining({
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'reorder-key-1' },
+    }))
   })
 })
 

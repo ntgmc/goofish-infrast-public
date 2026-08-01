@@ -28,7 +28,14 @@ const PROFILE_CAPACITY_LIMITS = Object.freeze({
 
 export async function getProfileCapacityLimits(profileId: string): Promise<{ plan: number; history: number; archive: number }> {
   await ensureSchema()
-  const balances = await query<{ entitlement_type: string; units: number }>(
+  return getProfileCapacityLimitsInTransaction({ query }, profileId)
+}
+
+export async function getProfileCapacityLimitsInTransaction(
+  client: Pick<PoolClient, 'query'>,
+  profileId: string,
+): Promise<{ plan: number; history: number; archive: number }> {
+  const balances = await client.query<{ entitlement_type: string; units: number }>(
     'select entitlement_type, units from profile_entitlement_balances where profile_id = $1', [profileId],
   )
   const units = new Map(balances.rows.map((row) => [row.entitlement_type, Number(row.units)]))

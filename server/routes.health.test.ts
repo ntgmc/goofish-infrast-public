@@ -28,6 +28,8 @@ describe('service health lifecycle', () => {
 
     expect(response.status).toBe(503)
     expect(response.headers.get('Retry-After')).toBe('60')
-    await expect(response.json()).resolves.toMatchObject({ code: 'service_draining' })
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'service_draining' },
+    })
   })
 })

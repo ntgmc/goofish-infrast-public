@@ -28,10 +28,9 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
   let profileIdForUsage: string | undefined
   const lifecycleState = getServiceLifecycleState()
   if (lifecycleState === 'draining' || lifecycleState === 'stopped') {
-    return new Response(JSON.stringify({ error: '服务正在重启或排空任务，请稍后重试。', code: 'service_draining' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
-    })
+    const response = jsonResponse({ error: '服务正在重启或排空任务，请稍后重试。', code: 'service_draining' }, 503)
+    response.headers.set('Retry-After', '60')
+    return response
   }
   const idempotencyKey = normalizeIdempotencyKey(req.headers.get('Idempotency-Key'))
   if (!idempotencyKey) return jsonResponse({ error: '缺少或无效的 Idempotency-Key。', code: 'idempotency_key_required' }, 400)
@@ -40,6 +39,7 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
     const body = await getValidatedJson(req, requestSchemas.reorderCheck) as CreateReorderCheckRequest
     const useCoupon = body.use_items?.includes('reorder_check_coupon') === true
     const requestHash = createHash('sha256').update(stableJsonStringify(body)).digest('hex')
+    const store = getOptimizeJobStore()
     const activeProfileId = typeof body.profileId === 'string' ? body.profileId.trim() : ''
     if (!activeProfileId || !body.config) {
       await recordReorderCheckEvent('failure', 'validation_failed', startedAt)
@@ -57,6 +57,12 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
       await recordReorderCheckEvent('failure', 'profile_missing', startedAt, profileIdForUsage)
       return jsonResponse({ error: '档案不存在。' }, 404)
     }
+    const replayed = await store.findIdempotentJob(
+      `reorder-job:${activeProfileId}`,
+      idempotencyKey,
+      requestHash,
+    )
+    if (replayed) return jsonResponse({ job: await buildOptimizeJobAccepted(replayed) }, 202)
     if (!isFreePreviewProfile(profile)) {
       await recordReorderCheckEvent('failure', 'permission_denied', startedAt, profileIdForUsage)
       return jsonResponse({ error: '重排检测仅面向免费个人排班档案开放。' }, 403)
@@ -115,7 +121,7 @@ export async function submitReorderCheck(req: Request): Promise<Response> {
       action: 'reorder_check',
       clientIp: getRequestClientIp(req),
     })
-    const admitted = await getOptimizeJobStore().admitJob({
+    const admitted = await store.admitJob({
       id: randomUUID(),
       priority: 0,
       owner_key: `reorder-job:${activeProfileId}`,

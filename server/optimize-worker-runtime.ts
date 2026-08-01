@@ -2,9 +2,11 @@ import { parentPort, workerData, type MessagePort } from 'node:worker_threads'
 import type { OptimizeCalculationStage } from '../src/lib/types'
 import {
   assertCompatibleOptimizerPort,
+  toOptimizerFailure,
   type OptimizeExecutionContext,
   type OptimizerPort,
 } from './optimization/jobs/optimizer-port'
+import type { OptimizerFailure } from './optimization/jobs/optimizer-port'
 import { executeOptimizationJobWithPort } from './optimization/jobs/optimizer-dispatcher'
 import { closePool } from './storage/postgres'
 import type { OptimizeJobRecord } from './storage/optimize-job-store'
@@ -16,7 +18,7 @@ export type OptimizeWorkerData = {
 
 type OptimizeWorkerResultMessage =
   | { type: 'succeeded'; result: unknown }
-  | { type: 'failed'; error: string }
+  | { type: 'failed'; failure: OptimizerFailure }
   | { type: 'progress'; stage: OptimizeCalculationStage }
 
 type OptimizeWorkerRuntimeOptions = {
@@ -43,7 +45,7 @@ export async function runOptimizeWorkerThread(options: OptimizeWorkerRuntimeOpti
   } catch (error) {
     message = {
       type: 'failed',
-      error: error instanceof Error ? error.message : String(error),
+      failure: toOptimizerFailure(error),
     }
   }
 

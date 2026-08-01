@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   admitJob: vi.fn(),
+  findIdempotentJob: vi.fn(),
   requestProcessing: vi.fn(),
   recordEvent: vi.fn(),
   recordPersonalUseDeclarationUsage: vi.fn(),
@@ -37,7 +38,7 @@ vi.mock('../../security/request-validation', () => ({
 }))
 vi.mock('../../storage/optimize-job-store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../storage/optimize-job-store')>()
-  return { ...actual, getOptimizeJobStore: () => ({ admitJob: mocks.admitJob }) }
+  return { ...actual, getOptimizeJobStore: () => ({ admitJob: mocks.admitJob, findIdempotentJob: mocks.findIdempotentJob }) }
 })
 vi.mock('../../storage/personal-use-declaration-store', () => ({
   PersonalUseDeclarationRequiredError: class PersonalUseDeclarationRequiredError extends Error {
@@ -101,11 +102,13 @@ import { submitReorderCheck } from './reorder-submission'
 describe('reorder check submission', () => {
   beforeEach(() => {
     mocks.admitJob.mockReset()
+    mocks.findIdempotentJob.mockReset()
     mocks.requestProcessing.mockReset()
     mocks.recordEvent.mockReset()
     mocks.recordPersonalUseDeclarationUsage.mockReset()
     mocks.recordPersonalUseDeclarationUsage.mockResolvedValue({ declaration_version: 'V1.1' })
     mocks.admitJob.mockResolvedValue({ job: { id: 'job-1' }, replayed: false })
+    mocks.findIdempotentJob.mockResolvedValue(null)
   })
 
   it('freezes the input snapshot, reserves quota, and returns an async job', async () => {
@@ -147,6 +150,23 @@ describe('reorder check submission', () => {
       error: '请先确认当前版本的个人使用声明。',
       code: 'personal_use_declaration_required',
     })
+    expect(mocks.admitJob).not.toHaveBeenCalled()
+    expect(mocks.requestProcessing).not.toHaveBeenCalled()
+  })
+
+  it('returns an idempotent replay before mutable preparation and declaration checks', async () => {
+    mocks.findIdempotentJob.mockResolvedValueOnce({ id: 'job-existing' })
+
+    const response = await submitReorderCheck(request())
+
+    expect(response.status).toBe(202)
+    await expect(response.json()).resolves.toMatchObject({ job: { kind: 'reorder_check', status: 'queued' } })
+    expect(mocks.findIdempotentJob).toHaveBeenCalledWith(
+      'reorder-job:profile-1',
+      'reorder-key-1',
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+    )
+    expect(mocks.recordPersonalUseDeclarationUsage).not.toHaveBeenCalled()
     expect(mocks.admitJob).not.toHaveBeenCalled()
     expect(mocks.requestProcessing).not.toHaveBeenCalled()
   })

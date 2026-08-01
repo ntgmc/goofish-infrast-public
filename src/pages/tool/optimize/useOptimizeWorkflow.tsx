@@ -4,7 +4,6 @@ import type { CreateOptimizationJobRequest } from '../../../lib/optimization-con
 import type { SystemItemCode } from '../../../lib/inventory-contracts'
 import { canEditConfig, canUseScenarioComparison, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../../../lib/license'
 import { canonicalJson } from '../../../lib/crypto'
-
 import { apiJson } from '../../../lib/api-client'
 
 import { normalizeConfig, validateConfig, normalizeScheduleMode, normalizeDormitoryRule } from '../../../lib/config'
@@ -13,7 +12,9 @@ import { describeConfigDiff } from '../../../lib/workspace-history'
 import { mergeOptimizeJobProgress, buildOptimizeJobStorageKey, writeActiveOptimizeJob, readActiveOptimizeJob, isActiveOptimizeJob, clearActiveOptimizeJob, clearLegacyOptimizeJobStorage, isOptimizeJobPollCancelled } from './job-progress'
 import { isOptimizationJobCancelledError, useOptimizationJob } from './useOptimizationJob'
 import type { OptimizePhase, OptimizeSection } from './types'
-import { requestFullResultExport, requestMaaExport, requestReorderCheck } from './optimization-api'
+import { requestFullResultExport, requestMaaExport } from './optimization-api'
+import { runReorderCheckJob } from './reorder-job-progress'
+import { useReorderJobRecovery } from './useReorderJobRecovery'
 import { isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
 import type { ConfigSyncStatus, WorkspacePatch } from '../useToolSession'
 import { useLicenseSync } from './useLicenseSync'
@@ -251,6 +252,7 @@ export function useOptimizeWorkflow(props: Props) {
       return null
     }, [configValidationMessage, isRestrictedPreview, itemBalances.reorder_check_coupon, latestWorkspaceResult, licenseSyncing, profile.skland_binding, reorderQuota?.remaining, useReorderCheckCoupon])
 
+  const isReorderJobCancelled = useReorderJobRecovery(profileId, isRestrictedPreview, refreshInventory, { setLoading: setReorderCheckLoading, setResult: setReorderCheckResult, setError: setReorderCheckError, setEntitlement: setFreeScheduleEntitlementOverride })
   const configDiffRows = useMemo(
       () => describeConfigDiff(activeConfig, latestWorkspaceResult?.config ?? null),
       [activeConfig, latestWorkspaceResult]
@@ -545,12 +547,12 @@ export function useOptimizeWorkflow(props: Props) {
       setReorderCheckResult(null)
       setReorderCheckError(null)
       try {
-        const data = await requestReorderCheck({
+        const data = await runReorderCheckJob({
           profileId,
           config: activeConfig,
           baselineHistoryId: latestWorkspaceResult.id,
           ...(useReorderCheckCoupon && { use_items: ['reorder_check_coupon'] }),
-        }, copy.optimize.pages_tool_optimize_useOptimizeWorkflow_015)
+        }, copy.optimize.pages_tool_optimize_useOptimizeWorkflow_015, isReorderJobCancelled)
         setReorderCheckResult(data)
         if (data.free_schedule_entitlement) {
           setFreeScheduleEntitlementOverride(data.free_schedule_entitlement)
@@ -563,7 +565,7 @@ export function useOptimizeWorkflow(props: Props) {
         await refreshInventory()
       }
       })
-    }, [activeConfig, guardPersonalUseDeclaration, isRestrictedPreview, latestWorkspaceResult, loading, profileId, refreshInventory, reorderCheckDisabledReason, reorderCheckLoading, useReorderCheckCoupon])
+    }, [activeConfig, guardPersonalUseDeclaration, isReorderJobCancelled, isRestrictedPreview, latestWorkspaceResult, loading, profileId, refreshInventory, reorderCheckDisabledReason, reorderCheckLoading, useReorderCheckCoupon])
 
   const handleConfirmFreeSchedule = useCallback(async () => {
       if (!isPreviewProfile || freeScheduleConfirming || !latestWorkspaceResult) return

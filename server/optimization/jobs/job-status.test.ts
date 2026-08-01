@@ -1,5 +1,13 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
-import { buildScenarioComparisonEstimate, createOptimizeJobPollToken, getOptimizeEstimateBucket, shouldReserveFreeScheduleEntitlement, verifyOptimizeJobPollToken } from './job-status'
+import {
+  buildScenarioComparisonEstimate,
+  createOptimizeJobPollToken,
+  decodeOptimizationJobCursor,
+  encodeOptimizationJobCursor,
+  getOptimizeEstimateBucket,
+  shouldReserveFreeScheduleEntitlement,
+  verifyOptimizeJobPollToken,
+} from './job-status'
 import { createPersistedOptimizeJobPayload } from './shared'
 import { DEFAULT_OPTIMIZE_JOB_HARD_TIMEOUT_MS, formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config'
 
@@ -69,6 +77,27 @@ describe('optimization job capability tokens', () => {
     process.env.MAA_ADMIN_SECRET_PREVIOUS = 'current-job-token-secret'
     process.env.MAA_ADMIN_SECRET = 'rotated-job-token-secret'
     expect(verifyOptimizeJobPollToken(job, token)).toBe(true)
+  })
+})
+
+describe('optimization job list cursors', () => {
+  it('round-trips the timestamp and id tiebreaker through an opaque cursor', () => {
+    const cursor = encodeOptimizationJobCursor({
+      created_at: '2026-07-31T12:34:56.789Z',
+      id: 'job_same_timestamp_2',
+    })
+
+    expect(decodeOptimizationJobCursor(cursor)).toEqual({
+      createdAt: '2026-07-31T12:34:56.789Z',
+      id: 'job_same_timestamp_2',
+    })
+  })
+
+  it('rejects malformed cursors and cursors without the id tiebreaker', () => {
+    expect(decodeOptimizationJobCursor('not-a-cursor')).toBeNull()
+    expect(decodeOptimizationJobCursor(Buffer.from(JSON.stringify({
+      createdAt: '2026-07-31T12:34:56.789Z',
+    })).toString('base64url'))).toBeNull()
   })
 })
 

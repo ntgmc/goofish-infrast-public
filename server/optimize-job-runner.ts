@@ -7,7 +7,9 @@ import type { OptimizeCalculationStage } from '../src/lib/types'
 import { executeRegisteredOptimizationJob } from './optimization/jobs/optimizer-dispatcher'
 import {
   requireRegisteredOptimizerPort,
+  toOptimizerFailure,
   type OptimizeExecutionContext,
+  type OptimizerFailure,
 } from './optimization/jobs/optimizer-port'
 import {
   formatOptimizeJobHardTimeout,
@@ -31,6 +33,7 @@ import {
   type OptimizeJobStatus,
   type OptimizeJobStore,
 } from './storage/optimize-job-store'
+import { processPendingOptimizationJobEffects } from './optimization/jobs/job-effects'
 
 const DEFAULT_LOCK_TTL_MS = 60_000
 const DEFAULT_HEARTBEAT_MS = 15_000
@@ -39,7 +42,7 @@ const DEFAULT_SHUTDOWN_GRACE_MS = 60_000
 
 type WorkerResultMessage =
   | { type: 'succeeded'; result: unknown }
-  | { type: 'failed'; error: string }
+  | { type: 'failed'; failure: OptimizerFailure }
   | { type: 'progress'; stage: OptimizeCalculationStage }
 
 type ActiveAttempt = {
@@ -195,7 +198,7 @@ async function processInlineQueue(): Promise<void> {
         else if (error instanceof OptimizeJobTimeoutError) {
           await retryAttempt(store, job.id, job.attempt_count, processWorkerId, lockToken, 'timed_out', error.message)
         }
-        else await failAttempt(store, job, lockToken, error instanceof Error ? error.message : String(error))
+        else await settleOptimizerFailure(store, job, lockToken, toOptimizerFailure(error))
       }
     }
   } finally {
@@ -321,8 +324,10 @@ async function settleWorkerMessage(
     if (message?.type === 'succeeded') {
       await completeAttempt(getOptimizeJobStore(), attempt.job, attempt.lockToken, message.result)
     } else {
-      const error = message?.type === 'failed' ? message.error : '优化 worker 返回了无效结果。'
-      await failAttempt(getOptimizeJobStore(), attempt.job, attempt.lockToken, error)
+      const failure = message?.type === 'failed'
+        ? message.failure
+        : toOptimizerFailure(new Error('优化 worker 返回了无效结果。'))
+      await settleOptimizerFailure(getOptimizeJobStore(), attempt.job, attempt.lockToken, failure)
     }
   } finally {
     finishAttempt(attempt)
@@ -521,12 +526,48 @@ async function updateAttemptStage(
   return store.updateAttemptStage(job.id, job.attempt_count, processWorkerId, lockToken, stage)
 }
 
-function completeAttempt(store: OptimizeJobStore, job: OptimizeJobRecord, lockToken: string, result: unknown): Promise<boolean> {
-  return store.completeAttempt(job.id, job.attempt_count, processWorkerId, lockToken, result)
+async function completeAttempt(store: OptimizeJobStore, job: OptimizeJobRecord, lockToken: string, result: unknown): Promise<boolean> {
+  const completed = await store.completeAttempt(job.id, job.attempt_count, processWorkerId, lockToken, result)
+  if (completed) {
+    await processPendingOptimizationJobEffects(job.id).catch((error) => {
+      console.warn('optimization job completion effects remain pending:', error)
+    })
+  }
+  return completed
 }
 
-function failAttempt(store: OptimizeJobStore, job: OptimizeJobRecord, lockToken: string, errorMessage: string): Promise<boolean> {
-  return store.failAttempt(job.id, job.attempt_count, processWorkerId, lockToken, errorMessage)
+function failAttempt(
+  store: OptimizeJobStore,
+  job: OptimizeJobRecord,
+  lockToken: string,
+  failure: Parameters<OptimizeJobStore['failAttempt']>[4],
+): Promise<boolean> {
+  return store.failAttempt(job.id, job.attempt_count, processWorkerId, lockToken, failure)
+}
+
+function settleOptimizerFailure(
+  store: OptimizeJobStore,
+  job: OptimizeJobRecord,
+  lockToken: string,
+  failure: OptimizerFailure,
+): Promise<boolean | OptimizeJobStatus | null> {
+  if (failure.kind === 'transient' && failure.retryable) {
+    return retryAttempt(
+      store,
+      job.id,
+      job.attempt_count,
+      processWorkerId,
+      lockToken,
+      'transient_error',
+      failure.internalMessage,
+    )
+  }
+  return failAttempt(store, job, lockToken, {
+    code: failure.code,
+    publicMessage: failure.publicMessage,
+    internalMessage: failure.internalMessage,
+    failureKind: failure.kind === 'validation' ? 'validation_error' : 'application_error',
+  })
 }
 
 async function retryAttempt(

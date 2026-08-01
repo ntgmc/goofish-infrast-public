@@ -5,7 +5,7 @@ import type { OptimizationFailureSnapshot, OptimizationJobListItem, Optimization
 import { getScheduleGenerateDurationStatsByBucket, recordUsageEvent } from "../../handlers/usage-stats";
 import { getProfileForUser } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
-import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobRecord } from "../../storage/optimize-job-store";
+import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobRecord, type OptimizeJobStore } from "../../storage/optimize-job-store";
 import { requestOptimizeJobCancellation, requestOptimizeJobProcessing } from "../../optimize-job-signals";
 import { isOptimizeEstimateOverdue } from "../../optimize-estimate";
 import type { OptimizeDurationEstimate, OptimizeRuntimeEstimate, OptimizationJobPayload, OptimizeJobSource } from './shared';
@@ -17,6 +17,7 @@ import { getSecretKeyring } from '../../handlers/license-utils';
 import { getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
 import { recordRequestBehaviorEvent } from '../../behavior-risk/service';
 import { getRequestClientIp } from '../../security/client-ip';
+import { stableJsonStringify } from '../../security/request-validation';
 import {
   PersonalUseDeclarationRequiredError,
   recordPersonalUseDeclarationUsage,
@@ -25,18 +26,28 @@ import {
 export async function submitOptimizationJob(req: Request): Promise<Response> {
   const lifecycleState = getServiceLifecycleState();
   if (lifecycleState === 'draining' || lifecycleState === 'stopped') {
-    return new Response(JSON.stringify({ error: '服务正在重启或排空任务，请稍后重试。', code: 'service_draining' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
-    });
+    const response = jsonResponse({ error: '服务正在重启或排空任务，请稍后重试。', code: 'service_draining' }, 503)
+    response.headers.set('Retry-After', '60')
+    return response
   }
   const idempotencyKey = normalizeIdempotencyKey(req.headers.get('Idempotency-Key'));
   if (!idempotencyKey) return jsonResponse({ error: '缺少或无效的 Idempotency-Key。', code: 'idempotency_key_required' }, 400);
-  const requestHash = createHash('sha256').update(await req.clone().text()).digest('hex');
+  const rawRequestBody = await req.clone().text()
+  const requestHash = hashOptimizationRequest(rawRequestBody)
+  const legacyRequestHash = createHash('sha256').update(rawRequestBody).digest('hex')
+  const store = getOptimizeJobStore();
+  try {
+    const replayed = await findEarlyIdempotentJob(req, rawRequestBody, idempotencyKey, requestHash, legacyRequestHash)
+    if (replayed) return acceptedOptimizationJobResponse(replayed)
+  } catch (error) {
+    if (error instanceof OptimizeJobAdmissionError) {
+      return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
+    throw error
+  }
   const preparedResult = await prepareOptimizeJob(req);
   if (!preparedResult.ok) return preparedResult.response;
 
-  const store = getOptimizeJobStore();
   const prepared = preparedResult.prepared;
   const preparedPayload = prepared.payload as { activeProfileId?: string | null; isPreviewTrial?: boolean };
 
@@ -59,6 +70,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       payload_json: prepared.payload,
       idempotency_key: idempotencyKey,
       request_hash: requestHash,
+      legacy_request_hash: legacyRequestHash,
       free_profile_id: shouldReserveFreeScheduleEntitlement(prepared.source, preparedPayload.isPreviewTrial)
         ? preparedPayload.activeProfileId ?? null
         : null,
@@ -73,9 +85,10 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
       ? await store.admitJob(admissionInput)
       : { job: await store.createJob(admissionInput), replayed: false };
 
-    if (prepared.source === 'account_profile' || prepared.source === 'free_preview') {
+    requestOptimizeJobProcessing();
+    if (!admitted.replayed && (prepared.source === 'account_profile' || prepared.source === 'free_preview')) {
       if (prepared.behaviorIdentity) {
-        await recordRequestBehaviorEvent({
+        void recordRequestBehaviorEvent({
           req,
           eventType: 'job_submit',
           userId: prepared.behaviorIdentity.userId,
@@ -83,15 +96,14 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
           profileId: admitted.job.profile_id,
           jobId: admitted.job.id,
           eventKey: `job-submit:${admitted.job.id}`,
+        }).catch((trackingError) => {
+          console.warn('optimization job submit behavior event skipped:', trackingError)
+          return false
         });
       }
     }
 
-    requestOptimizeJobProcessing();
-    return jsonResponse({
-      job: await buildOptimizeJobAccepted(admitted.job),
-      ...(!admitted.job.owner_key.startsWith('profile:') && { pollToken: createOptimizeJobPollToken(admitted.job) }),
-    }, 202);
+    return acceptedOptimizationJobResponse(admitted.job)
   } catch (error) {
     if (error instanceof PersonalUseDeclarationRequiredError) {
       return jsonResponse({ error: error.message, code: error.code }, error.status);
@@ -112,6 +124,48 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
     }
     throw error;
   }
+}
+
+async function findEarlyIdempotentJob(
+  req: Request,
+  rawRequestBody: string,
+  idempotencyKey: string,
+  requestHash: string,
+  legacyRequestHash: string,
+): Promise<OptimizeJobRecord | null> {
+  const store = getOptimizeJobStore()
+  if (typeof (store as Partial<OptimizeJobStore>).findIdempotentJob !== 'function') return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(rawRequestBody)
+  } catch {
+    return null
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+  const identity = (parsed as Record<string, unknown>).identity
+  if (!identity || typeof identity !== 'object' || Array.isArray(identity)) return null
+  const profileId = (identity as Record<string, unknown>).profileId
+  if (typeof profileId !== 'string' || !profileId) return null
+  const auth = await requireUserSession(req)
+  if (!auth || !await getProfileForUser(auth.user.id, profileId)) return null
+  return store.findIdempotentJob(`profile:${profileId}`, idempotencyKey, requestHash, legacyRequestHash)
+}
+
+async function acceptedOptimizationJobResponse(job: OptimizeJobRecord): Promise<Response> {
+  return jsonResponse({
+    job: await buildOptimizeJobAccepted(job),
+    ...(!job.owner_key.startsWith('profile:') && { pollToken: createOptimizeJobPollToken(job) }),
+  }, 202)
+}
+
+function hashOptimizationRequest(rawRequestBody: string): string {
+  let canonical = rawRequestBody
+  try {
+    canonical = stableJsonStringify(JSON.parse(rawRequestBody))
+  } catch {
+    // The request validation layer will return the stable malformed-body response.
+  }
+  return createHash('sha256').update(canonical).digest('hex')
 }
 
 export function shouldReserveFreeScheduleEntitlement(
@@ -150,15 +204,19 @@ export async function listOptimizationJobs(req: Request): Promise<Response> {
   const profile = await getProfileForUser(auth.user.id, profileId)
   if (!profile) return jsonResponse({ error: '无权查看该任务列表。' }, 403)
   const limit = Math.max(1, Math.min(100, Number(url.searchParams.get('limit') ?? 50) || 50))
-  const before = url.searchParams.get('before')?.trim() || null
+  const rawBefore = url.searchParams.get('before')?.trim() || null
+  const before = rawBefore ? decodeOptimizationJobCursor(rawBefore) : null
+  if (rawBefore && !before) return jsonResponse({ error: '无效的任务分页游标。', code: 'invalid_cursor' }, 400)
   const store = getOptimizeJobStore()
   const jobs = await store.listJobsByProfile(profileId, limit + 1, before)
   const page = jobs.slice(0, limit)
   const response: OptimizationJobListResponse = {
-    jobs: await Promise.all(page.map(async (job) => toOptimizationJobListItem(
-      formatOptimizeJobStatus(job, await store.getQueuePosition(job.id)),
-    ))),
-    nextCursor: jobs.length > limit ? page.at(-1)?.created_at ?? null : null,
+    jobs: page.map(({ job, queuePosition }) => toOptimizationJobListItem(
+      formatOptimizeJobStatus(job, queuePosition),
+    )),
+    nextCursor: jobs.length > limit && page.at(-1)
+      ? encodeOptimizationJobCursor(page.at(-1)!.job)
+      : null,
   }
   return jsonResponse(response)
 }
@@ -166,7 +224,11 @@ export async function listOptimizationJobs(req: Request): Promise<Response> {
 function toOptimizationJobListItem(snapshot: OptimizationJobSnapshot): OptimizationJobListItem {
   if (snapshot.status === 'succeeded') {
     const { result: _result, ...summary } = snapshot
-    return { ...summary, resultAvailable: true }
+    return {
+      ...summary,
+      resultAvailable: true,
+      ...(snapshot.kind === 'schedule' && { historyResultId: snapshot.id }),
+    }
   }
   return { ...snapshot, resultAvailable: false }
 }
@@ -264,7 +326,7 @@ function formatOptimizationJobSnapshot(
     failureCount: job.failure_count,
     cancellationRequested: Boolean(job.cancel_requested_at),
     canCancel: job.status === 'queued' || job.status === 'running',
-    canRetry: job.status === 'failed' || job.status === 'cancelled' || job.status === 'dead_lettered',
+    canRetry: canRetryOptimizeJob(job),
     billing: job.billing_json,
   };
   if (status === 'succeeded') {
@@ -334,6 +396,29 @@ function formatOptimizationFailure(
     ...(job.failure_kind && { failureKind: job.failure_kind }),
     attemptCount: job.attempt_count,
     supportReference: `OPT-${job.id.slice(0, 8).toUpperCase()}`,
+  }
+}
+
+function canRetryOptimizeJob(job: OptimizeJobRecord): boolean {
+  if (job.status !== 'failed' && job.status !== 'dead_lettered') return false
+  return formatOptimizationFailure(job, job.status).retryable
+}
+
+export function encodeOptimizationJobCursor(job: Pick<OptimizeJobRecord, 'created_at' | 'id'>): string {
+  return Buffer.from(JSON.stringify({ createdAt: job.created_at, id: job.id }), 'utf8').toString('base64url')
+}
+
+export function decodeOptimizationJobCursor(value: string): { createdAt: string; id: string } | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const createdAt = (parsed as Record<string, unknown>).createdAt
+    const id = (parsed as Record<string, unknown>).id
+    if (typeof createdAt !== 'string' || !Number.isFinite(Date.parse(createdAt))) return null
+    if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(id)) return null
+    return { createdAt: new Date(createdAt).toISOString(), id }
+  } catch {
+    return null
   }
 }
 

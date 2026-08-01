@@ -108,6 +108,7 @@ interface OptimizationJobSnapshotBase {
   cancellationRequested: boolean;
   canCancel: boolean;
   canRetry: boolean;
+  historyResultId?: string;
   billing?: OptimizationBillingSnapshot | null;
 }
 
