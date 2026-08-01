@@ -16,6 +16,7 @@ type ReorderCheckViewState = {
   error: string | null;
   result: ReorderCheckResult | null;
   onCheck: () => void;
+  onCancel: () => void;
   onGenerate: () => void;
   coupon?: { visible: boolean; balance: number; selected: boolean; onChange: (selected: boolean) => void };
 }
@@ -244,14 +245,19 @@ function ReorderCheckCard({ state }: { state: ReorderCheckViewState }) {
               {copy.optimize.pages_tool_optimize_OverviewSection_039}</InfoTooltip>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={state.onCheck}
-          disabled={disabled}
-          className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted"
-        >
-          {state.loading ? copy.optimize.pages_tool_optimize_OverviewSection_040 : copy.optimize.pages_tool_optimize_OverviewSection_041}
-        </button>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {state.loading && <button type="button" onClick={state.onCancel} className="tool-secondary-action">
+            {copy.optimize.pages_tool_optimize_OverviewSection_069}
+          </button>}
+          <button
+            type="button"
+            onClick={state.onCheck}
+            disabled={disabled}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-ink-muted"
+          >
+            {state.loading ? copy.optimize.pages_tool_optimize_OverviewSection_040 : copy.optimize.pages_tool_optimize_OverviewSection_041}
+          </button>
+        </div>
       </div>
 
       {state.coupon?.visible && (

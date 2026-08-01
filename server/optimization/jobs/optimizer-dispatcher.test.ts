@@ -80,11 +80,59 @@ describe('optimization job dispatcher', () => {
       .resolves.toEqual(result)
   })
 
+  it('accepts finite control-center efficiency breakdowns', async () => {
+    const result = {
+      ...scheduleResult(),
+      plans: [{
+        name: 'Plan 1',
+        rooms: {
+          control: [{
+            operators: ['Operator'],
+            efficiency: {
+              trading: 0.07,
+              manufacturing: 0.03,
+              meeting: 0,
+              mood_recovery: 0.05,
+              hire: 0,
+            },
+          }],
+        },
+      }],
+    }
+    const port = fakePort({ executeSchedule: vi.fn(async () => result) })
+
+    await expect(executeOptimizationJobWithPort(job(schedulePayload()), context, port))
+      .resolves.toEqual(result)
+  })
+
   it('still rejects non-finite optimizer result values', async () => {
     const port = fakePort({
       executeSchedule: vi.fn(async () => ({
         ...scheduleResult(),
         total_efficiency: Number.POSITIVE_INFINITY,
+      })),
+    })
+
+    await expect(executeOptimizationJobWithPort(job(schedulePayload()), context, port))
+      .rejects.toMatchObject({
+        failure: {
+          code: 'invalid_optimizer_result',
+          kind: 'validation',
+          retryable: false,
+        },
+      })
+  })
+
+  it('still rejects non-finite control-center efficiency values', async () => {
+    const port = fakePort({
+      executeSchedule: vi.fn(async () => ({
+        ...scheduleResult(),
+        plans: [{
+          name: 'Plan 1',
+          rooms: {
+            control: [{ efficiency: { trading: Number.POSITIVE_INFINITY } }],
+          },
+        }],
       })),
     })
 

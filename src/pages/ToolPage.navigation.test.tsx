@@ -136,7 +136,7 @@ describe('ToolPage route guards', () => {
     await waitFor(() => expect(withoutConfig.state.location.pathname).toBe('/tool/setup/config'))
   })
 
-  it('normalizes invalid optimize paths and rejects an unavailable lab with replace navigation', async () => {
+  it('normalizes invalid optimize paths and defers lab entitlement checks until inventory loads', async () => {
     const profile = createProfile()
     const session = {
       activeProfile: profile,
@@ -150,7 +150,7 @@ describe('ToolPage route guards', () => {
 
     sessionState.current = createSession({ ...session, activeProfile: createProfile('free_preview') })
     const unavailableLab = renderCurrentSession('/tool/optimize/lab')
-    await waitFor(() => expect(unavailableLab.state.location.pathname).toBe('/tool/optimize/overview'))
+    await waitFor(() => expect(unavailableLab.state.location.pathname).toBe('/tool/optimize/lab'))
     expect(await screen.findByText('优化页')).toBeInTheDocument()
   })
 })

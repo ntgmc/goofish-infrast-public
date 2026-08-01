@@ -101,6 +101,7 @@ import { submitReorderCheck } from './reorder-submission'
 
 describe('reorder check submission', () => {
   beforeEach(() => {
+    delete (mocks.body as Record<string, unknown>).use_items
     mocks.admitJob.mockReset()
     mocks.findIdempotentJob.mockReset()
     mocks.requestProcessing.mockReset()
@@ -184,6 +185,19 @@ describe('reorder check submission', () => {
       quota: { used: 2, remaining: 0 },
     })
     expect(mocks.requestProcessing).not.toHaveBeenCalled()
+  })
+
+  it('defers coupon applicability to the transactional admission check', async () => {
+    ;(mocks.body as Record<string, unknown>).use_items = ['reorder_check_coupon']
+
+    const response = await submitReorderCheck(request())
+
+    expect(response.status).toBe(202)
+    expect(mocks.admitJob).toHaveBeenCalledWith(expect.objectContaining({
+      reward_user_id: 'user-1',
+      reward_item_codes: ['reorder_check_coupon'],
+      reorderCheckQuota: expect.objectContaining({ useCoupon: true, limit: 2 }),
+    }))
   })
 })
 

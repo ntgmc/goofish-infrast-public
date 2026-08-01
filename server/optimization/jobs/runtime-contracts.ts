@@ -1,5 +1,10 @@
 import { z } from 'zod'
 import type { ScenarioComparisonResult } from '../../../src/lib/scenario-comparison'
+import {
+  scenarioComparisonFactorsSchema,
+  scenarioComparisonResultSchema,
+} from '../../../src/lib/scenario-comparison-validation'
+export { scenarioComparisonFactorsSchema } from '../../../src/lib/scenario-comparison-validation'
 import type { OptimizeResult, ReorderCheckResult } from '../../../src/lib/types'
 import {
   extensibleLicenseConfigSchema,
@@ -15,6 +20,10 @@ import type {
 const finiteNumber = z.number().finite()
 const boundedString = (maximum: number) => z.string().min(1).max(maximum)
 const nullableFiniteNumber = finiteNumber.nullable()
+const roomEfficiencySchema = z.union([
+  finiteNumber,
+  z.record(boundedString(128), finiteNumber),
+])
 
 const appBuildMetaSchema = z.strictObject({
   frontend_version: boundedString(128),
@@ -74,33 +83,6 @@ const freeScheduleDecisionSchema = z.strictObject({
   entitlement: freeScheduleEntitlementSchema,
 }).nullable()
 
-const scenarioProductionPlanSchema = z.strictObject({
-  trading: z.strictObject({ lmd: z.number().int().min(0).max(5), orundum: z.number().int().min(0).max(5) }),
-  manufacturing: z.strictObject({
-    pureGold: z.number().int().min(0).max(5),
-    battleRecord: z.number().int().min(0).max(5),
-    originiumShard: z.number().int().min(0).max(5),
-  }),
-})
-
-export const scenarioComparisonFactorsSchema = z.strictObject({
-  layouts: z.array(z.strictObject({
-    layout: z.enum(['153', '243', '333']),
-    plans: z.array(scenarioProductionPlanSchema).min(1).max(24),
-  })).min(1).max(3),
-  maaSchedules: z.array(z.enum(['variable', '8x3'])).min(1).max(2),
-  includeRotation: z.boolean(),
-  droneStrategies: z.array(z.enum([
-    'off',
-    'auto',
-    'lmd',
-    'orundum',
-    'pure_gold',
-    'battle_record',
-    'originium_shard',
-  ])).min(1).max(7),
-})
-
 const optimizeResultSchema: z.ZodType<OptimizeResult> = z.object({
   author: z.string().max(1_000),
   title: z.string().max(1_000),
@@ -115,7 +97,7 @@ const optimizeResultSchema: z.ZodType<OptimizeResult> = z.object({
     rooms: z.record(boundedString(128), z.array(z.object({
       operators: z.array(z.string().max(256)).max(200).optional(),
       product: z.string().max(256).optional(),
-      efficiency: finiteNumber.optional(),
+      efficiency: roomEfficiencySchema.optional(),
       final_efficiency: finiteNumber.optional(),
     }).passthrough()).max(100)),
   }).passthrough()).max(100),
@@ -131,63 +113,6 @@ const optimizeResultSchema: z.ZodType<OptimizeResult> = z.object({
   }).passthrough()).max(1_000),
   build_meta: appBuildMetaSchema.optional(),
 }).passthrough().superRefine(assertJsonSafe) as z.ZodType<OptimizeResult>
-
-const scenarioMetricsSchema = z.object({
-  productionSanityPerDay: finiteNumber,
-  totalEfficiency: finiteNumber,
-  lmdPerDay: finiteNumber,
-  orundumPerDay: finiteNumber,
-  battleRecordPerDay: finiteNumber,
-  pureGoldProducedPerDay: finiteNumber,
-  pureGoldConsumedPerDay: finiteNumber,
-  pureGoldNetPerDay: finiteNumber,
-  originiumShardProducedPerDay: finiteNumber,
-  originiumShardConsumedPerDay: finiteNumber,
-  originiumShardNetPerDay: finiteNumber,
-  dronesGeneratedPerDay: finiteNumber,
-  dronesUsedPerDay: finiteNumber,
-  dronesDiscardedPerDay: finiteNumber,
-  orundumEconomy: z.record(z.string(), z.unknown()).nullable(),
-}).passthrough()
-
-const scenarioSkipSchema = z.strictObject({
-  code: z.enum(['duplicate', 'missing_product']),
-  count: z.number().int().min(0).max(1_000_000),
-  message: z.string().max(2_000),
-  droneStrategy: scenarioComparisonFactorsSchema.shape.droneStrategies.element.optional(),
-})
-
-const scenarioComparisonResultSchema: z.ZodType<ScenarioComparisonResult> = z.object({
-  kind: z.literal('scenario_comparison'),
-  scenarioCount: z.number().int().min(0).max(10_000),
-  screeningCount: z.number().int().min(0).max(10_000),
-  verifiedCount: z.number().int().min(0).max(10_000),
-  failedCount: z.number().int().min(0).max(10_000),
-  rawCombinationCount: z.number().int().min(0).max(1_000_000),
-  skipped: z.array(scenarioSkipSchema).max(10_000),
-  points: z.array(z.object({
-    id: boundedString(256),
-    label: boundedString(1_000),
-    config: extensibleLicenseConfigSchema,
-    layout: z.enum(['153', '243', '333']),
-    productionPlan: scenarioProductionPlanSchema,
-    scheduleMode: z.enum(['maa', 'rotation']),
-    scheduleStrategy: z.enum(['variable', '8x3', 'rotation']),
-    shiftHours: z.array(finiteNumber.positive().max(24)).min(1).max(24),
-    operationsPerDay: finiteNumber.nonnegative(),
-    variableShiftFallback: z.boolean(),
-    droneStrategy: scenarioComparisonFactorsSchema.shape.droneStrategies.element,
-    status: z.enum(['succeeded', 'failed']),
-    screening: scenarioMetricsSchema.optional(),
-    verified: scenarioMetricsSchema.optional(),
-    isFrontier: z.boolean(),
-    error: z.string().max(4_000).optional(),
-  }).passthrough()).max(10_000),
-  frontierScenarioIds: z.array(z.string().max(256)).max(10_000),
-  frontierBasis: z.literal('fast_top_3_per_actual_operation_cost_then_layout_aware_verification'),
-  warnings: z.array(z.string().max(4_000)).max(10_000),
-  buildMeta: appBuildMetaSchema,
-}).passthrough().superRefine(assertJsonSafe) as z.ZodType<ScenarioComparisonResult>
 
 const reorderCheckResultSchema: z.ZodType<ReorderCheckResult> = z.object({
   recommendation: z.enum(['no_need', 'recommended', 'strongly_recommended']),
@@ -287,7 +212,29 @@ export function parseOptimizationJobResult(
   value: unknown,
 ): OptimizeResult | ScenarioComparisonResult | ReorderCheckResult {
   if ('kind' in payload && payload.kind === 'scenario_comparison') return scenarioComparisonResultSchema.parse(value)
-  if ('kind' in payload && payload.kind === 'reorder_check') return reorderCheckResultSchema.parse(value)
+  if ('kind' in payload && payload.kind === 'reorder_check') {
+    const result = reorderCheckResultSchema.parse(value)
+    if (result.baseline.history_id !== payload.baseline.id
+      || result.baseline.created_at !== payload.baseline.created_at
+      || result.baseline.name !== payload.baseline.name) {
+      throw new Error('换班结果基线与任务冻结基线不一致。')
+    }
+    if (result.estimated_gain_range.min !== null
+      && result.estimated_gain_range.max !== null
+      && result.estimated_gain_range.min > result.estimated_gain_range.max) {
+      throw new Error('换班结果收益区间上下界无效。')
+    }
+    if (result.quota.used + result.quota.remaining !== result.quota.limit) {
+      throw new Error('换班结果额度字段不一致。')
+    }
+    if (result.recommendation === 'strongly_recommended'
+      && result.reasons.length === 0
+      && result.changed_room_count === 0
+      && result.key_operators.length === 0) {
+      throw new Error('强烈建议换班的结果缺少推荐证据。')
+    }
+    return result
+  }
   return optimizeResultSchema.parse(value)
 }
 

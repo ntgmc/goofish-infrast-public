@@ -27,7 +27,7 @@ export default function ScenarioLabSection({
   onApplyConfig: (config: LicenseConfig) => void;
 }) {
   const [useCoupon, setUseCoupon] = useState(false)
-  const { factors, setFactors, result, error, loading, progress, run } = useScenarioComparison({
+  const { factors, setFactors, result, error, loading, cancelling, canCancel, progress, run, cancel } = useScenarioComparison({
     profileId,
     operators,
     config: activeConfig,
@@ -73,7 +73,7 @@ export default function ScenarioLabSection({
             </div>
           ) : <p role="alert" className="text-error">{expansion.error}</p>}
           {expansion.value?.skipped.map((item) => (
-            <p key={item.code} className="mt-1 text-xs leading-5 text-ink-muted">{item.message}（{item.count} {copy.optimize.pages_tool_optimize_ScenarioLabSection_009}</p>
+            <p key={`${item.code}:${item.droneStrategy ?? 'all'}`} className="mt-1 text-xs leading-5 text-ink-muted">{item.message}（{item.count} {copy.optimize.pages_tool_optimize_ScenarioLabSection_009}</p>
           ))}
         </div>
         {error && <div role="alert" className="tool-alert tool-alert--error mt-4">{error}</div>}
@@ -107,7 +107,19 @@ export default function ScenarioLabSection({
       </div>
 
       <div className="min-w-0 space-y-4" data-tour-target="optimize-lab-results">
-        {progress && <ScheduleProgress progress={progress} variant="focus" />}
+        {progress && <div className="space-y-2">
+          <ScheduleProgress progress={progress} variant="focus" />
+          {canCancel && <button
+            type="button"
+            disabled={cancelling}
+            onClick={() => {
+              if (window.confirm(copy.optimize.pages_tool_optimize_ScenarioLabSection_052)) void cancel()
+            }}
+            className="tool-secondary-action w-full"
+          >
+            {cancelling ? copy.optimize.pages_tool_optimize_ScenarioLabSection_053 : copy.optimize.pages_tool_optimize_ScenarioLabSection_051}
+          </button>}
+        </div>}
         {!result && !progress && (
           <div className="tool-panel border-dashed px-5 py-12 text-center">
             <p className="text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ScenarioLabSection_013}</p>

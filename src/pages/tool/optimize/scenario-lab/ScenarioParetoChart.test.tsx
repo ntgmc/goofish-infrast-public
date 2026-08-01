@@ -16,9 +16,19 @@ describe('ScenarioParetoChart', () => {
     fireEvent.keyDown(mark, { key: 'Enter' })
     expect(onSelect).toHaveBeenCalledWith('variable')
   })
+
+  it('derives a safe x-axis from finite points instead of assuming the 2-4 range', () => {
+    render(<ScenarioParetoChart points={[point(8)]} selectedId={null} onSelect={vi.fn()} />)
+
+    const mark = screen.getByRole('button')
+    const circle = mark.querySelector('circle')
+    expect(Number(circle?.getAttribute('cx'))).toBeGreaterThanOrEqual(70)
+    expect(Number(circle?.getAttribute('cx'))).toBeLessThanOrEqual(690)
+    expect(mark).toHaveAttribute('aria-label', expect.stringContaining('8 次换班'))
+  })
 })
 
-function point(): ScenarioComparisonPoint {
+function point(operationsPerDay = 3): ScenarioComparisonPoint {
   return {
     id: 'variable',
     label: '自动非固定 12-6-6',
@@ -31,7 +41,7 @@ function point(): ScenarioComparisonPoint {
     scheduleMode: 'maa',
     scheduleStrategy: 'variable',
     shiftHours: [12, 6, 6],
-    operationsPerDay: 3,
+    operationsPerDay,
     variableShiftFallback: false,
     droneStrategy: 'off',
     status: 'succeeded',

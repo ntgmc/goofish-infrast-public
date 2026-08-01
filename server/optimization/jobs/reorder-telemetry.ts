@@ -21,3 +21,18 @@ export async function recordReorderCheckEvent(
     console.warn('重排检测使用统计记录已跳过:', error)
   }
 }
+
+export async function applyReorderCheckSuccessEffect(
+  profileId: string,
+  submittedAt: number,
+  jobId: string,
+): Promise<void> {
+  await recordUsageEvent('reorder_check', {
+    status: 'success',
+    reason_code: 'ok',
+    duration_ms: Math.max(0, Date.now() - submittedAt),
+    permission: 'free_preview',
+    profile_id: profileId,
+    source: 'free_preview',
+  }, `optimize-job/${jobId}/reorder-check`)
+}

@@ -375,6 +375,10 @@ export const optimizeCopy = {
   pages_tool_optimize_OverviewSection_058: "预计收益提升很小，继续用当前方案即可。",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_059: "贸易站",
+
+  pages_tool_optimize_OverviewSection_069: "取消检查",
+
+  pages_tool_optimize_OverviewSection_070: "确认取消当前换班检查任务？",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_060: "制造站",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -587,6 +591,12 @@ export const optimizeCopy = {
   pages_tool_optimize_ScenarioLabSection_048: "制造",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_049: "贸易",
+
+  pages_tool_optimize_ScenarioLabSection_051: "取消当前情景任务",
+
+  pages_tool_optimize_ScenarioLabSection_052: "确认取消当前情景对比任务？",
+
+  pages_tool_optimize_ScenarioLabSection_053: "正在取消…",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_050: "库存",
   // src/pages/tool/optimize/feedback.tsx
@@ -719,6 +729,8 @@ export const optimizeCopy = {
   pages_tool_optimize_scenario_lab_ScenarioParetoChart_018: "游戏内轮换",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
   pages_tool_optimize_scenario_lab_ScenarioParetoChart_019: "自动非固定",
+
+  pages_tool_optimize_scenario_lab_ScenarioParetoChart_020: "已忽略 {count} 个坐标数据异常的情景点。",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_001: "场景",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
@@ -811,6 +823,8 @@ export const optimizeCopy = {
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_045: "加速经验",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_046: "加速源石碎片",
+
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_047: "越低越优",
   // src/pages/tool/optimize/scenario-lab/useScenarioComparison.ts
   pages_tool_optimize_scenario_lab_useScenarioComparison_001: "同步场景对比任务失败，请稍后重试",
   // src/pages/tool/optimize/scenario-lab/useScenarioComparison.ts
@@ -946,6 +960,8 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizationTaskCenter_036: "重排检测",
   pages_tool_optimize_OptimizationTaskCenter_037: "查看结果",
   pages_tool_optimize_OptimizationTaskCenter_038: "加载任务结果失败，请稍后重试。",
+
+  pages_tool_optimize_OptimizationTaskCenter_039: "返回换班检查",
   // src/pages/tool/optimize/optimization-api.ts
   pages_tool_optimize_optimization_api_001: "加载优化任务列表失败。",
   pages_tool_optimize_optimization_api_002: "取消优化任务失败。",

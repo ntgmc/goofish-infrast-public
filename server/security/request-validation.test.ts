@@ -140,6 +140,36 @@ describe('request validation boundary', () => {
     }).success).toBe(false)
   })
 
+  it('rejects duplicate and oversized scenario factor dimensions before expansion', () => {
+    const base = {
+      kind: 'scenario_comparison' as const,
+      identity: { type: 'profile' as const, profileId: 'profile-1' },
+      operators: [{ id: 'op-1', name: 'Operator', own: true, elite: 2, rarity: 6 }],
+      config: {
+        layout: '243', desc: 'test', trading_stations_count: 2, manufacturing_stations_count: 4,
+        product_requirements: { trading_stations: { lmd: 2 }, manufacturing_stations: { pure_gold: 4 } },
+      },
+      factors: {
+        layouts: [{
+          layout: '243',
+          plans: [{ trading: { lmd: 2, orundum: 0 }, manufacturing: { pureGold: 2, battleRecord: 2, originiumShard: 0 } }],
+        }],
+        maaSchedules: ['variable'],
+        includeRotation: true,
+        droneStrategies: ['off'],
+      },
+    }
+    expect(requestSchemas.optimizationJob.safeParse(base).success).toBe(true)
+    expect(requestSchemas.optimizationJob.safeParse({
+      ...base,
+      factors: { ...base.factors, maaSchedules: ['variable', 'variable'] },
+    }).success).toBe(false)
+    expect(requestSchemas.optimizationJob.safeParse({
+      ...base,
+      factors: { ...base.factors, droneStrategies: Array.from({ length: 5_000 }, () => 'off') },
+    }).success).toBe(false)
+  })
+
   it('keeps the strict admin feature schema aligned with the shared feature contract', () => {
     expect(requestSchemas.adminFeatureSettings.safeParse({
       features: DEFAULT_SITE_FEATURES,

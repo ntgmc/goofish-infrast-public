@@ -2,7 +2,6 @@ import { lazy, Suspense } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import AnnouncementPopup from '../components/AnnouncementPopup'
 import SessionLoader from '../components/SessionLoader'
-import { canUseScenarioComparison } from '../lib/license'
 import {
   dashboardPath,
   fallbackToolPath,
@@ -179,10 +178,6 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
 
   if (!license) {
     return <Navigate to={profileScopedPath(workspace?.operators ? workspaceSetupPath('config') : workspaceSetupPath('operators'), activeProfile.id)} replace />
-  }
-
-  if (route.section === 'lab' && !canUseScenarioComparison(license)) {
-    return <Navigate to={profileScopedPath(optimizePath('overview'), activeProfile.id)} replace />
   }
 
   if (route.section === 'lab' && !features.schedule_generation) {

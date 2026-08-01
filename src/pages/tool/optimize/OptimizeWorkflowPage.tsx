@@ -16,7 +16,9 @@ import { copy } from '../../../copy/index'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { apiJson } from '../../../lib/api-client'
 import { fetchOptimizationJobSnapshot } from './optimization-api'
-import type { OptimizeResult, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { OptimizeResult, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../../lib/types'
+import SessionLoader from '../../../components/SessionLoader'
+import { restoreScenarioComparisonJob } from './scenario-lab/useScenarioComparison'
 
 
 export default function OptimizeWorkflowPage(props: Props) {
@@ -27,7 +29,7 @@ export default function OptimizeWorkflowPage(props: Props) {
   const compactTaskCenterButtonRef = useRef<HTMLButtonElement>(null)
   const taskCenterTriggerRef = useRef(taskCenterButtonRef)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
-  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
+  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
   const [mainTourSeenAtMount] = useState(() => hasCompletedTour('optimize-overview', 2))
   const initialSectionRef = useRef(section)
   const [sectionChangedAfterMainTour, setSectionChangedAfterMainTour] = useState(false)
@@ -85,6 +87,14 @@ export default function OptimizeWorkflowPage(props: Props) {
   const closeTaskCenter = () => {
     setTaskCenterOpen(false)
     window.setTimeout(() => taskCenterTriggerRef.current.current?.focus(), 0)
+  }
+
+  useEffect(() => {
+    if (section === 'lab' && inventoryLoaded && !userCanUseScenarioLab) setSection('overview')
+  }, [inventoryLoaded, section, setSection, userCanUseScenarioLab])
+
+  if (section === 'lab' && !userHasScenarioLabCapability && !inventoryLoaded) {
+    return <SessionLoader label={copy.inventory.loading} />
   }
 
   return (
@@ -155,8 +165,28 @@ export default function OptimizeWorkflowPage(props: Props) {
               closeTaskCenter()
               setSection('lab')
             }}
+            onOpenReorder={() => {
+              closeTaskCenter()
+              setSection('overview')
+            }}
             onOpenResult={(job) => {
               void (async () => {
+                if (job.kind === 'scenario_comparison') {
+                  restoreScenarioComparisonJob(props.profileId, job.id)
+                  closeTaskCenter()
+                  setSection('lab')
+                  return
+                }
+                if (job.kind === 'reorder_check') {
+                  const snapshot = await fetchOptimizationJobSnapshot<ReorderCheckResult>(
+                    job.id,
+                    copy.optimize.pages_tool_optimize_OptimizationTaskCenter_038,
+                  )
+                  if (snapshot.status !== 'succeeded') throw new Error(copy.optimize.pages_tool_optimize_OptimizationTaskCenter_038)
+                  closeTaskCenter()
+                  handleOpenReorderCheckResult(snapshot.result)
+                  return
+                }
                 const resultId = job.historyResultId ?? job.id
                 const stored = [...resultHistory, ...archivedResults].find((item) => item.id === resultId)
                 if (stored) {
@@ -239,6 +269,7 @@ export default function OptimizeWorkflowPage(props: Props) {
                 error: reorderCheckError,
                 result: reorderCheckResult,
                 onCheck: handleReorderCheck,
+                onCancel: handleCancelReorderCheck,
                 onGenerate: handleGenerate,
                 coupon: {
                   visible: reorderQuota?.remaining === 0 && (itemBalances.reorder_check_coupon ?? 0) > 0,

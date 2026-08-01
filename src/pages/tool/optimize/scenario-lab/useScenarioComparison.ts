@@ -7,12 +7,17 @@ import type {
   CreateScenarioComparisonJobResponse,
   ScenarioComparisonJobSnapshot,
 } from '../../../../lib/optimization-contracts'
-import type { ScenarioComparisonFactors, ScenarioComparisonResult, ScenarioMaaSchedule } from '../../../../lib/scenario-comparison'
+import type { ScenarioComparisonFactors, ScenarioComparisonResult } from '../../../../lib/scenario-comparison'
+import {
+  scenarioComparisonFactorsSchema,
+  scenarioComparisonResultSchema,
+} from '../../../../lib/scenario-comparison-validation'
 import type { LicenseConfig, LicenseOperator } from '../../../../lib/types'
 import { copy } from '../../../../copy/index'
 import { fetchOptimizeJobSnapshotStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, waitForOptimizePoll } from '../job-progress'
-import { OPTIMIZE_SUBMIT_TIMEOUT_MS } from '../optimization-api'
+import { cancelOptimizationJob, OPTIMIZE_SUBMIT_TIMEOUT_MS } from '../optimization-api'
 import { publishOptimizationJobUpdate, subscribeOptimizationJobUpdates, withOptimizationSubmissionLock } from '../optimization-job-events'
+import { z } from 'zod'
 
 
 const DEFAULT_FACTORS: ScenarioComparisonFactors = {
@@ -35,6 +40,16 @@ interface StoredScenarioSession {
   pendingSubmission?: { requestJson: string; idempotencyKey: string };
 }
 
+const storedScenarioSessionSchema: z.ZodType<StoredScenarioSession> = z.strictObject({
+  factors: scenarioComparisonFactorsSchema,
+  activeJobId: z.string().min(1).max(256).optional(),
+  result: scenarioComparisonResultSchema.optional(),
+  pendingSubmission: z.strictObject({
+    requestJson: z.string().min(1).max(512 * 1024),
+    idempotencyKey: z.string().min(1).max(200),
+  }).optional(),
+})
+
 export function useScenarioComparison({
   profileId,
   operators,
@@ -52,6 +67,7 @@ export function useScenarioComparison({
   const [job, setJob] = useState<ScenarioComparisonJobSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(Boolean(initial?.activeJobId))
+  const [cancelling, setCancelling] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected')
   const [consecutivePollFailures, setConsecutivePollFailures] = useState(0)
   const pollRunRef = useRef(0)
@@ -100,9 +116,9 @@ export function useScenarioComparison({
           publishOptimizationJobUpdate(profileId, snapshot)
           if (snapshot.status === 'succeeded') {
             setResult(snapshot.result)
-            setLoading(false)
             writeSession(profileId, { factors: sessionFactors, result: snapshot.result })
-            void onSettled?.()
+            await settleInventory(onSettled, setError)
+            if (pollRunRef.current === runId) setLoading(false)
             return
           }
           if (snapshot.status === 'failed' || snapshot.status === 'cancelled' || snapshot.status === 'dead_lettered') {
@@ -112,9 +128,9 @@ export function useScenarioComparison({
               const supportSuffix = snapshot.error.supportReference ? ` (${snapshot.error.supportReference})` : ''
               setError(`${snapshot.error.message}${supportSuffix}`)
             }
-            setLoading(false)
             writeSession(profileId, { factors: sessionFactors })
-            void onSettled?.()
+            await settleInventory(onSettled, setError)
+            if (pollRunRef.current === runId) setLoading(false)
             return
           }
           await waitForOptimizePoll(
@@ -126,9 +142,9 @@ export function useScenarioComparison({
           if (isOptimizeJobPollCancelled(caught) || pollRunRef.current !== runId) return
           if (!isRetryableOptimizePollError(caught)) {
             setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_002)
-            setLoading(false)
             writeSession(profileId, { factors: sessionFactors })
-            void onSettled?.()
+            await settleInventory(onSettled, setError)
+            if (pollRunRef.current === runId) setLoading(false)
             return
           }
           failures += 1
@@ -187,11 +203,26 @@ export function useScenarioComparison({
       await pollJob(nextJob.id, pollRunRef.current, factors)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_004)
-      setLoading(false)
       writeSession(profileId, { factors, pendingSubmission })
-      void onSettled?.()
+      await settleInventory(onSettled, setError)
+      setLoading(false)
     }
   }, [config, factors, onSettled, operators, pollJob, profileId])
+
+  const cancel = useCallback(async () => {
+    if (!job?.canCancel || cancelling) return
+    setCancelling(true)
+    setError(null)
+    try {
+      const snapshot = await cancelOptimizationJob(job.id) as ScenarioComparisonJobSnapshot
+      setJob(snapshot)
+      publishOptimizationJobUpdate(profileId, snapshot)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_002)
+    } finally {
+      setCancelling(false)
+    }
+  }, [cancelling, job, profileId])
 
   useEffect(() => {
     const restored = readSession(profileId)
@@ -233,34 +264,69 @@ export function useScenarioComparison({
     cancellationRequested: job.cancellationRequested,
   } : null, [connectionStatus, consecutivePollFailures, job, loading])
 
-  return { factors, setFactors, result, error, loading, progress, run }
+  return { factors, setFactors, result, error, loading, cancelling, canCancel: Boolean(job?.canCancel), progress, run, cancel }
 }
 
 function sessionKey(profileId: string): string {
   return `maa:scenario-lab:v2:${profileId}`
 }
 
+export function restoreScenarioComparisonJob(profileId: string, jobId: string): void {
+  const current = readSession(profileId)
+  writeSession(profileId, {
+    factors: current?.factors ?? DEFAULT_FACTORS,
+    activeJobId: jobId,
+  })
+}
+
 function readSession(profileId: string): StoredScenarioSession | null {
   try {
     const raw = window.sessionStorage.getItem(sessionKey(profileId))
     if (!raw) return null
-    const parsed = JSON.parse(raw) as StoredScenarioSession
-    if (!parsed?.factors) return null
-    return { ...parsed, factors: normalizeStoredFactors(parsed.factors) }
+    const value = JSON.parse(raw) as unknown
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return clearInvalidSession(profileId)
+    const candidate = value as Record<string, unknown>
+    const factors = normalizeStoredFactors(candidate.factors)
+    if (!factors) return clearInvalidSession(profileId)
+    const parsed = storedScenarioSessionSchema.safeParse({ ...candidate, factors })
+    return parsed.success ? parsed.data : clearInvalidSession(profileId)
   } catch {
-    return null
+    return clearInvalidSession(profileId)
   }
 }
 
-function normalizeStoredFactors(factors: ScenarioComparisonFactors): ScenarioComparisonFactors {
+function normalizeStoredFactors(value: unknown): ScenarioComparisonFactors | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const factors = value as Record<string, unknown>
   const maaSchedules = Array.isArray(factors.maaSchedules)
-    ? factors.maaSchedules.filter((value): value is ScenarioMaaSchedule => value === 'variable' || value === '8x3')
+    ? factors.maaSchedules.filter((entry) => entry === 'variable' || entry === '8x3')
     : [...DEFAULT_FACTORS.maaSchedules]
-  return {
+  const parsed = scenarioComparisonFactorsSchema.safeParse({
     ...factors,
-    maaSchedules: maaSchedules.length > 0 || factors.includeRotation
+    maaSchedules: maaSchedules.length > 0 || factors.includeRotation === true
       ? maaSchedules
       : [...DEFAULT_FACTORS.maaSchedules],
+  })
+  return parsed.success ? parsed.data : null
+}
+
+function clearInvalidSession(profileId: string): null {
+  try {
+    window.sessionStorage.removeItem(sessionKey(profileId))
+  } catch {
+    // Invalid best-effort storage can be ignored after falling back to defaults.
+  }
+  return null
+}
+
+async function settleInventory(
+  onSettled: (() => void | Promise<void>) | undefined,
+  setError: (message: string | null) => void,
+): Promise<void> {
+  try {
+    await onSettled?.()
+  } catch {
+    setError(copy.inventory.refresh_failed)
   }
 }
 

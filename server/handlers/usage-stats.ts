@@ -320,11 +320,11 @@ export async function countSuccessfulUsageEventsForProfileInRange(
   }
   const events = await store.list(EVENT_PREFIX)
   return events.filter((record) => (
-    record.event === event &&
-    record.profile_id === profileId &&
-    record.status !== 'failure' &&
-    record.created_at >= startAt &&
-    record.created_at < endAt
+    record.event === event
+    && record.profile_id === profileId
+    && record.status !== 'failure'
+    && record.created_at >= startAt
+    && record.created_at < endAt
   )).length
 }
 
