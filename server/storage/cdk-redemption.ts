@@ -5,7 +5,7 @@ import { emptyWorkspace, insertUserAccountForRegistrationInTransaction } from '.
 import { claimCdkRecord, completeCdkRedemption } from './cdk-store'
 import { withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
-import type { CdkRecord } from '../handlers/license-utils'
+import type { CdkRecord, ProfileCdkRecord } from '../handlers/license-utils'
 
 export class CdkAlreadyRedeemedError extends Error {}
 export class IdempotencyConflictError extends Error {
@@ -17,6 +17,67 @@ export class IdempotencyConflictError extends Error {
 
 export function createRequestHash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
+}
+
+export interface LifetimeVoucherProfileAuthorization {
+  cdkKey: string
+  codeHash: string
+  orderHash: string
+}
+
+export function buildLifetimeVoucherProfileAuthorization(operationId: string): LifetimeVoucherProfileAuthorization {
+  const normalizedOperationId = operationId.trim().toLowerCase()
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(normalizedOperationId)) {
+    throw new Error('Lifetime voucher operation ID must be a UUID.')
+  }
+  const codeHash = `inventory-lifetime-${normalizedOperationId}`
+  return {
+    cdkKey: `cdk/${codeHash}.json`,
+    codeHash,
+    orderHash: `inventory-lifetime-order-${normalizedOperationId}`,
+  }
+}
+
+export async function createLifetimeVoucherProfileAuthorizationInTransaction(
+  client: PoolClient,
+  input: {
+    operationId: string
+    userId: string
+    profileId: string
+    authorizedAt: string
+    operatorCount?: number | null
+  },
+): Promise<LifetimeVoucherProfileAuthorization> {
+  const authorization = buildLifetimeVoucherProfileAuthorization(input.operationId)
+  const record: ProfileCdkRecord & {
+    authorization_source: 'lifetime_profile_voucher'
+    inventory_operation_id: string
+  } = {
+    version: 2,
+    cdk_type: 'profile',
+    code_hash: authorization.codeHash,
+    permission: 'advanced',
+    balance_amount: null,
+    status: 'used',
+    created_at: input.authorizedAt,
+    used_at: input.authorizedAt,
+    order_note: 'inventory:lifetime_profile_voucher',
+    license_order_hash: authorization.orderHash,
+    operator_count: input.operatorCount ?? null,
+    config_desc: null,
+    account_id: input.userId,
+    profile_id: input.profileId,
+    authorization_source: 'lifetime_profile_voucher',
+    inventory_operation_id: input.operationId,
+  }
+  await client.query(
+    `insert into cdk_records
+      (key, code_hash, cdk_type, status, permission, balance_amount, item_code, item_expires_at,
+       license_order_hash, record_json, created_at, updated_at)
+     values ($1, $2, 'profile', 'used', 'advanced', null, null, null, $3, $4::jsonb, $5, $5)`,
+    [authorization.cdkKey, authorization.codeHash, authorization.orderHash, JSON.stringify(record), input.authorizedAt],
+  )
+  return authorization
 }
 
 export async function redeemCdkAtomically<T>(options: {

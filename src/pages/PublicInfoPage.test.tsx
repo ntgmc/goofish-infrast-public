@@ -10,6 +10,8 @@ import { GITHUB_REPOSITORY_URL, SUPPORT_QQ_GROUP_URL } from '../components/Publi
 import { ThemeProvider } from '../lib/theme'
 import { DEFAULT_SITE_FEATURES } from '../lib/site-features'
 import * as siteFeatureContext from '../lib/site-feature-context'
+import { cloneDefaultPublicContentSettings } from '../lib/public-content'
+import * as publicContentContext from '../lib/public-content-context'
 
 afterEach(() => {
   cleanup()
@@ -58,6 +60,26 @@ describe('public information pages', () => {
     const githubIcon = githubLink.querySelector('svg')
     expect(githubIcon).toBeInTheDocument()
     expect(githubIcon).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('uses the configured Xianyu URL for the landing-page CDK entry', () => {
+    mockPublicContent('https://example.com/xianyu-listing')
+    render(<ThemeProvider><MemoryRouter><LandingPage onStart={() => undefined} /></MemoryRouter></ThemeProvider>)
+
+    const purchaseLink = screen.getByRole('link', { name: '获取 CDK' })
+    expect(purchaseLink).toHaveAttribute('href', 'https://example.com/xianyu-listing')
+    expect(purchaseLink).toHaveAttribute('target', '_blank')
+    expect(purchaseLink).toHaveAttribute('rel', 'noreferrer')
+  })
+
+  it.each([
+    { label: 'empty configuration', url: '', isFallback: false },
+    { label: 'initial configuration failure', url: 'https://example.com/stale-listing', isFallback: true },
+  ])('hides the landing-page CDK entry for $label', ({ url, isFallback }) => {
+    mockPublicContent(url, isFallback)
+    render(<ThemeProvider><MemoryRouter><LandingPage onStart={() => undefined} /></MemoryRouter></ThemeProvider>)
+
+    expect(screen.queryByRole('link', { name: '获取 CDK' })).not.toBeInTheDocument()
   })
 
   it('keeps FAQ, support, and home links in the compact public menu', async () => {
@@ -125,3 +147,14 @@ describe('public information pages', () => {
     expect(screen.getAllByRole('link', { name: /加入 QQ 群.*891655477/ }).length).toBeGreaterThan(0)
   })
 })
+
+function mockPublicContent(xianyuUrl: string, isFallback = false): void {
+  const content = cloneDefaultPublicContentSettings()
+  content.cdk_purchase.xianyu_url = xianyuUrl
+  vi.spyOn(publicContentContext, 'usePublicContent').mockReturnValue({
+    status: 'ready',
+    isFallback,
+    content,
+    refresh: vi.fn(),
+  })
+}

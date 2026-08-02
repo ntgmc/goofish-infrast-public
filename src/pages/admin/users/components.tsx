@@ -259,12 +259,20 @@ function UserBalanceCard({
           {loading ? '加载中…' : '加载更多'}
         </button>
       )}
-      <CommercialAdminControls userId={userId} />
+      <CommercialAdminControls
+        userId={userId}
+        eligible={balance?.balance.commercial.eligible === true}
+      />
     </section>
   )
 }
 
-function CommercialAdminControls({ userId }: { userId: string }) {
+export function CommercialAdminControls({ userId, eligible }: { userId: string; eligible: boolean }) {
+  if (!eligible) return null
+  return <EffectiveCommercialAdminControls userId={userId} />
+}
+
+function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
   type Limits = { active: number; total: number; active_limit: number; total_limit: number; suspended: boolean; suspension_reason: string | null }
   const [limits, setLimits] = useState<Limits | null>(null)
   const [activeLimit, setActiveLimit] = useState('100')

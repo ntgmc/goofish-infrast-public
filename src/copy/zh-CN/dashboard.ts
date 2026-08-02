@@ -166,6 +166,8 @@ export const dashboardCopy = {
   pages_tool_dashboard_ProfilesSection_014: "给这个账号写点备注",
   // src/pages/tool/dashboard/ProfilesSection.tsx
   pages_tool_dashboard_ProfilesSection_015: "保存",
+  // src/pages/tool/dashboard/ProfilesSection.tsx
+  pages_tool_dashboard_ProfilesSection_016: (endsAt: string) => `高级版功能已临时解锁，有效至 ${endsAt}；到期后恢复免费预览权限。`,
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_001: "CDK 兑换失败，请稍后重试",
   // src/pages/tool/dashboard/RedeemSection.tsx

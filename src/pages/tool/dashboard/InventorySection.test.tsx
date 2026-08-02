@@ -135,6 +135,53 @@ describe('InventorySection idempotent item use', () => {
     expect(itemRequests[2].idempotency_key).not.toBe(itemRequests[1].idempotency_key)
   })
 
+  it('syncs the activated profile and offers a route to the updated profiles page', async () => {
+    const onPayload = vi.fn()
+    const onViewProfiles = vi.fn()
+    const payload = {
+      user: { id: 'user-1' },
+      profiles: [{ id: 'preview-1', display_name: '主账号' }],
+      active_profile: { id: 'preview-1', display_name: '主账号' },
+      workspace: null,
+    }
+    let inventoryLoads = 0
+    mocks.apiJson.mockImplementation(async (path: string, options?: { method?: string }) => {
+      if (path === '/api/user/onboarding-tasks') return { tasks: [] }
+      if (path === '/api/user/inventory' && options?.method === 'POST') {
+        return {
+          operation_id: 'operation-1',
+          item_code: 'limited_profile_voucher',
+          profile_id: 'preview-1',
+          permission: 'advanced',
+          starts_at: '2026-08-01T00:00:00.000Z',
+          ends_at: '2026-08-19T16:00:00.000Z',
+          auth: payload,
+        }
+      }
+      if (path === '/api/user/inventory') {
+        inventoryLoads += 1
+        return inventoryLoads === 1 ? inventory : { ...inventory, stacks: [] }
+      }
+      throw new Error(`unexpected request: ${path}`)
+    })
+
+    const user = userEvent.setup()
+    render(<InventorySection onPayload={onPayload} onViewProfiles={onViewProfiles} />)
+
+    await user.click(await screen.findByRole('button', { name: /限时 CDK/ }))
+    await user.click(screen.getByRole('button', { name: '使用道具' }))
+
+    const notice = await screen.findByText(/「主账号」的高级版限时体验已生效/)
+    expect(notice).toHaveTextContent('有效至 2026/08/20 00:00')
+    expect(screen.queryByText('道具操作已完成。')).not.toBeInTheDocument()
+    expect(onPayload).toHaveBeenCalledOnce()
+    expect(onPayload).toHaveBeenCalledWith(payload)
+    await waitFor(() => expect(inventoryLoads).toBe(2))
+
+    await user.click(screen.getByRole('button', { name: '查看账号档案' }))
+    expect(onViewProfiles).toHaveBeenCalledOnce()
+  })
+
   it('creates a lifetime profile for JSON import without requiring Skland', async () => {
     const onPayload = vi.fn()
     const onLifetimeProfileCreated = vi.fn()

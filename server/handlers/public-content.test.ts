@@ -24,7 +24,12 @@ describe('public content handlers', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     const body = await response.json()
-    expect(body).toMatchObject({ version: 1, defaults_revision: 2, qq_group: { number: '891655477' } })
+    expect(body).toMatchObject({
+      version: 1,
+      defaults_revision: 3,
+      cdk_purchase: { xianyu_url: DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url },
+      qq_group: { number: '891655477' },
+    })
     expect(body).not.toHaveProperty('revision')
     expect(auth.authenticateAdminRequest).not.toHaveBeenCalled()
   })
@@ -50,7 +55,7 @@ describe('public content handlers', () => {
     expect((await adminHandler(new Request('http://localhost/api/admin/public-content'))).status).toBe(401)
 
     const invalid = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
-    invalid.qq_group.join_url = 'javascript:alert(1)'
+    invalid.cdk_purchase.xianyu_url = 'javascript:alert(1)'
     const invalidResponse = await adminHandler(jsonRequest({ ...invalid, expected_revision: 3 }))
     expect(invalidResponse.status).toBe(400)
     await expect(invalidResponse.json()).resolves.toMatchObject({ code: 'invalid_request', issues: expect.any(Array) })

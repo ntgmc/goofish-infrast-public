@@ -13,7 +13,7 @@ import {
 import { SortableMasterDetailList } from '../shared/SortableMasterDetailList'
 import { AdminToast } from '../shared/AdminToast'
 
-type TabId = 'qq' | 'faq' | 'pricing' | 'thanks'
+type TabId = 'qq' | 'purchase' | 'faq' | 'pricing' | 'thanks'
 type EditSettings = (updater: (draft: AdminPublicContentSettingsV1) => void) => void
 type FieldErrors = Record<string, string>
 
@@ -25,6 +25,7 @@ const ValidationContext = createContext<{
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'qq', label: copy.publicContent.admin_tab_qq },
+  { id: 'purchase', label: copy.publicContent.admin_tab_purchase },
   { id: 'faq', label: copy.publicContent.admin_tab_faq },
   { id: 'pricing', label: copy.publicContent.admin_tab_pricing },
   { id: 'thanks', label: copy.publicContent.admin_tab_thanks },
@@ -185,6 +186,7 @@ export default function PublicContentSettingsSection() {
         className="space-y-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60"
       >
         {activeTab === 'qq' && <QqEditor settings={settings} edit={edit} />}
+        {activeTab === 'purchase' && <PurchaseEditor settings={settings} edit={edit} />}
         {activeTab === 'faq' && <FaqEditor settings={settings} edit={edit} />}
         {activeTab === 'pricing' && <PricingEditor settings={settings} edit={edit} />}
         {activeTab === 'thanks' && <ThanksEditor settings={settings} edit={edit} />}
@@ -213,6 +215,23 @@ function QqEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit:
         <TextField path="qq_group.link_label" id="public-content-qq-label" label={copy.publicContent.admin_qq_link_label} value={settings.qq_group.link_label} maxLength={80} onChange={(value) => edit((next) => { next.qq_group.link_label = value })} />
         <TextField path="qq_group.join_url" id="public-content-qq-url" label={copy.publicContent.admin_qq_url} value={settings.qq_group.join_url} maxLength={2048} type="url" onChange={(value) => edit((next) => { next.qq_group.join_url = value })} />
       </div>
+    </EditorPanel>
+  )
+}
+
+function PurchaseEditor({ settings, edit }: { settings: PublicContentSettingsV1; edit: EditSettings }) {
+  return (
+    <EditorPanel title={copy.publicContent.admin_tab_purchase} description={copy.publicContent.admin_purchase_description}>
+      <TextField
+        path="cdk_purchase.xianyu_url"
+        id="public-content-xianyu-url"
+        label={copy.publicContent.admin_xianyu_url}
+        value={settings.cdk_purchase.xianyu_url}
+        maxLength={2048}
+        type="url"
+        required={false}
+        onChange={(value) => edit((next) => { next.cdk_purchase.xianyu_url = value })}
+      />
     </EditorPanel>
   )
 }
@@ -678,6 +697,7 @@ function issueTargetPath(path: string[]): string {
 }
 
 function tabForValidationPath(path: string): TabId {
+  if (path.startsWith('cdk_purchase.')) return 'purchase'
   if (path.startsWith('faq.')) return 'faq'
   if (path.startsWith('pricing.')) return 'pricing'
   if (path.startsWith('thanks.')) return 'thanks'
@@ -748,6 +768,7 @@ function newId(prefix: string): string {
 
 function toDraft(settings: PublicContentSettingsV1): PublicContentDraftV1 {
   return {
+    cdk_purchase: settings.cdk_purchase,
     qq_group: settings.qq_group,
     faq: settings.faq,
     pricing: settings.pricing,

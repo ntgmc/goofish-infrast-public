@@ -4,11 +4,13 @@ import {
   DEFAULT_PUBLIC_CONTENT_DRAFT,
   normalizePublicContentSettings,
   parsePublicContentDraft,
+  resolvePublicContentSettings,
 } from './public-content'
 
 describe('public content settings', () => {
-  it('provides a valid editable default with the QQ group and nineteen FAQ items', () => {
+  it('provides a valid editable default with the CDK purchase link, QQ group, and nineteen FAQ items', () => {
     const parsed = parsePublicContentDraft(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    expect(parsed.cdk_purchase.xianyu_url).toMatch(/^https:\/\//)
     expect(parsed.qq_group).toMatchObject({ number: '891655477', join_url: expect.stringMatching(/^https:\/\//) })
     expect(parsed.faq.items).toHaveLength(19)
     expect(parsed.faq.items[parsed.faq.items.length - 1]).toMatchObject({ id: 'qq-group', action: 'qq_group' })
@@ -29,6 +31,10 @@ describe('public content settings', () => {
   })
 
   it('rejects unsafe links, invalid group numbers, duplicate ids, and unknown fields', () => {
+    const unsafePurchase = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    unsafePurchase.cdk_purchase.xianyu_url = 'javascript:alert(1)'
+    expect(() => parsePublicContentDraft(unsafePurchase)).toThrow()
+
     const unsafe = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
     unsafe.qq_group.join_url = 'javascript:alert(1)'
     expect(() => parsePublicContentDraft(unsafe)).toThrow()
@@ -50,6 +56,18 @@ describe('public content settings', () => {
     expect(() => parsePublicContentDraft(protocolRelativeAvatar)).toThrow()
 
     expect(() => parsePublicContentDraft({ ...DEFAULT_PUBLIC_CONTENT_DRAFT, unknown: true })).toThrow()
+  })
+
+  it('trims the configured CDK purchase URL, allows an empty value, and enforces the length limit', () => {
+    const configured = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
+    configured.cdk_purchase.xianyu_url = '  https://example.com/xianyu-listing  '
+    expect(parsePublicContentDraft(configured).cdk_purchase.xianyu_url).toBe('https://example.com/xianyu-listing')
+
+    configured.cdk_purchase.xianyu_url = ''
+    expect(parsePublicContentDraft(configured).cdk_purchase.xianyu_url).toBe('')
+
+    configured.cdk_purchase.xianyu_url = `https://example.com/${'a'.repeat(2049)}`
+    expect(() => parsePublicContentDraft(configured)).toThrow()
   })
 
   it('normalizes omitted optional credit links and avatars to empty values', () => {
@@ -90,7 +108,7 @@ describe('public content settings', () => {
     delete (intermediate as unknown as { defaults_revision?: number }).defaults_revision
     intermediate.thanks.sections[1].entries[0].avatar_url = 'https://avatars.githubusercontent.com/u/74061867?v=4'
     expect(normalizePublicContentSettings(intermediate)).toMatchObject({
-      defaults_revision: 2,
+      defaults_revision: 3,
       thanks: {
         sections: expect.arrayContaining([
           expect.objectContaining({
@@ -126,6 +144,27 @@ describe('public content settings', () => {
       name: '所有参与开发、测试、反馈与验证的协助者',
       description: '管理员自定义说明',
     })
+  })
+
+  it('adds the current CDK purchase URL to legacy records without overwriting custom content or explicit empty values', () => {
+    const legacy = cloneDefaultPublicContentSettings()
+    const legacyRecord = legacy as unknown as { defaults_revision: number }
+    legacyRecord.defaults_revision = 2
+    legacy.qq_group.name = '管理员自定义群名'
+    delete (legacy as unknown as { cdk_purchase?: unknown }).cdk_purchase
+
+    const migrated = normalizePublicContentSettings(legacy)
+    expect(migrated.defaults_revision).toBe(3)
+    expect(migrated.qq_group.name).toBe('管理员自定义群名')
+    expect(migrated.cdk_purchase.xianyu_url).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url)
+
+    const disabled = cloneDefaultPublicContentSettings()
+    const disabledRecord = disabled as unknown as { defaults_revision: number }
+    disabledRecord.defaults_revision = 2
+    disabled.cdk_purchase.xianyu_url = ''
+    expect(normalizePublicContentSettings(disabled).cdk_purchase.xianyu_url).toBe('')
+
+    expect(resolvePublicContentSettings({ ...legacy, cdk_purchase: null }).isFallback).toBe(true)
   })
 
   it('falls back to a fresh default for invalid stored records', () => {

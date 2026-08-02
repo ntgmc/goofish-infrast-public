@@ -4,11 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import type { AuthUser, UserGameAccount } from '../lib/types'
+import { cloneDefaultPublicContentSettings } from '../lib/public-content'
 import ToolPage from './ToolPage'
 
-const { sessionState, toolsSectionImport } = vi.hoisted(() => {
+const { apiJson, sessionState, toolsSectionImport } = vi.hoisted(() => {
   let resolveToolsSection!: () => void
   return {
+    apiJson: vi.fn(),
     sessionState: { current: null as Record<string, unknown> | null },
     toolsSectionImport: {
       pending: new Promise<void>((resolve) => { resolveToolsSection = resolve }),
@@ -16,6 +18,11 @@ const { sessionState, toolsSectionImport } = vi.hoisted(() => {
     },
   }
 })
+
+vi.mock('../lib/api-client', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../lib/api-client')>(),
+  apiJson,
+}))
 
 vi.mock('./tool/useToolSession', () => ({
   useToolSession: () => sessionState.current,
@@ -31,6 +38,10 @@ vi.mock('./tool/dashboard/ToolsSection', async () => {
 })
 
 beforeEach(() => {
+  apiJson.mockReset().mockImplementation(async (url: string) => {
+    if (url === '/api/site/public-content') return cloneDefaultPublicContentSettings()
+    throw new Error(`Unexpected request: ${url}`)
+  })
   sessionState.current = createSession()
 })
 
@@ -134,6 +145,22 @@ describe('ToolPage route guards', () => {
     })
     const withoutConfig = renderCurrentSession('/tool/optimize/result')
     await waitFor(() => expect(withoutConfig.state.location.pathname).toBe('/tool/setup/config'))
+  })
+
+  it('loads public content for workspace setup without loading it on dashboard routes', async () => {
+    renderToolRoute('/tool/profiles')
+    expect(await screen.findByRole('heading', { name: '游戏账号' })).toBeInTheDocument()
+    expect(apiJson).not.toHaveBeenCalledWith('/api/site/public-content', expect.any(Object))
+    cleanup()
+    apiJson.mockClear()
+
+    const profile = createProfile()
+    renderToolRoute('/tool/setup/cdk', {
+      activeProfile: profile,
+      activeCdkProfile: profile,
+      cdkProfiles: [profile],
+    })
+    await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/site/public-content', expect.any(Object)))
   })
 
   it('normalizes invalid optimize paths and defers lab entitlement checks until inventory loads', async () => {

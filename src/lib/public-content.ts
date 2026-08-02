@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 2 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 3 as const
 export const PUBLIC_PRICING_PLAN_IDS = ['free_preview', 'single_account_lifetime'] as const
 export const PUBLIC_CONTENT_LIMITS = Object.freeze({
   faqItems: 50,
@@ -15,9 +15,10 @@ export const PUBLIC_CONTENT_LIMITS = Object.freeze({
 
 const identifier = z.string().trim().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/)
 const text = (max: number) => z.string().trim().min(1).max(max)
-const optionalHttpsUrl = z.string().trim().max(2048).refine((value) => value === '' || isHttpsUrl(value), {
+const httpsUrlOrEmpty = z.string().trim().max(2048).refine((value) => value === '' || isHttpsUrl(value), {
   message: copy.publicContent.validation_invalid,
-}).optional().default('')
+})
+const optionalHttpsUrl = httpsUrlOrEmpty.optional().default('')
 const optionalAvatarUrl = z.string().trim().max(2048).refine((value) => value === '' || isHttpsUrl(value) || isSafeSiteAssetUrl(value), {
   message: copy.publicContent.validation_invalid,
 }).optional().default('')
@@ -66,6 +67,9 @@ const thanksSectionSchema = z.strictObject({
 })
 
 export const publicContentDraftSchema = z.strictObject({
+  cdk_purchase: z.strictObject({
+    xianyu_url: httpsUrlOrEmpty,
+  }),
   qq_group: z.strictObject({
     name: text(80),
     number: z.string().trim().regex(/^[1-9]\d{4,11}$/),
@@ -116,6 +120,9 @@ const freePreview = getSku('free_preview')
 const singleAccountLifetime = getSku('single_account_lifetime')
 
 export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
+  cdk_purchase: {
+    xianyu_url: 'https://m.tb.cn/h.RGCWZHH?tk=X063g9yLZxZ%20MF287',
+  },
   qq_group: {
     name: copy.publicContent.default_qq_name,
     number: '891655477',
@@ -239,6 +246,9 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
   }
   const source = value as Record<string, unknown>
   const parsed = publicContentDraftSchema.safeParse({
+    cdk_purchase: Object.prototype.hasOwnProperty.call(source, 'cdk_purchase')
+      ? source.cdk_purchase
+      : DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase,
     qq_group: source.qq_group,
     faq: source.faq,
     pricing: source.pricing,

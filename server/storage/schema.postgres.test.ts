@@ -3,6 +3,7 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, getPool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
+import { buildLifetimeVoucherProfileAuthorization } from './cdk-redemption'
 import {
   confirmPersonalUseDeclaration,
   getPersonalUseDeclarationAcceptance,
@@ -146,6 +147,89 @@ describe('PostgreSQL schema migration', () => {
       ])
     } finally {
       await query('delete from user_accounts where id = $1', [profile.userId])
+    }
+  })
+
+  it('backfills lifetime voucher profile authorization idempotently', async () => {
+    const userId = randomUUID()
+    const profileId = randomUUID()
+    const operationId = randomUUID()
+    const now = '2026-08-02T00:00:00.000Z'
+    const authorization = buildLifetimeVoucherProfileAuthorization(operationId)
+    const profile = {
+      version: 1,
+      id: profileId,
+      user_id: userId,
+      kind: 'cdk',
+      cdk_key: null,
+      cdk_code_hash: null,
+      cdk_order_hash: null,
+      permission: 'advanced',
+      status: 'active',
+      display_name: '待修复终身档案',
+      note: '',
+      created_at: now,
+      updated_at: now,
+    }
+    try {
+      await query(
+        `insert into user_accounts
+          (id, email, password_hash, salt, iterations, permission, status, record_json, created_at, updated_at)
+         values ($1, $2, 'hash', 'salt', 1, 'growth', 'active', $3::jsonb, $4, $4)`,
+        [userId, `${userId}@example.test`, JSON.stringify({ id: userId }), now],
+      )
+      await query(
+        `insert into user_game_accounts
+          (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note,
+           kind, archived_at, record_json, created_at, updated_at)
+         values ($1, $2, null, null, null, 'advanced', 'active', $3, '', 'cdk', null, $4::jsonb, $5, $5)`,
+        [profileId, userId, profile.display_name, JSON.stringify(profile), now],
+      )
+      await query(
+        `insert into inventory_operations
+          (id, user_id, idempotency_key, operation_type, request_hash, response_json, created_at, completed_at)
+         values ($1, $2, $3, 'create_lifetime_profile', $4, $5::jsonb, $6, $6)`,
+        [operationId, userId, randomUUID(), randomUUID(), JSON.stringify({ profile_id: profileId, import_mode: 'json' }), now],
+      )
+
+      await migrateDatabaseSchema()
+      await migrateDatabaseSchema()
+
+      const repairedProfile = await query<{
+        cdk_key: string
+        cdk_code_hash: string
+        cdk_order_hash: string
+        record_json: typeof profile
+      }>(
+        'select cdk_key, cdk_code_hash, cdk_order_hash, record_json from user_game_accounts where id = $1',
+        [profileId],
+      )
+      expect(repairedProfile.rows[0]).toMatchObject({
+        cdk_key: authorization.cdkKey,
+        cdk_code_hash: authorization.codeHash,
+        cdk_order_hash: authorization.orderHash,
+        record_json: {
+          cdk_key: authorization.cdkKey,
+          cdk_code_hash: authorization.codeHash,
+          cdk_order_hash: authorization.orderHash,
+        },
+      })
+      const records = await query<{ record_json: Record<string, unknown> }>(
+        `select record_json
+           from cdk_records where key = $1`,
+        [authorization.cdkKey],
+      )
+      expect(records.rowCount).toBe(1)
+      expect(records.rows[0]?.record_json).toMatchObject({
+        status: 'used',
+        permission: 'advanced',
+        account_id: userId,
+        profile_id: profileId,
+        authorization_source: 'lifetime_profile_voucher',
+      })
+    } finally {
+      await query('delete from cdk_records where key = $1', [authorization.cdkKey])
+      await query('delete from user_accounts where id = $1', [userId])
     }
   })
 

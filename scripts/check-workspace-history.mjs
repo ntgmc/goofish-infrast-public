@@ -1266,6 +1266,7 @@ function memoryUserStoreModule() {
 export function emptyWorkspace(profileId) {
 return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, saved_configs: [], result_history: [], free_schedule_entitlement: null, updated_at: new Date().toISOString() }
 }
+    export async function insertUserAccountForRegistrationInTransaction() {}
     export async function listProfilesForUser(userId) {
       return [...store.profiles.values()].filter((profile) => profile.user_id === userId)
     }

@@ -65,6 +65,57 @@ describe('PublicContentSettingsSection', () => {
     expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument()
   })
 
+  it('publishes a trimmed Xianyu purchase URL from the CDK purchase tab', async () => {
+    const user = userEvent.setup()
+    render(<PublicContentSettingsSection />)
+    await screen.findByRole('heading', { name: '公开内容管理' })
+    await user.click(screen.getByRole('tab', { name: 'CDK 购买' }))
+
+    const xianyuUrl = screen.getByLabelText('闲鱼购买链接')
+    expect(xianyuUrl).not.toBeRequired()
+    await user.clear(xianyuUrl)
+    await user.type(xianyuUrl, '  https://example.com/xianyu-listing  ')
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({
+      method: 'PUT',
+      json: expect.objectContaining({
+        expected_revision: 3,
+        cdk_purchase: { xianyu_url: 'https://example.com/xianyu-listing' },
+      }),
+    })))
+  })
+
+  it('allows the Xianyu purchase URL to be cleared', async () => {
+    const user = userEvent.setup()
+    render(<PublicContentSettingsSection />)
+    await screen.findByRole('heading', { name: '公开内容管理' })
+    await user.click(screen.getByRole('tab', { name: 'CDK 购买' }))
+    await user.clear(screen.getByLabelText('闲鱼购买链接'))
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/public-content', expect.objectContaining({
+      method: 'PUT',
+      json: expect.objectContaining({ cdk_purchase: { xianyu_url: '' } }),
+    })))
+  })
+
+  it('switches to the CDK purchase tab and focuses a non-HTTPS Xianyu URL', async () => {
+    const settings = { ...cloneDefaultPublicContentSettings(), revision: 3 }
+    settings.cdk_purchase.xianyu_url = 'http://example.com/xianyu-listing'
+    adminApiJson.mockReset().mockResolvedValue({ settings })
+    const user = userEvent.setup()
+    render(<PublicContentSettingsSection />)
+    await screen.findByRole('heading', { name: '公开内容管理' })
+    await user.click(screen.getByRole('button', { name: '保存并发布' }))
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'CDK 购买' })).toHaveAttribute('aria-selected', 'true'))
+    const invalidUrl = await screen.findByDisplayValue('http://example.com/xianyu-listing')
+    await waitFor(() => expect(invalidUrl).toHaveFocus())
+    expect(invalidUrl).toHaveAttribute('aria-invalid', 'true')
+    expect(adminApiJson).toHaveBeenCalledTimes(1)
+  })
+
   it('edits the selected developer GitHub avatar before publishing', async () => {
     const user = userEvent.setup()
     render(<PublicContentSettingsSection />)

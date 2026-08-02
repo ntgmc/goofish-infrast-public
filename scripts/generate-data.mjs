@@ -19,8 +19,10 @@ const LINE_ENDING = '\n'
 
 const source = await readEfficiencyDataSource(sourcePath)
 const data = JSON.parse(source.replace(/^\uFEFF/, ''))
-const skillData = JSON.parse((await readFile(skillSourcePath, 'utf8')).replace(/^\uFEFF/, ''))
-if (!isPublicEfficiencyDataFallback(source)) validateEfficiencySkillReferences(skillData, data)
+if (!isPublicEfficiencyDataFallback(source)) {
+  const skillData = JSON.parse((await readFile(skillSourcePath, 'utf8')).replace(/^\uFEFF/, ''))
+  validateEfficiencySkillReferences(skillData, data)
+}
 const packageJson = JSON.parse(await readFile(packagePath, 'utf8'))
 const sourceHash = createHash('sha256').update(source).digest('hex')
 const baseVersion = String(packageJson.version || '0.0.0')

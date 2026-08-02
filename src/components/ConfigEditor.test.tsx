@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig } from '../lib/config'
@@ -216,6 +216,7 @@ describe('ConfigEditor number inputs', () => {
     const productRegion = screen.getByRole('region', { name: '产物数量' })
     expect(roomRegion.parentElement).toBe(productRegion.parentElement)
     expect(productRegion).toHaveClass('lg:border-l')
+    expect(within(roomRegion).getByRole('note')).toHaveTextContent('暂不支持 2 发电站。')
   })
 
   it('uses InputNumber controls for room and product counts', async () => {

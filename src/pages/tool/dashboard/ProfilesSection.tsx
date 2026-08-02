@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { AuthSuccessResponse, UserGameAccount } from '../../../lib/types'
 import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
-import { formatDate, getProfileAccessLabel, isFreePreviewProfile } from '../tool-utils'
+import { formatDate, formatShanghaiDateTime, getProfileAccessLabel, isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
 import { copy } from '../../../copy/index'
 import { usePersonalUseDeclaration } from '../../../hooks/usePersonalUseDeclaration'
 
@@ -98,6 +98,12 @@ function ProfileCard({
   const [displayName, setDisplayName] = useState(profile.display_name || fallbackName)
   const [note, setNote] = useState(profile.note)
   const [error, setError] = useState<string | null>(null)
+  const activeTrial = isFreePreviewTrialActive(profile) ? profile.trial : null
+  const description = profile.note || (activeTrial
+    ? null
+    : isFreePreviewProfile(profile)
+      ? copy.dashboard.pages_tool_dashboard_ProfilesSection_006
+      : copy.dashboard.pages_tool_dashboard_ProfilesSection_007)
 
   const save = async () => {
     setError(null)
@@ -124,7 +130,12 @@ function ProfileCard({
             <h2 className="truncate text-lg font-semibold text-ink-primary">{profile.display_name || fallbackName}</h2>
             <span className={`tool-status ${isFreePreviewProfile(profile) ? 'tool-status--warning' : 'tool-status--current'}`}>{getProfileAccessLabel(profile)}</span>
           </div>
-          <p className="mt-2 text-sm leading-6 text-ink-secondary">{profile.note || (isFreePreviewProfile(profile) ? copy.dashboard.pages_tool_dashboard_ProfilesSection_006 : copy.dashboard.pages_tool_dashboard_ProfilesSection_007)}</p>
+          {description && <p className="mt-2 text-sm leading-6 text-ink-secondary">{description}</p>}
+          {activeTrial && (
+            <p className="mt-2 text-sm leading-6 text-ink-secondary">
+              {copy.dashboard.pages_tool_dashboard_ProfilesSection_016(formatShanghaiDateTime(activeTrial.ends_at))}
+            </p>
+          )}
           <p className="mt-3 text-xs text-ink-muted">{profile.operator_count} {copy.dashboard.pages_tool_dashboard_ProfilesSection_008}{formatDate(profile.updated_at)}</p>
         </div>
         <button

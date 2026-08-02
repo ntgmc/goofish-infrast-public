@@ -236,7 +236,7 @@ export default function AccountDashboard({
               {section === 'tools' && <ToolsSection />}
               {section === 'redeem' && <RedeemSection autoStartTour={!suppressInitialRedeemTour} tourReplayToken={redeemTourReplayToken} onRedeemed={(payload) => { onPayload(payload); onSectionChange('profiles', { replace: true }) }} onInventoryRedeemed={() => onSectionChange('inventory', { replace: true })} />}
               {section === 'invitations' && <InvitationsSection />}
-              {section === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} />}
+              {section === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
               {section === 'balance' && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
               {section === 'announcements' && <AnnouncementsSection />}
               {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} />}

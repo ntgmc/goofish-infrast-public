@@ -1311,6 +1311,91 @@ CREATE TABLE IF NOT EXISTS inventory_operations (
   UNIQUE (user_id, idempotency_key)
 );
 
+-- goofish:migration-phase
+WITH lifetime_profile_operations AS (
+  SELECT operation.id,
+         operation.user_id,
+         operation.response_json->>'profile_id' AS profile_id,
+         'inventory-lifetime-' || operation.id AS code_hash,
+         'inventory-lifetime-order-' || operation.id AS order_hash,
+         coalesce(operation.completed_at, operation.created_at) AS authorized_at
+  FROM inventory_operations operation
+  JOIN user_game_accounts profile
+    ON profile.id = operation.response_json->>'profile_id'
+   AND profile.user_id = operation.user_id
+  WHERE operation.operation_type IN ('create_lifetime_profile', 'bind_lifetime_profile')
+    AND operation.response_json IS NOT NULL
+    AND operation.completed_at IS NOT NULL
+    AND profile.kind = 'cdk'
+    AND profile.cdk_key IS NULL
+)
+INSERT INTO cdk_records
+  (key, code_hash, cdk_type, status, permission, balance_amount, item_code, item_expires_at,
+   license_order_hash, record_json, created_at, updated_at)
+SELECT 'cdk/' || code_hash || '.json',
+       code_hash,
+       'profile',
+       'used',
+       'advanced',
+       null,
+       null,
+       null,
+       order_hash,
+       jsonb_build_object(
+         'version', 2,
+         'cdk_type', 'profile',
+         'code_hash', code_hash,
+         'permission', 'advanced',
+         'balance_amount', null,
+         'status', 'used',
+         'created_at', authorized_at,
+         'used_at', authorized_at,
+         'order_note', 'inventory:lifetime_profile_voucher',
+         'license_order_hash', order_hash,
+         'operator_count', null,
+         'config_desc', null,
+         'account_id', user_id,
+         'profile_id', profile_id,
+         'authorization_source', 'lifetime_profile_voucher',
+         'inventory_operation_id', id
+       ),
+       authorized_at,
+       authorized_at
+FROM lifetime_profile_operations
+ON CONFLICT (key) DO NOTHING;
+
+WITH lifetime_profile_operations AS (
+  SELECT operation.id,
+         operation.user_id,
+         operation.response_json->>'profile_id' AS profile_id,
+         'inventory-lifetime-' || operation.id AS code_hash,
+         'inventory-lifetime-order-' || operation.id AS order_hash
+  FROM inventory_operations operation
+  WHERE operation.operation_type IN ('create_lifetime_profile', 'bind_lifetime_profile')
+    AND operation.response_json IS NOT NULL
+    AND operation.completed_at IS NOT NULL
+)
+UPDATE user_game_accounts profile
+SET cdk_key = 'cdk/' || operation.code_hash || '.json',
+    cdk_code_hash = operation.code_hash,
+    cdk_order_hash = operation.order_hash,
+    record_json = profile.record_json || jsonb_build_object(
+      'cdk_key', 'cdk/' || operation.code_hash || '.json',
+      'cdk_code_hash', operation.code_hash,
+      'cdk_order_hash', operation.order_hash
+    )
+FROM lifetime_profile_operations operation
+WHERE profile.id = operation.profile_id
+  AND profile.user_id = operation.user_id
+  AND profile.kind = 'cdk'
+  AND profile.cdk_key IS NULL
+  AND EXISTS (
+    SELECT 1 FROM cdk_records cdk_record
+    WHERE cdk_record.key = 'cdk/' || operation.code_hash || '.json'
+      AND cdk_record.record_json->>'account_id' = operation.user_id
+      AND cdk_record.record_json->>'profile_id' = operation.profile_id
+  );
+
 CREATE TABLE IF NOT EXISTS profile_entitlement_balances (
   profile_id TEXT NOT NULL REFERENCES user_game_accounts(id) ON DELETE CASCADE,
   entitlement_type TEXT NOT NULL,
