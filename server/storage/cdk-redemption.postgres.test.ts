@@ -14,6 +14,7 @@ import {
   type UserGameAccountRecord,
 } from './user-store'
 import { hashCdk, isProfileCdkRecord, type CdkRecord, type LegacyProfileCdkRecord } from '../handlers/license-utils'
+import { resolveProfileAuthorization } from '../handlers/profile-authorization'
 import { redeemProfileCdk } from '../handlers/user-auth'
 import { adjustBalance, applyBalanceChangeInTransaction, BalanceError, createBalanceRequestHash, getBalanceSummary, releaseScheduleBalanceInTransaction, reserveScheduleBalanceInTransaction, reverseQualificationCredit, settleScheduleBalanceInTransaction } from './balance-store'
 import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
@@ -479,17 +480,42 @@ describe('CDK redemption PostgreSQL concurrency', () => {
     expect(first.replayed).toBe(false)
     expect(replay).toEqual({ profileId: first.profileId, replayed: true })
     expect(await getItemBalance(userId, 'lifetime_profile_voucher')).toBe(0)
-    const profile = await query<{ record_json: UserGameAccountRecord }>(
-      'select record_json from user_game_accounts where id = $1 and user_id = $2',
+    const profile = await query<{
+      cdk_key: string | null
+      cdk_code_hash: string | null
+      cdk_order_hash: string | null
+      record_json: UserGameAccountRecord
+    }>(
+      `select cdk_key, cdk_code_hash, cdk_order_hash, record_json
+         from user_game_accounts where id = $1 and user_id = $2`,
       [first.profileId, userId],
     )
-    expect(profile.rows[0]?.record_json).toMatchObject({
+    expect(profile.rows[0]).toMatchObject({
+      cdk_key: expect.any(String),
+      cdk_code_hash: expect.stringMatching(/^inventory-lifetime-/),
+      cdk_order_hash: expect.stringMatching(/^inventory-lifetime-order-/),
+    })
+    const storedProfile = profile.rows[0]?.record_json
+    expect(storedProfile).toMatchObject({
       kind: 'cdk',
+      cdk_key: expect.any(String),
+      cdk_code_hash: expect.stringMatching(/^inventory-lifetime-/),
+      cdk_order_hash: expect.stringMatching(/^inventory-lifetime-order-/),
       permission: 'advanced',
       display_name: 'JSON 终身档案',
       note: '手动导入',
     })
-    expect(profile.rows[0]?.record_json.skland_binding).toBeUndefined()
+    expect(storedProfile?.skland_binding).toBeUndefined()
+    await expect(resolveProfileAuthorization(storedProfile!)).resolves.toMatchObject({
+      ok: true,
+      permission: 'advanced',
+      cdkRecord: {
+        status: 'used',
+        account_id: userId,
+        profile_id: first.profileId,
+        authorization_source: 'lifetime_profile_voucher',
+      },
+    })
     expect((await query('select 1 from user_profile_workspaces where profile_id = $1', [first.profileId])).rowCount).toBe(1)
   })
 

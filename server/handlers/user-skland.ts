@@ -33,7 +33,7 @@ import {
 import { isLifetimeVoucherUpgradeableProfile } from './lifetime-voucher-profile-policy'
 import { commitReservedItemsInTransaction, getItemBalance, grantFreePreviewLimitedVoucher, InventoryError, markOnboardingTaskComplete, reserveItemsInTransaction } from '../storage/inventory-store'
 import { hasDatabaseUrl, query, withTransaction } from '../storage/postgres'
-import { saveProfileInTransaction } from '../storage/cdk-redemption'
+import { createLifetimeVoucherProfileAuthorizationInTransaction, saveProfileInTransaction } from '../storage/cdk-redemption'
 import {
   buildOperatorFingerprint,
   getCdkRecordStore,
@@ -990,6 +990,13 @@ async function confirmLifetimeVoucherBinding(
     if (nonUpgradeable) throw new InventoryError('skland_uid_already_bound', '该森空岛 UID 已经绑定其他终身或商用档案。', 409)
     const existingProfile = currentUserProfiles.find(isLifetimeVoucherUpgradeableProfile)
     const profileId = existingProfile?.id ?? randomUUID()
+    const authorization = await createLifetimeVoucherProfileAuthorizationInTransaction(client, {
+      operationId,
+      userId: user.id,
+      profileId,
+      authorizedAt: now,
+      operatorCount: operatorsCheck.operators.length,
+    })
     const currentWorkspace = existingProfile
       ? await updateProfileWorkspaceInTransaction(client, profileId, (workspace) => workspace ?? emptyWorkspace(profileId))
       : emptyWorkspace(profileId)
@@ -1000,7 +1007,8 @@ async function confirmLifetimeVoucherBinding(
     }
     const nextProfile: UserGameAccountRecord = {
       ...baseProfile,
-      kind: 'cdk', permission: 'advanced', status: 'active', temporary_permission: null,
+      kind: 'cdk', cdk_key: authorization.cdkKey, cdk_code_hash: authorization.codeHash,
+      cdk_order_hash: authorization.orderHash, permission: 'advanced', status: 'active', temporary_permission: null,
       skland_binding: {
         uid: imported.binding.uid, nickname: imported.binding.nickname, channel_name: imported.binding.channel_name,
         bound_at: existingProfile?.skland_binding?.bound_at ?? now, last_imported_at: now,

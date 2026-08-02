@@ -19,6 +19,7 @@ import { query, withTransaction } from './postgres'
 import { emptyWorkspace, getProfileWorkspace, isDepotValueProfile, listProfilesForUser, updateProfileWorkspaceInTransaction, type UserGameAccountRecord } from './user-store'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY, isFreePreviewLimitedCdkActivityActive } from '../free-preview-trial'
 import { upsertItemGrantNotificationInTransaction } from './notification-store'
+import { createLifetimeVoucherProfileAuthorizationInTransaction } from './cdk-redemption'
 
 const PROFILE_CAPACITY_LIMITS = Object.freeze({
   plan: { base: WORKSPACE_SAVED_CONFIG_LIMIT, maximum: 20, entitlement: 'plan_slots' },
@@ -138,14 +139,20 @@ export async function createLifetimeProfileForJsonImport(input: {
     }
 
     const profileId = randomUUID()
+    const authorization = await createLifetimeVoucherProfileAuthorizationInTransaction(client, {
+      operationId,
+      userId: input.userId,
+      profileId,
+      authorizedAt: now,
+    })
     const profile: UserGameAccountRecord = {
       version: 1,
       id: profileId,
       user_id: input.userId,
       kind: 'cdk',
-      cdk_key: null,
-      cdk_code_hash: null,
-      cdk_order_hash: null,
+      cdk_key: authorization.cdkKey,
+      cdk_code_hash: authorization.codeHash,
+      cdk_order_hash: authorization.orderHash,
       permission: 'advanced',
       status: 'active',
       display_name: displayName,
@@ -157,9 +164,10 @@ export async function createLifetimeProfileForJsonImport(input: {
       `insert into user_game_accounts
         (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note,
          kind, archived_at, record_json, created_at, updated_at)
-       values ($1, $2, null, null, null, $3, $4, $5, $6, $7, null, $8::jsonb, $9, $9)`,
-      [profile.id, profile.user_id, profile.permission, profile.status, profile.display_name,
-        profile.note, profile.kind, JSON.stringify(profile), profile.created_at],
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, null, $11::jsonb, $12, $12)`,
+      [profile.id, profile.user_id, profile.cdk_key, profile.cdk_code_hash, profile.cdk_order_hash,
+        profile.permission, profile.status, profile.display_name, profile.note, profile.kind,
+        JSON.stringify(profile), profile.created_at],
     )
     await updateProfileWorkspaceInTransaction(client, profileId, () => emptyWorkspace(profileId))
     await reserveItemsInTransaction(
