@@ -47,7 +47,7 @@ describe('useOptimizeWorkspace history mutations', () => {
       setWorkspaceError: vi.fn(),
       setWorkspaceBusyAction: vi.fn(),
       setSection: vi.fn(),
-      guardGeneratedResultExport: vi.fn(async (run) => { await run() }),
+      onDownloadMaaResult: vi.fn(async () => undefined),
     }))
 
     await act(async () => {

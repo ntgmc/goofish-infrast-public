@@ -79,5 +79,10 @@ export const inventoryCopy = {
   archive_full: '封存区已满，请先取消封存或使用结果封存夹扩容。',
   history_full_for_unarchive: '普通历史区已满，请先删除一个普通结果后再取消封存。',
   maa_export_failed: '导出 MAA JSON 失败。',
+  maa_export_coupon_confirm: (balance: number) => `当前档案没有永久 MAA 导出权限。本次导出将消耗 1 张 MAA 导出体验券（当前余额 ${balance} 张），是否继续？`,
+  maa_export_coupon_unavailable: '当前档案需要使用 MAA 导出体验券，但背包中没有可用券。',
+  maa_export_coupon_consumed: 'MAA JSON 已下载，并已消耗 1 张 MAA 导出体验券。',
+  export_downloading: '正在准备下载…',
+  result_data_incompatible: '这条排班结果的数据版本不兼容或已损坏，暂时无法完整展示。',
   full_result_export_failed: '下载完整计算数据失败。',
 } as const

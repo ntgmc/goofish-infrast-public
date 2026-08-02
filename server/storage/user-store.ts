@@ -23,9 +23,12 @@ import type {
 import {
   WORKSPACE_RESULT_HISTORY_LIMIT,
   WORKSPACE_RESULT_HISTORY_MAX_LIMIT,
+  WORKSPACE_ARCHIVED_RESULT_MAX_LIMIT,
   WORKSPACE_SAVED_CONFIG_LIMIT,
   WORKSPACE_SAVED_CONFIG_MAX_LIMIT,
 } from '../../src/lib/workspace-limits'
+import type { CapabilitySubject } from '../../src/lib/product-catalog'
+import { projectOptimizeResultForCapabilities } from '../../src/lib/optimize-result-projection'
 
 let schemaReady: Promise<void> | null = null
 
@@ -941,6 +944,35 @@ export async function listProfileWorkspaces(profileIds: string[]): Promise<Map<s
   return workspaces
 }
 
+export interface UserWorkspaceProfileSummary {
+  operators: LicenseOperator[] | null
+  updated_at: string
+}
+
+export async function listProfileWorkspaceSummaries(
+  profileIds: string[],
+): Promise<Map<string, UserWorkspaceProfileSummary>> {
+  if (profileIds.length === 0) return new Map()
+  await ensureSchema()
+  const result = await query<{
+    profile_id: string
+    operators_json: unknown
+    updated_at: Date | string
+  }>(
+    `select profile_id, operators_json, updated_at
+       from user_profile_workspaces
+      where profile_id = any($1::text[])`,
+    [profileIds],
+  )
+  return new Map(result.rows.map((row) => [
+    row.profile_id,
+    {
+      operators: Array.isArray(row.operators_json) ? row.operators_json as LicenseOperator[] : null,
+      updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+    },
+  ]))
+}
+
 async function getLegacyWorkspace(userId: string): Promise<LegacyUserWorkspaceRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: LegacyUserWorkspaceRecord }>(
@@ -1307,18 +1339,26 @@ export function toPublicWorkspace(
     history: WORKSPACE_RESULT_HISTORY_LIMIT,
     archive: 0,
   },
+  subject?: CapabilitySubject,
 ): UserWorkspace {
   const normalized = normalizeWorkspaceRecord(workspace)
   const resultHistory = normalized ? getPublicResultHistory(normalized) : []
+  const projectResult = (result: OptimizeResult) => subject
+    ? projectOptimizeResultForCapabilities(result, subject)
+    : result
+  const projectHistoryItem = (item: WorkspaceResultHistoryItem): WorkspaceResultHistoryItem => ({
+    ...item,
+    result: projectResult(item.result),
+  })
   return {
     profile_id: normalized?.profile_id ?? null,
     operators: normalized?.operators ?? null,
     config: normalized?.config ?? null,
     elite_overrides: normalized?.elite_overrides ?? {},
-    last_result: normalized?.last_result ?? null,
+    last_result: normalized?.last_result ? projectResult(normalized.last_result) : null,
     saved_configs: (normalized?.saved_configs ?? []).slice(0, limits.plan),
-    result_history: resultHistory.slice(0, limits.history),
-    archived_results: (normalized?.archived_results ?? []).slice(0, limits.archive),
+    result_history: resultHistory.slice(0, limits.history).map(projectHistoryItem),
+    archived_results: (normalized?.archived_results ?? []).slice(0, limits.archive).map(projectHistoryItem),
     free_schedule_entitlement: normalized?.free_schedule_entitlement ?? null,
     updated_at: normalized?.updated_at ?? null,
   }
@@ -1326,7 +1366,7 @@ export function toPublicWorkspace(
 
 export function toPublicProfile(
   profile: UserGameAccountRecord,
-  workspace?: UserWorkspaceRecord | null,
+  workspace?: Pick<UserWorkspaceRecord, 'operators' | 'updated_at'> | null,
   trial: FreePreviewTrial | null = null,
 ): UserGameAccount {
   return {
@@ -1368,8 +1408,14 @@ export function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null |
     elite_overrides: isRecord(workspace.elite_overrides) ? workspace.elite_overrides as Record<string, number> : {},
     last_result: isRecord(workspace.last_result) ? workspace.last_result as OptimizeResult : null,
     saved_configs: normalizeSavedConfigs((workspace as { saved_configs?: unknown }).saved_configs),
-    result_history: normalizeResultHistory((workspace as { result_history?: unknown }).result_history),
-    archived_results: normalizeResultHistory((workspace as { archived_results?: unknown }).archived_results),
+    result_history: normalizeResultHistory(
+      (workspace as { result_history?: unknown }).result_history,
+      WORKSPACE_RESULT_HISTORY_MAX_LIMIT,
+    ),
+    archived_results: normalizeResultHistory(
+      (workspace as { archived_results?: unknown }).archived_results,
+      WORKSPACE_ARCHIVED_RESULT_MAX_LIMIT,
+    ),
     free_schedule_entitlement: normalizeFreeScheduleEntitlement((workspace as { free_schedule_entitlement?: unknown }).free_schedule_entitlement),
     free_preview_normalized_activity_id: typeof workspace.free_preview_normalized_activity_id === 'string'
       ? workspace.free_preview_normalized_activity_id
@@ -1428,7 +1474,7 @@ function normalizeSavedConfigs(value: unknown): WorkspaceSavedConfig[] {
   }).slice(0, WORKSPACE_SAVED_CONFIG_MAX_LIMIT)
 }
 
-function normalizeResultHistory(value: unknown): WorkspaceResultHistoryItem[] {
+function normalizeResultHistory(value: unknown, maximum = WORKSPACE_RESULT_HISTORY_MAX_LIMIT): WorkspaceResultHistoryItem[] {
   if (!Array.isArray(value)) return []
   return value.flatMap((raw) => {
     if (!isRecord(raw) || !isRecord(raw.result)) return []
@@ -1439,6 +1485,7 @@ function normalizeResultHistory(value: unknown): WorkspaceResultHistoryItem[] {
     const source = raw.source === 'applied_suggestions' || raw.source === 'legacy' ? raw.source : 'generated'
     return [{
       id,
+      ...(typeof raw.job_id === 'string' && raw.job_id ? { job_id: raw.job_id } : {}),
       name,
       created_at: createdAt,
       config: isRecord(raw.config) ? raw.config as LicenseConfig : null,
@@ -1446,7 +1493,7 @@ function normalizeResultHistory(value: unknown): WorkspaceResultHistoryItem[] {
       operator_count: typeof raw.operator_count === 'number' && Number.isFinite(raw.operator_count) ? raw.operator_count : 0,
       source,
     }]
-  }).slice(0, WORKSPACE_RESULT_HISTORY_MAX_LIMIT)
+  }).slice(0, maximum)
 }
 
 function getPublicResultHistory(workspace: UserWorkspaceRecord): WorkspaceResultHistoryItem[] {

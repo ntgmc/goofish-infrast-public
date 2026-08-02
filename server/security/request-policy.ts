@@ -328,6 +328,7 @@ export const requestSchemas = {
     profile_id: shortString(128),
     result_id: shortString(128),
     idempotency_key: shortString(200),
+    use_coupon: z.literal(true).optional(),
   }),
   fullResultExport: strict({
     profile_id: shortString(128),

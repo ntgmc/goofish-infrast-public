@@ -5,7 +5,6 @@ import { normalizeUpgradeSuggestions } from './workflow-utils'
 import type { WorkspacePatch } from '../useToolSession'
 import type { OptimizePhase, OptimizeSection } from './types'
 import { copy } from '../../../copy/index'
-import { requestMaaExport } from './optimization-api'
 import { apiJson } from '../../../lib/api-client'
 
 
@@ -29,7 +28,7 @@ type UseOptimizeWorkspaceOptions = {
   setWorkspaceError: Setter<string | null>
   setWorkspaceBusyAction: Setter<string | null>
   setSection: (section: OptimizeSection) => void
-  guardGeneratedResultExport: (run: () => void | Promise<void>) => Promise<void>
+  onDownloadMaaResult: (resultId: string) => Promise<void>
 }
 
 export function useOptimizeWorkspace({
@@ -50,7 +49,7 @@ export function useOptimizeWorkspace({
   setWorkspaceError,
   setWorkspaceBusyAction,
   setSection,
-  guardGeneratedResultExport,
+  onDownloadMaaResult,
 }: UseOptimizeWorkspaceOptions) {
   const runSavedConfigAction = useCallback(async (
     busyKey: string,
@@ -146,10 +145,8 @@ export function useOptimizeWorkspace({
       setWorkspaceError(copy.workspace.pages_tool_optimize_useOptimizeWorkspace_013)
       return
     }
-    void guardGeneratedResultExport(async () => {
-      await requestMaaExport(profileId, item.id)
-    }).catch((error) => setWorkspaceError((error as Error).message))
-  }, [guardGeneratedResultExport, profileId, setWorkspaceError])
+    void onDownloadMaaResult(item.id)
+  }, [onDownloadMaaResult, setWorkspaceError])
 
   const mutateHistoryResult = useCallback(async (
     item: WorkspaceResultHistoryItem,

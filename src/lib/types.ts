@@ -204,6 +204,7 @@ export interface OptimizeJobAccepted {
   upgrade_suggestions_requested: boolean;
   upgrade_suggestions_allowed: boolean;
   billing?: import('./optimization-contracts').OptimizationBillingSnapshot | null;
+  history_result_id?: string;
   poll_token?: string;
 }
 
@@ -231,6 +232,7 @@ export interface OptimizeJobStatusResponse {
   upgrade_suggestions_requested: boolean;
   upgrade_suggestions_allowed: boolean;
   billing?: import('./optimization-contracts').OptimizationBillingSnapshot | null;
+  history_result_id?: string;
   result?: OptimizeResult;
   error?: string;
   error_code?: string;
@@ -792,6 +794,7 @@ type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legac
 
 export interface WorkspaceResultHistoryItem {
   id: string;
+  job_id?: string;
   name: string;
   created_at: string;
   config: LicenseConfig | null;

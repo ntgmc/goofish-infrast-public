@@ -13,10 +13,10 @@ import {
   type OnboardingTaskView,
   type ProfileCapacitySummary,
 } from '../../src/lib/inventory-contracts'
-import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
+import { WORKSPACE_ARCHIVED_RESULT_MAX_LIMIT, WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
-import { emptyWorkspace, getProfileWorkspace, isDepotValueProfile, listProfilesForUser, updateProfileWorkspaceInTransaction, type UserGameAccountRecord } from './user-store'
+import { emptyWorkspace, isDepotValueProfile, listProfilesForUser, updateProfileWorkspaceInTransaction, type UserGameAccountRecord } from './user-store'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY, isFreePreviewLimitedCdkActivityActive } from '../free-preview-trial'
 import { upsertItemGrantNotificationInTransaction } from './notification-store'
 import { createLifetimeVoucherProfileAuthorizationInTransaction } from './cdk-redemption'
@@ -24,7 +24,7 @@ import { createLifetimeVoucherProfileAuthorizationInTransaction } from './cdk-re
 const PROFILE_CAPACITY_LIMITS = Object.freeze({
   plan: { base: WORKSPACE_SAVED_CONFIG_LIMIT, maximum: 20, entitlement: 'plan_slots' },
   history: { base: WORKSPACE_RESULT_HISTORY_LIMIT, maximum: 50, entitlement: 'history_slots' },
-  archive: { base: 0, maximum: 20, entitlement: 'archive_slots' },
+  archive: { base: 0, maximum: WORKSPACE_ARCHIVED_RESULT_MAX_LIMIT, entitlement: 'archive_slots' },
 })
 
 export async function getProfileCapacityLimits(profileId: string): Promise<{ plan: number; history: number; archive: number }> {
@@ -735,30 +735,50 @@ async function getProfileCapacities(userId: string): Promise<ProfileCapacitySumm
   const profiles = (await listProfilesForUser(userId)).filter(
     (profile) => profile.status === 'active' && !isDepotValueProfile(profile),
   )
-  const balances = await query<{ profile_id: string; entitlement_type: string; units: number }>(
-    `select balances.profile_id, balances.entitlement_type, balances.units
-       from profile_entitlement_balances balances
-       join user_game_accounts profile on profile.id = balances.profile_id
-      where profile.user_id = $1`,
-    [userId],
-  )
+  const [balances, usageRows] = await Promise.all([
+    query<{ profile_id: string; entitlement_type: string; units: number }>(
+      `select balances.profile_id, balances.entitlement_type, balances.units
+         from profile_entitlement_balances balances
+         join user_game_accounts profile on profile.id = balances.profile_id
+        where profile.user_id = $1`,
+      [userId],
+    ),
+    query<{
+      profile_id: string
+      plan_used: number
+      history_used: number
+      archive_used: number
+    }>(
+      `select profile_id,
+              case when jsonb_typeof(record_json->'saved_configs') = 'array'
+                then jsonb_array_length(record_json->'saved_configs') else 0 end as plan_used,
+              case when jsonb_typeof(record_json->'result_history') = 'array'
+                then jsonb_array_length(record_json->'result_history') else 0 end as history_used,
+              case when jsonb_typeof(record_json->'archived_results') = 'array'
+                then jsonb_array_length(record_json->'archived_results') else 0 end as archive_used
+         from user_profile_workspaces
+        where profile_id = any($1::text[])`,
+      [profiles.map((profile) => profile.id)],
+    ),
+  ])
   const byProfile = new Map<string, Map<string, number>>()
   for (const row of balances.rows) {
     const current = byProfile.get(row.profile_id) ?? new Map<string, number>()
     current.set(row.entitlement_type, Number(row.units))
     byProfile.set(row.profile_id, current)
   }
-  return Promise.all(profiles.map(async (profile) => {
-    const workspace = await getProfileWorkspace(profile.id)
+  const usageByProfile = new Map(usageRows.rows.map((row) => [row.profile_id, row]))
+  return profiles.map((profile) => {
+    const usage = usageByProfile.get(profile.id)
     const units = byProfile.get(profile.id) ?? new Map<string, number>()
     return {
       profile_id: profile.id,
       display_name: profile.display_name,
-      plan_slots: capacity(workspace?.saved_configs.length ?? 0, PROFILE_CAPACITY_LIMITS.plan, units),
-      history_slots: capacity(workspace?.result_history.length ?? 0, PROFILE_CAPACITY_LIMITS.history, units),
-      archive_slots: capacity(workspace?.archived_results.length ?? 0, PROFILE_CAPACITY_LIMITS.archive, units),
+      plan_slots: capacity(Number(usage?.plan_used ?? 0), PROFILE_CAPACITY_LIMITS.plan, units),
+      history_slots: capacity(Number(usage?.history_used ?? 0), PROFILE_CAPACITY_LIMITS.history, units),
+      archive_slots: capacity(Number(usage?.archive_used ?? 0), PROFILE_CAPACITY_LIMITS.archive, units),
     }
-  }))
+  })
 }
 
 async function openGiftPackInTransaction(

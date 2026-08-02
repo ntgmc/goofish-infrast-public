@@ -5,6 +5,18 @@ import { copy } from '../../../copy/index'
 
 export const OPTIMIZE_SUBMIT_TIMEOUT_MS = 30_000
 
+export function getOrCreateExportIdempotencyKey(
+  pending: Map<string, string>,
+  requestKey: string,
+  create: () => string = () => crypto.randomUUID(),
+): string {
+  const existing = pending.get(requestKey)
+  if (existing) return existing
+  const created = create()
+  pending.set(requestKey, created)
+  return created
+}
+
 export async function submitOptimizationJob(
   request: CreateOptimizationJobRequest,
   fallbackMessage: string,
@@ -76,19 +88,41 @@ export async function submitReorderCheckJob(
   })
 }
 
-export async function requestMaaExport(profileId: string, resultId: string): Promise<void> {
-  const response = await apiJson<{ result: unknown; filename: string }>('/api/user/maa-export', {
+export interface MaaExportResponse {
+  result: unknown
+  result_id: string
+  filename: string
+  consumed_coupon: boolean
+  operation_id?: string
+}
+
+export async function requestMaaExport(
+  profileId: string,
+  resultId: string,
+  options: { idempotencyKey: string; useCoupon: boolean },
+): Promise<MaaExportResponse> {
+  const response = await apiJson<MaaExportResponse>('/api/user/maa-export', {
     method: 'POST',
-    json: { profile_id: profileId, result_id: resultId, idempotency_key: crypto.randomUUID() },
+    json: {
+      profile_id: profileId,
+      result_id: resultId,
+      idempotency_key: options.idempotencyKey,
+      ...(options.useCoupon && { use_coupon: true }),
+    },
     fallbackMessage: copy.inventory.maa_export_failed,
   })
   downloadJsonPayload(response, `maa_schedule_${resultId.slice(0, 8)}.json`)
+  return response
 }
 
-export async function requestFullResultExport(profileId: string, resultId: string): Promise<void> {
+export async function requestFullResultExport(
+  profileId: string,
+  resultId: string,
+  idempotencyKey: string,
+): Promise<void> {
   const response = await apiJson<{ result: unknown; filename: string }>('/api/user/full-result-export', {
     method: 'POST',
-    json: { profile_id: profileId, result_id: resultId, idempotency_key: crypto.randomUUID() },
+    json: { profile_id: profileId, result_id: resultId, idempotency_key: idempotencyKey },
     fallbackMessage: copy.inventory.full_result_export_failed,
   })
   downloadJsonPayload(response, `maatool_full_result_${resultId.slice(0, 8)}.json`)
@@ -100,8 +134,10 @@ function downloadJsonPayload(response: { result: unknown; filename: string }, fa
   const link = document.createElement('a')
   link.href = url
   link.download = response.filename || fallbackFilename
+  document.body.append(link)
   link.click()
-  URL.revokeObjectURL(url)
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 function toLegacyJobView(job: OptimizationJobSnapshot, pollToken?: string): OptimizeJobStatusResponse {
@@ -137,6 +173,7 @@ function toLegacyJobView(job: OptimizationJobSnapshot, pollToken?: string): Opti
     can_cancel: job.canCancel,
     can_retry: job.canRetry,
     billing: job.billing ?? null,
+    ...(job.historyResultId && { history_result_id: job.historyResultId }),
     ...(pollToken && { poll_token: pollToken }),
   }
   if (job.status === 'succeeded') return { ...common, status: job.status, result: job.result }

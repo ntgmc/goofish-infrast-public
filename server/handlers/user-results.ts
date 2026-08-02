@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { ZodError } from 'zod'
 import { hasCapability } from '../../src/lib/product-catalog'
 import type { WorkspaceResultHistoryItem } from '../../src/lib/types'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, stableJsonStringify } from '../security/request-validation'
 import {
   consumeInventoryItemImmediately,
-  getProfileCapacityLimits,
+  getProfileCapacityLimitsInTransaction,
   InventoryError,
 } from '../storage/inventory-store'
 import {
@@ -14,6 +15,7 @@ import {
   getProfileWorkspace,
   isDepotValueProfile,
   isFreePreviewProfile,
+  normalizeProfileKind,
   toPublicWorkspace,
   updateProfileWorkspaceInTransaction,
 } from '../storage/user-store'
@@ -24,7 +26,8 @@ import {
   PersonalUseDeclarationRequiredError,
   recordPersonalUseDeclarationUsage,
 } from '../storage/personal-use-declaration-store'
-import { buildMaaExportPayload } from '../optimization/jobs/maa-export'
+import { buildMaaExportPayload, MaaExportValidationError } from '../optimization/jobs/maa-export'
+import { parseOptimizeResult } from '../optimization/jobs/runtime-contracts'
 import { resolveProfileAuthorization } from './profile-authorization'
 import { getRequestClientIp } from '../security/client-ip'
 
@@ -56,7 +59,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
       const workspace = await getProfileWorkspace(profile.id)
       const historyItem = findHistoryItem(workspace?.result_history ?? [], workspace?.archived_results ?? [], body.result_id)
       if (!historyItem) return jsonResponse({ error: '排班结果不存在。' }, 404)
-      const result = JSON.parse(JSON.stringify(historyItem.result)) as Record<string, unknown>
+      const result = parseOptimizeResult(JSON.parse(JSON.stringify(historyItem.result)))
       const behaviorDeclaration = isFreePreviewProfile(profile) || profile.kind === 'metered_personal'
         ? await recordPersonalUseDeclarationUsage({
             userId: auth.user.id,
@@ -69,7 +72,7 @@ export default async function userResultsHandler(req: Request): Promise<Response
         req,
         auth,
         profileId: profile.id,
-        jobId: historyItem.id,
+        jobId: historyItem.job_id ?? historyItem.id,
         uid: profile.skland_binding?.uid,
         result,
         eventKey: `full-result-export:${auth.user.id}:${body.idempotency_key}`,
@@ -97,6 +100,16 @@ export default async function userResultsHandler(req: Request): Promise<Response
       const historyItem = findHistoryItem(workspace?.result_history ?? [], workspace?.archived_results ?? [], body.result_id)
       if (!historyItem) return jsonResponse({ error: '排班结果不存在。' }, 404)
       if (historyItem.result.schedule_mode === 'rotation') return jsonResponse({ error: '轮班制结果不能导出为 MAA JSON。' }, 409)
+      const canExportWithoutCoupon = hasCapability({
+        kind: normalizeProfileKind(profile),
+        permission: authorization.permission,
+      }, 'export_maa_json')
+      if (!canExportWithoutCoupon && body.use_coupon !== true) {
+        return jsonResponse({
+          error: '当前档案需要使用 1 张 MAA 导出体验券，请确认后重试。',
+          code: 'maa_export_coupon_required',
+        }, 403)
+      }
       const result = buildMaaExportPayload(historyItem.result)
       const behaviorDeclaration = isFreePreviewProfile(profile) || profile.kind === 'metered_personal'
         ? await recordPersonalUseDeclarationUsage({
@@ -107,15 +120,11 @@ export default async function userResultsHandler(req: Request): Promise<Response
           })
         : null
       const isFreePreview = isFreePreviewProfile(profile)
-      const canExportWithoutCoupon = !isFreePreview || hasCapability({
-        kind: profile.kind,
-        permission: authorization.permission,
-      }, 'export_maa_json')
       const recordExportBehavior = () => recordTrackedExportBehaviorEvent({
         req,
         auth,
         profileId: profile.id,
-        jobId: historyItem.id,
+        jobId: historyItem.job_id ?? historyItem.id,
         uid: profile.skland_binding?.uid,
         result,
         eventKey: `maa-export:${auth.user.id}:${body.idempotency_key}`,
@@ -150,7 +159,6 @@ export default async function userResultsHandler(req: Request): Promise<Response
     if (isDepotValueProfile(profile)) return jsonResponse({ error: '仓库分析档案没有排班结果。' }, 403)
     const authorization = await resolveProfileAuthorization(profile)
     if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
-    const limits = await getProfileCapacityLimits(profile.id)
     const requestHash = createHash('sha256').update(stableJsonStringify({
       profile_id: body.profile_id,
       result_id: body.result_id,
@@ -173,26 +181,45 @@ export default async function userResultsHandler(req: Request): Promise<Response
          values ($1, $2, $3, 'result_history_mutation', $4, $5)`,
         [operationId, auth.user.id, body.idempotency_key, requestHash, now],
       )
+      const limits = await getProfileCapacityLimitsInTransaction(client, profile.id)
       const next = await updateProfileWorkspaceInTransaction(client, profile.id, (current) => {
         const workspace = current ?? emptyWorkspace(profile.id)
         const archived = workspace.archived_results ?? []
         if (body.action === 'archive') {
-          if (archived.some((item) => item.id === body.result_id)) return workspace
+          if (archived.some((item) => item.id === body.result_id)) {
+            return withLatestResult(workspace, workspace.result_history)
+          }
           const target = workspace.result_history.find((item) => item.id === body.result_id)
           if (!target) throw new ResultMutationError('普通历史中不存在该结果。', 404)
           if (archived.length >= limits.archive) throw new ResultMutationError('封存区已满，请先取消封存或使用结果封存夹扩容。', 409)
-          return { ...workspace, result_history: workspace.result_history.filter((item) => item.id !== body.result_id), archived_results: [target, ...archived], updated_at: now }
+          const resultHistory = workspace.result_history.filter((item) => item.id !== body.result_id)
+          return withLatestResult({ ...workspace, archived_results: [target, ...archived], updated_at: now }, resultHistory)
         }
         if (body.action === 'delete') {
-          return { ...workspace, result_history: workspace.result_history.filter((item) => item.id !== body.result_id), updated_at: now }
+          if (!workspace.result_history.some((item) => item.id === body.result_id)) {
+            throw new ResultMutationError('普通历史中不存在该结果。', 404)
+          }
+          const resultHistory = workspace.result_history.filter((item) => item.id !== body.result_id)
+          return withLatestResult({ ...workspace, updated_at: now }, resultHistory)
         }
-        if (workspace.result_history.some((item) => item.id === body.result_id)) return workspace
+        if (workspace.result_history.some((item) => item.id === body.result_id)) {
+          return withLatestResult(workspace, workspace.result_history)
+        }
         const target = archived.find((item) => item.id === body.result_id)
         if (!target) throw new ResultMutationError('封存区中不存在该结果。', 404)
         if (workspace.result_history.length >= limits.history) throw new ResultMutationError('普通历史区已满，请先删除一个普通结果后再取消封存。', 409)
-        return { ...workspace, result_history: [target, ...workspace.result_history], archived_results: archived.filter((item) => item.id !== body.result_id), updated_at: now }
+        const resultHistory = [target, ...workspace.result_history]
+        return withLatestResult({ ...workspace, archived_results: archived.filter((item) => item.id !== body.result_id), updated_at: now }, resultHistory)
       })
-      const result = { workspace: toPublicWorkspace(next, limits), action: body.action, result_id: body.result_id, operation_id: operationId }
+      const result = {
+        workspace: toPublicWorkspace(next, limits, {
+          kind: normalizeProfileKind(profile),
+          permission: authorization.permission,
+        }),
+        action: body.action,
+        result_id: body.result_id,
+        operation_id: operationId,
+      }
       await client.query(
         'update inventory_operations set response_json = $3::jsonb, completed_at = $4 where id = $1 and user_id = $2',
         [operationId, auth.user.id, JSON.stringify(result), now],
@@ -203,6 +230,15 @@ export default async function userResultsHandler(req: Request): Promise<Response
   } catch (error) {
     if (error instanceof PersonalUseDeclarationRequiredError) {
       return jsonResponse({ error: error.message, code: error.code }, error.status)
+    }
+    if (error instanceof MaaExportValidationError) {
+      return jsonResponse({ error: error.message, code: error.code }, 422)
+    }
+    if (error instanceof ZodError) {
+      return jsonResponse({
+        error: '排班结果数据版本不兼容或已损坏，无法导出。',
+        code: 'result_data_invalid',
+      }, 422)
     }
     if (error instanceof InventoryError || error instanceof ResultMutationError) {
       return jsonResponse({ error: error.message, code: error instanceof InventoryError ? error.code : 'result_archive_failed' }, error.status)
@@ -229,5 +265,16 @@ function findHistoryItem(
 class ResultMutationError extends Error {
   constructor(message: string, readonly status: 404 | 409) {
     super(message)
+  }
+}
+
+function withLatestResult(
+  workspace: ReturnType<typeof emptyWorkspace>,
+  resultHistory: WorkspaceResultHistoryItem[],
+): ReturnType<typeof emptyWorkspace> {
+  return {
+    ...workspace,
+    last_result: resultHistory[0]?.result ?? null,
+    result_history: resultHistory,
   }
 }

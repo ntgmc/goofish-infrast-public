@@ -1054,6 +1054,10 @@ describe('PostgreSQL optimization job admission', () => {
       'history-3',
       'history-4',
     ])
+    expect(workspace?.result_history[0]).toMatchObject({
+      id: admitted.job.id,
+      job_id: admitted.job.id,
+    })
     expect(workspace?.last_result).toMatchObject({ title: 'new-result' })
     expect((await query<{ effect_type: string; status: string | null }>(
       `select effect_type, metadata_json->>'status' as status

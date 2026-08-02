@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createHash } from 'node:crypto'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY } from '../free-preview-trial'
 import { InventoryError } from '../storage/inventory-store'
 import { PersonalUseDeclarationRequiredError } from '../storage/personal-use-declaration-store'
@@ -6,12 +7,18 @@ import userResultsHandler from './user-results'
 
 const mocks = vi.hoisted(() => ({
   consumeInventoryItemImmediately: vi.fn(),
+  getProfileCapacityLimitsInTransaction: vi.fn(),
   recordPersonalUseDeclarationUsage: vi.fn(),
   getProfileForUser: vi.fn(),
   getProfileWorkspace: vi.fn(),
   getValidatedJson: vi.fn(),
   recordTrackedExportBehaviorEvent: vi.fn(),
   requireUserSession: vi.fn(),
+  emptyWorkspace: vi.fn(),
+  toPublicWorkspace: vi.fn(),
+  updateProfileWorkspaceInTransaction: vi.fn(),
+  withTransaction: vi.fn(),
+  clientQuery: vi.fn(),
 }))
 
 vi.mock('../storage/inventory-store', () => {
@@ -29,21 +36,23 @@ vi.mock('../storage/inventory-store', () => {
   return {
     consumeInventoryItemImmediately: mocks.consumeInventoryItemImmediately,
     getProfileCapacityLimits: vi.fn(),
+    getProfileCapacityLimitsInTransaction: mocks.getProfileCapacityLimitsInTransaction,
     InventoryError: MockInventoryError,
   }
 })
 
 vi.mock('../storage/user-store', () => ({
-  emptyWorkspace: vi.fn(),
+  emptyWorkspace: mocks.emptyWorkspace,
   getProfileForUser: mocks.getProfileForUser,
   getProfileWorkspace: mocks.getProfileWorkspace,
   isDepotValueProfile: (profile: { kind?: string }) => profile.kind === 'depot_value',
   isFreePreviewProfile: (profile: { kind?: string }) => profile.kind === 'free_preview',
-  toPublicWorkspace: vi.fn(),
-  updateProfileWorkspaceInTransaction: vi.fn(),
+  normalizeProfileKind: (profile: { kind?: string }) => profile.kind ?? 'cdk',
+  toPublicWorkspace: mocks.toPublicWorkspace,
+  updateProfileWorkspaceInTransaction: mocks.updateProfileWorkspaceInTransaction,
 }))
 
-vi.mock('../storage/postgres', () => ({ withTransaction: vi.fn() }))
+vi.mock('../storage/postgres', () => ({ withTransaction: mocks.withTransaction }))
 vi.mock('../behavior-risk/service', () => ({
   recordTrackedExportBehaviorEvent: mocks.recordTrackedExportBehaviorEvent,
 }))
@@ -86,6 +95,8 @@ const exportBody = {
   idempotency_key: 'export-request-1',
 }
 
+let workspaceState: ReturnType<typeof workspaceRecord>
+
 beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.startsAt))
@@ -95,9 +106,9 @@ beforeEach(() => {
     tokenHash: 'session-hash',
   })
   mocks.getValidatedJson.mockResolvedValue(exportBody)
-  mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'growth'))
+  mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
   mocks.getProfileWorkspace.mockResolvedValue({
-    result_history: [{ id: 'result-1', result: optimizerResult() }],
+    result_history: [{ id: 'result-1', job_id: 'job-1', result: optimizerResult() }],
     archived_results: [],
   })
   mocks.recordPersonalUseDeclarationUsage.mockResolvedValue({
@@ -109,6 +120,95 @@ beforeEach(() => {
     ...input.response,
     operation_id: 'operation-1',
   }))
+  workspaceState = workspaceRecord()
+  mocks.getProfileCapacityLimitsInTransaction.mockResolvedValue({ plan: 3, history: 5, archive: 1 })
+  mocks.emptyWorkspace.mockImplementation((profileId: string) => workspaceRecord(profileId, []))
+  mocks.toPublicWorkspace.mockImplementation((workspace: unknown) => workspace)
+  mocks.clientQuery.mockResolvedValue({ rows: [], rowCount: 1 })
+  mocks.withTransaction.mockImplementation(async (run: (client: { query: typeof mocks.clientQuery }) => unknown) => (
+    run({ query: mocks.clientQuery })
+  ))
+  mocks.updateProfileWorkspaceInTransaction.mockImplementation(async (
+    _client: unknown,
+    _profileId: string,
+    update: (current: typeof workspaceState) => typeof workspaceState,
+  ) => {
+    workspaceState = update(workspaceState)
+    return workspaceState
+  })
+})
+
+describe('result history mutations', () => {
+  it('archives the only result without recreating a legacy duplicate', async () => {
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'archive' })
+
+    const response = await userResultsHandler(exportRequest('result-archive'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      workspace: {
+        last_result: null,
+        result_history: [],
+        archived_results: [{ id: 'result-1' }],
+      },
+      action: 'archive',
+      result_id: 'result-1',
+    })
+    expect(workspaceState.last_result).toBeNull()
+  })
+
+  it('restores last_result when unarchiving a result', async () => {
+    const item = storedHistoryItem()
+    workspaceState = workspaceRecord('profile-1', [], [item])
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'unarchive' })
+
+    const response = await userResultsHandler(exportRequest('result-archive'))
+
+    expect(response.status).toBe(200)
+    expect(workspaceState.result_history.map((entry) => entry.id)).toEqual(['result-1'])
+    expect(workspaceState.archived_results).toEqual([])
+    expect(workspaceState.last_result).toEqual(item.result)
+  })
+
+  it('deletes the only result and clears last_result', async () => {
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'delete' })
+
+    const response = await userResultsHandler(exportRequest('result-archive'))
+
+    expect(response.status).toBe(200)
+    expect(workspaceState.result_history).toEqual([])
+    expect(workspaceState.last_result).toBeNull()
+  })
+
+  it('returns 404 for a new delete operation targeting a missing result', async () => {
+    workspaceState = workspaceRecord('profile-1', [])
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'delete' })
+
+    const response = await userResultsHandler(exportRequest('result-archive'))
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toMatchObject({ code: 'result_archive_failed' })
+  })
+
+  it('replays a completed mutation with the same idempotency key', async () => {
+    const replay = { workspace: workspaceRecord('profile-1', []), action: 'delete', result_id: 'result-1', operation_id: 'operation-replay' }
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, action: 'delete' })
+    mocks.clientQuery.mockResolvedValueOnce({
+      rows: [{
+        request_hash: createHash('sha256')
+          .update(JSON.stringify({ profile_id: 'profile-1', result_id: 'result-1', action: 'delete' }))
+          .digest('hex'),
+        response_json: replay,
+      }],
+      rowCount: 1,
+    })
+
+    const response = await userResultsHandler(exportRequest('result-archive'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual(replay)
+    expect(mocks.updateProfileWorkspaceInTransaction).not.toHaveBeenCalled()
+  })
 })
 
 afterEach(() => {
@@ -117,7 +217,7 @@ afterEach(() => {
 })
 
 describe('MAA JSON export entitlement', () => {
-  it('lets a CDK profile export without consuming a trial coupon', async () => {
+  it('lets an advanced CDK profile export without consuming a trial coupon', async () => {
     const response = await userResultsHandler(exportRequest())
 
     expect(response.status).toBe(200)
@@ -144,6 +244,7 @@ describe('MAA JSON export entitlement', () => {
     expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
     expect(mocks.recordTrackedExportBehaviorEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventKey: 'maa-export:user-1:export-request-1',
+      jobId: 'job-1',
       result: expect.not.objectContaining({ raw_results: expect.anything() }),
     }))
   })
@@ -175,6 +276,7 @@ describe('MAA JSON export entitlement', () => {
 
   it('rejects a personal-use export when the current declaration is not accepted', async () => {
     mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, use_coupon: true })
     mocks.recordPersonalUseDeclarationUsage.mockRejectedValue(new PersonalUseDeclarationRequiredError())
 
     const response = await userResultsHandler(exportRequest())
@@ -191,6 +293,7 @@ describe('MAA JSON export entitlement', () => {
   it('fails closed when the declaration audit store is unavailable', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, use_coupon: true })
     mocks.recordPersonalUseDeclarationUsage.mockRejectedValue(new Error('database unavailable'))
 
     const response = await userResultsHandler(exportRequest())
@@ -207,6 +310,7 @@ describe('MAA JSON export entitlement', () => {
   it('consumes a trial coupon for an ordinary free preview after the advanced trial', async () => {
     vi.setSystemTime(new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt))
     mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, use_coupon: true })
 
     const response = await userResultsHandler(exportRequest())
 
@@ -221,6 +325,7 @@ describe('MAA JSON export entitlement', () => {
   it('preserves the inventory error when an ordinary free preview has no coupon', async () => {
     vi.setSystemTime(new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt))
     mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, use_coupon: true })
     mocks.consumeInventoryItemImmediately.mockRejectedValue(new InventoryError(
       'item_unavailable',
       '没有可用的 MAA 导出体验券。',
@@ -250,6 +355,7 @@ describe('MAA JSON export entitlement', () => {
     vi.setSystemTime(new Date(FREE_PREVIEW_LIMITED_CDK_ACTIVITY.endsAt))
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     mocks.getProfileForUser.mockResolvedValue(profile('free_preview', 'growth'))
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, use_coupon: true })
     mocks.recordTrackedExportBehaviorEvent.mockRejectedValue(new Error('tracking unavailable'))
 
     const response = await userResultsHandler(exportRequest())
@@ -271,6 +377,58 @@ describe('MAA JSON export entitlement', () => {
     })
   })
 
+  it('requires an explicit coupon confirmation for a growth profile', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'growth'))
+
+    const response = await userResultsHandler(exportRequest())
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toEqual({
+      error: '当前档案需要使用 1 张 MAA 导出体验券，请确认后重试。',
+      code: 'maa_export_coupon_required',
+    })
+    expect(mocks.recordPersonalUseDeclarationUsage).not.toHaveBeenCalled()
+    expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+  })
+
+  it('requires an explicit coupon confirmation for a recommended profile', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'recommended'))
+
+    const response = await userResultsHandler(exportRequest())
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({ code: 'maa_export_coupon_required' })
+    expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+  })
+
+  it('lets a growth profile export only after explicitly submitting a coupon', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'growth'))
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, use_coupon: true })
+
+    const response = await userResultsHandler(exportRequest())
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ consumed_coupon: true, operation_id: 'operation-1' })
+    expect(mocks.consumeInventoryItemImmediately).toHaveBeenCalledWith(expect.objectContaining({
+      itemCode: 'maa_export_trial_coupon',
+      profileId: 'profile-1',
+    }))
+  })
+
+  it('lets a metered advanced profile export without a coupon after declaration audit', async () => {
+    mocks.getProfileForUser.mockResolvedValue(profile('metered_personal', 'metered_advanced'))
+
+    const response = await userResultsHandler(exportRequest())
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ consumed_coupon: false })
+    expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+    expect(mocks.recordPersonalUseDeclarationUsage).toHaveBeenCalledWith(expect.objectContaining({
+      profileId: 'profile-1',
+      action: 'generated_result_export',
+    }))
+  })
+
   it('lets an advanced profile download the complete stored result', async () => {
     mocks.getProfileForUser.mockResolvedValue(profile('cdk', 'advanced'))
 
@@ -288,6 +446,7 @@ describe('MAA JSON export entitlement', () => {
     expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
     expect(mocks.recordTrackedExportBehaviorEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventKey: 'full-result-export:user-1:export-request-1',
+      jobId: 'job-1',
       result: expect.objectContaining({ raw_results: expect.any(Array) }),
     }))
   })
@@ -352,7 +511,7 @@ function exportRequest(path = 'maa-export'): Request {
   return new Request(`http://localhost/api/user/${path}`, { method: 'POST' })
 }
 
-function profile(kind: 'cdk' | 'free_preview', permission: 'growth' | 'advanced') {
+function profile(kind: 'cdk' | 'free_preview' | 'metered_personal', permission: 'recommended' | 'growth' | 'advanced' | 'metered_advanced') {
   return {
     id: 'profile-1',
     user_id: 'user-1',
@@ -391,5 +550,34 @@ function optimizerResult() {
     }],
     raw_results: [{ total_efficiency: 100, assignment_detail: [] }],
     daily_production: { manufacturing: { LMD: 1000 } },
+  }
+}
+
+function storedHistoryItem() {
+  return {
+    id: 'result-1',
+    job_id: 'job-1',
+    name: '历史结果',
+    created_at: '2026-08-01T00:00:00.000Z',
+    config: null,
+    result: optimizerResult(),
+    operator_count: 1,
+    source: 'generated' as const,
+  }
+}
+
+function workspaceRecord(profileId = 'profile-1', resultHistory = [storedHistoryItem()], archivedResults: ReturnType<typeof storedHistoryItem>[] = []) {
+  return {
+    version: 1 as const,
+    profile_id: profileId,
+    operators: [],
+    config: null,
+    elite_overrides: {},
+    last_result: resultHistory[0]?.result ?? null,
+    saved_configs: [],
+    result_history: resultHistory,
+    archived_results: archivedResults,
+    free_schedule_entitlement: null,
+    updated_at: '2026-08-01T00:00:00.000Z',
   }
 }

@@ -102,7 +102,7 @@ describe('PostgreSQL schema migration', () => {
     }
   })
 
-  it('permanently trims existing workspace JSON to the newest 3 configurations and 5 results', async () => {
+  it('preserves workspace entries above base limits across idempotent migrations', async () => {
     const profile = await seedProfile()
     const savedConfigs = Array.from({ length: 4 }, (_, index) => ({ id: `config-${index + 1}` }))
     const resultHistory = Array.from({ length: 6 }, (_, index) => ({ id: `result-${index + 1}` }))
@@ -125,25 +125,27 @@ describe('PostgreSQL schema migration', () => {
       await migrateDatabaseSchema()
 
       const afterFirstMigration = await readWorkspace(profile.profileId)
-      expect(afterFirstMigration.saved_configs.map((item) => item.id)).toEqual(['config-1', 'config-2', 'config-3'])
+      expect(afterFirstMigration.saved_configs.map((item) => item.id)).toEqual(['config-1', 'config-2', 'config-3', 'config-4'])
       expect(afterFirstMigration.result_history.map((item) => item.id)).toEqual([
         'result-1',
         'result-2',
         'result-3',
         'result-4',
         'result-5',
+        'result-6',
       ])
 
       await migrateDatabaseSchema()
 
       const afterSecondMigration = await readWorkspace(profile.profileId)
-      expect(afterSecondMigration.saved_configs.map((item) => item.id)).toEqual(['config-1', 'config-2', 'config-3'])
+      expect(afterSecondMigration.saved_configs.map((item) => item.id)).toEqual(['config-1', 'config-2', 'config-3', 'config-4'])
       expect(afterSecondMigration.result_history.map((item) => item.id)).toEqual([
         'result-1',
         'result-2',
         'result-3',
         'result-4',
         'result-5',
+        'result-6',
       ])
     } finally {
       await query('delete from user_accounts where id = $1', [profile.userId])

@@ -96,6 +96,19 @@ describe('optimization progress mapping', () => {
     expect(progress.billing).toMatchObject({ status: 'reserved', charge: '600.00' })
   })
 
+  it('maps the persisted history result id from a successful job', () => {
+    const progress = mergeOptimizeJobProgress(null, {
+      ...accepted,
+      status: 'succeeded',
+      history_result_id: 'history-1',
+      queue_position: null,
+      estimated_remaining_ms: 0,
+      estimate_phase: 'completed',
+    } as OptimizeJobStatusResponse, 'generate', Date.parse(accepted.submitted_at))
+
+    expect(progress.historyResultId).toBe('history-1')
+  })
+
   it('wakes a long poll when an external terminal update arrives', async () => {
     let shouldRefresh = true
     await expect(waitForOptimizePoll(10_000, undefined, () => {

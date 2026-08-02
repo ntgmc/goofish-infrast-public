@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OptimizeResult } from '../../../lib/types'
-import { UpgradeSuggestionStatusNotice } from './ResultSection'
+import ResultSection, { UpgradeSuggestionStatusNotice } from './ResultSection'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('UpgradeSuggestionStatusNotice', () => {
   it.each([
@@ -32,5 +35,55 @@ describe('UpgradeSuggestionStatusNotice', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent(message)
     expect(screen.getByRole('status')).toHaveClass('tool-alert--warning')
+  })
+})
+
+describe('ResultSection compatibility fallback', () => {
+  it('contains malformed history rendering and keeps the diagnostic download action', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const onDownloadFullResult = vi.fn()
+    const invalidResult = {
+      author: 'test',
+      title: '损坏结果',
+      description: 'test',
+      buildingType: 253,
+      planTimes: '1 班',
+      plans: null,
+      raw_results: [],
+    } as unknown as OptimizeResult
+
+    render(
+      <ResultSection
+        phase="history"
+        historyItem={{
+          id: 'history-invalid',
+          name: '损坏历史',
+          created_at: '2026-08-02T00:00:00.000Z',
+          config: null,
+          result: invalidResult,
+          operator_count: 0,
+          source: 'legacy',
+        }}
+        currentResult={null}
+        finalResult={null}
+        operators={[]}
+        suggestions={[]}
+        loading={false}
+        progress={null}
+        inlineError={null}
+        previewProfile={false}
+        upgradeCdk=""
+        upgradeLoading={false}
+        upgradeError={null}
+        onUpgradeCdkChange={vi.fn()}
+        onUpgradePreviewProfile={vi.fn()}
+        onDownloadFullResult={onDownloadFullResult}
+        onApplySuggestions={vi.fn(async () => undefined)}
+        onReset={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByRole('alert', undefined, { timeout: 5_000 })).toHaveTextContent('这条排班结果的数据版本不兼容或已损坏')
+    expect(screen.getByRole('button', { name: '下载完整计算数据' })).toBeInTheDocument()
   })
 })

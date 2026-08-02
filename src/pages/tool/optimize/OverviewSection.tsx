@@ -60,6 +60,7 @@ export default function OverviewSection({
   onViewHistory,
   onUseHistoryConfig,
   onDownloadHistory,
+  downloadBusy = false,
 }: {
   activeConfig: LicenseConfig;
   configChanged: boolean;
@@ -90,6 +91,7 @@ export default function OverviewSection({
   onViewHistory: (item: WorkspaceResultHistoryItem) => void;
   onUseHistoryConfig: (item: WorkspaceResultHistoryItem) => void;
   onDownloadHistory: (item: WorkspaceResultHistoryItem) => void;
+  downloadBusy?: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -160,7 +162,7 @@ export default function OverviewSection({
           {latestResult ? (
             <div className="mt-4 flex flex-wrap gap-2">
               <SmallActionButton onClick={() => onViewHistory(latestResult)}>{copy.optimize.pages_tool_optimize_OverviewSection_018}</SmallActionButton>
-              <SmallActionButton onClick={() => onDownloadHistory(latestResult)} disabled={!isMaaJsonDownloadable(latestResult.result)}>{copy.optimize.pages_tool_optimize_OverviewSection_019}</SmallActionButton>
+              <SmallActionButton onClick={() => onDownloadHistory(latestResult)} disabled={downloadBusy || !isMaaJsonDownloadable(latestResult.result)}>{downloadBusy ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_OverviewSection_019}</SmallActionButton>
               <SmallActionButton onClick={() => onUseHistoryConfig(latestResult)} disabled={!latestResult.config}>{copy.optimize.pages_tool_optimize_OverviewSection_020}</SmallActionButton>
             </div>
           ) : null}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { OptimizeResult } from '../../../src/lib/types';
-import { buildMaaExportPayload } from './maa-export';
+import { buildMaaExportPayload, MaaExportValidationError } from './maa-export';
 
 describe('buildMaaExportPayload', () => {
   it('projects a rich optimizer result to the MAA execution allowlist', () => {
@@ -76,6 +76,14 @@ describe('buildMaaExportPayload', () => {
     const savedBytes = fullBytes - maaBytes;
     expect(savedBytes).toBeGreaterThan(0);
   });
+
+  it('rejects malformed plans before producing a download', () => {
+    const input = richResult();
+    input.plans = [{ name: '损坏班次', rooms: { trading: [42] } } as never];
+
+    expect(() => buildMaaExportPayload(input)).toThrow(MaaExportValidationError);
+    expect(() => buildMaaExportPayload(input)).toThrow(/plans\.0\.rooms\.trading\.0/);
+  });
 });
 
 function richResult(): OptimizeResult {
@@ -138,8 +146,9 @@ function richResult(): OptimizeResult {
       frontend_version: 'test',
       backend_version: 'test',
       data_version: 'test',
+      generated_at: '2026-07-26T00:00:00.000Z',
+      source_summary: 'test',
       git_sha: 'test',
-      build_time: '2026-07-26T00:00:00.000Z',
     },
   } as unknown as OptimizeResult;
 }

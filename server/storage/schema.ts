@@ -2,7 +2,6 @@ import { resolveAppRole, type AppRole } from '../process-role'
 import { query } from './postgres'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
-import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 
 const MIGRATION_PHASE_SEPARATOR = '-- goofish:migration-phase'
 const RETRIABLE_MIGRATION_CODES = new Set(['40P01', '40001', '55P03'])
@@ -888,77 +887,6 @@ CREATE TABLE IF NOT EXISTS user_profile_workspaces (
   record_json JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
-
--- goofish:migration-phase
--- Workspaces store newest saved configurations and history entries first.  Trim
--- pre-existing records once the lower retention policy is deployed, while
--- leaving malformed legacy fields to the application normalizer.
-WITH workspace_retention AS (
-  SELECT
-    profile_id,
-    record_json,
-    CASE
-      WHEN jsonb_typeof(record_json->'saved_configs') = 'array'
-        THEN jsonb_array_length(record_json->'saved_configs')
-      ELSE 0
-    END AS saved_config_count,
-    CASE
-      WHEN jsonb_typeof(record_json->'result_history') = 'array'
-        THEN jsonb_array_length(record_json->'result_history')
-      ELSE 0
-    END AS result_history_count
-  FROM user_profile_workspaces
-),
-trimmed_saved_configs AS (
-  SELECT
-    profile_id,
-    saved_config_count,
-    result_history_count,
-    CASE
-      WHEN saved_config_count > ${WORKSPACE_SAVED_CONFIG_LIMIT} THEN jsonb_set(
-        record_json,
-        '{saved_configs}',
-        (
-          SELECT COALESCE(jsonb_agg(item.value ORDER BY item.ordinality), '[]'::jsonb)
-          FROM jsonb_array_elements(record_json->'saved_configs') WITH ORDINALITY AS item(value, ordinality)
-          WHERE item.ordinality <= ${WORKSPACE_SAVED_CONFIG_LIMIT}
-        ),
-        true
-      )
-      ELSE record_json
-    END AS record_json
-  FROM workspace_retention
-),
-trimmed_workspace_history AS (
-  SELECT
-    profile_id,
-    CASE
-      WHEN result_history_count > ${WORKSPACE_RESULT_HISTORY_LIMIT} THEN jsonb_set(
-        record_json,
-        '{result_history}',
-        (
-          SELECT COALESCE(jsonb_agg(item.value ORDER BY item.ordinality), '[]'::jsonb)
-          FROM jsonb_array_elements(record_json->'result_history') WITH ORDINALITY AS item(value, ordinality)
-          WHERE item.ordinality <= ${WORKSPACE_RESULT_HISTORY_LIMIT}
-        ),
-        true
-      )
-      ELSE record_json
-    END AS record_json
-  FROM trimmed_saved_configs
-  WHERE saved_config_count > ${WORKSPACE_SAVED_CONFIG_LIMIT}
-     OR result_history_count > ${WORKSPACE_RESULT_HISTORY_LIMIT}
-)
-UPDATE user_profile_workspaces AS workspace
-SET record_json = jsonb_set(
-      trimmed.record_json,
-      '{updated_at}',
-      to_jsonb(to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
-      true
-    ),
-    updated_at = now()
-FROM trimmed_workspace_history AS trimmed
-WHERE workspace.profile_id = trimmed.profile_id;
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS profile_entitlements (

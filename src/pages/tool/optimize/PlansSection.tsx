@@ -165,7 +165,7 @@ export default function PlansSection({
                   </div>
                   <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
                     <SmallActionButton onClick={() => onViewHistory(item)} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
-                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={!isMaaJsonDownloadable(item.result)}>{copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
+                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !isMaaJsonDownloadable(item.result)}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
                     <SmallActionButton onClick={() => onUseHistoryConfig(item)} disabled={!item.config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
                     <SmallActionButton onClick={() => void onArchiveHistory(item)} disabled={archiveLimitReached || busyAction === `archive:${item.id}`}>{copy.inventory.archive_action}</SmallActionButton>
                     <SmallActionButton onClick={() => void onDeleteHistory(item)} disabled={busyAction === `delete:${item.id}`} tone="danger">{copy.inventory.delete_result}</SmallActionButton>
@@ -201,7 +201,7 @@ export default function PlansSection({
                   </div>
                   <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
                     <SmallActionButton onClick={() => onViewHistory(item)} tone="primary">{copy.optimize.pages_tool_optimize_PlansSection_030}</SmallActionButton>
-                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={!isMaaJsonDownloadable(item.result)}>{copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
+                    <SmallActionButton onClick={() => onDownloadHistory(item)} disabled={busyAction === `download:${item.id}` || !isMaaJsonDownloadable(item.result)}>{busyAction === `download:${item.id}` ? copy.inventory.export_downloading : copy.optimize.pages_tool_optimize_PlansSection_031}</SmallActionButton>
                     <SmallActionButton onClick={() => onUseHistoryConfig(item)} disabled={!item.config}>{copy.optimize.pages_tool_optimize_PlansSection_032}</SmallActionButton>
                     <SmallActionButton onClick={() => void onUnarchiveHistory(item)} disabled={historyLimitReached || busyAction === `unarchive:${item.id}`}>{copy.inventory.unarchive_action}</SmallActionButton>
                   </div>

@@ -70,10 +70,8 @@ describe('database schema ownership', () => {
     expect(combinedSchema.indexOf('ADD COLUMN IF NOT EXISTS cdk_type')).toBeLessThan(
       combinedSchema.indexOf('idx_cdk_records_admin_type_created'),
     )
-    expect(combinedSchema).toMatch(/WITH workspace_retention AS/)
-    expect(combinedSchema).toMatch(/trimmed_workspace_history AS/)
-    expect(combinedSchema).toMatch(/jsonb_array_elements\(record_json->'saved_configs'\) WITH ORDINALITY/)
-    expect(combinedSchema).toMatch(/jsonb_array_elements\(record_json->'result_history'\) WITH ORDINALITY/)
+    expect(combinedSchema).not.toMatch(/WITH workspace_retention AS/)
+    expect(combinedSchema).not.toMatch(/trimmed_workspace_history AS/)
     expect(combinedSchema).toMatch(/select 1 from optimize_jobs job/)
     expect(combinedSchema).not.toMatch(/\boptimization_jobs\b/)
     expect(statements.at(-2)).toMatch(/insert into personal_use_declaration_versions/i)

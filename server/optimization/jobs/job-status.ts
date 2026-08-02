@@ -1,9 +1,10 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import type { CapabilitySubject } from '../../../src/lib/product-catalog'
 import type { LicenseConfig, OptimizeEstimateBucket, OptimizeResult } from "../../../src/lib/types";
 import { SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT } from '../../../src/lib/scenario-comparison';
 import type { OptimizationFailureSnapshot, OptimizationJobListItem, OptimizationJobListResponse, OptimizationJobSnapshot } from "../../../src/lib/optimization-contracts";
 import { getScheduleGenerateDurationStatsByBucket, recordUsageEvent } from "../../handlers/usage-stats";
-import { getProfileForUser } from "../../storage/user-store";
+import { getProfileForUser, normalizeProfileKind } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobRecord, type OptimizeJobStore } from "../../storage/optimize-job-store";
 import { requestOptimizeJobCancellation, requestOptimizeJobProcessing } from "../../optimize-job-signals";
@@ -22,6 +23,8 @@ import {
   PersonalUseDeclarationRequiredError,
   recordPersonalUseDeclarationUsage,
 } from '../../storage/personal-use-declaration-store';
+import { resolveProfileAuthorization } from '../../handlers/profile-authorization'
+import { projectOptimizeResultForCapabilities } from '../../../src/lib/optimize-result-projection'
 
 export async function submitOptimizationJob(req: Request): Promise<Response> {
   const lifecycleState = getServiceLifecycleState();
@@ -192,7 +195,10 @@ export async function getOptimizationJob(req: Request, rawJobId: string): Promis
   if (!access.ok) return jsonResponse({ error: access.message }, access.status);
 
   const queuePosition = await store.getQueuePosition(job.id);
-  return jsonResponse(formatOptimizeJobStatus(job, queuePosition));
+  return jsonResponse(projectOptimizeJobSnapshot(
+    formatOptimizeJobStatus(job, queuePosition),
+    access.subject,
+  ));
 }
 
 export async function listOptimizationJobs(req: Request): Promise<Response> {
@@ -256,27 +262,53 @@ export async function cancelOptimizationJob(req: Request, rawJobId: string): Pro
 async function canReadOptimizeJob(
   req: Request,
   job: OptimizeJobRecord,
-): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
+): Promise<{ ok: true; subject: CapabilitySubject } | { ok: false; status: number; message: string }> {
   const profileId = job.profile_id
     ?? (job.owner_key.startsWith('profile:') ? job.owner_key.slice('profile:'.length) : null)
   if (!profileId) {
     const token = req.headers.get('X-Optimize-Job-Token')?.trim() ?? '';
     return verifyOptimizeJobPollToken(job, token)
-      ? { ok: true }
+      ? { ok: true, subject: getJobCapabilitySubject(job) }
       : { ok: false, status: 403, message: '缺少或无效的任务查询凭据。' };
   }
   const auth = await requireUserSession(req);
   if (!auth) return { ok: false, status: 401, message: '请先登录后查看任务状态。' };
   const profile = await getProfileForUser(auth.user.id, profileId);
   if (!profile) return { ok: false, status: 403, message: '无权查看该任务。' };
-  return { ok: true };
+  const authorization = await resolveProfileAuthorization(profile)
+  if (!authorization.ok) return { ok: false, status: authorization.status, message: authorization.message }
+  return {
+    ok: true,
+    subject: { kind: normalizeProfileKind(profile), permission: authorization.permission },
+  };
 }
 
 export async function buildOptimizeJobAccepted(job: OptimizeJobRecord): Promise<OptimizationJobSnapshot> {
   const queuePosition = await getOptimizeJobStore().getQueuePosition(job.id);
   const estimate = getOptimizeJobEstimate(job);
   const runtimeEstimate = getOptimizeRuntimeEstimate(job, queuePosition, estimate);
-  return formatOptimizationJobSnapshot(job, queuePosition, estimate, runtimeEstimate);
+  return projectOptimizeJobSnapshot(
+    formatOptimizationJobSnapshot(job, queuePosition, estimate, runtimeEstimate),
+    getJobCapabilitySubject(job),
+  );
+}
+
+function getJobCapabilitySubject(job: OptimizeJobRecord): CapabilitySubject {
+  return {
+    kind: job.source === 'free_preview' ? 'free_preview' : undefined,
+    permission: job.permission,
+  }
+}
+
+function projectOptimizeJobSnapshot(
+  snapshot: OptimizationJobSnapshot,
+  subject: CapabilitySubject,
+): OptimizationJobSnapshot {
+  if (snapshot.status !== 'succeeded' || snapshot.kind !== 'schedule') return snapshot
+  return {
+    ...snapshot,
+    result: projectOptimizeResultForCapabilities(snapshot.result, subject),
+  }
 }
 
 function formatOptimizeJobStatus(job: OptimizeJobRecord, queuePosition: number | null): OptimizationJobSnapshot {
@@ -330,7 +362,12 @@ function formatOptimizationJobSnapshot(
     billing: job.billing_json,
   };
   if (status === 'succeeded') {
-    return { ...base, status, result: job.result_json as OptimizeResult };
+    return {
+      ...base,
+      status,
+      result: job.result_json as OptimizeResult,
+      ...(getOptimizeJobKind(job) === 'schedule' && { historyResultId: job.id }),
+    };
   }
   if (status === 'failed') {
     return {

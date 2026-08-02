@@ -2081,6 +2081,7 @@ async function persistScheduleCompletionInTransaction(
     const limits = await getProfileCapacityLimitsInTransaction(client, profileId)
     const historyItem: WorkspaceResultHistoryItem = {
       id: job.id,
+      job_id: job.id,
       name: `排班结果 ${formatShanghaiHistoryTime(nowIso)}`,
       created_at: nowIso,
       config: payload.effectiveConfig,

@@ -65,6 +65,25 @@ describe('ResultPanel tabs', () => {
     expect(onDownload).not.toHaveBeenCalled()
     expect(onDownloadFullResult).toHaveBeenCalledTimes(1)
   })
+
+  it('hides the full-data tab when the profile lacks the view capability', () => {
+    render(<ResultPanel result={createResult()} fullDataAvailable={false} />)
+
+    expect(screen.queryByRole('tab', { name: '产出数据' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '导入' })).toBeInTheDocument()
+  })
+
+  it('disables the MAA download while the request is in flight', async () => {
+    const user = userEvent.setup()
+    const onDownload = vi.fn()
+    render(<ResultPanel result={createResult()} onDownload={onDownload} downloadBusy />)
+
+    const button = screen.getByRole('button', { name: '正在准备下载…' })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    await user.click(button)
+    expect(onDownload).not.toHaveBeenCalled()
+  })
 })
 
 function createResult(): OptimizeResult {

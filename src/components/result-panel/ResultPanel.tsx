@@ -15,6 +15,9 @@ export default function ResultPanel({
   operators = [],
   onDownload,
   onDownloadFullResult,
+  downloadBusy = false,
+  fullResultDownloadBusy = false,
+  fullDataAvailable = true,
   onSaveWorkfile,
   detailDefaultOpen = false,
   suggestionsSlot,
@@ -51,17 +54,19 @@ export default function ResultPanel({
   const tabs: Array<{ id: ResultTabId; label: string }> = [
     { id: 'board', label: copy.domain.components_result_panel_ResultPanel_017 },
     { id: 'detail', label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_018 : copy.domain.components_result_panel_ResultPanel_019 },
-    ...(!isPreview ? [{ id: 'data' as const, label: copy.domain.components_result_panel_ResultPanel_020 }] : []),
+    ...(!isPreview && fullDataAvailable ? [{ id: 'data' as const, label: copy.domain.components_result_panel_ResultPanel_020 }] : []),
     ...(!isPreview ? [{ id: 'import' as const, label: isRotationMode ? copy.domain.components_result_panel_ResultPanel_021 : copy.domain.components_result_panel_ResultPanel_022 }] : []),
     ...(!isPreview && suggestionsSlot ? [{ id: 'suggestions' as const, label: copy.domain.components_result_panel_ResultPanel_023 }] : []),
   ] as const
   const [activeTab, setActiveTab] = useState<ResultTabId>(
     detailDefaultOpen ? 'detail' : 'board',
   )
-  const selectedTab = isPreview && (activeTab === 'data' || activeTab === 'import' || activeTab === 'suggestions')
+  const selectedTab = (isPreview || !fullDataAvailable) && activeTab === 'data'
     ? 'board'
+    : isPreview && (activeTab === 'import' || activeTab === 'suggestions')
+      ? 'board'
     : activeTab === 'suggestions' && !suggestionsSlot
-      ? 'data'
+      ? fullDataAvailable ? 'data' : 'board'
       : activeTab
 
   return (
@@ -87,9 +92,11 @@ export default function ResultPanel({
                 <button
                   type="button"
                   onClick={onDownload}
+                  disabled={downloadBusy}
+                  aria-busy={downloadBusy}
                   className="tool-primary-action"
                 >
-                  {copy.domain.components_result_panel_ResultPanel_032}</button>
+                  {downloadBusy ? copy.inventory.export_downloading : copy.domain.components_result_panel_ResultPanel_032}</button>
               )}
               {onSaveWorkfile && (
                 <button
@@ -162,7 +169,7 @@ export default function ResultPanel({
         {selectedTab === 'data' && (
           <div className="space-y-4">
             <ResultMetrics isRotationMode={isRotationMode} prepared={prepared} />
-            {onDownloadFullResult && <FullResultExportDisclosure onDownload={onDownloadFullResult} />}
+            {onDownloadFullResult && <FullResultExportDisclosure onDownload={onDownloadFullResult} busy={fullResultDownloadBusy} />}
           </div>
         )}
         {selectedTab === 'detail' && <ResultDetail isRotationMode={isRotationMode} prepared={prepared} planTimes={result.planTimes} />}
@@ -177,7 +184,7 @@ export default function ResultPanel({
   )
 }
 
-function FullResultExportDisclosure({ onDownload }: { onDownload: () => void }) {
+function FullResultExportDisclosure({ onDownload, busy }: { onDownload: () => void; busy: boolean }) {
   return (
     <details className="tool-panel overflow-hidden">
       <summary className="cursor-pointer px-5 py-4 text-xs font-medium text-ink-muted transition-colors hover:text-ink-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500/45 sm:px-6">
@@ -190,9 +197,11 @@ function FullResultExportDisclosure({ onDownload }: { onDownload: () => void }) 
         <button
           type="button"
           onClick={onDownload}
+          disabled={busy}
+          aria-busy={busy}
           className="mt-3 inline-flex min-h-10 items-center text-sm font-medium text-ink-muted underline decoration-surface-4 underline-offset-4 transition-colors hover:text-ink-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/45"
         >
-          {copy.domain.components_result_panel_ResultPanel_039}
+          {busy ? copy.inventory.export_downloading : copy.domain.components_result_panel_ResultPanel_039}
         </button>
       </div>
     </details>
