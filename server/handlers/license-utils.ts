@@ -237,11 +237,15 @@ export async function getRiskControlSettings(): Promise<RiskControlSettings> {
   }
 }
 
-export async function saveRiskControlSettings(patch: RiskControlSettingsPatch): Promise<RiskControlSettings> {
+export async function saveRiskControlSettings(input: {
+  patch: RiskControlSettingsPatch
+  expectedRevision: number
+  adminUsername: string
+  reason: string
+  requestId: string
+}): Promise<RiskControlSettings> {
   const store = getRiskControlSettingsStore()
-  const current = normalizeRiskControlSettings(await store.get())
-  const next = normalizeRiskControlSettings({ ...current, ...patch })
-  return store.set(next)
+  return store.set(input)
 }
 
 function getTestingCdkRecordStore(): CdkRecordStore | null {

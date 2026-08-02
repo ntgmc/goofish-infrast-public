@@ -82,5 +82,6 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   lifetime_voucher_pending_bindings: { disposition: 'exclude', reason: '未完成绑定的短期状态包含加密凭据。' },
   inventory_admin_audit: { disposition: 'exclude', reason: '管理员审计按合规策略留存并在账户删除时匿名化。' },
   behavior_risk_events: { disposition: 'exclude', reason: '反滥用 HMAC 证据按安全与合规留存策略处理。' },
+  behavior_risk_dirty_users: { disposition: 'exclude', reason: '风控增量评估的待处理用户和事件水位属于内部安全调度状态，评估后即删除。' },
   behavior_risk_case_members: { disposition: 'exclude', reason: '风控案件证据属于受限安全审计数据。' },
 } as const satisfies Record<string, PersonalDataExportCoverageEntry>

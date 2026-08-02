@@ -36,6 +36,7 @@ export type BehaviorRiskEvent = {
   network_hmac: string | null
   ua_hmac: string | null
   uid_hmac: string | null
+  signal_aliases?: Partial<Record<'browser' | 'session' | 'network' | 'ua' | 'uid', string[]>> | null
   output_hash: string | null
   page_category: BehaviorRiskPageCategory | null
   structure_summary?: Record<string, unknown> | null
@@ -152,8 +153,8 @@ function evaluateGroup(events: IdentifiedEvent[], userIds: string[], now: Date):
     rules.push(rule(
       'browser_identity_cluster',
       'environment',
-      55,
-      '同一浏览器实例在 7 天内关联至少三个账号和三个档案标识。',
+      20,
+      '同一经服务端签名的设备 cookie 在 7 天内关联至少三个账号和三个档案标识；该信号仅作为弱证据。',
       browserCluster,
     ))
   } else if (environmentMultiUid) {
@@ -240,7 +241,7 @@ function evaluateGroup(events: IdentifiedEvent[], userIds: string[], now: Date):
     }))
   }
 
-  const strongSignal = Boolean(browserCluster || repeatedOperatorAnomaly)
+  const strongSignal = repeatedOperatorAnomaly
   const score = Math.min(100, rules.reduce((sum, item) => sum + item.score, 0))
   const categories = [...new Set(rules.map((item) => item.category))]
   const firstSeenAt = events[0]?.occurred_at ?? now.toISOString()
@@ -358,21 +359,32 @@ function environmentCohorts(events: IdentifiedEvent[]): EnvironmentCohort[] {
 
 function environmentSignals(event: BehaviorRiskEvent): Array<Omit<EnvironmentCohort, 'events'>> {
   const signals: Array<Omit<EnvironmentCohort, 'events'>> = []
-  if (event.browser_hmac) {
+  for (const browserHmac of signalValues(event, 'browser', event.browser_hmac)) {
     signals.push({
-      key: `browser:${event.browser_hmac}`,
+      key: `browser:${browserHmac}`,
       type: 'browser',
-      signalPrefix: event.browser_hmac.slice(0, 12),
+      signalPrefix: browserHmac.slice(0, 12),
     })
   }
-  if (event.network_hmac && event.ua_hmac) {
-    signals.push({
-      key: `network-ua:${event.network_hmac}:${event.ua_hmac}`,
-      type: 'network-ua',
-      signalPrefix: `${event.network_hmac.slice(0, 6)}:${event.ua_hmac.slice(0, 6)}`,
-    })
+  for (const networkHmac of signalValues(event, 'network', event.network_hmac)) {
+    for (const uaHmac of signalValues(event, 'ua', event.ua_hmac)) {
+      signals.push({
+        key: `network-ua:${networkHmac}:${uaHmac}`,
+        type: 'network-ua',
+        signalPrefix: `${networkHmac.slice(0, 6)}:${uaHmac.slice(0, 6)}`,
+      })
+    }
   }
-  return signals
+  return [...new Map(signals.map((signal) => [signal.key, signal])).values()]
+}
+
+function signalValues(
+  event: BehaviorRiskEvent,
+  namespace: 'browser' | 'session' | 'network' | 'ua' | 'uid',
+  primary: string | null,
+): string[] {
+  return [...new Set([primary, ...(event.signal_aliases?.[namespace] ?? [])]
+    .filter((value): value is string => typeof value === 'string' && value.length > 0))]
 }
 
 function environmentEvidence(

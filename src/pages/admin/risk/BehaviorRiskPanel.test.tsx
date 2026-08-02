@@ -4,11 +4,22 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BehaviorRiskPanel from './BehaviorRiskPanel'
 
-const { apiJsonMock } = vi.hoisted(() => ({
-  apiJsonMock: vi.fn(),
-}))
+const { apiJsonMock, ApiErrorMock } = vi.hoisted(() => {
+  class TestApiError extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+      readonly data: unknown,
+      readonly url: string,
+    ) {
+      super(message)
+    }
+  }
+  return { apiJsonMock: vi.fn(), ApiErrorMock: TestApiError }
+})
 
 vi.mock('../../../lib/api-client', () => ({
+  ApiError: ApiErrorMock,
   apiJson: apiJsonMock,
 }))
 
@@ -33,6 +44,7 @@ beforeEach(() => {
       expires_at: '2026-10-23T00:00:00.000Z',
       reviewed_at: null,
       reviewed_by: null,
+      audits: [],
       members: [{
         user_id: 'user-1-complete-id',
         account_email: 'user-1@example.test',
@@ -53,6 +65,20 @@ beforeEach(() => {
       }],
     }],
     pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+    health: {
+      status: 'ok',
+      last_collection_at: '2026-07-25T01:00:00.000Z',
+      last_collection_status: 'success',
+      last_evaluation_at: '2026-07-25T01:30:00.000Z',
+      last_evaluation_status: 'success',
+      last_failure_at: null,
+      last_failure_stage: null,
+      backlog_count: 0,
+      events_processed: 3,
+      duration_ms: 12,
+      purged_events: 0,
+    },
+    capabilities: ['risk_view', 'risk_review'],
   })
 })
 
@@ -96,6 +122,7 @@ describe('BehaviorRiskPanel review form', () => {
         expires_at: '2026-10-23T00:00:00.000Z',
         reviewed_at: '2026-07-25T02:00:00.000Z',
         reviewed_by: 'system:behavior-risk-v1.2.0',
+        audits: [],
         members: [{
           user_id: 'deleted-user-complete-id',
           account_email: null,
@@ -110,6 +137,20 @@ describe('BehaviorRiskPanel review form', () => {
         }],
       }],
       pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+      health: {
+        status: 'ok',
+        last_collection_at: '2026-07-25T01:00:00.000Z',
+        last_collection_status: 'success',
+        last_evaluation_at: '2026-07-25T02:00:00.000Z',
+        last_evaluation_status: 'success',
+        last_failure_at: null,
+        last_failure_stage: null,
+        backlog_count: 0,
+        events_processed: 0,
+        duration_ms: 5,
+        purged_events: 0,
+      },
+      capabilities: ['risk_view'],
     })
 
     render(<BehaviorRiskPanel />)
@@ -117,4 +158,98 @@ describe('BehaviorRiskPanel review form', () => {
     expect(await screen.findByText('账号已删除')).toBeInTheDocument()
     expect(screen.getByText('用户 ID：deleted-user-complete-id')).toBeInTheDocument()
   })
+
+  it('keeps the newest filter response when an older request resolves last', async () => {
+    const user = userEvent.setup()
+    let resolveOld!: (value: unknown) => void
+    let resolveNew!: (value: unknown) => void
+    apiJsonMock.mockReset()
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNew = resolve }))
+    render(<BehaviorRiskPanel />)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: '状态' }), 'actioned')
+    await waitFor(() => expect(apiJsonMock).toHaveBeenCalledTimes(2))
+    resolveNew(buildCasePage({ id: 'new-case', status: 'actioned', email: 'new@example.test' }))
+    expect(await screen.findByText('new@example.test')).toBeInTheDocument()
+
+    resolveOld(buildCasePage({ id: 'old-case', status: 'pending', email: 'old@example.test' }))
+    await waitFor(() => expect(screen.queryByText('old@example.test')).not.toBeInTheDocument())
+    expect(screen.getByText('new@example.test')).toBeInTheDocument()
+  })
+
+  it('clears stale cases when the current filter request fails and exposes retry', async () => {
+    const user = userEvent.setup()
+    render(<BehaviorRiskPanel />)
+    expect(await screen.findByText('user-1@example.test')).toBeInTheDocument()
+
+    apiJsonMock.mockRejectedValueOnce(new Error('当前筛选加载失败'))
+    await user.selectOptions(screen.getByRole('combobox', { name: '状态' }), 'actioned')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('当前筛选加载失败')
+    expect(screen.queryByText('user-1@example.test')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '重试当前筛选' })).toBeInTheDocument()
+  })
+
+  it('reloads immediately after a concurrent 409 review conflict', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<BehaviorRiskPanel />)
+    const note = await screen.findByRole('textbox', { name: '复核说明（必填，将写入审计）' })
+    await user.type(note, '另一个管理员可能正在处理')
+    apiJsonMock
+      .mockRejectedValueOnce(new ApiErrorMock('该复核单已经处理。', 409, { error: '该复核单已经处理。' }, '/api/admin/behavior-risk'))
+      .mockResolvedValueOnce(buildCasePage({ id: 'new-case', status: 'actioned', email: 'new@example.test' }))
+
+    await user.click(screen.getByRole('button', { name: '标记误报' }))
+
+    expect(await screen.findByText('该复核单已由其他管理员处理，列表已自动刷新。')).toBeInTheDocument()
+    expect(await screen.findByText('new@example.test')).toBeInTheDocument()
+  })
 })
+
+function buildCasePage(input: { id: string; status: 'pending' | 'dismissed' | 'actioned'; email: string }) {
+  return {
+    cases: [{
+      id: input.id,
+      status: input.status,
+      score: 55,
+      categories: ['operator_data'],
+      rules: [],
+      model_version: 'behavior-risk-v1.2.0',
+      first_seen_at: '2026-07-25T00:00:00.000Z',
+      last_seen_at: '2026-07-25T01:00:00.000Z',
+      expires_at: '2026-10-23T00:00:00.000Z',
+      reviewed_at: input.status === 'pending' ? null : '2026-07-25T02:00:00.000Z',
+      reviewed_by: input.status === 'pending' ? null : 'reviewer',
+      audits: [],
+      members: [{
+        user_id: `${input.id}-user`,
+        account_email: input.email,
+        counts: {},
+        first_seen_at: '2026-07-25T00:00:00.000Z',
+        last_seen_at: '2026-07-25T01:00:00.000Z',
+        browser_prefixes: [],
+        network_prefixes: [],
+        uid_prefixes: [],
+        output_prefixes: [],
+        profiles: [],
+      }],
+    }],
+    pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+    health: {
+      status: 'ok',
+      last_collection_at: '2026-07-25T01:00:00.000Z',
+      last_collection_status: 'success',
+      last_evaluation_at: '2026-07-25T02:00:00.000Z',
+      last_evaluation_status: 'success',
+      last_failure_at: null,
+      last_failure_stage: null,
+      backlog_count: 0,
+      events_processed: 1,
+      duration_ms: 5,
+      purged_events: 0,
+    },
+    capabilities: ['risk_view', 'risk_review'],
+  }
+}

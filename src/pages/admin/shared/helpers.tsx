@@ -331,6 +331,8 @@ function normalizeCdkDistributionItem(value: Partial<UsageCdkDistributionItem>):
 export function normalizeRiskSettings(value: Partial<RiskControlSettings> | null | undefined): RiskControlSettings {
   return {
     operator_data_risk_enabled: value?.operator_data_risk_enabled !== false,
+    revision: Number.isSafeInteger(value?.revision) && Number(value?.revision) >= 0 ? Number(value?.revision) : 0,
+    can_configure: value?.can_configure === true,
     updated_at: typeof value?.updated_at === 'string' ? value.updated_at : null,
   }
 }

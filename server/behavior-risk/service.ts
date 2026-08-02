@@ -1,4 +1,4 @@
-import { createHash, createHmac } from 'node:crypto'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import type { OptimizeResult } from '../../src/lib/types'
 import { getRequestClientIp } from '../security/client-ip'
@@ -7,18 +7,24 @@ import {
   getTrackedGenerationEvent,
   insertBehaviorRiskEvent,
   insertBehaviorRiskEventInTransaction,
+  recordBehaviorRiskCollectionStatus,
   runBehaviorRiskEvaluation,
   type BehaviorRiskEventInput,
 } from '../storage/behavior-risk-store'
 import type { AuthContext } from '../handlers/user-auth'
 import type { BehaviorRiskEventType, BehaviorRiskPageCategory } from './scoring'
 
-const BEHAVIOR_RISK_BROWSER_HEADER = 'X-Maa-Behavior-Instance'
+const BEHAVIOR_RISK_DEVICE_COOKIE = 'maa_behavior_device'
+const DEVICE_COOKIE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60
+const DEVICE_COOKIE_CLOCK_SKEW_MS = 5 * 60_000
 const DEFAULT_KEY_VERSION = 'v1'
 const EVALUATION_DELAY_MS = 5_000
 
 let evaluationTimer: ReturnType<typeof setTimeout> | null = null
 let missingSecretWarned = false
+
+type BehaviorRiskHmacKey = { secret: string; version: string }
+type BehaviorRiskKeyring = { current: BehaviorRiskHmacKey; previous: BehaviorRiskHmacKey | null }
 
 export async function recordRequestBehaviorEvent(input: {
   req: Request
@@ -39,7 +45,11 @@ export async function recordRequestBehaviorEvent(input: {
   occurredAt?: Date
 }): Promise<boolean> {
   const keyring = getBehaviorRiskKeyring()
-  if (!keyring || !hasDatabaseUrl()) return false
+  if (!hasDatabaseUrl()) return false
+  if (!keyring) {
+    await recordBehaviorRiskCollectionStatus('disabled').catch(() => undefined)
+    return false
+  }
   return safelyInsert(buildRequestBehaviorRiskEvent(input, keyring), shouldEvaluateImmediately(input.eventType))
 }
 
@@ -56,16 +66,17 @@ export async function recordRequestBehaviorEventInTransaction(
 
 function buildRequestBehaviorRiskEvent(
   input: Parameters<typeof recordRequestBehaviorEvent>[0],
-  keyring: { secret: string; version: string },
+  keyring: BehaviorRiskKeyring,
 ): BehaviorRiskEventInput {
   const signals = requestSignals(input.req, input.sessionTokenHash ?? null, keyring)
+  const uidSignal = input.uid ? hashSignalSet(keyring, 'uid', input.uid.trim()) : null
   return {
     eventKey: input.eventKey,
     eventType: input.eventType,
     userId: input.userId,
     profileId: input.profileId,
     jobId: input.jobId,
-    uidHmac: input.uid ? hashSignal(keyring, 'uid', input.uid.trim()) : null,
+    uidHmac: uidSignal?.primary ?? null,
     outputHash: input.outputHash,
     pageCategory: input.pageCategory,
     optimizerVersion: input.optimizerVersion,
@@ -74,8 +85,9 @@ function buildRequestBehaviorRiskEvent(
     declarationVersion: input.declarationVersion,
     declarationAcceptedAt: input.declarationAcceptedAt,
     occurredAt: input.occurredAt,
-    keyVersion: keyring.version,
+    keyVersion: keyring.current.version,
     ...signals,
+    signalAliases: mergeSignalAliases(signals.signalAliases, uidSignal ? { uid: uidSignal.aliases } : null),
   }
 }
 
@@ -118,15 +130,17 @@ export async function recordGeneratedBehaviorEvent(input: {
   const optimizerVersion = buildMeta
     ? [buildMeta.frontend_version, buildMeta.backend_version, buildMeta.data_version, buildMeta.git_sha].filter(Boolean).join(':')
     : 'unknown'
+  const uidSignal = input.uid ? hashSignalSet(keyring, 'uid', input.uid.trim()) : null
   return safelyInsert({
     eventKey: `generate:${input.jobId}`,
     eventType: 'generate',
     userId: input.userId,
     profileId: input.profileId,
     jobId: input.jobId,
-    uidHmac: input.uid ? hashSignal(keyring, 'uid', input.uid.trim()) : null,
+    uidHmac: uidSignal?.primary ?? null,
     outputHash: createHash('sha256').update(bytes, 'utf8').digest('hex'),
-    keyVersion: keyring.version,
+    keyVersion: keyring.current.version,
+    signalAliases: uidSignal ? { uid: uidSignal.aliases } : null,
     optimizerVersion,
     structureSummary: buildIdentityFreeStructureSummary(input.result),
     occurredAt: input.occurredAt,
@@ -205,7 +219,7 @@ export async function recordAccountDeletedBehaviorEvent(userId: string, occurred
     eventKey: `account-deleted:${userId}`,
     eventType: 'account_deleted',
     userId,
-    keyVersion: keyring.version,
+    keyVersion: keyring.current.version,
     occurredAt,
   }, false)
 }
@@ -213,20 +227,30 @@ export async function recordAccountDeletedBehaviorEvent(userId: string, occurred
 function requestSignals(
   req: Request,
   sessionTokenHash: string | null,
-  keyring: { secret: string; version: string },
-): Pick<BehaviorRiskEventInput, 'browserHmac' | 'sessionHmac' | 'networkHmac' | 'uaHmac'> {
-  const browserInstance = normalizeBrowserInstance(req.headers.get(BEHAVIOR_RISK_BROWSER_HEADER))
+  keyring: BehaviorRiskKeyring,
+): Pick<BehaviorRiskEventInput, 'browserHmac' | 'sessionHmac' | 'networkHmac' | 'uaHmac' | 'signalAliases'> {
+  const browserInstance = readBehaviorRiskDeviceCookie(req, keyring)?.deviceId ?? null
   const clientIp = getRequestClientIp(req)
   const userAgent = req.headers.get('user-agent')?.trim() ?? ''
+  const browserSignal = browserInstance ? hashSignalSet(keyring, 'browser', browserInstance) : null
+  const sessionSignal = sessionTokenHash ? hashSignalSet(keyring, 'session', sessionTokenHash) : null
+  const networkSignal = clientIp !== 'unknown' ? hashSignalSet(keyring, 'network', clientIp) : null
+  const uaSignal = userAgent ? hashSignalSet(keyring, 'ua', userAgent) : null
   return {
-    browserHmac: browserInstance ? hashSignal(keyring, 'browser', browserInstance) : null,
-    sessionHmac: sessionTokenHash ? hashSignal(keyring, 'session', sessionTokenHash) : null,
-    networkHmac: clientIp !== 'unknown' ? hashSignal(keyring, 'network', clientIp) : null,
-    uaHmac: userAgent ? hashSignal(keyring, 'ua', userAgent) : null,
+    browserHmac: browserSignal?.primary ?? null,
+    sessionHmac: sessionSignal?.primary ?? null,
+    networkHmac: networkSignal?.primary ?? null,
+    uaHmac: uaSignal?.primary ?? null,
+    signalAliases: mergeSignalAliases(
+      browserSignal ? { browser: browserSignal.aliases } : null,
+      sessionSignal ? { session: sessionSignal.aliases } : null,
+      networkSignal ? { network: networkSignal.aliases } : null,
+      uaSignal ? { ua: uaSignal.aliases } : null,
+    ),
   }
 }
 
-function getBehaviorRiskKeyring(): { secret: string; version: string } | null {
+function getBehaviorRiskKeyring(): BehaviorRiskKeyring | null {
   const secret = process.env.BEHAVIOR_RISK_HMAC_SECRET?.trim()
   if (!secret) {
     if (process.env.NODE_ENV === 'production' && !missingSecretWarned) {
@@ -242,17 +266,104 @@ function getBehaviorRiskKeyring(): { secret: string; version: string } | null {
     }
     return null
   }
-  return { secret, version: process.env.BEHAVIOR_RISK_HMAC_KEY_VERSION?.trim() || DEFAULT_KEY_VERSION }
+  const current: BehaviorRiskHmacKey = {
+    secret,
+    version: normalizeKeyVersion(process.env.BEHAVIOR_RISK_HMAC_KEY_VERSION) ?? DEFAULT_KEY_VERSION,
+  }
+  const previousSecret = process.env.BEHAVIOR_RISK_HMAC_PREVIOUS_SECRET?.trim()
+  const previousVersion = normalizeKeyVersion(process.env.BEHAVIOR_RISK_HMAC_PREVIOUS_KEY_VERSION)
+  const previous = previousSecret && previousVersion && previousVersion !== current.version
+    && (process.env.NODE_ENV !== 'production' || previousSecret.length >= 32)
+    ? { secret: previousSecret, version: previousVersion }
+    : null
+  return { current, previous }
 }
 
-function hashSignal(keyring: { secret: string; version: string }, namespace: string, value: string): string {
-  return createHmac('sha256', keyring.secret).update(`${keyring.version}:${namespace}:${value}`).digest('hex')
+function hashSignal(key: BehaviorRiskHmacKey, namespace: string, value: string): string {
+  return createHmac('sha256', key.secret).update(`${key.version}:${namespace}:${value}`).digest('hex')
 }
 
-function normalizeBrowserInstance(value: string | null): string | null {
-  if (!value) return null
-  const normalized = value.trim()
-  return /^[A-Za-z0-9_-]{16,128}$/.test(normalized) ? normalized : null
+function hashSignalSet(
+  keyring: BehaviorRiskKeyring,
+  namespace: string,
+  value: string,
+): { primary: string; aliases: string[] } {
+  const primary = hashSignal(keyring.current, namespace, value)
+  const aliases = keyring.previous
+    ? [primary, hashSignal(keyring.previous, namespace, value)]
+    : [primary]
+  return { primary, aliases }
+}
+
+function mergeSignalAliases(
+  ...sources: Array<BehaviorRiskEventInput['signalAliases'] | null | undefined>
+): BehaviorRiskEventInput['signalAliases'] {
+  const merged: NonNullable<BehaviorRiskEventInput['signalAliases']> = {}
+  for (const source of sources) {
+    if (!source) continue
+    for (const namespace of ['browser', 'session', 'network', 'ua', 'uid'] as const) {
+      if (source[namespace]?.length) merged[namespace] = [...new Set([...(merged[namespace] ?? []), ...source[namespace]!])]
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : null
+}
+
+export function ensureBehaviorRiskDeviceCookie(req: Request, now = new Date()): string | null {
+  const keyring = getBehaviorRiskKeyring()
+  if (!keyring) return null
+  const existing = readBehaviorRiskDeviceCookie(req, keyring, now)
+  if (existing?.keyVersion === keyring.current.version) return null
+  const deviceId = existing?.deviceId ?? randomBytes(24).toString('base64url')
+  const issuedAt = Math.floor(now.getTime() / 1000)
+  const payload = `${deviceId}.${issuedAt}.${keyring.current.version}`
+  const signature = signDeviceCookie(keyring.current, payload)
+  return `${BEHAVIOR_RISK_DEVICE_COOKIE}=${payload}.${signature}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${DEVICE_COOKIE_MAX_AGE_SECONDS}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
+}
+
+function readBehaviorRiskDeviceCookie(
+  req: Request,
+  keyring: BehaviorRiskKeyring,
+  now = new Date(),
+): { deviceId: string; keyVersion: string } | null {
+  const raw = readCookie(req.headers.get('cookie'), BEHAVIOR_RISK_DEVICE_COOKIE)
+  if (!raw) return null
+  const [deviceId, issuedAtValue, keyVersion, signature, ...extra] = raw.split('.')
+  if (extra.length > 0 || !deviceId || !issuedAtValue || !keyVersion || !signature) return null
+  if (!/^[A-Za-z0-9_-]{32}$/.test(deviceId) || !/^\d{1,12}$/.test(issuedAtValue)) return null
+  const issuedAtMs = Number(issuedAtValue) * 1000
+  if (!Number.isSafeInteger(issuedAtMs)
+    || issuedAtMs > now.getTime() + DEVICE_COOKIE_CLOCK_SKEW_MS
+    || issuedAtMs < now.getTime() - DEVICE_COOKIE_MAX_AGE_SECONDS * 1000) return null
+  const key = [keyring.current, keyring.previous].find((candidate) => candidate?.version === keyVersion)
+  if (!key) return null
+  const expected = signDeviceCookie(key, `${deviceId}.${issuedAtValue}.${keyVersion}`)
+  if (!safeEqual(signature, expected)) return null
+  return { deviceId, keyVersion }
+}
+
+function signDeviceCookie(key: BehaviorRiskHmacKey, payload: string): string {
+  return createHmac('sha256', key.secret).update(`device-cookie:${payload}`).digest('base64url')
+}
+
+function safeEqual(left: string, right: string): boolean {
+  const leftBytes = Buffer.from(left)
+  const rightBytes = Buffer.from(right)
+  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes)
+}
+
+function readCookie(header: string | null, name: string): string | null {
+  const match = (header ?? '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))
+  if (!match?.[1]) return null
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return null
+  }
+}
+
+function normalizeKeyVersion(value: string | undefined): string | null {
+  const normalized = value?.trim() ?? ''
+  return /^[A-Za-z0-9._-]{1,32}$/.test(normalized) ? normalized : null
 }
 
 function buildIdentityFreeStructureSummary(result: OptimizeResult): Record<string, unknown> {
@@ -280,6 +391,7 @@ async function safelyInsert(input: BehaviorRiskEventInput, evaluate: boolean): P
     if (inserted && evaluate) queueBehaviorRiskEvaluation()
     return inserted
   } catch (error) {
+    await recordBehaviorRiskCollectionStatus('failed').catch(() => undefined)
     console.warn('[behavior-risk] event recording skipped:', error instanceof Error ? error.message : 'unknown error')
     return false
   }

@@ -8,6 +8,7 @@ import { useAnnouncementDraft } from './announcements/useAnnouncementDraft'
 import { createAdminUserBalanceActions, fetchAdminUserBalance } from './users/balance-actions'
 import { downloadAdminUserWorkspaces } from './users/workspace-export-actions'
 import { revokeSelectedCdks } from './cdk/bulk-actions'
+import { saveRiskControlSettings } from './risk/settings-actions'
 export function useAdminController() {
   const [adminUsername, setAdminUsername] = useState<string | null>(null)
 
@@ -498,26 +499,14 @@ export function useAdminController() {
       }
     }
 
-  const handleSaveRiskSettings = async (patch: RiskControlSettingsPatch) => {
-      setBusyAction('risk-settings')
-      setError(null)
-      setNotice(null)
-      try {
-        const data = await apiJson<{ settings?: Partial<RiskControlSettings> }>('/api/admin/risk-settings', {
-          method: 'PUT',
-          json: {
-            ...patch,
-          },
-          fallbackMessage: '保存风控设置失败',
-        })
-        setRiskSettings(normalizeRiskSettings(data.settings))
-        setNotice('风控设置已保存')
-      } catch (caught) {
-        setError((caught as Error).message)
-      } finally {
-        setBusyAction(null)
-      }
-    }
+  const handleSaveRiskSettings = async (
+      patch: RiskControlSettingsPatch,
+      reason: string,
+      rootPassword: string,
+    ): Promise<boolean> => saveRiskControlSettings({
+      patch, reason, rootPassword, currentRevision: riskSettings.revision,
+      setSettings: setRiskSettings, setBusyAction, setError, setNotice,
+    })
 
   const patchCdk = async (
       record: AdminCdkRecord,

@@ -16,14 +16,19 @@ import {
   verifyPasswordHashOrDummy,
 } from '../security/password'
 import { RateLimitStoreError } from '../security/persistent-rate-limit'
+import { recordBehaviorRiskAdminAudit } from '../storage/behavior-risk-store'
 
 const ADMIN_SESSION_COOKIE = 'maa_admin_session'
 export const ADMIN_SESSION_IDLE_MS = 30 * 60 * 1000
 export const ADMIN_SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000
 
+export type AdminRole = 'risk_viewer' | 'risk_reviewer' | 'security_admin'
+export type AdminCapability = 'risk_view' | 'risk_review' | 'risk_config'
+
 export interface AdminUserRecord {
-  version: 1
+  version: 1 | 2
   username: string
+  role?: AdminRole
   password_hash: string
   salt: string
   iterations: number
@@ -48,7 +53,7 @@ const USERNAME_PATTERN = /^[A-Za-z0-9_-]{3,32}$/
 const ADMIN_SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
 
 export type AdminAuthenticationResult =
-  | { ok: true; username: string }
+  | { ok: true; username: string; role: AdminRole; capabilities: AdminCapability[] }
   | AdminFailureResult
 
 export type AdminLoginResult =
@@ -103,6 +108,7 @@ export async function loginAdminRequest(
 
 export async function authenticateAdminRequest(
   req: Request,
+  requiredCapability?: AdminCapability,
   now = new Date(),
 ): Promise<AdminAuthenticationResult> {
   const originFailure = unsafeOriginFailure(req)
@@ -117,7 +123,18 @@ export async function authenticateAdminRequest(
     idleCutoff(now).toISOString(),
   )
   if (!session) return sessionRequiredResult(true)
-  return { ok: true, username: session.username }
+  const user = await (await getAdminUserStore()).get(session.username)
+  if (!user) return sessionRequiredResult(true)
+  const role = normalizeAdminRole(user.role, user.version)
+  const capabilities = capabilitiesForRole(role)
+  if (requiredCapability && !capabilities.includes(requiredCapability)) {
+    await auditAdminCapability(req, session.username, requiredCapability, 'deny', '管理员角色缺少所需能力。')
+    return forbiddenResult('当前管理员账号没有执行此风控操作的权限。')
+  }
+  if (requiredCapability) {
+    await auditAdminCapability(req, session.username, requiredCapability, 'allow', '管理员能力校验通过。')
+  }
+  return { ok: true, username: session.username, role, capabilities }
 }
 
 export async function logoutAdminRequest(req: Request): Promise<{ ok: true; cookie: string } | { ok: false; response: Response }> {
@@ -147,24 +164,36 @@ export async function requireRootAdminPassword(req: Request, value: unknown): Pr
   const authenticated = typeof value === 'string' && constantTimeSecretEqual(value, rootPassword)
   if (authenticated) {
     await rateLimit.attempt.refund()
-    return { ok: true, username: 'root' }
+    return {
+      ok: true,
+      username: 'root',
+      role: 'security_admin',
+      capabilities: ['risk_view', 'risk_review', 'risk_config'],
+    }
   }
   rateLimit.attempt.retainFailure()
   return unauthorizedResult('Root 口令错误。')
 }
 
-export async function createAdminUser(usernameValue: unknown, passwordValue: unknown): Promise<{ ok: true; user: AdminUserRecord } | { ok: false; message: string }> {
+export async function createAdminUser(
+  usernameValue: unknown,
+  passwordValue: unknown,
+  roleValue: unknown = 'risk_viewer',
+): Promise<{ ok: true; user: AdminUserRecord } | { ok: false; message: string }> {
   const username = normalizeUsername(usernameValue)
   if (!username) return { ok: false, message: '账号名需为 3-32 位字母、数字、下划线或短横线。' }
   if (typeof passwordValue !== 'string' || passwordValue.length < 8) {
     return { ok: false, message: '账号密码至少需要 8 位。' }
   }
+  const role = normalizeAdminRoleValue(roleValue)
+  if (!role) return { ok: false, message: '管理员角色无效。' }
 
   const now = new Date().toISOString()
   const passwordHash = await createPasswordHash(passwordValue)
   const user: AdminUserRecord = {
-    version: 1,
+    version: 2,
     username,
+    role,
     password_hash: passwordHash.password_hash,
     salt: passwordHash.salt,
     iterations: passwordHash.iterations,
@@ -177,11 +206,14 @@ export async function createAdminUser(usernameValue: unknown, passwordValue: unk
   return { ok: true, user }
 }
 
-export async function listAdminUsers(): Promise<Array<Pick<AdminUserRecord, 'username' | 'created_at' | 'updated_at'>>> {
+export async function listAdminUsers(): Promise<Array<Pick<AdminUserRecord, 'username' | 'created_at' | 'updated_at'> & { role: AdminRole; capabilities: AdminCapability[] }>> {
   const store = await getAdminUserStore()
   return (await store.list())
     .sort((a, b) => a.username.localeCompare(b.username))
-    .map(({ username, created_at, updated_at }) => ({ username, created_at, updated_at }))
+    .map(({ username, role, version, created_at, updated_at }) => {
+      const normalizedRole = normalizeAdminRole(role, version)
+      return { username, role: normalizedRole, capabilities: capabilitiesForRole(normalizedRole), created_at, updated_at }
+    })
 }
 
 export async function deleteAdminUser(usernameValue: unknown): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -275,6 +307,39 @@ function normalizeUsername(value: unknown): string | null {
   return USERNAME_PATTERN.test(username) ? username : null
 }
 
+function normalizeAdminRoleValue(value: unknown): AdminRole | null {
+  return value === 'risk_viewer' || value === 'risk_reviewer' || value === 'security_admin' ? value : null
+}
+
+function normalizeAdminRole(value: unknown, version: AdminUserRecord['version']): AdminRole {
+  return normalizeAdminRoleValue(value) ?? (version === 1 ? 'security_admin' : 'risk_viewer')
+}
+
+function capabilitiesForRole(role: AdminRole): AdminCapability[] {
+  if (role === 'security_admin') return ['risk_view', 'risk_review', 'risk_config']
+  if (role === 'risk_reviewer') return ['risk_view', 'risk_review']
+  return ['risk_view']
+}
+
+async function auditAdminCapability(
+  req: Request,
+  username: string,
+  capability: AdminCapability,
+  decision: 'allow' | 'deny',
+  reason: string,
+): Promise<void> {
+  const url = new URL(req.url)
+  const requestId = req.headers.get('x-request-id')?.trim() || randomUUID()
+  await recordBehaviorRiskAdminAudit({
+    adminUsername: username,
+    capability,
+    action: `${req.method} ${url.pathname}`,
+    decision,
+    reason,
+    requestId,
+  })
+}
+
 async function getAdminUserStore(): Promise<AdminUserStore> {
   return createPostgresAdminUserStore()
 }
@@ -299,6 +364,13 @@ function unauthorizedResult(message: string): AdminFailureResult {
   return {
     ok: false,
     response: jsonResponse({ error: message }, 401, { 'Cache-Control': 'no-store' }),
+  }
+}
+
+function forbiddenResult(message: string): AdminFailureResult {
+  return {
+    ok: false,
+    response: jsonResponse({ error: message }, 403, { 'Cache-Control': 'no-store' }),
   }
 }
 

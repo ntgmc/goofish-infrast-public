@@ -54,11 +54,12 @@ export default async (req: Request): Promise<Response> => {
       const body = await getValidatedJson(req, requestSchemas.adminUserCreate)
       const authentication = await requireRootAdminPassword(req, body.root_password)
       if (!authentication.ok) return authentication.response
-      const created = await createAdminUser(body.username, body.password)
+      const created = await createAdminUser(body.username, body.password, body.role)
       if (!created.ok) return jsonResponse({ error: created.message }, 400)
       return jsonResponse({
         user: {
           username: created.user.username,
+          role: created.user.role,
           created_at: created.user.created_at,
           updated_at: created.user.updated_at,
         },

@@ -263,6 +263,8 @@ export interface CdkOpsSummary {
 
 export interface RiskControlSettings {
   operator_data_risk_enabled: boolean;
+  revision: number;
+  can_configure: boolean;
   updated_at: string | null;
 }
 
@@ -481,6 +483,8 @@ export const EMPTY_ANNOUNCEMENT_REACH_STATS: AnnouncementReachStats = {
 
 export const DEFAULT_RISK_SETTINGS: RiskControlSettings = {
   operator_data_risk_enabled: productPolicies.risk.operator_data_enabled_by_default,
+  revision: 0,
+  can_configure: false,
   updated_at: null,
 }
 

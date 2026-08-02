@@ -209,11 +209,17 @@ export const requestSchemas = {
     reason: inventoryReasonSchema,
     root_password: shortString(128),
   }),
-  adminRiskSettings: strict({ operator_data_risk_enabled: z.boolean().optional() }),
+  adminRiskSettings: strict({
+    operator_data_risk_enabled: z.boolean(),
+    expected_revision: z.number().int().min(0),
+    reason: z.string().trim().min(2).max(500),
+    root_password: z.string().max(128).optional(),
+  }),
   adminBehaviorRiskReview: strict({
     case_id: shortString(128),
     outcome: z.enum(['dismiss', 'restrict']),
     note: shortString(1000),
+    root_password: z.string().max(128).optional(),
     members: z.array(strict({
       user_id: shortString(128),
       action: z.enum(['freeze_account', 'freeze_profile']),
@@ -224,6 +230,7 @@ export const requestSchemas = {
     root_password: optionalUnknown,
     username: optionalUnknown,
     password: optionalUnknown,
+    role: z.enum(['risk_viewer', 'risk_reviewer', 'security_admin']).optional(),
   }),
   adminUserDelete: strict({ root_password: optionalUnknown, username: optionalUnknown }),
   adminUserPatch: strict({

@@ -298,24 +298,44 @@ export function RiskSettingsPanel({
 }: {
   settings: RiskControlSettings;
   saving: boolean;
-  onChange: (patch: RiskControlSettingsPatch) => Promise<void>;
+  onChange: (patch: RiskControlSettingsPatch, reason: string, rootPassword: string) => Promise<boolean>;
 }) {
+  const [reason, setReason] = useState('')
+  const [rootPassword, setRootPassword] = useState('')
+  const normalizedReason = reason.trim()
   return (
     <section className="tool-panel">
       <div className="tool-panel-header flex flex-wrap items-center justify-between gap-3 p-4">
         <div>
           <h2 className="text-base font-semibold text-ink-primary">风控开关</h2>
           <p className="mt-1 text-sm text-ink-muted">控制账号档案的干员数据异常检测；异常提交会被软拦截并进入全站行为评分，不会自动冻结授权。</p>
+          {!settings.can_configure && <p className="mt-1 text-xs text-ink-muted">当前账号仅有查看权限；修改开关需要 risk_config 能力。</p>}
         </div>
-        <span className="text-xs text-ink-muted" role="status" aria-live="polite">{saving ? '保存中...' : `更新 ${formatDate(settings.updated_at)}`}</span>
+        <span className="text-xs text-ink-muted" role="status" aria-live="polite">{saving ? '保存中...' : `revision ${settings.revision} · 更新 ${formatDate(settings.updated_at)}`}</span>
       </div>
       <div className="grid gap-3 p-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">变更原因（写入不可变审计）</span>
+            <input value={reason} onChange={(event) => setReason(event.currentTarget.value)} maxLength={500} disabled={saving || !settings.can_configure} className="tool-field" placeholder="至少 2 个字符" />
+          </label>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">Root 口令（关闭风控时必填）</span>
+            <input type="password" value={rootPassword} onChange={(event) => setRootPassword(event.currentTarget.value)} maxLength={128} disabled={saving || !settings.can_configure} className="tool-field" autoComplete="off" />
+          </label>
+        </div>
         <RiskToggle
           label="干员数据风控"
           description="校验干员消失、练度回退和拥有数异常下降；重复且不同的异常快照会进入人工复核。"
           checked={settings.operator_data_risk_enabled}
-          disabled={saving}
-          onChange={(checked) => onChange({ operator_data_risk_enabled: checked })}
+          disabled={!settings.can_configure || saving || normalizedReason.length < 2 || (settings.operator_data_risk_enabled && !rootPassword)}
+          onChange={async (checked) => {
+            const saved = await onChange({ operator_data_risk_enabled: checked }, normalizedReason, rootPassword)
+            if (saved) {
+              setReason('')
+              setRootPassword('')
+            }
+          }}
         />
       </div>
     </section>

@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const runBehaviorRiskEvaluation = vi.hoisted(() => vi.fn())
+const purgeExpiredBehaviorRiskData = vi.hoisted(() => vi.fn())
 
-vi.mock('./storage/behavior-risk-store', () => ({ runBehaviorRiskEvaluation }))
+vi.mock('./storage/behavior-risk-store', () => ({ purgeExpiredBehaviorRiskData, runBehaviorRiskEvaluation }))
 
 import { initializeBehaviorRiskMaintenance, shutdownBehaviorRiskMaintenance } from './behavior-risk-maintenance'
 
 beforeEach(() => {
   runBehaviorRiskEvaluation.mockReset()
+  purgeExpiredBehaviorRiskData.mockReset().mockResolvedValue({ status: 'success', purgedEvents: 0, purgedCases: 0 })
 })
 
 afterEach(() => {

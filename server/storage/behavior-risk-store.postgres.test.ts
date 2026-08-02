@@ -1,12 +1,13 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BEHAVIOR_RISK_MODEL_VERSION } from '../behavior-risk/scoring'
-import { closePool, query } from './postgres'
+import { closePool, getPool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
 import {
   insertBehaviorRiskEvent,
   listBehaviorRiskCases,
+  purgeExpiredBehaviorRiskData,
   reviewBehaviorRiskCase,
   runBehaviorRiskEvaluation,
 } from './behavior-risk-store'
@@ -38,6 +39,9 @@ describe('behavior risk PostgreSQL store', () => {
         insert('bind:second', 'bind', second, now, 24, { uidHmac: 'uid-hmac-second' }),
         insert('register:third', 'register', third, now, 27),
         insert('bind:third', 'bind', third, now, 23, { uidHmac: 'uid-hmac-third' }),
+        insert('operator:first:1', 'operator_data_anomaly', first, now, 20, { structureSummary: operatorAnomaly('a') }),
+        insert('operator:first:2', 'operator_data_anomaly', first, now, 10, { structureSummary: operatorAnomaly('b') }),
+        insert('operator:first:3', 'operator_data_anomaly', first, now, 5, { structureSummary: operatorAnomaly('b') }),
       ])
       await runBehaviorRiskEvaluation(now)
 
@@ -148,6 +152,9 @@ describe('behavior risk PostgreSQL store', () => {
         insert('legacy:bind:first', 'bind', first, now, 30, { uidHmac: 'legacy-uid-first' }),
         insert('legacy:bind:second', 'bind', second, now, 20, { uidHmac: 'legacy-uid-second' }),
         insert('legacy:bind:third', 'bind', third, now, 10, { uidHmac: 'legacy-uid-third' }),
+        insert('legacy:operator:first:1', 'operator_data_anomaly', first, now, 9, { structureSummary: operatorAnomaly('a') }),
+        insert('legacy:operator:first:2', 'operator_data_anomaly', first, now, 8, { structureSummary: operatorAnomaly('b') }),
+        insert('legacy:operator:first:3', 'operator_data_anomaly', first, now, 7, { structureSummary: operatorAnomaly('b') }),
       ])
 
       await runBehaviorRiskEvaluation(now)
@@ -155,7 +162,7 @@ describe('behavior risk PostgreSQL store', () => {
       const pending = await listBehaviorRiskCases({ status: 'pending' })
       const dismissed = await listBehaviorRiskCases({ status: 'dismissed' })
       expect(pending.cases).toHaveLength(1)
-      expect(pending.cases[0]).toMatchObject({ model_version: BEHAVIOR_RISK_MODEL_VERSION, score: 55 })
+      expect(pending.cases[0]).toMatchObject({ model_version: BEHAVIOR_RISK_MODEL_VERSION, score: 75 })
       expect(JSON.stringify(pending.cases[0])).not.toContain(stale.userId)
       expect(dismissed.cases.find((riskCase) => riskCase.id === legacyCaseId)).toMatchObject({
         status: 'dismissed',
@@ -290,6 +297,89 @@ describe('behavior risk PostgreSQL store', () => {
       await query('delete from user_accounts where id = $1', [account.userId])
     }
   })
+
+  it('does not mutate reviewed member evidence when evaluation races with the audit transaction', async () => {
+    const account = await seedAccount('review-race')
+    const now = new Date('2026-07-25T12:00:00.000Z')
+    const auditLockHolder = await getPool().connect()
+    try {
+      await Promise.all([
+        insert('review-race:1', 'operator_data_anomaly', account, now, 20, { structureSummary: operatorAnomaly('a') }),
+        insert('review-race:2', 'operator_data_anomaly', account, now, 10, { structureSummary: operatorAnomaly('b') }),
+        insert('review-race:3', 'operator_data_anomaly', account, now, 5, { structureSummary: operatorAnomaly('b') }),
+      ])
+      await runBehaviorRiskEvaluation(now)
+      const pending = await listBehaviorRiskCases({ status: 'pending' })
+      const caseId = pending.cases[0]?.id
+      expect(caseId).toBeTruthy()
+      await insert('review-race:4', 'operator_data_anomaly', account, now, 1, { structureSummary: operatorAnomaly('c') })
+
+      await auditLockHolder.query('begin')
+      await auditLockHolder.query('select pg_advisory_xact_lock($1)', [1_743_861_293])
+      const review = reviewBehaviorRiskCase({
+        caseId: caseId!,
+        outcome: 'dismiss',
+        note: '并发复核栅栏测试。',
+        actions: [],
+        adminUsername: 'race-reviewer',
+        now,
+      })
+      await waitForBlockedAdvisoryLock()
+      const evaluation = runBehaviorRiskEvaluation(new Date(now.getTime() + 60_000))
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      await auditLockHolder.query('commit')
+      await Promise.all([review, evaluation])
+
+      const member = await query<{ evidence_json: { counts?: Record<string, number> } }>(
+        'select evidence_json from behavior_risk_case_members where case_id = $1 and user_id = $2',
+        [caseId, account.userId],
+      )
+      const audit = await query<{ case_snapshot_json: { members: Array<{ evidence_json: { counts?: Record<string, number> } }> } }>(
+        `select case_snapshot_json from behavior_risk_review_audit
+          where case_id = $1 and admin_username = 'race-reviewer'`,
+        [caseId],
+      )
+      expect(member.rows[0]?.evidence_json.counts?.operator_data_anomaly).toBe(3)
+      expect(audit.rows[0]?.case_snapshot_json.members[0]?.evidence_json.counts?.operator_data_anomaly).toBe(3)
+    } finally {
+      await auditLockHolder.query('rollback').catch(() => undefined)
+      auditLockHolder.release()
+      await query('delete from behavior_risk_cases')
+      await query('delete from behavior_risk_events where user_id = $1', [account.userId])
+      await query('delete from user_accounts where id = $1', [account.userId])
+    }
+  })
+
+  it('retains chained review audit after its hot case expires', async () => {
+    const account = await seedAccount('audit-retention')
+    const now = new Date('2026-07-25T12:00:00.000Z')
+    const caseId = randomUUID()
+    try {
+      await seedLegacyPendingCase(caseId, account.userId, now)
+      await reviewBehaviorRiskCase({
+        caseId,
+        outcome: 'dismiss',
+        note: '长期保留复核记录。',
+        actions: [],
+        adminUsername: 'retention-reviewer',
+        now,
+      })
+      await query('update behavior_risk_cases set expires_at = $2 where id = $1', [caseId, now.toISOString()])
+      await purgeExpiredBehaviorRiskData(new Date(now.getTime() + 1_000))
+
+      const audit = await query<{ case_id: string | null; entry_hash: string; expires_at: Date }>(
+        `select case_id, entry_hash, expires_at from behavior_risk_review_audit
+          where admin_username = 'retention-reviewer' order by created_at desc limit 1`,
+      )
+      expect(audit.rows[0]?.case_id).toBeNull()
+      expect(audit.rows[0]?.entry_hash).toMatch(/^[a-f0-9]{64}$/)
+      expect(audit.rows[0]!.expires_at.getTime()).toBeGreaterThan(now.getTime() + 6 * 365 * 86_400_000)
+    } finally {
+      await query("delete from behavior_risk_review_audit where admin_username = 'retention-reviewer'")
+      await query('delete from behavior_risk_cases where id = $1', [caseId])
+      await query('delete from user_accounts where id = $1', [account.userId])
+    }
+  })
 })
 
 function insert(
@@ -305,13 +395,45 @@ function insert(
     eventType,
     userId: account.userId,
     profileId: account.profileId,
-    browserHmac: 'browser-hmac-shared',
-    networkHmac: 'network-hmac-shared',
-    uaHmac: 'ua-hmac-shared',
     keyVersion: 'test-v1',
     occurredAt: new Date(now.getTime() - minutesAgo * 60_000),
     ...patch,
+    browserHmac: normalizeDigest(patch.browserHmac ?? digest('browser-hmac-shared')),
+    sessionHmac: normalizeDigest(patch.sessionHmac),
+    networkHmac: normalizeDigest(patch.networkHmac ?? digest('network-hmac-shared')),
+    uaHmac: normalizeDigest(patch.uaHmac ?? digest('ua-hmac-shared')),
+    uidHmac: normalizeDigest(patch.uidHmac),
+    outputHash: normalizeDigest(patch.outputHash),
   })
+}
+
+function normalizeDigest(value: string | null | undefined): string | null | undefined {
+  if (value === null || value === undefined) return value
+  return /^[a-f0-9]{64}$/.test(value) ? value : digest(value)
+}
+
+function digest(value: string): string {
+  return createHash('sha256').update(value).digest('hex')
+}
+
+function operatorAnomaly(fingerprint: string): Record<string, unknown> {
+  return {
+    anomaly_type: 'operator_count_regression',
+    operator_fingerprint_hash: fingerprint.repeat(64),
+    owned_count: 100,
+  }
+}
+
+async function waitForBlockedAdvisoryLock(): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const waiting = await query<{ total: string }>(
+      `select count(*)::text as total from pg_locks
+        where locktype = 'advisory' and granted = false`,
+    )
+    if (Number(waiting.rows[0]?.total) > 0) return
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+  throw new Error('Timed out waiting for review audit advisory lock.')
 }
 
 type SeededAccount = { userId: string; profileId: string; email: string }

@@ -98,8 +98,24 @@ ALTER TABLE announcements ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEF
 CREATE TABLE IF NOT EXISTS risk_settings (
   key TEXT PRIMARY KEY,
   record_json JSONB NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
+  updated_at TIMESTAMPTZ NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0)
 );
+ALTER TABLE risk_settings ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0);
+
+CREATE TABLE IF NOT EXISTS risk_settings_audit (
+  id TEXT PRIMARY KEY,
+  admin_username TEXT NOT NULL,
+  settings_key TEXT NOT NULL,
+  reason TEXT NOT NULL CHECK (length(trim(reason)) >= 2),
+  request_id TEXT NOT NULL,
+  before_json JSONB NOT NULL,
+  after_json JSONB NOT NULL,
+  previous_hash TEXT,
+  entry_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_risk_settings_audit_created ON risk_settings_audit(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS invitation_settings (
   key TEXT PRIMARY KEY,
@@ -1832,6 +1848,7 @@ CREATE TABLE IF NOT EXISTS behavior_risk_events (
   network_hmac TEXT,
   ua_hmac TEXT,
   uid_hmac TEXT,
+  signal_aliases_json JSONB NOT NULL DEFAULT '{}'::jsonb,
   output_hash TEXT,
   page_category TEXT,
   key_version TEXT NOT NULL,
@@ -1844,16 +1861,68 @@ CREATE TABLE IF NOT EXISTS behavior_risk_events (
   occurred_at TIMESTAMPTZ NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE behavior_risk_events ADD COLUMN IF NOT EXISTS signal_aliases_json JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE behavior_risk_events DROP CONSTRAINT IF EXISTS behavior_risk_events_event_type_check;
 ALTER TABLE behavior_risk_events
   ADD CONSTRAINT behavior_risk_events_event_type_check
   CHECK (event_type IN ('register', 'activation', 'login', 'bind', 'job_submit', 'generate', 'export', 'workspace_save', 'page_view', 'operator_data_anomaly', 'account_deleted'));
+ALTER TABLE behavior_risk_events DROP CONSTRAINT IF EXISTS behavior_risk_events_page_category_check;
+ALTER TABLE behavior_risk_events ADD CONSTRAINT behavior_risk_events_page_category_check
+  CHECK (page_category IS NULL OR page_category IN ('landing', 'auth', 'profiles', 'workspace', 'optimizer', 'result', 'account', 'public_info', 'other')) NOT VALID;
+ALTER TABLE behavior_risk_events DROP CONSTRAINT IF EXISTS behavior_risk_events_signal_shape_check;
+ALTER TABLE behavior_risk_events ADD CONSTRAINT behavior_risk_events_signal_shape_check CHECK (
+  (browser_hmac IS NULL OR browser_hmac ~ '^[0-9a-f]{64}$')
+  AND (session_hmac IS NULL OR session_hmac ~ '^[0-9a-f]{64}$')
+  AND (network_hmac IS NULL OR network_hmac ~ '^[0-9a-f]{64}$')
+  AND (ua_hmac IS NULL OR ua_hmac ~ '^[0-9a-f]{64}$')
+  AND (uid_hmac IS NULL OR uid_hmac ~ '^[0-9a-f]{64}$')
+  AND (output_hash IS NULL OR output_hash ~ '^[0-9a-f]{64}$')
+  AND jsonb_typeof(signal_aliases_json) = 'object'
+) NOT VALID;
+ALTER TABLE behavior_risk_events DROP CONSTRAINT IF EXISTS behavior_risk_events_length_check;
+ALTER TABLE behavior_risk_events ADD CONSTRAINT behavior_risk_events_length_check CHECK (
+  (event_key IS NULL OR length(event_key) <= 256)
+  AND length(key_version) BETWEEN 1 AND 32
+  AND length(model_version) BETWEEN 1 AND 64
+  AND (optimizer_version IS NULL OR length(optimizer_version) <= 256)
+  AND (declaration_version IS NULL OR length(declaration_version) <= 128)
+) NOT VALID;
+ALTER TABLE behavior_risk_events DROP CONSTRAINT IF EXISTS behavior_risk_events_retention_check;
+ALTER TABLE behavior_risk_events ADD CONSTRAINT behavior_risk_events_retention_check
+  CHECK (expires_at > occurred_at AND expires_at <= occurred_at + interval '91 days') NOT VALID;
 CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_user_time ON behavior_risk_events(user_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_browser_time ON behavior_risk_events(browser_hmac, occurred_at DESC) WHERE browser_hmac IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_network_ua_time ON behavior_risk_events(network_hmac, ua_hmac, occurred_at DESC) WHERE network_hmac IS NOT NULL AND ua_hmac IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_uid_time ON behavior_risk_events(uid_hmac, occurred_at DESC) WHERE uid_hmac IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_job ON behavior_risk_events(job_id) WHERE job_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_behavior_risk_events_expiry ON behavior_risk_events(expires_at);
+
+CREATE TABLE IF NOT EXISTS behavior_risk_dirty_users (
+  user_id TEXT PRIMARY KEY,
+  first_event_at TIMESTAMPTZ NOT NULL,
+  last_event_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_dirty_users_updated ON behavior_risk_dirty_users(updated_at, user_id);
+
+CREATE TABLE IF NOT EXISTS behavior_risk_health (
+  key TEXT PRIMARY KEY,
+  last_collection_at TIMESTAMPTZ,
+  last_collection_status TEXT CHECK (last_collection_status IN ('success', 'disabled', 'failed')),
+  last_evaluation_at TIMESTAMPTZ,
+  last_evaluation_status TEXT CHECK (last_evaluation_status IN ('success', 'lock_busy', 'failed')),
+  last_failure_at TIMESTAMPTZ,
+  last_failure_stage TEXT,
+  events_processed INTEGER NOT NULL DEFAULT 0 CHECK (events_processed >= 0),
+  duration_ms INTEGER NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
+  purged_events INTEGER NOT NULL DEFAULT 0 CHECK (purged_events >= 0),
+  updated_at TIMESTAMPTZ NOT NULL
+);
+ALTER TABLE behavior_risk_health ADD COLUMN IF NOT EXISTS last_collection_at TIMESTAMPTZ;
+ALTER TABLE behavior_risk_health ADD COLUMN IF NOT EXISTS last_collection_status TEXT;
+ALTER TABLE behavior_risk_health DROP CONSTRAINT IF EXISTS behavior_risk_health_last_collection_status_check;
+ALTER TABLE behavior_risk_health ADD CONSTRAINT behavior_risk_health_last_collection_status_check
+  CHECK (last_collection_status IS NULL OR last_collection_status IN ('success', 'disabled', 'failed')) NOT VALID;
 
 CREATE TABLE IF NOT EXISTS behavior_risk_cases (
   id TEXT PRIMARY KEY,
@@ -1893,16 +1962,37 @@ CREATE TABLE IF NOT EXISTS behavior_risk_case_members (
 
 CREATE TABLE IF NOT EXISTS behavior_risk_review_audit (
   id TEXT PRIMARY KEY,
-  case_id TEXT NOT NULL REFERENCES behavior_risk_cases(id) ON DELETE CASCADE,
+  case_id TEXT REFERENCES behavior_risk_cases(id) ON DELETE SET NULL,
   admin_username TEXT NOT NULL,
   outcome TEXT NOT NULL CHECK (outcome IN ('dismiss', 'restrict')),
   note TEXT NOT NULL CHECK (length(trim(note)) > 0),
   actions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
   case_snapshot_json JSONB NOT NULL,
+  previous_hash TEXT,
+  entry_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE behavior_risk_review_audit ADD COLUMN IF NOT EXISTS previous_hash TEXT;
+ALTER TABLE behavior_risk_review_audit ADD COLUMN IF NOT EXISTS entry_hash TEXT;
+ALTER TABLE behavior_risk_review_audit DROP CONSTRAINT IF EXISTS behavior_risk_review_audit_case_id_fkey;
+ALTER TABLE behavior_risk_review_audit ALTER COLUMN case_id DROP NOT NULL;
+ALTER TABLE behavior_risk_review_audit ADD CONSTRAINT behavior_risk_review_audit_case_id_fkey
+  FOREIGN KEY (case_id) REFERENCES behavior_risk_cases(id) ON DELETE SET NULL NOT VALID;
 CREATE INDEX IF NOT EXISTS idx_behavior_risk_review_case ON behavior_risk_review_audit(case_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_review_created ON behavior_risk_review_audit(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS behavior_risk_admin_audit (
+  id TEXT PRIMARY KEY,
+  admin_username TEXT,
+  capability TEXT NOT NULL CHECK (capability IN ('risk_view', 'risk_review', 'risk_config')),
+  action TEXT NOT NULL,
+  decision TEXT NOT NULL CHECK (decision IN ('allow', 'deny')),
+  reason TEXT NOT NULL,
+  request_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_behavior_risk_admin_audit_created ON behavior_risk_admin_audit(created_at DESC);
 
 -- goofish:migration-phase
 INSERT INTO item_definitions
