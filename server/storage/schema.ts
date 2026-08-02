@@ -102,8 +102,10 @@ CREATE TABLE IF NOT EXISTS risk_settings (
 CREATE TABLE IF NOT EXISTS invitation_settings (
   key TEXT PRIMARY KEY,
   record_json JSONB NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
+  updated_at TIMESTAMPTZ NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1)
 );
+ALTER TABLE invitation_settings ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1);
 
 CREATE TABLE IF NOT EXISTS registration_settings (
   key TEXT PRIMARY KEY,
@@ -460,9 +462,30 @@ CREATE TABLE IF NOT EXISTS commercial_account_limits (
 CREATE TABLE IF NOT EXISTS invitation_codes (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
   code TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused')),
+  created_at TIMESTAMPTZ NOT NULL,
+  rotated_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS rotated_at TIMESTAMPTZ;
+ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
+ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE invitation_codes DROP CONSTRAINT IF EXISTS invitation_codes_status_check;
+ALTER TABLE invitation_codes ADD CONSTRAINT invitation_codes_status_check CHECK (status IN ('active', 'paused'));
+CREATE INDEX IF NOT EXISTS idx_invitation_codes_code ON invitation_codes(code);
+
+CREATE TABLE IF NOT EXISTS invitation_code_audit (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  action TEXT NOT NULL CHECK (action IN ('create', 'rotate', 'pause', 'resume')),
+  previous_code_hash TEXT,
+  next_code_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_invitation_codes_code ON invitation_codes(code);
+CREATE INDEX IF NOT EXISTS idx_invitation_code_audit_user_created
+  ON invitation_code_audit(user_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS invitations (
   id TEXT PRIMARY KEY,
@@ -475,21 +498,64 @@ CREATE TABLE IF NOT EXISTS invitations (
   settled_at TIMESTAMPTZ,
   settings_snapshot JSONB,
   settlement_json JSONB,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  next_retry_at TIMESTAMPTZ,
+  processing_started_at TIMESTAMPTZ,
+  last_error TEXT,
+  dead_lettered_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL,
-  CHECK (inviter_user_id IS NULL OR inviter_user_id <> invitee_user_id)
+  CHECK (inviter_user_id IS NULL OR inviter_user_id <> invitee_user_id),
+  CHECK (status IN ('registered', 'activated', 'processing', 'failed', 'settled', 'dead_letter')),
+  CHECK (attempt_count >= 0)
 );
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_registered_at ON invitations(inviter_user_id, registered_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_settled_at ON invitations(inviter_user_id, settled_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_invitation_code ON invitations(invitation_code);
 ALTER TABLE invitations ADD COLUMN IF NOT EXISTS inviter_rewarded_at TIMESTAMPTZ;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS last_error TEXT;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS dead_lettered_at TIMESTAMPTZ;
+UPDATE invitations
+   SET activated_at = coalesce(activated_at, registered_at),
+       status = 'failed',
+       next_retry_at = coalesce(next_retry_at, now()),
+       last_error = coalesce(last_error, 'Legacy invitation status required repair during schema migration')
+ WHERE status NOT IN ('registered', 'activated', 'processing', 'failed', 'settled', 'dead_letter');
+UPDATE invitations
+   SET activated_at = coalesce(activated_at, registered_at),
+       status = 'failed',
+       next_retry_at = coalesce(next_retry_at, now()),
+       last_error = coalesce(last_error, 'Invitation activation snapshot is missing or invalid')
+ WHERE status IN ('activated', 'processing', 'failed', 'dead_letter')
+   AND (settings_snapshot IS NULL OR jsonb_typeof(settings_snapshot) <> 'object');
+UPDATE invitations SET activated_at = coalesce(activated_at, registered_at) WHERE status = 'settled';
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_status_check;
+ALTER TABLE invitations ADD CONSTRAINT invitations_status_check
+  CHECK (status IN ('registered', 'activated', 'processing', 'failed', 'settled', 'dead_letter'));
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_attempt_count_check;
+ALTER TABLE invitations ADD CONSTRAINT invitations_attempt_count_check CHECK (attempt_count >= 0);
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_state_timestamps_check;
+ALTER TABLE invitations ADD CONSTRAINT invitations_state_timestamps_check CHECK (
+  (status = 'registered' AND activated_at IS NULL AND settled_at IS NULL AND dead_lettered_at IS NULL)
+  OR (status IN ('activated', 'failed') AND activated_at IS NOT NULL AND settled_at IS NULL AND dead_lettered_at IS NULL)
+  OR (status = 'processing' AND activated_at IS NOT NULL AND settled_at IS NULL AND processing_started_at IS NOT NULL AND dead_lettered_at IS NULL)
+  OR (status = 'settled' AND activated_at IS NOT NULL AND settled_at IS NOT NULL AND dead_lettered_at IS NULL)
+  OR (status = 'dead_letter' AND activated_at IS NOT NULL AND settled_at IS NULL AND dead_lettered_at IS NOT NULL)
+);
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_snapshot_shape_check;
+ALTER TABLE invitations ADD CONSTRAINT invitations_snapshot_shape_check CHECK (
+  status = 'registered' OR (jsonb_typeof(settings_snapshot) = 'object' AND settings_snapshot->>'version' = '2')
+);
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_registered_cursor
   ON invitations(inviter_user_id, registered_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_rewarded
   ON invitations(inviter_user_id, inviter_rewarded_at)
   WHERE inviter_rewarded_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_invitations_pending_settlement
-  ON invitations(activated_at ASC, id ASC)
-  WHERE status = 'activated';
+  ON invitations(next_retry_at ASC, activated_at ASC, id ASC)
+  WHERE status IN ('activated', 'failed', 'processing');
 UPDATE invitations
    SET inviter_rewarded_at = settled_at
  WHERE inviter_rewarded_at IS NULL
@@ -500,17 +566,70 @@ UPDATE invitations
 CREATE TABLE IF NOT EXISTS admin_registration_invitations (
   id TEXT PRIMARY KEY,
   code_hash TEXT NOT NULL UNIQUE,
+  created_by TEXT NOT NULL DEFAULT 'legacy',
+  create_reason TEXT NOT NULL DEFAULT 'Legacy invitation',
+  idempotency_key TEXT,
+  request_hash TEXT,
+  code_ciphertext TEXT,
+  code_iv TEXT,
+  code_auth_tag TEXT,
+  code_recoverable_until TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   consumed_at TIMESTAMPTZ,
   consumed_by_user_id TEXT REFERENCES user_accounts(id) ON DELETE SET NULL,
   revoked_at TIMESTAMPTZ,
+  revoked_by TEXT,
+  revoke_reason TEXT,
   CHECK (consumed_at IS NULL OR revoked_at IS NULL)
 );
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT 'legacy';
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS create_reason TEXT NOT NULL DEFAULT 'Legacy invitation';
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS request_hash TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS code_ciphertext TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS code_iv TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS code_auth_tag TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS code_recoverable_until TIMESTAMPTZ;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS revoked_by TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS revoke_reason TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_admin_registration_invitations_idempotency
+  ON admin_registration_invitations(created_by, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_admin_registration_invitations_created
   ON admin_registration_invitations(created_at DESC, id ASC);
 CREATE INDEX IF NOT EXISTS idx_admin_registration_invitations_status
   ON admin_registration_invitations(consumed_at, revoked_at, expires_at, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS admin_registration_invitation_audit (
+  id TEXT PRIMARY KEY,
+  invitation_id TEXT NOT NULL,
+  admin_username TEXT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('create', 'revoke', 'resend_verification', 'replay_settlement')),
+  reason TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  before_json JSONB,
+  after_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_registration_invitation_audit_invitation
+  ON admin_registration_invitation_audit(invitation_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS admin_invitation_verification_outbox (
+  id TEXT PRIMARY KEY,
+  invitation_id TEXT NOT NULL UNIQUE REFERENCES admin_registration_invitations(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'dead_letter')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_attempt_at TIMESTAMPTZ NOT NULL,
+  lease_token TEXT,
+  lease_expires_at TIMESTAMPTZ,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_invitation_verification_outbox_due
+  ON admin_invitation_verification_outbox(status, next_attempt_at, created_at);
 
 CREATE TABLE IF NOT EXISTS reward_grants (
   id TEXT PRIMARY KEY,

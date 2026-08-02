@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AuthForm from './AuthForm'
 
 afterEach(() => {
@@ -44,6 +44,13 @@ describe('AuthForm feedback spacing', () => {
 })
 
 describe('AuthForm registration field spacing', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ invite_code_required: false }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )))
+  })
+
   it('does not reserve hidden error-message space between registration inputs', async () => {
     const user = userEvent.setup()
     const { container } = render(<AuthForm onAuthenticated={vi.fn()} compact />)
@@ -65,6 +72,7 @@ describe('AuthForm registration field spacing', () => {
     await user.click(screen.getByRole('button', { name: '注册' }))
     const emailField = screen.getByLabelText('邮箱')
     const passwordField = screen.getByLabelText('密码')
+    await waitFor(() => expect(screen.getByRole('button', { name: '创建账号' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: '创建账号' }))
 
     expect(container.querySelectorAll('.auth-field-message')).toHaveLength(2)

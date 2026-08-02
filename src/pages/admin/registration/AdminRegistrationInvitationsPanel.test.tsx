@@ -18,6 +18,11 @@ const invitation = {
   revoked_at: null,
   consumed_by_user_id: null,
   consumed_by_email: null,
+  created_by: 'operator',
+  create_reason: 'test issuance',
+  revoked_by: null,
+  revoke_reason: null,
+  verification_status: 'not_applicable',
 }
 
 describe('AdminRegistrationInvitationsPanel', () => {
@@ -36,6 +41,7 @@ describe('AdminRegistrationInvitationsPanel', () => {
         pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 },
       }
     })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
   })
 
   afterEach(() => {
@@ -48,16 +54,32 @@ describe('AdminRegistrationInvitationsPanel', () => {
     render(<AdminRegistrationInvitationsPanel />)
     expect(await screen.findByText('可使用')).toBeInTheDocument()
 
+    await user.type(screen.getByLabelText('操作原因'), 'test issuance')
+    await user.type(screen.getByLabelText('Root 口令'), 'root-secret')
     await user.click(screen.getByRole('button', { name: '生成邀请码' }))
     expect(await screen.findByText(/明文邀请码只显示这一次/)).toBeInTheDocument()
+    expect(adminApiJson).toHaveBeenCalledWith('/api/admin/registration-invitations', expect.objectContaining({
+      method: 'POST',
+      json: {
+        reason: 'test issuance',
+        root_password: 'root-secret',
+        idempotency_key: expect.any(String),
+      },
+    }))
     expect(screen.getByDisplayValue('12AB34CD5E6F7G8H')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '复制链接' }))
     expect(await screen.findByText('注册链接已复制。')).toBeInTheDocument()
 
+    await user.type(screen.getByLabelText('Root 口令'), 'root-secret')
     await user.click(screen.getByRole('button', { name: '撤销' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/registration-invitations', expect.objectContaining({
       method: 'PATCH',
-      json: { invitation_id: 'invite-1', action: 'revoke' },
+      json: {
+        invitation_id: 'invite-1',
+        action: 'revoke',
+        reason: 'test issuance',
+        root_password: 'root-secret',
+      },
     })))
   })
 })

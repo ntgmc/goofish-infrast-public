@@ -79,7 +79,7 @@ import {
   InvitationCodeError,
   saveInvitationInTransaction,
   saveRegistrationWithInvitation,
-  settleInvitationForActivatedUser,
+  activateInvitationForUser,
   validateInvitationCode,
   type ValidatedInvitationCode,
 } from '../storage/invitation-store'
@@ -814,6 +814,13 @@ export async function resendEmailVerification(emailValue: unknown): Promise<{ ok
   return { ok: true, message: authCopy.api_email_verification_resend }
 }
 
+export async function resendEmailVerificationForUserId(userId: string): Promise<boolean> {
+  const user = await getUserById(userId)
+  if (!user || user.email_verified_at) return false
+  await issueEmailVerification(user)
+  return true
+}
+
 export function toPublicUser(user: UserAccountRecord): AuthUser {
   return {
     id: user.id,
@@ -838,8 +845,8 @@ async function getAnnouncementUnreadCount(userId: string): Promise<number> {
 }
 
 function scheduleInvitationSettlement(userId: string): void {
-  void settleInvitationForActivatedUser(userId).catch((error) => {
-    console.warn('invitation activation settlement deferred:', safeErrorName(error))
+  void activateInvitationForUser(userId).catch((error) => {
+    console.warn('invitation activation deferred:', safeErrorName(error))
   })
 }
 

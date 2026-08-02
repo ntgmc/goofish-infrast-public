@@ -19,7 +19,7 @@ import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
 import { emptyWorkspace, isDepotValueProfile, listProfilesForUser, updateProfileWorkspaceInTransaction, type UserGameAccountRecord } from './user-store'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY, isFreePreviewLimitedCdkActivityActive } from '../free-preview-trial'
-import { upsertItemGrantNotificationInTransaction } from './notification-store'
+import { upsertItemGrantNotificationGroupInTransaction, upsertItemGrantNotificationInTransaction } from './notification-store'
 import { createLifetimeVoucherProfileAuthorizationInTransaction } from './cdk-redemption'
 
 const PROFILE_CAPACITY_LIMITS = Object.freeze({
@@ -325,17 +325,202 @@ export async function grantItem(input: GrantInput): Promise<string | null> {
 }
 
 export async function grantItemInTransaction(client: PoolClient, input: GrantInput): Promise<string | null> {
+  const definition = await client.query<{ kind: string; issuance_enabled: boolean; name: string; icon_key: string }>(
+    'select kind, issuance_enabled, name, icon_key from item_definitions where code = $1',
+    [input.itemCode],
+  )
+  const item = definition.rows[0]
+  const version = input.giftPackVersionId
+    ? (await client.query<{ status: string; item_code: string }>(
+      'select status, item_code from gift_pack_versions where id = $1',
+      [input.giftPackVersionId],
+    )).rows[0] ?? null
+    : null
+  return grantItemWithSnapshot(client, input, item ?? null, version)
+}
+
+export async function grantItemsInTransaction(client: PoolClient, inputs: GrantInput[]): Promise<Array<string | null>> {
+  if (inputs.length === 0) return []
+  const itemCodes = [...new Set(inputs.map((input) => input.itemCode))]
+  const definitions = await client.query<{
+    code: string
+    kind: string
+    issuance_enabled: boolean
+    name: string
+    icon_key: string
+  }>(
+    'select code, kind, issuance_enabled, name, icon_key from item_definitions where code = any($1::text[])',
+    [itemCodes],
+  )
+  const definitionsByCode = new Map(definitions.rows.map((definition) => [definition.code, definition]))
+  const versionIds = [...new Set(inputs.flatMap((input) => input.giftPackVersionId ? [input.giftPackVersionId] : []))]
+  const versions = versionIds.length === 0
+    ? { rows: [] as Array<{ id: string; status: string; item_code: string }> }
+    : await client.query<{ id: string; status: string; item_code: string }>(
+      'select id, status, item_code from gift_pack_versions where id = any($1::text[])',
+      [versionIds],
+    )
+  const versionsById = new Map(versions.rows.map((version) => [version.id, version]))
+  const prepared = inputs.map((input) => {
+    const item = definitionsByCode.get(input.itemCode) ?? null
+    const version = input.giftPackVersionId ? versionsById.get(input.giftPackVersionId) ?? null : null
+    const quantity = normalizeQuantity(input.quantity)
+    const now = input.now ?? new Date().toISOString()
+    const validityDays = input.expiry.mode === 'relative_days' ? input.expiry.days : 0
+    const expiresAt = input.expiresAt !== undefined
+      ? normalizeAbsoluteExpiry(input.expiresAt, now)
+      : validityDays > 0 ? new Date(Date.parse(now) + validityDays * 86_400_000).toISOString() : null
+    const historicalInvitationSnapshot = input.allowHistoricalSnapshot === true
+      && input.sourceType === 'invitation'
+      && input.metadata?.invitation_snapshot === true
+    if (!item) throw new InventoryError('item_unknown', '道具不存在。', 404)
+    if (!item.issuance_enabled && !historicalInvitationSnapshot) throw new InventoryError('item_issuance_disabled', '该道具当前不可发放。', 409)
+    if (item.kind === 'gift_pack' && !input.giftPackVersionId) {
+      throw new InventoryError('gift_pack_version_required', '礼包发放必须指定已发布版本。', 400)
+    }
+    if (input.giftPackVersionId) {
+      const versionAvailable = version?.status === 'published'
+        || (historicalInvitationSnapshot && version?.status === 'retired')
+      if (!versionAvailable || version?.item_code !== input.itemCode) {
+        throw new InventoryError('gift_pack_version_unavailable', '礼包版本不可发放。', 409)
+      }
+    }
+    return {
+      id: randomUUID(),
+      user_id: input.userId,
+      reward_type: input.itemCode,
+      source_type: input.sourceType,
+      source_id: input.sourceId,
+      recipient_role: input.recipientRole,
+      original_quantity: quantity,
+      remaining_quantity: quantity,
+      validity_days: validityDays,
+      expires_at: expiresAt,
+      metadata_json: input.metadata ?? {},
+      gift_pack_version_id: input.giftPackVersionId ?? null,
+      created_at: now,
+      item_name: item.name,
+      icon_key: item.icon_key,
+    }
+  })
+  const inserted = await client.query<{
+    id: string
+    user_id: string
+    reward_type: string
+    source_type: string
+    source_id: string
+    recipient_role: string
+    original_quantity: number
+    expires_at: string | null
+    metadata_json: Record<string, unknown>
+    created_at: string
+  }>(
+    `with input as (
+       select * from jsonb_to_recordset($1::jsonb) as item(
+         id text, user_id text, reward_type text, source_type text, source_id text, recipient_role text,
+         original_quantity integer, remaining_quantity integer, validity_days integer, expires_at text,
+         metadata_json jsonb, gift_pack_version_id text, created_at text
+       )
+     )
+     insert into reward_grants
+       (id, user_id, reward_type, source_type, source_id, recipient_role, original_quantity, remaining_quantity,
+        validity_days, expires_at, metadata_json, gift_pack_version_id, created_at)
+     select id, user_id, reward_type, source_type, source_id, recipient_role, original_quantity, remaining_quantity,
+            validity_days, expires_at::timestamptz, metadata_json, gift_pack_version_id, created_at::timestamptz
+       from input
+     on conflict (user_id, reward_type, source_type, source_id, recipient_role) do nothing
+     returning id, user_id, reward_type, source_type, source_id, recipient_role,
+               original_quantity, expires_at::text, metadata_json, created_at::text`,
+    [JSON.stringify(prepared.map(({ item_name: _itemName, icon_key: _iconKey, ...row }) => row))],
+  )
+  if (inserted.rows.length > 0) {
+    await client.query(
+      `insert into inventory_ledger
+        (id, user_id, item_code, event_type, quantity, grant_id, reference_type, reference_id, metadata_json, created_at)
+       select ledger.id, ledger.user_id, ledger.item_code, 'grant', ledger.quantity, ledger.grant_id,
+              ledger.reference_type, ledger.reference_id, ledger.metadata_json, ledger.created_at::timestamptz
+         from jsonb_to_recordset($1::jsonb) as ledger(
+           id text, user_id text, item_code text, quantity integer, grant_id text,
+           reference_type text, reference_id text, metadata_json jsonb, created_at text
+         )
+       on conflict (user_id, item_code, event_type, reference_type, reference_id) do nothing`,
+      [JSON.stringify(inserted.rows.map((row) => ({
+        id: randomUUID(),
+        user_id: row.user_id,
+        item_code: row.reward_type,
+        quantity: Number(row.original_quantity),
+        grant_id: row.id,
+        reference_type: row.source_type,
+        reference_id: row.source_id,
+        metadata_json: row.metadata_json ?? {},
+        created_at: row.created_at,
+      })))],
+    )
+  }
+  const preparedByKey = new Map(prepared.map((row) => [grantKey(row), row]))
+  const notificationGroups = new Map<string, {
+    userId: string
+    sourceType: string
+    sourceId: string
+    now: string
+    items: Array<{
+      grantId: string
+      itemCode: string
+      itemName: string
+      iconKey: string
+      quantity: number
+      expiresAt: string | null
+    }>
+  }>()
+  for (const row of inserted.rows) {
+    const source = preparedByKey.get(grantKey(row))!
+    const groupKey = JSON.stringify([row.user_id, row.source_type, row.source_id])
+    const group = notificationGroups.get(groupKey) ?? {
+      userId: row.user_id,
+      sourceType: row.source_type,
+      sourceId: row.source_id,
+      now: row.created_at,
+      items: [],
+    }
+    group.items.push({
+      grantId: row.id,
+      itemCode: row.reward_type,
+      itemName: source.item_name,
+      iconKey: source.icon_key,
+      quantity: Number(row.original_quantity),
+      expiresAt: row.expires_at,
+    })
+    notificationGroups.set(groupKey, group)
+  }
+  for (const group of notificationGroups.values()) {
+    await upsertItemGrantNotificationGroupInTransaction(client, group)
+  }
+  const insertedByKey = new Map(inserted.rows.map((row) => [grantKey(row), row.id]))
+  return prepared.map((row) => insertedByKey.get(grantKey(row)) ?? null)
+}
+
+function grantKey(row: {
+  user_id: string
+  reward_type: string
+  source_type: string
+  source_id: string
+  recipient_role: string
+}): string {
+  return JSON.stringify([row.user_id, row.reward_type, row.source_type, row.source_id, row.recipient_role])
+}
+
+async function grantItemWithSnapshot(
+  client: PoolClient,
+  input: GrantInput,
+  item: { kind: string; issuance_enabled: boolean; name: string; icon_key: string } | null,
+  version: { status: string; item_code: string } | null,
+): Promise<string | null> {
   const quantity = normalizeQuantity(input.quantity)
   const now = input.now ?? new Date().toISOString()
   const validityDays = input.expiry.mode === 'relative_days' ? input.expiry.days : 0
   const expiresAt = input.expiresAt !== undefined
     ? normalizeAbsoluteExpiry(input.expiresAt, now)
     : validityDays > 0 ? new Date(Date.parse(now) + validityDays * 86_400_000).toISOString() : null
-  const definition = await client.query<{ kind: string; issuance_enabled: boolean; name: string; icon_key: string }>(
-    'select kind, issuance_enabled, name, icon_key from item_definitions where code = $1',
-    [input.itemCode],
-  )
-  const item = definition.rows[0]
   const historicalInvitationSnapshot = input.allowHistoricalSnapshot === true
     && input.sourceType === 'invitation'
     && input.metadata?.invitation_snapshot === true
@@ -345,13 +530,9 @@ export async function grantItemInTransaction(client: PoolClient, input: GrantInp
     throw new InventoryError('gift_pack_version_required', '礼包发放必须指定已发布版本。', 400)
   }
   if (input.giftPackVersionId) {
-    const version = await client.query<{ status: string; item_code: string }>(
-      'select status, item_code from gift_pack_versions where id = $1',
-      [input.giftPackVersionId],
-    )
-    const versionAvailable = version.rows[0]?.status === 'published'
-      || (historicalInvitationSnapshot && version.rows[0]?.status === 'retired')
-    if (!versionAvailable || version.rows[0]?.item_code !== input.itemCode) {
+    const versionAvailable = version?.status === 'published'
+      || (historicalInvitationSnapshot && version?.status === 'retired')
+    if (!versionAvailable || version?.item_code !== input.itemCode) {
       throw new InventoryError('gift_pack_version_unavailable', '礼包版本不可发放。', 409)
     }
   }

@@ -290,3 +290,44 @@ describe('administrator inventory request policy', () => {
     }).success).toBe(false)
   })
 })
+
+describe('invitation request policy', () => {
+  it('validates reward snapshots and revision deeply', () => {
+    const valid = {
+      enabled: true,
+      expected_revision: 2,
+      rewards: [{
+        recipient: 'inviter',
+        item_code: 'priority_compute_coupon',
+        quantity: 1,
+        expiry: { mode: 'never' },
+        gift_pack_version_id: null,
+      }],
+    }
+    expect(requestSchemas.adminInvitationSettings.safeParse(valid).success).toBe(true)
+    expect(requestSchemas.adminInvitationSettings.safeParse({
+      ...valid,
+      rewards: [{ ...valid.rewards[0], quantity: 0 }],
+    }).success).toBe(false)
+    expect(requestSchemas.adminInvitationSettings.safeParse({ ...valid, expected_revision: undefined }).success).toBe(false)
+  })
+
+  it('requires root accountability and idempotency for administrator codes', () => {
+    const create = { reason: 'test issuance', idempotency_key: 'request-1', root_password: 'root-secret' }
+    expect(requestSchemas.adminRegistrationInvitationCreate.safeParse(create).success).toBe(true)
+    expect(requestSchemas.adminRegistrationInvitationCreate.safeParse({ ...create, root_password: undefined }).success).toBe(false)
+    expect(requestSchemas.adminRegistrationInvitationCreate.safeParse({ ...create, idempotency_key: undefined }).success).toBe(false)
+    expect(requestSchemas.adminRegistrationInvitationPatch.safeParse({
+      invitation_id: 'invitation-1', action: 'revoke', reason: 'test revoke', root_password: 'root-secret',
+    }).success).toBe(true)
+    expect(requestSchemas.adminRegistrationInvitationPatch.safeParse({
+      invitation_id: 'invitation-1', action: 'delete', reason: 'test revoke', root_password: 'root-secret',
+    }).success).toBe(false)
+  })
+
+  it('accepts only explicit user invitation code actions', () => {
+    expect(requestSchemas.userInvitationCode.safeParse({ action: 'ensure' }).success).toBe(true)
+    expect(requestSchemas.userInvitationCode.safeParse({ action: 'rotate' }).success).toBe(true)
+    expect(requestSchemas.userInvitationCode.safeParse({ action: 'delete' }).success).toBe(false)
+  })
+})

@@ -8,9 +8,11 @@ const apiJson = vi.fn()
 vi.mock('../../../lib/api-client', () => ({ apiJson: (...args: unknown[]) => apiJson(...args) }))
 
 const summary: InvitationSummary = {
+  as_of: '2026-07-25T03:00:00.000Z',
   can_invite: true,
   campaign_enabled: true,
   code: '12AB34CD5E',
+  code_status: 'active',
   share_url: '/tool/profiles?invite=12AB34CD5E',
   reward_preview: {
     inviter: [{ item_code: 'priority_compute_coupon', name: '优先计算券', description: '优先排队', kind: 'consumable', icon_key: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' }, gift_pack_version: null, available: true }],
@@ -24,6 +26,9 @@ const summary: InvitationSummary = {
     registered_at: '2026-07-25T01:00:00.000Z',
     activated_at: '2026-07-25T02:00:00.000Z',
     status: 'settled',
+    attempt_count: 1,
+    next_retry_at: null,
+    last_error: null,
     inviter_reward_status: 'granted',
     inviter_rewards: [{ item_code: 'priority_compute_coupon', name: '优先计算券', description: '优先排队', kind: 'consumable', icon_key: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' }, gift_pack_version: null, available: true }],
   }],
@@ -45,6 +50,7 @@ describe('InvitationsSection', () => {
     expect(screen.getByText(/方案扩容证/)).toBeInTheDocument()
     expect(screen.getAllByText('1 / 10')).not.toHaveLength(0)
     expect(screen.getAllByText('受邀用户 #A1B2C3')).not.toHaveLength(0)
+    expect(screen.getAllByText(/上海时间/)).not.toHaveLength(0)
     expect(apiJson).toHaveBeenCalledTimes(1)
     expect(apiJson).toHaveBeenCalledWith('/api/user/invitations')
   })

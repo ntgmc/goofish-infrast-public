@@ -1,3 +1,5 @@
+import { resendEmailVerificationForUserId } from './handlers/user-auth'
+import { processAdminInvitationVerificationOutboxBatch } from './storage/admin-registration-invitation-store'
 import { processInvitationSettlementBatch } from './storage/invitation-store'
 
 const SETTLEMENT_INTERVAL_MS = 2_000
@@ -20,7 +22,13 @@ async function runBatch(): Promise<void> {
   if (running) return
   running = true
   try {
-    await processInvitationSettlementBatch(100)
+    const results = await Promise.allSettled([
+      processInvitationSettlementBatch(100),
+      processAdminInvitationVerificationOutboxBatch(resendEmailVerificationForUserId, 20),
+    ])
+    for (const result of results) {
+      if (result.status === 'rejected') console.warn('invitation worker subtask skipped:', result.reason)
+    }
   } catch (error) {
     console.warn('invitation settlement batch skipped:', error)
   } finally {

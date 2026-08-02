@@ -1,4 +1,4 @@
-import type { FreeScheduleEntitlement, LicenseConfig, ReorderCheckResult, RewardBalance, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { FreeScheduleEntitlement, LicenseConfig, PriorityCouponBalance, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import InfoTooltip from '../../../components/InfoTooltip'
 import { formatResultSummary, formatWorkspaceDate, isMaaJsonDownloadable } from '../../../lib/workspace-history'
@@ -74,7 +74,7 @@ export default function OverviewSection({
   hasResult: boolean;
   resultIsCurrent: boolean;
   error: string | null;
-  priorityCoupon: { balance: RewardBalance | null; selected: boolean; onChange: (selected: boolean) => void };
+  priorityCoupon: { balance: PriorityCouponBalance | null; selected: boolean; onChange: (selected: boolean) => void };
   additionalCoupons?: Array<{ id: string; label: string; help: string; balance: number; selected: boolean; onChange: (selected: boolean) => void }>;
   savedConfigCount: number;
   savedConfigLimit?: number;

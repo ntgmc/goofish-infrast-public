@@ -17,19 +17,31 @@ export default function InvitationsSection() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       setSummary(await apiJson<InvitationSummary>('/api/user/invitations'))
     } catch (caught) {
-      setError((caught as Error).message)
+      if (!silent) setError((caught as Error).message)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
   useEffect(() => { void load() }, [load])
+
+  const hasPendingSettlement = summary?.records.some((record) => (
+    record.status === 'activated' || record.status === 'processing' || record.status === 'failed'
+  )) === true
+
+  useEffect(() => {
+    if (!hasPendingSettlement) return
+    const timer = window.setInterval(() => void load(true), 15_000)
+    return () => window.clearInterval(timer)
+  }, [hasPendingSettlement, load])
 
   const absoluteShareUrl = useMemo(() => {
     if (!summary?.share_url) return null
@@ -41,9 +53,33 @@ export default function InvitationsSection() {
     setError(null)
     setNotice(null)
     try {
-      await apiJson('/api/user/invitations/code', { method: 'POST', fallbackMessage: copy.dashboard.pages_tool_dashboard_InvitationsSection_001 })
+      await apiJson('/api/user/invitations/code', {
+        method: 'POST',
+        json: { action: 'ensure' },
+        fallbackMessage: copy.dashboard.pages_tool_dashboard_InvitationsSection_001,
+      })
       await load()
       setNotice(copy.dashboard.pages_tool_dashboard_InvitationsSection_002)
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const manageCode = async (action: 'rotate' | 'pause' | 'resume') => {
+    if (action === 'rotate' && !window.confirm('轮换后旧邀请码将立即失效，历史邀请记录会保留。确认继续吗？')) return
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      await apiJson('/api/user/invitations/code', {
+        method: 'POST',
+        json: { action },
+        fallbackMessage: '更新邀请码失败。',
+      })
+      await load()
+      setNotice(action === 'pause' ? '邀请码已暂停。' : action === 'resume' ? '邀请码已恢复。' : '邀请码已轮换。')
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -92,17 +128,31 @@ export default function InvitationsSection() {
             <h2 id="invitation-title" className="mt-2 text-xl font-semibold text-ink-primary">{copy.dashboard.pages_tool_dashboard_InvitationsSection_007}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.dashboard.pages_tool_dashboard_InvitationsSection_040}</p>
           </div>
-          <p className="max-w-md text-xs leading-5 text-ink-muted">{copy.dashboard.pages_tool_dashboard_InvitationsSection_077}</p>
+          <div className="flex max-w-md flex-col items-start gap-3 lg:items-end">
+            <p className="text-xs leading-5 text-ink-muted">{copy.dashboard.pages_tool_dashboard_InvitationsSection_077}</p>
+            <button type="button" disabled={loading} onClick={() => void load()} className="tool-secondary-action min-h-9 px-3 text-sm">
+              {loading ? '刷新中...' : '刷新状态'}
+            </button>
+          </div>
         </div>
 
         {!summary?.campaign_enabled ? (
           <div className="tool-alert tool-alert--warning mt-5" role="status">{copy.dashboard.pages_tool_dashboard_InvitationsSection_041}</div>
         ) : !summary.can_invite ? (
           <div className="tool-alert tool-alert--warning mt-5" role="status">{copy.dashboard.pages_tool_dashboard_InvitationsSection_013}</div>
-        ) : summary.code && absoluteShareUrl ? (
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <CopyField id="invitation-code" label={copy.dashboard.pages_tool_dashboard_InvitationsSection_014} value={summary.code} onCopy={() => void copyToClipboard(summary.code!, copy.dashboard.pages_tool_dashboard_InvitationsSection_015)} />
-            <CopyField id="invitation-link" label={copy.dashboard.pages_tool_dashboard_InvitationsSection_016} value={absoluteShareUrl} onCopy={() => void copyToClipboard(absoluteShareUrl, copy.dashboard.pages_tool_dashboard_InvitationsSection_017)} />
+        ) : summary.code ? (
+          <div className="mt-5 space-y-4">
+            {summary.code_status === 'paused' && <div className="tool-alert tool-alert--warning" role="status">当前邀请码已暂停，旧链接暂不可注册。</div>}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <CopyField id="invitation-code" label={copy.dashboard.pages_tool_dashboard_InvitationsSection_014} value={summary.code} onCopy={() => void copyToClipboard(summary.code!, copy.dashboard.pages_tool_dashboard_InvitationsSection_015)} />
+              {absoluteShareUrl && <CopyField id="invitation-link" label={copy.dashboard.pages_tool_dashboard_InvitationsSection_016} value={absoluteShareUrl} onCopy={() => void copyToClipboard(absoluteShareUrl, copy.dashboard.pages_tool_dashboard_InvitationsSection_017)} />}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={busy} onClick={() => void manageCode(summary.code_status === 'paused' ? 'resume' : 'pause')} className="tool-secondary-action min-h-9 px-3 text-sm">
+                {summary.code_status === 'paused' ? '恢复邀请码' : '暂停邀请码'}
+              </button>
+              <button type="button" disabled={busy} onClick={() => void manageCode('rotate')} className="tool-secondary-action min-h-9 px-3 text-sm">轮换邀请码</button>
+            </div>
           </div>
         ) : (
           <button type="button" disabled={busy} onClick={() => void generateCode()} className="tool-primary-action mt-5">
@@ -179,7 +229,8 @@ function formatExpiry(reward: InvitationRewardPreviewItem): string {
 
 function progressLabel(record: InvitationRecordSummary): string {
   if (record.status === 'registered') return copy.dashboard.pages_tool_dashboard_InvitationsSection_061
-  if (record.status === 'activated') return copy.dashboard.pages_tool_dashboard_InvitationsSection_062
+  if (record.status === 'activated' || record.status === 'processing' || record.status === 'failed') return copy.dashboard.pages_tool_dashboard_InvitationsSection_062
+  if (record.status === 'dead_letter') return '结算异常'
   return copy.dashboard.pages_tool_dashboard_InvitationsSection_063
 }
 
@@ -188,6 +239,8 @@ function rewardStatusLabel(status: InviterRewardStatus): string {
     pending_activation: copy.dashboard.pages_tool_dashboard_InvitationsSection_064,
     pending_campaign_resume: copy.dashboard.pages_tool_dashboard_InvitationsSection_065,
     settlement_pending: copy.dashboard.pages_tool_dashboard_InvitationsSection_066,
+    settlement_retry: '结算失败，等待自动重试',
+    settlement_failed: '结算失败，请联系客服',
     granted: copy.dashboard.pages_tool_dashboard_InvitationsSection_067,
     daily_limit_skipped: copy.dashboard.pages_tool_dashboard_InvitationsSection_068,
     inviter_ineligible: copy.dashboard.pages_tool_dashboard_InvitationsSection_069,
@@ -197,5 +250,13 @@ function rewardStatusLabel(status: InviterRewardStatus): string {
 }
 
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(CURRENT_LOCALE, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+  return `${new Intl.DateTimeFormat(CURRENT_LOCALE, {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(value))} 上海时间`
 }

@@ -51,6 +51,10 @@ const inventoryRewardSchema = strict({
   quantity: z.number().int().min(1).max(10000),
   expiry: inventoryExpirySchema,
 })
+const invitationRewardSchema = inventoryRewardSchema.extend({
+  recipient: z.enum(['inviter', 'invitee']),
+  gift_pack_version_id: shortString(128).nullable(),
+})
 const inventoryReasonSchema = z.string().trim().min(2).max(500)
 
 const siteFeatureShape = Object.fromEntries(
@@ -81,6 +85,7 @@ export const requestSchemas = {
     old_password: z.string().max(AUTH_PASSWORD_MAX_LENGTH),
     new_password: z.string().min(AUTH_PASSWORD_MIN_LENGTH).max(AUTH_PASSWORD_MAX_LENGTH),
   }),
+  userInvitationCode: strict({ action: z.enum(['ensure', 'rotate', 'pause', 'resume']) }),
   accountDelete: strict({
     email: z.string().email().max(AUTH_EMAIL_MAX_LENGTH),
     password: z.string().min(1).max(AUTH_PASSWORD_MAX_LENGTH),
@@ -117,7 +122,8 @@ export const requestSchemas = {
   adminInvitationSettings: strict({
     enabled: z.boolean().optional(),
     daily_inviter_reward_limit: z.number().int().min(1).max(1000).optional(),
-    rewards: z.array(z.unknown()).max(32).optional(),
+    rewards: z.array(invitationRewardSchema).max(32).optional(),
+    expected_revision: expectedRevisionSchema,
   }),
   adminRegistrationSettings: strict({
     email_verification_required: z.boolean(),
@@ -128,10 +134,30 @@ export const requestSchemas = {
   }),
   adminFeatureSettings: strict({ features: siteFeaturesSchema, expected_revision: expectedRevisionSchema }),
   adminPublicContent: publicContentDraftSchema.extend({ expected_revision: expectedRevisionSchema }),
-  adminRegistrationInvitationCreate: strict({}),
-  adminRegistrationInvitationPatch: strict({
+  adminRegistrationInvitationCreate: strict({
+    reason: inventoryReasonSchema,
+    idempotency_key: shortString(200),
+    root_password: shortString(128),
+  }),
+  adminRegistrationInvitationPatch: z.discriminatedUnion('action', [
+    strict({
+      invitation_id: shortString(128),
+      action: z.literal('revoke'),
+      reason: inventoryReasonSchema,
+      root_password: shortString(128),
+    }),
+    strict({
+      invitation_id: shortString(128),
+      action: z.literal('resend_verification'),
+      reason: inventoryReasonSchema,
+      root_password: shortString(128),
+    }),
+  ]),
+  adminInvitationSettlement: strict({
     invitation_id: shortString(128),
-    action: z.literal('revoke'),
+    action: z.literal('replay'),
+    reason: inventoryReasonSchema,
+    root_password: shortString(128),
   }),
   adminRiskSettings: strict({ operator_data_risk_enabled: z.boolean().optional() }),
   adminBehaviorRiskReview: strict({
@@ -466,6 +492,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
     POST: json('admin', requestSchemas.adminRegistrationInvitationCreate),
     PATCH: json('admin', requestSchemas.adminRegistrationInvitationPatch),
   }, ['page', 'page_size', 'status'])],
+  ['/api/admin/invitation-settlements', route({ POST: json('admin', requestSchemas.adminInvitationSettlement) })],
   ['/api/admin/optimization', route({ GET: none(), POST: json('admin', requestSchemas.adminOptimization) }, ['view', 'status', 'limit', 'id'])],
   ['/api/admin/session', route({ GET: none(), POST: json('auth', requestSchemas.adminSession), DELETE: none() })],
   ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'search'])],
@@ -510,8 +537,8 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/workspace/free-schedule/confirm', route({ POST: json('standard', requestSchemas.workspaceFreeScheduleConfirm) })],
   ['/api/user/behavior-risk/engagement', route({ POST: json('standard', requestSchemas.behaviorRiskEngagement) })],
   ['/api/user/invitations', route({ GET: none() }, ['cursor', 'limit'])],
-  ['/api/user/invitations/code', route({ POST: none() })],
-  ['/api/user/rewards', route({ GET: none() })],
+  ['/api/user/invitations/code', route({ POST: json('standard', requestSchemas.userInvitationCode) })],
+  ['/api/user/priority-coupon-balance', route({ GET: none() })],
   ['/api/user/inventory', route({ GET: none(), POST: json('standard', requestSchemas.inventoryUse) })],
   ['/api/user/inventory/lifetime-profile', route({ POST: json('standard', requestSchemas.lifetimeVoucherProfileCreate) })],
   ['/api/user/cdk/redeem', route({ POST: json('standard', requestSchemas.cdkRedeem) })],

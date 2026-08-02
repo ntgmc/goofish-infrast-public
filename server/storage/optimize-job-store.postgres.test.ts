@@ -10,21 +10,34 @@ import {
 } from './optimize-job-store'
 import { emptyWorkspace, getWorkspace, saveWorkspace, updateProfileWorkspaceAtomically, updateProfileWorkspaceInTransaction } from './user-store'
 import {
+  activateInvitationForUser,
   ensureInvitationCode,
-  getRewardBalances,
+  getInvitationSummary,
+  getPriorityCouponBalances,
+  manageInvitationCode,
   processInvitationSettlementBatch,
+  replayInvitationSettlement,
   saveInvitationSettings,
-  settleInvitationForActivatedUser,
+  type InvitationSettingsPatch,
+  validateInvitationCode,
 } from './invitation-store'
 import { confirmFreeScheduleEntitlement, getFreeScheduleEntitlement } from './reorder-admission'
 import { adjustBalance, getBalanceSummary } from './balance-store'
 import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
 import { recordOperatorFingerprintInTransaction } from './cdk-store'
 import { getItemBalance, grantItem } from './inventory-store'
+import { SettingsConflictError } from './settings-conflict'
 
 let container: PostgreSqlContainer
 const legacyJobId = randomUUID()
 const legacyJobCreatedAt = '2026-01-01T00:00:00.000Z'
+
+async function saveTestInvitationSettings(patch: InvitationSettingsPatch) {
+  const revision = (await query<{ revision: number }>(
+    "select revision from invitation_settings where key = 'global'",
+  )).rows[0]?.revision ?? 0
+  return saveInvitationSettings('root', patch, revision)
+}
 
 beforeAll(async () => {
   container = await new PostgreSqlContainer('postgres:16-alpine').start()
@@ -456,16 +469,55 @@ describe('PostgreSQL optimization job admission', () => {
        values ($1, $2, $3, $4, 'registered', now(), now())`,
       [randomUUID(), inviter, invitee, code],
     )
-    await saveInvitationSettings('root', {
+    await saveTestInvitationSettings({
       rewards: [
         { recipient: 'inviter', item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' }, gift_pack_version_id: null },
         { recipient: 'invitee', item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'relative_days', days: 30 }, gift_pack_version_id: null },
       ],
     })
-    await Promise.all(Array.from({ length: 4 }, () => settleInvitationForActivatedUser(invitee)))
-    expect((await getRewardBalances(inviter))[0].available).toBe(1)
-    expect((await getRewardBalances(invitee))[0].available).toBe(1)
+    await Promise.all(Array.from({ length: 4 }, () => activateInvitationForUser(invitee)))
+    expect((await query<{ status: string }>('select status from invitations where invitee_user_id = $1', [invitee])).rows[0]?.status).toBe('activated')
+    await expect(processInvitationSettlementBatch(10)).resolves.toBeGreaterThanOrEqual(1)
+    expect((await getPriorityCouponBalances(inviter))[0].available).toBe(1)
+    expect((await getPriorityCouponBalances(invitee))[0].available).toBe(1)
     expect((await query<{ count: string }>('select count(*)::text as count from reward_grants where source_type = $1 and user_id = $2', ['invitation', inviter])).rows[0]?.count).toBe('1')
+  })
+
+  it('rejects a stale invitation settings revision', async () => {
+    const revision = (await query<{ revision: number }>(
+      "select revision from invitation_settings where key = 'global'",
+    )).rows[0]?.revision ?? 0
+    await saveInvitationSettings('first-admin', { daily_inviter_reward_limit: 9 }, revision)
+    await expect(saveInvitationSettings('second-admin', { daily_inviter_reward_limit: 8 }, revision))
+      .rejects.toBeInstanceOf(SettingsConflictError)
+  })
+
+  it('pauses, resumes, and rotates a recommendation code with cooldown audit', async () => {
+    const profileId = await seedProfile()
+    const userId = (await query<{ user_id: string }>(
+      'select user_id from user_game_accounts where id = $1', [profileId],
+    )).rows[0]!.user_id
+    const original = await ensureInvitationCode(userId)
+    const base = Date.now() + 60_000
+    await manageInvitationCode(userId, 'pause', new Date(base))
+    await expect(validateInvitationCode(original)).rejects.toMatchObject({ code: 'invalid_invite_code' })
+    await manageInvitationCode(userId, 'resume', new Date(base + 60_000))
+    await expect(validateInvitationCode(original)).resolves.toMatchObject({ inviter_user_id: userId })
+    const rotated = await manageInvitationCode(userId, 'rotate', new Date(base + 120_000))
+    expect(rotated.code).not.toBe(original)
+    await expect(validateInvitationCode(original)).rejects.toMatchObject({ code: 'invalid_invite_code' })
+    await expect(validateInvitationCode(rotated.code)).resolves.toMatchObject({ inviter_user_id: userId })
+    await expect(getInvitationSummary(userId)).resolves.toMatchObject({
+      code: rotated.code,
+      code_status: 'active',
+      as_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    })
+    await expect(manageInvitationCode(userId, 'rotate', new Date(base + 60 * 60_000)))
+      .rejects.toMatchObject({ code: 'rotation_cooldown' })
+    expect((await query<{ actions: string[] }>(
+      'select array_agg(action order by created_at) as actions from invitation_code_audit where user_id = $1',
+      [userId],
+    )).rows[0]?.actions).toEqual(['create', 'pause', 'resume', 'rotate'])
   })
 
   it('counts a multi-item inviter reward group as one daily invitation under concurrency', async () => {
@@ -476,7 +528,7 @@ describe('PostgreSQL optimization job admission', () => {
     const inviteeUsers = await Promise.all(invitees.map(async (profileId) => (
       (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [profileId])).rows[0]!.user_id
     )))
-    await saveInvitationSettings('root', {
+    await saveTestInvitationSettings({
       enabled: true,
       daily_inviter_reward_limit: 1,
       rewards: [
@@ -493,7 +545,8 @@ describe('PostgreSQL optimization job admission', () => {
       )
     }
 
-    await Promise.all(inviteeUsers.map((invitee) => settleInvitationForActivatedUser(invitee)))
+    await Promise.all(inviteeUsers.map((invitee) => activateInvitationForUser(invitee)))
+    await Promise.all([processInvitationSettlementBatch(10), processInvitationSettlementBatch(10)])
 
     const invitations = await query<{ rewarded: string; settled: string }>(
       `select count(*) filter (where inviter_rewarded_at is not null)::text as rewarded,
@@ -520,7 +573,7 @@ describe('PostgreSQL optimization job admission', () => {
     const code = await ensureInvitationCode(inviter)
     const inviteeProfileId = await seedProfile()
     const invitee = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviteeProfileId])).rows[0]!.user_id
-    await saveInvitationSettings('root', {
+    await saveTestInvitationSettings({
       enabled: false,
       rewards: [{ recipient: 'inviter', item_code: 'scenario_simulation_coupon', quantity: 1, expiry: { mode: 'relative_days', days: 7 }, gift_pack_version_id: null }],
     })
@@ -531,13 +584,13 @@ describe('PostgreSQL optimization job admission', () => {
       [invitationId, inviter, invitee, code],
     )
 
-    await settleInvitationForActivatedUser(invitee)
+    await activateInvitationForUser(invitee)
     expect((await query<{ status: string; settings_snapshot: { enabled: boolean } }>(
       'select status, settings_snapshot from invitations where id = $1', [invitationId],
     )).rows[0]).toMatchObject({ status: 'activated', settings_snapshot: { enabled: false } })
     expect((await query<{ count: string }>('select count(*)::text as count from reward_grants where source_id = $1', [invitationId])).rows[0]?.count).toBe('0')
 
-    await saveInvitationSettings('root', {
+    await saveTestInvitationSettings({
       enabled: true,
       rewards: [{ recipient: 'inviter', item_code: 'priority_compute_coupon', quantity: 99, expiry: { mode: 'never' }, gift_pack_version_id: null }],
     })
@@ -548,6 +601,105 @@ describe('PostgreSQL optimization job admission', () => {
     )
     expect(grants.rows).toEqual([{ reward_type: 'scenario_simulation_coupon', original_quantity: 1, validity_days: 7 }])
     expect((await query<{ status: string }>('select status from invitations where id = $1', [invitationId])).rows[0]?.status).toBe('settled')
+  })
+
+  it('reconciles a registered invitation when the invitee already has an active profile', async () => {
+    const inviterProfileId = await seedProfile()
+    const inviter = (await query<{ user_id: string }>(
+      'select user_id from user_game_accounts where id = $1', [inviterProfileId],
+    )).rows[0]!.user_id
+    const code = await ensureInvitationCode(inviter)
+    const inviteeProfileId = await seedProfile()
+    const invitee = (await query<{ user_id: string }>(
+      'select user_id from user_game_accounts where id = $1', [inviteeProfileId],
+    )).rows[0]!.user_id
+    const invitationId = randomUUID()
+    await saveTestInvitationSettings({
+      enabled: true,
+      rewards: [{
+        recipient: 'invitee', item_code: 'priority_compute_coupon', quantity: 1,
+        expiry: { mode: 'never' }, gift_pack_version_id: null,
+      }],
+    })
+    await query(
+      `insert into invitations (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, updated_at)
+       values ($1, $2, $3, $4, 'registered', now(), now())`,
+      [invitationId, inviter, invitee, code],
+    )
+
+    await expect(processInvitationSettlementBatch(10)).resolves.toBeGreaterThanOrEqual(1)
+
+    expect((await query<{ status: string; activated_at: string | null }>(
+      'select status, activated_at::text from invitations where id = $1', [invitationId],
+    )).rows[0]).toMatchObject({ status: 'settled', activated_at: expect.any(String) })
+    expect((await getPriorityCouponBalances(invitee))[0].available).toBe(1)
+  })
+
+  it('isolates a poison invitation and dead-letters it without blocking later settlements', async () => {
+    const inviterProfileId = await seedProfile()
+    const inviter = (await query<{ user_id: string }>(
+      'select user_id from user_game_accounts where id = $1', [inviterProfileId],
+    )).rows[0]!.user_id
+    const code = await ensureInvitationCode(inviter)
+    const inviteeProfileIds = await Promise.all([seedProfile(), seedProfile()])
+    const invitees = await Promise.all(inviteeProfileIds.map(async (profileId) => (
+      (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [profileId])).rows[0]!.user_id
+    )))
+    await saveTestInvitationSettings({
+      enabled: true,
+      rewards: [{
+        recipient: 'invitee', item_code: 'priority_compute_coupon', quantity: 1,
+        expiry: { mode: 'never' }, gift_pack_version_id: null,
+      }],
+    })
+    const poisonId = randomUUID()
+    const healthyId = randomUUID()
+    for (const [id, invitee] of [[poisonId, invitees[0]!], [healthyId, invitees[1]!]] as const) {
+      await query(
+        `insert into invitations (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, updated_at)
+         values ($1, $2, $3, $4, 'registered', now(), now())`,
+        [id, inviter, invitee, code],
+      )
+      await activateInvitationForUser(invitee)
+    }
+    await query(
+      `update invitations
+          set settings_snapshot = jsonb_set(settings_snapshot, '{rewards,0,quantity}', '0'::jsonb),
+              activated_at = now() - interval '1 hour'
+        where id = $1`,
+      [poisonId],
+    )
+
+    await expect(processInvitationSettlementBatch(2)).resolves.toBe(2)
+    expect((await query<{ status: string; attempt_count: number }>(
+      'select status, attempt_count from invitations where id = $1', [poisonId],
+    )).rows[0]).toEqual({ status: 'failed', attempt_count: 1 })
+    expect((await query<{ status: string }>('select status from invitations where id = $1', [healthyId])).rows[0]?.status).toBe('settled')
+
+    for (let attempt = 1; attempt < 5; attempt += 1) {
+      await query("update invitations set next_retry_at = now() where id = $1 and status = 'failed'", [poisonId])
+      await expect(processInvitationSettlementBatch(1)).resolves.toBe(1)
+    }
+    expect((await query<{ status: string; attempt_count: number; dead_lettered_at: string | null }>(
+      'select status, attempt_count, dead_lettered_at::text from invitations where id = $1', [poisonId],
+    )).rows[0]).toMatchObject({ status: 'dead_letter', attempt_count: 5, dead_lettered_at: expect.any(String) })
+    expect((await getPriorityCouponBalances(invitees[1]!))[0].available).toBe(1)
+
+    await query(
+      `update invitations poison
+          set settings_snapshot = healthy.settings_snapshot
+         from invitations healthy
+        where poison.id = $1 and healthy.id = $2`,
+      [poisonId, healthyId],
+    )
+    await expect(replayInvitationSettlement('root', poisonId, 'snapshot repaired')).resolves.toBe(true)
+    await expect(processInvitationSettlementBatch(1)).resolves.toBe(1)
+    expect((await query<{ status: string }>('select status from invitations where id = $1', [poisonId])).rows[0]?.status).toBe('settled')
+    expect((await query<{ count: string }>(
+      `select count(*)::text as count from admin_registration_invitation_audit
+        where invitation_id = $1 and action = 'replay_settlement'`,
+      [poisonId],
+    )).rows[0]?.count).toBe('1')
   })
 
   it('atomically consumes a priority coupon and refunds it once on terminal failure', async () => {
@@ -568,12 +720,12 @@ describe('PostgreSQL optimization job admission', () => {
       reward_user_id: userId,
       use_priority_coupon: true,
     }))
-    expect((await getRewardBalances(userId))[0].available).toBe(0)
+    expect((await getPriorityCouponBalances(userId))[0].available).toBe(0)
     const claimed = await store.claimNextJob('test-worker', 'coupon-lock', new Date(Date.now() + 60_000).toISOString(), 2)
     expect(claimed?.id).toBe(admitted.job.id)
     await store.failAttempt(admitted.job.id, claimed!.attempt_count, 'test-worker', 'coupon-lock', 'system failure')
     await store.failAttempt(admitted.job.id, claimed!.attempt_count, 'test-worker', 'coupon-lock', 'duplicate failure')
-    expect((await getRewardBalances(userId))[0].available).toBe(1)
+    expect((await getPriorityCouponBalances(userId))[0].available).toBe(1)
     expect((await query<{ status: string }>('select status from reward_consumptions where optimization_job_id = $1', [admitted.job.id])).rows[0]?.status).toBe('refunded')
   })
 
@@ -824,9 +976,9 @@ describe('PostgreSQL optimization job admission', () => {
       created_at: new Date(Date.now() - 25 * 60 * 60_000).toISOString(),
     }))
 
-    expect((await getRewardBalances(userId))[0].available).toBe(0)
+    expect((await getPriorityCouponBalances(userId))[0].available).toBe(0)
     await expect(store.expireQueuedJobs(new Date().toISOString())).resolves.toBeGreaterThanOrEqual(1)
-    expect((await getRewardBalances(userId))[0].available).toBe(1)
+    expect((await getPriorityCouponBalances(userId))[0].available).toBe(1)
     expect((await query<{ status: string }>(
       'select status from reward_consumptions where optimization_job_id = $1',
       [admitted.job.id],

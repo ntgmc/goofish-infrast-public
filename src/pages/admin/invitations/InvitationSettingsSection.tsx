@@ -14,6 +14,7 @@ import { AdminToast } from '../shared/AdminToast'
 
 const DEFAULT_SETTINGS: InvitationSettings = {
   version: 2,
+  revision: 0,
   enabled: true,
   activation_rule: 'first_active_profile',
   daily_inviter_reward_limit: 10,
@@ -103,6 +104,7 @@ export default function InvitationSettingsSection() {
           enabled: settings.enabled,
           daily_inviter_reward_limit: settings.daily_inviter_reward_limit,
           rewards: settings.rewards,
+          expected_revision: settings.revision,
         },
         fallbackMessage: '保存邀请设置失败',
       })

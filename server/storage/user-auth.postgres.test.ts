@@ -218,7 +218,13 @@ describe('registration email serialization', () => {
     const recommendedUser = userRecord(email, now)
     const administratorInvitedUser = userRecord(email, now)
     const cdkUser = userRecord(email, now)
-    const invitation = await createAdminRegistrationInvitation(now)
+    const invitation = await createAdminRegistrationInvitation({
+      adminUsername: 'root',
+      reason: '验证跨注册路径邮箱串行化',
+      idempotencyKey: randomUUID(),
+      encryptionSecret: 'test-root-password',
+      now,
+    })
     const validatedInvitation = await validateAdminRegistrationInvitation(invitation.code, now)
     const cdkKey = await seedRegistrationCdk(now)
 

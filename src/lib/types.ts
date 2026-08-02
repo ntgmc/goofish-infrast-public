@@ -892,6 +892,7 @@ export interface InvitationRewardRule {
 
 export interface InvitationSettings {
   version: 2;
+  revision: number;
   enabled: boolean;
   activation_rule: 'first_active_profile';
   daily_inviter_reward_limit: number;
@@ -949,6 +950,13 @@ export interface RegistrationSettings {
 }
 
 export type AdminRegistrationInvitationStatus = 'active' | 'used' | 'revoked' | 'expired';
+export type AdminRegistrationVerificationStatus =
+  | 'not_applicable'
+  | 'pending'
+  | 'sent'
+  | 'failed'
+  | 'uncertain'
+  | 'verified';
 
 export interface AdminRegistrationInvitation {
   id: string;
@@ -959,12 +967,19 @@ export interface AdminRegistrationInvitation {
   revoked_at: string | null;
   consumed_by_user_id: string | null;
   consumed_by_email: string | null;
+  created_by: string;
+  create_reason: string;
+  revoked_by: string | null;
+  revoke_reason: string | null;
+  verification_status: AdminRegistrationVerificationStatus;
 }
 
 export interface InvitationSummary {
+  as_of: string;
   can_invite: boolean;
   campaign_enabled: boolean;
   code: string | null;
+  code_status: 'active' | 'paused' | null;
   share_url: string | null;
   reward_preview: {
     inviter: InvitationRewardPreviewItem[];
@@ -986,7 +1001,7 @@ export interface InvitationSummary {
   next_cursor: string | null;
 }
 
-export interface RewardBalance {
+export interface PriorityCouponBalance {
   type: 'priority_compute_coupon';
   available: number;
   permanent: number;
@@ -1035,11 +1050,13 @@ export interface InvitationRewardPreviewItem {
   available: boolean;
 }
 
-type InvitationProgressStatus = 'registered' | 'activated' | 'settled';
+type InvitationProgressStatus = 'registered' | 'activated' | 'processing' | 'failed' | 'settled' | 'dead_letter';
 export type InviterRewardStatus =
   | 'pending_activation'
   | 'pending_campaign_resume'
   | 'settlement_pending'
+  | 'settlement_retry'
+  | 'settlement_failed'
   | 'granted'
   | 'daily_limit_skipped'
   | 'inviter_ineligible'
@@ -1051,6 +1068,9 @@ export interface InvitationRecordSummary {
   registered_at: string;
   activated_at: string | null;
   status: InvitationProgressStatus;
+  attempt_count: number;
+  next_retry_at: string | null;
+  last_error: string | null;
   inviter_reward_status: InviterRewardStatus;
   inviter_rewards: InvitationRewardPreviewItem[];
 }

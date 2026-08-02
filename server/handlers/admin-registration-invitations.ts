@@ -1,12 +1,14 @@
 import type { AdminRegistrationInvitationStatus } from '../../src/lib/types'
-import { authenticateAdminRequest } from './admin-auth'
+import { authenticateAdminRequest, requireRootAdminPassword } from './admin-auth'
 import { buildAdminPagination } from './admin-pagination'
-import { jsonResponse } from './user-auth'
+import { jsonResponse, resendEmailVerificationForUserId } from './user-auth'
 import { getValidatedJson } from '../security/request-validation'
 import { requestSchemas } from '../security/request-policy'
 import {
   createAdminRegistrationInvitation,
   listAdminRegistrationInvitations,
+  AdminRegistrationInvitationOperationError,
+  recordAdminInvitationVerificationResend,
   revokeAdminRegistrationInvitation,
 } from '../storage/admin-registration-invitation-store'
 
@@ -20,12 +22,20 @@ export default async function adminRegistrationInvitationsHandler(req: Request):
 
     if (req.method === 'GET') return handleList(req)
     if (req.method === 'POST') {
+      let body
       try {
-        await getValidatedJson(req, requestSchemas.adminRegistrationInvitationCreate)
+        body = await getValidatedJson(req, requestSchemas.adminRegistrationInvitationCreate)
       } catch (error) {
         return jsonResponse({ error: requestErrorMessage(error) }, 400)
       }
-      const created = await createAdminRegistrationInvitation()
+      const root = await requireRootAdminPassword(req, body.root_password)
+      if (!root.ok) return root.response
+      const created = await createAdminRegistrationInvitation({
+        adminUsername: authentication.username,
+        reason: body.reason,
+        idempotencyKey: body.idempotency_key,
+        encryptionSecret: body.root_password,
+      })
       return jsonResponse({
         invitation: created.invitation,
         code: created.code,
@@ -33,21 +43,42 @@ export default async function adminRegistrationInvitationsHandler(req: Request):
       }, 201)
     }
     if (req.method === 'PATCH') {
-      let body: { invitation_id: string; action: 'revoke' }
+      let body
       try {
         body = await getValidatedJson(req, requestSchemas.adminRegistrationInvitationPatch)
       } catch (error) {
         return jsonResponse({ error: requestErrorMessage(error) }, 400)
       }
-      if (body.action !== 'revoke' || typeof body.invitation_id !== 'string' || !body.invitation_id.trim()) {
-        return jsonResponse({ error: '管理员邀请码撤销请求无效。' }, 400)
+      if (body.action !== 'revoke' && body.action !== 'resend_verification') {
+        return jsonResponse({ error: '管理员邀请码操作无效。' }, 400)
       }
-      const invitation = await revokeAdminRegistrationInvitation(body.invitation_id)
+      const root = await requireRootAdminPassword(req, body.root_password)
+      if (!root.ok) return root.response
+      if (body.action === 'resend_verification') {
+        const userId = await recordAdminInvitationVerificationResend(
+          body.invitation_id,
+          authentication.username,
+          body.reason,
+        )
+        if (!userId) return jsonResponse({ error: '邀请码未使用、账户已验证或记录不存在。' }, 409)
+        if (!(await resendEmailVerificationForUserId(userId))) {
+          return jsonResponse({ error: '账户已验证或不存在。' }, 409)
+        }
+        return jsonResponse({ ok: true })
+      }
+      const invitation = await revokeAdminRegistrationInvitation({
+        invitationId: body.invitation_id,
+        adminUsername: authentication.username,
+        reason: body.reason,
+      })
       if (!invitation) return jsonResponse({ error: '邀请码不存在、已使用或已过期。' }, 409)
       return jsonResponse({ invitation })
     }
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
+    if (error instanceof AdminRegistrationInvitationOperationError) {
+      return jsonResponse({ error: error.message, code: error.code }, 409)
+    }
     if (error instanceof AdminInvitationRequestError) return jsonResponse({ error: error.message }, 400)
     console.error('admin registration invitations error:', error)
     return jsonResponse({ error: 'Internal server error' }, 500)

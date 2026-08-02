@@ -48,15 +48,46 @@ export async function upsertItemGrantNotificationInTransaction(client: PoolClien
   expiresAt: string | null
   now: string
 }): Promise<void> {
-  const item: InternalItemGrantDetail = {
-    item_code: input.itemCode,
-    name: input.itemName,
-    icon_key: input.iconKey,
-    quantity: input.quantity,
-    expires_at: input.expiresAt,
-    grant_ids: [input.grantId],
-  }
-  const payload: InternalItemGrantPayload = { kind: 'item_grant', items: [item] }
+  return upsertItemGrantNotificationGroupInTransaction(client, {
+    userId: input.userId,
+    sourceType: input.sourceType,
+    sourceId: input.sourceId,
+    now: input.now,
+    items: [{
+      grantId: input.grantId,
+      itemCode: input.itemCode,
+      itemName: input.itemName,
+      iconKey: input.iconKey,
+      quantity: input.quantity,
+      expiresAt: input.expiresAt,
+    }],
+  })
+}
+
+export async function upsertItemGrantNotificationGroupInTransaction(client: PoolClient, input: {
+  userId: string
+  sourceType: string
+  sourceId: string
+  now: string
+  items: Array<{
+    grantId: string
+    itemCode: string
+    itemName: string
+    iconKey: string
+    quantity: number
+    expiresAt: string | null
+  }>
+}): Promise<void> {
+  if (input.items.length === 0) return
+  const items: InternalItemGrantDetail[] = input.items.map((item) => ({
+    item_code: item.itemCode,
+    name: item.itemName,
+    icon_key: item.iconKey,
+    quantity: item.quantity,
+    expires_at: item.expiresAt,
+    grant_ids: [item.grantId],
+  }))
+  const payload: InternalItemGrantPayload = { kind: 'item_grant', items }
   const inserted = await client.query<{ id: string }>(
     `insert into user_notifications
       (id, user_id, type, source_type, source_id, title, body, action_kind, payload_json, read_at, created_at, updated_at)
@@ -77,16 +108,17 @@ export async function upsertItemGrantNotificationInTransaction(client: PoolClien
   const row = existing.rows[0]
   if (!row) throw new Error('Expected an existing item grant notification after a uniqueness conflict.')
   const current = normalizeInternalPayload(row.payload_json)
-  if (current.items.some((entry) => entry.grant_ids.includes(input.grantId))) return
-
-  const matching = current.items.find((entry) => (
-    entry.item_code === item.item_code && entry.expires_at === item.expires_at
-  ))
-  if (matching) {
-    matching.quantity += item.quantity
-    matching.grant_ids.push(input.grantId)
-  } else {
-    current.items.push(item)
+  for (const item of items) {
+    if (current.items.some((entry) => entry.grant_ids.includes(item.grant_ids[0]!))) continue
+    const matching = current.items.find((entry) => (
+      entry.item_code === item.item_code && entry.expires_at === item.expires_at
+    ))
+    if (matching) {
+      matching.quantity += item.quantity
+      matching.grant_ids.push(...item.grant_ids)
+    } else {
+      current.items.push(item)
+    }
   }
   await client.query(
     `update user_notifications

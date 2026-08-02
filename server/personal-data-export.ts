@@ -19,6 +19,10 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   },
   depot_value_samples: { disposition: 'export', field: 'depot_samples' },
   invitation_codes: { disposition: 'export', field: 'invitation_code' },
+  invitation_code_audit: {
+    disposition: 'exclude',
+    reason: '邀请码轮换与暂停审计属于安全控制记录，账户删除时通过外键级联清理。',
+  },
   invitations: { disposition: 'export', field: 'invitations' },
   reward_grants: { disposition: 'export', field: 'inventory.grants' },
   reward_consumptions: { disposition: 'export', field: 'inventory.consumptions' },
@@ -48,6 +52,10 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   password_reset_tokens: { disposition: 'exclude', reason: '密码重置令牌哈希属于安全凭据。' },
   email_verification_tokens: { disposition: 'exclude', reason: '邮箱验证令牌哈希属于安全凭据。' },
   admin_registration_invitations: { disposition: 'exclude', reason: '管理员邀请码哈希和发放审计属于安全控制数据。' },
+  admin_invitation_verification_outbox: {
+    disposition: 'exclude',
+    reason: '短期验证邮件投递队列属于安全与恢复状态，不作为可移植用户内容复制。',
+  },
   cdk_redemption_idempotency: { disposition: 'exclude', reason: '内部请求防重放哈希不属于可移植用户内容。' },
   free_preview_claims: { disposition: 'exclude', reason: '森空岛 UID 哈希属于防重复领取安全证据。' },
   free_preview_pending_claims: { disposition: 'exclude', reason: '未完成领取的短期验证状态可能包含授权材料。' },
