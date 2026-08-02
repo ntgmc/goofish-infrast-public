@@ -42,6 +42,16 @@ const shortString = (max = 256) => z.string().min(1).max(max)
 const optionalString = (max = 256) => z.string().max(max).optional()
 const optionalUnknown = z.unknown().optional()
 const strict = z.strictObject
+const inventoryExpirySchema = z.discriminatedUnion('mode', [
+  strict({ mode: z.literal('never') }),
+  strict({ mode: z.literal('relative_days'), days: z.number().int().min(1).max(3650) }),
+])
+const inventoryRewardSchema = strict({
+  item_code: shortString(128),
+  quantity: z.number().int().min(1).max(10000),
+  expiry: inventoryExpirySchema,
+})
+const inventoryReasonSchema = z.string().trim().min(2).max(500)
 
 const siteFeatureShape = Object.fromEntries(
   SITE_FEATURE_KEYS.map((key) => [key, z.boolean()]),
@@ -341,34 +351,75 @@ export const requestSchemas = {
     action: z.enum(['archive', 'unarchive', 'delete']),
     idempotency_key: shortString(200),
   }),
-  adminItems: strict({
-    action: shortString(64),
-    item_code: optionalString(128),
-    name: optionalString(80),
-    description: optionalString(500),
-    icon_key: optionalString(128),
-    issuance_enabled: z.boolean().optional(),
-    contents: z.array(z.unknown()).max(100).optional(),
-    version_id: optionalString(128),
-    task_code: z.enum(['welcome_inventory', 'bind_skland', 'first_main_schedule']).optional(),
-    enabled: z.boolean().optional(),
-    rewards: z.array(z.unknown()).max(100).optional(),
-  }),
-  adminInventory: strict({
-    action: shortString(64),
-    root_password: optionalUnknown,
-    user_id: optionalString(128),
-    user_ids: z.array(shortString(128)).max(10000).optional(),
-    campaign_id: optionalString(128),
-    grant_id: optionalString(128),
-    item_code: optionalString(128),
-    gift_pack_version_id: optionalString(128),
-    quantity: z.number().int().min(1).max(10000).optional(),
-    validity_days: z.number().int().min(0).max(3650).optional(),
-    target_mode: z.enum(['user_ids', 'all_users']).optional(),
-    reason: optionalString(500),
-    confirmation: optionalString(128),
-  }),
+  adminItems: z.discriminatedUnion('action', [
+    strict({
+      action: z.literal('create_gift_pack'),
+      name: shortString(80),
+      description: shortString(500),
+      icon_key: optionalString(128),
+      contents: z.array(inventoryRewardSchema).min(1).max(100),
+      idempotency_key: shortString(200),
+    }),
+    strict({
+      action: z.literal('create_gift_pack_version'),
+      item_code: shortString(128),
+      contents: z.array(inventoryRewardSchema).min(1).max(100),
+      idempotency_key: shortString(200),
+    }),
+    strict({ action: z.literal('publish_gift_pack_version'), version_id: shortString(128) }),
+    strict({ action: z.literal('retire_gift_pack_version'), version_id: shortString(128) }),
+    strict({
+      action: z.literal('update_item'),
+      item_code: shortString(128),
+      name: optionalString(80),
+      description: optionalString(500),
+      icon_key: optionalString(128),
+      issuance_enabled: z.boolean().optional(),
+    }),
+    strict({
+      action: z.literal('configure_onboarding_task'),
+      task_code: z.enum(['welcome_inventory', 'bind_skland', 'first_main_schedule']),
+      enabled: z.boolean(),
+      rewards: z.array(inventoryRewardSchema).max(100),
+    }),
+  ]),
+  adminInventory: z.discriminatedUnion('action', [
+    strict({
+      action: z.literal('grant'),
+      user_id: shortString(128),
+      item_code: shortString(128),
+      gift_pack_version_id: optionalString(128),
+      quantity: z.number().int().min(1).max(10000),
+      validity_days: z.number().int().min(0).max(3650),
+      reason: inventoryReasonSchema,
+      idempotency_key: shortString(200),
+    }),
+    strict({ action: z.literal('revoke_grant'), grant_id: shortString(128), reason: inventoryReasonSchema }),
+    strict({
+      action: z.literal('create_campaign'),
+      root_password: optionalUnknown,
+      user_ids: z.array(shortString(128)).max(10000).optional(),
+      item_code: shortString(128),
+      gift_pack_version_id: optionalString(128),
+      quantity: z.number().int().min(1).max(10000),
+      validity_days: z.number().int().min(0).max(3650),
+      target_mode: z.enum(['user_ids', 'all_users']),
+      reason: inventoryReasonSchema,
+      confirmation: optionalString(128),
+      idempotency_key: shortString(200),
+    }),
+    strict({ action: z.literal('pause_campaign'), campaign_id: shortString(128), reason: inventoryReasonSchema }),
+    strict({ action: z.literal('resume_campaign'), campaign_id: shortString(128), reason: inventoryReasonSchema }),
+    strict({ action: z.literal('cancel_campaign'), campaign_id: shortString(128), reason: inventoryReasonSchema }),
+    strict({
+      action: z.literal('reverse_campaign'),
+      campaign_id: shortString(128),
+      reason: inventoryReasonSchema,
+      root_password: optionalUnknown,
+    }),
+    strict({ action: z.literal('retry_campaign_failures'), campaign_id: shortString(128), reason: inventoryReasonSchema }),
+    strict({ action: z.literal('process_campaigns') }),
+  ]),
 } as const
 
 const none = (): RequestMethodPolicy => ({ bodyProfile: 'none' })

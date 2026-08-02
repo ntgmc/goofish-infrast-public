@@ -1142,6 +1142,17 @@ CREATE TABLE IF NOT EXISTS item_definitions (
 ALTER TABLE item_definitions DROP CONSTRAINT IF EXISTS item_definitions_kind_check;
 ALTER TABLE item_definitions ADD CONSTRAINT item_definitions_kind_check
   CHECK (kind IN ('consumable', 'capacity_upgrade', 'gift_pack', 'cosmetic', 'badge', 'license_voucher'));
+ALTER TABLE item_definitions DROP CONSTRAINT IF EXISTS item_definitions_effect_kind_check;
+ALTER TABLE item_definitions ADD CONSTRAINT item_definitions_effect_kind_check CHECK (
+  (kind = 'consumable' AND effect_code IN (
+    'priority_compute', 'reorder_check', 'scenario_simulation', 'training_diagnosis',
+    'additional_recompute', 'maa_export_trial'
+  ))
+  OR (kind = 'capacity_upgrade' AND effect_code IN ('plan_capacity', 'history_capacity', 'result_archive_capacity'))
+  OR (kind = 'gift_pack' AND effect_code = 'open_gift_pack')
+  OR (kind = 'license_voucher' AND effect_code IN ('bind_lifetime_profile', 'activate_limited_profile'))
+  OR (kind IN ('cosmetic', 'badge') AND effect_code IS NULL)
+);
 
 CREATE TABLE IF NOT EXISTS gift_pack_versions (
   id TEXT PRIMARY KEY,
@@ -1169,7 +1180,14 @@ ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS reference_id TEXT;
 ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS profile_id TEXT;
 ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS committed_at TIMESTAMPTZ;
 ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS refunded_grant_id TEXT;
+ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS original_expires_at TIMESTAMPTZ;
 ALTER TABLE reward_consumptions ALTER COLUMN optimization_job_id DROP NOT NULL;
+UPDATE reward_consumptions consumption
+   SET original_expires_at = source_grant.expires_at
+  FROM reward_grants source_grant
+ WHERE source_grant.id = consumption.grant_id
+   AND consumption.original_expires_at IS NULL
+   AND source_grant.expires_at IS NOT NULL;
 UPDATE reward_consumptions
 SET reference_type = coalesce(reference_type, 'optimization_job'),
     reference_id = coalesce(reference_id, optimization_job_id),
@@ -1237,6 +1255,18 @@ CREATE TABLE IF NOT EXISTS inventory_operations (
   created_at TIMESTAMPTZ NOT NULL,
   completed_at TIMESTAMPTZ,
   UNIQUE (user_id, idempotency_key)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_admin_operations (
+  id TEXT PRIMARY KEY,
+  admin_username TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  operation_type TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  response_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  UNIQUE (admin_username, idempotency_key)
 );
 
 -- goofish:migration-phase
@@ -1378,7 +1408,7 @@ CREATE TABLE IF NOT EXISTS inventory_distribution_campaigns (
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   validity_days INTEGER NOT NULL CHECK (validity_days >= 0 AND validity_days <= 3650),
   target_mode TEXT NOT NULL CHECK (target_mode IN ('user_ids', 'all_users')),
-  status TEXT NOT NULL CHECK (status IN ('draft', 'queued', 'running', 'paused', 'completed', 'cancelled', 'reversing', 'reversed')),
+  status TEXT NOT NULL CHECK (status IN ('draft', 'queued', 'running', 'paused', 'completed', 'completed_with_failures', 'cancelled', 'reversing', 'reversed')),
   reason TEXT NOT NULL,
   created_by TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
@@ -1391,9 +1421,19 @@ CREATE TABLE IF NOT EXISTS inventory_distribution_recipients (
   status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'granted', 'failed', 'revoked', 'skipped')),
   grant_id TEXT REFERENCES reward_grants(id) ON DELETE SET NULL,
   error_message TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   processed_at TIMESTAMPTZ,
   PRIMARY KEY (campaign_id, user_id)
 );
+ALTER TABLE inventory_distribution_recipients
+  ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE inventory_distribution_recipients
+  ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE inventory_distribution_recipients
+  DROP CONSTRAINT IF EXISTS inventory_distribution_recipients_attempt_count_check;
+ALTER TABLE inventory_distribution_recipients
+  ADD CONSTRAINT inventory_distribution_recipients_attempt_count_check CHECK (attempt_count >= 0);
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -1409,8 +1449,23 @@ BEGIN
       CHECK (status IN ('pending', 'processing', 'granted', 'failed', 'revoked', 'skipped'));
   END IF;
 END $$;
-CREATE INDEX IF NOT EXISTS idx_inventory_distribution_pending
-  ON inventory_distribution_recipients(campaign_id, status, user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'inventory_distribution_campaigns_status_check'
+       AND conrelid = 'inventory_distribution_campaigns'::regclass
+       AND pg_get_constraintdef(oid) LIKE '%completed_with_failures%'
+  ) THEN
+    ALTER TABLE inventory_distribution_campaigns
+      DROP CONSTRAINT IF EXISTS inventory_distribution_campaigns_status_check;
+    ALTER TABLE inventory_distribution_campaigns
+      ADD CONSTRAINT inventory_distribution_campaigns_status_check
+      CHECK (status IN ('draft', 'queued', 'running', 'paused', 'completed', 'completed_with_failures', 'cancelled', 'reversing', 'reversed'));
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_inventory_distribution_ready
+  ON inventory_distribution_recipients(campaign_id, status, next_attempt_at, user_id);
 
 CREATE TABLE IF NOT EXISTS behavior_risk_events (
   id TEXT PRIMARY KEY,
@@ -1581,6 +1636,7 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'user_balance_qualification_ledger',
   'commercial_account_limits',
   'user_notifications',
+  'inventory_admin_operations',
 ])
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'

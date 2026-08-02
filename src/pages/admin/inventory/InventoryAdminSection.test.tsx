@@ -7,6 +7,7 @@ import InventoryAdminSection from './InventoryAdminSection'
 
 const adminApiJson = vi.fn()
 vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson: (...args: unknown[]) => adminApiJson(...args) }))
+const timestamp = '2026-08-01T00:00:00.000Z'
 
 const definitions: ItemDefinition[] = [
   {
@@ -24,6 +25,11 @@ const definitions: ItemDefinition[] = [
     name: '新人补给包', description: '新人礼包', icon_key: 'newcomer_supply_pack',
     system_owned: true, issuance_enabled: true, created_at: null, updated_at: null,
   },
+  {
+    code: 'lifetime_profile_voucher', kind: 'license_voucher', effect_code: 'bind_lifetime_profile',
+    name: '终身版兑换 CDK', description: '创建终身档案', icon_key: 'lifetime_profile_voucher',
+    system_owned: true, issuance_enabled: true, created_at: null, updated_at: null,
+  },
 ]
 
 const overview = {
@@ -31,11 +37,13 @@ const overview = {
   gift_pack_versions: [{
     id: 'pack-version-1', item_code: 'newcomer_supply_pack', version: 1, status: 'published' as const,
     contents: [{ item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' as const } }],
+    created_at: timestamp,
+    published_at: timestamp,
   }],
   tasks: [
-    { task_code: 'welcome_inventory' as const, version: 2, enabled: true, rewards_json: [{ item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' as const } }] },
-    { task_code: 'bind_skland' as const, version: 1, enabled: false, rewards_json: [{ item_code: 'plan_capacity_certificate', quantity: 1, expiry: { mode: 'relative_days' as const, days: 30 } }] },
-    { task_code: 'first_main_schedule' as const, version: 1, enabled: false, rewards_json: [] },
+    { task_code: 'welcome_inventory' as const, version: 2, enabled: true, rewards_json: [{ item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' as const } }], created_at: timestamp },
+    { task_code: 'bind_skland' as const, version: 1, enabled: false, rewards_json: [{ item_code: 'plan_capacity_certificate', quantity: 1, expiry: { mode: 'relative_days' as const, days: 30 } }], created_at: timestamp },
+    { task_code: 'first_main_schedule' as const, version: 1, enabled: false, rewards_json: [], created_at: timestamp },
   ],
   campaigns: [],
   audits: [],
@@ -47,7 +55,10 @@ beforeEach(() => {
   adminApiJson.mockImplementation(async (_url: string, options?: unknown) => options ? {} : overview)
 })
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('InventoryAdminSection', () => {
   it('splits the management workflow into accessible tabs', async () => {
@@ -144,5 +155,100 @@ describe('InventoryAdminSection', () => {
     expect(createForm).not.toBeNull()
     const selector = within(createForm as HTMLFormElement).getByLabelText('选择要添加的道具')
     expect(within(selector).queryByRole('option', { name: /新人补给包/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the initial load error and retries instead of staying in a loading state', async () => {
+    adminApiJson
+      .mockRejectedValueOnce(new Error('overview unavailable'))
+      .mockResolvedValueOnce(overview)
+
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('overview unavailable')
+    expect(screen.queryByText('正在加载道具管理…')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '重试加载' }))
+    expect(await screen.findByRole('tabpanel', { name: '道具目录' })).toBeInTheDocument()
+  })
+
+  it('reuses an administrator idempotency key after an unknown grant result', async () => {
+    const grantKeys: string[] = []
+    let grantAttempt = 0
+    adminApiJson.mockImplementation(async (_url: string, options?: { json?: Record<string, unknown> }) => {
+      if (!options) return overview
+      if (options.json?.action === 'grant') {
+        grantKeys.push(String(options.json.idempotency_key))
+        grantAttempt += 1
+        if (grantAttempt === 1) throw new Error('response lost')
+        return { grant_id: 'grant-1' }
+      }
+      return {}
+    })
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /发放中心/ }))
+
+    await user.type(screen.getByLabelText('用户 ID'), 'user-1')
+    await user.type(screen.getByLabelText('发放原因'), '测试幂等发放')
+    await user.click(screen.getByRole('button', { name: '发放' }))
+    expect(await screen.findByText('response lost')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '发放' }))
+
+    await waitFor(() => expect(grantKeys).toHaveLength(2))
+    expect(grantKeys[0]).toBeTruthy()
+    expect(grantKeys[1]).toBe(grantKeys[0])
+  })
+
+  it('labels license vouchers explicitly in reward editors', async () => {
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /新人任务/ }))
+    await user.selectOptions(screen.getByLabelText('选择要添加的道具'), 'lifetime_profile_voucher')
+    await user.click(screen.getByRole('button', { name: '添加道具' }))
+
+    expect(screen.getByText('授权凭证')).toBeInTheDocument()
+    expect(screen.queryByText('成就勋章（预留）')).not.toBeInTheDocument()
+  })
+
+  it('requires and submits a Root password when reversing an all-users campaign', async () => {
+    const allUsersOverview = {
+      ...overview,
+      campaigns: [{
+        id: 'campaign-all',
+        item_code: 'priority_compute_coupon',
+        target_mode: 'all_users' as const,
+        status: 'completed' as const,
+        recipient_count: 3,
+        granted_count: 3,
+        failed_count: 0,
+        pending_count: 0,
+        processing_count: 0,
+        skipped_count: 0,
+        revoked_count: 0,
+        failed_recipients: [],
+      }],
+    }
+    adminApiJson.mockImplementation(async (_url: string, options?: unknown) => options ? {} : allUsersOverview)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = userEvent.setup()
+    render(<InventoryAdminSection />)
+    await user.click(await screen.findByRole('tab', { name: /发放中心/ }))
+
+    const reverse = screen.getByRole('button', { name: '撤回未消费余额' })
+    expect(reverse).toBeDisabled()
+    await user.type(screen.getByLabelText('全站撤回 Root 口令'), 'root-secret')
+    expect(reverse).toBeEnabled()
+    await user.click(reverse)
+
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/inventory', expect.objectContaining({
+      method: 'POST',
+      json: expect.objectContaining({
+        action: 'reverse_campaign',
+        campaign_id: 'campaign-all',
+        root_password: 'root-secret',
+      }),
+    })))
+    expect(confirm).toHaveBeenCalledOnce()
+    confirm.mockRestore()
   })
 })

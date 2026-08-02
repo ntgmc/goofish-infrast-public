@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import {
   ITEM_ICON_PATHS,
@@ -16,7 +16,9 @@ import {
   assertInvitationItemCanBeDisabled,
 } from './invitation-store'
 
-type CampaignStatus = 'draft' | 'queued' | 'running' | 'paused' | 'completed' | 'cancelled' | 'reversing' | 'reversed'
+type CampaignStatus = 'draft' | 'queued' | 'running' | 'paused' | 'completed' | 'completed_with_failures' | 'cancelled' | 'reversing' | 'reversed'
+
+const CAMPAIGN_MAX_ATTEMPTS = 3
 
 export async function getAdminInventoryOverview(): Promise<Record<string, unknown>> {
   await ensureDatabaseSchema()
@@ -45,7 +47,20 @@ export async function getAdminInventoryOverview(): Promise<Record<string, unknow
               count(recipient.user_id)::integer as recipient_count,
               count(*) filter (where recipient.status = 'granted')::integer as granted_count,
               count(*) filter (where recipient.status = 'failed')::integer as failed_count,
-              count(*) filter (where recipient.status = 'pending')::integer as pending_count
+              count(*) filter (where recipient.status = 'pending')::integer as pending_count,
+              count(*) filter (where recipient.status = 'processing')::integer as processing_count,
+              count(*) filter (where recipient.status = 'skipped')::integer as skipped_count,
+              count(*) filter (where recipient.status = 'revoked')::integer as revoked_count,
+              coalesce((
+                select jsonb_agg(to_jsonb(failure) order by failure.processed_at desc, failure.user_id)
+                  from (
+                    select failed.user_id, failed.error_message, failed.attempt_count, failed.processed_at
+                      from inventory_distribution_recipients failed
+                     where failed.campaign_id = campaign.id and failed.status = 'failed'
+                     order by failed.processed_at desc, failed.user_id
+                     limit 50
+                  ) failure
+              ), '[]'::jsonb) as failed_recipients
          from inventory_distribution_campaigns campaign
          left join inventory_distribution_recipients recipient on recipient.campaign_id = campaign.id
         group by campaign.id order by campaign.created_at desc limit 100`,
@@ -65,7 +80,7 @@ export async function getAdminInventoryOverview(): Promise<Record<string, unknow
 
 export async function createCustomGiftPack(
   adminUsername: string,
-  input: { name: unknown; description: unknown; icon_key?: unknown; contents: unknown },
+  input: { name: unknown; description: unknown; icon_key?: unknown; contents: unknown; idempotencyKey?: string },
 ): Promise<Record<string, unknown>> {
   const name = requireString(input.name, 1, 80, '礼包名称')
   const description = requireString(input.description, 1, 500, '礼包描述')
@@ -73,6 +88,10 @@ export async function createCustomGiftPack(
   if (!ITEM_ICON_PATHS[iconKey]) throw new InventoryError('icon_key_invalid', '只能选择受控的本地图标。', 400)
   const contents = normalizeContents(input.contents)
   return withTransaction(async (client) => {
+    const operation = await beginAdminOperation(client, adminUsername, input.idempotencyKey ?? randomUUID(), 'create_gift_pack', {
+      name, description, icon_key: iconKey, contents,
+    })
+    if (operation.replayedResponse) return operation.replayedResponse
     await assertGiftContents(client, contents)
     const itemCode = `gift_pack_${randomUUID().replaceAll('-', '')}`
     const versionId = randomUUID()
@@ -90,7 +109,9 @@ export async function createCustomGiftPack(
     )
     await replaceGiftContents(client, versionId, contents)
     await audit(client, adminUsername, 'create_gift_pack', 'item', itemCode, '创建自定义礼包草稿。', null, { name, description, version_id: versionId }, now)
-    return { item_code: itemCode, version_id: versionId, version: 1, status: 'draft' }
+    const response = { item_code: itemCode, version_id: versionId, version: 1, status: 'draft' }
+    await completeAdminOperation(client, operation.id, response, now)
+    return response
   })
 }
 
@@ -98,9 +119,14 @@ export async function createGiftPackDraft(
   adminUsername: string,
   itemCode: string,
   contentsValue: unknown,
+  idempotencyKey = randomUUID(),
 ): Promise<Record<string, unknown>> {
   const contents = normalizeContents(contentsValue)
   return withTransaction(async (client) => {
+    const operation = await beginAdminOperation(client, adminUsername, idempotencyKey, 'create_gift_pack_version', {
+      item_code: itemCode, contents,
+    })
+    if (operation.replayedResponse) return operation.replayedResponse
     const item = await client.query<{ kind: string }>('select kind from item_definitions where code = $1 for update', [itemCode])
     if (item.rows[0]?.kind !== 'gift_pack') throw new InventoryError('gift_pack_missing', '礼包不存在。', 404)
     await assertGiftContents(client, contents)
@@ -118,7 +144,9 @@ export async function createGiftPackDraft(
     )
     await replaceGiftContents(client, versionId, contents)
     await audit(client, adminUsername, 'create_gift_pack_version', 'gift_pack_version', versionId, '创建礼包新版本草稿。', null, { item_code: itemCode, version: nextVersion }, now)
-    return { item_code: itemCode, version_id: versionId, version: nextVersion, status: 'draft' }
+    const response = { item_code: itemCode, version_id: versionId, version: nextVersion, status: 'draft' }
+    await completeAdminOperation(client, operation.id, response, now)
+    return response
   })
 }
 
@@ -210,10 +238,15 @@ export async function configureOnboardingTask(
 
 export async function adminGrantItem(
   adminUsername: string,
-  input: { userId: string; itemCode: string; quantity: number; validityDays: number; giftPackVersionId?: string | null; reason: string },
+  input: {
+    userId: string; itemCode: string; quantity: number; validityDays: number
+    giftPackVersionId?: string | null; reason: string; idempotencyKey?: string
+  },
 ): Promise<string | null> {
   return withTransaction(async (client) => {
     const now = new Date().toISOString()
+    const operation = await beginAdminOperation(client, adminUsername, input.idempotencyKey ?? randomUUID(), 'grant_item', input)
+    if (operation.replayedResponse) return typeof operation.replayedResponse.grant_id === 'string' ? operation.replayedResponse.grant_id : null
     const user = await client.query('select 1 from user_accounts where id = $1', [input.userId])
     if (!user.rowCount) throw new InventoryError('user_missing', '目标用户不存在。', 404)
     const grantId = await grantItemInTransaction(client, {
@@ -222,13 +255,14 @@ export async function adminGrantItem(
       quantity: input.quantity,
       expiry: input.validityDays > 0 ? { mode: 'relative_days', days: input.validityDays } : { mode: 'never' },
       sourceType: 'admin_grant',
-      sourceId: randomUUID(),
+      sourceId: operation.id,
       recipientRole: 'user',
       giftPackVersionId: input.giftPackVersionId,
       metadata: { reason: input.reason, admin_username: adminUsername },
       now,
     })
     await audit(client, adminUsername, 'grant_item', 'user', input.userId, input.reason, null, { grant_id: grantId, ...input }, now)
+    await completeAdminOperation(client, operation.id, { grant_id: grantId }, now)
     return grantId
   })
 }
@@ -267,8 +301,15 @@ export async function createDistributionCampaign(adminUsername: string, input: {
   targetMode: 'user_ids' | 'all_users'
   userIds?: string[]
   reason: string
+  idempotencyKey?: string
 }): Promise<Record<string, unknown>> {
   return withTransaction(async (client) => {
+    const now = new Date().toISOString()
+    const normalizedUserIds = input.targetMode === 'user_ids' ? [...new Set(input.userIds ?? [])].sort() : []
+    const operation = await beginAdminOperation(client, adminUsername, input.idempotencyKey ?? randomUUID(), 'create_campaign', {
+      ...input, userIds: normalizedUserIds,
+    })
+    if (operation.replayedResponse) return operation.replayedResponse
     if (!Number.isInteger(input.quantity) || input.quantity < 1 || input.quantity > 10000) {
       throw new InventoryError('quantity_invalid', '发放数量必须是 1 到 10000 之间的整数。', 400)
     }
@@ -294,7 +335,6 @@ export async function createDistributionCampaign(adminUsername: string, input: {
       throw new InventoryError('gift_pack_version_not_applicable', '非礼包道具不能绑定礼包版本。', 400)
     }
     const campaignId = randomUUID()
-    const now = new Date().toISOString()
     await client.query(
       `insert into inventory_distribution_campaigns
         (id, item_code, gift_pack_version_id, quantity, validity_days, target_mode, status, reason, created_by, created_at, updated_at)
@@ -308,7 +348,7 @@ export async function createDistributionCampaign(adminUsername: string, input: {
         [campaignId],
       )
     } else {
-      const userIds = [...new Set(input.userIds ?? [])]
+      const userIds = normalizedUserIds
       if (userIds.length === 0) throw new InventoryError('campaign_targets_missing', '批量发放必须提供用户 ID。', 400)
       await client.query(
         `insert into inventory_distribution_recipients (campaign_id, user_id, status)
@@ -324,7 +364,9 @@ export async function createDistributionCampaign(adminUsername: string, input: {
     }
     const count = await client.query<{ count: string }>('select count(*)::text as count from inventory_distribution_recipients where campaign_id = $1', [campaignId])
     await audit(client, adminUsername, 'create_distribution_campaign', 'campaign', campaignId, input.reason, null, { ...input, recipient_count: count.rows[0]?.count }, now)
-    return { campaign_id: campaignId, status: 'queued', recipient_count: Number(count.rows[0]?.count ?? 0) }
+    const response = { campaign_id: campaignId, status: 'queued', recipient_count: Number(count.rows[0]?.count ?? 0) }
+    await completeAdminOperation(client, operation.id, response, now)
+    return response
   })
 }
 
@@ -341,13 +383,58 @@ export async function updateCampaignStatus(adminUsername: string, campaignId: st
         ? currentStatus === 'paused'
         : action === 'cancel'
           ? currentStatus === 'queued' || currentStatus === 'running' || currentStatus === 'paused'
-          : currentStatus === 'completed'
+          : currentStatus === 'completed' || currentStatus === 'completed_with_failures'
     if (!allowed) throw new InventoryError('campaign_transition_invalid', `发放活动不能从 ${currentStatus} 执行 ${action}。`, 409)
     const now = new Date().toISOString()
     await client.query('update inventory_distribution_campaigns set status = $2, updated_at = $3 where id = $1', [campaignId, nextStatus, now])
-    if (action === 'cancel') await client.query("update inventory_distribution_recipients set status = 'skipped', processed_at = $2 where campaign_id = $1 and status = 'pending'", [campaignId, now])
+    if (action === 'pause') {
+      await client.query(
+        "update inventory_distribution_recipients set status = 'pending', processed_at = null, next_attempt_at = $2 where campaign_id = $1 and status = 'processing'",
+        [campaignId, now],
+      )
+    }
+    if (action === 'cancel') {
+      await client.query(
+        "update inventory_distribution_recipients set status = 'skipped', processed_at = $2 where campaign_id = $1 and status in ('pending', 'processing')",
+        [campaignId, now],
+      )
+    }
     await audit(client, adminUsername, `campaign_${action}`, 'campaign', campaignId, reason, campaign.rows[0], { status: nextStatus }, now)
   })
+}
+
+export async function retryFailedCampaignRecipients(adminUsername: string, campaignId: string, reason: string): Promise<number> {
+  return withTransaction(async (client) => {
+    const campaign = await client.query<{ status: CampaignStatus }>(
+      'select status from inventory_distribution_campaigns where id = $1 for update',
+      [campaignId],
+    )
+    if (!campaign.rows[0]) throw new InventoryError('campaign_missing', '发放活动不存在。', 404)
+    if (campaign.rows[0].status !== 'completed_with_failures') {
+      throw new InventoryError('campaign_retry_invalid', '只有部分失败的已结束活动可以重试。', 409)
+    }
+    const now = new Date().toISOString()
+    const retried = await client.query(
+      `update inventory_distribution_recipients
+          set status = 'pending', attempt_count = 0, next_attempt_at = $2, processed_at = null, error_message = null
+        where campaign_id = $1 and status = 'failed'
+        returning user_id`,
+      [campaignId, now],
+    )
+    await client.query("update inventory_distribution_campaigns set status = 'queued', updated_at = $2 where id = $1", [campaignId, now])
+    await audit(client, adminUsername, 'campaign_retry_failures', 'campaign', campaignId, reason, campaign.rows[0], { status: 'queued', retried: retried.rowCount ?? 0 }, now)
+    return retried.rowCount ?? 0
+  })
+}
+
+export async function isAllUsersDistributionCampaign(campaignId: string): Promise<boolean> {
+  await ensureDatabaseSchema()
+  const campaign = await query<{ target_mode: 'user_ids' | 'all_users' }>(
+    'select target_mode from inventory_distribution_campaigns where id = $1',
+    [campaignId],
+  )
+  if (!campaign.rows[0]) throw new InventoryError('campaign_missing', '发放活动不存在。', 404)
+  return campaign.rows[0].target_mode === 'all_users'
 }
 
 export async function processInventoryCampaignBatch(limit = 100): Promise<number> {
@@ -391,7 +478,7 @@ async function grantCampaignBatch(campaignId: string, limit: number): Promise<nu
     const recipients = await client.query<{ user_id: string }>(
       `with selected as (
          select user_id from inventory_distribution_recipients
-          where campaign_id = $1 and status = 'pending'
+          where campaign_id = $1 and status = 'pending' and next_attempt_at <= $3
           order by user_id for update skip locked limit $2
        )
        update inventory_distribution_recipients recipient set status = 'processing', processed_at = $3, error_message = null
@@ -408,6 +495,16 @@ async function grantCampaignBatch(campaignId: string, limit: number): Promise<nu
       await withTransaction(async (client) => {
         const now = new Date().toISOString()
         const row = claimed.row!
+        const campaignState = await client.query<{ status: CampaignStatus }>(
+          'select status from inventory_distribution_campaigns where id = $1 for share',
+          [campaignId],
+        )
+        if (campaignState.rows[0]?.status !== 'running' && campaignState.rows[0]?.status !== 'queued') return
+        const recipientState = await client.query<{ status: string }>(
+          'select status from inventory_distribution_recipients where campaign_id = $1 and user_id = $2 for update',
+          [campaignId, userId],
+        )
+        if (recipientState.rows[0]?.status !== 'processing') return
         const grantId = await grantItemInTransaction(client, {
           userId,
           itemCode: row.item_code,
@@ -428,17 +525,27 @@ async function grantCampaignBatch(campaignId: string, limit: number): Promise<nu
       })
     } catch (error) {
       await query(
-        "update inventory_distribution_recipients set status = 'failed', error_message = $3, processed_at = $4 where campaign_id = $1 and user_id = $2 and status = 'processing'",
-        [campaignId, userId, error instanceof Error ? error.message.slice(0, 500) : 'unknown error', new Date().toISOString()],
+        `update inventory_distribution_recipients
+            set attempt_count = attempt_count + 1,
+                status = case when attempt_count + 1 >= $5 then 'failed' else 'pending' end,
+                error_message = $3,
+                processed_at = $4,
+                next_attempt_at = $4::timestamptz + make_interval(secs => least(300, (power(2, attempt_count)::integer * 5)))
+          where campaign_id = $1 and user_id = $2 and status = 'processing'`,
+        [campaignId, userId, error instanceof Error ? error.message.slice(0, 500) : 'unknown error', new Date().toISOString(), CAMPAIGN_MAX_ATTEMPTS],
       )
     }
   }
   await withTransaction(async (client) => {
-    const pending = await client.query<{ count: string }>(
-      "select count(*)::text as count from inventory_distribution_recipients where campaign_id = $1 and status in ('pending', 'processing')", [campaignId],
+    const counts = await client.query<{ active_count: string; failed_count: string }>(
+      `select count(*) filter (where status in ('pending', 'processing'))::text as active_count,
+              count(*) filter (where status = 'failed')::text as failed_count
+         from inventory_distribution_recipients where campaign_id = $1`,
+      [campaignId],
     )
-    if (Number(pending.rows[0]?.count ?? 0) === 0) {
-      await client.query("update inventory_distribution_campaigns set status = 'completed', updated_at = $2 where id = $1 and status = 'running'", [campaignId, new Date().toISOString()])
+    if (Number(counts.rows[0]?.active_count ?? 0) === 0) {
+      const status = Number(counts.rows[0]?.failed_count ?? 0) > 0 ? 'completed_with_failures' : 'completed'
+      await client.query('update inventory_distribution_campaigns set status = $2, updated_at = $3 where id = $1 and status = \'running\'', [campaignId, status, new Date().toISOString()])
     }
   })
   return claimed.recipients.length
@@ -566,6 +673,52 @@ async function audit(
       (id, admin_username, action, target_type, target_id, reason, before_json, after_json, created_at)
      values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9)`,
     [randomUUID(), adminUsername, action, targetType, targetId, reason, JSON.stringify(before), JSON.stringify(after), now],
+  )
+}
+
+async function beginAdminOperation(
+  client: PoolClient,
+  adminUsername: string,
+  idempotencyKey: string,
+  operationType: string,
+  request: unknown,
+): Promise<{ id: string; replayedResponse: Record<string, unknown> | null }> {
+  const key = requireString(idempotencyKey, 1, 200, '幂等键')
+  const requestHash = createHash('sha256').update(JSON.stringify(request)).digest('hex')
+  const operationId = randomUUID()
+  const now = new Date().toISOString()
+  const inserted = await client.query(
+    `insert into inventory_admin_operations
+      (id, admin_username, idempotency_key, operation_type, request_hash, created_at)
+     values ($1, $2, $3, $4, $5, $6)
+     on conflict (admin_username, idempotency_key) do nothing`,
+    [operationId, adminUsername, key, operationType, requestHash, now],
+  )
+  if (inserted.rowCount) return { id: operationId, replayedResponse: null }
+  const existing = await client.query<{
+    id: string; operation_type: string; request_hash: string; response_json: Record<string, unknown> | null
+  }>(
+    `select id, operation_type, request_hash, response_json from inventory_admin_operations
+      where admin_username = $1 and idempotency_key = $2 for update`,
+    [adminUsername, key],
+  )
+  const row = existing.rows[0]
+  if (!row || row.operation_type !== operationType || row.request_hash !== requestHash) {
+    throw new InventoryError('idempotency_conflict', '幂等键已被其他管理员请求使用。', 409)
+  }
+  if (!row.response_json) throw new InventoryError('operation_in_progress', '管理员操作正在处理中。', 409)
+  return { id: row.id, replayedResponse: row.response_json }
+}
+
+async function completeAdminOperation(
+  client: PoolClient,
+  operationId: string,
+  response: Record<string, unknown>,
+  now: string,
+): Promise<void> {
+  await client.query(
+    'update inventory_admin_operations set response_json = $2::jsonb, completed_at = $3 where id = $1',
+    [operationId, JSON.stringify(response), now],
   )
 }
 

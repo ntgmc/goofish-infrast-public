@@ -225,3 +225,68 @@ describe('profile metadata request policy', () => {
     expect(requestSchemas.profilePatch.safeParse({ profile_id: 'profile-1', note: '' }).success).toBe(true)
   })
 })
+
+describe('administrator inventory request policy', () => {
+  const reward = {
+    item_code: 'priority_compute_coupon',
+    quantity: 1,
+    expiry: { mode: 'never' as const },
+  }
+
+  it('accepts action-specific asset writes with reason and idempotency', () => {
+    expect(requestSchemas.adminItems.safeParse({
+      action: 'create_gift_pack',
+      name: '测试礼包',
+      description: '测试说明',
+      contents: [reward],
+      idempotency_key: 'gift-pack-request',
+    }).success).toBe(true)
+    expect(requestSchemas.adminInventory.safeParse({
+      action: 'grant',
+      user_id: 'user-1',
+      item_code: 'priority_compute_coupon',
+      quantity: 1,
+      validity_days: 0,
+      reason: '人工补发',
+      idempotency_key: 'grant-request',
+    }).success).toBe(true)
+    expect(requestSchemas.adminInventory.safeParse({
+      action: 'create_campaign',
+      item_code: 'priority_compute_coupon',
+      quantity: 1,
+      validity_days: 0,
+      target_mode: 'user_ids',
+      user_ids: ['user-1'],
+      reason: '活动补偿',
+      idempotency_key: 'campaign-request',
+    }).success).toBe(true)
+    expect(requestSchemas.adminInventory.safeParse({
+      action: 'reverse_campaign',
+      campaign_id: 'campaign-1',
+      reason: '全站撤回',
+      root_password: 'root-password',
+    }).success).toBe(true)
+  })
+
+  it('rejects missing accountability fields, unknown actions, and untyped reward fields', () => {
+    const grant = {
+      action: 'grant',
+      user_id: 'user-1',
+      item_code: 'priority_compute_coupon',
+      quantity: 1,
+      validity_days: 0,
+      reason: '人工补发',
+      idempotency_key: 'grant-request',
+    }
+    expect(requestSchemas.adminInventory.safeParse({ ...grant, reason: undefined }).success).toBe(false)
+    expect(requestSchemas.adminInventory.safeParse({ ...grant, idempotency_key: undefined }).success).toBe(false)
+    expect(requestSchemas.adminInventory.safeParse({ ...grant, action: 'arbitrary' }).success).toBe(false)
+    expect(requestSchemas.adminItems.safeParse({
+      action: 'create_gift_pack',
+      name: '测试礼包',
+      description: '测试说明',
+      contents: [{ ...reward, server_owned: true }],
+      idempotency_key: 'gift-pack-request',
+    }).success).toBe(false)
+  })
+})
