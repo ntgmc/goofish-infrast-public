@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto'
 import type { ScenarioComparisonResult } from '../../../src/lib/scenario-comparison'
 import type { OptimizeResult, ReorderCheckResult } from '../../../src/lib/types'
+import { attachTrainingCostsToUpgradeSuggestions } from '../../handlers/training-cost'
 import type { OptimizeJobRecord } from '../../storage/optimize-job-store'
+import { getProfileById } from '../../storage/user-store'
 import {
   requireRegisteredOptimizerPort,
   OptimizerExecutionError,
@@ -32,7 +35,8 @@ export async function executeOptimizationJobWithPort(
       internalMessage: error instanceof Error ? error.message : String(error),
     })
   }
-  const result = await dispatchOptimizationJobPayload(payload, context, port)
+  const dispatchedResult = await dispatchOptimizationJobPayload(payload, context, port)
+  const result = await enrichScheduleTrainingCosts(payload, dispatchedResult, context)
   try {
     return parseOptimizationJobResult(payload, result)
   } catch (error) {
@@ -44,6 +48,63 @@ export async function executeOptimizationJobWithPort(
       internalMessage: error instanceof Error ? error.message : String(error),
     })
   }
+}
+
+async function enrichScheduleTrainingCosts(
+  payload: OptimizationJobPayload,
+  result: OptimizationJobExecutionResult,
+  context: OptimizeExecutionContext,
+): Promise<OptimizationJobExecutionResult> {
+  if ('kind' in payload) return result
+  const scheduleResult = result as OptimizeResult
+  if (!scheduleResult.upgrade_suggestions) return scheduleResult
+  const suggestions = scheduleResult.upgrade_suggestions.map((suggestion) => ({
+    ...suggestion,
+    suggestion_id: createSuggestionId(suggestion),
+  }))
+  const resultWithSuggestionIds = { ...scheduleResult, upgrade_suggestions: suggestions }
+  if (!payload.request.include_upgrade_suggestions || !payload.request.upgrade_suggestions_allowed) {
+    return resultWithSuggestionIds
+  }
+  if (suggestions.length === 0) return scheduleResult
+
+  await context.reportStage?.('enriching_training_costs')
+  const profile = payload.activeProfileId
+    ? await getProfileById(payload.activeProfileId).catch(() => null)
+    : null
+  const enriched = await attachTrainingCostsToUpgradeSuggestions({
+    suggestions,
+    operators: payload.operators,
+    encryptedCred: profile?.skland_binding?.encrypted_cred ?? null,
+    uid: profile?.skland_binding?.uid ?? null,
+  })
+  return {
+    ...resultWithSuggestionIds,
+    upgrade_suggestions: enriched as typeof suggestions,
+  }
+}
+
+function createSuggestionId(suggestion: NonNullable<OptimizeResult['upgrade_suggestions']>[number]): string {
+  const identity = suggestion.type === 'single'
+    ? {
+      type: suggestion.type,
+      id: suggestion.id ?? null,
+      name: suggestion.name,
+      current: suggestion.current,
+      target: suggestion.target,
+      specialType: suggestion.specialType ?? null,
+    }
+    : {
+      type: suggestion.type,
+      ops: suggestion.ops.map((operator) => ({
+        id: operator.id ?? null,
+        name: operator.name,
+        current: operator.current ?? operator.current_elite ?? null,
+        target: operator.target ?? operator.target_elite ?? null,
+      })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
+      specialType: suggestion.specialType ?? null,
+    }
+  return `upgrade-${createHash('sha256').update(JSON.stringify(identity)).digest('hex').slice(0, 20)}`
 }
 
 export async function executeRegisteredOptimizationJob(

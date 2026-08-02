@@ -65,6 +65,38 @@ describe('usage stats handler', () => {
     expect(stats.days[0]).toMatchObject({ visits: 1, unique_visitors: 1 })
   })
 
+  it('deduplicates versioned announcement impressions by visitor', async () => {
+    const records = new Map<string, UsageEventRecord>()
+    const store: UsageEventStore = {
+      set: async (key, record) => { records.set(key, record) },
+      list: async () => [...records.values()],
+      getStats: async (dates) => buildUsageStats([...records.values()], dates),
+    }
+    setUsageEventStoreForTesting(store)
+    const body = JSON.stringify({
+      event: 'announcement_impression',
+      visitor_id: 'tool-visitor_12345',
+      announcement_id: 'announcement-1',
+      announcement_kind: 'popup',
+      announcement_version: '2026-07-31T12:00:00.000Z',
+      source: 'popup_impression',
+    })
+
+    for (let index = 0; index < 2; index += 1) {
+      const response = await usageStatsHandler(new Request('http://localhost/api/usage-stats', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+      }))
+      expect(response.status).toBe(200)
+    }
+
+    expect(records.size).toBe(1)
+    expect([...records.values()][0]).toMatchObject({
+      visitor_id: 'tool-visitor_12345',
+      announcement_id: 'announcement-1',
+      announcement_version: '2026-07-31T12:00:00.000Z',
+    })
+  })
+
   it('uses authoritative CDK redemptions and free preview account additions for dashboard trends', () => {
     const dates = ['2026-03-10', '2026-03-11']
     const legacyEvents: UsageEventRecord[] = [

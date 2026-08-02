@@ -1,13 +1,14 @@
 import { query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
-import type { BrevoQuotaAction } from '../../src/lib/types'
+import type { BrevoQuotaAction, EmailProviderPriority } from '../../src/lib/types'
 
 const REGISTRATION_SETTINGS_KEY = 'global'
 
-export interface RegistrationSettingsV4 {
-  version: 4
+export interface RegistrationSettingsV5 {
+  version: 5
   email_verification_required: boolean
   invite_code_required: boolean
+  email_provider_priority: EmailProviderPriority
   brevo_quota_action: BrevoQuotaAction
   admin_invite_email_reserve: number
   password_reset_email_reserve: number
@@ -15,14 +16,15 @@ export interface RegistrationSettingsV4 {
 }
 
 export type RegistrationSettingsPatch = Pick<
-  RegistrationSettingsV4,
-  'email_verification_required' | 'invite_code_required' | 'brevo_quota_action' | 'admin_invite_email_reserve' | 'password_reset_email_reserve'
+  RegistrationSettingsV5,
+  'email_verification_required' | 'invite_code_required' | 'email_provider_priority' | 'brevo_quota_action' | 'admin_invite_email_reserve' | 'password_reset_email_reserve'
 >
 
-export const DEFAULT_REGISTRATION_SETTINGS: RegistrationSettingsV4 = {
-  version: 4,
+export const DEFAULT_REGISTRATION_SETTINGS: RegistrationSettingsV5 = {
+  version: 5,
   email_verification_required: true,
   invite_code_required: false,
+  email_provider_priority: ['brevo', 'ses'],
   brevo_quota_action: 'pause_registration',
   admin_invite_email_reserve: 0,
   password_reset_email_reserve: 0,
@@ -45,19 +47,22 @@ export class RegistrationSettingsValidationError extends Error {
 
 let schemaReady: Promise<void> | null = null
 
-export function normalizeRegistrationSettings(value: unknown): RegistrationSettingsV4 {
-  const source = value && typeof value === 'object' ? value as Partial<RegistrationSettingsV4> : {}
+export function normalizeRegistrationSettings(value: unknown): RegistrationSettingsV5 {
+  const source = value && typeof value === 'object' ? value as Partial<RegistrationSettingsV5> : {}
   const adminInviteReserve = integerInRange(source.admin_invite_email_reserve, 0, 300, 0)
   const passwordResetReserve = Math.min(
     integerInRange(source.password_reset_email_reserve, 0, 300, 0),
     300 - adminInviteReserve,
   )
   return {
-    version: 4,
+    version: 5,
     email_verification_required: typeof source.email_verification_required === 'boolean'
       ? source.email_verification_required
       : true,
     invite_code_required: source.invite_code_required === true,
+    email_provider_priority: isEmailProviderPriority(source.email_provider_priority)
+      ? [...source.email_provider_priority]
+      : ['brevo', 'ses'],
     brevo_quota_action: isBrevoQuotaAction(source.brevo_quota_action)
       ? source.brevo_quota_action
       : 'pause_registration',
@@ -78,6 +83,9 @@ export function validateRegistrationSettingsPatch(value: unknown): RegistrationS
   }
   if (typeof source.invite_code_required !== 'boolean') {
     issues.push({ path: 'invite_code_required', message: '仅邀请注册设置必须是布尔值。' })
+  }
+  if (!isEmailProviderPriority(source.email_provider_priority)) {
+    issues.push({ path: 'email_provider_priority', message: '邮件服务优先级必须包含 Brevo 和 Amazon SES，且不能重复。' })
   }
   if (!isBrevoQuotaAction(source.brevo_quota_action)) {
     issues.push({ path: 'brevo_quota_action', message: 'Brevo 配额处理方式无效。' })
@@ -102,22 +110,23 @@ export function validateRegistrationSettingsPatch(value: unknown): RegistrationS
   return {
     email_verification_required: source.email_verification_required as boolean,
     invite_code_required: source.invite_code_required as boolean,
+    email_provider_priority: [...source.email_provider_priority as EmailProviderPriority],
     brevo_quota_action: source.brevo_quota_action as BrevoQuotaAction,
     admin_invite_email_reserve: adminInviteReserve!,
     password_reset_email_reserve: passwordResetReserve!,
   }
 }
 
-export async function getRegistrationSettings(): Promise<RegistrationSettingsV4> {
+export async function getRegistrationSettings(): Promise<RegistrationSettingsV5> {
   await ensureSchema()
-  const result = await query<{ record_json: RegistrationSettingsV4 }>(
+  const result = await query<{ record_json: RegistrationSettingsV5 }>(
     'select record_json from registration_settings where key = $1',
     [REGISTRATION_SETTINGS_KEY],
   )
   return normalizeRegistrationSettings(result.rows[0]?.record_json)
 }
 
-export async function saveRegistrationSettings(patch: RegistrationSettingsPatch): Promise<RegistrationSettingsV4> {
+export async function saveRegistrationSettings(patch: RegistrationSettingsPatch): Promise<RegistrationSettingsV5> {
   await ensureSchema()
   const saved = normalizeRegistrationSettings({
     ...await getRegistrationSettings(),
@@ -135,6 +144,13 @@ export async function saveRegistrationSettings(patch: RegistrationSettingsPatch)
 
 function isBrevoQuotaAction(value: unknown): value is BrevoQuotaAction {
   return value === 'pause_registration' || value === 'allow_unverified_registration'
+}
+
+function isEmailProviderPriority(value: unknown): value is EmailProviderPriority {
+  return Array.isArray(value)
+    && value.length === 2
+    && value.includes('brevo')
+    && value.includes('ses')
 }
 
 function integerInRange(value: unknown, min: number, max: number, fallback: number): number {

@@ -30,6 +30,7 @@ describe('inventory listing', () => {
       if (statement.includes('from reward_grants grants')) return { rows: [] }
       if (statement.includes('from inventory_ledger')) return { rows: [] }
       if (statement.includes('from profile_entitlement_balances balances')) return { rows: [] }
+      if (statement.includes('from user_profile_workspaces')) return { rows: [] }
       throw new Error(`Unexpected inventory query: ${statement}`)
     })
   })
@@ -45,7 +46,6 @@ describe('inventory listing', () => {
       history_slots: expect.objectContaining({ used: 0 }),
       archive_slots: expect.objectContaining({ used: 0 }),
     })])
-    expect(getProfileWorkspace).toHaveBeenCalledTimes(1)
-    expect(getProfileWorkspace).toHaveBeenCalledWith('schedule-profile')
+    expect(getProfileWorkspace).not.toHaveBeenCalled()
   })
 })

@@ -19,8 +19,10 @@ import {
   getUserById,
   insertUserAccountForRegistration,
   listProfileWorkspaces,
+  listProfileWorkspaceSummaries,
   listProfilesForUser,
   migrateLegacyUserIfNeeded,
+  normalizeProfileKind,
   savePasswordResetToken,
   saveEmailVerificationToken,
   saveUserProfile,
@@ -37,8 +39,10 @@ import {
   type UserGameAccountRecord,
   type UserSessionRecord,
 } from '../storage/user-store'
+import { getProfileCapacityLimits } from '../storage/inventory-store'
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
 import { getFreePreviewTrial } from '../free-preview-trial'
+import { resolveProfileAuthorization } from './profile-authorization'
 import { createPasswordHash, verifyPasswordHash, verifyPasswordHashOrDummy } from '../security/password'
 import {
   BrevoDailyQuotaExceededError,
@@ -47,7 +51,7 @@ import {
   reservePasswordResetDelivery,
   sendEmailVerificationEmail,
   sendPasswordResetEmail,
-  type BrevoEmailReservation,
+  type EmailDeliveryReservation,
 } from './email'
 import { getRegistrationSettings } from '../storage/registration-settings-store'
 import { validateRegistrationEmailForRegistration } from '../security/registration-email-policy'
@@ -75,7 +79,7 @@ import {
   InvitationCodeError,
   saveInvitationInTransaction,
   saveRegistrationWithInvitation,
-  settleInvitationForActivatedUser,
+  activateInvitationForUser,
   validateInvitationCode,
   type ValidatedInvitationCode,
 } from '../storage/invitation-store'
@@ -171,7 +175,7 @@ export async function registerUser(
     throw error
   }
   let verificationRequired = registrationSettings.email_verification_required
-  let emailReservation: BrevoEmailReservation | null = null
+  let emailReservation: EmailDeliveryReservation | null = null
 
   if (verificationRequired) {
     try {
@@ -732,26 +736,49 @@ export async function logoutRequest(req: Request): Promise<void> {
 export async function buildAuthPayload(user: UserAccountRecord, activeProfileId?: string | null): Promise<AuthSuccessResponse> {
   const allRecords = await migrateLegacyUserIfNeeded(user)
   const { records, activeProfileRecord, workspaceProfileIds } = selectAuthPayloadProfiles(allRecords, activeProfileId)
-  const [workspaces, announcementUnreadCount] = await Promise.all([
-    listProfileWorkspaces(workspaceProfileIds),
+  const [workspaces, workspaceSummaries, announcementUnreadCount, activeCapacityLimits, activeAuthorization] = await Promise.all([
+    listProfileWorkspaces(activeProfileRecord ? [activeProfileRecord.id] : []),
+    listProfileWorkspaceSummaries(workspaceProfileIds),
     getAnnouncementUnreadCount(user.id),
+    activeProfileRecord ? getProfileCapacityLimits(activeProfileRecord.id) : null,
+    activeProfileRecord ? resolveProfileAuthorization(activeProfileRecord) : null,
   ])
-  for (const profile of records) {
-    const workspace = workspaces.get(profile.id) ?? null
-    if (!workspace) continue
-    workspaces.set(profile.id, projectExpiredFreePreviewWorkspace(profile, workspace).workspace)
+  if (activeProfileRecord) {
+    const activeWorkspace = workspaces.get(activeProfileRecord.id)
+    if (activeWorkspace) {
+      workspaces.set(
+        activeProfileRecord.id,
+        projectExpiredFreePreviewWorkspace(activeProfileRecord, activeWorkspace).workspace,
+      )
+    }
   }
   const publicProfiles: UserGameAccount[] = records.map((profile) => (
-    toPublicProfile(profile, workspaces.get(profile.id) ?? null, getFreePreviewTrial(profile))
+    toPublicProfile(
+      profile,
+      workspaces.get(profile.id) ?? workspaceSummaries.get(profile.id) ?? null,
+      getFreePreviewTrial(profile),
+    )
   ))
   const activeWorkspace = activeProfileRecord ? workspaces.get(activeProfileRecord.id) ?? null : null
+  const activeSubject = activeProfileRecord
+    ? {
+        kind: normalizeProfileKind(activeProfileRecord),
+        permission: activeAuthorization?.ok ? activeAuthorization.permission : 'recommended' as const,
+      }
+    : undefined
   return {
     user: toPublicUser(user),
     profiles: publicProfiles,
     active_profile: activeProfileRecord
-      ? toPublicProfile(activeProfileRecord, activeWorkspace, getFreePreviewTrial(activeProfileRecord))
+      ? toPublicProfile(
+          activeProfileRecord,
+          activeWorkspace ?? workspaceSummaries.get(activeProfileRecord.id) ?? null,
+          getFreePreviewTrial(activeProfileRecord),
+        )
       : null,
-    workspace: activeProfileRecord ? toPublicWorkspace(activeWorkspace) : null,
+    workspace: activeProfileRecord
+      ? toPublicWorkspace(activeWorkspace, activeCapacityLimits ?? undefined, activeSubject)
+      : null,
     announcement_unread_count: announcementUnreadCount,
   }
 }
@@ -787,6 +814,13 @@ export async function resendEmailVerification(emailValue: unknown): Promise<{ ok
   return { ok: true, message: authCopy.api_email_verification_resend }
 }
 
+export async function resendEmailVerificationForUserId(userId: string): Promise<boolean> {
+  const user = await getUserById(userId)
+  if (!user || user.email_verified_at) return false
+  await issueEmailVerification(user)
+  return true
+}
+
 export function toPublicUser(user: UserAccountRecord): AuthUser {
   return {
     id: user.id,
@@ -811,8 +845,8 @@ async function getAnnouncementUnreadCount(userId: string): Promise<number> {
 }
 
 function scheduleInvitationSettlement(userId: string): void {
-  void settleInvitationForActivatedUser(userId).catch((error) => {
-    console.warn('invitation activation settlement deferred:', safeErrorName(error))
+  void activateInvitationForUser(userId).catch((error) => {
+    console.warn('invitation activation deferred:', safeErrorName(error))
   })
 }
 
@@ -885,7 +919,7 @@ function hashEmailVerificationToken(token: string): string {
 
 async function issueEmailVerification(
   user: UserAccountRecord,
-  suppliedReservation?: BrevoEmailReservation,
+  suppliedReservation?: EmailDeliveryReservation,
 ): Promise<void> {
   const resendSince = new Date(Date.now() - EMAIL_VERIFICATION_RESEND_WINDOW_MS).toISOString()
   if (await getRecentEmailVerificationTokenForUser(user.id, resendSince)) return
@@ -918,7 +952,7 @@ async function issueEmailVerification(
   }
 }
 
-async function safelyReleaseEmailReservation(reservation: BrevoEmailReservation): Promise<void> {
+async function safelyReleaseEmailReservation(reservation: EmailDeliveryReservation): Promise<void> {
   try {
     await releaseEmailDeliveryReservation(reservation)
   } catch (error) {

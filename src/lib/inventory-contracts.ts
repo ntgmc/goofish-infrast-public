@@ -95,6 +95,8 @@ export interface InventoryLedgerEvent {
   reference_id: string
   created_at: string
   metadata: Record<string, unknown>
+  item_name?: string
+  icon_key?: string
 }
 
 export interface ItemUseRequest {
@@ -112,6 +114,11 @@ export interface GiftPackContentInput {
   gift_pack_version_id?: string
 }
 
+export interface OnboardingTaskRewardView extends GiftPackContentInput {
+  name: string
+  icon_key: string
+}
+
 export interface GiftPackVersion {
   id: string
   item_code: string
@@ -126,13 +133,15 @@ export type OnboardingTaskCode = 'welcome_inventory' | 'bind_skland' | 'first_ma
 
 export interface OnboardingTaskView {
   code: OnboardingTaskCode
+  version_id: string
+  version: number
   title: string
   description: string
   enabled: boolean
   status: 'disabled' | 'incomplete' | 'claimable' | 'claimed'
   completed_at: string | null
   claimed_at: string | null
-  rewards: GiftPackContentInput[]
+  rewards: OnboardingTaskRewardView[]
 }
 
 export const ITEM_ICON_PATHS: Record<string, string> = {

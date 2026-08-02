@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { OptimizeResult } from '../../../lib/types'
-import { normalizeUpgradeSuggestions } from './workflow-utils'
+import { getUpgradeSuggestionId } from '../../../lib/upgrade-suggestion-id'
+import { buildUpgradeSuggestionEliteOverrides, normalizeUpgradeSuggestions } from './workflow-utils'
 
 describe('normalizeUpgradeSuggestions', () => {
   it('restores persisted suggestions with ROI and apply-ready elite fields', () => {
@@ -50,5 +51,44 @@ describe('normalizeUpgradeSuggestions', () => {
     expect(restored).toHaveLength(20)
     expect(restored[0]?.gain).toBe(21)
     expect(restored[restored.length - 1]?.gain).toBe(2)
+  })
+
+  it('preserves stable IDs and applies selected single and bundle suggestions', () => {
+    const persisted: NonNullable<OptimizeResult['upgrade_suggestions']> = [{
+      type: 'single',
+      suggestion_id: 'upgrade-single',
+      id: 'char-1',
+      name: '干员 1',
+      current: 0,
+      target: 1,
+      gain: 10,
+    }, {
+      type: 'bundle',
+      suggestion_id: 'upgrade-bundle',
+      gain: 20,
+      ops: [{ id: 'char-2', name: '干员 2', current: 1, target: 2 }],
+    }]
+    const restored = normalizeUpgradeSuggestions(persisted)
+
+    expect(restored.map((suggestion) => suggestion.suggestion_id)).toEqual(['upgrade-bundle', 'upgrade-single'])
+    expect(buildUpgradeSuggestionEliteOverrides(
+      restored,
+      ['upgrade-bundle', 'upgrade-single'],
+      { 'char-existing': 1 },
+    )).toEqual({
+      'char-existing': 1,
+      'char-1': 1,
+      'char-2': 2,
+    })
+  })
+
+  it('keeps legacy bundle fallback IDs stable when suggestions are reordered', () => {
+    const bundle = normalizeUpgradeSuggestions([{
+      type: 'bundle',
+      gain: 10,
+      ops: [{ id: 'char-2', name: '干员 2', current: 1, target: 2 }],
+    }])[0]
+
+    expect(getUpgradeSuggestionId(bundle, 0)).toBe(getUpgradeSuggestionId(bundle, 8))
   })
 })

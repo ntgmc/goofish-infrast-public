@@ -27,6 +27,7 @@ export type CreateOptimizationJobRequest =
       historySource?: 'generated' | 'applied_suggestions';
       use_priority_coupon?: boolean;
       use_items?: SystemItemCode[];
+      billing_quote_id?: string;
       pricing_version?: string;
       accepted_max_points?: string;
     })

@@ -23,9 +23,12 @@ import type {
 import {
   WORKSPACE_RESULT_HISTORY_LIMIT,
   WORKSPACE_RESULT_HISTORY_MAX_LIMIT,
+  WORKSPACE_ARCHIVED_RESULT_MAX_LIMIT,
   WORKSPACE_SAVED_CONFIG_LIMIT,
   WORKSPACE_SAVED_CONFIG_MAX_LIMIT,
 } from '../../src/lib/workspace-limits'
+import type { CapabilitySubject } from '../../src/lib/product-catalog'
+import { projectOptimizeResultForCapabilities } from '../../src/lib/optimize-result-projection'
 
 let schemaReady: Promise<void> | null = null
 
@@ -225,6 +228,7 @@ interface LegacyUserWorkspaceRecord {
 export interface AnnouncementReadRecord {
   user_id: string
   announcement_id: string
+  announcement_version: string | Date | null
   read_at: string
 }
 
@@ -365,13 +369,18 @@ export async function deleteUserAccount(userId: string): Promise<void> {
 
 export async function deleteUserAccountInTransaction(client: PoolClient, userId: string): Promise<void> {
   const profileRows = await client.query<{ record_json: UserGameAccountRecord }>('select record_json from user_game_accounts where user_id = $1', [userId])
-  const sampleSecret = process.env.DEPOT_SAMPLE_HASH_SECRET?.trim()
-  if (!sampleSecret) throw new Error('DEPOT_SAMPLE_HASH_SECRET is not configured')
+  const sampleSecrets = [
+    process.env.DEPOT_SAMPLE_HASH_SECRET?.trim(),
+    process.env.DEPOT_SAMPLE_HASH_SECRET_PREVIOUS?.trim(),
+  ].filter((secret): secret is string => Boolean(secret))
   const sampleHashes = profileRows.rows
     .map((row) => row.record_json.skland_binding?.uid)
     .filter((uid): uid is string => Boolean(uid))
-    .map((uid) => createHmac('sha256', sampleSecret).update(`skland:${uid}`).digest('hex'))
+    .flatMap((uid) => sampleSecrets.map((secret) => createHmac('sha256', secret).update(`skland:${uid}`).digest('hex')))
   await client.query('delete from depot_value_samples where contributor_profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
+  if (sampleSecrets.length === 0 && profileRows.rows.some((row) => row.record_json.skland_binding?.uid)) {
+    console.warn('depot sample hash secrets are unavailable; account deletion skipped legacy hash-only sample cleanup')
+  }
   if (sampleHashes.length > 0) await client.query('delete from depot_value_samples where uid_hash = any($1)', [sampleHashes])
   await client.query('delete from usage_events where user_id = $1 or profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
   await client.query(
@@ -941,6 +950,35 @@ export async function listProfileWorkspaces(profileIds: string[]): Promise<Map<s
   return workspaces
 }
 
+export interface UserWorkspaceProfileSummary {
+  operators: LicenseOperator[] | null
+  updated_at: string
+}
+
+export async function listProfileWorkspaceSummaries(
+  profileIds: string[],
+): Promise<Map<string, UserWorkspaceProfileSummary>> {
+  if (profileIds.length === 0) return new Map()
+  await ensureSchema()
+  const result = await query<{
+    profile_id: string
+    operators_json: unknown
+    updated_at: Date | string
+  }>(
+    `select profile_id, operators_json, updated_at
+       from user_profile_workspaces
+      where profile_id = any($1::text[])`,
+    [profileIds],
+  )
+  return new Map(result.rows.map((row) => [
+    row.profile_id,
+    {
+      operators: Array.isArray(row.operators_json) ? row.operators_json as LicenseOperator[] : null,
+      updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+    },
+  ]))
+}
+
 async function getLegacyWorkspace(userId: string): Promise<LegacyUserWorkspaceRecord | null> {
   await ensureSchema()
   const result = await query<{ record_json: LegacyUserWorkspaceRecord }>(
@@ -1219,32 +1257,53 @@ export async function migrateLegacyUserIfNeeded(user: UserAccountRecord): Promis
 export async function getAnnouncementReads(userId: string): Promise<AnnouncementReadRecord[]> {
   await ensureSchema()
   const result = await query<AnnouncementReadRecord>(
-    'select user_id, announcement_id, read_at from user_announcement_reads where user_id = $1',
+    'select user_id, announcement_id, announcement_version, read_at from user_announcement_reads where user_id = $1',
     [userId],
   )
   return result.rows
 }
 
-export async function getAnnouncementReadCounts(): Promise<Record<string, number>> {
+export async function getAnnouncementReadCounts(
+  announcements: Array<{ id: string; updated_at: string }>,
+): Promise<Record<string, number>> {
   await ensureSchema()
+  if (announcements.length === 0) return {}
   const result = await query<{ announcement_id: string; read_count: number }>(
-    `select announcement_id, count(*)::int as read_count
-     from user_announcement_reads
-     group by announcement_id`,
+    `with active(announcement_id, announcement_version) as (
+       select * from unnest($1::text[], $2::timestamptz[])
+     )
+     select reads.announcement_id, count(*)::int as read_count
+       from user_announcement_reads reads
+       join active on active.announcement_id = reads.announcement_id
+        and active.announcement_version = reads.announcement_version
+      group by reads.announcement_id`,
+    [announcements.map((item) => item.id), announcements.map((item) => item.updated_at)],
   )
   return Object.fromEntries(
     result.rows.map((row) => [row.announcement_id, Number.isFinite(Number(row.read_count)) ? Number(row.read_count) : 0]),
   )
 }
 
-export async function markAnnouncementRead(userId: string, announcementId: string, readAt = new Date().toISOString()): Promise<void> {
+export async function markAnnouncementsRead(
+  userId: string,
+  announcements: Array<{ id: string; updated_at: string }>,
+  readAt = new Date().toISOString(),
+): Promise<number> {
   await ensureSchema()
-  await query(
-    `insert into user_announcement_reads (user_id, announcement_id, read_at)
-     values ($1, $2, $3)
-     on conflict (user_id, announcement_id) do update set read_at = excluded.read_at`,
-    [userId, announcementId, readAt],
-  )
+  if (announcements.length === 0) return 0
+  return withTransaction(async (client) => {
+    const result = await client.query(
+    `insert into user_announcement_reads (user_id, announcement_id, announcement_version, read_at)
+     select $1, input.announcement_id, input.announcement_version, $4::timestamptz
+       from unnest($2::text[], $3::timestamptz[]) as input(announcement_id, announcement_version)
+     on conflict (user_id, announcement_id) do update set
+       announcement_version = excluded.announcement_version,
+       read_at = excluded.read_at
+     where user_announcement_reads.announcement_version is distinct from excluded.announcement_version`,
+    [userId, announcements.map((item) => item.id), announcements.map((item) => item.updated_at), readAt],
+    )
+    return result.rowCount ?? 0
+  })
 }
 
 export function emptyWorkspace(profileId: string): UserWorkspaceRecord {
@@ -1307,18 +1366,26 @@ export function toPublicWorkspace(
     history: WORKSPACE_RESULT_HISTORY_LIMIT,
     archive: 0,
   },
+  subject?: CapabilitySubject,
 ): UserWorkspace {
   const normalized = normalizeWorkspaceRecord(workspace)
   const resultHistory = normalized ? getPublicResultHistory(normalized) : []
+  const projectResult = (result: OptimizeResult) => subject
+    ? projectOptimizeResultForCapabilities(result, subject)
+    : result
+  const projectHistoryItem = (item: WorkspaceResultHistoryItem): WorkspaceResultHistoryItem => ({
+    ...item,
+    result: projectResult(item.result),
+  })
   return {
     profile_id: normalized?.profile_id ?? null,
     operators: normalized?.operators ?? null,
     config: normalized?.config ?? null,
     elite_overrides: normalized?.elite_overrides ?? {},
-    last_result: normalized?.last_result ?? null,
+    last_result: normalized?.last_result ? projectResult(normalized.last_result) : null,
     saved_configs: (normalized?.saved_configs ?? []).slice(0, limits.plan),
-    result_history: resultHistory.slice(0, limits.history),
-    archived_results: (normalized?.archived_results ?? []).slice(0, limits.archive),
+    result_history: resultHistory.slice(0, limits.history).map(projectHistoryItem),
+    archived_results: (normalized?.archived_results ?? []).slice(0, limits.archive).map(projectHistoryItem),
     free_schedule_entitlement: normalized?.free_schedule_entitlement ?? null,
     updated_at: normalized?.updated_at ?? null,
   }
@@ -1326,7 +1393,7 @@ export function toPublicWorkspace(
 
 export function toPublicProfile(
   profile: UserGameAccountRecord,
-  workspace?: UserWorkspaceRecord | null,
+  workspace?: Pick<UserWorkspaceRecord, 'operators' | 'updated_at'> | null,
   trial: FreePreviewTrial | null = null,
 ): UserGameAccount {
   return {
@@ -1368,8 +1435,14 @@ export function normalizeWorkspaceRecord(workspace: UserWorkspaceRecord | null |
     elite_overrides: isRecord(workspace.elite_overrides) ? workspace.elite_overrides as Record<string, number> : {},
     last_result: isRecord(workspace.last_result) ? workspace.last_result as OptimizeResult : null,
     saved_configs: normalizeSavedConfigs((workspace as { saved_configs?: unknown }).saved_configs),
-    result_history: normalizeResultHistory((workspace as { result_history?: unknown }).result_history),
-    archived_results: normalizeResultHistory((workspace as { archived_results?: unknown }).archived_results),
+    result_history: normalizeResultHistory(
+      (workspace as { result_history?: unknown }).result_history,
+      WORKSPACE_RESULT_HISTORY_MAX_LIMIT,
+    ),
+    archived_results: normalizeResultHistory(
+      (workspace as { archived_results?: unknown }).archived_results,
+      WORKSPACE_ARCHIVED_RESULT_MAX_LIMIT,
+    ),
     free_schedule_entitlement: normalizeFreeScheduleEntitlement((workspace as { free_schedule_entitlement?: unknown }).free_schedule_entitlement),
     free_preview_normalized_activity_id: typeof workspace.free_preview_normalized_activity_id === 'string'
       ? workspace.free_preview_normalized_activity_id
@@ -1428,7 +1501,7 @@ function normalizeSavedConfigs(value: unknown): WorkspaceSavedConfig[] {
   }).slice(0, WORKSPACE_SAVED_CONFIG_MAX_LIMIT)
 }
 
-function normalizeResultHistory(value: unknown): WorkspaceResultHistoryItem[] {
+function normalizeResultHistory(value: unknown, maximum = WORKSPACE_RESULT_HISTORY_MAX_LIMIT): WorkspaceResultHistoryItem[] {
   if (!Array.isArray(value)) return []
   return value.flatMap((raw) => {
     if (!isRecord(raw) || !isRecord(raw.result)) return []
@@ -1439,6 +1512,7 @@ function normalizeResultHistory(value: unknown): WorkspaceResultHistoryItem[] {
     const source = raw.source === 'applied_suggestions' || raw.source === 'legacy' ? raw.source : 'generated'
     return [{
       id,
+      ...(typeof raw.job_id === 'string' && raw.job_id ? { job_id: raw.job_id } : {}),
       name,
       created_at: createdAt,
       config: isRecord(raw.config) ? raw.config as LicenseConfig : null,
@@ -1446,7 +1520,7 @@ function normalizeResultHistory(value: unknown): WorkspaceResultHistoryItem[] {
       operator_count: typeof raw.operator_count === 'number' && Number.isFinite(raw.operator_count) ? raw.operator_count : 0,
       source,
     }]
-  }).slice(0, WORKSPACE_RESULT_HISTORY_MAX_LIMIT)
+  }).slice(0, maximum)
 }
 
 function getPublicResultHistory(workspace: UserWorkspaceRecord): WorkspaceResultHistoryItem[] {

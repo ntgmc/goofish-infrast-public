@@ -3,7 +3,7 @@ import { canonicalJson, type CdkRecord, incrementCdkScheduleGenerateCount } from
 import { countSuccessfulUsageEventsForProfileInRange, recordUsageEvent } from "../../handlers/usage-stats";
 import type { UsageReasonCode } from "../../storage/usage-store";
 import { hasDatabaseUrl } from '../../storage/postgres';
-import { countReorderCheckQuota } from '../../storage/reorder-quota-store';
+import { countReorderCheckQuota, countReorderCheckQuotas } from '../../storage/reorder-quota-store';
 import type { ReorderCheckQuota, ScheduleUsageContext, FreeScheduleGenerateDecision } from './shared';
 import { FREE_PREVIEW_MODE, FREE_SCHEDULE_REVISION_LIMIT, FREE_SCHEDULE_REVISION_WINDOW_HOURS, SHANGHAI_TIMEZONE, SHANGHAI_UTC_OFFSET_MS } from './shared';
 import { REORDER_CHECK_MONTHLY_LIMIT } from '../../reorder-check-policy';
@@ -166,6 +166,24 @@ export async function getReorderCheckQuota(profileId: string): Promise<ReorderCh
         window.end_at,
       );
   return buildReorderCheckQuota(used, window.end_at);
+}
+
+export async function getReorderCheckQuotas(profileIds: string[]): Promise<Map<string, ReorderCheckQuota>> {
+  const uniqueProfileIds = [...new Set(profileIds)]
+  if (uniqueProfileIds.length === 0) return new Map()
+  const window = getShanghaiMonthWindow()
+  if (!hasDatabaseUrl()) {
+    const quotas = await Promise.all(uniqueProfileIds.map(async (profileId) => [
+      profileId,
+      await getReorderCheckQuota(profileId),
+    ] as const))
+    return new Map(quotas)
+  }
+  const usage = await countReorderCheckQuotas(uniqueProfileIds, getShanghaiMonthKey())
+  return new Map(uniqueProfileIds.map((profileId) => [
+    profileId,
+    buildReorderCheckQuota(usage.get(profileId) ?? 0, window.end_at),
+  ]))
 }
 
 function createFreeScheduleEntitlement(): FreeScheduleEntitlement {

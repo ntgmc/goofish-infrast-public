@@ -10,21 +10,22 @@ import {
   type ItemDefinition,
   type ItemUseRequest,
   type OnboardingTaskCode,
+  type OnboardingTaskRewardView,
   type OnboardingTaskView,
   type ProfileCapacitySummary,
 } from '../../src/lib/inventory-contracts'
-import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
+import { WORKSPACE_ARCHIVED_RESULT_MAX_LIMIT, WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 import { ensureDatabaseSchema } from './schema'
 import { query, withTransaction } from './postgres'
-import { emptyWorkspace, getProfileWorkspace, isDepotValueProfile, listProfilesForUser, updateProfileWorkspaceInTransaction, type UserGameAccountRecord } from './user-store'
+import { emptyWorkspace, isDepotValueProfile, listProfilesForUser, updateProfileWorkspaceInTransaction, type UserGameAccountRecord } from './user-store'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY, isFreePreviewLimitedCdkActivityActive } from '../free-preview-trial'
-import { upsertItemGrantNotificationInTransaction } from './notification-store'
+import { upsertItemGrantNotificationGroupInTransaction, upsertItemGrantNotificationInTransaction } from './notification-store'
 import { createLifetimeVoucherProfileAuthorizationInTransaction } from './cdk-redemption'
 
 const PROFILE_CAPACITY_LIMITS = Object.freeze({
   plan: { base: WORKSPACE_SAVED_CONFIG_LIMIT, maximum: 20, entitlement: 'plan_slots' },
   history: { base: WORKSPACE_RESULT_HISTORY_LIMIT, maximum: 50, entitlement: 'history_slots' },
-  archive: { base: 0, maximum: 20, entitlement: 'archive_slots' },
+  archive: { base: 0, maximum: WORKSPACE_ARCHIVED_RESULT_MAX_LIMIT, entitlement: 'archive_slots' },
 })
 
 export async function getProfileCapacityLimits(profileId: string): Promise<{ plan: number; history: number; archive: number }> {
@@ -213,7 +214,6 @@ let schemaReady: Promise<void> | null = null
 
 export async function listInventory(userId: string, now = new Date()): Promise<InventoryResponse> {
   await ensureSchema()
-  await grantFreePreviewLimitedVoucher(userId, now)
   const nowIso = now.toISOString()
   const [rows, events, capacities] = await Promise.all([
     query<{
@@ -254,9 +254,14 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
     query<{
       id: string; item_code: string; event_type: InventoryLedgerEvent['event_type']; quantity: number
       reference_type: string; reference_id: string; created_at: string; metadata_json: Record<string, unknown>
+      item_name: string; icon_key: string
     }>(
-      `select id, item_code, event_type, quantity, reference_type, reference_id, created_at, metadata_json
-         from inventory_ledger where user_id = $1 order by created_at desc limit 30`,
+      `select ledger.id, ledger.item_code, ledger.event_type, ledger.quantity, ledger.reference_type,
+              ledger.reference_id, ledger.created_at, ledger.metadata_json,
+              definition.name as item_name, definition.icon_key
+         from inventory_ledger ledger
+         join item_definitions definition on definition.code = ledger.item_code
+        where ledger.user_id = $1 order by ledger.created_at desc limit 30`,
       [userId],
     ),
     getProfileCapacities(userId),
@@ -297,6 +302,8 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
       reference_id: event.reference_id,
       created_at: event.created_at,
       metadata: event.metadata_json ?? {},
+      item_name: event.item_name,
+      icon_key: event.icon_key,
     })),
   }
 }
@@ -318,17 +325,202 @@ export async function grantItem(input: GrantInput): Promise<string | null> {
 }
 
 export async function grantItemInTransaction(client: PoolClient, input: GrantInput): Promise<string | null> {
+  const definition = await client.query<{ kind: string; issuance_enabled: boolean; name: string; icon_key: string }>(
+    'select kind, issuance_enabled, name, icon_key from item_definitions where code = $1',
+    [input.itemCode],
+  )
+  const item = definition.rows[0]
+  const version = input.giftPackVersionId
+    ? (await client.query<{ status: string; item_code: string }>(
+      'select status, item_code from gift_pack_versions where id = $1',
+      [input.giftPackVersionId],
+    )).rows[0] ?? null
+    : null
+  return grantItemWithSnapshot(client, input, item ?? null, version)
+}
+
+export async function grantItemsInTransaction(client: PoolClient, inputs: GrantInput[]): Promise<Array<string | null>> {
+  if (inputs.length === 0) return []
+  const itemCodes = [...new Set(inputs.map((input) => input.itemCode))]
+  const definitions = await client.query<{
+    code: string
+    kind: string
+    issuance_enabled: boolean
+    name: string
+    icon_key: string
+  }>(
+    'select code, kind, issuance_enabled, name, icon_key from item_definitions where code = any($1::text[])',
+    [itemCodes],
+  )
+  const definitionsByCode = new Map(definitions.rows.map((definition) => [definition.code, definition]))
+  const versionIds = [...new Set(inputs.flatMap((input) => input.giftPackVersionId ? [input.giftPackVersionId] : []))]
+  const versions = versionIds.length === 0
+    ? { rows: [] as Array<{ id: string; status: string; item_code: string }> }
+    : await client.query<{ id: string; status: string; item_code: string }>(
+      'select id, status, item_code from gift_pack_versions where id = any($1::text[])',
+      [versionIds],
+    )
+  const versionsById = new Map(versions.rows.map((version) => [version.id, version]))
+  const prepared = inputs.map((input) => {
+    const item = definitionsByCode.get(input.itemCode) ?? null
+    const version = input.giftPackVersionId ? versionsById.get(input.giftPackVersionId) ?? null : null
+    const quantity = normalizeQuantity(input.quantity)
+    const now = input.now ?? new Date().toISOString()
+    const validityDays = input.expiry.mode === 'relative_days' ? input.expiry.days : 0
+    const expiresAt = input.expiresAt !== undefined
+      ? normalizeAbsoluteExpiry(input.expiresAt, now)
+      : validityDays > 0 ? new Date(Date.parse(now) + validityDays * 86_400_000).toISOString() : null
+    const historicalInvitationSnapshot = input.allowHistoricalSnapshot === true
+      && input.sourceType === 'invitation'
+      && input.metadata?.invitation_snapshot === true
+    if (!item) throw new InventoryError('item_unknown', '道具不存在。', 404)
+    if (!item.issuance_enabled && !historicalInvitationSnapshot) throw new InventoryError('item_issuance_disabled', '该道具当前不可发放。', 409)
+    if (item.kind === 'gift_pack' && !input.giftPackVersionId) {
+      throw new InventoryError('gift_pack_version_required', '礼包发放必须指定已发布版本。', 400)
+    }
+    if (input.giftPackVersionId) {
+      const versionAvailable = version?.status === 'published'
+        || (historicalInvitationSnapshot && version?.status === 'retired')
+      if (!versionAvailable || version?.item_code !== input.itemCode) {
+        throw new InventoryError('gift_pack_version_unavailable', '礼包版本不可发放。', 409)
+      }
+    }
+    return {
+      id: randomUUID(),
+      user_id: input.userId,
+      reward_type: input.itemCode,
+      source_type: input.sourceType,
+      source_id: input.sourceId,
+      recipient_role: input.recipientRole,
+      original_quantity: quantity,
+      remaining_quantity: quantity,
+      validity_days: validityDays,
+      expires_at: expiresAt,
+      metadata_json: input.metadata ?? {},
+      gift_pack_version_id: input.giftPackVersionId ?? null,
+      created_at: now,
+      item_name: item.name,
+      icon_key: item.icon_key,
+    }
+  })
+  const inserted = await client.query<{
+    id: string
+    user_id: string
+    reward_type: string
+    source_type: string
+    source_id: string
+    recipient_role: string
+    original_quantity: number
+    expires_at: string | null
+    metadata_json: Record<string, unknown>
+    created_at: string
+  }>(
+    `with input as (
+       select * from jsonb_to_recordset($1::jsonb) as item(
+         id text, user_id text, reward_type text, source_type text, source_id text, recipient_role text,
+         original_quantity integer, remaining_quantity integer, validity_days integer, expires_at text,
+         metadata_json jsonb, gift_pack_version_id text, created_at text
+       )
+     )
+     insert into reward_grants
+       (id, user_id, reward_type, source_type, source_id, recipient_role, original_quantity, remaining_quantity,
+        validity_days, expires_at, metadata_json, gift_pack_version_id, created_at)
+     select id, user_id, reward_type, source_type, source_id, recipient_role, original_quantity, remaining_quantity,
+            validity_days, expires_at::timestamptz, metadata_json, gift_pack_version_id, created_at::timestamptz
+       from input
+     on conflict (user_id, reward_type, source_type, source_id, recipient_role) do nothing
+     returning id, user_id, reward_type, source_type, source_id, recipient_role,
+               original_quantity, expires_at::text, metadata_json, created_at::text`,
+    [JSON.stringify(prepared.map(({ item_name: _itemName, icon_key: _iconKey, ...row }) => row))],
+  )
+  if (inserted.rows.length > 0) {
+    await client.query(
+      `insert into inventory_ledger
+        (id, user_id, item_code, event_type, quantity, grant_id, reference_type, reference_id, metadata_json, created_at)
+       select ledger.id, ledger.user_id, ledger.item_code, 'grant', ledger.quantity, ledger.grant_id,
+              ledger.reference_type, ledger.reference_id, ledger.metadata_json, ledger.created_at::timestamptz
+         from jsonb_to_recordset($1::jsonb) as ledger(
+           id text, user_id text, item_code text, quantity integer, grant_id text,
+           reference_type text, reference_id text, metadata_json jsonb, created_at text
+         )
+       on conflict (user_id, item_code, event_type, reference_type, reference_id) do nothing`,
+      [JSON.stringify(inserted.rows.map((row) => ({
+        id: randomUUID(),
+        user_id: row.user_id,
+        item_code: row.reward_type,
+        quantity: Number(row.original_quantity),
+        grant_id: row.id,
+        reference_type: row.source_type,
+        reference_id: row.source_id,
+        metadata_json: row.metadata_json ?? {},
+        created_at: row.created_at,
+      })))],
+    )
+  }
+  const preparedByKey = new Map(prepared.map((row) => [grantKey(row), row]))
+  const notificationGroups = new Map<string, {
+    userId: string
+    sourceType: string
+    sourceId: string
+    now: string
+    items: Array<{
+      grantId: string
+      itemCode: string
+      itemName: string
+      iconKey: string
+      quantity: number
+      expiresAt: string | null
+    }>
+  }>()
+  for (const row of inserted.rows) {
+    const source = preparedByKey.get(grantKey(row))!
+    const groupKey = JSON.stringify([row.user_id, row.source_type, row.source_id])
+    const group = notificationGroups.get(groupKey) ?? {
+      userId: row.user_id,
+      sourceType: row.source_type,
+      sourceId: row.source_id,
+      now: row.created_at,
+      items: [],
+    }
+    group.items.push({
+      grantId: row.id,
+      itemCode: row.reward_type,
+      itemName: source.item_name,
+      iconKey: source.icon_key,
+      quantity: Number(row.original_quantity),
+      expiresAt: row.expires_at,
+    })
+    notificationGroups.set(groupKey, group)
+  }
+  for (const group of notificationGroups.values()) {
+    await upsertItemGrantNotificationGroupInTransaction(client, group)
+  }
+  const insertedByKey = new Map(inserted.rows.map((row) => [grantKey(row), row.id]))
+  return prepared.map((row) => insertedByKey.get(grantKey(row)) ?? null)
+}
+
+function grantKey(row: {
+  user_id: string
+  reward_type: string
+  source_type: string
+  source_id: string
+  recipient_role: string
+}): string {
+  return JSON.stringify([row.user_id, row.reward_type, row.source_type, row.source_id, row.recipient_role])
+}
+
+async function grantItemWithSnapshot(
+  client: PoolClient,
+  input: GrantInput,
+  item: { kind: string; issuance_enabled: boolean; name: string; icon_key: string } | null,
+  version: { status: string; item_code: string } | null,
+): Promise<string | null> {
   const quantity = normalizeQuantity(input.quantity)
   const now = input.now ?? new Date().toISOString()
   const validityDays = input.expiry.mode === 'relative_days' ? input.expiry.days : 0
   const expiresAt = input.expiresAt !== undefined
     ? normalizeAbsoluteExpiry(input.expiresAt, now)
     : validityDays > 0 ? new Date(Date.parse(now) + validityDays * 86_400_000).toISOString() : null
-  const definition = await client.query<{ kind: string; issuance_enabled: boolean; name: string; icon_key: string }>(
-    'select kind, issuance_enabled, name, icon_key from item_definitions where code = $1',
-    [input.itemCode],
-  )
-  const item = definition.rows[0]
   const historicalInvitationSnapshot = input.allowHistoricalSnapshot === true
     && input.sourceType === 'invitation'
     && input.metadata?.invitation_snapshot === true
@@ -338,13 +530,9 @@ export async function grantItemInTransaction(client: PoolClient, input: GrantInp
     throw new InventoryError('gift_pack_version_required', '礼包发放必须指定已发布版本。', 400)
   }
   if (input.giftPackVersionId) {
-    const version = await client.query<{ status: string; item_code: string }>(
-      'select status, item_code from gift_pack_versions where id = $1',
-      [input.giftPackVersionId],
-    )
-    const versionAvailable = version.rows[0]?.status === 'published'
-      || (historicalInvitationSnapshot && version.rows[0]?.status === 'retired')
-    if (!versionAvailable || version.rows[0]?.item_code !== input.itemCode) {
+    const versionAvailable = version?.status === 'published'
+      || (historicalInvitationSnapshot && version?.status === 'retired')
+    if (!versionAvailable || version?.item_code !== input.itemCode) {
       throw new InventoryError('gift_pack_version_unavailable', '礼包版本不可发放。', 409)
     }
   }
@@ -398,18 +586,19 @@ export async function reserveItemsInTransaction(
   now = new Date().toISOString(),
 ): Promise<void> {
   for (const itemCode of [...new Set(itemCodes)]) {
+    await lockInventoryItemInTransaction(client, userId, itemCode)
     const existing = await client.query(
       `select 1 from reward_consumptions
         where reference_type = $1 and reference_id = $2 and reward_type = $3`,
       [referenceType, referenceId, itemCode],
     )
     if (existing.rowCount) continue
-    const grant = await client.query<{ id: string; validity_days: number }>(
-      `select id, validity_days from reward_grants
+    const grant = await client.query<{ id: string; validity_days: number; expires_at: string | null }>(
+      `select id, validity_days, expires_at from reward_grants
         where user_id = $1 and reward_type = $2 and remaining_quantity > 0
           and (expires_at is null or expires_at > $3)
         order by expires_at asc nulls last, created_at asc
-        for update skip locked limit 1`,
+        for update limit 1`,
       [userId, itemCode, now],
     )
     const row = grant.rows[0]
@@ -419,10 +608,10 @@ export async function reserveItemsInTransaction(
     await client.query(
       `insert into reward_consumptions
         (id, user_id, reward_type, grant_id, optimization_job_id, reference_type, reference_id, profile_id,
-         status, validity_days, consumed_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, 'reserved', $9, $10)`,
+         status, validity_days, original_expires_at, consumed_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, 'reserved', $9, $10, $11)`,
       [consumptionId, userId, itemCode, row.id, referenceType === 'optimization_job' ? referenceId : null,
-        referenceType, referenceId, profileId, row.validity_days, now],
+        referenceType, referenceId, profileId, row.validity_days, row.expires_at, now],
     )
     await insertLedger(client, {
       userId, itemCode, eventType: 'reserve', quantity: 1, grantId: row.id,
@@ -458,29 +647,32 @@ export async function refundReservedItemsInTransaction(
   now = new Date().toISOString(),
 ): Promise<void> {
   const reserved = await client.query<{
-    id: string; user_id: string; reward_type: string; validity_days: number; grant_id: string
+    id: string; user_id: string; reward_type: string; validity_days: number
+    original_expires_at: string | null; grant_id: string
   }>(
-    `select id, user_id, reward_type, validity_days, grant_id from reward_consumptions
+    `select id, user_id, reward_type, validity_days, original_expires_at, grant_id from reward_consumptions
       where reference_type = $1 and reference_id = $2 and status = 'reserved' for update`,
     [referenceType, referenceId],
   )
   for (const item of reserved.rows) {
-    const expiresAt = item.validity_days > 0
-      ? new Date(Date.parse(now) + item.validity_days * 86_400_000).toISOString()
-      : null
-    const refundGrantId = randomUUID()
-    const inserted = await client.query<{ id: string }>(
-      `insert into reward_grants
-        (id, user_id, reward_type, source_type, source_id, recipient_role, original_quantity, remaining_quantity,
-         validity_days, expires_at, metadata_json, created_at)
-       values ($1, $2, $3, 'operation_refund', $4, $5, 1, 1, $6, $7, $8::jsonb, $9)
-       on conflict (user_id, reward_type, source_type, source_id, recipient_role) do update
-         set remaining_quantity = reward_grants.remaining_quantity
-       returning id`,
-      [refundGrantId, item.user_id, item.reward_type, referenceId, `refund:${item.reward_type}`,
-        item.validity_days, expiresAt, JSON.stringify({ refunded_consumption_id: item.id }), now],
-    )
-    const actualGrantId = inserted.rows[0]?.id ?? refundGrantId
+    const expiresAt = item.original_expires_at ? new Date(item.original_expires_at).toISOString() : null
+    const canRestore = expiresAt === null || Date.parse(expiresAt) > Date.parse(now)
+    let actualGrantId: string | null = null
+    if (canRestore) {
+      const refundGrantId = randomUUID()
+      const inserted = await client.query<{ id: string }>(
+        `insert into reward_grants
+          (id, user_id, reward_type, source_type, source_id, recipient_role, original_quantity, remaining_quantity,
+           validity_days, expires_at, metadata_json, created_at)
+         values ($1, $2, $3, 'operation_refund', $4, $5, 1, 1, $6, $7, $8::jsonb, $9)
+         on conflict (user_id, reward_type, source_type, source_id, recipient_role) do update
+           set remaining_quantity = reward_grants.remaining_quantity
+         returning id`,
+        [refundGrantId, item.user_id, item.reward_type, referenceId, `refund:${item.reward_type}`,
+          item.validity_days, expiresAt, JSON.stringify({ refunded_consumption_id: item.id }), now],
+      )
+      actualGrantId = inserted.rows[0]?.id ?? refundGrantId
+    }
     await client.query(
       `update reward_consumptions set status = 'refunded', refunded_at = $2, refunded_grant_id = $3
         where id = $1 and status = 'reserved'`,
@@ -488,7 +680,11 @@ export async function refundReservedItemsInTransaction(
     )
     await insertLedger(client, {
       userId: item.user_id, itemCode: item.reward_type, eventType: 'refund', quantity: 1,
-      grantId: actualGrantId, referenceType, referenceId, metadata: { consumption_id: item.id }, now,
+      grantId: actualGrantId ?? item.grant_id,
+      referenceType,
+      referenceId,
+      metadata: { consumption_id: item.id, restored: canRestore, original_expires_at: expiresAt },
+      now,
     })
   }
 }
@@ -638,26 +834,58 @@ export async function listOnboardingTasks(userId: string): Promise<OnboardingTas
   await ensureSchema()
   await backfillOnboardingProgress(userId)
   const result = await query<{
-    task_code: OnboardingTaskCode; enabled: boolean; rewards_json: GiftPackContentInput[]
+    task_code: OnboardingTaskCode; version_id: string; version: number
+    enabled: boolean; rewards_json: GiftPackContentInput[]
     completed_at: string | null; claimed_at: string | null
   }>(
-    `select current.task_code, version.enabled, version.rewards_json,
+    `select current.task_code,
+            coalesce(progress_version.id, current_version.id) as version_id,
+            coalesce(progress_version.version, current_version.version) as version,
+            coalesce(progress_version.enabled, current_version.enabled) as enabled,
+            coalesce(progress_version.rewards_json, current_version.rewards_json) as rewards_json,
             progress.completed_at, progress.claimed_at
        from onboarding_task_current current
-       join onboarding_task_versions version on version.id = current.version_id
+       join onboarding_task_versions current_version on current_version.id = current.version_id
        left join user_onboarding_tasks progress on progress.user_id = $1 and progress.task_code = current.task_code
+       left join onboarding_task_versions progress_version on progress_version.id = progress.version_id
       order by case current.task_code when 'welcome_inventory' then 1 when 'bind_skland' then 2 else 3 end`,
     [userId],
   )
+  const itemCodes = [...new Set(result.rows.flatMap((row) => (
+    Array.isArray(row.rewards_json) ? row.rewards_json.map((reward) => reward.item_code) : []
+  )))]
+  const definitions = itemCodes.length > 0
+    ? await query<{ code: string; name: string; icon_key: string }>(
+        'select code, name, icon_key from item_definitions where code = any($1::text[])',
+        [itemCodes],
+      )
+    : { rows: [] }
+  const definitionByCode = new Map(definitions.rows.map((definition) => [definition.code, definition]))
   return result.rows.map((row) => ({
     code: row.task_code,
+    version_id: row.version_id,
+    version: Number(row.version),
     ...taskCopy(row.task_code),
     enabled: row.enabled,
     status: !row.enabled ? 'disabled' : row.claimed_at ? 'claimed' : row.completed_at ? 'claimable' : 'incomplete',
     completed_at: row.completed_at,
     claimed_at: row.claimed_at,
-    rewards: Array.isArray(row.rewards_json) ? row.rewards_json : [],
+    rewards: (Array.isArray(row.rewards_json) ? row.rewards_json : []).map((reward): OnboardingTaskRewardView => {
+      const definition = definitionByCode.get(reward.item_code)
+      return {
+        ...reward,
+        name: definition?.name ?? reward.item_code,
+        icon_key: definition?.icon_key ?? 'placeholder',
+      }
+    }),
   }))
+}
+
+async function lockInventoryItemInTransaction(client: PoolClient, userId: string, itemCode: string): Promise<void> {
+  await client.query(
+    "select pg_advisory_xact_lock(hashtextextended('inventory-item:' || $1 || ':' || $2, 0))",
+    [userId, itemCode],
+  )
 }
 
 export async function claimOnboardingTask(userId: string, taskCode: OnboardingTaskCode, idempotencyKey: string): Promise<Record<string, unknown>> {
@@ -735,30 +963,50 @@ async function getProfileCapacities(userId: string): Promise<ProfileCapacitySumm
   const profiles = (await listProfilesForUser(userId)).filter(
     (profile) => profile.status === 'active' && !isDepotValueProfile(profile),
   )
-  const balances = await query<{ profile_id: string; entitlement_type: string; units: number }>(
-    `select balances.profile_id, balances.entitlement_type, balances.units
-       from profile_entitlement_balances balances
-       join user_game_accounts profile on profile.id = balances.profile_id
-      where profile.user_id = $1`,
-    [userId],
-  )
+  const [balances, usageRows] = await Promise.all([
+    query<{ profile_id: string; entitlement_type: string; units: number }>(
+      `select balances.profile_id, balances.entitlement_type, balances.units
+         from profile_entitlement_balances balances
+         join user_game_accounts profile on profile.id = balances.profile_id
+        where profile.user_id = $1`,
+      [userId],
+    ),
+    query<{
+      profile_id: string
+      plan_used: number
+      history_used: number
+      archive_used: number
+    }>(
+      `select profile_id,
+              case when jsonb_typeof(record_json->'saved_configs') = 'array'
+                then jsonb_array_length(record_json->'saved_configs') else 0 end as plan_used,
+              case when jsonb_typeof(record_json->'result_history') = 'array'
+                then jsonb_array_length(record_json->'result_history') else 0 end as history_used,
+              case when jsonb_typeof(record_json->'archived_results') = 'array'
+                then jsonb_array_length(record_json->'archived_results') else 0 end as archive_used
+         from user_profile_workspaces
+        where profile_id = any($1::text[])`,
+      [profiles.map((profile) => profile.id)],
+    ),
+  ])
   const byProfile = new Map<string, Map<string, number>>()
   for (const row of balances.rows) {
     const current = byProfile.get(row.profile_id) ?? new Map<string, number>()
     current.set(row.entitlement_type, Number(row.units))
     byProfile.set(row.profile_id, current)
   }
-  return Promise.all(profiles.map(async (profile) => {
-    const workspace = await getProfileWorkspace(profile.id)
+  const usageByProfile = new Map(usageRows.rows.map((row) => [row.profile_id, row]))
+  return profiles.map((profile) => {
+    const usage = usageByProfile.get(profile.id)
     const units = byProfile.get(profile.id) ?? new Map<string, number>()
     return {
       profile_id: profile.id,
       display_name: profile.display_name,
-      plan_slots: capacity(workspace?.saved_configs.length ?? 0, PROFILE_CAPACITY_LIMITS.plan, units),
-      history_slots: capacity(workspace?.result_history.length ?? 0, PROFILE_CAPACITY_LIMITS.history, units),
-      archive_slots: capacity(workspace?.archived_results.length ?? 0, PROFILE_CAPACITY_LIMITS.archive, units),
+      plan_slots: capacity(Number(usage?.plan_used ?? 0), PROFILE_CAPACITY_LIMITS.plan, units),
+      history_slots: capacity(Number(usage?.history_used ?? 0), PROFILE_CAPACITY_LIMITS.history, units),
+      archive_slots: capacity(Number(usage?.archive_used ?? 0), PROFILE_CAPACITY_LIMITS.archive, units),
     }
-  }))
+  })
 }
 
 async function openGiftPackInTransaction(
@@ -768,21 +1016,23 @@ async function openGiftPackInTransaction(
   operationId: string,
   now: string,
 ): Promise<Record<string, unknown>> {
+  await lockInventoryItemInTransaction(client, userId, input.item_code)
   const grant = await client.query<{ id: string; gift_pack_version_id: string | null }>(
     `select id, gift_pack_version_id from reward_grants
       where user_id = $1 and reward_type = $2 and remaining_quantity > 0
         and (expires_at is null or expires_at > $3)
         and ($4::text is null or gift_pack_version_id = $4)
-      order by expires_at asc nulls last, created_at asc for update skip locked limit 1`,
+      order by expires_at asc nulls last, created_at asc for update limit 1`,
     [userId, input.item_code, now, input.gift_pack_version_id ?? null],
   )
   const source = grant.rows[0]
   if (!source) throw new ItemUnavailableError(input.item_code)
   if (!source.gift_pack_version_id) throw new InventoryError('gift_pack_version_missing', '礼包没有绑定可开启的内容版本。', 409)
-  const contents = await client.query<{ item_code: string; quantity: number; validity_days: number }>(
-    `select content.item_code, content.quantity, content.validity_days
+  const contents = await client.query<{ item_code: string; quantity: number; validity_days: number; name: string; icon_key: string }>(
+    `select content.item_code, content.quantity, content.validity_days, definition.name, definition.icon_key
        from gift_pack_version_contents content
        join gift_pack_versions version on version.id = content.gift_pack_version_id
+       join item_definitions definition on definition.code = content.item_code
       where content.gift_pack_version_id = $1 and version.item_code = $2
         and version.status in ('published', 'retired')`,
     [source.gift_pack_version_id, input.item_code],
@@ -794,7 +1044,7 @@ async function openGiftPackInTransaction(
     referenceType: 'gift_opening', referenceId: operationId,
     metadata: { gift_pack_version_id: source.gift_pack_version_id }, now,
   })
-  const rewards: Array<{ item_code: string; quantity: number; expires_at: string | null }> = []
+  const rewards: Array<{ item_code: string; name: string; icon_key: string; quantity: number; expires_at: string | null }> = []
   for (const content of contents.rows) {
     const expiry: ExpiryPolicy = content.validity_days > 0
       ? { mode: 'relative_days', days: content.validity_days }
@@ -812,6 +1062,8 @@ async function openGiftPackInTransaction(
     })
     if (grantId) rewards.push({
       item_code: content.item_code,
+      name: content.name,
+      icon_key: content.icon_key,
       quantity: Number(content.quantity),
       expires_at: content.validity_days > 0 ? new Date(Date.parse(now) + content.validity_days * 86_400_000).toISOString() : null,
     })

@@ -5,6 +5,7 @@ import workspaceHandler from './user-workspace'
 const mocks = vi.hoisted(() => ({
   buildAuthPayload: vi.fn(),
   getEffectiveProfilePermission: vi.fn(),
+  getProfileCapacityLimits: vi.fn(),
   getProfileForUser: vi.fn(),
   getValidatedJson: vi.fn(),
   isFreePreviewTrialActive: vi.fn(),
@@ -29,6 +30,15 @@ vi.mock('../storage/user-store', () => ({
 vi.mock('../free-preview-trial', () => ({
   getEffectiveProfilePermission: mocks.getEffectiveProfilePermission,
   isFreePreviewTrialActive: mocks.isFreePreviewTrialActive,
+}))
+
+vi.mock('../storage/inventory-store', () => ({
+  getProfileCapacityLimits: mocks.getProfileCapacityLimits,
+}))
+
+vi.mock('../storage/postgres', () => ({
+  hasDatabaseUrl: () => true,
+  withTransaction: vi.fn(),
 }))
 
 vi.mock('./license-utils', () => ({
@@ -72,6 +82,7 @@ beforeEach(() => {
     skland_binding: null,
   })
   mocks.getEffectiveProfilePermission.mockReturnValue('growth')
+  mocks.getProfileCapacityLimits.mockResolvedValue({ plan: 3, history: 5, archive: 0 })
   mocks.isFreePreviewTrialActive.mockReturnValue(false)
   mocks.validateConfig.mockImplementation((candidate: LicenseConfig) => ({ ok: true, config: candidate }))
   mocks.resolveConfigForPermission.mockImplementation((_permission: string, candidate: LicenseConfig) => ({ ok: true, config: candidate }))
@@ -111,6 +122,19 @@ describe('saved workspace configuration limit', () => {
     expect(saveResponse.status).toBe(200)
     expect(workspace.saved_configs).toHaveLength(3)
     expect(workspace.saved_configs[0]?.name).toBe('配置 4')
+  })
+
+  it('uses expanded profile capacity when saving through PATCH', async () => {
+    mocks.getProfileCapacityLimits.mockResolvedValue({ plan: 4, history: 6, archive: 1 })
+    mocks.getValidatedJson.mockResolvedValue(savePayload('配置 4'))
+
+    const response = await workspaceHandler(patchRequest())
+
+    expect(response.status).toBe(200)
+    expect(mocks.getProfileCapacityLimits).toHaveBeenCalledWith('profile-1')
+    expect(workspace.saved_configs).toHaveLength(4)
+    expect(workspace.saved_configs[0]?.name).toBe('配置 4')
+    expect(mocks.buildAuthPayload).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-1' }), 'profile-1')
   })
 
   it.each(['delete', 'touch'] as const)('returns 404 when %s targets a missing configuration', async (type) => {

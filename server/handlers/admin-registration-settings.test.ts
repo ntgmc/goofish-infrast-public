@@ -19,9 +19,10 @@ vi.mock('../brevo-quota', () => quota)
 import handler from './admin-registration-settings'
 
 const settings = {
-  version: 4 as const,
+  version: 5 as const,
   email_verification_required: true,
   invite_code_required: false,
+  email_provider_priority: ['brevo', 'ses'] as ['brevo', 'ses'],
   brevo_quota_action: 'pause_registration' as const,
   admin_invite_email_reserve: 20,
   password_reset_email_reserve: 10,

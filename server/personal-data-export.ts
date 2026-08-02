@@ -19,6 +19,10 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   },
   depot_value_samples: { disposition: 'export', field: 'depot_samples' },
   invitation_codes: { disposition: 'export', field: 'invitation_code' },
+  invitation_code_audit: {
+    disposition: 'exclude',
+    reason: '邀请码轮换与暂停审计属于安全控制记录，账户删除时通过外键级联清理。',
+  },
   invitations: { disposition: 'export', field: 'invitations' },
   reward_grants: { disposition: 'export', field: 'inventory.grants' },
   reward_consumptions: { disposition: 'export', field: 'inventory.consumptions' },
@@ -33,7 +37,27 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   user_balance_transactions: { disposition: 'export', field: 'balance.transactions' },
   user_balance_qualification_ledger: { disposition: 'export', field: 'balance.qualification_ledger' },
   user_balance_reservations: { disposition: 'export', field: 'balance.reservations' },
+  user_balance_operations: {
+    disposition: 'exclude',
+    reason: '积分管理请求的幂等键、请求哈希与响应快照属于内部防重放状态，最终积分流水已通过余额交易明细导出。',
+  },
   commercial_account_limits: { disposition: 'export', field: 'commercial_account' },
+  commercial_account_audit: {
+    disposition: 'exclude',
+    reason: '商用账户变更的管理员审批与双人复核记录属于内部合规审计，账户删除时通过外键级联清理。',
+  },
+  commercial_profile_operations: {
+    disposition: 'exclude',
+    reason: '商用档案操作的请求哈希与响应快照属于内部幂等控制状态，档案本身已通过 profiles 字段导出。',
+  },
+  metered_billing_quotes: {
+    disposition: 'exclude',
+    reason: '计量计费报价与确认状态属于内部计费流程数据，最终费用已通过余额预留和交易明细导出。',
+  },
+  billing_reconciliation_cases: {
+    disposition: 'exclude',
+    reason: '计费异常详情与管理员处置结果属于内部对账审计，账户删除后解除用户关联并按运维策略留存。',
+  },
   metered_personal_claims: { disposition: 'export', field: 'metered_personal_claim' },
   user_notifications: { disposition: 'export', field: 'notifications' },
   user_announcement_reads: { disposition: 'export', field: 'announcement_reads' },
@@ -48,6 +72,10 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   password_reset_tokens: { disposition: 'exclude', reason: '密码重置令牌哈希属于安全凭据。' },
   email_verification_tokens: { disposition: 'exclude', reason: '邮箱验证令牌哈希属于安全凭据。' },
   admin_registration_invitations: { disposition: 'exclude', reason: '管理员邀请码哈希和发放审计属于安全控制数据。' },
+  admin_invitation_verification_outbox: {
+    disposition: 'exclude',
+    reason: '短期验证邮件投递队列属于安全与恢复状态，不作为可移植用户内容复制。',
+  },
   cdk_redemption_idempotency: { disposition: 'exclude', reason: '内部请求防重放哈希不属于可移植用户内容。' },
   free_preview_claims: { disposition: 'exclude', reason: '森空岛 UID 哈希属于防重复领取安全证据。' },
   free_preview_pending_claims: { disposition: 'exclude', reason: '未完成领取的短期验证状态可能包含授权材料。' },

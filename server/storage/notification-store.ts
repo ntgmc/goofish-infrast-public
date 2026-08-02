@@ -7,7 +7,7 @@ import type {
 } from '../../src/lib/types'
 import { notificationsCopy } from '../../src/copy/zh-CN/notifications'
 import { ensureDatabaseSchema } from './schema'
-import { query } from './postgres'
+import { query, withTransaction } from './postgres'
 
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
@@ -48,15 +48,46 @@ export async function upsertItemGrantNotificationInTransaction(client: PoolClien
   expiresAt: string | null
   now: string
 }): Promise<void> {
-  const item: InternalItemGrantDetail = {
-    item_code: input.itemCode,
-    name: input.itemName,
-    icon_key: input.iconKey,
-    quantity: input.quantity,
-    expires_at: input.expiresAt,
-    grant_ids: [input.grantId],
-  }
-  const payload: InternalItemGrantPayload = { kind: 'item_grant', items: [item] }
+  return upsertItemGrantNotificationGroupInTransaction(client, {
+    userId: input.userId,
+    sourceType: input.sourceType,
+    sourceId: input.sourceId,
+    now: input.now,
+    items: [{
+      grantId: input.grantId,
+      itemCode: input.itemCode,
+      itemName: input.itemName,
+      iconKey: input.iconKey,
+      quantity: input.quantity,
+      expiresAt: input.expiresAt,
+    }],
+  })
+}
+
+export async function upsertItemGrantNotificationGroupInTransaction(client: PoolClient, input: {
+  userId: string
+  sourceType: string
+  sourceId: string
+  now: string
+  items: Array<{
+    grantId: string
+    itemCode: string
+    itemName: string
+    iconKey: string
+    quantity: number
+    expiresAt: string | null
+  }>
+}): Promise<void> {
+  if (input.items.length === 0) return
+  const items: InternalItemGrantDetail[] = input.items.map((item) => ({
+    item_code: item.itemCode,
+    name: item.itemName,
+    icon_key: item.iconKey,
+    quantity: item.quantity,
+    expires_at: item.expiresAt,
+    grant_ids: [item.grantId],
+  }))
+  const payload: InternalItemGrantPayload = { kind: 'item_grant', items }
   const inserted = await client.query<{ id: string }>(
     `insert into user_notifications
       (id, user_id, type, source_type, source_id, title, body, action_kind, payload_json, read_at, created_at, updated_at)
@@ -77,16 +108,17 @@ export async function upsertItemGrantNotificationInTransaction(client: PoolClien
   const row = existing.rows[0]
   if (!row) throw new Error('Expected an existing item grant notification after a uniqueness conflict.')
   const current = normalizeInternalPayload(row.payload_json)
-  if (current.items.some((entry) => entry.grant_ids.includes(input.grantId))) return
-
-  const matching = current.items.find((entry) => (
-    entry.item_code === item.item_code && entry.expires_at === item.expires_at
-  ))
-  if (matching) {
-    matching.quantity += item.quantity
-    matching.grant_ids.push(input.grantId)
-  } else {
-    current.items.push(item)
+  for (const item of items) {
+    if (current.items.some((entry) => entry.grant_ids.includes(item.grant_ids[0]!))) continue
+    const matching = current.items.find((entry) => (
+      entry.item_code === item.item_code && entry.expires_at === item.expires_at
+    ))
+    if (matching) {
+      matching.quantity += item.quantity
+      matching.grant_ids.push(...item.grant_ids)
+    } else {
+      current.items.push(item)
+    }
   }
   await client.query(
     `update user_notifications
@@ -103,28 +135,34 @@ export async function listUserNotifications(
   await ensureSchema()
   const limit = normalizeLimit(options.limit)
   const cursor = decodeCursor(options.cursor)
-  const values: unknown[] = [userId, limit + 1]
-  const cursorClause = cursor ? 'and (updated_at, id) < ($3::timestamptz, $4::text)' : ''
-  if (cursor) values.push(cursor.updatedAt, cursor.id)
-  const [notifications, unread] = await Promise.all([
-    query<StoredNotification>(
+  return withTransaction(async (client) => {
+    await client.query('set transaction isolation level repeatable read read only')
+    const snapshot = cursor?.asOf ?? new Date((await client.query<{ as_of: string }>(
+      'select transaction_timestamp()::text as as_of',
+    )).rows[0]!.as_of).toISOString()
+    const values: unknown[] = [userId, limit + 1, snapshot]
+    const cursorClause = cursor ? 'and (updated_at, id) < ($4::timestamptz, $5::text)' : ''
+    if (cursor) values.push(cursor.updatedAt, cursor.id)
+    const notifications = await client.query<StoredNotification>(
       `select id, type, title, body, action_kind, payload_json, read_at, created_at, updated_at
          from user_notifications
-        where user_id = $1 ${cursorClause}
+        where user_id = $1 and updated_at <= $3::timestamptz ${cursorClause}
         order by updated_at desc, id desc limit $2`,
       values,
-    ),
-    query<{ count: string }>(
-      'select count(*)::text as count from user_notifications where user_id = $1 and read_at is null',
-      [userId],
-    ),
-  ])
-  const rows = notifications.rows.slice(0, limit)
-  return {
-    notifications: rows.map(toPublicNotification),
-    unread_count: Number(unread.rows[0]?.count ?? 0),
-    next_cursor: notifications.rows.length > limit && rows.length > 0 ? encodeCursor(rows.at(-1)!) : null,
-  }
+    )
+    const unread = await client.query<{ count: string }>(
+      `select count(*)::text as count from user_notifications
+        where user_id = $1 and read_at is null and updated_at <= $2::timestamptz`,
+      [userId, snapshot],
+    )
+    const rows = notifications.rows.slice(0, limit)
+    return {
+      notifications: rows.map(toPublicNotification),
+      unread_count: Number(unread.rows[0]?.count ?? 0),
+      next_cursor: notifications.rows.length > limit && rows.length > 0 ? encodeCursor(snapshot, rows.at(-1)!) : null,
+      as_of: snapshot,
+    }
+  })
 }
 
 export async function markUserNotificationRead(userId: string, notificationId: string, now = new Date().toISOString()): Promise<number> {
@@ -155,7 +193,15 @@ export async function exportUserNotifications(userId: string): Promise<UserNotif
 }
 
 function toPublicNotification(row: StoredNotification): UserNotification {
-  const payload = normalizeInternalPayload(row.payload_json)
+  if (row.type !== 'item_grant' || row.action_kind !== 'inventory') {
+    throw invalidNotification(row.id)
+  }
+  let payload: InternalItemGrantPayload
+  try {
+    payload = normalizeInternalPayload(row.payload_json)
+  } catch {
+    throw invalidNotification(row.id)
+  }
   return {
     id: row.id,
     type: 'item_grant',
@@ -173,26 +219,47 @@ function toPublicNotification(row: StoredNotification): UserNotification {
 }
 
 function normalizeInternalPayload(value: unknown): InternalItemGrantPayload {
-  if (!value || typeof value !== 'object' || !('items' in value) || !Array.isArray(value.items)) {
-    return { kind: 'item_grant', items: [] }
+  if (!value || typeof value !== 'object' || !('kind' in value) || value.kind !== 'item_grant'
+    || !('items' in value) || !Array.isArray(value.items) || value.items.length === 0) {
+    throw invalidNotificationPayload()
   }
-  const items = value.items.flatMap((raw): InternalItemGrantDetail[] => {
-    if (!raw || typeof raw !== 'object') return []
+  const items = value.items.map((raw): InternalItemGrantDetail => {
+    if (!raw || typeof raw !== 'object') throw invalidNotificationPayload()
     const item = raw as Record<string, unknown>
-    if (typeof item.item_code !== 'string' || typeof item.name !== 'string' || typeof item.icon_key !== 'string') return []
-    if (typeof item.quantity !== 'number' || !Number.isFinite(item.quantity) || item.quantity <= 0) return []
-    const expiresAt = typeof item.expires_at === 'string' ? item.expires_at : null
-    const grantIds = Array.isArray(item.grant_ids) ? item.grant_ids.filter((id): id is string => typeof id === 'string') : []
-    return [{
+    if (typeof item.item_code !== 'string' || !item.item_code || typeof item.name !== 'string' || !item.name
+      || typeof item.icon_key !== 'string' || !item.icon_key) throw invalidNotificationPayload()
+    if (typeof item.quantity !== 'number' || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+      throw invalidNotificationPayload()
+    }
+    const expiresAt = item.expires_at === null
+      ? null
+      : typeof item.expires_at === 'string' && !Number.isNaN(Date.parse(item.expires_at))
+        ? item.expires_at
+        : undefined
+    const rawGrantIds = item.grant_ids
+    const grantIds = Array.isArray(rawGrantIds) ? rawGrantIds.filter((id): id is string => typeof id === 'string' && Boolean(id)) : []
+    if (expiresAt === undefined || grantIds.length === 0 || !Array.isArray(rawGrantIds) || grantIds.length !== rawGrantIds.length) {
+      throw invalidNotificationPayload()
+    }
+    return {
       item_code: item.item_code,
       name: item.name,
       icon_key: item.icon_key,
       quantity: item.quantity,
       expires_at: expiresAt,
       grant_ids: grantIds,
-    }]
+    }
   })
   return { kind: 'item_grant', items }
+}
+
+function invalidNotification(notificationId: string): Error {
+  console.error(`Invalid stored notification contract: ${notificationId}`)
+  return new Error('Invalid stored notification contract.')
+}
+
+function invalidNotificationPayload(): Error {
+  return new Error('Invalid stored item grant notification payload.')
 }
 
 function itemGrantBody(items: InternalItemGrantDetail[]): string {
@@ -209,18 +276,21 @@ function normalizeLimit(value: number | undefined): number {
   return limit
 }
 
-function encodeCursor(row: Pick<StoredNotification, 'updated_at' | 'id'>): string {
-  return Buffer.from(JSON.stringify({ updatedAt: row.updated_at, id: row.id }), 'utf8').toString('base64url')
+function encodeCursor(asOf: string, row: Pick<StoredNotification, 'updated_at' | 'id'>): string {
+  return Buffer.from(JSON.stringify({ asOf, updatedAt: row.updated_at, id: row.id }), 'utf8').toString('base64url')
 }
 
-function decodeCursor(value: string | null | undefined): { updatedAt: string; id: string } | null {
+function decodeCursor(value: string | null | undefined): { asOf: string; updatedAt: string; id: string } | null {
   if (!value) return null
   try {
     const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as Record<string, unknown>
-    if (typeof parsed.updatedAt !== 'string' || Number.isNaN(Date.parse(parsed.updatedAt)) || typeof parsed.id !== 'string' || !parsed.id) {
+    const updatedAt = typeof parsed.updatedAt === 'string' ? parsed.updatedAt : null
+    const asOf = typeof parsed.asOf === 'string' ? parsed.asOf : updatedAt
+    if (!updatedAt || !asOf || Number.isNaN(Date.parse(updatedAt)) || Number.isNaN(Date.parse(asOf))
+      || typeof parsed.id !== 'string' || !parsed.id) {
       throw new Error('invalid cursor')
     }
-    return { updatedAt: parsed.updatedAt, id: parsed.id }
+    return { asOf, updatedAt, id: parsed.id }
   } catch {
     throw new NotificationError('invalid_cursor', notificationsCopy.apiInvalidCursor, 400)
   }

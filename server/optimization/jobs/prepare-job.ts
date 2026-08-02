@@ -19,10 +19,8 @@ import { requestSchemas } from '../../security/request-policy';
 import { getValidatedJson } from '../../security/request-validation';
 import { formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
 import { recordOperatorDataAnomalyBehaviorEvent } from '../../behavior-risk/service';
-import { getBalanceSummary } from '../../storage/balance-store';
-import { getMeteredScheduleQuote, pointsToMinor, type MeteredScheduleQuote } from '../../../src/lib/metered-billing';
+import type { MeteredBillingKind } from '../../../src/lib/metered-billing';
 import { normalizePointsAmount } from '../../../src/lib/balance-contracts';
-import { getCommercialLimits } from '../../storage/metered-profile-store';
 import { requireMeteredBillingFeature } from '../../feature-gate';
 
 export async function prepareOptimizeJob(
@@ -88,7 +86,7 @@ export async function prepareOptimizeJob(
     let isPreviewProfile = false;
     let isPreviewTrial = false;
     let personalUseAudit: PreparedOptimizeJob['personalUseAudit'];
-    let meteredBilling: { userId: string; quote: MeteredScheduleQuote } | null = null;
+    let meteredBilling: PreparedOptimizeJob['billing'] = null;
 
     {
       activeProfileId = profile_id;
@@ -136,23 +134,19 @@ export async function prepareOptimizeJob(
         return fail({ error: '按次计费档案不开放场景对比实验室。', code: 'capability_not_available' }, 403);
       }
       if (profileKind === 'metered_personal' || profileKind === 'metered_commercial') {
-        const balance = await getBalanceSummary(auth.user.id);
-        if (pointsToMinor(balance.debt) > 0n) {
-          return fail({ error: '账户存在待追偿积分，结清前不能提交新任务。', code: 'debt_outstanding' }, 409);
-        }
-        if (profileKind === 'metered_commercial' && !balance.commercial.eligible) {
-          return fail({ error: '商用资格未生效或账户存在待追偿，暂不能提交新任务。', code: 'commercial_not_eligible' }, 409);
-        }
-        if (profileKind === 'metered_commercial' && (await getCommercialLimits(auth.user.id)).suspended) {
-          return fail({ error: '商用账户已暂停，暂不能提交新任务。', code: 'commercial_suspended' }, 409);
-        }
-        const quote = getMeteredScheduleQuote(profileKind, balance.lifetime_credited, balance.debt);
         const accepted = body.kind === 'schedule' ? normalizePointsAmount(body.accepted_max_points) : null;
-        if (body.kind !== 'schedule' || body.pricing_version !== quote.pricing_version || !accepted
-          || pointsToMinor(quote.charge) > pointsToMinor(accepted)) {
-          return fail({ error: '计价版本或本次价格已变化，请刷新报价后重新确认。', code: 'pricing_changed', quote }, 409);
+        if (body.kind !== 'schedule' || !body.billing_quote_id || !body.pricing_version || !accepted) {
+          return fail({ error: '缺少已确认的计费报价，请刷新报价后重新确认。', code: 'pricing_changed' }, 409);
         }
-        meteredBilling = { userId: auth.user.id, quote };
+        meteredBilling = {
+          userId: auth.user.id,
+          billingKind: profileKind as MeteredBillingKind,
+          confirmation: {
+            quoteId: body.billing_quote_id,
+            pricingVersion: body.pricing_version,
+            acceptedMaxPoints: accepted,
+          },
+        };
       }
       isPreviewProfile = isFreePreviewProfile(profile);
       activeProfileUid = profile.skland_binding?.uid ?? null;

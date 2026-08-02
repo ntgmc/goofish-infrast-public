@@ -1,5 +1,5 @@
 import * as esbuild from 'esbuild'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -181,6 +181,9 @@ async function assertUploadFormats() {
 }
 
 async function assertPriceCacheFallback() {
+  const diskCache = JSON.parse(await readFile(priceCachePath, 'utf8'))
+  diskCache.fetched_at = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+  await writeFile(priceCachePath, `${JSON.stringify(diskCache)}\n`, 'utf8')
   globalThis.fetch = async () => {
     throw new Error('remote price source down')
   }
@@ -189,8 +192,8 @@ async function assertPriceCacheFallback() {
   if (fallback.status !== 200) {
     throw new Error(`price cache fallback: expected 200, got ${fallback.status}`)
   }
-  if (fallback.body.sources.yituliu !== 'ok') {
-    throw new Error(`price cache fallback: expected cached yituliu ok, got ${fallback.body.sources.yituliu}`)
+  if (fallback.body.sources.yituliu !== 'stale') {
+    throw new Error(`price cache fallback: expected stale yituliu snapshot, got ${fallback.body.sources.yituliu}`)
   }
   if (fallback.body.warnings.some((warning) => warning.includes('材料价值源暂不可用'))) {
     throw new Error('price cache fallback: should not downgrade to fixed-only warning when disk cache exists')
@@ -206,6 +209,12 @@ async function assertUploadErrors() {
   await expectDepotStatus({ source: 'upload', inventory: {} }, 400, 'empty object')
   await expectDepotStatus({ source: 'upload', inventory: { '2001': -1 } }, 400, 'negative count')
   await expectDepotStatus({ source: 'upload', inventory: { '2001': '1' } }, 400, 'string count')
+  await expectDepotStatus({ source: 'upload', inventory: { '2001': 1.5 } }, 400, 'fractional count')
+  await expectDepotStatus({ source: 'upload', inventory: { '2001': 1_000_000_001 } }, 400, 'count above business maximum')
+  await expectDepotStatus({
+    source: 'upload',
+    inventory: { items: [{ id: '2001', count: 600_000_000 }, { id: '2001', count: 600_000_000 }] },
+  }, 400, 'duplicate merged count overflow')
   await expectDepotStatus({ source: 'upload', inventory: { nested: { count: 1 } } }, 400, 'unknown structure')
   await expectRawStatus('{"source":', 400, 'invalid json')
 
@@ -233,16 +242,23 @@ async function assertSklandFlow() {
     },
   }]
 
-  const missingAuth = await callDepot({ source: 'skland', profile_id: 'bound-profile' }, { auth: false })
+  const missingAuth = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true }, { auth: false })
   if (missingAuth.status !== 401) throw new Error(`skland auth: expected 401, got ${missingAuth.status}`)
 
-  const unbound = await callDepot({ source: 'skland', profile_id: 'unbound-profile' })
+  const unbound = await callDepot({ source: 'skland', profile_id: 'unbound-profile', sample_consent: true })
   if (unbound.status !== 404) throw new Error(`skland unbound: expected 404, got ${unbound.status}`)
 
-  const imported = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
+  const declined = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: false })
+  if (declined.body.ranking.contribution_status !== 'declined'
+    || sampleStore.records.size !== 0
+    || (globalThis.__depotGameInfoCalls ?? 0) !== 0) {
+    throw new Error('skland import: explicit sample consent should be required before reading sample-only player data')
+  }
+
+  const imported = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true })
   assertNoSecretLeak(imported.body, 'skland import response')
   if (imported.body.ranking.contribution_status !== 'saved') {
-    throw new Error(`skland import: expected default saved contribution, got ${imported.body.ranking.contribution_status}`)
+    throw new Error(`skland import: expected consented saved contribution, got ${imported.body.ranking.contribution_status}`)
   }
   if (imported.status !== 200 || imported.body.source !== 'skland') {
     throw new Error(`skland import: expected 200 skland result, got ${imported.status}`)
@@ -269,16 +285,43 @@ async function assertSklandFlow() {
   }
   assertNoRawSampleLeak(record, 'skland import sample record')
 
-  const repeated = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
+  const repeated = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true })
   if (repeated.status !== 200 || sampleStore.records.size !== 1) {
     throw new Error('skland import: repeated same uid should update one sample record')
   }
 
   globalThis.__depotGameInfoFails = true
-  const unavailable = await callDepot({ source: 'skland', profile_id: 'bound-profile' })
+  const unavailable = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true })
   globalThis.__depotGameInfoFails = false
   if (unavailable.status !== 200 || unavailable.body.ranking.contribution_status !== 'unavailable') {
     throw new Error(`skland import: game info failure should not block analysis, got ${unavailable.status}/${unavailable.body.ranking.contribution_status}`)
+  }
+
+  const secret = process.env.DEPOT_SAMPLE_HASH_SECRET
+  delete process.env.DEPOT_SAMPLE_HASH_SECRET
+  const missingSecret = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true })
+  process.env.DEPOT_SAMPLE_HASH_SECRET = secret
+  if (missingSecret.status !== 200 || missingSecret.body.ranking.contribution_status !== 'unavailable') {
+    throw new Error('skland import: missing sample hash secret should degrade without failing valuation')
+  }
+
+  const existingRecord = [...sampleStore.records.values()][0]
+  await rm(priceCachePath, { force: true })
+  process.env.MAA_MATERIAL_VALUE_MAX_STALE_MS = '0'
+  globalThis.fetch = async () => { throw new Error('remote price source down') }
+  handler = await loadHandler(handlerPath)
+  const pricingUnavailable = await callDepot({ source: 'skland', profile_id: 'bound-profile', sample_consent: true })
+  const preservedRecord = [...sampleStore.records.values()][0]
+  if (pricingUnavailable.status !== 200
+    || pricingUnavailable.body.ranking.contribution_status !== 'skipped'
+    || sampleStore.records.size !== 1
+    || preservedRecord?.updated_at !== existingRecord?.updated_at) {
+    throw new Error('skland import: unavailable pricing must preserve the previous complete sample')
+  }
+
+  const revoked = await callDepotDelete({ profile_id: 'bound-profile' })
+  if (revoked.status !== 200 || sampleStore.records.size !== 0) {
+    throw new Error('skland import: contributor should be able to revoke the profile sample')
   }
 }
 
@@ -292,6 +335,15 @@ async function callDepot(body, init = {}) {
     body: JSON.stringify(body),
   })
   const response = await handler(request)
+  return { status: response.status, body: await response.json() }
+}
+
+async function callDepotDelete(body) {
+  const response = await handler(new Request('http://local/api/depot-value', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', cookie: 'maa_session=test-session' },
+    body: JSON.stringify(body),
+  }))
   return { status: response.status, body: await response.json() }
 }
 
@@ -482,6 +534,7 @@ function memorySklandClientModule() {
         }
       }
       async getGamePlayerInfo(uid) {
+        globalThis.__depotGameInfoCalls = (globalThis.__depotGameInfoCalls ?? 0) + 1
         globalThis.__depotGameInfoUid = uid
         if (globalThis.__depotGameInfoFails) throw new Error('game player info down')
         return {
@@ -509,16 +562,26 @@ function createMemoryDepotValueSampleStore() {
   const records = new Map()
   return {
     records,
-    save: async (record) => {
+    save: async (record, previousUidHashes = []) => {
+      previousUidHashes.forEach((hash) => records.delete(hash))
       records.set(record.uid_hash, record)
     },
-    getDistribution: async (totalEquivalentSanity) => {
-      const values = [...records.values()]
+    getDistribution: async (totalEquivalentSanity, valuationVersion) => {
+      const values = [...records.values()].filter((record) => record.complete && record.valuation_version === valuationVersion)
       return {
         sample_count: values.length,
         less_count: values.filter((record) => record.total_equivalent_sanity < totalEquivalentSanity).length,
         equal_count: values.filter((record) => record.total_equivalent_sanity === totalEquivalentSanity).length,
       }
+    },
+    deleteForContributorProfile: async (profileId) => {
+      let deleted = 0
+      for (const [hash, record] of records) {
+        if (record.contributor_profile_id !== profileId) continue
+        records.delete(hash)
+        deleted += 1
+      }
+      return deleted
     },
   }
 }

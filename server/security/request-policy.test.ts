@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_DEPOT_ITEM_TYPES } from '../../src/lib/depot-value-constraints'
 import { requestSchemas } from './request-policy'
 
 const codeHash = 'a'.repeat(64)
@@ -223,5 +224,176 @@ describe('profile metadata request policy', () => {
     expect(requestSchemas.profilePatch.safeParse({ profile_id: 'profile-1' }).success).toBe(false)
     expect(requestSchemas.profilePatch.safeParse({ profile_id: 'profile-1', display_name: '新名称' }).success).toBe(true)
     expect(requestSchemas.profilePatch.safeParse({ profile_id: 'profile-1', note: '' }).success).toBe(true)
+  })
+})
+
+describe('administrator inventory request policy', () => {
+  const reward = {
+    item_code: 'priority_compute_coupon',
+    quantity: 1,
+    expiry: { mode: 'never' as const },
+  }
+
+  it('accepts action-specific asset writes with reason and idempotency', () => {
+    expect(requestSchemas.adminItems.safeParse({
+      action: 'create_gift_pack',
+      name: '测试礼包',
+      description: '测试说明',
+      contents: [reward],
+      idempotency_key: 'gift-pack-request',
+    }).success).toBe(true)
+    expect(requestSchemas.adminInventory.safeParse({
+      action: 'grant',
+      user_id: 'user-1',
+      item_code: 'priority_compute_coupon',
+      quantity: 1,
+      validity_days: 0,
+      reason: '人工补发',
+      idempotency_key: 'grant-request',
+    }).success).toBe(true)
+    expect(requestSchemas.adminInventory.safeParse({
+      action: 'create_campaign',
+      item_code: 'priority_compute_coupon',
+      quantity: 1,
+      validity_days: 0,
+      target_mode: 'user_ids',
+      user_ids: ['user-1'],
+      reason: '活动补偿',
+      idempotency_key: 'campaign-request',
+    }).success).toBe(true)
+    expect(requestSchemas.adminInventory.safeParse({
+      action: 'reverse_campaign',
+      campaign_id: 'campaign-1',
+      reason: '全站撤回',
+      root_password: 'root-password',
+    }).success).toBe(true)
+  })
+
+  it('rejects missing accountability fields, unknown actions, and untyped reward fields', () => {
+    const grant = {
+      action: 'grant',
+      user_id: 'user-1',
+      item_code: 'priority_compute_coupon',
+      quantity: 1,
+      validity_days: 0,
+      reason: '人工补发',
+      idempotency_key: 'grant-request',
+    }
+    expect(requestSchemas.adminInventory.safeParse({ ...grant, reason: undefined }).success).toBe(false)
+    expect(requestSchemas.adminInventory.safeParse({ ...grant, idempotency_key: undefined }).success).toBe(false)
+    expect(requestSchemas.adminInventory.safeParse({ ...grant, action: 'arbitrary' }).success).toBe(false)
+    expect(requestSchemas.adminItems.safeParse({
+      action: 'create_gift_pack',
+      name: '测试礼包',
+      description: '测试说明',
+      contents: [{ ...reward, server_owned: true }],
+      idempotency_key: 'gift-pack-request',
+    }).success).toBe(false)
+  })
+})
+
+describe('announcement request policy', () => {
+  it('requires optimistic concurrency and mutually exclusive read mutations', () => {
+    const announcement = { banner: null, announcements: [], expected_revision: 0 }
+    expect(requestSchemas.announcement.safeParse(announcement).success).toBe(true)
+    expect(requestSchemas.announcement.safeParse({ ...announcement, expected_revision: undefined }).success).toBe(false)
+    expect(requestSchemas.userAnnouncement.safeParse({ announcement_id: 'announcement-1' }).success).toBe(true)
+    expect(requestSchemas.userAnnouncement.safeParse({ all: true }).success).toBe(true)
+    expect(requestSchemas.userAnnouncement.safeParse({}).success).toBe(false)
+    expect(requestSchemas.userAnnouncement.safeParse({ all: false }).success).toBe(false)
+    expect(requestSchemas.userAnnouncement.safeParse({ announcement_id: 'announcement-1', all: true }).success).toBe(false)
+  })
+})
+
+describe('invitation request policy', () => {
+  it('validates reward snapshots and revision deeply', () => {
+    const valid = {
+      enabled: true,
+      expected_revision: 2,
+      rewards: [{
+        recipient: 'inviter',
+        item_code: 'priority_compute_coupon',
+        quantity: 1,
+        expiry: { mode: 'never' },
+        gift_pack_version_id: null,
+      }],
+    }
+    expect(requestSchemas.adminInvitationSettings.safeParse(valid).success).toBe(true)
+    expect(requestSchemas.adminInvitationSettings.safeParse({
+      ...valid,
+      rewards: [{ ...valid.rewards[0], quantity: 0 }],
+    }).success).toBe(false)
+    expect(requestSchemas.adminInvitationSettings.safeParse({ ...valid, expected_revision: undefined }).success).toBe(false)
+  })
+
+  it('requires root accountability and idempotency for administrator codes', () => {
+    const create = { reason: 'test issuance', idempotency_key: 'request-1', root_password: 'root-secret' }
+    expect(requestSchemas.adminRegistrationInvitationCreate.safeParse(create).success).toBe(true)
+    expect(requestSchemas.adminRegistrationInvitationCreate.safeParse({ ...create, root_password: undefined }).success).toBe(false)
+    expect(requestSchemas.adminRegistrationInvitationCreate.safeParse({ ...create, idempotency_key: undefined }).success).toBe(false)
+    expect(requestSchemas.adminRegistrationInvitationPatch.safeParse({
+      invitation_id: 'invitation-1', action: 'revoke', reason: 'test revoke', root_password: 'root-secret',
+    }).success).toBe(true)
+    expect(requestSchemas.adminRegistrationInvitationPatch.safeParse({
+      invitation_id: 'invitation-1', action: 'delete', reason: 'test revoke', root_password: 'root-secret',
+    }).success).toBe(false)
+  })
+
+  it('accepts only explicit user invitation code actions', () => {
+    expect(requestSchemas.userInvitationCode.safeParse({ action: 'ensure' }).success).toBe(true)
+    expect(requestSchemas.userInvitationCode.safeParse({ action: 'rotate' }).success).toBe(true)
+    expect(requestSchemas.userInvitationCode.safeParse({ action: 'delete' }).success).toBe(false)
+  })
+})
+
+describe('depot value request policy', () => {
+  it('uses a strict source union with bounded integer inventory counts and explicit consent', () => {
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: { '2001': 1, '30011': 100 },
+    }).success).toBe(true)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: {
+        '@type': '@penguin-statistics/depot',
+        items: [{ id: '30011', have: 2, name: '源岩' }],
+      },
+    }).success).toBe(true)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'skland',
+      profile_id: 'profile-1',
+      sample_consent: false,
+    }).success).toBe(true)
+
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'skland',
+      profile_id: 'profile-1',
+    }).success).toBe(false)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: { '2001': 1.5 },
+    }).success).toBe(false)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: { '2001': 1_000_000_001 },
+    }).success).toBe(false)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: { '2001': 1 },
+      profile_id: 'unexpected',
+    }).success).toBe(false)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: Object.fromEntries(Array.from(
+        { length: MAX_DEPOT_ITEM_TYPES + 1 },
+        (_, index) => [String(index), 1],
+      )),
+    }).success).toBe(false)
+  })
+
+  it('limits sample revocation to one bounded profile id', () => {
+    expect(requestSchemas.depotSampleRevoke.safeParse({ profile_id: 'profile-1' }).success).toBe(true)
+    expect(requestSchemas.depotSampleRevoke.safeParse({ profile_id: '' }).success).toBe(false)
+    expect(requestSchemas.depotSampleRevoke.safeParse({ profile_id: 'profile-1', all: true }).success).toBe(false)
   })
 })

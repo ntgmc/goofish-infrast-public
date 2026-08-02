@@ -1,4 +1,4 @@
-import { lazy, Suspense, type FormEvent } from 'react'
+import { Component, lazy, Suspense, type ErrorInfo, type FormEvent, type ReactNode } from 'react'
 import type { LicenseOperator, OptimizeResult, UpgradeSuggestion, WorkspaceResultHistoryItem } from '../../../lib/types'
 import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { isMaaJsonDownloadable } from '../../../lib/workspace-history'
@@ -28,6 +28,9 @@ export default function ResultSection({
   onUpgradePreviewProfile,
   onDownloadMAA,
   onDownloadFullResult,
+  maaDownloadBusy = false,
+  fullResultDownloadBusy = false,
+  fullDataAvailable = true,
   onApplySuggestions,
   suggestionsReadOnly = false,
   onReset,
@@ -49,6 +52,9 @@ export default function ResultSection({
   onUpgradePreviewProfile: (event: FormEvent) => void;
   onDownloadMAA?: () => void;
   onDownloadFullResult?: () => void;
+  maaDownloadBusy?: boolean;
+  fullResultDownloadBusy?: boolean;
+  fullDataAvailable?: boolean;
   onApplySuggestions: (selectedIds: string[]) => Promise<void>;
   suggestionsReadOnly?: boolean;
   onReset: () => void;
@@ -67,6 +73,11 @@ export default function ResultSection({
         </div>
       )}
 
+      <ResultErrorBoundary
+        resetKey={`${phase}:${historyItem?.id ?? progress?.jobId ?? 'none'}`}
+        onDownloadDiagnostic={onDownloadFullResult}
+        diagnosticDownloadBusy={fullResultDownloadBusy}
+      >
       <div data-tour-target="optimize-result-actions">
       {phase === 'history' && historyItem && (
         <Suspense fallback={<ResultFallback />}>
@@ -77,6 +88,9 @@ export default function ResultSection({
             previewLimit={previewProfile ? historyItem.result.preview_limit : undefined}
             onDownload={onDownloadMAA && isMaaJsonDownloadable(historyItem.result) ? onDownloadMAA : undefined}
             onDownloadFullResult={onDownloadFullResult}
+            downloadBusy={maaDownloadBusy}
+            fullResultDownloadBusy={fullResultDownloadBusy}
+            fullDataAvailable={fullDataAvailable}
             suggestionsSlot={!previewProfile && suggestions.length > 0 ? (
               <Suspense fallback={<ResultFallback />}>
                 <UpgradeSuggestions
@@ -103,6 +117,9 @@ export default function ResultSection({
             previewLimit={previewProfile ? currentResult.preview_limit : undefined}
             onDownload={onDownloadMAA}
             onDownloadFullResult={onDownloadFullResult}
+            downloadBusy={maaDownloadBusy}
+            fullResultDownloadBusy={fullResultDownloadBusy}
+            fullDataAvailable={fullDataAvailable}
             suggestionsSlot={!previewProfile && suggestions.length > 0 ? (
               <Suspense fallback={<ResultFallback />}>
                 <UpgradeSuggestions
@@ -130,13 +147,62 @@ export default function ResultSection({
             previewLimit={previewProfile ? finalResult.preview_limit : undefined}
             onDownload={onDownloadMAA}
             onDownloadFullResult={onDownloadFullResult}
+            downloadBusy={maaDownloadBusy}
+            fullResultDownloadBusy={fullResultDownloadBusy}
+            fullDataAvailable={fullDataAvailable}
           />
           {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
         </Suspense>
       )}
       </div>
+      </ResultErrorBoundary>
     </section>
   )
+}
+
+class ResultErrorBoundary extends Component<{
+  resetKey: string
+  onDownloadDiagnostic?: () => void
+  diagnosticDownloadBusy: boolean
+  children: ReactNode
+}, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('result rendering failed:', error, info.componentStack)
+  }
+
+  componentDidUpdate(previous: Readonly<{ resetKey: string }>) {
+    if (this.state.failed && previous.resetKey !== this.props.resetKey) {
+      this.setState({ failed: false })
+    }
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <div className="tool-alert tool-alert--warning" role="alert">
+        <p>{copy.inventory.result_data_incompatible}</p>
+        {this.props.onDownloadDiagnostic && (
+          <button
+            type="button"
+            className="tool-secondary-action mt-3"
+            disabled={this.props.diagnosticDownloadBusy}
+            aria-busy={this.props.diagnosticDownloadBusy}
+            onClick={this.props.onDownloadDiagnostic}
+          >
+            {this.props.diagnosticDownloadBusy
+              ? copy.inventory.export_downloading
+              : copy.domain.components_result_panel_ResultPanel_039}
+          </button>
+        )}
+      </div>
+    )
+  }
 }
 
 export function UpgradeSuggestionStatusNotice({ result }: { result: OptimizeResult }) {

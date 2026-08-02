@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const auth = vi.hoisted(() => ({ authenticateAdminRequest: vi.fn() }))
-const store = vi.hoisted(() => ({
-  createAdminRegistrationInvitation: vi.fn(),
-  listAdminRegistrationInvitations: vi.fn(),
-  revokeAdminRegistrationInvitation: vi.fn(),
-}))
+const auth = vi.hoisted(() => ({ authenticateAdminRequest: vi.fn(), requireRootAdminPassword: vi.fn() }))
+const store = vi.hoisted(() => {
+  class AdminRegistrationInvitationOperationError extends Error {
+    code = 'idempotency_conflict'
+  }
+  return {
+    AdminRegistrationInvitationOperationError,
+    createAdminRegistrationInvitation: vi.fn(),
+    listAdminRegistrationInvitations: vi.fn(),
+    recordAdminInvitationVerificationResend: vi.fn(),
+    revokeAdminRegistrationInvitation: vi.fn(),
+  }
+})
 
 vi.mock('./admin-auth', () => auth)
 vi.mock('../storage/admin-registration-invitation-store', () => store)
@@ -21,11 +28,17 @@ const invitation = {
   revoked_at: null,
   consumed_by_user_id: null,
   consumed_by_email: null,
+  created_by: 'operator',
+  create_reason: 'test issuance',
+  revoked_by: null,
+  revoke_reason: null,
+  verification_status: 'not_applicable' as const,
 }
 
 describe('admin registration invitations handler', () => {
   beforeEach(() => {
-    auth.authenticateAdminRequest.mockResolvedValue({ ok: true })
+    auth.authenticateAdminRequest.mockResolvedValue({ ok: true, username: 'operator' })
+    auth.requireRootAdminPassword.mockResolvedValue({ ok: true, username: 'root' })
     store.createAdminRegistrationInvitation.mockResolvedValue({ invitation, code: '12AB34CD5E6F7G8H' })
     store.listAdminRegistrationInvitations.mockResolvedValue({ records: [invitation], total: 1, page: 1 })
     store.revokeAdminRegistrationInvitation.mockResolvedValue({ ...invitation, status: 'revoked', revoked_at: '2026-07-21T05:00:00.000Z' })
@@ -42,12 +55,22 @@ describe('admin registration invitations handler', () => {
   })
 
   it('creates a seven-day invitation and returns the plaintext only in the response', async () => {
-    const response = await handler(jsonRequest('POST', {}))
+    const response = await handler(jsonRequest('POST', {
+      reason: 'test issuance',
+      idempotency_key: 'request-1',
+      root_password: 'root-secret',
+    }))
     expect(response.status).toBe(201)
     expect(await response.json()).toEqual({
       invitation,
       code: '12AB34CD5E6F7G8H',
       share_url: '/tool/profiles?invite=12AB34CD5E6F7G8H',
+    })
+    expect(store.createAdminRegistrationInvitation).toHaveBeenCalledWith({
+      adminUsername: 'operator',
+      reason: 'test issuance',
+      idempotencyKey: 'request-1',
+      encryptionSecret: 'root-secret',
     })
   })
 
@@ -59,9 +82,18 @@ describe('admin registration invitations handler', () => {
   })
 
   it('revokes an active invitation and validates the action', async () => {
-    const response = await handler(jsonRequest('PATCH', { invitation_id: 'invite-1', action: 'revoke' }))
+    const response = await handler(jsonRequest('PATCH', {
+      invitation_id: 'invite-1',
+      action: 'revoke',
+      reason: 'test revoke',
+      root_password: 'root-secret',
+    }))
     expect(response.status).toBe(200)
-    expect(store.revokeAdminRegistrationInvitation).toHaveBeenCalledWith('invite-1')
+    expect(store.revokeAdminRegistrationInvitation).toHaveBeenCalledWith({
+      invitationId: 'invite-1',
+      adminUsername: 'operator',
+      reason: 'test revoke',
+    })
 
     const invalid = await handler(jsonRequest('PATCH', { invitation_id: 'invite-1', action: 'delete' }))
     expect(invalid.status).toBe(400)

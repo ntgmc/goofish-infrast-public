@@ -9,6 +9,7 @@ import type {
   LicenseOperator,
 } from '../../src/lib/types'
 import { APP_BUILD_META } from '../../src/lib/build-meta'
+import { MAX_DEPOT_ITEM_COUNT } from '../../src/lib/depot-value-constraints'
 import { getValidatedJsonValue } from '../security/request-validation'
 import { requireUserSession } from './user-auth'
 import { requireSiteFeatures } from '../feature-gate'
@@ -30,6 +31,7 @@ const TOP_ITEM_LIMIT = 8
 const UNPRICED_ITEM_LIMIT = 12
 const SAMPLE_WEIGHT_PRIOR_COUNT = 200
 const DEPOT_CURVE_SANITY_SCALE = 30
+const MIN_SAMPLE_PRICING_COVERAGE = 0.8
 const LMD_ITEM_ID = '4001'
 const UNPRICED_BY_POLICY = new Set(['3401', 'mod_unlock_token', 'mod_update_token_1', 'mod_update_token_2'])
 
@@ -41,6 +43,7 @@ type DepotInventoryItem = {
 
 type HandlerError = Error & {
   status?: number
+  code?: string
 }
 
 type SklandDepotRead = {
@@ -66,6 +69,7 @@ type DepotOperatorStats = {
 type DepotValueBuildOptions = {
   sample?: SklandSampleData | null
   contributorProfileId?: string | null
+  sampleConsent?: boolean
 }
 
 const ITEM_NAMES: Record<string, string> = {
@@ -162,21 +166,24 @@ const ITEM_NAMES: Record<string, string> = {
 
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
-  if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+  if (req.method !== 'POST' && req.method !== 'DELETE') return jsonResponse({ error: 'Method not allowed' }, 405)
 
   try {
     const body = await readLimitedJsonBody(req)
     if (!isRecord(body)) return jsonResponse({ error: '请求体必须是对象。' }, 400)
+    if (req.method === 'DELETE') return revokeDepotSample(req, body.profile_id)
     if (body.source === 'upload') {
       return jsonResponse(await buildDepotValueResponse(normalizeDepotInventory(body.inventory), 'upload'))
     }
     if (body.source === 'skland') {
       const gated = await requireSiteFeatures(['login', 'profiles', 'skland'])
       if (gated) return gated
-      const skland = await readSklandInventory(req, body.profile_id, true)
+      const sampleConsent = body.sample_consent === true
+      const skland = await readSklandInventory(req, body.profile_id, sampleConsent)
       return jsonResponse(await buildDepotValueResponse(skland.inventory, 'skland', undefined, {
-      sample: skland.sample,
-      contributorProfileId: typeof body.profile_id === 'string' ? body.profile_id : null,
+        sample: skland.sample,
+        contributorProfileId: typeof body.profile_id === 'string' ? body.profile_id : null,
+        sampleConsent,
       }))
     }
     return jsonResponse({ error: '请指定 source 为 upload 或 skland。' }, 400)
@@ -184,8 +191,18 @@ export default async (req: Request): Promise<Response> => {
     console.error('depot value error:', error instanceof Error ? error.message : error)
     const status = isHandlerError(error) ? error.status ?? 500 : 500
     const message = isHandlerError(error) ? error.message : 'Internal server error'
-    return jsonResponse({ error: message }, status)
+    return jsonResponse({ error: message, ...(isHandlerError(error) && error.code ? { code: error.code } : {}) }, status)
   }
+}
+
+async function revokeDepotSample(req: Request, profileIdValue: unknown): Promise<Response> {
+  const auth = await requireUserSession(req)
+  if (!auth) throw createError('请先登录。', 401)
+  const profileId = typeof profileIdValue === 'string' ? profileIdValue.trim() : ''
+  if (!profileId) throw createError('缺少 profile_id。', 400)
+  if (!auth.profiles.some((profile) => profile.id === profileId)) throw createError('账号档案不存在。', 404)
+  const deletedCount = await getDepotValueSampleStore()?.deleteForContributorProfile(profileId) ?? 0
+  return jsonResponse({ revoked: true, deleted_count: deletedCount })
 }
 
 function normalizeDepotInventory(value: unknown): DepotInventoryItem[] {
@@ -210,18 +227,29 @@ async function buildDepotValueResponse(
       unpricedItems.push({ id: item.id, name: item.name, count: item.count })
       continue
     }
+    const equivalentSanity = checkedRound(unitSanity * item.count, 2, `物品 ${item.id}`)
     pricedItems.push({
       id: item.id,
       name: item.name,
       count: item.count,
-      unit_sanity: round(unitSanity, 6),
-      equivalent_sanity: round(unitSanity * item.count, 2),
+      unit_sanity: checkedRound(unitSanity, 6, `物品 ${item.id}`),
+      equivalent_sanity: equivalentSanity,
     })
   }
 
-  const total = round(pricedItems.reduce((sum, item) => sum + item.equivalent_sanity, 0), 2)
+  let totalRaw = 0
+  for (const item of pricedItems) {
+    totalRaw += item.equivalent_sanity
+    assertFiniteValuation(totalRaw, '仓库总值')
+  }
+  const total = checkedRound(totalRaw, 2, '仓库总值')
+  const pricingCoverage = calculatePricingCoverage(items, pricedItems)
   const warnings: string[] = []
-  if (pricing.status === 'unavailable') {
+  if (pricing.status === 'stale') {
+    warnings.push('材料价值源刷新失败，当前使用有效期内的历史价格快照。')
+  } else if (pricing.status === 'invalid') {
+    warnings.push('材料价值源返回了无效数据，当前仅统计龙门币和作战记录等固定口径物品。')
+  } else if (pricing.status === 'unavailable') {
     warnings.push('材料价值源暂不可用，当前仅统计龙门币和作战记录等固定口径物品。')
   }
   if (unpricedItems.length > 0) {
@@ -236,10 +264,19 @@ async function buildDepotValueResponse(
     unpricedCount: unpricedItems.length,
     sample: options.sample ?? null,
     contributorProfileId: options.contributorProfileId ?? null,
+    sampleConsent: options.sampleConsent === true,
+    pricing,
+    pricingCoverage,
     sampleStore,
     warnings,
   })
-  const rankingResult = await buildDepotRanking(total, sampleStore, contributionStatus, warnings)
+  const rankingResult = await buildDepotRanking(
+    total,
+    pricing.valuation_version,
+    sampleStore,
+    contributionStatus,
+    warnings,
+  )
 
   return {
     source,
@@ -257,6 +294,11 @@ async function buildDepotValueResponse(
     sources: {
       inventory: source,
       yituliu: pricing.status,
+      pricing_snapshot_id: pricing.snapshot_id,
+      pricing_fetched_at: pricing.fetched_at,
+      pricing_age_ms: pricing.age_ms,
+      valuation_version: pricing.valuation_version,
+      pricing_coverage: pricingCoverage,
       lmd_exp: 'fixed_lmd_exp_36_per_10000',
       ranking: rankingResult.ranking.mode === 'sample_adjusted' ? 'sample_adjusted_curve_v1' : 'entertainment_curve_v1',
     },
@@ -273,6 +315,9 @@ async function saveDepotSampleIfRequested({
   unpricedCount,
   sample,
   contributorProfileId,
+  sampleConsent,
+  pricing,
+  pricingCoverage,
   sampleStore,
   warnings,
 }: {
@@ -283,34 +328,39 @@ async function saveDepotSampleIfRequested({
   unpricedCount: number
   sample: SklandSampleData | null
   contributorProfileId: string | null
+  sampleConsent: boolean
+  pricing: PricingState
+  pricingCoverage: number
   sampleStore: DepotValueSampleStore | null
   warnings: string[]
 }): Promise<DepotValueSampleContributionStatus> {
   if (source !== 'skland') return 'not_applicable'
+  if (!sampleConsent) return 'declined'
   if (!sampleStore || !sample) return 'unavailable'
+  if ((pricing.status !== 'fresh' && pricing.status !== 'stale')
+    || !pricing.snapshot_id
+    || !pricing.fetched_at
+    || pricingCoverage < MIN_SAMPLE_PRICING_COVERAGE) {
+    warnings.push(`本次价格覆盖率为 ${Math.round(pricingCoverage * 100)}%，未达到统计样本保存标准。`)
+    return 'skipped'
+  }
 
-  const uidHash = hashSklandUid(sample.uid)
-  if (!uidHash) return 'unavailable'
-
-  const now = new Date().toISOString()
-  const record: DepotValueSampleRecord = {
-    version: 1,
-    uid_hash: uidHash,
-    contributor_profile_id: contributorProfileId,
-    total_equivalent_sanity: total,
-    account_level: sample.accountLevel,
-    operator_power_score: sample.operatorStats.operator_power_score,
-    operator_count: sample.operatorStats.operator_count,
-    elite2_count: sample.operatorStats.elite2_count,
-    six_star_count: sample.operatorStats.six_star_count,
-    six_star_e2_count: sample.operatorStats.six_star_e2_count,
-    e2_90_count: sample.operatorStats.e2_90_count,
-    inventory_item_count: itemCount,
-    priced_count: pricedCount,
-    unpriced_count: unpricedCount,
-    sample_json: {
-      version: 1,
-      source: 'skland',
+  try {
+    const hashes = hashSklandUidCandidates(sample.uid)
+    const currentHash = hashes[0]
+    if (!currentHash) throw new Error('DEPOT_SAMPLE_HASH_SECRET is not configured')
+    const now = new Date().toISOString()
+    const record: DepotValueSampleRecord = {
+      version: 2,
+      uid_hash: currentHash.hash,
+      uid_hash_key_version: currentHash.keyVersion,
+      contributor_profile_id: contributorProfileId,
+      valuation_version: pricing.valuation_version,
+      pricing_snapshot_id: pricing.snapshot_id,
+      pricing_fetched_at: pricing.fetched_at,
+      pricing_status: pricing.status,
+      pricing_coverage: pricingCoverage,
+      complete: true,
       total_equivalent_sanity: total,
       account_level: sample.accountLevel,
       operator_power_score: sample.operatorStats.operator_power_score,
@@ -322,24 +372,43 @@ async function saveDepotSampleIfRequested({
       inventory_item_count: itemCount,
       priced_count: pricedCount,
       unpriced_count: unpricedCount,
+      sample_json: {
+        version: 2,
+        source: 'skland',
+        valuation_version: pricing.valuation_version,
+        pricing_snapshot_id: pricing.snapshot_id,
+        pricing_fetched_at: pricing.fetched_at,
+        pricing_status: pricing.status,
+        pricing_coverage: pricingCoverage,
+        complete: true,
+        total_equivalent_sanity: total,
+        account_level: sample.accountLevel,
+        operator_power_score: sample.operatorStats.operator_power_score,
+        operator_count: sample.operatorStats.operator_count,
+        elite2_count: sample.operatorStats.elite2_count,
+        six_star_count: sample.operatorStats.six_star_count,
+        six_star_e2_count: sample.operatorStats.six_star_e2_count,
+        e2_90_count: sample.operatorStats.e2_90_count,
+        inventory_item_count: itemCount,
+        priced_count: pricedCount,
+        unpriced_count: unpricedCount,
+        sampled_at: now,
+      },
       sampled_at: now,
-    },
-    sampled_at: now,
-    updated_at: now,
-  }
-
-  try {
-    await sampleStore.save(record)
+      updated_at: now,
+    }
+    await sampleStore.save(record, hashes.slice(1).map((candidate) => candidate.hash))
     return 'saved'
   } catch (error) {
     console.warn('depot value sample save failed:', error instanceof Error ? error.message : error)
-    warnings.push('匿名样本暂未保存，本次分析结果不受影响。')
+    warnings.push('假名化统计样本暂未保存，本次分析结果不受影响。')
     return 'unavailable'
   }
 }
 
 async function buildDepotRanking(
   totalSanity: number,
+  valuationVersion: string,
   sampleStore: DepotValueSampleStore | null,
   contributionStatus: DepotValueSampleContributionStatus,
   warnings: string[],
@@ -356,7 +425,7 @@ async function buildDepotRanking(
   if (!sampleStore) return { percentile: curvePercentile, ranking: curveRanking }
 
   try {
-    const distribution = await sampleStore.getDistribution(totalSanity)
+    const distribution = await sampleStore.getDistribution(totalSanity, valuationVersion)
     if (distribution.sample_count <= 0) return { percentile: curvePercentile, ranking: curveRanking }
     const samplePercentile = ((distribution.less_count + distribution.equal_count * 0.5) / distribution.sample_count) * 100
     const sampleWeight = distribution.sample_count / (distribution.sample_count + SAMPLE_WEIGHT_PRIOR_COUNT)
@@ -415,13 +484,33 @@ function mergeDepotItems(items: DepotInventoryItem[]): DepotInventoryItem[] {
   for (const item of items) {
     const existing = byId.get(item.id)
     if (existing) {
-      existing.count += item.count
+      existing.count = normalizeCount(existing.count + item.count, `物品 ${item.id}`)
       if (existing.name === getItemName(existing.id) && item.name !== existing.name) existing.name = item.name
       continue
     }
     byId.set(item.id, { ...item })
   }
   return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id))
+}
+
+function calculatePricingCoverage(items: DepotInventoryItem[], pricedItems: DepotValueItem[]): number {
+  const eligibleIds = new Set(items.filter((item) => !UNPRICED_BY_POLICY.has(item.id)).map((item) => item.id))
+  if (eligibleIds.size === 0) return 1
+  const coveredCount = pricedItems.filter((item) => eligibleIds.has(item.id)).length
+  return round(coveredCount / eligibleIds.size, 4)
+}
+
+function checkedRound(value: number, digits: number, label: string): number {
+  assertFiniteValuation(value, label)
+  const rounded = round(value, digits)
+  assertFiniteValuation(rounded, label)
+  return rounded
+}
+
+function assertFiniteValuation(value: number, label: string): void {
+  if (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER) {
+    throw createError(`${label} 超出可安全计算范围。`, 400, 'count_out_of_range')
+  }
 }
 
 async function readSklandInventory(
@@ -535,10 +624,20 @@ function readAccountLevel(value: unknown): number | null {
   return null
 }
 
-function hashSklandUid(uid: string): string | null {
-  const secret = process.env.DEPOT_SAMPLE_HASH_SECRET?.trim()
-  if (!secret) throw new Error('DEPOT_SAMPLE_HASH_SECRET is not configured')
-  return createHmac('sha256', secret).update(`skland:${uid}`).digest('hex')
+function hashSklandUidCandidates(uid: string): Array<{ hash: string; keyVersion: string }> {
+  const candidates = [
+    {
+      secret: process.env.DEPOT_SAMPLE_HASH_SECRET?.trim(),
+      keyVersion: process.env.DEPOT_SAMPLE_HASH_KEY_VERSION?.trim() || '1',
+    },
+    {
+      secret: process.env.DEPOT_SAMPLE_HASH_SECRET_PREVIOUS?.trim(),
+      keyVersion: process.env.DEPOT_SAMPLE_HASH_PREVIOUS_KEY_VERSION?.trim() || 'previous',
+    },
+  ]
+  return candidates.flatMap(({ secret, keyVersion }) => secret
+    ? [{ hash: createHmac('sha256', secret).update(`skland:${uid}`).digest('hex'), keyVersion }]
+    : [])
 }
 
 function getDepotUnitSanity(id: string, pricing: PricingState): number | null {
@@ -610,10 +709,12 @@ function readLimitedJsonBody(req: Request): Promise<unknown> {
 }
 
 function normalizeCount(value: unknown, label: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw createError(`${label} 的数量必须是数字。`, 400)
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
+    throw createError(`${label} 的数量必须是安全整数。`, 400, 'count_out_of_range')
   }
-  if (value < 0) throw createError(`${label} 的数量不能为负数。`, 400)
+  if (value < 0 || value > MAX_DEPOT_ITEM_COUNT) {
+    throw createError(`${label} 的数量必须在 0 到 ${MAX_DEPOT_ITEM_COUNT} 之间。`, 400, 'count_out_of_range')
+  }
   return value
 }
 
@@ -629,9 +730,10 @@ function getItemName(id: string): string {
   return ITEM_NAMES[id] ?? `物品 ${id}`
 }
 
-function createError(message: string, status: number): HandlerError {
+function createError(message: string, status: number, code?: string): HandlerError {
   const error = new Error(message) as HandlerError
   error.status = status
+  error.code = code
   return error
 }
 

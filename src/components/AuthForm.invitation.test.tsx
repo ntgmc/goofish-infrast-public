@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AuthForm from './AuthForm'
@@ -54,6 +54,23 @@ describe('AuthForm invitation code', () => {
     await user.click(screen.getByRole('button', { name: '创建账号' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('请输入有效的 10 位推荐码或 16 位管理员邀请码')
     expect(input).toHaveAttribute('aria-describedby', 'auth-invite-code-error')
+  })
+
+  it('blocks registration until failed registration settings can be retried', async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error('settings unavailable'))
+      .mockResolvedValue(jsonResponse({ invite_code_required: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<AuthForm onAuthenticated={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: '注册' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('settings unavailable')
+    expect(screen.getByRole('button', { name: '创建账号' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: '重试' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '创建账号' })).toBeEnabled())
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
 

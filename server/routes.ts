@@ -2,6 +2,7 @@ import adminCdkHandler from './handlers/admin-cdk'
 import adminRiskSettingsHandler from './handlers/admin-risk-settings'
 import adminBehaviorRiskHandler from './handlers/admin-behavior-risk'
 import adminInvitationSettingsHandler from './handlers/admin-invitation-settings'
+import adminInvitationSettlementsHandler from './handlers/admin-invitation-settlements'
 import adminRegistrationSettingsHandler from './handlers/admin-registration-settings'
 import adminFeatureSettingsHandler from './handlers/admin-feature-settings'
 import adminPublicContentHandler from './handlers/admin-public-content'
@@ -50,6 +51,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/admin/risk-settings', adminRiskSettingsHandler as unknown as ApiHandler],
   ['/api/admin/behavior-risk', adminBehaviorRiskHandler as unknown as ApiHandler],
   ['/api/admin/invitation-settings', adminInvitationSettingsHandler as unknown as ApiHandler],
+  ['/api/admin/invitation-settlements', adminInvitationSettlementsHandler as unknown as ApiHandler],
   ['/api/admin/registration-settings', adminRegistrationSettingsHandler as unknown as ApiHandler],
   ['/api/admin/feature-settings', adminFeatureSettingsHandler as unknown as ApiHandler],
   ['/api/admin/public-content', adminPublicContentHandler as unknown as ApiHandler],
@@ -114,7 +116,7 @@ const ROUTES = new Map<string, ApiHandler>([
   ['/api/user/behavior-risk/engagement', userBehaviorRiskHandler as unknown as ApiHandler],
   ['/api/user/invitations', userInvitationsHandler as unknown as ApiHandler],
   ['/api/user/invitations/code', userInvitationsHandler as unknown as ApiHandler],
-  ['/api/user/rewards', userRewardsHandler as unknown as ApiHandler],
+  ['/api/user/priority-coupon-balance', userRewardsHandler as unknown as ApiHandler],
   ['/api/user/inventory', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/inventory/lifetime-profile', userInventoryHandler as unknown as ApiHandler],
   ['/api/user/balance', userBalanceHandler as unknown as ApiHandler],

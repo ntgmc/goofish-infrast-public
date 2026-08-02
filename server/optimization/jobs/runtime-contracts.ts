@@ -150,6 +150,7 @@ const reorderCheckResultSchema: z.ZodType<ReorderCheckResult> = z.object({
 
 const workspaceHistoryItemSchema = z.strictObject({
   id: boundedString(128),
+  job_id: boundedString(128).optional(),
   name: boundedString(1_000),
   created_at: boundedString(128),
   config: extensibleLicenseConfigSchema.nullable(),
@@ -207,6 +208,10 @@ export const optimizationJobPayloadSchema: z.ZodType<OptimizationJobPayload> = z
   schedulePayloadSchema,
 ])
 
+export function parseOptimizeResult(value: unknown): OptimizeResult {
+  return optimizeResultSchema.parse(value)
+}
+
 export function parseOptimizationJobResult(
   payload: OptimizationJobPayload,
   value: unknown,
@@ -235,7 +240,7 @@ export function parseOptimizationJobResult(
     }
     return result
   }
-  return optimizeResultSchema.parse(value)
+  return parseOptimizeResult(value)
 }
 
 function assertJsonSafe(value: unknown, context: z.RefinementCtx): void {

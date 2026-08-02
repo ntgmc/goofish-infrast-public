@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import { Link } from 'react-router'
 import type { Announcement } from '../lib/types'
-import { apiVoid } from '../lib/api-client'
+import { apiJson, apiVoid } from '../lib/api-client'
+import { getOrCreateToolVisitorId } from '../lib/usage-tracking'
+import type { UserAnnouncementRead } from '../lib/types'
 import AnnouncementMarkdown from './AnnouncementMarkdown'
 import { AnimatedPresenceRegion } from './MotionPrimitives'
 import { copy } from '../copy/index'
 
 
 const READ_PREFIX = 'maa-announcement-read:'
+const sessionReadVersions = new Set<string>()
+const sessionDismissedVersions = new Set<string>()
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
@@ -19,24 +23,54 @@ const FOCUSABLE_SELECTOR = [
 
 interface Props {
   announcements: Announcement[];
+  userId?: string;
+  onUnreadCountChange?: (count: number) => void;
 }
 
-export default function AnnouncementPopup({ announcements }: Props) {
+export default function AnnouncementPopup({ announcements, userId, onUnreadCountChange }: Props) {
   const candidates = useMemo(
     () => announcements.filter((item) => item.active && item.kind === 'popup'),
     [announcements],
   )
   const [queue, setQueue] = useState<Announcement[]>([])
+  const [serverReadVersions, setServerReadVersions] = useState<Set<string> | null>(null)
+  const [marking, setMarking] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const initialFocusRef = useRef<HTMLButtonElement>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
-  const dismissedRef = useRef(new Set<string>())
+  const dismissedRef = useRef(sessionDismissedVersions)
 
   useEffect(() => {
+    if (!userId) {
+      setServerReadVersions(null)
+      return
+    }
+    let active = true
+    setServerReadVersions(null)
+    void apiJson<{ announcements?: UserAnnouncementRead[]; unread_count?: number }>('/api/user/announcements')
+      .then((payload) => {
+        if (!active) return
+        setServerReadVersions(new Set((payload.announcements ?? [])
+          .filter((item) => Boolean(item.read_at))
+          .map((item) => announcementVersionKey(item.announcement))))
+        if (typeof payload.unread_count === 'number') onUnreadCountChange?.(payload.unread_count)
+      })
+      .catch(() => {
+        // Logged-in read state remains server-authoritative when the request fails.
+      })
+    return () => { active = false }
+  }, [onUnreadCountChange, userId])
+
+  useEffect(() => {
+    if (userId && serverReadVersions === null) {
+      setQueue([])
+      return
+    }
     setQueue(candidates.filter((item) => (
-      !isAnnouncementRead(item) && !dismissedRef.current.has(announcementVersionKey(item))
+      !(userId ? serverReadVersions?.has(announcementVersionKey(item)) : isAnnouncementRead(item))
+      && !dismissedRef.current.has(announcementVersionKey(item))
     )))
-  }, [candidates])
+  }, [candidates, serverReadVersions, userId])
 
   const current = queue[0]
 
@@ -53,7 +87,10 @@ export default function AnnouncementPopup({ announcements }: Props) {
 
     const previousOverflow = document.documentElement.style.overflow
     document.documentElement.style.overflow = 'hidden'
-    if (!dialog.open) dialog.showModal()
+    if (!dialog.open) {
+      dialog.showModal()
+      void reportAnnouncementEvent('announcement_impression', current, 'popup_impression')
+    }
     initialFocusRef.current?.focus()
 
     return () => {
@@ -68,14 +105,31 @@ export default function AnnouncementPopup({ announcements }: Props) {
       }
       restoreFocusRef.current = null
     }
-  }, [Boolean(current)])
+  }, [current ? announcementVersionKey(current) : null])
 
   if (!current) return null
 
-  const markCurrentRead = () => {
-    markAnnouncementRead(current)
-    void reportAnnouncementRead(current)
-    setQueue((items) => items.slice(1))
+  const markCurrentRead = async () => {
+    if (marking) return
+    setMarking(true)
+    try {
+      if (userId) {
+        const payload = await apiJson<{ unread_count?: number }>('/api/user/announcements', {
+          method: 'PATCH',
+          json: { announcement_id: current.id },
+        })
+        setServerReadVersions((versions) => new Set(versions ?? []).add(announcementVersionKey(current)))
+        if (typeof payload.unread_count === 'number') onUnreadCountChange?.(payload.unread_count)
+      } else {
+        markAnnouncementRead(current)
+      }
+      void reportAnnouncementEvent('announcement_read', current, 'popup_read')
+      setQueue((items) => items.slice(1))
+    } catch {
+      // Keep the popup open so the user can retry the server-authoritative mutation.
+    } finally {
+      setMarking(false)
+    }
   }
 
   const dismissPopupSession = () => {
@@ -108,6 +162,7 @@ export default function AnnouncementPopup({ announcements }: Props) {
           </div>
           <Link
             to="/announcements"
+            onClick={dismissPopupSession}
             className="tool-secondary-action shrink-0 px-3 text-sm"
           >
             {copy.public.components_AnnouncementPopup_002}</Link>
@@ -117,7 +172,8 @@ export default function AnnouncementPopup({ announcements }: Props) {
           <button
             ref={initialFocusRef}
             type="button"
-            onClick={markCurrentRead}
+            onClick={() => void markCurrentRead()}
+            disabled={marking}
             className="tool-primary-action"
           >
             {copy.public.components_AnnouncementPopup_003}</button>
@@ -147,24 +203,40 @@ function isAvailableFocusTarget(element: HTMLElement): boolean {
 }
 
 function isAnnouncementRead(announcement: Announcement): boolean {
-  if (!canUseLocalStorage()) return false
-  return window.localStorage.getItem(readKey(announcement)) === announcement.updated_at
+  const versionKey = announcementVersionKey(announcement)
+  if (sessionReadVersions.has(versionKey)) return true
+  try {
+    return window.localStorage.getItem(readKey(announcement)) === announcement.updated_at
+  } catch {
+    return false
+  }
 }
 
 function markAnnouncementRead(announcement: Announcement): void {
-  if (!canUseLocalStorage()) return
-  window.localStorage.setItem(readKey(announcement), announcement.updated_at)
+  sessionReadVersions.add(announcementVersionKey(announcement))
+  try {
+    window.localStorage.setItem(readKey(announcement), announcement.updated_at)
+  } catch {
+    // Session memory remains authoritative when persistent storage is unavailable.
+  }
 }
 
-async function reportAnnouncementRead(announcement: Announcement): Promise<void> {
+async function reportAnnouncementEvent(
+  event: 'announcement_impression' | 'announcement_read',
+  announcement: Announcement,
+  source: 'popup_impression' | 'popup_read',
+): Promise<void> {
   try {
     await apiVoid('/api/usage-stats', {
       method: 'POST',
+      keepalive: true,
       json: {
-        event: 'announcement_read',
+        event,
+        visitor_id: getOrCreateToolVisitorId(),
         announcement_id: announcement.id,
         announcement_kind: announcement.kind,
-        source: 'popup_local',
+        announcement_version: announcement.updated_at,
+        source,
       },
     })
   } catch {
@@ -174,8 +246,4 @@ async function reportAnnouncementRead(announcement: Announcement): Promise<void>
 
 function readKey(announcement: Announcement): string {
   return `${READ_PREFIX}${announcement.id}`
-}
-
-function canUseLocalStorage(): boolean {
-  return typeof window !== 'undefined' && Boolean(window.localStorage)
 }

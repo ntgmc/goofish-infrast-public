@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { ChevronDown } from 'lucide-react'
 import type { AdminBalanceTransaction, BalancePage } from '../../../lib/balance-contracts'
 import { normalizePointsAmount } from '../../../lib/balance-contracts'
 import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, permissionLabels, appUserStatusLabels } from '../contracts'
@@ -22,7 +23,8 @@ export interface UserDetailPanelProps {
   onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
   onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
   onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
-  onAdjustBalance: (operation: 'credit' | 'debit' | 'reverse_credit', amount: string, reason: string, idempotencyKey: string, originalTransactionId?: string) => Promise<boolean>;
+  onDownloadWorkspaces: () => Promise<void>;
+  onAdjustBalance: (operation: 'credit' | 'debit' | 'reverse_credit', amount: string, reason: string, idempotencyKey: string, rootPassword: string, originalTransactionId?: string) => Promise<boolean>;
   onLoadMoreBalance: () => Promise<void>;
   onFreezeUser: (user: AppUserSummary) => Promise<void>;
   onUnfreezeUser: (user: AppUserSummary) => Promise<void>;
@@ -53,6 +55,7 @@ function UserDetailPanel({
   onClearWorkspace,
   onViewOperators,
   onDownloadOperators,
+  onDownloadWorkspaces,
   onAdjustBalance,
   onLoadMoreBalance,
   onFreezeUser,
@@ -72,6 +75,7 @@ function UserDetailPanel({
           <p className="mt-2 break-all text-sm text-ink-muted">用户 ID：{user.id}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <SmallButton onClick={() => void onDownloadWorkspaces()} loading={busyAction === `user-workspaces-export:${user.id}`}>导出工作区</SmallButton>
           {user.status === 'active' && <SmallButton onClick={() => void onFreezeUser(user)} loading={busyAction === `app-user:freeze_account:${user.id}`}>冻结用户</SmallButton>}
           {user.status === 'frozen' && <SmallButton onClick={() => void onUnfreezeUser(user)} loading={busyAction === `app-user:unfreeze_account:${user.id}`} tone="success">解冻用户</SmallButton>}
           <SmallButton onClick={() => void onDeleteUser(user)} loading={busyAction === `app-user:delete_account:${user.id}`} tone="danger">删除用户</SmallButton>
@@ -144,6 +148,7 @@ function UserBalanceCard({
   const [originalTransactionId, setOriginalTransactionId] = useState('')
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
+  const [rootPassword, setRootPassword] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
   const [validationError, setValidationError] = useState<string | null>(null)
 
@@ -164,106 +169,120 @@ function UserBalanceCard({
       setValidationError('资格冲正必须填写原正向积分交易 ID。')
       return
     }
+    if (!rootPassword) {
+      setValidationError('Root 口令必填。')
+      return
+    }
     setValidationError(null)
-    const succeeded = await onAdjust(operation, normalizedAmount, normalizedReason, idempotencyKey, originalTransactionId.trim() || undefined)
+    const succeeded = await onAdjust(operation, normalizedAmount, normalizedReason, idempotencyKey, rootPassword, originalTransactionId.trim() || undefined)
     if (!succeeded) return
     setAmount('')
     setReason('')
+    setRootPassword('')
     resetRequestIdentity()
   }
 
   return (
-    <section className="tool-inset mt-5 p-4" aria-labelledby="admin-user-balance-title">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <details className="tool-inset group mt-5 overflow-hidden" aria-labelledby="admin-user-balance-title">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors duration-150 hover:bg-surface-2/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500/55 [&::-webkit-details-marker]:hidden">
+        <h3 id="admin-user-balance-title" className="text-sm font-semibold text-ink-primary">积分余额</h3>
+        <span className="flex items-center gap-2">
+          <span className="tool-status">{balance?.transactions.length ?? 0} 条已加载流水</span>
+          <ChevronDown aria-hidden="true" className="h-4 w-4 text-ink-secondary transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none" />
+        </span>
+      </summary>
+      <div className="border-t border-surface-3 p-4">
         <div>
-          <h3 id="admin-user-balance-title" className="text-sm font-semibold text-ink-primary">积分余额</h3>
-          <p className="mt-2 text-3xl font-semibold tabular-nums text-ink-primary">{balance?.balance.available ?? '0.00'}</p>
+          <p className="text-3xl font-semibold tabular-nums text-ink-primary">{balance?.balance.available ?? '0.00'}</p>
           <p className="mt-1 text-xs text-ink-muted">可用 {balance?.balance.available ?? '0.00'} · 预留 {balance?.balance.reserved ?? '0.00'} · 待追偿 {balance?.balance.debt ?? '0.00'}</p>
           <p className="mt-1 text-xs text-ink-muted">累计获得 {balance?.balance.lifetime_credited ?? '0.00'} · 资格冲正 {balance?.balance.qualification_reversed ?? '0.00'} · {balance?.balance.commercial?.eligible ? `商用 Lv${balance.balance.commercial.level}` : '商用未生效'}</p>
         </div>
-        <span className="tool-status">{balance?.transactions.length ?? 0} 条已加载流水</span>
-      </div>
 
-      <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[140px_180px_1fr_auto]" noValidate>
-        <label>
-          <span className="mb-1.5 block text-xs font-medium text-ink-muted">操作</span>
-          <select
-            value={operation}
-            onChange={(event) => { setOperation(event.currentTarget.value as 'credit' | 'debit' | 'reverse_credit'); resetRequestIdentity() }}
-            className="tool-field"
-          >
-            <option value="credit">增加积分</option>
-            <option value="debit">扣减积分</option>
-            <option value="reverse_credit">资格冲正</option>
-          </select>
-        </label>
-        {operation === 'reverse_credit' && <label className="lg:col-span-2">
-          <span className="mb-1.5 block text-xs font-medium text-ink-muted">原正向交易 ID</span>
-          <input value={originalTransactionId} onChange={(event) => { setOriginalTransactionId(event.currentTarget.value); resetRequestIdentity() }} className="tool-field font-mono" />
-        </label>}
-        <label>
-          <span className="mb-1.5 block text-xs font-medium text-ink-muted">金额</span>
-          <input
-            value={amount}
-            onChange={(event) => { setAmount(event.currentTarget.value); resetRequestIdentity() }}
-            inputMode="decimal"
-            placeholder="例如 12.30"
-            className="tool-field"
-          />
-        </label>
-        <label>
-          <span className="mb-1.5 block text-xs font-medium text-ink-muted">内部原因（必填）</span>
-          <input
-            value={reason}
-            onChange={(event) => { setReason(event.currentTarget.value); resetRequestIdentity() }}
-            maxLength={500}
-            placeholder="仅管理员审计可见"
-            className="tool-field"
-          />
-        </label>
-        <button type="submit" disabled={busy} className={operation === 'credit' ? 'tool-primary-action self-end' : 'tool-danger-action self-end'}>
-          {busy ? '处理中…' : operation === 'credit' ? '增加' : operation === 'debit' ? '扣减' : '冲正'}
-        </button>
-      </form>
-      {validationError && <p className="mt-2 text-sm text-error" role="alert">{validationError}</p>}
+        <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[140px_180px_1fr_180px_auto]" noValidate>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">操作</span>
+            <select
+              value={operation}
+              onChange={(event) => { setOperation(event.currentTarget.value as 'credit' | 'debit' | 'reverse_credit'); resetRequestIdentity() }}
+              className="tool-field"
+            >
+              <option value="credit">增加积分</option>
+              <option value="debit">扣减积分</option>
+              <option value="reverse_credit">资格冲正</option>
+            </select>
+          </label>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">Root 口令（高风险操作二次认证）</span>
+            <input type="password" value={rootPassword} onChange={(event) => { setRootPassword(event.currentTarget.value); resetRequestIdentity() }} maxLength={128} autoComplete="off" className="tool-field" />
+          </label>
+          {operation === 'reverse_credit' && <label className="lg:col-span-2">
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">原正向交易 ID</span>
+            <input value={originalTransactionId} onChange={(event) => { setOriginalTransactionId(event.currentTarget.value); resetRequestIdentity() }} className="tool-field font-mono" />
+          </label>}
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">金额</span>
+            <input
+              value={amount}
+              onChange={(event) => { setAmount(event.currentTarget.value); resetRequestIdentity() }}
+              inputMode="decimal"
+              placeholder="例如 12.30"
+              className="tool-field"
+            />
+          </label>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">内部原因（必填）</span>
+            <input
+              value={reason}
+              onChange={(event) => { setReason(event.currentTarget.value); resetRequestIdentity() }}
+              maxLength={500}
+              placeholder="仅管理员审计可见"
+              className="tool-field"
+            />
+          </label>
+          <button type="submit" disabled={busy} className={operation === 'credit' ? 'tool-primary-action self-end' : 'tool-danger-action self-end'}>
+            {busy ? '处理中…' : operation === 'credit' ? '增加' : operation === 'debit' ? '扣减' : '冲正'}
+          </button>
+        </form>
+        {validationError && <p className="mt-2 text-sm text-error" role="alert">{validationError}</p>}
 
-      <div className="mt-5 overflow-x-auto">
-        <table className="min-w-full text-left text-xs text-ink-secondary">
-          <thead className="border-b border-surface-3 text-ink-muted">
-            <tr>
-              <th className="px-2 py-2 font-medium">类型</th>
-              <th className="px-2 py-2 font-medium">变动</th>
-              <th className="px-2 py-2 font-medium">余额</th>
-              <th className="px-2 py-2 font-medium">管理员 / 原因</th>
-              <th className="px-2 py-2 font-medium">引用</th>
-              <th className="px-2 py-2 font-medium">时间</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-surface-3">
-            {(balance?.transactions ?? []).map((transaction) => (
-              <tr key={transaction.id}>
-                <td className="px-2 py-2">{adminBalanceKindLabel(transaction.kind)}</td>
-                <td className={`px-2 py-2 font-mono font-medium ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? transaction.amount : `+${transaction.amount}`}</td>
-                <td className="px-2 py-2 font-mono">{transaction.balance_after}</td>
-                <td className="max-w-72 px-2 py-2"><div>{transaction.admin_username ?? '-'}</div><div className="truncate text-ink-muted" title={transaction.reason ?? undefined}>{transaction.reason ?? '-'}</div></td>
-                <td className="max-w-52 px-2 py-2 font-mono text-ink-muted"><div>{transaction.reference_type}</div><div className="truncate" title={transaction.reference_id}>{transaction.reference_id}</div></td>
-                <td className="whitespace-nowrap px-2 py-2">{formatDate(transaction.created_at)}</td>
+        <div className="mt-5 overflow-x-auto">
+          <table className="min-w-full text-left text-xs text-ink-secondary">
+            <thead className="border-b border-surface-3 text-ink-muted">
+              <tr>
+                <th className="px-2 py-2 font-medium">类型</th>
+                <th className="px-2 py-2 font-medium">变动</th>
+                <th className="px-2 py-2 font-medium">余额</th>
+                <th className="px-2 py-2 font-medium">管理员 / 原因</th>
+                <th className="px-2 py-2 font-medium">引用</th>
+                <th className="px-2 py-2 font-medium">时间</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!balance?.transactions.length && <p className="py-6 text-center text-sm text-ink-muted">暂无积分流水。</p>}
+            </thead>
+            <tbody className="divide-y divide-surface-3">
+              {(balance?.transactions ?? []).map((transaction) => (
+                <tr key={transaction.id}>
+                  <td className="px-2 py-2">{adminBalanceKindLabel(transaction.kind)}</td>
+                  <td className={`px-2 py-2 font-mono font-medium ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? transaction.amount : `+${transaction.amount}`}</td>
+                  <td className="px-2 py-2 font-mono">{transaction.balance_after}</td>
+                  <td className="max-w-72 px-2 py-2"><div>{transaction.admin_username ?? '-'}{transaction.approved_by ? ` / ${transaction.approved_by} 审批` : ''}</div><div className="truncate text-ink-muted" title={transaction.reason ?? undefined}>{transaction.reason ?? '-'}</div></td>
+                  <td className="max-w-52 px-2 py-2 font-mono text-ink-muted"><div>{transaction.reference_type}</div><div className="truncate" title={transaction.reference_id}>{transaction.reference_id}</div></td>
+                  <td className="whitespace-nowrap px-2 py-2">{formatDate(transaction.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!balance?.transactions.length && <p className="py-6 text-center text-sm text-ink-muted">暂无积分流水。</p>}
+        </div>
+        {balance?.next_cursor && (
+          <button type="button" onClick={() => void onLoadMore()} disabled={loading} className="tool-secondary-action mt-3 text-sm">
+            {loading ? '加载中…' : '加载更多'}
+          </button>
+        )}
+        <CommercialAdminControls
+          userId={userId}
+          eligible={balance?.balance.commercial.eligible === true}
+        />
       </div>
-      {balance?.next_cursor && (
-        <button type="button" onClick={() => void onLoadMore()} disabled={loading} className="tool-secondary-action mt-3 text-sm">
-          {loading ? '加载中…' : '加载更多'}
-        </button>
-      )}
-      <CommercialAdminControls
-        userId={userId}
-        eligible={balance?.balance.commercial.eligible === true}
-      />
-    </section>
+    </details>
   )
 }
 
@@ -273,34 +292,106 @@ export function CommercialAdminControls({ userId, eligible }: { userId: string; 
 }
 
 function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
-  type Limits = { active: number; total: number; active_limit: number; total_limit: number; suspended: boolean; suspension_reason: string | null }
+  type Limits = {
+    active: number
+    total: number
+    active_limit: number
+    total_limit: number
+    suspended: boolean
+    suspension_reason: string | null
+    revision: number
+    as_of: string
+    inflight_jobs: number
+    inflight_reserved: string
+  }
   const [limits, setLimits] = useState<Limits | null>(null)
-  const [activeLimit, setActiveLimit] = useState('100')
-  const [totalLimit, setTotalLimit] = useState('1000')
+  const [activeLimit, setActiveLimit] = useState('')
+  const [totalLimit, setTotalLimit] = useState('')
   const [reason, setReason] = useState('')
+  const [rootPassword, setRootPassword] = useState('')
+  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const load = async () => {
-    const data = await adminApiJson<{ limits: Limits }>(`/api/admin/commercial?user_id=${encodeURIComponent(userId)}`)
-    setLimits(data.limits); setActiveLimit(String(data.limits.active_limit)); setTotalLimit(String(data.limits.total_limit)); setReason(data.limits.suspension_reason ?? '')
-  }
-  useEffect(() => { void load().catch(() => undefined) }, [userId])
+  const requestIdentity = useRef<{ signature: string; key: string } | null>(null)
+  const resetRequestIdentity = () => { requestIdentity.current = null }
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await adminApiJson<{ limits: Limits }>(`/api/admin/commercial?user_id=${encodeURIComponent(userId)}`)
+      setLimits(data.limits)
+      setActiveLimit(String(data.limits.active_limit))
+      setTotalLimit(String(data.limits.total_limit))
+      setReason('')
+      setRootPassword('')
+      resetRequestIdentity()
+    } catch (caught) {
+      setLimits(null)
+      setActiveLimit('')
+      setTotalLimit('')
+      setError((caught as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }, [userId])
+  useEffect(() => { void load() }, [load])
   const save = async (suspended = limits?.suspended ?? false) => {
+    if (!limits) return
+    const active = Number(activeLimit)
+    const total = Number(totalLimit)
+    const normalizedReason = reason.trim()
+    if (!Number.isInteger(active) || !Number.isInteger(total) || active < 1 || total < active) {
+      setError('商用档案上限必须为正整数，且总量不得小于活跃量。')
+      return
+    }
+    if (normalizedReason.length < 2) {
+      setError('变更原因至少需要 2 个字符，并会写入不可变审计。')
+      return
+    }
+    if (!rootPassword) {
+      setError('Root 口令必填。')
+      return
+    }
+    if (suspended && !limits.suspended && limits.inflight_jobs > 0
+      && !window.confirm(`当前仍有 ${limits.inflight_jobs} 个在途任务、已预留 ${limits.inflight_reserved} 积分。暂停仅阻止新任务，在途任务仍会执行并按结果结算。确认继续？`)) return
+    const signature = JSON.stringify({ active, total, suspended, normalizedReason, revision: limits.revision })
+    const request = requestIdentity.current?.signature === signature
+      ? requestIdentity.current
+      : { signature, key: crypto.randomUUID() }
+    requestIdentity.current = request
     setBusy(true); setError(null)
     try {
       const data = await adminApiJson<{ limits: Limits }>('/api/admin/commercial', {
-        method: 'POST', json: { user_id: userId, active_profile_limit: Number(activeLimit), total_profile_limit: Number(totalLimit), suspended, reason },
+        method: 'POST', json: {
+          user_id: userId,
+          active_profile_limit: active,
+          total_profile_limit: total,
+          suspended,
+          reason: normalizedReason,
+          expected_revision: limits.revision,
+          idempotency_key: request.key,
+          root_password: rootPassword,
+        },
       })
       setLimits(data.limits)
+      setActiveLimit(String(data.limits.active_limit))
+      setTotalLimit(String(data.limits.total_limit))
+      setReason('')
+      setRootPassword('')
+      resetRequestIdentity()
     } catch (caught) { setError((caught as Error).message) }
     finally { setBusy(false) }
   }
   return <div className="mt-5 border-t border-surface-3 pt-4">
     <h4 className="text-sm font-semibold text-ink-primary">商用账户控制</h4>
-    <p className="mt-1 text-xs text-ink-muted">档案用量：活跃 {limits?.active ?? 0} / {limits?.active_limit ?? 100}，总量 {limits?.total ?? 0} / {limits?.total_limit ?? 1000}；状态：{limits?.suspended ? '已暂停' : '正常'}</p>
-    <div className="mt-3 grid gap-2 sm:grid-cols-3"><input aria-label="商用活跃档案上限" value={activeLimit} onChange={(event) => setActiveLimit(event.currentTarget.value)} className="tool-field" inputMode="numeric" /><input aria-label="商用档案总量上限" value={totalLimit} onChange={(event) => setTotalLimit(event.currentTarget.value)} className="tool-field" inputMode="numeric" /><input aria-label="暂停原因" value={reason} onChange={(event) => setReason(event.currentTarget.value)} className="tool-field" placeholder="暂停时填写原因" /></div>
-    <div className="mt-3 flex gap-2"><button type="button" disabled={busy} onClick={() => void save()} className="tool-secondary-action">保存限额</button><button type="button" disabled={busy} onClick={() => void save(!limits?.suspended)} className={limits?.suspended ? 'tool-primary-action' : 'tool-danger-action'}>{limits?.suspended ? '恢复商用' : '暂停商用'}</button></div>
-    {error && <p className="mt-2 text-sm text-error">{error}</p>}
+    {loading && <p className="mt-2 text-sm text-ink-muted" role="status">正在加载商用账户真实状态…</p>}
+    {limits && <>
+      <p className="mt-1 text-xs text-ink-muted">档案用量：活跃 {limits.active} / {limits.active_limit}，总量 {limits.total} / {limits.total_limit}；状态：{limits.suspended ? '已暂停' : '正常'}；revision {limits.revision}</p>
+      <p className="mt-1 text-xs text-ink-muted">在途任务 {limits.inflight_jobs} 个 · 已预留 {limits.inflight_reserved} 积分。暂停只阻止新任务，在途任务仍会执行并结算。</p>
+    </>}
+    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><input aria-label="商用活跃档案上限" disabled={!limits || loading || busy} value={activeLimit} onChange={(event) => { setActiveLimit(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" inputMode="numeric" /><input aria-label="商用档案总量上限" disabled={!limits || loading || busy} value={totalLimit} onChange={(event) => { setTotalLimit(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" inputMode="numeric" /><input aria-label="商用变更原因" disabled={!limits || loading || busy} value={reason} onChange={(event) => { setReason(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" placeholder="必填，将写入审计" /><input aria-label="商用 Root 口令" type="password" disabled={!limits || loading || busy} value={rootPassword} onChange={(event) => { setRootPassword(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" autoComplete="off" placeholder="高风险操作二次认证" /></div>
+    <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={!limits || loading || busy} onClick={() => void save()} className="tool-secondary-action">保存限额</button><button type="button" disabled={!limits || loading || busy} onClick={() => void save(!limits?.suspended)} className={limits?.suspended ? 'tool-primary-action' : 'tool-danger-action'}>{limits?.suspended ? '恢复商用' : '暂停商用'}</button>{!limits && !loading && <button type="button" onClick={() => void load()} className="tool-secondary-action">重新加载</button>}</div>
+    {error && <p className="mt-2 text-sm text-error" role="alert">{error}</p>}
   </div>
 }
 
@@ -315,42 +406,47 @@ function adminBalanceKindLabel(kind: AdminBalanceTransaction['kind']): string {
 
 function PersonalUseDeclarations({ declarations }: { declarations: AdminUserDetail['personal_use_declarations'] }) {
   return (
-    <section className="tool-inset mt-5 p-4" aria-labelledby="personal-use-declarations-title">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <details className="tool-inset group mt-5 overflow-hidden" aria-labelledby="personal-use-declarations-title">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors duration-150 hover:bg-surface-2/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500/55 [&::-webkit-details-marker]:hidden">
         <h3 id="personal-use-declarations-title" className="text-sm font-semibold text-ink-primary">个人使用声明确认</h3>
-        <span className="tool-status">{declarations.length} 条记录</span>
-      </div>
-      {declarations.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-muted">暂无个人使用声明确认记录。</p>
-      ) : (
-        <div className="mt-3 overflow-x-auto">
-          <table className="min-w-full text-left text-xs text-ink-secondary">
-            <thead className="border-b border-surface-3 text-ink-muted">
-              <tr>
-                <th className="px-2 py-2 font-medium">版本</th>
-                <th className="px-2 py-2 font-medium">触发操作</th>
-                <th className="px-2 py-2 font-medium">档案</th>
-                <th className="px-2 py-2 font-medium">IP</th>
-                <th className="px-2 py-2 font-medium">确认时间</th>
-                <th className="px-2 py-2 font-medium">保留至</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-3">
-              {declarations.map((declaration) => (
-                <tr key={`${declaration.declaration_id}-${declaration.accepted_at}`}>
-                  <td className="px-2 py-2 font-mono">{declaration.declaration_version}</td>
-                  <td className="px-2 py-2">{personalUseActionLabel(declaration.action)}</td>
-                  <td className="max-w-40 truncate px-2 py-2 font-mono" title={declaration.profile_id ?? undefined}>{declaration.profile_id ?? '-'}</td>
-                  <td className="px-2 py-2 font-mono">{declaration.client_ip}</td>
-                  <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.accepted_at)}</td>
-                  <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.retain_until)}</td>
+        <span className="flex items-center gap-2">
+          <span className="tool-status">{declarations.length} 条记录</span>
+          <ChevronDown aria-hidden="true" className="h-4 w-4 text-ink-secondary transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none" />
+        </span>
+      </summary>
+      <div className="border-t border-surface-3 p-4">
+        {declarations.length === 0 ? (
+          <p className="text-sm text-ink-muted">暂无个人使用声明确认记录。</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs text-ink-secondary">
+              <thead className="border-b border-surface-3 text-ink-muted">
+                <tr>
+                  <th className="px-2 py-2 font-medium">版本</th>
+                  <th className="px-2 py-2 font-medium">触发操作</th>
+                  <th className="px-2 py-2 font-medium">档案</th>
+                  <th className="px-2 py-2 font-medium">IP</th>
+                  <th className="px-2 py-2 font-medium">确认时间</th>
+                  <th className="px-2 py-2 font-medium">保留至</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+              </thead>
+              <tbody className="divide-y divide-surface-3">
+                {declarations.map((declaration) => (
+                  <tr key={`${declaration.declaration_id}-${declaration.accepted_at}`}>
+                    <td className="px-2 py-2 font-mono">{declaration.declaration_version}</td>
+                    <td className="px-2 py-2">{personalUseActionLabel(declaration.action)}</td>
+                    <td className="max-w-40 truncate px-2 py-2 font-mono" title={declaration.profile_id ?? undefined}>{declaration.profile_id ?? '-'}</td>
+                    <td className="px-2 py-2 font-mono">{declaration.client_ip}</td>
+                    <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.accepted_at)}</td>
+                    <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.retain_until)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </details>
   )
 }
 

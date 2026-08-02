@@ -12,15 +12,16 @@ import {
   reserveItemsInTransaction,
   getProfileCapacityLimitsInTransaction,
 } from './inventory-store'
-import type { MeteredScheduleQuote } from '../../src/lib/metered-billing'
+import type { MeteredBillingKind, MeteredQuoteConfirmation, MeteredScheduleQuote } from '../../src/lib/metered-billing'
 import type { OptimizationBillingSnapshot } from '../../src/lib/optimization-contracts'
-import { getMeteredBillingPolicy } from '../../src/lib/metered-billing'
+import { getMeteredBillingPolicy, getMeteredScheduleQuote } from '../../src/lib/metered-billing'
 import { BalanceError, releaseScheduleBalanceInTransaction, reserveScheduleBalanceInTransaction, settleScheduleBalanceInTransaction } from './balance-store'
 import { emptyWorkspace, updateProfileWorkspaceInTransaction } from './user-store'
 import { limitPreviewOptimizeResult } from '../optimization/jobs/entitlements'
 import { normalizePersistedOptimizationJobPayload, type OptimizationJobPayload, type OptimizeJobPayload } from '../optimization/jobs/shared'
 import { parseOptimizationJobResult } from '../optimization/jobs/runtime-contracts'
 import { countReorderCheckQuotaInTransaction } from './reorder-quota-store'
+import { confirmMeteredQuoteInTransaction, MeteredBillingQuoteError } from './metered-billing-store'
 
 export type OptimizeJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'dead_lettered'
 export type OptimizeJobPriority = 'priority_coupon' | 'paid' | 'analysis' | 'standard'
@@ -101,13 +102,13 @@ interface AdmitOptimizeJobInput<TPayload = unknown> extends CreateOptimizeJobInp
     limit: number
     useCoupon?: boolean
   } | null
-  billing?: { userId: string; quote: MeteredScheduleQuote } | null
+  billing?: { userId: string; billingKind: MeteredBillingKind; confirmation: MeteredQuoteConfirmation } | null
 }
 
 export class OptimizeJobAdmissionError extends Error {
   constructor(
-    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance',
-    readonly status: 409 | 429,
+    readonly code: 'idempotency_conflict' | 'idempotency_in_progress' | 'active_job_exists' | 'queue_capacity_exceeded' | 'commercial_queue_capacity_exceeded' | 'global_queue_capacity_exceeded' | 'queue_wait_capacity_exceeded' | 'submission_rate_exceeded' | 'commercial_submission_rate_exceeded' | 'free_revision_limit_exceeded' | 'priority_coupon_unavailable' | 'item_unavailable' | 'item_not_applicable' | 'reorder_check_quota_exceeded' | 'insufficient_balance' | 'pricing_changed' | 'quote_already_used' | 'profile_not_found' | 'not_metered_profile' | 'profile_archived' | 'commercial_not_eligible' | 'commercial_suspended' | 'debt_outstanding',
+    readonly status: 404 | 409 | 429,
     message: string,
   ) {
     super(message)
@@ -136,7 +137,13 @@ export interface OptimizeJobStore {
   recoverExpiredAttempts: (nowIso: string, maxFailures: number) => Promise<number>
   expireQueuedJobs: (nowIso: string) => Promise<number>
   cleanupOldJobs: (beforeIso: string) => Promise<void>
-  reconcileBilling?: () => Promise<{ settled: number; released: number; anomalies: number }>
+  reconcileBilling?: () => Promise<{
+    settled: number
+    released: number
+    repaired: number
+    quarantined: number
+    anomalies: number
+  }>
 }
 
 export interface OptimizationDeadLetterRecord {
@@ -256,6 +263,24 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           return { job: fromRow(job.rows[0]), replayed: true }
         }
 
+        let confirmedBillingQuote: MeteredScheduleQuote | null = null
+        if (input.billing) {
+          try {
+            confirmedBillingQuote = await confirmMeteredQuoteInTransaction(client, {
+              jobId: input.id,
+              userId: input.billing.userId,
+              profileId: input.profile_id!,
+              confirmation: input.billing.confirmation,
+              now,
+            })
+          } catch (error) {
+            if (error instanceof MeteredBillingQuoteError) {
+              throw new OptimizeJobAdmissionError(error.code, error.status, error.message)
+            }
+            throw error
+          }
+        }
+
         const limits = input.source === 'free_preview'
           ? { running: 1, queued: 0, perHour: 2 }
           : { running: 1, queued: 3, perHour: 12 }
@@ -295,7 +320,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         if (Number(submitted.rows[0]?.count ?? 0) >= limits.perHour) {
           throw new OptimizeJobAdmissionError('submission_rate_exceeded', 429, '当前账号的优化提交次数已达小时上限。请1小时后再试。')
         }
-        if (input.billing?.quote.billing_kind === 'metered_commercial') {
+        if (confirmedBillingQuote?.billing_kind === 'metered_commercial') {
           const commercialPolicy = getMeteredBillingPolicy().commercial
           const commercial = await client.query<{ running: string; queued: string; submitted: string }>(
             `select
@@ -386,8 +411,8 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
           }
         }
 
-        const billingSnapshot: OptimizationBillingSnapshot | null = input.billing ? {
-          status: 'reserved', ...input.billing.quote,
+        const billingSnapshot: OptimizationBillingSnapshot | null = confirmedBillingQuote ? {
+          status: 'reserved', ...confirmedBillingQuote,
         } : null
         const inserted = await client.query<OptimizeJobRow>([
           'insert into optimize_jobs',
@@ -397,11 +422,11 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
         ].join(' '), [input.id, 'queued', input.priority, input.owner_key, input.profile_id ?? null,
           input.billing?.userId ?? null, billingSnapshot ? JSON.stringify(billingSnapshot) : null,
           input.permission, input.source, input.payload_json, now, queueExpiresAt(now)])
-        if (input.billing) {
+        if (input.billing && confirmedBillingQuote) {
           try {
             await reserveScheduleBalanceInTransaction(client, {
               jobId: input.id, userId: input.billing.userId,
-              profileId: input.profile_id!, quote: input.billing.quote, now,
+              profileId: input.profile_id!, quote: confirmedBillingQuote, now,
             })
           } catch (error) {
             if (error instanceof BalanceError && error.code === 'insufficient_balance') {
@@ -959,25 +984,105 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
             released += 1
           }
         }
-        const anomalies = await client.query<{ count: string }>(
-          `select count(*)::text as count from (
-             select reservation.id
-               from user_balance_reservations reservation
-               left join optimize_jobs job on job.id = reservation.job_id
-              where job.id is null
-                 or (reservation.status = 'consumed' and job.status <> 'succeeded')
-                 or (reservation.status = 'released' and job.status = 'succeeded')
-             union all
-             select account.user_id
-               from user_balance_accounts account
-               left join (
-                 select user_id, sum(amount) as expected from user_balance_reservations
-                  where status = 'reserved' group by user_id
-               ) projection on projection.user_id = account.user_id
-              where account.reserved <> coalesce(projection.expected, 0)
-           ) inconsistent`,
+        let repaired = 0
+        const orphans = await client.query<{
+          id: string; job_id: string; user_id: string; amount: string; status: string;
+        }>(
+          `select reservation.id, reservation.job_id, reservation.user_id,
+                  reservation.amount::text, reservation.status
+             from user_balance_reservations reservation
+             left join optimize_jobs job on job.id = reservation.job_id
+            where job.id is null and reservation.status = 'reserved'
+            order by reservation.created_at asc limit 100
+            for update of reservation skip locked`,
         )
-        return { settled, released, anomalies: Number(anomalies.rows[0]?.count ?? 0) }
+        for (const orphan of orphans.rows) {
+          await client.query(
+            `update user_balance_accounts
+                set reserved = greatest(reserved - $2::numeric, 0), updated_at = $3
+              where user_id = $1`,
+            [orphan.user_id, orphan.amount, now],
+          )
+          await client.query(
+            `update user_balance_reservations
+                set status = 'released', settled_at = $2 where id = $1`,
+            [orphan.id, now],
+          )
+          await upsertBillingReconciliationCase(client, {
+            anomalyKey: `orphan:${orphan.id}`,
+            kind: 'orphan_reservation',
+            status: 'resolved',
+            userId: orphan.user_id,
+            jobId: orphan.job_id,
+            reservationId: orphan.id,
+            detail: orphan,
+            resolution: { action: 'released_orphan_reservation', at: now },
+            now,
+          })
+          repaired += 1
+        }
+        const projections = await client.query<{
+          user_id: string; actual: string; expected: string;
+        }>(
+          `select account.user_id, account.reserved::text as actual,
+                  coalesce(projection.expected, 0)::text as expected
+             from user_balance_accounts account
+             left join (
+               select user_id, sum(amount) as expected from user_balance_reservations
+                where status = 'reserved' group by user_id
+             ) projection on projection.user_id = account.user_id
+            where account.reserved <> coalesce(projection.expected, 0)
+            order by account.user_id limit 100 for update of account skip locked`,
+        )
+        for (const projection of projections.rows) {
+          await client.query(
+            'update user_balance_accounts set reserved = $2::numeric, updated_at = $3 where user_id = $1',
+            [projection.user_id, projection.expected, now],
+          )
+          await upsertBillingReconciliationCase(client, {
+            anomalyKey: `projection:${projection.user_id}:${projection.actual}:${projection.expected}`,
+            kind: 'account_projection_mismatch',
+            status: 'resolved',
+            userId: projection.user_id,
+            detail: projection,
+            resolution: { action: 'rebuilt_from_reserved_rows', at: now },
+            now,
+          })
+          repaired += 1
+        }
+        const mismatches = await client.query<{
+          id: string; job_id: string; user_id: string; reservation_status: string; job_status: string;
+        }>(
+          `select reservation.id, reservation.job_id, reservation.user_id,
+                  reservation.status as reservation_status, job.status as job_status
+             from user_balance_reservations reservation
+             inner join optimize_jobs job on job.id = reservation.job_id
+            where (reservation.status = 'consumed' and job.status <> 'succeeded')
+               or (reservation.status = 'released' and job.status = 'succeeded')
+            order by reservation.created_at asc limit 100`,
+        )
+        for (const mismatch of mismatches.rows) {
+          await upsertBillingReconciliationCase(client, {
+            anomalyKey: `reservation-job:${mismatch.id}:${mismatch.reservation_status}:${mismatch.job_status}`,
+            kind: 'reservation_job_mismatch',
+            status: 'pending_review',
+            userId: mismatch.user_id,
+            jobId: mismatch.job_id,
+            reservationId: mismatch.id,
+            detail: mismatch,
+            now,
+          })
+        }
+        const pendingCases = await client.query<{ count: string }>(
+          "select count(*)::text as count from billing_reconciliation_cases where status = 'pending_review'",
+        )
+        return {
+          settled,
+          released,
+          repaired,
+          quarantined: mismatches.rows.length,
+          anomalies: Number(pendingCases.rows[0]?.count ?? 0),
+        }
       })
     },
   }
@@ -1062,7 +1167,7 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       }
       const now = Date.now()
       let commercialSubmission: { key: string; recent: number[] } | null = null
-      if (input.billing?.quote.billing_kind === 'metered_commercial') {
+      if (input.billing?.billingKind === 'metered_commercial') {
         const accountJobs = [...records.values()].filter((job) => job.billing_user_id === input.billing?.userId)
         const accountKey = `commercial:${input.billing.userId}`
         const accountRecent = (submissions.get(accountKey) ?? []).filter((time) => time >= now - 60 * 60_000)
@@ -1097,10 +1202,15 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
       }
       const job = await (async () => {
         const value = await Promise.resolve({ ...input, created_at: input.created_at ?? new Date(now).toISOString() })
+        const memoryBillingQuote = value.billing ? {
+          ...getMeteredScheduleQuote(value.billing.billingKind),
+          pricing_version: value.billing.confirmation.pricingVersion,
+          charge: value.billing.confirmation.acceptedMaxPoints,
+        } : null
         const record: OptimizeJobRecord = {
           id: value.id, status: 'queued', priority: value.priority, owner_key: value.owner_key,
           profile_id: value.profile_id ?? null, billing_user_id: value.billing?.userId ?? null,
-          billing_json: value.billing ? { status: 'reserved', ...value.billing.quote } : null,
+          billing_json: memoryBillingQuote ? { status: 'reserved', ...memoryBillingQuote } : null,
           permission: value.permission, source: value.source, payload_json: clone(value.payload_json),
           result_json: null, error_message: null, failure_kind: null, public_error_code: null,
           attempt_count: 0, failure_count: 0, worker_id: null, heartbeat_at: null, lock_token: null,
@@ -1468,8 +1578,41 @@ export function createMemoryOptimizeJobStore(): OptimizeJobStore & { records: Ma
         if ((job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled') && Date.parse(job.updated_at) < before) records.delete(id)
       }
     },
-    reconcileBilling: async () => ({ settled: 0, released: 0, anomalies: 0 }),
+    reconcileBilling: async () => ({ settled: 0, released: 0, repaired: 0, quarantined: 0, anomalies: 0 }),
   }
+}
+
+async function upsertBillingReconciliationCase(
+  client: PoolClient,
+  input: {
+    anomalyKey: string
+    kind: 'orphan_reservation' | 'reservation_job_mismatch' | 'account_projection_mismatch'
+    status: 'pending_review' | 'resolved'
+    userId?: string | null
+    jobId?: string | null
+    reservationId?: string | null
+    detail: unknown
+    resolution?: unknown
+    now: string
+  },
+): Promise<void> {
+  await client.query(
+    `insert into billing_reconciliation_cases
+      (id, anomaly_key, kind, status, user_id, job_id, reservation_id, detail_json,
+       resolution_json, first_seen_at, last_seen_at, resolved_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $10,
+             case when $4 = 'resolved' then $10::timestamptz else null end)
+     on conflict (anomaly_key) do update
+       set status = excluded.status,
+           detail_json = excluded.detail_json,
+           resolution_json = coalesce(excluded.resolution_json, billing_reconciliation_cases.resolution_json),
+           last_seen_at = excluded.last_seen_at,
+           resolved_at = case when excluded.status = 'resolved'
+             then excluded.last_seen_at else billing_reconciliation_cases.resolved_at end`,
+    [randomUUID(), input.anomalyKey, input.kind, input.status, input.userId ?? null,
+      input.jobId ?? null, input.reservationId ?? null, JSON.stringify(input.detail),
+      input.resolution === undefined ? null : JSON.stringify(input.resolution), input.now],
+  )
 }
 
 type OptimizeQueueCapacityJob = Pick<OptimizeJobRecord,
@@ -2081,6 +2224,7 @@ async function persistScheduleCompletionInTransaction(
     const limits = await getProfileCapacityLimitsInTransaction(client, profileId)
     const historyItem: WorkspaceResultHistoryItem = {
       id: job.id,
+      job_id: job.id,
       name: `排班结果 ${formatShanghaiHistoryTime(nowIso)}`,
       created_at: nowIso,
       config: payload.effectiveConfig,

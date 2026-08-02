@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   countReorderCheckQuota: vi.fn(),
+  countReorderCheckQuotas: vi.fn(),
   countSuccessfulUsageEventsForProfileInRange: vi.fn(),
   hasDatabaseUrl: vi.fn(),
 }))
 
 vi.mock('../../storage/reorder-quota-store', () => ({
   countReorderCheckQuota: mocks.countReorderCheckQuota,
+  countReorderCheckQuotas: mocks.countReorderCheckQuotas,
 }))
 
 vi.mock('../../storage/postgres', () => ({
@@ -19,7 +21,7 @@ vi.mock('../../handlers/usage-stats', () => ({
   recordUsageEvent: vi.fn(),
 }))
 
-import { getReorderCheckQuota } from './entitlements'
+import { getReorderCheckQuota, getReorderCheckQuotas } from './entitlements'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -57,5 +59,19 @@ describe('reorder-check quota projection', () => {
       expect.any(String),
     )
     expect(mocks.countReorderCheckQuota).not.toHaveBeenCalled()
+  })
+
+  it('loads all PostgreSQL profile quotas with one aggregate query', async () => {
+    mocks.countReorderCheckQuotas.mockResolvedValue(new Map([['profile-1', 1]]))
+
+    const quotas = await getReorderCheckQuotas(['profile-1', 'profile-2', 'profile-1'])
+
+    expect(mocks.countReorderCheckQuotas).toHaveBeenCalledOnce()
+    expect(mocks.countReorderCheckQuotas).toHaveBeenCalledWith(
+      ['profile-1', 'profile-2'],
+      expect.stringMatching(/^\d{4}-\d{2}$/),
+    )
+    expect(quotas.get('profile-1')).toMatchObject({ used: 1, remaining: 1 })
+    expect(quotas.get('profile-2')).toMatchObject({ used: 0, remaining: 2 })
   })
 })

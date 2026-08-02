@@ -42,6 +42,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
   document.body.replaceChildren()
   document.documentElement.style.overflow = ''
 })
@@ -49,7 +50,7 @@ afterEach(() => {
 describe('AnnouncementPopup accessibility', () => {
   it('opens modally, focuses the acknowledgement, and dismisses with Escape without marking read', async () => {
     const { container, opener } = createAppRoot()
-    const announcement = createAnnouncement('one', '第一条公告')
+    const announcement = createAnnouncement('escape-one', '第一条公告')
     const { rerender } = render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} /></MemoryRouter>, { container })
 
     const dialog = await screen.findByRole('dialog', { name: '第一条公告' })
@@ -65,8 +66,11 @@ describe('AnnouncementPopup accessibility', () => {
     expect(cancelEvent.defaultPrevented).toBe(true)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(opener).toHaveFocus()
-    expect(window.localStorage.getItem('maa-announcement-read:one')).toBeNull()
-    expect(apiVoidMock).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem('maa-announcement-read:escape-one')).toBeNull()
+    expect(apiVoidMock).toHaveBeenCalledWith('/api/usage-stats', expect.objectContaining({
+      json: expect.objectContaining({ event: 'announcement_impression', announcement_id: 'escape-one' }),
+    }))
+    expect(apiVoidMock.mock.calls.some(([, init]) => init.json.event === 'announcement_read')).toBe(false)
 
     rerender(<MemoryRouter><AnnouncementPopup announcements={[{ ...announcement }]} /></MemoryRouter>)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -86,8 +90,45 @@ describe('AnnouncementPopup accessibility', () => {
     await user.click(screen.getByRole('button', { name: '已读' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(window.localStorage.getItem('maa-announcement-read:two')).toBe(second.updated_at)
-    expect(apiVoidMock).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(apiVoidMock).toHaveBeenCalledTimes(4))
     expect(opener).toHaveFocus()
+  })
+
+  it('keeps working when localStorage access is blocked', async () => {
+    const user = userEvent.setup()
+    const { container } = createAppRoot()
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError') })
+
+    render(<MemoryRouter><AnnouncementPopup announcements={[createAnnouncement('storage-blocked', '受限存储公告')]} /></MemoryRouter>, { container })
+    await user.click(await screen.findByRole('button', { name: '已读' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('uses server reads for logged-in users and updates the shared unread count', async () => {
+    const user = userEvent.setup()
+    const onUnreadCountChange = vi.fn()
+    const announcement = createAnnouncement('server-read', '登录公告')
+    apiJsonMock
+      .mockResolvedValueOnce({ announcements: [{ announcement, read_at: null }], unread_count: 1 })
+      .mockResolvedValueOnce({ announcements: [{ announcement, read_at: '2026-07-31T02:00:00.000Z' }], unread_count: 0 })
+    const { container } = createAppRoot()
+    render(
+      <MemoryRouter>
+        <AnnouncementPopup announcements={[announcement]} userId="user-1" onUnreadCountChange={onUnreadCountChange} />
+      </MemoryRouter>,
+      { container },
+    )
+
+    await user.click(await screen.findByRole('button', { name: '已读' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(apiJsonMock).toHaveBeenLastCalledWith('/api/user/announcements', {
+      method: 'PATCH', json: { announcement_id: 'server-read' },
+    })
+    expect(onUnreadCountChange).toHaveBeenLastCalledWith(0)
+    expect(window.localStorage.getItem('maa-announcement-read:server-read')).toBeNull()
+    expect(apiVoidMock.mock.calls.some(([, init]) => init.json.event === 'announcement_read')).toBe(true)
   })
 
   it('focuses the first available app control when the popup opened from body focus', async () => {

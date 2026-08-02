@@ -150,6 +150,47 @@ describe('account deletion PostgreSQL lifecycle', () => {
     expect(mocks.recordAccountDeletedBehaviorEvent).toHaveBeenCalledOnce()
   })
 
+  it('deletes profile-linked depot samples when hash secrets are unavailable', async () => {
+    const now = new Date('2026-07-31T03:30:00.000Z')
+    const user = await seedUser('missing-depot-secret@example.test', now)
+    const profile = await seedProfile(user.id, now)
+    const linkedHash = `linked-${randomUUID()}`
+    const legacyHash = `legacy-${randomUUID()}`
+    await query(
+      `update user_game_accounts
+          set record_json = jsonb_set(record_json, '{skland_binding}', $2::jsonb)
+        where id = $1`,
+      [profile.id, JSON.stringify({ uid: 'missing-secret-test-uid' })],
+    )
+    await seedDepotSample(linkedHash, profile.id)
+    await seedDepotSample(legacyHash, null)
+    const accepted = await requestAccountDeletion(user, now)
+    const currentSecret = process.env.DEPOT_SAMPLE_HASH_SECRET
+    const previousSecret = process.env.DEPOT_SAMPLE_HASH_SECRET_PREVIOUS
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      delete process.env.DEPOT_SAMPLE_HASH_SECRET
+      delete process.env.DEPOT_SAMPLE_HASH_SECRET_PREVIOUS
+      await expect(processDueAccountDeletions(new Date(accepted.scheduledFor))).resolves.toBe(1)
+
+      expect(await readUserStatus(user.id)).toBeNull()
+      const samples = await query<{ uid_hash: string }>(
+        'select uid_hash from depot_value_samples where uid_hash = any($1::text[]) order by uid_hash',
+        [[linkedHash, legacyHash]],
+      )
+      expect(samples.rows.map((row) => row.uid_hash)).toEqual([legacyHash])
+      expect(warn).toHaveBeenCalledWith(
+        'depot sample hash secrets are unavailable; account deletion skipped legacy hash-only sample cleanup',
+      )
+    } finally {
+      restoreEnvironment('DEPOT_SAMPLE_HASH_SECRET', currentSecret)
+      restoreEnvironment('DEPOT_SAMPLE_HASH_SECRET_PREVIOUS', previousSecret)
+      warn.mockRestore()
+      await query('delete from depot_value_samples where uid_hash = $1', [legacyHash])
+    }
+  })
+
   it('persists email failures and removes short-lived recipient data after a retry succeeds', async () => {
     const now = new Date('2026-07-31T04:00:00.000Z')
     const user = await seedUser('outbox-retry@example.test', now)
@@ -312,6 +353,18 @@ async function seedOptimizationResidue(userId: string, profileId: string, now: D
      values ($1, $2, $3, $4, 'reorder_check', 'application_error', 'failed',
              'diagnostic residue', '{}'::jsonb, 1, $5, $5)`,
     [randomUUID(), jobId, ownerKey, profileId, timestamp],
+  )
+}
+
+async function seedDepotSample(uidHash: string, contributorProfileId: string | null): Promise<void> {
+  await query(
+    `insert into depot_value_samples
+      (uid_hash, contributor_profile_id, total_equivalent_sanity, account_level,
+       operator_power_score, operator_count, elite2_count, six_star_count,
+       six_star_e2_count, e2_90_count, inventory_item_count, priced_count,
+       unpriced_count, sample_json, sampled_at, updated_at)
+     values ($1, $2, 100, 120, 10, 1, 1, 1, 1, 0, 1, 1, 0, '{}'::jsonb, now(), now())`,
+    [uidHash, contributorProfileId],
   )
 }
 

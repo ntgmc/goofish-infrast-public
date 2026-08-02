@@ -16,13 +16,16 @@ import {
 
 type Category = 'all' | 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'license_voucher'
 type UseResponse = {
-  rewards?: Array<{ item_code: string; quantity: number; expires_at: string | null }>
+  rewards?: Array<{ item_code: string; name: string; icon_key: string; quantity: number; expires_at: string | null }>
   operation_id?: string
   item_code?: string
   profile_id?: string
   permission?: string
   starts_at?: string
   ends_at?: string
+  previous_limit?: number
+  next_limit?: number
+  maximum?: number
   auth?: AuthSuccessResponse
 }
 type LimitedProfileUseResponse = UseResponse & {
@@ -117,7 +120,11 @@ export default function InventorySection({
           action: 'profiles',
         })
       } else {
-        setNotice({ message: copy.inventory.operation_done })
+        setNotice({
+          message: typeof response.previous_limit === 'number' && typeof response.next_limit === 'number'
+            ? `扩容已生效：${response.previous_limit} → ${response.next_limit}（上限 ${response.maximum ?? response.next_limit}）。`
+            : copy.inventory.operation_done,
+        })
       }
       setSelected(null)
       await load()
@@ -221,6 +228,12 @@ export default function InventorySection({
               <article key={task.code} className="tool-inset p-4">
                 <h4 className="text-sm font-semibold text-ink-primary">{task.title}</h4>
                 <p className="mt-1 text-xs leading-5 text-ink-secondary">{task.description}</p>
+                <ul className="mt-3 space-y-2" aria-label={`${task.title}奖励`}>
+                  {task.rewards.map((reward) => <li key={reward.item_code} className="flex items-center gap-2 text-xs text-ink-secondary">
+                    <img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={28} height={28} className="h-7 w-7 object-contain" />
+                    <span>{reward.name} × {reward.quantity} · {reward.expiry.mode === 'never' ? copy.inventory.permanent : `领取后 ${reward.expiry.days} 天`}</span>
+                  </li>)}
+                </ul>
                 <button type="button" className="tool-secondary-action mt-4 w-full" disabled={busy || task.status !== 'claimable'} onClick={() => void claimTask(task)}>
                   {task.status === 'claimed' ? copy.inventory.claimed : task.status === 'claimable' ? copy.inventory.claim : task.status === 'disabled' ? copy.inventory.disabled : copy.inventory.incomplete}
                 </button>
@@ -251,7 +264,7 @@ export default function InventorySection({
                 <img src={itemIconPath(stack.item.icon_key)} onError={fallbackItemIcon} alt="" width={64} height={64} className="mx-auto h-16 w-16 object-contain" />
                 <strong className="mt-3 block truncate text-sm text-ink-primary">{stack.item.name}</strong>
                 <span className="mt-1 block text-xs text-ink-secondary">{copy.inventory.quantity} × {stack.quantity}</span>
-                <span className="mt-1 block truncate text-[11px] text-ink-muted">{stack.next_expiry_at ? `${copy.inventory.expires}${formatDate(stack.next_expiry_at)}` : copy.inventory.permanent}</span>
+                <span className="mt-1 block truncate text-[11px] text-ink-muted">{stack.next_expiry_at ? `${copy.inventory.expires}${formatShanghaiDateTime(stack.next_expiry_at)}` : copy.inventory.permanent}</span>
               </button>
             ))}
           </div>
@@ -269,7 +282,7 @@ export default function InventorySection({
               </div>
               <h4 className="mt-5 text-sm font-semibold text-ink-primary">{copy.inventory.batches}</h4>
               <ul className="mt-2 space-y-2 text-sm text-ink-secondary">
-                {selected.expiry_buckets.map((bucket, index) => <li key={`${bucket.expires_at ?? 'never'}-${index}`} className="tool-inset flex justify-between p-3"><span>× {bucket.quantity}</span><span>{bucket.expires_at ? formatDate(bucket.expires_at) : copy.inventory.permanent}</span></li>)}
+                {selected.expiry_buckets.map((bucket, index) => <li key={`${bucket.expires_at ?? 'never'}-${index}`} className="tool-inset flex justify-between p-3"><span>× {bucket.quantity}</span><span>{bucket.expires_at ? formatShanghaiDateTime(bucket.expires_at) : copy.inventory.permanent}</span></li>)}
               </ul>
               {selected.item.kind === 'capacity_upgrade' && <>
                 <label htmlFor="inventory-profile" className="mt-5 block text-sm font-medium text-ink-primary">{copy.inventory.choose_profile}</label>
@@ -310,7 +323,14 @@ export default function InventorySection({
         </Dialog.Portal>
       </Dialog.Root>
 
-      {rewards && rewards.length > 0 && <section className="tool-panel p-5" aria-live="polite"><h3 className="text-base font-semibold text-ink-primary">{copy.inventory.rewards_received}</h3><ul className="mt-3 grid gap-2 sm:grid-cols-2">{rewards.map((reward) => <li key={reward.item_code} className="tool-inset p-3 text-sm text-ink-secondary">{reward.item_code} × {reward.quantity} · {reward.expires_at ? formatDate(reward.expires_at) : copy.inventory.permanent}</li>)}</ul></section>}
+      {rewards && rewards.length > 0 && <section className="tool-panel p-5" aria-live="polite"><h3 className="text-base font-semibold text-ink-primary">{copy.inventory.rewards_received}</h3><ul className="mt-3 grid gap-2 sm:grid-cols-2">{rewards.map((reward) => <li key={reward.item_code} className="tool-inset flex items-center gap-3 p-3 text-sm text-ink-secondary"><img src={itemIconPath(reward.icon_key)} onError={fallbackItemIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" /><span>{reward.name} × {reward.quantity} · {reward.expires_at ? formatShanghaiDateTime(reward.expires_at) : copy.inventory.permanent}</span></li>)}</ul></section>}
+      {(inventory?.recent_events.length ?? 0) > 0 && <section className="tool-panel p-5 sm:p-6" aria-labelledby="inventory-events-title">
+        <h3 id="inventory-events-title" className="text-base font-semibold text-ink-primary">最近资产变动</h3>
+        <ul className="mt-3 space-y-2">{inventory!.recent_events.map((event) => <li key={event.id} className="tool-inset flex items-center gap-3 p-3 text-sm text-ink-secondary">
+          <img src={itemIconPath(event.icon_key ?? 'placeholder')} onError={fallbackItemIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" />
+          <span className="min-w-0 flex-1"><strong className="text-ink-primary">{event.item_name ?? event.item_code}</strong><span className="ml-2">{ledgerEventLabel(event.event_type)} × {event.quantity}</span><span className="mt-1 block text-xs text-ink-muted">{formatShanghaiDateTime(event.created_at)}</span></span>
+        </li>)}</ul>
+      </section>}
       <SklandBindingDialog
         open={lifetimeDialogOpen}
         profile={null}
@@ -339,8 +359,14 @@ function capacityForItem(code: string, profileId: string, profiles: ProfileCapac
   return null
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+function ledgerEventLabel(eventType: InventoryResponse['recent_events'][number]['event_type']): string {
+  if (eventType === 'grant') return '到账'
+  if (eventType === 'reserve') return '预留'
+  if (eventType === 'consume') return '消费'
+  if (eventType === 'refund') return '退回'
+  if (eventType === 'revoke') return '撤回'
+  if (eventType === 'gift_open') return '开启礼包'
+  return '容量生效'
 }
 
 function isLimitedProfileUseResponse(response: UseResponse): response is LimitedProfileUseResponse {

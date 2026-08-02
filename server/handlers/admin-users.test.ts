@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AdminUserWorkspaceExportV1 } from '../../src/lib/types'
 import adminUsersHandler from './admin-users'
 
 const mocks = vi.hoisted(() => ({
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getProfileWorkspace: vi.fn(),
   getUserById: vi.fn(),
   listProfilesForUser: vi.fn(),
+  listProfileWorkspaces: vi.fn(),
   resetUserPasswordByAdmin: vi.fn(),
   saveUserProfile: vi.fn(),
   setOperatorBaselineByAdmin: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock('../storage/user-store', () => ({
   getProfileWorkspace: mocks.getProfileWorkspace,
   isFreePreviewProfile: vi.fn(() => false),
   listProfilesForUser: mocks.listProfilesForUser,
+  listProfileWorkspaces: mocks.listProfileWorkspaces,
   listAdminUserAccountsPage: vi.fn(),
   normalizeProfileKind: vi.fn(() => 'cdk'),
   saveProfileWorkspace: vi.fn(),
@@ -116,6 +119,102 @@ beforeEach(() => {
   mocks.listProfilesForUser.mockImplementation(async () => [
     mocks.saveUserProfile.mock.calls.at(-1)?.[0] ?? profile,
   ])
+  mocks.listProfileWorkspaces.mockResolvedValue(new Map())
+})
+
+describe('admin user workspace export', () => {
+  it('exports every profile workspace with complete history through one batch query', async () => {
+    const secondProfile = {
+      ...profile,
+      id: 'profile-2',
+      display_name: '账号 C',
+      cdk_key: 'cdk/hash-2.json',
+      cdk_code_hash: 'hash-2',
+      cdk_order_hash: 'order-2',
+      note: '不应导出的备注',
+      skland_binding: { uid: 'uid-c', encrypted_cred: 'encrypted-secret' },
+    }
+    const workspace = {
+      version: 1,
+      profile_id: profile.id,
+      operators: [{ name: 'Amiya', own: true }],
+      config: { desc: '243 基建', layout: '243' },
+      elite_overrides: { Amiya: 2 },
+      last_result: { title: '最近排班' },
+      saved_configs: [{ id: 'config-1', name: '243', config: { desc: '243' } }],
+      result_history: [{ id: 'history-1', name: '历史排班', result: { title: '历史' } }],
+      archived_results: [{ id: 'archive-1', name: '封存排班', result: { title: '封存' } }],
+      free_schedule_entitlement: { revision_count: 2 },
+      free_preview_normalized_activity_id: 'internal-activity-marker',
+      updated_at: '2026-08-03T00:00:00.000Z',
+    }
+    mocks.listProfilesForUser.mockResolvedValue([profile, secondProfile])
+    mocks.listProfileWorkspaces.mockResolvedValue(new Map([[profile.id, workspace]]))
+
+    const response = await adminUsersHandler(workspaceExportRequest())
+    const body = await response.json() as AdminUserWorkspaceExportV1
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Type')).toBe('application/json; charset=utf-8')
+    expect(response.headers.get('Content-Disposition')).toBe('attachment; filename="maa-user-workspaces.json"')
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(body.version).toBe(1)
+    expect(body.user).toEqual({ id: user.id, email: user.email })
+    expect(new Date(body.exported_at).toISOString()).toBe(body.exported_at)
+    expect(mocks.listProfileWorkspaces).toHaveBeenCalledOnce()
+    expect(mocks.listProfileWorkspaces).toHaveBeenCalledWith([profile.id, secondProfile.id])
+    expect(body.profiles.map((item) => item.id)).toEqual([profile.id, secondProfile.id])
+    expect(body.profiles[0]?.workspace).toMatchObject({
+      operators: workspace.operators,
+      config: workspace.config,
+      elite_overrides: workspace.elite_overrides,
+      last_result: workspace.last_result,
+      saved_configs: workspace.saved_configs,
+      result_history: workspace.result_history,
+      archived_results: workspace.archived_results,
+      free_schedule_entitlement: workspace.free_schedule_entitlement,
+      updated_at: workspace.updated_at,
+    })
+    expect(body.profiles[1]?.workspace).toBeNull()
+    expect(body.profiles[1]).not.toHaveProperty('note')
+    expect(body.profiles[1]).not.toHaveProperty('cdk_key')
+    expect(body.profiles[1]).not.toHaveProperty('cdk_order_hash')
+    expect(body.profiles[1]).not.toHaveProperty('skland_binding')
+    expect(body.profiles[0]?.workspace).not.toHaveProperty('free_preview_normalized_activity_id')
+    expect(JSON.stringify(body)).not.toContain('encrypted-secret')
+    expect(JSON.stringify(body)).not.toContain('internal-activity-marker')
+  })
+
+  it('exports an empty profile list without querying workspaces individually', async () => {
+    mocks.listProfilesForUser.mockResolvedValue([])
+
+    const response = await adminUsersHandler(workspaceExportRequest())
+    const body = await response.json() as AdminUserWorkspaceExportV1
+
+    expect(response.status).toBe(200)
+    expect(body.profiles).toEqual([])
+    expect(mocks.listProfileWorkspaces).toHaveBeenCalledOnce()
+    expect(mocks.listProfileWorkspaces).toHaveBeenCalledWith([])
+    expect(mocks.getProfileWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('rejects unauthenticated requests and reports a missing target user', async () => {
+    mocks.authenticateAdminRequest.mockResolvedValueOnce({
+      ok: false,
+      response: new Response(JSON.stringify({ error: '请先登录。' }), { status: 401 }),
+    })
+
+    const unauthenticated = await adminUsersHandler(workspaceExportRequest())
+    expect(unauthenticated.status).toBe(401)
+    expect(mocks.getUserById).not.toHaveBeenCalled()
+    expect(mocks.listProfileWorkspaces).not.toHaveBeenCalled()
+
+    mocks.getUserById.mockResolvedValueOnce(null)
+    const missing = await adminUsersHandler(workspaceExportRequest())
+    expect(missing.status).toBe(404)
+    await expect(missing.json()).resolves.toEqual({ error: '用户不存在。' })
+    expect(mocks.listProfileWorkspaces).not.toHaveBeenCalled()
+  })
 })
 
 describe('admin user Skland binding reset', () => {
@@ -198,4 +297,8 @@ function clearBindingRequest() {
       profile_id: profile.id,
     }),
   })
+}
+
+function workspaceExportRequest() {
+  return new Request(`http://localhost/api/admin/users?user_id=${user.id}&include=workspaces`)
 }

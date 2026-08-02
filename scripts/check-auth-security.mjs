@@ -585,10 +585,12 @@ async function assertUserSessionTouchAndAuthPayload() {
   globalThis.__authSecurityWorkspaces = new Map([
     ['profile-1', { profile_id: 'profile-1', updated_at: '2026-07-10T11:00:00.000Z' }],
   ])
-  globalThis.__authSecurityWorkspaceBatchCalls = []
+  globalThis.__authSecurityWorkspaceFullCalls = []
+  globalThis.__authSecurityWorkspaceSummaryCalls = []
   globalThis.__authSecurityWorkspaceSingleCalls = 0
   const payload = await userAuth.buildAuthPayload(activeUser, 'profile-1')
-  assert.deepEqual(globalThis.__authSecurityWorkspaceBatchCalls, [['profile-2', 'profile-1']])
+  assert.deepEqual(globalThis.__authSecurityWorkspaceFullCalls, [['profile-1']])
+  assert.deepEqual(globalThis.__authSecurityWorkspaceSummaryCalls, [['profile-2', 'profile-1']])
   assert.equal(globalThis.__authSecurityWorkspaceSingleCalls, 0, 'auth payload should not read workspaces individually')
   assert.deepEqual(payload.profiles.map((profile) => profile.id), ['profile-2', 'profile-1'])
   assert.equal(payload.profiles[0].workspace_profile_id, null)
@@ -597,24 +599,30 @@ async function assertUserSessionTouchAndAuthPayload() {
   assert.equal(payload.active_profile.workspace_profile_id, 'profile-1')
   assert.equal(payload.workspace.profile_id, 'profile-1')
 
-  globalThis.__authSecurityWorkspaceBatchCalls = []
+  globalThis.__authSecurityWorkspaceFullCalls = []
+  globalThis.__authSecurityWorkspaceSummaryCalls = []
   const fallbackPayload = await userAuth.buildAuthPayload(activeUser, 'missing-profile')
-  assert.deepEqual(globalThis.__authSecurityWorkspaceBatchCalls, [['profile-2', 'profile-1']])
+  assert.deepEqual(globalThis.__authSecurityWorkspaceFullCalls, [['profile-2']])
+  assert.deepEqual(globalThis.__authSecurityWorkspaceSummaryCalls, [['profile-2', 'profile-1']])
   assert.equal(fallbackPayload.active_profile.id, 'profile-2')
   assert.equal(fallbackPayload.workspace, null)
 
   globalThis.__authSecurityProfiles = [profiles[1]]
-  globalThis.__authSecurityWorkspaceBatchCalls = []
+  globalThis.__authSecurityWorkspaceFullCalls = []
+  globalThis.__authSecurityWorkspaceSummaryCalls = []
   const singleProfilePayload = await userAuth.buildAuthPayload(activeUser)
-  assert.deepEqual(globalThis.__authSecurityWorkspaceBatchCalls, [['profile-1']])
+  assert.deepEqual(globalThis.__authSecurityWorkspaceFullCalls, [['profile-1']])
+  assert.deepEqual(globalThis.__authSecurityWorkspaceSummaryCalls, [['profile-1']])
   assert.deepEqual(singleProfilePayload.profiles.map((profile) => profile.id), ['profile-1'])
   assert.equal(singleProfilePayload.active_profile.id, 'profile-1')
   assert.equal(singleProfilePayload.workspace.profile_id, 'profile-1')
 
   globalThis.__authSecurityProfiles = []
-  globalThis.__authSecurityWorkspaceBatchCalls = []
+  globalThis.__authSecurityWorkspaceFullCalls = []
+  globalThis.__authSecurityWorkspaceSummaryCalls = []
   const emptyPayload = await userAuth.buildAuthPayload(activeUser, 'missing-profile')
-  assert.deepEqual(globalThis.__authSecurityWorkspaceBatchCalls, [[]])
+  assert.deepEqual(globalThis.__authSecurityWorkspaceFullCalls, [[]])
+  assert.deepEqual(globalThis.__authSecurityWorkspaceSummaryCalls, [[]])
   assert.deepEqual(emptyPayload.profiles, [])
   assert.equal(emptyPayload.active_profile, null)
   assert.equal(emptyPayload.workspace, null)
@@ -626,7 +634,7 @@ async function assertUserSessionStorage() {
   globalThis.__authSecurityStoredSession = null
   globalThis.__authSecurityStoredWorkspaces = new Map()
   const userStore = await bundleInlineModule(
-    "export { listProfileWorkspaces, touchSession } from './server/storage/user-store.ts'",
+    "export { listProfileWorkspaces, listProfileWorkspaceSummaries, touchSession } from './server/storage/user-store.ts'",
     'user-session-storage',
     [userSessionStoragePlugin()],
   )
@@ -679,6 +687,16 @@ async function assertUserSessionStorage() {
   assert.equal(workspaces.get('profile-1').profile_id, 'profile-1')
   assert.deepEqual(workspaces.get('profile-1').saved_configs, [])
   assert.deepEqual(workspaces.get('profile-2').result_history, [])
+
+  const summaries = await userStore.listProfileWorkspaceSummaries(['profile-1', 'missing', 'profile-2'])
+  const summaryQuery = globalThis.__authSecurityStorageQueries.at(-1)
+  assert(/select profile_id, operators_json, updated_at/i.test(summaryQuery.text))
+  assert.doesNotMatch(summaryQuery.text, /record_json/i, 'workspace summary query should not load complete result history JSON')
+  assert.deepEqual([...summaries.keys()].sort(), ['profile-1', 'profile-2'])
+  assert.deepEqual(summaries.get('profile-1'), {
+    operators: null,
+    updated_at: '2026-07-10T10:00:00.000Z',
+  })
 }
 
 async function assertAtomicPasswordResetHandler() {
@@ -1636,7 +1654,7 @@ function userAuthMigrationPlugin() {
   return {
     name: 'auth-security-user-migration-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'inventory-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-migration',
@@ -1645,6 +1663,7 @@ function userAuthMigrationPlugin() {
       build.onLoad({ filter: /.*/, namespace: 'auth-security-user-migration' }, (args) => {
         const mocks = {
           'user-store': userStoreMigrationMock(),
+          'inventory-store': inventoryStoreMock(),
           'announcement-store': announcementStoreMock(),
           'license-utils': userLicenseUtilsMock(),
           'cdk-redemption': cdkRedemptionMock(),
@@ -1663,7 +1682,7 @@ function userRegistrationCdkPlugin() {
   return {
     name: 'auth-security-user-registration-cdk-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'inventory-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-registration-cdk',
@@ -1672,6 +1691,7 @@ function userRegistrationCdkPlugin() {
       build.onLoad({ filter: /.*/, namespace: 'auth-security-user-registration-cdk' }, (args) => {
         const mocks = {
           'user-store': userRegistrationCdkStoreMock(),
+          'inventory-store': inventoryStoreMock(),
           password: userRegistrationPasswordMock(),
           'announcement-store': announcementStoreMock(),
           'license-utils': userRegistrationLicenseUtilsMock(),
@@ -1691,7 +1711,7 @@ function userSessionAuthPlugin() {
   return {
     name: 'auth-security-user-session-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'inventory-store', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\\\/])${moduleName}(\\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-user-session',
@@ -1700,6 +1720,7 @@ function userSessionAuthPlugin() {
       build.onLoad({ filter: /.*/, namespace: 'auth-security-user-session' }, (args) => {
         const mocks = {
           'user-store': userSessionAuthStoreMock(),
+          'inventory-store': inventoryStoreMock(),
           'announcement-store': announcementStoreMock(),
           'license-utils': userLicenseUtilsMock(),
           'cdk-redemption': cdkRedemptionMock(),
@@ -1738,7 +1759,7 @@ function passwordResetAuthPlugin() {
   return {
     name: 'auth-security-password-reset-mocks',
     setup(build) {
-      for (const moduleName of ['user-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
+      for (const moduleName of ['user-store', 'inventory-store', 'password', 'announcement-store', 'license-utils', 'cdk-redemption', 'invitation-store', 'admin-registration-invitation-store', 'registration-settings-store', 'email']) {
         build.onResolve({ filter: new RegExp(`(^|[\\/])${moduleName}(\.ts)?$`) }, () => ({
           path: moduleName,
           namespace: 'auth-security-password-reset',
@@ -1747,6 +1768,7 @@ function passwordResetAuthPlugin() {
       build.onLoad({ filter: /.*/, namespace: 'auth-security-password-reset' }, (args) => {
         const mocks = {
           'user-store': passwordResetAuthStoreMock(),
+          'inventory-store': inventoryStoreMock(),
           password: passwordResetPasswordMock(),
           'announcement-store': announcementStoreMock(),
           'license-utils': userLicenseUtilsMock(),
@@ -1948,6 +1970,7 @@ function userStoreMigrationMock() {
     export async function getSessionByTokenHash() { return null }
     export async function getUserById() { return null }
     export async function listProfileWorkspaces() { return new Map() }
+    export async function listProfileWorkspaceSummaries() { return new Map() }
     export async function listProfilesForUser() { return [] }
     export async function markAnnouncementRead() {}
     export async function savePasswordResetToken() {}
@@ -1956,6 +1979,7 @@ function userStoreMigrationMock() {
     export async function saveUserProfile() {}
     export async function resetUserPasswordWithToken() { return null }
     export function isFreePreviewProfile() { return false }
+    export function normalizeProfileKind(profile) { return profile.kind ?? 'cdk' }
     export function toPublicProfile(value) { return value }
     export function toPublicWorkspace(value) { return value }
     export async function touchSession() {}
@@ -2008,6 +2032,7 @@ function userRegistrationCdkStoreMock() {
     export async function getSessionByTokenHash() { return null }
     export async function getUserById() { return null }
     export async function listProfileWorkspaces() { return new Map() }
+    export async function listProfileWorkspaceSummaries() { return new Map() }
     export async function listProfilesForUser() { return [] }
     export async function markAnnouncementRead() {}
     export async function migrateLegacyUserIfNeeded() { return [] }
@@ -2016,6 +2041,7 @@ function userRegistrationCdkStoreMock() {
     export async function saveProfileWorkspace() {}
     export async function saveUserProfile() {}
     export function isFreePreviewProfile() { return false }
+    export function normalizeProfileKind(profile) { return profile.kind ?? 'cdk' }
     export function toPublicProfile(value) { return value }
     export function toPublicWorkspace(value) { return value }
     export async function touchSession() { return false }
@@ -2056,6 +2082,7 @@ function userRegistrationLicenseUtilsMock() {
     export function isProfileCdkRecord(record) { return getCdkType(record) === 'profile' }
     export function normalizeCode(value) { return value.trim().toUpperCase() }
     export function normalizePermissionMode(value) { return value }
+    export function formatRiskFreezeMessage(value) { return value }
     export function getFreePreviewDefaultConfig() { return {} }
     export function resolveFreePreviewConfig(config) { return { ok: true, config } }
   `
@@ -2124,15 +2151,30 @@ function userSessionAuthStoreMock() {
       return globalThis.__authSecurityProfiles ?? []
     }
     export async function listProfileWorkspaces(profileIds) {
-      globalThis.__authSecurityWorkspaceBatchCalls.push([...profileIds])
-      return new Map(globalThis.__authSecurityWorkspaces ?? [])
+      globalThis.__authSecurityWorkspaceFullCalls.push([...profileIds])
+      return new Map(
+        [...(globalThis.__authSecurityWorkspaces ?? new Map())]
+          .filter(([profileId]) => profileIds.includes(profileId)),
+      )
+    }
+    export async function listProfileWorkspaceSummaries(profileIds) {
+      globalThis.__authSecurityWorkspaceSummaryCalls.push([...profileIds])
+      return new Map(
+        [...(globalThis.__authSecurityWorkspaces ?? new Map())]
+          .filter(([profileId]) => profileIds.includes(profileId))
+          .map(([profileId, workspace]) => [profileId, {
+            operators: workspace.operators ?? null,
+            updated_at: workspace.updated_at,
+            summary_profile_id: profileId,
+          }]),
+      )
     }
     export async function getProfileWorkspace() {
       globalThis.__authSecurityWorkspaceSingleCalls += 1
       return null
     }
     export function toPublicProfile(profile, workspace) {
-      return { ...profile, workspace_profile_id: workspace?.profile_id ?? null }
+      return { ...profile, workspace_profile_id: workspace?.profile_id ?? workspace?.summary_profile_id ?? null }
     }
     export function toPublicWorkspace(workspace) { return workspace }
     export async function getAnnouncementReads() { return [] }
@@ -2152,6 +2194,7 @@ function userSessionAuthStoreMock() {
     export async function saveUserSession() {}
     export async function resetUserPasswordWithToken() { return null }
     export function isFreePreviewProfile() { return false }
+    export function normalizeProfileKind(profile) { return profile.kind ?? 'cdk' }
     export async function upgradeUserPasswordHash() { return null }
   `
 }
@@ -2175,10 +2218,16 @@ function userSessionPostgresMock() {
         const rows = [...values[0]]
           .reverse()
           .filter((profileId) => globalThis.__authSecurityStoredWorkspaces.has(profileId))
-          .map((profileId) => ({
-            profile_id: profileId,
-            record_json: globalThis.__authSecurityStoredWorkspaces.get(profileId),
-          }))
+          .map((profileId) => {
+            const workspace = globalThis.__authSecurityStoredWorkspaces.get(profileId)
+            return /operators_json/i.test(text)
+              ? {
+                  profile_id: profileId,
+                  operators_json: workspace.operators,
+                  updated_at: workspace.updated_at,
+                }
+              : { profile_id: profileId, record_json: workspace }
+          })
         return { rows, rowCount: rows.length }
       }
       throw new Error('Unexpected query in user session storage check: ' + text)
@@ -2224,6 +2273,7 @@ function passwordResetAuthStoreMock() {
     export async function getSessionByTokenHash() { return null }
     export async function getUserByEmail() { return null }
     export async function listProfileWorkspaces() { return new Map() }
+    export async function listProfileWorkspaceSummaries() { return new Map() }
     export async function listProfilesForUser() { return [] }
     export async function markAnnouncementRead() {}
     export async function migrateLegacyUserIfNeeded() { return [] }
@@ -2233,6 +2283,7 @@ function passwordResetAuthStoreMock() {
     export async function saveUserProfile() {}
     export async function saveUserSession() {}
     export function isFreePreviewProfile() { return false }
+    export function normalizeProfileKind(profile) { return profile.kind ?? 'cdk' }
     export function toPublicProfile(value) { return value }
     export function toPublicWorkspace(value) { return value }
     export async function touchSession() { return false }
@@ -2384,6 +2435,14 @@ function announcementStoreMock() {
   return 'export function createPostgresAnnouncementStore() { return { get: async () => null } }'
 }
 
+function inventoryStoreMock() {
+  return `
+    export async function getProfileCapacityLimits() {
+      return { plan: 3, history: 5, archive: 0 }
+    }
+  `
+}
+
 function userLicenseUtilsMock() {
   return `
     export async function findCdkRecordByCode() { return null }
@@ -2393,6 +2452,7 @@ function userLicenseUtilsMock() {
     export function hashCdk(value) { return value }
     export function normalizeCode(value) { return value }
     export function normalizePermissionMode(value) { return value }
+    export function formatRiskFreezeMessage(value) { return value }
     export function getFreePreviewDefaultConfig() { return {} }
     export function resolveFreePreviewConfig(config) { return { ok: true, config } }
     export function requireEnv(name) { return process.env[name] ?? '' }
@@ -2419,6 +2479,7 @@ function invitationStoreMock() {
     export async function validateInvitationCode() { return null }
     export async function saveRegistrationWithInvitation() {}
     export async function saveInvitationInTransaction() {}
+    export async function activateInvitationForUser() { return false }
     export async function settleInvitationForActivatedUser() {}
   `
 }
@@ -2442,6 +2503,7 @@ function registrationSettingsStoreMock() {
       return globalThis.__authSecurityRegistrationSettings ?? {
         email_verification_required: false,
         invite_code_required: false,
+        email_provider_priority: ['brevo', 'ses'],
         brevo_quota_action: 'pause_registration',
         admin_invite_email_reserve: 0,
         password_reset_email_reserve: 0,

@@ -2,18 +2,17 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import type { AnnouncementAdminResponse } from '../../lib/types'
 import type { AdminBalanceTransaction, BalancePage } from '../../lib/balance-contracts'
 import { ADMIN_SESSION_EXPIRED_EVENT, adminApiJson as apiJson, adminApiVoid as apiVoid } from '../../lib/admin-api-client'
+import { ApiError } from '../../lib/api-client'
 import { GeneratedPermission, CdkType, CdkTypeFilter, StatusFilter, PermissionFilter, BinaryFilter, FieldErrors, CdkTableFilters, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, UsageRangeMode, UsageStatsResponse, RiskControlSettings, RiskControlSettingsPatch, AdminUserSummary, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, PaginationMeta, CdkOpsSummary, EMPTY_PAGINATION, DEFAULT_RISK_SETTINGS, permissionLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, buildSummary, buildCdkOpsSummary, buildUsageStatsQuery, getDateOffsetString, normalizeUsageStats, normalizeRiskSettings, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, isAppUserStatus, buildCurrentOpsReport, buildCurrentOpsReportCsv, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp, omitProfileOperatorData } from './modules'
 import { useAnnouncementDraft } from './announcements/useAnnouncementDraft'
 import { createAdminUserBalanceActions, fetchAdminUserBalance } from './users/balance-actions'
+import { downloadAdminUserWorkspaces } from './users/workspace-export-actions'
 import { revokeSelectedCdks } from './cdk/bulk-actions'
-
 export function useAdminController() {
   const [adminUsername, setAdminUsername] = useState<string | null>(null)
 
   const [loginUser, setLoginUser] = useState('')
-
   const [loginPassword, setLoginPassword] = useState('')
-
   const [authenticated, setAuthenticated] = useState(false)
 
   const [sessionChecking, setSessionChecking] = useState(true)
@@ -472,6 +471,7 @@ export function useAdminController() {
         if (adminUsername) acceptServerAnnouncementData(adminUsername, data, true)
         setNotice('横幅和公告已发布')
       } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 409 && adminUsername && caught.data && typeof caught.data === 'object') reconcileLoadedAnnouncementData(adminUsername, caught.data as Partial<AnnouncementAdminResponse>)
         setError((caught as Error).message)
       } finally {
         setBusyAction(null)
@@ -689,7 +689,7 @@ export function useAdminController() {
       downloadOperatorsJson(data)
       setNotice(`已开始下载 ${profile.display_name || '账号档案'} 的干员 JSON`)
     }
-
+  const handleDownloadUserWorkspaces = () => selectedUserDetail ? downloadAdminUserWorkspaces({ userId: selectedUserDetail.user.id, setBusyAction, setError, setNotice }) : Promise.resolve()
   const patchUserProfile = async (
       profile: AdminProfileSummary,
       action: 'update_profile' | 'set_profile_status' | 'set_profile_permission' | 'upgrade_preview_profile' | 'clear_profile_skland_binding' | 'clear_profile_workspace',
@@ -895,5 +895,5 @@ export function useAdminController() {
       }
     }
 
-  return { cdkSearchInput, setCdkSearchInput, cdkPage, setCdkPage, cdkPageSize, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, userPage, setUserPage, userPageSize, setUserPageSize, userPagination, usersLoading, riskPage, setRiskPage, riskPageSize, setRiskPageSize, riskPagination, riskLoading, permission, cdkType, setCdkType, cdkTypeFilter, setCdkTypeFilter, balanceAmount, setBalanceAmount, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, records, appUsers, deadLetters, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, announcementDraftStatus, announcementDraftSavedAt, announcementDraftRestored, announcementDraftConflict, announcementDraftError, announcementDraftDirty, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, selectedUserBalance, setSelectedUserBalance, userBalanceLoading, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, clearNotice, summary, cdkOpsSummary, cdkFilters, visibleRecords, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleDiscardAnnouncementDraft, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, reorderAnnouncements, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleLoadMoreUserBalance, handleAdjustUserBalance, handleViewProfileOperators, handleDownloadProfileOperators, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser, handleOptimizationDeadLetter }
+  return { cdkSearchInput, setCdkSearchInput, cdkPage, setCdkPage, cdkPageSize, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, userPage, setUserPage, userPageSize, setUserPageSize, userPagination, usersLoading, riskPage, setRiskPage, riskPageSize, setRiskPageSize, riskPagination, riskLoading, permission, cdkType, setCdkType, cdkTypeFilter, setCdkTypeFilter, balanceAmount, setBalanceAmount, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, records, appUsers, deadLetters, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, announcementDraftStatus, announcementDraftSavedAt, announcementDraftRestored, announcementDraftConflict, announcementDraftError, announcementDraftDirty, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, selectedUserBalance, setSelectedUserBalance, userBalanceLoading, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, clearNotice, summary, cdkOpsSummary, cdkFilters, visibleRecords, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleDiscardAnnouncementDraft, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, reorderAnnouncements, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleLoadMoreUserBalance, handleAdjustUserBalance, handleViewProfileOperators, handleDownloadProfileOperators, handleDownloadUserWorkspaces, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser, handleOptimizationDeadLetter }
 }

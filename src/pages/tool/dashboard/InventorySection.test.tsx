@@ -77,6 +77,51 @@ afterEach(() => {
 })
 
 describe('InventorySection idempotent item use', () => {
+  it('shows onboarding reward details and recent asset events', async () => {
+    mocks.apiJson.mockImplementation(async (path: string) => {
+      if (path === '/api/user/onboarding-tasks') return { tasks: [{
+        code: 'welcome_inventory',
+        version_id: 'welcome-v2',
+        version: 2,
+        title: '认识网站',
+        description: '浏览库存页面',
+        enabled: true,
+        status: 'claimable',
+        completed_at: '2026-08-01T00:00:00.000Z',
+        claimed_at: null,
+        rewards: [{
+          item_code: 'priority_compute_coupon',
+          name: '优先计算券',
+          icon_key: 'priority_compute_coupon',
+          quantity: 2,
+          expiry: { mode: 'never' },
+        }],
+      }] }
+      if (path === '/api/user/inventory') return {
+        ...inventory,
+        recent_events: [{
+          id: 'event-1',
+          item_code: 'priority_compute_coupon',
+          item_name: '优先计算券',
+          icon_key: 'priority_compute_coupon',
+          event_type: 'grant',
+          quantity: 2,
+          reference_type: 'onboarding_task',
+          reference_id: 'welcome-v2',
+          created_at: '2026-08-01T00:00:00.000Z',
+          metadata: {},
+        }],
+      }
+      throw new Error(`unexpected request: ${path}`)
+    })
+
+    render(<InventorySection onPayload={vi.fn()} />)
+
+    expect(await screen.findByRole('list', { name: '认识网站奖励' })).toHaveTextContent('优先计算券 × 2 · 永久')
+    expect(screen.getByRole('heading', { name: '最近资产变动' })).toBeInTheDocument()
+    expect(screen.getByText('到账 × 2')).toBeInTheDocument()
+  })
+
   it('loads inventory without requesting onboarding tasks when the feature is disabled', async () => {
     mocks.onboardingTasksEnabled = false
     mocks.apiJson.mockImplementation(async (path: string) => {

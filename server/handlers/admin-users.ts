@@ -24,6 +24,7 @@ import {
   getProfileWorkspace,
   isFreePreviewProfile,
   listProfilesForUser,
+  listProfileWorkspaces,
   listAdminUserAccountsPage,
   normalizeProfileKind,
   saveProfileWorkspace,
@@ -36,7 +37,7 @@ import {
 } from '../storage/user-store'
 import { AdminPaginationError, buildAdminPagination, parseAdminPageRequest } from './admin-pagination'
 import { resetUserPasswordByAdmin } from './user-auth'
-import type { ProductPermissionMode } from '../../src/lib/types'
+import type { AdminUserWorkspaceExportV1, ProductPermissionMode } from '../../src/lib/types'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 import {
@@ -70,6 +71,11 @@ export default async (req: Request): Promise<Response> => {
       const url = new URL(req.url)
       const userId = url.searchParams.get('user_id')
       const profileId = url.searchParams.get('profile_id')
+      if (url.searchParams.get('include') === 'workspaces') {
+        const user = await findTargetUser({ user_id: userId })
+        if (!user) return jsonResponse({ error: '用户不存在。' }, 404)
+        return exportAdminUserWorkspaces(user)
+      }
       if (url.searchParams.get('include') === 'operators') {
         const user = await findTargetUser({ user_id: userId })
         if (!user) return jsonResponse({ error: '用户不存在。' }, 404)
@@ -315,6 +321,52 @@ async function syncLinkedCdkPermission(profile: UserGameAccountRecord, permissio
   await store.mutate(profile.cdk_key, (current) => (
     isProfileCdkRecord(current) ? { ...current, permission } : current
   ))
+}
+
+async function exportAdminUserWorkspaces(user: UserAccountRecord): Promise<Response> {
+  const profiles = await listProfilesForUser(user.id)
+  const workspaceMap = await listProfileWorkspaces(profiles.map((profile) => profile.id))
+  const body = {
+    version: 1,
+    exported_at: new Date().toISOString(),
+    user: {
+      id: user.id,
+      email: user.email,
+    },
+    profiles: profiles.map((profile) => {
+      const workspace = workspaceMap.get(profile.id)
+      return {
+        id: profile.id,
+        display_name: profile.display_name,
+        kind: normalizeProfileKind(profile),
+        permission: profile.permission,
+        status: profile.status,
+        workspace: workspace
+          ? {
+              version: 1,
+              profile_id: workspace.profile_id,
+              operators: workspace.operators,
+              config: workspace.config,
+              elite_overrides: workspace.elite_overrides,
+              last_result: workspace.last_result,
+              saved_configs: workspace.saved_configs,
+              result_history: workspace.result_history,
+              archived_results: workspace.archived_results,
+              free_schedule_entitlement: workspace.free_schedule_entitlement,
+              updated_at: workspace.updated_at,
+            }
+          : null,
+      }
+    }),
+  } satisfies AdminUserWorkspaceExportV1
+
+  return new Response(JSON.stringify(body, null, 2), {
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="maa-user-workspaces.json"',
+      'Cache-Control': 'no-store',
+    },
+  })
 }
 
 async function buildAdminUserDetail(user: UserAccountRecord) {

@@ -25,6 +25,7 @@ async function loadMoreAdminUserBalance(options: {
       ...page.transactions.filter((item) => !current.transactions.some((existing) => existing.id === item.id)),
     ],
     next_cursor: page.next_cursor,
+    as_of: page.as_of,
   } : page)
 }
 
@@ -34,6 +35,7 @@ async function adjustAdminUserBalance(options: {
   amount: string
   reason: string
   idempotencyKey: string
+  rootPassword: string
   originalTransactionId?: string
 }): Promise<BalancePage<AdminBalanceTransaction>> {
   await apiJson('/api/admin/balance', {
@@ -44,6 +46,7 @@ async function adjustAdminUserBalance(options: {
       amount: options.amount,
       reason: options.reason,
       idempotency_key: options.idempotencyKey,
+      root_password: options.rootPassword,
       ...(options.originalTransactionId ? { original_transaction_id: options.originalTransactionId } : {}),
     },
     fallbackMessage: options.operation === 'credit' ? '增加积分失败' : '扣减积分失败',
@@ -77,7 +80,7 @@ export function createAdminUserBalanceActions(options: {
 
   const handleAdjustUserBalance = async (
     operation: 'credit' | 'debit' | 'reverse_credit', amount: string, reason: string, idempotencyKey: string,
-    originalTransactionId?: string,
+    rootPassword: string, originalTransactionId?: string,
   ): Promise<boolean> => {
     if (!options.detail) return false
     if (operation === 'debit' && !window.confirm(`确认从该用户余额扣减 ${amount} 积分？余额不足时服务端会拒绝本次操作。`)) return false
@@ -86,7 +89,7 @@ export function createAdminUserBalanceActions(options: {
     options.setError(null)
     options.setNotice(null)
     try {
-      options.setBalance(await adjustAdminUserBalance({ userId: options.detail.user.id, operation, amount, reason, idempotencyKey, originalTransactionId }))
+      options.setBalance(await adjustAdminUserBalance({ userId: options.detail.user.id, operation, amount, reason, idempotencyKey, rootPassword, originalTransactionId }))
       options.setNotice(operation === 'credit' ? `已增加 ${amount} 积分` : operation === 'debit' ? `已扣减 ${amount} 积分` : `已冲正 ${amount} 积分`)
       await options.refreshUsers()
       return true

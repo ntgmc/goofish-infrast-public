@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
   UpgradeImpactRoom,
   UpgradePartialOutcome,
@@ -7,6 +7,7 @@ import type {
   UpgradeTrainingCostBucket,
   UpgradeTrainingMaterial,
 } from '../lib/types'
+import { getUpgradeSuggestionId } from '../lib/upgrade-suggestion-id'
 import ScheduleProgress, { type ScheduleProgressState } from './ScheduleProgress'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 
@@ -36,14 +37,26 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
   const [sortMode, setSortMode] = useState<SortMode>('payback')
   const [singleOnly, setSingleOnly] = useState(false)
 
-  const selectedIds = useMemo(() => Array.from(selected), [selected])
-
   const visibleSuggestions = useMemo(() => {
     return suggestions
-      .map((suggestion, index) => ({ suggestion, index, id: suggestion.id || `bundle-${index}` }))
+      .map((suggestion, index) => ({ suggestion, index, id: getUpgradeSuggestionId(suggestion, index) }))
       .filter((item) => !singleOnly || item.suggestion.type === 'single')
       .sort((left, right) => compareSuggestions(left.suggestion, right.suggestion, sortMode, left.index, right.index))
   }, [singleOnly, sortMode, suggestions])
+  const visibleIdSet = useMemo(() => new Set(visibleSuggestions.map((item) => item.id)), [visibleSuggestions])
+  const selectedIds = useMemo(
+    () => Array.from(selected).filter((id) => visibleIdSet.has(id)),
+    [selected, visibleIdSet],
+  )
+
+  useEffect(() => {
+    const prune = (current: Set<string>) => {
+      const next = new Set(Array.from(current).filter((id) => visibleIdSet.has(id)))
+      return next.size === current.size ? current : next
+    }
+    setSelected(prune)
+    setExpanded(prune)
+  }, [visibleIdSet])
 
   const toggle = useCallback((id: string) => {
     setSelected((current) => {
@@ -103,7 +116,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
           {!readOnly && (
             <button
               onClick={() => onApply(selectedIds)}
-              disabled={loading || selected.size === 0}
+              disabled={loading || selectedIds.length === 0}
               aria-describedby="upgrade-selection-note"
               className="tool-primary-action lg:flex-shrink-0"
             >
@@ -115,7 +128,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
                   </svg>
                   {copy.optimize.components_UpgradeSuggestions_008}</span>
               ) : (
-                `${copy.optimize.components_UpgradeSuggestions_009}${selected.size})`
+                `${copy.optimize.components_UpgradeSuggestions_009}${selectedIds.length})`
               )}
             </button>
           )}
@@ -134,7 +147,7 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
             <button
               type="button"
               onClick={() => onApply(selectedIds)}
-              disabled={loading || selected.size === 0}
+              disabled={loading || selectedIds.length === 0}
               className="tool-primary-action"
             >
               {copy.optimize.components_UpgradeSuggestions_011}</button>
@@ -171,9 +184,9 @@ export default function UpgradeSuggestions({ suggestions, onApply, loading, prog
 
       {!readOnly && (
         <div id="upgrade-selection-note" className="tool-inset p-4 text-sm leading-6 text-ink-secondary" role="status" aria-live="polite">
-          {selected.size === 0
+          {selectedIds.length === 0
             ? copy.optimize.components_UpgradeSuggestions_014
-            : `${copy.optimize.components_UpgradeSuggestions_015}${selected.size}${copy.optimize.components_UpgradeSuggestions_016}`}
+            : `${copy.optimize.components_UpgradeSuggestions_015}${selectedIds.length}${copy.optimize.components_UpgradeSuggestions_016}`}
         </div>
       )}
     </div>
@@ -336,18 +349,34 @@ function MetricGrid({ suggestion, cost }: { suggestion: UpgradeSuggestion; cost?
 function TrainingCostPanel({ cost }: { cost?: UpgradeTrainingCost }) {
   if (!cost || cost.status === 'unavailable') {
     return (
-      <div className="tool-inset px-3 py-2 text-sm leading-6 text-ink-muted">
-        {cost?.warnings[0] || copy.optimize.components_UpgradeSuggestions_032}
+      <div className="tool-inset space-y-2 px-3 py-2 text-sm leading-6 text-ink-muted">
+        {(cost?.warnings.length ? cost.warnings : [copy.optimize.components_UpgradeSuggestions_032]).map((warning, index) => (
+          <p key={`${index}:${warning}`}>{warning}</p>
+        ))}
       </div>
     )
   }
 
   const available = cost.available ?? deriveAvailableBucket(cost)
   return (
-    <div className="grid gap-3 lg:grid-cols-3">
-      <CostColumn title={copy.optimize.components_UpgradeSuggestions_033} bucket={cost.totals} emptyLabel={copy.optimize.components_UpgradeSuggestions_034} />
-      <CostColumn title={copy.optimize.components_UpgradeSuggestions_035} bucket={available} emptyLabel={copy.optimize.components_UpgradeSuggestions_036} />
-      <CostColumn title={copy.optimize.components_UpgradeSuggestions_037} bucket={cost.missing} emptyLabel={copy.optimize.components_UpgradeSuggestions_038} emphasizeMissing />
+    <div className="space-y-3">
+      <div className="grid gap-3 lg:grid-cols-3">
+        <CostColumn title={copy.optimize.components_UpgradeSuggestions_033} bucket={cost.totals} emptyLabel={copy.optimize.components_UpgradeSuggestions_034} />
+        <CostColumn title={copy.optimize.components_UpgradeSuggestions_035} bucket={available} emptyLabel={copy.optimize.components_UpgradeSuggestions_036} />
+        <CostColumn title={copy.optimize.components_UpgradeSuggestions_037} bucket={cost.missing} emptyLabel={copy.optimize.components_UpgradeSuggestions_038} emphasizeMissing />
+      </div>
+      {(cost.status === 'partial' || cost.warnings.length > 0 || cost.unpriced_items.length > 0) && (
+        <div className="tool-alert tool-alert--warning space-y-2 text-sm leading-6" role="status">
+          {cost.status === 'partial' && <p>{copy.optimize.components_UpgradeSuggestions_076}</p>}
+          {cost.warnings.map((warning, index) => <p key={`${index}:${warning}`}>{warning}</p>)}
+          {cost.unpriced_items.length > 0 && (
+            <p>{copy.optimize.components_UpgradeSuggestions_077}{cost.unpriced_items.map((item) => item.name).join('、')}</p>
+          )}
+        </div>
+      )}
+      <p className="text-xs text-ink-muted">
+        {copy.optimize.components_UpgradeSuggestions_078}{formatPricingSource(cost)}
+      </p>
     </div>
   )
 }
@@ -522,13 +551,25 @@ function compareNullableDesc(left: number | null | undefined, right: number | nu
 }
 
 function isStockEnough(cost?: UpgradeTrainingCost): boolean {
-  if (!cost || cost.status === 'unavailable') return false
+  if (!cost || cost.status !== 'available' || cost.operators.some((operator) => operator.status !== 'complete')) return false
   return cost.missing.cash === 0 && cost.missing.exp === 0 && cost.missing.materials.length === 0
 }
 
 function getStockLabel(cost?: UpgradeTrainingCost): string {
   if (!cost || cost.status === 'unavailable') return copy.optimize.components_UpgradeSuggestions_061
+  if (cost.status === 'partial' || cost.operators.some((operator) => operator.status !== 'complete')) {
+    return copy.optimize.components_UpgradeSuggestions_079
+  }
   return isStockEnough(cost) ? copy.optimize.components_UpgradeSuggestions_062 : copy.optimize.components_UpgradeSuggestions_063
+}
+
+function formatPricingSource(cost: UpgradeTrainingCost): string {
+  const fetchedAt = cost.sources.pricing_fetched_at
+    ? new Date(cost.sources.pricing_fetched_at).toLocaleString(CURRENT_LOCALE)
+    : copy.optimize.components_UpgradeSuggestions_080
+  const snapshot = cost.sources.pricing_snapshot_id?.slice(0, 12) ?? copy.optimize.components_UpgradeSuggestions_080
+  const valuationVersion = cost.sources.valuation_version ?? copy.optimize.components_UpgradeSuggestions_080
+  return `${cost.sources.yituliu} · ${fetchedAt} · ${snapshot} · ${valuationVersion}`
 }
 
 function metricToneClass(tone: 'brand' | 'success' | 'warning' | 'default'): string {

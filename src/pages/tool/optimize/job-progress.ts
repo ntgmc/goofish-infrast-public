@@ -136,6 +136,7 @@ export function mergeOptimizeJobProgress(
     queuePosition: observedRunning ? null : next.queue_position,
     priority: next.priority,
     jobId: next.job_id,
+    historyResultId: next.history_result_id,
     observedRunning,
     percentFloor: Math.max(0, Math.min(96, previousPercentFloor)),
     estimatedDurationMs: next.estimated_duration_ms,

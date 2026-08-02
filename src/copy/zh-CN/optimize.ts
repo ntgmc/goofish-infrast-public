@@ -149,6 +149,16 @@ export const optimizeCopy = {
   components_UpgradeSuggestions_074: "暂不可算",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_075: " 理智",
+  // src/components/UpgradeSuggestions.tsx
+  components_UpgradeSuggestions_076: "部分目标或材料成本无法完整计算，以下数值不能用于判断库存充足。",
+  // src/components/UpgradeSuggestions.tsx
+  components_UpgradeSuggestions_077: "未定价材料：",
+  // src/components/UpgradeSuggestions.tsx
+  components_UpgradeSuggestions_078: "价格来源：",
+  // src/components/UpgradeSuggestions.tsx
+  components_UpgradeSuggestions_079: "成本不完整",
+  // src/components/UpgradeSuggestions.tsx
+  components_UpgradeSuggestions_080: "无快照",
   // src/pages/tool/optimize/ConfigSection.tsx
   pages_tool_optimize_ConfigSection_001: "工作区输入",
   // src/pages/tool/optimize/ConfigSection.tsx

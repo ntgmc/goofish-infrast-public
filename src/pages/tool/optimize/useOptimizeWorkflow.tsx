@@ -1,35 +1,30 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react'
 import type { Announcement, AuthSuccessResponse, FreeScheduleEntitlement, LicenseConfig, LicenseFile, OptimizeResult, ReorderCheckResult, UpgradeSuggestion, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
-import type { CreateOptimizationJobRequest } from '../../../lib/optimization-contracts'
 import type { SystemItemCode } from '../../../lib/inventory-contracts'
 import { canEditConfig, canUseScenarioComparison, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../../../lib/license'
 import { canonicalJson } from '../../../lib/crypto'
 import { apiJson } from '../../../lib/api-client'
-
 import { normalizeConfig, validateConfig, normalizeScheduleMode, normalizeDormitoryRule } from '../../../lib/config'
 import { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { describeConfigDiff } from '../../../lib/workspace-history'
 import { mergeOptimizeJobProgress, buildOptimizeJobStorageKey, writeActiveOptimizeJob, readActiveOptimizeJob, isActiveOptimizeJob, clearActiveOptimizeJob, clearLegacyOptimizeJobStorage, isOptimizeJobPollCancelled } from './job-progress'
 import { isOptimizationJobCancelledError, useOptimizationJob } from './useOptimizationJob'
 import type { OptimizePhase, OptimizeSection } from './types'
-import { requestFullResultExport, requestMaaExport } from './optimization-api'
 import { runReorderCheckJob } from './reorder-job-progress'
 import { useReorderJobRecovery } from './useReorderJobRecovery'
 import { isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
 import type { ConfigSyncStatus, WorkspacePatch } from '../useToolSession'
 import { useLicenseSync } from './useLicenseSync'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
-import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, normalizeUpgradeSuggestions } from './workflow-utils'
+import { buildOptimizeSignature, buildUpgradeSuggestionEliteOverrides, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, normalizeUpgradeSuggestions } from './workflow-utils'
 import { usePriorityCoupon as usePriorityCouponState } from './usePriorityCoupon'
 import { useInventoryBalances } from './useInventoryBalances'
 import { copy } from '../../../copy/index'
 import { hasCapability } from '../../../lib/product-catalog'
 import { usePersonalUseDeclaration } from '../../../hooks/usePersonalUseDeclaration'
 import { upgradeProfileWithCdk } from '../profile-redemption'
-
-type BillingQuote = { pricing_version: string; charge: string; available: string; sufficient: boolean; tier: number | null; discount_bps: number }
-
-
+import { useResultDownloads } from './useResultDownloads'
+import { submitWithMeteredBillingQuote, useMeteredBillingQuote } from './useMeteredBillingQuote'
 export interface Props {
   profileId: string;
   profile: UserGameAccount;
@@ -104,46 +99,28 @@ export function useOptimizeWorkflow(props: Props) {
   const [workspaceNotice, setWorkspaceNotice] = useState<string | null>(null)
   const [workspaceError, setWorkspaceError] = useState<string | null>(null)
   const [workspaceBusyAction, setWorkspaceBusyAction] = useState<string | null>(null)
-  const [billingQuote, setBillingQuote] = useState<BillingQuote | null>(null)
-
-  const loadBillingQuote = useCallback(async (): Promise<BillingQuote | null> => {
-    if (profile.kind !== 'metered_personal' && profile.kind !== 'metered_commercial') return null
-    const quote = await apiJson<BillingQuote>(`/api/user/billing/quote?profile_id=${encodeURIComponent(profileId)}&operation=main_schedule`, { fallbackMessage: copy.metered.quote.load_failed })
-    setBillingQuote(quote)
-    return quote
-  }, [profile.kind, profileId])
-
-  useEffect(() => { void loadBillingQuote().catch(() => setBillingQuote(null)) }, [loadBillingQuote])
+  const { quote: billingQuote, loading: billingQuoteLoading, error: billingQuoteError, refresh: loadBillingQuote } = useMeteredBillingQuote(profile.kind, profileId)
 
   const [upgradeCdk, setUpgradeCdk] = useState('')
-
   const [upgradeLoading, setUpgradeLoading] = useState(false)
-
   const [upgradeError, setUpgradeError] = useState<string | null>(null)
-
   const upgradeRequestRef = useRef<{ cdk: string; idempotencyKey: string } | null>(null)
-
   const handleUpgradeCdkChange = useCallback((value: string) => {
     upgradeRequestRef.current = null
     setUpgradeCdk(value)
   }, [])
 
-  const { balance: priorityCouponBalance, selected: usePriorityCoupon, setSelected: setUsePriorityCoupon, refresh: refreshRewardBalance } = usePriorityCouponState(profileId)
-  const { balances: itemBalances, capacity: profileCapacity, reorderQuota, loaded: inventoryLoaded, refresh: refreshInventory } = useInventoryBalances(profileId)
+  const { balance: priorityCouponBalance, selected: usePriorityCoupon, setSelected: setUsePriorityCoupon, loading: priorityCouponLoading, error: priorityCouponError, refresh: refreshRewardBalance } = usePriorityCouponState(profileId)
+  const { balances: itemBalances, capacity: profileCapacity, reorderQuota, loaded: inventoryLoaded, loading: inventoryLoading, error: inventoryError, refresh: refreshInventory } = useInventoryBalances(profileId)
   const [useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon] = useState(false)
   const [useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon] = useState(false)
   const [useReorderCheckCoupon, setUseReorderCheckCoupon] = useState(false)
 
   const [lastGeneratedSignature, setLastGeneratedSignature] = useState<string | null>(null)
-
   const progressRef = useRef<ScheduleProgressState | null>(null)
-
   const optimizeInFlightRef = useRef(false)
-
   const optimizeRestoreKeyRef = useRef<string | null>(null)
-
   const configToastTimerRef = useRef<number | null>(null)
-
   const configToastIdRef = useRef(0)
 
   const isPreviewProfile = isFreePreviewProfile(profile)
@@ -159,15 +136,12 @@ export function useOptimizeWorkflow(props: Props) {
   }, [guardPersonalUseDeclaration])
 
   const permission = getPermissionMode(license)
-
   const userCanEditConfig = canEditConfig(license)
-
   const userCanUseIntermediateAutoConfig = isPreviewProfile || hasCapability({ permission }, 'use_intermediate_auto_config')
-
   const userCanDownloadFullResult = hasCapability({ kind: profile.kind, permission }, 'export_full_result_json')
-
+  const userCanExportMaaWithoutCoupon = hasCapability({ kind: profile.kind, permission }, 'export_maa_json')
+  const userCanViewFullData = hasCapability({ kind: profile.kind, permission }, 'view_full_data')
   const userCanApplyConfigOverride = true
-
   const userCanUseUpgradeFeatures = !isRestrictedPreview && canUseUpgradeFeatures(license)
   const userHasScenarioLabCapability = !isRestrictedPreview && canUseScenarioComparison(license)
   const userCanUseScenarioLab = userHasScenarioLabCapability || (itemBalances.scenario_simulation_coupon ?? 0) > 0
@@ -372,7 +346,26 @@ export function useOptimizeWorkflow(props: Props) {
       setInlineError(null)
       setReorderCheckResult(null)
       setReorderCheckError(null)
-    }, [clearConfigValidationToast, setConfigOverride])
+  }, [clearConfigValidationToast, setConfigOverride])
+
+  const refreshWorkspaceResults = useCallback(async () => {
+    const data = await apiJson<AuthSuccessResponse>(
+      `/api/user/workspace?profile_id=${encodeURIComponent(profileId)}`,
+      { fallbackMessage: copy.common.pages_tool_useToolSession_002 },
+    )
+    if (data.workspace) onWorkspaceUpdated(profileId, data.workspace)
+  }, [onWorkspaceUpdated, profileId])
+
+  const { downloadMaaResult, downloadFullResult } = useResultDownloads({
+    profileId,
+    guardExport: guardGeneratedResultExport,
+    canExportMaaWithoutCoupon: userCanExportMaaWithoutCoupon,
+    maaExportCouponBalance: itemBalances.maa_export_trial_coupon ?? 0,
+    refreshInventory,
+    setWorkspaceNotice,
+    setWorkspaceError,
+    setWorkspaceBusyAction,
+  })
 
   const {
     handleSaveCurrentConfig,
@@ -403,7 +396,7 @@ export function useOptimizeWorkflow(props: Props) {
     setWorkspaceError,
     setWorkspaceBusyAction,
     setSection,
-    guardGeneratedResultExport,
+    onDownloadMaaResult: downloadMaaResult,
   })
 
   const {
@@ -482,6 +475,9 @@ export function useOptimizeWorkflow(props: Props) {
           }
           setSection('result')
           setLastGeneratedSignature(optimizeSignature)
+          await refreshWorkspaceResults().catch((error) => {
+            setWorkspaceError(error instanceof Error ? error.message : copy.common.pages_tool_useToolSession_002)
+          })
         } catch (error) {
           if (!cancelled && !isOptimizeJobPollCancelled(error)) {
             clearActiveOptimizeJob(active.storageKey)
@@ -511,21 +507,22 @@ export function useOptimizeWorkflow(props: Props) {
         cancelled = true
         optimizeInFlightRef.current = false
       }
-    }, [flushPendingLicenseSync, license.order_hash, optimizeSignature, pollOptimizeJob, profileId, refreshInventory, refreshRewardBalance])
+    }, [flushPendingLicenseSync, license.order_hash, optimizeSignature, pollOptimizeJob, profileId, refreshInventory, refreshRewardBalance, refreshWorkspaceResults])
 
   const runOptimize = useCallback(async (includeUpgradeSuggestions: boolean, useItems: SystemItemCode[] = []) => {
-      const quote = await loadBillingQuote()
-      const payload: CreateOptimizationJobRequest = {
-        kind: 'schedule',
-        identity: { type: 'profile', profileId },
-        operators: mergedOperators,
-        config: activeConfig,
-        includeUpgradeSuggestions,
-        ...(useItems.length > 0 && { use_items: useItems }),
-        ...(quote && { pricing_version: quote.pricing_version, accepted_max_points: quote.charge }),
-      }
-      return await runOptimizeJob(payload, 'generate', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_013)
-    }, [activeConfig, loadBillingQuote, mergedOperators, profileId, runOptimizeJob])
+      return await submitWithMeteredBillingQuote({
+        profileKind: profile.kind, quote: billingQuote, quoteError: billingQuoteError, refreshQuote: loadBillingQuote,
+        submit: async (quote) => runOptimizeJob({
+          kind: 'schedule',
+          identity: { type: 'profile', profileId },
+          operators: mergedOperators,
+          config: activeConfig,
+          includeUpgradeSuggestions,
+          ...(useItems.length > 0 && { use_items: useItems }),
+          ...(quote && { billing_quote_id: quote.quote_id, pricing_version: quote.pricing_version, accepted_max_points: quote.charge }),
+        }, 'generate', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_013),
+      })
+    }, [activeConfig, billingQuote, billingQuoteError, loadBillingQuote, mergedOperators, profile.kind, profileId, runOptimizeJob])
 
   const handleReorderCheck = useCallback(async () => {
       await guardPersonalUseDeclaration('reorder_check', async () => {
@@ -639,6 +636,9 @@ export function useOptimizeWorkflow(props: Props) {
         setPhase('suggestions')
         setSection('result')
         setLastGeneratedSignature(optimizeSignature)
+        await refreshWorkspaceResults().catch((error) => {
+          setWorkspaceError(error instanceof Error ? error.message : copy.common.pages_tool_useToolSession_002)
+        })
       } catch (e) {
         if (!isOptimizationJobCancelledError(e)) {
           setInlineError({ scope: 'generate', message: formatOptimizeError((e as Error).message) })
@@ -658,7 +658,7 @@ export function useOptimizeWorkflow(props: Props) {
         }
       }
       })
-    }, [additionalRecomputeCouponEligible, configValidationMessage, effectiveFreeScheduleGenerateBlockedReason, flushConfigSave, flushPendingLicenseSync, guardPersonalUseDeclaration, hasResult, itemBalances.training_diagnosis_coupon, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, refreshInventory, refreshRewardBalance, runOptimize, showConfigValidationToast, useAdditionalRecomputeCoupon, usePriorityCoupon, useTrainingDiagnosisCoupon, userCanUseUpgradeFeatures])
+    }, [additionalRecomputeCouponEligible, configValidationMessage, effectiveFreeScheduleGenerateBlockedReason, flushConfigSave, flushPendingLicenseSync, guardPersonalUseDeclaration, hasResult, itemBalances.training_diagnosis_coupon, lastGeneratedSignature, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, refreshInventory, refreshRewardBalance, refreshWorkspaceResults, runOptimize, showConfigValidationToast, useAdditionalRecomputeCoupon, usePriorityCoupon, useTrainingDiagnosisCoupon, userCanUseUpgradeFeatures])
 
   const handleApplySuggestions = useCallback(async (selectedIds: string[]) => {
       if (loading || optimizeInFlightRef.current) return
@@ -679,34 +679,22 @@ export function useOptimizeWorkflow(props: Props) {
       progressRef.current = initialProgress
       setProgress(initialProgress)
       let completed = false
-      const selectedSet = new Set(selectedIds)
-      const newOverrides = { ...eliteOverrides }
-      for (const s of suggestions) {
-        if (s.type === 'single' && s.id && selectedSet.has(s.id) && s.target_elite !== undefined) {
-          newOverrides[s.id] = s.target_elite
-        }
-        if (s.type === 'bundle' && s.id && s.ops && selectedSet.has(s.id)) {
-          for (const op of s.ops) {
-            if (op.id && op.target_elite !== undefined) {
-              newOverrides[op.id] = op.target_elite
-            }
-          }
-        }
-      }
+      const newOverrides = buildUpgradeSuggestionEliteOverrides(suggestions, selectedIds, eliteOverrides)
       setLoading(true)
       try {
         await setEliteOverrides(newOverrides)
-        const quote = await loadBillingQuote()
-        const applyPayload: CreateOptimizationJobRequest = {
-          kind: 'schedule',
-          identity: { type: 'profile', profileId },
-          operators: mergeOperators(license.operators, newOverrides),
-          config: activeConfig,
-          includeUpgradeSuggestions: false,
-          historySource: 'applied_suggestions',
-          ...(quote && { pricing_version: quote.pricing_version, accepted_max_points: quote.charge }),
-        }
-        const data = await runOptimizeJob(applyPayload, 'apply', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_022)
+        const data = await submitWithMeteredBillingQuote({
+          profileKind: profile.kind, quote: billingQuote, quoteError: billingQuoteError, refreshQuote: loadBillingQuote,
+          submit: async (quote) => runOptimizeJob({
+            kind: 'schedule',
+            identity: { type: 'profile', profileId },
+            operators: mergeOperators(license.operators, newOverrides),
+            config: activeConfig,
+            includeUpgradeSuggestions: false,
+            historySource: 'applied_suggestions',
+            ...(quote && { billing_quote_id: quote.quote_id, pricing_version: quote.pricing_version, accepted_max_points: quote.charge }),
+          }, 'apply', copy.optimize.pages_tool_optimize_useOptimizeWorkflow_022),
+        })
         completed = true
         setProgress((current) => ({
           ...current,
@@ -725,6 +713,9 @@ export function useOptimizeWorkflow(props: Props) {
         setPhase('final')
         setSection('result')
         setLastGeneratedSignature(buildOptimizeSignature(mergeOperators(license.operators, newOverrides), activeConfig))
+        await refreshWorkspaceResults().catch((error) => {
+          setWorkspaceError(error instanceof Error ? error.message : copy.common.pages_tool_useToolSession_002)
+        })
       } catch (e) {
         if (!isOptimizationJobCancelledError(e)) {
           setInlineError({ scope: 'apply', message: formatOptimizeError((e as Error).message) })
@@ -738,27 +729,23 @@ export function useOptimizeWorkflow(props: Props) {
           setProgress(null)
         }
       }
-    }, [activeConfig, eliteOverrides, loadBillingQuote, loading, resultIsCurrent, runOptimizeJob, suggestions, license, profileId, setEliteOverrides])
+    }, [activeConfig, billingQuote, billingQuoteError, eliteOverrides, loadBillingQuote, loading, profile.kind, refreshWorkspaceResults, resultIsCurrent, runOptimizeJob, suggestions, license, profileId, setEliteOverrides])
 
   const handleDownloadMAA = useCallback(() => {
       const resultId = currentResult || finalResult
-        ? progress?.jobId
+        ? progress?.historyResultId ?? progress?.jobId
         : historyItem?.id ?? latestWorkspaceResult?.id
       if (!resultId) return
-      void guardGeneratedResultExport(async () => {
-        await requestMaaExport(profileId, resultId)
-      }).catch((error) => setWorkspaceError((error as Error).message))
-    }, [currentResult, finalResult, guardGeneratedResultExport, historyItem?.id, latestWorkspaceResult?.id, profileId, progress?.jobId, setWorkspaceError])
+      void downloadMaaResult(resultId)
+    }, [currentResult, downloadMaaResult, finalResult, historyItem?.id, latestWorkspaceResult?.id, progress?.historyResultId, progress?.jobId])
 
   const handleDownloadFullResult = useCallback(() => {
       const resultId = currentResult || finalResult
-        ? progress?.jobId
+        ? progress?.historyResultId ?? progress?.jobId
         : historyItem?.id ?? latestWorkspaceResult?.id
       if (!resultId) return
-      void guardGeneratedResultExport(async () => {
-        await requestFullResultExport(profileId, resultId)
-      }).catch((error) => setWorkspaceError((error as Error).message))
-    }, [currentResult, finalResult, guardGeneratedResultExport, historyItem?.id, latestWorkspaceResult?.id, profileId, progress?.jobId, setWorkspaceError])
+      void downloadFullResult(resultId)
+    }, [currentResult, downloadFullResult, finalResult, historyItem?.id, latestWorkspaceResult?.id, progress?.historyResultId, progress?.jobId])
 
   const handleUpgradePreviewProfile = useCallback(async (event: FormEvent) => {
       event.preventDefault()
@@ -787,5 +774,5 @@ export function useOptimizeWorkflow(props: Props) {
       }
     }, [isPreviewProfile, onProfileUpgraded, profileId, upgradeCdk, upgradeLoading])
 
-  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk: handleUpgradeCdkChange, upgradeLoading, upgradeError, priorityCouponBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isPreviewProfile, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults: workspace?.archived_results ?? [], latestWorkspaceResult, freeScheduleGenerateBlockedReason: effectiveFreeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog }
+  return { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote: loadBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk: handleUpgradeCdkChange, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isPreviewProfile, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults: workspace?.archived_results ?? [], latestWorkspaceResult, freeScheduleGenerateBlockedReason: effectiveFreeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog }
 }

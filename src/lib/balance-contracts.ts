@@ -32,6 +32,7 @@ export interface AdminBalanceTransaction extends PublicBalanceTransaction {
   reference_type: string
   reference_id: string
   admin_username: string | null
+  approved_by: string | null
   reason: string | null
 }
 
@@ -39,6 +40,7 @@ export interface BalancePage<Transaction = PublicBalanceTransaction> {
   balance: BalanceSummary
   transactions: Transaction[]
   next_cursor: string | null
+  as_of: string
 }
 
 export function normalizePointsAmount(value: unknown): string | null {

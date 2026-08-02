@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { adminApiJson } from '../../../lib/admin-api-client'
+import {
+  adminInventoryOverviewSchema,
+  type AdminInventoryCampaign as Campaign,
+  type AdminInventoryGiftVersion as GiftVersion,
+  type AdminInventoryOverview as Overview,
+} from '../../../lib/admin-inventory-contracts'
 import { itemIconPath } from '../../../lib/inventory-contracts'
 import type { ExpiryPolicy, GiftPackContentInput, ItemDefinition, OnboardingTaskCode } from '../../../lib/inventory-contracts'
 import { AdminToast } from '../shared/AdminToast'
 
-type GiftVersion = { id: string; item_code: string; version: number; status: 'draft' | 'published' | 'retired'; contents: GiftPackContentInput[] }
-type TaskConfig = { task_code: OnboardingTaskCode; version: number; enabled: boolean; rewards_json: GiftPackContentInput[] }
-type Campaign = { id: string; item_code: string; status: string; recipient_count: number; granted_count: number; failed_count: number; pending_count: number }
-type Audit = { id: string; admin_username: string; action: string; target_type: string; target_id: string; reason: string; created_at: string }
-type Overview = { definitions: ItemDefinition[]; gift_pack_versions: GiftVersion[]; tasks: TaskConfig[]; campaigns: Campaign[]; audits: Audit[]; user_count: number }
 type AdminTab = 'catalog' | 'packs' | 'onboarding' | 'distribution' | 'audit'
 type TaskDraft = { enabled: boolean; rewards: GiftPackContentInput[] }
 
@@ -63,10 +64,11 @@ export default function InventoryAdminSection() {
   const [versionItemCode, setVersionItemCode] = useState('')
   const [versionContents, setVersionContents] = useState<GiftPackContentInput[]>(initialContents)
   const [lastGrantId, setLastGrantId] = useState<string | null>(null)
+  const pendingIdempotencyRef = useRef(new Map<string, { requestJson: string; key: string }>())
 
   const load = useCallback(async () => {
     setError(null)
-    try { setData(await adminApiJson<Overview>('/api/admin/items')) }
+    try { setData(adminInventoryOverviewSchema.parse(await adminApiJson<unknown>('/api/admin/items'))) }
     catch (caught) { setError((caught as Error).message) }
   }, [])
   useEffect(() => { void load() }, [load])
@@ -93,12 +95,30 @@ export default function InventoryAdminSection() {
     })
   }, [data])
 
-  const run = async <T = unknown>(url: string, json: Record<string, unknown>, success: string): Promise<T | null> => {
+  const run = async <T = unknown>(
+    url: string,
+    json: Record<string, unknown>,
+    success: string,
+    options: { idempotencyScope?: string; confirmation?: string } = {},
+  ): Promise<T | null> => {
+    if (options.confirmation && !window.confirm(options.confirmation)) return null
+    const requestJson = JSON.stringify(json)
+    const pending = options.idempotencyScope
+      ? pendingIdempotencyRef.current.get(options.idempotencyScope)
+      : null
+    const idempotencyKey = options.idempotencyScope
+      ? pending?.requestJson === requestJson ? pending.key : crypto.randomUUID()
+      : null
+    if (options.idempotencyScope && idempotencyKey) {
+      pendingIdempotencyRef.current.set(options.idempotencyScope, { requestJson, key: idempotencyKey })
+    }
+    const request = idempotencyKey ? { ...json, idempotency_key: idempotencyKey } : json
     setBusy(true)
     setError(null)
     setNotice(null)
     try {
-      const response = await adminApiJson<T>(url, { method: 'POST', json })
+      const response = await adminApiJson<T>(url, { method: 'POST', json: request })
+      if (options.idempotencyScope) pendingIdempotencyRef.current.delete(options.idempotencyScope)
       setNotice(success)
       await load()
       return response
@@ -117,7 +137,10 @@ export default function InventoryAdminSection() {
   const selectedItem = data?.definitions.find((item) => item.code === itemCode)
   const userIds = [...new Set(targetUsers.split(/[\s,]+/).filter(Boolean))]
 
-  if (!data) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">正在加载道具管理…</div>
+  if (!data) return <div className="tool-panel p-6 text-sm text-ink-secondary" role={error ? 'alert' : 'status'}>
+    <p>{error ?? '正在加载道具管理…'}</p>
+    {error && <button type="button" className="tool-secondary-action mt-4" onClick={() => void load()}>重试加载</button>}
+  </div>
 
   return (
     <div className="space-y-6">
@@ -179,7 +202,7 @@ export default function InventoryAdminSection() {
           void run('/api/admin/items', {
             action: 'create_gift_pack', name: giftName, description: giftDescription,
             icon_key: 'generic_gift_pack', contents,
-          }, '礼包草稿已创建。')
+          }, '礼包草稿已创建。', { idempotencyScope: 'create_gift_pack' })
         }}>
           <h3 className="text-base font-semibold text-ink-primary">创建自定义礼包</h3>
           <Field label="礼包名称"><input className="tool-field mt-2 w-full" value={giftName} onChange={(event) => setGiftName(event.currentTarget.value)} /></Field>
@@ -192,7 +215,7 @@ export default function InventoryAdminSection() {
           <h3 className="text-base font-semibold text-ink-primary">礼包版本</h3>
           <form className="mt-4 border-b border-surface-3 pb-4" onSubmit={(event) => {
             event.preventDefault()
-            void run('/api/admin/items', { action: 'create_gift_pack_version', item_code: versionItemCode, contents: versionContents }, '礼包新版本草稿已创建。')
+            void run('/api/admin/items', { action: 'create_gift_pack_version', item_code: versionItemCode, contents: versionContents }, '礼包新版本草稿已创建。', { idempotencyScope: 'create_gift_pack_version' })
           }}>
             <Field label="基于礼包创建新版本"><select className="tool-field mt-2 w-full" value={versionItemCode} onChange={(event) => setVersionItemCode(event.currentTarget.value)}><option value="">请选择礼包</option>{data.definitions.filter((item) => item.kind === 'gift_pack').map((item) => <option key={item.code} value={item.code}>{item.name} · {item.code}</option>)}</select></Field>
             <RewardListEditor id="new-version-contents" label="新版本内容" value={versionContents} definitions={data.definitions} versions={data.gift_pack_versions} allowGiftPacks={false} onChange={setVersionContents} />
@@ -241,7 +264,7 @@ export default function InventoryAdminSection() {
           const response = await run<{ grant_id: string | null }>('/api/admin/inventory', {
             action: 'grant', user_id: userId, item_code: itemCode, quantity, validity_days: validityDays,
             ...(giftVersionId && { gift_pack_version_id: giftVersionId }), reason,
-          }, '道具已发放。')
+          }, '道具已发放。', { idempotencyScope: 'grant' })
           if (response?.grant_id) {
             setLastGrantId(response.grant_id)
             setRevokeGrantId(response.grant_id)
@@ -251,14 +274,14 @@ export default function InventoryAdminSection() {
           <Field label="用户 ID"><input className="tool-field mt-2 w-full" value={userId} onChange={(event) => setUserId(event.currentTarget.value)} /></Field>
           <ItemFields definitions={data.definitions} versions={publishedVersions} itemCode={itemCode} setItemCode={setItemCode} giftVersionId={giftVersionId} setGiftVersionId={setGiftVersionId} quantity={quantity} setQuantity={setQuantity} validityDays={validityDays} setValidityDays={setValidityDays} />
           <Field label="发放原因"><input className="tool-field mt-2 w-full" value={reason} onChange={(event) => setReason(event.currentTarget.value)} /></Field>
-          <button className="tool-primary-action mt-4" disabled={busy}>发放</button>
+          <button className="tool-primary-action mt-4" disabled={busy || reason.trim().length < 2}>发放</button>
           {lastGrantId && <p className="tool-alert tool-alert--success mt-4 break-all text-xs" role="status">最近发放批次 ID：{lastGrantId}（已自动填入撤回表单）</p>}
         </form>
-        <form className="tool-panel p-5" onSubmit={(event) => { event.preventDefault(); void run('/api/admin/inventory', { action: 'revoke_grant', grant_id: revokeGrantId, reason }, '尚未消费的余额已撤回。') }}>
+        <form className="tool-panel p-5" onSubmit={(event) => { event.preventDefault(); void run('/api/admin/inventory', { action: 'revoke_grant', grant_id: revokeGrantId, reason }, '尚未消费的余额已撤回。', { confirmation: `确认撤回批次 ${revokeGrantId} 的全部未消费余额？已消费资产不会恢复。` }) }}>
           <h3 className="text-base font-semibold text-ink-primary">撤回发放批次</h3>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">只撤回该批次尚未消费的数量，不影响已消费道具、已开启礼包或永久档案权益。</p>
           <Field label="发放批次 ID"><input className="tool-field mt-2 w-full" value={revokeGrantId} onChange={(event) => setRevokeGrantId(event.currentTarget.value)} /></Field>
-          <button className="tool-secondary-action mt-4" disabled={busy}>撤回余额</button>
+          <button className="tool-secondary-action mt-4" disabled={busy || reason.trim().length < 2}>撤回余额</button>
         </form>
       </section>
 
@@ -266,7 +289,7 @@ export default function InventoryAdminSection() {
         action: 'create_campaign', item_code: itemCode, quantity, validity_days: validityDays, target_mode: targetMode,
         ...(giftVersionId && { gift_pack_version_id: giftVersionId }),
         ...(targetMode === 'user_ids' ? { user_ids: userIds } : { root_password: rootPassword, confirmation: 'DISTRIBUTE TO ALL USERS' }), reason,
-      }, '发放活动已进入队列。') }}>
+      }, '发放活动已进入队列。', { idempotencyScope: 'create_campaign' }) }}>
         <h3 className="text-base font-semibold text-ink-primary">批量与全站发放</h3>
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <div>
@@ -276,24 +299,33 @@ export default function InventoryAdminSection() {
           <div><ItemFields definitions={data.definitions} versions={publishedVersions} itemCode={itemCode} setItemCode={setItemCode} giftVersionId={giftVersionId} setGiftVersionId={setGiftVersionId} quantity={quantity} setQuantity={setQuantity} validityDays={validityDays} setValidityDays={setValidityDays} /><Field label="管理员备注"><input className="tool-field mt-2 w-full" value={reason} onChange={(event) => setReason(event.currentTarget.value)} /></Field></div>
         </div>
         <div className="tool-alert mt-4">预计用户数：{targetMode === 'all_users' ? data.user_count : userIds.length}；预计道具总量：{(targetMode === 'all_users' ? data.user_count : userIds.length) * quantity}。提交时会固定目标用户集合；之后注册的用户不会被包含。{selectedItem?.kind === 'gift_pack' ? '当前礼包必须选择已发布版本。' : ''}</div>
-        <button className="tool-primary-action mt-4" disabled={busy}>创建发放活动</button>
+        <button className="tool-primary-action mt-4" disabled={busy || reason.trim().length < 2}>创建发放活动</button>
       </form>
 
       <section className="tool-panel p-5 sm:p-6">
         <h3 className="text-base font-semibold text-ink-primary">发放活动</h3>
         <div className="mt-4 space-y-3">{data.campaigns.map((campaign) => <article key={campaign.id} className="tool-inset p-4">
           <div className="flex flex-wrap justify-between gap-2"><span className="font-mono text-xs">{campaign.id}</span><strong className="text-sm">{campaign.status}</strong></div>
-          <p className="mt-2 text-xs text-ink-secondary">{campaign.item_code} · 目标 {campaign.recipient_count} · 成功 {campaign.granted_count} · 失败 {campaign.failed_count} · 待处理 {campaign.pending_count}</p>
+          <p className="mt-2 text-xs text-ink-secondary">{campaign.item_code} · 目标 {campaign.recipient_count} · 成功 {campaign.granted_count} · 失败 {campaign.failed_count} · 待处理 {campaign.pending_count} · 处理中 {campaign.processing_count} · 跳过 {campaign.skipped_count} · 已撤回 {campaign.revoked_count}</p>
+          {campaign.failed_recipients.length > 0 && <details className="mt-3 text-xs text-ink-secondary">
+            <summary className="cursor-pointer font-medium text-warning-700">查看失败收件人与原因</summary>
+            <ul className="mt-2 space-y-2">{campaign.failed_recipients.map((recipient) => <li key={recipient.user_id} className="rounded-lg border border-surface-3 p-2">
+              <span className="font-mono">{recipient.user_id}</span> · 已尝试 {recipient.attempt_count} 次 · {recipient.error_message ?? '未知错误'}
+            </li>)}</ul>
+            <button type="button" className="tool-secondary-action mt-2" onClick={() => downloadCampaignFailures(campaign)}>导出失败 CSV</button>
+          </details>}
+          {campaign.target_mode === 'all_users' && (campaign.status === 'completed' || campaign.status === 'completed_with_failures') && <Field label="全站撤回 Root 口令"><input type="password" className="tool-field mt-2 w-full" value={rootPassword} onChange={(event) => setRootPassword(event.currentTarget.value)} /></Field>}
           <div className="mt-3 flex flex-wrap gap-2">
-            {(campaign.status === 'queued' || campaign.status === 'running') && <><CampaignAction action="pause_campaign" label="暂停" campaign={campaign} run={run} /><CampaignAction action="cancel_campaign" label="取消" campaign={campaign} run={run} /></>}
-            {campaign.status === 'paused' && <CampaignAction action="resume_campaign" label="恢复" campaign={campaign} run={run} />}
-            {campaign.status === 'completed' && <CampaignAction action="reverse_campaign" label="撤回未消费余额" campaign={campaign} run={run} />}
+            {(campaign.status === 'queued' || campaign.status === 'running') && <><CampaignAction action="pause_campaign" label="暂停" campaign={campaign} run={run} rootPassword={rootPassword} /><CampaignAction action="cancel_campaign" label="取消" campaign={campaign} run={run} rootPassword={rootPassword} /></>}
+            {campaign.status === 'paused' && <CampaignAction action="resume_campaign" label="恢复" campaign={campaign} run={run} rootPassword={rootPassword} />}
+            {campaign.status === 'completed_with_failures' && <button type="button" className="tool-secondary-action" onClick={() => void run('/api/admin/inventory', { action: 'retry_campaign_failures', campaign_id: campaign.id, reason: '管理员重试失败收件人' }, '失败收件人已重新入队。', { confirmation: `确认重试活动 ${campaign.id} 的 ${campaign.failed_count} 个失败收件人？` })}>重试失败收件人</button>}
+            {(campaign.status === 'completed' || campaign.status === 'completed_with_failures') && <CampaignAction action="reverse_campaign" label="撤回未消费余额" campaign={campaign} run={run} rootPassword={rootPassword} />}
           </div>
         </article>)}</div>
       </section>
       </div>}
 
-      {activeTab === 'audit' && <section id="inventory-admin-panel-audit" role="tabpanel" aria-labelledby="inventory-admin-tab-audit" className="tool-panel p-5 sm:p-6"><h3 className="text-base font-semibold text-ink-primary">最近审计</h3><ul className="mt-4 max-h-96 space-y-2 overflow-y-auto text-xs text-ink-secondary">{data.audits.map((audit) => <li key={audit.id} className="tool-inset p-3">{new Date(audit.created_at).toLocaleString('zh-CN')} · {audit.admin_username} · {audit.action} · {audit.target_type}/{audit.target_id} · {audit.reason}</li>)}</ul></section>}
+      {activeTab === 'audit' && <section id="inventory-admin-panel-audit" role="tabpanel" aria-labelledby="inventory-admin-tab-audit" className="tool-panel p-5 sm:p-6"><h3 className="text-base font-semibold text-ink-primary">最近审计</h3><ul className="mt-4 max-h-96 space-y-2 overflow-y-auto text-xs text-ink-secondary">{data.audits.map((audit) => <li key={audit.id} className="tool-inset p-3"><details><summary className="cursor-pointer">{new Date(audit.created_at).toLocaleString('zh-CN')} · {audit.admin_username} · {audit.action} · {audit.target_type}/{audit.target_id} · {audit.reason}</summary><div className="mt-2 grid gap-2 lg:grid-cols-2"><AuditJson label="变更前" value={audit.before_json} /><AuditJson label="变更后" value={audit.after_json} /></div></details></li>)}</ul></section>}
     </div>
   )
 }
@@ -315,8 +347,18 @@ function ItemFields(props: {
   </>
 }
 
-function CampaignAction({ action, label, campaign, run }: { action: string; label: string; campaign: Campaign; run: (url: string, json: Record<string, unknown>, success: string) => Promise<unknown | null> }) {
-  return <button type="button" className="tool-secondary-action" onClick={() => void run('/api/admin/inventory', { action, campaign_id: campaign.id, reason: `管理员${label}` }, `活动已${label}。`)}>{label}</button>
+function CampaignAction({ action, label, campaign, run, rootPassword }: { action: string; label: string; campaign: Campaign; run: (url: string, json: Record<string, unknown>, success: string, options?: { idempotencyScope?: string; confirmation?: string }) => Promise<unknown | null>; rootPassword: string }) {
+  const destructive = action === 'pause_campaign' || action === 'cancel_campaign' || action === 'reverse_campaign'
+  const requiresRoot = action === 'reverse_campaign' && campaign.target_mode === 'all_users'
+  const confirmation = destructive
+    ? `确认对活动 ${campaign.id} 执行“${label}”？目标 ${campaign.recipient_count} 人，当前成功 ${campaign.granted_count} 人。`
+    : undefined
+  return <button type="button" className="tool-secondary-action" disabled={requiresRoot && !rootPassword} onClick={() => void run('/api/admin/inventory', {
+    action,
+    campaign_id: campaign.id,
+    reason: `管理员${label}`,
+    ...(requiresRoot && { root_password: rootPassword }),
+  }, `活动已${label}。`, { confirmation })}>{label}</button>
 }
 
 function RewardListEditor(props: {
@@ -417,7 +459,40 @@ function itemKindLabel(kind: ItemDefinition['kind']): string {
   if (kind === 'capacity_upgrade') return '档案扩容'
   if (kind === 'gift_pack') return '礼包'
   if (kind === 'cosmetic') return '主题装扮（预留）'
-  return '成就勋章（预留）'
+  if (kind === 'badge') return '成就勋章（预留）'
+  if (kind === 'license_voucher') return '授权凭证'
+  return assertNever(kind)
+}
+
+function AuditJson({ label, value }: { label: string; value: unknown }) {
+  return <div><strong className="text-ink-primary">{label}</strong><pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-surface-2 p-2">{JSON.stringify(value, null, 2) ?? 'null'}</pre></div>
+}
+
+function downloadCampaignFailures(campaign: Campaign): void {
+  const rows = [
+    ['user_id', 'attempt_count', 'processed_at', 'error_message'],
+    ...campaign.failed_recipients.map((recipient) => [
+      recipient.user_id,
+      String(recipient.attempt_count),
+      recipient.processed_at ?? '',
+      recipient.error_message ?? '',
+    ]),
+  ]
+  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')
+  const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `inventory-campaign-${campaign.id}-failures.csv`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function csvCell(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported item kind: ${String(value)}`)
 }
 
 function formatExpiry(expiry: ExpiryPolicy): string {

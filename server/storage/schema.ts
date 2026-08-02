@@ -2,7 +2,6 @@ import { resolveAppRole, type AppRole } from '../process-role'
 import { query } from './postgres'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
-import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 
 const MIGRATION_PHASE_SEPARATOR = '-- goofish:migration-phase'
 const RETRIABLE_MIGRATION_CODES = new Set(['40P01', '40001', '55P03'])
@@ -91,8 +90,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_cdk_records_license_order_hash
 CREATE TABLE IF NOT EXISTS announcements (
   key TEXT PRIMARY KEY,
   data_json JSONB NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
+  updated_at TIMESTAMPTZ NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0)
 );
+ALTER TABLE announcements ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS risk_settings (
   key TEXT PRIMARY KEY,
@@ -103,8 +104,10 @@ CREATE TABLE IF NOT EXISTS risk_settings (
 CREATE TABLE IF NOT EXISTS invitation_settings (
   key TEXT PRIMARY KEY,
   record_json JSONB NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
+  updated_at TIMESTAMPTZ NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1)
 );
+ALTER TABLE invitation_settings ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1);
 
 CREATE TABLE IF NOT EXISTS registration_settings (
   key TEXT PRIMARY KEY,
@@ -133,6 +136,7 @@ ALTER TABLE public_content_settings ADD COLUMN IF NOT EXISTS revision INTEGER NO
 CREATE TABLE IF NOT EXISTS brevo_email_deliveries (
   id TEXT PRIMARY KEY,
   quota_date DATE NOT NULL,
+  provider TEXT NOT NULL DEFAULT 'brevo' CHECK (provider IN ('brevo', 'ses')),
   purpose TEXT NOT NULL CHECK (purpose IN (
     'email_verification',
     'admin_invite_verification',
@@ -144,8 +148,24 @@ CREATE TABLE IF NOT EXISTS brevo_email_deliveries (
   reserved_at TIMESTAMPTZ NOT NULL,
   completed_at TIMESTAMPTZ
 );
+ALTER TABLE brevo_email_deliveries
+  ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'brevo';
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'brevo_email_deliveries_provider_check'
+       AND conrelid = 'brevo_email_deliveries'::regclass
+  ) THEN
+    ALTER TABLE brevo_email_deliveries
+      ADD CONSTRAINT brevo_email_deliveries_provider_check
+      CHECK (provider IN ('brevo', 'ses'));
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_brevo_email_deliveries_quota_date
   ON brevo_email_deliveries(quota_date);
+CREATE INDEX IF NOT EXISTS idx_brevo_email_deliveries_provider_quota_date
+  ON brevo_email_deliveries(provider, quota_date);
 CREATE INDEX IF NOT EXISTS idx_brevo_email_deliveries_daily_breakdown
   ON brevo_email_deliveries(quota_date, purpose, status);
 DO $$
@@ -189,6 +209,9 @@ CREATE TABLE IF NOT EXISTS usage_events (
 );
 CREATE INDEX IF NOT EXISTS idx_usage_events_date ON usage_events(date);
 CREATE INDEX IF NOT EXISTS idx_usage_events_event ON usage_events(event);
+CREATE INDEX IF NOT EXISTS idx_usage_events_announcement_version
+  ON usage_events ((record_json->>'announcement_id'), (record_json->>'announcement_version'), event)
+  WHERE record_json ? 'announcement_id';
 
 CREATE TABLE IF NOT EXISTS optimize_jobs (
   id TEXT PRIMARY KEY,
@@ -399,10 +422,12 @@ CREATE TABLE IF NOT EXISTS user_balance_transactions (
   reference_id TEXT NOT NULL,
   idempotency_key TEXT,
   admin_username TEXT,
+  approved_by TEXT,
   reason TEXT,
   request_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE user_balance_transactions ADD COLUMN IF NOT EXISTS approved_by TEXT;
 CREATE INDEX IF NOT EXISTS idx_user_balance_transactions_user_created
   ON user_balance_transactions(user_id, created_at DESC, id DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_balance_transactions_idempotency
@@ -416,6 +441,24 @@ ALTER TABLE user_balance_transactions DROP CONSTRAINT IF EXISTS user_balance_tra
 ALTER TABLE user_balance_transactions ADD CONSTRAINT user_balance_transactions_kind_check CHECK (
   kind IN ('cdk_credit', 'admin_credit', 'admin_debit', 'schedule_debit', 'admin_credit_reversal', 'debt_repayment')
 );
+
+CREATE TABLE IF NOT EXISTS user_balance_operations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  idempotency_key TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('claimed', 'completed')),
+  transaction_id TEXT REFERENCES user_balance_transactions(id) ON DELETE SET NULL,
+  response_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  UNIQUE (user_id, idempotency_key)
+);
+ALTER TABLE user_balance_operations
+  DROP CONSTRAINT IF EXISTS user_balance_operations_transaction_id_fkey;
+ALTER TABLE user_balance_operations
+  ADD CONSTRAINT user_balance_operations_transaction_id_fkey
+  FOREIGN KEY (transaction_id) REFERENCES user_balance_transactions(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS user_balance_qualification_ledger (
   id TEXT PRIMARY KEY,
@@ -454,16 +497,67 @@ CREATE TABLE IF NOT EXISTS commercial_account_limits (
   total_profile_limit INTEGER NOT NULL DEFAULT 1000 CHECK (total_profile_limit >= active_profile_limit),
   suspended_at TIMESTAMPTZ,
   suspension_reason TEXT,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+  updated_by TEXT,
   updated_at TIMESTAMPTZ NOT NULL
+);
+ALTER TABLE commercial_account_limits ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE commercial_account_limits ADD COLUMN IF NOT EXISTS updated_by TEXT;
+
+CREATE TABLE IF NOT EXISTS commercial_account_audit (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  actor_username TEXT NOT NULL,
+  approved_by TEXT NOT NULL,
+  request_id TEXT NOT NULL UNIQUE,
+  request_hash TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  before_json JSONB NOT NULL,
+  after_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_commercial_account_audit_user_created
+  ON commercial_account_audit(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS commercial_profile_operations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  operation_id TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  response_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  UNIQUE (user_id, operation_id)
 );
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS invitation_codes (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
   code TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused')),
+  created_at TIMESTAMPTZ NOT NULL,
+  rotated_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS rotated_at TIMESTAMPTZ;
+ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
+ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE invitation_codes DROP CONSTRAINT IF EXISTS invitation_codes_status_check;
+ALTER TABLE invitation_codes ADD CONSTRAINT invitation_codes_status_check CHECK (status IN ('active', 'paused'));
+CREATE INDEX IF NOT EXISTS idx_invitation_codes_code ON invitation_codes(code);
+
+CREATE TABLE IF NOT EXISTS invitation_code_audit (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  action TEXT NOT NULL CHECK (action IN ('create', 'rotate', 'pause', 'resume')),
+  previous_code_hash TEXT,
+  next_code_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_invitation_codes_code ON invitation_codes(code);
+CREATE INDEX IF NOT EXISTS idx_invitation_code_audit_user_created
+  ON invitation_code_audit(user_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS invitations (
   id TEXT PRIMARY KEY,
@@ -476,21 +570,64 @@ CREATE TABLE IF NOT EXISTS invitations (
   settled_at TIMESTAMPTZ,
   settings_snapshot JSONB,
   settlement_json JSONB,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  next_retry_at TIMESTAMPTZ,
+  processing_started_at TIMESTAMPTZ,
+  last_error TEXT,
+  dead_lettered_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL,
-  CHECK (inviter_user_id IS NULL OR inviter_user_id <> invitee_user_id)
+  CHECK (inviter_user_id IS NULL OR inviter_user_id <> invitee_user_id),
+  CHECK (status IN ('registered', 'activated', 'processing', 'failed', 'settled', 'dead_letter')),
+  CHECK (attempt_count >= 0)
 );
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_registered_at ON invitations(inviter_user_id, registered_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_settled_at ON invitations(inviter_user_id, settled_at DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_invitation_code ON invitations(invitation_code);
 ALTER TABLE invitations ADD COLUMN IF NOT EXISTS inviter_rewarded_at TIMESTAMPTZ;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS last_error TEXT;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS dead_lettered_at TIMESTAMPTZ;
+UPDATE invitations
+   SET activated_at = coalesce(activated_at, registered_at),
+       status = 'failed',
+       next_retry_at = coalesce(next_retry_at, now()),
+       last_error = coalesce(last_error, 'Legacy invitation status required repair during schema migration')
+ WHERE status NOT IN ('registered', 'activated', 'processing', 'failed', 'settled', 'dead_letter');
+UPDATE invitations
+   SET activated_at = coalesce(activated_at, registered_at),
+       status = 'failed',
+       next_retry_at = coalesce(next_retry_at, now()),
+       last_error = coalesce(last_error, 'Invitation activation snapshot is missing or invalid')
+ WHERE status IN ('activated', 'processing', 'failed', 'dead_letter')
+   AND (settings_snapshot IS NULL OR jsonb_typeof(settings_snapshot) <> 'object');
+UPDATE invitations SET activated_at = coalesce(activated_at, registered_at) WHERE status = 'settled';
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_status_check;
+ALTER TABLE invitations ADD CONSTRAINT invitations_status_check
+  CHECK (status IN ('registered', 'activated', 'processing', 'failed', 'settled', 'dead_letter'));
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_attempt_count_check;
+ALTER TABLE invitations ADD CONSTRAINT invitations_attempt_count_check CHECK (attempt_count >= 0);
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_state_timestamps_check;
+ALTER TABLE invitations ADD CONSTRAINT invitations_state_timestamps_check CHECK (
+  (status = 'registered' AND activated_at IS NULL AND settled_at IS NULL AND dead_lettered_at IS NULL)
+  OR (status IN ('activated', 'failed') AND activated_at IS NOT NULL AND settled_at IS NULL AND dead_lettered_at IS NULL)
+  OR (status = 'processing' AND activated_at IS NOT NULL AND settled_at IS NULL AND processing_started_at IS NOT NULL AND dead_lettered_at IS NULL)
+  OR (status = 'settled' AND activated_at IS NOT NULL AND settled_at IS NOT NULL AND dead_lettered_at IS NULL)
+  OR (status = 'dead_letter' AND activated_at IS NOT NULL AND settled_at IS NULL AND dead_lettered_at IS NOT NULL)
+);
+ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_snapshot_shape_check;
+ALTER TABLE invitations ADD CONSTRAINT invitations_snapshot_shape_check CHECK (
+  status = 'registered' OR (jsonb_typeof(settings_snapshot) = 'object' AND settings_snapshot->>'version' = '2')
+);
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_registered_cursor
   ON invitations(inviter_user_id, registered_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_rewarded
   ON invitations(inviter_user_id, inviter_rewarded_at)
   WHERE inviter_rewarded_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_invitations_pending_settlement
-  ON invitations(activated_at ASC, id ASC)
-  WHERE status = 'activated';
+  ON invitations(next_retry_at ASC, activated_at ASC, id ASC)
+  WHERE status IN ('activated', 'failed', 'processing');
 UPDATE invitations
    SET inviter_rewarded_at = settled_at
  WHERE inviter_rewarded_at IS NULL
@@ -501,17 +638,70 @@ UPDATE invitations
 CREATE TABLE IF NOT EXISTS admin_registration_invitations (
   id TEXT PRIMARY KEY,
   code_hash TEXT NOT NULL UNIQUE,
+  created_by TEXT NOT NULL DEFAULT 'legacy',
+  create_reason TEXT NOT NULL DEFAULT 'Legacy invitation',
+  idempotency_key TEXT,
+  request_hash TEXT,
+  code_ciphertext TEXT,
+  code_iv TEXT,
+  code_auth_tag TEXT,
+  code_recoverable_until TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   consumed_at TIMESTAMPTZ,
   consumed_by_user_id TEXT REFERENCES user_accounts(id) ON DELETE SET NULL,
   revoked_at TIMESTAMPTZ,
+  revoked_by TEXT,
+  revoke_reason TEXT,
   CHECK (consumed_at IS NULL OR revoked_at IS NULL)
 );
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT 'legacy';
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS create_reason TEXT NOT NULL DEFAULT 'Legacy invitation';
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS request_hash TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS code_ciphertext TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS code_iv TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS code_auth_tag TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS code_recoverable_until TIMESTAMPTZ;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS revoked_by TEXT;
+ALTER TABLE admin_registration_invitations ADD COLUMN IF NOT EXISTS revoke_reason TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_admin_registration_invitations_idempotency
+  ON admin_registration_invitations(created_by, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_admin_registration_invitations_created
   ON admin_registration_invitations(created_at DESC, id ASC);
 CREATE INDEX IF NOT EXISTS idx_admin_registration_invitations_status
   ON admin_registration_invitations(consumed_at, revoked_at, expires_at, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS admin_registration_invitation_audit (
+  id TEXT PRIMARY KEY,
+  invitation_id TEXT NOT NULL,
+  admin_username TEXT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('create', 'revoke', 'resend_verification', 'replay_settlement')),
+  reason TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  before_json JSONB,
+  after_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_registration_invitation_audit_invitation
+  ON admin_registration_invitation_audit(invitation_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS admin_invitation_verification_outbox (
+  id TEXT PRIMARY KEY,
+  invitation_id TEXT NOT NULL UNIQUE REFERENCES admin_registration_invitations(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'dead_letter')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_attempt_at TIMESTAMPTZ NOT NULL,
+  lease_token TEXT,
+  lease_expires_at TIMESTAMPTZ,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_invitation_verification_outbox_due
+  ON admin_invitation_verification_outbox(status, next_attempt_at, created_at);
 
 CREATE TABLE IF NOT EXISTS reward_grants (
   id TEXT PRIMARY KEY,
@@ -820,6 +1010,55 @@ CREATE INDEX IF NOT EXISTS idx_user_game_accounts_commercial_page
   ON user_game_accounts(user_id, archived_at, created_at DESC, id DESC)
   WHERE kind = 'metered_commercial';
 
+CREATE TABLE IF NOT EXISTS metered_billing_quotes (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  profile_id TEXT NOT NULL REFERENCES user_game_accounts(id) ON DELETE CASCADE,
+  billing_kind TEXT NOT NULL CHECK (billing_kind IN ('metered_personal', 'metered_commercial')),
+  pricing_version TEXT NOT NULL,
+  tier INTEGER CHECK (tier BETWEEN 1 AND 4),
+  list_price NUMERIC(20,2) NOT NULL CHECK (list_price > 0),
+  discount_bps INTEGER NOT NULL CHECK (discount_bps BETWEEN 0 AND 10000),
+  charge NUMERIC(20,2) NOT NULL CHECK (charge > 0),
+  expires_at TIMESTAMPTZ NOT NULL,
+  admitted_job_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  confirmed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_metered_billing_quotes_expiry
+  ON metered_billing_quotes(expires_at) WHERE admitted_job_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_metered_billing_quotes_admitted_job
+  ON metered_billing_quotes(admitted_job_id) WHERE admitted_job_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS billing_reconciliation_cases (
+  id TEXT PRIMARY KEY,
+  anomaly_key TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL CHECK (kind IN ('orphan_reservation', 'reservation_job_mismatch', 'account_projection_mismatch')),
+  status TEXT NOT NULL CHECK (status IN ('pending_review', 'resolved')),
+  user_id TEXT REFERENCES user_accounts(id) ON DELETE SET NULL,
+  job_id TEXT,
+  reservation_id TEXT,
+  detail_json JSONB NOT NULL,
+  resolution_json JSONB,
+  first_seen_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL,
+  resolved_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_billing_reconciliation_cases_status_seen
+  ON billing_reconciliation_cases(status, last_seen_at DESC);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_balance_reservations_job') THEN
+    ALTER TABLE user_balance_reservations ADD CONSTRAINT fk_balance_reservations_job
+      FOREIGN KEY (job_id) REFERENCES optimize_jobs(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_balance_reservations_profile') THEN
+    ALTER TABLE user_balance_reservations ADD CONSTRAINT fk_balance_reservations_profile
+      FOREIGN KEY (profile_id) REFERENCES user_game_accounts(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS metered_personal_claims (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,
   profile_id TEXT NOT NULL,
@@ -888,77 +1127,6 @@ CREATE TABLE IF NOT EXISTS user_profile_workspaces (
   record_json JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
-
--- goofish:migration-phase
--- Workspaces store newest saved configurations and history entries first.  Trim
--- pre-existing records once the lower retention policy is deployed, while
--- leaving malformed legacy fields to the application normalizer.
-WITH workspace_retention AS (
-  SELECT
-    profile_id,
-    record_json,
-    CASE
-      WHEN jsonb_typeof(record_json->'saved_configs') = 'array'
-        THEN jsonb_array_length(record_json->'saved_configs')
-      ELSE 0
-    END AS saved_config_count,
-    CASE
-      WHEN jsonb_typeof(record_json->'result_history') = 'array'
-        THEN jsonb_array_length(record_json->'result_history')
-      ELSE 0
-    END AS result_history_count
-  FROM user_profile_workspaces
-),
-trimmed_saved_configs AS (
-  SELECT
-    profile_id,
-    saved_config_count,
-    result_history_count,
-    CASE
-      WHEN saved_config_count > ${WORKSPACE_SAVED_CONFIG_LIMIT} THEN jsonb_set(
-        record_json,
-        '{saved_configs}',
-        (
-          SELECT COALESCE(jsonb_agg(item.value ORDER BY item.ordinality), '[]'::jsonb)
-          FROM jsonb_array_elements(record_json->'saved_configs') WITH ORDINALITY AS item(value, ordinality)
-          WHERE item.ordinality <= ${WORKSPACE_SAVED_CONFIG_LIMIT}
-        ),
-        true
-      )
-      ELSE record_json
-    END AS record_json
-  FROM workspace_retention
-),
-trimmed_workspace_history AS (
-  SELECT
-    profile_id,
-    CASE
-      WHEN result_history_count > ${WORKSPACE_RESULT_HISTORY_LIMIT} THEN jsonb_set(
-        record_json,
-        '{result_history}',
-        (
-          SELECT COALESCE(jsonb_agg(item.value ORDER BY item.ordinality), '[]'::jsonb)
-          FROM jsonb_array_elements(record_json->'result_history') WITH ORDINALITY AS item(value, ordinality)
-          WHERE item.ordinality <= ${WORKSPACE_RESULT_HISTORY_LIMIT}
-        ),
-        true
-      )
-      ELSE record_json
-    END AS record_json
-  FROM trimmed_saved_configs
-  WHERE saved_config_count > ${WORKSPACE_SAVED_CONFIG_LIMIT}
-     OR result_history_count > ${WORKSPACE_RESULT_HISTORY_LIMIT}
-)
-UPDATE user_profile_workspaces AS workspace
-SET record_json = jsonb_set(
-      trimmed.record_json,
-      '{updated_at}',
-      to_jsonb(to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
-      true
-    ),
-    updated_at = now()
-FROM trimmed_workspace_history AS trimmed
-WHERE workspace.profile_id = trimmed.profile_id;
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS profile_entitlements (
@@ -1064,9 +1232,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_optimize_jobs_free_owner_active
 CREATE TABLE IF NOT EXISTS user_announcement_reads (
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
   announcement_id TEXT NOT NULL,
+  announcement_version TIMESTAMPTZ,
   read_at TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (user_id, announcement_id)
 );
+ALTER TABLE user_announcement_reads ADD COLUMN IF NOT EXISTS announcement_version TIMESTAMPTZ;
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS user_notifications (
@@ -1084,6 +1254,15 @@ CREATE TABLE IF NOT EXISTS user_notifications (
   updated_at TIMESTAMPTZ NOT NULL,
   UNIQUE (user_id, type, source_type, source_id)
 );
+ALTER TABLE user_notifications DROP CONSTRAINT IF EXISTS user_notifications_type_check;
+ALTER TABLE user_notifications ADD CONSTRAINT user_notifications_type_check
+  CHECK (type = 'item_grant') NOT VALID;
+ALTER TABLE user_notifications DROP CONSTRAINT IF EXISTS user_notifications_action_kind_check;
+ALTER TABLE user_notifications ADD CONSTRAINT user_notifications_action_kind_check
+  CHECK (action_kind = 'inventory') NOT VALID;
+ALTER TABLE user_notifications DROP CONSTRAINT IF EXISTS user_notifications_payload_kind_check;
+ALTER TABLE user_notifications ADD CONSTRAINT user_notifications_payload_kind_check
+  CHECK (payload_json->>'kind' = type AND jsonb_typeof(payload_json->'items') = 'array') NOT VALID;
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_updated
   ON user_notifications(user_id, updated_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_unread
@@ -1091,6 +1270,14 @@ CREATE INDEX IF NOT EXISTS idx_user_notifications_user_unread
 
 CREATE TABLE IF NOT EXISTS depot_value_samples (
   uid_hash TEXT PRIMARY KEY,
+  uid_hash_key_version TEXT NOT NULL DEFAULT 'legacy',
+  version INTEGER NOT NULL DEFAULT 1,
+  valuation_version TEXT,
+  pricing_snapshot_id TEXT,
+  pricing_fetched_at TIMESTAMPTZ,
+  pricing_status TEXT,
+  pricing_coverage NUMERIC,
+  complete BOOLEAN NOT NULL DEFAULT FALSE,
   total_equivalent_sanity NUMERIC NOT NULL,
   account_level INTEGER,
   operator_power_score NUMERIC NOT NULL,
@@ -1172,7 +1359,20 @@ UPDATE optimize_jobs
 SET payload_json = payload_json - 'activeProfile' - 'previewWorkspaceForGeneration'
 WHERE payload_json ? 'activeProfile' OR payload_json ? 'previewWorkspaceForGeneration';
 ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS contributor_profile_id TEXT;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS uid_hash_key_version TEXT NOT NULL DEFAULT 'legacy';
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS valuation_version TEXT;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS pricing_snapshot_id TEXT;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS pricing_fetched_at TIMESTAMPTZ;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS pricing_status TEXT;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS pricing_coverage NUMERIC;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS complete BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_depot_value_samples_contributor_profile_id ON depot_value_samples(contributor_profile_id);
+CREATE INDEX IF NOT EXISTS idx_depot_value_samples_valuation_total
+  ON depot_value_samples(valuation_version, total_equivalent_sanity) WHERE complete = true;
+UPDATE depot_value_samples SET contributor_profile_id = NULL
+ WHERE contributor_profile_id IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM user_game_accounts WHERE id = depot_value_samples.contributor_profile_id);
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_usage_events_user') THEN
@@ -1187,7 +1387,88 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_depot_samples_profile') THEN
     ALTER TABLE depot_value_samples ADD CONSTRAINT fk_depot_samples_profile FOREIGN KEY (contributor_profile_id) REFERENCES user_game_accounts(id) ON DELETE CASCADE NOT VALID;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_nonnegative_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_nonnegative_check CHECK (
+      total_equivalent_sanity >= 0 AND operator_power_score >= 0
+      AND operator_count >= 0 AND elite2_count >= 0 AND six_star_count >= 0
+      AND six_star_e2_count >= 0 AND e2_90_count >= 0
+      AND inventory_item_count >= 0 AND priced_count >= 0 AND unpriced_count >= 0
+    ) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_count_consistency_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_count_consistency_check
+      CHECK (priced_count + unpriced_count = inventory_item_count) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_version_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_version_check CHECK (
+      version IN (1, 2)
+      AND (pricing_coverage IS NULL OR pricing_coverage BETWEEN 0 AND 1)
+      AND (complete = false OR (
+        version = 2 AND valuation_version IS NOT NULL AND pricing_snapshot_id IS NOT NULL
+        AND pricing_fetched_at IS NOT NULL AND pricing_status IN ('fresh', 'stale')
+      ))
+    ) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_account_level_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_account_level_check
+      CHECK (account_level IS NULL OR account_level >= 0) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_safe_numeric_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_safe_numeric_check CHECK (
+      total_equivalent_sanity <= 9007199254740991
+      AND operator_power_score <= 9007199254740991
+    ) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_complete_metadata_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_complete_metadata_check CHECK (
+      complete = false OR ((
+        version = 2
+        AND nullif(btrim(uid_hash_key_version), '') IS NOT NULL
+        AND nullif(btrim(valuation_version), '') IS NOT NULL
+        AND nullif(btrim(pricing_snapshot_id), '') IS NOT NULL
+        AND pricing_fetched_at IS NOT NULL
+        AND pricing_status IN ('fresh', 'stale')
+        AND pricing_coverage BETWEEN 0.8 AND 1
+      ) IS TRUE)
+    ) NOT VALID;
+  END IF;
 END $$;
+DO $$
+DECLARE invalid_sample_count BIGINT;
+BEGIN
+  SELECT count(*) INTO invalid_sample_count
+    FROM depot_value_samples
+   WHERE total_equivalent_sanity < 0
+      OR total_equivalent_sanity > 9007199254740991
+      OR operator_power_score < 0
+      OR operator_power_score > 9007199254740991
+      OR account_level < 0
+      OR operator_count < 0 OR elite2_count < 0 OR six_star_count < 0
+      OR six_star_e2_count < 0 OR e2_90_count < 0
+      OR inventory_item_count < 0 OR priced_count < 0 OR unpriced_count < 0
+      OR priced_count + unpriced_count <> inventory_item_count
+      OR version NOT IN (1, 2)
+      OR pricing_coverage < 0 OR pricing_coverage > 1
+      OR (complete = true AND ((
+        version = 2
+        AND nullif(btrim(uid_hash_key_version), '') IS NOT NULL
+        AND nullif(btrim(valuation_version), '') IS NOT NULL
+        AND nullif(btrim(pricing_snapshot_id), '') IS NOT NULL
+        AND pricing_fetched_at IS NOT NULL
+        AND pricing_status IN ('fresh', 'stale')
+        AND pricing_coverage BETWEEN 0.8 AND 1
+      ) IS NOT TRUE));
+  IF invalid_sample_count > 0 THEN
+    RAISE EXCEPTION 'invalid depot value samples must be repaired before constraint validation: % row(s)', invalid_sample_count;
+  END IF;
+END $$;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT fk_depot_samples_profile;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_nonnegative_check;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_count_consistency_check;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_version_check;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_account_level_check;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_safe_numeric_check;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_complete_metadata_check;
 
 -- goofish:migration-phase
 ALTER TABLE user_accounts ALTER COLUMN cdk_key DROP NOT NULL;
@@ -1214,6 +1495,17 @@ CREATE TABLE IF NOT EXISTS item_definitions (
 ALTER TABLE item_definitions DROP CONSTRAINT IF EXISTS item_definitions_kind_check;
 ALTER TABLE item_definitions ADD CONSTRAINT item_definitions_kind_check
   CHECK (kind IN ('consumable', 'capacity_upgrade', 'gift_pack', 'cosmetic', 'badge', 'license_voucher'));
+ALTER TABLE item_definitions DROP CONSTRAINT IF EXISTS item_definitions_effect_kind_check;
+ALTER TABLE item_definitions ADD CONSTRAINT item_definitions_effect_kind_check CHECK (
+  (kind = 'consumable' AND effect_code IN (
+    'priority_compute', 'reorder_check', 'scenario_simulation', 'training_diagnosis',
+    'additional_recompute', 'maa_export_trial'
+  ))
+  OR (kind = 'capacity_upgrade' AND effect_code IN ('plan_capacity', 'history_capacity', 'result_archive_capacity'))
+  OR (kind = 'gift_pack' AND effect_code = 'open_gift_pack')
+  OR (kind = 'license_voucher' AND effect_code IN ('bind_lifetime_profile', 'activate_limited_profile'))
+  OR (kind IN ('cosmetic', 'badge') AND effect_code IS NULL)
+);
 
 CREATE TABLE IF NOT EXISTS gift_pack_versions (
   id TEXT PRIMARY KEY,
@@ -1241,7 +1533,14 @@ ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS reference_id TEXT;
 ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS profile_id TEXT;
 ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS committed_at TIMESTAMPTZ;
 ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS refunded_grant_id TEXT;
+ALTER TABLE reward_consumptions ADD COLUMN IF NOT EXISTS original_expires_at TIMESTAMPTZ;
 ALTER TABLE reward_consumptions ALTER COLUMN optimization_job_id DROP NOT NULL;
+UPDATE reward_consumptions consumption
+   SET original_expires_at = source_grant.expires_at
+  FROM reward_grants source_grant
+ WHERE source_grant.id = consumption.grant_id
+   AND consumption.original_expires_at IS NULL
+   AND source_grant.expires_at IS NOT NULL;
 UPDATE reward_consumptions
 SET reference_type = coalesce(reference_type, 'optimization_job'),
     reference_id = coalesce(reference_id, optimization_job_id),
@@ -1309,6 +1608,18 @@ CREATE TABLE IF NOT EXISTS inventory_operations (
   created_at TIMESTAMPTZ NOT NULL,
   completed_at TIMESTAMPTZ,
   UNIQUE (user_id, idempotency_key)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_admin_operations (
+  id TEXT PRIMARY KEY,
+  admin_username TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  operation_type TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  response_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  UNIQUE (admin_username, idempotency_key)
 );
 
 -- goofish:migration-phase
@@ -1450,7 +1761,7 @@ CREATE TABLE IF NOT EXISTS inventory_distribution_campaigns (
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   validity_days INTEGER NOT NULL CHECK (validity_days >= 0 AND validity_days <= 3650),
   target_mode TEXT NOT NULL CHECK (target_mode IN ('user_ids', 'all_users')),
-  status TEXT NOT NULL CHECK (status IN ('draft', 'queued', 'running', 'paused', 'completed', 'cancelled', 'reversing', 'reversed')),
+  status TEXT NOT NULL CHECK (status IN ('draft', 'queued', 'running', 'paused', 'completed', 'completed_with_failures', 'cancelled', 'reversing', 'reversed')),
   reason TEXT NOT NULL,
   created_by TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
@@ -1463,9 +1774,19 @@ CREATE TABLE IF NOT EXISTS inventory_distribution_recipients (
   status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'granted', 'failed', 'revoked', 'skipped')),
   grant_id TEXT REFERENCES reward_grants(id) ON DELETE SET NULL,
   error_message TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   processed_at TIMESTAMPTZ,
   PRIMARY KEY (campaign_id, user_id)
 );
+ALTER TABLE inventory_distribution_recipients
+  ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE inventory_distribution_recipients
+  ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE inventory_distribution_recipients
+  DROP CONSTRAINT IF EXISTS inventory_distribution_recipients_attempt_count_check;
+ALTER TABLE inventory_distribution_recipients
+  ADD CONSTRAINT inventory_distribution_recipients_attempt_count_check CHECK (attempt_count >= 0);
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -1481,8 +1802,23 @@ BEGIN
       CHECK (status IN ('pending', 'processing', 'granted', 'failed', 'revoked', 'skipped'));
   END IF;
 END $$;
-CREATE INDEX IF NOT EXISTS idx_inventory_distribution_pending
-  ON inventory_distribution_recipients(campaign_id, status, user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'inventory_distribution_campaigns_status_check'
+       AND conrelid = 'inventory_distribution_campaigns'::regclass
+       AND pg_get_constraintdef(oid) LIKE '%completed_with_failures%'
+  ) THEN
+    ALTER TABLE inventory_distribution_campaigns
+      DROP CONSTRAINT IF EXISTS inventory_distribution_campaigns_status_check;
+    ALTER TABLE inventory_distribution_campaigns
+      ADD CONSTRAINT inventory_distribution_campaigns_status_check
+      CHECK (status IN ('draft', 'queued', 'running', 'paused', 'completed', 'completed_with_failures', 'cancelled', 'reversing', 'reversed'));
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_inventory_distribution_ready
+  ON inventory_distribution_recipients(campaign_id, status, next_attempt_at, user_id);
 
 CREATE TABLE IF NOT EXISTS behavior_risk_events (
   id TEXT PRIMARY KEY,
@@ -1653,6 +1989,7 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'user_balance_qualification_ledger',
   'commercial_account_limits',
   'user_notifications',
+  'inventory_admin_operations',
 ])
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'

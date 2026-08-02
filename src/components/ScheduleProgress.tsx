@@ -22,6 +22,7 @@ export interface ScheduleProgressState {
   queuePosition?: number | null;
   priority?: OptimizeJobPriority;
   jobId?: string;
+  historyResultId?: string;
   observedRunning?: boolean;
   percentFloor?: number;
   lastUpdatedAt?: number;

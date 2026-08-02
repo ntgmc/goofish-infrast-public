@@ -1,4 +1,6 @@
 import type { OptimizeResult } from '../../../src/lib/types';
+import { ZodError } from 'zod';
+import { parseOptimizeResult } from './runtime-contracts';
 
 const MAA_EXPORT_ROOM_TYPES = [
   'trading',
@@ -50,11 +52,31 @@ export interface MaaExportPayload {
   plans: MaaExportPlan[];
 }
 
+export class MaaExportValidationError extends Error {
+  readonly code = 'maa_export_result_invalid'
+
+  constructor(message: string) {
+    super(message)
+    this.name = 'MaaExportValidationError'
+  }
+}
+
 export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload {
+  let validated: OptimizeResult
+  try {
+    validated = parseOptimizeResult(result)
+  } catch (error) {
+    const issue = error instanceof ZodError ? error.issues[0] : null
+    const path = issue?.path.length ? issue.path.join('.') : 'result'
+    throw new MaaExportValidationError(`排班结果无法导出：${path} ${issue?.message ?? '结构无效'}。`)
+  }
+  if (!validated.title.trim()) throw new MaaExportValidationError('排班结果无法导出：title 不能为空。')
+  if (validated.plans.length === 0) throw new MaaExportValidationError('排班结果无法导出：plans 不能为空。')
+
   return {
-    title: result.title,
-    description: result.description,
-    plans: (result.plans ?? []).map((planValue) => {
+    title: validated.title,
+    description: validated.description,
+    plans: validated.plans.map((planValue, planIndex) => {
       const plan = planValue as unknown as Record<string, unknown>;
       const roomsValue = isRecord(plan.rooms) ? plan.rooms : {};
       const rooms: MaaExportPlan['rooms'] = {};
@@ -63,6 +85,10 @@ export function buildMaaExportPayload(result: OptimizeResult): MaaExportPayload 
         const roomList = roomsValue[roomType];
         if (!Array.isArray(roomList)) continue;
         rooms[roomType] = roomList.map(projectRoom);
+      }
+
+      if (Object.keys(rooms).length === 0) {
+        throw new MaaExportValidationError(`排班结果无法导出：plans.${planIndex}.rooms 不包含可执行房间。`)
       }
 
       const projected: MaaExportPlan = {

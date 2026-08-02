@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_DEPOT_ITEM_TYPES } from '../../src/lib/depot-value-constraints'
 import { REQUEST_BODY_LIMITS, type RequestBodyProfile } from './request-policy'
 
 const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
@@ -109,7 +110,7 @@ function sortJsonValue(value: unknown): unknown {
 
 function assertJsonComplexity(value: unknown, profile: RequestBodyProfile): void {
   const budget = profile === 'depot'
-    ? { depth: 24, nodes: 50_000, objectKeys: 512, arrayItems: 20_000 }
+    ? { depth: 24, nodes: 150_000, objectKeys: MAX_DEPOT_ITEM_TYPES, arrayItems: MAX_DEPOT_ITEM_TYPES }
     : profile === 'compute'
       ? { depth: 24, nodes: 20_000, objectKeys: 256, arrayItems: 5_000 }
       : { depth: 24, nodes: 10_000, objectKeys: 256, arrayItems: 2_000 }

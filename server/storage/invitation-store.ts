@@ -1,5 +1,6 @@
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
+import { z } from 'zod'
 import type {
   InvitationExpiryPolicy,
   InvitationGiftPackSummary,
@@ -13,9 +14,10 @@ import type {
   InviterRewardStatus,
 } from '../../src/lib/types'
 import { saveUserAccountInTransaction } from './cdk-redemption'
-import { grantItemInTransaction, InventoryError } from './inventory-store'
+import { grantItemsInTransaction, InventoryError } from './inventory-store'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import { SettingsConflictError } from './settings-conflict'
 import type { UserAccountRecord } from './user-store'
 
 const PRIORITY_COMPUTE_COUPON = 'priority_compute_coupon' as const
@@ -23,6 +25,9 @@ const INVITATION_SETTINGS_KEY = 'global'
 const INVITE_CODE_LENGTH = 10
 const MAX_REWARDS_PER_RECIPIENT = 16
 const MAX_REWARDS = 32
+const MAX_SETTLEMENT_ATTEMPTS = 5
+const SETTLEMENT_LEASE_MS = 5 * 60 * 1000
+const INVITE_CODE_ROTATION_COOLDOWN_MS = 24 * 60 * 60 * 1000
 const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 
 export type InvitationSettingsPatch = Partial<Pick<InvitationSettings, 'enabled' | 'daily_inviter_reward_limit' | 'rewards'>>
@@ -32,7 +37,7 @@ export interface ValidatedInvitationCode {
   inviter_user_id: string
 }
 
-export interface RewardBalance {
+export interface PriorityCouponBalance {
   type: typeof PRIORITY_COMPUTE_COUPON
   available: number
   permanent: number
@@ -41,7 +46,7 @@ export interface RewardBalance {
 
 export class InvitationCodeError extends Error {
   constructor(
-    readonly code: 'invalid_invite_code' | 'invitation_campaign_paused' | 'invalid_cursor',
+    readonly code: 'invalid_invite_code' | 'invitation_campaign_paused' | 'invalid_cursor' | 'rotation_cooldown',
     message: string,
   ) {
     super(message)
@@ -51,6 +56,7 @@ export class InvitationCodeError extends Error {
 
 export const DEFAULT_INVITATION_SETTINGS: InvitationSettings = {
   version: 2,
+  revision: 0,
   enabled: true,
   activation_rule: 'first_active_profile',
   daily_inviter_reward_limit: 10,
@@ -62,6 +68,33 @@ export const DEFAULT_INVITATION_SETTINGS: InvitationSettings = {
     gift_pack_version_id: null,
   }],
   updated_at: null,
+}
+
+const invitationExpirySnapshotSchema = z.discriminatedUnion('mode', [
+  z.strictObject({ mode: z.literal('never') }),
+  z.strictObject({ mode: z.literal('relative_days'), days: z.number().int().min(1).max(3650) }),
+])
+const invitationRewardSnapshotSchema = z.strictObject({
+  recipient: z.enum(['inviter', 'invitee']),
+  item_code: z.string().trim().min(1).max(128),
+  quantity: z.number().int().min(1).max(10_000),
+  expiry: invitationExpirySnapshotSchema,
+  gift_pack_version_id: z.string().trim().min(1).max(128).nullable(),
+})
+const invitationSettingsSnapshotSchema = z.strictObject({
+  version: z.literal(2),
+  revision: z.number().int().nonnegative(),
+  enabled: z.boolean(),
+  activation_rule: z.literal('first_active_profile'),
+  daily_inviter_reward_limit: z.number().int().min(1).max(1000),
+  rewards: z.array(invitationRewardSnapshotSchema).max(MAX_REWARDS),
+  updated_at: z.string().datetime().nullable(),
+})
+
+function parseInvitationSettingsSnapshot(value: unknown): InvitationSettings {
+  const parsed = invitationSettingsSnapshotSchema.safeParse(value)
+  if (!parsed.success) throw new Error(`Invitation settings snapshot is invalid: ${parsed.error.issues[0]?.message ?? 'unknown schema error'}`)
+  return parsed.data
 }
 
 let schemaReady: Promise<void> | null = null
@@ -80,6 +113,7 @@ export function normalizeInvitationSettings(value: unknown): InvitationSettings 
     : normalizeLegacyRewards(source.rewards)
   return {
     version: 2,
+    revision: integerInRange(source.revision, 0, Number.MAX_SAFE_INTEGER, 0),
     enabled: source.enabled !== false,
     activation_rule: 'first_active_profile',
     daily_inviter_reward_limit: integerInRange(source.daily_inviter_reward_limit, 1, 1000, 10),
@@ -132,13 +166,42 @@ export function validateInvitationSettingsPatch(value: unknown): InvitationSetti
 
 async function getInvitationSettings(): Promise<InvitationSettings> {
   await ensureSchema()
-  const result = await query<{ record_json: unknown }>('select record_json from invitation_settings where key = $1', [INVITATION_SETTINGS_KEY])
-  return normalizeInvitationSettings(result.rows[0]?.record_json)
+  const result = await query<{ record_json: unknown; revision: number }>(
+    'select record_json, revision from invitation_settings where key = $1',
+    [INVITATION_SETTINGS_KEY],
+  )
+  const row = result.rows[0]
+  return { ...normalizeInvitationSettings(row?.record_json), revision: row?.revision ?? 0 }
+}
+
+async function getInvitationSettingsInTransaction(client: PoolClient): Promise<InvitationSettings> {
+  const result = await client.query<{ record_json: unknown; revision: number }>(
+    'select record_json, revision from invitation_settings where key = $1',
+    [INVITATION_SETTINGS_KEY],
+  )
+  const row = result.rows[0]
+  return { ...normalizeInvitationSettings(row?.record_json), revision: row?.revision ?? 0 }
 }
 
 async function getInvitationRewardCatalog(): Promise<InvitationRewardCatalogItem[]> {
   await ensureSchema()
   const result = await query<{
+    item_code: string
+    name: string
+    description: string
+    kind: InvitationRewardCatalogItem['kind']
+    icon_key: string
+    issuance_enabled: boolean
+    version_id: string | null
+    version: number | null
+    version_status: 'published' | null
+    contents: InvitationGiftPackSummary['contents'] | null
+  }>(catalogQuery())
+  return result.rows.map(catalogRow)
+}
+
+async function getInvitationRewardCatalogInTransaction(client: PoolClient): Promise<InvitationRewardCatalogItem[]> {
+  const result = await client.query<{
     item_code: string
     name: string
     description: string
@@ -166,17 +229,22 @@ export async function getAdminInvitationSettingsOverview(): Promise<{
 export async function saveInvitationSettings(
   adminUsername: string,
   patch: InvitationSettingsPatch,
+  expectedRevision: number,
 ): Promise<InvitationSettings> {
   await ensureSchema()
   return withTransaction(async (client) => {
-    const currentResult = await client.query<{ record_json: unknown }>(
-      'select record_json from invitation_settings where key = $1 for update',
+    const currentResult = await client.query<{ record_json: unknown; revision: number }>(
+      'select record_json, revision from invitation_settings where key = $1 for update',
       [INVITATION_SETTINGS_KEY],
     )
-    const current = normalizeInvitationSettings(currentResult.rows[0]?.record_json)
+    const currentRow = currentResult.rows[0]
+    const currentRevision = currentRow?.revision ?? 0
+    if (currentRevision !== expectedRevision) throw new SettingsConflictError()
+    const current = { ...normalizeInvitationSettings(currentRow?.record_json), revision: currentRevision }
     const rewards = patch.rewards === undefined ? current.rewards : await snapshotRewardRules(client, patch.rewards)
     const next: InvitationSettings = {
       version: 2,
+      revision: currentRevision + 1,
       enabled: patch.enabled ?? current.enabled,
       activation_rule: 'first_active_profile',
       daily_inviter_reward_limit: patch.daily_inviter_reward_limit ?? current.daily_inviter_reward_limit,
@@ -184,12 +252,15 @@ export async function saveInvitationSettings(
       updated_at: new Date().toISOString(),
     }
     if (next.enabled && next.rewards.length === 0) throw new InventoryError('invitation_rewards_missing', '启用邀请活动前至少要为一方配置一项奖励。', 409)
-    await client.query(
-      `insert into invitation_settings (key, record_json, updated_at)
-       values ($1, $2::jsonb, $3)
-       on conflict (key) do update set record_json = excluded.record_json, updated_at = excluded.updated_at`,
-      [INVITATION_SETTINGS_KEY, JSON.stringify(next), next.updated_at],
+    const saved = await client.query(
+      `insert into invitation_settings (key, record_json, updated_at, revision)
+       values ($1, $2::jsonb, $3, $4)
+       on conflict (key) do update
+         set record_json = excluded.record_json, updated_at = excluded.updated_at, revision = excluded.revision
+       where invitation_settings.revision = $5`,
+      [INVITATION_SETTINGS_KEY, JSON.stringify(next), next.updated_at, next.revision, expectedRevision],
     )
+    if (saved.rowCount !== 1) throw new SettingsConflictError()
     await client.query(
       `insert into inventory_admin_audit
         (id, admin_username, action, target_type, target_id, reason, before_json, after_json, created_at)
@@ -232,6 +303,7 @@ export async function validateInvitationCode(value: unknown): Promise<ValidatedI
        from invitation_codes code
        join user_accounts account on account.id = code.user_id and account.status = 'active'
       where code.code = $1
+        and code.status = 'active'
         and exists (
           select 1 from user_game_accounts profile
            where profile.user_id = code.user_id and profile.status = 'active'
@@ -266,20 +338,106 @@ export async function saveInvitationInTransaction(client: PoolClient, inviteeUse
 export async function ensureInvitationCode(userId: string): Promise<string> {
   await ensureSchema()
   if (!(await userCanInvite(userId))) throw new InvitationCodeError('invalid_invite_code', '完成账号激活后才能生成邀请码。')
-  const existing = await query<{ code: string }>('select code from invitation_codes where user_id = $1', [userId])
-  if (existing.rows[0]) return existing.rows[0].code
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const code = createInviteCode()
-    const inserted = await query<{ code: string }>(
-      `insert into invitation_codes (user_id, code, created_at)
-       values ($1, $2, now()) on conflict do nothing returning code`,
-      [userId, code],
-    )
-    if (inserted.rows[0]) return inserted.rows[0].code
-    const concurrent = await query<{ code: string }>('select code from invitation_codes where user_id = $1', [userId])
-    if (concurrent.rows[0]) return concurrent.rows[0].code
+  return withTransaction(async (client) => {
+    const existing = await client.query<{ code: string }>('select code from invitation_codes where user_id = $1 for update', [userId])
+    if (existing.rows[0]) return existing.rows[0].code
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const code = createInviteCode()
+      const now = new Date().toISOString()
+      const inserted = await client.query<{ code: string }>(
+        `insert into invitation_codes (user_id, code, status, created_at, updated_at)
+         values ($1, $2, 'active', $3, $3) on conflict do nothing returning code`,
+        [userId, code, now],
+      )
+      if (inserted.rows[0]) {
+        await insertInvitationCodeAudit(client, userId, 'create', null, code, now)
+        return inserted.rows[0].code
+      }
+      const concurrent = await client.query<{ code: string }>('select code from invitation_codes where user_id = $1 for update', [userId])
+      if (concurrent.rows[0]) return concurrent.rows[0].code
+    }
+    throw new Error('生成邀请码失败，请稍后重试。')
+  })
+}
+
+export async function manageInvitationCode(
+  userId: string,
+  action: 'rotate' | 'pause' | 'resume',
+  now = new Date(),
+): Promise<{ code: string; status: 'active' | 'paused' }> {
+  await ensureSchema()
+  if (action !== 'pause' && !(await userCanInvite(userId))) {
+    throw new InvitationCodeError('invalid_invite_code', '完成账号激活后才能管理邀请码。')
   }
-  throw new Error('生成邀请码失败，请稍后重试。')
+  return withTransaction(async (client) => {
+    const currentResult = await client.query<{
+      code: string
+      status: 'active' | 'paused'
+      rotated_at: string | null
+    }>('select code, status, rotated_at::text from invitation_codes where user_id = $1 for update', [userId])
+    const current = currentResult.rows[0]
+    if (!current) throw new InvitationCodeError('invalid_invite_code', '请先生成邀请码。')
+    const nowIso = now.toISOString()
+    if (action === 'pause' || action === 'resume') {
+      const status = action === 'pause' ? 'paused' : 'active'
+      if (current.status !== status) {
+        await client.query(
+          `update invitation_codes
+              set status = $2,
+                  revoked_at = case when $2 = 'paused' then $3::timestamptz else null end,
+                  updated_at = $3::timestamptz
+            where user_id = $1`,
+          [userId, status, nowIso],
+        )
+        await insertInvitationCodeAudit(client, userId, action, current.code, current.code, nowIso)
+      }
+      return { code: current.code, status }
+    }
+    if (current.rotated_at && now.getTime() - Date.parse(current.rotated_at) < INVITE_CODE_ROTATION_COOLDOWN_MS) {
+      throw new InvitationCodeError('rotation_cooldown', '邀请码每 24 小时最多轮换一次。')
+    }
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const nextCode = createInviteCode()
+      await client.query('savepoint invitation_code_rotation')
+      let updated: { rows: Array<{ code: string }> }
+      try {
+        updated = await client.query<{ code: string }>(
+          `update invitation_codes
+              set code = $2, status = 'active', rotated_at = $3, revoked_at = null, updated_at = $3
+            where user_id = $1
+            returning code`,
+          [userId, nextCode, nowIso],
+        )
+        await client.query('release savepoint invitation_code_rotation')
+      } catch (error) {
+        await client.query('rollback to savepoint invitation_code_rotation')
+        await client.query('release savepoint invitation_code_rotation')
+        if (!isUniqueViolation(error)) throw error
+        continue
+      }
+      if (updated.rows[0]) {
+        await insertInvitationCodeAudit(client, userId, 'rotate', current.code, nextCode, nowIso)
+        return { code: nextCode, status: 'active' }
+      }
+    }
+    throw new Error('轮换邀请码失败，请稍后重试。')
+  })
+}
+
+async function insertInvitationCodeAudit(
+  client: PoolClient,
+  userId: string,
+  action: 'create' | 'rotate' | 'pause' | 'resume',
+  previousCode: string | null,
+  nextCode: string | null,
+  now: string,
+): Promise<void> {
+  await client.query(
+    `insert into invitation_code_audit
+      (id, user_id, action, previous_code_hash, next_code_hash, created_at)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [randomUUID(), userId, action, hashInviteCode(previousCode), hashInviteCode(nextCode), now],
+  )
 }
 
 export async function getInvitationSummary(
@@ -291,75 +449,85 @@ export async function getInvitationSummary(
   const cursor = decodeCursor(options.cursor)
   const now = new Date()
   const nowIso = now.toISOString()
-  const [settings, canInvite, codeResult, catalog, statsResult, recordsResult] = await Promise.all([
-    getInvitationSettings(),
-    userCanInvite(userId),
-    query<{ code: string }>('select code from invitation_codes where user_id = $1', [userId]),
-    getInvitationRewardCatalog(),
-    query<{ registered: string; activated: string; rewarded: string; today_rewarded: string }>(
-      `select count(*)::text as registered,
-              count(*) filter (where activated_at is not null)::text as activated,
-              count(*) filter (where inviter_rewarded_at is not null)::text as rewarded,
-              count(*) filter (where inviter_rewarded_at is not null
-                and (inviter_rewarded_at at time zone 'Asia/Shanghai')::date = ($2::timestamptz at time zone 'Asia/Shanghai')::date)::text as today_rewarded
-         from invitations where inviter_user_id = $1`,
+  return withTransaction(async (client) => {
+    await client.query('set transaction isolation level repeatable read read only')
+    const settings = await getInvitationSettingsInTransaction(client)
+    const canInvite = await userCanInviteInTransaction(client, userId)
+    const codeResult = await client.query<{ code: string; status: 'active' | 'paused' }>(
+      'select code, status from invitation_codes where user_id = $1', [userId],
+    )
+    const catalog = await getInvitationRewardCatalogInTransaction(client)
+    const statsResult = await client.query<{ registered: string; activated: string; rewarded: string; today_rewarded: string }>(
+        `select count(*)::text as registered,
+                count(*) filter (where activated_at is not null)::text as activated,
+                count(*) filter (where inviter_rewarded_at is not null)::text as rewarded,
+                count(*) filter (where inviter_rewarded_at is not null
+                  and (inviter_rewarded_at at time zone 'Asia/Shanghai')::date = ($2::timestamptz at time zone 'Asia/Shanghai')::date)::text as today_rewarded
+           from invitations where inviter_user_id = $1`,
       [userId, nowIso],
-    ),
-    query<{
-      id: string
-      registered_at: string
-      activated_at: string | null
-      status: 'registered' | 'activated' | 'settled'
-      settings_snapshot: unknown
-      settlement_json: unknown
-    }>(
-      `select id, registered_at, activated_at, status, settings_snapshot, settlement_json
-         from invitations
-        where inviter_user_id = $1
-          and ($2::timestamptz is null or (registered_at, id) < ($2::timestamptz, $3::text))
-        order by registered_at desc, id desc limit $4`,
+    )
+    const recordsResult = await client.query<{
+        id: string
+        registered_at: string
+        activated_at: string | null
+        status: InvitationRow['status']
+        settings_snapshot: unknown
+        settlement_json: unknown
+        attempt_count: number
+        next_retry_at: string | null
+        last_error: string | null
+      }>(
+        `select id, registered_at, activated_at, status, settings_snapshot, settlement_json,
+                attempt_count, next_retry_at::text, last_error
+           from invitations
+          where inviter_user_id = $1
+            and ($2::timestamptz is null or (registered_at, id) < ($2::timestamptz, $3::text))
+          order by registered_at desc, id desc limit $4`,
       [userId, cursor?.registered_at ?? null, cursor?.id ?? null, limit + 1],
-    ),
-  ])
-  const code = codeResult.rows[0]?.code ?? null
-  const stats = statsResult.rows[0]
-  const rows = recordsResult.rows.slice(0, limit)
-  const recordSnapshots = rows.map((row) => normalizeInvitationSettings(row.settings_snapshot))
-  const giftPackVersions = await loadGiftPackSummaries([
-    ...settings.rewards,
-    ...recordSnapshots.flatMap((snapshot) => snapshot.rewards),
-  ].flatMap((reward) => reward.gift_pack_version_id ? [reward.gift_pack_version_id] : []))
-  const used = Number(stats?.today_rewarded ?? 0)
-  const previews = previewRewards(settings.rewards, catalog, giftPackVersions)
-  return {
-    can_invite: canInvite && settings.enabled,
-    campaign_enabled: settings.enabled,
-    code,
-    share_url: code ? `/tool/profiles?invite=${encodeURIComponent(code)}` : null,
-    reward_preview: {
-      inviter: previews.filter((item) => item.recipient === 'inviter').map(({ recipient: _recipient, ...item }) => item),
-      invitee: previews.filter((item) => item.recipient === 'invitee').map(({ recipient: _recipient, ...item }) => item),
-    },
-    stats: {
-      registered: Number(stats?.registered ?? 0),
-      activated: Number(stats?.activated ?? 0),
-      rewarded_invitations: Number(stats?.rewarded ?? 0),
-      today_rewarded: used,
-    },
-    daily_limit: {
-      used,
-      limit: settings.daily_inviter_reward_limit,
-      remaining: Math.max(0, settings.daily_inviter_reward_limit - used),
-      reset_at: nextShanghaiMidnight(now),
-    },
-    records: rows.map((row) => invitationRecord(row, settings.enabled, catalog, giftPackVersions)),
-    next_cursor: recordsResult.rows.length > limit && rows.length > 0
-      ? encodeCursor({ registered_at: rows.at(-1)!.registered_at, id: rows.at(-1)!.id })
-      : null,
-  }
+    )
+    const codeRow = codeResult.rows[0]
+    const code = codeRow?.code ?? null
+    const stats = statsResult.rows[0]
+    const rows = recordsResult.rows.slice(0, limit)
+    const recordSnapshots = rows.map((row) => normalizeInvitationSettings(row.settings_snapshot))
+    const giftPackVersions = await loadGiftPackSummariesInTransaction(client, [
+      ...settings.rewards,
+      ...recordSnapshots.flatMap((snapshot) => snapshot.rewards),
+    ].flatMap((reward) => reward.gift_pack_version_id ? [reward.gift_pack_version_id] : []))
+    const used = Number(stats?.today_rewarded ?? 0)
+    const previews = previewRewards(settings.rewards, catalog, giftPackVersions)
+    return {
+      as_of: nowIso,
+      can_invite: canInvite && settings.enabled,
+      campaign_enabled: settings.enabled,
+      code,
+      code_status: codeRow?.status ?? null,
+      share_url: code && codeRow?.status === 'active' ? `/tool/profiles?invite=${encodeURIComponent(code)}` : null,
+      reward_preview: {
+        inviter: previews.filter((item) => item.recipient === 'inviter').map(({ recipient: _recipient, ...item }) => item),
+        invitee: previews.filter((item) => item.recipient === 'invitee').map(({ recipient: _recipient, ...item }) => item),
+      },
+      stats: {
+        registered: Number(stats?.registered ?? 0),
+        activated: Number(stats?.activated ?? 0),
+        rewarded_invitations: Number(stats?.rewarded ?? 0),
+        today_rewarded: used,
+      },
+      daily_limit: {
+        used,
+        limit: settings.daily_inviter_reward_limit,
+        remaining: Math.max(0, settings.daily_inviter_reward_limit - used),
+        reset_at: nextShanghaiMidnight(now),
+      },
+      records: rows.map((row) => invitationRecord(row, settings.enabled, catalog, giftPackVersions)),
+      next_cursor: recordsResult.rows.length > limit && rows.length > 0
+        ? encodeCursor({ registered_at: rows.at(-1)!.registered_at, id: rows.at(-1)!.id })
+        : null,
+    }
+  })
 }
 
-export async function getRewardBalances(userId: string, now = new Date()): Promise<RewardBalance[]> {
+export async function getPriorityCouponBalances(userId: string, now = new Date()): Promise<PriorityCouponBalance[]> {
   await ensureSchema()
   const result = await query<{ available: string; permanent: string; next_expiry_at: string | null }>(
     `select coalesce(sum(remaining_quantity), 0)::text as available,
@@ -379,66 +547,209 @@ export async function getRewardBalances(userId: string, now = new Date()): Promi
   }]
 }
 
-export async function settleInvitationForActivatedUser(userId: string): Promise<void> {
+export async function activateInvitationForUser(userId: string): Promise<boolean> {
   await ensureSchema()
-  await withTransaction(async (client) => {
+  return withTransaction(async (client) => {
     const invitationResult = await client.query<InvitationRow>(
-      `select id, inviter_user_id, invitee_user_id, status, activated_at, settings_snapshot
+      `select id, inviter_user_id, invitee_user_id, status, activated_at, settings_snapshot,
+              attempt_count, next_retry_at, processing_started_at, last_error, dead_lettered_at
          from invitations where invitee_user_id = $1 for update`,
       [userId],
     )
     const invitation = invitationResult.rows[0]
-    if (!invitation || invitation.status === 'settled') return
-    if (!(await userHasActiveProfile(client, userId))) return
-    let snapshot = invitation.settings_snapshot ? normalizeInvitationSettings(invitation.settings_snapshot) : null
-    if (!snapshot) {
-      const settingsResult = await client.query<{ record_json: unknown }>(
-        'select record_json from invitation_settings where key = $1', [INVITATION_SETTINGS_KEY],
-      )
-      snapshot = normalizeInvitationSettings(settingsResult.rows[0]?.record_json)
-      const activatedAt = invitation.activated_at ?? new Date().toISOString()
-      await client.query(
-        `update invitations set status = 'activated', activated_at = $2, settings_snapshot = $3::jsonb, updated_at = $2 where id = $1`,
-        [invitation.id, activatedAt, JSON.stringify(snapshot)],
-      )
-      invitation.status = 'activated'
-      invitation.activated_at = activatedAt
-      invitation.settings_snapshot = snapshot
-    }
-    if (!snapshot.enabled) return
-    await settleInvitationInTransaction(client, invitation, snapshot)
+    if (!invitation || invitation.status !== 'registered') return false
+    if (!(await userHasActiveProfile(client, userId))) return false
+    const snapshot = await getInvitationSettingsInTransaction(client)
+    const activatedAt = new Date().toISOString()
+    await client.query(
+      `update invitations
+          set status = 'activated', activated_at = $2, settings_snapshot = $3::jsonb,
+              next_retry_at = $2, updated_at = $2
+        where id = $1 and status = 'registered'`,
+      [invitation.id, activatedAt, JSON.stringify(snapshot)],
+    )
+    return true
   })
 }
 
 export async function processInvitationSettlementBatch(limit = 100): Promise<number> {
   await ensureSchema()
+  const batchLimit = Math.max(1, Math.min(limit, 100))
+  await reconcileRegisteredInvitations(batchLimit)
   const settings = await getInvitationSettings()
   if (!settings.enabled) return 0
   let processed = 0
-  for (let index = 0; index < Math.max(1, Math.min(limit, 100)); index += 1) {
-    const claimed = await withTransaction(async (client) => {
-      const currentSettings = await client.query<{ record_json: unknown }>(
-        'select record_json from invitation_settings where key = $1', [INVITATION_SETTINGS_KEY],
-      )
-      if (!normalizeInvitationSettings(currentSettings.rows[0]?.record_json).enabled) return false
-      const result = await client.query<InvitationRow>(
-        `select id, inviter_user_id, invitee_user_id, status, activated_at, settings_snapshot
-           from invitations
-          where id = (
-            select id from invitations where status = 'activated'
-             order by activated_at asc, id asc for update skip locked limit 1
-          ) for update`,
-      )
-      const invitation = result.rows[0]
-      if (!invitation) return false
-      const snapshot = normalizeInvitationSettings(invitation.settings_snapshot)
-      await settleInvitationInTransaction(client, invitation, snapshot)
-      return true
-    })
+  for (let index = 0; index < batchLimit; index += 1) {
+    const claimed = await claimInvitationSettlement()
     if (!claimed) break
+    try {
+      await withTransaction(async (client) => {
+        const result = await client.query<InvitationRow>(
+          `select id, inviter_user_id, invitee_user_id, status, activated_at, settings_snapshot,
+                  attempt_count, next_retry_at, processing_started_at, last_error, dead_lettered_at
+             from invitations
+            where id = $1 and status = 'processing' and attempt_count = $2
+            for update`,
+          [claimed.id, claimed.attempt_count],
+        )
+        const invitation = result.rows[0]
+        if (!invitation) return
+        await settleInvitationInTransaction(client, invitation, parseInvitationSettingsSnapshot(invitation.settings_snapshot))
+      })
+    } catch (error) {
+      await recordInvitationSettlementFailure(claimed, error)
+    }
     processed += 1
   }
   return processed
+}
+
+export async function replayInvitationSettlement(
+  adminUsername: string,
+  invitationId: string,
+  reason: string,
+  now = new Date(),
+): Promise<boolean> {
+  await ensureSchema()
+  return withTransaction(async (client) => {
+    const before = await client.query<{
+      status: InvitationRow['status']
+      attempt_count: number
+      last_error: string | null
+      dead_lettered_at: string | null
+    }>(
+      `select status, attempt_count, last_error, dead_lettered_at::text
+         from invitations where id = $1 for update`,
+      [invitationId],
+    )
+    const current = before.rows[0]
+    if (!current || (current.status !== 'failed' && current.status !== 'dead_letter')) return false
+    const nowIso = now.toISOString()
+    await client.query(
+      `update invitations
+          set status = 'activated', attempt_count = 0, next_retry_at = $2,
+              processing_started_at = null, last_error = null, dead_lettered_at = null, updated_at = $2
+        where id = $1`,
+      [invitationId, nowIso],
+    )
+    const requestHash = createHash('sha256')
+      .update(JSON.stringify({ action: 'replay_settlement', adminUsername, invitationId, reason }))
+      .digest('hex')
+    await client.query(
+      `insert into admin_registration_invitation_audit
+        (id, invitation_id, admin_username, action, reason, request_hash, before_json, after_json, created_at)
+       values ($1, $2, $3, 'replay_settlement', $4, $5, $6::jsonb, $7::jsonb, $8)`,
+      [
+        randomUUID(), invitationId, adminUsername, reason, requestHash, JSON.stringify(current),
+        JSON.stringify({ status: 'activated', attempt_count: 0, next_retry_at: nowIso }), nowIso,
+      ],
+    )
+    return true
+  })
+}
+
+async function reconcileRegisteredInvitations(limit: number): Promise<number> {
+  return withTransaction(async (client) => {
+    const snapshot = await getInvitationSettingsInTransaction(client)
+    const now = new Date().toISOString()
+    const result = await client.query(
+      `with candidates as (
+         select invitation.id
+           from invitations invitation
+          where invitation.status = 'registered'
+            and exists (
+              select 1 from user_game_accounts profile
+               where profile.user_id = invitation.invitee_user_id
+                 and profile.status = 'active'
+                 and coalesce(profile.kind, profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
+            )
+          order by invitation.registered_at asc, invitation.id asc
+          for update skip locked
+          limit $1
+       )
+       update invitations invitation
+          set status = 'activated', activated_at = $2, settings_snapshot = $3::jsonb,
+              next_retry_at = $2, updated_at = $2
+         from candidates
+        where invitation.id = candidates.id`,
+      [limit, now, JSON.stringify(snapshot)],
+    )
+    return result.rowCount ?? 0
+  })
+}
+
+async function claimInvitationSettlement(now = new Date()): Promise<InvitationRow | null> {
+  const nowIso = now.toISOString()
+  const leaseExpiredBefore = new Date(now.getTime() - SETTLEMENT_LEASE_MS).toISOString()
+  return withTransaction(async (client) => {
+    await client.query(
+      `update invitations
+          set status = 'dead_letter', dead_lettered_at = $1, processing_started_at = null,
+              next_retry_at = null, last_error = coalesce(last_error, 'Settlement lease expired after the final attempt'),
+              updated_at = $1
+        where status = 'processing' and processing_started_at <= $2 and attempt_count >= $3`,
+      [nowIso, leaseExpiredBefore, MAX_SETTLEMENT_ATTEMPTS],
+    )
+    const result = await client.query<InvitationRow>(
+      `with candidate as (
+         select id
+           from invitations
+          where attempt_count < $3
+            and (
+              status = 'activated'
+              or (status = 'failed' and coalesce(next_retry_at, activated_at) <= $1)
+              or (status = 'processing' and processing_started_at <= $2)
+            )
+          order by coalesce(next_retry_at, activated_at) asc, activated_at asc, id asc
+          for update skip locked
+          limit 1
+       )
+       update invitations invitation
+          set status = 'processing', attempt_count = invitation.attempt_count + 1,
+              processing_started_at = $1, next_retry_at = null, last_error = null, updated_at = $1
+         from candidate
+        where invitation.id = candidate.id
+        returning invitation.id, invitation.inviter_user_id, invitation.invitee_user_id,
+                  invitation.status, invitation.activated_at::text, invitation.settings_snapshot,
+                  invitation.attempt_count, invitation.next_retry_at::text,
+                  invitation.processing_started_at::text, invitation.last_error,
+                  invitation.dead_lettered_at::text`,
+      [nowIso, leaseExpiredBefore, MAX_SETTLEMENT_ATTEMPTS],
+    )
+    return result.rows[0] ?? null
+  })
+}
+
+async function recordInvitationSettlementFailure(claimed: InvitationRow, error: unknown, now = new Date()): Promise<void> {
+  const deadLettered = claimed.attempt_count >= MAX_SETTLEMENT_ATTEMPTS
+  const nowIso = now.toISOString()
+  const nextRetryAt = deadLettered
+    ? null
+    : new Date(now.getTime() + settlementRetryDelayMs(claimed.attempt_count)).toISOString()
+  await query(
+    `update invitations
+        set status = $3, next_retry_at = $4::timestamptz, processing_started_at = null,
+            last_error = $5, dead_lettered_at = case when $3 = 'dead_letter' then $6::timestamptz else null end,
+            updated_at = $6::timestamptz
+      where id = $1 and status = 'processing' and attempt_count = $2`,
+    [
+      claimed.id,
+      claimed.attempt_count,
+      deadLettered ? 'dead_letter' : 'failed',
+      nextRetryAt,
+      safeSettlementError(error),
+      nowIso,
+    ],
+  )
+}
+
+function settlementRetryDelayMs(attempt: number): number {
+  return Math.min(6 * 60 * 60 * 1000, 30_000 * 2 ** Math.max(0, attempt - 1))
+}
+
+function safeSettlementError(error: unknown): string {
+  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+  return message.replace(/[\r\n\t]+/g, ' ').slice(0, 500)
 }
 
 async function settleInvitationInTransaction(
@@ -470,16 +781,14 @@ async function settleInvitationInTransaction(
     }
   }
 
-  if (inviterStatus === 'granted' && invitation.inviter_user_id) {
-    await grantRewardGroup(client, invitation.inviter_user_id, invitation.id, 'inviter', inviterRewards, now)
-  }
-  await grantRewardGroup(client, invitation.invitee_user_id, invitation.id, 'invitee', inviteeRewards, now)
+  await grantRewardGroups(client, invitation, inviterStatus, inviterRewards, inviteeRewards, now)
 
   const [inviterDescriptions, inviteeDescriptions] = await Promise.all([
     describeRewardsInTransaction(client, inviterStatus === 'granted' ? inviterRewards : []),
     describeRewardsInTransaction(client, inviteeRewards),
   ])
   const settlement = {
+    version: 1,
     rewards: {
       inviter: { status: inviterStatus, items: inviterDescriptions },
       invitee: { status: inviteeRewards.length > 0 ? 'granted' : 'not_configured', items: inviteeDescriptions },
@@ -488,54 +797,73 @@ async function settleInvitationInTransaction(
   await client.query(
     `update invitations set status = 'settled', settled_at = $2,
        inviter_rewarded_at = case when $3 then $2 else inviter_rewarded_at end,
-       settlement_json = $4::jsonb, updated_at = $2 where id = $1`,
+       settlement_json = $4::jsonb, next_retry_at = null, processing_started_at = null,
+       last_error = null, dead_lettered_at = null, updated_at = $2 where id = $1`,
     [invitation.id, now, inviterStatus === 'granted' && inviterRewards.length > 0, JSON.stringify(settlement)],
   )
 }
 
-async function grantRewardGroup(
+async function grantRewardGroups(
   client: PoolClient,
-  userId: string,
-  invitationId: string,
-  recipient: InvitationRewardRecipient,
-  rewards: InvitationRewardRule[],
+  invitation: InvitationRow,
+  inviterStatus: InviterRewardStatus,
+  inviterRewards: InvitationRewardRule[],
+  inviteeRewards: InvitationRewardRule[],
   now: string,
 ): Promise<void> {
-  for (const reward of rewards) {
-    await grantItemInTransaction(client, {
-      userId,
-      itemCode: reward.item_code,
-      quantity: reward.quantity,
-      expiry: reward.expiry,
-      sourceType: 'invitation',
-      sourceId: invitationId,
-      recipientRole: recipient,
-      giftPackVersionId: reward.gift_pack_version_id,
-      metadata: { invitation_snapshot: true, invitation_id: invitationId, recipient },
-      allowHistoricalSnapshot: true,
-      now,
-    })
+  const groups: Array<{
+    userId: string
+    recipient: InvitationRewardRecipient
+    rewards: InvitationRewardRule[]
+  }> = [{ userId: invitation.invitee_user_id, recipient: 'invitee', rewards: inviteeRewards }]
+  if (inviterStatus === 'granted' && invitation.inviter_user_id) {
+    groups.unshift({ userId: invitation.inviter_user_id, recipient: 'inviter', rewards: inviterRewards })
   }
+  await grantItemsInTransaction(client, groups.flatMap((group) => group.rewards.map((reward) => ({
+    userId: group.userId,
+    itemCode: reward.item_code,
+    quantity: reward.quantity,
+    expiry: reward.expiry,
+    sourceType: 'invitation',
+    sourceId: invitation.id,
+    recipientRole: group.recipient,
+    giftPackVersionId: reward.gift_pack_version_id,
+    metadata: { invitation_snapshot: true, invitation_id: invitation.id, recipient: group.recipient },
+    allowHistoricalSnapshot: true,
+    now,
+  }))))
 }
 
 async function snapshotRewardRules(client: PoolClient, rewards: InvitationRewardRule[]): Promise<InvitationRewardRule[]> {
+  if (rewards.length === 0) return []
   const result: InvitationRewardRule[] = []
-  for (const reward of rewards) {
-    const item = await client.query<{ kind: string; issuance_enabled: boolean }>(
-      'select kind, issuance_enabled from item_definitions where code = $1', [reward.item_code],
+  const codes = [...new Set(rewards.map((reward) => reward.item_code))]
+  const definitionsResult = await client.query<{ code: string; kind: string; issuance_enabled: boolean }>(
+    'select code, kind, issuance_enabled from item_definitions where code = any($1::text[])',
+    [codes],
+  )
+  const definitions = new Map(definitionsResult.rows.map((definition) => [definition.code, definition]))
+  const giftPackCodes = definitionsResult.rows
+    .filter((definition) => definition.kind === 'gift_pack')
+    .map((definition) => definition.code)
+  const versionsResult = giftPackCodes.length === 0
+    ? { rows: [] as Array<{ id: string; item_code: string }> }
+    : await client.query<{ id: string; item_code: string }>(
+      `select distinct on (item_code) id, item_code
+         from gift_pack_versions
+        where item_code = any($1::text[]) and status = 'published'
+        order by item_code, version desc`,
+      [giftPackCodes],
     )
-    const definition = item.rows[0]
+  const versions = new Map(versionsResult.rows.map((version) => [version.item_code, version.id]))
+  for (const reward of rewards) {
+    const definition = definitions.get(reward.item_code)
     if (!definition) throw new InventoryError('item_unknown', `道具 ${reward.item_code} 不存在。`, 404)
     if (!definition.issuance_enabled) throw new InventoryError('item_issuance_disabled', `道具 ${reward.item_code} 当前不可发放。`, 409)
     if (definition.kind === 'cosmetic' || definition.kind === 'badge') throw new InventoryError('item_kind_unavailable', '当前邀请活动不能发放主题装扮或成就勋章。', 409)
     let giftPackVersionId: string | null = null
     if (definition.kind === 'gift_pack') {
-      const version = await client.query<{ id: string }>(
-        `select id from gift_pack_versions where item_code = $1 and status = 'published'
-          order by version desc limit 1`,
-        [reward.item_code],
-      )
-      giftPackVersionId = version.rows[0]?.id ?? null
+      giftPackVersionId = versions.get(reward.item_code) ?? null
       if (!giftPackVersionId) throw new InventoryError('gift_pack_version_unavailable', `礼包 ${reward.item_code} 没有可发放版本。`, 409)
     }
     result.push({ ...reward, gift_pack_version_id: giftPackVersionId })
@@ -621,6 +949,22 @@ async function userCanInvite(userId: string): Promise<boolean> {
   return result.rows[0]?.eligible === true
 }
 
+async function userCanInviteInTransaction(client: PoolClient, userId: string): Promise<boolean> {
+  const result = await client.query<{ eligible: boolean }>(
+    `select exists (
+       select 1 from user_accounts account
+       where account.id = $1 and account.status = 'active'
+         and exists (
+           select 1 from user_game_accounts profile
+            where profile.user_id = account.id and profile.status = 'active'
+              and coalesce(profile.kind, profile.record_json->>'kind', 'cdk') in ('cdk', 'free_preview')
+         )
+     ) as eligible`,
+    [userId],
+  )
+  return result.rows[0]?.eligible === true
+}
+
 async function userHasActiveProfile(client: PoolClient, userId: string): Promise<boolean> {
   const active = await client.query<{ active: boolean }>(
     `select exists (select 1 from user_game_accounts
@@ -662,9 +1006,12 @@ function invitationRecord(
     id: string
     registered_at: string
     activated_at: string | null
-    status: 'registered' | 'activated' | 'settled'
+    status: InvitationRow['status']
     settings_snapshot: unknown
     settlement_json: unknown
+    attempt_count: number
+    next_retry_at: string | null
+    last_error: string | null
   },
   campaignEnabled: boolean,
   catalog: InvitationRewardCatalogItem[],
@@ -681,7 +1028,9 @@ function invitationRecord(
     : null
   let rewardStatus: InviterRewardStatus
   if (row.status === 'registered') rewardStatus = 'pending_activation'
-  else if (row.status === 'activated') rewardStatus = campaignEnabled ? 'settlement_pending' : 'pending_campaign_resume'
+  else if (row.status === 'dead_letter') rewardStatus = 'settlement_failed'
+  else if (row.status === 'failed') rewardStatus = 'settlement_retry'
+  else if (row.status === 'activated' || row.status === 'processing') rewardStatus = campaignEnabled ? 'settlement_pending' : 'pending_campaign_resume'
   else rewardStatus = settledInviterStatus(settlement?.rewards?.inviter)
   const settledItems = settlement?.rewards?.inviter?.items
   const snapshot = normalizeInvitationSettings(row.settings_snapshot)
@@ -693,10 +1042,13 @@ function invitationRecord(
     registered_at: row.registered_at,
     activated_at: row.activated_at,
     status: row.status,
+    attempt_count: row.attempt_count,
+    next_retry_at: row.next_retry_at,
+    last_error: row.last_error,
     inviter_reward_status: rewardStatus,
     inviter_rewards: Array.isArray(settledItems)
       ? settledItems
-      : row.status === 'activated' || rewardStatus === 'granted' ? pendingItems : [],
+      : row.status !== 'registered' || rewardStatus === 'granted' ? pendingItems : [],
   }
 }
 
@@ -847,11 +1199,54 @@ async function loadGiftPackSummaries(versionIds: string[]): Promise<Map<string, 
   }]))
 }
 
+async function loadGiftPackSummariesInTransaction(
+  client: PoolClient,
+  versionIds: string[],
+): Promise<Map<string, InvitationGiftPackSummary>> {
+  const uniqueIds = [...new Set(versionIds)]
+  if (uniqueIds.length === 0) return new Map()
+  const result = await client.query<{
+    id: string
+    version: number
+    status: 'published' | 'retired'
+    contents: InvitationGiftPackSummary['contents']
+  }>(
+    `select version.id, version.version, version.status,
+            coalesce(jsonb_agg(jsonb_build_object(
+              'item_code', content.item_code,
+              'name', definition.name,
+              'quantity', content.quantity,
+              'expiry', case when content.validity_days = 0 then jsonb_build_object('mode', 'never')
+                else jsonb_build_object('mode', 'relative_days', 'days', content.validity_days) end
+            ) order by content.item_code) filter (where content.item_code is not null), '[]'::jsonb) as contents
+       from gift_pack_versions version
+       left join gift_pack_version_contents content on content.gift_pack_version_id = version.id
+       left join item_definitions definition on definition.code = content.item_code
+      where version.id = any($1::text[])
+      group by version.id`,
+    [uniqueIds],
+  )
+  return new Map(result.rows.map((version) => [version.id, {
+    id: version.id,
+    version: Number(version.version),
+    status: version.status,
+    contents: Array.isArray(version.contents) ? version.contents : [],
+  }]))
+}
+
 function createInviteCode(): string {
   const bytes = randomBytes(INVITE_CODE_LENGTH)
   let code = ''
   for (const value of bytes) code += CROCKFORD_ALPHABET[value % CROCKFORD_ALPHABET.length]
   return code
+}
+
+function hashInviteCode(code: string | null): string | null {
+  return code ? createHash('sha256').update(code).digest('hex') : null
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === '23505')
 }
 
 function normalizeExpiry(value: unknown): InvitationExpiryPolicy | null {
@@ -925,7 +1320,12 @@ type InvitationRow = {
   id: string
   inviter_user_id: string | null
   invitee_user_id: string
-  status: 'registered' | 'activated' | 'settled'
+  status: 'registered' | 'activated' | 'processing' | 'failed' | 'settled' | 'dead_letter'
   activated_at: string | null
   settings_snapshot: unknown
+  attempt_count: number
+  next_retry_at: string | null
+  processing_started_at: string | null
+  last_error: string | null
+  dead_lettered_at: string | null
 }

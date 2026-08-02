@@ -34,9 +34,10 @@ describe('RegistrationSettingsSection', () => {
       ? { invitations: [], pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 } }
       : {
           settings: {
-            version: 4,
+            version: 5,
             email_verification_required: true,
             invite_code_required: false,
+            email_provider_priority: ['brevo', 'ses'],
             brevo_quota_action: 'pause_registration',
             admin_invite_email_reserve: 20,
             password_reset_email_reserve: 10,
@@ -70,6 +71,7 @@ describe('RegistrationSettingsSection', () => {
       json: {
         email_verification_required: false,
         invite_code_required: true,
+        email_provider_priority: ['brevo', 'ses'],
         brevo_quota_action: 'pause_registration',
         admin_invite_email_reserve: 20,
         password_reset_email_reserve: 10,
@@ -90,10 +92,24 @@ describe('RegistrationSettingsSection', () => {
       json: {
         email_verification_required: true,
         invite_code_required: false,
+        email_provider_priority: ['brevo', 'ses'],
         brevo_quota_action: 'allow_unverified_registration',
         admin_invite_email_reserve: 20,
         password_reset_email_reserve: 10,
       },
+    })))
+  })
+
+  it('saves Amazon SES as the first email provider', async () => {
+    const user = userEvent.setup()
+    render(<RegistrationSettingsSection />)
+
+    await user.click(await screen.findByRole('radio', { name: /Amazon SES → Brevo/ }))
+    await user.click(screen.getByRole('button', { name: '保存注册设置' }))
+
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/registration-settings', expect.objectContaining({
+      method: 'PUT',
+      json: expect.objectContaining({ email_provider_priority: ['ses', 'brevo'] }),
     })))
   })
 
@@ -118,9 +134,10 @@ describe('RegistrationSettingsSection', () => {
       if (settingsAttempts === 1) throw new Error('注册设置加载失败')
       return {
         settings: {
-          version: 4,
+          version: 5,
           email_verification_required: true,
           invite_code_required: false,
+          email_provider_priority: ['brevo', 'ses'],
           brevo_quota_action: 'pause_registration',
           admin_invite_email_reserve: 20,
           password_reset_email_reserve: 10,

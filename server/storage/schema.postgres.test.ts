@@ -3,6 +3,10 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, getPool, query } from './postgres'
 import { migrateDatabaseSchema } from './schema'
+import {
+  getDepotValueSampleStore,
+  type DepotValueSampleRecord,
+} from './depot-value-sample-store'
 import { buildLifetimeVoucherProfileAuthorization } from './cdk-redemption'
 import {
   confirmPersonalUseDeclaration,
@@ -102,7 +106,7 @@ describe('PostgreSQL schema migration', () => {
     }
   })
 
-  it('permanently trims existing workspace JSON to the newest 3 configurations and 5 results', async () => {
+  it('preserves workspace entries above base limits across idempotent migrations', async () => {
     const profile = await seedProfile()
     const savedConfigs = Array.from({ length: 4 }, (_, index) => ({ id: `config-${index + 1}` }))
     const resultHistory = Array.from({ length: 6 }, (_, index) => ({ id: `result-${index + 1}` }))
@@ -125,26 +129,110 @@ describe('PostgreSQL schema migration', () => {
       await migrateDatabaseSchema()
 
       const afterFirstMigration = await readWorkspace(profile.profileId)
-      expect(afterFirstMigration.saved_configs.map((item) => item.id)).toEqual(['config-1', 'config-2', 'config-3'])
+      expect(afterFirstMigration.saved_configs.map((item) => item.id)).toEqual(['config-1', 'config-2', 'config-3', 'config-4'])
       expect(afterFirstMigration.result_history.map((item) => item.id)).toEqual([
         'result-1',
         'result-2',
         'result-3',
         'result-4',
         'result-5',
+        'result-6',
       ])
 
       await migrateDatabaseSchema()
 
       const afterSecondMigration = await readWorkspace(profile.profileId)
-      expect(afterSecondMigration.saved_configs.map((item) => item.id)).toEqual(['config-1', 'config-2', 'config-3'])
+      expect(afterSecondMigration.saved_configs.map((item) => item.id)).toEqual(['config-1', 'config-2', 'config-3', 'config-4'])
       expect(afterSecondMigration.result_history.map((item) => item.id)).toEqual([
         'result-1',
         'result-2',
         'result-3',
         'result-4',
         'result-5',
+        'result-6',
       ])
+    } finally {
+      await query('delete from user_accounts where id = $1', [profile.userId])
+    }
+  })
+
+  it('rotates depot sample hashes atomically and isolates distributions by valuation version', async () => {
+    const firstProfile = await seedProfile()
+    const secondProfile = await seedProfile()
+    const previousHash = `previous-${randomUUID()}`
+    const currentHash = `current-${randomUUID()}`
+    const otherHash = `other-${randomUUID()}`
+    const valuationVersion = `valuation-${randomUUID()}`
+    const otherValuationVersion = `valuation-${randomUUID()}`
+    const store = getDepotValueSampleStore()
+    if (!store) throw new Error('Expected the PostgreSQL depot sample store to be available.')
+
+    try {
+      await store.save(buildDepotSample({
+        uid_hash: previousHash,
+        contributor_profile_id: firstProfile.profileId,
+        valuation_version: valuationVersion,
+      }))
+      await store.save(buildDepotSample({
+        uid_hash: currentHash,
+        uid_hash_key_version: 'current',
+        contributor_profile_id: firstProfile.profileId,
+        valuation_version: valuationVersion,
+      }), [previousHash])
+      await store.save(buildDepotSample({
+        uid_hash: otherHash,
+        contributor_profile_id: secondProfile.profileId,
+        valuation_version: otherValuationVersion,
+      }))
+
+      const hashes = await query<{ uid_hash: string }>(
+        'select uid_hash from depot_value_samples where uid_hash = any($1::text[]) order by uid_hash',
+        [[previousHash, currentHash, otherHash]],
+      )
+      expect(hashes.rows.map((row) => row.uid_hash)).toEqual([currentHash, otherHash].sort())
+      await expect(store.getDistribution(100, valuationVersion)).resolves.toEqual({
+        sample_count: 1,
+        less_count: 0,
+        equal_count: 1,
+      })
+      await expect(store.getDistribution(100, otherValuationVersion)).resolves.toEqual({
+        sample_count: 1,
+        less_count: 0,
+        equal_count: 1,
+      })
+
+      await expect(store.deleteForContributorProfile(firstProfile.profileId)).resolves.toBe(1)
+      await expect(store.getDistribution(100, valuationVersion)).resolves.toEqual({
+        sample_count: 0,
+        less_count: 0,
+        equal_count: 0,
+      })
+    } finally {
+      await query('delete from user_accounts where id = any($1::text[])', [[firstProfile.userId, secondProfile.userId]])
+    }
+  })
+
+  it('rejects unsafe or incomplete depot sample records at the database boundary', async () => {
+    const profile = await seedProfile()
+    const store = getDepotValueSampleStore()
+    if (!store) throw new Error('Expected the PostgreSQL depot sample store to be available.')
+
+    try {
+      await expect(store.save(buildDepotSample({
+        uid_hash: `negative-level-${randomUUID()}`,
+        contributor_profile_id: profile.profileId,
+        account_level: -1,
+      }))).rejects.toThrow(/depot_samples_account_level_check/)
+      await expect(store.save(buildDepotSample({
+        uid_hash: `unsafe-total-${randomUUID()}`,
+        contributor_profile_id: profile.profileId,
+        total_equivalent_sanity: Number.MAX_SAFE_INTEGER + 1,
+      }))).rejects.toThrow(/depot_samples_safe_numeric_check/)
+      await expect(store.save(buildDepotSample({
+        uid_hash: `low-coverage-${randomUUID()}`,
+        contributor_profile_id: profile.profileId,
+        pricing_coverage: 0.79,
+      }))).rejects.toThrow(/depot_samples_complete_metadata_check/)
     } finally {
       await query('delete from user_accounts where id = $1', [profile.userId])
     }
@@ -314,4 +402,35 @@ async function seedProfile(): Promise<{ userId: string; profileId: string }> {
 type StoredWorkspaceRecord = {
   saved_configs: Array<{ id: string }>
   result_history: Array<{ id: string }>
+}
+
+function buildDepotSample(overrides: Partial<DepotValueSampleRecord> = {}): DepotValueSampleRecord {
+  const now = '2026-08-02T00:00:00.000Z'
+  return {
+    version: 2,
+    uid_hash: `sample-${randomUUID()}`,
+    uid_hash_key_version: 'previous',
+    contributor_profile_id: null,
+    valuation_version: 'valuation-v2',
+    pricing_snapshot_id: 'snapshot-v2',
+    pricing_fetched_at: now,
+    pricing_status: 'fresh',
+    pricing_coverage: 1,
+    complete: true,
+    total_equivalent_sanity: 100,
+    account_level: 120,
+    operator_power_score: 10,
+    operator_count: 1,
+    elite2_count: 1,
+    six_star_count: 1,
+    six_star_e2_count: 1,
+    e2_90_count: 0,
+    inventory_item_count: 1,
+    priced_count: 1,
+    unpriced_count: 0,
+    sample_json: { version: 2 },
+    sampled_at: now,
+    updated_at: now,
+    ...overrides,
+  }
 }

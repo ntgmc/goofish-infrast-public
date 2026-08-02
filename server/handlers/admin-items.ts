@@ -6,8 +6,10 @@ import {
   createDistributionCampaign,
   createGiftPackDraft,
   getAdminInventoryOverview,
+  isAllUsersDistributionCampaign,
   processInventoryCampaignBatch,
   publishGiftPackVersion,
+  retryFailedCampaignRecipients,
   retireGiftPackVersion,
   revokeGrant,
   updateCampaignStatus,
@@ -31,10 +33,13 @@ export default async function adminItemsHandler(req: Request): Promise<Response>
     if (path === '/api/admin/items') {
       const body = await getValidatedJson(req, requestSchemas.adminItems)
       if (body.action === 'create_gift_pack') {
-        return jsonResponse(await createCustomGiftPack(authentication.username, body), 201)
+        return jsonResponse(await createCustomGiftPack(authentication.username, {
+          ...body,
+          idempotencyKey: body.idempotency_key,
+        }), 201)
       }
       if (body.action === 'create_gift_pack_version') {
-        return jsonResponse(await createGiftPackDraft(authentication.username, requireValue(body.item_code, '缺少礼包代码。'), body.contents), 201)
+        return jsonResponse(await createGiftPackDraft(authentication.username, body.item_code, body.contents, body.idempotency_key), 201)
       }
       if (body.action === 'publish_gift_pack_version') {
         await publishGiftPackVersion(authentication.username, requireValue(body.version_id, '缺少礼包版本。'))
@@ -49,7 +54,6 @@ export default async function adminItemsHandler(req: Request): Promise<Response>
         return jsonResponse({ ok: true })
       }
       if (body.action === 'configure_onboarding_task') {
-        if (!body.task_code || typeof body.enabled !== 'boolean') return jsonResponse({ error: '缺少任务代码或启用状态。' }, 400)
         await configureOnboardingTask(authentication.username, body.task_code as OnboardingTaskCode, body.enabled, body.rewards)
         return jsonResponse({ ok: true })
       }
@@ -58,20 +62,20 @@ export default async function adminItemsHandler(req: Request): Promise<Response>
 
     if (path === '/api/admin/inventory') {
       const body = await getValidatedJson(req, requestSchemas.adminInventory)
-      const reason = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : '未填写原因'
       if (body.action === 'grant') {
         const grantId = await adminGrantItem(authentication.username, {
-          userId: requireValue(body.user_id, '缺少用户 ID。'),
-          itemCode: requireValue(body.item_code, '缺少道具代码。'),
-          quantity: requireNumber(body.quantity, '缺少发放数量。'),
-          validityDays: body.validity_days ?? 0,
+          userId: body.user_id,
+          itemCode: body.item_code,
+          quantity: body.quantity,
+          validityDays: body.validity_days,
           giftPackVersionId: body.gift_pack_version_id,
-          reason,
+          reason: body.reason,
+          idempotencyKey: body.idempotency_key,
         })
         return jsonResponse({ ok: true, grant_id: grantId }, 201)
       }
       if (body.action === 'revoke_grant') {
-        return jsonResponse(await revokeGrant(authentication.username, requireValue(body.grant_id, '缺少发放批次。'), reason))
+        return jsonResponse(await revokeGrant(authentication.username, body.grant_id, body.reason))
       }
       if (body.action === 'create_campaign') {
         if (body.target_mode === 'all_users') {
@@ -80,20 +84,28 @@ export default async function adminItemsHandler(req: Request): Promise<Response>
           if (!root.ok) return root.response
         }
         const campaign = await createDistributionCampaign(authentication.username, {
-          itemCode: requireValue(body.item_code, '缺少道具代码。'),
+          itemCode: body.item_code,
           giftPackVersionId: body.gift_pack_version_id,
-          quantity: requireNumber(body.quantity, '缺少发放数量。'),
-          validityDays: body.validity_days ?? 0,
-          targetMode: body.target_mode ?? 'user_ids',
+          quantity: body.quantity,
+          validityDays: body.validity_days,
+          targetMode: body.target_mode,
           userIds: body.user_ids,
-          reason,
+          reason: body.reason,
+          idempotencyKey: body.idempotency_key,
         })
         return jsonResponse(campaign, 201)
       }
       if (body.action === 'pause_campaign' || body.action === 'resume_campaign' || body.action === 'cancel_campaign' || body.action === 'reverse_campaign') {
+        if (body.action === 'reverse_campaign' && await isAllUsersDistributionCampaign(body.campaign_id)) {
+          const root = await requireRootAdminPassword(req, body.root_password)
+          if (!root.ok) return root.response
+        }
         const action = body.action.replace('_campaign', '') as 'pause' | 'resume' | 'cancel' | 'reverse'
-        await updateCampaignStatus(authentication.username, requireValue(body.campaign_id, '缺少活动 ID。'), action, reason)
+        await updateCampaignStatus(authentication.username, body.campaign_id, action, body.reason)
         return jsonResponse({ ok: true })
+      }
+      if (body.action === 'retry_campaign_failures') {
+        return jsonResponse({ ok: true, retried: await retryFailedCampaignRecipients(authentication.username, body.campaign_id, body.reason) })
       }
       if (body.action === 'process_campaigns') {
         return jsonResponse({ ok: true, processed: await processInventoryCampaignBatch(100) })
@@ -113,9 +125,3 @@ function requireValue(value: string | undefined, message: string): string {
   if (!value) throw new InventoryError('value_required', message, 400)
   return value
 }
-
-function requireNumber(value: number | undefined, message: string): number {
-  if (!Number.isInteger(value)) throw new InventoryError('value_required', message, 400)
-  return Number(value)
-}
-

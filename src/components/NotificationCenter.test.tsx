@@ -76,18 +76,65 @@ describe('NotificationCenter', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: '通知，无未读消息' })).toBeInTheDocument())
   })
+
+  it('does not let an old user read mutation overwrite the next user', async () => {
+    const staleMutation = deferred<Response>()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(page(1)))
+      .mockResolvedValueOnce(jsonResponse(page(1)))
+      .mockReturnValueOnce(staleMutation.promise)
+      .mockResolvedValueOnce(jsonResponse(page(7)))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    const view = renderCenter()
+
+    await user.click(await screen.findByRole('button', { name: '通知，1 条未读' }))
+    await user.click(await screen.findByRole('button', { name: /获得新道具/ }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+    view.rerender(center('user-2'))
+
+    await screen.findByRole('button', { name: '通知，7 条未读' })
+    staleMutation.resolve(jsonResponse({ unread_count: 0 }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '通知，7 条未读' })).toBeInTheDocument())
+  })
+
+  it('ignores an old user pagination failure after switching users', async () => {
+    const stalePage = deferred<Response>()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(page(1, 'next-page')))
+      .mockResolvedValueOnce(jsonResponse(page(1, 'next-page')))
+      .mockReturnValueOnce(stalePage.promise)
+      .mockResolvedValueOnce(jsonResponse(page(5)))
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    const view = renderCenter()
+
+    await user.click(await screen.findByRole('button', { name: '通知，1 条未读' }))
+    await user.click(await screen.findByRole('button', { name: '加载更多' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+    view.rerender(center('user-2'))
+
+    await screen.findByRole('button', { name: '通知，5 条未读' })
+    stalePage.reject(new Error('old user page failed'))
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: '通知，5 条未读' })).toBeInTheDocument()
+  })
 })
 
-function renderCenter() {
-  render(
+function renderCenter(userId = 'user-1') {
+  return render(center(userId))
+}
+
+function center(userId: string) {
+  return (
     <MemoryRouter initialEntries={['/tool/profiles']}>
-      <NotificationCenterProvider userId="user-1">
+      <NotificationCenterProvider userId={userId}>
         <NotificationBell iconOnly />
         <Routes>
           <Route path="*" element={<Location />} />
         </Routes>
       </NotificationCenterProvider>
-    </MemoryRouter>,
+    </MemoryRouter>
   )
 }
 
@@ -95,10 +142,11 @@ function Location() {
   return <span data-testid="location">{useLocation().pathname}</span>
 }
 
-function page(unreadCount: number): UserNotificationPage {
+function page(unreadCount: number, nextCursor: string | null = null): UserNotificationPage {
   return {
     unread_count: unreadCount,
-    next_cursor: null,
+    next_cursor: nextCursor,
+    as_of: '2026-07-30T00:01:00.000Z',
     notifications: [{
       id: 'notification-1',
       type: 'item_grant',
@@ -128,6 +176,7 @@ function jsonResponse(body: unknown): Response {
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => { resolve = done })
-  return { promise, resolve }
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail })
+  return { promise, resolve, reject }
 }

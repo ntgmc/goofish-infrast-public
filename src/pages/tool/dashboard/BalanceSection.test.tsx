@@ -8,11 +8,15 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../../../lib/api-client', () => ({
+  ApiError: class ApiError extends Error {
+    constructor(message: string, readonly status: number, readonly data: unknown) { super(message) }
+  },
   apiJson: mocks.apiJson,
   getApiErrorMessage: (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback,
 }))
 
 import BalanceSection from './BalanceSection'
+import { ApiError } from '../../../lib/api-client'
 
 const firstPage = {
   balance: { currency: 'points' as const, available: '12.30' },
@@ -37,6 +41,19 @@ afterEach(() => {
 })
 
 describe('BalanceSection', () => {
+  it('shows a dedicated retry state instead of zero assets when the initial load fails', async () => {
+    mocks.apiJson.mockRejectedValueOnce(new Error('积分服务不可用'))
+
+    const user = userEvent.setup()
+    render(<BalanceSection redemptionEnabled />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('积分服务不可用')
+    expect(screen.queryByText('0.00')).not.toBeInTheDocument()
+    expect(screen.queryByText('暂无积分变动记录。')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '重试' }))
+    expect(mocks.apiJson).toHaveBeenCalledTimes(2)
+  })
+
   it('loads the balance and appends cursor-paginated transactions', async () => {
     mocks.apiJson
       .mockResolvedValueOnce(firstPage)
@@ -96,5 +113,25 @@ describe('BalanceSection', () => {
     expect(redeemCalls).toHaveLength(2)
     expect(redeemCalls[0]?.[1]?.json).toEqual({ cdk: 'BALANCE-CODE', idempotency_key: 'balance-request-key' })
     expect(redeemCalls[1]?.[1]?.json).toEqual(redeemCalls[0]?.[1]?.json)
+  })
+
+  it('shows only the allowlisted account redemption target for a mismatched CDK', async () => {
+    mocks.apiJson
+      .mockResolvedValueOnce({ ...firstPage, next_cursor: null })
+      .mockRejectedValueOnce(new ApiError(
+        '该 CDK 应在账号兑换页使用',
+        409,
+        { code: 'cdk_type_mismatch', target: '/tool/redeem' },
+        '/api/user/balance/redeem',
+      ))
+    const user = userEvent.setup()
+    render(<BalanceSection redemptionEnabled />)
+    await screen.findByText('+12.30')
+
+    await user.type(screen.getByPlaceholderText('输入余额 CDK'), 'account-code')
+    await user.click(screen.getByRole('button', { name: '确认兑换' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('该 CDK 应在账号兑换页使用')
+    expect(screen.getByRole('link', { name: '前往账号兑换页' })).toHaveAttribute('href', '/tool/redeem')
   })
 })

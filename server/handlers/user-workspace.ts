@@ -7,6 +7,7 @@ import {
   getProfileWorkspace,
   isDepotValueProfile,
   isFreePreviewProfile,
+  normalizeProfileKind,
   toPublicWorkspace,
   updateProfileWorkspaceAtomically,
   updateProfileWorkspaceInTransaction,
@@ -53,7 +54,13 @@ export default async (req: Request): Promise<Response> => {
       if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
       const capacityLimits = await getWorkspaceCapacityLimits(profile.id)
       const workspace = await getProfileWorkspace(profile.id)
-      return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(workspace, capacityLimits) })
+      return jsonResponse({
+        ...(await buildAuthPayload(auth.user, profile.id)),
+        workspace: toPublicWorkspace(workspace, capacityLimits, {
+          kind: normalizeProfileKind(profile),
+          permission: authorization.permission,
+        }),
+      })
     }
 
     if (req.method !== 'PATCH' && req.method !== 'POST') {
@@ -89,7 +96,13 @@ export default async (req: Request): Promise<Response> => {
       if (!('result_history_id' in body)) return jsonResponse({ error: '缺少 result_history_id。' }, 400)
       const next = await confirmFreeScheduleEntitlement(profile.id, body.result_history_id)
       await recordAuthenticatedRequestBehaviorEvent({ req, auth, eventType: 'workspace_save', profileId: profile.id })
-      return jsonResponse({ ...(await buildAuthPayload(auth.user, profile.id)), workspace: toPublicWorkspace(next, capacityLimits) })
+      return jsonResponse({
+        ...(await buildAuthPayload(auth.user, profile.id)),
+        workspace: toPublicWorkspace(next, capacityLimits, {
+          kind: normalizeProfileKind(profile),
+          permission: authorization.permission,
+        }),
+      })
     }
 
     let operatorsValue: UserWorkspaceRecord['operators'] | undefined

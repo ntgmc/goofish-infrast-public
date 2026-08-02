@@ -149,7 +149,7 @@ export interface AnnouncementStats {
   impressions: number;
   reads: number;
   server_reads: number;
-  local_reads: number;
+  visitor_reads: number;
   unread: number;
   read_rate: number;
 }
@@ -157,6 +157,7 @@ export interface AnnouncementStats {
 export interface AnnouncementAdminResponse {
   banner: Announcement | null;
   announcements: Announcement[];
+  revision: number;
   stats?: Record<string, AnnouncementStats>;
 }
 
@@ -204,6 +205,7 @@ export interface OptimizeJobAccepted {
   upgrade_suggestions_requested: boolean;
   upgrade_suggestions_allowed: boolean;
   billing?: import('./optimization-contracts').OptimizationBillingSnapshot | null;
+  history_result_id?: string;
   poll_token?: string;
 }
 
@@ -231,6 +233,7 @@ export interface OptimizeJobStatusResponse {
   upgrade_suggestions_requested: boolean;
   upgrade_suggestions_allowed: boolean;
   billing?: import('./optimization-contracts').OptimizationBillingSnapshot | null;
+  history_result_id?: string;
   result?: OptimizeResult;
   error?: string;
   error_code?: string;
@@ -259,6 +262,7 @@ export type DepotValueRequest =
   | {
       source: 'skland';
       profile_id: string;
+      sample_consent: boolean;
     };
 
 export interface DepotValueItem {
@@ -276,7 +280,7 @@ export interface DepotValueUnpricedItem {
 }
 
 type DepotValueRankingMode = 'curve' | 'sample_adjusted';
-export type DepotValueSampleContributionStatus = 'saved' | 'not_applicable' | 'unavailable';
+export type DepotValueSampleContributionStatus = 'saved' | 'declined' | 'skipped' | 'not_applicable' | 'unavailable';
 
 export interface DepotValueRanking {
   mode: DepotValueRankingMode;
@@ -300,7 +304,12 @@ export interface DepotValueResponse {
   warnings: string[];
   sources: {
     inventory: DepotValueSource;
-    yituliu: 'ok' | 'unavailable';
+    yituliu: 'fresh' | 'stale' | 'unavailable' | 'invalid';
+    pricing_snapshot_id: string | null;
+    pricing_fetched_at: string | null;
+    pricing_age_ms: number | null;
+    valuation_version: string;
+    pricing_coverage: number;
     lmd_exp: 'fixed_lmd_exp_36_per_10000';
     ranking: 'entertainment_curve_v1' | 'sample_adjusted_curve_v1';
   };
@@ -450,7 +459,9 @@ export interface UpgradeTrainingCostBucket {
   equivalent_sanity: number | null;
 }
 
-interface UpgradeTrainingOperatorCost {
+export interface UpgradeTrainingOperatorCost {
+  status: 'complete' | 'partial' | 'unavailable';
+  error_code?: 'operator_not_found' | 'invalid_rarity' | 'elite_out_of_range' | 'missing_promotion_materials';
   id: string;
   name: string;
   current_elite: number;
@@ -477,7 +488,11 @@ export interface UpgradeTrainingCost {
   unpriced_items: UpgradeTrainingMaterial[];
   sources: {
     skland: 'ok' | 'unavailable';
-    yituliu: 'ok' | 'unavailable';
+    yituliu: 'fresh' | 'stale' | 'unavailable' | 'invalid';
+    pricing_snapshot_id: string | null;
+    pricing_fetched_at: string | null;
+    pricing_age_ms: number | null;
+    valuation_version: string | null;
     lmd_exp: 'fixed_lmd_trade_gold_net_exp_36_per_10000';
   };
   warnings: string[];
@@ -535,6 +550,7 @@ type RawUpgradeSuggestion = (
       specialType?: string;
     }
 ) & {
+  suggestion_id?: string;
   training_cost?: UpgradeTrainingCost;
   roi?: UpgradeSuggestionRoi;
   orundum_roi?: OrundumRoi;
@@ -686,6 +702,7 @@ interface ShiftPlan {
 }
 
 export interface UpgradeSuggestion {
+  suggestion_id?: string;
   type: 'single' | 'bundle';
   id?: string;
   name?: string;
@@ -778,6 +795,37 @@ export interface UserWorkspace {
   updated_at: string | null;
 }
 
+export interface AdminUserWorkspaceExportWorkspace {
+  version: 1;
+  profile_id: string;
+  operators: LicenseOperator[] | null;
+  config: LicenseConfig | null;
+  elite_overrides: Record<string, number>;
+  last_result: OptimizeResult | null;
+  saved_configs: WorkspaceSavedConfig[];
+  result_history: WorkspaceResultHistoryItem[];
+  archived_results: WorkspaceResultHistoryItem[];
+  free_schedule_entitlement: FreeScheduleEntitlement | null;
+  updated_at: string;
+}
+
+export interface AdminUserWorkspaceExportV1 {
+  version: 1;
+  exported_at: string;
+  user: {
+    id: string;
+    email: string;
+  };
+  profiles: Array<{
+    id: string;
+    display_name: string;
+    kind: UserGameAccountKind;
+    permission: ProductPermissionMode;
+    status: 'active' | 'frozen' | 'revoked';
+    workspace: AdminUserWorkspaceExportWorkspace | null;
+  }>;
+}
+
 export interface WorkspaceSavedConfig {
   id: string;
   name: string;
@@ -792,6 +840,7 @@ type WorkspaceResultHistorySource = 'generated' | 'applied_suggestions' | 'legac
 
 export interface WorkspaceResultHistoryItem {
   id: string;
+  job_id?: string;
   name: string;
   created_at: string;
   config: LicenseConfig | null;
@@ -840,6 +889,7 @@ export interface UserNotificationPage {
   notifications: UserNotification[];
   unread_count: number;
   next_cursor: string | null;
+  as_of: string;
 }
 
 export interface AuthMeResponse {
@@ -889,6 +939,7 @@ export interface InvitationRewardRule {
 
 export interface InvitationSettings {
   version: 2;
+  revision: number;
   enabled: boolean;
   activation_rule: 'first_active_profile';
   daily_inviter_reward_limit: number;
@@ -897,6 +948,9 @@ export interface InvitationSettings {
 }
 
 export type BrevoQuotaAction = 'pause_registration' | 'allow_unverified_registration';
+
+export type EmailProvider = 'brevo' | 'ses';
+export type EmailProviderPriority = [EmailProvider, EmailProvider];
 
 export type BrevoEmailPurpose =
   | 'email_verification'
@@ -936,9 +990,10 @@ export interface BrevoEmailStats {
 }
 
 export interface RegistrationSettings {
-  version: 4;
+  version: 5;
   email_verification_required: boolean;
   invite_code_required: boolean;
+  email_provider_priority: EmailProviderPriority;
   brevo_quota_action: BrevoQuotaAction;
   admin_invite_email_reserve: number;
   password_reset_email_reserve: number;
@@ -946,6 +1001,13 @@ export interface RegistrationSettings {
 }
 
 export type AdminRegistrationInvitationStatus = 'active' | 'used' | 'revoked' | 'expired';
+export type AdminRegistrationVerificationStatus =
+  | 'not_applicable'
+  | 'pending'
+  | 'sent'
+  | 'failed'
+  | 'uncertain'
+  | 'verified';
 
 export interface AdminRegistrationInvitation {
   id: string;
@@ -956,12 +1018,19 @@ export interface AdminRegistrationInvitation {
   revoked_at: string | null;
   consumed_by_user_id: string | null;
   consumed_by_email: string | null;
+  created_by: string;
+  create_reason: string;
+  revoked_by: string | null;
+  revoke_reason: string | null;
+  verification_status: AdminRegistrationVerificationStatus;
 }
 
 export interface InvitationSummary {
+  as_of: string;
   can_invite: boolean;
   campaign_enabled: boolean;
   code: string | null;
+  code_status: 'active' | 'paused' | null;
   share_url: string | null;
   reward_preview: {
     inviter: InvitationRewardPreviewItem[];
@@ -983,7 +1052,7 @@ export interface InvitationSummary {
   next_cursor: string | null;
 }
 
-export interface RewardBalance {
+export interface PriorityCouponBalance {
   type: 'priority_compute_coupon';
   available: number;
   permanent: number;
@@ -1032,11 +1101,13 @@ export interface InvitationRewardPreviewItem {
   available: boolean;
 }
 
-type InvitationProgressStatus = 'registered' | 'activated' | 'settled';
+type InvitationProgressStatus = 'registered' | 'activated' | 'processing' | 'failed' | 'settled' | 'dead_letter';
 export type InviterRewardStatus =
   | 'pending_activation'
   | 'pending_campaign_resume'
   | 'settlement_pending'
+  | 'settlement_retry'
+  | 'settlement_failed'
   | 'granted'
   | 'daily_limit_skipped'
   | 'inviter_ineligible'
@@ -1048,6 +1119,9 @@ export interface InvitationRecordSummary {
   registered_at: string;
   activated_at: string | null;
   status: InvitationProgressStatus;
+  attempt_count: number;
+  next_retry_at: string | null;
+  last_error: string | null;
   inviter_reward_status: InviterRewardStatus;
   inviter_rewards: InvitationRewardPreviewItem[];
 }

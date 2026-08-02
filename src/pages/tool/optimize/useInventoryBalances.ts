@@ -12,14 +12,19 @@ const EMPTY_INVENTORY: InventoryResponse = {
 export function useInventoryBalances(profileId: string) {
   const [inventory, setInventory] = useState<InventoryResponse>(EMPTY_INVENTORY)
   const [loaded, setLoaded] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
       setInventory(await apiJson<InventoryResponse>('/api/user/inventory'))
-    } catch {
-      setInventory(EMPTY_INVENTORY)
-    } finally {
       setLoaded(true)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '库存数据加载失败。')
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -43,5 +48,5 @@ export function useInventoryBalances(profileId: string) {
     [inventory.reorder_quotas, profileId],
   )
 
-  return { balances, capacity, reorderQuota, loaded, refresh }
+  return { balances, capacity, reorderQuota, loaded, loading, error, refresh }
 }

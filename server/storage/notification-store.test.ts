@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   ensureDatabaseSchema: vi.fn(),
   query: vi.fn(),
+  withTransaction: vi.fn(),
 }))
 
 vi.mock('./schema', () => ({ ensureDatabaseSchema: mocks.ensureDatabaseSchema }))
-vi.mock('./postgres', () => ({ query: mocks.query }))
+vi.mock('./postgres', () => ({ query: mocks.query, withTransaction: mocks.withTransaction }))
 
 import {
   listUserNotifications,
@@ -18,6 +19,13 @@ import {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.ensureDatabaseSchema.mockResolvedValue(undefined)
+  mocks.withTransaction.mockImplementation(async (work: (client: { query: (text: string, values?: unknown[]) => Promise<unknown> }) => Promise<unknown>) => work({
+    query: (text, values) => text.startsWith('set transaction')
+      ? Promise.resolve({ rows: [], rowCount: 0 })
+      : text.startsWith('select transaction_timestamp()')
+        ? Promise.resolve({ rows: [{ as_of: '2026-07-30T00:01:00.000Z' }], rowCount: 1 })
+      : mocks.query(text, values),
+  }))
 })
 
 describe('notification store', () => {
@@ -70,6 +78,26 @@ describe('notification store', () => {
     expect(page.notifications[0]?.payload.items[0]).not.toHaveProperty('grant_ids')
     expect(page.unread_count).toBe(2)
     expect(page.next_cursor).toEqual(expect.any(String))
+    expect(mocks.query.mock.calls[0]?.[0]).toContain('updated_at <= $3::timestamptz')
+    expect(mocks.query.mock.calls[0]?.[0]).toContain('order by updated_at desc, id desc')
+    expect(JSON.parse(Buffer.from(page.next_cursor!, 'base64url').toString('utf8'))).toEqual({
+      asOf: '2026-07-30T00:01:00.000Z',
+      updatedAt: '2026-07-30T00:00:02.000Z',
+      id: 'notification-2',
+    })
+    expect(page.as_of).toBe('2026-07-30T00:01:00.000Z')
+  })
+
+  it('rejects unknown notification types and damaged payloads', async () => {
+    mocks.query
+      .mockResolvedValueOnce({ rows: [{ ...storedNotification('notification-1'), type: 'future_type' }] })
+      .mockResolvedValueOnce({ rows: [{ count: '1' }] })
+    await expect(listUserNotifications('user-1')).rejects.toThrow('Invalid stored notification contract.')
+
+    mocks.query
+      .mockResolvedValueOnce({ rows: [{ ...storedNotification('notification-1'), payload_json: { kind: 'item_grant', items: [] } }] })
+      .mockResolvedValueOnce({ rows: [{ count: '1' }] })
+    await expect(listUserNotifications('user-1')).rejects.toThrow('Invalid stored notification contract.')
   })
 
   it('marks owned notifications read and rejects unknown ids', async () => {

@@ -2,10 +2,16 @@ import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  adminGrantItem,
+  configureOnboardingTask,
   createCustomGiftPack,
+  createDistributionCampaign,
   createGiftPackDraft,
+  processInventoryCampaignBatch,
   publishGiftPackVersion,
   recoverStaleInventoryCampaignRecipients,
+  retryFailedCampaignRecipients,
+  updateCampaignStatus,
 } from './admin-inventory-store'
 import {
   getItemBalance,
@@ -14,12 +20,16 @@ import {
   grantItem,
   grantItemInTransaction,
   listInventory,
+  listOnboardingTasks,
+  markOnboardingTaskComplete,
   refundReservedItemsInTransaction,
   reserveItemsInTransaction,
   useInventoryItem,
 } from './inventory-store'
 import { closePool, query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import { buildAuthPayload } from '../handlers/user-auth'
+import type { UserAccountRecord } from './user-store'
 
 let container: PostgreSqlContainer
 
@@ -49,7 +59,7 @@ describe('PostgreSQL unified inventory', () => {
     })])
   })
 
-  it('consumes the earliest expiring batch and refunds once with a renewed relative lifetime', async () => {
+  it('consumes the earliest expiring batch and refunds once with the original absolute expiry', async () => {
     const { userId, profileId } = await seedUserProfile()
     const grantedAt = '2026-07-01T00:00:00.000Z'
     await grantItem({ userId, itemCode: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' }, sourceType: 'test', sourceId: 'permanent', recipientRole: 'test', now: grantedAt })
@@ -70,7 +80,46 @@ describe('PostgreSQL unified inventory', () => {
       [userId],
     )
     expect(refund.rows[0]?.count).toBe('1')
-    expect(new Date(refund.rows[0]!.expires_at).toISOString()).toBe('2026-07-08T00:00:00.000Z')
+    expect(new Date(refund.rows[0]!.expires_at).toISOString()).toBe('2026-07-06T00:00:00.000Z')
+  })
+
+  it('does not restore an already expired reservation as renewed inventory', async () => {
+    const { userId, profileId } = await seedUserProfile()
+    await grantItem({
+      userId,
+      itemCode: 'priority_compute_coupon',
+      quantity: 1,
+      expiry: { mode: 'relative_days', days: 2 },
+      sourceType: 'test',
+      sourceId: 'expires-during-reservation',
+      recipientRole: 'test',
+      now: '2026-07-01T00:00:00.000Z',
+    })
+    await withTransaction((client) => reserveItemsInTransaction(
+      client,
+      userId,
+      ['priority_compute_coupon'],
+      'optimization_job',
+      'job-expired-refund',
+      profileId,
+      '2026-07-02T00:00:00.000Z',
+    ))
+
+    const refundedAt = '2026-07-04T00:00:00.000Z'
+    await withTransaction((client) => refundReservedItemsInTransaction(client, 'optimization_job', 'job-expired-refund', refundedAt))
+
+    expect(await getItemBalance(userId, 'priority_compute_coupon', new Date(refundedAt))).toBe(0)
+    const consumption = await query<{ refunded_grant_id: string | null }>(
+      "select refunded_grant_id from reward_consumptions where reference_id = 'job-expired-refund'",
+    )
+    expect(consumption.rows[0]?.refunded_grant_id).toBeNull()
+    const ledger = await query<{ metadata_json: { restored: boolean; original_expires_at: string } }>(
+      "select metadata_json from inventory_ledger where reference_id = 'job-expired-refund' and event_type = 'refund'",
+    )
+    expect(ledger.rows[0]?.metadata_json).toMatchObject({
+      restored: false,
+      original_expires_at: '2026-07-03T00:00:00.000Z',
+    })
   })
 
   it('allows only one concurrent reservation to claim the final coupon', async () => {
@@ -83,6 +132,39 @@ describe('PostgreSQL unified inventory', () => {
     expect(attempts.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
     expect(attempts.filter((result) => result.status === 'rejected')).toHaveLength(1)
     expect(await getItemBalance(userId, 'priority_compute_coupon')).toBe(0)
+  })
+
+  it('serializes concurrent reservations so both can consume a multi-quantity grant', async () => {
+    const { userId, profileId } = await seedUserProfile()
+    await grantItem({ userId, itemCode: 'priority_compute_coupon', quantity: 2, expiry: { mode: 'never' }, sourceType: 'test', sourceId: 'multi', recipientRole: 'test' })
+
+    const attempts = await Promise.allSettled(['job-multi-a', 'job-multi-b'].map((jobId) => (
+      withTransaction((client) => reserveItemsInTransaction(client, userId, ['priority_compute_coupon'], 'optimization_job', jobId, profileId))
+    )))
+
+    expect(attempts.every((result) => result.status === 'fulfilled')).toBe(true)
+    expect(await getItemBalance(userId, 'priority_compute_coupon')).toBe(0)
+  })
+
+  it('keeps onboarding list rewards and enabled state pinned to the completed version', async () => {
+    const { userId } = await seedUserProfile()
+    await configureOnboardingTask('root', 'welcome_inventory', true, [
+      { item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' } },
+    ])
+    await markOnboardingTaskComplete(userId, 'welcome_inventory', '2026-07-01T00:00:00.000Z')
+    await configureOnboardingTask('root', 'welcome_inventory', false, [
+      { item_code: 'training_diagnosis_coupon', quantity: 2, expiry: { mode: 'never' } },
+    ])
+
+    const task = (await listOnboardingTasks(userId)).find((entry) => entry.code === 'welcome_inventory')
+
+    expect(task).toMatchObject({
+      enabled: true,
+      status: 'claimable',
+      rewards: [{ item_code: 'priority_compute_coupon', quantity: 1 }],
+    })
+    expect(task?.version).toBeGreaterThan(1)
+    expect(task?.version_id).toBeTruthy()
   })
 
   it('keeps issued gift packs pinned to their original immutable version', async () => {
@@ -134,6 +216,55 @@ describe('PostgreSQL unified inventory', () => {
     await expect(useInventoryItem(userId, { item_code: 'plan_capacity_certificate', quantity: 1, profile_id: profileId, idempotency_key: randomUUID() })).rejects.toMatchObject({ code: 'capacity_limit_reached' })
     expect(await getProfileCapacityLimits(profileId)).toMatchObject({ plan: 20 })
     expect(await getItemBalance(userId, 'plan_capacity_certificate')).toBe(1)
+  })
+
+  it('projects expanded history and archive capacities through an auth refresh without trimming stored results', async () => {
+    const { userId, profileId } = await seedUserProfile()
+    const history = Array.from({ length: 6 }, (_, index) => historyItem(`history-${index + 1}`))
+    const archived = [historyItem('archive-1')]
+    const workspace = {
+      version: 1,
+      profile_id: profileId,
+      operators: null,
+      config: null,
+      elite_overrides: {},
+      last_result: null,
+      saved_configs: [],
+      result_history: history,
+      archived_results: archived,
+      free_schedule_entitlement: null,
+      updated_at: '2026-07-01T00:00:00.000Z',
+    }
+    await query(
+      `insert into user_profile_workspaces
+        (profile_id, operators_json, config_json, elite_overrides_json, last_result_json, record_json, updated_at)
+       values ($1, null, null, '{}'::jsonb, null, $2::jsonb, $3)`,
+      [profileId, JSON.stringify(workspace), workspace.updated_at],
+    )
+    const user = (await query<{ record_json: UserAccountRecord }>(
+      'select record_json from user_accounts where id = $1',
+      [userId],
+    )).rows[0]!.record_json
+
+    const before = await buildAuthPayload(user, profileId)
+    expect(before.workspace?.result_history).toHaveLength(5)
+    expect(before.workspace?.archived_results).toHaveLength(0)
+
+    await grantItem({ userId, itemCode: 'history_capacity_certificate', quantity: 1, expiry: { mode: 'never' }, sourceType: 'test', sourceId: 'history-capacity-refresh', recipientRole: 'test' })
+    await grantItem({ userId, itemCode: 'result_archive_folder', quantity: 1, expiry: { mode: 'never' }, sourceType: 'test', sourceId: 'archive-capacity-refresh', recipientRole: 'test' })
+    await useInventoryItem(userId, { item_code: 'history_capacity_certificate', quantity: 1, profile_id: profileId, idempotency_key: randomUUID() })
+    await useInventoryItem(userId, { item_code: 'result_archive_folder', quantity: 1, profile_id: profileId, idempotency_key: randomUUID() })
+
+    const refreshed = await buildAuthPayload(user, profileId)
+    expect(refreshed.workspace?.result_history.map((item) => item.id)).toEqual(history.map((item) => item.id))
+    expect(refreshed.workspace?.archived_results.map((item) => item.id)).toEqual(['archive-1'])
+    const stored = await query<{ history_count: number; archive_count: number }>(
+      `select jsonb_array_length(record_json->'result_history') as history_count,
+              jsonb_array_length(record_json->'archived_results') as archive_count
+         from user_profile_workspaces where profile_id = $1`,
+      [profileId],
+    )
+    expect(stored.rows[0]).toEqual({ history_count: 6, archive_count: 1 })
   })
 
   it('lists lifetime and limited vouchers with their dedicated actions and fixed expiry', async () => {
@@ -261,6 +392,138 @@ describe('PostgreSQL unified inventory', () => {
       [campaignId, userId],
     )
     expect(recipient.rows[0]).toEqual({ status: 'pending', processed_at: null })
+    await updateCampaignStatus('root', campaignId, 'cancel', 'test cleanup')
+  })
+
+  it('replays administrator grants and campaigns without duplicating assets or snapshots', async () => {
+    const { userId } = await seedUserProfile()
+    const grantInput = {
+      userId,
+      itemCode: 'priority_compute_coupon',
+      quantity: 2,
+      validityDays: 0,
+      reason: 'idempotency regression',
+      idempotencyKey: randomUUID(),
+    }
+    const firstGrantId = await adminGrantItem('root', grantInput)
+    const replayedGrantId = await adminGrantItem('root', grantInput)
+    expect(replayedGrantId).toBe(firstGrantId)
+    expect(await getItemBalance(userId, 'priority_compute_coupon')).toBe(2)
+
+    const campaignInput = {
+      itemCode: 'training_diagnosis_coupon',
+      quantity: 1,
+      validityDays: 0,
+      targetMode: 'user_ids' as const,
+      userIds: [userId],
+      reason: 'campaign idempotency regression',
+      idempotencyKey: randomUUID(),
+    }
+    const firstCampaign = await createDistributionCampaign('root', campaignInput)
+    const replayedCampaign = await createDistributionCampaign('root', campaignInput)
+    expect(replayedCampaign).toEqual(firstCampaign)
+    const campaigns = await query<{ count: string }>(
+      'select count(*)::text as count from inventory_distribution_campaigns where reason = $1',
+      [campaignInput.reason],
+    )
+    expect(campaigns.rows[0]?.count).toBe('1')
+    await updateCampaignStatus('root', String(firstCampaign.campaign_id), 'cancel', 'test cleanup')
+  })
+
+  it('replays custom gift pack creation with the original response', async () => {
+    const idempotencyKey = randomUUID()
+    const input = {
+      name: 'Idempotent pack',
+      description: 'Created once across response retries',
+      contents: [{ item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' as const } }],
+      idempotencyKey,
+    }
+
+    const first = await createCustomGiftPack('root', input)
+    const replayed = await createCustomGiftPack('root', input)
+
+    expect(replayed).toEqual(first)
+    const definitions = await query<{ count: string }>(
+      "select count(*)::text as count from item_definitions where name = 'Idempotent pack'",
+    )
+    expect(definitions.rows[0]?.count).toBe('1')
+  })
+
+  it('returns claimed recipients to a safe state when a campaign is paused or cancelled', async () => {
+    const { userId } = await seedUserProfile()
+    const campaignId = randomUUID()
+    await query(
+      `insert into inventory_distribution_campaigns
+        (id, item_code, quantity, validity_days, target_mode, status, reason, created_by, created_at, updated_at)
+       values ($1, 'priority_compute_coupon', 1, 0, 'user_ids', 'running', 'pause test', 'root', now(), now())`,
+      [campaignId],
+    )
+    await query(
+      `insert into inventory_distribution_recipients (campaign_id, user_id, status, processed_at)
+       values ($1, $2, 'processing', now())`,
+      [campaignId, userId],
+    )
+
+    await updateCampaignStatus('root', campaignId, 'pause', 'pause delivery')
+    expect((await query<{ status: string }>(
+      'select status from inventory_distribution_recipients where campaign_id = $1 and user_id = $2',
+      [campaignId, userId],
+    )).rows[0]?.status).toBe('pending')
+
+    await updateCampaignStatus('root', campaignId, 'resume', 'resume delivery')
+    await query(
+      "update inventory_distribution_recipients set status = 'processing', processed_at = now() where campaign_id = $1 and user_id = $2",
+      [campaignId, userId],
+    )
+    await updateCampaignStatus('root', campaignId, 'cancel', 'cancel delivery')
+    expect((await query<{ status: string }>(
+      'select status from inventory_distribution_recipients where campaign_id = $1 and user_id = $2',
+      [campaignId, userId],
+    )).rows[0]?.status).toBe('skipped')
+  })
+
+  it('retries campaign failures before exposing a partial completion and supports a controlled retry', async () => {
+    const { userId } = await seedUserProfile()
+    const campaign = await createDistributionCampaign('root', {
+      itemCode: 'priority_compute_coupon',
+      quantity: 1,
+      validityDays: 0,
+      targetMode: 'user_ids',
+      userIds: [userId],
+      reason: 'retry regression',
+      idempotencyKey: randomUUID(),
+    }) as { campaign_id: string }
+    await query("update item_definitions set issuance_enabled = false where code = 'priority_compute_coupon'")
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await query(
+        'update inventory_distribution_recipients set next_attempt_at = now() - interval \'1 second\' where campaign_id = $1',
+        [campaign.campaign_id],
+      )
+      await processInventoryCampaignBatch(1)
+    }
+
+    const failed = await query<{ campaign_status: string; recipient_status: string; attempt_count: number }>(
+      `select campaign.status as campaign_status, recipient.status as recipient_status, recipient.attempt_count
+         from inventory_distribution_campaigns campaign
+         join inventory_distribution_recipients recipient on recipient.campaign_id = campaign.id
+        where campaign.id = $1`,
+      [campaign.campaign_id],
+    )
+    expect(failed.rows[0]).toEqual({
+      campaign_status: 'completed_with_failures',
+      recipient_status: 'failed',
+      attempt_count: 3,
+    })
+
+    await query("update item_definitions set issuance_enabled = true where code = 'priority_compute_coupon'")
+    expect(await retryFailedCampaignRecipients('root', campaign.campaign_id, 'retry repaired delivery')).toBe(1)
+    await processInventoryCampaignBatch(1)
+    expect((await query<{ status: string }>(
+      'select status from inventory_distribution_campaigns where id = $1',
+      [campaign.campaign_id],
+    )).rows[0]?.status).toBe('completed')
+    expect(await getItemBalance(userId, 'priority_compute_coupon')).toBe(1)
   })
 })
 
@@ -268,19 +531,64 @@ async function seedUserProfile(): Promise<{ userId: string; profileId: string }>
   const userId = randomUUID()
   const profileId = randomUUID()
   const now = new Date().toISOString()
+  const email = `${userId}@inventory.test`
+  const userRecord: UserAccountRecord = {
+    version: 1,
+    id: userId,
+    email,
+    password_hash: 'hash',
+    salt: 'salt',
+    iterations: 1,
+    password_algorithm: 'pbkdf2-sha256',
+    permission: 'advanced',
+    status: 'active',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    email_verified_at: now,
+    created_at: now,
+    updated_at: now,
+  }
   await query(
     `insert into user_accounts
       (id, email, password_hash, salt, iterations, permission, status, record_json, created_at, updated_at)
      values ($1, $2, 'hash', 'salt', 1, 'advanced', 'active', $3::jsonb, $4, $4)`,
-    [userId, `${userId}@inventory.test`, JSON.stringify({ id: userId, email: `${userId}@inventory.test` }), now],
+    [userId, email, JSON.stringify(userRecord), now],
   )
+  const profileRecord = {
+    version: 1,
+    id: profileId,
+    user_id: userId,
+    kind: 'cdk',
+    cdk_key: null,
+    cdk_code_hash: null,
+    cdk_order_hash: null,
+    permission: 'advanced',
+    status: 'active',
+    display_name: 'Inventory test',
+    note: '',
+    created_at: now,
+    updated_at: now,
+  }
   await query(
     `insert into user_game_accounts
-      (id, user_id, permission, status, display_name, note, record_json, created_at, updated_at)
-     values ($1, $2, 'advanced', 'active', 'Inventory test', '', $3::jsonb, $4, $4)`,
-    [profileId, userId, JSON.stringify({ id: profileId, user_id: userId, kind: 'cdk', permission: 'advanced', status: 'active', display_name: 'Inventory test' }), now],
+      (id, user_id, permission, status, display_name, note, kind, record_json, created_at, updated_at)
+     values ($1, $2, 'advanced', 'active', 'Inventory test', '', 'cdk', $3::jsonb, $4, $4)`,
+    [profileId, userId, JSON.stringify(profileRecord), now],
   )
   return { userId, profileId }
+}
+
+function historyItem(id: string) {
+  return {
+    id,
+    name: id,
+    created_at: '2026-07-01T00:00:00.000Z',
+    config: null,
+    result: {},
+    operator_count: 0,
+    source: 'generated',
+  }
 }
 
 async function seedFreePreviewProfile(): Promise<{ userId: string; profileId: string }> {

@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import {
+  MAX_DEPOT_ITEM_COUNT,
+  MAX_DEPOT_ITEM_TYPES,
+  MAX_DEPOT_PROFILE_ID_LENGTH,
+} from '../../src/lib/depot-value-constraints'
 import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
 import {
   AUTH_EMAIL_MAX_LENGTH,
@@ -42,6 +47,61 @@ const shortString = (max = 256) => z.string().min(1).max(max)
 const optionalString = (max = 256) => z.string().max(max).optional()
 const optionalUnknown = z.unknown().optional()
 const strict = z.strictObject
+const depotCountSchema = z.number().int().min(0).max(MAX_DEPOT_ITEM_COUNT)
+const depotItemIdSchema = z.union([
+  z.string().trim().min(1).max(128),
+  z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+])
+const depotItemSchema = strict({
+  id: depotItemIdSchema.optional(),
+  itemId: depotItemIdSchema.optional(),
+  name: z.string().max(256).optional(),
+  have: depotCountSchema.optional(),
+  count: depotCountSchema.optional(),
+  quantity: depotCountSchema.optional(),
+}).superRefine((value, context) => {
+  if (value.id === undefined && value.itemId === undefined) {
+    context.addIssue({ code: 'custom', path: ['id'], message: '物品必须提供 id 或 itemId。' })
+  }
+  if (value.have === undefined && value.count === undefined && value.quantity === undefined) {
+    context.addIssue({ code: 'custom', path: ['count'], message: '物品必须提供 have、count 或 quantity。' })
+  }
+})
+const depotInventorySchema = z.union([
+  z.record(z.string().min(1).max(128), depotCountSchema).refine((value) => {
+    const itemCount = Object.keys(value).length
+    return itemCount > 0 && itemCount <= MAX_DEPOT_ITEM_TYPES
+  }),
+  strict({
+    '@type': z.literal('@penguin-statistics/depot').optional(),
+    items: z.array(depotItemSchema).min(1).max(MAX_DEPOT_ITEM_TYPES),
+  }),
+])
+const depotValueRequestSchema = z.discriminatedUnion('source', [
+  strict({ source: z.literal('upload'), inventory: depotInventorySchema }),
+  strict({
+    source: z.literal('skland'),
+    profile_id: z.string().trim().min(1).max(MAX_DEPOT_PROFILE_ID_LENGTH),
+    sample_consent: z.boolean(),
+  }),
+])
+const depotSampleRevokeSchema = strict({
+  profile_id: z.string().trim().min(1).max(MAX_DEPOT_PROFILE_ID_LENGTH),
+})
+const inventoryExpirySchema = z.discriminatedUnion('mode', [
+  strict({ mode: z.literal('never') }),
+  strict({ mode: z.literal('relative_days'), days: z.number().int().min(1).max(3650) }),
+])
+const inventoryRewardSchema = strict({
+  item_code: shortString(128),
+  quantity: z.number().int().min(1).max(10000),
+  expiry: inventoryExpirySchema,
+})
+const invitationRewardSchema = inventoryRewardSchema.extend({
+  recipient: z.enum(['inviter', 'invitee']),
+  gift_pack_version_id: shortString(128).nullable(),
+})
+const inventoryReasonSchema = z.string().trim().min(2).max(500)
 
 const siteFeatureShape = Object.fromEntries(
   SITE_FEATURE_KEYS.map((key) => [key, z.boolean()]),
@@ -53,6 +113,8 @@ const adminPermissionSchema = z.enum(
 )
 
 export const requestSchemas = {
+  depotValue: depotValueRequestSchema,
+  depotSampleRevoke: depotSampleRevokeSchema,
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
   authRegister: strict({
     email: shortString(AUTH_EMAIL_MAX_LENGTH),
@@ -71,6 +133,7 @@ export const requestSchemas = {
     old_password: z.string().max(AUTH_PASSWORD_MAX_LENGTH),
     new_password: z.string().min(AUTH_PASSWORD_MIN_LENGTH).max(AUTH_PASSWORD_MAX_LENGTH),
   }),
+  userInvitationCode: strict({ action: z.enum(['ensure', 'rotate', 'pause', 'resume']) }),
   accountDelete: strict({
     email: z.string().email().max(AUTH_EMAIL_MAX_LENGTH),
     password: z.string().min(1).max(AUTH_PASSWORD_MAX_LENGTH),
@@ -107,21 +170,44 @@ export const requestSchemas = {
   adminInvitationSettings: strict({
     enabled: z.boolean().optional(),
     daily_inviter_reward_limit: z.number().int().min(1).max(1000).optional(),
-    rewards: z.array(z.unknown()).max(32).optional(),
+    rewards: z.array(invitationRewardSchema).max(32).optional(),
+    expected_revision: expectedRevisionSchema,
   }),
   adminRegistrationSettings: strict({
     email_verification_required: z.boolean(),
     invite_code_required: z.boolean(),
+    email_provider_priority: z.tuple([z.enum(['brevo', 'ses']), z.enum(['brevo', 'ses'])])
+      .refine(([first, second]) => first !== second, 'Email providers must not be repeated'),
     brevo_quota_action: z.enum(['pause_registration', 'allow_unverified_registration']),
     admin_invite_email_reserve: z.number().int().min(0).max(300),
     password_reset_email_reserve: z.number().int().min(0).max(300),
   }),
   adminFeatureSettings: strict({ features: siteFeaturesSchema, expected_revision: expectedRevisionSchema }),
   adminPublicContent: publicContentDraftSchema.extend({ expected_revision: expectedRevisionSchema }),
-  adminRegistrationInvitationCreate: strict({}),
-  adminRegistrationInvitationPatch: strict({
+  adminRegistrationInvitationCreate: strict({
+    reason: inventoryReasonSchema,
+    idempotency_key: shortString(200),
+    root_password: shortString(128),
+  }),
+  adminRegistrationInvitationPatch: z.discriminatedUnion('action', [
+    strict({
+      invitation_id: shortString(128),
+      action: z.literal('revoke'),
+      reason: inventoryReasonSchema,
+      root_password: shortString(128),
+    }),
+    strict({
+      invitation_id: shortString(128),
+      action: z.literal('resend_verification'),
+      reason: inventoryReasonSchema,
+      root_password: shortString(128),
+    }),
+  ]),
+  adminInvitationSettlement: strict({
     invitation_id: shortString(128),
-    action: z.literal('revoke'),
+    action: z.literal('replay'),
+    reason: inventoryReasonSchema,
+    root_password: shortString(128),
   }),
   adminRiskSettings: strict({ operator_data_risk_enabled: z.boolean().optional() }),
   adminBehaviorRiskReview: strict({
@@ -155,15 +241,20 @@ export const requestSchemas = {
   announcement: strict({
     banner: z.unknown().nullable(),
     announcements: z.array(z.unknown()).max(100),
+    expected_revision: expectedRevisionSchema,
   }),
   usageStats: strict({
     event: shortString(64),
     visitor_id: optionalString(128),
     announcement_id: optionalString(120),
     announcement_kind: optionalString(32),
+    announcement_version: optionalString(64),
     source: optionalString(120),
   }),
-  userAnnouncement: strict({ announcement_id: optionalString(128), all: z.boolean().optional() }),
+  userAnnouncement: z.union([
+    strict({ announcement_id: shortString(128) }),
+    strict({ all: z.literal(true) }),
+  ]),
   userNotification: z.union([
     strict({ notification_id: shortString(128) }),
     strict({ all: z.literal(true) }),
@@ -197,10 +288,17 @@ export const requestSchemas = {
   }),
   meteredPersonalProfile: strict({ profile_id: optionalString(128), display_name: optionalString(40), note: optionalString(500) }),
   commercialProfileCreate: strict({ display_name: optionalString(40), note: optionalString(500) }),
-  commercialProfilePatch: strict({
-    profile_id: shortString(128), action: z.enum(['update', 'archive', 'restore']),
-    display_name: optionalString(40), note: optionalString(500),
-  }),
+  commercialProfilePatch: z.discriminatedUnion('action', [
+    strict({
+      profile_id: shortString(128), action: z.enum(['update', 'archive', 'restore']),
+      display_name: optionalString(40), note: optionalString(500),
+    }),
+    strict({
+      action: z.literal('batch_archive'),
+      profile_ids: z.array(shortString(128)).min(1).max(100),
+      operation_id: shortString(128),
+    }),
+  ]),
   commercialProfileDelete: strict({ profile_id: shortString(128), confirm_permanent_delete: z.literal(true) }),
   userWorkspace: strict({
     profile_id: shortString(128),
@@ -273,6 +371,7 @@ export const requestSchemas = {
         'newcomer_supply_pack',
       ])).max(3).optional(),
       historySource: z.enum(['generated', 'applied_suggestions']).optional(),
+      billing_quote_id: optionalString(128),
       pricing_version: optionalString(64),
       accepted_max_points: optionalString(32),
     }),
@@ -311,6 +410,7 @@ export const requestSchemas = {
     amount: shortString(32),
     reason: shortString(500),
     idempotency_key: shortString(200),
+    root_password: shortString(128),
     original_transaction_id: optionalString(128),
   }),
   adminCommercial: strict({
@@ -318,7 +418,13 @@ export const requestSchemas = {
     active_profile_limit: z.number().int().min(1).max(100000).optional(),
     total_profile_limit: z.number().int().min(1).max(100000).optional(),
     suspended: z.boolean().optional(),
-    reason: optionalString(500),
+    reason: inventoryReasonSchema,
+    expected_revision: expectedRevisionSchema,
+    idempotency_key: shortString(128),
+    root_password: shortString(128),
+  }).refine((body) => body.active_profile_limit !== undefined
+    || body.total_profile_limit !== undefined || body.suspended !== undefined, {
+    message: 'At least one commercial account mutation is required.',
   }),
   onboardingTaskClaim: strict({
     task_code: z.enum(['welcome_inventory', 'bind_skland', 'first_main_schedule']).optional(),
@@ -328,6 +434,7 @@ export const requestSchemas = {
     profile_id: shortString(128),
     result_id: shortString(128),
     idempotency_key: shortString(200),
+    use_coupon: z.literal(true).optional(),
   }),
   fullResultExport: strict({
     profile_id: shortString(128),
@@ -340,34 +447,75 @@ export const requestSchemas = {
     action: z.enum(['archive', 'unarchive', 'delete']),
     idempotency_key: shortString(200),
   }),
-  adminItems: strict({
-    action: shortString(64),
-    item_code: optionalString(128),
-    name: optionalString(80),
-    description: optionalString(500),
-    icon_key: optionalString(128),
-    issuance_enabled: z.boolean().optional(),
-    contents: z.array(z.unknown()).max(100).optional(),
-    version_id: optionalString(128),
-    task_code: z.enum(['welcome_inventory', 'bind_skland', 'first_main_schedule']).optional(),
-    enabled: z.boolean().optional(),
-    rewards: z.array(z.unknown()).max(100).optional(),
-  }),
-  adminInventory: strict({
-    action: shortString(64),
-    root_password: optionalUnknown,
-    user_id: optionalString(128),
-    user_ids: z.array(shortString(128)).max(10000).optional(),
-    campaign_id: optionalString(128),
-    grant_id: optionalString(128),
-    item_code: optionalString(128),
-    gift_pack_version_id: optionalString(128),
-    quantity: z.number().int().min(1).max(10000).optional(),
-    validity_days: z.number().int().min(0).max(3650).optional(),
-    target_mode: z.enum(['user_ids', 'all_users']).optional(),
-    reason: optionalString(500),
-    confirmation: optionalString(128),
-  }),
+  adminItems: z.discriminatedUnion('action', [
+    strict({
+      action: z.literal('create_gift_pack'),
+      name: shortString(80),
+      description: shortString(500),
+      icon_key: optionalString(128),
+      contents: z.array(inventoryRewardSchema).min(1).max(100),
+      idempotency_key: shortString(200),
+    }),
+    strict({
+      action: z.literal('create_gift_pack_version'),
+      item_code: shortString(128),
+      contents: z.array(inventoryRewardSchema).min(1).max(100),
+      idempotency_key: shortString(200),
+    }),
+    strict({ action: z.literal('publish_gift_pack_version'), version_id: shortString(128) }),
+    strict({ action: z.literal('retire_gift_pack_version'), version_id: shortString(128) }),
+    strict({
+      action: z.literal('update_item'),
+      item_code: shortString(128),
+      name: optionalString(80),
+      description: optionalString(500),
+      icon_key: optionalString(128),
+      issuance_enabled: z.boolean().optional(),
+    }),
+    strict({
+      action: z.literal('configure_onboarding_task'),
+      task_code: z.enum(['welcome_inventory', 'bind_skland', 'first_main_schedule']),
+      enabled: z.boolean(),
+      rewards: z.array(inventoryRewardSchema).max(100),
+    }),
+  ]),
+  adminInventory: z.discriminatedUnion('action', [
+    strict({
+      action: z.literal('grant'),
+      user_id: shortString(128),
+      item_code: shortString(128),
+      gift_pack_version_id: optionalString(128),
+      quantity: z.number().int().min(1).max(10000),
+      validity_days: z.number().int().min(0).max(3650),
+      reason: inventoryReasonSchema,
+      idempotency_key: shortString(200),
+    }),
+    strict({ action: z.literal('revoke_grant'), grant_id: shortString(128), reason: inventoryReasonSchema }),
+    strict({
+      action: z.literal('create_campaign'),
+      root_password: optionalUnknown,
+      user_ids: z.array(shortString(128)).max(10000).optional(),
+      item_code: shortString(128),
+      gift_pack_version_id: optionalString(128),
+      quantity: z.number().int().min(1).max(10000),
+      validity_days: z.number().int().min(0).max(3650),
+      target_mode: z.enum(['user_ids', 'all_users']),
+      reason: inventoryReasonSchema,
+      confirmation: optionalString(128),
+      idempotency_key: shortString(200),
+    }),
+    strict({ action: z.literal('pause_campaign'), campaign_id: shortString(128), reason: inventoryReasonSchema }),
+    strict({ action: z.literal('resume_campaign'), campaign_id: shortString(128), reason: inventoryReasonSchema }),
+    strict({ action: z.literal('cancel_campaign'), campaign_id: shortString(128), reason: inventoryReasonSchema }),
+    strict({
+      action: z.literal('reverse_campaign'),
+      campaign_id: shortString(128),
+      reason: inventoryReasonSchema,
+      root_password: optionalUnknown,
+    }),
+    strict({ action: z.literal('retry_campaign_failures'), campaign_id: shortString(128), reason: inventoryReasonSchema }),
+    strict({ action: z.literal('process_campaigns') }),
+  ]),
 } as const
 
 const none = (): RequestMethodPolicy => ({ bodyProfile: 'none' })
@@ -414,6 +562,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
     POST: json('admin', requestSchemas.adminRegistrationInvitationCreate),
     PATCH: json('admin', requestSchemas.adminRegistrationInvitationPatch),
   }, ['page', 'page_size', 'status'])],
+  ['/api/admin/invitation-settlements', route({ POST: json('admin', requestSchemas.adminInvitationSettlement) })],
   ['/api/admin/optimization', route({ GET: none(), POST: json('admin', requestSchemas.adminOptimization) }, ['view', 'status', 'limit', 'id'])],
   ['/api/admin/session', route({ GET: none(), POST: json('auth', requestSchemas.adminSession), DELETE: none() })],
   ['/api/admin/users', route({ GET: none(), POST: json('admin', requestSchemas.adminUserCreate), PATCH: json('admin', requestSchemas.adminUserPatch), DELETE: json('admin', requestSchemas.adminUserDelete) }, ['user_id', 'profile_id', 'include', 'page', 'page_size', 'search'])],
@@ -439,7 +588,10 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/announcement', route({ GET: none(), PUT: json('admin', requestSchemas.announcement) }, ['admin'])],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
-  ['/api/depot-value', route({ POST: json('depot', z.unknown()) })],
+  ['/api/depot-value', route({
+    POST: json('depot', requestSchemas.depotValue),
+    DELETE: json('standard', requestSchemas.depotSampleRevoke),
+  })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) })],
   ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],
@@ -458,8 +610,8 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/workspace/free-schedule/confirm', route({ POST: json('standard', requestSchemas.workspaceFreeScheduleConfirm) })],
   ['/api/user/behavior-risk/engagement', route({ POST: json('standard', requestSchemas.behaviorRiskEngagement) })],
   ['/api/user/invitations', route({ GET: none() }, ['cursor', 'limit'])],
-  ['/api/user/invitations/code', route({ POST: none() })],
-  ['/api/user/rewards', route({ GET: none() })],
+  ['/api/user/invitations/code', route({ POST: json('standard', requestSchemas.userInvitationCode) })],
+  ['/api/user/priority-coupon-balance', route({ GET: none() })],
   ['/api/user/inventory', route({ GET: none(), POST: json('standard', requestSchemas.inventoryUse) })],
   ['/api/user/inventory/lifetime-profile', route({ POST: json('standard', requestSchemas.lifetimeVoucherProfileCreate) })],
   ['/api/user/cdk/redeem', route({ POST: json('standard', requestSchemas.cdkRedeem) })],

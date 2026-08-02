@@ -1,0 +1,3 @@
+export const MAX_DEPOT_ITEM_COUNT = 1_000_000_000
+export const MAX_DEPOT_ITEM_TYPES = 20_000
+export const MAX_DEPOT_PROFILE_ID_LENGTH = 128

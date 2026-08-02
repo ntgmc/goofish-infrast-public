@@ -4,6 +4,7 @@ import type {
   BrevoEmailPurpose,
   BrevoEmailStats,
   BrevoOfficialQuotaStatus,
+  EmailProvider,
 } from '../../src/lib/types'
 import { withTransaction, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
@@ -20,11 +21,14 @@ const PURPOSES: BrevoEmailPurpose[] = [
   'account_deletion_receipt',
 ]
 
-export interface BrevoEmailReservation {
+export interface EmailDeliveryReservation {
   id: string
   quotaDate: string
   purpose: BrevoEmailPurpose
+  provider: EmailProvider
 }
+
+export type BrevoEmailReservation = EmailDeliveryReservation & { provider: 'brevo' }
 
 export interface BrevoEmailQuotaPolicy {
   adminInviteReserve: number
@@ -89,7 +93,7 @@ export async function reserveBrevoEmail(
 ): Promise<BrevoEmailReservation> {
   await ensureSchema()
   const quotaDate = getUtcDate(now)
-  const reservation: BrevoEmailReservation = { id: randomUUID(), quotaDate, purpose }
+  const reservation: BrevoEmailReservation = { id: randomUUID(), quotaDate, purpose, provider: 'brevo' }
 
   await withTransaction(async (client) => {
     await lockQuotaDate(client, quotaDate)
@@ -110,8 +114,8 @@ export async function reserveBrevoEmail(
     }
     await client.query(
       `insert into brevo_email_deliveries
-        (id, quota_date, purpose, status, reserved_at, completed_at)
-       values ($1, $2::date, $3, 'reserved', $4, null)`,
+        (id, quota_date, provider, purpose, status, reserved_at, completed_at)
+       values ($1, $2::date, 'brevo', $3, 'reserved', $4, null)`,
       [reservation.id, quotaDate, purpose, now.toISOString()],
     )
   })
@@ -119,20 +123,40 @@ export async function reserveBrevoEmail(
   return reservation
 }
 
-export async function markBrevoEmailSent(reservation: BrevoEmailReservation): Promise<void> {
+export async function reserveSesEmail(
+  purpose: BrevoEmailPurpose,
+  now = new Date(),
+): Promise<EmailDeliveryReservation> {
+  await ensureSchema()
+  const reservation: EmailDeliveryReservation = {
+    id: randomUUID(),
+    quotaDate: getUtcDate(now),
+    purpose,
+    provider: 'ses',
+  }
+  await query(
+    `insert into brevo_email_deliveries
+      (id, quota_date, provider, purpose, status, reserved_at, completed_at)
+     values ($1, $2::date, 'ses', $3, 'reserved', $4, null)`,
+    [reservation.id, reservation.quotaDate, purpose, now.toISOString()],
+  )
+  return reservation
+}
+
+export async function markEmailDeliverySent(reservation: EmailDeliveryReservation): Promise<void> {
   await completeReservation(reservation.id, 'sent')
 }
 
-export async function markBrevoEmailFailed(reservation: BrevoEmailReservation): Promise<void> {
+export async function markEmailDeliveryFailed(reservation: EmailDeliveryReservation): Promise<void> {
   await completeReservation(reservation.id, 'failed')
 }
 
-export async function markBrevoEmailUncertain(reservation: BrevoEmailReservation): Promise<void> {
+export async function markEmailDeliveryUncertain(reservation: EmailDeliveryReservation): Promise<void> {
   await completeReservation(reservation.id, 'uncertain')
 }
 
-export async function releaseBrevoEmailReservation(reservation: BrevoEmailReservation): Promise<void> {
-  await markBrevoEmailFailed(reservation)
+export async function releaseEmailDeliveryReservation(reservation: EmailDeliveryReservation): Promise<void> {
+  await markEmailDeliveryFailed(reservation)
 }
 
 export async function getBrevoOfficialQuotaSnapshot(
@@ -242,6 +266,7 @@ export async function getBrevoEmailStats(now = new Date(), days = 7): Promise<Br
               count(*) filter (where status = 'sent' and purpose = 'account_deletion_receipt')::text as account_deletion_receipt_count
          from brevo_email_deliveries
         where quota_date between $1::date and $2::date
+          and provider = 'brevo'
         group by quota_date
         order by quota_date asc`,
       [dates[0], dates[dates.length - 1]],
@@ -311,8 +336,9 @@ async function countActiveDeliveries(
 ): Promise<number> {
   const result = await client.query<{ count: string }>(
     `select count(*)::text as count
-       from brevo_email_deliveries
+      from brevo_email_deliveries
       where quota_date = $1::date
+        and provider = 'brevo'
         and status = any($2::text[])`,
     [quotaDate, ACTIVE_STATUSES],
   )

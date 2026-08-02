@@ -43,6 +43,9 @@ export default function AuthForm({
   const [cdk, setCdk] = useState('')
   const [inviteCode, setInviteCode] = useState(() => new URLSearchParams(window.location.search).get('invite')?.trim().toUpperCase() ?? '')
   const [inviteCodeRequired, setInviteCodeRequired] = useState<boolean | null>(null)
+  const [registrationSettingsLoading, setRegistrationSettingsLoading] = useState(false)
+  const [registrationSettingsError, setRegistrationSettingsError] = useState<string | null>(null)
+  const [registrationSettingsAttempt, setRegistrationSettingsAttempt] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -54,14 +57,21 @@ export default function AuthForm({
   useEffect(() => {
     if (mode !== 'register' || inviteCodeRequired !== null) return
     const controller = new AbortController()
+    setRegistrationSettingsLoading(true)
+    setRegistrationSettingsError(null)
     void apiJson<{ invite_code_required?: boolean }>('/api/auth/registration-settings', {
       signal: controller.signal,
       fallbackMessage: copy.auth.components_AuthForm_004,
     })
       .then((data) => setInviteCodeRequired(data.invite_code_required === true))
-      .catch(() => undefined)
+      .catch((caught) => {
+        if ((caught as Error).name !== 'AbortError') {
+          setRegistrationSettingsError((caught as Error).message || '注册设置加载失败，请重试。')
+        }
+      })
+      .finally(() => setRegistrationSettingsLoading(false))
     return () => controller.abort()
-  }, [inviteCodeRequired, mode])
+  }, [inviteCodeRequired, mode, registrationSettingsAttempt])
 
   useEffect(() => {
     if (mode === 'login' && !features.login) setMode(features.registration ? 'register' : 'forgot')
@@ -82,6 +92,10 @@ export default function AuthForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    if (mode === 'register' && inviteCodeRequired === null) {
+      setError(registrationSettingsError ?? '正在确认注册要求，请稍后再试。')
+      return
+    }
     const nextErrors: FieldErrors = {}
     const emailValidation = validateEmailInputForMode(mode, email)
     const passwordError = mode === 'forgot' ? null : validatePasswordInput(password)
@@ -290,7 +304,7 @@ export default function AuthForm({
         </label>
       )}
 
-      {mode === 'register' && (
+      {mode === 'register' && <>
         <label className="block">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">
             {inviteCodeRequired ? copy.auth.components_AuthForm_032 : copy.auth.components_AuthForm_015}
@@ -313,7 +327,23 @@ export default function AuthForm({
           />
           <FieldMessage id="auth-invite-code-error" message={fieldErrors.inviteCode} />
         </label>
-      )}
+        {registrationSettingsLoading && (
+          <p className="-mt-3 text-sm text-ink-muted" role="status">正在确认邀请码要求...</p>
+        )}
+        {registrationSettingsError && (
+          <div className="tool-alert tool-alert--error -mt-2 flex flex-wrap items-center justify-between gap-3" role="alert">
+            <span>{registrationSettingsError}</span>
+            <button
+              type="button"
+              className="tool-secondary-action min-h-9 px-3 text-sm"
+              onClick={() => {
+                setRegistrationSettingsError(null)
+                setRegistrationSettingsAttempt((current) => current + 1)
+              }}
+            >重试</button>
+          </div>
+        )}
+      </>}
 
       {mode === 'login' && (
         <button type="button" onClick={() => { setMode('forgot'); setError(null); setNotice(null); setFieldErrors({}); setShowVerificationResend(false); setResendCooldownSeconds(0) }} className="tool-secondary-action min-h-11 w-fit px-3 text-sm">
@@ -340,7 +370,7 @@ export default function AuthForm({
         </button>
       )}
 
-      <button type="submit" disabled={loading} className={`min-h-12 ${submitClassName ?? 'tool-primary-action w-full px-6 py-3'}`}>
+      <button type="submit" disabled={loading || (mode === 'register' && inviteCodeRequired === null)} className={`min-h-12 ${submitClassName ?? 'tool-primary-action w-full px-6 py-3'}`}>
         {loading ? copy.auth.components_AuthForm_019 : mode === 'login' ? copy.auth.components_AuthForm_020 : mode === 'register' ? copy.auth.components_AuthForm_021 : copy.auth.components_AuthForm_022}
       </button>
     </form>

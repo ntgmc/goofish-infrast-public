@@ -11,6 +11,7 @@ vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson: (...args: unknow
 const overview: AdminInvitationSettingsResponse = {
   settings: {
     version: 2,
+    revision: 3,
     enabled: true,
     activation_rule: 'first_active_profile',
     daily_inviter_reward_limit: 10,
@@ -46,5 +47,10 @@ describe('InvitationSettingsSection', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByText('方案扩容证')).toBeInTheDocument()
     expect(screen.getByText(/有未保存修改/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '保存邀请设置' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/invitation-settings', expect.objectContaining({
+      method: 'PUT',
+      json: expect.objectContaining({ expected_revision: 3 }),
+    })))
   })
 })

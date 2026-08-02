@@ -7,7 +7,7 @@ import { copy } from '../../../copy/index'
 
 
 
-export default function AnnouncementsSection() {
+export default function AnnouncementsSection({ onUnreadCountChange }: { onUnreadCountChange: (count: number) => void }) {
   const [items, setItems] = useState<UserAnnouncementRead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -17,15 +17,16 @@ export default function AnnouncementsSection() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await apiJson<{ announcements?: UserAnnouncementRead[] }>('/api/user/announcements', { fallbackMessage: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_001 })
+      const data = await apiJson<{ announcements?: UserAnnouncementRead[]; unread_count?: number }>('/api/user/announcements', { fallbackMessage: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_001 })
       setItems(data.announcements ?? [])
+      onUnreadCountChange(data.unread_count ?? 0)
       setError(null)
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [onUnreadCountChange])
 
   useEffect(() => { void load() }, [load])
 
@@ -36,13 +37,14 @@ export default function AnnouncementsSection() {
     else setMarkingId(announcementId)
 
     try {
-      const data = await apiJson<{ announcements?: UserAnnouncementRead[] }>('/api/user/announcements', {
+      const data = await apiJson<{ announcements?: UserAnnouncementRead[]; unread_count?: number }>('/api/user/announcements', {
         method: 'PATCH',
         json: announcementId ? { announcement_id: announcementId } : { all: true },
         fallbackMessage: copy.dashboard.pages_tool_dashboard_AnnouncementsSection_002,
       })
       if (Array.isArray(data.announcements)) setItems(data.announcements)
       else await load()
+      if (typeof data.unread_count === 'number') onUnreadCountChange(data.unread_count)
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -51,6 +53,8 @@ export default function AnnouncementsSection() {
     }
   }
 
+  const unreadCount = items.filter((item) => !item.read_at).length
+
   return (
     <section className="max-w-4xl space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -58,7 +62,7 @@ export default function AnnouncementsSection() {
         <button
           type="button"
           onClick={() => void markRead()}
-          disabled={markingAll || markingId !== null}
+          disabled={loading || unreadCount === 0 || markingAll || markingId !== null}
           className="tool-secondary-action disabled:cursor-wait"
         >
           {markingAll ? copy.dashboard.pages_tool_dashboard_AnnouncementsSection_004 : copy.dashboard.pages_tool_dashboard_AnnouncementsSection_005}

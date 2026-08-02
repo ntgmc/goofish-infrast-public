@@ -55,7 +55,7 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
     || /^\/api\/user\/onboarding-tasks\/[^/]+\/claim$/.test(pathname)) {
     return ['inventory', 'onboarding_tasks']
   }
-  if (pathname === '/api/user/invitations' || pathname === '/api/user/invitations/code' || pathname === '/api/user/rewards') {
+  if (pathname === '/api/user/invitations' || pathname === '/api/user/invitations/code' || pathname === '/api/user/priority-coupon-balance') {
     return ['invitations']
   }
   if (pathname.startsWith('/api/user/skland/free-preview/')) return ['free_preview', 'skland']

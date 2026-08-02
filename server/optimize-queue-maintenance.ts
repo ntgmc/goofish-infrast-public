@@ -41,6 +41,9 @@ async function runQueueMaintenance(): Promise<void> {
     const expired = await store.expireQueuedJobs(now)
     const billing = await store.reconcileBilling?.()
     await processPendingOptimizationJobEffects()
+    if (billing && (billing.repaired > 0 || billing.quarantined > 0)) {
+      console.warn(`[billing-reconciliation] repaired ${billing.repaired}; queued ${billing.quarantined} cases for review`)
+    }
     if (billing?.anomalies) {
       console.error(`[billing-reconciliation] detected ${billing.anomalies} reservation/account projection inconsistencies`)
       await recordUsageEvent('metered_billing', {

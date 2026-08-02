@@ -23,6 +23,19 @@ export interface MeteredScheduleQuote {
   charge: string
 }
 
+export interface IssuedMeteredScheduleQuote extends MeteredScheduleQuote {
+  quote_id: string
+  expires_at: string
+  available: string
+  sufficient: boolean
+}
+
+export interface MeteredQuoteConfirmation {
+  quoteId: string
+  pricingVersion: string
+  acceptedMaxPoints: string
+}
+
 const policy = productPolicies.metered_billing
 
 export function getCommercialTierSummary(

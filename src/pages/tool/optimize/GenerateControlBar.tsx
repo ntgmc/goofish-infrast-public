@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
 import InfoTooltip from '../../../components/InfoTooltip'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
-import type { LicenseConfig, RewardBalance } from '../../../lib/types'
+import type { LicenseConfig, PriorityCouponBalance } from '../../../lib/types'
 import { InlineErrorPanel } from './feedback'
 import type { ValidationState } from './types'
 import { copy, CURRENT_LOCALE } from '../../../copy/index'
@@ -40,7 +40,7 @@ export default function GenerateControlBar({
   hasResult: boolean
   resultIsCurrent: boolean
   error: string | null
-  priorityCoupon: { balance: RewardBalance | null; selected: boolean; onChange: (selected: boolean) => void }
+  priorityCoupon: { balance: PriorityCouponBalance | null; selected: boolean; onChange: (selected: boolean) => void }
   additionalCoupons?: Array<{ id: string; label: string; help: string; balance: number; selected: boolean; onChange: (selected: boolean) => void }>
   extraDisabledReason?: string | null
   onGenerate: () => void

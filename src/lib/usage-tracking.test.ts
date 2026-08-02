@@ -69,6 +69,8 @@ describe('tool visit tracking', () => {
     })
 
     await expect(reportToolVisit()).resolves.toBeUndefined()
+    const firstVisitorId = apiVoidMock.mock.calls[0]?.[1]?.json?.visitor_id
+    expect(getOrCreateToolVisitorId()).toBe(firstVisitorId)
 
     expect(apiVoid).toHaveBeenCalledWith('/api/usage-stats', expect.objectContaining({
       method: 'POST',

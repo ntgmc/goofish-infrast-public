@@ -10,21 +10,34 @@ import {
 } from './optimize-job-store'
 import { emptyWorkspace, getWorkspace, saveWorkspace, updateProfileWorkspaceAtomically, updateProfileWorkspaceInTransaction } from './user-store'
 import {
+  activateInvitationForUser,
   ensureInvitationCode,
-  getRewardBalances,
+  getInvitationSummary,
+  getPriorityCouponBalances,
+  manageInvitationCode,
   processInvitationSettlementBatch,
+  replayInvitationSettlement,
   saveInvitationSettings,
-  settleInvitationForActivatedUser,
+  type InvitationSettingsPatch,
+  validateInvitationCode,
 } from './invitation-store'
 import { confirmFreeScheduleEntitlement, getFreeScheduleEntitlement } from './reorder-admission'
-import { adjustBalance, getBalanceSummary } from './balance-store'
-import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
+import { adjustBalance, getBalanceSummary, reverseQualificationCredit } from './balance-store'
+import { issueMeteredScheduleQuote } from './metered-billing-store'
 import { recordOperatorFingerprintInTransaction } from './cdk-store'
 import { getItemBalance, grantItem } from './inventory-store'
+import { SettingsConflictError } from './settings-conflict'
 
 let container: PostgreSqlContainer
 const legacyJobId = randomUUID()
 const legacyJobCreatedAt = '2026-01-01T00:00:00.000Z'
+
+async function saveTestInvitationSettings(patch: InvitationSettingsPatch) {
+  const revision = (await query<{ revision: number }>(
+    "select revision from invitation_settings where key = 'global'",
+  )).rows[0]?.revision ?? 0
+  return saveInvitationSettings('root', patch, revision)
+}
 
 beforeAll(async () => {
   container = await new PostgreSqlContainer('postgres:16-alpine').start()
@@ -456,16 +469,55 @@ describe('PostgreSQL optimization job admission', () => {
        values ($1, $2, $3, $4, 'registered', now(), now())`,
       [randomUUID(), inviter, invitee, code],
     )
-    await saveInvitationSettings('root', {
+    await saveTestInvitationSettings({
       rewards: [
         { recipient: 'inviter', item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'never' }, gift_pack_version_id: null },
         { recipient: 'invitee', item_code: 'priority_compute_coupon', quantity: 1, expiry: { mode: 'relative_days', days: 30 }, gift_pack_version_id: null },
       ],
     })
-    await Promise.all(Array.from({ length: 4 }, () => settleInvitationForActivatedUser(invitee)))
-    expect((await getRewardBalances(inviter))[0].available).toBe(1)
-    expect((await getRewardBalances(invitee))[0].available).toBe(1)
+    await Promise.all(Array.from({ length: 4 }, () => activateInvitationForUser(invitee)))
+    expect((await query<{ status: string }>('select status from invitations where invitee_user_id = $1', [invitee])).rows[0]?.status).toBe('activated')
+    await expect(processInvitationSettlementBatch(10)).resolves.toBeGreaterThanOrEqual(1)
+    expect((await getPriorityCouponBalances(inviter))[0].available).toBe(1)
+    expect((await getPriorityCouponBalances(invitee))[0].available).toBe(1)
     expect((await query<{ count: string }>('select count(*)::text as count from reward_grants where source_type = $1 and user_id = $2', ['invitation', inviter])).rows[0]?.count).toBe('1')
+  })
+
+  it('rejects a stale invitation settings revision', async () => {
+    const revision = (await query<{ revision: number }>(
+      "select revision from invitation_settings where key = 'global'",
+    )).rows[0]?.revision ?? 0
+    await saveInvitationSettings('first-admin', { daily_inviter_reward_limit: 9 }, revision)
+    await expect(saveInvitationSettings('second-admin', { daily_inviter_reward_limit: 8 }, revision))
+      .rejects.toBeInstanceOf(SettingsConflictError)
+  })
+
+  it('pauses, resumes, and rotates a recommendation code with cooldown audit', async () => {
+    const profileId = await seedProfile()
+    const userId = (await query<{ user_id: string }>(
+      'select user_id from user_game_accounts where id = $1', [profileId],
+    )).rows[0]!.user_id
+    const original = await ensureInvitationCode(userId)
+    const base = Date.now() + 60_000
+    await manageInvitationCode(userId, 'pause', new Date(base))
+    await expect(validateInvitationCode(original)).rejects.toMatchObject({ code: 'invalid_invite_code' })
+    await manageInvitationCode(userId, 'resume', new Date(base + 60_000))
+    await expect(validateInvitationCode(original)).resolves.toMatchObject({ inviter_user_id: userId })
+    const rotated = await manageInvitationCode(userId, 'rotate', new Date(base + 120_000))
+    expect(rotated.code).not.toBe(original)
+    await expect(validateInvitationCode(original)).rejects.toMatchObject({ code: 'invalid_invite_code' })
+    await expect(validateInvitationCode(rotated.code)).resolves.toMatchObject({ inviter_user_id: userId })
+    await expect(getInvitationSummary(userId)).resolves.toMatchObject({
+      code: rotated.code,
+      code_status: 'active',
+      as_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    })
+    await expect(manageInvitationCode(userId, 'rotate', new Date(base + 60 * 60_000)))
+      .rejects.toMatchObject({ code: 'rotation_cooldown' })
+    expect((await query<{ actions: string[] }>(
+      'select array_agg(action order by created_at) as actions from invitation_code_audit where user_id = $1',
+      [userId],
+    )).rows[0]?.actions).toEqual(['create', 'pause', 'resume', 'rotate'])
   })
 
   it('counts a multi-item inviter reward group as one daily invitation under concurrency', async () => {
@@ -476,7 +528,7 @@ describe('PostgreSQL optimization job admission', () => {
     const inviteeUsers = await Promise.all(invitees.map(async (profileId) => (
       (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [profileId])).rows[0]!.user_id
     )))
-    await saveInvitationSettings('root', {
+    await saveTestInvitationSettings({
       enabled: true,
       daily_inviter_reward_limit: 1,
       rewards: [
@@ -493,7 +545,8 @@ describe('PostgreSQL optimization job admission', () => {
       )
     }
 
-    await Promise.all(inviteeUsers.map((invitee) => settleInvitationForActivatedUser(invitee)))
+    await Promise.all(inviteeUsers.map((invitee) => activateInvitationForUser(invitee)))
+    await Promise.all([processInvitationSettlementBatch(10), processInvitationSettlementBatch(10)])
 
     const invitations = await query<{ rewarded: string; settled: string }>(
       `select count(*) filter (where inviter_rewarded_at is not null)::text as rewarded,
@@ -520,7 +573,7 @@ describe('PostgreSQL optimization job admission', () => {
     const code = await ensureInvitationCode(inviter)
     const inviteeProfileId = await seedProfile()
     const invitee = (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [inviteeProfileId])).rows[0]!.user_id
-    await saveInvitationSettings('root', {
+    await saveTestInvitationSettings({
       enabled: false,
       rewards: [{ recipient: 'inviter', item_code: 'scenario_simulation_coupon', quantity: 1, expiry: { mode: 'relative_days', days: 7 }, gift_pack_version_id: null }],
     })
@@ -531,13 +584,13 @@ describe('PostgreSQL optimization job admission', () => {
       [invitationId, inviter, invitee, code],
     )
 
-    await settleInvitationForActivatedUser(invitee)
+    await activateInvitationForUser(invitee)
     expect((await query<{ status: string; settings_snapshot: { enabled: boolean } }>(
       'select status, settings_snapshot from invitations where id = $1', [invitationId],
     )).rows[0]).toMatchObject({ status: 'activated', settings_snapshot: { enabled: false } })
     expect((await query<{ count: string }>('select count(*)::text as count from reward_grants where source_id = $1', [invitationId])).rows[0]?.count).toBe('0')
 
-    await saveInvitationSettings('root', {
+    await saveTestInvitationSettings({
       enabled: true,
       rewards: [{ recipient: 'inviter', item_code: 'priority_compute_coupon', quantity: 99, expiry: { mode: 'never' }, gift_pack_version_id: null }],
     })
@@ -548,6 +601,105 @@ describe('PostgreSQL optimization job admission', () => {
     )
     expect(grants.rows).toEqual([{ reward_type: 'scenario_simulation_coupon', original_quantity: 1, validity_days: 7 }])
     expect((await query<{ status: string }>('select status from invitations where id = $1', [invitationId])).rows[0]?.status).toBe('settled')
+  })
+
+  it('reconciles a registered invitation when the invitee already has an active profile', async () => {
+    const inviterProfileId = await seedProfile()
+    const inviter = (await query<{ user_id: string }>(
+      'select user_id from user_game_accounts where id = $1', [inviterProfileId],
+    )).rows[0]!.user_id
+    const code = await ensureInvitationCode(inviter)
+    const inviteeProfileId = await seedProfile()
+    const invitee = (await query<{ user_id: string }>(
+      'select user_id from user_game_accounts where id = $1', [inviteeProfileId],
+    )).rows[0]!.user_id
+    const invitationId = randomUUID()
+    await saveTestInvitationSettings({
+      enabled: true,
+      rewards: [{
+        recipient: 'invitee', item_code: 'priority_compute_coupon', quantity: 1,
+        expiry: { mode: 'never' }, gift_pack_version_id: null,
+      }],
+    })
+    await query(
+      `insert into invitations (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, updated_at)
+       values ($1, $2, $3, $4, 'registered', now(), now())`,
+      [invitationId, inviter, invitee, code],
+    )
+
+    await expect(processInvitationSettlementBatch(10)).resolves.toBeGreaterThanOrEqual(1)
+
+    expect((await query<{ status: string; activated_at: string | null }>(
+      'select status, activated_at::text from invitations where id = $1', [invitationId],
+    )).rows[0]).toMatchObject({ status: 'settled', activated_at: expect.any(String) })
+    expect((await getPriorityCouponBalances(invitee))[0].available).toBe(1)
+  })
+
+  it('isolates a poison invitation and dead-letters it without blocking later settlements', async () => {
+    const inviterProfileId = await seedProfile()
+    const inviter = (await query<{ user_id: string }>(
+      'select user_id from user_game_accounts where id = $1', [inviterProfileId],
+    )).rows[0]!.user_id
+    const code = await ensureInvitationCode(inviter)
+    const inviteeProfileIds = await Promise.all([seedProfile(), seedProfile()])
+    const invitees = await Promise.all(inviteeProfileIds.map(async (profileId) => (
+      (await query<{ user_id: string }>('select user_id from user_game_accounts where id = $1', [profileId])).rows[0]!.user_id
+    )))
+    await saveTestInvitationSettings({
+      enabled: true,
+      rewards: [{
+        recipient: 'invitee', item_code: 'priority_compute_coupon', quantity: 1,
+        expiry: { mode: 'never' }, gift_pack_version_id: null,
+      }],
+    })
+    const poisonId = randomUUID()
+    const healthyId = randomUUID()
+    for (const [id, invitee] of [[poisonId, invitees[0]!], [healthyId, invitees[1]!]] as const) {
+      await query(
+        `insert into invitations (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, updated_at)
+         values ($1, $2, $3, $4, 'registered', now(), now())`,
+        [id, inviter, invitee, code],
+      )
+      await activateInvitationForUser(invitee)
+    }
+    await query(
+      `update invitations
+          set settings_snapshot = jsonb_set(settings_snapshot, '{rewards,0,quantity}', '0'::jsonb),
+              activated_at = now() - interval '1 hour'
+        where id = $1`,
+      [poisonId],
+    )
+
+    await expect(processInvitationSettlementBatch(2)).resolves.toBe(2)
+    expect((await query<{ status: string; attempt_count: number }>(
+      'select status, attempt_count from invitations where id = $1', [poisonId],
+    )).rows[0]).toEqual({ status: 'failed', attempt_count: 1 })
+    expect((await query<{ status: string }>('select status from invitations where id = $1', [healthyId])).rows[0]?.status).toBe('settled')
+
+    for (let attempt = 1; attempt < 5; attempt += 1) {
+      await query("update invitations set next_retry_at = now() where id = $1 and status = 'failed'", [poisonId])
+      await expect(processInvitationSettlementBatch(1)).resolves.toBe(1)
+    }
+    expect((await query<{ status: string; attempt_count: number; dead_lettered_at: string | null }>(
+      'select status, attempt_count, dead_lettered_at::text from invitations where id = $1', [poisonId],
+    )).rows[0]).toMatchObject({ status: 'dead_letter', attempt_count: 5, dead_lettered_at: expect.any(String) })
+    expect((await getPriorityCouponBalances(invitees[1]!))[0].available).toBe(1)
+
+    await query(
+      `update invitations poison
+          set settings_snapshot = healthy.settings_snapshot
+         from invitations healthy
+        where poison.id = $1 and healthy.id = $2`,
+      [poisonId, healthyId],
+    )
+    await expect(replayInvitationSettlement('root', poisonId, 'snapshot repaired')).resolves.toBe(true)
+    await expect(processInvitationSettlementBatch(1)).resolves.toBe(1)
+    expect((await query<{ status: string }>('select status from invitations where id = $1', [poisonId])).rows[0]?.status).toBe('settled')
+    expect((await query<{ count: string }>(
+      `select count(*)::text as count from admin_registration_invitation_audit
+        where invitation_id = $1 and action = 'replay_settlement'`,
+      [poisonId],
+    )).rows[0]?.count).toBe('1')
   })
 
   it('atomically consumes a priority coupon and refunds it once on terminal failure', async () => {
@@ -568,12 +720,12 @@ describe('PostgreSQL optimization job admission', () => {
       reward_user_id: userId,
       use_priority_coupon: true,
     }))
-    expect((await getRewardBalances(userId))[0].available).toBe(0)
+    expect((await getPriorityCouponBalances(userId))[0].available).toBe(0)
     const claimed = await store.claimNextJob('test-worker', 'coupon-lock', new Date(Date.now() + 60_000).toISOString(), 2)
     expect(claimed?.id).toBe(admitted.job.id)
     await store.failAttempt(admitted.job.id, claimed!.attempt_count, 'test-worker', 'coupon-lock', 'system failure')
     await store.failAttempt(admitted.job.id, claimed!.attempt_count, 'test-worker', 'coupon-lock', 'duplicate failure')
-    expect((await getRewardBalances(userId))[0].available).toBe(1)
+    expect((await getPriorityCouponBalances(userId))[0].available).toBe(1)
     expect((await query<{ status: string }>('select status from reward_consumptions where optimization_job_id = $1', [admitted.job.id])).rows[0]?.status).toBe('refunded')
   })
 
@@ -824,9 +976,9 @@ describe('PostgreSQL optimization job admission', () => {
       created_at: new Date(Date.now() - 25 * 60 * 60_000).toISOString(),
     }))
 
-    expect((await getRewardBalances(userId))[0].available).toBe(0)
+    expect((await getPriorityCouponBalances(userId))[0].available).toBe(0)
     await expect(store.expireQueuedJobs(new Date().toISOString())).resolves.toBeGreaterThanOrEqual(1)
-    expect((await getRewardBalances(userId))[0].available).toBe(1)
+    expect((await getPriorityCouponBalances(userId))[0].available).toBe(1)
     expect((await query<{ status: string }>(
       'select status from reward_consumptions where optimization_job_id = $1',
       [admitted.job.id],
@@ -946,10 +1098,9 @@ describe('PostgreSQL optimization job admission', () => {
       userId, kind: 'admin_credit', amount: '1200.00', referenceType: 'admin_adjustment',
       referenceId: randomUUID(), idempotencyKey: `fund:${userId}`, adminUsername: 'root', reason: 'metered test',
     })
-    const quote = getMeteredScheduleQuote('metered_personal')
     const first = await store.admitJob(input({
       priority: 500_000, owner_key: `profile:${profileId}`, profile_id: profileId,
-      permission: 'metered_advanced', billing: { userId, quote },
+      permission: 'metered_advanced', billing: await meteredBillingConfirmation(userId, profileId),
     }))
     expect(first.job.billing_json).toMatchObject({ status: 'reserved', charge: '600.00' })
     expect(await getBalanceSummary(userId)).toMatchObject({ available: '600.00', reserved: '600.00' })
@@ -961,7 +1112,7 @@ describe('PostgreSQL optimization job admission', () => {
 
     const second = await store.admitJob(input({
       priority: 500_001, owner_key: `profile:${profileId}`, profile_id: profileId,
-      permission: 'metered_advanced', billing: { userId, quote },
+      permission: 'metered_advanced', billing: await meteredBillingConfirmation(userId, profileId),
     }))
     const failedClaim = await store.claimNextJob('billing-failure-worker', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 2, 100)
     expect(failedClaim?.id).toBe(second.job.id)
@@ -972,7 +1123,7 @@ describe('PostgreSQL optimization job admission', () => {
 
     const pending = await store.admitJob(input({
       priority: 500_002, owner_key: `profile:${profileId}`, profile_id: profileId,
-      permission: 'metered_advanced', billing: { userId, quote },
+      permission: 'metered_advanced', billing: await meteredBillingConfirmation(userId, profileId),
     }))
     await query("update optimize_jobs set status = 'failed', updated_at = now() - interval '2 days' where id = $1", [pending.job.id])
     await store.cleanupOldJobs(new Date(Date.now() - 24 * 60 * 60_000).toISOString())
@@ -982,6 +1133,243 @@ describe('PostgreSQL optimization job admission', () => {
     await query("update optimize_jobs set updated_at = now() - interval '2 days' where id = $1", [pending.job.id])
     await store.cleanupOldJobs(new Date(Date.now() - 24 * 60 * 60_000).toISOString())
     expect(await store.getJob(pending.job.id)).toBeNull()
+  })
+
+  it('quotes commercial billing from net qualification points and free balance', async () => {
+    const { userId, profileId } = await seedMeteredProfile()
+    await query(
+      `update user_game_accounts
+          set kind = 'metered_commercial', record_json = record_json || '{"kind":"metered_commercial"}'::jsonb
+        where id = $1`,
+      [profileId],
+    )
+    await query(
+      `insert into user_balance_accounts
+        (user_id, available, reserved, lifetime_credited, qualification_reversed, debt, updated_at)
+       values ($1, 1000, 250, 100000, 90000, 0, now())
+       on conflict (user_id) do update
+         set available = excluded.available,
+             reserved = excluded.reserved,
+             lifetime_credited = excluded.lifetime_credited,
+             qualification_reversed = excluded.qualification_reversed,
+             debt = excluded.debt,
+             updated_at = excluded.updated_at`,
+      [userId],
+    )
+
+    const quote = await issueMeteredScheduleQuote(userId, profileId)
+
+    expect(quote).toMatchObject({
+      billing_kind: 'metered_commercial',
+      tier: 1,
+      charge: '900.00',
+      available: '750.00',
+      sufficient: false,
+    })
+  })
+
+  it('rejects a confirmed commercial price after a qualification reversal raises the charge', async () => {
+    const { userId, profileId } = await seedMeteredProfile()
+    await query(
+      `update user_game_accounts
+          set kind = 'metered_commercial', record_json = record_json || '{"kind":"metered_commercial"}'::jsonb
+        where id = $1`,
+      [profileId],
+    )
+    const credit = await adjustBalance({
+      userId,
+      kind: 'admin_credit',
+      amount: '30000.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `commercial-price-fund:${userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+      reason: 'commercial price revalidation test',
+    })
+    const billing = await meteredBillingConfirmation(userId, profileId)
+    expect(billing.confirmation.acceptedMaxPoints).toBe('800.00')
+    await reverseQualificationCredit({
+      userId,
+      originalTransactionId: credit.transaction.id,
+      amount: '20000.00',
+      reason: 'qualification correction after quote',
+      idempotencyKey: `commercial-price-reversal:${userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+    })
+
+    await expect(createPostgresOptimizeJobStore().admitJob(input({
+      priority: 500_005,
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      permission: 'metered_advanced',
+      billing,
+    }))).rejects.toMatchObject({ code: 'pricing_changed', status: 409 })
+    expect((await query<{ count: string }>(
+      'select count(*)::text as count from user_balance_reservations where profile_id = $1',
+      [profileId],
+    )).rows[0]?.count).toBe('0')
+  })
+
+  it('rejects reused and expired billing quote ids without creating another reservation', async () => {
+    const store = createPostgresOptimizeJobStore()
+    const used = await seedMeteredProfile()
+    await adjustBalance({
+      userId: used.userId,
+      kind: 'admin_credit',
+      amount: '1200.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `used-quote-fund:${used.userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+      reason: 'used quote test',
+    })
+    const usedBilling = await meteredBillingConfirmation(used.userId, used.profileId)
+    await store.admitJob(input({
+      priority: 500_006,
+      owner_key: `profile:${used.profileId}`,
+      profile_id: used.profileId,
+      permission: 'metered_advanced',
+      billing: usedBilling,
+    }))
+    await expect(store.admitJob(input({
+      priority: 500_007,
+      owner_key: `profile:${used.profileId}`,
+      profile_id: used.profileId,
+      permission: 'metered_advanced',
+      billing: usedBilling,
+    }))).rejects.toMatchObject({ code: 'quote_already_used', status: 409 })
+    expect((await query<{ count: string }>(
+      'select count(*)::text as count from user_balance_reservations where profile_id = $1',
+      [used.profileId],
+    )).rows[0]?.count).toBe('1')
+
+    const expired = await seedMeteredProfile()
+    await adjustBalance({
+      userId: expired.userId,
+      kind: 'admin_credit',
+      amount: '600.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `expired-quote-fund:${expired.userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+      reason: 'expired quote test',
+    })
+    const expiredBilling = await meteredBillingConfirmation(expired.userId, expired.profileId)
+    await query('update metered_billing_quotes set expires_at = now() - interval \'1 second\' where id = $1', [
+      expiredBilling.confirmation.quoteId,
+    ])
+    await expect(store.admitJob(input({
+      priority: 500_008,
+      owner_key: `profile:${expired.profileId}`,
+      profile_id: expired.profileId,
+      permission: 'metered_advanced',
+      billing: expiredBilling,
+    }))).rejects.toMatchObject({ code: 'pricing_changed', status: 409 })
+    expect((await query<{ count: string }>(
+      'select count(*)::text as count from user_balance_reservations where profile_id = $1',
+      [expired.profileId],
+    )).rows[0]?.count).toBe('0')
+  })
+
+  it('revalidates a commercial suspension inside the admission transaction', async () => {
+    const { userId, profileId } = await seedMeteredProfile()
+    await query(
+      `update user_game_accounts
+          set kind = 'metered_commercial', record_json = record_json || '{"kind":"metered_commercial"}'::jsonb
+        where id = $1`,
+      [profileId],
+    )
+    await adjustBalance({
+      userId,
+      kind: 'admin_credit',
+      amount: '10000.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `commercial-fund:${userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+      reason: 'commercial admission race test',
+    })
+    const billing = await meteredBillingConfirmation(userId, profileId)
+    await query(
+      `insert into commercial_account_limits
+        (user_id, active_profile_limit, total_profile_limit, suspended_at, suspension_reason, updated_at)
+       values ($1, 100, 1000, now(), 'concurrent review', now())
+       on conflict (user_id) do update
+         set suspended_at = excluded.suspended_at,
+             suspension_reason = excluded.suspension_reason,
+             revision = commercial_account_limits.revision + 1,
+             updated_at = excluded.updated_at`,
+      [userId],
+    )
+
+    await expect(createPostgresOptimizeJobStore().admitJob(input({
+      priority: 500_010,
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      permission: 'metered_advanced',
+      billing,
+    }))).rejects.toMatchObject({ code: 'commercial_suspended', status: 409 })
+    expect((await query<{ count: string }>(
+      'select count(*)::text as count from user_balance_reservations where profile_id = $1',
+      [profileId],
+    )).rows[0]?.count).toBe('0')
+  })
+
+  it('repairs balance projections and quarantines ambiguous billing mismatches', async () => {
+    const { userId, profileId } = await seedMeteredProfile()
+    await adjustBalance({
+      userId,
+      kind: 'admin_credit',
+      amount: '1200.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `reconciliation-fund:${userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+      reason: 'billing reconciliation test',
+    })
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      priority: 500_020,
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      permission: 'metered_advanced',
+      billing: await meteredBillingConfirmation(userId, profileId),
+    }))
+    await query('update user_balance_accounts set reserved = 700 where user_id = $1', [userId])
+
+    const repaired = await store.reconcileBilling?.()
+
+    expect(repaired?.repaired).toBeGreaterThanOrEqual(1)
+    expect((await query<{ reserved: string }>(
+      'select reserved::text from user_balance_accounts where user_id = $1',
+      [userId],
+    )).rows[0]?.reserved).toBe('600.00')
+    expect((await query<{ status: string }>(
+      "select status from billing_reconciliation_cases where kind = 'account_projection_mismatch' and user_id = $1 order by last_seen_at desc limit 1",
+      [userId],
+    )).rows[0]?.status).toBe('resolved')
+
+    await query("update user_balance_reservations set status = 'consumed', settled_at = now() where job_id = $1", [admitted.job.id])
+    await query('update user_balance_accounts set reserved = 0 where user_id = $1', [userId])
+    await query("update optimize_jobs set status = 'failed', finished_at = now(), updated_at = now() where id = $1", [admitted.job.id])
+
+    const quarantined = await store.reconcileBilling?.()
+
+    expect(quarantined?.quarantined).toBeGreaterThanOrEqual(1)
+    expect((await query<{ status: string }>(
+      "select status from billing_reconciliation_cases where kind = 'reservation_job_mismatch' and job_id = $1",
+      [admitted.job.id],
+    )).rows[0]?.status).toBe('pending_review')
+    expect((await query<{ status: string }>(
+      'select status from user_balance_reservations where job_id = $1',
+      [admitted.job.id],
+    )).rows[0]?.status).toBe('consumed')
   })
 
   it('preserves both concurrent workspace updates under the profile lock', async () => {
@@ -1054,6 +1442,10 @@ describe('PostgreSQL optimization job admission', () => {
       'history-3',
       'history-4',
     ])
+    expect(workspace?.result_history[0]).toMatchObject({
+      id: admitted.job.id,
+      job_id: admitted.job.id,
+    })
     expect(workspace?.last_result).toMatchObject({ title: 'new-result' })
     expect((await query<{ effect_type: string; status: string | null }>(
       `select effect_type, metadata_json->>'status' as status
@@ -1093,7 +1485,7 @@ describe('PostgreSQL optimization job admission', () => {
       permission: 'metered_advanced',
       source: 'account_profile',
       payload_json: formalSchedulePayload(profileId),
-      billing: { userId, quote: getMeteredScheduleQuote('metered_personal') },
+      billing: await meteredBillingConfirmation(userId, profileId),
     }))
     const claimed = await store.claimNextJob('invalid-result-worker', 'invalid-result-lock', new Date(Date.now() + 60_000).toISOString(), 2, 100)
     expect(claimed?.id).toBe(admitted.job.id)
@@ -1314,6 +1706,19 @@ async function seedMeteredProfile(): Promise<{ userId: string; profileId: string
     [profileId, userId, JSON.stringify(profile)],
   )
   return { userId, profileId }
+}
+
+async function meteredBillingConfirmation(userId: string, profileId: string) {
+  const quote = await issueMeteredScheduleQuote(userId, profileId)
+  return {
+    userId,
+    billingKind: quote.billing_kind,
+    confirmation: {
+      quoteId: quote.quote_id,
+      pricingVersion: quote.pricing_version,
+      acceptedMaxPoints: quote.charge,
+    },
+  }
 }
 
 function shanghaiMonthKey(value: string): string {
