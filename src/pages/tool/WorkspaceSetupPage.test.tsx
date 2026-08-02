@@ -8,6 +8,8 @@ import type { Announcement, AuthSuccessResponse, AuthUser, UserGameAccount } fro
 import AccountDashboard from './AccountDashboard'
 import WorkspaceSetupPage from './WorkspaceSetupPage'
 import { tourStorageKey } from '../../components/GuidedTour'
+import { cloneDefaultPublicContentSettings } from '../../lib/public-content'
+import * as publicContentContext from '../../lib/public-content-context'
 
 const { apiJsonMock } = vi.hoisted(() => ({
   apiJsonMock: vi.fn(),
@@ -23,10 +25,12 @@ vi.mock('../../lib/api-client', async (importOriginal) => {
 
 beforeEach(() => {
   apiJsonMock.mockReset()
+  vi.spyOn(publicContentContext, 'usePublicContent').mockReturnValue(publicContentValue('https://example.com/xianyu-listing'))
 })
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
 })
 
 describe('WorkspaceSetupPage CDK paths', () => {
@@ -266,7 +270,19 @@ describe('WorkspaceSetupPage CDK paths', () => {
     const purchaseLink = screen.getByRole('link', { name: '去闲鱼购买 CDK' })
     expect(purchaseLink).toHaveAttribute('target', '_blank')
     expect(purchaseLink).toHaveAttribute('rel', 'noopener noreferrer')
-    expect(purchaseLink).toHaveAttribute('href', expect.stringContaining('m.tb.cn'))
+    expect(purchaseLink).toHaveAttribute('href', 'https://example.com/xianyu-listing')
+  })
+
+  it.each([
+    { label: 'empty configuration', url: '', isFallback: false },
+    { label: 'initial configuration failure', url: 'https://example.com/stale-listing', isFallback: true },
+  ])('hides the CDK purchase path for $label', async ({ url, isFallback }) => {
+    vi.mocked(publicContentContext.usePublicContent).mockReturnValue(publicContentValue(url, isFallback))
+    const user = userEvent.setup()
+    renderWorkspace()
+    await openCdkTab(user)
+
+    expect(screen.queryByRole('link', { name: '去闲鱼购买 CDK' })).not.toBeInTheDocument()
   })
 
   it('can open the account dashboard directly on the CDK redemption path', async () => {
@@ -298,6 +314,12 @@ async function openCdkTab(user: ReturnType<typeof userEvent.setup>) {
   await user.click(cdkTab)
   expect(cdkTab).toHaveAttribute('aria-current', 'page')
   expect(screen.getByRole('heading', { name: '档案与 CDK' })).toBeInTheDocument()
+}
+
+function publicContentValue(xianyuUrl: string, isFallback = false): ReturnType<typeof publicContentContext.usePublicContent> {
+  const content = cloneDefaultPublicContentSettings()
+  content.cdk_purchase.xianyu_url = xianyuUrl
+  return { status: 'ready', isFallback, content, refresh: vi.fn() }
 }
 
 function renderWorkspace(overrides: {

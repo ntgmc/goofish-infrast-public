@@ -2,8 +2,9 @@ import { Link } from 'react-router'
 import BrandLogo from '../components/BrandLogo'
 import PublicFooter from '../components/PublicFooter'
 import ThemeSwitcher from '../components/ThemeSwitcher'
-import { ACTIVE_PURCHASE_CHANNEL } from '../lib/purchase'
+import { resolveActivePurchaseChannel } from '../lib/purchase'
 import { copy } from '../copy/index'
+import { usePublicContent } from '../lib/public-content-context'
 import { useTheme } from '../lib/theme'
 import { useSiteFeatures } from '../lib/site-feature-context'
 
@@ -38,7 +39,8 @@ const metrics = [
 ]
 
 export default function LandingPage({ onStart }: Props) {
-  const purchaseHref = ACTIVE_PURCHASE_CHANNEL?.href
+  const { content, isFallback } = usePublicContent()
+  const purchaseHref = isFallback ? undefined : resolveActivePurchaseChannel(content.cdk_purchase.xianyu_url)?.href
   const { resolvedTheme } = useTheme()
   const featureState = useSiteFeatures()
   const productAvailable = featureState.status === 'ready' && featureState.features.site

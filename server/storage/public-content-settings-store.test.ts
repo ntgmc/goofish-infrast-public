@@ -19,7 +19,14 @@ describe('public content settings store', () => {
   it('returns defaults without writing when no row exists', async () => {
     queryMock.mockResolvedValue({ rows: [] })
     const settings = await getPublicContentSettings()
-    expect(settings).toMatchObject({ version: 1, defaults_revision: 2, revision: 0, updated_at: null, qq_group: { number: '891655477' } })
+    expect(settings).toMatchObject({
+      version: 1,
+      defaults_revision: 3,
+      revision: 0,
+      updated_at: null,
+      cdk_purchase: { xianyu_url: DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url },
+      qq_group: { number: '891655477' },
+    })
     expect(queryMock).toHaveBeenCalledTimes(1)
   })
 
@@ -36,6 +43,7 @@ describe('public content settings store', () => {
       expect.any(String),
       0,
     ])
+    expect(queryMock.mock.calls[0]?.[1]?.[1]).toContain('"cdk_purchase"')
 
     const updated = await savePublicContentSettings(structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT), 1)
     expect(updated.revision).toBe(2)
@@ -52,9 +60,11 @@ describe('public content settings store', () => {
     await expect(savePublicContentSettings(structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT), 4)).rejects.toBeInstanceOf(SettingsConflictError)
   })
 
-  it('returns upgraded built-in credits to the management API for an older stored default', async () => {
+  it('returns upgraded built-in credits and the purchase URL to the management API for an older stored default', async () => {
     const stored = cloneDefaultPublicContentSettings()
     delete (stored as unknown as { defaults_revision?: number }).defaults_revision
+    delete (stored as unknown as { cdk_purchase?: unknown }).cdk_purchase
+    stored.qq_group.name = '管理员自定义群名'
     stored.thanks.sections[1].entries[0].avatar_url = 'https://avatars.githubusercontent.com/u/74061867?v=4'
     stored.thanks.sections[2].entries[0] = {
       id: 'all-helpers',
@@ -67,8 +77,10 @@ describe('public content settings store', () => {
 
     const settings = await getPublicContentSettings()
 
-    expect(settings.defaults_revision).toBe(2)
+    expect(settings.defaults_revision).toBe(3)
     expect(settings.revision).toBe(7)
+    expect(settings.cdk_purchase.xianyu_url).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.cdk_purchase.xianyu_url)
+    expect(settings.qq_group.name).toBe('管理员自定义群名')
     expect(settings.thanks.sections[1].entries[0]).toMatchObject({
       id: 'ntgmc',
       name: 'ntgmc',

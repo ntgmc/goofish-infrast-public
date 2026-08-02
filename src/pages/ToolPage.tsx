@@ -23,6 +23,7 @@ import { useSiteFeatures } from '../lib/site-feature-context'
 import type { SiteFeatures } from '../lib/site-features'
 import FeatureUnavailablePage from '../components/FeatureUnavailablePage'
 import { NotificationCenterProvider } from '../components/NotificationCenter'
+import { PublicContentProvider } from '../lib/public-content-context'
 
 
 const OptimizePage = lazy(() => import('./OptimizePage'))
@@ -154,25 +155,27 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     if (!features.profiles) return <FeatureUnavailablePage feature="profiles" />
     if (route.section === 'cdk' && !features.cdk_redemption) return <FeatureUnavailablePage feature="cdk_redemption" />
     return (
-      <NotificationCenterProvider userId={user.id}>
-        {features.announcements && <AnnouncementPopup announcements={popups} />}
-        <WorkspaceSetupPage
-          user={user}
-          profile={activeProfile}
-          workspace={workspace}
-          announcement={banner}
-          activeSection={route.section}
-          onSectionChange={navigateSetup}
-          onSaved={(payload) => {
-            applyAuthPayload(payload)
-            navigate(profileScopedPath(optimizePath('overview'), activeProfile.id))
-          }}
-          onSynced={applyAuthPayload}
-          onBack={() => navigate(dashboardPath('profiles'))}
-          onRedeemNewProfile={() => navigate(dashboardPath('redeem'))}
-          onLogout={handleLogout}
-        />
-      </NotificationCenterProvider>
+      <PublicContentProvider>
+        <NotificationCenterProvider userId={user.id}>
+          {features.announcements && <AnnouncementPopup announcements={popups} />}
+          <WorkspaceSetupPage
+            user={user}
+            profile={activeProfile}
+            workspace={workspace}
+            announcement={banner}
+            activeSection={route.section}
+            onSectionChange={navigateSetup}
+            onSaved={(payload) => {
+              applyAuthPayload(payload)
+              navigate(profileScopedPath(optimizePath('overview'), activeProfile.id))
+            }}
+            onSynced={applyAuthPayload}
+            onBack={() => navigate(dashboardPath('profiles'))}
+            onRedeemNewProfile={() => navigate(dashboardPath('redeem'))}
+            onLogout={handleLogout}
+          />
+        </NotificationCenterProvider>
+      </PublicContentProvider>
     )
   }
 

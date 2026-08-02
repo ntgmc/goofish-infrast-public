@@ -11,12 +11,13 @@ import SklandBindingDialog, { type SklandPayload } from '../../components/Skland
 import { ApiError, apiJson } from '../../lib/api-client'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig, validateConfig } from '../../lib/config'
 import { canonicalJson } from '../../lib/crypto'
-import { ACTIVE_PURCHASE_CHANNEL } from '../../lib/purchase'
+import { resolveActivePurchaseChannel } from '../../lib/purchase'
 import type { WorkspaceSetupSection } from '../../lib/app-routes'
 import { countOwnedOperators, formatDate, getEffectiveProfilePermission, getProfileAccessLabel, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from './tool-utils'
 import { copy } from '../../copy/index'
 import { hasCapability } from '../../lib/product-catalog'
 import { useSiteFeatures } from '../../lib/site-feature-context'
+import { usePublicContent } from '../../lib/public-content-context'
 import { NotificationBell } from '../../components/NotificationCenter'
 import { upgradeProfileWithCdk } from './profile-redemption'
 
@@ -56,6 +57,8 @@ export default function WorkspaceSetupPage({
   onLogout: () => void
 }) {
   const { features } = useSiteFeatures()
+  const { content, isFallback } = usePublicContent()
+  const activePurchaseChannel = isFallback ? undefined : resolveActivePurchaseChannel(content.cdk_purchase.xianyu_url)
   const onSectionChangeRef = useRef(onSectionChange)
   onSectionChangeRef.current = onSectionChange
   const setupTour = useFirstRunTour({ id: 'workspace-setup', version: 1 })
@@ -309,7 +312,12 @@ export default function WorkspaceSetupPage({
           <AnnouncementBanner announcement={announcement} />
           <AnimatedPresenceRegion motionKey={activeSection}>
             {activeSection === 'cdk' ? (
-              <ProfileCdkPaths profile={profile} onUpgraded={onSynced} onRedeemNewProfile={onRedeemNewProfile} />
+              <ProfileCdkPaths
+                profile={profile}
+                purchaseChannel={activePurchaseChannel}
+                onUpgraded={onSynced}
+                onRedeemNewProfile={onRedeemNewProfile}
+              />
             ) : (
               <form onSubmit={handleSave}>
                 <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
@@ -411,10 +419,12 @@ export default function WorkspaceSetupPage({
 
 function ProfileCdkPaths({
   profile,
+  purchaseChannel,
   onUpgraded,
   onRedeemNewProfile,
 }: {
   profile: UserGameAccount
+  purchaseChannel: ReturnType<typeof resolveActivePurchaseChannel>
   onUpgraded: (payload: AuthSuccessResponse) => void
   onRedeemNewProfile: () => void
 }) {
@@ -504,17 +514,17 @@ function ProfileCdkPaths({
             {copy.workspace.pages_tool_WorkspaceSetupPage_059}</button>
         </div>
 
-        {ACTIVE_PURCHASE_CHANNEL && (
+        {purchaseChannel && (
           <div className="tool-inset flex flex-col p-4">
             <h3 className="text-sm font-semibold text-ink-primary">{copy.workspace.pages_tool_WorkspaceSetupPage_060}</h3>
             <p className="mt-2 flex-1 text-sm leading-6 text-ink-secondary">{copy.workspace.pages_tool_WorkspaceSetupPage_061}</p>
             <a
-              href={ACTIVE_PURCHASE_CHANNEL.href ?? undefined}
+              href={purchaseChannel.href ?? undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="tool-secondary-action mt-4"
             >
-              {ACTIVE_PURCHASE_CHANNEL.actionLabel}
+              {purchaseChannel.actionLabel}
             </a>
           </div>
         )}

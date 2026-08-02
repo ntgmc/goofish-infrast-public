@@ -9,21 +9,29 @@ interface PurchaseChannel {
   enabled: boolean;
 }
 
-const PURCHASE_CHANNELS: PurchaseChannel[] = [
+const PURCHASE_CHANNELS: Array<Omit<PurchaseChannel, 'href'>> = [
   {
     id: 'xianyu',
     label: copy.common.lib_purchase_001,
     actionLabel: copy.common.lib_purchase_002,
-    href: 'https://m.tb.cn/h.RGCWZHH?tk=X063g9yLZxZ%20MF287',
     enabled: true,
   },
   {
     id: 'cardNetwork',
     label: copy.common.lib_purchase_003,
     actionLabel: copy.common.lib_purchase_004,
-    href: null,
     enabled: false,
   },
 ]
 
-export const ACTIVE_PURCHASE_CHANNEL = PURCHASE_CHANNELS.find((channel) => channel.enabled && channel.href)
+export function resolveActivePurchaseChannel(xianyuHref: string): PurchaseChannel | undefined {
+  const configuredHrefs: Record<PurchaseChannelId, string | null> = {
+    xianyu: xianyuHref.trim() || null,
+    cardNetwork: null,
+  }
+  for (const channel of PURCHASE_CHANNELS) {
+    const href = configuredHrefs[channel.id]
+    if (channel.enabled && href) return { ...channel, href }
+  }
+  return undefined
+}
