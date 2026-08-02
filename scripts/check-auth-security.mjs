@@ -2479,6 +2479,7 @@ function invitationStoreMock() {
     export async function validateInvitationCode() { return null }
     export async function saveRegistrationWithInvitation() {}
     export async function saveInvitationInTransaction() {}
+    export async function activateInvitationForUser() { return false }
     export async function settleInvitationForActivatedUser() {}
   `
 }
