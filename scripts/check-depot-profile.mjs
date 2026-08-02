@@ -155,6 +155,7 @@ function memoryUserStoreModule() {
     export function emptyWorkspace(profileId) {
       return { version: 1, profile_id: profileId, operators: null, config: null, elite_overrides: {}, last_result: null, updated_at: new Date().toISOString() }
     }
+    export async function insertUserAccountForRegistrationInTransaction() {}
     export async function getOrCreateDepotValueProfile(user) {
       const existing = [...store.profiles.values()].find((profile) => profile.user_id === user.id && profile.kind === 'depot_value')
       if (existing) return existing
