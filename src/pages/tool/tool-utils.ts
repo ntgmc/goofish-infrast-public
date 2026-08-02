@@ -87,6 +87,20 @@ export function formatDate(value: string | null | undefined): string {
   return date.toLocaleString(CURRENT_LOCALE, { hour12: false })
 }
 
+export function formatShanghaiDateTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat(CURRENT_LOCALE, {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
+}
+
 function numberValue(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string' && value.trim()) {

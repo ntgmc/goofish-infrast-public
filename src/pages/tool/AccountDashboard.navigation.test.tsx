@@ -8,6 +8,12 @@ import { dashboardPath, resolveToolRoute, type DashboardSection } from '../../li
 import { tourStorageKey } from '../../components/GuidedTour'
 import AccountDashboard from './AccountDashboard'
 
+vi.mock('./dashboard/InventorySection', () => ({
+  default: ({ onViewProfiles }: { onViewProfiles?: () => void }) => (
+    <button type="button" onClick={onViewProfiles}>查看账号档案</button>
+  ),
+}))
+
 afterEach(() => cleanup())
 
 describe('AccountDashboard route navigation', () => {
@@ -102,6 +108,21 @@ describe('AccountDashboard route navigation', () => {
     await user.click(homeLink)
     expect(await screen.findByRole('heading', { name: '主页' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('pushes the profiles route from the inventory success action', async () => {
+    const user = userEvent.setup()
+    const router = createMemoryRouter([
+      { path: '/tool/*', element: <DashboardRouteHarness /> },
+    ], { initialEntries: ['/tool/inventory'] })
+
+    render(<RouterProvider router={router} />)
+
+    await user.click(await screen.findByRole('button', { name: '查看账号档案' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/profiles'))
+
+    await act(async () => router.navigate(-1))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/inventory'))
   })
 })
 

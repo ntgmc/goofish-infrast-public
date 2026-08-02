@@ -30,7 +30,12 @@ export default async function userInventoryHandler(req: Request): Promise<Respon
       }
       if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
       const body = await getValidatedJson(req, requestSchemas.inventoryUse) as ItemUseRequest
-      return jsonResponse(await useInventoryItem(auth.user.id, body))
+      const result = await useInventoryItem(auth.user.id, body)
+      if (!isLimitedProfileActivation(result)) return jsonResponse(result)
+      return jsonResponse({
+        ...result,
+        auth: await buildAuthPayload(auth.user, result.profile_id),
+      })
     }
 
     if (path === '/api/user/inventory/lifetime-profile') {
@@ -76,4 +81,22 @@ export default async function userInventoryHandler(req: Request): Promise<Respon
     console.error('user inventory error:', error)
     return jsonResponse({ error: 'Internal server error' }, 500)
   }
+}
+
+type LimitedProfileActivation = {
+  operation_id: string
+  item_code: 'limited_profile_voucher'
+  profile_id: string
+  permission: 'advanced'
+  starts_at: string
+  ends_at: string
+}
+
+function isLimitedProfileActivation(result: Record<string, unknown>): result is LimitedProfileActivation {
+  return typeof result.operation_id === 'string'
+    && result.item_code === 'limited_profile_voucher'
+    && typeof result.profile_id === 'string'
+    && result.permission === 'advanced'
+    && typeof result.starts_at === 'string'
+    && typeof result.ends_at === 'string'
 }

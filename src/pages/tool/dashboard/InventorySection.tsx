@@ -5,6 +5,7 @@ import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import SklandBindingDialog, { type SklandPayload } from '../../../components/SklandBindingDialog'
 import type { AuthSuccessResponse } from '../../../lib/types'
+import { formatShanghaiDateTime } from '../tool-utils'
 import {
   itemIconPath,
   type InventoryResponse,
@@ -14,14 +15,35 @@ import {
 } from '../../../lib/inventory-contracts'
 
 type Category = 'all' | 'consumable' | 'capacity_upgrade' | 'gift_pack' | 'license_voucher'
-type UseResponse = { rewards?: Array<{ item_code: string; quantity: number; expires_at: string | null }> }
+type UseResponse = {
+  rewards?: Array<{ item_code: string; quantity: number; expires_at: string | null }>
+  operation_id?: string
+  item_code?: string
+  profile_id?: string
+  permission?: string
+  starts_at?: string
+  ends_at?: string
+  auth?: AuthSuccessResponse
+}
+type LimitedProfileUseResponse = UseResponse & {
+  operation_id: string
+  item_code: 'limited_profile_voucher'
+  profile_id: string
+  permission: 'advanced'
+  starts_at: string
+  ends_at: string
+  auth: AuthSuccessResponse
+}
+type InventoryNotice = { message: string; action?: 'profiles' }
 
 export default function InventorySection({
   onPayload,
   onLifetimeProfileCreated,
+  onViewProfiles,
 }: {
   onPayload: (payload: AuthSuccessResponse) => void
   onLifetimeProfileCreated?: () => void
+  onViewProfiles?: () => void
 }) {
   const [inventory, setInventory] = useState<InventoryResponse | null>(null)
   const [tasks, setTasks] = useState<OnboardingTaskView[]>([])
@@ -34,7 +56,7 @@ export default function InventorySection({
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<InventoryNotice | null>(null)
   const [rewards, setRewards] = useState<UseResponse['rewards']>(undefined)
   const [lifetimeDialogOpen, setLifetimeDialogOpen] = useState(false)
   const itemIdempotencyKeyRef = useRef(crypto.randomUUID())
@@ -85,7 +107,18 @@ export default function InventorySection({
       })
       itemIdempotencyKeyRef.current = crypto.randomUUID()
       setRewards(response.rewards)
-      setNotice(copy.inventory.operation_done)
+      if (isLimitedProfileUseResponse(response)) {
+        const activatedProfile = response.auth.profiles.find((profile) => profile.id === response.profile_id)
+          ?? response.auth.active_profile
+        const profileName = activatedProfile?.display_name || copy.inventory.limited_profile_fallback
+        onPayload(response.auth)
+        setNotice({
+          message: copy.inventory.limited_activation_done(profileName, formatShanghaiDateTime(response.ends_at)),
+          action: 'profiles',
+        })
+      } else {
+        setNotice({ message: copy.inventory.operation_done })
+      }
       setSelected(null)
       await load()
     } catch (caught) {
@@ -103,7 +136,7 @@ export default function InventorySection({
         method: 'POST',
         json: { idempotency_key: crypto.randomUUID() },
       })
-      setNotice(copy.inventory.claim_done)
+      setNotice({ message: copy.inventory.claim_done })
       await load()
     } catch (caught) {
       setError(getApiErrorMessage(caught, copy.inventory.load_failed))
@@ -131,7 +164,7 @@ export default function InventorySection({
       setSelected(null)
       setLifetimeDisplayName('')
       setLifetimeNote('')
-      setNotice(copy.inventory.lifetime_json_created)
+      setNotice({ message: copy.inventory.lifetime_json_created })
       onPayload(response)
       if (onLifetimeProfileCreated) onLifetimeProfileCreated()
       else await load()
@@ -153,7 +186,7 @@ export default function InventorySection({
   const handleLifetimePayload = (payload: SklandPayload) => {
     if (!payload.user) return
     setLifetimeDialogOpen(false)
-    setNotice(copy.inventory.lifetime_bound)
+    setNotice({ message: copy.inventory.lifetime_bound })
     onPayload(payload)
     if (onLifetimeProfileCreated) onLifetimeProfileCreated()
     else void load()
@@ -166,7 +199,18 @@ export default function InventorySection({
         <h2 className="mt-2 text-xl font-semibold text-ink-primary">{copy.inventory.title}</h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{copy.inventory.description}</p>
         {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
-        {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
+        {notice && (
+          <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span>{notice.message}</span>
+              {notice.action === 'profiles' && onViewProfiles && (
+                <button type="button" className="tool-secondary-action shrink-0" onClick={onViewProfiles}>
+                  {copy.inventory.view_profiles}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       {tasks.some((task) => task.enabled) && (
@@ -297,6 +341,21 @@ function capacityForItem(code: string, profileId: string, profiles: ProfileCapac
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+
+function isLimitedProfileUseResponse(response: UseResponse): response is LimitedProfileUseResponse {
+  return typeof response.operation_id === 'string'
+    && response.item_code === 'limited_profile_voucher'
+    && typeof response.profile_id === 'string'
+    && response.permission === 'advanced'
+    && typeof response.starts_at === 'string'
+    && Number.isFinite(Date.parse(response.starts_at))
+    && typeof response.ends_at === 'string'
+    && Number.isFinite(Date.parse(response.ends_at))
+    && Boolean(response.auth?.user)
+    && Array.isArray(response.auth?.profiles)
+    && Object.prototype.hasOwnProperty.call(response.auth, 'active_profile')
+    && Object.prototype.hasOwnProperty.call(response.auth, 'workspace')
 }
 
 function fallbackItemIcon(event: SyntheticEvent<HTMLImageElement>): void {
