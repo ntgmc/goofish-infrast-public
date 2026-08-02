@@ -42,6 +42,30 @@ describe('admin user workspace export controls', () => {
   })
 })
 
+describe('admin user detail disclosure sections', () => {
+  it('keeps balance and declarations collapsed by default and toggles them independently', () => {
+    render(createElement(UserDetailDialog, userDetailProps()))
+
+    const balanceDetails = screen.getByRole('heading', { name: '积分余额' }).closest('details') as HTMLDetailsElement
+    const declarationsDetails = screen.getByRole('heading', { name: '个人使用声明确认' }).closest('details') as HTMLDetailsElement
+
+    expect(balanceDetails.open).toBe(false)
+    expect(declarationsDetails.open).toBe(false)
+
+    fireEvent.click(balanceDetails.querySelector('summary')!)
+    expect(balanceDetails.open).toBe(true)
+    expect(declarationsDetails.open).toBe(false)
+
+    fireEvent.click(declarationsDetails.querySelector('summary')!)
+    expect(balanceDetails.open).toBe(true)
+    expect(declarationsDetails.open).toBe(true)
+
+    fireEvent.click(balanceDetails.querySelector('summary')!)
+    expect(balanceDetails.open).toBe(false)
+    expect(declarationsDetails.open).toBe(true)
+  })
+})
+
 function userDetailProps(): UserDetailPanelProps {
   const user: AdminUserDetail['user'] = {
     id: 'user-123456789',

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { ChevronDown } from 'lucide-react'
 import type { AdminBalanceTransaction, BalancePage } from '../../../lib/balance-contracts'
 import { normalizePointsAmount } from '../../../lib/balance-contracts'
 import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, permissionLabels, appUserStatusLabels } from '../contracts'
@@ -182,101 +183,106 @@ function UserBalanceCard({
   }
 
   return (
-    <section className="tool-inset mt-5 p-4" aria-labelledby="admin-user-balance-title">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <details className="tool-inset group mt-5 overflow-hidden" aria-labelledby="admin-user-balance-title">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors duration-150 hover:bg-surface-2/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500/55 [&::-webkit-details-marker]:hidden">
+        <h3 id="admin-user-balance-title" className="text-sm font-semibold text-ink-primary">积分余额</h3>
+        <span className="flex items-center gap-2">
+          <span className="tool-status">{balance?.transactions.length ?? 0} 条已加载流水</span>
+          <ChevronDown aria-hidden="true" className="h-4 w-4 text-ink-secondary transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none" />
+        </span>
+      </summary>
+      <div className="border-t border-surface-3 p-4">
         <div>
-          <h3 id="admin-user-balance-title" className="text-sm font-semibold text-ink-primary">积分余额</h3>
-          <p className="mt-2 text-3xl font-semibold tabular-nums text-ink-primary">{balance?.balance.available ?? '0.00'}</p>
+          <p className="text-3xl font-semibold tabular-nums text-ink-primary">{balance?.balance.available ?? '0.00'}</p>
           <p className="mt-1 text-xs text-ink-muted">可用 {balance?.balance.available ?? '0.00'} · 预留 {balance?.balance.reserved ?? '0.00'} · 待追偿 {balance?.balance.debt ?? '0.00'}</p>
           <p className="mt-1 text-xs text-ink-muted">累计获得 {balance?.balance.lifetime_credited ?? '0.00'} · 资格冲正 {balance?.balance.qualification_reversed ?? '0.00'} · {balance?.balance.commercial?.eligible ? `商用 Lv${balance.balance.commercial.level}` : '商用未生效'}</p>
         </div>
-        <span className="tool-status">{balance?.transactions.length ?? 0} 条已加载流水</span>
-      </div>
 
-      <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[140px_180px_1fr_180px_auto]" noValidate>
-        <label>
-          <span className="mb-1.5 block text-xs font-medium text-ink-muted">操作</span>
-          <select
-            value={operation}
-            onChange={(event) => { setOperation(event.currentTarget.value as 'credit' | 'debit' | 'reverse_credit'); resetRequestIdentity() }}
-            className="tool-field"
-          >
-            <option value="credit">增加积分</option>
-            <option value="debit">扣减积分</option>
-            <option value="reverse_credit">资格冲正</option>
-          </select>
-        </label>
-        <label>
-          <span className="mb-1.5 block text-xs font-medium text-ink-muted">Root 口令（高风险操作二次认证）</span>
-          <input type="password" value={rootPassword} onChange={(event) => { setRootPassword(event.currentTarget.value); resetRequestIdentity() }} maxLength={128} autoComplete="off" className="tool-field" />
-        </label>
-        {operation === 'reverse_credit' && <label className="lg:col-span-2">
-          <span className="mb-1.5 block text-xs font-medium text-ink-muted">原正向交易 ID</span>
-          <input value={originalTransactionId} onChange={(event) => { setOriginalTransactionId(event.currentTarget.value); resetRequestIdentity() }} className="tool-field font-mono" />
-        </label>}
-        <label>
-          <span className="mb-1.5 block text-xs font-medium text-ink-muted">金额</span>
-          <input
-            value={amount}
-            onChange={(event) => { setAmount(event.currentTarget.value); resetRequestIdentity() }}
-            inputMode="decimal"
-            placeholder="例如 12.30"
-            className="tool-field"
-          />
-        </label>
-        <label>
-          <span className="mb-1.5 block text-xs font-medium text-ink-muted">内部原因（必填）</span>
-          <input
-            value={reason}
-            onChange={(event) => { setReason(event.currentTarget.value); resetRequestIdentity() }}
-            maxLength={500}
-            placeholder="仅管理员审计可见"
-            className="tool-field"
-          />
-        </label>
-        <button type="submit" disabled={busy} className={operation === 'credit' ? 'tool-primary-action self-end' : 'tool-danger-action self-end'}>
-          {busy ? '处理中…' : operation === 'credit' ? '增加' : operation === 'debit' ? '扣减' : '冲正'}
-        </button>
-      </form>
-      {validationError && <p className="mt-2 text-sm text-error" role="alert">{validationError}</p>}
+        <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[140px_180px_1fr_180px_auto]" noValidate>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">操作</span>
+            <select
+              value={operation}
+              onChange={(event) => { setOperation(event.currentTarget.value as 'credit' | 'debit' | 'reverse_credit'); resetRequestIdentity() }}
+              className="tool-field"
+            >
+              <option value="credit">增加积分</option>
+              <option value="debit">扣减积分</option>
+              <option value="reverse_credit">资格冲正</option>
+            </select>
+          </label>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">Root 口令（高风险操作二次认证）</span>
+            <input type="password" value={rootPassword} onChange={(event) => { setRootPassword(event.currentTarget.value); resetRequestIdentity() }} maxLength={128} autoComplete="off" className="tool-field" />
+          </label>
+          {operation === 'reverse_credit' && <label className="lg:col-span-2">
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">原正向交易 ID</span>
+            <input value={originalTransactionId} onChange={(event) => { setOriginalTransactionId(event.currentTarget.value); resetRequestIdentity() }} className="tool-field font-mono" />
+          </label>}
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">金额</span>
+            <input
+              value={amount}
+              onChange={(event) => { setAmount(event.currentTarget.value); resetRequestIdentity() }}
+              inputMode="decimal"
+              placeholder="例如 12.30"
+              className="tool-field"
+            />
+          </label>
+          <label>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">内部原因（必填）</span>
+            <input
+              value={reason}
+              onChange={(event) => { setReason(event.currentTarget.value); resetRequestIdentity() }}
+              maxLength={500}
+              placeholder="仅管理员审计可见"
+              className="tool-field"
+            />
+          </label>
+          <button type="submit" disabled={busy} className={operation === 'credit' ? 'tool-primary-action self-end' : 'tool-danger-action self-end'}>
+            {busy ? '处理中…' : operation === 'credit' ? '增加' : operation === 'debit' ? '扣减' : '冲正'}
+          </button>
+        </form>
+        {validationError && <p className="mt-2 text-sm text-error" role="alert">{validationError}</p>}
 
-      <div className="mt-5 overflow-x-auto">
-        <table className="min-w-full text-left text-xs text-ink-secondary">
-          <thead className="border-b border-surface-3 text-ink-muted">
-            <tr>
-              <th className="px-2 py-2 font-medium">类型</th>
-              <th className="px-2 py-2 font-medium">变动</th>
-              <th className="px-2 py-2 font-medium">余额</th>
-              <th className="px-2 py-2 font-medium">管理员 / 原因</th>
-              <th className="px-2 py-2 font-medium">引用</th>
-              <th className="px-2 py-2 font-medium">时间</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-surface-3">
-            {(balance?.transactions ?? []).map((transaction) => (
-              <tr key={transaction.id}>
-                <td className="px-2 py-2">{adminBalanceKindLabel(transaction.kind)}</td>
-                <td className={`px-2 py-2 font-mono font-medium ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? transaction.amount : `+${transaction.amount}`}</td>
-                <td className="px-2 py-2 font-mono">{transaction.balance_after}</td>
-                <td className="max-w-72 px-2 py-2"><div>{transaction.admin_username ?? '-'}{transaction.approved_by ? ` / ${transaction.approved_by} 审批` : ''}</div><div className="truncate text-ink-muted" title={transaction.reason ?? undefined}>{transaction.reason ?? '-'}</div></td>
-                <td className="max-w-52 px-2 py-2 font-mono text-ink-muted"><div>{transaction.reference_type}</div><div className="truncate" title={transaction.reference_id}>{transaction.reference_id}</div></td>
-                <td className="whitespace-nowrap px-2 py-2">{formatDate(transaction.created_at)}</td>
+        <div className="mt-5 overflow-x-auto">
+          <table className="min-w-full text-left text-xs text-ink-secondary">
+            <thead className="border-b border-surface-3 text-ink-muted">
+              <tr>
+                <th className="px-2 py-2 font-medium">类型</th>
+                <th className="px-2 py-2 font-medium">变动</th>
+                <th className="px-2 py-2 font-medium">余额</th>
+                <th className="px-2 py-2 font-medium">管理员 / 原因</th>
+                <th className="px-2 py-2 font-medium">引用</th>
+                <th className="px-2 py-2 font-medium">时间</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!balance?.transactions.length && <p className="py-6 text-center text-sm text-ink-muted">暂无积分流水。</p>}
+            </thead>
+            <tbody className="divide-y divide-surface-3">
+              {(balance?.transactions ?? []).map((transaction) => (
+                <tr key={transaction.id}>
+                  <td className="px-2 py-2">{adminBalanceKindLabel(transaction.kind)}</td>
+                  <td className={`px-2 py-2 font-mono font-medium ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? transaction.amount : `+${transaction.amount}`}</td>
+                  <td className="px-2 py-2 font-mono">{transaction.balance_after}</td>
+                  <td className="max-w-72 px-2 py-2"><div>{transaction.admin_username ?? '-'}{transaction.approved_by ? ` / ${transaction.approved_by} 审批` : ''}</div><div className="truncate text-ink-muted" title={transaction.reason ?? undefined}>{transaction.reason ?? '-'}</div></td>
+                  <td className="max-w-52 px-2 py-2 font-mono text-ink-muted"><div>{transaction.reference_type}</div><div className="truncate" title={transaction.reference_id}>{transaction.reference_id}</div></td>
+                  <td className="whitespace-nowrap px-2 py-2">{formatDate(transaction.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!balance?.transactions.length && <p className="py-6 text-center text-sm text-ink-muted">暂无积分流水。</p>}
+        </div>
+        {balance?.next_cursor && (
+          <button type="button" onClick={() => void onLoadMore()} disabled={loading} className="tool-secondary-action mt-3 text-sm">
+            {loading ? '加载中…' : '加载更多'}
+          </button>
+        )}
+        <CommercialAdminControls
+          userId={userId}
+          eligible={balance?.balance.commercial.eligible === true}
+        />
       </div>
-      {balance?.next_cursor && (
-        <button type="button" onClick={() => void onLoadMore()} disabled={loading} className="tool-secondary-action mt-3 text-sm">
-          {loading ? '加载中…' : '加载更多'}
-        </button>
-      )}
-      <CommercialAdminControls
-        userId={userId}
-        eligible={balance?.balance.commercial.eligible === true}
-      />
-    </section>
+    </details>
   )
 }
 
@@ -400,42 +406,47 @@ function adminBalanceKindLabel(kind: AdminBalanceTransaction['kind']): string {
 
 function PersonalUseDeclarations({ declarations }: { declarations: AdminUserDetail['personal_use_declarations'] }) {
   return (
-    <section className="tool-inset mt-5 p-4" aria-labelledby="personal-use-declarations-title">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <details className="tool-inset group mt-5 overflow-hidden" aria-labelledby="personal-use-declarations-title">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors duration-150 hover:bg-surface-2/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500/55 [&::-webkit-details-marker]:hidden">
         <h3 id="personal-use-declarations-title" className="text-sm font-semibold text-ink-primary">个人使用声明确认</h3>
-        <span className="tool-status">{declarations.length} 条记录</span>
-      </div>
-      {declarations.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-muted">暂无个人使用声明确认记录。</p>
-      ) : (
-        <div className="mt-3 overflow-x-auto">
-          <table className="min-w-full text-left text-xs text-ink-secondary">
-            <thead className="border-b border-surface-3 text-ink-muted">
-              <tr>
-                <th className="px-2 py-2 font-medium">版本</th>
-                <th className="px-2 py-2 font-medium">触发操作</th>
-                <th className="px-2 py-2 font-medium">档案</th>
-                <th className="px-2 py-2 font-medium">IP</th>
-                <th className="px-2 py-2 font-medium">确认时间</th>
-                <th className="px-2 py-2 font-medium">保留至</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-3">
-              {declarations.map((declaration) => (
-                <tr key={`${declaration.declaration_id}-${declaration.accepted_at}`}>
-                  <td className="px-2 py-2 font-mono">{declaration.declaration_version}</td>
-                  <td className="px-2 py-2">{personalUseActionLabel(declaration.action)}</td>
-                  <td className="max-w-40 truncate px-2 py-2 font-mono" title={declaration.profile_id ?? undefined}>{declaration.profile_id ?? '-'}</td>
-                  <td className="px-2 py-2 font-mono">{declaration.client_ip}</td>
-                  <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.accepted_at)}</td>
-                  <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.retain_until)}</td>
+        <span className="flex items-center gap-2">
+          <span className="tool-status">{declarations.length} 条记录</span>
+          <ChevronDown aria-hidden="true" className="h-4 w-4 text-ink-secondary transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none" />
+        </span>
+      </summary>
+      <div className="border-t border-surface-3 p-4">
+        {declarations.length === 0 ? (
+          <p className="text-sm text-ink-muted">暂无个人使用声明确认记录。</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-xs text-ink-secondary">
+              <thead className="border-b border-surface-3 text-ink-muted">
+                <tr>
+                  <th className="px-2 py-2 font-medium">版本</th>
+                  <th className="px-2 py-2 font-medium">触发操作</th>
+                  <th className="px-2 py-2 font-medium">档案</th>
+                  <th className="px-2 py-2 font-medium">IP</th>
+                  <th className="px-2 py-2 font-medium">确认时间</th>
+                  <th className="px-2 py-2 font-medium">保留至</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+              </thead>
+              <tbody className="divide-y divide-surface-3">
+                {declarations.map((declaration) => (
+                  <tr key={`${declaration.declaration_id}-${declaration.accepted_at}`}>
+                    <td className="px-2 py-2 font-mono">{declaration.declaration_version}</td>
+                    <td className="px-2 py-2">{personalUseActionLabel(declaration.action)}</td>
+                    <td className="max-w-40 truncate px-2 py-2 font-mono" title={declaration.profile_id ?? undefined}>{declaration.profile_id ?? '-'}</td>
+                    <td className="px-2 py-2 font-mono">{declaration.client_ip}</td>
+                    <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.accepted_at)}</td>
+                    <td className="px-2 py-2 whitespace-nowrap">{formatDate(declaration.retain_until)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </details>
   )
 }
 
