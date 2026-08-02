@@ -795,6 +795,37 @@ export interface UserWorkspace {
   updated_at: string | null;
 }
 
+export interface AdminUserWorkspaceExportWorkspace {
+  version: 1;
+  profile_id: string;
+  operators: LicenseOperator[] | null;
+  config: LicenseConfig | null;
+  elite_overrides: Record<string, number>;
+  last_result: OptimizeResult | null;
+  saved_configs: WorkspaceSavedConfig[];
+  result_history: WorkspaceResultHistoryItem[];
+  archived_results: WorkspaceResultHistoryItem[];
+  free_schedule_entitlement: FreeScheduleEntitlement | null;
+  updated_at: string;
+}
+
+export interface AdminUserWorkspaceExportV1 {
+  version: 1;
+  exported_at: string;
+  user: {
+    id: string;
+    email: string;
+  };
+  profiles: Array<{
+    id: string;
+    display_name: string;
+    kind: UserGameAccountKind;
+    permission: ProductPermissionMode;
+    status: 'active' | 'frozen' | 'revoked';
+    workspace: AdminUserWorkspaceExportWorkspace | null;
+  }>;
+}
+
 export interface WorkspaceSavedConfig {
   id: string;
   name: string;
@@ -918,6 +949,9 @@ export interface InvitationSettings {
 
 export type BrevoQuotaAction = 'pause_registration' | 'allow_unverified_registration';
 
+export type EmailProvider = 'brevo' | 'ses';
+export type EmailProviderPriority = [EmailProvider, EmailProvider];
+
 export type BrevoEmailPurpose =
   | 'email_verification'
   | 'admin_invite_verification'
@@ -956,9 +990,10 @@ export interface BrevoEmailStats {
 }
 
 export interface RegistrationSettings {
-  version: 4;
+  version: 5;
   email_verification_required: boolean;
   invite_code_required: boolean;
+  email_provider_priority: EmailProviderPriority;
   brevo_quota_action: BrevoQuotaAction;
   admin_invite_email_reserve: number;
   password_reset_email_reserve: number;

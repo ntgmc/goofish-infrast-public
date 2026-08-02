@@ -22,6 +22,7 @@ export interface UserDetailPanelProps {
   onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
   onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
   onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
+  onDownloadWorkspaces: () => Promise<void>;
   onAdjustBalance: (operation: 'credit' | 'debit' | 'reverse_credit', amount: string, reason: string, idempotencyKey: string, rootPassword: string, originalTransactionId?: string) => Promise<boolean>;
   onLoadMoreBalance: () => Promise<void>;
   onFreezeUser: (user: AppUserSummary) => Promise<void>;
@@ -53,6 +54,7 @@ function UserDetailPanel({
   onClearWorkspace,
   onViewOperators,
   onDownloadOperators,
+  onDownloadWorkspaces,
   onAdjustBalance,
   onLoadMoreBalance,
   onFreezeUser,
@@ -72,6 +74,7 @@ function UserDetailPanel({
           <p className="mt-2 break-all text-sm text-ink-muted">用户 ID：{user.id}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <SmallButton onClick={() => void onDownloadWorkspaces()} loading={busyAction === `user-workspaces-export:${user.id}`}>导出工作区</SmallButton>
           {user.status === 'active' && <SmallButton onClick={() => void onFreezeUser(user)} loading={busyAction === `app-user:freeze_account:${user.id}`}>冻结用户</SmallButton>}
           {user.status === 'frozen' && <SmallButton onClick={() => void onUnfreezeUser(user)} loading={busyAction === `app-user:unfreeze_account:${user.id}`} tone="success">解冻用户</SmallButton>}
           <SmallButton onClick={() => void onDeleteUser(user)} loading={busyAction === `app-user:delete_account:${user.id}`} tone="danger">删除用户</SmallButton>

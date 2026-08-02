@@ -647,6 +647,10 @@ export function downloadOperatorsJson(data: AdminProfileOperatorData): void {
   downloadBlob(blob, `skland-operators-${formatFileSegment(data.profile.id)}-${formatDownloadTimestamp()}.json`)
 }
 
+export function buildUserWorkspaceExportFilename(userId: string, date = new Date()): string {
+  return `maa-user-workspaces-${formatFileSegment(userId)}-${formatDownloadTimestamp(date)}.json`
+}
+
 function formatFileSegment(value: string): string {
   return value.slice(0, 8).replace(/[^A-Za-z0-9_-]/g, '') || 'profile'
 }
