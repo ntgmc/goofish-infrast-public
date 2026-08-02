@@ -191,15 +191,20 @@ export const requestSchemas = {
   announcement: strict({
     banner: z.unknown().nullable(),
     announcements: z.array(z.unknown()).max(100),
+    expected_revision: expectedRevisionSchema,
   }),
   usageStats: strict({
     event: shortString(64),
     visitor_id: optionalString(128),
     announcement_id: optionalString(120),
     announcement_kind: optionalString(32),
+    announcement_version: optionalString(64),
     source: optionalString(120),
   }),
-  userAnnouncement: strict({ announcement_id: optionalString(128), all: z.boolean().optional() }),
+  userAnnouncement: z.union([
+    strict({ announcement_id: shortString(128) }),
+    strict({ all: z.literal(true) }),
+  ]),
   userNotification: z.union([
     strict({ notification_id: shortString(128) }),
     strict({ all: z.literal(true) }),

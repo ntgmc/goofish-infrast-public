@@ -292,6 +292,7 @@ export function useToolSession(requestedProfileId?: string | null) {
     banner,
     popups,
     announcementUnreadCount,
+    setAnnouncementUnreadCount,
     openingProfileId,
     workspaceLoadError,
     applyAuthPayload,

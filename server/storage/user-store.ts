@@ -228,6 +228,7 @@ interface LegacyUserWorkspaceRecord {
 export interface AnnouncementReadRecord {
   user_id: string
   announcement_id: string
+  announcement_version: string | Date | null
   read_at: string
 }
 
@@ -1251,32 +1252,53 @@ export async function migrateLegacyUserIfNeeded(user: UserAccountRecord): Promis
 export async function getAnnouncementReads(userId: string): Promise<AnnouncementReadRecord[]> {
   await ensureSchema()
   const result = await query<AnnouncementReadRecord>(
-    'select user_id, announcement_id, read_at from user_announcement_reads where user_id = $1',
+    'select user_id, announcement_id, announcement_version, read_at from user_announcement_reads where user_id = $1',
     [userId],
   )
   return result.rows
 }
 
-export async function getAnnouncementReadCounts(): Promise<Record<string, number>> {
+export async function getAnnouncementReadCounts(
+  announcements: Array<{ id: string; updated_at: string }>,
+): Promise<Record<string, number>> {
   await ensureSchema()
+  if (announcements.length === 0) return {}
   const result = await query<{ announcement_id: string; read_count: number }>(
-    `select announcement_id, count(*)::int as read_count
-     from user_announcement_reads
-     group by announcement_id`,
+    `with active(announcement_id, announcement_version) as (
+       select * from unnest($1::text[], $2::timestamptz[])
+     )
+     select reads.announcement_id, count(*)::int as read_count
+       from user_announcement_reads reads
+       join active on active.announcement_id = reads.announcement_id
+        and active.announcement_version = reads.announcement_version
+      group by reads.announcement_id`,
+    [announcements.map((item) => item.id), announcements.map((item) => item.updated_at)],
   )
   return Object.fromEntries(
     result.rows.map((row) => [row.announcement_id, Number.isFinite(Number(row.read_count)) ? Number(row.read_count) : 0]),
   )
 }
 
-export async function markAnnouncementRead(userId: string, announcementId: string, readAt = new Date().toISOString()): Promise<void> {
+export async function markAnnouncementsRead(
+  userId: string,
+  announcements: Array<{ id: string; updated_at: string }>,
+  readAt = new Date().toISOString(),
+): Promise<number> {
   await ensureSchema()
-  await query(
-    `insert into user_announcement_reads (user_id, announcement_id, read_at)
-     values ($1, $2, $3)
-     on conflict (user_id, announcement_id) do update set read_at = excluded.read_at`,
-    [userId, announcementId, readAt],
-  )
+  if (announcements.length === 0) return 0
+  return withTransaction(async (client) => {
+    const result = await client.query(
+    `insert into user_announcement_reads (user_id, announcement_id, announcement_version, read_at)
+     select $1, input.announcement_id, input.announcement_version, $4::timestamptz
+       from unnest($2::text[], $3::timestamptz[]) as input(announcement_id, announcement_version)
+     on conflict (user_id, announcement_id) do update set
+       announcement_version = excluded.announcement_version,
+       read_at = excluded.read_at
+     where user_announcement_reads.announcement_version is distinct from excluded.announcement_version`,
+    [userId, announcements.map((item) => item.id), announcements.map((item) => item.updated_at), readAt],
+    )
+    return result.rowCount ?? 0
+  })
 }
 
 export function emptyWorkspace(profileId: string): UserWorkspaceRecord {

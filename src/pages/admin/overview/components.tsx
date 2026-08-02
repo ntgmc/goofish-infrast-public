@@ -182,9 +182,9 @@ export function AnnouncementReachMetrics({ stats }: { stats: AnnouncementReachSt
         <dd className="mt-1 font-semibold text-ink-primary">{stats.impressions}</dd>
       </div>
       <div className="sm:px-3">
-        <dt className="text-xs text-ink-muted">已读</dt>
+        <dt className="text-xs text-ink-muted">独立访客已读</dt>
         <dd className="mt-1 font-semibold text-ink-primary">{stats.reads}</dd>
-        <dd className="mt-0.5 text-xs text-ink-muted">账号 {stats.server_reads} / 本地 {stats.local_reads}</dd>
+        <dd className="mt-0.5 text-xs text-ink-muted">账号已读 {stats.server_reads}（单独统计）</dd>
       </div>
       <div className="sm:px-3">
         <dt className="text-xs text-ink-muted">未读估算</dt>

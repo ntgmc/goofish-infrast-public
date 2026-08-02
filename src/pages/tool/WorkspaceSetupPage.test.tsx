@@ -293,6 +293,7 @@ describe('WorkspaceSetupPage CDK paths', () => {
         activeProfile={createPreviewProfile()}
         announcement={null}
         announcementUnreadCount={0}
+        onAnnouncementUnreadCountChange={vi.fn()}
         openingProfileId={null}
         workspaceLoadError={null}
         section="redeem"

@@ -67,6 +67,43 @@ export interface UsageEventRecord {
   estimate_bucket?: string
   announcement_id?: string
   announcement_kind?: string
+  announcement_version?: string
+}
+
+export interface AnnouncementEventCounts {
+  impressions: number
+  visitor_reads: number
+}
+
+export async function getAnnouncementEventCounts(
+  announcements: Array<{ id: string; updated_at: string }>,
+): Promise<Record<string, AnnouncementEventCounts>> {
+  if (announcements.length === 0) return {}
+  const result = await query<{ announcement_id: string; impressions: number; visitor_reads: number }>(
+    `with active(announcement_id, announcement_version) as (
+       select * from unnest($1::text[], $2::text[])
+     )
+     select events.record_json->>'announcement_id' as announcement_id,
+            count(distinct events.visitor_id) filter (
+              where events.event = 'announcement_impression'
+            )::int as impressions,
+            count(distinct events.visitor_id) filter (
+              where events.event = 'announcement_read'
+            )::int as visitor_reads
+       from usage_events events
+       join active
+         on active.announcement_id = events.record_json->>'announcement_id'
+        and active.announcement_version = events.record_json->>'announcement_version'
+      where events.event in ('announcement_impression', 'announcement_read')
+        and events.visitor_id is not null
+        and coalesce(events.record_json->>'status', 'success') = 'success'
+      group by events.record_json->>'announcement_id'`,
+    [announcements.map((item) => item.id), announcements.map((item) => item.updated_at)],
+  )
+  return Object.fromEntries(result.rows.map((row) => [row.announcement_id, {
+    impressions: Number(row.impressions) || 0,
+    visitor_reads: Number(row.visitor_reads) || 0,
+  }]))
 }
 
 interface UsageDayStats {

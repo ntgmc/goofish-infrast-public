@@ -32,6 +32,7 @@ export default function AccountDashboard({
   activeProfile,
   announcement,
   announcementUnreadCount,
+  onAnnouncementUnreadCountChange,
   openingProfileId,
   workspaceLoadError,
   section,
@@ -46,6 +47,7 @@ export default function AccountDashboard({
   activeProfile: UserGameAccount | null
   announcement: Announcement | null
   announcementUnreadCount: number
+  onAnnouncementUnreadCountChange: (count: number) => void
   openingProfileId: string | null
   workspaceLoadError: string | null
   section: DashboardSection
@@ -238,7 +240,7 @@ export default function AccountDashboard({
               {section === 'invitations' && <InvitationsSection />}
               {section === 'inventory' && <InventorySection onPayload={onPayload} onLifetimeProfileCreated={() => onSectionChange('profiles', { replace: true })} onViewProfiles={() => onSectionChange('profiles')} />}
               {section === 'balance' && <BalanceSection redemptionEnabled={features.cdk_redemption} />}
-              {section === 'announcements' && <AnnouncementsSection />}
+              {section === 'announcements' && <AnnouncementsSection onUnreadCountChange={onAnnouncementUnreadCountChange} />}
               {section === 'settings' && <SettingsSection profiles={profiles} onLogout={onLogout} onPayload={onPayload} />}
             </Suspense>
           </AnimatedPresenceRegion>

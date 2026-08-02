@@ -143,6 +143,7 @@ function DashboardRouteHarness({ announcementUnreadCount = 0 }: { announcementUn
       activeProfile={null}
       announcement={null}
       announcementUnreadCount={announcementUnreadCount}
+      onAnnouncementUnreadCountChange={vi.fn()}
       openingProfileId={null}
       workspaceLoadError={null}
       section={route.section}

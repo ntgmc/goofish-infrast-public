@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import type { AnnouncementAdminResponse } from '../../lib/types'
 import type { AdminBalanceTransaction, BalancePage } from '../../lib/balance-contracts'
 import { ADMIN_SESSION_EXPIRED_EVENT, adminApiJson as apiJson, adminApiVoid as apiVoid } from '../../lib/admin-api-client'
+import { ApiError } from '../../lib/api-client'
 import { GeneratedPermission, CdkType, CdkTypeFilter, StatusFilter, PermissionFilter, BinaryFilter, FieldErrors, CdkTableFilters, GeneratedCdk, AdminCdkCreateResponse, AdminCdkRecord, AdminCdkDetail, UsageRangeMode, UsageStatsResponse, RiskControlSettings, RiskControlSettingsPatch, AdminUserSummary, AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, PaginationMeta, CdkOpsSummary, EMPTY_PAGINATION, DEFAULT_RISK_SETTINGS, permissionLabels, cdkProductPermissions, MAX_CDK_BATCH_COUNT, buildSummary, buildCdkOpsSummary, buildUsageStatsQuery, getDateOffsetString, normalizeUsageStats, normalizeRiskSettings, validateEmailInput, validatePasswordInput, normalizeGeneratedCdks, normalizeProductPermission, isAppUserStatus, buildCurrentOpsReport, buildCurrentOpsReportCsv, buildGeneratedCdkCsv, downloadBlob, downloadOperatorsJson, formatDownloadTimestamp, omitProfileOperatorData } from './modules'
 import { useAnnouncementDraft } from './announcements/useAnnouncementDraft'
 import { createAdminUserBalanceActions, fetchAdminUserBalance } from './users/balance-actions'
@@ -11,9 +12,7 @@ export function useAdminController() {
   const [adminUsername, setAdminUsername] = useState<string | null>(null)
 
   const [loginUser, setLoginUser] = useState('')
-
   const [loginPassword, setLoginPassword] = useState('')
-
   const [authenticated, setAuthenticated] = useState(false)
 
   const [sessionChecking, setSessionChecking] = useState(true)
@@ -472,6 +471,7 @@ export function useAdminController() {
         if (adminUsername) acceptServerAnnouncementData(adminUsername, data, true)
         setNotice('横幅和公告已发布')
       } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 409 && adminUsername && caught.data && typeof caught.data === 'object') reconcileLoadedAnnouncementData(adminUsername, caught.data as Partial<AnnouncementAdminResponse>)
         setError((caught as Error).message)
       } finally {
         setBusyAction(null)

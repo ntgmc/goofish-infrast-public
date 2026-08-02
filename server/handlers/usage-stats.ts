@@ -32,6 +32,7 @@ type UsageEventInput = string | null | Partial<Pick<
   | 'estimate_bucket'
   | 'announcement_id'
   | 'announcement_kind'
+  | 'announcement_version'
 >>
 
 export default async (req: Request): Promise<Response> => {
@@ -85,6 +86,7 @@ export async function recordUsageEvent(event: UsageEventName, input: UsageEventI
     ...(options.estimate_bucket && { estimate_bucket: options.estimate_bucket }),
     ...(options.announcement_id && { announcement_id: options.announcement_id }),
     ...(options.announcement_kind && { announcement_kind: options.announcement_kind }),
+    ...(options.announcement_version && { announcement_version: options.announcement_version }),
   }
   const store = await getUsageEventStore()
   await store.set(key, record)
@@ -94,16 +96,20 @@ async function handlePublicPost(req: Request): Promise<Response> {
   const body = await getValidatedJson(req, requestSchemas.usageStats)
   if (body.event === 'announcement_impression' || body.event === 'announcement_read') {
     const announcementId = normalizeNullableString(body.announcement_id, 120)
-    if (!announcementId) {
-      return jsonResponse({ error: 'Invalid announcement id.' }, 400)
+    const announcementVersion = normalizeIsoString(body.announcement_version)
+    const visitorId = normalizeNullableString(body.visitor_id, 128)
+    if (!announcementId || !announcementVersion || !visitorId || !VALID_VISITOR_ID.test(visitorId)) {
+      return jsonResponse({ error: 'Invalid announcement event identity.' }, 400)
     }
     await recordUsageEvent(body.event, {
+      visitor_id: visitorId,
       status: 'success',
       reason_code: 'ok',
       announcement_id: announcementId,
+      announcement_version: announcementVersion,
       ...(normalizeAnnouncementKind(body.announcement_kind) && { announcement_kind: normalizeAnnouncementKind(body.announcement_kind) as string }),
       source: normalizePublicAnnouncementSource(body.source),
-    })
+    }, `${visitorId}:${announcementId}:${announcementVersion}`)
     return jsonResponse({ ok: true })
   }
   if (body.event !== 'tool_visit') {
@@ -206,6 +212,7 @@ function normalizeUsageEventInput(input: UsageEventInput): Required<Pick<UsageEv
     ...(normalizeNullableString(input.estimate_bucket, 40) && { estimate_bucket: normalizeNullableString(input.estimate_bucket, 40) as string }),
     ...(normalizeNullableString(input.announcement_id, 120) && { announcement_id: normalizeNullableString(input.announcement_id, 120) as string }),
     ...(normalizeAnnouncementKind(input.announcement_kind) && { announcement_kind: normalizeAnnouncementKind(input.announcement_kind) as string }),
+    ...(normalizeIsoString(input.announcement_version) && { announcement_version: normalizeIsoString(input.announcement_version) as string }),
   }
 }
 
@@ -214,7 +221,12 @@ function normalizeAnnouncementKind(value: unknown): 'banner' | 'popup' | null {
 }
 
 function normalizePublicAnnouncementSource(value: unknown): string {
-  return value === 'popup_local' || value === 'public_page' ? value : 'public_report'
+  return value === 'popup_read' || value === 'popup_impression' || value === 'public_page' ? value : 'public_report'
+}
+
+function normalizeIsoString(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim() || Number.isNaN(Date.parse(value))) return null
+  return new Date(value).toISOString()
 }
 
 function normalizeNullableString(value: unknown, maxLength: number): string | null {
@@ -301,11 +313,6 @@ async function getUsageEventStore(): Promise<UsageEventStore> {
   const testingStore = getTestingUsageEventStore()
   if (testingStore) return testingStore
   return createPostgresUsageEventStore()
-}
-
-export async function listUsageEvents(prefix = EVENT_PREFIX): Promise<UsageEventRecord[]> {
-  const store = await getUsageEventStore()
-  return store.list(prefix)
 }
 
 export async function countSuccessfulUsageEventsForProfileInRange(

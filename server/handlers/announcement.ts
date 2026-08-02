@@ -2,9 +2,13 @@ import { randomUUID } from 'node:crypto'
 import type { Announcement, AnnouncementKind } from '../../src/lib/types'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
-import { createPostgresAnnouncementStore } from '../storage/announcement-store'
+import {
+  AnnouncementConflictError,
+  createPostgresAnnouncementStore,
+  type AnnouncementStore,
+} from '../storage/announcement-store'
 import { getAnnouncementReadCounts } from '../storage/user-store'
-import { listUsageEvents, recordUsageEvent } from './usage-stats'
+import { getAnnouncementEventCounts } from '../storage/usage-store'
 import type { AnnouncementStats } from '../../src/lib/types'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
@@ -26,11 +30,6 @@ interface LegacyAnnouncement {
   updated_at?: unknown;
 }
 
-interface AnnouncementStore {
-  get: () => Promise<unknown>;
-  set: (data: AnnouncementData) => Promise<void>;
-}
-
 export default async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return jsonResponse(null, 204)
@@ -41,7 +40,7 @@ export default async (req: Request): Promise<Response> => {
 
   try {
     if (req.method === 'GET') {
-      return isAdminRoute ? handleAdminGet(req) : handlePublicGet()
+      return isAdminRoute ? handleAdminGet(req) : handlePublicGet(req)
     }
     if (req.method === 'PUT' && isAdminRoute) {
       return handleAdminPut(req)
@@ -53,47 +52,33 @@ export default async (req: Request): Promise<Response> => {
   }
 }
 
-async function handlePublicGet(): Promise<Response> {
-  const data = await readAnnouncementData()
+async function handlePublicGet(req: Request): Promise<Response> {
+  const { data, revision } = await readAnnouncementDocument()
   const banner = data.banner?.active ? data.banner : null
   const announcements = data.announcements
     .filter((item) => item.active)
-  if (announcements.length > 0) {
-    await Promise.all(announcements.map((item) => recordAnnouncementEvent('announcement_impression', 'public_get', item)))
+  const etag = `"announcements-${revision}"`
+  const headers = {
+    'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+    ETag: etag,
   }
+  if (req.headers.get('If-None-Match') === etag) return new Response(null, { status: 304, headers })
 
   return jsonResponse({
     banner,
     popups: announcements,
     announcements,
-  })
-}
-
-async function recordAnnouncementEvent(
-  event: 'announcement_impression' | 'announcement_read',
-  source: string,
-  announcement: Pick<Announcement, 'id' | 'kind'>,
-): Promise<void> {
-  try {
-    await recordUsageEvent(event, {
-      status: 'success',
-      reason_code: 'ok',
-      source,
-      announcement_id: announcement.id,
-      announcement_kind: announcement.kind,
-    })
-  } catch (error) {
-    console.warn('usage stats announcement skipped:', error)
-  }
+  }, 200, headers)
 }
 
 async function handleAdminGet(req: Request): Promise<Response> {
   const authentication = await authenticateAdminRequest(req)
   if (!authentication.ok) return authentication.response
 
-  const data = await readAnnouncementData()
+  const { data, revision } = await readAnnouncementDocument()
   return jsonResponse({
     ...data,
+    revision,
     stats: await buildAnnouncementStats(data.announcements),
   })
 }
@@ -103,7 +88,8 @@ async function handleAdminPut(req: Request): Promise<Response> {
   if (!authentication.ok) return authentication.response
 
   const body = await getValidatedJson(req, requestSchemas.announcement)
-  const current = await readAnnouncementData()
+  const currentDocument = await readAnnouncementDocument()
+  const current = currentDocument.data
   const bannerValidation = validateAnnouncementBanner(body.banner, current.banner)
   if (!bannerValidation.ok) {
     return jsonResponse({ error: bannerValidation.message }, 400)
@@ -118,41 +104,44 @@ async function handleAdminPut(req: Request): Promise<Response> {
     announcements: announcementValidation.announcements,
   }
   const store = await getAnnouncementStore()
-  await store.set(data)
+  const retainedIds = data.announcements.map((announcement) => announcement.id)
+  let revision: number
+  try {
+    revision = await store.set(data, body.expected_revision, retainedIds)
+  } catch (error) {
+    if (!(error instanceof AnnouncementConflictError)) throw error
+    const latest = await readAnnouncementDocument()
+    return jsonResponse({
+      error: '线上公告已更新，请重新载入后合并本机草稿。',
+      code: 'announcement_revision_conflict',
+      ...latest.data,
+      revision: latest.revision,
+    }, 409)
+  }
 
   return jsonResponse({
     ...data,
-    stats: await buildAnnouncementStats(data.announcements),
+    revision,
   })
 }
 
 async function buildAnnouncementStats(announcements: Announcement[]): Promise<Record<string, AnnouncementStats>> {
   const [events, serverReadCounts] = await Promise.all([
-    listUsageEvents(),
-    getAnnouncementReadCounts(),
+    getAnnouncementEventCounts(announcements),
+    getAnnouncementReadCounts(announcements),
   ])
-  const stats = new Map<string, { impressions: number; local_reads: number }>()
-  const activeIds = new Set(announcements.map((announcement) => announcement.id))
-
-  for (const event of events) {
-    if (!event.announcement_id || !activeIds.has(event.announcement_id) || event.status === 'failure') continue
-    const current = stats.get(event.announcement_id) ?? { impressions: 0, local_reads: 0 }
-    if (event.event === 'announcement_impression') current.impressions += 1
-    if (event.event === 'announcement_read' && event.source !== 'user_announcements') current.local_reads += 1
-    stats.set(event.announcement_id, current)
-  }
 
   return Object.fromEntries(announcements.map((announcement) => {
-    const eventStats = stats.get(announcement.id)
+    const eventStats = events[announcement.id]
     const serverReads = serverReadCounts[announcement.id] ?? 0
-    const localReads = eventStats?.local_reads ?? 0
-    const reads = serverReads + localReads
-    const impressions = Math.max(eventStats?.impressions ?? 0, reads)
+    const visitorReads = eventStats?.visitor_reads ?? 0
+    const reads = visitorReads
+    const impressions = eventStats?.impressions ?? 0
     return [announcement.id, {
       impressions,
       reads,
       server_reads: serverReads,
-      local_reads: localReads,
+      visitor_reads: visitorReads,
       unread: Math.max(0, impressions - reads),
       read_rate: rate(reads, impressions),
     }]
@@ -274,9 +263,10 @@ function hasAnnouncementChanged(
     || previous.body !== next.body
 }
 
-async function readAnnouncementData(): Promise<AnnouncementData> {
+async function readAnnouncementDocument(): Promise<{ data: AnnouncementData; revision: number }> {
   const store = await getAnnouncementStore()
-  return normalizeAnnouncementData(await store.get())
+  const document = await store.get()
+  return { data: normalizeAnnouncementData(document.data), revision: document.revision }
 }
 
 async function getAnnouncementStore(): Promise<AnnouncementStore> {
@@ -360,7 +350,7 @@ function normalizeIsoString(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
-  return value
+  return date.toISOString()
 }
 
 function compareNewestFirst(a: Announcement, b: Announcement): number {

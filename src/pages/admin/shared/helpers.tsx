@@ -384,7 +384,7 @@ function normalizeAnnouncementReachStats(value: Partial<AnnouncementReachStats> 
     impressions: normalizeCount(value?.impressions),
     reads: normalizeCount(value?.reads),
     server_reads: normalizeCount(value?.server_reads),
-    local_reads: normalizeCount(value?.local_reads),
+    visitor_reads: normalizeCount(value?.visitor_reads),
     unread: normalizeCount(value?.unread),
     read_rate: normalizeNumber(value?.read_rate),
   }
@@ -612,7 +612,7 @@ export function buildCurrentOpsReportCsv(report: ReturnType<typeof buildCurrentO
     `id=${report.banner_item.id}`,
   ])
   for (const item of report.announcement_items) {
-    const extra = `id=${item.id};kind=${item.kind};active=${item.active};server_reads=${item.stats.server_reads};local_reads=${item.stats.local_reads}`
+    const extra = `id=${item.id};kind=${item.kind};active=${item.active};server_reads=${item.stats.server_reads};visitor_reads=${item.stats.visitor_reads}`
     rows.push(['announcement_item', 'impressions', item.title, item.updated_at, String(item.stats.impressions), extra])
     rows.push(['announcement_item', 'reads', item.title, item.updated_at, String(item.stats.reads), extra])
     rows.push(['announcement_item', 'read_rate', item.title, item.updated_at, String(item.stats.read_rate), extra])

@@ -291,6 +291,19 @@ describe('administrator inventory request policy', () => {
   })
 })
 
+describe('announcement request policy', () => {
+  it('requires optimistic concurrency and mutually exclusive read mutations', () => {
+    const announcement = { banner: null, announcements: [], expected_revision: 0 }
+    expect(requestSchemas.announcement.safeParse(announcement).success).toBe(true)
+    expect(requestSchemas.announcement.safeParse({ ...announcement, expected_revision: undefined }).success).toBe(false)
+    expect(requestSchemas.userAnnouncement.safeParse({ announcement_id: 'announcement-1' }).success).toBe(true)
+    expect(requestSchemas.userAnnouncement.safeParse({ all: true }).success).toBe(true)
+    expect(requestSchemas.userAnnouncement.safeParse({}).success).toBe(false)
+    expect(requestSchemas.userAnnouncement.safeParse({ all: false }).success).toBe(false)
+    expect(requestSchemas.userAnnouncement.safeParse({ announcement_id: 'announcement-1', all: true }).success).toBe(false)
+  })
+})
+
 describe('invitation request policy', () => {
   it('validates reward snapshots and revision deeply', () => {
     const valid = {

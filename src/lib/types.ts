@@ -149,7 +149,7 @@ export interface AnnouncementStats {
   impressions: number;
   reads: number;
   server_reads: number;
-  local_reads: number;
+  visitor_reads: number;
   unread: number;
   read_rate: number;
 }
@@ -157,6 +157,7 @@ export interface AnnouncementStats {
 export interface AnnouncementAdminResponse {
   banner: Announcement | null;
   announcements: Announcement[];
+  revision: number;
   stats?: Record<string, AnnouncementStats>;
 }
 
@@ -843,6 +844,7 @@ export interface UserNotificationPage {
   notifications: UserNotification[];
   unread_count: number;
   next_cursor: string | null;
+  as_of: string;
 }
 
 export interface AuthMeResponse {

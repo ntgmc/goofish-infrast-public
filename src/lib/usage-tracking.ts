@@ -3,6 +3,7 @@ import { apiVoid } from './api-client'
 export const TOOL_VISITOR_ID_STORAGE_KEY = 'maa-tool-visitor-id'
 
 const VISITOR_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/
+let ephemeralVisitorId: string | null = null
 
 export async function reportToolVisit(): Promise<void> {
   try {
@@ -20,23 +21,25 @@ export async function reportToolVisit(): Promise<void> {
 }
 
 export function getOrCreateToolVisitorId(): string {
-  const storedVisitorId = readStoredVisitorId()
-  if (storedVisitorId && VISITOR_ID_PATTERN.test(storedVisitorId)) return storedVisitorId
+  const stored = readStoredVisitorId()
+  if (stored.value && VISITOR_ID_PATTERN.test(stored.value)) return stored.value
+  if (stored.unavailable && ephemeralVisitorId) return ephemeralVisitorId
 
   const visitorId = createVisitorId()
   try {
     window.localStorage.setItem(TOOL_VISITOR_ID_STORAGE_KEY, visitorId)
   } catch {
-    // Storage may be unavailable; retain an ephemeral ID for this visit instead.
+    ephemeralVisitorId = visitorId
   }
+  if (stored.unavailable) ephemeralVisitorId = visitorId
   return visitorId
 }
 
-function readStoredVisitorId(): string | null {
+function readStoredVisitorId(): { value: string | null; unavailable: boolean } {
   try {
-    return window.localStorage.getItem(TOOL_VISITOR_ID_STORAGE_KEY)
+    return { value: window.localStorage.getItem(TOOL_VISITOR_ID_STORAGE_KEY), unavailable: false }
   } catch {
-    return null
+    return { value: null, unavailable: true }
   }
 }
 

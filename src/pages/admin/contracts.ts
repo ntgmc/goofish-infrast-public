@@ -474,7 +474,7 @@ export const EMPTY_ANNOUNCEMENT_REACH_STATS: AnnouncementReachStats = {
   impressions: 0,
   reads: 0,
   server_reads: 0,
-  local_reads: 0,
+  visitor_reads: 0,
   unread: 0,
   read_rate: 0,
 }

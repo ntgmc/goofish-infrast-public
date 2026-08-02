@@ -32,6 +32,7 @@ export function useAnnouncementDraft() {
   const bannerRef = useRef(banner)
   const announcementsRef = useRef(announcements)
   const publishedRef = useRef<AnnouncementSnapshot | null>(null)
+  const documentRevisionRef = useRef(0)
   const serverRevisionRef = useRef<string | null>(null)
   const baseRevisionRef = useRef<string | null>(null)
   const ownerRef = useRef<string | null>(null)
@@ -116,6 +117,7 @@ export function useAnnouncementDraft() {
 
     cancelTimer()
     publishedRef.current = snapshot
+    documentRevisionRef.current = normalizeDocumentRevision(data.revision, documentRevisionRef.current)
     serverRevisionRef.current = revision
     baseRevisionRef.current = revision
     ownerRef.current = owner
@@ -123,7 +125,7 @@ export function useAnnouncementDraft() {
     recoveryPendingRef.current = false
     skipNextAutosaveRef.current = true
     applySnapshot(snapshot)
-    setStats(normalizeAnnouncementStatsMap(data.stats, nextAnnouncements))
+    if (data.stats) setStats(normalizeAnnouncementStatsMap(data.stats, nextAnnouncements))
 
     if (clearStoredDraft) {
       const clearError = clearAnnouncementDraft(owner)
@@ -149,8 +151,9 @@ export function useAnnouncementDraft() {
     const sameOwner = hydratedRef.current && ownerRef.current === owner
 
     publishedRef.current = serverSnapshot
+    documentRevisionRef.current = normalizeDocumentRevision(data.revision, documentRevisionRef.current)
     serverRevisionRef.current = serverRevision
-    setStats(normalizeAnnouncementStatsMap(data.stats, nextAnnouncements))
+    if (data.stats) setStats(normalizeAnnouncementStatsMap(data.stats, nextAnnouncements))
 
     if (sameOwner && dirtyRef.current) {
       const currentSnapshot = { banner: bannerRef.current, announcements: announcementsRef.current }
@@ -281,9 +284,10 @@ export function useAnnouncementDraft() {
     return null
   }, [acceptServerData])
 
-  const currentSnapshot = useCallback((): AnnouncementSnapshot => ({
+  const currentSnapshot = useCallback((): AnnouncementSnapshot & { expected_revision: number } => ({
     banner: bannerRef.current,
     announcements: announcementsRef.current,
+    expected_revision: documentRevisionRef.current,
   }), [])
 
   const updateBanner = (patch: Partial<Pick<Announcement, 'active' | 'title' | 'body'>>) => {
@@ -353,4 +357,8 @@ export function useAnnouncementDraft() {
     deleteAnnouncement,
     reorderAnnouncements,
   }
+}
+
+function normalizeDocumentRevision(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : fallback
 }

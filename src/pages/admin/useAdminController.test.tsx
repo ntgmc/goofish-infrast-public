@@ -41,8 +41,14 @@ describe('useAdminController announcement drafts', () => {
       if (url === '/api/admin/announcement') {
         if (init?.method === 'PUT') {
           if (failAnnouncementPut) throw new Error('发布服务不可用')
-          const payload = init.json as Pick<AnnouncementAdminResponse, 'banner' | 'announcements'>
-          serverAnnouncements = { ...payload, stats: {} }
+          const payload = init.json as Pick<AnnouncementAdminResponse, 'banner' | 'announcements'> & { expected_revision: number }
+          if (payload.expected_revision !== serverAnnouncements.revision) throw new Error('公告版本冲突')
+          serverAnnouncements = {
+            banner: payload.banner,
+            announcements: payload.announcements,
+            revision: serverAnnouncements.revision + 1,
+            stats: {},
+          }
         }
         if (!init?.method && failAnnouncementGet) throw new Error('线上公告加载失败')
         return serverAnnouncements
@@ -225,7 +231,7 @@ function createServerAnnouncements(): AnnouncementAdminResponse {
   const announcements = [
     createAnnouncement('popup-one', 'popup', '线上公告', '线上公告正文', '2026-07-24T11:00:00.000Z'),
   ]
-  return { banner, announcements, stats: {} }
+  return { banner, announcements, revision: 1, stats: {} }
 }
 
 function createAnnouncement(

@@ -90,8 +90,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_cdk_records_license_order_hash
 CREATE TABLE IF NOT EXISTS announcements (
   key TEXT PRIMARY KEY,
   data_json JSONB NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
+  updated_at TIMESTAMPTZ NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0)
 );
+ALTER TABLE announcements ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS risk_settings (
   key TEXT PRIMARY KEY,
@@ -190,6 +192,9 @@ CREATE TABLE IF NOT EXISTS usage_events (
 );
 CREATE INDEX IF NOT EXISTS idx_usage_events_date ON usage_events(date);
 CREATE INDEX IF NOT EXISTS idx_usage_events_event ON usage_events(event);
+CREATE INDEX IF NOT EXISTS idx_usage_events_announcement_version
+  ON usage_events ((record_json->>'announcement_id'), (record_json->>'announcement_version'), event)
+  WHERE record_json ? 'announcement_id';
 
 CREATE TABLE IF NOT EXISTS optimize_jobs (
   id TEXT PRIMARY KEY,
@@ -1210,9 +1215,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_optimize_jobs_free_owner_active
 CREATE TABLE IF NOT EXISTS user_announcement_reads (
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
   announcement_id TEXT NOT NULL,
+  announcement_version TIMESTAMPTZ,
   read_at TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (user_id, announcement_id)
 );
+ALTER TABLE user_announcement_reads ADD COLUMN IF NOT EXISTS announcement_version TIMESTAMPTZ;
 
 -- goofish:migration-phase
 CREATE TABLE IF NOT EXISTS user_notifications (
@@ -1230,6 +1237,15 @@ CREATE TABLE IF NOT EXISTS user_notifications (
   updated_at TIMESTAMPTZ NOT NULL,
   UNIQUE (user_id, type, source_type, source_id)
 );
+ALTER TABLE user_notifications DROP CONSTRAINT IF EXISTS user_notifications_type_check;
+ALTER TABLE user_notifications ADD CONSTRAINT user_notifications_type_check
+  CHECK (type = 'item_grant') NOT VALID;
+ALTER TABLE user_notifications DROP CONSTRAINT IF EXISTS user_notifications_action_kind_check;
+ALTER TABLE user_notifications ADD CONSTRAINT user_notifications_action_kind_check
+  CHECK (action_kind = 'inventory') NOT VALID;
+ALTER TABLE user_notifications DROP CONSTRAINT IF EXISTS user_notifications_payload_kind_check;
+ALTER TABLE user_notifications ADD CONSTRAINT user_notifications_payload_kind_check
+  CHECK (payload_json->>'kind' = type AND jsonb_typeof(payload_json->'items') = 'array') NOT VALID;
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_updated
   ON user_notifications(user_id, updated_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_user_notifications_user_unread

@@ -66,6 +66,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     banner,
     popups,
     announcementUnreadCount,
+    setAnnouncementUnreadCount,
     openingProfileId,
     workspaceLoadError,
     applyAuthPayload,
@@ -123,13 +124,14 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     if (requiredFeature) return <FeatureUnavailablePage feature={requiredFeature} />
     return (
       <NotificationCenterProvider userId={user.id}>
-        {features.announcements && <AnnouncementPopup announcements={popups} />}
+        {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
         <AccountDashboard
           user={user}
           profiles={cdkProfiles}
           activeProfile={activeCdkProfile}
           announcement={banner}
           announcementUnreadCount={announcementUnreadCount}
+          onAnnouncementUnreadCountChange={setAnnouncementUnreadCount}
           openingProfileId={openingProfileId}
           workspaceLoadError={workspaceLoadError}
           section={route.section}
@@ -157,7 +159,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
     return (
       <PublicContentProvider>
         <NotificationCenterProvider userId={user.id}>
-          {features.announcements && <AnnouncementPopup announcements={popups} />}
+          {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
           <WorkspaceSetupPage
             user={user}
             profile={activeProfile}
@@ -189,7 +191,7 @@ function ToolPageSession({ features }: { features: SiteFeatures }) {
 
   return (
     <NotificationCenterProvider userId={user.id}>
-      {features.announcements && <AnnouncementPopup announcements={popups} />}
+      {features.announcements && <AnnouncementPopup announcements={popups} userId={user.id} onUnreadCountChange={setAnnouncementUnreadCount} />}
       <Suspense fallback={<SessionLoader label={copy.common.pages_ToolPage_002} />}>
         <OptimizePage
           profileId={activeProfile.id}
