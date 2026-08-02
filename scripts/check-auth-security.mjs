@@ -2503,6 +2503,7 @@ function registrationSettingsStoreMock() {
       return globalThis.__authSecurityRegistrationSettings ?? {
         email_verification_required: false,
         invite_code_required: false,
+        email_provider_priority: ['brevo', 'ses'],
         brevo_quota_action: 'pause_registration',
         admin_invite_email_reserve: 0,
         password_reset_email_reserve: 0,

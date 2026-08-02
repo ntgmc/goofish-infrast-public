@@ -136,6 +136,7 @@ ALTER TABLE public_content_settings ADD COLUMN IF NOT EXISTS revision INTEGER NO
 CREATE TABLE IF NOT EXISTS brevo_email_deliveries (
   id TEXT PRIMARY KEY,
   quota_date DATE NOT NULL,
+  provider TEXT NOT NULL DEFAULT 'brevo' CHECK (provider IN ('brevo', 'ses')),
   purpose TEXT NOT NULL CHECK (purpose IN (
     'email_verification',
     'admin_invite_verification',
@@ -147,8 +148,24 @@ CREATE TABLE IF NOT EXISTS brevo_email_deliveries (
   reserved_at TIMESTAMPTZ NOT NULL,
   completed_at TIMESTAMPTZ
 );
+ALTER TABLE brevo_email_deliveries
+  ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'brevo';
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'brevo_email_deliveries_provider_check'
+       AND conrelid = 'brevo_email_deliveries'::regclass
+  ) THEN
+    ALTER TABLE brevo_email_deliveries
+      ADD CONSTRAINT brevo_email_deliveries_provider_check
+      CHECK (provider IN ('brevo', 'ses'));
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_brevo_email_deliveries_quota_date
   ON brevo_email_deliveries(quota_date);
+CREATE INDEX IF NOT EXISTS idx_brevo_email_deliveries_provider_quota_date
+  ON brevo_email_deliveries(provider, quota_date);
 CREATE INDEX IF NOT EXISTS idx_brevo_email_deliveries_daily_breakdown
   ON brevo_email_deliveries(quota_date, purpose, status);
 DO $$

@@ -176,6 +176,8 @@ export const requestSchemas = {
   adminRegistrationSettings: strict({
     email_verification_required: z.boolean(),
     invite_code_required: z.boolean(),
+    email_provider_priority: z.tuple([z.enum(['brevo', 'ses']), z.enum(['brevo', 'ses'])])
+      .refine(([first, second]) => first !== second, 'Email providers must not be repeated'),
     brevo_quota_action: z.enum(['pause_registration', 'allow_unverified_registration']),
     admin_invite_email_reserve: z.number().int().min(0).max(300),
     password_reset_email_reserve: z.number().int().min(0).max(300),

@@ -5,10 +5,11 @@ import { ensureDatabaseSchema } from './schema'
 import {
   BrevoDailyQuotaExceededError,
   getBrevoEmailStats,
-  markBrevoEmailFailed,
-  markBrevoEmailSent,
-  markBrevoEmailUncertain,
+  markEmailDeliveryFailed,
+  markEmailDeliverySent,
+  markEmailDeliveryUncertain,
   reserveBrevoEmail,
+  reserveSesEmail,
   saveBrevoOfficialQuotaSnapshot,
 } from './brevo-email-store'
 
@@ -83,8 +84,8 @@ describe('Brevo email quota PostgreSQL store', () => {
     const now = new Date('2026-07-21T04:00:00.000Z')
     const failed = await reserveBrevoEmail('password_reset', now)
     const uncertain = await reserveBrevoEmail('account_deletion_receipt', now)
-    await markBrevoEmailFailed(failed)
-    await markBrevoEmailUncertain(uncertain)
+    await markEmailDeliveryFailed(failed)
+    await markEmailDeliveryUncertain(uncertain)
     await reserveBrevoEmail('email_verification', now)
 
     const stats = await getBrevoEmailStats(now)
@@ -103,8 +104,8 @@ describe('Brevo email quota PostgreSQL store', () => {
     const now = new Date('2026-07-21T04:00:00.000Z')
     const verification = await reserveBrevoEmail('email_verification', now)
     const reset = await reserveBrevoEmail('password_reset', new Date('2026-07-20T04:00:00.000Z'))
-    await markBrevoEmailSent(verification)
-    await markBrevoEmailSent(reset)
+    await markEmailDeliverySent(verification)
+    await markEmailDeliverySent(reset)
 
     const stats = await getBrevoEmailStats(now)
     expect(stats.days).toHaveLength(7)
@@ -114,6 +115,20 @@ describe('Brevo email quota PostgreSQL store', () => {
     expect(stats.days[5]).toMatchObject({ sent_count: 1, by_purpose: { password_reset: 1 } })
     expect(stats.today).toMatchObject({ sent_count: 1, by_purpose: { email_verification: 1 } })
     expect(stats.days[0]?.quota_used_count).toBe(0)
+  })
+
+  it('tracks SES delivery status without consuming the Brevo quota', async () => {
+    const now = new Date('2026-07-21T04:00:00.000Z')
+    const reservation = await reserveSesEmail('email_verification', now)
+    await markEmailDeliverySent(reservation)
+
+    await expect(query<{ provider: string; status: string }>(
+      'select provider, status from brevo_email_deliveries where id = $1',
+      [reservation.id],
+    )).resolves.toMatchObject({ rows: [{ provider: 'ses', status: 'sent' }] })
+    expect(await getBrevoEmailStats(now)).toMatchObject({
+      today: { sent_count: 0, local_quota_used_count: 0, remaining_count: 300 },
+    })
   })
 
   it('combines official external usage with local reservations atomically', async () => {

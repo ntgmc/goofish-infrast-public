@@ -46,6 +46,37 @@ FREE_PREVIEW_UID_HASH_SECRET=<stable local random value of at least 32 character
 
 PostgreSQL 新连接默认最多等待 10 秒；可通过 `POSTGRES_CONNECTION_TIMEOUT_MS` 覆盖，允许范围为 1000–60000 毫秒。有限连接超时可以避免 API 或外部 worker 在数据库不可达时无限停留在启动阶段。
 
+### 事务邮件服务
+
+注册验证、管理员邀请验证、密码重置和账号注销邮件支持 Brevo 与 Amazon SES。管理员可在“注册与验证”后台调整邮件服务优先级；默认顺序为 `Brevo → Amazon SES`，Brevo 达到每日额度或预留边界后自动使用已配置的 SES。若首选服务未配置，系统会继续尝试下一服务；发送请求已经发出但结果未知时不会切换服务，以避免重复投递。
+
+Brevo 使用以下配置：
+
+```text
+BREVO_API_KEY=<Brevo API key>
+BREVO_SENDER_EMAIL=<verified sender email>
+BREVO_SENDER_NAME=<optional sender name>
+BREVO_VERIFY_EMAIL_TEMPLATE_ID=<template id>
+BREVO_RESET_TEMPLATE_ID=<template id>
+BREVO_ACCOUNT_DELETION_CANCEL_TEMPLATE_ID=<template id>
+BREVO_ACCOUNT_DELETION_RECEIPT_TEMPLATE_ID=<template id>
+```
+
+Amazon SES 使用 AWS SDK 默认凭证链（例如实例角色、任务角色或 `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` 环境变量），不要把访问密钥写入仓库。SES 还需要：
+
+```text
+AWS_SES_REGION=<SES region; falls back to AWS_REGION>
+AWS_SES_SENDER_EMAIL=<verified SES identity>
+AWS_SES_SENDER_NAME=<optional sender name>
+AWS_SES_VERIFY_EMAIL_TEMPLATE_NAME=<SES template name>
+AWS_SES_RESET_TEMPLATE_NAME=<SES template name>
+AWS_SES_ACCOUNT_DELETION_CANCEL_TEMPLATE_NAME=<SES template name>
+AWS_SES_ACCOUNT_DELETION_RECEIPT_TEMPLATE_NAME=<SES template name>
+AWS_SES_CONFIGURATION_SET_NAME=<optional configuration set>
+```
+
+SES 模板数据沿用现有事务邮件参数：验证模板接收 `verification_url`、`expires_hours`；重置模板接收 `reset_url`、`expires_minutes`；注销取消模板接收 `cancel_url`、`expires_days`；注销回执模板接收 `receipt_id`。
+
 没有外部 worker 时，已提交任务会可靠保留在 PostgreSQL 队列中，直到兼容的 `OptimizerPort` worker 消费。仓库不提供 fake optimizer，避免生成看似成功但并非真实优化结果的数据。
 
 默认 API 地址为 `http://127.0.0.1:3000`；可通过 `HOST` 和 `PORT` 覆盖。

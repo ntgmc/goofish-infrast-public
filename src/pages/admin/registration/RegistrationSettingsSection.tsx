@@ -57,6 +57,7 @@ export default function RegistrationSettingsSection() {
         json: {
           email_verification_required: settings.email_verification_required,
           invite_code_required: settings.invite_code_required,
+          email_provider_priority: settings.email_provider_priority,
           brevo_quota_action: settings.brevo_quota_action,
           admin_invite_email_reserve: settings.admin_invite_email_reserve,
           password_reset_email_reserve: settings.password_reset_email_reserve,
@@ -233,6 +234,36 @@ export default function RegistrationSettingsSection() {
           <p className="mt-2">{copy.admin.registration_disabled_help}</p>
           <p className="mt-2">{copy.admin.registration_invite_help}</p>
         </div>
+        <fieldset className="mt-5 space-y-3">
+          <legend className="text-sm font-semibold text-ink-primary">{copy.admin.registration_provider_priority_title}</legend>
+          <p className="text-sm leading-6 text-ink-secondary">{copy.admin.registration_provider_priority_help}</p>
+          <label className="tool-inset flex cursor-pointer gap-3 p-4 text-sm text-ink-secondary">
+            <input
+              type="radio"
+              name="email-provider-priority"
+              value="brevo-first"
+              checked={settings.email_provider_priority[0] === 'brevo'}
+              onChange={() => setSettings((current) => current
+                ? { ...current, email_provider_priority: ['brevo', 'ses'] }
+                : current)}
+              className="mt-1 h-4 w-4 accent-brand-600"
+            />
+            <span><strong className="block text-ink-primary">{copy.admin.registration_provider_brevo_first}</strong>{copy.admin.registration_provider_brevo_first_help}</span>
+          </label>
+          <label className="tool-inset flex cursor-pointer gap-3 p-4 text-sm text-ink-secondary">
+            <input
+              type="radio"
+              name="email-provider-priority"
+              value="ses-first"
+              checked={settings.email_provider_priority[0] === 'ses'}
+              onChange={() => setSettings((current) => current
+                ? { ...current, email_provider_priority: ['ses', 'brevo'] }
+                : current)}
+              className="mt-1 h-4 w-4 accent-brand-600"
+            />
+            <span><strong className="block text-ink-primary">{copy.admin.registration_provider_ses_first}</strong>{copy.admin.registration_provider_ses_first_help}</span>
+          </label>
+        </fieldset>
         <fieldset className="mt-5">
           <legend className="text-sm font-semibold text-ink-primary">{copy.admin.registration_reserve_title}</legend>
           <p id="registration-reserve-help" className="mt-2 text-sm leading-6 text-ink-secondary">{copy.admin.registration_reserve_help}</p>

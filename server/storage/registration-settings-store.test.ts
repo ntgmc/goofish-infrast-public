@@ -16,9 +16,10 @@ describe('registration settings', () => {
       email_verification_required: false,
       updated_at: '2026-07-19T00:00:00.000Z',
     })).toEqual({
-      version: 4,
+      version: 5,
       email_verification_required: false,
       invite_code_required: false,
+      email_provider_priority: ['brevo', 'ses'],
       brevo_quota_action: 'pause_registration',
       admin_invite_email_reserve: 0,
       password_reset_email_reserve: 0,
@@ -40,12 +41,14 @@ describe('registration settings', () => {
     expect(validateRegistrationSettingsPatch({
       email_verification_required: false,
       invite_code_required: true,
+      email_provider_priority: ['ses', 'brevo'],
       brevo_quota_action: 'allow_unverified_registration',
       admin_invite_email_reserve: 20,
       password_reset_email_reserve: 10,
     })).toEqual({
       email_verification_required: false,
       invite_code_required: true,
+      email_provider_priority: ['ses', 'brevo'],
       brevo_quota_action: 'allow_unverified_registration',
       admin_invite_email_reserve: 20,
       password_reset_email_reserve: 10,
@@ -53,6 +56,7 @@ describe('registration settings', () => {
     expect(() => validateRegistrationSettingsPatch({})).toThrow(/布尔值/)
     expect(() => validateRegistrationSettingsPatch({
       email_verification_required: false,
+      email_provider_priority: ['brevo', 'ses'],
       brevo_quota_action: 'pause_registration',
       admin_invite_email_reserve: 0,
       password_reset_email_reserve: 0,
@@ -60,12 +64,14 @@ describe('registration settings', () => {
     expect(() => validateRegistrationSettingsPatch({
       email_verification_required: false,
       invite_code_required: false,
+      email_provider_priority: ['brevo', 'ses'],
       admin_invite_email_reserve: 0,
       password_reset_email_reserve: 0,
     })).toThrow(/处理方式/)
     expect(() => validateRegistrationSettingsPatch({
       email_verification_required: true,
       invite_code_required: false,
+      email_provider_priority: ['brevo', 'ses'],
       brevo_quota_action: 'unknown',
       admin_invite_email_reserve: 0,
       password_reset_email_reserve: 0,
@@ -73,6 +79,7 @@ describe('registration settings', () => {
     expect(() => validateRegistrationSettingsPatch({
       email_verification_required: true,
       invite_code_required: false,
+      email_provider_priority: ['brevo', 'ses'],
       brevo_quota_action: 'pause_registration',
       admin_invite_email_reserve: 200,
       password_reset_email_reserve: 101,
@@ -80,10 +87,19 @@ describe('registration settings', () => {
     expect(() => validateRegistrationSettingsPatch({
       email_verification_required: true,
       invite_code_required: false,
+      email_provider_priority: ['brevo', 'ses'],
       brevo_quota_action: 'pause_registration',
       admin_invite_email_reserve: 1.5,
       password_reset_email_reserve: 0,
     })).toThrow(/整数/)
+    expect(() => validateRegistrationSettingsPatch({
+      email_verification_required: true,
+      invite_code_required: false,
+      email_provider_priority: ['brevo', 'brevo'],
+      brevo_quota_action: 'pause_registration',
+      admin_invite_email_reserve: 0,
+      password_reset_email_reserve: 0,
+    })).toThrow(/优先级/)
     expect(() => validateRegistrationSettingsPatch(null)).toThrow(/对象/)
   })
 })

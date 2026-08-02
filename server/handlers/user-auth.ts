@@ -51,7 +51,7 @@ import {
   reservePasswordResetDelivery,
   sendEmailVerificationEmail,
   sendPasswordResetEmail,
-  type BrevoEmailReservation,
+  type EmailDeliveryReservation,
 } from './email'
 import { getRegistrationSettings } from '../storage/registration-settings-store'
 import { validateRegistrationEmailForRegistration } from '../security/registration-email-policy'
@@ -175,7 +175,7 @@ export async function registerUser(
     throw error
   }
   let verificationRequired = registrationSettings.email_verification_required
-  let emailReservation: BrevoEmailReservation | null = null
+  let emailReservation: EmailDeliveryReservation | null = null
 
   if (verificationRequired) {
     try {
@@ -919,7 +919,7 @@ function hashEmailVerificationToken(token: string): string {
 
 async function issueEmailVerification(
   user: UserAccountRecord,
-  suppliedReservation?: BrevoEmailReservation,
+  suppliedReservation?: EmailDeliveryReservation,
 ): Promise<void> {
   const resendSince = new Date(Date.now() - EMAIL_VERIFICATION_RESEND_WINDOW_MS).toISOString()
   if (await getRecentEmailVerificationTokenForUser(user.id, resendSince)) return
@@ -952,7 +952,7 @@ async function issueEmailVerification(
   }
 }
 
-async function safelyReleaseEmailReservation(reservation: BrevoEmailReservation): Promise<void> {
+async function safelyReleaseEmailReservation(reservation: EmailDeliveryReservation): Promise<void> {
   try {
     await releaseEmailDeliveryReservation(reservation)
   } catch (error) {
