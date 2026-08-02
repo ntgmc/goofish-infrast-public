@@ -754,14 +754,16 @@ async function main() {
   }
 
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-  const [skillPayload, efficiencySource] = await Promise.all([
-    readFile(resolve(root, 'tools/prts_logistics_skills.json'), 'utf8').then(JSON.parse),
-    readEfficiencyDataSource(resolve(root, 'server/handlers/efficiency-data.json')),
-  ])
+  const efficiencySource = await readEfficiencyDataSource(
+    resolve(root, 'server/handlers/efficiency-data.json'),
+  )
   if (isPublicEfficiencyDataFallback(efficiencySource)) {
     console.log('Skipped efficiency skill reference validation because the private efficiency source is unavailable.')
     return
   }
+  const skillPayload = JSON.parse(
+    await readFile(resolve(root, 'tools/prts_logistics_skills.json'), 'utf8'),
+  )
   const efficiencyData = JSON.parse(efficiencySource)
   const result = validateEfficiencySkillReferences(skillPayload, efficiencyData)
   console.log(
