@@ -3,6 +3,7 @@ import { requestSchemas } from '../security/request-policy'
 import { jsonResponse, requireUserSession } from './user-auth'
 import {
   createCommercialProfile,
+  batchArchiveCommercialProfiles,
   createOrConvertMeteredPersonal,
   deleteCommercialProfile,
   listCommercialProfiles,
@@ -30,7 +31,11 @@ export default async function userMeteredProfilesHandler(req: Request): Promise<
       }) }, 201)
     }
     if (req.method === 'GET') {
-      const state = url.searchParams.get('state') === 'archived' ? 'archived' : 'active'
+      const rawState = url.searchParams.get('state') ?? 'active'
+      if (rawState !== 'active' && rawState !== 'archived') {
+        return jsonResponse({ error: '商用档案状态筛选无效。', code: 'invalid_state' }, 400)
+      }
+      const state = rawState
       const rawLimit = url.searchParams.get('limit')
       return jsonResponse(await listCommercialProfiles({
         userId: auth.user.id,
@@ -50,6 +55,13 @@ export default async function userMeteredProfilesHandler(req: Request): Promise<
     }
     if (req.method === 'PATCH') {
       const body = await getValidatedJson(req, requestSchemas.commercialProfilePatch)
+      if (body.action === 'batch_archive') {
+        return jsonResponse(await batchArchiveCommercialProfiles({
+          userId: auth.user.id,
+          profileIds: body.profile_ids,
+          operationId: body.operation_id,
+        }))
+      }
       return jsonResponse(await patchCommercialProfile({
         userId: auth.user.id,
         profileId: body.profile_id,

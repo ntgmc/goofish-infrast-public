@@ -118,7 +118,7 @@ export async function submitOptimizationJob(req: Request): Promise<Response> {
         await recordUsageEvent('metered_billing', {
           status: 'failure',
           reason_code: error.code,
-          source: prepared.billing.quote.billing_kind,
+          source: prepared.billing.billingKind,
         }, `admission:${requestHash}:${error.code}`).catch((trackingError) => {
           console.warn('metered billing admission metric skipped:', trackingError)
         });

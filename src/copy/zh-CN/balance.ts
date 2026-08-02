@@ -20,6 +20,7 @@ export const balanceCopy = {
   loading: '正在加载积分…',
   load_failed: '加载积分失败。',
   retry: '重试',
+  go_to_redeem: '前往账号兑换页',
   cdk_credit: '余额 CDK 兑换',
   admin_credit: '管理员发放',
   admin_debit: '管理员扣减',

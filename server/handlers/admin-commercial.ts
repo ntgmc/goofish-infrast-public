@@ -1,4 +1,4 @@
-import { authenticateAdminRequest } from './admin-auth'
+import { authenticateAdminRequest, requireRootAdminPassword } from './admin-auth'
 import { jsonResponse } from './license-utils'
 import { getValidatedJson } from '../security/request-validation'
 import { requestSchemas } from '../security/request-policy'
@@ -24,12 +24,18 @@ export default async function adminCommercialHandler(req: Request): Promise<Resp
     }
     if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
     const body = await getValidatedJson(req, requestSchemas.adminCommercial)
+    const approval = await requireRootAdminPassword(req, body.root_password)
+    if (!approval.ok) return approval.response
     return jsonResponse({ limits: await updateCommercialAccount({
       userId: body.user_id,
       activeLimit: body.active_profile_limit,
       totalLimit: body.total_profile_limit,
       suspended: body.suspended,
       reason: body.reason,
+      expectedRevision: body.expected_revision,
+      actorUsername: auth.username,
+      approvedBy: approval.username,
+      requestId: body.idempotency_key,
     }) })
   } catch (error) {
     if (error instanceof MeteredProfileError) return jsonResponse({ error: error.message, code: error.code }, error.status)
@@ -40,7 +46,7 @@ export default async function adminCommercialHandler(req: Request): Promise<Resp
 
 async function commercialOperationalSummary() {
   const [level1, level2, level3, level4] = commercialPolicy.tiers.map((tier) => tier.threshold_points)
-  const [reservations, profiles, accounts, jobs, settledByTier, billingEvents, eligibleAccounts, activations, reconciliationAnomalies] = await Promise.all([
+  const [reservations, profiles, accounts, jobs, settledByTier, billingEvents, eligibleAccounts, activations, reconciliationCases] = await Promise.all([
     query<{ status: string; count: string; amount: string }>(`select status, count(*)::text as count, coalesce(sum(amount), 0)::text as amount from user_balance_reservations group by status`),
     query<{ state: string; count: string }>(`select case when archived_at is null then 'active' else 'archived' end as state, count(*)::text as count from user_game_accounts where kind = 'metered_commercial' group by state`),
     query<{ level: string; count: string; debt: string }>(`select case
@@ -68,20 +74,21 @@ async function commercialOperationalSummary() {
         ) as cumulative_credited
         from user_balance_qualification_ledger
       ) qualification_history where cumulative_credited >= $1::numeric`, [level1]),
-    query<{ count: string }>(`select count(*)::text as count from (
-        select reservation.id
-          from user_balance_reservations reservation
-          left join optimize_jobs job on job.id = reservation.job_id
-         where job.id is null
-            or (reservation.status = 'consumed' and job.status <> 'succeeded')
-            or (reservation.status = 'released' and job.status = 'succeeded')
-        union all
-        select account.user_id
-          from user_balance_accounts account
-          left join (select user_id, sum(amount) as expected from user_balance_reservations
-            where status = 'reserved' group by user_id) projection on projection.user_id = account.user_id
-         where account.reserved <> coalesce(projection.expected, 0)
-      ) inconsistent`),
+    query<{
+      id: string
+      kind: string
+      user_id: string | null
+      job_id: string | null
+      reservation_id: string | null
+      detail_json: unknown
+      first_seen_at: string
+      last_seen_at: string
+      total: string
+    }>(`select id, kind, user_id, job_id, reservation_id, detail_json,
+              first_seen_at, last_seen_at, count(*) over()::text as total
+         from billing_reconciliation_cases
+        where status = 'pending_review'
+        order by last_seen_at desc, id desc limit 100`),
   ])
   const terminalJobs = jobs.rows.filter((row) => ['succeeded', 'failed', 'cancelled', 'dead_lettered'].includes(row.status))
   const totalJobs = terminalJobs.reduce((sum, row) => sum + Number(row.count), 0)
@@ -94,7 +101,8 @@ async function commercialOperationalSummary() {
     commercial_activations: Number(activations.rows[0]?.count ?? 0),
     settled_by_tier: settledByTier.rows,
     billing_events: billingEvents.rows,
-    reconciliation_anomalies: Number(reconciliationAnomalies.rows[0]?.count ?? 0),
+    reconciliation_anomalies: Number(reconciliationCases.rows[0]?.total ?? 0),
+    reconciliation_cases: reconciliationCases.rows.map(({ total: _total, ...reconciliationCase }) => reconciliationCase),
     metered_jobs: jobs.rows,
     metered_job_success_rate: totalJobs > 0 ? succeededJobs / totalJobs : 0,
   }

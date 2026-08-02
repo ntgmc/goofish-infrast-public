@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { getCommercialTierSummary, getMeteredBillingPolicy, pointsToMinor } from '../../src/lib/metered-billing'
 import type { UserGameAccount } from '../../src/lib/types'
 import { ensureDatabaseSchema } from './schema'
@@ -23,7 +23,8 @@ export class MeteredProfileError extends Error {
     readonly code: 'profile_not_found' | 'personal_profile_already_claimed' | 'invalid_conversion'
       | 'commercial_not_eligible' | 'commercial_suspended' | 'active_profile_limit'
       | 'total_profile_limit' | 'profile_archived' | 'profile_active' | 'active_job_exists'
-      | 'confirmation_required' | 'invalid_cursor' | 'invalid_limit',
+      | 'confirmation_required' | 'invalid_cursor' | 'invalid_limit' | 'revision_conflict'
+      | 'idempotency_conflict',
     message: string,
     readonly status: 400 | 404 | 409 | 429,
   ) {
@@ -39,6 +40,16 @@ export interface CommercialProfileLimits {
   total_limit: number
   suspended: boolean
   suspension_reason: string | null
+  revision: number
+  as_of: string
+  inflight_jobs: number
+  inflight_reserved: string
+}
+
+type BatchArchiveCommercialProfilesResponse = {
+  results: Array<{ profile_id: string; status: 'archived' }>
+  limits: CommercialProfileLimits
+  replayed: boolean
 }
 
 export async function createOrConvertMeteredPersonal(input: {
@@ -138,7 +149,7 @@ export async function listCommercialProfiles(input: {
   const limit = input.limit ?? 20
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new MeteredProfileError('invalid_limit', '分页数量必须是 1 到 100 的整数。', 400)
   const cursor = decodeCursor(input.cursor)
-  const search = input.query?.trim().slice(0, 100) ?? ''
+  const search = escapeLikePattern(input.query?.trim().slice(0, 100) ?? '')
   return withTransaction(async (client) => {
     const values: unknown[] = [input.userId, input.state === 'archived', `%${search}%`, limit + 1]
     let cursorClause = ''
@@ -150,7 +161,7 @@ export async function listCommercialProfiles(input: {
       `select record_json, created_at, id from user_game_accounts
         where user_id = $1 and kind = 'metered_commercial'
           and (($2::boolean and archived_at is not null) or (not $2::boolean and archived_at is null))
-          and ($3 = '%%' or display_name ilike $3 or note ilike $3)
+          and ($3 = '%%' or display_name ilike $3 escape '\\' or note ilike $3 escape '\\')
           ${cursorClause}
         order by created_at desc, id desc limit $4`,
       values,
@@ -170,7 +181,7 @@ export async function createCommercialProfile(input: {
   note?: string
 }): Promise<{ profile: UserGameAccount; limits: CommercialProfileLimits }> {
   await ensureDatabaseSchema()
-  const record = await withTransaction(async (client) => {
+  return withTransaction(async (client) => {
     await lockCommercialAccount(client, input.userId)
     await assertCommercialEligibleInTransaction(client, input.userId)
     const limits = await getCommercialLimitsInTransaction(client, input.userId)
@@ -180,9 +191,11 @@ export async function createCommercialProfile(input: {
     const profile = createMeteredProfile(input.userId, 'metered_commercial', input.displayName || `商用档案 ${limits.total + 1}`, input.note, now)
     await insertProfileInTransaction(client, profile)
     await ensureProfileWorkspaceInTransaction(client, profile.id)
-    return profile
+    return {
+      profile: toPublicProfile(profile, emptyWorkspace(profile.id)),
+      limits: await getCommercialLimitsInTransaction(client, input.userId),
+    }
   })
-  return { profile: toPublicProfile(record, await getProfileWorkspace(record.id)), limits: await getCommercialLimits(record.user_id) }
 }
 
 export async function patchCommercialProfile(input: {
@@ -193,7 +206,7 @@ export async function patchCommercialProfile(input: {
   note?: string
 }): Promise<{ profile: UserGameAccount; limits: CommercialProfileLimits }> {
   await ensureDatabaseSchema()
-  const profile = await withTransaction(async (client) => {
+  return withTransaction(async (client) => {
     await lockCommercialAccount(client, input.userId)
     const selected = await client.query<{ record_json: UserGameAccountRecord }>(
       "select record_json from user_game_accounts where id = $1 and user_id = $2 and kind = 'metered_commercial' for update",
@@ -217,9 +230,76 @@ export async function patchCommercialProfile(input: {
       updated_at: now,
     }
     await updateProfileInTransaction(client, updated)
-    return updated
+    return {
+      profile: toPublicProfile(updated, null),
+      limits: await getCommercialLimitsInTransaction(client, input.userId),
+    }
   })
-  return { profile: toPublicProfile(profile, null), limits: await getCommercialLimits(input.userId) }
+}
+
+export async function batchArchiveCommercialProfiles(input: {
+  userId: string
+  profileIds: string[]
+  operationId: string
+}): Promise<BatchArchiveCommercialProfilesResponse> {
+  await ensureDatabaseSchema()
+  const profileIds = [...new Set(input.profileIds)]
+  if (profileIds.length === 0 || profileIds.length > 100) {
+    throw new MeteredProfileError('invalid_limit', '单次批量归档必须包含 1 到 100 个档案。', 400)
+  }
+  const requestHash = createHash('sha256').update(JSON.stringify([...profileIds].sort())).digest('hex')
+  return withTransaction(async (client) => {
+    await lockCommercialAccount(client, input.userId)
+    const operationRecordId = randomUUID()
+    await client.query(
+      `insert into commercial_profile_operations
+        (id, user_id, operation_id, request_hash, created_at)
+       values ($1, $2, $3, $4, now())
+       on conflict (user_id, operation_id) do nothing`,
+      [operationRecordId, input.userId, input.operationId, requestHash],
+    )
+    const claimed = await client.query<{ id: string; request_hash: string; response_json: unknown }>(
+      `select id, request_hash, response_json from commercial_profile_operations
+        where user_id = $1 and operation_id = $2 for update`,
+      [input.userId, input.operationId],
+    )
+    const operation = claimed.rows[0]
+    if (!operation || operation.request_hash !== requestHash) {
+      throw new MeteredProfileError('idempotency_conflict', '批量操作标识已用于其他请求。', 409)
+    }
+    if (operation.response_json) {
+      return {
+        ...(operation.response_json as Omit<BatchArchiveCommercialProfilesResponse, 'replayed'>),
+        replayed: true,
+      }
+    }
+    const selected = await client.query<{ record_json: UserGameAccountRecord }>(
+      `select record_json from user_game_accounts
+        where user_id = $1 and kind = 'metered_commercial' and id = any($2::text[])
+        order by id for update`,
+      [input.userId, profileIds],
+    )
+    if (selected.rows.length !== profileIds.length) {
+      throw new MeteredProfileError('profile_not_found', '批量操作中包含不存在的商用档案。', 404)
+    }
+    if (selected.rows.some((row) => row.record_json.archived_at)) {
+      throw new MeteredProfileError('profile_archived', '批量操作中包含已归档档案，请刷新后重试。', 409)
+    }
+    const now = new Date().toISOString()
+    for (const row of selected.rows) {
+      await updateProfileInTransaction(client, { ...row.record_json, archived_at: now, updated_at: now })
+    }
+    const response = {
+      results: profileIds.map((profileId) => ({ profile_id: profileId, status: 'archived' as const })),
+      limits: await getCommercialLimitsInTransaction(client, input.userId),
+    }
+    await client.query(
+      `update commercial_profile_operations
+          set response_json = $2::jsonb, completed_at = now() where id = $1`,
+      [operation.id, JSON.stringify(response)],
+    )
+    return { ...response, replayed: false }
+  })
 }
 
 export async function deleteCommercialProfile(input: {
@@ -229,7 +309,7 @@ export async function deleteCommercialProfile(input: {
 }): Promise<{ deleted: true; limits: CommercialProfileLimits }> {
   if (!input.confirmed) throw new MeteredProfileError('confirmation_required', '永久删除必须显式确认。', 400)
   await ensureDatabaseSchema()
-  await withTransaction(async (client) => {
+  return withTransaction(async (client) => {
     await lockCommercialAccount(client, input.userId)
     const selected = await client.query(
       "select id from user_game_accounts where id = $1 and user_id = $2 and kind = 'metered_commercial' for update",
@@ -253,8 +333,8 @@ export async function deleteCommercialProfile(input: {
     )
     await client.query('delete from optimize_jobs where profile_id = $1', [input.profileId])
     await client.query('delete from user_game_accounts where id = $1', [input.profileId])
+    return { deleted: true as const, limits: await getCommercialLimitsInTransaction(client, input.userId) }
   })
-  return { deleted: true, limits: await getCommercialLimits(input.userId) }
 }
 
 export async function getCommercialLimits(userId: string): Promise<CommercialProfileLimits> {
@@ -267,22 +347,54 @@ export async function updateCommercialAccount(input: {
   activeLimit?: number
   totalLimit?: number
   suspended?: boolean
-  reason?: string | null
+  reason: string
+  expectedRevision: number
+  actorUsername: string
+  approvedBy: string
+  requestId: string
 }): Promise<CommercialProfileLimits> {
   await ensureDatabaseSchema()
-  await withTransaction(async (client) => {
+  return withTransaction(async (client) => {
     await lockCommercialAccount(client, input.userId)
-    const current = await client.query<{ active_profile_limit: number; total_profile_limit: number }>(
-      'select active_profile_limit, total_profile_limit from commercial_account_limits where user_id = $1 for update',
+    const reason = input.reason.trim()
+    if (reason.length < 2) throw new MeteredProfileError('invalid_limit', '商用账户变更原因至少需要 2 个字符。', 400)
+    const requestHash = createHash('sha256').update(JSON.stringify({
+      userId: input.userId,
+      activeLimit: input.activeLimit ?? null,
+      totalLimit: input.totalLimit ?? null,
+      suspended: input.suspended ?? null,
+      expectedRevision: input.expectedRevision,
+      reason,
+      actorUsername: input.actorUsername,
+      approvedBy: input.approvedBy,
+    })).digest('hex')
+    const replay = await client.query<{ request_hash: string; after_json: unknown }>(
+      'select request_hash, after_json from commercial_account_audit where request_id = $1 for update',
+      [input.requestId],
+    )
+    if (replay.rows[0]) {
+      if (replay.rows[0].request_hash !== requestHash) {
+        throw new MeteredProfileError('idempotency_conflict', '商用账户操作标识已用于其他请求。', 409)
+      }
+      return replay.rows[0].after_json as CommercialProfileLimits
+    }
+    const current = await client.query<{
+      active_profile_limit: number; total_profile_limit: number; revision: number;
+    }>(
+      'select active_profile_limit, total_profile_limit, revision from commercial_account_limits where user_id = $1 for update',
       [input.userId],
     )
+    if (current.rows[0]!.revision !== input.expectedRevision) {
+      throw new MeteredProfileError('revision_conflict', '商用账户状态已被其他管理员更新，请重新载入。', 409)
+    }
+    const before = await getCommercialLimitsInTransaction(client, input.userId)
     const active = input.activeLimit ?? current.rows[0]!.active_profile_limit
     const total = input.totalLimit ?? current.rows[0]!.total_profile_limit
     if (!Number.isInteger(active) || !Number.isInteger(total) || active < 1 || total < active || total > 100_000) {
       throw new MeteredProfileError('invalid_limit', '商用档案上限必须为正整数，且总量不得小于活跃量。', 400)
     }
     const now = new Date().toISOString()
-    await client.query(
+    const updated = await client.query(
       `update commercial_account_limits set active_profile_limit = $2, total_profile_limit = $3,
               suspended_at = case
                 when $4::boolean is null then suspended_at
@@ -294,12 +406,25 @@ export async function updateCommercialAccount(input: {
                 when $4::boolean then $5
                 else null
               end,
+              revision = revision + 1,
+              updated_by = $7,
               updated_at = $6
-        where user_id = $1`,
-      [input.userId, active, total, input.suspended ?? null, input.reason?.trim() || null, now],
+        where user_id = $1 and revision = $8`,
+      [input.userId, active, total, input.suspended ?? null, reason, now,
+        input.actorUsername, input.expectedRevision],
     )
+    if (!updated.rowCount) throw new MeteredProfileError('revision_conflict', '商用账户状态已被其他管理员更新，请重新载入。', 409)
+    const after = await getCommercialLimitsInTransaction(client, input.userId)
+    await client.query(
+      `insert into commercial_account_audit
+        (id, user_id, actor_username, approved_by, request_id, request_hash, reason,
+         before_json, after_json, created_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10)`,
+      [randomUUID(), input.userId, input.actorUsername, input.approvedBy, input.requestId,
+        requestHash, reason, JSON.stringify(before), JSON.stringify(after), now],
+    )
+    return after
   })
-  return getCommercialLimits(input.userId)
 }
 
 async function lockCommercialAccount(client: import('pg').PoolClient, userId: string): Promise<void> {
@@ -336,16 +461,23 @@ async function assertCommercialEligibleInTransaction(client: import('pg').PoolCl
 async function getCommercialLimitsInTransaction(client: import('pg').PoolClient, userId: string): Promise<CommercialProfileLimits> {
   const result = await client.query<{
     active: string; total: string; active_profile_limit: number | null; total_profile_limit: number | null;
-    suspended_at: string | null; suspension_reason: string | null;
+    suspended_at: string | null; suspension_reason: string | null; revision: number | null;
+    updated_at: string | null; inflight_jobs: string; inflight_reserved: string;
   }>(
     `select count(p.id) filter (where p.archived_at is null)::text as active,
             count(p.id)::text as total,
-            l.active_profile_limit, l.total_profile_limit, l.suspended_at, l.suspension_reason
+            l.active_profile_limit, l.total_profile_limit, l.suspended_at, l.suspension_reason,
+            l.revision, coalesce(l.updated_at, transaction_timestamp())::text as updated_at,
+            (select count(*)::text from optimize_jobs job
+              where job.billing_user_id = u.id and job.status in ('queued', 'running')) as inflight_jobs,
+            (select coalesce(sum(reservation.amount), 0)::text from user_balance_reservations reservation
+              where reservation.user_id = u.id and reservation.status = 'reserved') as inflight_reserved
        from user_accounts u
        left join commercial_account_limits l on l.user_id = u.id
        left join user_game_accounts p on p.user_id = u.id and p.kind = 'metered_commercial'
       where u.id = $1
-      group by l.active_profile_limit, l.total_profile_limit, l.suspended_at, l.suspension_reason`,
+      group by u.id, l.active_profile_limit, l.total_profile_limit, l.suspended_at,
+               l.suspension_reason, l.revision, l.updated_at`,
     [userId],
   )
   const row = result.rows[0]
@@ -354,6 +486,10 @@ async function getCommercialLimitsInTransaction(client: import('pg').PoolClient,
     active_limit: row?.active_profile_limit ?? policy.commercial.default_active_profile_limit,
     total_limit: row?.total_profile_limit ?? policy.commercial.default_total_profile_limit,
     suspended: Boolean(row?.suspended_at), suspension_reason: row?.suspension_reason ?? null,
+    revision: row?.revision ?? 1,
+    as_of: row?.updated_at ?? new Date().toISOString(),
+    inflight_jobs: Number(row?.inflight_jobs ?? 0),
+    inflight_reserved: row?.inflight_reserved ?? '0.00',
   }
 }
 
@@ -404,6 +540,10 @@ function normalizeDisplayName(value: unknown): string {
 
 function normalizeNote(value: unknown): string {
   return typeof value === 'string' ? value.trim().slice(0, 500) : ''
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`)
 }
 
 function encodeCursor(row: { created_at: string; id: string }): string {

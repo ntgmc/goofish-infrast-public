@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { copy } from '../../../copy/index'
-import { apiJson, getApiErrorMessage } from '../../../lib/api-client'
+import { ApiError, apiJson, getApiErrorMessage } from '../../../lib/api-client'
 import type { BalancePage, PublicBalanceTransaction } from '../../../lib/balance-contracts'
 import { getMeteredBillingPolicy } from '../../../lib/metered-billing'
 
@@ -22,16 +22,19 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
   const [redeeming, setRedeeming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [errorTarget, setErrorTarget] = useState<string | null>(null)
 
   const load = useCallback(async (cursor?: string | null) => {
     cursor ? setLoadingMore(true) : setLoading(true)
     setError(null)
+    setErrorTarget(null)
     try {
       const next = await apiJson<BalancePage>(`/api/user/balance${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`)
       setPage((current) => cursor && current ? {
         balance: next.balance,
         transactions: [...current.transactions, ...next.transactions],
         next_cursor: next.next_cursor,
+        as_of: next.as_of,
       } : next)
     } catch (caught) {
       setError(getApiErrorMessage(caught, copy.balance.load_failed))
@@ -51,6 +54,7 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
     setPending(request)
     setRedeeming(true)
     setError(null)
+    setErrorTarget(null)
     setNotice(null)
     try {
       const response = await apiJson<RedeemResponse>('/api/user/balance/redeem', {
@@ -64,12 +68,19 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
       await load()
     } catch (caught) {
       setError(getApiErrorMessage(caught, copy.metered.balance.redeem_retry))
+      setErrorTarget(getSafeErrorTarget(caught))
     } finally {
       setRedeeming(false)
     }
   }
 
-  if (loading && !page) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.balance.loading}</div>
+  if (!page) {
+    if (loading) return <div className="tool-panel p-6 text-sm text-ink-secondary" role="status">{copy.balance.loading}</div>
+    return <div className="tool-panel p-6" role="alert">
+      <p className="text-sm text-error">{error ?? copy.balance.load_failed}</p>
+      <button type="button" className="tool-secondary-action mt-4" onClick={() => void load()}>{copy.balance.retry}</button>
+    </div>
+  }
 
   return (
     <div className="space-y-5">
@@ -98,7 +109,10 @@ export default function BalanceSection({ redemptionEnabled }: { redemptionEnable
               : copy.metered.balance.commercial_locked(page.balance.commercial.points_to_next_level ?? page.balance.commercial.threshold_points ?? '10000.00')}</strong></div>
           {page.balance.commercial.eligible && page.balance.commercial.next_threshold_points && <div className="mt-2 flex justify-between gap-4"><span>{copy.metered.balance.next_level_label}</span><strong className="text-right text-ink-primary">{copy.metered.balance.next_level(page.balance.commercial.points_to_next_level, page.balance.commercial.next_threshold_points)}</strong></div>}</>}
         </div>
-        {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error} {!page && <button type="button" className="ml-2 underline" onClick={() => void load()}>{copy.balance.retry}</button>}</div>}
+        {error && <div className="tool-alert tool-alert--error mt-4" role="alert">
+          <span>{error}</span>
+          {errorTarget && <a className="ml-2 underline" href={errorTarget}>{copy.balance.go_to_redeem}</a>}
+        </div>}
         {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
       </section>
 
@@ -140,4 +154,10 @@ function transactionLabel(kind: PublicBalanceTransaction['kind']): string {
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+}
+
+function getSafeErrorTarget(error: unknown): string | null {
+  if (!(error instanceof ApiError) || !error.data || typeof error.data !== 'object') return null
+  const target = 'target' in error.data ? (error.data as { target?: unknown }).target : undefined
+  return target === '/tool/redeem' ? target : null
 }

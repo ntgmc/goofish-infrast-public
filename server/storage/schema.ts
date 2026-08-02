@@ -400,10 +400,12 @@ CREATE TABLE IF NOT EXISTS user_balance_transactions (
   reference_id TEXT NOT NULL,
   idempotency_key TEXT,
   admin_username TEXT,
+  approved_by TEXT,
   reason TEXT,
   request_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE user_balance_transactions ADD COLUMN IF NOT EXISTS approved_by TEXT;
 CREATE INDEX IF NOT EXISTS idx_user_balance_transactions_user_created
   ON user_balance_transactions(user_id, created_at DESC, id DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_balance_transactions_idempotency
@@ -417,6 +419,24 @@ ALTER TABLE user_balance_transactions DROP CONSTRAINT IF EXISTS user_balance_tra
 ALTER TABLE user_balance_transactions ADD CONSTRAINT user_balance_transactions_kind_check CHECK (
   kind IN ('cdk_credit', 'admin_credit', 'admin_debit', 'schedule_debit', 'admin_credit_reversal', 'debt_repayment')
 );
+
+CREATE TABLE IF NOT EXISTS user_balance_operations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  idempotency_key TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('claimed', 'completed')),
+  transaction_id TEXT REFERENCES user_balance_transactions(id) ON DELETE SET NULL,
+  response_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  UNIQUE (user_id, idempotency_key)
+);
+ALTER TABLE user_balance_operations
+  DROP CONSTRAINT IF EXISTS user_balance_operations_transaction_id_fkey;
+ALTER TABLE user_balance_operations
+  ADD CONSTRAINT user_balance_operations_transaction_id_fkey
+  FOREIGN KEY (transaction_id) REFERENCES user_balance_transactions(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS user_balance_qualification_ledger (
   id TEXT PRIMARY KEY,
@@ -455,7 +475,37 @@ CREATE TABLE IF NOT EXISTS commercial_account_limits (
   total_profile_limit INTEGER NOT NULL DEFAULT 1000 CHECK (total_profile_limit >= active_profile_limit),
   suspended_at TIMESTAMPTZ,
   suspension_reason TEXT,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+  updated_by TEXT,
   updated_at TIMESTAMPTZ NOT NULL
+);
+ALTER TABLE commercial_account_limits ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE commercial_account_limits ADD COLUMN IF NOT EXISTS updated_by TEXT;
+
+CREATE TABLE IF NOT EXISTS commercial_account_audit (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  actor_username TEXT NOT NULL,
+  approved_by TEXT NOT NULL,
+  request_id TEXT NOT NULL UNIQUE,
+  request_hash TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  before_json JSONB NOT NULL,
+  after_json JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_commercial_account_audit_user_created
+  ON commercial_account_audit(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS commercial_profile_operations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  operation_id TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  response_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  UNIQUE (user_id, operation_id)
 );
 
 -- goofish:migration-phase
@@ -937,6 +987,55 @@ ALTER TABLE user_game_accounts ADD CONSTRAINT user_game_accounts_kind_check
 CREATE INDEX IF NOT EXISTS idx_user_game_accounts_commercial_page
   ON user_game_accounts(user_id, archived_at, created_at DESC, id DESC)
   WHERE kind = 'metered_commercial';
+
+CREATE TABLE IF NOT EXISTS metered_billing_quotes (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  profile_id TEXT NOT NULL REFERENCES user_game_accounts(id) ON DELETE CASCADE,
+  billing_kind TEXT NOT NULL CHECK (billing_kind IN ('metered_personal', 'metered_commercial')),
+  pricing_version TEXT NOT NULL,
+  tier INTEGER CHECK (tier BETWEEN 1 AND 4),
+  list_price NUMERIC(20,2) NOT NULL CHECK (list_price > 0),
+  discount_bps INTEGER NOT NULL CHECK (discount_bps BETWEEN 0 AND 10000),
+  charge NUMERIC(20,2) NOT NULL CHECK (charge > 0),
+  expires_at TIMESTAMPTZ NOT NULL,
+  admitted_job_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  confirmed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_metered_billing_quotes_expiry
+  ON metered_billing_quotes(expires_at) WHERE admitted_job_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_metered_billing_quotes_admitted_job
+  ON metered_billing_quotes(admitted_job_id) WHERE admitted_job_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS billing_reconciliation_cases (
+  id TEXT PRIMARY KEY,
+  anomaly_key TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL CHECK (kind IN ('orphan_reservation', 'reservation_job_mismatch', 'account_projection_mismatch')),
+  status TEXT NOT NULL CHECK (status IN ('pending_review', 'resolved')),
+  user_id TEXT REFERENCES user_accounts(id) ON DELETE SET NULL,
+  job_id TEXT,
+  reservation_id TEXT,
+  detail_json JSONB NOT NULL,
+  resolution_json JSONB,
+  first_seen_at TIMESTAMPTZ NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL,
+  resolved_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_billing_reconciliation_cases_status_seen
+  ON billing_reconciliation_cases(status, last_seen_at DESC);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_balance_reservations_job') THEN
+    ALTER TABLE user_balance_reservations ADD CONSTRAINT fk_balance_reservations_job
+      FOREIGN KEY (job_id) REFERENCES optimize_jobs(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_balance_reservations_profile') THEN
+    ALTER TABLE user_balance_reservations ADD CONSTRAINT fk_balance_reservations_profile
+      FOREIGN KEY (profile_id) REFERENCES user_game_accounts(id) ON DELETE CASCADE NOT VALID;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS metered_personal_claims (
   user_id TEXT PRIMARY KEY REFERENCES user_accounts(id) ON DELETE CASCADE,

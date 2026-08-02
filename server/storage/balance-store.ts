@@ -18,7 +18,7 @@ const MAX_PAGE_SIZE = 100
 
 export class BalanceError extends Error {
   constructor(
-    readonly code: 'invalid_cursor' | 'invalid_limit' | 'insufficient_balance' | 'idempotency_conflict' | 'user_not_found' | 'reservation_conflict' | 'invalid_reversal' | 'reversal_exceeds_credit',
+    readonly code: 'invalid_cursor' | 'invalid_limit' | 'insufficient_balance' | 'idempotency_conflict' | 'idempotency_in_progress' | 'user_not_found' | 'reservation_conflict' | 'invalid_reversal' | 'reversal_exceeds_credit',
     message: string,
     readonly status: 400 | 404 | 409,
   ) {
@@ -35,6 +35,7 @@ export interface BalanceChangeInput {
   referenceId: string
   idempotencyKey?: string | null
   adminUsername?: string | null
+  approvedBy?: string | null
   reason?: string | null
   requestHash?: string
   now?: string
@@ -80,9 +81,14 @@ export type StoredBalanceTransaction = {
   reference_type: string
   reference_id: string
   admin_username: string | null
+  approved_by: string | null
   reason: string | null
   request_hash: string | null
   created_at: string
+}
+
+type StoredBalanceTransactionRow = Omit<StoredBalanceTransaction, 'created_at'> & {
+  created_at: string | Date
 }
 
 let schemaReady: Promise<void> | null = null
@@ -96,7 +102,7 @@ export async function getPublicBalancePage(
   options: { cursor?: string | null; limit?: number } = {},
 ): Promise<BalancePage<PublicBalanceTransaction>> {
   const page = await getBalancePage(userId, options)
-  return { balance: page.balance, transactions: page.transactions.map(toPublicBalanceTransaction), next_cursor: page.next_cursor }
+  return { balance: page.balance, transactions: page.transactions.map(toPublicBalanceTransaction), next_cursor: page.next_cursor, as_of: page.as_of }
 }
 
 export async function getAdminBalancePage(
@@ -104,7 +110,7 @@ export async function getAdminBalancePage(
   options: { cursor?: string | null; limit?: number } = {},
 ): Promise<BalancePage<AdminBalanceTransaction>> {
   const page = await getBalancePage(userId, options)
-  return { balance: page.balance, transactions: page.transactions.map(toAdminTransaction), next_cursor: page.next_cursor }
+  return { balance: page.balance, transactions: page.transactions.map(toAdminTransaction), next_cursor: page.next_cursor, as_of: page.as_of }
 }
 
 export async function getBalanceSummary(userId: string): Promise<BalanceSummary> {
@@ -126,18 +132,30 @@ export async function adjustBalance(input: BalanceChangeInput): Promise<{
   await ensureSchema()
   return withTransaction(async (client) => {
     const result = await applyBalanceChangeInTransaction(client, input)
-    return {
+    if (result.responseSnapshot) return { ...result.responseSnapshot, replayed: true }
+    const response = {
       balance: await getBalanceSummaryInTransaction(client, input.userId),
       transaction: toAdminTransaction(result.transaction),
       replayed: result.replayed,
     }
+    if (result.operationId) {
+      await completeBalanceOperationInTransaction(client, result.operationId, result.transaction.id, response)
+    }
+    return response
   })
 }
 
 export async function applyBalanceChangeInTransaction(
   client: PoolClient,
   input: BalanceChangeInput,
-): Promise<{ transaction: StoredBalanceTransaction; replayed: boolean }> {
+): Promise<{
+  transaction: StoredBalanceTransaction
+  replayed: boolean
+  operationId?: string
+  responseSnapshot?: { balance: BalanceSummary; transaction: AdminBalanceTransaction; replayed: boolean }
+}> {
+  const user = await client.query('select 1 from user_accounts where id = $1 for key share', [input.userId])
+  if (!user.rowCount) throw new BalanceError('user_not_found', '用户不存在。', 404)
   const requestHash = input.requestHash ?? createBalanceRequestHash({
     userId: input.userId,
     kind: input.kind,
@@ -145,25 +163,25 @@ export async function applyBalanceChangeInTransaction(
     referenceType: input.referenceType,
     referenceId: input.referenceId,
     adminUsername: input.adminUsername ?? null,
+    approvedBy: input.approvedBy ?? null,
     reason: input.reason ?? null,
   })
+  let operationId: string | undefined
   if (input.idempotencyKey) {
-    const existing = await client.query<StoredBalanceTransaction>(
-      `select id, kind, amount::text, balance_after::text, reference_type, reference_id,
-              admin_username, reason, request_hash, created_at
-         from user_balance_transactions
-        where user_id = $1 and idempotency_key = $2 for update`,
-      [input.userId, input.idempotencyKey],
-    )
-    const row = existing.rows[0]
-    if (row) {
-      if (row.request_hash !== requestHash) throw new BalanceError('idempotency_conflict', '当前请求标识已用于其他积分操作。', 409)
-      return { transaction: normalizeTransaction(row), replayed: true }
+    const claim = await claimBalanceOperationInTransaction(client, input.userId, input.idempotencyKey, requestHash)
+    operationId = claim.id
+    if (claim.transactionId) {
+      const existing = await getStoredBalanceTransactionInTransaction(client, claim.transactionId)
+      if (!existing) throw new BalanceError('idempotency_in_progress', '积分操作结果正在恢复，请稍后重试。', 409)
+      return {
+        transaction: existing,
+        replayed: true,
+        operationId,
+        responseSnapshot: parseBalanceResponseSnapshot(claim.responseJson),
+      }
     }
   }
 
-  const user = await client.query('select 1 from user_accounts where id = $1', [input.userId])
-  if (!user.rowCount) throw new BalanceError('user_not_found', '用户不存在。', 404)
   await ensureBalanceAccountInTransaction(client, input.userId)
   const negativeKind = input.kind === 'admin_debit' || input.kind === 'schedule_debit'
     || input.kind === 'admin_credit_reversal' || input.kind === 'debt_repayment'
@@ -180,16 +198,16 @@ export async function applyBalanceChangeInTransaction(
     [input.userId, signedAmount, now, qualificationCredit ? input.amount : '0.00'],
   )
   if (!updated.rowCount) throw new BalanceError('insufficient_balance', '积分余额不足。', 409)
-  const inserted = await client.query<StoredBalanceTransaction>(
+  const inserted = await client.query<StoredBalanceTransactionRow>(
     `insert into user_balance_transactions
       (id, user_id, kind, amount, balance_after, reference_type, reference_id, idempotency_key,
-       admin_username, reason, request_hash, created_at)
-     values ($1, $2, $3, $4::numeric, $5::numeric, $6, $7, $8, $9, $10, $11, $12)
+       admin_username, approved_by, reason, request_hash, created_at)
+     values ($1, $2, $3, $4::numeric, $5::numeric, $6, $7, $8, $9, $10, $11, $12, $13)
      returning id, kind, amount::text, balance_after::text, reference_type, reference_id,
-               admin_username, reason, request_hash, created_at`,
+               admin_username, approved_by, reason, request_hash, created_at`,
     [randomUUID(), input.userId, input.kind, signedAmount, updated.rows[0]?.available, input.referenceType,
-      input.referenceId, input.idempotencyKey ?? null, input.adminUsername ?? null, input.reason ?? null,
-      requestHash, now],
+      input.referenceId, input.idempotencyKey ?? null, input.adminUsername ?? null, input.approvedBy ?? null,
+      input.reason ?? null, requestHash, now],
   )
   const transaction = normalizeTransaction(inserted.rows[0]!)
   if (qualificationCredit) {
@@ -201,7 +219,7 @@ export async function applyBalanceChangeInTransaction(
     )
     await repayDebtAfterCreditInTransaction(client, input.userId, transaction.id, now)
   }
-  return { transaction, replayed: false }
+  return { transaction, replayed: false, operationId }
 }
 
 export async function reverseQualificationCredit(input: {
@@ -211,30 +229,35 @@ export async function reverseQualificationCredit(input: {
   reason: string
   idempotencyKey: string
   adminUsername: string
+  approvedBy: string
   now?: string
 }): Promise<{ balance: BalanceSummary; transaction: AdminBalanceTransaction; replayed: boolean }> {
   await ensureSchema()
   return withTransaction(async (client) => {
+    const user = await client.query('select 1 from user_accounts where id = $1 for key share', [input.userId])
+    if (!user.rowCount) throw new BalanceError('user_not_found', '用户不存在。', 404)
     const requestHash = createBalanceRequestHash({
       userId: input.userId,
       originalTransactionId: input.originalTransactionId,
       amount: input.amount,
       reason: input.reason,
       adminUsername: input.adminUsername,
+      approvedBy: input.approvedBy,
     })
-    const replay = await client.query<StoredBalanceTransaction>(
-      `select id, kind, amount::text, balance_after::text, reference_type, reference_id,
-              admin_username, reason, request_hash, created_at
-         from user_balance_transactions where user_id = $1 and idempotency_key = $2 for update`,
-      [input.userId, input.idempotencyKey],
+    const claim = await claimBalanceOperationInTransaction(
+      client,
+      input.userId,
+      input.idempotencyKey,
+      requestHash,
     )
-    if (replay.rows[0]) {
-      if (replay.rows[0].request_hash !== requestHash) {
-        throw new BalanceError('idempotency_conflict', '当前请求标识已用于其他积分操作。', 409)
-      }
+    if (claim.transactionId) {
+      const snapshot = parseBalanceResponseSnapshot(claim.responseJson)
+      if (snapshot) return { ...snapshot, replayed: true }
+      const replay = await getStoredBalanceTransactionInTransaction(client, claim.transactionId)
+      if (!replay) throw new BalanceError('idempotency_in_progress', '积分操作结果正在恢复，请稍后重试。', 409)
       return {
         balance: await getBalanceSummaryInTransaction(client, input.userId),
-        transaction: toAdminTransaction(normalizeTransaction(replay.rows[0])),
+        transaction: toAdminTransaction(replay),
         replayed: true,
       }
     }
@@ -268,16 +291,17 @@ export async function reverseQualificationCredit(input: {
       [input.userId, input.amount, now],
     )
     if (!account.rows[0]) throw new BalanceError('reversal_exceeds_credit', '冲正金额超过该用户可冲正的累计积分。', 409)
-    const inserted = await client.query<StoredBalanceTransaction>(
+    const inserted = await client.query<StoredBalanceTransactionRow>(
       `insert into user_balance_transactions
         (id, user_id, kind, amount, balance_after, reference_type, reference_id, idempotency_key,
-         admin_username, reason, request_hash, created_at)
+         admin_username, approved_by, reason, request_hash, created_at)
        values ($1, $2, 'admin_credit_reversal', -$3::numeric, $4::numeric,
-               'balance_credit_reversal', $5, $6, $7, $8, $9, $10)
+               'balance_credit_reversal', $5, $6, $7, $8, $9, $10, $11)
        returning id, kind, amount::text, balance_after::text, reference_type, reference_id,
-                 admin_username, reason, request_hash, created_at`,
+                 admin_username, approved_by, reason, request_hash, created_at`,
       [randomUUID(), input.userId, input.amount, account.rows[0].available,
-        input.originalTransactionId, input.idempotencyKey, input.adminUsername, input.reason, requestHash, now],
+        input.originalTransactionId, input.idempotencyKey, input.adminUsername, input.approvedBy,
+        input.reason, requestHash, now],
     )
     const transaction = normalizeTransaction(inserted.rows[0]!)
     await client.query(
@@ -287,11 +311,13 @@ export async function reverseQualificationCredit(input: {
       [randomUUID(), input.userId, input.originalTransactionId, input.amount,
         input.reason, `reversal:${input.idempotencyKey}`, now],
     )
-    return {
+    const response = {
       balance: await getBalanceSummaryInTransaction(client, input.userId),
       transaction: toAdminTransaction(transaction),
       replayed: false,
     }
+    await completeBalanceOperationInTransaction(client, claim.id, transaction.id, response)
+    return response
   })
 }
 
@@ -320,9 +346,9 @@ async function repayDebtAfterCreditInTransaction(
   await client.query(
     `insert into user_balance_transactions
       (id, user_id, kind, amount, balance_after, reference_type, reference_id, idempotency_key,
-       admin_username, reason, request_hash, created_at)
+       admin_username, approved_by, reason, request_hash, created_at)
      values ($1, $2, 'debt_repayment', -$3::numeric, $4::numeric, 'balance_credit', $5,
-             $6, null, '自动抵扣待追偿积分', null, $7)`,
+             $6, null, null, '自动抵扣待追偿积分', null, $7)`,
     [randomUUID(), userId, row.amount, row.available, creditTransactionId, `debt:${creditTransactionId}`, now],
   )
 }
@@ -446,27 +472,30 @@ async function getBalancePage(
   const values: unknown[] = [userId, limit + 1]
   const cursorClause = cursor ? 'and (created_at, id) < ($3::timestamptz, $4)' : ''
   if (cursor) values.push(cursor.createdAt, cursor.id)
-  const [account, transactions] = await Promise.all([
-    query<BalanceAccountRow>(
+  return withTransaction(async (client) => {
+    await client.query('set transaction isolation level repeatable read, read only')
+    const asOf = await client.query<{ as_of: string }>('select transaction_timestamp()::text as as_of')
+    const account = await client.query<BalanceAccountRow>(
       `select available::text, reserved::text, lifetime_credited::text,
               qualification_reversed::text, debt::text
          from user_balance_accounts where user_id = $1`, [userId],
-    ),
-    query<StoredBalanceTransaction>(
+    )
+    const transactions = await client.query<StoredBalanceTransactionRow>(
       `select id, kind, amount::text, balance_after::text, reference_type, reference_id,
-              admin_username, reason, request_hash, created_at
+              admin_username, approved_by, reason, request_hash, created_at
          from user_balance_transactions
         where user_id = $1 ${cursorClause}
         order by created_at desc, id desc limit $2`,
       values,
-    ),
-  ])
-  const rows = transactions.rows.slice(0, limit).map(normalizeTransaction)
-  return {
-    balance: toBalanceSummary(account.rows[0]),
-    transactions: rows,
-    next_cursor: transactions.rows.length > limit && rows.length > 0 ? encodeCursor(rows.at(-1)!) : null,
-  }
+    )
+    const rows = transactions.rows.slice(0, limit).map(normalizeTransaction)
+    return {
+      balance: toBalanceSummary(account.rows[0]),
+      transactions: rows,
+      next_cursor: transactions.rows.length > limit && rows.length > 0 ? encodeCursor(rows.at(-1)!) : null,
+      as_of: asOf.rows[0]!.as_of,
+    }
+  })
 }
 
 async function ensureBalanceAccountInTransaction(client: PoolClient, userId: string): Promise<void> {
@@ -526,11 +555,85 @@ export function toPublicBalanceTransaction(row: StoredBalanceTransaction): Publi
 }
 
 function toAdminTransaction(row: StoredBalanceTransaction): AdminBalanceTransaction {
-  return { ...toPublicBalanceTransaction(row), reference_type: row.reference_type, reference_id: row.reference_id, admin_username: row.admin_username, reason: row.reason }
+  return { ...toPublicBalanceTransaction(row), reference_type: row.reference_type, reference_id: row.reference_id, admin_username: row.admin_username, approved_by: row.approved_by, reason: row.reason }
 }
 
-function normalizeTransaction(row: StoredBalanceTransaction): StoredBalanceTransaction {
-  return { ...row, amount: normalizeStoredPoints(row.amount), balance_after: normalizeStoredPoints(row.balance_after) }
+async function claimBalanceOperationInTransaction(
+  client: PoolClient,
+  userId: string,
+  idempotencyKey: string,
+  requestHash: string,
+): Promise<{ id: string; transactionId: string | null; responseJson: unknown }> {
+  const operationId = randomUUID()
+  await client.query(
+    `insert into user_balance_operations
+      (id, user_id, idempotency_key, request_hash, status, created_at)
+     values ($1, $2, $3, $4, 'claimed', now())
+     on conflict (user_id, idempotency_key) do nothing`,
+    [operationId, userId, idempotencyKey, requestHash],
+  )
+  const result = await client.query<{
+    id: string; request_hash: string; status: 'claimed' | 'completed'; transaction_id: string | null; response_json: unknown;
+  }>(
+    `select id, request_hash, status, transaction_id, response_json
+       from user_balance_operations
+      where user_id = $1 and idempotency_key = $2 for update`,
+    [userId, idempotencyKey],
+  )
+  const row = result.rows[0]
+  if (!row) throw new BalanceError('idempotency_in_progress', '积分操作正在处理中，请稍后重试。', 409)
+  if (row.request_hash !== requestHash) {
+    throw new BalanceError('idempotency_conflict', '当前请求标识已用于其他积分操作。', 409)
+  }
+  if (row.status === 'claimed' && row.id !== operationId) {
+    throw new BalanceError('idempotency_in_progress', '积分操作正在处理中，请稍后重试。', 409)
+  }
+  return { id: row.id, transactionId: row.transaction_id, responseJson: row.response_json }
+}
+
+async function completeBalanceOperationInTransaction(
+  client: PoolClient,
+  operationId: string,
+  transactionId: string,
+  response: { balance: BalanceSummary; transaction: AdminBalanceTransaction; replayed: boolean },
+): Promise<void> {
+  await client.query(
+    `update user_balance_operations
+        set status = 'completed', transaction_id = $2, response_json = $3::jsonb, completed_at = now()
+      where id = $1`,
+    [operationId, transactionId, JSON.stringify(response)],
+  )
+}
+
+async function getStoredBalanceTransactionInTransaction(
+  client: PoolClient,
+  transactionId: string,
+): Promise<StoredBalanceTransaction | null> {
+  const result = await client.query<StoredBalanceTransactionRow>(
+    `select id, kind, amount::text, balance_after::text, reference_type, reference_id,
+            admin_username, approved_by, reason, request_hash, created_at
+       from user_balance_transactions where id = $1`,
+    [transactionId],
+  )
+  return result.rows[0] ? normalizeTransaction(result.rows[0]) : null
+}
+
+function parseBalanceResponseSnapshot(
+  value: unknown,
+): { balance: BalanceSummary; transaction: AdminBalanceTransaction; replayed: boolean } | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  if (!record.balance || !record.transaction) return undefined
+  return value as { balance: BalanceSummary; transaction: AdminBalanceTransaction; replayed: boolean }
+}
+
+function normalizeTransaction(row: StoredBalanceTransactionRow): StoredBalanceTransaction {
+  return {
+    ...row,
+    amount: normalizeStoredPoints(row.amount),
+    balance_after: normalizeStoredPoints(row.balance_after),
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+  }
 }
 
 function encodeCursor(row: Pick<StoredBalanceTransaction, 'created_at' | 'id'>): string {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { AdminBalanceTransaction, BalancePage } from '../../../lib/balance-contracts'
 import { normalizePointsAmount } from '../../../lib/balance-contracts'
 import { AppUserSummary, AdminProfileSummary, AdminUserDetail, AdminProfileOperatorData, permissionLabels, appUserStatusLabels } from '../contracts'
@@ -22,7 +22,7 @@ export interface UserDetailPanelProps {
   onClearWorkspace: (profile: AdminProfileSummary) => Promise<void>;
   onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
   onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
-  onAdjustBalance: (operation: 'credit' | 'debit' | 'reverse_credit', amount: string, reason: string, idempotencyKey: string, originalTransactionId?: string) => Promise<boolean>;
+  onAdjustBalance: (operation: 'credit' | 'debit' | 'reverse_credit', amount: string, reason: string, idempotencyKey: string, rootPassword: string, originalTransactionId?: string) => Promise<boolean>;
   onLoadMoreBalance: () => Promise<void>;
   onFreezeUser: (user: AppUserSummary) => Promise<void>;
   onUnfreezeUser: (user: AppUserSummary) => Promise<void>;
@@ -144,6 +144,7 @@ function UserBalanceCard({
   const [originalTransactionId, setOriginalTransactionId] = useState('')
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
+  const [rootPassword, setRootPassword] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
   const [validationError, setValidationError] = useState<string | null>(null)
 
@@ -164,11 +165,16 @@ function UserBalanceCard({
       setValidationError('资格冲正必须填写原正向积分交易 ID。')
       return
     }
+    if (!rootPassword) {
+      setValidationError('Root 口令必填。')
+      return
+    }
     setValidationError(null)
-    const succeeded = await onAdjust(operation, normalizedAmount, normalizedReason, idempotencyKey, originalTransactionId.trim() || undefined)
+    const succeeded = await onAdjust(operation, normalizedAmount, normalizedReason, idempotencyKey, rootPassword, originalTransactionId.trim() || undefined)
     if (!succeeded) return
     setAmount('')
     setReason('')
+    setRootPassword('')
     resetRequestIdentity()
   }
 
@@ -184,7 +190,7 @@ function UserBalanceCard({
         <span className="tool-status">{balance?.transactions.length ?? 0} 条已加载流水</span>
       </div>
 
-      <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[140px_180px_1fr_auto]" noValidate>
+      <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[140px_180px_1fr_180px_auto]" noValidate>
         <label>
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">操作</span>
           <select
@@ -196,6 +202,10 @@ function UserBalanceCard({
             <option value="debit">扣减积分</option>
             <option value="reverse_credit">资格冲正</option>
           </select>
+        </label>
+        <label>
+          <span className="mb-1.5 block text-xs font-medium text-ink-muted">Root 口令（高风险操作二次认证）</span>
+          <input type="password" value={rootPassword} onChange={(event) => { setRootPassword(event.currentTarget.value); resetRequestIdentity() }} maxLength={128} autoComplete="off" className="tool-field" />
         </label>
         {operation === 'reverse_credit' && <label className="lg:col-span-2">
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">原正向交易 ID</span>
@@ -245,7 +255,7 @@ function UserBalanceCard({
                 <td className="px-2 py-2">{adminBalanceKindLabel(transaction.kind)}</td>
                 <td className={`px-2 py-2 font-mono font-medium ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? transaction.amount : `+${transaction.amount}`}</td>
                 <td className="px-2 py-2 font-mono">{transaction.balance_after}</td>
-                <td className="max-w-72 px-2 py-2"><div>{transaction.admin_username ?? '-'}</div><div className="truncate text-ink-muted" title={transaction.reason ?? undefined}>{transaction.reason ?? '-'}</div></td>
+                <td className="max-w-72 px-2 py-2"><div>{transaction.admin_username ?? '-'}{transaction.approved_by ? ` / ${transaction.approved_by} 审批` : ''}</div><div className="truncate text-ink-muted" title={transaction.reason ?? undefined}>{transaction.reason ?? '-'}</div></td>
                 <td className="max-w-52 px-2 py-2 font-mono text-ink-muted"><div>{transaction.reference_type}</div><div className="truncate" title={transaction.reference_id}>{transaction.reference_id}</div></td>
                 <td className="whitespace-nowrap px-2 py-2">{formatDate(transaction.created_at)}</td>
               </tr>
@@ -273,34 +283,106 @@ export function CommercialAdminControls({ userId, eligible }: { userId: string; 
 }
 
 function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
-  type Limits = { active: number; total: number; active_limit: number; total_limit: number; suspended: boolean; suspension_reason: string | null }
+  type Limits = {
+    active: number
+    total: number
+    active_limit: number
+    total_limit: number
+    suspended: boolean
+    suspension_reason: string | null
+    revision: number
+    as_of: string
+    inflight_jobs: number
+    inflight_reserved: string
+  }
   const [limits, setLimits] = useState<Limits | null>(null)
-  const [activeLimit, setActiveLimit] = useState('100')
-  const [totalLimit, setTotalLimit] = useState('1000')
+  const [activeLimit, setActiveLimit] = useState('')
+  const [totalLimit, setTotalLimit] = useState('')
   const [reason, setReason] = useState('')
+  const [rootPassword, setRootPassword] = useState('')
+  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const load = async () => {
-    const data = await adminApiJson<{ limits: Limits }>(`/api/admin/commercial?user_id=${encodeURIComponent(userId)}`)
-    setLimits(data.limits); setActiveLimit(String(data.limits.active_limit)); setTotalLimit(String(data.limits.total_limit)); setReason(data.limits.suspension_reason ?? '')
-  }
-  useEffect(() => { void load().catch(() => undefined) }, [userId])
+  const requestIdentity = useRef<{ signature: string; key: string } | null>(null)
+  const resetRequestIdentity = () => { requestIdentity.current = null }
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await adminApiJson<{ limits: Limits }>(`/api/admin/commercial?user_id=${encodeURIComponent(userId)}`)
+      setLimits(data.limits)
+      setActiveLimit(String(data.limits.active_limit))
+      setTotalLimit(String(data.limits.total_limit))
+      setReason('')
+      setRootPassword('')
+      resetRequestIdentity()
+    } catch (caught) {
+      setLimits(null)
+      setActiveLimit('')
+      setTotalLimit('')
+      setError((caught as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }, [userId])
+  useEffect(() => { void load() }, [load])
   const save = async (suspended = limits?.suspended ?? false) => {
+    if (!limits) return
+    const active = Number(activeLimit)
+    const total = Number(totalLimit)
+    const normalizedReason = reason.trim()
+    if (!Number.isInteger(active) || !Number.isInteger(total) || active < 1 || total < active) {
+      setError('商用档案上限必须为正整数，且总量不得小于活跃量。')
+      return
+    }
+    if (normalizedReason.length < 2) {
+      setError('变更原因至少需要 2 个字符，并会写入不可变审计。')
+      return
+    }
+    if (!rootPassword) {
+      setError('Root 口令必填。')
+      return
+    }
+    if (suspended && !limits.suspended && limits.inflight_jobs > 0
+      && !window.confirm(`当前仍有 ${limits.inflight_jobs} 个在途任务、已预留 ${limits.inflight_reserved} 积分。暂停仅阻止新任务，在途任务仍会执行并按结果结算。确认继续？`)) return
+    const signature = JSON.stringify({ active, total, suspended, normalizedReason, revision: limits.revision })
+    const request = requestIdentity.current?.signature === signature
+      ? requestIdentity.current
+      : { signature, key: crypto.randomUUID() }
+    requestIdentity.current = request
     setBusy(true); setError(null)
     try {
       const data = await adminApiJson<{ limits: Limits }>('/api/admin/commercial', {
-        method: 'POST', json: { user_id: userId, active_profile_limit: Number(activeLimit), total_profile_limit: Number(totalLimit), suspended, reason },
+        method: 'POST', json: {
+          user_id: userId,
+          active_profile_limit: active,
+          total_profile_limit: total,
+          suspended,
+          reason: normalizedReason,
+          expected_revision: limits.revision,
+          idempotency_key: request.key,
+          root_password: rootPassword,
+        },
       })
       setLimits(data.limits)
+      setActiveLimit(String(data.limits.active_limit))
+      setTotalLimit(String(data.limits.total_limit))
+      setReason('')
+      setRootPassword('')
+      resetRequestIdentity()
     } catch (caught) { setError((caught as Error).message) }
     finally { setBusy(false) }
   }
   return <div className="mt-5 border-t border-surface-3 pt-4">
     <h4 className="text-sm font-semibold text-ink-primary">商用账户控制</h4>
-    <p className="mt-1 text-xs text-ink-muted">档案用量：活跃 {limits?.active ?? 0} / {limits?.active_limit ?? 100}，总量 {limits?.total ?? 0} / {limits?.total_limit ?? 1000}；状态：{limits?.suspended ? '已暂停' : '正常'}</p>
-    <div className="mt-3 grid gap-2 sm:grid-cols-3"><input aria-label="商用活跃档案上限" value={activeLimit} onChange={(event) => setActiveLimit(event.currentTarget.value)} className="tool-field" inputMode="numeric" /><input aria-label="商用档案总量上限" value={totalLimit} onChange={(event) => setTotalLimit(event.currentTarget.value)} className="tool-field" inputMode="numeric" /><input aria-label="暂停原因" value={reason} onChange={(event) => setReason(event.currentTarget.value)} className="tool-field" placeholder="暂停时填写原因" /></div>
-    <div className="mt-3 flex gap-2"><button type="button" disabled={busy} onClick={() => void save()} className="tool-secondary-action">保存限额</button><button type="button" disabled={busy} onClick={() => void save(!limits?.suspended)} className={limits?.suspended ? 'tool-primary-action' : 'tool-danger-action'}>{limits?.suspended ? '恢复商用' : '暂停商用'}</button></div>
-    {error && <p className="mt-2 text-sm text-error">{error}</p>}
+    {loading && <p className="mt-2 text-sm text-ink-muted" role="status">正在加载商用账户真实状态…</p>}
+    {limits && <>
+      <p className="mt-1 text-xs text-ink-muted">档案用量：活跃 {limits.active} / {limits.active_limit}，总量 {limits.total} / {limits.total_limit}；状态：{limits.suspended ? '已暂停' : '正常'}；revision {limits.revision}</p>
+      <p className="mt-1 text-xs text-ink-muted">在途任务 {limits.inflight_jobs} 个 · 已预留 {limits.inflight_reserved} 积分。暂停只阻止新任务，在途任务仍会执行并结算。</p>
+    </>}
+    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><input aria-label="商用活跃档案上限" disabled={!limits || loading || busy} value={activeLimit} onChange={(event) => { setActiveLimit(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" inputMode="numeric" /><input aria-label="商用档案总量上限" disabled={!limits || loading || busy} value={totalLimit} onChange={(event) => { setTotalLimit(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" inputMode="numeric" /><input aria-label="商用变更原因" disabled={!limits || loading || busy} value={reason} onChange={(event) => { setReason(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" placeholder="必填，将写入审计" /><input aria-label="商用 Root 口令" type="password" disabled={!limits || loading || busy} value={rootPassword} onChange={(event) => { setRootPassword(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" autoComplete="off" placeholder="高风险操作二次认证" /></div>
+    <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={!limits || loading || busy} onClick={() => void save()} className="tool-secondary-action">保存限额</button><button type="button" disabled={!limits || loading || busy} onClick={() => void save(!limits?.suspended)} className={limits?.suspended ? 'tool-primary-action' : 'tool-danger-action'}>{limits?.suspended ? '恢复商用' : '暂停商用'}</button>{!limits && !loading && <button type="button" onClick={() => void load()} className="tool-secondary-action">重新加载</button>}</div>
+    {error && <p className="mt-2 text-sm text-error" role="alert">{error}</p>}
   </div>
 }
 

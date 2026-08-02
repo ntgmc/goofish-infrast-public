@@ -233,10 +233,17 @@ export const requestSchemas = {
   }),
   meteredPersonalProfile: strict({ profile_id: optionalString(128), display_name: optionalString(40), note: optionalString(500) }),
   commercialProfileCreate: strict({ display_name: optionalString(40), note: optionalString(500) }),
-  commercialProfilePatch: strict({
-    profile_id: shortString(128), action: z.enum(['update', 'archive', 'restore']),
-    display_name: optionalString(40), note: optionalString(500),
-  }),
+  commercialProfilePatch: z.discriminatedUnion('action', [
+    strict({
+      profile_id: shortString(128), action: z.enum(['update', 'archive', 'restore']),
+      display_name: optionalString(40), note: optionalString(500),
+    }),
+    strict({
+      action: z.literal('batch_archive'),
+      profile_ids: z.array(shortString(128)).min(1).max(100),
+      operation_id: shortString(128),
+    }),
+  ]),
   commercialProfileDelete: strict({ profile_id: shortString(128), confirm_permanent_delete: z.literal(true) }),
   userWorkspace: strict({
     profile_id: shortString(128),
@@ -309,6 +316,7 @@ export const requestSchemas = {
         'newcomer_supply_pack',
       ])).max(3).optional(),
       historySource: z.enum(['generated', 'applied_suggestions']).optional(),
+      billing_quote_id: optionalString(128),
       pricing_version: optionalString(64),
       accepted_max_points: optionalString(32),
     }),
@@ -347,6 +355,7 @@ export const requestSchemas = {
     amount: shortString(32),
     reason: shortString(500),
     idempotency_key: shortString(200),
+    root_password: shortString(128),
     original_transaction_id: optionalString(128),
   }),
   adminCommercial: strict({
@@ -354,7 +363,13 @@ export const requestSchemas = {
     active_profile_limit: z.number().int().min(1).max(100000).optional(),
     total_profile_limit: z.number().int().min(1).max(100000).optional(),
     suspended: z.boolean().optional(),
-    reason: optionalString(500),
+    reason: inventoryReasonSchema,
+    expected_revision: expectedRevisionSchema,
+    idempotency_key: shortString(128),
+    root_password: shortString(128),
+  }).refine((body) => body.active_profile_limit !== undefined
+    || body.total_profile_limit !== undefined || body.suspended !== undefined, {
+    message: 'At least one commercial account mutation is required.',
   }),
   onboardingTaskClaim: strict({
     task_code: z.enum(['welcome_inventory', 'bind_skland', 'first_main_schedule']).optional(),

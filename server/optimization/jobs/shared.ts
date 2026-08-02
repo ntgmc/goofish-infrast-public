@@ -3,7 +3,7 @@ import { type CdkRecord } from "../../handlers/license-utils"
 import type { UsageReasonCode } from "../../storage/usage-store";
 import { type OptimizeJobPriority } from "../../storage/optimize-job-store"
 import type { ScenarioComparisonFactors } from '../../../src/lib/scenario-comparison'
-import type { MeteredScheduleQuote } from '../../../src/lib/metered-billing'
+import type { MeteredBillingKind, MeteredQuoteConfirmation } from '../../../src/lib/metered-billing'
 import { optimizationJobPayloadSchema } from './runtime-contracts'
 
 export const UPGRADE_MAX_SIMULATIONS = 24;
@@ -176,7 +176,7 @@ export type PreparedOptimizeJob = {
   rewardItemCodes?: string[];
   behaviorIdentity?: { userId: string; sessionTokenHash: string };
   personalUseAudit?: { userId: string; profileId: string };
-  billing?: { userId: string; quote: MeteredScheduleQuote } | null;
+  billing?: { userId: string; billingKind: MeteredBillingKind; confirmation: MeteredQuoteConfirmation } | null;
 };
 
 export type OptimizeConfigPermission = PermissionMode | "free_preview";

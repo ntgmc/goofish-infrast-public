@@ -22,8 +22,8 @@ import {
   validateInvitationCode,
 } from './invitation-store'
 import { confirmFreeScheduleEntitlement, getFreeScheduleEntitlement } from './reorder-admission'
-import { adjustBalance, getBalanceSummary } from './balance-store'
-import { getMeteredScheduleQuote } from '../../src/lib/metered-billing'
+import { adjustBalance, getBalanceSummary, reverseQualificationCredit } from './balance-store'
+import { issueMeteredScheduleQuote } from './metered-billing-store'
 import { recordOperatorFingerprintInTransaction } from './cdk-store'
 import { getItemBalance, grantItem } from './inventory-store'
 import { SettingsConflictError } from './settings-conflict'
@@ -1098,10 +1098,9 @@ describe('PostgreSQL optimization job admission', () => {
       userId, kind: 'admin_credit', amount: '1200.00', referenceType: 'admin_adjustment',
       referenceId: randomUUID(), idempotencyKey: `fund:${userId}`, adminUsername: 'root', reason: 'metered test',
     })
-    const quote = getMeteredScheduleQuote('metered_personal')
     const first = await store.admitJob(input({
       priority: 500_000, owner_key: `profile:${profileId}`, profile_id: profileId,
-      permission: 'metered_advanced', billing: { userId, quote },
+      permission: 'metered_advanced', billing: await meteredBillingConfirmation(userId, profileId),
     }))
     expect(first.job.billing_json).toMatchObject({ status: 'reserved', charge: '600.00' })
     expect(await getBalanceSummary(userId)).toMatchObject({ available: '600.00', reserved: '600.00' })
@@ -1113,7 +1112,7 @@ describe('PostgreSQL optimization job admission', () => {
 
     const second = await store.admitJob(input({
       priority: 500_001, owner_key: `profile:${profileId}`, profile_id: profileId,
-      permission: 'metered_advanced', billing: { userId, quote },
+      permission: 'metered_advanced', billing: await meteredBillingConfirmation(userId, profileId),
     }))
     const failedClaim = await store.claimNextJob('billing-failure-worker', randomUUID(), new Date(Date.now() + 60_000).toISOString(), 2, 100)
     expect(failedClaim?.id).toBe(second.job.id)
@@ -1124,7 +1123,7 @@ describe('PostgreSQL optimization job admission', () => {
 
     const pending = await store.admitJob(input({
       priority: 500_002, owner_key: `profile:${profileId}`, profile_id: profileId,
-      permission: 'metered_advanced', billing: { userId, quote },
+      permission: 'metered_advanced', billing: await meteredBillingConfirmation(userId, profileId),
     }))
     await query("update optimize_jobs set status = 'failed', updated_at = now() - interval '2 days' where id = $1", [pending.job.id])
     await store.cleanupOldJobs(new Date(Date.now() - 24 * 60 * 60_000).toISOString())
@@ -1134,6 +1133,243 @@ describe('PostgreSQL optimization job admission', () => {
     await query("update optimize_jobs set updated_at = now() - interval '2 days' where id = $1", [pending.job.id])
     await store.cleanupOldJobs(new Date(Date.now() - 24 * 60 * 60_000).toISOString())
     expect(await store.getJob(pending.job.id)).toBeNull()
+  })
+
+  it('quotes commercial billing from net qualification points and free balance', async () => {
+    const { userId, profileId } = await seedMeteredProfile()
+    await query(
+      `update user_game_accounts
+          set kind = 'metered_commercial', record_json = record_json || '{"kind":"metered_commercial"}'::jsonb
+        where id = $1`,
+      [profileId],
+    )
+    await query(
+      `insert into user_balance_accounts
+        (user_id, available, reserved, lifetime_credited, qualification_reversed, debt, updated_at)
+       values ($1, 1000, 250, 100000, 90000, 0, now())
+       on conflict (user_id) do update
+         set available = excluded.available,
+             reserved = excluded.reserved,
+             lifetime_credited = excluded.lifetime_credited,
+             qualification_reversed = excluded.qualification_reversed,
+             debt = excluded.debt,
+             updated_at = excluded.updated_at`,
+      [userId],
+    )
+
+    const quote = await issueMeteredScheduleQuote(userId, profileId)
+
+    expect(quote).toMatchObject({
+      billing_kind: 'metered_commercial',
+      tier: 1,
+      charge: '900.00',
+      available: '750.00',
+      sufficient: false,
+    })
+  })
+
+  it('rejects a confirmed commercial price after a qualification reversal raises the charge', async () => {
+    const { userId, profileId } = await seedMeteredProfile()
+    await query(
+      `update user_game_accounts
+          set kind = 'metered_commercial', record_json = record_json || '{"kind":"metered_commercial"}'::jsonb
+        where id = $1`,
+      [profileId],
+    )
+    const credit = await adjustBalance({
+      userId,
+      kind: 'admin_credit',
+      amount: '30000.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `commercial-price-fund:${userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+      reason: 'commercial price revalidation test',
+    })
+    const billing = await meteredBillingConfirmation(userId, profileId)
+    expect(billing.confirmation.acceptedMaxPoints).toBe('800.00')
+    await reverseQualificationCredit({
+      userId,
+      originalTransactionId: credit.transaction.id,
+      amount: '20000.00',
+      reason: 'qualification correction after quote',
+      idempotencyKey: `commercial-price-reversal:${userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+    })
+
+    await expect(createPostgresOptimizeJobStore().admitJob(input({
+      priority: 500_005,
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      permission: 'metered_advanced',
+      billing,
+    }))).rejects.toMatchObject({ code: 'pricing_changed', status: 409 })
+    expect((await query<{ count: string }>(
+      'select count(*)::text as count from user_balance_reservations where profile_id = $1',
+      [profileId],
+    )).rows[0]?.count).toBe('0')
+  })
+
+  it('rejects reused and expired billing quote ids without creating another reservation', async () => {
+    const store = createPostgresOptimizeJobStore()
+    const used = await seedMeteredProfile()
+    await adjustBalance({
+      userId: used.userId,
+      kind: 'admin_credit',
+      amount: '1200.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `used-quote-fund:${used.userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+      reason: 'used quote test',
+    })
+    const usedBilling = await meteredBillingConfirmation(used.userId, used.profileId)
+    await store.admitJob(input({
+      priority: 500_006,
+      owner_key: `profile:${used.profileId}`,
+      profile_id: used.profileId,
+      permission: 'metered_advanced',
+      billing: usedBilling,
+    }))
+    await expect(store.admitJob(input({
+      priority: 500_007,
+      owner_key: `profile:${used.profileId}`,
+      profile_id: used.profileId,
+      permission: 'metered_advanced',
+      billing: usedBilling,
+    }))).rejects.toMatchObject({ code: 'quote_already_used', status: 409 })
+    expect((await query<{ count: string }>(
+      'select count(*)::text as count from user_balance_reservations where profile_id = $1',
+      [used.profileId],
+    )).rows[0]?.count).toBe('1')
+
+    const expired = await seedMeteredProfile()
+    await adjustBalance({
+      userId: expired.userId,
+      kind: 'admin_credit',
+      amount: '600.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `expired-quote-fund:${expired.userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+      reason: 'expired quote test',
+    })
+    const expiredBilling = await meteredBillingConfirmation(expired.userId, expired.profileId)
+    await query('update metered_billing_quotes set expires_at = now() - interval \'1 second\' where id = $1', [
+      expiredBilling.confirmation.quoteId,
+    ])
+    await expect(store.admitJob(input({
+      priority: 500_008,
+      owner_key: `profile:${expired.profileId}`,
+      profile_id: expired.profileId,
+      permission: 'metered_advanced',
+      billing: expiredBilling,
+    }))).rejects.toMatchObject({ code: 'pricing_changed', status: 409 })
+    expect((await query<{ count: string }>(
+      'select count(*)::text as count from user_balance_reservations where profile_id = $1',
+      [expired.profileId],
+    )).rows[0]?.count).toBe('0')
+  })
+
+  it('revalidates a commercial suspension inside the admission transaction', async () => {
+    const { userId, profileId } = await seedMeteredProfile()
+    await query(
+      `update user_game_accounts
+          set kind = 'metered_commercial', record_json = record_json || '{"kind":"metered_commercial"}'::jsonb
+        where id = $1`,
+      [profileId],
+    )
+    await adjustBalance({
+      userId,
+      kind: 'admin_credit',
+      amount: '10000.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `commercial-fund:${userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+      reason: 'commercial admission race test',
+    })
+    const billing = await meteredBillingConfirmation(userId, profileId)
+    await query(
+      `insert into commercial_account_limits
+        (user_id, active_profile_limit, total_profile_limit, suspended_at, suspension_reason, updated_at)
+       values ($1, 100, 1000, now(), 'concurrent review', now())
+       on conflict (user_id) do update
+         set suspended_at = excluded.suspended_at,
+             suspension_reason = excluded.suspension_reason,
+             revision = commercial_account_limits.revision + 1,
+             updated_at = excluded.updated_at`,
+      [userId],
+    )
+
+    await expect(createPostgresOptimizeJobStore().admitJob(input({
+      priority: 500_010,
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      permission: 'metered_advanced',
+      billing,
+    }))).rejects.toMatchObject({ code: 'commercial_suspended', status: 409 })
+    expect((await query<{ count: string }>(
+      'select count(*)::text as count from user_balance_reservations where profile_id = $1',
+      [profileId],
+    )).rows[0]?.count).toBe('0')
+  })
+
+  it('repairs balance projections and quarantines ambiguous billing mismatches', async () => {
+    const { userId, profileId } = await seedMeteredProfile()
+    await adjustBalance({
+      userId,
+      kind: 'admin_credit',
+      amount: '1200.00',
+      referenceType: 'admin_adjustment',
+      referenceId: randomUUID(),
+      idempotencyKey: `reconciliation-fund:${userId}`,
+      adminUsername: 'operator',
+      approvedBy: 'root',
+      reason: 'billing reconciliation test',
+    })
+    const store = createPostgresOptimizeJobStore()
+    const admitted = await store.admitJob(input({
+      priority: 500_020,
+      owner_key: `profile:${profileId}`,
+      profile_id: profileId,
+      permission: 'metered_advanced',
+      billing: await meteredBillingConfirmation(userId, profileId),
+    }))
+    await query('update user_balance_accounts set reserved = 700 where user_id = $1', [userId])
+
+    const repaired = await store.reconcileBilling?.()
+
+    expect(repaired?.repaired).toBeGreaterThanOrEqual(1)
+    expect((await query<{ reserved: string }>(
+      'select reserved::text from user_balance_accounts where user_id = $1',
+      [userId],
+    )).rows[0]?.reserved).toBe('600.00')
+    expect((await query<{ status: string }>(
+      "select status from billing_reconciliation_cases where kind = 'account_projection_mismatch' and user_id = $1 order by last_seen_at desc limit 1",
+      [userId],
+    )).rows[0]?.status).toBe('resolved')
+
+    await query("update user_balance_reservations set status = 'consumed', settled_at = now() where job_id = $1", [admitted.job.id])
+    await query('update user_balance_accounts set reserved = 0 where user_id = $1', [userId])
+    await query("update optimize_jobs set status = 'failed', finished_at = now(), updated_at = now() where id = $1", [admitted.job.id])
+
+    const quarantined = await store.reconcileBilling?.()
+
+    expect(quarantined?.quarantined).toBeGreaterThanOrEqual(1)
+    expect((await query<{ status: string }>(
+      "select status from billing_reconciliation_cases where kind = 'reservation_job_mismatch' and job_id = $1",
+      [admitted.job.id],
+    )).rows[0]?.status).toBe('pending_review')
+    expect((await query<{ status: string }>(
+      'select status from user_balance_reservations where job_id = $1',
+      [admitted.job.id],
+    )).rows[0]?.status).toBe('consumed')
   })
 
   it('preserves both concurrent workspace updates under the profile lock', async () => {
@@ -1249,7 +1485,7 @@ describe('PostgreSQL optimization job admission', () => {
       permission: 'metered_advanced',
       source: 'account_profile',
       payload_json: formalSchedulePayload(profileId),
-      billing: { userId, quote: getMeteredScheduleQuote('metered_personal') },
+      billing: await meteredBillingConfirmation(userId, profileId),
     }))
     const claimed = await store.claimNextJob('invalid-result-worker', 'invalid-result-lock', new Date(Date.now() + 60_000).toISOString(), 2, 100)
     expect(claimed?.id).toBe(admitted.job.id)
@@ -1470,6 +1706,19 @@ async function seedMeteredProfile(): Promise<{ userId: string; profileId: string
     [profileId, userId, JSON.stringify(profile)],
   )
   return { userId, profileId }
+}
+
+async function meteredBillingConfirmation(userId: string, profileId: string) {
+  const quote = await issueMeteredScheduleQuote(userId, profileId)
+  return {
+    userId,
+    billingKind: quote.billing_kind,
+    confirmation: {
+      quoteId: quote.quote_id,
+      pricingVersion: quote.pricing_version,
+      acceptedMaxPoints: quote.charge,
+    },
+  }
 }
 
 function shanghaiMonthKey(value: string): string {

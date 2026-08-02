@@ -14,7 +14,6 @@ import { getProfileAccessLabel } from '../tool-utils'
 import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
 import { copy } from '../../../copy/index'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
-import { apiJson } from '../../../lib/api-client'
 import { fetchOptimizationJobSnapshot } from './optimization-api'
 import type { OptimizeResult, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../../lib/types'
 import SessionLoader from '../../../components/SessionLoader'
@@ -23,13 +22,24 @@ import { restoreScenarioComparisonJob } from './scenario-lab/useScenarioComparis
 
 export default function OptimizeWorkflowPage(props: Props) {
   const { features } = useSiteFeatures()
-  const generationDisabledReason = features.schedule_generation ? null : copy.features.schedule_read_only
   const [taskCenterOpen, setTaskCenterOpen] = useState(false)
   const taskCenterButtonRef = useRef<HTMLButtonElement>(null)
   const compactTaskCenterButtonRef = useRef<HTMLButtonElement>(null)
   const taskCenterTriggerRef = useRef(taskCenterButtonRef)
   const taskCenter = useOptimizationTaskCenter(props.profileId, taskCenterOpen)
-  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
+  const { license, progress, profile, onReset, announcement, redeemedNotice, permission, billingQuote, billingQuoteLoading, billingQuoteError, refreshBillingQuote, suggestions, currentResult, finalResult, historyItem, loading, phase, section, setSection, licenseSyncing, licenseSyncStatus, configSyncStatus, retryConfigSave, inlineError, reorderCheckLoading, reorderCheckResult, reorderCheckError, freeScheduleEntitlement, freeScheduleConfirming, freeScheduleConfirmError, configToast, workspaceNotice, workspaceError, workspaceBusyAction, upgradeCdk, setUpgradeCdk, upgradeLoading, upgradeError, priorityCouponBalance, priorityCouponLoading, priorityCouponError, refreshRewardBalance, usePriorityCoupon, setUsePriorityCoupon, itemBalances, profileCapacity, reorderQuota, inventoryLoaded, inventoryLoading, inventoryError, useTrainingDiagnosisCoupon, setUseTrainingDiagnosisCoupon, useAdditionalRecomputeCoupon, setUseAdditionalRecomputeCoupon, additionalRecomputeCouponEligible, useReorderCheckCoupon, setUseReorderCheckCoupon, refreshInventory, isRestrictedPreview, userCanEditConfig, userCanUseIntermediateAutoConfig, userCanUseUpgradeFeatures, userCanDownloadFullResult, userCanViewFullData, userHasScenarioLabCapability, userCanUseScenarioLab, activeConfig, configChanged, configValidation, configPresetLabel, savedConfigs, resultHistory, archivedResults, latestWorkspaceResult, freeScheduleGenerateBlockedReason, reorderCheckDisabledReason, configDiffRows, mergedOperators, hasResult, resultIsCurrent, updateConfig, resetConfig, handleApplyScenarioConfig, handleSaveCurrentConfig, handleRenameSavedConfig, handleDeleteSavedConfig, handleUseSavedConfig, handleViewHistory, handleUseHistoryConfig, handleDownloadHistory, handleArchiveHistory, handleUnarchiveHistory, handleDeleteHistory, handleReorderCheck, handleCancelReorderCheck, handleOpenReorderCheckResult, handleConfirmFreeSchedule, handleGenerate, handleApplySuggestions, handleDownloadMAA, handleDownloadFullResult, handleUpgradePreviewProfile, declarationDialog } = useOptimizeWorkflow(props)
+  const isMetered = profile.kind === 'metered_personal' || profile.kind === 'metered_commercial'
+  const generationDisabledReason = !features.schedule_generation
+    ? copy.features.schedule_read_only
+    : isMetered && billingQuoteLoading
+      ? copy.metered.quote.loading
+      : isMetered && billingQuoteError
+        ? copy.metered.quote.load_failed
+        : isMetered && !billingQuote
+          ? copy.metered.quote.load_failed
+          : billingQuote?.sufficient === false
+            ? copy.metered.quote.insufficient
+            : null
   const [mainTourSeenAtMount] = useState(() => hasCompletedTour('optimize-overview', 2))
   const initialSectionRef = useRef(section)
   const [sectionChangedAfterMainTour, setSectionChangedAfterMainTour] = useState(false)
@@ -217,7 +227,13 @@ export default function OptimizeWorkflowPage(props: Props) {
           />
   
           {section === 'overview' && (
-            <><MeteredBillingNotice profile={profile} profileId={props.profileId} />
+            <><MeteredBillingNotice
+              profile={profile}
+              quote={billingQuote}
+              loading={billingQuoteLoading}
+              error={billingQuoteError}
+              onRetry={refreshBillingQuote}
+            />
             {(inventoryError || priorityCouponError) && <div className="tool-alert tool-alert--error mb-4" role="alert">
               <p>{[inventoryError && `库存数据：${inventoryError}`, priorityCouponError && `优先计算券：${priorityCouponError}`].filter(Boolean).join('；')}</p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -395,15 +411,25 @@ export default function OptimizeWorkflowPage(props: Props) {
     )
 }
 
-function MeteredBillingNotice({ profile, profileId }: { profile: Props['profile']; profileId: string }) {
-  const [quote, setQuote] = useState<{ charge: string; available: string; sufficient: boolean; tier: number | null } | null>(null)
-  useEffect(() => {
-    if (profile.kind !== 'metered_personal' && profile.kind !== 'metered_commercial') return
-    void apiJson<{ charge: string; available: string; sufficient: boolean; tier: number | null }>(`/api/user/billing/quote?profile_id=${encodeURIComponent(profileId)}&operation=main_schedule`)
-      .then(setQuote).catch(() => setQuote(null))
-  }, [profile.kind, profileId])
+function MeteredBillingNotice({
+  profile,
+  quote,
+  loading,
+  error,
+  onRetry,
+}: {
+  profile: Props['profile']
+  quote: ReturnType<typeof useOptimizeWorkflow>['billingQuote']
+  loading: boolean
+  error: string | null
+  onRetry: () => Promise<unknown>
+}) {
   if (profile.kind !== 'metered_personal' && profile.kind !== 'metered_commercial') return null
-  return <div className={`tool-alert mb-4 ${quote?.sufficient === false ? 'tool-alert--error' : 'tool-alert--warning'}`} role="status">
-    {quote ? copy.metered.quote.summary(quote.charge, quote.available, quote.tier, quote.sufficient) : copy.metered.quote.loading}
+  return <div className={`tool-alert mb-4 ${error || quote?.sufficient === false ? 'tool-alert--error' : 'tool-alert--warning'}`} role={error ? 'alert' : 'status'}>
+    <p>{error ?? (quote ? copy.metered.quote.summary(quote.charge, quote.available, quote.tier, quote.sufficient) : copy.metered.quote.loading)}</p>
+    <div className="mt-3 flex flex-wrap gap-2">
+      {error && <button type="button" className="tool-secondary-action" disabled={loading} onClick={() => void onRetry()}>{loading ? copy.metered.quote.loading : copy.metered.quote.retry}</button>}
+      {quote?.sufficient === false && <a className="tool-secondary-action" href="/tool/balance">{copy.metered.quote.go_to_balance}</a>}
+    </div>
   </div>
 }
