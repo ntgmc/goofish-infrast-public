@@ -1,16 +1,22 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { APP_BUILD_META } from '../../src/lib/build-meta'
 
 const YITULIU_ITEM_VALUE_URL = 'https://backend.yituliu.cn/item/v7/value'
 const YITULIU_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const YITULIU_RETRY_AFTER_FAILURE_MS = 15 * 60 * 1000
-const YITULIU_CACHE_FILE_VERSION = 1
+const YITULIU_MAX_STALE_MS = 7 * 24 * 60 * 60 * 1000
+const YITULIU_RESPONSE_MAX_BYTES = 2 * 1024 * 1024
+const YITULIU_CACHE_FILE_VERSION = 2
+const VALUATION_MODEL_VERSION = 2
+const MAX_PRICE_PAYLOAD_NODES = 100_000
 const PURE_GOLD_ITEM_ID = '3003'
 const TRADE_PURE_GOLD_PER_LMD = 2 / 1000
 
 const FIXED_SANITY_PER_LMD_GROSS = 36 / 10000
 const FIXED_SANITY_PER_EXP = 36 / 10000
-const EXP_ITEM_VALUES: Record<string, number> = {
+export const EXP_ITEM_VALUES: Readonly<Record<string, number>> = {
   '2001': 200,
   '2002': 400,
   '2003': 1000,
@@ -32,45 +38,79 @@ const YITULIU_ITEM_VALUE_CONFIG = {
 }
 
 export type PricingState = {
-  status: 'ok' | 'unavailable'
+  status: 'fresh' | 'stale' | 'unavailable' | 'invalid'
   prices: Map<string, number>
+  fetched_at: string | null
+  age_ms: number | null
+  snapshot_id: string | null
+  valuation_version: string
 }
 
+type PricingSnapshot = {
+  fetchedAt: number
+  expiresAt: number
+  state: PricingState
+}
+
+type RemotePricingResult =
+  | { ok: true; snapshot: PricingSnapshot }
+  | { ok: false; status: 'unavailable' | 'invalid' }
+
+class InvalidPricingPayloadError extends Error {}
+
 let yituliuCache: { expiresAt: number; state: PricingState } | null = null
+let yituliuRefreshPromise: Promise<PricingState> | null = null
 
 export async function getYituliuPricing(): Promise<PricingState> {
   const now = Date.now()
-  if (yituliuCache && now < yituliuCache.expiresAt) return yituliuCache.state
+  if (yituliuCache && now < yituliuCache.expiresAt) return refreshPricingAge(yituliuCache.state, now)
+  yituliuRefreshPromise ??= refreshYituliuPricing(now).finally(() => {
+    yituliuRefreshPromise = null
+  })
+  return yituliuRefreshPromise
+}
 
+async function refreshYituliuPricing(now: number): Promise<PricingState> {
   const diskCache = await readYituliuDiskCache()
   if (diskCache && now < diskCache.expiresAt) {
-    yituliuCache = { expiresAt: diskCache.expiresAt, state: diskCache.state }
-    return diskCache.state
+    const state = createPricingState('fresh', diskCache.state.prices, diskCache.fetchedAt, diskCache.state.snapshot_id)
+    yituliuCache = { expiresAt: diskCache.expiresAt, state }
+    return refreshPricingAge(state, now)
   }
 
   const remoteCache = await fetchYituliuPricing()
-  if (remoteCache) {
-    yituliuCache = { expiresAt: remoteCache.expiresAt, state: remoteCache.state }
-    await writeYituliuDiskCache(remoteCache)
-    return remoteCache.state
+  if (remoteCache.ok) {
+    yituliuCache = { expiresAt: remoteCache.snapshot.expiresAt, state: remoteCache.snapshot.state }
+    await writeYituliuDiskCache(remoteCache.snapshot)
+    return remoteCache.snapshot.state
+  }
+
+  if (diskCache && now - diskCache.fetchedAt <= getMaximumStaleAgeMs()) {
+    const state = createPricingState('stale', diskCache.state.prices, diskCache.fetchedAt, diskCache.state.snapshot_id)
+    logYituliuDebug({
+      event: 'using_stale_disk_cache',
+      cache_fetched_at: new Date(diskCache.fetchedAt).toISOString(),
+      cache_age_ms: now - diskCache.fetchedAt,
+      price_count: state.prices.size,
+    })
+    yituliuCache = { expiresAt: now + YITULIU_RETRY_AFTER_FAILURE_MS, state }
+    return refreshPricingAge(state, now)
   }
 
   if (diskCache) {
     logYituliuDebug({
-      event: 'using_stale_disk_cache',
+      event: 'stale_disk_cache_rejected',
       cache_fetched_at: new Date(diskCache.fetchedAt).toISOString(),
-      price_count: diskCache.state.prices.size,
+      cache_age_ms: now - diskCache.fetchedAt,
+      maximum_stale_age_ms: getMaximumStaleAgeMs(),
     })
-    yituliuCache = { expiresAt: Date.now() + YITULIU_RETRY_AFTER_FAILURE_MS, state: diskCache.state }
-    return diskCache.state
   }
-
-  const state = { status: 'unavailable' as const, prices: new Map<string, number>() }
-  yituliuCache = { expiresAt: Date.now() + YITULIU_RETRY_AFTER_FAILURE_MS, state }
+  const state = createPricingState(remoteCache.status, new Map(), null, null)
+  yituliuCache = { expiresAt: now + YITULIU_RETRY_AFTER_FAILURE_MS, state }
   return state
 }
 
-async function fetchYituliuPricing(): Promise<{ fetchedAt: number; expiresAt: number; state: PricingState } | null> {
+async function fetchYituliuPricing(): Promise<RemotePricingResult> {
   const startedAt = Date.now()
   let loggedFailure = false
   try {
@@ -89,16 +129,15 @@ async function fetchYituliuPricing(): Promise<{ fetchedAt: number; expiresAt: nu
       elapsed_ms: Date.now() - startedAt,
     }
     if (!response.ok) {
-      const bodyText = await response.text().catch(() => '')
+      await response.body?.cancel().catch(() => undefined)
       logYituliuDebug({
         event: 'http_error',
         ...responseMeta,
-        body_excerpt: bodyTextExcerpt(bodyText),
       })
       loggedFailure = true
       throw new Error(`yituliu ${response.status}`)
     }
-    const data = await response.json()
+    const data = await readBoundedJsonResponse(response)
     const prices = buildYituliuPriceMap(data)
     if (prices.size === 0) {
       logYituliuDebug({
@@ -106,11 +145,11 @@ async function fetchYituliuPricing(): Promise<{ fetchedAt: number; expiresAt: nu
         ...responseMeta,
         ...summarizeYituliuPayload(data, prices.size),
       })
-      return null
+      return { ok: false, status: 'invalid' }
     }
     const fetchedAt = Date.now()
-    const state = { status: 'ok' as const, prices }
-    return { fetchedAt, expiresAt: fetchedAt + YITULIU_CACHE_TTL_MS, state }
+    const state = createPricingState('fresh', prices, fetchedAt, null)
+    return { ok: true, snapshot: { fetchedAt, expiresAt: fetchedAt + YITULIU_CACHE_TTL_MS, state } }
   } catch (error) {
     if (!loggedFailure) {
       logYituliuDebug({
@@ -121,7 +160,7 @@ async function fetchYituliuPricing(): Promise<{ fetchedAt: number; expiresAt: nu
         error_message: error instanceof Error ? error.message : String(error),
       })
     }
-    return null
+    return { ok: false, status: error instanceof InvalidPricingPayloadError ? 'invalid' : 'unavailable' }
   }
 }
 
@@ -135,7 +174,10 @@ async function readYituliuDiskCache(): Promise<{ fetchedAt: number; expiresAt: n
     if (!Number.isFinite(fetchedAt)) return null
     const prices = readSerializedPrices(payload.prices)
     if (prices.size === 0) return null
-    const state = { status: 'ok' as const, prices }
+    const expectedSnapshotId = createPricingSnapshotId(prices)
+    const snapshotId = stringValue(payload.snapshot_id)
+    if (!snapshotId || snapshotId !== expectedSnapshotId) return null
+    const state = createPricingState('fresh', prices, fetchedAt, snapshotId)
     return { fetchedAt, expiresAt: fetchedAt + YITULIU_CACHE_TTL_MS, state }
   } catch (error) {
     if (errorCode(error) !== 'ENOENT') {
@@ -150,15 +192,27 @@ async function readYituliuDiskCache(): Promise<{ fetchedAt: number; expiresAt: n
   }
 }
 
-async function writeYituliuDiskCache(cache: { fetchedAt: number; state: PricingState }): Promise<void> {
+async function writeYituliuDiskCache(cache: PricingSnapshot): Promise<void> {
+  let temporaryPath = ''
   try {
     const cachePath = getYituliuCachePath()
     await mkdir(dirname(cachePath), { recursive: true })
-    await writeFile(cachePath, `${JSON.stringify({
+    temporaryPath = `${cachePath}.${process.pid}.${randomUUID()}.tmp`
+    const payload = `${JSON.stringify({
       version: YITULIU_CACHE_FILE_VERSION,
       fetched_at: new Date(cache.fetchedAt).toISOString(),
+      snapshot_id: cache.state.snapshot_id,
       prices: [...cache.state.prices.entries()].sort(([left], [right]) => left.localeCompare(right)),
-    })}\n`, 'utf8')
+    })}\n`
+    const file = await open(temporaryPath, 'wx', 0o600)
+    try {
+      await file.writeFile(payload, 'utf8')
+      await file.sync()
+    } finally {
+      await file.close()
+    }
+    await rename(temporaryPath, cachePath)
+    temporaryPath = ''
   } catch (error) {
     logYituliuDebug({
       event: 'disk_cache_write_failed',
@@ -166,6 +220,8 @@ async function writeYituliuDiskCache(cache: { fetchedAt: number; state: PricingS
       error_name: error instanceof Error ? error.name : typeof error,
       error_message: error instanceof Error ? error.message : String(error),
     })
+  } finally {
+    if (temporaryPath) await unlink(temporaryPath).catch(() => undefined)
   }
 }
 
@@ -186,7 +242,92 @@ function getYituliuCachePath(): string {
   return configured || join(process.cwd(), '.cache', 'material-value', 'yituliu-item-value-v1.json')
 }
 
-function buildYituliuPriceMap(data: unknown): Map<string, number> {
+function getMaximumStaleAgeMs(): number {
+  const configured = Number(process.env.MAA_MATERIAL_VALUE_MAX_STALE_MS)
+  return Number.isFinite(configured) && configured >= 0 ? configured : YITULIU_MAX_STALE_MS
+}
+
+function createPricingState(
+  status: PricingState['status'],
+  prices: Map<string, number>,
+  fetchedAt: number | null,
+  snapshotId: string | null,
+): PricingState {
+  const resolvedSnapshotId = prices.size > 0 ? snapshotId || createPricingSnapshotId(prices) : null
+  return {
+    status,
+    prices,
+    fetched_at: fetchedAt === null ? null : new Date(fetchedAt).toISOString(),
+    age_ms: fetchedAt === null ? null : Math.max(0, Date.now() - fetchedAt),
+    snapshot_id: resolvedSnapshotId,
+    valuation_version: [
+      `depot-v${VALUATION_MODEL_VERSION}`,
+      APP_BUILD_META.data_version,
+      resolvedSnapshotId || status,
+    ].join(':'),
+  }
+}
+
+function refreshPricingAge(state: PricingState, now: number): PricingState {
+  if (!state.fetched_at) return state
+  const fetchedAt = Date.parse(state.fetched_at)
+  if (!Number.isFinite(fetchedAt)) return state
+  return { ...state, age_ms: Math.max(0, now - fetchedAt) }
+}
+
+function createPricingSnapshotId(prices: Map<string, number>): string {
+  const normalized = [...prices.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([itemId, price]) => [itemId, round(price, 8)])
+  return createHash('sha256').update(JSON.stringify({
+    config: YITULIU_ITEM_VALUE_CONFIG,
+    fixed_sanity_per_lmd_gross: FIXED_SANITY_PER_LMD_GROSS,
+    fixed_sanity_per_exp: FIXED_SANITY_PER_EXP,
+    trade_pure_gold_per_lmd: TRADE_PURE_GOLD_PER_LMD,
+    prices: normalized,
+  })).digest('hex')
+}
+
+async function readBoundedJsonResponse(response: Response): Promise<unknown> {
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+  if (!contentType.includes('application/json') && !contentType.includes('+json')) {
+    throw new InvalidPricingPayloadError(`unexpected content type: ${contentType || 'missing'}`)
+  }
+  const contentLength = Number(response.headers.get('content-length'))
+  if (Number.isFinite(contentLength) && contentLength > YITULIU_RESPONSE_MAX_BYTES) {
+    throw new InvalidPricingPayloadError(`response exceeds ${YITULIU_RESPONSE_MAX_BYTES} bytes`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) throw new InvalidPricingPayloadError('response body is missing')
+  const chunks: Uint8Array[] = []
+  let totalBytes = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (!value) continue
+    totalBytes += value.byteLength
+    if (totalBytes > YITULIU_RESPONSE_MAX_BYTES) {
+      await reader.cancel().catch(() => undefined)
+      throw new InvalidPricingPayloadError(`response exceeds ${YITULIU_RESPONSE_MAX_BYTES} bytes`)
+    }
+    chunks.push(value)
+  }
+  const bytes = new Uint8Array(totalBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes)) as unknown
+  } catch (error) {
+    throw new InvalidPricingPayloadError(error instanceof Error ? error.message : 'invalid JSON')
+  }
+}
+
+export function buildYituliuPriceMap(data: unknown): Map<string, number> {
+  assertPricingPayloadBudget(data)
   const prices = new Map<string, number>()
   const itemValueRows = readYituliuItemValueRows(data)
   for (const item of itemValueRows) {
@@ -223,6 +364,10 @@ function buildYituliuPriceMap(data: unknown): Map<string, number> {
 export function getExpItemSanity(itemId: string): number | null {
   const exp = EXP_ITEM_VALUES[itemId]
   return exp ? exp * FIXED_SANITY_PER_EXP : null
+}
+
+export function getExpSanity(experience: number): number {
+  return experience * FIXED_SANITY_PER_EXP
 }
 
 export function getNetLmdSanity(pricing: PricingState): number {
@@ -285,10 +430,6 @@ function readYituliuItemValueRows(data: unknown): unknown[] {
   return []
 }
 
-function bodyTextExcerpt(text: string): string {
-  return text.replace(/\s+/g, ' ').trim().slice(0, 1000)
-}
-
 function countNestedItems(arrays: unknown[][]): number {
   return arrays.reduce((total, list) => total + list.length, 0)
 }
@@ -307,7 +448,12 @@ function describeValueType(value: unknown): string {
   return typeof value
 }
 
-function collectArraysByKey(value: unknown, key: string, arrays: unknown[][] = [], depth = 0): unknown[][] {
+function collectArraysByKey(
+  value: unknown,
+  key: string,
+  arrays: unknown[][] = [],
+  depth = 0,
+): unknown[][] {
   if (depth > 8 || !value || typeof value !== 'object') return arrays
   if (Array.isArray(value)) {
     for (const item of value) collectArraysByKey(item, key, arrays, depth + 1)
@@ -317,6 +463,24 @@ function collectArraysByKey(value: unknown, key: string, arrays: unknown[][] = [
   if (Array.isArray(record[key])) arrays.push(record[key] as unknown[])
   for (const child of Object.values(record)) collectArraysByKey(child, key, arrays, depth + 1)
   return arrays
+}
+
+function assertPricingPayloadBudget(value: unknown): void {
+  const stack: Array<{ value: unknown; depth: number }> = [{ value, depth: 0 }]
+  let visited = 0
+  while (stack.length > 0) {
+    const current = stack.pop()!
+    visited += 1
+    if (visited > MAX_PRICE_PAYLOAD_NODES) {
+      throw new InvalidPricingPayloadError(`price payload exceeds ${MAX_PRICE_PAYLOAD_NODES} nodes`)
+    }
+    if (current.depth > 8) throw new InvalidPricingPayloadError('price payload is nested too deeply')
+    if (!current.value || typeof current.value !== 'object') continue
+    const children = Array.isArray(current.value)
+      ? current.value
+      : Object.values(current.value as Record<string, unknown>)
+    for (const child of children) stack.push({ value: child, depth: current.depth + 1 })
+  }
 }
 
 function setLowerPrice(prices: Map<string, number>, itemId: string, price: number): void {

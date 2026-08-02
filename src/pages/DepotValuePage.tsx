@@ -6,23 +6,30 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 import SklandBindingDialog, { type SklandPayload } from '../components/SklandBindingDialog'
 import { getCurrentSiteUrl } from '../lib/site-url'
 import { apiJson, apiJsonOrNull } from '../lib/api-client'
+import { MAX_DEPOT_ITEM_COUNT, MAX_DEPOT_ITEM_TYPES } from '../lib/depot-value-constraints'
 import type { AuthMeResponse, DepotValueItem, DepotValueProfileResponse, DepotValueRequest, DepotValueResponse, UserGameAccount } from '../lib/types'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 
 
 const LMD_ITEM_ID = '4001'
+const DEPOT_REQUEST_MAX_BYTES = 1024 * 1024
 
 export default function DepotValuePage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [depotText, setDepotText] = useState('')
   const [auth, setAuth] = useState<AuthMeResponse | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [authLoadRevision, setAuthLoadRevision] = useState(0)
   const [depotProfile, setDepotProfile] = useState<UserGameAccount | null>(null)
   const [selectedProfileId, setSelectedProfileId] = useState('')
   const [result, setResult] = useState<DepotValueResponse | null>(null)
   const [loading, setLoading] = useState<DepotValueRequest['source'] | null>(null)
   const [profilePreparing, setProfilePreparing] = useState(false)
   const [sklandDialogOpen, setSklandDialogOpen] = useState(false)
+  const [sampleConsent, setSampleConsent] = useState(false)
+  const [sampleActionLoading, setSampleActionLoading] = useState(false)
+  const [sampleStatus, setSampleStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const applyAuthData = useCallback((data: AuthMeResponse | null) => {
@@ -37,22 +44,24 @@ export default function DepotValuePage() {
   }, [])
 
   useEffect(() => {
-    let cancelled = false
-    apiJsonOrNull<AuthMeResponse>('/api/auth/me')
+    const controller = new AbortController()
+    setAuthLoading(true)
+    setAuthError(null)
+    apiJsonOrNull<AuthMeResponse>('/api/auth/me', { signal: controller.signal })
       .then((data) => {
-        if (cancelled || !data) return
+        if (controller.signal.aborted) return
         applyAuthData(data)
       })
-      .catch(() => {
-        if (!cancelled) applyAuthData(null)
+      .catch((caught) => {
+        if (!controller.signal.aborted) {
+          setAuthError((caught as Error).message || copy.tools.pages_DepotValuePage_080)
+        }
       })
       .finally(() => {
-        if (!cancelled) setAuthLoading(false)
+        if (!controller.signal.aborted) setAuthLoading(false)
       })
-    return () => {
-      cancelled = true
-    }
-  }, [applyAuthData])
+    return () => controller.abort()
+  }, [applyAuthData, authLoadRevision])
 
   useEffect(() => {
     if (result) drawShareCard(canvasRef.current, result)
@@ -154,7 +163,7 @@ export default function DepotValuePage() {
         await openSklandBinding()
         return
       }
-      await analyze({ source: 'skland', profile_id: profileId })
+      await analyze({ source: 'skland', profile_id: profileId, sample_consent: sampleConsent })
       return
     }
     if (!auth?.user) {
@@ -186,7 +195,32 @@ export default function DepotValuePage() {
     }
     setSklandDialogOpen(false)
     setSelectedProfileId(completedProfile.id)
-    void analyze({ source: 'skland', profile_id: completedProfile.id })
+    void analyze({ source: 'skland', profile_id: completedProfile.id, sample_consent: sampleConsent })
+  }
+
+  const revokeSample = async () => {
+    const profileId = selectedSklandProfile?.id
+    if (!profileId) return
+    setSampleActionLoading(true)
+    setSampleStatus(null)
+    setError(null)
+    try {
+      await apiJson<{ revoked: true }>('/api/depot-value', {
+        method: 'DELETE',
+        json: { profile_id: profileId },
+        fallbackMessage: copy.tools.pages_DepotValuePage_081,
+      })
+      setSampleConsent(false)
+      setSampleStatus(copy.tools.pages_DepotValuePage_082)
+      setResult((current) => current ? {
+        ...current,
+        ranking: { ...current.ranking, contribution_status: 'declined' },
+      } : current)
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setSampleActionLoading(false)
+    }
   }
 
   const downloadShareImage = () => {
@@ -270,8 +304,11 @@ export default function DepotValuePage() {
                 />
                 {depotText.trim() && (
                   <span className="tool-status tool-status--success mt-3">
-                    {copy.tools.pages_DepotValuePage_020}{depotText.trim().length} {copy.tools.pages_DepotValuePage_021}</span>
+                    {copy.tools.pages_DepotValuePage_020}{depotText.trim().length}{copy.tools.pages_DepotValuePage_021}
+                    {copy.tools.pages_DepotValuePage_083}{formatNumber(getUtf8ByteLength(depotText))}
+                    {copy.tools.pages_DepotValuePage_084}</span>
                 )}
+                <p className="mt-2 text-xs leading-5 text-ink-muted">{copy.tools.pages_DepotValuePage_085}</p>
               </section>
 
               <button
@@ -297,6 +334,14 @@ export default function DepotValuePage() {
               </div>
               {authLoading ? (
                 <p className="tool-inset mt-4 p-3 text-sm text-ink-secondary">{copy.tools.pages_DepotValuePage_027}</p>
+              ) : authError ? (
+                <div className="tool-alert tool-alert--error mt-4" role="alert">
+                  <p>{copy.tools.pages_DepotValuePage_080}</p>
+                  <p className="mt-1 text-sm text-ink-secondary">{authError}</p>
+                  <button type="button" onClick={() => setAuthLoadRevision((current) => current + 1)} className="tool-secondary-action mt-3">
+                    {copy.tools.pages_DepotValuePage_086}
+                  </button>
+                </div>
               ) : !auth?.user ? (
                 <div className="tool-inset mt-4 p-4">
                   <AuthForm
@@ -351,6 +396,26 @@ export default function DepotValuePage() {
                       {profilePreparing ? copy.tools.pages_DepotValuePage_033 : copy.tools.pages_DepotValuePage_034}
                     </button>
                   )}
+                  <label className="tool-inset flex items-start gap-3 p-3 text-sm leading-6 text-ink-secondary">
+                    <input
+                      type="checkbox"
+                      checked={sampleConsent}
+                      onChange={(event) => setSampleConsent(event.currentTarget.checked)}
+                      className="mt-1 h-4 w-4 accent-brand-500"
+                    />
+                    <span>{copy.tools.pages_DepotValuePage_087}</span>
+                  </label>
+                  {selectedSklandProfile && (
+                    <button
+                      type="button"
+                      onClick={() => void revokeSample()}
+                      disabled={sampleActionLoading}
+                      className="tool-secondary-action"
+                    >
+                      {sampleActionLoading ? copy.tools.pages_DepotValuePage_088 : copy.tools.pages_DepotValuePage_089}
+                    </button>
+                  )}
+                  {sampleStatus && <p className="tool-alert tool-alert--success" role="status">{sampleStatus}</p>}
                 </div>
               )}
               <p className="tool-alert tool-alert--warning mt-4">
@@ -414,6 +479,24 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
         </div>
       )}
 
+      <div className="tool-inset mt-5 p-4 text-sm leading-6 text-ink-secondary">
+        <h3 className="font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_090}</h3>
+        <dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
+          <dt>{copy.tools.pages_DepotValuePage_091}</dt>
+          <dd>{formatPricingStatus(result.sources.yituliu)} · {formatOptionalDate(result.sources.pricing_fetched_at)}</dd>
+          <dt>{copy.tools.pages_DepotValuePage_092}</dt>
+          <dd className="break-all">{result.sources.pricing_snapshot_id?.slice(0, 16) ?? copy.tools.pages_DepotValuePage_093}</dd>
+          <dt>{copy.tools.pages_DepotValuePage_094}</dt>
+          <dd>{Math.round(result.sources.pricing_coverage * 100)}%</dd>
+          <dt>{copy.tools.pages_DepotValuePage_095}</dt>
+          <dd className="break-all">{result.sources.valuation_version}</dd>
+          <dt>{copy.tools.pages_DepotValuePage_096}</dt>
+          <dd>{formatContributionStatus(result.ranking.contribution_status)}</dd>
+          <dt>{copy.tools.pages_DepotValuePage_097}</dt>
+          <dd>{formatOptionalDate(result.generated_at)} · {result.build_meta.data_version}</dd>
+        </dl>
+      </div>
+
       <div className="mt-5">
         <h3 className="text-sm font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_049}</h3>
         <div className="tool-inset mt-3 divide-y divide-surface-3 overflow-hidden">
@@ -434,7 +517,10 @@ function ResultSummary({ result }: { result: DepotValueResponse }) {
 
       {result.unpriced_items.length > 0 && (
         <div className="mt-5">
-          <h3 className="text-sm font-semibold text-ink-primary">{copy.tools.pages_DepotValuePage_051}</h3>
+          <h3 className="text-sm font-semibold text-ink-primary">
+            {copy.tools.pages_DepotValuePage_051}
+            {result.unpriced_count > result.unpriced_items.length ? copy.tools.pages_DepotValuePage_098 : ''}
+          </h3>
           <div className="mt-3 flex flex-wrap gap-2">
             {result.unpriced_items.map((item) => (
               <span key={item.id} className="tool-status">
@@ -561,13 +647,19 @@ function drawShareCard(canvas: HTMLCanvasElement | null, result: DepotValueRespo
     ctx.textAlign = 'left'
   })
 
-  drawRoundedRect(ctx, 72, 1400, 756, 104, 24, colors.panel)
+  drawRoundedRect(ctx, 72, 1380, 756, 154, 24, colors.panel)
   ctx.fillStyle = colors.ink
   ctx.font = `600 28px ${colors.displayFont}`
-  ctx.fillText(copy.tools.pages_DepotValuePage_067, 112, 1446)
+  ctx.fillText(copy.tools.pages_DepotValuePage_067, 112, 1426)
   ctx.fillStyle = colors.muted
   ctx.font = `400 22px ${colors.bodyFont}`
-  ctx.fillText(`${copy.tools.pages_DepotValuePage_068}${getCurrentSiteUrl()}`, 112, 1484)
+  ctx.fillText(`${copy.tools.pages_DepotValuePage_068}${getCurrentSiteUrl()}`, 112, 1464)
+  ctx.font = `400 18px ${colors.bodyFont}`
+  ctx.fillText(truncateText(
+    ctx,
+    `${result.sources.yituliu} · ${result.sources.pricing_snapshot_id?.slice(0, 12) ?? 'no-snapshot'} · ${result.build_meta.data_version}`,
+    676,
+  ), 112, 1504)
 }
 
 function drawRoundedRect(
@@ -631,11 +723,67 @@ function formatProfileLabel(profile: UserGameAccount): string {
 function parseDepotText(text: string): unknown {
   const trimmed = text.replace(/^\uFEFF/, '').trim()
   if (!trimmed) throw new Error(copy.tools.pages_DepotValuePage_070)
+  if (getUtf8ByteLength(trimmed) > DEPOT_REQUEST_MAX_BYTES) {
+    throw new Error(copy.tools.pages_DepotValuePage_099)
+  }
+  let parsed: unknown
   try {
-    return JSON.parse(trimmed) as unknown
+    parsed = JSON.parse(trimmed) as unknown
   } catch {
     throw new Error(copy.tools.pages_DepotValuePage_071)
   }
+  if (getUtf8ByteLength(JSON.stringify({ source: 'upload', inventory: parsed })) > DEPOT_REQUEST_MAX_BYTES) {
+    throw new Error(copy.tools.pages_DepotValuePage_099)
+  }
+  validateDepotInventoryForClient(parsed)
+  return parsed
+}
+
+function validateDepotInventoryForClient(value: unknown): void {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(copy.tools.pages_DepotValuePage_071)
+  const record = value as Record<string, unknown>
+  const entries = Array.isArray(record.items)
+    ? record.items.map((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(copy.tools.pages_DepotValuePage_071)
+      const itemRecord = item as Record<string, unknown>
+      return itemRecord.have ?? itemRecord.count ?? itemRecord.quantity
+    })
+    : Object.values(record)
+  if (entries.length === 0 || entries.length > MAX_DEPOT_ITEM_TYPES) throw new Error(copy.tools.pages_DepotValuePage_071)
+  for (const count of entries) {
+    if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0 || count > MAX_DEPOT_ITEM_COUNT) {
+      throw new Error(copy.tools.pages_DepotValuePage_100)
+    }
+  }
+}
+
+function getUtf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength
+}
+
+function formatPricingStatus(status: DepotValueResponse['sources']['yituliu']): string {
+  return {
+    fresh: copy.tools.pages_DepotValuePage_101,
+    stale: copy.tools.pages_DepotValuePage_102,
+    unavailable: copy.tools.pages_DepotValuePage_103,
+    invalid: copy.tools.pages_DepotValuePage_104,
+  }[status]
+}
+
+function formatContributionStatus(status: DepotValueResponse['ranking']['contribution_status']): string {
+  return {
+    saved: copy.tools.pages_DepotValuePage_105,
+    declined: copy.tools.pages_DepotValuePage_106,
+    skipped: copy.tools.pages_DepotValuePage_107,
+    not_applicable: copy.tools.pages_DepotValuePage_108,
+    unavailable: copy.tools.pages_DepotValuePage_109,
+  }[status]
+}
+
+function formatOptionalDate(value: string | null): string {
+  if (!value) return copy.tools.pages_DepotValuePage_093
+  const date = new Date(value)
+  return Number.isFinite(date.getTime()) ? date.toLocaleString(CURRENT_LOCALE) : value
 }
 
 function formatRankingNote(result: DepotValueResponse): string {

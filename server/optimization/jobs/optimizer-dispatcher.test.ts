@@ -145,6 +145,36 @@ describe('optimization job dispatcher', () => {
         },
       })
   })
+
+  it('assigns stable suggestion ids and deterministically attaches unavailable training costs', async () => {
+    const payload = {
+      ...schedulePayload(),
+      activeProfileId: null,
+      request: { include_upgrade_suggestions: true, upgrade_suggestions_allowed: true },
+    }
+    const result = {
+      ...scheduleResult(),
+      upgrade_suggestions: [{
+        type: 'single' as const,
+        suggestion_id: 'private-unstable-id',
+        id: 'op-1',
+        name: 'Operator',
+        current: 1,
+        target: 2,
+        gain: 0.1,
+      }],
+    }
+    const reportStage = vi.fn()
+    const executionContext = { ...context, reportStage }
+    const port = fakePort({ executeSchedule: vi.fn(async () => result) })
+
+    const received = await executeOptimizationJobWithPort(job(payload), executionContext, port)
+    expect('upgrade_suggestions' in received && received.upgrade_suggestions?.[0]).toMatchObject({
+      suggestion_id: expect.stringMatching(/^upgrade-[a-f0-9]{20}$/),
+      training_cost: { status: 'unavailable' },
+    })
+    expect(reportStage).toHaveBeenCalledWith('enriching_training_costs')
+  })
 })
 
 function fakePort(overrides: Partial<OptimizerPort> = {}): OptimizerPort {

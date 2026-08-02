@@ -369,13 +369,18 @@ export async function deleteUserAccount(userId: string): Promise<void> {
 
 export async function deleteUserAccountInTransaction(client: PoolClient, userId: string): Promise<void> {
   const profileRows = await client.query<{ record_json: UserGameAccountRecord }>('select record_json from user_game_accounts where user_id = $1', [userId])
-  const sampleSecret = process.env.DEPOT_SAMPLE_HASH_SECRET?.trim()
-  if (!sampleSecret) throw new Error('DEPOT_SAMPLE_HASH_SECRET is not configured')
+  const sampleSecrets = [
+    process.env.DEPOT_SAMPLE_HASH_SECRET?.trim(),
+    process.env.DEPOT_SAMPLE_HASH_SECRET_PREVIOUS?.trim(),
+  ].filter((secret): secret is string => Boolean(secret))
   const sampleHashes = profileRows.rows
     .map((row) => row.record_json.skland_binding?.uid)
     .filter((uid): uid is string => Boolean(uid))
-    .map((uid) => createHmac('sha256', sampleSecret).update(`skland:${uid}`).digest('hex'))
+    .flatMap((uid) => sampleSecrets.map((secret) => createHmac('sha256', secret).update(`skland:${uid}`).digest('hex')))
   await client.query('delete from depot_value_samples where contributor_profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
+  if (sampleSecrets.length === 0 && profileRows.rows.some((row) => row.record_json.skland_binding?.uid)) {
+    console.warn('depot sample hash secrets are unavailable; account deletion skipped legacy hash-only sample cleanup')
+  }
   if (sampleHashes.length > 0) await client.query('delete from depot_value_samples where uid_hash = any($1)', [sampleHashes])
   await client.query('delete from usage_events where user_id = $1 or profile_id in (select id from user_game_accounts where user_id = $1)', [userId])
   await client.query(

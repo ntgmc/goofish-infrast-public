@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_DEPOT_ITEM_TYPES } from '../../src/lib/depot-value-constraints'
 import { requestSchemas } from './request-policy'
 
 const codeHash = 'a'.repeat(64)
@@ -342,5 +343,57 @@ describe('invitation request policy', () => {
     expect(requestSchemas.userInvitationCode.safeParse({ action: 'ensure' }).success).toBe(true)
     expect(requestSchemas.userInvitationCode.safeParse({ action: 'rotate' }).success).toBe(true)
     expect(requestSchemas.userInvitationCode.safeParse({ action: 'delete' }).success).toBe(false)
+  })
+})
+
+describe('depot value request policy', () => {
+  it('uses a strict source union with bounded integer inventory counts and explicit consent', () => {
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: { '2001': 1, '30011': 100 },
+    }).success).toBe(true)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: {
+        '@type': '@penguin-statistics/depot',
+        items: [{ id: '30011', have: 2, name: '源岩' }],
+      },
+    }).success).toBe(true)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'skland',
+      profile_id: 'profile-1',
+      sample_consent: false,
+    }).success).toBe(true)
+
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'skland',
+      profile_id: 'profile-1',
+    }).success).toBe(false)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: { '2001': 1.5 },
+    }).success).toBe(false)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: { '2001': 1_000_000_001 },
+    }).success).toBe(false)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: { '2001': 1 },
+      profile_id: 'unexpected',
+    }).success).toBe(false)
+    expect(requestSchemas.depotValue.safeParse({
+      source: 'upload',
+      inventory: Object.fromEntries(Array.from(
+        { length: MAX_DEPOT_ITEM_TYPES + 1 },
+        (_, index) => [String(index), 1],
+      )),
+    }).success).toBe(false)
+  })
+
+  it('limits sample revocation to one bounded profile id', () => {
+    expect(requestSchemas.depotSampleRevoke.safeParse({ profile_id: 'profile-1' }).success).toBe(true)
+    expect(requestSchemas.depotSampleRevoke.safeParse({ profile_id: '' }).success).toBe(false)
+    expect(requestSchemas.depotSampleRevoke.safeParse({ profile_id: 'profile-1', all: true }).success).toBe(false)
   })
 })

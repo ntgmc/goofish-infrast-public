@@ -262,6 +262,7 @@ export type DepotValueRequest =
   | {
       source: 'skland';
       profile_id: string;
+      sample_consent: boolean;
     };
 
 export interface DepotValueItem {
@@ -279,7 +280,7 @@ export interface DepotValueUnpricedItem {
 }
 
 type DepotValueRankingMode = 'curve' | 'sample_adjusted';
-export type DepotValueSampleContributionStatus = 'saved' | 'not_applicable' | 'unavailable';
+export type DepotValueSampleContributionStatus = 'saved' | 'declined' | 'skipped' | 'not_applicable' | 'unavailable';
 
 export interface DepotValueRanking {
   mode: DepotValueRankingMode;
@@ -303,7 +304,12 @@ export interface DepotValueResponse {
   warnings: string[];
   sources: {
     inventory: DepotValueSource;
-    yituliu: 'ok' | 'unavailable';
+    yituliu: 'fresh' | 'stale' | 'unavailable' | 'invalid';
+    pricing_snapshot_id: string | null;
+    pricing_fetched_at: string | null;
+    pricing_age_ms: number | null;
+    valuation_version: string;
+    pricing_coverage: number;
     lmd_exp: 'fixed_lmd_exp_36_per_10000';
     ranking: 'entertainment_curve_v1' | 'sample_adjusted_curve_v1';
   };
@@ -453,7 +459,9 @@ export interface UpgradeTrainingCostBucket {
   equivalent_sanity: number | null;
 }
 
-interface UpgradeTrainingOperatorCost {
+export interface UpgradeTrainingOperatorCost {
+  status: 'complete' | 'partial' | 'unavailable';
+  error_code?: 'operator_not_found' | 'invalid_rarity' | 'elite_out_of_range' | 'missing_promotion_materials';
   id: string;
   name: string;
   current_elite: number;
@@ -480,7 +488,11 @@ export interface UpgradeTrainingCost {
   unpriced_items: UpgradeTrainingMaterial[];
   sources: {
     skland: 'ok' | 'unavailable';
-    yituliu: 'ok' | 'unavailable';
+    yituliu: 'fresh' | 'stale' | 'unavailable' | 'invalid';
+    pricing_snapshot_id: string | null;
+    pricing_fetched_at: string | null;
+    pricing_age_ms: number | null;
+    valuation_version: string | null;
     lmd_exp: 'fixed_lmd_trade_gold_net_exp_36_per_10000';
   };
   warnings: string[];
@@ -538,6 +550,7 @@ type RawUpgradeSuggestion = (
       specialType?: string;
     }
 ) & {
+  suggestion_id?: string;
   training_cost?: UpgradeTrainingCost;
   roi?: UpgradeSuggestionRoi;
   orundum_roi?: OrundumRoi;
@@ -689,6 +702,7 @@ interface ShiftPlan {
 }
 
 export interface UpgradeSuggestion {
+  suggestion_id?: string;
   type: 'single' | 'bundle';
   id?: string;
   name?: string;

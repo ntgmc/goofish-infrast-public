@@ -1253,6 +1253,14 @@ CREATE INDEX IF NOT EXISTS idx_user_notifications_user_unread
 
 CREATE TABLE IF NOT EXISTS depot_value_samples (
   uid_hash TEXT PRIMARY KEY,
+  uid_hash_key_version TEXT NOT NULL DEFAULT 'legacy',
+  version INTEGER NOT NULL DEFAULT 1,
+  valuation_version TEXT,
+  pricing_snapshot_id TEXT,
+  pricing_fetched_at TIMESTAMPTZ,
+  pricing_status TEXT,
+  pricing_coverage NUMERIC,
+  complete BOOLEAN NOT NULL DEFAULT FALSE,
   total_equivalent_sanity NUMERIC NOT NULL,
   account_level INTEGER,
   operator_power_score NUMERIC NOT NULL,
@@ -1334,7 +1342,20 @@ UPDATE optimize_jobs
 SET payload_json = payload_json - 'activeProfile' - 'previewWorkspaceForGeneration'
 WHERE payload_json ? 'activeProfile' OR payload_json ? 'previewWorkspaceForGeneration';
 ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS contributor_profile_id TEXT;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS uid_hash_key_version TEXT NOT NULL DEFAULT 'legacy';
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS valuation_version TEXT;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS pricing_snapshot_id TEXT;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS pricing_fetched_at TIMESTAMPTZ;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS pricing_status TEXT;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS pricing_coverage NUMERIC;
+ALTER TABLE depot_value_samples ADD COLUMN IF NOT EXISTS complete BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_depot_value_samples_contributor_profile_id ON depot_value_samples(contributor_profile_id);
+CREATE INDEX IF NOT EXISTS idx_depot_value_samples_valuation_total
+  ON depot_value_samples(valuation_version, total_equivalent_sanity) WHERE complete = true;
+UPDATE depot_value_samples SET contributor_profile_id = NULL
+ WHERE contributor_profile_id IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM user_game_accounts WHERE id = depot_value_samples.contributor_profile_id);
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_usage_events_user') THEN
@@ -1349,7 +1370,88 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_depot_samples_profile') THEN
     ALTER TABLE depot_value_samples ADD CONSTRAINT fk_depot_samples_profile FOREIGN KEY (contributor_profile_id) REFERENCES user_game_accounts(id) ON DELETE CASCADE NOT VALID;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_nonnegative_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_nonnegative_check CHECK (
+      total_equivalent_sanity >= 0 AND operator_power_score >= 0
+      AND operator_count >= 0 AND elite2_count >= 0 AND six_star_count >= 0
+      AND six_star_e2_count >= 0 AND e2_90_count >= 0
+      AND inventory_item_count >= 0 AND priced_count >= 0 AND unpriced_count >= 0
+    ) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_count_consistency_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_count_consistency_check
+      CHECK (priced_count + unpriced_count = inventory_item_count) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_version_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_version_check CHECK (
+      version IN (1, 2)
+      AND (pricing_coverage IS NULL OR pricing_coverage BETWEEN 0 AND 1)
+      AND (complete = false OR (
+        version = 2 AND valuation_version IS NOT NULL AND pricing_snapshot_id IS NOT NULL
+        AND pricing_fetched_at IS NOT NULL AND pricing_status IN ('fresh', 'stale')
+      ))
+    ) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_account_level_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_account_level_check
+      CHECK (account_level IS NULL OR account_level >= 0) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_safe_numeric_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_safe_numeric_check CHECK (
+      total_equivalent_sanity <= 9007199254740991
+      AND operator_power_score <= 9007199254740991
+    ) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'depot_samples_complete_metadata_check') THEN
+    ALTER TABLE depot_value_samples ADD CONSTRAINT depot_samples_complete_metadata_check CHECK (
+      complete = false OR ((
+        version = 2
+        AND nullif(btrim(uid_hash_key_version), '') IS NOT NULL
+        AND nullif(btrim(valuation_version), '') IS NOT NULL
+        AND nullif(btrim(pricing_snapshot_id), '') IS NOT NULL
+        AND pricing_fetched_at IS NOT NULL
+        AND pricing_status IN ('fresh', 'stale')
+        AND pricing_coverage BETWEEN 0.8 AND 1
+      ) IS TRUE)
+    ) NOT VALID;
+  END IF;
 END $$;
+DO $$
+DECLARE invalid_sample_count BIGINT;
+BEGIN
+  SELECT count(*) INTO invalid_sample_count
+    FROM depot_value_samples
+   WHERE total_equivalent_sanity < 0
+      OR total_equivalent_sanity > 9007199254740991
+      OR operator_power_score < 0
+      OR operator_power_score > 9007199254740991
+      OR account_level < 0
+      OR operator_count < 0 OR elite2_count < 0 OR six_star_count < 0
+      OR six_star_e2_count < 0 OR e2_90_count < 0
+      OR inventory_item_count < 0 OR priced_count < 0 OR unpriced_count < 0
+      OR priced_count + unpriced_count <> inventory_item_count
+      OR version NOT IN (1, 2)
+      OR pricing_coverage < 0 OR pricing_coverage > 1
+      OR (complete = true AND ((
+        version = 2
+        AND nullif(btrim(uid_hash_key_version), '') IS NOT NULL
+        AND nullif(btrim(valuation_version), '') IS NOT NULL
+        AND nullif(btrim(pricing_snapshot_id), '') IS NOT NULL
+        AND pricing_fetched_at IS NOT NULL
+        AND pricing_status IN ('fresh', 'stale')
+        AND pricing_coverage BETWEEN 0.8 AND 1
+      ) IS NOT TRUE));
+  IF invalid_sample_count > 0 THEN
+    RAISE EXCEPTION 'invalid depot value samples must be repaired before constraint validation: % row(s)', invalid_sample_count;
+  END IF;
+END $$;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT fk_depot_samples_profile;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_nonnegative_check;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_count_consistency_check;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_version_check;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_account_level_check;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_safe_numeric_check;
+ALTER TABLE depot_value_samples VALIDATE CONSTRAINT depot_samples_complete_metadata_check;
 
 -- goofish:migration-phase
 ALTER TABLE user_accounts ALTER COLUMN cdk_key DROP NOT NULL;

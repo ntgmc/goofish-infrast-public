@@ -84,9 +84,49 @@ and migrated records use `SKLAND-V2:<key-id>`. Resolve every reported invalid
 credential before removing the previous secret.
 
 `DEPOT_SAMPLE_HASH_SECRET` and `FREE_PREVIEW_UID_HASH_SECRET` are independent,
-required production secrets. Rotate them only with a dedicated data-migration
-and deletion-path verification procedure; they intentionally do not fall back
-to `CDK_HASH_SECRET`.
+required production secrets. They intentionally do not fall back to
+`CDK_HASH_SECRET`.
+
+Rotate depot-sample hashing with one current and one previous slot. Before the
+deployment, move the old `DEPOT_SAMPLE_HASH_SECRET` and
+`DEPOT_SAMPLE_HASH_KEY_VERSION` values to
+`DEPOT_SAMPLE_HASH_SECRET_PREVIOUS` and
+`DEPOT_SAMPLE_HASH_PREVIOUS_KEY_VERSION`, then install a new current secret and
+a new, distinct key version. Apply the same four values to every API process in
+one maintenance window. New samples use the current key; a successful sample
+save atomically removes the matching previous-key row. Distribution queries
+also deduplicate by contributor profile while both slots are active. Account
+deletion checks both secrets after deleting profile-linked samples, so keep the
+previous slot configured until the verification below is clean.
+
+After deployment, exercise a consented depot valuation and its sample-revoke
+path, then audit rotation progress without selecting hashes or profile IDs:
+
+```sql
+SELECT uid_hash_key_version, count(*)
+  FROM depot_value_samples
+ GROUP BY uid_hash_key_version
+ ORDER BY uid_hash_key_version;
+
+SELECT count(*) AS duplicate_contributors
+  FROM (
+    SELECT contributor_profile_id
+      FROM depot_value_samples
+     WHERE contributor_profile_id IS NOT NULL AND complete = true
+     GROUP BY contributor_profile_id, valuation_version
+    HAVING count(*) > 1
+  ) duplicates;
+```
+
+Do not remove the previous slot while its key version still has rows unless a
+reviewed retention/deletion migration intentionally removes those rows. In
+particular, hash-only legacy rows cannot be recomputed or found during account
+deletion once their secret is gone. Record the pre/post counts, confirm the
+duplicate-contributor query returns zero, verify account deletion with a
+previous-key sample, and only then remove both previous-slot variables in a
+later deployment. Roll back by restoring the original secret as the current
+slot with its original key version; never reuse a key-version label for a
+different secret.
 
 `BEHAVIOR_RISK_HMAC_SECRET` is also independent and must match on the API and
 Worker processes. It never falls back to raw identifiers or another product

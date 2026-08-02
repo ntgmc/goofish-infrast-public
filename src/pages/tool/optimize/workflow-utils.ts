@@ -1,6 +1,7 @@
 import type { FreeScheduleEntitlement, LicenseConfig, LicenseOperator, OptimizeResult, UpgradeSuggestion } from '../../../lib/types'
 import { canonicalJson } from '../../../lib/crypto'
 import { SCHEDULE_PROGRESS_COMPLETION_DURATION_MS } from '../../../components/ScheduleProgress'
+import { getUpgradeSuggestionId } from '../../../lib/upgrade-suggestion-id'
 import { copy } from '../../../copy/index'
 
 
@@ -25,6 +26,7 @@ export function normalizeUpgradeSuggestions(
       if (suggestion.type === 'single') {
         return {
           type: 'single',
+          suggestion_id: suggestion.suggestion_id,
           id: suggestion.id || suggestion.name || '',
           name: suggestion.name,
           current_elite: suggestion.current,
@@ -44,6 +46,7 @@ export function normalizeUpgradeSuggestions(
       }
       return {
         type: 'bundle',
+        suggestion_id: suggestion.suggestion_id,
         id: `bundle-${index}`,
         gain: Math.round(suggestion.gain),
         desc: suggestion.ops.map((operator) => `${operator.name}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_019}${operator.current}${copy.optimize.pages_tool_optimize_useOptimizeWorkflow_020}${operator.target}`).join(', '),
@@ -68,6 +71,30 @@ export function normalizeUpgradeSuggestions(
     })
     .sort((left, right) => right.gain - left.gain)
     .slice(0, 20)
+}
+
+export function buildUpgradeSuggestionEliteOverrides(
+  suggestions: UpgradeSuggestion[],
+  selectedIds: string[],
+  eliteOverrides: Record<string, number>,
+): Record<string, number> {
+  const selectedSet = new Set(selectedIds)
+  const nextOverrides = { ...eliteOverrides }
+  suggestions.forEach((suggestion, index) => {
+    if (!selectedSet.has(getUpgradeSuggestionId(suggestion, index))) return
+    if (suggestion.type === 'single' && suggestion.id && suggestion.target_elite !== undefined) {
+      nextOverrides[suggestion.id] = suggestion.target_elite
+      return
+    }
+    if (suggestion.type === 'bundle') {
+      for (const operator of suggestion.ops ?? []) {
+        if (operator.id && operator.target_elite !== undefined) {
+          nextOverrides[operator.id] = operator.target_elite
+        }
+      }
+    }
+  })
+  return nextOverrides
 }
 
 export function waitForProgressCompletion(): Promise<void> {

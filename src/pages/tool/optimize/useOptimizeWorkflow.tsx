@@ -16,7 +16,7 @@ import { isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
 import type { ConfigSyncStatus, WorkspacePatch } from '../useToolSession'
 import { useLicenseSync } from './useLicenseSync'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
-import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, normalizeUpgradeSuggestions } from './workflow-utils'
+import { buildOptimizeSignature, buildUpgradeSuggestionEliteOverrides, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, getFreeScheduleGenerateBlockedReason, normalizeUpgradeSuggestions } from './workflow-utils'
 import { usePriorityCoupon as usePriorityCouponState } from './usePriorityCoupon'
 import { useInventoryBalances } from './useInventoryBalances'
 import { copy } from '../../../copy/index'
@@ -679,20 +679,7 @@ export function useOptimizeWorkflow(props: Props) {
       progressRef.current = initialProgress
       setProgress(initialProgress)
       let completed = false
-      const selectedSet = new Set(selectedIds)
-      const newOverrides = { ...eliteOverrides }
-      for (const s of suggestions) {
-        if (s.type === 'single' && s.id && selectedSet.has(s.id) && s.target_elite !== undefined) {
-          newOverrides[s.id] = s.target_elite
-        }
-        if (s.type === 'bundle' && s.id && s.ops && selectedSet.has(s.id)) {
-          for (const op of s.ops) {
-            if (op.id && op.target_elite !== undefined) {
-              newOverrides[op.id] = op.target_elite
-            }
-          }
-        }
-      }
+      const newOverrides = buildUpgradeSuggestionEliteOverrides(suggestions, selectedIds, eliteOverrides)
       setLoading(true)
       try {
         await setEliteOverrides(newOverrides)

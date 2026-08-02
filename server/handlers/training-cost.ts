@@ -1,32 +1,15 @@
 import levelData from './training-level-data.json'
 import type { LicenseOperator, UpgradeTrainingCost } from '../../src/lib/types'
 import { decryptSklandCredential, SklandClient } from './skland-client'
-
-const YITULIU_ITEM_VALUE_URL = 'https://backend.yituliu.cn/item/v7/value'
-const YITULIU_CACHE_TTL_MS = 15 * 60 * 1000
-const FIXED_SANITY_PER_LMD_GROSS = 36 / 10000
-const FIXED_SANITY_PER_EXP = 36 / 10000
-const PURE_GOLD_ITEM_ID = '3003'
-const TRADE_PURE_GOLD_PER_LMD = 2 / 1000
-const YITULIU_ITEM_VALUE_CONFIG = {
-  source: 'penguin',
-  version: 'v1.0',
-  useActivityAverageStage: false,
-  useActivityAverageStageAndUnlimitedItem: false,
-  sampleSize: 300,
-  stageBlacklist: [],
-  stageWhitelist: [],
-  lmdPricingStrategy: 'LMD_PRICING_CE-6',
-  lmdCoefficient: 1,
-  expPricingStrategy: 'EXP_PRICING_BASE_LVL_3_TRADING_POST',
-  expCoefficient: 145 / 229,
-}
-const EXP_ITEM_VALUES: Record<string, number> = {
-  '2001': 200,
-  '2002': 400,
-  '2003': 1000,
-  '2004': 2000,
-}
+import {
+  EXP_ITEM_VALUES,
+  getExpSanity,
+  getNetLmdSanity,
+  getYituliuPricing,
+  round,
+  type PricingState,
+} from './material-value'
+export { buildYituliuPriceMap } from './material-value'
 
 type LevelData = {
   maxLevel: number[][]
@@ -37,7 +20,7 @@ type LevelData = {
 
 type UpgradeSuggestionLike = Record<string, unknown>
 
-type TrainingCostParams = {
+export type TrainingCostParams = {
   suggestions: UpgradeSuggestionLike[]
   operators: LicenseOperator[]
   encryptedCred?: string | null
@@ -61,6 +44,8 @@ type CostBucket = {
 }
 
 type OperatorCost = {
+  status: 'complete' | 'partial' | 'unavailable'
+  error_code?: 'operator_not_found' | 'invalid_rarity' | 'elite_out_of_range' | 'missing_promotion_materials'
   id: string
   name: string
   current_elite: number
@@ -93,17 +78,10 @@ type InventoryItem = {
   count: number
 }
 
-type PricingState = {
-  status: 'ok' | 'unavailable'
-  prices: Map<string, number>
-}
-
 type BucketSanityResult = {
   value: number | null
   unpricedItems: MaterialAmount[]
 }
-
-let yituliuCache: { expiresAt: number; state: PricingState } | null = null
 
 export async function attachTrainingCostsToUpgradeSuggestions({
   suggestions,
@@ -137,9 +115,9 @@ export async function attachTrainingCostsToUpgradeSuggestions({
   }
 
   const pricing = await getYituliuPricing()
-  const characterCostCache = new Map<string, unknown>()
+  const characterCostCache = new Map<string, Promise<unknown>>()
 
-  return Promise.all(suggestions.map(async (suggestion) => {
+  return mapWithConcurrency(suggestions, 4, async (suggestion) => {
     try {
       const cost = await calculateSuggestionTrainingCost(
         suggestion,
@@ -155,7 +133,7 @@ export async function attachTrainingCostsToUpgradeSuggestions({
         training_cost: createUnavailableCost('该建议的材料成本暂时无法计算。'),
       }
     }
-  }))
+  })
 }
 
 export function calculateEliteTrainingCostForTest(params: {
@@ -168,7 +146,12 @@ export function calculateEliteTrainingCostForTest(params: {
 }): UpgradeTrainingCost {
   const context = createCultivateContext({} as SklandClient, params.calInfo, params.calPlayer)
   const operator = resolveOperator(params.target, params.operators)
-  if (!operator) throw new Error('operator not found')
+  if (!operator) {
+    const pricing = params.pricing ?? unavailablePricingState()
+    return aggregateOperatorCosts([
+      createOperatorUnavailableCost(params.target, '当前工作区未找到该干员。'),
+    ], pricing)
+  }
   const playerCharacter = findPlayerCharacter(context.playerCharacters, params.target.id)
   const operatorCost = calculateOperatorCost(
     params.target,
@@ -176,9 +159,9 @@ export function calculateEliteTrainingCostForTest(params: {
     playerCharacter,
     normalizeCharacterCost(params.characterCost, params.target.id),
     context,
-    params.pricing ?? { status: 'unavailable', prices: new Map() },
+    params.pricing ?? unavailablePricingState(),
   )
-  return aggregateOperatorCosts([operatorCost], params.pricing ?? { status: 'unavailable', prices: new Map() })
+  return aggregateOperatorCosts([operatorCost], params.pricing ?? unavailablePricingState())
 }
 
 async function calculateSuggestionTrainingCost(
@@ -186,7 +169,7 @@ async function calculateSuggestionTrainingCost(
   operators: LicenseOperator[],
   context: CultivateContext,
   pricing: PricingState,
-  characterCostCache: Map<string, unknown>,
+  characterCostCache: Map<string, Promise<unknown>>,
 ): Promise<UpgradeTrainingCost> {
   const targets = getSuggestionTargets(suggestion)
   if (targets.length === 0) return createUnavailableCost('练度建议缺少目标干员。')
@@ -204,11 +187,10 @@ async function calculateSuggestionTrainingCost(
       name: target.name || operator.name,
     }
 
-    let characterCost = characterCostCache.get(resolvedTarget.id)
-    if (!characterCost) {
-      characterCost = await context.client.getCultivateCharacter(resolvedTarget.id)
-      characterCostCache.set(resolvedTarget.id, characterCost)
-    }
+    const characterCostPromise = characterCostCache.get(resolvedTarget.id)
+      ?? context.client.getCultivateCharacter(resolvedTarget.id)
+    characterCostCache.set(resolvedTarget.id, characterCostPromise)
+    const characterCost = await characterCostPromise
 
     operatorCosts.push(calculateOperatorCost(
       resolvedTarget,
@@ -242,6 +224,8 @@ function calculateOperatorCost(
   if (rarity === null) {
     warnings.push('干员稀有度缺失或无效，请重新导入森空岛数据。')
     return {
+      status: 'unavailable',
+      error_code: 'invalid_rarity',
       id: target.id,
       name: target.name,
       current_elite: currentElite,
@@ -259,6 +243,8 @@ function calculateOperatorCost(
   if (targetElite > maxEvolve) {
     warnings.push(`目标精英阶段超过该干员上限 E${maxEvolve}。`)
     return {
+      status: 'unavailable',
+      error_code: 'elite_out_of_range',
       id: target.id,
       name: target.name,
       current_elite: currentElite,
@@ -286,20 +272,30 @@ function calculateOperatorCost(
   }
 
   const evolveCosts = Array.isArray(characterCost.evolvePhaseCost) ? characterCost.evolvePhaseCost : []
-  if (targetElite > currentElite && evolveCosts.length === 0) {
-    warnings.push('森空岛未返回该干员晋升材料明细，仅能展示等级与龙门币/经验成本。')
-  }
+  let status: OperatorCost['status'] = 'complete'
+  let errorCode: OperatorCost['error_code']
+  let missingPromotionMaterials = false
   for (let phase = currentElite; phase < targetElite; phase += 1) {
     totals.cash += positiveArrayValue(LEVEL.evolveGoldCost[rarity], phase)
     const phaseCost = evolveCosts[phase]
-    if (!isRecord(phaseCost) || !Array.isArray(phaseCost.items)) continue
+    if (!isRecord(phaseCost) || !Array.isArray(phaseCost.items)) {
+      missingPromotionMaterials = true
+      continue
+    }
     mergeMaterials(totals.materials, phaseCost.items, context.itemMeta)
+  }
+  if (missingPromotionMaterials) {
+    warnings.push('森空岛未返回该干员晋升材料明细，仅能展示等级与龙门币/经验成本。')
+    status = 'partial'
+    errorCode = 'missing_promotion_materials'
   }
 
   totals.equivalent_sanity = calculateBucketSanity(totals, pricing).value
   const missing = calculateMissingBucket(totals, context.playerItems, pricing)
 
   return {
+    status,
+    ...(errorCode ? { error_code: errorCode } : {}),
     id: target.id,
     name: target.name || String(operator.name),
     current_elite: currentElite,
@@ -333,7 +329,16 @@ function aggregateOperatorCosts(operatorCosts: OperatorCost[], pricing: PricingS
   const available = calculateAvailableBucket(totals, missing, pricing)
 
   const unpricedItems = totalSanity.unpricedItems
-  const status: UpgradeTrainingCost['status'] = unpricedItems.length > 0 ? 'partial' : 'available'
+  const unavailableOperatorCount = operatorCosts.filter((cost) => cost.status === 'unavailable').length
+  const status: UpgradeTrainingCost['status'] = operatorCosts.length === 0
+    || unavailableOperatorCount === operatorCosts.length
+    ? 'unavailable'
+    : operatorCosts.some((cost) => cost.status !== 'complete')
+      || unpricedItems.length > 0
+      || pricing.status === 'unavailable'
+      || pricing.status === 'invalid'
+      ? 'partial'
+      : 'available'
   return {
     status,
     target: operatorCosts.length === 1
@@ -352,6 +357,10 @@ function aggregateOperatorCosts(operatorCosts: OperatorCost[], pricing: PricingS
     sources: {
       skland: 'ok',
       yituliu: pricing.status,
+      pricing_snapshot_id: pricing.snapshot_id,
+      pricing_fetched_at: pricing.fetched_at,
+      pricing_age_ms: pricing.age_ms,
+      valuation_version: pricing.valuation_version,
       lmd_exp: 'fixed_lmd_trade_gold_net_exp_36_per_10000',
     },
     warnings,
@@ -393,7 +402,7 @@ function calculateMissingBucket(totals: CostBucket, inventory: InventoryItem[], 
 }
 
 function calculateBucketSanity(bucket: CostBucket, pricing: PricingState): BucketSanityResult {
-  let total = bucket.cash * getNetLmdSanity(pricing) + bucket.exp * FIXED_SANITY_PER_EXP
+  let total = bucket.cash * getNetLmdSanity(pricing) + getExpSanity(bucket.exp)
   const unpricedItems: MaterialAmount[] = []
   for (const material of bucket.materials) {
     const price = pricing.prices.get(material.id)
@@ -406,174 +415,6 @@ function calculateBucketSanity(bucket: CostBucket, pricing: PricingState): Bucke
   }
   if (unpricedItems.length > 0) return { value: null, unpricedItems }
   return { value: round(total, 2), unpricedItems }
-}
-
-function getNetLmdSanity(pricing: PricingState): number {
-  const pureGoldSanity = pricing.prices.get(PURE_GOLD_ITEM_ID) ?? getFixedPureGoldSanity()
-  return Math.max(0, FIXED_SANITY_PER_LMD_GROSS - pureGoldSanity * TRADE_PURE_GOLD_PER_LMD)
-}
-
-function getFixedPureGoldSanity(): number {
-  return FIXED_SANITY_PER_EXP * YITULIU_ITEM_VALUE_CONFIG.expCoefficient * (50 / 3) * 24
-}
-
-async function getYituliuPricing(): Promise<PricingState> {
-  if (yituliuCache && Date.now() < yituliuCache.expiresAt) return yituliuCache.state
-  const startedAt = Date.now()
-  let loggedFailure = false
-  try {
-    const response = await fetch(YITULIU_ITEM_VALUE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json;charset=utf-8' },
-      body: JSON.stringify(YITULIU_ITEM_VALUE_CONFIG),
-      signal: AbortSignal.timeout(25000),
-    })
-    const responseMeta = {
-      url: YITULIU_ITEM_VALUE_URL,
-      response_url: response.url,
-      http_status: response.status,
-      ok: response.ok,
-      content_type: response.headers.get('content-type'),
-      elapsed_ms: Date.now() - startedAt,
-    }
-    if (!response.ok) {
-      const bodyText = await response.text().catch(() => '')
-      logYituliuDebug({
-        event: 'http_error',
-        ...responseMeta,
-        body_excerpt: bodyTextExcerpt(bodyText),
-      })
-      loggedFailure = true
-      throw new Error(`yituliu ${response.status}`)
-    }
-    const data = await response.json()
-    const prices = buildYituliuPriceMap(data)
-    if (prices.size === 0) {
-      logYituliuDebug({
-        event: 'empty_price_map',
-        ...responseMeta,
-        ...summarizeYituliuPayload(data, prices.size),
-      })
-    }
-    const state = { status: 'ok' as const, prices }
-    yituliuCache = { expiresAt: Date.now() + YITULIU_CACHE_TTL_MS, state }
-    return state
-  } catch (error) {
-    if (!loggedFailure) {
-      logYituliuDebug({
-        event: 'request_failed',
-        url: YITULIU_ITEM_VALUE_URL,
-        elapsed_ms: Date.now() - startedAt,
-        error_name: error instanceof Error ? error.name : typeof error,
-        error_message: error instanceof Error ? error.message : String(error),
-      })
-    }
-    const state = { status: 'unavailable' as const, prices: new Map<string, number>() }
-    yituliuCache = { expiresAt: Date.now() + YITULIU_CACHE_TTL_MS, state }
-    return state
-  }
-}
-
-export function buildYituliuPriceMap(data: unknown): Map<string, number> {
-  const prices = new Map<string, number>()
-  const itemValueRows = readYituliuItemValueRows(data)
-  for (const item of itemValueRows) {
-    if (!isRecord(item)) continue
-    const itemId = stringValue(item.itemId ?? item.id)
-    const price = numberValue(item.itemValueAp ?? item.itemValue)
-    if (itemId && price && price > 0) setLowerPrice(prices, itemId, price)
-  }
-
-  const lists = collectArraysByKey(data, 'recommendedStageList')
-  for (const list of lists) {
-    for (const item of list) {
-      if (!isRecord(item)) continue
-      const nestedItem = isRecord(item.item) ? item.item : null
-      const itemId = stringValue(item.itemId ?? item.materialId ?? item.id ?? nestedItem?.id)
-      const stages = Array.isArray(item.stageResultList) ? item.stageResultList : []
-      const price = minPositive(stages.map((stage) => isRecord(stage) ? numberValue(stage.apExpect) : null))
-      if (itemId && price) setLowerPrice(prices, itemId, price)
-    }
-  }
-  const stageLists = collectArraysByKey(data, 'stageResultList')
-  for (const list of stageLists) {
-    for (const stage of list) {
-      if (!isRecord(stage)) continue
-      const nestedItem = isRecord(stage.item) ? stage.item : null
-      const itemId = stringValue(stage.itemId ?? stage.materialId ?? stage.id ?? nestedItem?.id)
-      const price = numberValue(stage.apExpect)
-      if (itemId && price && price > 0) setLowerPrice(prices, itemId, price)
-    }
-  }
-  return prices
-}
-
-function logYituliuDebug(payload: Record<string, unknown>): void {
-  console.warn('[training-cost yituliu debug]', JSON.stringify(payload))
-}
-
-function summarizeYituliuPayload(data: unknown, priceCount: number): Record<string, unknown> {
-  const root = isRecord(data) ? data : null
-  const nestedData = root && isRecord(root.data) ? root.data : null
-  const itemValueRows = readYituliuItemValueRows(data)
-  const recommendedStageLists = collectArraysByKey(data, 'recommendedStageList')
-  const stageResultLists = collectArraysByKey(data, 'stageResultList')
-  return {
-    root_type: describeValueType(data),
-    root_keys: root ? Object.keys(root).slice(0, 40) : [],
-    response_code: numberValue(root?.code),
-    response_msg: stringValue(root?.msg ?? root?.message) || undefined,
-    data_type: describeValueType(nestedData),
-    data_keys: nestedData ? Object.keys(nestedData).slice(0, 40) : [],
-    item_value_row_count: itemValueRows.length,
-    item_value_sample_keys: firstRecordKeys([itemValueRows]),
-    recommended_stage_list_count: recommendedStageLists.length,
-    recommended_stage_item_count: countNestedItems(recommendedStageLists),
-    recommended_stage_sample_keys: firstRecordKeys(recommendedStageLists),
-    stage_result_list_count: stageResultLists.length,
-    stage_result_item_count: countNestedItems(stageResultLists),
-    stage_result_sample_keys: firstRecordKeys(stageResultLists),
-    price_count: priceCount,
-  }
-}
-
-function readYituliuItemValueRows(data: unknown): unknown[] {
-  if (Array.isArray(data)) return data
-  if (!isRecord(data)) return []
-  if (Array.isArray(data.data)) return data.data
-  if (isRecord(data.data)) {
-    for (const key of ['items', 'itemList', 'list', 'records']) {
-      const value = data.data[key]
-      if (Array.isArray(value)) return value
-    }
-  }
-  for (const key of ['items', 'itemList', 'list', 'records']) {
-    const value = data[key]
-    if (Array.isArray(value)) return value
-  }
-  return []
-}
-
-function bodyTextExcerpt(text: string): string {
-  return text.replace(/\s+/g, ' ').trim().slice(0, 1000)
-}
-
-function countNestedItems(arrays: unknown[][]): number {
-  return arrays.reduce((total, list) => total + list.length, 0)
-}
-
-function firstRecordKeys(arrays: unknown[][]): string[] {
-  for (const list of arrays) {
-    const item = list.find(isRecord)
-    if (item) return Object.keys(item).slice(0, 40)
-  }
-  return []
-}
-
-function describeValueType(value: unknown): string {
-  if (Array.isArray(value)) return 'array'
-  if (value === null) return 'null'
-  return typeof value
 }
 
 function createCultivateContext(client: SklandClient, calInfo: unknown, calPlayer: unknown): CultivateContext {
@@ -647,6 +488,8 @@ function findPlayerCharacter(characters: Record<string, unknown>[], id: string):
 
 function createOperatorUnavailableCost(target: CostTarget, warning: string): OperatorCost {
   return {
+    status: 'unavailable',
+    error_code: 'operator_not_found',
     id: target.id,
     name: target.name,
     current_elite: target.currentElite,
@@ -668,13 +511,46 @@ function createUnavailableCost(message: string): UpgradeTrainingCost {
     equivalent_sanity: null,
     unpriced_items: [],
     sources: {
-    skland: 'unavailable',
-    yituliu: 'unavailable',
-    lmd_exp: 'fixed_lmd_trade_gold_net_exp_36_per_10000',
+      skland: 'unavailable',
+      yituliu: 'unavailable',
+      pricing_snapshot_id: null,
+      pricing_fetched_at: null,
+      pricing_age_ms: null,
+      valuation_version: null,
+      lmd_exp: 'fixed_lmd_trade_gold_net_exp_36_per_10000',
     },
     warnings: [message],
     operators: [],
   }
+}
+
+function unavailablePricingState(): PricingState {
+  return {
+    status: 'unavailable',
+    prices: new Map(),
+    fetched_at: null,
+    age_ms: null,
+    snapshot_id: null,
+    valuation_version: 'depot-v2:unavailable',
+  }
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  maximumConcurrency: number,
+  mapper: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length)
+  let nextIndex = 0
+  const workers = Array.from({ length: Math.min(maximumConcurrency, values.length) }, async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex
+      nextIndex += 1
+      results[index] = await mapper(values[index])
+    }
+  })
+  await Promise.all(workers)
+  return results
 }
 
 function emptyBucket(): CostBucket {
@@ -734,28 +610,6 @@ function createItemMeta(value: unknown): Record<string, unknown> {
   return ensureRecord(value)
 }
 
-function collectArraysByKey(value: unknown, key: string, arrays: unknown[][] = [], depth = 0): unknown[][] {
-  if (depth > 8 || !value || typeof value !== 'object') return arrays
-  if (Array.isArray(value)) {
-    for (const item of value) collectArraysByKey(item, key, arrays, depth + 1)
-    return arrays
-  }
-  const record = value as Record<string, unknown>
-  if (Array.isArray(record[key])) arrays.push(record[key] as unknown[])
-  for (const child of Object.values(record)) collectArraysByKey(child, key, arrays, depth + 1)
-  return arrays
-}
-
-function setLowerPrice(prices: Map<string, number>, itemId: string, price: number): void {
-  const existing = prices.get(itemId)
-  if (!existing || price < existing) prices.set(itemId, price)
-}
-
-function minPositive(values: (number | null)[]): number | null {
-  const positives = values.filter((value): value is number => typeof value === 'number' && value > 0)
-  return positives.length > 0 ? Math.min(...positives) : null
-}
-
 function positiveArrayValue(values: number[] | undefined, index: number): number {
   const value = values?.[index] ?? 0
   return value > 0 ? value : 0
@@ -787,11 +641,6 @@ function numberValue(value: unknown): number | null {
     return Number.isFinite(parsed) ? parsed : null
   }
   return null
-}
-
-function round(value: number, digits: number): number {
-  const factor = 10 ** digits
-  return Math.round(value * factor) / factor
 }
 
 const LEVEL = levelData as LevelData

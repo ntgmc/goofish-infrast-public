@@ -51,8 +51,22 @@ const characterCostB = {
   ],
 }
 
-const priced = { status: 'ok', prices: new Map([['3001', 18], ['3002', 24]]) }
-const unpriced = { status: 'unavailable', prices: new Map() }
+const priced = {
+  status: 'fresh',
+  prices: new Map([['3001', 18], ['3002', 24]]),
+  fetched_at: '2026-07-31T00:00:00.000Z',
+  age_ms: 0,
+  snapshot_id: 'test-snapshot',
+  valuation_version: 'depot-v2:test:test-snapshot',
+}
+const unpriced = {
+  status: 'unavailable',
+  prices: new Map(),
+  fetched_at: null,
+  age_ms: null,
+  snapshot_id: null,
+  valuation_version: 'depot-v2:test:unavailable',
+}
 
 const partial = training.calculateEliteTrainingCostForTest({
   target: { id: 'char_test_a', name: '测试干员A', currentElite: 0, targetElite: 1 },
@@ -197,6 +211,58 @@ const priceMap = training.buildYituliuPriceMap({
 
 if (priceMap.get('3001') !== 19 || priceMap.get('3002') !== 31 || priceMap.get('3003') !== 12) {
   throw new Error('Yituliu price map should read itemValueAp and prefer the lowest positive apExpect')
+}
+
+const missingOperator = training.calculateEliteTrainingCostForTest({
+  target: { id: 'char_missing', name: '不存在干员', currentElite: 0, targetElite: 1 },
+  operators,
+  calInfo,
+  calPlayer: { items: [], characters: [] },
+  characterCost: {},
+  pricing: priced,
+})
+if (missingOperator.status !== 'unavailable'
+  || missingOperator.operators[0]?.status !== 'unavailable'
+  || missingOperator.operators[0]?.error_code !== 'operator_not_found') {
+  throw new Error('missing operator must be unavailable instead of a zero-cost available result')
+}
+
+const invalidRarity = training.calculateEliteTrainingCostForTest({
+  target: { id: 'char_invalid', name: '异常稀有度', currentElite: 0, targetElite: 1 },
+  operators: [{ id: 'char_invalid', name: '异常稀有度', own: true, elite: 0, level: 1, rarity: 99 }],
+  calInfo,
+  calPlayer: { items: [], characters: [{ id: 'char_invalid', evolvePhase: 0, level: 1 }] },
+  characterCost: characterCostA,
+  pricing: priced,
+})
+if (invalidRarity.status !== 'unavailable' || invalidRarity.operators[0]?.error_code !== 'invalid_rarity') {
+  throw new Error('invalid rarity must be unavailable instead of a zero-cost available result')
+}
+
+const eliteOutOfRange = training.calculateEliteTrainingCostForTest({
+  target: { id: 'char_test_a', name: '测试干员A', currentElite: 0, targetElite: 9 },
+  operators,
+  calInfo,
+  calPlayer: { items: [], characters: [{ id: 'char_test_a', evolvePhase: 0, level: 1 }] },
+  characterCost: characterCostA,
+  pricing: priced,
+})
+if (eliteOutOfRange.status !== 'unavailable' || eliteOutOfRange.operators[0]?.error_code !== 'elite_out_of_range') {
+  throw new Error('elite phase overflow must be unavailable instead of a zero-cost available result')
+}
+
+const missingPromotionMaterials = training.calculateEliteTrainingCostForTest({
+  target: { id: 'char_test_b', name: '测试干员B', currentElite: 1, targetElite: 2 },
+  operators,
+  calInfo,
+  calPlayer: { items: [], characters: [{ id: 'char_test_b', evolvePhase: 1, level: 1 }] },
+  characterCost: { evolvePhaseCost: [{ items: [] }] },
+  pricing: priced,
+})
+if (missingPromotionMaterials.status !== 'partial'
+  || missingPromotionMaterials.operators[0]?.status !== 'partial'
+  || missingPromotionMaterials.operators[0]?.error_code !== 'missing_promotion_materials') {
+  throw new Error('missing material details for any required phase must keep the aggregate cost partial')
 }
 
 console.log('training cost smoke check ok')

@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import {
+  MAX_DEPOT_ITEM_COUNT,
+  MAX_DEPOT_ITEM_TYPES,
+  MAX_DEPOT_PROFILE_ID_LENGTH,
+} from '../../src/lib/depot-value-constraints'
 import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
 import {
   AUTH_EMAIL_MAX_LENGTH,
@@ -42,6 +47,47 @@ const shortString = (max = 256) => z.string().min(1).max(max)
 const optionalString = (max = 256) => z.string().max(max).optional()
 const optionalUnknown = z.unknown().optional()
 const strict = z.strictObject
+const depotCountSchema = z.number().int().min(0).max(MAX_DEPOT_ITEM_COUNT)
+const depotItemIdSchema = z.union([
+  z.string().trim().min(1).max(128),
+  z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+])
+const depotItemSchema = strict({
+  id: depotItemIdSchema.optional(),
+  itemId: depotItemIdSchema.optional(),
+  name: z.string().max(256).optional(),
+  have: depotCountSchema.optional(),
+  count: depotCountSchema.optional(),
+  quantity: depotCountSchema.optional(),
+}).superRefine((value, context) => {
+  if (value.id === undefined && value.itemId === undefined) {
+    context.addIssue({ code: 'custom', path: ['id'], message: '物品必须提供 id 或 itemId。' })
+  }
+  if (value.have === undefined && value.count === undefined && value.quantity === undefined) {
+    context.addIssue({ code: 'custom', path: ['count'], message: '物品必须提供 have、count 或 quantity。' })
+  }
+})
+const depotInventorySchema = z.union([
+  z.record(z.string().min(1).max(128), depotCountSchema).refine((value) => {
+    const itemCount = Object.keys(value).length
+    return itemCount > 0 && itemCount <= MAX_DEPOT_ITEM_TYPES
+  }),
+  strict({
+    '@type': z.literal('@penguin-statistics/depot').optional(),
+    items: z.array(depotItemSchema).min(1).max(MAX_DEPOT_ITEM_TYPES),
+  }),
+])
+const depotValueRequestSchema = z.discriminatedUnion('source', [
+  strict({ source: z.literal('upload'), inventory: depotInventorySchema }),
+  strict({
+    source: z.literal('skland'),
+    profile_id: z.string().trim().min(1).max(MAX_DEPOT_PROFILE_ID_LENGTH),
+    sample_consent: z.boolean(),
+  }),
+])
+const depotSampleRevokeSchema = strict({
+  profile_id: z.string().trim().min(1).max(MAX_DEPOT_PROFILE_ID_LENGTH),
+})
 const inventoryExpirySchema = z.discriminatedUnion('mode', [
   strict({ mode: z.literal('never') }),
   strict({ mode: z.literal('relative_days'), days: z.number().int().min(1).max(3650) }),
@@ -67,6 +113,8 @@ const adminPermissionSchema = z.enum(
 )
 
 export const requestSchemas = {
+  depotValue: depotValueRequestSchema,
+  depotSampleRevoke: depotSampleRevokeSchema,
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
   authRegister: strict({
     email: shortString(AUTH_EMAIL_MAX_LENGTH),
@@ -538,7 +586,10 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/announcement', route({ GET: none(), PUT: json('admin', requestSchemas.announcement) }, ['admin'])],
   ['/api/usage-stats', route({ POST: json('standard', requestSchemas.usageStats) }, ['admin'])],
   ['/api/admin/usage-stats', route({ GET: none() }, ['admin', 'format', 'from', 'to', 'range'])],
-  ['/api/depot-value', route({ POST: json('depot', z.unknown()) })],
+  ['/api/depot-value', route({
+    POST: json('depot', requestSchemas.depotValue),
+    DELETE: json('standard', requestSchemas.depotSampleRevoke),
+  })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) })],
   ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],

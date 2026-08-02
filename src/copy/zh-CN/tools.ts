@@ -48,7 +48,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_024: "森空岛快捷导入",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_025: "\r\n                    使用森空岛导入会读取养成库存做本次估值，并匿名贡献聚合统计，用于改进击败百分比。\r\n                  ",
+  pages_DepotValuePage_025: "使用森空岛导入会读取养成库存做本次估值；统计样本仅在你明确同意且价格覆盖达标时保存。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_026: "已登录",
   // src/pages/DepotValuePage.tsx
@@ -68,7 +68,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_034: "绑定森空岛并分析仓库",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_035: "使用森空岛导入会默认匿名贡献本次统计结果；样本不包含仓库明细、干员明细、昵称、UID 明文或凭据。",
+  pages_DepotValuePage_035: "统计样本属于假名化数据而非匿名数据：它不含仓库/干员明细、昵称、UID 明文或凭据，但会关联本网站档案，以支持导出、撤回和账户删除。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_036: "估值说明",
   // src/pages/DepotValuePage.tsx
@@ -78,7 +78,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_039: "材料价格优先参考一图流/企鹅物流的物品价值。模组数据块、数据增补仪、数据增补条、家具零件不会参与计算。",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_040: "使用森空岛库存时会默认贡献匿名统计样本，样本越多，“击败 X% 博士”会越接近真实分布。",
+  pages_DepotValuePage_040: "只有明确同意、价格快照有效且覆盖率达标的同版本样本才会进入排名；你可以随时撤回。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_041: "分析完成",
   // src/pages/DepotValuePage.tsx
@@ -157,4 +157,64 @@ export const toolsCopy = {
   pages_DepotValuePage_078: "单件 ",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_079: " 理智",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_080: "登录状态加载失败，请重试。",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_081: "撤回仓库统计样本失败，请稍后重试。",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_082: "该档案关联的仓库统计样本已撤回。",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_083: " · ",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_084: " 字节",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_085: "请求上限为 1 MiB、20,000 类物品；数量必须是 0 到 10 亿之间的整数。",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_086: "重试登录状态",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_087: "我明确同意贡献假名化聚合样本，用于改进同版本仓库排名。样本保存总值、价格快照/覆盖率、账号等级和干员聚合计数，并关联本网站档案以支持导出、撤回和账户删除；保存至撤回或账户删除为止。",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_088: "正在撤回...",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_089: "撤回该档案的仓库样本",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_090: "估值口径",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_091: "材料价格",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_092: "价格快照",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_093: "无",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_094: "价格覆盖率",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_095: "估值版本",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_096: "样本贡献",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_097: "生成时间 / 数据版本",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_098: "（仅展示前 12 类）",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_099: "仓库 JSON 超过 1 MiB 请求上限，请缩减后重试。",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_100: "物品数量必须是 0 到 10 亿之间的整数。",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_101: "新鲜快照",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_102: "有效期内历史快照",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_103: "不可用",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_104: "无效响应",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_105: "已保存",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_106: "未同意",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_107: "因价格质量不足跳过",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_108: "上传数据不适用",
+  // src/pages/DepotValuePage.tsx
+  pages_DepotValuePage_109: "保存服务不可用",
 } as const
