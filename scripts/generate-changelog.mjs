@@ -1,6 +1,7 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { writeFileIfChanged } from './atomic-write.mjs'
 import {
   createChangelogEnvelope,
   createReleaseRecord,
@@ -21,6 +22,7 @@ const buildMetaPath = resolve(root, 'src/lib/.generated/build-meta.ts')
 const generatedModulePath = resolve(root, 'src/lib/.generated/changelog.ts')
 const releaseRecordPath = resolve(root, 'changelog-release.json')
 const releaseNotesPath = resolve(root, 'changelog-release.md')
+const MAX_PUBLIC_RELEASES = 100
 const candidate = isEnabled(process.env.GENERATE_CHANGELOG_CANDIDATE)
 const gitRoot = resolveChangelogGitRoot(root, process.env.CHANGELOG_GIT_ROOT)
 
@@ -47,7 +49,7 @@ const release = candidate
   })
   : null
 const envelope = createChangelogEnvelope(candidate, release)
-const releases = mergeChangelogReleases(history, release)
+const releases = mergeChangelogReleases(history, release).slice(0, MAX_PUBLIC_RELEASES)
 
 await writeFileIfChanged(generatedModulePath, renderGeneratedModule(releases))
 await writeFileIfChanged(releaseRecordPath, `${JSON.stringify(envelope, null, 2)}\n`)
@@ -68,7 +70,7 @@ async function loadReleaseHistory() {
 
   const apiUrl = String(process.env.GITHUB_API_URL ?? 'https://api.github.com').replace(/\/$/, '')
   const releases = []
-  for (let page = 1; page <= 100; page += 1) {
+  for (let page = 1; page <= Math.ceil(MAX_PUBLIC_RELEASES / 100); page += 1) {
     const batch = await requestJson(`${apiUrl}/repos/${repository}/releases?per_page=100&page=${page}`, token)
     if (!Array.isArray(batch)) throw new Error('GitHub releases API returned an unexpected payload')
     releases.push(...batch)
@@ -84,7 +86,7 @@ async function loadReleaseHistory() {
     const envelope = validateChangelogEnvelope(await requestJson(asset.url, token, 'application/octet-stream'))
     if (envelope.candidate) history.push(envelope.release)
   }
-  return mergeChangelogReleases(history)
+  return mergeChangelogReleases(history).slice(0, MAX_PUBLIC_RELEASES)
 }
 
 async function readHistoryFile(filePath) {
@@ -102,7 +104,7 @@ function resolvePreviousTargetSha(previousRelease) {
   if (previousRelease) return previousRelease.targetSha
 
   const configuredBase = String(process.env.CHANGELOG_BASE_SHA ?? '').trim()
-  if (configuredBase) return normalizeSha(configuredBase)
+  if (configuredBase && !/^0{40}$/.test(configuredBase)) return normalizeSha(configuredBase)
   return null
 }
 
@@ -193,23 +195,6 @@ async function requestJson(url, token, accept = 'application/vnd.github+json') {
   })
   if (!response.ok) throw new Error(`GitHub changelog history request failed: ${response.status} ${response.statusText}`)
   return response.json()
-}
-
-async function writeFileIfChanged(filePath, content) {
-  try {
-    if (await readFile(filePath, 'utf8') === content) return
-  } catch {
-    // Generate the first local artifact when no file exists yet.
-  }
-
-  await mkdir(dirname(filePath), { recursive: true })
-  const temporaryPath = `${filePath}.tmp-${process.pid}`
-  try {
-    await writeFile(temporaryPath, content, 'utf8')
-    await rename(temporaryPath, filePath)
-  } finally {
-    await rm(temporaryPath, { force: true })
-  }
 }
 
 function readObjectLiteral(source, name) {

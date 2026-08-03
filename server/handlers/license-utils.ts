@@ -614,7 +614,7 @@ export function formatRiskFreezeMessage(reason: string): string {
 }
 
 export function formatOperatorRiskBlockMessage(reason: string): string {
-  return `本次操作已拦截：${reason} 这通常是误选了其他账号或旧版 operators.json，请确认文件后重新上传。`
+  return `本次操作已拦截：${reason} 这通常是误选了其他账号或不兼容的 operators.json，请确认文件后重新上传。`
 }
 
 export async function recordOperatorFingerprint(

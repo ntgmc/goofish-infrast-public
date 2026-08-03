@@ -60,7 +60,7 @@ describe('database schema ownership', () => {
     const schemaStatements = statements.filter((statement) => (
       !statement.includes('goofish_schema_migrations')
       && !statement.includes('pg_advisory_')
-      && !statement.startsWith('set statement_timeout')
+      && !statement.includes("set_config('statement_timeout'")
       && !statement.includes('from personal_use_declaration_versions')
     ))
     const combinedSchema = schemaStatements.join('\n')
@@ -102,6 +102,7 @@ describe('database schema ownership', () => {
     expect(combinedSchema).toMatch(/select 1 from optimize_jobs job/)
     expect(combinedSchema).not.toMatch(/\boptimization_jobs\b/)
     expect(statements).toEqual(expect.arrayContaining([
+      expect.stringMatching(/select set_config\('statement_timeout', \$1, false\)/i),
       expect.stringMatching(/select pg_advisory_lock/i),
       expect.stringMatching(/create table if not exists goofish_schema_migrations/i),
       expect.stringMatching(/insert into goofish_schema_migrations/i),
@@ -110,6 +111,10 @@ describe('database schema ownership', () => {
       expect.stringMatching(/status = 'completed'/i),
       expect.stringMatching(/select pg_advisory_unlock/i),
     ]))
+    expect(queryMock).toHaveBeenCalledWith(
+      "select set_config('statement_timeout', $1, false)",
+      ['300000ms'],
+    )
     expect(queryMock.mock.calls.some(([, values]) => (
       Array.isArray(values)
       && values.includes(DATABASE_SCHEMA_VERSION)

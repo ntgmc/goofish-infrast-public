@@ -1,13 +1,19 @@
 import ReactMarkdown from 'react-markdown'
+import { Link } from 'react-router'
 import remarkGfm from 'remark-gfm'
+import { isAppRoutePath } from '../lib/app-routes'
+import type { MouseEvent } from 'react'
 
 interface Props {
   children: string;
   className?: string;
   id?: string;
+  onInternalNavigate?: () => void;
 }
 
-export default function AnnouncementMarkdown({ children, className = '', id }: Props) {
+const linkClassName = 'font-medium text-brand-600 underline underline-offset-4 hover:text-brand-500'
+
+export default function AnnouncementMarkdown({ children, className = '', id, onInternalNavigate }: Props) {
   return (
     <div id={id} className={`min-w-0 max-w-full overflow-x-auto text-sm leading-6 text-ink-secondary ${className}`}>
       <ReactMarkdown
@@ -17,7 +23,18 @@ export default function AnnouncementMarkdown({ children, className = '', id }: P
           h2: ({ node: _node, ...props }) => <h2 {...props} className="mb-2 mt-5 text-lg font-semibold leading-7 text-ink-primary" />,
           h3: ({ node: _node, ...props }) => <h3 {...props} className="mb-2 mt-4 text-base font-semibold text-ink-primary" />,
           p: ({ node: _node, ...props }) => <p {...props} className="mb-3 last:mb-0" />,
-          a: ({ node: _node, ...props }) => <a {...props} className="font-medium text-brand-600 underline underline-offset-4 hover:text-brand-500" target="_blank" rel="noreferrer" />,
+          a: ({ node: _node, href, ...props }) => isInternalAnnouncementHref(href)
+            ? (
+                <Link
+                  {...props}
+                  to={href}
+                  className={linkClassName}
+                  onClick={(event) => {
+                    if (isPrimaryNavigation(event)) onInternalNavigate?.()
+                  }}
+                />
+              )
+            : <a {...props} href={href} className={linkClassName} target="_blank" rel="noreferrer" />,
           ul: ({ node: _node, ...props }) => <ul {...props} className="mb-3 list-disc space-y-1 pl-5 last:mb-0" />,
           ol: ({ node: _node, ...props }) => <ol {...props} className="mb-3 list-decimal space-y-1 pl-5 last:mb-0" />,
           blockquote: ({ node: _node, ...props }) => <blockquote {...props} className="mb-3 border-l-2 border-brand-500/50 pl-3 text-ink-muted last:mb-0" />,
@@ -32,4 +49,20 @@ export default function AnnouncementMarkdown({ children, className = '', id }: P
       </ReactMarkdown>
     </div>
   )
+}
+
+function isInternalAnnouncementHref(href: string | undefined): href is string {
+  if (!href) return false
+  if (href.startsWith('#') || href.startsWith('?')) return true
+  if (!href.startsWith('/') || href.startsWith('//')) return false
+
+  try {
+    return isAppRoutePath(new URL(href, 'https://announcement.internal').pathname)
+  } catch {
+    return false
+  }
+}
+
+function isPrimaryNavigation(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return event.button === 0 && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
 }

@@ -120,7 +120,13 @@ export interface LicenseFile {
 export interface AppBuildMeta {
   frontend_version: string;
   backend_version: string;
+  expected_backend_version?: string;
   data_version: string;
+  source_mode?: 'public_fallback' | 'full';
+  source_schema_version?: number;
+  data_content_sha256?: string;
+  data_source_updated_at?: string;
+  build_generated_at?: string;
   generated_at: string;
   source_summary: string;
   git_sha?: string | null;

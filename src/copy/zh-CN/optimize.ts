@@ -298,7 +298,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_015: "建议后",
   // src/pages/tool/optimize/OverviewSection.tsx
-  pages_tool_optimize_OverviewSection_016: "旧结果",
+  pages_tool_optimize_OverviewSection_016: "历史结果",
   // src/pages/tool/optimize/OverviewSection.tsx
   pages_tool_optimize_OverviewSection_017: "生成",
   // src/pages/tool/optimize/OverviewSection.tsx
@@ -427,8 +427,6 @@ export const optimizeCopy = {
   pages_tool_optimize_PlansSection_009: "已保存的配置可随时载入到配置编辑器，再按需修改。",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_010: "已达到保存上限，请先删除不再需要的方案。",
-  // src/pages/tool/optimize/PlansSection.tsx
-  pages_tool_optimize_PlansSection_011: "旧结果",
   // src/pages/tool/optimize/PlansSection.tsx
   pages_tool_optimize_PlansSection_012: "生成",
   // src/pages/tool/optimize/PlansSection.tsx

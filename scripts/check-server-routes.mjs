@@ -33,7 +33,7 @@ const expectedRoutes = [
   '/api/user/commercial/profiles',
   '/api/user/invitations',
   '/api/user/invitations/code',
-  '/api/user/rewards',
+  '/api/user/priority-coupon-balance',
   '/api/user/profiles',
   '/api/user/profiles/depot-value',
   '/api/user/profiles/metered-personal',
@@ -58,13 +58,13 @@ if (missing.length > 0) {
   throw new Error(`missing server API routes: ${missing.join(', ')}`)
 }
 
-const removedRoutes = ['/api/optimize', '/api/optimize/job', '/api/optimize/reorder-check', '/api/user/data/skland/unlink', '/api/redeem-cdk', '/api/license-status']
+const removedRoutes = ['/api/optimize', '/api/optimize/job', '/api/optimize/reorder-check', '/api/user/data/skland/unlink', '/api/user/rewards', '/api/redeem-cdk', '/api/license-status']
 const stale = removedRoutes.filter((route) => actualRoutes.includes(route))
 if (stale.length > 0) {
   throw new Error(`removed API routes are still registered: ${stale.join(', ')}`)
 }
 
-for (const route of ['/api/redeem-cdk', '/api/license-status']) {
+for (const route of ['/api/user/rewards', '/api/redeem-cdk', '/api/license-status']) {
   const response = await routeRequest(new Request(`http://local${route}`, { method: 'POST' }))
   if (response.status !== 404) throw new Error(`removed API route ${route} returned ${response.status} instead of 404`)
 }

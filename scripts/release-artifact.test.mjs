@@ -18,9 +18,10 @@ for (const kind of Object.keys(ARTIFACT_KINDS)) {
       run(fixture, ['create', '--kind', kind, '--sha', sha, '--run-id', '42', '--run-url', 'https://example.invalid/runs/42'])
       run(fixture, ['verify', '--kind', kind, '--sha', sha])
       const manifest = JSON.parse(await readFile(join(fixture.artifact, 'build-manifest.json'), 'utf8'))
-      assert.equal(manifest.schema_version, 2)
+      assert.equal(manifest.schema_version, 3)
       assert.equal(manifest.artifact_kind, kind)
       assert.equal(manifest.target_sha, sha)
+      assert.equal(manifest.deployable, true)
       assert.equal(manifest.changelog.release.version, '2.0.1')
       for (const required of ARTIFACT_KINDS[kind].required) assert.ok(manifest.files[required])
     } finally {
@@ -88,12 +89,37 @@ test('rejects changelog and build metadata that do not describe the target', asy
   }
 })
 
+test('rejects non-candidate changelog metadata for release artifacts', async () => {
+  const fixture = await createFixture('public')
+  try {
+    await writeFile(join(fixture.artifact, 'changelog-release.json'), `${JSON.stringify({
+      schema_version: 1,
+      candidate: false,
+      release: null,
+    }, null, 2)}\n`, 'utf8')
+    assert.throws(() => run(fixture, ['create', '--kind', 'public', '--sha', sha]), /require a candidate changelog/)
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true })
+  }
+})
+
+test('marks public fallback artifacts as non-deployable', async () => {
+  const fixture = await createFixture('public', 'public_fallback')
+  try {
+    run(fixture, ['create', '--kind', 'public', '--sha', sha])
+    const manifest = JSON.parse(await readFile(join(fixture.artifact, 'build-manifest.json'), 'utf8'))
+    assert.equal(manifest.deployable, false)
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true })
+  }
+})
+
 test('allows an immutable deployment worktree only when explicitly requested', async () => {
   const fixture = await createFixture('public')
   try {
     run(fixture, ['create', '--kind', 'public', '--sha', sha])
-    await writeFile(join(fixture.artifact, 'package.json'), '{}\n', 'utf8')
-    assert.throws(() => run(fixture, ['verify', '--kind', 'public', '--sha', sha]), /unexpected public artifact entry.*package\.json/)
+    await writeFile(join(fixture.artifact, 'README.md'), 'source tree only\n', 'utf8')
+    assert.throws(() => run(fixture, ['verify', '--kind', 'public', '--sha', sha]), /unexpected public artifact entry.*README\.md/)
     run(fixture, ['verify', '--kind', 'public', '--sha', sha], { RELEASE_ALLOW_SOURCE_TREE: 'true' })
   } finally {
     await rm(fixture.root, { recursive: true, force: true })
@@ -116,7 +142,7 @@ test('writes a separate deployable decision for build-relevant releases', async 
   }
 })
 
-async function createFixture(kind) {
+async function createFixture(kind, sourceMode = 'full') {
   const fixtureRoot = await mkdtemp(join(tmpdir(), 'goofish-release-'))
   const source = join(fixtureRoot, 'source')
   const artifact = join(fixtureRoot, 'artifact')
@@ -124,7 +150,10 @@ async function createFixture(kind) {
   await mkdir(artifact, { recursive: true })
   await writeFile(join(source, 'src/lib/.generated/build-meta.ts'), `export const APP_BUILD_META = ${JSON.stringify({
     frontend_version: '2.0.1', backend_version: '2.0.1', data_version: 'data.1.0123456',
-    generated_at: '2026-07-18T00:00:00.000Z', source_summary: 'fixture', git_sha: sha, build_context: 'test',
+    expected_backend_version: '2.0.1', source_mode: sourceMode, source_schema_version: 1,
+    data_content_sha256: 'a'.repeat(64), data_source_updated_at: '2026-07-18T00:00:00.000Z',
+    build_generated_at: '2026-07-18T00:00:00.000Z', generated_at: '2026-07-18T00:00:00.000Z',
+    source_summary: 'fixture', git_sha: sha, build_context: 'test',
   }, null, 2)} as const;\n`, 'utf8')
   await writeRequiredFiles(artifact, kind)
   return { root: fixtureRoot, source, artifact }
@@ -147,6 +176,24 @@ async function writeRequiredFiles(artifact, kind) {
       await writeFile(target, '# v2.0.1\n\nBaseline\n', 'utf8')
     } else if (path.endsWith('.map')) {
       await writeFile(target, JSON.stringify({ version: 3, sources: ['../index.ts'], sourcesContent: ['export {}'], mappings: '' }), 'utf8')
+    } else if (path === 'package.json') {
+      await writeFile(target, `${JSON.stringify({
+        name: 'fixture', version: '2.0.0', type: 'module', engines: { node: '>=24 <25' },
+        dependencies: { '@aws-sdk/client-sesv2': '1.0.0', '@node-rs/argon2': '1.0.0', pg: '1.0.0', qrcode: '1.0.0' },
+      })}\n`, 'utf8')
+    } else if (path === 'package-lock.json') {
+      await writeFile(target, `${JSON.stringify({
+        name: 'fixture', lockfileVersion: 3,
+        packages: {
+          '': { name: 'fixture', version: '2.0.0' },
+          'node_modules/@aws-sdk/client-sesv2': { version: '1.0.0' },
+          'node_modules/@node-rs/argon2': { version: '1.0.0' },
+          'node_modules/pg': { version: '1.0.0' },
+          'node_modules/qrcode': { version: '1.0.0' },
+        },
+      })}\n`, 'utf8')
+    } else if (path === 'release-sbom.cdx.json') {
+      await writeFile(target, `${JSON.stringify({ bomFormat: 'CycloneDX', specVersion: '1.6', components: [{ name: 'pg', version: '1.0.0' }] })}\n`, 'utf8')
     } else {
       await writeFile(target, path.endsWith('.html') ? '<!doctype html>' : 'export {}', 'utf8')
     }

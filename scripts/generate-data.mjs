@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { writeFileIfChanged } from './atomic-write.mjs'
 import {
   isPublicEfficiencyDataFallback,
   readEfficiencyDataSource,
@@ -19,7 +20,10 @@ const LINE_ENDING = '\n'
 
 const source = await readEfficiencyDataSource(sourcePath)
 const data = JSON.parse(source.replace(/^\uFEFF/, ''))
-if (!isPublicEfficiencyDataFallback(source)) {
+const sourceMode = isPublicEfficiencyDataFallback(source) ? 'public_fallback' : 'full'
+const sourceStats = validateEfficiencyData(data, sourceMode)
+assertExpectedSourceMode(sourceMode, sourceStats)
+if (sourceMode === 'full') {
   const skillData = JSON.parse((await readFile(skillSourcePath, 'utf8')).replace(/^\uFEFF/, ''))
   validateEfficiencySkillReferences(skillData, data)
 }
@@ -31,6 +35,9 @@ const existingFrontendVersion = await readExistingBuildMetaField('frontend_versi
 const existingBackendVersion = await readExistingBuildMetaField('backend_version')
 const existingDataVersion = await readExistingBuildMetaField('data_version')
 const existingGeneratedAt = await readExistingBuildMetaField('generated_at')
+const existingBuildGeneratedAt = await readExistingBuildMetaField('build_generated_at')
+const existingDataSourceUpdatedAt = await readExistingBuildMetaField('data_source_updated_at')
+const existingDataContentSha256 = await readExistingBuildMetaField('data_content_sha256')
 const existingSourceSummary = await readExistingBuildMetaField('source_summary')
 const existingGitSha = await readExistingBuildMetaField('git_sha')
 const existingBuildContext = await readExistingBuildMetaField('build_context')
@@ -38,21 +45,27 @@ const defaultBuildVersion = normalizeBaseVersion(baseVersion)
 const gitSha = resolveGitSha(existingGitSha, refreshMetadata)
 const buildNumber = refreshMetadata ? resolveBuildNumber() : null
 const generatedBuildVersion = resolveGeneratedBuildVersion(baseVersion, buildNumber)
-const dataVersion = process.env.DATA_VERSION || resolveGeneratedDataVersion(
-  sourceHash,
-  refreshMetadata ? buildNumber : null,
-  refreshMetadata ? gitSha : null,
-)
-const sourceSummary = buildSourceSummary(data, sourceHash)
+const dataVersion = process.env.DATA_VERSION || resolveGeneratedDataVersion(sourceHash)
+const sourceSummary = buildSourceSummary(sourceStats, sourceHash, sourceMode)
 const canReuseGeneratedAt = !refreshMetadata && existingDataVersion === dataVersion && existingSourceSummary === sourceSummary
-const generatedAt = process.env.GENERATED_AT ||
-  (canReuseGeneratedAt ? existingGeneratedAt : null) ||
+const buildGeneratedAt = readIsoDateEnvironment('BUILD_GENERATED_AT') || readIsoDateEnvironment('GENERATED_AT') ||
+  (canReuseGeneratedAt ? existingBuildGeneratedAt || existingGeneratedAt : null) ||
   new Date().toISOString()
+const dataSourceUpdatedAt = readIsoDateEnvironment('DATA_SOURCE_UPDATED_AT') ||
+  (existingDataContentSha256 === sourceHash ? existingDataSourceUpdatedAt : null) ||
+  buildGeneratedAt
+const backendVersion = process.env.BACKEND_VERSION || process.env.APP_VERSION || generatedBuildVersion || existingBackendVersion || defaultBuildVersion
 const appBuildMeta = {
   frontend_version: process.env.FRONTEND_VERSION || process.env.APP_VERSION || generatedBuildVersion || existingFrontendVersion || defaultBuildVersion,
-  backend_version: process.env.BACKEND_VERSION || process.env.APP_VERSION || generatedBuildVersion || existingBackendVersion || defaultBuildVersion,
+  backend_version: backendVersion,
+  expected_backend_version: backendVersion,
   data_version: dataVersion,
-  generated_at: generatedAt,
+  source_mode: sourceMode,
+  source_schema_version: sourceStats.schemaVersion,
+  data_content_sha256: sourceHash,
+  data_source_updated_at: dataSourceUpdatedAt,
+  build_generated_at: buildGeneratedAt,
+  generated_at: buildGeneratedAt,
   source_summary: sourceSummary,
   git_sha: gitSha,
   build_context: (refreshMetadata ? process.env.BUILD_CONTEXT : null) ||
@@ -61,6 +74,11 @@ const appBuildMeta = {
 }
 const dataMetadata = {
   data_version: appBuildMeta.data_version,
+  source_mode: appBuildMeta.source_mode,
+  source_schema_version: appBuildMeta.source_schema_version,
+  data_content_sha256: appBuildMeta.data_content_sha256,
+  data_source_updated_at: appBuildMeta.data_source_updated_at,
+  build_generated_at: appBuildMeta.build_generated_at,
   generated_at: appBuildMeta.generated_at,
   source_summary: appBuildMeta.source_summary,
 }
@@ -107,10 +125,7 @@ function resolveGeneratedBuildVersion(baseVersion, buildNumber) {
   return `${major}.${minor}.${buildNumber}`
 }
 
-function resolveGeneratedDataVersion(hash, buildNumber, gitSha) {
-  const shortSha = gitSha ? gitSha.slice(0, 7) : null
-  if (buildNumber && shortSha) return `data.${buildNumber}.${shortSha}`
-  if (buildNumber) return `data.${buildNumber}`
+function resolveGeneratedDataVersion(hash) {
   return `data.${hash.slice(0, 12)}`
 }
 
@@ -164,23 +179,6 @@ function readGitCommitCount() {
   return /^\d+$/.test(value) ? String(Number(value)) : null
 }
 
-async function writeFileIfChanged(filePath, content) {
-  try {
-    if (await readFile(filePath, 'utf8') === content) return
-  } catch {
-    // First generation should write the generated file.
-  }
-
-  await mkdir(dirname(filePath), { recursive: true })
-  const temporaryPath = `${filePath}.tmp-${process.pid}`
-  try {
-    await writeFile(temporaryPath, content, 'utf8')
-    await rename(temporaryPath, filePath)
-  } finally {
-    await rm(temporaryPath, { force: true })
-  }
-}
-
 async function readExistingBuildMetaField(fieldName) {
   try {
     const content = await readFile(buildMetaPath, 'utf8')
@@ -201,22 +199,77 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function buildSourceSummary(rawData, hash) {
-  const workplaces = rawData.workplaces ?? {}
-  const tradingRules = rawData.combination_rules?.trading_station ?? {}
-  const manufacturingRules = rawData.combination_rules?.manufacturing_station ?? {}
-  const controlRules = rawData.control_center_rules ?? []
-  const workplaceCount = Object.values(workplaces).reduce((count, value) => {
+function buildSourceSummary(stats, hash, sourceMode) {
+  return [
+    'source=server/handlers/efficiency-data.json',
+    `mode=${sourceMode}`,
+    `sha256=${hash}`,
+    `workplaces=${stats.workplaces}`,
+    `trading_rule_groups=${stats.tradingRuleGroups}`,
+    `manufacturing_rule_groups=${stats.manufacturingRuleGroups}`,
+    `control_center_rules=${stats.controlCenterRules}`,
+  ].join('; ')
+}
+
+function validateEfficiencyData(rawData, sourceMode) {
+  if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) throw new Error('efficiency data must be a JSON object')
+  for (const field of ['workplaces', 'operator_groups', 'combination_rules']) {
+    const value = rawData[field]
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`efficiency data ${field} must be an object`)
+  }
+  for (const field of ['control_center_rules', 'dormitory_mood_recovery_rules']) {
+    if (!Array.isArray(rawData[field])) throw new Error(`efficiency data ${field} must be an array`)
+  }
+
+  const workplaces = Object.values(rawData.workplaces).reduce((count, value) => {
     if (Array.isArray(value)) return count + value.length
     return count + (value ? 1 : 0)
   }, 0)
+  const tradingRuleGroups = Object.keys(rawData.combination_rules.trading_station ?? {}).length
+  const manufacturingRuleGroups = Object.keys(rawData.combination_rules.manufacturing_station ?? {}).length
+  const controlCenterRules = rawData.control_center_rules.length
+  const stats = {
+    schemaVersion: Number.isInteger(rawData.schema_version) ? rawData.schema_version : 1,
+    workplaces,
+    tradingRuleGroups,
+    manufacturingRuleGroups,
+    controlCenterRules,
+  }
+  if (sourceMode === 'full' && workplaces < readNonNegativeIntegerEnvironment('EFFICIENCY_DATA_MIN_WORKPLACES', 1)) {
+    throw new Error(`full efficiency data has too few workplaces: ${workplaces}`)
+  }
+  const ruleGroups = tradingRuleGroups + manufacturingRuleGroups + controlCenterRules
+  if (sourceMode === 'full' && ruleGroups < readNonNegativeIntegerEnvironment('EFFICIENCY_DATA_MIN_RULE_GROUPS', 1)) {
+    throw new Error(`full efficiency data has too few rule groups: ${ruleGroups}`)
+  }
+  return stats
+}
 
-  return [
-    'source=server/handlers/efficiency-data.json',
-    `sha256=${hash.slice(0, 12)}`,
-    `workplaces=${workplaceCount}`,
-    `trading_rule_groups=${Object.keys(tradingRules).length}`,
-    `manufacturing_rule_groups=${Object.keys(manufacturingRules).length}`,
-    `control_center_rules=${Array.isArray(controlRules) ? controlRules.length : 0}`,
-  ].join('; ')
+function assertExpectedSourceMode(sourceMode, stats) {
+  const expectedMode = String(process.env.EFFICIENCY_DATA_EXPECTED_MODE ?? '').trim()
+  if (expectedMode && !['public_fallback', 'full'].includes(expectedMode)) {
+    throw new Error('EFFICIENCY_DATA_EXPECTED_MODE must be public_fallback or full')
+  }
+  if (expectedMode && sourceMode !== expectedMode) {
+    throw new Error(`efficiency data source mode mismatch: expected ${expectedMode}, received ${sourceMode}`)
+  }
+  const expectedSchemaVersion = process.env.EFFICIENCY_DATA_SCHEMA_VERSION
+  if (expectedSchemaVersion && stats.schemaVersion !== readNonNegativeIntegerEnvironment('EFFICIENCY_DATA_SCHEMA_VERSION', 0)) {
+    throw new Error(`efficiency data schema mismatch: expected ${expectedSchemaVersion}, received ${stats.schemaVersion}`)
+  }
+}
+
+function readNonNegativeIntegerEnvironment(name, fallback) {
+  const rawValue = process.env[name]
+  if (rawValue === undefined || rawValue === '') return fallback
+  if (!/^\d+$/.test(rawValue)) throw new Error(`${name} must be a non-negative integer`)
+  return Number(rawValue)
+}
+
+function readIsoDateEnvironment(name) {
+  const rawValue = String(process.env[name] ?? '').trim()
+  if (!rawValue) return null
+  const date = new Date(rawValue)
+  if (Number.isNaN(date.getTime()) || date.toISOString() !== rawValue) throw new Error(`${name} must be an ISO-8601 UTC timestamp`)
+  return rawValue
 }

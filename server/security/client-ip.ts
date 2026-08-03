@@ -26,7 +26,12 @@ export function isTrustedProxyAddress(
   if (!remoteIp) return false
   const configured = resolveTrustedProxyAddresses(environment)
   if (configured.length > 0) return configured.includes(remoteIp)
-  return environment.NODE_ENV !== 'production' && isLoopbackIp(remoteIp)
+  return environment.NODE_ENV !== 'production' && isLoopbackIpAddress(remoteIp)
+}
+
+export function isLoopbackIpAddress(value: string | undefined): boolean {
+  const normalized = normalizeIp(value)
+  return normalized === '::1' || Boolean(normalized?.startsWith('127.'))
 }
 
 export function resolveTrustedProxyAddresses(
@@ -52,8 +57,4 @@ function normalizeIp(value: string | undefined): string | null {
     candidate = candidate.slice(7)
   }
   return isIP(candidate) ? candidate : null
-}
-
-function isLoopbackIp(value: string): boolean {
-  return value === '::1' || value.startsWith('127.')
 }

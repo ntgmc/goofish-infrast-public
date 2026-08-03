@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -47,8 +49,14 @@ jobs:
       - name: Run public tests
         run: |
           npm run test:workflow-contracts
+          npm run test:generate-data
+          npm run test:product-catalog
+          npm run test:migration-verifier
+          npm run test:backup-contracts
           npm run test:generate-changelog
           npm run test:release-artifact
+          npm run test:build-relevance
+          npm run check:build-relevance
           npm test
 
       - name: Build public application
@@ -57,9 +65,13 @@ jobs:
           VERSION_SOURCE_SHA: ${{ github.sha }}
           BUILD_NUMBER: ${{ github.run_number }}
           BUILD_CONTEXT: public-quality-checks
-          GENERATE_CHANGELOG_CANDIDATE: "false"
+          EFFICIENCY_DATA_EXPECTED_MODE: public_fallback
+          GENERATE_CHANGELOG_CANDIDATE: ${{ github.event_name == 'push' && 'true' || 'false' }}
+          CHANGELOG_BASE_SHA: ${{ github.event.before }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npm run build
+          npm run generate:release-sbom
           npm run check:public-export
 
       - name: Create and verify public artifact
@@ -73,8 +85,18 @@ jobs:
           node scripts/release-artifact.mjs create --kind public --sha "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --run-url "$GITHUB_RUN_URL"
           node scripts/release-artifact.mjs verify --kind public --sha "$GITHUB_SHA"
           mkdir -p .release-packages/public
-          tar -C .release-staging/public -czf .release-packages/public/public.tgz dist server scripts build-manifest.json changelog-release.json changelog-release.md
+          tar -C .release-staging/public -czf .release-packages/public/public.tgz dist server scripts package.json package-lock.json release-sbom.cdx.json build-manifest.json changelog-release.json changelog-release.md
           (cd .release-packages/public && sha256sum public.tgz > public.tgz.sha256)
+          mkdir -p .release-smoke/public
+          tar -C .release-smoke/public -xzf .release-packages/public/public.tgz
+          npm ci --prefix .release-smoke/public --omit=dev
+          node .release-smoke/public/scripts/check-release-runtime.mjs .release-smoke/public
+
+      - name: Attest public artifact provenance
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-path: .release-packages/public/public.tgz
 
       - name: Upload public artifact
         if: github.event_name == 'push'
@@ -89,6 +111,22 @@ jobs:
     name: PostgreSQL Integration
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: goofish
+          POSTGRES_PASSWORD: integration-test-only
+          POSTGRES_DB: goofish
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U goofish -d goofish"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://goofish:integration-test-only@127.0.0.1:5432/goofish
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -104,3 +142,13 @@ jobs:
 
       - name: Run PostgreSQL integration tests
         run: npm run test:postgres
+
+      - name: Verify a migrated PostgreSQL deployment
+        env:
+          ALLOW_DATABASE_MIGRATION: "true"
+          APP_ROLE: api
+        run: |
+          npm run build
+          node server/dist/migrate.js
+          node scripts/check-server-routes.mjs
+          node scripts/verify-migrated-data.mjs --require-database

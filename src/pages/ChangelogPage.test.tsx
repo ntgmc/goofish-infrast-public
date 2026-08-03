@@ -3,10 +3,15 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import App from '../App'
+import { copy } from '../copy/index'
 
 afterEach(() => cleanup())
 
 describe('ChangelogPage', () => {
+  it('describes the baseline release as the first public changelog version', () => {
+    expect(copy.public.pages_ChangelogPage_019).toBe('这是首个公开更新日志版本；后续版本将记录自上一正式发布以来面向用户的改动。')
+  })
+
   it('renders the static release details from the public route', async () => {
     render(<MemoryRouter initialEntries={['/changelog']}><App /></MemoryRouter>)
 

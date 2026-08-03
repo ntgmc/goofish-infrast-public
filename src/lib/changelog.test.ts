@@ -48,7 +48,7 @@ describe('changelog releases', () => {
     expect(releases.map(({ version }) => version)).toEqual(['2.0.100', '2.0.99'])
   })
 
-  it('hides releases that only contain repository-internal changes', () => {
+  it('keeps baseline and no-public-change releases so their empty states remain reachable', () => {
     const releases = selectPublicChangelogReleases([
       {
         id: 'v2.0.101',
@@ -68,6 +68,25 @@ describe('changelog releases', () => {
       },
     ])
 
-    expect(releases.map(({ id }) => id)).toEqual(['v2.0.102'])
+    expect(releases.map(({ id }) => id)).toEqual(['v2.0.102', 'v2.0.101'])
+  })
+
+  it('rejects conflicting duplicate ids or versions instead of silently shadowing them', () => {
+    const original = {
+      id: 'v2.0.103',
+      version: '2.0.103',
+      displayVersion: 'v2.0.103',
+      releasedAt: '2026-07-25',
+      kind: 'release' as const,
+      sections: [],
+    }
+    expect(() => sortChangelogReleases([
+      original,
+      { ...original, displayVersion: 'modified' },
+    ])).toThrow(/Conflicting changelog release id/)
+    expect(() => sortChangelogReleases([
+      original,
+      { ...original, id: 'release-103-copy' },
+    ])).toThrow(/Conflicting changelog release version/)
   })
 })

@@ -303,7 +303,7 @@ export default function BehaviorRiskPanel() {
                       <p>{audit.admin_username} · {audit.outcome === 'dismiss' ? '排除' : '限制'} · {formatDate(audit.created_at)}</p>
                       <p className="mt-1 text-ink-secondary">说明：{audit.note}</p>
                       <p className="mt-1 break-all font-mono">动作：{formatJson(audit.actions)} · 快照：{formatJson(audit.case_snapshot)}</p>
-                      <p className="mt-1 break-all font-mono">完整性哈希：{audit.integrity_hash ?? '旧记录未生成'}</p>
+                      <p className="mt-1 break-all font-mono">完整性哈希：{audit.integrity_hash ?? '未记录'}</p>
                     </div>
                   ))}
                 </div>

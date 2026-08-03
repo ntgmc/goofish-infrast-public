@@ -78,7 +78,7 @@ export const publicCopy = {
   // src/pages/ChangelogPage.tsx
   pages_ChangelogPage_018: "提交 ",
   // src/pages/ChangelogPage.tsx
-  pages_ChangelogPage_019: "此版本建立了自动更新日志基线，后续版本将列出自上一正式发布以来的用户可见改动。",
+  pages_ChangelogPage_019: "这是首个公开更新日志版本；后续版本将记录自上一正式发布以来面向用户的改动。",
   // src/pages/ChangelogPage.tsx
   pages_ChangelogPage_020: "本次发布未检测到面向用户的更新内容。",
   // src/pages/ChangelogPage.tsx
@@ -392,7 +392,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_104: "异常信号采用多项评分并进入人工复核；共用同一 IP、一次快速操作或一次导出高峰不会单独构成强风险结论。待复核状态、分数和证据不会向普通用户展示；只有管理员人工确认并实施限制后，账号或档案才会显示中性的不可用与联系客服提示。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_105: "上述行为风控事件、关联复核单和可关联审计证据最长保留 90 天，到期删除；系统不回填上线前历史。账号注销冷静期结束后，常规账户和工作区数据会删除，但尚未到期的 HMAC 风控证据仍按该 90 天上限到期删除。个人使用声明确认记录属于独立的法律与争议处理记录，其中包含确认时客户端 IP，按账号存续期加注销后一年保留，不适用行为风控库的 90 天期限。",
+  pages_PublicInfoPage_105: "上述行为风控事件、关联复核单和可关联审计证据最长保留 90 天，到期删除。账号注销冷静期结束后，常规账户和工作区数据会删除，但尚未到期的 HMAC 风控证据仍按该 90 天上限到期删除。个人使用声明确认记录属于独立的法律与争议处理记录，其中包含确认时客户端 IP，按账号存续期加注销后一年保留，不适用行为风控库的 90 天期限。",
   // src/pages/PricingPage.tsx
   pages_PricingPage_001: "价格与权益",
   // src/pages/PricingPage.tsx

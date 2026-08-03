@@ -44,7 +44,16 @@ beforeEach(() => {
       expires_at: '2026-10-23T00:00:00.000Z',
       reviewed_at: null,
       reviewed_by: null,
-      audits: [],
+      audits: [{
+        id: 'audit-1',
+        admin_username: 'reviewer',
+        outcome: 'dismiss',
+        note: '已核对记录',
+        actions: [],
+        case_snapshot: {},
+        created_at: '2026-07-25T02:00:00.000Z',
+        integrity_hash: null,
+      }],
       members: [{
         user_id: 'user-1-complete-id',
         account_email: 'user-1@example.test',
@@ -97,6 +106,7 @@ describe('BehaviorRiskPanel review form', () => {
     expect(screen.getByText('风险 55')).toBeInTheDocument()
     expect(screen.getByText('user-1@example.test')).toBeInTheDocument()
     expect(screen.getByText('用户 ID：user-1-complete-id')).toBeInTheDocument()
+    expect(screen.getByText('完整性哈希：未记录')).toBeInTheDocument()
     expect(screen.getByRole('option', { name: '主档案 · profile-1-complete-id · cdk · active' })).toBeInTheDocument()
 
     const actionSelect = screen.getAllByRole('combobox')[1]

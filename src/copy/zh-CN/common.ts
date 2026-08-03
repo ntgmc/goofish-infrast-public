@@ -54,7 +54,7 @@ export const commonCopy = {
   // src/components/BrandLogo.tsx
   components_BrandLogo_001: "MAA 基建排班优化器",
   // src/components/BuildMetaStrip.tsx
-  components_BuildMetaStrip_001: "当前规则数据更新于 ",
+  components_BuildMetaStrip_001: "当前构建生成于 ",
   // src/components/BuildMetaStrip.tsx
   components_BuildMetaStrip_002: "版本",
   // src/components/BuildMetaStrip.tsx
@@ -62,9 +62,23 @@ export const commonCopy = {
   // src/components/BuildMetaStrip.tsx
   components_BuildMetaStrip_004: "前端",
   // src/components/BuildMetaStrip.tsx
-  components_BuildMetaStrip_005: "服务",
+  components_BuildMetaStrip_005: "预期服务",
   // src/components/BuildMetaStrip.tsx
   components_BuildMetaStrip_006: "来源摘要",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_007: "规则数据更新于",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_008: "实际服务",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_009: "未知",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_010: "正在检查",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_011: "不可达",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_012: "版本一致",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_013: "版本漂移",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_001: "龙门币",
   // src/components/ConfigEditor.tsx
@@ -255,6 +269,8 @@ export const commonCopy = {
   components_ConfigEditor_093: "选择固定换班频率、自动变间隔换班或自定义班次。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_094: "暂不支持 2 发电站。",
+  // src/components/ConfigEditor.tsx
+  components_ConfigEditor_095: "未安装或不想安装 MAA？可生成 MAA 排班表后，手动在游戏内设置队列，再定时执行全部轮换。",
   // src/components/InputNumber.tsx
   components_InputNumber_001: "减少",
   // src/components/InputNumber.tsx
@@ -578,7 +594,7 @@ export const commonCopy = {
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_009: "管理账号设置",
   // src/pages/AdminSetupPage.tsx
-  pages_AdminSetupPage_010: "这里使用 `MAA_ADMIN_PASSWORD` 创建日常管理账号。创建完成后，回到后台使用账号密码登录，减少 root 口令暴露次数。",
+  pages_AdminSetupPage_010: "首次使用管理后台时，请使用 Root 口令创建第一个管理账号；已有账号时，可在这里继续维护。",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_011: "返回后台",
   // src/pages/AdminSetupPage.tsx
@@ -600,7 +616,7 @@ export const commonCopy = {
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_020: "删除账号同样需要 Root 口令。",
   // src/pages/AdminSetupPage.tsx
-  pages_AdminSetupPage_021: "登录后台后可在这里看到账号列表，或创建第一个账号。",
+  pages_AdminSetupPage_021: "尚未创建管理账号，请使用左侧表单创建第一个账号。",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_022: "创建 ",
   // src/pages/AdminSetupPage.tsx

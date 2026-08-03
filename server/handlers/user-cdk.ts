@@ -45,7 +45,7 @@ export default async function userCdkHandler(req: Request): Promise<Response> {
     }
 
     const itemCode = getCdkItemCode(match.record)
-    if (!itemCode) return jsonResponse({ error: '该道具 CDK 使用旧版载荷，暂不支持兑换。', code: 'cdk_payload_unsupported' }, 409)
+    if (!itemCode) return jsonResponse({ error: '该道具 CDK 的载荷格式不受支持，暂时无法兑换。', code: 'cdk_payload_unsupported' }, 409)
     const requestHash = createRequestHash({ codeHash: match.codeHash, userId: auth.user.id, itemCode })
     const redeemed = await redeemCdkAtomically({
       key: match.key,

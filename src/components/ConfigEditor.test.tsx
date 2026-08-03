@@ -125,6 +125,35 @@ describe('ConfigEditor shift patterns', () => {
     }))
   })
 
+  it('explains how to use an MAA schedule without installing MAA', () => {
+    const config = normalizeConfig(CONFIG_PRESETS['243'])
+    const onUpdate = vi.fn()
+
+    const { rerender } = render(
+      <ConfigEditor
+        config={config}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    expect(screen.getByText('未安装或不想安装 MAA？可生成 MAA 排班表后，手动在游戏内设置队列，再定时执行全部轮换。')).toBeInTheDocument()
+    expect(screen.queryByText(/游戏内轮换会生成两个设施预设队列/)).not.toBeInTheDocument()
+
+    rerender(
+      <ConfigEditor
+        config={normalizeConfig({ ...CONFIG_PRESETS['243'], schedule_mode: 'rotation' })}
+        canEdit
+        validation={{ ok: true }}
+        onUpdate={onUpdate}
+      />,
+    )
+
+    expect(screen.getByText(/游戏内轮换会生成两个设施预设队列/)).toBeInTheDocument()
+    expect(screen.queryByText(/未安装或不想安装 MAA/)).not.toBeInTheDocument()
+  })
+
   it('leaves automatic variable mode when applying a custom pattern', async () => {
     const user = userEvent.setup()
     const config = normalizeConfig({
