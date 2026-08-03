@@ -8,6 +8,7 @@ import {
   dashboardPath,
   fallbackAdminPath,
   fallbackToolPath,
+  isAppRoutePath,
   optimizePath,
   resolveAdminSection,
   resolveToolRoute,
@@ -54,5 +55,14 @@ describe('app route contract', () => {
   it('accepts trailing slashes without changing the route identity', () => {
     expect(resolveToolRoute('/tool/setup/config/')).toEqual({ kind: 'setup', section: 'config' })
     expect(resolveAdminSection('/admin/users/')).toBe('users')
+  })
+
+  it('identifies real client-side routes without accepting similar resource paths', () => {
+    expect(isAppRoutePath('/tool/inventory')).toBe(true)
+    expect(isAppRoutePath('/tool/inventory/')).toBe(true)
+    expect(isAppRoutePath('/announcements')).toBe(true)
+    expect(isAppRoutePath('/tools/depot-value')).toBe(true)
+    expect(isAppRoutePath('/tool/inventory/export')).toBe(false)
+    expect(isAppRoutePath('/api/user/inventory')).toBe(false)
   })
 })

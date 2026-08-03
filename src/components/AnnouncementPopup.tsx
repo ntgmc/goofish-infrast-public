@@ -166,7 +166,7 @@ export default function AnnouncementPopup({ announcements, userId, onUnreadCount
           >
             {copy.public.components_AnnouncementPopup_002}</Link>
         </div>
-        <AnnouncementMarkdown id="announcement-popup-body" className="mt-4">{current.body}</AnnouncementMarkdown>
+        <AnnouncementMarkdown id="announcement-popup-body" className="mt-4" onInternalNavigate={dismissPopupSession}>{current.body}</AnnouncementMarkdown>
         <div className="mt-6 flex justify-end">
           <button
             ref={initialFocusRef}

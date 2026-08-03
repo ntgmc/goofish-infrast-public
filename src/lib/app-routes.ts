@@ -55,6 +55,27 @@ const adminPaths: Record<AdminSection, string> = {
   users: '/admin/users',
 }
 
+const standaloneAppPaths = new Set([
+  '/',
+  '/account-safety',
+  '/admin',
+  '/admin/setup',
+  '/announcements',
+  '/cancel-account-deletion',
+  '/changelog',
+  '/disclaimer',
+  '/faq',
+  '/pricing',
+  '/privacy',
+  '/reset-password',
+  '/support',
+  '/terms',
+  '/thanks',
+  '/tool',
+  '/tools/depot-value',
+  '/verify-email',
+])
+
 export function dashboardPath(section: DashboardSection): string {
   return dashboardPaths[section]
 }
@@ -98,6 +119,11 @@ export function resolveAdminSection(pathname: string): AdminSection | null {
 
 export function fallbackAdminPath(): string {
   return adminPath('overview')
+}
+
+export function isAppRoutePath(pathname: string): boolean {
+  const path = normalizePath(pathname)
+  return standaloneAppPaths.has(path) || resolveToolRoute(path) !== null || resolveAdminSection(path) !== null
 }
 
 function normalizePath(pathname: string): string {

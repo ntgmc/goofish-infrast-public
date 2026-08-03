@@ -94,6 +94,21 @@ describe('AnnouncementPopup accessibility', () => {
     expect(opener).toHaveFocus()
   })
 
+  it('dismisses the popup when an announcement link navigates inside the app', async () => {
+    const user = userEvent.setup()
+    const { container } = createAppRoot()
+    const announcement = {
+      ...createAnnouncement('internal-link', '带入口公告'),
+      body: '[打开背包](/tool/inventory)',
+    }
+    render(<MemoryRouter><AnnouncementPopup announcements={[announcement]} /></MemoryRouter>, { container })
+
+    await user.click(await screen.findByRole('link', { name: '打开背包' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(window.localStorage.getItem('maa-announcement-read:internal-link')).toBeNull()
+  })
+
   it('keeps working when localStorage access is blocked', async () => {
     const user = userEvent.setup()
     const { container } = createAppRoot()
