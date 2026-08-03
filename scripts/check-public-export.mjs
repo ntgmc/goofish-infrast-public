@@ -16,6 +16,7 @@ const includedTopLevel = new Set([
   'index.html',
   'package.json',
   'package-lock.json',
+  'optimizer-port-contract.json',
   'tsconfig.json',
   'tsconfig.server.json',
   'vite.config.ts',
