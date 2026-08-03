@@ -416,7 +416,7 @@ return <RevealItem className={`tool-inset p-4 ${tone === 'warning' ? 'border-war
 }
 
 function itemCdkLabel(record: AdminCdkRecord): string {
-  const name = record.item_name ?? '旧版道具记录'
+  const name = record.item_name ?? '未命名道具记录'
   if (!record.item_expires_at) return name
   if (record.status === 'unused' && Date.now() >= Date.parse(record.item_expires_at)) return `${name} · 兑换期限已过`
   return `${name} · ${formatDate(record.item_expires_at)} 到期`

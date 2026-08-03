@@ -34,6 +34,15 @@ afterEach(() => {
 })
 
 describe('AdminSetupPage', () => {
+  it('uses first-time setup guidance without migration-era instructions', async () => {
+    adminApi.json.mockResolvedValueOnce({ users: [] })
+    renderPage()
+
+    expect(screen.getByText('首次使用管理后台时，请使用 Root 口令创建第一个管理账号；已有账号时，可在这里继续维护。')).toBeInTheDocument()
+    expect(screen.queryByText(/日常管理账号|减少 root 口令暴露次数/)).not.toBeInTheDocument()
+    expect(await screen.findByText('尚未创建管理账号，请使用左侧表单创建第一个账号。')).toBeInTheDocument()
+  })
+
   it('distinguishes a loading failure from an empty list and retries explicitly', async () => {
     adminApi.json
       .mockRejectedValueOnce(new Error('管理员列表网络失败'))

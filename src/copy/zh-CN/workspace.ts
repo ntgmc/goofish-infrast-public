@@ -448,7 +448,7 @@ export const workspaceCopy = {
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
   pages_tool_optimize_useOptimizeWorkspace_009: "已载入方案“",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
-  pages_tool_optimize_useOptimizeWorkspace_010: "这条旧结果没有保存配置快照，只能查看或下载。",
+  pages_tool_optimize_useOptimizeWorkspace_010: "这条历史结果没有保存配置快照，只能查看或下载。",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts
   pages_tool_optimize_useOptimizeWorkspace_011: "已载入历史配置“",
   // src/pages/tool/optimize/useOptimizeWorkspace.ts

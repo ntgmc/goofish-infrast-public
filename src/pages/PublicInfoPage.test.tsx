@@ -146,6 +146,13 @@ describe('public information pages', () => {
     expect(screen.getByText(/游戏内轮换会生成两班设施预设队列/)).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /加入 QQ 群.*891655477/ }).length).toBeGreaterThan(0)
   })
+
+  it('states the current risk-data retention policy without rollout details', async () => {
+    render(<MemoryRouter initialEntries={['/privacy']}><App /></MemoryRouter>)
+
+    expect(await screen.findByText(/行为风控事件、关联复核单和可关联审计证据最长保留 90 天/)).toBeInTheDocument()
+    expect(screen.queryByText(/不回填上线前历史/)).not.toBeInTheDocument()
+  })
 })
 
 function mockPublicContent(xianyuUrl: string, isFallback = false): void {

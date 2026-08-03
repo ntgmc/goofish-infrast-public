@@ -592,7 +592,7 @@ export const commonCopy = {
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_009: "管理账号设置",
   // src/pages/AdminSetupPage.tsx
-  pages_AdminSetupPage_010: "这里使用 `MAA_ADMIN_PASSWORD` 创建日常管理账号。创建完成后，回到后台使用账号密码登录，减少 root 口令暴露次数。",
+  pages_AdminSetupPage_010: "首次使用管理后台时，请使用 Root 口令创建第一个管理账号；已有账号时，可在这里继续维护。",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_011: "返回后台",
   // src/pages/AdminSetupPage.tsx
@@ -614,7 +614,7 @@ export const commonCopy = {
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_020: "删除账号同样需要 Root 口令。",
   // src/pages/AdminSetupPage.tsx
-  pages_AdminSetupPage_021: "登录后台后可在这里看到账号列表，或创建第一个账号。",
+  pages_AdminSetupPage_021: "尚未创建管理账号，请使用左侧表单创建第一个账号。",
   // src/pages/AdminSetupPage.tsx
   pages_AdminSetupPage_022: "创建 ",
   // src/pages/AdminSetupPage.tsx

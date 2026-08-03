@@ -17,7 +17,7 @@ const historyItem: WorkspaceResultHistoryItem = {
   config,
   result: { schedule_mode: 'maa', plans: [] } as unknown as OptimizeResult,
   operator_count: 1,
-  source: 'generated',
+  source: 'legacy',
 }
 
 describe('OverviewSection', () => {
@@ -59,6 +59,8 @@ describe('OverviewSection', () => {
 
     expect(screen.getByText('1/3')).toBeInTheDocument()
     expect(screen.getByText('1/5')).toBeInTheDocument()
+    expect(screen.getByText('历史结果', { selector: '.tool-status' })).toBeInTheDocument()
+    expect(screen.queryByText('旧结果')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '查看结果' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '编辑当前配置' }))

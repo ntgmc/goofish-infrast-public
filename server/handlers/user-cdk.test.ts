@@ -78,7 +78,10 @@ describe('user CDK redemption', () => {
     mocks.findCdkRecordByCode.mockResolvedValue({ key: 'cdk/legacy.json', codeHash: 'c'.repeat(64), record: { cdk_type: 'item', version: 2 } })
     const response = await userCdkHandler(request())
     expect(response.status).toBe(409)
-    await expect(response.json()).resolves.toMatchObject({ code: 'cdk_payload_unsupported' })
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'cdk_payload_unsupported',
+      error: '该道具 CDK 的载荷格式不受支持，暂时无法兑换。',
+    })
     expect(mocks.redeemCdkAtomically).not.toHaveBeenCalled()
   })
 
