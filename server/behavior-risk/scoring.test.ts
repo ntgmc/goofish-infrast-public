@@ -62,7 +62,7 @@ describe('evaluateBehaviorRiskEvents', () => {
     expect(result.every((evaluation) => evaluation.rules.every((rule) => rule.category !== 'environment'))).toBe(true)
   })
 
-  it('creates one high-confidence case for three accounts and three UIDs on one browser', () => {
+  it('treats a cloned browser identifier as weak evidence that cannot create a case alone', () => {
     const result = evaluateBehaviorRiskEvents([
       event('a', 'user-a', 'bind', 30, { uid_hmac: 'uid-a' }),
       event('b', 'user-b', 'bind', 20, { uid_hmac: 'uid-b' }),
@@ -70,9 +70,9 @@ describe('evaluateBehaviorRiskEvents', () => {
     ], now)[0]
 
     expect(result.userIds).toEqual(['user-a', 'user-b', 'user-c'])
-    expect(result.score).toBe(55)
-    expect(result.strongSignal).toBe(true)
-    expect(result.createCase).toBe(true)
+    expect(result.score).toBe(20)
+    expect(result.strongSignal).toBe(false)
+    expect(result.createCase).toBe(false)
     expect(result.rules.map((rule) => rule.code)).toEqual(['browser_identity_cluster'])
   })
 
@@ -196,7 +196,7 @@ describe('evaluateBehaviorRiskEvents', () => {
       event('register-c', 'user-c', 'register', 30, { uid_hmac: 'uid-c' }),
     ], now)[0]
 
-    expect(result.score).toBe(55)
+    expect(result.score).toBe(20)
     expect(result.rules.map((rule) => rule.code)).toEqual(['browser_identity_cluster'])
   })
 

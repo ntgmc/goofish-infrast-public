@@ -8,6 +8,7 @@ import ThemeSwitcher from '../components/ThemeSwitcher'
 
 interface AdminUserSummary {
   username: string;
+  role: 'risk_viewer' | 'risk_reviewer' | 'security_admin';
   created_at: string;
   updated_at: string;
 }
@@ -16,6 +17,7 @@ export default function AdminSetupPage() {
   const [rootPassword, setRootPassword] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [role, setRole] = useState<AdminUserSummary['role']>('risk_viewer')
   const [users, setUsers] = useState<AdminUserSummary[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,7 +39,7 @@ export default function AdminSetupPage() {
     try {
       const data = await apiJson<{ user?: AdminUserSummary }>('/api/admin/users', {
         method: 'POST',
-        json: { root_password: rootPassword, username, password },
+        json: { root_password: rootPassword, username, password, role },
         fallbackMessage: copy.common.pages_AdminSetupPage_001,
       })
       if (!data.user) throw new Error(copy.common.pages_AdminSetupPage_002)
@@ -105,6 +107,14 @@ export default function AdminSetupPage() {
               <span className="mb-2 block text-sm font-medium text-ink-secondary">{copy.common.pages_AdminSetupPage_016}</span>
               <input type="password" value={password} onChange={(event) => setPassword(event.currentTarget.value)} className="tool-field" autoComplete="new-password" />
             </label>
+            <label className="mt-4 block">
+              <span className="mb-2 block text-sm font-medium text-ink-secondary">风控角色</span>
+              <select value={role} onChange={(event) => setRole(event.currentTarget.value as AdminUserSummary['role'])} className="tool-field">
+                <option value="risk_viewer">风险只读</option>
+                <option value="risk_reviewer">风险复核</option>
+                <option value="security_admin">安全管理员</option>
+              </select>
+            </label>
             {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
             {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
             <button type="submit" disabled={loading || !rootPassword || !username.trim() || password.length < 8} className="tool-primary-action mt-5 w-full">
@@ -124,6 +134,7 @@ export default function AdminSetupPage() {
                 <div key={user.username} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="font-medium text-ink-primary">{user.username}</div>
+                    <div className="mt-1 text-xs text-ink-muted">角色：{adminRoleLabel(user.role)}</div>
                     <div className="mt-1 text-xs text-ink-muted">{copy.common.pages_AdminSetupPage_022}{formatDate(user.created_at)} {copy.common.pages_AdminSetupPage_023}{formatDate(user.updated_at)}</div>
                   </div>
                   <button type="button" onClick={() => handleDelete(user.username)} disabled={loading || !rootPassword} className="tool-secondary-action border-error/35 bg-error/10 text-error hover:bg-error/20">{copy.common.pages_AdminSetupPage_024}</button>
@@ -142,4 +153,8 @@ function formatDate(value: string | null): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function adminRoleLabel(role: AdminUserSummary['role']): string {
+  return role === 'security_admin' ? '安全管理员' : role === 'risk_reviewer' ? '风险复核' : '风险只读'
 }

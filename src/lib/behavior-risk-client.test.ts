@@ -1,22 +1,14 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  categorizeBehaviorRiskPath,
-  getBehaviorRiskBrowserInstance,
-} from './behavior-risk-client'
+import { describe, expect, it } from 'vitest'
+import * as behaviorRiskClient from './behavior-risk-client'
+
+const { categorizeBehaviorRiskPath } = behaviorRiskClient
 
 describe('behavior risk client', () => {
-  beforeEach(() => {
-    window.localStorage.clear()
-    vi.restoreAllMocks()
-  })
-
-  it('uses one first-party random browser instance without exposing route details', () => {
-    const first = getBehaviorRiskBrowserInstance()
-    const second = getBehaviorRiskBrowserInstance()
-    expect(first).toMatch(/^[A-Za-z0-9_-]{16,128}$/)
-    expect(second).toBe(first)
+  it('does not expose a client-controlled device identifier', () => {
+    expect('getBehaviorRiskBrowserInstance' in behaviorRiskClient).toBe(false)
+    expect('BEHAVIOR_RISK_BROWSER_HEADER' in behaviorRiskClient).toBe(false)
   })
 
   it('maps full paths to the approved coarse categories', () => {
