@@ -43,6 +43,7 @@ import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-security'
 import { getServiceLifecycleState, isServiceReady } from './lifecycle'
 import { getAccountDeletionConfigurationHealth } from './account-data-lifecycle'
+import { getRuntimeDatabaseSchemaStatus } from './storage/schema'
 
 type ApiHandler = (req: Request) => Promise<Response>
 
@@ -187,15 +188,26 @@ async function handleReadiness(): Promise<Response> {
     }, 503)
   }
   const database = await checkPostgresHealth()
+  const schema = getRuntimeDatabaseSchemaStatus()
   const accountDeletion = getAccountDeletionConfigurationHealth()
-  const ok = hasDatabaseUrl() && database.ok && accountDeletion.ok
+  const storageOk = database.ok && schema !== null
+  const ok = hasDatabaseUrl() && storageOk && accountDeletion.ok
   return jsonResponse(
     {
       ok,
       state,
       storage: {
         type: 'postgres',
-        ok: database.ok,
+        ok: storageOk,
+        schema: schema
+          ? {
+              ok: true,
+              version: schema.version,
+              checksum: schema.checksum,
+              minimum_app_version: schema.minimumAppVersion,
+              validated_at: schema.validatedAt,
+            }
+          : { ok: false },
       },
       account_deletion: accountDeletion,
     },

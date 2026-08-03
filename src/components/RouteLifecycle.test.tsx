@@ -64,6 +64,26 @@ describe('RouteLifecycle', () => {
     await user.click(screen.getByRole('button', { name: '挂载页面' }))
     await waitFor(() => expect(screen.getByRole('main')).toHaveFocus())
   })
+
+  it('evicts the oldest scroll positions during a long navigation session', async () => {
+    const router = createMemoryRouter([
+      { path: '*', element: <LifecycleHarness /> },
+    ], { initialEntries: ['/page-0'] })
+
+    render(<RouterProvider router={router} />)
+    window.scrollX = 4
+    window.scrollY = 400
+    for (let index = 1; index <= 101; index += 1) {
+      await act(async () => router.navigate(`/page-${index}`))
+      window.scrollY = index
+    }
+
+    const callsBeforePop = scrollToMock.mock.calls.length
+    await act(async () => router.navigate(-101))
+
+    expect(screen.getByRole('main')).toHaveTextContent('/page-0')
+    expect(scrollToMock).toHaveBeenCalledTimes(callsBeforePop)
+  })
 })
 
 function LifecycleHarness() {

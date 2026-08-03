@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto'
+import type { PoolClient, QueryResult, QueryResultRow } from 'pg'
 import { resolveAppRole, type AppRole } from '../process-role'
-import { query } from './postgres'
+import { getPool, query } from './postgres'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
 
@@ -7,6 +9,10 @@ const MIGRATION_PHASE_SEPARATOR = '-- goofish:migration-phase'
 const RETRIABLE_MIGRATION_CODES = new Set(['40P01', '40001', '55P03'])
 const MIGRATION_PHASE_MAX_ATTEMPTS = 5
 const MIGRATION_RETRY_BASE_MS = 1_000
+const MIGRATION_ADVISORY_LOCK_KEY = 774_006_153
+const MIGRATION_STATEMENT_TIMEOUT_MS = 300_000
+export const DATABASE_SCHEMA_VERSION = '2026-08-03.1'
+export const DATABASE_SCHEMA_MINIMUM_APP_VERSION = '2.0.0'
 const PERSONAL_USE_DECLARATION_ACTION_SQL = PERSONAL_USE_DECLARATION_ACTIONS
   .map((action) => `'${action}'`)
   .join(', ')
@@ -2134,6 +2140,14 @@ VALUES
 ON CONFLICT (task_code) DO NOTHING;
 `
 
+export const DATABASE_SCHEMA_CHECKSUM = createHash('sha256')
+  .update(CREATE_SCHEMA_SQL)
+  .update('\0')
+  .update(JSON.stringify(CURRENT_PERSONAL_USE_DECLARATION))
+  .update('\0')
+  .update(DATABASE_SCHEMA_MINIMUM_APP_VERSION)
+  .digest('hex')
+
 const TABLE_CONSTRAINT_KEYWORDS = new Set(['check', 'constraint', 'foreign', 'primary', 'unique'])
 const API_ONLY_RUNTIME_TABLES = new Set([
   'feature_settings',
@@ -2150,7 +2164,15 @@ const API_ONLY_RUNTIME_TABLES = new Set([
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'
 
+export type RuntimeDatabaseSchemaStatus = {
+  version: string
+  checksum: string
+  minimumAppVersion: string
+  validatedAt: string
+}
+
 let runtimeSchemaReady: Promise<void> | null = null
+let runtimeSchemaStatus: RuntimeDatabaseSchemaStatus | null = null
 
 export function resolveDatabaseSchemaMode(environment: NodeJS.ProcessEnv = process.env): DatabaseSchemaMode {
   const role = resolveAppRole(environment)
@@ -2158,16 +2180,24 @@ export function resolveDatabaseSchemaMode(environment: NodeJS.ProcessEnv = proce
 }
 
 export async function ensureDatabaseSchema(): Promise<void> {
-  if (resolveDatabaseSchemaMode() === 'migrate') {
-    await migrateDatabaseSchema()
-    return
-  }
-
-  runtimeSchemaReady ??= validateRuntimeDatabaseSchema().catch((error) => {
+  runtimeSchemaReady ??= (async () => {
+    if (resolveDatabaseSchemaMode() === 'migrate') await migrateDatabaseSchema()
+    await validateRuntimeDatabaseSchema()
+  })().catch((error) => {
     runtimeSchemaReady = null
+    runtimeSchemaStatus = null
     throw error
   })
   await runtimeSchemaReady
+}
+
+export function getRuntimeDatabaseSchemaStatus(): RuntimeDatabaseSchemaStatus | null {
+  return runtimeSchemaStatus ? { ...runtimeSchemaStatus } : null
+}
+
+export function resetRuntimeDatabaseSchemaStateForTesting(): void {
+  runtimeSchemaReady = null
+  runtimeSchemaStatus = null
 }
 
 export async function migrateDatabaseSchema(): Promise<void> {
@@ -2191,13 +2221,99 @@ export async function migrateDatabaseSchema(): Promise<void> {
     ],
   })
 
-  for (const [index, phase] of migrationPhases.entries()) {
-    await runMigrationPhase(phase.sql, phase.values ?? [], index + 1, migrationPhases.length)
+  const client = await getPool().connect()
+  let migrationStarted = false
+  try {
+    await client.query(`set statement_timeout = '${MIGRATION_STATEMENT_TIMEOUT_MS}ms'`)
+    await client.query('select pg_advisory_lock($1)', [MIGRATION_ADVISORY_LOCK_KEY])
+    await ensureMigrationLedger(client)
+
+    const existing = await client.query<{
+      checksum: string
+      status: string
+    }>(
+      `select checksum, status
+         from goofish_schema_migrations
+        where version = $1`,
+      [DATABASE_SCHEMA_VERSION],
+    )
+    const existingMigration = existing.rows[0]
+    if (existingMigration && existingMigration.checksum !== DATABASE_SCHEMA_CHECKSUM) {
+      throw new Error(
+        `Database migration ${DATABASE_SCHEMA_VERSION} checksum does not match the current application. ` +
+        'Publish schema changes under a new migration version.',
+      )
+    }
+    if (existingMigration?.status === 'completed') {
+      await validateCurrentPersonalUseDeclarationVersion(client)
+      return
+    }
+
+    await client.query(
+      `insert into goofish_schema_migrations
+        (version, checksum, minimum_app_version, status, started_at, completed_at, failed_at, failure_code)
+       values ($1, $2, $3, 'running', now(), null, null, null)
+       on conflict (version) do update
+         set checksum = excluded.checksum,
+             minimum_app_version = excluded.minimum_app_version,
+             status = 'running',
+             started_at = now(),
+             completed_at = null,
+             failed_at = null,
+             failure_code = null`,
+      [DATABASE_SCHEMA_VERSION, DATABASE_SCHEMA_CHECKSUM, DATABASE_SCHEMA_MINIMUM_APP_VERSION],
+    )
+    migrationStarted = true
+
+    for (const [index, phase] of migrationPhases.entries()) {
+      await runMigrationPhase(client, phase.sql, phase.values ?? [], index + 1, migrationPhases.length)
+    }
+    await validateCurrentPersonalUseDeclarationVersion(client)
+    await client.query(
+      `update goofish_schema_migrations
+          set status = 'completed', completed_at = now(), failed_at = null, failure_code = null
+        where version = $1 and checksum = $2`,
+      [DATABASE_SCHEMA_VERSION, DATABASE_SCHEMA_CHECKSUM],
+    )
+  } catch (error) {
+    if (migrationStarted) {
+      try {
+        await client.query(
+          `update goofish_schema_migrations
+              set status = 'failed', failed_at = now(), completed_at = null, failure_code = $2
+            where version = $1`,
+          [DATABASE_SCHEMA_VERSION, postgresErrorCode(error) ?? 'migration_failed'],
+        )
+      } catch {
+        // Preserve the migration failure that caused the ledger update.
+      }
+    }
+    throw error
+  } finally {
+    try {
+      await client.query('select pg_advisory_unlock($1)', [MIGRATION_ADVISORY_LOCK_KEY])
+    } catch {
+      // Releasing the client also releases a session-level advisory lock.
+    }
+    client.release()
   }
-  await validateCurrentPersonalUseDeclarationVersion()
+}
+
+async function ensureMigrationLedger(client: PoolClient): Promise<void> {
+  await client.query(`create table if not exists goofish_schema_migrations (
+    version TEXT PRIMARY KEY,
+    checksum TEXT NOT NULL,
+    minimum_app_version TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
+    started_at TIMESTAMPTZ NOT NULL,
+    completed_at TIMESTAMPTZ,
+    failed_at TIMESTAMPTZ,
+    failure_code TEXT
+  )`)
 }
 
 async function runMigrationPhase(
+  client: PoolClient,
   sql: string,
   values: unknown[],
   phaseNumber: number,
@@ -2205,7 +2321,11 @@ async function runMigrationPhase(
 ): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
     try {
-      await query(sql, values)
+      await client.query({
+        text: sql,
+        values,
+        query_timeout: MIGRATION_STATEMENT_TIMEOUT_MS,
+      })
       return
     } catch (error) {
       const code = postgresErrorCode(error)
@@ -2233,6 +2353,28 @@ function sleep(ms: number): Promise<void> {
 }
 
 export async function validateRuntimeDatabaseSchema(): Promise<void> {
+  runtimeSchemaStatus = null
+  const ledger = await query<{
+    checksum: string
+    minimum_app_version: string
+    status: string
+  }>(
+    `select checksum, minimum_app_version, status
+       from goofish_schema_migrations
+      where version = $1`,
+    [DATABASE_SCHEMA_VERSION],
+  )
+  const migration = ledger.rows[0]
+  if (!migration
+    || migration.status !== 'completed'
+    || migration.checksum !== DATABASE_SCHEMA_CHECKSUM
+    || migration.minimum_app_version !== DATABASE_SCHEMA_MINIMUM_APP_VERSION) {
+    throw new Error(
+      `Runtime database schema version ${DATABASE_SCHEMA_VERSION} is not fully applied with the expected checksum. ` +
+      'Apply database migrations before starting production API or Worker processes.',
+    )
+  }
+
   const requiredColumns = runtimeSchemaRequirements(resolveAppRole())
   const missing = await query<{ table_name: string; column_name: string }>(
     `with required as (
@@ -2257,16 +2399,124 @@ export async function validateRuntimeDatabaseSchema(): Promise<void> {
       'Apply database migrations before starting production API or Worker processes.',
     )
   }
+
+  await validateCriticalSchemaMetadata(resolveAppRole())
   if (resolveAppRole() !== 'worker') await validateCurrentPersonalUseDeclarationVersion()
+  runtimeSchemaStatus = {
+    version: DATABASE_SCHEMA_VERSION,
+    checksum: DATABASE_SCHEMA_CHECKSUM,
+    minimumAppVersion: DATABASE_SCHEMA_MINIMUM_APP_VERSION,
+    validatedAt: new Date().toISOString(),
+  }
 }
 
-async function validateCurrentPersonalUseDeclarationVersion(): Promise<void> {
-  const result = await query<{
+async function validateCriticalSchemaMetadata(role: AppRole): Promise<void> {
+  const requiredColumns = [
+    { table_name: 'optimize_jobs', column_name: 'id', data_type: 'text', is_nullable: 'NO' },
+    { table_name: 'optimize_jobs', column_name: 'status', data_type: 'text', is_nullable: 'NO' },
+    { table_name: 'optimize_jobs', column_name: 'payload_json', data_type: 'jsonb', is_nullable: 'NO' },
+    {
+      table_name: 'optimize_jobs',
+      column_name: 'attempt_count',
+      data_type: 'integer',
+      is_nullable: 'NO',
+      default_fragment: '0',
+    },
+    ...(role === 'worker' ? [] : [
+      { table_name: 'user_accounts', column_name: 'id', data_type: 'text', is_nullable: 'NO' },
+      { table_name: 'user_accounts', column_name: 'email', data_type: 'text', is_nullable: 'NO' },
+      { table_name: 'personal_use_declaration_versions', column_name: 'content_hash', data_type: 'text', is_nullable: 'NO' },
+    ]),
+  ]
+  const incompatibleColumns = await query<{
+    table_name: string
+    column_name: string
+  }>(
+    `with required as (
+       select table_name, column_name, data_type, is_nullable, default_fragment
+       from jsonb_to_recordset($1::jsonb)
+         as item(table_name text, column_name text, data_type text, is_nullable text, default_fragment text)
+     )
+     select required.table_name, required.column_name
+       from required
+       join information_schema.columns actual
+         on actual.table_schema = current_schema()
+        and actual.table_name = required.table_name
+        and actual.column_name = required.column_name
+      where actual.data_type <> required.data_type
+         or actual.is_nullable <> required.is_nullable
+         or (required.default_fragment is not null
+             and position(required.default_fragment in coalesce(actual.column_default, '')) = 0)
+      order by required.table_name, required.column_name`,
+    [JSON.stringify(requiredColumns)],
+  )
+  if (incompatibleColumns.rows.length > 0) {
+    const names = incompatibleColumns.rows.map((row) => `${row.table_name}.${row.column_name}`).join(', ')
+    throw new Error(`Runtime database schema has incompatible critical columns: ${names}.`)
+  }
+
+  const requiredConstraints = role === 'worker'
+    ? ['optimize_jobs_pkey']
+    : ['optimize_jobs_pkey', 'user_accounts_pkey', 'personal_use_declaration_versions_pkey']
+  const missingConstraints = await query<{ name: string }>(
+    `select required.name
+       from unnest($1::text[]) required(name)
+       left join pg_constraint actual
+         on actual.conname = required.name
+        and actual.connamespace = current_schema()::regnamespace
+      where actual.oid is null
+      order by required.name`,
+    [requiredConstraints],
+  )
+  if (missingConstraints.rows.length > 0) {
+    throw new Error(
+      `Runtime database schema is missing critical constraints: ${missingConstraints.rows.map((row) => row.name).join(', ')}.`,
+    )
+  }
+
+  const requiredIndexes = role === 'worker'
+    ? [
+      { name: 'idx_optimize_jobs_dispatch_ready', is_unique: false },
+      { name: 'uq_optimize_jobs_owner_running', is_unique: true },
+    ]
+    : [
+      { name: 'idx_optimize_jobs_dispatch_ready', is_unique: false },
+      { name: 'uq_optimize_jobs_owner_running', is_unique: true },
+      { name: 'idx_user_accounts_email', is_unique: false },
+      { name: 'idx_security_rate_limit_buckets_expires_at', is_unique: false },
+    ]
+  const missingIndexes = await query<{ name: string }>(
+    `with required as (
+       select name, is_unique
+         from jsonb_to_recordset($1::jsonb) as item(name text, is_unique boolean)
+     )
+     select required.name
+       from required
+       left join pg_class actual
+         on actual.relname = required.name
+        and actual.relnamespace = current_schema()::regnamespace
+        and actual.relkind = 'i'
+       left join pg_index index_metadata on index_metadata.indexrelid = actual.oid
+      where actual.oid is null or index_metadata.indisunique <> required.is_unique
+      order by required.name`,
+    [JSON.stringify(requiredIndexes)],
+  )
+  if (missingIndexes.rows.length > 0) {
+    throw new Error(
+      `Runtime database schema is missing critical indexes: ${missingIndexes.rows.map((row) => row.name).join(', ')}.`,
+    )
+  }
+}
+
+type SchemaQueryExecutor = Pick<PoolClient, 'query'>
+
+async function validateCurrentPersonalUseDeclarationVersion(executor?: SchemaQueryExecutor): Promise<void> {
+  const result = await schemaQuery<{
     display_version: string
     effective_date: string
     content_text: string
     content_hash: string
-  }>(
+  }>(executor,
     `select display_version, effective_date::text, content_text, content_hash
        from personal_use_declaration_versions
       where declaration_id = $1`,
@@ -2283,6 +2533,14 @@ async function validateCurrentPersonalUseDeclarationVersion(): Promise<void> {
       'Publish changed content under a new declaration ID before starting the service.',
     )
   }
+}
+
+function schemaQuery<T extends QueryResultRow>(
+  executor: SchemaQueryExecutor | undefined,
+  text: string,
+  values: unknown[] = [],
+): Promise<QueryResult<T>> {
+  return executor ? executor.query<T>(text, values) : query<T>(text, values)
 }
 
 function runtimeSchemaRequirements(role: AppRole): Array<{ table_name: string; column_name: string }> {

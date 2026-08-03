@@ -5,7 +5,6 @@ import { authenticateAdminRequest, requireRootAdminPassword } from './admin-auth
 import { jsonResponse } from './user-auth'
 
 export default async function adminInvitationSettlementsHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
   const authentication = await authenticateAdminRequest(req, {
     capability: 'admin_manage',

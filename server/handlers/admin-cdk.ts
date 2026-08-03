@@ -40,9 +40,6 @@ const MAX_BATCH_CREATE_COUNT = 100
 const MAX_CDK_GENERATION_ATTEMPTS = 10
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
-    return jsonResponse(null, 204)
-  }
   if (req.method === 'GET') {
     return handleList(req)
   }

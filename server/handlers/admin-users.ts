@@ -54,7 +54,6 @@ import { recordAdminOperationAudit } from '../storage/admin-operation-audit-stor
 import { listCdkRecordsByKeys } from '../storage/cdk-store'
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   try {
     if (req.method === 'POST') {

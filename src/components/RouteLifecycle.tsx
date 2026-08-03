@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useLocation, useNavigationType } from 'react-router'
 
 type ScrollPosition = { x: number; y: number }
+const MAX_SAVED_SCROLL_POSITIONS = 100
 
 export default function RouteLifecycle() {
   const location = useLocation()
@@ -41,11 +42,25 @@ export default function RouteLifecycle() {
     return () => {
       window.cancelAnimationFrame(frame)
       focusObserver?.disconnect()
-      positionsRef.current.set(currentKey, { x: window.scrollX, y: window.scrollY })
+      rememberScrollPosition(positionsRef.current, currentKey, { x: window.scrollX, y: window.scrollY })
     }
   }, [location.key, navigationType])
 
   return null
+}
+
+function rememberScrollPosition(
+  positions: Map<string, ScrollPosition>,
+  key: string,
+  position: ScrollPosition,
+): void {
+  positions.delete(key)
+  positions.set(key, position)
+  while (positions.size > MAX_SAVED_SCROLL_POSITIONS) {
+    const oldestKey = positions.keys().next().value
+    if (oldestKey === undefined) return
+    positions.delete(oldestKey)
+  }
 }
 
 function focusRouteTarget(): boolean {

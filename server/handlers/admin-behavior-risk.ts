@@ -9,7 +9,6 @@ import {
 } from '../storage/behavior-risk-store'
 
 export default async function adminBehaviorRiskHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   try {
     const capability = req.method === 'POST' ? 'risk_review' : 'risk_view'
     const authentication = await authenticateAdminRequest(req, capability)

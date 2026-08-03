@@ -32,6 +32,9 @@ export function inspectIncomingRequest(req: IncomingMessage): HttpBoundaryDecisi
   if (!isValidHost(firstHeader(req.headers.host))) {
     return reject(400, 'invalid_request', 'Invalid Host header.')
   }
+  if (!isAllowedProductionHost(firstHeader(req.headers.host))) {
+    return reject(400, 'invalid_request', 'Host header is not allowed.')
+  }
 
   let url: URL
   try {
@@ -133,6 +136,17 @@ function isTrustedOrigin(value: string): boolean {
   if (!configured) return process.env.NODE_ENV !== 'production'
   try {
     return new URL(value).origin === new URL(configured).origin
+  } catch {
+    return false
+  }
+}
+
+function isAllowedProductionHost(value: string | null): boolean {
+  if (process.env.NODE_ENV !== 'production') return true
+  const publicAppUrl = process.env.PUBLIC_APP_URL?.trim()
+  if (!value || !publicAppUrl) return false
+  try {
+    return new URL(`http://${value}`).host.toLowerCase() === new URL(publicAppUrl).host.toLowerCase()
   } catch {
     return false
   }

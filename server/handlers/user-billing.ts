@@ -2,7 +2,6 @@ import { jsonResponse, requireUserSession } from './user-auth'
 import { issueMeteredScheduleQuote, MeteredBillingQuoteError } from '../storage/metered-billing-store'
 
 export default async function userBillingHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
   const auth = await requireUserSession(req)
   if (!auth) return jsonResponse({ error: '请先登录。' }, 401)

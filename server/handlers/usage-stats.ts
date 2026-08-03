@@ -41,10 +41,6 @@ type UsageEventInput = string | null | Partial<Pick<
 >>
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
-    return jsonResponse(null, 204)
-  }
-
   const url = new URL(req.url)
   const isAdminRoute = url.searchParams.get('admin') === '1' || url.pathname.includes('/api/admin/usage-stats')
 

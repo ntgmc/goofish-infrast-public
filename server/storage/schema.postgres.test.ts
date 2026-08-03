@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { closePool, getPool, query } from './postgres'
-import { migrateDatabaseSchema } from './schema'
+import { DATABASE_SCHEMA_VERSION, migrateDatabaseSchema } from './schema'
 import {
   getDepotValueSampleStore,
   type DepotValueSampleRecord,
@@ -355,6 +355,7 @@ describe('PostgreSQL schema migration', () => {
         [operationId, userId, randomUUID(), randomUUID(), JSON.stringify({ profile_id: profileId, import_mode: 'json' }), now],
       )
 
+      await markCurrentMigrationPending()
       await migrateDatabaseSchema()
       await migrateDatabaseSchema()
 
@@ -420,6 +421,7 @@ describe('PostgreSQL schema migration', () => {
         [settledInvitationId, settled.userId, now],
       )
 
+      await markCurrentMigrationPending()
       await migrateDatabaseSchema()
       await migrateDatabaseSchema()
 
@@ -473,6 +475,7 @@ describe('PostgreSQL schema migration', () => {
   })
 
   it('releases earlier phase locks before a later migration phase waits', async () => {
+    await markCurrentMigrationPending()
     const blocker = await getPool().connect()
     let blockerInTransaction = false
     let migration: Promise<void> | null = null
@@ -505,6 +508,10 @@ describe('PostgreSQL schema migration', () => {
     }
   })
 })
+
+async function markCurrentMigrationPending(): Promise<void> {
+  await query('delete from goofish_schema_migrations where version = $1', [DATABASE_SCHEMA_VERSION])
+}
 
 async function waitForBlockedRewardMigration(): Promise<void> {
   for (let attempt = 0; attempt < 100; attempt += 1) {

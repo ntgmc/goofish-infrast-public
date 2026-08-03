@@ -4,7 +4,6 @@ import { getValidatedJson } from '../security/request-validation'
 import { jsonResponse, requireUserSession } from './user-auth'
 
 export default async function userInvitationsHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)

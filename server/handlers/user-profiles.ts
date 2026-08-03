@@ -24,7 +24,6 @@ import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   try {
     const auth = await requireUserSession(req)

@@ -18,7 +18,6 @@ import {
 } from './user-auth'
 
 export default async function userCdkHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
   try {
     const auth = await requireUserSession(req)

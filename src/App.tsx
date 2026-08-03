@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { MotionConfig } from 'motion/react'
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
+import { Route, Routes, useLocation, useNavigate } from 'react-router'
 import BuildMetaStrip from './components/BuildMetaStrip'
 import { AnimatedPresenceRegion, motionTokens } from './components/MotionPrimitives'
 import RouteLifecycle from './components/RouteLifecycle'
@@ -18,6 +18,7 @@ import AccountSafetyPage from './pages/AccountSafetyPage'
 import PublicContentRoute from './components/PublicContentRoute'
 import { apiVoid } from './lib/api-client'
 import { categorizeBehaviorRiskPath } from './lib/behavior-risk-client'
+import NotFoundPage from './components/NotFoundPage'
 
 
 const ToolPage = lazy(() => import('./pages/ToolPage'))
@@ -81,7 +82,7 @@ function AppContent() {
           <Route path="/tools/depot-value" element={<FeatureRoute feature="depot_value"><LazyPage fallback={copy.common.App_009}><DepotValuePage /></LazyPage></FeatureRoute>} />
           <Route path="/admin/setup" element={<LazyPage fallback={copy.common.App_010}><AdminSetupPage /></LazyPage>} />
           <Route path="/admin/*" element={<LazyPage fallback={copy.common.App_011}><AdminPage /></LazyPage>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </AnimatedPresenceRegion>
       <BuildMetaStrip placement="corner" />

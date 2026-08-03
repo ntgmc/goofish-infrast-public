@@ -16,6 +16,8 @@ import {
 } from './optimization/jobs/optimizer-port'
 import { canRunOptimizeWorker, resolveAppRole } from './process-role'
 import { closePool } from './storage/postgres'
+import { describeServerError } from './security/error-reporting'
+import { ensureDatabaseSchema } from './storage/schema'
 import {
   createOptimizeWorkerHealthServer,
   type WorkerLifecycleState,
@@ -62,7 +64,7 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
 
   void start().catch(async (error) => {
     if (shutdownPromise) return
-    console.error('optimize worker startup failed:', error)
+    console.error('optimize worker startup failed', describeServerError(error))
     lifecycleState = 'draining'
     try {
       await shutdownOptimizeJobProcessing(0).catch(() => undefined)
@@ -100,7 +102,7 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
 
     lifecycleState = 'draining'
     shutdownPromise = shutdown(signal).catch((error) => {
-      console.error('optimize worker shutdown failed:', error)
+      console.error('optimize worker shutdown failed', describeServerError(error))
       process.exitCode = 1
     })
   }
@@ -146,6 +148,7 @@ export async function initializeOptimizeWorkerRuntime(
 
 function optimizeWorkerStartupStages(): readonly OptimizeWorkerStartupStage[] {
   return [
+    { name: 'database schema validation', initialize: ensureDatabaseSchema },
     { name: 'optimize queue maintenance', initialize: initializeOptimizeQueueMaintenance },
     { name: 'inventory campaign worker', initialize: initializeInventoryCampaignWorker },
     { name: 'invitation settlement worker', initialize: initializeInvitationSettlementWorker },

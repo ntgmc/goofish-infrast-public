@@ -2,7 +2,6 @@ import { getPriorityCouponBalances } from '../storage/invitation-store'
 import { jsonResponse, requireUserSession } from './user-auth'
 
 export default async function userRewardsHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
   try {
     const auth = await requireUserSession(req)

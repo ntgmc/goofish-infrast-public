@@ -154,6 +154,19 @@ describe('account data Skland controls', () => {
     expect(body.notifications[0]).not.toHaveProperty('grant_id')
   })
 
+  it('rejects a personal data attachment that exceeds the bounded export size', async () => {
+    mocks.exportUserNotifications.mockResolvedValue([{
+      id: 'oversized-notification',
+      body: 'x'.repeat(16 * 1024 * 1024),
+    }])
+
+    const response = await accountDataHandler(new Request('http://localhost/api/user/data/export'))
+
+    expect(response.status).toBe(413)
+    expect(response.headers.get('Content-Disposition')).toBeNull()
+    await expect(response.json()).resolves.toMatchObject({ code: 'personal_data_export_too_large' })
+  })
+
   it('uses one batch workspace query and exports the V4 coverage additions', async () => {
     mocks.listProfilesForUser.mockResolvedValue([
       { id: 'profile-1', skland_binding: null, skland_pending_binding: null },

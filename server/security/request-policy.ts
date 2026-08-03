@@ -589,18 +589,15 @@ const SKLAND_PATHS: Record<string, z.ZodType> = {
   '/api/user/skland/login/confirm': requestSchemas.sklandConfirmation,
   '/api/user/skland/credential/preview': requestSchemas.sklandCredential,
   '/api/user/skland/account/select': requestSchemas.sklandSelection,
-  '/api/user/skland/pending/cancel': requestSchemas.sklandPendingCancel,
   '/api/user/skland/import/refresh': requestSchemas.sklandProfile,
   '/api/user/skland/free-preview/login/complete': requestSchemas.freePreviewScanComplete,
   '/api/user/skland/free-preview/login/confirm': requestSchemas.freePreviewConfirmation,
   '/api/user/skland/free-preview/credential/preview': requestSchemas.freePreviewCredential,
   '/api/user/skland/free-preview/account/select': requestSchemas.freePreviewSelection,
-  '/api/user/skland/free-preview/pending/cancel': requestSchemas.profilelessSklandPendingCancel,
   '/api/user/skland/lifetime-voucher/login/complete': requestSchemas.lifetimeVoucherScanComplete,
   '/api/user/skland/lifetime-voucher/login/confirm': requestSchemas.lifetimeVoucherConfirmation,
   '/api/user/skland/lifetime-voucher/credential/preview': requestSchemas.lifetimeVoucherCredential,
   '/api/user/skland/lifetime-voucher/account/select': requestSchemas.lifetimeVoucherSelection,
-  '/api/user/skland/lifetime-voucher/pending/cancel': requestSchemas.profilelessSklandPendingCancel,
 }
 
 const ROUTE_POLICIES = new Map<string, RoutePolicy>([
@@ -711,4 +708,13 @@ export function getRoutePolicy(pathname: string): RoutePolicy | null {
 
 export function getAllowedMethods(policy: RoutePolicy): string[] {
   return Object.keys(policy.methods).sort()
+}
+
+export function getDeclaredApiPolicyRoutes(): string[] {
+  return [
+    ...ROUTE_POLICIES.keys(),
+    '/api/user/onboarding-tasks/:code/claim',
+    '/api/optimization/jobs/:jobId',
+    '/api/optimization/jobs/:jobId/cancel',
+  ].sort()
 }

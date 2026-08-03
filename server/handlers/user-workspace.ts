@@ -37,7 +37,6 @@ import { confirmFreeScheduleEntitlement, FreeScheduleConfirmationError } from '.
 import { recordOperatorFingerprintInTransaction } from '../storage/cdk-store'
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   try {
     const auth = await requireUserSession(req)

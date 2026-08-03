@@ -498,7 +498,7 @@ async function getAdminUserStore(): Promise<AdminUserStore> {
 }
 
 function unsafeOriginFailure(req: Request): Response | null {
-  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return null
+  if (req.method === 'GET' || req.method === 'HEAD') return null
   const origin = req.headers.get('origin')
   if (!origin) return null
   try {

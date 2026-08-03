@@ -7,9 +7,6 @@ import { getValidatedJson } from '../security/request-validation'
 import { SettingsConflictError } from '../storage/settings-conflict'
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
-    return jsonResponse(null, 204)
-  }
   if (req.method === 'GET') {
     return handleGet(req)
   }

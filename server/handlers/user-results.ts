@@ -32,7 +32,6 @@ import { resolveProfileAuthorization } from './profile-authorization'
 import { getRequestClientIp } from '../security/client-ip'
 
 export default async function userResultsHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
   const pathname = new URL(req.url).pathname
   const isMaaExportRequest = pathname.endsWith('/maa-export')

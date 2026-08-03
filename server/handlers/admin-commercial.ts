@@ -11,7 +11,6 @@ import { getMeteredBillingPolicy } from '../../src/lib/metered-billing'
 const commercialPolicy = getMeteredBillingPolicy().commercial
 
 export default async function adminCommercialHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   try {
     const auth = await authenticateAdminRequest(req, req.method === 'GET'
       ? 'sensitive_data_view'

@@ -143,7 +143,6 @@ class SklandHttpError extends Error {
 }
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   const startedAt = Date.now()
   try {

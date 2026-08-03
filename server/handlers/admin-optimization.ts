@@ -19,7 +19,6 @@ import { getRequestClientIp } from '../security/client-ip'
 import { recordAdminOperationAudit } from '../storage/admin-operation-audit-store'
 
 export default async function adminOptimizationHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   const url = new URL(req.url)
   const view = url.searchParams.get('view')
   const authentication = await authenticateAdminRequest(req, optimizationRequirement(req.method, view))

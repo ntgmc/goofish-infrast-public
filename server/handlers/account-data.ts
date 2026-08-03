@@ -22,6 +22,8 @@ import { getValidatedJson } from '../security/request-validation'
 import { normalizeStoredPoints } from '../../src/lib/balance-contracts'
 import { exportUserNotifications } from '../storage/notification-store'
 import type { PersonalDataExportV4 } from '../../src/lib/types'
+
+const MAX_PERSONAL_DATA_EXPORT_BYTES = 16 * 1024 * 1024
 import { PERSONAL_DATA_EXPORT_COVERAGE } from '../personal-data-export'
 
 export default async function accountDataHandler(req: Request): Promise<Response> {
@@ -296,7 +298,15 @@ async function exportData(userId: string): Promise<Response> {
     deletion_request: deletion.rows[0] ?? null,
   } satisfies PersonalDataExportV4
 
-  return new Response(JSON.stringify(body, null, 2), {
+  const serialized = JSON.stringify(body, null, 2)
+  if (Buffer.byteLength(serialized, 'utf8') > MAX_PERSONAL_DATA_EXPORT_BYTES) {
+    return jsonResponse({
+      error: '个人数据导出超过单次下载上限，请联系管理员分批处理。',
+      code: 'personal_data_export_too_large',
+    }, 413)
+  }
+
+  return new Response(serialized, {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'Content-Disposition': 'attachment; filename="maa-personal-data.json"',
@@ -347,3 +357,4 @@ async function handleCancellation(req: Request): Promise<Response> {
   }
   return jsonResponse({ ok: true })
 }
+import { Buffer } from 'node:buffer'

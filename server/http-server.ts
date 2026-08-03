@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
-import { nodeRequestToWebRequest, writeWebResponse } from './http-adapter'
+import { nodeRequestToWebRequest, releaseWebRequestResources, writeWebResponse } from './http-adapter'
 import { RequestBodyTooLargeError } from './request-body-limits'
 import { routeRequest } from './routes'
 import { applyHttpSecurityHeaders, isSecureIncomingRequest } from './security/http-security'
@@ -15,6 +15,7 @@ export function createApiServer(): Server {
     rejectNonStandardBodyWrites: true,
   }, async (req, res) => {
     const requestId = randomUUID()
+    let request: Request | null = null
     try {
       const boundary = inspectIncomingRequest(req)
       if (!boundary.allowed) {
@@ -22,7 +23,7 @@ export function createApiServer(): Server {
         return
       }
 
-      const request = await nodeRequestToWebRequest(req, boundary.bodyLimitBytes)
+      request = await nodeRequestToWebRequest(req, boundary.bodyLimitBytes)
       if (boundary.methodPolicy.schema) {
         await validateAndStoreJsonBody(
           request,
@@ -68,6 +69,8 @@ export function createApiServer(): Server {
         errorResponse(500, 'internal_error', 'Internal server error.', requestId),
         requestId,
       )
+    } finally {
+      if (request) releaseWebRequestResources(request)
     }
   })
 

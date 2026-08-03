@@ -12,7 +12,6 @@ import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
 
 export default async function adminInvitationSettingsHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   try {
     const authentication = await authenticateAdminRequest(req, 'admin_manage')
     if (!authentication.ok) return authentication.response

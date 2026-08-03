@@ -8,7 +8,6 @@ import { authenticateAdminRequest, requireRootAdminPassword } from './admin-auth
 import { jsonResponse } from './license-utils'
 
 export default async function adminBalanceHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   try {
     const authentication = await authenticateAdminRequest(req, req.method === 'GET'
       ? 'sensitive_data_view'

@@ -4,7 +4,6 @@ import { jsonResponse, requireUserSession, toPublicUser } from './user-auth'
 import { resolveProfileAuthorization } from './profile-authorization'
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
 
   try {
