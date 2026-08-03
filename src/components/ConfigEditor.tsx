@@ -353,6 +353,11 @@ export default function ConfigEditor({
                     </button>
                   ))}
                 </div>
+                <p className="mt-2 text-xs leading-5 text-ink-muted">
+                  {rotationMode
+                    ? copy.common.components_ConfigEditor_062
+                    : copy.common.components_ConfigEditor_095}
+                </p>
               </div>
               <div>
                 <p className="mb-2 text-xs font-medium text-ink-muted">{copy.common.components_ConfigEditor_040}</p>
@@ -527,7 +532,10 @@ export default function ConfigEditor({
                 ))}
               </div>
               <p className="mt-2 text-xs leading-5 text-ink-muted">
-                {copy.common.components_ConfigEditor_062}</p>
+                {rotationMode
+                  ? copy.common.components_ConfigEditor_062
+                  : copy.common.components_ConfigEditor_095}
+              </p>
             </div>
             {!rotationMode && (
               <ShiftHoursEditor
