@@ -38,7 +38,14 @@ try {
   if (JSON.stringify(serverOutputs) !== JSON.stringify(expectedOutputs)) {
     throw new Error(`public server output mismatch: ${serverOutputs.join(', ')}`)
   }
-  process.stdout.write('Public export builds and tests without private optimizer sources\n')
+  runNode([
+    'scripts/stage-release-artifact.mjs',
+    '--kind',
+    'public',
+    '--output',
+    '.release-staging/public',
+  ], temporaryRoot)
+  process.stdout.write('Public export builds, tests, and stages without private optimizer sources\n')
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true })
 }
@@ -78,6 +85,14 @@ async function assertNoEscapingSymlinks(directory, publicRoot) {
 
 function runNpm(argumentsList, cwd) {
   const command = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  runCommand(command, argumentsList, cwd, process.platform === 'win32')
+}
+
+function runNode(argumentsList, cwd) {
+  runCommand(process.execPath, argumentsList, cwd, false)
+}
+
+function runCommand(command, argumentsList, cwd, shell) {
   const result = spawnSync(command, argumentsList, {
     cwd,
     env: {
@@ -87,7 +102,7 @@ function runNpm(argumentsList, cwd) {
     },
     encoding: 'utf8',
     stdio: 'pipe',
-    shell: process.platform === 'win32',
+    shell,
   })
   if (result.status !== 0) {
     throw new Error(`${command} ${argumentsList.join(' ')} failed\n${result.error?.message || ''}\n${result.stdout || ''}\n${result.stderr || ''}`)
