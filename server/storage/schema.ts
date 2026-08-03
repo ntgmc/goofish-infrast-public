@@ -585,6 +585,7 @@ CREATE TABLE IF NOT EXISTS invitations (
   activated_at TIMESTAMPTZ,
   settled_at TIMESTAMPTZ,
   settings_snapshot JSONB,
+  legacy_snapshot_unavailable BOOLEAN NOT NULL DEFAULT false,
   settlement_json JSONB,
   attempt_count INTEGER NOT NULL DEFAULT 0,
   next_retry_at TIMESTAMPTZ,
@@ -605,6 +606,7 @@ ALTER TABLE invitations ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
 ALTER TABLE invitations ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ;
 ALTER TABLE invitations ADD COLUMN IF NOT EXISTS last_error TEXT;
 ALTER TABLE invitations ADD COLUMN IF NOT EXISTS dead_lettered_at TIMESTAMPTZ;
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS legacy_snapshot_unavailable BOOLEAN NOT NULL DEFAULT false;
 UPDATE invitations
    SET activated_at = coalesce(activated_at, registered_at),
        status = 'failed',
@@ -613,11 +615,23 @@ UPDATE invitations
  WHERE status NOT IN ('registered', 'activated', 'processing', 'failed', 'settled', 'dead_letter');
 UPDATE invitations
    SET activated_at = coalesce(activated_at, registered_at),
-       status = 'failed',
-       next_retry_at = coalesce(next_retry_at, now()),
-       last_error = coalesce(last_error, 'Invitation activation snapshot is missing or invalid')
+       status = 'dead_letter',
+       next_retry_at = null,
+       processing_started_at = null,
+       dead_lettered_at = coalesce(dead_lettered_at, now()),
+       last_error = coalesce(last_error, 'Legacy invitation snapshot is unavailable; settlement cannot be replayed'),
+       legacy_snapshot_unavailable = true
  WHERE status IN ('activated', 'processing', 'failed', 'dead_letter')
-   AND (settings_snapshot IS NULL OR jsonb_typeof(settings_snapshot) <> 'object');
+   AND (settings_snapshot IS NULL
+     OR jsonb_typeof(settings_snapshot) IS DISTINCT FROM 'object'
+     OR settings_snapshot->>'version' IS DISTINCT FROM '2');
+UPDATE invitations
+   SET activated_at = coalesce(activated_at, registered_at),
+       legacy_snapshot_unavailable = true
+ WHERE status = 'settled'
+   AND (settings_snapshot IS NULL
+     OR jsonb_typeof(settings_snapshot) IS DISTINCT FROM 'object'
+     OR settings_snapshot->>'version' IS DISTINCT FROM '2');
 UPDATE invitations SET activated_at = coalesce(activated_at, registered_at) WHERE status = 'settled';
 ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_status_check;
 ALTER TABLE invitations ADD CONSTRAINT invitations_status_check
@@ -634,8 +648,19 @@ ALTER TABLE invitations ADD CONSTRAINT invitations_state_timestamps_check CHECK 
 );
 ALTER TABLE invitations DROP CONSTRAINT IF EXISTS invitations_snapshot_shape_check;
 ALTER TABLE invitations ADD CONSTRAINT invitations_snapshot_shape_check CHECK (
-  status = 'registered' OR (jsonb_typeof(settings_snapshot) = 'object' AND settings_snapshot->>'version' = '2')
-);
+  status = 'registered'
+  OR (settings_snapshot IS NOT NULL
+    AND jsonb_typeof(settings_snapshot) = 'object'
+    AND settings_snapshot->>'version' = '2')
+  OR (
+    legacy_snapshot_unavailable
+    AND status IN ('settled', 'dead_letter')
+    AND (settings_snapshot IS NULL
+      OR jsonb_typeof(settings_snapshot) IS DISTINCT FROM 'object'
+      OR settings_snapshot->>'version' IS DISTINCT FROM '2')
+  )
+) NOT VALID;
+ALTER TABLE invitations VALIDATE CONSTRAINT invitations_snapshot_shape_check;
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_registered_cursor
   ON invitations(inviter_user_id, registered_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_invitations_inviter_rewarded

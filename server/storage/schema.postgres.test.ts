@@ -8,6 +8,7 @@ import {
   type DepotValueSampleRecord,
 } from './depot-value-sample-store'
 import { buildLifetimeVoucherProfileAuthorization } from './cdk-redemption'
+import { replayInvitationSettlement } from './invitation-store'
 import {
   confirmPersonalUseDeclaration,
   getPersonalUseDeclarationAcceptance,
@@ -318,6 +319,82 @@ describe('PostgreSQL schema migration', () => {
     } finally {
       await query('delete from cdk_records where key = $1', [authorization.cdkKey])
       await query('delete from user_accounts where id = $1', [userId])
+    }
+  })
+
+  it('quarantines legacy invitation snapshots before validating the v2 constraint', async () => {
+    const pending = await seedProfile()
+    const settled = await seedProfile()
+    const rejected = await seedProfile()
+    const pendingInvitationId = randomUUID()
+    const settledInvitationId = randomUUID()
+    const now = '2026-08-02T00:00:00.000Z'
+    try {
+      await query('alter table invitations drop constraint invitations_snapshot_shape_check')
+      await query(
+        `insert into invitations
+          (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, activated_at,
+           settings_snapshot, next_retry_at, updated_at)
+         values ($1, null, $2, 'LEGACY0001', 'activated', $3, $3, null, $3, $3)`,
+        [pendingInvitationId, pending.userId, now],
+      )
+      await query(
+        `insert into invitations
+          (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, activated_at,
+           settled_at, settings_snapshot, updated_at)
+         values ($1, null, $2, 'LEGACY0002', 'settled', $3, $3, $3, '{"version":1}'::jsonb, $3)`,
+        [settledInvitationId, settled.userId, now],
+      )
+
+      await migrateDatabaseSchema()
+      await migrateDatabaseSchema()
+
+      const migrated = await query<{
+        id: string
+        status: string
+        settings_snapshot: unknown
+        legacy_snapshot_unavailable: boolean
+        dead_lettered_at: string | null
+        last_error: string | null
+      }>(
+        `select id, status, settings_snapshot, legacy_snapshot_unavailable,
+                dead_lettered_at::text, last_error
+           from invitations where id = any($1::text[]) order by id`,
+        [[pendingInvitationId, settledInvitationId]],
+      )
+      const byId = new Map(migrated.rows.map((row) => [row.id, row]))
+      expect(byId.get(pendingInvitationId)).toMatchObject({
+        status: 'dead_letter',
+        settings_snapshot: null,
+        legacy_snapshot_unavailable: true,
+        last_error: 'Legacy invitation snapshot is unavailable; settlement cannot be replayed',
+      })
+      expect(byId.get(pendingInvitationId)?.dead_lettered_at).not.toBeNull()
+      expect(byId.get(settledInvitationId)).toMatchObject({
+        status: 'settled',
+        settings_snapshot: { version: 1 },
+        legacy_snapshot_unavailable: true,
+      })
+      await expect(replayInvitationSettlement(
+        'security_admin',
+        pendingInvitationId,
+        '尝试重放历史坏快照',
+      )).resolves.toBe(false)
+      await expect(query(
+        `insert into invitations
+          (id, inviter_user_id, invitee_user_id, invitation_code, status, registered_at, activated_at,
+           settings_snapshot, next_retry_at, updated_at)
+         values ($1, null, $2, 'INVALID001', 'activated', $3, $3, null, $3, $3)`,
+        [randomUUID(), rejected.userId, now],
+      )).rejects.toThrow(/invitations_snapshot_shape_check/)
+      const constraint = await query<{ convalidated: boolean }>(
+        `select convalidated from pg_constraint
+          where conrelid = 'invitations'::regclass and conname = 'invitations_snapshot_shape_check'`,
+      )
+      expect(constraint.rows[0]?.convalidated).toBe(true)
+    } finally {
+      await query('delete from user_accounts where id = any($1::text[])', [[pending.userId, settled.userId, rejected.userId]])
+      await migrateDatabaseSchema()
     }
   })
 
