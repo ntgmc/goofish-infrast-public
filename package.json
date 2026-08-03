@@ -25,7 +25,7 @@
     "build:web": "tsc && vite build",
     "build:server": "npm run build:server:public",
     "build:server:public": "node scripts/build-server.mjs --scope public",
-    "build:public": "npm run generate:data && npm run generate:changelog && npm run build:web && npm run build:server:public",
+    "build:public": "npm run generate:data && npm run generate:changelog && npm run generate:release-sbom && npm run build:web && npm run build:server:public",
     "build": "npm run build:public",
     "test": "vitest run",
     "test:generate-data": "node --test scripts/generate-data.test.mjs",
