@@ -57,9 +57,6 @@ export default function AdminDashboardView() {
               <div className="max-w-2xl">
                 <p className="section-index">MAA 基建管理后台</p>
                 <h1 className="display-title mt-3 text-3xl text-ink-primary sm:text-4xl">管理工作台</h1>
-                <p className="mt-4 max-w-xl text-sm leading-6 text-ink-secondary">
-                  使用独立管理账号进入后台。Root 口令只用于创建和维护管理账号，日常操作不再需要反复输入。
-                </p>
               </div>
             </section>
           <form onSubmit={handleLogin} noValidate className="tool-panel p-6">
@@ -106,7 +103,6 @@ export default function AdminDashboardView() {
             <button type="submit" disabled={loading} className="tool-primary-action mt-5 w-full">
                 {loading ? '正在登录…' : '进入后台'}
               </button>
-              <Link to="/admin/setup" className="tool-secondary-action mt-4 w-full">添加管理账号</Link>
             </form>
           </div>
         </main>
