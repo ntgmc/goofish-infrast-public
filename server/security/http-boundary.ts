@@ -1,4 +1,5 @@
 import type { IncomingMessage } from 'node:http'
+import { isLoopbackIpAddress } from './client-ip'
 import {
   getAllowedMethods,
   getRoutePolicy,
@@ -9,6 +10,8 @@ import {
 
 const MAX_REQUEST_TARGET_BYTES = 8 * 1024
 const SAFE_METHODS = new Set(['GET', 'HEAD'])
+const LOOPBACK_HEALTH_PATHS = new Set(['/api/health', '/api/health/live', '/api/health/ready'])
+const FORWARDED_REQUEST_HEADERS = ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip'] as const
 
 export type HttpBoundaryDecision =
   | {
@@ -32,15 +35,14 @@ export function inspectIncomingRequest(req: IncomingMessage): HttpBoundaryDecisi
   if (!isValidHost(firstHeader(req.headers.host))) {
     return reject(400, 'invalid_request', 'Invalid Host header.')
   }
-  if (!isAllowedProductionHost(firstHeader(req.headers.host))) {
-    return reject(400, 'invalid_request', 'Host header is not allowed.')
-  }
-
   let url: URL
   try {
     url = new URL(target, 'http://request.invalid')
   } catch {
     return reject(400, 'invalid_request', 'Invalid request target.')
+  }
+  if (!isAllowedProductionHost(firstHeader(req.headers.host)) && !isDirectLoopbackHealthRequest(req, method, url.pathname)) {
+    return reject(400, 'invalid_request', 'Host header is not allowed.')
   }
 
   const routePolicy = getRoutePolicy(url.pathname)
@@ -147,6 +149,22 @@ function isAllowedProductionHost(value: string | null): boolean {
   if (!value || !publicAppUrl) return false
   try {
     return new URL(`http://${value}`).host.toLowerCase() === new URL(publicAppUrl).host.toLowerCase()
+  } catch {
+    return false
+  }
+}
+
+function isDirectLoopbackHealthRequest(req: IncomingMessage, method: string, pathname: string): boolean {
+  if (process.env.NODE_ENV !== 'production' || method !== 'GET' || !LOOPBACK_HEALTH_PATHS.has(pathname)) return false
+  if (!isLoopbackIpAddress(req.socket.remoteAddress) || !isLoopbackHost(firstHeader(req.headers.host))) return false
+  return FORWARDED_REQUEST_HEADERS.every((header) => firstHeader(req.headers[header]) === null)
+}
+
+function isLoopbackHost(value: string | null): boolean {
+  if (!value) return false
+  try {
+    const hostname = new URL(`http://${value}`).hostname.replace(/^\[|\]$/g, '')
+    return isLoopbackIpAddress(hostname)
   } catch {
     return false
   }

@@ -36,6 +36,23 @@ describe('HTTP security boundary', () => {
     expect(inspectIncomingRequest(incomingGet('/api/health/live', 'app.example.test')).allowed).toBe(true)
   })
 
+  it('allows only direct loopback health probes to use a loopback Host in production', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.PUBLIC_APP_URL = 'https://app.example.test'
+
+    for (const path of ['/api/health', '/api/health/live', '/api/health/ready']) {
+      expect(inspectIncomingRequest(incomingGet(path, '127.0.0.1:3001', '127.0.0.1')).allowed).toBe(true)
+    }
+    expect(inspectIncomingRequest(incomingGet('/api/data', '127.0.0.1:3001', '127.0.0.1')).allowed).toBe(false)
+    expect(inspectIncomingRequest(incomingGet('/api/health', '127.0.0.1:3001', '203.0.113.8')).allowed).toBe(false)
+    expect(inspectIncomingRequest(incomingGet(
+      '/api/health',
+      '127.0.0.1:3001',
+      '127.0.0.1',
+      { 'x-forwarded-for': '203.0.113.8' },
+    )).allowed).toBe(false)
+  })
+
   it('ships a strict-style report-only policy during inline-style migration', () => {
     const response = applyHttpSecurityHeaders(new Response('ok'), true)
 
@@ -46,12 +63,18 @@ describe('HTTP security boundary', () => {
   })
 })
 
-function incomingGet(target: string, host: string): IncomingMessage {
+function incomingGet(
+  target: string,
+  host: string,
+  remoteAddress = '203.0.113.8',
+  additionalHeaders: Record<string, string> = {},
+): IncomingMessage {
   return {
     method: 'GET',
     url: target,
-    headers: { host },
+    headers: { host, ...additionalHeaders },
     rawHeaders: ['Host', host],
+    socket: { remoteAddress },
   } as IncomingMessage
 }
 
