@@ -5,36 +5,45 @@ import { getOptimizeJobStore } from './storage/optimize-job-store'
 import { recordUsageEvent } from './handlers/usage-stats'
 import { processPendingOptimizationJobEffects } from './optimization/jobs/job-effects'
 import { describeServerError } from './security/error-reporting'
+import { createBackgroundWorker } from './background-worker-runtime'
+import { hasDatabaseUrl, withPostgresAdvisoryLock } from './storage/postgres'
 
 const DEFAULT_CLEANUP_AGE_MS = 24 * 60 * 60 * 1000
 const MAINTENANCE_INTERVAL_MS = 60_000
 
-let maintenanceInitialized = false
-let cleanupTimer: ReturnType<typeof setInterval> | null = null
+const controller = createBackgroundWorker({
+  name: 'optimize_queue',
+  intervalMs: MAINTENANCE_INTERVAL_MS,
+  run: runQueueMaintenance,
+})
 
 export async function initializeOptimizeQueueMaintenance(): Promise<void> {
-  if (!canMaintainOptimizeQueue() || maintenanceInitialized) return
-  maintenanceInitialized = true
-  await runQueueMaintenance()
-  startMaintenanceTimer()
+  if (!canMaintainOptimizeQueue()) return
+  await controller.initialize()
 }
 
 export function shutdownOptimizeQueueMaintenance(): void {
-  if (cleanupTimer) clearInterval(cleanupTimer)
-  cleanupTimer = null
-  maintenanceInitialized = false
+  controller.stop()
 }
 
 export function isOptimizeQueueMaintenanceInitialized(): boolean {
-  return maintenanceInitialized
+  return controller.getHealth().initialized
 }
 
-function startMaintenanceTimer(): void {
-  cleanupTimer = setInterval(() => void runQueueMaintenance(), MAINTENANCE_INTERVAL_MS)
-  cleanupTimer.unref?.()
+export function waitForOptimizeQueueMaintenanceIdle(): Promise<void> {
+  return controller.waitForIdle()
 }
 
 async function runQueueMaintenance(): Promise<void> {
+  if (!hasDatabaseUrl()) {
+    await runQueueMaintenanceAsLeader()
+    return
+  }
+  const result = await withPostgresAdvisoryLock('optimize-queue-maintenance', runQueueMaintenanceAsLeader)
+  if (!result.acquired) console.info('[optimize-queue-maintenance] leader lock busy; run skipped')
+}
+
+async function runQueueMaintenanceAsLeader(): Promise<void> {
   try {
     const store = getOptimizeJobStore()
     const now = new Date().toISOString()
@@ -59,6 +68,7 @@ async function runQueueMaintenance(): Promise<void> {
     await store.cleanupOldJobs(before)
     if (recovered > 0 || expired > 0) requestOptimizeJobProcessing()
   } catch (error) {
-    console.warn('optimize job recovery skipped', describeServerError(error))
+    console.warn('[optimize-queue-maintenance] run failed', describeServerError(error))
+    throw error
   }
 }

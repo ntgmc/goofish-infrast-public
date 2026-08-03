@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   closePool,
   getPool,
@@ -33,6 +33,23 @@ afterEach(async () => {
 })
 
 describe('PostgreSQL pool configuration', () => {
+  it('rejects new pool creation while the current pool is closing', async () => {
+    process.env.DATABASE_URL = 'postgresql://invalid.example/test'
+    const current = getPool()
+    let releaseClose: () => void = () => undefined
+    const end = vi.spyOn(current, 'end').mockImplementation(() => new Promise<void>((resolve) => {
+      releaseClose = resolve
+    }))
+
+    const closing = closePool()
+    expect(end).toHaveBeenCalledOnce()
+    expect(() => getPool()).toThrow('PostgreSQL pool is closing')
+
+    releaseClose()
+    await closing
+    expect(getPool()).not.toBe(current)
+  })
+
   it('uses a finite default connection timeout', () => {
     expect(resolvePostgresConnectionTimeoutMs({})).toBe(10_000)
     expect(resolvePostgresConnectionTimeoutMs({ POSTGRES_CONNECTION_TIMEOUT_MS: '  ' })).toBe(10_000)

@@ -367,6 +367,10 @@ export interface AdminOptimizationQueueSnapshot {
   capacity: {
     queue_limit: number;
     worker_concurrency: number;
+    worker_instances: number;
+    source: 'runtime_registry' | 'configured_fallback';
+    heartbeat_interval_ms: number;
+    stale_after_ms: number;
   };
   counts: {
     queued: number;

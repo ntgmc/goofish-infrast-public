@@ -1,7 +1,8 @@
-import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg'
+import { Client, Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg'
 import { describeServerError } from '../security/error-reporting'
 
 let pool: Pool | null = null
+let poolClosing: Promise<void> | null = null
 const DEADLOCK_DETECTED = '40P01'
 const SERIALIZATION_FAILURE = '40001'
 const RETRIABLE_POSTGRES_CODES = new Set([DEADLOCK_DETECTED, SERIALIZATION_FAILURE])
@@ -23,6 +24,9 @@ export function hasDatabaseUrl(): boolean {
 }
 
 export function getPool(): Pool {
+  if (poolClosing) {
+    throw new Error('PostgreSQL pool is closing; new database work is not accepted')
+  }
   const connectionString = process.env.DATABASE_URL?.trim()
   if (!connectionString) {
     throw new Error('DATABASE_URL not configured')
@@ -175,6 +179,39 @@ export async function withTransaction<T>(work: (client: PoolClient) => Promise<T
   }
 }
 
+export async function withPostgresAdvisoryLock<T>(
+  lockName: string,
+  work: () => Promise<T>,
+): Promise<{ acquired: false } | { acquired: true; value: T }> {
+  if (poolClosing) throw new Error('PostgreSQL pool is closing; maintenance leadership is not accepted')
+  const connectionString = process.env.DATABASE_URL?.trim()
+  if (!connectionString) throw new Error('DATABASE_URL not configured')
+  const client = new Client({
+    connectionString,
+    connectionTimeoutMillis: resolvePostgresConnectionTimeoutMs(),
+    statement_timeout: resolvePostgresStatementTimeoutMs(),
+    query_timeout: resolvePostgresQueryTimeoutMs(),
+    lock_timeout: resolvePostgresLockTimeoutMs(),
+    application_name: 'goofish-infrast-v1-maintenance-leader',
+  })
+  let acquired = false
+  try {
+    await client.connect()
+    acquired = Boolean((await client.query<{ acquired: boolean }>(
+      'select pg_try_advisory_lock(hashtextextended($1, 0)) as acquired',
+      [lockName],
+    )).rows[0]?.acquired)
+    if (!acquired) return { acquired: false }
+    return { acquired: true, value: await work() }
+  } finally {
+    if (acquired) {
+      await client.query('select pg_advisory_unlock(hashtextextended($1, 0))', [lockName])
+        .catch((error) => console.warn('[postgres] advisory unlock failed', describeServerError(error)))
+    }
+    await client.end().catch((error) => console.warn('[postgres] advisory client close failed', describeServerError(error)))
+  }
+}
+
 function isRetriablePostgresError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false
   const code = (error as { code?: unknown }).code
@@ -203,10 +240,14 @@ export async function checkPostgresHealth(): Promise<{ ok: true } | { ok: false;
 }
 
 export async function closePool(): Promise<void> {
+  if (poolClosing) return poolClosing
   if (!pool) return
   const current = pool
   pool = null
-  await current.end()
+  poolClosing = current.end().finally(() => {
+    poolClosing = null
+  })
+  return poolClosing
 }
 
 function resolveIntegerEnvironmentValue(

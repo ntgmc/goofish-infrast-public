@@ -11,7 +11,7 @@ const MIGRATION_PHASE_MAX_ATTEMPTS = 5
 const MIGRATION_RETRY_BASE_MS = 1_000
 const MIGRATION_ADVISORY_LOCK_KEY = 774_006_153
 const MIGRATION_STATEMENT_TIMEOUT_MS = 300_000
-export const DATABASE_SCHEMA_VERSION = '2026-08-03.1'
+export const DATABASE_SCHEMA_VERSION = '2026-08-03.2'
 export const DATABASE_SCHEMA_MINIMUM_APP_VERSION = '2.0.0'
 const PERSONAL_USE_DECLARATION_ACTION_SQL = PERSONAL_USE_DECLARATION_ACTIONS
   .map((action) => `'${action}'`)
@@ -320,6 +320,20 @@ CREATE INDEX IF NOT EXISTS idx_optimize_job_attempts_worker_status
   ON optimize_job_attempts(worker_id, status);
 CREATE INDEX IF NOT EXISTS idx_optimize_job_attempts_heartbeat
   ON optimize_job_attempts(heartbeat_at) WHERE status = 'running';
+
+CREATE TABLE IF NOT EXISTS optimize_worker_registry (
+  worker_id TEXT PRIMARY KEY,
+  concurrency INTEGER NOT NULL CHECK (concurrency BETWEEN 1 AND 32),
+  heartbeat_interval_ms INTEGER NOT NULL CHECK (heartbeat_interval_ms BETWEEN 1000 AND 60000),
+  stale_after_ms INTEGER NOT NULL CHECK (stale_after_ms BETWEEN heartbeat_interval_ms AND 300000),
+  capabilities TEXT[] NOT NULL DEFAULT '{}',
+  build_sha TEXT,
+  started_at TIMESTAMPTZ NOT NULL,
+  heartbeat_at TIMESTAMPTZ NOT NULL,
+  draining BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_optimize_worker_registry_active
+  ON optimize_worker_registry(draining, heartbeat_at DESC);
 
 CREATE TABLE IF NOT EXISTS optimization_dead_letters (
   id TEXT PRIMARY KEY,

@@ -2,9 +2,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY,
   DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS,
+  DEFAULT_OPTIMIZE_WORKER_CONCURRENCY,
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
+  getOptimizeWorkerConfiguration,
+  getOptimizeWorkerConcurrency,
+  MAX_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY,
   MAX_OPTIMIZE_JOB_ATTEMPTS,
+  MAX_OPTIMIZE_WORKER_CONCURRENCY,
 } from './optimize-job-config'
 
 const originalGlobalWorkerConcurrency = process.env.OPTIMIZE_GLOBAL_WORKER_CONCURRENCY
@@ -31,26 +36,29 @@ describe('optimization job configuration', () => {
     expect(getOptimizeGlobalWorkerConcurrency()).toBe(5)
   })
 
-  it('falls back to the production capacity for an invalid value', () => {
-    process.env.OPTIMIZE_GLOBAL_WORKER_CONCURRENCY = 'invalid'
-
-    expect(getOptimizeGlobalWorkerConcurrency()).toBe(3)
+  it('rejects invalid or unsafe concurrency values', () => {
+    for (const value of ['invalid', '0', '1.5', String(MAX_OPTIMIZE_GLOBAL_WORKER_CONCURRENCY + 1)]) {
+      expect(() => getOptimizeGlobalWorkerConcurrency({ OPTIMIZE_GLOBAL_WORKER_CONCURRENCY: value })).toThrow(/integer between/)
+    }
+    expect(getOptimizeWorkerConcurrency({})).toBe(DEFAULT_OPTIMIZE_WORKER_CONCURRENCY)
+    expect(() => getOptimizeWorkerConcurrency({
+      OPTIMIZE_WORKER_CONCURRENCY: String(MAX_OPTIMIZE_WORKER_CONCURRENCY + 1),
+    })).toThrow(/integer between/)
   })
 
-  it('normalizes the configured maximum attempt count', () => {
+  it('rejects invalid maximum attempts instead of silently normalizing them', () => {
     delete process.env.OPTIMIZE_JOB_MAX_ATTEMPTS
     expect(getOptimizeJobMaxAttempts()).toBe(DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS)
 
-    process.env.OPTIMIZE_JOB_MAX_ATTEMPTS = '4.8'
-    expect(getOptimizeJobMaxAttempts()).toBe(4)
+    for (const value of ['4.8', '0', String(MAX_OPTIMIZE_JOB_ATTEMPTS + 1), 'invalid']) {
+      expect(() => getOptimizeJobMaxAttempts({ OPTIMIZE_JOB_MAX_ATTEMPTS: value })).toThrow(/integer between/)
+    }
+  })
 
-    process.env.OPTIMIZE_JOB_MAX_ATTEMPTS = '0'
-    expect(getOptimizeJobMaxAttempts()).toBe(1)
-
-    process.env.OPTIMIZE_JOB_MAX_ATTEMPTS = '100'
-    expect(getOptimizeJobMaxAttempts()).toBe(MAX_OPTIMIZE_JOB_ATTEMPTS)
-
-    process.env.OPTIMIZE_JOB_MAX_ATTEMPTS = 'invalid'
-    expect(getOptimizeJobMaxAttempts()).toBe(DEFAULT_OPTIMIZE_JOB_MAX_ATTEMPTS)
+  it('requires local concurrency not to exceed global capacity', () => {
+    expect(() => getOptimizeWorkerConfiguration({
+      OPTIMIZE_WORKER_CONCURRENCY: '4',
+      OPTIMIZE_GLOBAL_WORKER_CONCURRENCY: '3',
+    })).toThrow('OPTIMIZE_WORKER_CONCURRENCY must not exceed OPTIMIZE_GLOBAL_WORKER_CONCURRENCY')
   })
 })

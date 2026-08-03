@@ -21,7 +21,6 @@ vi.mock('../storage/optimize-job-store', () => ({
   isOptimizeJobAdmissionError: () => false,
 }))
 vi.mock('../storage/admin-operation-audit-store', () => ({ recordAdminOperationAudit: recordAudit }))
-vi.mock('../optimize-job-config', () => ({ getOptimizeGlobalWorkerConcurrency: () => 3 }))
 vi.mock('../optimize-job-signals', () => ({ requestOptimizeJobProcessing: requestProcessing }))
 
 import adminOptimizationHandler from './admin-optimization'
@@ -44,11 +43,11 @@ describe('admin optimization handler', () => {
     expect(getQueueSnapshot).not.toHaveBeenCalled()
   })
 
-  it('returns a no-store queue snapshot with configured concurrency', async () => {
+  it('returns a no-store queue snapshot using registered worker capacity', async () => {
     const response = await adminOptimizationHandler(new Request('http://localhost/api/admin/optimization?view=queue'))
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
-    expect(getQueueSnapshot).toHaveBeenCalledWith(3, 20)
+    expect(getQueueSnapshot).toHaveBeenCalledWith(undefined, 20)
     expect(authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'optimization_view')
     await expect(response.json()).resolves.toMatchObject({ queued_jobs: [], running_jobs: [], recent_jobs: [] })
   })

@@ -123,18 +123,6 @@ describe('PostgreSQL optimization job admission', () => {
       'idx_optimize_jobs_dispatch_ready',
       'idx_optimize_jobs_queue_expires_at',
     ])
-
-    await query(
-      "update optimize_jobs set expires_at = created_at + interval '30 minutes' where id = $1",
-      [legacyJobId],
-    )
-    await expect(ensureDatabaseSchema()).resolves.toBeUndefined()
-    const extended = await query<{ expires_at_extended: boolean }>(
-      `select expires_at = created_at + interval '24 hours' as expires_at_extended
-       from optimize_jobs where id = $1`,
-      [legacyJobId],
-    )
-    expect(extended.rows[0]?.expires_at_extended).toBe(true)
   })
 
   it('handles unexpected errors from idle pool clients', () => {
@@ -175,6 +163,7 @@ describe('PostgreSQL optimization job admission', () => {
     const queuedRetryId = randomUUID()
     const runningId = randomUUID()
     const failedId = randomUUID()
+    const workerRegistryId = `worker-snapshot-${randomUUID()}`
     const ids = [queuedHighId, queuedRetryId, runningId, failedId]
     const now = new Date()
     const createdAt = new Date(now.getTime() - 60_000).toISOString()
@@ -210,8 +199,21 @@ describe('PostgreSQL optimization job admission', () => {
           finishedAt,
         ],
       )
+      await query(
+        `insert into optimize_worker_registry
+          (worker_id, concurrency, heartbeat_interval_ms, stale_after_ms, capabilities,
+           build_sha, started_at, heartbeat_at, draining)
+         values ($1, 2, 10000, 30000, '{optimize_jobs}', 'test-sha', $2, $2, false)`,
+        [workerRegistryId, now.toISOString()],
+      )
 
       const snapshot = await getAdminOptimizationQueueSnapshot(4)
+      expect(snapshot.capacity).toMatchObject({
+        worker_concurrency: 2,
+        worker_instances: 1,
+        source: 'runtime_registry',
+        stale_after_ms: 30_000,
+      })
       const highIndex = snapshot.queued_jobs.findIndex((job) => job.id === queuedHighId)
       const retryIndex = snapshot.queued_jobs.findIndex((job) => job.id === queuedRetryId)
       expect(highIndex).toBeGreaterThanOrEqual(0)
@@ -229,6 +231,7 @@ describe('PostgreSQL optimization job admission', () => {
       expect(JSON.stringify(snapshot)).not.toContain('secret')
       expect(JSON.stringify(snapshot)).not.toContain('internal exception detail')
     } finally {
+      await query('delete from optimize_worker_registry where worker_id = $1', [workerRegistryId])
       await query('delete from optimize_jobs where id = any($1::text[])', [ids])
     }
   })

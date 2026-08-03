@@ -1,15 +1,8 @@
 import type { Server } from 'node:http'
-import { initializeBehaviorRiskMaintenance, shutdownBehaviorRiskMaintenance } from './behavior-risk-maintenance'
-import { initializeInventoryCampaignWorker, shutdownInventoryCampaignWorker } from './inventory-campaign-worker'
-import { initializeInvitationSettlementWorker, shutdownInvitationSettlementWorker } from './invitation-settlement-worker'
 import {
   initializeOptimizeJobProcessing,
   shutdownOptimizeJobProcessing,
 } from './optimize-job-runner'
-import {
-  initializeOptimizeQueueMaintenance,
-  shutdownOptimizeQueueMaintenance,
-} from './optimize-queue-maintenance'
 import {
   registerOptimizerPort,
   type OptimizerPort,
@@ -22,6 +15,20 @@ import {
   createOptimizeWorkerHealthServer,
   type WorkerLifecycleState,
 } from './worker-health'
+import {
+  getWorkerLifecycleStages,
+  stopWorkerLifecycleStages,
+  waitForWorkerLifecycleStagesIdle,
+} from './worker-lifecycle-stages'
+import {
+  initializeOptimizeWorkerRegistration,
+  stopOptimizeWorkerRegistration,
+  waitForOptimizeWorkerRegistrationIdle,
+} from './optimize-worker-registration'
+import {
+  resolveProcessShutdownDeadlineMs,
+  scheduleProcessHardExit,
+} from './process-shutdown-deadline'
 
 export type OptimizeWorkerStartupStage = {
   name: string
@@ -50,6 +57,7 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
       throw new Error('The production optimize worker requires APP_ROLE=worker')
     }
     validateHealthBoundary(healthHost)
+    resolveProcessShutdownDeadlineMs()
   } catch (error) {
     releaseOptimizerPort()
     throw error
@@ -58,23 +66,30 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
   let lifecycleState: WorkerLifecycleState = 'starting'
   const healthServer = createOptimizeWorkerHealthServer(() => lifecycleState)
   let shutdownPromise: Promise<void> | null = null
+  let cancelHardExit: (() => void) | null = null
 
   process.on('SIGTERM', () => startShutdown('SIGTERM'))
   process.on('SIGINT', () => startShutdown('SIGINT'))
 
   void start().catch(async (error) => {
     if (shutdownPromise) return
+    cancelHardExit = scheduleProcessHardExit(false)
     console.error('optimize worker startup failed', describeServerError(error))
     lifecycleState = 'draining'
     try {
-      await shutdownOptimizeJobProcessing(0).catch(() => undefined)
+      stopOptimizeWorkerRegistration()
       shutdownMaintenance()
+      await shutdownOptimizeJobProcessing(0).catch(() => undefined)
+      await waitForOptimizeWorkerRegistrationIdle()
+      await waitForWorkerLifecycleStagesIdle()
       await closeServer(healthServer).catch(() => undefined)
       await closePool().catch(() => undefined)
     } finally {
       releaseOptimizerPort()
       lifecycleState = 'stopped'
       process.exitCode = 1
+      cancelHardExit()
+      cancelHardExit = null
     }
   })
 
@@ -93,27 +108,40 @@ export function runOptimizeWorkerProcess(optimizerPort: OptimizerPort): void {
   function startShutdown(signal: NodeJS.Signals): void {
     if (shutdownPromise) {
       console.warn(`received ${signal} while optimize worker is already draining; forcing active attempts to stop`)
+      cancelHardExit?.()
+      cancelHardExit = scheduleProcessHardExit(true)
       healthServer.closeAllConnections?.()
       releaseOptimizerPort()
+      stopOptimizeWorkerRegistration()
+      shutdownMaintenance()
       void shutdownOptimizeJobProcessing(0)
       process.exitCode = 1
       return
     }
 
     lifecycleState = 'draining'
-    shutdownPromise = shutdown(signal).catch((error) => {
-      console.error('optimize worker shutdown failed', describeServerError(error))
-      process.exitCode = 1
-    })
+    cancelHardExit = scheduleProcessHardExit(false)
+    shutdownPromise = shutdown(signal)
+      .then(() => {
+        cancelHardExit?.()
+        cancelHardExit = null
+      })
+      .catch((error) => {
+        console.error('optimize worker shutdown failed', describeServerError(error))
+        process.exitCode = 1
+      })
   }
 
   async function shutdown(signal: NodeJS.Signals): Promise<void> {
     console.log(`received ${signal}; draining optimization workers`)
+    stopOptimizeWorkerRegistration()
+    shutdownMaintenance()
     try {
       await shutdownOptimizeJobProcessing()
     } finally {
       try {
-        shutdownMaintenance()
+        await waitForOptimizeWorkerRegistrationIdle()
+        await waitForWorkerLifecycleStagesIdle()
         healthServer.closeAllConnections?.()
         await closeServer(healthServer)
         await closePool()
@@ -149,19 +177,14 @@ export async function initializeOptimizeWorkerRuntime(
 function optimizeWorkerStartupStages(): readonly OptimizeWorkerStartupStage[] {
   return [
     { name: 'database schema validation', initialize: ensureDatabaseSchema },
-    { name: 'optimize queue maintenance', initialize: initializeOptimizeQueueMaintenance },
-    { name: 'inventory campaign worker', initialize: initializeInventoryCampaignWorker },
-    { name: 'invitation settlement worker', initialize: initializeInvitationSettlementWorker },
-    { name: 'behavior risk maintenance', initialize: initializeBehaviorRiskMaintenance },
+    ...getWorkerLifecycleStages().map(({ name, initialize }) => ({ name, initialize })),
     { name: 'optimize job processing', initialize: initializeOptimizeJobProcessing },
+    { name: 'worker runtime registration', initialize: initializeOptimizeWorkerRegistration },
   ]
 }
 
 function shutdownMaintenance(): void {
-  shutdownOptimizeQueueMaintenance()
-  shutdownInventoryCampaignWorker()
-  shutdownInvitationSettlementWorker()
-  shutdownBehaviorRiskMaintenance()
+  stopWorkerLifecycleStages()
 }
 
 function listen(target: Server, port: number, host: string): Promise<void> {

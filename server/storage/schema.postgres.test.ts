@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { closePool, getPool, query } from './postgres'
+import { closePool, getPool, query, withPostgresAdvisoryLock } from './postgres'
 import { DATABASE_SCHEMA_VERSION, migrateDatabaseSchema } from './schema'
 import {
   getDepotValueSampleStore,
@@ -32,6 +32,24 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL schema migration', () => {
+  it('allows only one maintenance leader for the same advisory lock', async () => {
+    const lockName = `maintenance-test:${randomUUID()}`
+    let releaseLeader: () => void = () => undefined
+    let leaderAcquired: () => void = () => undefined
+    const acquired = new Promise<void>((resolve) => { leaderAcquired = resolve })
+    const leader = withPostgresAdvisoryLock(lockName, async () => {
+      leaderAcquired()
+      await new Promise<void>((resolve) => { releaseLeader = resolve })
+      return 'leader'
+    })
+
+    await acquired
+    await expect(withPostgresAdvisoryLock(lockName, async () => 'duplicate'))
+      .resolves.toEqual({ acquired: false })
+    releaseLeader()
+    await expect(leader).resolves.toEqual({ acquired: true, value: 'leader' })
+  })
+
   it('rolls back administrator account changes when their audit insert fails', async () => {
     const store = createPostgresAdminUserStore()
     const username = `audit-rollback-${randomUUID().slice(0, 8)}`

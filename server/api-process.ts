@@ -16,6 +16,10 @@ import { resolveTrustedProxyAddresses } from './security/client-ip'
 import { closePool } from './storage/postgres'
 import { ensureDatabaseSchema } from './storage/schema'
 import { ensureSklandServiceConfiguration } from './skland-config'
+import {
+  resolveProcessShutdownDeadlineMs,
+  scheduleProcessHardExit,
+} from './process-shutdown-deadline'
 
 export type ApiProcessHooks = {
   initialize: () => Promise<void>
@@ -53,6 +57,7 @@ export function createApiProcess(
   const port = dependencies.port ?? resolveApiPort()
   const host = dependencies.host ?? process.env.HOST ?? '127.0.0.1'
   validateProductionBoundaryConfig(host)
+  resolveProcessShutdownDeadlineMs()
 
   const server = (dependencies.createServer ?? createApiServer)()
   const startAccountDeletion = dependencies.startAccountDeletion ?? startAccountDeletionWorker
@@ -60,6 +65,7 @@ export function createApiProcess(
   const ensureDatabase = dependencies.ensureDatabase ?? ensureDatabaseSchema
   let accountDeletionWorker: AccountDeletionWorkerController | null = null
   let shutdownPromise: Promise<void> | null = null
+  let cancelHardExit: (() => void) | null = null
 
   async function start(): Promise<void> {
     await ensureDatabase()
@@ -77,6 +83,7 @@ export function createApiProcess(
   }
 
   async function handleStartupFailure(error: unknown): Promise<void> {
+    cancelHardExit = scheduleProcessHardExit(false)
     logServerError('server startup failed', error)
     beginServiceDrain()
     accountDeletionWorker?.stop()
@@ -89,11 +96,15 @@ export function createApiProcess(
     await closeDatabase().catch(() => undefined)
     markServiceStopped()
     process.exitCode = 1
+    cancelHardExit()
+    cancelHardExit = null
   }
 
   function startShutdown(signal: NodeJS.Signals): Promise<void> {
     if (shutdownPromise) {
       console.warn(`received ${signal} while already draining; forcing open HTTP connections closed`)
+      cancelHardExit?.()
+      cancelHardExit = scheduleProcessHardExit(true)
       server.closeAllConnections?.()
       void Promise.resolve(hooks.forceDrain()).catch((error) => {
         logServerError('server force drain failed', error)
@@ -103,10 +114,16 @@ export function createApiProcess(
     }
 
     beginServiceDrain()
-    shutdownPromise = shutdown(signal).catch((error) => {
-      logServerError('server shutdown failed', error)
-      process.exitCode = 1
-    })
+    cancelHardExit = scheduleProcessHardExit(false)
+    shutdownPromise = shutdown(signal)
+      .then(() => {
+        cancelHardExit?.()
+        cancelHardExit = null
+      })
+      .catch((error) => {
+        logServerError('server shutdown failed', error)
+        process.exitCode = 1
+      })
     return shutdownPromise
   }
 

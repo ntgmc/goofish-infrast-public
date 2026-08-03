@@ -107,7 +107,7 @@ npm run build:server
 npm run build:server:public
 ```
 
-本仓库不包含 `build:private`、`start:worker` 或 `start:all`。真实 worker 由闭源优化器仓库在固定公共 commit 上组合构建。
+本仓库不包含 `build:private`、`start:worker` 或 `start:all`。真实 worker 由闭源优化器仓库在固定公共 commit 上组合构建。机器可读的组合边界位于 [optimizer-port-contract.json](optimizer-port-contract.json)：私有 CI 必须记录真实 public Git SHA，生成 `worker.js`、`all.js` 与 runner 所需的 `optimize-worker.js`，并对 Worker 启动、thread entry、readiness 和优雅关停进行验收。公共仓库只声明约束，不虚构或提交私有仓库的实际 SHA。
 
 ## 检查与测试
 
@@ -123,7 +123,7 @@ npm test
 npm run test:postgres
 ```
 
-`check:architecture` 默认使用 public scope，禁止公共 API、runner 和 worker runtime 导入私有优化器实现。`check:public-export` 会在临时副本中验证公共源码能够独立构建和测试。
+`check:architecture` 默认使用 public scope，禁止公共 API、runner 和 worker runtime 导入私有优化器实现，并校验机器可读的私有组合产物契约。`check:public-export` 会在临时副本中验证公共源码能够独立构建和测试。
 
 PostgreSQL 集成测试使用 Testcontainers，需要可用的 Docker daemon。
 

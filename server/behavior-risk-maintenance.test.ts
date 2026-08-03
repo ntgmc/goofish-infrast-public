@@ -18,24 +18,22 @@ afterEach(() => {
 })
 
 describe('behavior risk maintenance lifecycle', () => {
-  it('does not block worker initialization on a pending evaluation', async () => {
-    runBehaviorRiskEvaluation.mockImplementation(() => new Promise(() => undefined))
+  it('waits for the initial evaluation before becoming initialized', async () => {
+    let release: (value: unknown) => void = () => undefined
+    runBehaviorRiskEvaluation.mockImplementation(() => new Promise((resolve) => { release = resolve }))
 
-    await expect(initializeBehaviorRiskMaintenance()).resolves.toBeUndefined()
-    await initializeBehaviorRiskMaintenance()
-
+    const initialization = initializeBehaviorRiskMaintenance()
+    await Promise.resolve()
     expect(runBehaviorRiskEvaluation).toHaveBeenCalledOnce()
+    release({ status: 'success', cases: 0, eventsProcessed: 0, backlog: 0 })
+
+    await expect(initialization).resolves.toBeUndefined()
   })
 
-  it('logs rejected background evaluations without rejecting initialization', async () => {
+  it('rejects initialization when the initial evaluation fails', async () => {
     const error = Object.assign(new Error('statement timed out'), { code: '57014' })
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     runBehaviorRiskEvaluation.mockRejectedValue(error)
 
-    await expect(initializeBehaviorRiskMaintenance()).resolves.toBeUndefined()
-    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(
-      expect.stringMatching(/^\[behavior-risk] daily maintenance skipped after \d+ms code=57014:$/),
-      'statement timed out',
-    ))
+    await expect(initializeBehaviorRiskMaintenance()).rejects.toBe(error)
   })
 })

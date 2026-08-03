@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
 })
 
 vi.mock('pg', () => ({
+  Client: class {},
   Pool: class {
     connect = mocks.connect
     on = vi.fn()

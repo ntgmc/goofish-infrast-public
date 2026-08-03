@@ -214,6 +214,10 @@ export interface AdminOptimizationQueueSnapshot {
   capacity: {
     queue_limit: number
     worker_concurrency: number
+    worker_instances: number
+    source: 'runtime_registry' | 'configured_fallback'
+    heartbeat_interval_ms: number
+    stale_after_ms: number
   }
   counts: {
     queued: number
@@ -1861,13 +1865,27 @@ function buildDeadLetterDiagnostic(job: OptimizeJobRecord): Record<string, unkno
 }
 
 export async function getAdminOptimizationQueueSnapshot(
-  workerConcurrency: number,
+  configuredFallbackConcurrency?: number,
   recentLimit = 20,
 ): Promise<AdminOptimizationQueueSnapshot> {
   await ensureSchema()
   return withTransaction(async (client) => {
     await client.query('set transaction isolation level repeatable read read only')
     const snapshotResult = await client.query<{ snapshot_at: string | Date }>('select transaction_timestamp() as snapshot_at')
+    const workerCapacity = (await client.query<{
+      worker_concurrency: string
+      worker_instances: string
+      heartbeat_interval_ms: string | null
+      stale_after_ms: string | null
+    }>(
+      `select coalesce(sum(concurrency), 0)::text as worker_concurrency,
+              count(*)::text as worker_instances,
+              max(heartbeat_interval_ms)::text as heartbeat_interval_ms,
+              max(stale_after_ms)::text as stale_after_ms
+         from optimize_worker_registry
+        where draining = false
+          and heartbeat_at + stale_after_ms * interval '1 millisecond' > transaction_timestamp()`,
+    )).rows[0]
     const active = await client.query<AdminOptimizationQueueRow>(
       `${adminOptimizationQueueSelect()}
        where job.status in ('queued', 'running')
@@ -1891,12 +1909,21 @@ export async function getAdminOptimizationQueueSnapshot(
     const queuedJobs = queuedRows.map((row, index) => toAdminOptimizationQueueJob(row, index + 1))
     const runningJobs = runningRows.map((row) => toAdminOptimizationQueueJob(row, null))
     const recentJobs = recent.rows.map((row) => toAdminOptimizationQueueJob(row, null))
+    const registeredConcurrency = Number(workerCapacity?.worker_concurrency ?? 0)
+    const workerInstances = Number(workerCapacity?.worker_instances ?? 0)
+    const useFallback = workerInstances === 0 && configuredFallbackConcurrency !== undefined
 
     return {
       snapshot_at: normalizeTimestamp(snapshotResult.rows[0]?.snapshot_at ?? null) ?? new Date().toISOString(),
       capacity: {
         queue_limit: getOptimizeGlobalQueueLimit(),
-        worker_concurrency: Math.max(1, Math.floor(workerConcurrency)),
+        worker_concurrency: useFallback
+          ? Math.max(1, Math.floor(configuredFallbackConcurrency))
+          : Math.max(0, registeredConcurrency),
+        worker_instances: Math.max(0, workerInstances),
+        source: useFallback ? 'configured_fallback' : 'runtime_registry',
+        heartbeat_interval_ms: Number(workerCapacity?.heartbeat_interval_ms ?? 10_000),
+        stale_after_ms: Number(workerCapacity?.stale_after_ms ?? 30_000),
       },
       counts: {
         queued: queuedJobs.length,

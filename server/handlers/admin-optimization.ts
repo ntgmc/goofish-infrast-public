@@ -11,7 +11,6 @@ import {
   type OptimizationDeadLetterRecord,
   type OptimizationDeadLetterResolution,
 } from '../storage/optimize-job-store'
-import { getOptimizeGlobalWorkerConcurrency } from '../optimize-job-config'
 import { requestOptimizeJobProcessing } from '../optimize-job-signals'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
@@ -27,10 +26,7 @@ export default async function adminOptimizationHandler(req: Request): Promise<Re
   try {
     if (req.method === 'GET') {
       if (view === 'queue') {
-        return noStore(jsonResponse(await getAdminOptimizationQueueSnapshot(
-          getOptimizeGlobalWorkerConcurrency(),
-          20,
-        )))
+        return noStore(jsonResponse(await getAdminOptimizationQueueSnapshot(undefined, 20)))
       }
       if (view === 'dead_letter' || view === 'dead_letter_download') {
         const id = url.searchParams.get('id')?.trim() ?? ''

@@ -3,16 +3,21 @@ import {
   initializeOptimizeJobProcessing,
   shutdownOptimizeJobProcessing,
 } from './optimize-job-runner'
-import {
-  initializeOptimizeQueueMaintenance,
-  shutdownOptimizeQueueMaintenance,
-} from './optimize-queue-maintenance'
-import { initializeBehaviorRiskMaintenance, shutdownBehaviorRiskMaintenance } from './behavior-risk-maintenance'
 import { initializeAuthDataMaintenance, shutdownAuthDataMaintenance } from './auth-data-maintenance'
 import {
   registerOptimizerPort,
   type OptimizerPort,
 } from './optimization/jobs/optimizer-port'
+import {
+  initializeWorkerLifecycleStages,
+  stopWorkerLifecycleStages,
+  waitForWorkerLifecycleStagesIdle,
+} from './worker-lifecycle-stages'
+import {
+  initializeOptimizeWorkerRegistration,
+  stopOptimizeWorkerRegistration,
+  waitForOptimizeWorkerRegistrationIdle,
+} from './optimize-worker-registration'
 
 export function createCombinedProcessHooks(optimizerPort: OptimizerPort): ApiProcessHooks {
   let unregisterOptimizerPort: (() => void) | null = null
@@ -23,14 +28,16 @@ export function createCombinedProcessHooks(optimizerPort: OptimizerPort): ApiPro
   }
 
   const stop = async (graceMs?: number) => {
+    stopOptimizeWorkerRegistration()
+    stopWorkerLifecycleStages()
+    shutdownAuthDataMaintenance()
     try {
       if (graceMs === undefined) await shutdownOptimizeJobProcessing()
       else await shutdownOptimizeJobProcessing(graceMs)
     } finally {
       try {
-        shutdownOptimizeQueueMaintenance()
-        shutdownBehaviorRiskMaintenance()
-        shutdownAuthDataMaintenance()
+        await waitForOptimizeWorkerRegistrationIdle()
+        await waitForWorkerLifecycleStagesIdle()
       } finally {
         releaseOptimizerPort()
       }
@@ -42,10 +49,10 @@ export function createCombinedProcessHooks(optimizerPort: OptimizerPort): ApiPro
       if (unregisterOptimizerPort) return
       unregisterOptimizerPort = registerOptimizerPort(optimizerPort)
       try {
-        await initializeOptimizeQueueMaintenance()
-        await initializeBehaviorRiskMaintenance()
+        await initializeWorkerLifecycleStages()
         await initializeAuthDataMaintenance()
         await initializeOptimizeJobProcessing()
+        await initializeOptimizeWorkerRegistration()
       } catch (error) {
         await stop(0).catch(() => undefined)
         throw error
