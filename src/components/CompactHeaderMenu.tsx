@@ -64,7 +64,7 @@ export default function CompactHeaderMenu({
   const iconTrigger = triggerVariant === 'icon'
 
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root modal={false}>
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
@@ -94,6 +94,7 @@ export default function CompactHeaderMenu({
           sideOffset={8}
           collisionPadding={16}
           sticky="always"
+          updatePositionStrategy="always"
           style={{ maxHeight: 'min(32rem, calc(100dvh - 5rem), var(--radix-dropdown-menu-content-available-height))' }}
           className="z-50 w-[min(18rem,calc(100vw-2rem))] overscroll-contain overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
         >

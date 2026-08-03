@@ -67,7 +67,7 @@ describe('CompactHeaderMenu', () => {
     expect(trigger).toHaveFocus()
   })
 
-  it('constrains the menu to the live mobile viewport after scrolling', async () => {
+  it('keeps the menu visible in the live mobile viewport without locking a scrolled page', async () => {
     const user = userEvent.setup()
     renderMenu()
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 720 })
@@ -75,9 +75,14 @@ describe('CompactHeaderMenu', () => {
 
     await user.click(screen.getByRole('button', { name: '打开栏目菜单' }))
 
-    expect(screen.getByRole('menu')).toHaveStyle({
+    const menu = screen.getByRole('menu')
+    expect(menu).toBeVisible()
+    expect(menu).toHaveStyle({
       maxHeight: 'min(32rem, calc(100dvh - 5rem), var(--radix-dropdown-menu-content-available-height))',
     })
+    expect(menu.closest('[data-radix-popper-content-wrapper]')).toHaveStyle({ position: 'fixed' })
+    expect(document.body.style.pointerEvents).toBe('')
+    expect(document.body.style.overflow).toBe('')
   })
 })
 
