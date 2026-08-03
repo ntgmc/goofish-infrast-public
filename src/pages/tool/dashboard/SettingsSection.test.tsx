@@ -57,8 +57,14 @@ describe('SettingsSection privacy controls', () => {
     const onPayload = vi.fn()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ user: { id: 'user-1' }, profiles: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ user: { id: 'user-1' }, profiles: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
     vi.stubGlobal('fetch', fetchMock)
     render(<SettingsSection profiles={[{
       id: 'profile-1', user_id: 'user-1', kind: 'cdk', permission: 'growth', status: 'active', cdk_order_hash: 'order-1',
@@ -87,7 +93,7 @@ describe('SettingsSection privacy controls', () => {
       ok: true,
       scheduled_for: '2026-08-07T00:00:00.000Z',
       cancellation_email: 'queued',
-    }), { status: 202 })))
+    }), { status: 202, headers: { 'Content-Type': 'application/json' } })))
     render(<SettingsSection profiles={[]} onLogout={onLogout} onPayload={vi.fn()} />)
 
     const email = screen.getByLabelText('确认邮箱')

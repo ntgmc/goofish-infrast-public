@@ -9,7 +9,6 @@ import type {
 import DeadLetterPanel from './DeadLetterPanel'
 
 const POLL_INTERVAL_MS = 5_000
-const HEARTBEAT_STALE_MS = 60_000
 
 type Filters = {
   query: string
@@ -122,7 +121,16 @@ export default function QueueMonitorPanel() {
         ) : (
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <QueueMetric label="等待任务" value={`${snapshot.counts.queued} / ${snapshot.capacity.queue_limit}`} hint="当前排队 / 全局容量" tone={snapshot.counts.queued >= snapshot.capacity.queue_limit ? 'warning' : 'default'} />
-            <QueueMetric label="正在执行" value={`${snapshot.counts.running} / ${snapshot.capacity.worker_concurrency}`} hint="当前执行 / 全局并发" tone={snapshot.counts.running >= snapshot.capacity.worker_concurrency ? 'current' : 'default'} />
+            <QueueMetric
+              label="正在执行"
+              value={`${snapshot.counts.running} / ${snapshot.capacity.worker_concurrency}`}
+              hint={snapshot.capacity.worker_instances > 0
+                ? `当前执行 / ${snapshot.capacity.worker_instances} 个活跃 Worker 实际并发`
+                : '无活跃 Worker；任务不会被消费'}
+              tone={snapshot.capacity.worker_concurrency === 0
+                ? 'error'
+                : snapshot.counts.running >= snapshot.capacity.worker_concurrency ? 'current' : 'default'}
+            />
             <QueueMetric label="重试等待" value={String(snapshot.counts.retry_waiting)} hint="已有执行尝试的排队任务" tone={snapshot.counts.retry_waiting > 0 ? 'warning' : 'default'} />
             <QueueMetric label="近期失败" value={String(snapshot.counts.recent_failed)} hint="最近 20 条终态任务" tone={snapshot.counts.recent_failed > 0 ? 'error' : 'default'} />
           </div>
@@ -148,6 +156,7 @@ export default function QueueMonitorPanel() {
             description="关注 Worker、运行时长、最后心跳和取消请求状态。"
             jobs={filtered.running}
             total={snapshot.running_jobs.length}
+            heartbeatStaleMs={snapshot.capacity.stale_after_ms}
             expandedJobs={expandedJobs}
             onToggle={toggleJob}
           />
@@ -225,12 +234,13 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
   )
 }
 
-function QueueJobsSection({ id, title, description, jobs, total, expandedJobs, onToggle }: {
+function QueueJobsSection({ id, title, description, jobs, total, heartbeatStaleMs, expandedJobs, onToggle }: {
   id: string
   title: string
   description: string
   jobs: AdminOptimizationQueueJob[]
   total: number
+  heartbeatStaleMs?: number
   expandedJobs: Set<string>
   onToggle: (id: string) => void
 }) {
@@ -244,13 +254,13 @@ function QueueJobsSection({ id, title, description, jobs, total, expandedJobs, o
         <span className="tool-status tool-status--current">{jobs.length} / {total}</span>
       </div>
       <div className="p-5">
-        <QueueJobsContent jobs={jobs} expandedJobs={expandedJobs} onToggle={onToggle} />
+        <QueueJobsContent jobs={jobs} heartbeatStaleMs={heartbeatStaleMs} expandedJobs={expandedJobs} onToggle={onToggle} />
       </div>
     </section>
   )
 }
 
-function QueueJobsContent({ jobs, expandedJobs, onToggle }: { jobs: AdminOptimizationQueueJob[]; expandedJobs: Set<string>; onToggle: (id: string) => void }) {
+function QueueJobsContent({ jobs, heartbeatStaleMs, expandedJobs, onToggle }: { jobs: AdminOptimizationQueueJob[]; heartbeatStaleMs?: number; expandedJobs: Set<string>; onToggle: (id: string) => void }) {
   if (jobs.length === 0) return <p className="py-6 text-center text-sm text-ink-muted">当前筛选条件下没有任务。</p>
   return (
     <>
@@ -269,7 +279,7 @@ function QueueJobsContent({ jobs, expandedJobs, onToggle }: { jobs: AdminOptimiz
             {jobs.map((job) => {
               const expanded = expandedJobs.has(job.id)
               return (
-                <JobTableRows key={job.id} job={job} expanded={expanded} onToggle={onToggle} />
+                <JobTableRows key={job.id} job={job} heartbeatStaleMs={heartbeatStaleMs} expanded={expanded} onToggle={onToggle} />
               )
             })}
           </tbody>
@@ -298,7 +308,7 @@ function QueueJobsContent({ jobs, expandedJobs, onToggle }: { jobs: AdminOptimiz
   )
 }
 
-function JobTableRows({ job, expanded, onToggle }: { job: AdminOptimizationQueueJob; expanded: boolean; onToggle: (id: string) => void }) {
+function JobTableRows({ job, heartbeatStaleMs, expanded, onToggle }: { job: AdminOptimizationQueueJob; heartbeatStaleMs?: number; expanded: boolean; onToggle: (id: string) => void }) {
   return (
     <>
       <tr className="align-top hover:bg-surface-2/50">
@@ -317,7 +327,7 @@ function JobTableRows({ job, expanded, onToggle }: { job: AdminOptimizationQueue
           <p className="text-ink-secondary">{sourceLabel(job.source)}</p>
           <p className="mt-1 text-xs text-ink-muted">{job.priority.label} · {job.priority.value}</p>
         </td>
-        <td className="py-3 pr-4"><StatusPill status={job.status} />{heartbeatWarning(job)}</td>
+        <td className="py-3 pr-4"><StatusPill status={job.status} />{heartbeatWarning(job, heartbeatStaleMs)}</td>
         <td className="py-3">
           <p className="whitespace-nowrap text-ink-secondary">{timingLabel(job)}</p>
           <p className="mt-1 text-xs text-ink-muted">尝试 {job.attempt_count} · 失败 {job.failure_count}</p>
@@ -392,9 +402,14 @@ function timingLabel(job: AdminOptimizationQueueJob): string {
   return job.finished_at ? `结束于 ${formatDateTime(job.finished_at)}` : `更新于 ${formatDateTime(job.updated_at)}`
 }
 
-function heartbeatWarning(job: AdminOptimizationQueueJob) {
-  if (job.status !== 'running' || !job.heartbeat_at || Date.now() - Date.parse(job.heartbeat_at) <= HEARTBEAT_STALE_MS) return null
-  return <p className="mt-2 text-xs font-semibold text-warning">心跳已超过 60 秒</p>
+function heartbeatWarning(job: AdminOptimizationQueueJob, staleAfterMs = 60_000) {
+  if (job.status !== 'running' || !job.heartbeat_at || Date.now() - Date.parse(job.heartbeat_at) <= staleAfterMs) return null
+  return <p className="mt-2 text-xs font-semibold text-warning">心跳已超过 {formatDuration(staleAfterMs)}</p>
+}
+
+function formatDuration(milliseconds: number): string {
+  const seconds = Math.max(1, Math.ceil(milliseconds / 1_000))
+  return seconds < 60 ? `${seconds} 秒` : `${Math.ceil(seconds / 60)} 分钟`
 }
 
 function formatElapsed(from: number, to: number): string {

@@ -12,7 +12,6 @@ const JOBS_PATH = '/api/optimization/jobs'
 const REORDER_CHECKS_PATH = '/api/optimization/reorder-checks'
 
 export default async function optimizationHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204 })
 
   const pathname = new URL(req.url).pathname
   if (pathname === JOBS_PATH) {

@@ -1,4 +1,26 @@
 {
   "schema_version": 1,
-  "optimizer_port_version": 1
+  "optimizer_port_version": 1,
+  "private_composition": {
+    "public_source_pin": {
+      "kind": "git_commit_sha",
+      "required": true
+    },
+    "entry_points": [
+      "server/worker.ts",
+      "server/all.ts",
+      "server/optimize-worker.ts"
+    ],
+    "required_outputs": [
+      "server/dist/worker.js",
+      "server/dist/all.js",
+      "server/dist/optimize-worker.js"
+    ],
+    "acceptance_checks": [
+      "worker_startup",
+      "worker_thread_entry",
+      "health_ready",
+      "graceful_shutdown"
+    ]
+  }
 }

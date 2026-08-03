@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import {
   authenticateAdminRequest,
   createAdminUser,
@@ -9,13 +10,10 @@ import { PasswordWorkCapacityError } from '../security/password'
 import {
   CDK_PRODUCT_PERMISSIONS,
   getCdkRecordStore,
-  isProfileCdkRecord,
   jsonResponse,
-  setOperatorBaselineByAdmin,
   type CdkRecord,
 } from './license-utils'
 import {
-  deleteSessionsForUser,
   deleteUserAccount,
   emptyWorkspace,
   getUserByEmail,
@@ -27,15 +25,21 @@ import {
   listProfileWorkspaces,
   listAdminUserAccountsPage,
   normalizeProfileKind,
-  saveProfileWorkspace,
-  saveUserProfile,
-  saveUserAccount,
+  saveUserProfileByAdmin,
+  saveUserAccountByAdmin,
   toPublicProfile,
   type UserAccountRecord,
   type UserGameAccountRecord,
   type UserWorkspaceRecord,
+  AdminProfileMutationConflictError,
 } from '../storage/user-store'
-import { AdminPaginationError, buildAdminPagination, parseAdminPageRequest } from './admin-pagination'
+import {
+  AdminPaginationError,
+  buildAdminPagination,
+  parseAdminPageRequest,
+  parseAdminProfilePageRequest,
+  type AdminProfilePageRequest,
+} from './admin-pagination'
 import { resetUserPasswordByAdmin } from './user-auth'
 import type { AdminUserWorkspaceExportV1, ProductPermissionMode } from '../../src/lib/types'
 import { requestSchemas } from '../security/request-policy'
@@ -45,17 +49,35 @@ import {
   listPersonalUseDeclarationUsageEventsForUser,
 } from '../storage/personal-use-declaration-store'
 import { recordAccountDeletedBehaviorEvent } from '../behavior-risk/service'
+import { getRequestClientIp } from '../security/client-ip'
+import { recordAdminOperationAudit } from '../storage/admin-operation-audit-store'
+import { listCdkRecordsByKeys } from '../storage/cdk-store'
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
 
   try {
     if (req.method === 'POST') {
       const body = await getValidatedJson(req, requestSchemas.adminUserCreate)
-      const authentication = await requireRootAdminPassword(req, body.root_password)
-      if (!authentication.ok) return authentication.response
-      const created = await createAdminUser(body.username, body.password, body.role)
-      if (!created.ok) return jsonResponse({ error: created.message }, 400)
+      const existingAdmins = await listAdminUsers()
+      const currentAdmin = existingAdmins.length === 0
+        ? null
+        : await authenticateAdminRequest(req, { capability: 'admin_manage', requireRecentLogin: true })
+      if (currentAdmin && !currentAdmin.ok) return currentAdmin.response
+      const rootAuthentication = await requireRootAdminPassword(req, body.root_password)
+      if (!rootAuthentication.ok) return rootAuthentication.response
+      const auditContext = buildAdminAuditContext(
+        req,
+        currentAdmin?.ok ? currentAdmin.username : rootAuthentication.username,
+        body.reason,
+      )
+      const created = await createAdminUser(
+        body.username,
+        body.password,
+        body.role,
+        body.replace_existing === true,
+        auditContext,
+      )
+      if (!created.ok) return jsonResponse({ error: created.message, code: created.code }, created.code === 'already_exists' ? 409 : 400)
       return jsonResponse({
         user: {
           username: created.user.username,
@@ -63,31 +85,60 @@ export default async (req: Request): Promise<Response> => {
           created_at: created.user.created_at,
           updated_at: created.user.updated_at,
         },
+        replaced: created.replaced,
       })
     }
 
     if (req.method === 'GET') {
-      const authentication = await authenticateAdminRequest(req)
-      if (!authentication.ok) return authentication.response
       const url = new URL(req.url)
       const userId = url.searchParams.get('user_id')
       const profileId = url.searchParams.get('profile_id')
-      if (url.searchParams.get('include') === 'workspaces') {
+      const include = url.searchParams.get('include')
+      const authentication = await authenticateAdminRequest(
+        req,
+        include === 'workspaces' || include === 'operators' || Boolean(userId)
+          ? 'sensitive_data_view'
+          : 'user_view',
+      )
+      if (!authentication.ok) return authentication.response
+      if (include === 'workspaces') {
         const user = await findTargetUser({ user_id: userId })
         if (!user) return jsonResponse({ error: '用户不存在。' }, 404)
+        await auditOperation(req, {
+          actorUsername: authentication.username,
+          action: 'user_workspace.export',
+          targetType: 'user',
+          targetId: user.id,
+          reason: '管理员导出用户工作区数据。',
+        })
         return exportAdminUserWorkspaces(user)
       }
-      if (url.searchParams.get('include') === 'operators') {
+      if (include === 'operators') {
         const user = await findTargetUser({ user_id: userId })
         if (!user) return jsonResponse({ error: '用户不存在。' }, 404)
         const profile = await findTargetProfile({ profile_id: profileId }, user)
         if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
+        await auditOperation(req, {
+          actorUsername: authentication.username,
+          action: 'profile_operators.view',
+          targetType: 'profile',
+          targetId: profile.id,
+          reason: '管理员查看完整干员数据。',
+        })
         return jsonResponse({ operator_data: await buildAdminProfileOperatorData(user, profile) })
       }
       if (userId) {
         const user = await getUserById(userId)
         if (!user) return jsonResponse({ error: '用户不存在。' }, 404)
-        return jsonResponse({ detail: await buildAdminUserDetail(user) })
+        const profilePage = parseAdminProfilePageRequest(url)
+        await auditOperation(req, {
+          actorUsername: authentication.username,
+          action: 'user_sensitive_detail.view',
+          targetType: 'user',
+          targetId: user.id,
+          reason: '管理员查看用户敏感详情。',
+        })
+        return jsonResponse({ detail: await buildAdminUserDetail(user, profilePage) })
       }
       const request = parseAdminPageRequest(url)
       const result = await listAdminUserAccountsPage(request)
@@ -110,22 +161,8 @@ export default async (req: Request): Promise<Response> => {
 
     if (req.method === 'PATCH') {
       const body = await getValidatedJson(req, requestSchemas.adminUserPatch)
-      const authentication = await authenticateAdminRequest(req)
+      const authentication = await authenticateAdminRequest(req, adminUserActionRequirement(body.action))
       if (!authentication.ok) return authentication.response
-      if (
-        body.action !== 'reset_password'
-        && body.action !== 'freeze_account'
-        && body.action !== 'unfreeze_account'
-        && body.action !== 'delete_account'
-        && body.action !== 'update_profile'
-        && body.action !== 'set_profile_status'
-        && body.action !== 'set_profile_permission'
-        && body.action !== 'upgrade_preview_profile'
-        && body.action !== 'clear_profile_skland_binding'
-        && body.action !== 'clear_profile_workspace'
-      ) {
-        return jsonResponse({ error: '未知操作。' }, 400)
-      }
       const target = await findTargetUser(body)
       if (!target) return jsonResponse({ error: '用户不存在。' }, 404)
 
@@ -140,24 +177,41 @@ export default async (req: Request): Promise<Response> => {
         const profile = await findTargetProfile(body, target)
         if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
         if (profile.user_id !== target.id) return jsonResponse({ error: '档案不属于目标用户。' }, 409)
+        if (body.expected_updated_at !== profile.updated_at) {
+          return jsonResponse({ error: '账号档案已被其他请求修改，请刷新后重试。' }, 409)
+        }
 
         if (body.action === 'update_profile') {
-          const updated = await updateProfileSummary(profile, body.display_name, body.note)
+          const updated = await updateProfileSummary(
+            profile,
+            body.display_name,
+            body.note,
+            profileMutationContext(req, authentication.username, body.action, body.reason),
+          )
           return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(updated) })
         }
 
         if (body.action === 'set_profile_status') {
           const status = normalizeStatus(body.status)
           if (!status) return jsonResponse({ error: '档案状态必须是 active、frozen 或 revoked。' }, 400)
-          const updated = await saveProfilePatch(profile, { status })
+          const updated = await saveProfilePatch(
+            profile,
+            { status },
+            profileMutationContext(req, authentication.username, body.action, body.reason),
+          )
           return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(updated) })
         }
 
         if (body.action === 'set_profile_permission') {
           const permission = normalizeProductPermission(body.permission)
           if (!permission) return jsonResponse({ error: '档案权限必须是 recommended、growth、advanced 或 ultimate。' }, 400)
-          const updated = await saveProfilePatch(profile, { permission })
-          await syncLinkedCdkPermission(updated, permission)
+          const updated = await saveProfilePatch(
+            profile,
+            { permission },
+            profileMutationContext(req, authentication.username, body.action, body.reason, {
+              linkedCdkPermission: permission,
+            }),
+          )
           return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(updated) })
         }
 
@@ -173,40 +227,43 @@ export default async (req: Request): Promise<Response> => {
             cdk_key: null,
             cdk_code_hash: null,
             cdk_order_hash: null,
-          })
+          }, profileMutationContext(req, authentication.username, body.action, body.reason))
           return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(updated) })
         }
 
         if (body.action === 'clear_profile_skland_binding') {
-          if (profile.cdk_key) {
-            const cdk = await (await getCdkRecordStore()).get(profile.cdk_key)
-            if (cdk && isProfileCdkRecord(cdk) && (cdk.status === 'used' || cdk.status === 'frozen')) {
-              const reset = await setOperatorBaselineByAdmin(cdk, {
-                source: 'next_import',
-                reason: '管理员清除森空岛绑定，等待下次有效导入建立新干员基线。',
-                unfreeze: false,
-                eventType: 'admin_operator_baseline_reset',
-                reviewed: false,
-              })
-              if (!reset) return jsonResponse({ error: '重置关联 CDK 的干员基线失败，绑定未清除。' }, 409)
-            }
-          }
           const updated = await saveProfilePatch(profile, {
             skland_binding: null,
             skland_pending_binding: null,
             skland_risk: null,
-          })
+          }, profileMutationContext(req, authentication.username, body.action, body.reason, {
+            resetLinkedCdkOperatorBaselineReason: '管理员清除森空岛绑定，等待下次有效导入建立新干员基线。',
+          }))
           return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(updated) })
         }
 
         if (body.action === 'clear_profile_workspace') {
-          await saveProfileWorkspace(emptyWorkspace(profile.id))
-          return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(profile) })
+          const updated = await saveProfilePatch(
+            profile,
+            {},
+            profileMutationContext(req, authentication.username, body.action, body.reason, {
+              workspace: emptyWorkspace(profile.id),
+              expectedWorkspaceUpdatedAt: body.expected_workspace_updated_at,
+            }),
+          )
+          return jsonResponse({ ok: true, detail: await buildAdminUserDetail(target), profile: await buildAdminProfileSummary(updated) })
         }
       }
 
       if (body.action === 'reset_password') {
-        const reset = await resetUserPasswordByAdmin(target, body.new_password)
+        const reset = await resetUserPasswordByAdmin(target, body.new_password, buildAuditOperationInput(req, {
+          actorUsername: authentication.username,
+          action: 'user.reset_password',
+          targetType: 'user',
+          targetId: target.id,
+          reason: body.reason,
+          before: userAuditSnapshot(target),
+        }))
         if (!reset.ok) {
           return jsonResponse({ error: reset.message, ...(reset.code && { code: reset.code }) }, reset.status)
         }
@@ -215,8 +272,14 @@ export default async (req: Request): Promise<Response> => {
 
       if (body.action === 'freeze_account' || body.action === 'unfreeze_account') {
         const status = body.action === 'freeze_account' ? 'frozen' : 'active'
-        const updated = await setUserStatus(target, status)
-        if (status !== 'active') await deleteSessionsForUser(target.id)
+        const updated = await setUserStatus(target, status, buildAuditOperationInput(req, {
+          actorUsername: authentication.username,
+          action: `user.${body.action}`,
+          targetType: 'user',
+          targetId: target.id,
+          reason: body.reason,
+          before: userAuditSnapshot(target),
+        }))
         return jsonResponse({ ok: true, user: toAdminAppUser(updated), detail: await buildAdminUserDetail(updated) })
       }
 
@@ -227,8 +290,20 @@ export default async (req: Request): Promise<Response> => {
         if (confirmedEmail !== target.email) {
           return jsonResponse({ error: '确认邮箱不匹配。' }, 400)
         }
-        await deleteUserAccount(target.id)
-        await recordAccountDeletedBehaviorEvent(target.id)
+        await deleteUserAccount(target.id, buildAuditOperationInput(req, {
+          actorUsername: authentication.username,
+          action: 'user.delete_account',
+          targetType: 'user',
+          targetId: target.id,
+          reason: body.reason,
+          before: userAuditSnapshot(target),
+          after: { deleted: true },
+        }))
+        try {
+          await recordAccountDeletedBehaviorEvent(target.id)
+        } catch (error) {
+          console.warn('account deletion behavior event could not be recorded:', error instanceof Error ? error.name : 'UnknownError')
+        }
         return jsonResponse({ ok: true, deleted: true, user: { id: target.id, email: target.email } })
       }
 
@@ -237,9 +312,14 @@ export default async (req: Request): Promise<Response> => {
 
     if (req.method === 'DELETE') {
       const body = await getValidatedJson(req, requestSchemas.adminUserDelete)
-      const authentication = await requireRootAdminPassword(req, body.root_password)
+      const authentication = await authenticateAdminRequest(req, { capability: 'admin_manage', requireRecentLogin: true })
       if (!authentication.ok) return authentication.response
-      const deleted = await deleteAdminUser(body.username)
+      const rootAuthentication = await requireRootAdminPassword(req, body.root_password)
+      if (!rootAuthentication.ok) return rootAuthentication.response
+      const deleted = await deleteAdminUser(
+        body.username,
+        buildAdminAuditContext(req, authentication.username, body.reason),
+      )
       if (!deleted.ok) return jsonResponse({ error: deleted.message }, 400)
       return jsonResponse({ deleted: true })
     }
@@ -247,6 +327,7 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
     if (error instanceof AdminPaginationError) return jsonResponse({ error: error.message }, 400)
+    if (error instanceof AdminProfileMutationConflictError) return jsonResponse({ error: error.message }, 409)
     if (error instanceof PasswordWorkCapacityError) {
       return jsonResponse(
         { error: '认证服务繁忙，请稍后重试。' },
@@ -260,6 +341,67 @@ export default async (req: Request): Promise<Response> => {
     }
     console.error('admin users error:', error)
     return jsonResponse({ error: 'Internal server error' }, 500)
+  }
+}
+
+function adminUserActionRequirement(action: string) {
+  if (action === 'delete_account') {
+    return { capability: 'user_delete' as const, requireRecentLogin: true }
+  }
+  const requireRecentLogin = action === 'reset_password'
+    || action === 'set_profile_permission'
+    || action === 'upgrade_preview_profile'
+    || action === 'clear_profile_skland_binding'
+    || action === 'clear_profile_workspace'
+  return { capability: 'user_manage' as const, requireRecentLogin }
+}
+
+async function auditOperation(
+  req: Request,
+  input: Omit<Parameters<typeof recordAdminOperationAudit>[0], 'requestId' | 'clientIp'>,
+): Promise<void> {
+  await recordAdminOperationAudit(buildAuditOperationInput(req, input))
+}
+
+function buildAuditOperationInput(
+  req: Request,
+  input: Omit<Parameters<typeof recordAdminOperationAudit>[0], 'requestId' | 'clientIp'>,
+): Parameters<typeof recordAdminOperationAudit>[0] {
+  return {
+    ...input,
+    requestId: req.headers.get('x-request-id')?.trim() || randomUUID(),
+    clientIp: getRequestClientIp(req),
+  }
+}
+
+function userAuditSnapshot(user: UserAccountRecord) {
+  return { id: user.id, email: user.email, status: user.status, permission: user.permission, updated_at: user.updated_at }
+}
+
+function buildAdminAuditContext(req: Request, actorUsername: string, reason: string) {
+  const { requestId, clientIp } = buildAuditOperationInput(req, {
+    actorUsername,
+    action: 'admin_user.pending',
+    targetType: 'admin_user',
+    targetId: 'pending',
+    reason,
+  })
+  return { actorUsername, reason, requestId, clientIp }
+}
+
+function profileAuditSnapshot(profile: UserGameAccountRecord) {
+  return {
+    id: profile.id,
+    user_id: profile.user_id,
+    status: profile.status,
+    permission: profile.permission,
+    kind: normalizeProfileKind(profile),
+    display_name: profile.display_name,
+    note: profile.note,
+    has_skland_binding: Boolean(profile.skland_binding),
+    has_skland_pending_binding: Boolean(profile.skland_pending_binding),
+    has_skland_risk: Boolean(profile.skland_risk),
+    updated_at: profile.updated_at,
   }
 }
 
@@ -281,13 +423,17 @@ async function findTargetProfile(body: { profile_id?: unknown }, user: UserAccou
 async function setUserStatus(
   user: UserAccountRecord,
   status: UserAccountRecord['status'],
+  audit: Parameters<typeof saveUserAccountByAdmin>[1]['audit'],
 ): Promise<UserAccountRecord> {
   const updated: UserAccountRecord = {
     ...user,
     status,
     updated_at: new Date().toISOString(),
   }
-  await saveUserAccount(updated)
+  await saveUserAccountByAdmin(updated, {
+    revokeSessions: status !== 'active',
+    audit: { ...audit, after: userAuditSnapshot(updated) },
+  })
   return updated
 }
 
@@ -295,33 +441,60 @@ async function updateProfileSummary(
   profile: UserGameAccountRecord,
   displayNameValue: unknown,
   noteValue: unknown,
+  context: AdminProfileMutationContext,
 ): Promise<UserGameAccountRecord> {
   const displayName = normalizeDisplayName(displayNameValue) || profile.display_name || '账号'
   const note = normalizeNote(noteValue)
-  return saveProfilePatch(profile, { display_name: displayName, note })
+  return saveProfilePatch(profile, { display_name: displayName, note }, context)
+}
+
+type AdminProfileMutationContext = Omit<Parameters<typeof saveUserProfileByAdmin>[1], 'expectedUpdatedAt' | 'audit'> & {
+  audit: Omit<Parameters<typeof recordAdminOperationAudit>[0], 'requestId' | 'clientIp' | 'before' | 'after'>
+  req: Request
+}
+
+function profileMutationContext(
+  req: Request,
+  actorUsername: string,
+  action: string,
+  reason: string,
+  options: Omit<Parameters<typeof saveUserProfileByAdmin>[1], 'expectedUpdatedAt' | 'audit'> = {},
+): AdminProfileMutationContext {
+  return {
+    ...options,
+    req,
+    audit: {
+      actorUsername,
+      action: `profile.${action}`,
+      targetType: 'profile',
+      targetId: '',
+      reason,
+    },
+  }
 }
 
 async function saveProfilePatch(
   profile: UserGameAccountRecord,
   patch: Partial<UserGameAccountRecord>,
+  context: AdminProfileMutationContext,
 ): Promise<UserGameAccountRecord> {
   const updated: UserGameAccountRecord = {
     ...profile,
     ...patch,
     updated_at: new Date().toISOString(),
   }
-  await saveUserProfile(updated)
+  const { req, audit, ...storageOptions } = context
+  await saveUserProfileByAdmin(updated, {
+    ...storageOptions,
+    expectedUpdatedAt: profile.updated_at,
+    audit: buildAuditOperationInput(req, {
+      ...audit,
+      targetId: updated.id,
+      before: profileAuditSnapshot(profile),
+      after: profileAuditSnapshot(updated),
+    }),
+  })
   return updated
-}
-
-async function syncLinkedCdkPermission(profile: UserGameAccountRecord, permission: ProductPermissionMode): Promise<void> {
-  if (!profile.cdk_key) return
-  const store = await getCdkRecordStore()
-  const record = await store.get(profile.cdk_key)
-  if (!record || !isProfileCdkRecord(record)) return
-  await store.mutate(profile.cdk_key, (current) => (
-    isProfileCdkRecord(current) ? { ...current, permission } : current
-  ))
 }
 
 async function exportAdminUserWorkspaces(user: UserAccountRecord): Promise<Response> {
@@ -370,11 +543,21 @@ async function exportAdminUserWorkspaces(user: UserAccountRecord): Promise<Respo
   })
 }
 
-async function buildAdminUserDetail(user: UserAccountRecord) {
-  const [profiles, personalUseDeclarations, personalUseUsageEvents] = await Promise.all([
+async function buildAdminUserDetail(
+  user: UserAccountRecord,
+  profilePage: AdminProfilePageRequest = { page: 1, pageSize: 100 },
+) {
+  const [allProfiles, personalUseDeclarations, personalUseUsageEvents] = await Promise.all([
     listProfilesForUser(user.id),
     listPersonalUseDeclarationAcceptancesForUser(user.id),
     listPersonalUseDeclarationUsageEventsForUser(user.id),
+  ])
+  const pagination = buildAdminPagination(profilePage.page, profilePage.pageSize, allProfiles.length)
+  const profileOffset = (pagination.page - 1) * pagination.page_size
+  const profiles = allProfiles.slice(profileOffset, profileOffset + pagination.page_size)
+  const [workspaceMap, cdkMap] = await Promise.all([
+    listProfileWorkspaces(profiles.map((profile) => profile.id)),
+    listCdkRecordsByKeys(profiles.flatMap((profile) => profile.cdk_key ? [profile.cdk_key] : [])),
   ])
   const personalUseAudit = [
     ...personalUseDeclarations.map((acceptance) => ({
@@ -399,15 +582,28 @@ async function buildAdminUserDetail(user: UserAccountRecord) {
     })),
   ].sort((left, right) => right.accepted_at.localeCompare(left.accepted_at))
   return {
-    user: { ...toAdminAppUser(user, profiles), profile_count: profiles.length },
-    profiles: await Promise.all(profiles.map((profile) => buildAdminProfileSummary(profile))),
+    user: { ...toAdminAppUser(user, allProfiles), profile_count: allProfiles.length },
+    profiles: await Promise.all(profiles.map((profile) => buildAdminProfileSummary(profile, {
+      workspace: workspaceMap.get(profile.id) ?? null,
+      cdk: profile.cdk_key ? cdkMap.get(profile.cdk_key) ?? null : null,
+    }))),
+    profile_pagination: {
+      ...pagination,
+      returned: profiles.length,
+      truncated: allProfiles.length > profiles.length,
+    },
     personal_use_declarations: personalUseAudit,
   }
 }
 
-async function buildAdminProfileSummary(profile: UserGameAccountRecord) {
-  const workspace = await getProfileWorkspace(profile.id)
-  const cdk = profile.cdk_key ? await (await getCdkRecordStore()).get(profile.cdk_key) : null
+async function buildAdminProfileSummary(
+  profile: UserGameAccountRecord,
+  prefetched?: { workspace: UserWorkspaceRecord | null; cdk: CdkRecord | null },
+) {
+  const workspace = prefetched ? prefetched.workspace : await getProfileWorkspace(profile.id)
+  const cdk = prefetched
+    ? prefetched.cdk
+    : profile.cdk_key ? await (await getCdkRecordStore()).get(profile.cdk_key) : null
   const publicProfile = toPublicProfile(profile, workspace)
   return {
     ...publicProfile,

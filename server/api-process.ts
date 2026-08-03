@@ -11,8 +11,15 @@ import {
   markServiceReady,
   markServiceStopped,
 } from './lifecycle'
+import { describeServerError } from './security/error-reporting'
+import { resolveTrustedProxyAddresses } from './security/client-ip'
 import { closePool } from './storage/postgres'
+import { ensureDatabaseSchema } from './storage/schema'
 import { ensureSklandServiceConfiguration } from './skland-config'
+import {
+  resolveProcessShutdownDeadlineMs,
+  scheduleProcessHardExit,
+} from './process-shutdown-deadline'
 
 export type ApiProcessHooks = {
   initialize: () => Promise<void>
@@ -24,6 +31,7 @@ type ApiProcessDependencies = {
   createServer?: typeof createApiServer
   startAccountDeletion?: typeof startAccountDeletionWorker
   closeDatabase?: typeof closePool
+  ensureDatabase?: typeof ensureDatabaseSchema
   host?: string
   port?: number
 }
@@ -46,17 +54,21 @@ export function createApiProcess(
   hooks: ApiProcessHooks,
   dependencies: ApiProcessDependencies = {},
 ): ApiProcessController {
-  const port = dependencies.port ?? Number(process.env.PORT || 3000)
+  const port = dependencies.port ?? resolveApiPort()
   const host = dependencies.host ?? process.env.HOST ?? '127.0.0.1'
   validateProductionBoundaryConfig(host)
+  resolveProcessShutdownDeadlineMs()
 
   const server = (dependencies.createServer ?? createApiServer)()
   const startAccountDeletion = dependencies.startAccountDeletion ?? startAccountDeletionWorker
   const closeDatabase = dependencies.closeDatabase ?? closePool
+  const ensureDatabase = dependencies.ensureDatabase ?? ensureDatabaseSchema
   let accountDeletionWorker: AccountDeletionWorkerController | null = null
   let shutdownPromise: Promise<void> | null = null
+  let cancelHardExit: (() => void) | null = null
 
   async function start(): Promise<void> {
+    await ensureDatabase()
     await hooks.initialize()
     if (getServiceLifecycleState() !== 'starting') return
     accountDeletionWorker = startAccountDeletion()
@@ -71,11 +83,12 @@ export function createApiProcess(
   }
 
   async function handleStartupFailure(error: unknown): Promise<void> {
-    console.error('server startup failed:', error)
+    cancelHardExit = scheduleProcessHardExit(false)
+    logServerError('server startup failed', error)
     beginServiceDrain()
     accountDeletionWorker?.stop()
     await Promise.resolve(hooks.forceDrain()).catch((forceDrainError) => {
-      console.error('server startup force drain failed:', forceDrainError)
+      logServerError('server startup force drain failed', forceDrainError)
     })
     server.closeAllConnections?.()
     await closeServer(server).catch(() => undefined)
@@ -83,24 +96,34 @@ export function createApiProcess(
     await closeDatabase().catch(() => undefined)
     markServiceStopped()
     process.exitCode = 1
+    cancelHardExit()
+    cancelHardExit = null
   }
 
   function startShutdown(signal: NodeJS.Signals): Promise<void> {
     if (shutdownPromise) {
       console.warn(`received ${signal} while already draining; forcing open HTTP connections closed`)
+      cancelHardExit?.()
+      cancelHardExit = scheduleProcessHardExit(true)
       server.closeAllConnections?.()
       void Promise.resolve(hooks.forceDrain()).catch((error) => {
-        console.error('server force drain failed:', error)
+        logServerError('server force drain failed', error)
       })
       process.exitCode = 1
       return shutdownPromise
     }
 
     beginServiceDrain()
-    shutdownPromise = shutdown(signal).catch((error) => {
-      console.error('server shutdown failed:', error)
-      process.exitCode = 1
-    })
+    cancelHardExit = scheduleProcessHardExit(false)
+    shutdownPromise = shutdown(signal)
+      .then(() => {
+        cancelHardExit?.()
+        cancelHardExit = null
+      })
+      .catch((error) => {
+        logServerError('server shutdown failed', error)
+        process.exitCode = 1
+      })
     return shutdownPromise
   }
 
@@ -120,6 +143,25 @@ export function createApiProcess(
   }
 
   return { server, start, handleStartupFailure, startShutdown }
+}
+
+export function resolveApiPort(
+  environment: Pick<NodeJS.ProcessEnv, 'PORT'> = process.env,
+): number {
+  const rawValue = environment.PORT?.trim()
+  if (!rawValue) return 3_000
+  const configured = Number(rawValue)
+  if (!Number.isFinite(configured)
+    || !Number.isInteger(configured)
+    || configured < 1
+    || configured > 65_535) {
+    throw new Error('PORT must be an integer between 1 and 65535')
+  }
+  return configured
+}
+
+function logServerError(message: string, error: unknown): void {
+  console.error(message, describeServerError(error))
 }
 
 function listen(target: Server, port: number, host: string): Promise<void> {
@@ -148,6 +190,9 @@ function validateProductionBoundaryConfig(listenHost: string): void {
   }
   const publicAppUrl = process.env.PUBLIC_APP_URL?.trim()
   if (!publicAppUrl) throw new Error('PUBLIC_APP_URL is required in production')
+  if (resolveTrustedProxyAddresses().length === 0) {
+    throw new Error('TRUSTED_PROXY_ADDRESSES is required in production')
+  }
   let parsed: URL
   try {
     parsed = new URL(publicAppUrl)

@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createApiProcess, type ApiProcessHooks } from './api-process'
+import { createApiProcess, resolveApiPort, type ApiProcessHooks } from './api-process'
 import {
   getServiceLifecycleState,
   setServiceLifecycleStateForTesting,
@@ -28,8 +28,10 @@ describe('API process lifecycle', () => {
     const previousNodeEnv = process.env.NODE_ENV
     const previousPublicAppUrl = process.env.PUBLIC_APP_URL
     const previousDepotSecret = process.env.DEPOT_SAMPLE_HASH_SECRET
+    const previousTrustedProxies = process.env.TRUSTED_PROXY_ADDRESSES
     process.env.NODE_ENV = 'production'
     process.env.PUBLIC_APP_URL = 'https://example.test'
+    process.env.TRUSTED_PROXY_ADDRESSES = '127.0.0.1,::1'
     delete process.env.DEPOT_SAMPLE_HASH_SECRET
 
     try {
@@ -39,6 +41,7 @@ describe('API process lifecycle', () => {
       restoreEnvironment('NODE_ENV', previousNodeEnv)
       restoreEnvironment('PUBLIC_APP_URL', previousPublicAppUrl)
       restoreEnvironment('DEPOT_SAMPLE_HASH_SECRET', previousDepotSecret)
+      restoreEnvironment('TRUSTED_PROXY_ADDRESSES', previousTrustedProxies)
     }
   })
 
@@ -49,12 +52,14 @@ describe('API process lifecycle', () => {
       'DEPOT_SAMPLE_HASH_SECRET',
       'SKLAND_CREDENTIAL_SECRET',
       'FREE_PREVIEW_UID_HASH_SECRET',
+      'TRUSTED_PROXY_ADDRESSES',
     ] as const
     const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]))
     process.env.NODE_ENV = 'production'
     process.env.PUBLIC_APP_URL = 'https://example.test'
     process.env.DEPOT_SAMPLE_HASH_SECRET = 'stable-depot-hash-secret'
     process.env.FREE_PREVIEW_UID_HASH_SECRET = 'stable-free-preview-hmac-secret-at-least-32'
+    process.env.TRUSTED_PROXY_ADDRESSES = '127.0.0.1,::1'
     delete process.env.SKLAND_CREDENTIAL_SECRET
 
     try {
@@ -80,7 +85,10 @@ describe('API process lifecycle', () => {
     expect(getServiceLifecycleState()).toBe('ready')
     expect(controller.server.listening).toBe(true)
     expect(hooks.initialize).toHaveBeenCalledOnce()
+    expect(dependencies.ensureDatabase).toHaveBeenCalledOnce()
     expect(dependencies.startAccountDeletion).toHaveBeenCalledOnce()
+    expect(dependencies.ensureDatabase.mock.invocationCallOrder[0])
+      .toBeLessThan(hooks.initialize.mock.invocationCallOrder[0]!)
     expect(hooks.initialize.mock.invocationCallOrder[0])
       .toBeLessThan(dependencies.startAccountDeletion.mock.invocationCallOrder[0]!)
 
@@ -131,6 +139,32 @@ describe('API process lifecycle', () => {
     expect(getServiceLifecycleState()).toBe('stopped')
     expect(process.exitCode).toBe(1)
   })
+
+  it('does not initialize hooks or listen when schema validation fails', async () => {
+    const schemaError = new Error('schema incompatible')
+    const hooks = createHooks()
+    const dependencies = createDependencies()
+    dependencies.ensureDatabase.mockRejectedValue(schemaError)
+    const controller = createApiProcess(hooks, dependencies.values)
+
+    await expect(controller.start()).rejects.toBe(schemaError)
+
+    expect(hooks.initialize).not.toHaveBeenCalled()
+    expect(dependencies.startAccountDeletion).not.toHaveBeenCalled()
+    expect(controller.server.listening).toBe(false)
+  })
+
+  it.each(['0', '-1', '65536', '1.5', 'NaN', 'Infinity'])(
+    'rejects an invalid API port: %s',
+    (port) => expect(() => resolveApiPort({ PORT: port }))
+      .toThrow('PORT must be an integer between 1 and 65535'),
+  )
+
+  it('accepts API port boundary values', () => {
+    expect(resolveApiPort({ PORT: '1' })).toBe(1)
+    expect(resolveApiPort({ PORT: '65535' })).toBe(65_535)
+    expect(resolveApiPort({})).toBe(3_000)
+  })
 })
 
 function createHooks() {
@@ -151,11 +185,13 @@ function createDependencies() {
     waitForIdle: waitForAccountDeletion,
   }))
   const closeDatabase = vi.fn(async () => undefined)
+  const ensureDatabase = vi.fn(async () => undefined)
   return {
     values: {
       createServer: () => server,
       startAccountDeletion,
       closeDatabase,
+      ensureDatabase,
       host: '127.0.0.1',
       port: 0,
     },
@@ -163,6 +199,7 @@ function createDependencies() {
     stopAccountDeletion,
     waitForAccountDeletion,
     closeDatabase,
+    ensureDatabase,
   }
 }
 

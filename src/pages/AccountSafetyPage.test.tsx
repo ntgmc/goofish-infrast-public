@@ -17,7 +17,7 @@ describe('AccountSafetyPage lifecycle controls', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       error: '请先登录。',
       code: 'authentication_required',
-    }), { status: 401 })))
+    }), { status: 401, headers: { 'Content-Type': 'application/json' } })))
     renderPage()
 
     await user.click(screen.getByRole('button', { name: '导出个人数据' }))
@@ -32,7 +32,7 @@ describe('AccountSafetyPage lifecycle controls', () => {
       ok: true,
       scheduled_for: '2026-08-07T00:00:00.000Z',
       cancellation_email: 'queued',
-    }), { status: 202 })))
+    }), { status: 202, headers: { 'Content-Type': 'application/json' } })))
     renderPage()
 
     const email = screen.getByLabelText('账号邮箱')

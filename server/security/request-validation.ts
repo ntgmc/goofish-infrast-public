@@ -4,6 +4,7 @@ import { REQUEST_BODY_LIMITS, type RequestBodyProfile } from './request-policy'
 
 const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 const validatedBodies = new WeakMap<Request, { schema: z.ZodType; value: unknown }>()
+const rawRequestBodies = new WeakMap<Request, Uint8Array>()
 
 type ValidationIssue = { path: string; code: string }
 
@@ -21,13 +22,17 @@ export class RequestInputError extends Error {
   }
 }
 
+export function storeRawRequestBody(req: Request, bytes: Uint8Array): void {
+  rawRequestBodies.set(req, bytes)
+}
+
 export async function validateAndStoreJsonBody(
   req: Request,
   schema: z.ZodType,
   profile: RequestBodyProfile,
   enforceSchema = true,
 ): Promise<void> {
-  const bytes = new Uint8Array(await req.clone().arrayBuffer())
+  const bytes = rawRequestBodies.get(req) ?? new Uint8Array(await req.clone().arrayBuffer())
   const byteLimit = REQUEST_BODY_LIMITS[profile]
   if (byteLimit > 0 && bytes.byteLength > byteLimit) {
     throw new RequestInputError('Request body too large.', 'payload_too_large', 413)
@@ -47,6 +52,8 @@ export async function validateAndStoreJsonBody(
   } catch {
     throw new RequestInputError('Malformed JSON request body.')
   }
+
+  assertIdempotencyKeyConsistency(req, parsed)
 
   assertJsonComplexity(parsed, profile)
   const result = schema.safeParse(parsed)
@@ -68,8 +75,24 @@ export async function validateAndStoreJsonBody(
   validatedBodies.set(req, { schema, value: result.data })
 }
 
-export async function getValidatedJson<S extends z.ZodType>(req: Request, schema: S): Promise<z.output<S>> {
-  if (!validatedBodies.has(req)) await validateAndStoreJsonBody(req, schema, 'standard', false)
+function assertIdempotencyKeyConsistency(req: Request, parsed: unknown): void {
+  const headerKey = req.headers.get('Idempotency-Key')
+  if (!headerKey || !parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return
+  const bodyKey = (parsed as Record<string, unknown>).idempotency_key
+  if (bodyKey !== undefined && bodyKey !== headerKey) {
+    throw new RequestInputError(
+      'Idempotency-Key header must match the JSON idempotency_key field.',
+      'idempotency_key_mismatch',
+    )
+  }
+}
+
+export async function getValidatedJson<S extends z.ZodType>(
+  req: Request,
+  schema: S,
+  enforceSchema = false,
+): Promise<z.output<S>> {
+  if (!validatedBodies.has(req)) await validateAndStoreJsonBody(req, schema, 'standard', enforceSchema)
   const entry = validatedBodies.get(req)
   if (!entry || entry.schema !== schema) {
     throw new Error('Validated request body is unavailable or uses the wrong schema')

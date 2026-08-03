@@ -1,7 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { apiJson, apiVoid, getApiErrorMessage } from '../lib/api-client'
-import { adminApiJson } from '../lib/admin-api-client'
+import { getApiErrorMessage } from '../lib/api-client'
+import { adminApiJson, adminApiVoid } from '../lib/admin-api-client'
 import { copy } from '../copy/index'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 
@@ -17,19 +17,27 @@ export default function AdminSetupPage() {
   const [rootPassword, setRootPassword] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [operationReason, setOperationReason] = useState('')
   const [role, setRole] = useState<AdminUserSummary['role']>('risk_viewer')
   const [users, setUsers] = useState<AdminUserSummary[]>([])
   const [loading, setLoading] = useState(false)
+  const [usersLoading, setUsersLoading] = useState(true)
+  const [usersError, setUsersError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  useEffect(() => {
-    adminApiJson<{ users?: AdminUserSummary[] }>('/api/admin/users')
+  const loadUsers = useCallback(() => {
+    setUsersLoading(true)
+    setUsersError(null)
+    return adminApiJson<{ users?: AdminUserSummary[] }>('/api/admin/users')
       .then((data) => {
         setUsers(data.users ?? [])
       })
-      .catch(() => undefined)
+      .catch((caught) => setUsersError(getApiErrorMessage(caught, '加载管理员列表失败。')))
+      .finally(() => setUsersLoading(false))
   }, [])
+
+  useEffect(() => { void loadUsers() }, [loadUsers])
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault()
@@ -37,16 +45,26 @@ export default function AdminSetupPage() {
     setError(null)
     setNotice(null)
     try {
-      const data = await apiJson<{ user?: AdminUserSummary }>('/api/admin/users', {
+      const replaceExisting = users.some((item) => item.username === username.trim())
+      if (replaceExisting && !window.confirm(`管理员 ${username.trim()} 已存在。确认替换其密码和角色并撤销全部现有会话？`)) return
+      const data = await adminApiJson<{ user?: AdminUserSummary; replaced?: boolean }>('/api/admin/users', {
         method: 'POST',
-        json: { root_password: rootPassword, username, password, role },
+        json: {
+          root_password: rootPassword,
+          username,
+          password,
+          role,
+          reason: operationReason.trim(),
+          ...(replaceExisting && { replace_existing: true }),
+        },
         fallbackMessage: copy.common.pages_AdminSetupPage_001,
       })
       if (!data.user) throw new Error(copy.common.pages_AdminSetupPage_002)
       setUsers((current) => [data.user!, ...current.filter((item) => item.username !== data.user!.username)])
       setUsername('')
       setPassword('')
-      setNotice(`${copy.common.pages_AdminSetupPage_003}${data.user.username}`)
+      setOperationReason('')
+      setNotice(data.replaced ? `已替换管理员 ${data.user.username}` : `${copy.common.pages_AdminSetupPage_003}${data.user.username}`)
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
@@ -61,12 +79,13 @@ export default function AdminSetupPage() {
     setError(null)
     setNotice(null)
     try {
-      await apiVoid('/api/admin/users', {
+      await adminApiVoid('/api/admin/users', {
         method: 'DELETE',
-        json: { root_password: rootPassword, username: target },
+        json: { root_password: rootPassword, username: target, reason: operationReason.trim() },
         fallbackMessage: copy.common.pages_AdminSetupPage_005,
       })
       setUsers((current) => current.filter((item) => item.username !== target))
+      setOperationReason('')
       setNotice(`${copy.common.pages_AdminSetupPage_006}${target}`)
     } catch (caught) {
       setError(getApiErrorMessage(caught, copy.common.pages_AdminSetupPage_007))
@@ -108,6 +127,10 @@ export default function AdminSetupPage() {
               <input type="password" value={password} onChange={(event) => setPassword(event.currentTarget.value)} className="tool-field" autoComplete="new-password" />
             </label>
             <label className="mt-4 block">
+              <span className="mb-2 block text-sm font-medium text-ink-secondary">操作原因 / 工单号</span>
+              <input value={operationReason} onChange={(event) => setOperationReason(event.currentTarget.value)} maxLength={500} className="tool-field" />
+            </label>
+            <label className="mt-4 block">
               <span className="mb-2 block text-sm font-medium text-ink-secondary">风控角色</span>
               <select value={role} onChange={(event) => setRole(event.currentTarget.value as AdminUserSummary['role'])} className="tool-field">
                 <option value="risk_viewer">风险只读</option>
@@ -117,7 +140,7 @@ export default function AdminSetupPage() {
             </label>
             {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
             {notice && <div className="tool-alert tool-alert--success mt-4" role="status" aria-live="polite">{notice}</div>}
-            <button type="submit" disabled={loading || !rootPassword || !username.trim() || password.length < 8} className="tool-primary-action mt-5 w-full">
+            <button type="submit" disabled={loading || !rootPassword || !username.trim() || password.length < 8 || password.length > 128 || operationReason.trim().length < 2} className="tool-primary-action mt-5 w-full">
               {loading ? copy.common.pages_AdminSetupPage_017 : copy.common.pages_AdminSetupPage_018}
             </button>
           </form>
@@ -128,7 +151,14 @@ export default function AdminSetupPage() {
               <p className="mt-1 text-sm text-ink-muted">{copy.common.pages_AdminSetupPage_020}</p>
             </div>
             <div className="divide-y divide-surface-3">
-              {users.length === 0 ? (
+              {usersLoading ? (
+                <div className="p-8 text-center text-sm text-ink-muted">正在加载管理账号…</div>
+              ) : usersError ? (
+                <div className="p-6 text-center">
+                  <p className="text-sm text-error" role="alert">{usersError}</p>
+                  <button type="button" onClick={() => void loadUsers()} className="tool-secondary-action mt-3">重试</button>
+                </div>
+              ) : users.length === 0 ? (
                 <div className="p-8 text-center text-sm text-ink-muted">{copy.common.pages_AdminSetupPage_021}</div>
               ) : users.map((user) => (
                 <div key={user.username} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -137,7 +167,7 @@ export default function AdminSetupPage() {
                     <div className="mt-1 text-xs text-ink-muted">角色：{adminRoleLabel(user.role)}</div>
                     <div className="mt-1 text-xs text-ink-muted">{copy.common.pages_AdminSetupPage_022}{formatDate(user.created_at)} {copy.common.pages_AdminSetupPage_023}{formatDate(user.updated_at)}</div>
                   </div>
-                  <button type="button" onClick={() => handleDelete(user.username)} disabled={loading || !rootPassword} className="tool-secondary-action border-error/35 bg-error/10 text-error hover:bg-error/20">{copy.common.pages_AdminSetupPage_024}</button>
+                  <button type="button" onClick={() => handleDelete(user.username)} disabled={loading || !rootPassword || operationReason.trim().length < 2} className="tool-secondary-action border-error/35 bg-error/10 text-error hover:bg-error/20">{copy.common.pages_AdminSetupPage_024}</button>
                 </div>
               ))}
             </div>

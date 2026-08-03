@@ -20,6 +20,7 @@ checkNewPageModuleUnusedSymbols(typeProgram)
 checkOptimizationUnusedImports(typeProgram)
 await checkProductCatalogOwnership()
 await checkLocalDevelopmentScripts()
+await checkPrivateCompositionContract()
 
 const engineFiles = []
 for await (const filename of glob('server/optimization/**/*.ts')) engineFiles.push(filename)
@@ -160,6 +161,27 @@ async function checkLocalDevelopmentScripts() {
   for (const [name, expected] of Object.entries(expectedScripts)) {
     if (packageJson.scripts?.[name] !== expected) {
       failures.push(`package.json: ${name} must remain ${JSON.stringify(expected)}`)
+    }
+  }
+}
+
+async function checkPrivateCompositionContract() {
+  const contract = JSON.parse(await readFile('optimizer-port-contract.json', 'utf8'))
+  const composition = contract.private_composition
+  if (contract.optimizer_port_version !== 1) {
+    failures.push('optimizer-port-contract.json: optimizer_port_version must match OptimizerPort v1')
+  }
+  if (composition?.public_source_pin?.kind !== 'git_commit_sha' || composition.public_source_pin.required !== true) {
+    failures.push('optimizer-port-contract.json: private composition must require a public git commit SHA')
+  }
+  for (const [field, expected] of Object.entries({
+    entry_points: ['server/worker.ts', 'server/all.ts', 'server/optimize-worker.ts'],
+    required_outputs: ['server/dist/worker.js', 'server/dist/all.js', 'server/dist/optimize-worker.js'],
+    acceptance_checks: ['worker_startup', 'worker_thread_entry', 'health_ready', 'graceful_shutdown'],
+  })) {
+    const actual = composition?.[field]
+    if (!Array.isArray(actual) || expected.some((value) => !actual.includes(value))) {
+      failures.push(`optimizer-port-contract.json: private composition ${field} is incomplete`)
     }
   }
 }

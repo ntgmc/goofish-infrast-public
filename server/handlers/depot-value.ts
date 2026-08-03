@@ -165,7 +165,6 @@ const ITEM_NAMES: Record<string, string> = {
 }
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   if (req.method !== 'POST' && req.method !== 'DELETE') return jsonResponse({ error: 'Method not allowed' }, 405)
 
   try {

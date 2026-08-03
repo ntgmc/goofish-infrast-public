@@ -1223,7 +1223,19 @@ async function assertAdminAuthenticationRateLimits() {
     result.ok
       && result.username === 'security_admin'
       && result.role === 'security_admin'
-      && JSON.stringify(result.capabilities) === JSON.stringify(['risk_view', 'risk_review', 'risk_config'])
+      && JSON.stringify(result.capabilities) === JSON.stringify([
+        'risk_view',
+        'risk_review',
+        'risk_config',
+        'usage_view',
+        'user_view',
+        'sensitive_data_view',
+        'user_manage',
+        'user_delete',
+        'optimization_view',
+        'optimization_manage',
+        'admin_manage',
+      ])
   )))
   assert.equal(
     globalThis.__authSecurityAdminGets,
@@ -1441,7 +1453,15 @@ async function assertAdminAuthenticationRateLimits() {
     'correct-admin-password',
   )
   assert.equal(replacedLogin.ok, true)
-  assert.equal((await adminAuth.createAdminUser('security_admin', 'replacement-password')).ok, true)
+  const implicitReplacement = await adminAuth.createAdminUser('security_admin', 'replacement-password')
+  assert.equal(implicitReplacement.ok, false)
+  assert.equal(implicitReplacement.code, 'already_exists')
+  assert.equal((await adminAuth.createAdminUser(
+    'security_admin',
+    'replacement-password',
+    'security_admin',
+    true,
+  )).ok, true)
   assert.equal(
     (await adminAuth.authenticateAdminRequest(adminSessionRequest(replacedLogin.cookie))).ok,
     false,
@@ -1861,6 +1881,11 @@ function adminUserStoreMock() {
           for (const [tokenHash, session] of globalThis.__authSecurityAdminSessions) {
             if (session.username === username) globalThis.__authSecurityAdminSessions.delete(tokenHash)
           }
+        },
+        create: async (username, user) => {
+          if (globalThis.__authSecurityAdminStore.has(username)) return false
+          globalThis.__authSecurityAdminStore.set(username, user)
+          return true
         },
         upgradePasswordHash: async (username, expectedPasswordHash, replacement) => {
           const current = globalThis.__authSecurityAdminStore.get(username)

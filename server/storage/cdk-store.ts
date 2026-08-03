@@ -15,6 +15,16 @@ import { normalizeRuntimePermission } from '../../src/lib/product-catalog'
 
 let schemaReady: Promise<void> | null = null
 
+export async function listCdkRecordsByKeys(keys: string[]): Promise<Map<string, CdkRecord>> {
+  if (keys.length === 0) return new Map()
+  await ensureSchema()
+  const result = await query<{ key: string; record_json: CdkRecord }>(
+    'select key, record_json from cdk_records where key = any($1::text[])',
+    [keys],
+  )
+  return new Map(result.rows.map((row) => [row.key, row.record_json]))
+}
+
 export async function claimCdkRecord(client: PoolClient, key: string): Promise<CdkRecord | null> {
   const result = await client.query<{ record_json: CdkRecord }>(
     `update cdk_records

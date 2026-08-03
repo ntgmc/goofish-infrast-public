@@ -24,6 +24,7 @@ export interface UserDetailPanelProps {
   onViewOperators: (profile: AdminProfileSummary) => Promise<void>;
   onDownloadOperators: (profile: AdminProfileSummary) => Promise<void>;
   onDownloadWorkspaces: () => Promise<void>;
+  onLoadProfilePage: (page: number) => Promise<void>;
   onAdjustBalance: (operation: 'credit' | 'debit' | 'reverse_credit', amount: string, reason: string, idempotencyKey: string, rootPassword: string, originalTransactionId?: string) => Promise<boolean>;
   onLoadMoreBalance: () => Promise<void>;
   onFreezeUser: (user: AppUserSummary) => Promise<void>;
@@ -56,6 +57,7 @@ function UserDetailPanel({
   onViewOperators,
   onDownloadOperators,
   onDownloadWorkspaces,
+  onLoadProfilePage,
   onAdjustBalance,
   onLoadMoreBalance,
   onFreezeUser,
@@ -86,11 +88,31 @@ function UserDetailPanel({
       <div className="p-4">
         <dl className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
           <DetailItem label="账号状态" value={getAppUserStatusLabel(user.status, user.email_verified_at)} />
-          <DetailItem label="档案数量" value={String(detail.profiles.length)} />
+          <DetailItem label="档案数量" value={String(detail.profile_pagination?.total ?? detail.profiles.length)} />
           <DetailItem label="CDK 订单标识" value={user.cdk_order_hash || '-'} />
           <DetailItem label="创建时间" value={formatDate(user.created_at)} />
           <DetailItem label="更新时间" value={formatDate(user.updated_at)} />
         </dl>
+
+        {detail.profile_pagination?.truncated && (
+          <div className="tool-alert tool-alert--warning mt-5" role="status">
+            当前展示第 {detail.profile_pagination.page} / {detail.profile_pagination.total_pages} 页，共 {detail.profile_pagination.total} 个档案；每页最多 {detail.profile_pagination.page_size} 个。
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={detail.profile_pagination.page <= 1}
+                onClick={() => void onLoadProfilePage(detail.profile_pagination!.page - 1)}
+                className="tool-secondary-action"
+              >上一页</button>
+              <button
+                type="button"
+                disabled={detail.profile_pagination.page >= detail.profile_pagination.total_pages}
+                onClick={() => void onLoadProfilePage(detail.profile_pagination!.page + 1)}
+                className="tool-secondary-action"
+              >{busyAction === `user-profile-page:${user.id}` ? '加载中…' : '下一页'}</button>
+            </div>
+          </div>
+        )}
 
         <UserBalanceCard
           userId={user.id}

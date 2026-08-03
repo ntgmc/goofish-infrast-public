@@ -1,14 +1,16 @@
 import type { IncomingMessage } from 'node:http'
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { DEFAULT_SITE_FEATURES } from '../../src/lib/site-features'
 import { DEFAULT_PUBLIC_CONTENT_DRAFT } from '../../src/lib/public-content'
 import { getRegisteredApiRoutes } from '../routes'
 import { inspectIncomingRequest } from './http-boundary'
-import { getAllowedMethods, getRoutePolicy, requestSchemas } from './request-policy'
+import { getAllowedMethods, getDeclaredApiPolicyRoutes, getRoutePolicy, requestSchemas } from './request-policy'
 import {
   getValidatedJson,
   RequestInputError,
   stableJsonStringify,
+  storeRawRequestBody,
   validateAndStoreJsonBody,
 } from './request-validation'
 
@@ -31,6 +33,7 @@ function incomingGet(target: string): IncomingMessage {
 
 describe('request validation boundary', () => {
   it('declares a fail-closed policy for every registered API route', () => {
+    expect(getDeclaredApiPolicyRoutes()).toEqual(getRegisteredApiRoutes())
     for (const registeredRoute of getRegisteredApiRoutes()) {
       const pathname = registeredRoute
         .replace(':jobId', 'job_test-1')
@@ -39,6 +42,35 @@ describe('request validation boundary', () => {
       expect(policy, `missing request policy for ${registeredRoute}`).not.toBeNull()
       expect(getAllowedMethods(policy!)).not.toHaveLength(0)
     }
+  })
+
+  it('rejects conflicting header and JSON idempotency keys', async () => {
+    const request = new Request('http://local/api/example', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'header-key',
+      },
+      body: JSON.stringify({ idempotency_key: 'body-key' }),
+    })
+    await expect(validateAndStoreJsonBody(
+      request,
+      z.object({ idempotency_key: z.string() }).strict(),
+      'standard',
+    )).rejects.toMatchObject({ code: 'idempotency_key_mismatch' })
+  })
+
+  it('reuses raw bytes already buffered by the HTTP adapter', async () => {
+    const request = jsonRequest(JSON.stringify({ email: 'wrong@example.com', password: 'wrong' }))
+    storeRawRequestBody(
+      request,
+      new TextEncoder().encode(JSON.stringify({ email: 'cached@example.com', password: 'cached-password' })),
+    )
+    await validateAndStoreJsonBody(request, requestSchemas.authLogin, 'auth')
+    await expect(getValidatedJson(request, requestSchemas.authLogin)).resolves.toEqual({
+      email: 'cached@example.com',
+      password: 'cached-password',
+    })
   })
 
   it('only declares onboarding claim policies for fixed task codes', () => {

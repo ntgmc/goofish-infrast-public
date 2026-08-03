@@ -2,16 +2,21 @@ import { getPool, query } from './postgres'
 import { ensureDatabaseSchema } from './schema'
 import type { AdminUserRecord } from '../handlers/admin-auth'
 import type { PasswordHashRecord } from '../security/password'
+import {
+  recordAdminOperationAuditInTransaction,
+  type AdminOperationAuditInput,
+} from './admin-operation-audit-store'
 
 export interface AdminUserStore {
   get: (username: string) => Promise<AdminUserRecord | null>
-  set: (username: string, user: AdminUserRecord) => Promise<void>
+  set: (username: string, user: AdminUserRecord, audit?: AdminOperationAuditInput) => Promise<void>
+  create: (username: string, user: AdminUserRecord, audit?: AdminOperationAuditInput) => Promise<boolean>
   upgradePasswordHash: (
     username: string,
     expectedPasswordHash: string,
     replacement: PasswordHashRecord,
   ) => Promise<AdminUserRecord | null>
-  delete: (username: string) => Promise<void>
+  delete: (username: string, audit?: AdminOperationAuditInput) => Promise<void>
   list: () => Promise<AdminUserRecord[]>
 }
 
@@ -22,39 +27,75 @@ export function createPostgresAdminUserStore(): AdminUserStore {
     get: async (username) => {
       await ensureSchema()
       const result = await query<{ record_json: AdminUserRecord }>(
-        'select record_json from admin_users where username = $1',
+        `select record_json || jsonb_build_object('disabled', disabled) as record_json
+         from admin_users where username = $1`,
         [username],
       )
       return result.rows[0]?.record_json ?? null
     },
-    set: async (username, user) => {
+    set: async (username, user, audit) => {
       await ensureSchema()
       const client = await getPool().connect()
       try {
         await client.query('begin')
         await client.query(
           `insert into admin_users
-          (username, password_hash, salt, iterations, record_json, created_at, updated_at)
-           values ($1, $2, $3, $4, $5::jsonb, $6, $7)
+          (username, password_hash, salt, iterations, disabled, record_json, created_at, updated_at)
+           values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
            on conflict (username) do update set
           password_hash = excluded.password_hash,
           salt = excluded.salt,
           iterations = excluded.iterations,
+          disabled = excluded.disabled,
           record_json = excluded.record_json,
-          created_at = excluded.created_at,
           updated_at = excluded.updated_at`,
           [
             username,
             user.password_hash,
             user.salt,
             user.iterations,
+            user.disabled ?? false,
             JSON.stringify(user),
             user.created_at,
             user.updated_at,
           ],
         )
         await client.query('delete from admin_sessions where username = $1', [username])
+        if (audit) await recordAdminOperationAuditInTransaction(client, audit)
         await client.query('commit')
+      } catch (error) {
+        await client.query('rollback')
+        throw error
+      } finally {
+        client.release()
+      }
+    },
+    create: async (username, user, audit) => {
+      await ensureSchema()
+      const client = await getPool().connect()
+      try {
+        await client.query('begin')
+        const result = await client.query(
+          `insert into admin_users
+            (username, password_hash, salt, iterations, disabled, record_json, created_at, updated_at)
+           values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
+           on conflict (username) do nothing
+           returning username`,
+          [
+            username,
+            user.password_hash,
+            user.salt,
+            user.iterations,
+            user.disabled ?? false,
+            JSON.stringify(user),
+            user.created_at,
+            user.updated_at,
+          ],
+        )
+        const created = result.rowCount === 1
+        if (created && audit) await recordAdminOperationAuditInTransaction(client, audit)
+        await client.query('commit')
+        return created
       } catch (error) {
         await client.query('rollback')
         throw error
@@ -93,14 +134,26 @@ export function createPostgresAdminUserStore(): AdminUserStore {
       )
       return result.rows[0]?.record_json ?? null
     },
-    delete: async (username) => {
+    delete: async (username, audit) => {
       await ensureSchema()
-      await query('delete from admin_users where username = $1', [username])
+      const client = await getPool().connect()
+      try {
+        await client.query('begin')
+        await client.query('delete from admin_users where username = $1', [username])
+        if (audit) await recordAdminOperationAuditInTransaction(client, audit)
+        await client.query('commit')
+      } catch (error) {
+        await client.query('rollback')
+        throw error
+      } finally {
+        client.release()
+      }
     },
     list: async () => {
       await ensureSchema()
       const result = await query<{ record_json: AdminUserRecord }>(
-        'select record_json from admin_users order by username asc',
+        `select record_json || jsonb_build_object('disabled', disabled) as record_json
+         from admin_users order by username asc`,
       )
       return result.rows.map((row) => row.record_json)
     },

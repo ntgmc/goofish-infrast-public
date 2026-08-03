@@ -39,6 +39,18 @@ export const commonCopy = {
   App_013: "正在载入致谢页...",
   // src/App.tsx
   App_014: "正在载入更新日志...",
+  // src/components/NotFoundPage.tsx
+  components_NotFoundPage_001: "404 · 页面未找到",
+  // src/components/NotFoundPage.tsx
+  components_NotFoundPage_002: "这个链接暂时没有对应页面",
+  // src/components/NotFoundPage.tsx
+  components_NotFoundPage_003: "请检查地址是否完整，或从下面的入口继续访问。原请求路径已保留，便于核对失效链接。",
+  // src/components/NotFoundPage.tsx
+  components_NotFoundPage_004: "页面导航",
+  // src/components/NotFoundPage.tsx
+  components_NotFoundPage_005: "返回首页",
+  // src/components/NotFoundPage.tsx
+  components_NotFoundPage_006: "进入工作台",
   // src/components/BrandLogo.tsx
   components_BrandLogo_001: "MAA 基建排班优化器",
   // src/components/BuildMetaStrip.tsx

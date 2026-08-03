@@ -13,7 +13,6 @@ import { requestSchemas } from '../security/request-policy'
 import { jsonResponse, requireUserSession } from './user-auth'
 
 export default async function userBalanceHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)

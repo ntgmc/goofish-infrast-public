@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { PostgreSqlContainer } from '@testcontainers/postgresql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { closePool, getPool, query } from './postgres'
-import { migrateDatabaseSchema } from './schema'
+import { closePool, getPool, query, withPostgresAdvisoryLock } from './postgres'
+import { DATABASE_SCHEMA_VERSION, migrateDatabaseSchema } from './schema'
 import {
   getDepotValueSampleStore,
   type DepotValueSampleRecord,
@@ -15,6 +15,8 @@ import {
   recordPersonalUseDeclarationUsage,
 } from './personal-use-declaration-store'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
+import { createPostgresAdminUserStore } from './admin-user-store'
+import type { AdminUserRecord } from '../handlers/admin-auth'
 
 let container: PostgreSqlContainer
 
@@ -30,6 +32,96 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL schema migration', () => {
+  it('allows only one maintenance leader for the same advisory lock', async () => {
+    const lockName = `maintenance-test:${randomUUID()}`
+    let releaseLeader: () => void = () => undefined
+    let leaderAcquired: () => void = () => undefined
+    const acquired = new Promise<void>((resolve) => { leaderAcquired = resolve })
+    const leader = withPostgresAdvisoryLock(lockName, async () => {
+      leaderAcquired()
+      await new Promise<void>((resolve) => { releaseLeader = resolve })
+      return 'leader'
+    })
+
+    await acquired
+    await expect(withPostgresAdvisoryLock(lockName, async () => 'duplicate'))
+      .resolves.toEqual({ acquired: false })
+    releaseLeader()
+    await expect(leader).resolves.toEqual({ acquired: true, value: 'leader' })
+  })
+
+  it('rolls back administrator account changes when their audit insert fails', async () => {
+    const store = createPostgresAdminUserStore()
+    const username = `audit-rollback-${randomUUID().slice(0, 8)}`
+    const now = new Date().toISOString()
+    const user: AdminUserRecord = {
+      version: 2,
+      username,
+      role: 'security_admin',
+      disabled: false,
+      password_hash: 'hash-before',
+      salt: 'salt',
+      iterations: 1,
+      password_algorithm: 'pbkdf2-sha256',
+      created_at: now,
+      updated_at: now,
+    }
+    const audit = {
+      actorUsername: 'rollback-admin-test',
+      action: 'admin_user.create',
+      targetType: 'admin_user',
+      targetId: username,
+      reason: '验证管理员账号与审计共同回滚。',
+      requestId: randomUUID(),
+      after: { username },
+    }
+    await query(`
+      create function reject_admin_account_audit() returns trigger language plpgsql as $$
+      begin
+        if new.actor_username = 'rollback-admin-test' then
+          raise exception 'injected administrator audit failure';
+        end if;
+        return new;
+      end
+      $$
+    `)
+    await query(`
+      create trigger reject_admin_account_audit
+      before insert on admin_operation_audit
+      for each row execute function reject_admin_account_audit()
+    `)
+
+    try {
+      await expect(store.create(username, user, audit)).rejects.toThrow('injected administrator audit failure')
+      await expect(store.get(username)).resolves.toBeNull()
+
+      await expect(store.create(username, user)).resolves.toBe(true)
+      await expect(store.delete(username, { ...audit, action: 'admin_user.delete', before: { username } }))
+        .rejects.toThrow('injected administrator audit failure')
+      await expect(store.get(username)).resolves.toMatchObject({ username, password_hash: 'hash-before' })
+    } finally {
+      await query('drop trigger reject_admin_account_audit on admin_operation_audit')
+      await query('drop function reject_admin_account_audit()')
+      await query('delete from admin_users where username = $1', [username])
+    }
+  })
+
+  it('keeps unified administrator audit records append-only', async () => {
+    const id = randomUUID()
+    await query(
+      `insert into admin_operation_audit
+        (id, actor_username, action, target_type, target_id, reason, request_id, created_at)
+       values ($1, 'append-only-test', 'test.insert', 'test', $1, '验证审计不可变。', $1, now())`,
+      [id],
+    )
+    await expect(query(
+      'update admin_operation_audit set reason = $2 where id = $1',
+      [id, '不得修改'],
+    )).rejects.toThrow('admin_operation_audit is append-only')
+    await expect(query('delete from admin_operation_audit where id = $1', [id]))
+      .rejects.toThrow('admin_operation_audit is append-only')
+  })
+
   it('accepts a first metered-personal confirmation and records protected operations', async () => {
     const userId = randomUUID()
     const acceptance = await confirmPersonalUseDeclaration(
@@ -281,6 +373,7 @@ describe('PostgreSQL schema migration', () => {
         [operationId, userId, randomUUID(), randomUUID(), JSON.stringify({ profile_id: profileId, import_mode: 'json' }), now],
       )
 
+      await markCurrentMigrationPending()
       await migrateDatabaseSchema()
       await migrateDatabaseSchema()
 
@@ -346,6 +439,7 @@ describe('PostgreSQL schema migration', () => {
         [settledInvitationId, settled.userId, now],
       )
 
+      await markCurrentMigrationPending()
       await migrateDatabaseSchema()
       await migrateDatabaseSchema()
 
@@ -399,6 +493,7 @@ describe('PostgreSQL schema migration', () => {
   })
 
   it('releases earlier phase locks before a later migration phase waits', async () => {
+    await markCurrentMigrationPending()
     const blocker = await getPool().connect()
     let blockerInTransaction = false
     let migration: Promise<void> | null = null
@@ -431,6 +526,10 @@ describe('PostgreSQL schema migration', () => {
     }
   })
 })
+
+async function markCurrentMigrationPending(): Promise<void> {
+  await query('delete from goofish_schema_migrations where version = $1', [DATABASE_SCHEMA_VERSION])
+}
 
 async function waitForBlockedRewardMigration(): Promise<void> {
   for (let attempt = 0; attempt < 100; attempt += 1) {

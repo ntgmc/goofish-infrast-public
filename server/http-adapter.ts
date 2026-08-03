@@ -1,46 +1,77 @@
 import { Buffer } from 'node:buffer'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { RequestBodyTooLargeError } from './request-body-limits'
-import { INTERNAL_CLIENT_IP_HEADER, resolveIncomingClientIp } from './security/client-ip'
+import { INTERNAL_CLIENT_IP_HEADER, isTrustedProxyAddress, resolveIncomingClientIp } from './security/client-ip'
+import { storeRawRequestBody } from './security/request-validation'
+
+const requestResourceCleanups = new WeakMap<Request, () => void>()
 
 export async function nodeRequestToWebRequest(req: IncomingMessage, bodyLimitBytes: number): Promise<Request> {
-  const host = firstHeaderValue(req.headers.host) || '127.0.0.1'
-  const protocol = resolveIncomingProtocol(req)
-  const url = `${protocol}://${host}${req.url || '/'}`
-  const headers = new Headers()
+  const abortResources = createIncomingRequestAbortController(req)
+  try {
+    const host = firstHeaderValue(req.headers.host) || '127.0.0.1'
+    const protocol = resolveIncomingProtocol(req)
+    const url = `${protocol}://${host}${req.url || '/'}`
+    const headers = new Headers()
 
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (Array.isArray(value)) {
-      for (const item of value) headers.append(key, item)
-    } else if (value !== undefined) {
-      headers.set(key, value)
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (Array.isArray(value)) {
+        for (const item of value) headers.append(key, item)
+      } else if (value !== undefined) {
+        headers.set(key, value)
+      }
     }
-  }
-  headers.delete(INTERNAL_CLIENT_IP_HEADER)
-  headers.set(INTERNAL_CLIENT_IP_HEADER, resolveIncomingClientIp(req))
+    headers.delete(INTERNAL_CLIENT_IP_HEADER)
+    headers.set(INTERNAL_CLIENT_IP_HEADER, resolveIncomingClientIp(req))
 
-  const method = req.method || 'GET'
-  const init: RequestInit = { method, headers }
-  if (method !== 'GET' && method !== 'HEAD') {
-    if (bodyLimitBytes > 0) init.body = new Uint8Array(await readRequestBody(req, bodyLimitBytes))
-  }
+    const method = req.method || 'GET'
+    const init: RequestInit = { method, headers, signal: abortResources.controller.signal }
+    let bodyBytes: Uint8Array | null = null
+    if (method !== 'GET' && method !== 'HEAD') {
+      if (bodyLimitBytes > 0) {
+        bodyBytes = new Uint8Array(await readRequestBody(req, bodyLimitBytes))
+        init.body = bodyBytes
+      }
+    }
 
-  return new Request(url, init)
+    const request = new Request(url, init)
+    requestResourceCleanups.set(request, abortResources.cleanup)
+    if (bodyBytes) storeRawRequestBody(request, bodyBytes)
+    return request
+  } catch (error) {
+    abortResources.cleanup()
+    throw error
+  }
+}
+
+export function releaseWebRequestResources(request: Request): void {
+  requestResourceCleanups.get(request)?.()
+  requestResourceCleanups.delete(request)
+}
+
+function createIncomingRequestAbortController(req: IncomingMessage): {
+  controller: AbortController
+  cleanup: () => void
+} {
+  const controller = new AbortController()
+  function cleanup() {
+    req.off('aborted', abort)
+    req.socket.off('close', abort)
+  }
+  function abort() {
+    cleanup()
+    if (!controller.signal.aborted) controller.abort(new Error('Client connection closed'))
+  }
+  req.once('aborted', abort)
+  req.socket.once('close', abort)
+  return { controller, cleanup }
 }
 
 function resolveIncomingProtocol(req: IncomingMessage): 'http' | 'https' {
   if (Boolean((req.socket as { encrypted?: boolean }).encrypted)) return 'https'
-  if (!isLoopbackAddress(req.socket.remoteAddress)) return 'http'
+  if (!isTrustedProxyAddress(req.socket.remoteAddress)) return 'http'
   const forwarded = firstHeaderValue(req.headers['x-forwarded-proto'])
   return forwarded?.split(',', 1)[0]?.trim().toLowerCase() === 'https' ? 'https' : 'http'
-}
-
-function isLoopbackAddress(value: string | undefined): boolean {
-  if (!value) return false
-  const normalized = value.toLowerCase()
-  return normalized === '::1'
-    || normalized.startsWith('127.')
-    || normalized.startsWith('::ffff:127.')
 }
 
 export async function writeWebResponse(res: ServerResponse, response: Response): Promise<void> {
@@ -55,8 +86,55 @@ export async function writeWebResponse(res: ServerResponse, response: Response):
     return
   }
 
-  const body = Buffer.from(await response.arrayBuffer())
-  res.end(body)
+  const reader = response.body.getReader()
+  let closed = false
+  const onClose = () => {
+    closed = true
+    void reader.cancel('Client connection closed').catch(() => undefined)
+  }
+  res.once('close', onClose)
+  try {
+    while (!closed) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      if (!res.write(chunk.value) && !await waitForDrain(res)) {
+        closed = true
+        break
+      }
+    }
+    if (!closed && !res.writableEnded) res.end()
+  } catch (error) {
+    if (!closed && !res.destroyed) res.destroy(error instanceof Error ? error : new Error('Response stream failed'))
+    if (!closed) throw error
+  } finally {
+    res.off('close', onClose)
+    if (closed) await reader.cancel('Client connection closed').catch(() => undefined)
+  }
+}
+
+function waitForDrain(res: ServerResponse): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      res.off('drain', onDrain)
+      res.off('close', onClose)
+      res.off('error', onError)
+    }
+    const onDrain = () => {
+      cleanup()
+      resolve(true)
+    }
+    const onClose = () => {
+      cleanup()
+      resolve(false)
+    }
+    const onError = (error: Error) => {
+      cleanup()
+      reject(error)
+    }
+    res.once('drain', onDrain)
+    res.once('close', onClose)
+    res.once('error', onError)
+  })
 }
 
 function firstHeaderValue(value: string | string[] | undefined): string | null {

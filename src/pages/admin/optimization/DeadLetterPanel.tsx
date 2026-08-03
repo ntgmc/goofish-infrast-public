@@ -1,7 +1,8 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { adminApiJson as apiJson } from '../../../lib/admin-api-client'
+import { adminApiBlob as apiBlob, adminApiJson as apiJson } from '../../../lib/admin-api-client'
 import type { AdminOptimizationDeadLetter, AdminOptimizationDeadLetterDetail } from '../contracts'
+import { requestAdminOperationReason } from '../../../lib/admin-operation-reason'
 
 export default function DeadLetterPanel() {
   const [records, setRecords] = useState<AdminOptimizationDeadLetter[]>([])
@@ -10,6 +11,7 @@ export default function DeadLetterPanel() {
   const [loadingDetailIds, setLoadingDetailIds] = useState<Set<string>>(() => new Set())
   const [detailErrors, setDetailErrors] = useState<Record<string, string>>({})
   const [busyAction, setBusyAction] = useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const load = useCallback(async () => {
     try {
@@ -55,16 +57,37 @@ export default function DeadLetterPanel() {
     if (!details[id]) void loadDetail(id)
   }
   const onAction = async (id: string, action: 'replay' | 'discard') => {
-    const reason = window.prompt(action === 'replay' ? '管理员重放会绕过用户额度扣减。请输入本次重放原因。' : '请输入丢弃原因。')
-    if (!reason?.trim()) return
+    const reason = await requestAdminOperationReason({
+      title: action === 'replay' ? '确认重放死信任务' : '确认丢弃死信任务',
+      description: action === 'replay'
+        ? `死信 ${id} 将以管理员无偿方式重放，不扣用户额度。请输入本次重放原因。`
+        : `死信 ${id} 将被标记为丢弃且不能再次处理。请输入丢弃原因。`,
+      confirmLabel: action === 'replay' ? '确认重放' : '确认丢弃',
+    })
+    if (!reason) return
     setBusyAction(`dead-letter:${id}`)
     try {
-      await apiJson('/api/admin/optimization', { method: 'POST', json: { action, id, reason: reason.trim() }, fallbackMessage: action === 'replay' ? '重放失败' : '丢弃失败' })
+      await apiJson('/api/admin/optimization', { method: 'POST', json: { action, id, reason }, fallbackMessage: action === 'replay' ? '重放失败' : '丢弃失败' })
       await load()
     } catch (caught) {
       setError((caught as Error).message)
     } finally {
       setBusyAction(null)
+    }
+  }
+  const downloadPayload = async (id: string) => {
+    setDownloadingId(id)
+    setError(null)
+    try {
+      const blob = await apiBlob(getDeadLetterPayloadDownloadUrl(id), { fallbackMessage: '下载完整任务载荷失败' })
+      if (blob.type && !blob.type.toLowerCase().startsWith('application/json')) {
+        throw new Error('下载响应不是 JSON，已取消保存。')
+      }
+      downloadBlob(blob, `optimization-dead-letter-${safeFileSegment(id)}.json`)
+    } catch (caught) {
+      setError((caught as Error).message)
+    } finally {
+      setDownloadingId(null)
     }
   }
   const pendingCount = records.filter((record) => record.status === 'pending_review').length
@@ -95,16 +118,18 @@ export default function DeadLetterPanel() {
                     <p className="font-semibold text-ink-primary">{record.public_error_code} · {record.status}</p>
                     <p className="break-all text-ink-secondary">任务 {record.job_id} · 档案 {record.profile_id ?? '无'} · {record.source}</p>
                     <p className="text-ink-muted">失败类型 {record.failure_kind} · 尝试 {record.attempt_count} 次 · 重放 {record.replay_count} 次</p>
+                    {record.resolved_by && <p className="text-ink-muted">处置人 {record.resolved_by} · 原因：{record.resolution_reason ?? '未记录'}</p>}
                     <p className="break-words text-danger">{record.internal_error_message}</p>
                     <details className="text-xs text-ink-muted"><summary className="cursor-pointer">安全诊断摘要</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(record.diagnostic_json, null, 2)}</pre></details>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <a
-                        href={getDeadLetterPayloadDownloadUrl(record.id)}
-                        download
+                      <button
+                        type="button"
+                        onClick={() => void downloadPayload(record.id)}
+                        disabled={downloadingId === record.id}
                         className="tool-secondary-action inline-flex min-h-11 items-center px-3 text-sm"
                       >
-                        下载完整任务载荷 JSON
-                      </a>
+                        {downloadingId === record.id ? '正在下载...' : '下载完整任务载荷 JSON'}
+                      </button>
                       <button
                         type="button"
                         onClick={() => toggleDetail(record.id)}
@@ -220,4 +245,17 @@ function formatJson(value: unknown): string {
 
 function getDeadLetterPayloadDownloadUrl(id: string): string {
   return `/api/admin/optimization?view=dead_letter_download&id=${encodeURIComponent(id)}`
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function safeFileSegment(value: string): string {
+  return value.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) || 'unknown'
 }

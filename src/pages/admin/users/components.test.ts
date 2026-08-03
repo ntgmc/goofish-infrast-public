@@ -97,6 +97,7 @@ function userDetailProps(): UserDetailPanelProps {
     onViewOperators: profileAction,
     onDownloadOperators: profileAction,
     onDownloadWorkspaces: vi.fn(async () => undefined),
+    onLoadProfilePage: vi.fn(async () => undefined),
     onAdjustBalance: vi.fn(async () => true),
     onLoadMoreBalance: vi.fn(async () => undefined),
     onFreezeUser: vi.fn(async () => undefined),

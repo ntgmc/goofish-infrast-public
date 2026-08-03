@@ -10,7 +10,6 @@ import { getValidatedJson } from '../security/request-validation'
 import { jsonResponse, requireUserSession } from './user-auth'
 
 export default async function userNotificationsHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return noStoreJson(null, 204)
 
   try {
     const auth = await requireUserSession(req)

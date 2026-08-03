@@ -4,6 +4,7 @@ import { AdminDetailDialog } from '../shared/AdminDetailDialog'
 import { DetailItem, StatusPill, SmallButton, formatDate, getNextProductPermission, formatNullableNumber, formatRiskDetail } from '../shared/helpers'
 import { AnimatedValue, RevealItem } from '../../../components/MotionPrimitives'
 import { PaginationControls } from '../shared/PaginationControls'
+import { requestAdminOperationReason } from '../../../lib/admin-operation-reason'
 
 export function CdkTable({ records, selected, filters, search, pagination, loading, busyAction, onSearchChange, onPageChange, onPageSizeChange, onFilterChange, onSelect, onBulkRevoke, onPatch, onOpenDetail, onDelete }: {
   records: AdminCdkRecord[];
@@ -171,13 +172,17 @@ function CdkDetailPanel({
     baselineOptions.find((option) => option.available)?.source ?? 'next_import',
   )
   const selectedBaseline = baselineOptions.find((option) => option.source === baselineSource)
-  const setOperatorBaseline = () => {
+  const setOperatorBaseline = async () => {
     if (!selectedBaseline?.available) return
-    const reason = window.prompt('请输入干员数据核验备注。选择具体快照会同时更新初始和最近基线；清空基线则等待下次有效导入自动重建。')
-    if (!reason?.trim()) return
-    void onPatch(detail, 'set_operator_baseline', undefined, {
+    const reason = await requestAdminOperationReason({
+      title: '确认更新干员基线',
+      description: `CDK ${detail.cdk_id} 将使用“${formatOperatorBaselineOption(selectedBaseline)}”作为新基线。选择具体快照会同时更新初始和最近基线；清空基线则等待下次有效导入自动重建。`,
+      confirmLabel: '应用新基线',
+    })
+    if (!reason) return
+    await onPatch(detail, 'set_operator_baseline', undefined, {
       baseline_source: baselineSource,
-      reason: reason.trim(),
+      reason,
     })
   }
   return (

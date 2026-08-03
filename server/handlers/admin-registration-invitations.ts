@@ -15,9 +15,11 @@ import {
 const STATUSES = new Set<AdminRegistrationInvitationStatus | 'all'>(['all', 'active', 'used', 'revoked', 'expired'])
 
 export default async function adminRegistrationInvitationsHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   try {
-    const authentication = await authenticateAdminRequest(req)
+    const authentication = await authenticateAdminRequest(req, {
+      capability: 'admin_manage',
+      requireRecentLogin: req.method !== 'GET',
+    })
     if (!authentication.ok) return authentication.response
 
     if (req.method === 'GET') return handleList(req)

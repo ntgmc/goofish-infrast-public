@@ -112,7 +112,7 @@ describe('useToolSession config synchronization', () => {
 
     const { result } = renderHook(() => useToolSession())
     await waitFor(() => expect(result.current.authStatus).toBe('error'))
-    expect(result.current.authError?.message).toContain('network offline')
+    expect(result.current.authError?.message).toBe('确认登录信息失败')
   })
 
   it('preserves an authenticated snapshot on failure and restores it after retry', async () => {

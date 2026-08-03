@@ -36,22 +36,17 @@ export const EMPTY_ANNOUNCEMENT_STATS: UsageAnnouncementStats = {
 export function FunnelPanel({ steps }: { steps: UsageFunnelStep[] }) {
   return (
     <section className="tool-panel p-5">
-      <h2 className="text-base font-semibold text-ink-primary">运营漏斗</h2>
+      <h2 className="text-base font-semibold text-ink-primary">关键事件量对比</h2>
+      <p className="mt-1 text-xs text-ink-muted">各项为独立事件总量，不代表同一用户群的转化关系。</p>
       <div className="mt-4 space-y-3">
-        {steps.length === 0 && <div className="tool-inset px-4 py-6 text-center text-sm text-ink-muted">暂无漏斗数据</div>}
+        {steps.length === 0 && <div className="tool-inset px-4 py-6 text-center text-sm text-ink-muted">暂无事件数据</div>}
         {steps.map((step) => (
           <div key={step.key} className="tool-inset p-3">
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="font-medium text-ink-primary">{step.label}</span>
               <span className="font-semibold text-ink-primary">{step.count}</span>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3">
-              <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min(100, Math.max(0, step.conversion_rate))}%` }} />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs text-ink-muted">
-              <span>转化 {step.conversion_rate}%</span>
-              <span>掉失 {step.dropoff}</span>
-            </div>
+            <p className="mt-2 text-xs text-ink-muted">统计周期内独立计数</p>
           </div>
         ))}
       </div>

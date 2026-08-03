@@ -40,9 +40,13 @@ npm run start:server
 DATABASE_URL=postgresql://<user>:<password>@127.0.0.1:5432/<database>
 SKLAND_CREDENTIAL_SECRET=<stable local random value of at least 16 characters>
 FREE_PREVIEW_UID_HASH_SECRET=<stable local random value of at least 32 characters>
+USAGE_VISITOR_SECRET=<stable random value of at least 32 characters>
+# USAGE_VISITOR_SECRET_PREVIOUS=<previous value during a controlled rotation>
 ```
 
 `SKLAND_CREDENTIAL_SECRET`（或其 keyring 配置）用于加密可刷新的森空岛凭证；`FREE_PREVIEW_UID_HASH_SECRET` 用于生成稳定的 UID HMAC、防止重复领取。两者都必须由密码学安全随机源生成、纳入受控密钥备份，并在所有 API 实例间保持一致。不要直接替换 UID HMAC 密钥；轮换前必须迁移现有 claim hash。凭证 keyring 轮换应保留旧解密密钥，完成 `scripts/rekey-skland-credentials.mjs` 重加密后再移除旧密钥。生产环境会在监听端口前校验这两类配置，缺失或长度不足时启动失败。
+
+`USAGE_VISITOR_SECRET` 用于签名匿名 usage visitor cookie，必须在所有 API 实例间保持一致。轮换时先配置新值，并将旧值放入 `USAGE_VISITOR_SECRET_PREVIOUS`；至少保留一个 visitor cookie 有效期（当前为 180 天）后再移除旧值。为兼容旧部署，服务端在未配置专用值时会回退到管理员签名密钥，但生产环境应使用独立 secret，避免不同安全域共用密钥。
 
 PostgreSQL 新连接默认最多等待 10 秒；可通过 `POSTGRES_CONNECTION_TIMEOUT_MS` 覆盖，允许范围为 1000–60000 毫秒。有限连接超时可以避免 API 或外部 worker 在数据库不可达时无限停留在启动阶段。
 
@@ -103,7 +107,7 @@ npm run build:server
 npm run build:server:public
 ```
 
-本仓库不包含 `build:private`、`start:worker` 或 `start:all`。真实 worker 由闭源优化器仓库在固定公共 commit 上组合构建。
+本仓库不包含 `build:private`、`start:worker` 或 `start:all`。真实 worker 由闭源优化器仓库在固定公共 commit 上组合构建。机器可读的组合边界位于 [optimizer-port-contract.json](optimizer-port-contract.json)：私有 CI 必须记录真实 public Git SHA，生成 `worker.js`、`all.js` 与 runner 所需的 `optimize-worker.js`，并对 Worker 启动、thread entry、readiness 和优雅关停进行验收。公共仓库只声明约束，不虚构或提交私有仓库的实际 SHA。
 
 ## 检查与测试
 
@@ -119,7 +123,7 @@ npm test
 npm run test:postgres
 ```
 
-`check:architecture` 默认使用 public scope，禁止公共 API、runner 和 worker runtime 导入私有优化器实现。`check:public-export` 会在临时副本中验证公共源码能够独立构建和测试。
+`check:architecture` 默认使用 public scope，禁止公共 API、runner 和 worker runtime 导入私有优化器实现，并校验机器可读的私有组合产物契约。`check:public-export` 会在临时副本中验证公共源码能够独立构建和测试。
 
 PostgreSQL 集成测试使用 Testcontainers，需要可用的 Docker daemon。
 

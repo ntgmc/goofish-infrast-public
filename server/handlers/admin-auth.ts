@@ -17,18 +17,38 @@ import {
 } from '../security/password'
 import { RateLimitStoreError } from '../security/persistent-rate-limit'
 import { recordBehaviorRiskAdminAudit } from '../storage/behavior-risk-store'
+import { recordAdminOperationAudit } from '../storage/admin-operation-audit-store'
+import type { AdminOperationAuditInput } from '../storage/admin-operation-audit-store'
 
 const ADMIN_SESSION_COOKIE = 'maa_admin_session'
 export const ADMIN_SESSION_IDLE_MS = 30 * 60 * 1000
 export const ADMIN_SESSION_ABSOLUTE_MS = 8 * 60 * 60 * 1000
+export const ADMIN_STEP_UP_MAX_AGE_MS = 15 * 60 * 1000
 
 export type AdminRole = 'risk_viewer' | 'risk_reviewer' | 'security_admin'
-export type AdminCapability = 'risk_view' | 'risk_review' | 'risk_config'
+export type AdminCapability =
+  | 'risk_view'
+  | 'risk_review'
+  | 'risk_config'
+  | 'usage_view'
+  | 'user_view'
+  | 'sensitive_data_view'
+  | 'user_manage'
+  | 'user_delete'
+  | 'optimization_view'
+  | 'optimization_manage'
+  | 'admin_manage'
+
+export interface AdminAuthenticationRequirement {
+  capability?: AdminCapability
+  requireRecentLogin?: boolean
+}
 
 export interface AdminUserRecord {
   version: 1 | 2
   username: string
   role?: AdminRole
+  disabled?: boolean
   password_hash: string
   salt: string
   iterations: number
@@ -39,13 +59,14 @@ export interface AdminUserRecord {
 
 interface AdminUserStore {
   get: (username: string) => Promise<AdminUserRecord | null>
-  set: (username: string, user: AdminUserRecord) => Promise<void>
+  set: (username: string, user: AdminUserRecord, audit?: AdminOperationAuditInput) => Promise<void>
+  create: (username: string, user: AdminUserRecord, audit?: AdminOperationAuditInput) => Promise<boolean>
   upgradePasswordHash: (
     username: string,
     expectedPasswordHash: string,
     replacement: PasswordHashRecord,
   ) => Promise<AdminUserRecord | null>
-  delete: (username: string) => Promise<void>
+  delete: (username: string, audit?: AdminOperationAuditInput) => Promise<void>
   list: () => Promise<AdminUserRecord[]>
 }
 
@@ -53,11 +74,18 @@ const USERNAME_PATTERN = /^[A-Za-z0-9_-]{3,32}$/
 const ADMIN_SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
 
 export type AdminAuthenticationResult =
-  | { ok: true; username: string; role: AdminRole; capabilities: AdminCapability[] }
+  | { ok: true; username: string; role: AdminRole; capabilities: AdminCapability[]; authenticated_at: string }
   | AdminFailureResult
 
 export type AdminLoginResult =
-  | { ok: true; username: string; cookie: string }
+  | {
+      ok: true
+      username: string
+      role: AdminRole
+      capabilities: AdminCapability[]
+      authenticated_at: string
+      cookie: string
+    }
   | AdminFailureResult
 
 type AdminFailureResult = { ok: false; response: Response }
@@ -98,7 +126,15 @@ export async function loginAdminRequest(
     await sessionStore.deleteExpired(now.toISOString(), idleCutoff(now).toISOString())
     await sessionStore.save(session.record)
     await rateLimit.attempt.refund()
-    return { ok: true, username, cookie: adminSessionCookie(session.token) }
+    const role = normalizeAdminRole(authenticated.role, authenticated.version)
+    return {
+      ok: true,
+      username,
+      role,
+      capabilities: capabilitiesForRole(role),
+      authenticated_at: session.record.created_at,
+      cookie: adminSessionCookie(session.token),
+    }
   } catch (error) {
     await rateLimit.attempt.refund()
     if (error instanceof PasswordWorkCapacityError) return passwordCapacityResult()
@@ -109,16 +145,17 @@ export async function loginAdminRequest(
 export function authenticateAdminRequest(req: Request, now?: Date): Promise<AdminAuthenticationResult>
 export function authenticateAdminRequest(
   req: Request,
-  requiredCapability?: AdminCapability,
+  requirement?: AdminCapability | AdminAuthenticationRequirement,
   now?: Date,
 ): Promise<AdminAuthenticationResult>
 export async function authenticateAdminRequest(
   req: Request,
-  capabilityOrNow?: AdminCapability | Date,
+  requirementOrNow?: AdminCapability | AdminAuthenticationRequirement | Date,
   explicitNow = new Date(),
 ): Promise<AdminAuthenticationResult> {
-  const requiredCapability = capabilityOrNow instanceof Date ? undefined : capabilityOrNow
-  const now = capabilityOrNow instanceof Date ? capabilityOrNow : explicitNow
+  const requirement = normalizeAuthenticationRequirement(requirementOrNow)
+  const requiredCapability = requirement.capability
+  const now = requirementOrNow instanceof Date ? requirementOrNow : explicitNow
   const originFailure = unsafeOriginFailure(req)
   if (originFailure) return { ok: false, response: originFailure }
 
@@ -133,16 +170,35 @@ export async function authenticateAdminRequest(
   if (!session) return sessionRequiredResult(true)
   const user = await (await getAdminUserStore()).get(session.username)
   if (!user) return sessionRequiredResult(true)
+  if (user.disabled) {
+    await store.deleteByTokenHash(hashSessionToken(sessionCookie.token))
+    return sessionRequiredResult(true)
+  }
   const role = normalizeAdminRole(user.role, user.version)
   const capabilities = capabilitiesForRole(role)
   if (requiredCapability && !capabilities.includes(requiredCapability)) {
     await auditAdminCapability(req, session.username, requiredCapability, 'deny', '管理员角色缺少所需能力。')
-    return forbiddenResult('当前管理员账号没有执行此风控操作的权限。')
+    return forbiddenResult('当前管理员账号没有执行此操作的权限。')
+  }
+  if (requirement.requireRecentLogin) {
+    const authenticatedAt = Date.parse(session.created_at)
+    if (!Number.isFinite(authenticatedAt) || now.getTime() - authenticatedAt > ADMIN_STEP_UP_MAX_AGE_MS) {
+      if (requiredCapability) {
+        await auditAdminCapability(req, session.username, requiredCapability, 'deny', '敏感操作需要近期管理员登录。')
+      }
+      return forbiddenResult('该敏感操作需要近期管理员登录，请退出后重新登录再试。')
+    }
   }
   if (requiredCapability) {
     await auditAdminCapability(req, session.username, requiredCapability, 'allow', '管理员能力校验通过。')
   }
-  return { ok: true, username: session.username, role, capabilities }
+  return {
+    ok: true,
+    username: session.username,
+    role,
+    capabilities,
+    authenticated_at: session.created_at,
+  }
 }
 
 export async function logoutAdminRequest(req: Request): Promise<{ ok: true; cookie: string } | { ok: false; response: Response }> {
@@ -176,7 +232,8 @@ export async function requireRootAdminPassword(req: Request, value: unknown): Pr
       ok: true,
       username: 'root',
       role: 'security_admin',
-      capabilities: ['risk_view', 'risk_review', 'risk_config'],
+      capabilities: capabilitiesForRole('security_admin'),
+      authenticated_at: new Date().toISOString(),
     }
   }
   rateLimit.attempt.retainFailure()
@@ -187,31 +244,57 @@ export async function createAdminUser(
   usernameValue: unknown,
   passwordValue: unknown,
   roleValue: unknown = 'risk_viewer',
-): Promise<{ ok: true; user: AdminUserRecord } | { ok: false; message: string }> {
+  replaceExisting = false,
+  auditContext?: AdminUserAuditContext,
+): Promise<{ ok: true; user: AdminUserRecord; replaced: boolean } | { ok: false; message: string; code?: 'already_exists' }> {
   const username = normalizeUsername(usernameValue)
   if (!username) return { ok: false, message: '账号名需为 3-32 位字母、数字、下划线或短横线。' }
-  if (typeof passwordValue !== 'string' || passwordValue.length < 8) {
-    return { ok: false, message: '账号密码至少需要 8 位。' }
+  if (typeof passwordValue !== 'string' || passwordValue.length < 8 || passwordValue.length > 128) {
+    return { ok: false, message: '账号密码必须为 8-128 位。' }
   }
   const role = normalizeAdminRoleValue(roleValue)
   if (!role) return { ok: false, message: '管理员角色无效。' }
 
+  const store = await getAdminUserStore()
+  const existing = await store.get(username)
+  if (existing && !replaceExisting) {
+    return { ok: false, code: 'already_exists', message: '同名管理员已存在；如需替换密码和角色，请明确确认覆盖。' }
+  }
   const now = new Date().toISOString()
   const passwordHash = await createPasswordHash(passwordValue)
   const user: AdminUserRecord = {
     version: 2,
     username,
     role,
+    disabled: false,
     password_hash: passwordHash.password_hash,
     salt: passwordHash.salt,
     iterations: passwordHash.iterations,
     password_algorithm: passwordHash.password_algorithm,
-    created_at: now,
+    created_at: existing?.created_at ?? now,
     updated_at: now,
   }
-  const store = await getAdminUserStore()
-  await store.set(username, user)
-  return { ok: true, user }
+  if (existing) {
+    await store.set(username, user, auditContext && {
+      ...auditContext,
+      action: 'admin_user.replace',
+      targetType: 'admin_user',
+      targetId: username,
+      before: adminUserAuditSnapshot(existing),
+      after: adminUserAuditSnapshot(user),
+    })
+    return { ok: true, user, replaced: true }
+  }
+  if (!await store.create(username, user, auditContext && {
+    ...auditContext,
+    action: 'admin_user.create',
+    targetType: 'admin_user',
+    targetId: username,
+    after: adminUserAuditSnapshot(user),
+  })) {
+    return { ok: false, code: 'already_exists', message: '同名管理员已存在；请刷新列表后重试。' }
+  }
+  return { ok: true, user, replaced: false }
 }
 
 export async function listAdminUsers(): Promise<Array<Pick<AdminUserRecord, 'username' | 'created_at' | 'updated_at'> & { role: AdminRole; capabilities: AdminCapability[] }>> {
@@ -224,23 +307,50 @@ export async function listAdminUsers(): Promise<Array<Pick<AdminUserRecord, 'use
     })
 }
 
-export async function deleteAdminUser(usernameValue: unknown): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function deleteAdminUser(
+  usernameValue: unknown,
+  auditContext?: AdminUserAuditContext,
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const username = normalizeUsername(usernameValue)
   if (!username) return { ok: false, message: '账号名格式不正确。' }
   const store = await getAdminUserStore()
-  await store.delete(username)
+  const existing = await store.get(username)
+  if (!existing) return { ok: false, message: '管理员账号不存在。' }
+  await store.delete(username, auditContext && {
+    ...auditContext,
+    action: 'admin_user.delete',
+    targetType: 'admin_user',
+    targetId: username,
+    before: adminUserAuditSnapshot(existing),
+    after: { deleted: true },
+  })
   return { ok: true }
+}
+
+type AdminUserAuditContext = Pick<
+  AdminOperationAuditInput,
+  'actorUsername' | 'reason' | 'requestId' | 'clientIp'
+>
+
+function adminUserAuditSnapshot(user: AdminUserRecord) {
+  return {
+    username: user.username,
+    role: normalizeAdminRole(user.role, user.version),
+    disabled: user.disabled ?? false,
+    created_at: user.created_at,
+    updated_at: user.updated_at,
+  }
 }
 
 function clearAdminSessionCookie(): string {
   return `${ADMIN_SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=0${secureCookieSuffix()}`
 }
 
-async function verifyAdminUser(username: string | null, password: string): Promise<boolean> {
+async function verifyAdminUser(username: string | null, password: string): Promise<AdminUserRecord | null> {
   const store = await getAdminUserStore()
   const user = username ? await store.get(username) : null
   const passwordVerification = await verifyPasswordHashOrDummy(password, user)
-  if (!user || !passwordVerification.verified) return false
+  if (!user || user.disabled || !passwordVerification.verified) return null
   if (passwordVerification.needsRehash) {
     try {
       const replacement = await createPasswordHash(password)
@@ -249,7 +359,7 @@ async function verifyAdminUser(username: string | null, password: string): Promi
       console.warn('admin password hash upgrade skipped:', error instanceof Error ? error.name : 'UnknownError')
     }
   }
-  return true
+  return user
 }
 
 function rateLimitStoreUnavailableResult(): AdminFailureResult {
@@ -324,9 +434,30 @@ function normalizeAdminRole(value: unknown, version: AdminUserRecord['version'])
 }
 
 function capabilitiesForRole(role: AdminRole): AdminCapability[] {
-  if (role === 'security_admin') return ['risk_view', 'risk_review', 'risk_config']
-  if (role === 'risk_reviewer') return ['risk_view', 'risk_review']
-  return ['risk_view']
+  if (role === 'security_admin') {
+    return [
+      'risk_view',
+      'risk_review',
+      'risk_config',
+      'usage_view',
+      'user_view',
+      'sensitive_data_view',
+      'user_manage',
+      'user_delete',
+      'optimization_view',
+      'optimization_manage',
+      'admin_manage',
+    ]
+  }
+  if (role === 'risk_reviewer') return ['risk_view', 'risk_review', 'usage_view', 'user_view']
+  return ['risk_view', 'usage_view']
+}
+
+function normalizeAuthenticationRequirement(
+  value: AdminCapability | AdminAuthenticationRequirement | Date | undefined,
+): AdminAuthenticationRequirement {
+  if (!value || value instanceof Date) return {}
+  return typeof value === 'string' ? { capability: value } : value
 }
 
 async function auditAdminCapability(
@@ -338,13 +469,27 @@ async function auditAdminCapability(
 ): Promise<void> {
   const url = new URL(req.url)
   const requestId = req.headers.get('x-request-id')?.trim() || randomUUID()
-  await recordBehaviorRiskAdminAudit({
-    adminUsername: username,
-    capability,
-    action: `${req.method} ${url.pathname}`,
-    decision,
+  const action = `${req.method} ${url.pathname}`
+  if (capability === 'risk_view' || capability === 'risk_review' || capability === 'risk_config') {
+    await recordBehaviorRiskAdminAudit({
+      adminUsername: username,
+      capability,
+      action,
+      decision,
+      reason,
+      requestId,
+    })
+    return
+  }
+  await recordAdminOperationAudit({
+    actorUsername: username,
+    action: `authorization.${decision}`,
+    targetType: 'admin_capability',
+    targetId: capability,
     reason,
     requestId,
+    clientIp: getRequestClientIp(req),
+    after: { capability, request: action, decision },
   })
 }
 
@@ -353,7 +498,7 @@ async function getAdminUserStore(): Promise<AdminUserStore> {
 }
 
 function unsafeOriginFailure(req: Request): Response | null {
-  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return null
+  if (req.method === 'GET' || req.method === 'HEAD') return null
   const origin = req.headers.get('origin')
   if (!origin) return null
   try {

@@ -31,10 +31,6 @@ interface LegacyAnnouncement {
 }
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
-    return jsonResponse(null, 204)
-  }
-
   const url = new URL(req.url)
   const isAdminRoute = url.searchParams.get('admin') === '1' || url.pathname.includes('/api/admin/announcement')
 
@@ -72,7 +68,7 @@ async function handlePublicGet(req: Request): Promise<Response> {
 }
 
 async function handleAdminGet(req: Request): Promise<Response> {
-  const authentication = await authenticateAdminRequest(req)
+  const authentication = await authenticateAdminRequest(req, 'admin_manage')
   if (!authentication.ok) return authentication.response
 
   const { data, revision } = await readAnnouncementDocument()
@@ -84,7 +80,7 @@ async function handleAdminGet(req: Request): Promise<Response> {
 }
 
 async function handleAdminPut(req: Request): Promise<Response> {
-  const authentication = await authenticateAdminRequest(req)
+  const authentication = await authenticateAdminRequest(req, 'admin_manage')
   if (!authentication.ok) return authentication.response
 
   const body = await getValidatedJson(req, requestSchemas.announcement)

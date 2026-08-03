@@ -247,12 +247,6 @@ describe('behavior risk PostgreSQL store', () => {
     const account = await seedAccount('operator-anomaly')
     const now = new Date('2026-07-25T12:00:00.000Z')
     try {
-      await query('alter table behavior_risk_events drop constraint behavior_risk_events_event_type_check')
-      await query(`alter table behavior_risk_events
-        add constraint behavior_risk_events_event_type_check
-        check (event_type in ('register', 'activation', 'login', 'bind', 'job_submit', 'generate', 'export', 'workspace_save', 'page_view', 'account_deleted'))`)
-      await migrateDatabaseSchema()
-
       await Promise.all([
         insert('operator-anomaly:1', 'operator_data_anomaly', account, now, 20, {
           structureSummary: {

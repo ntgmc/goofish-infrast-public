@@ -12,7 +12,6 @@ import { confirmPersonalUseDeclaration, getPersonalUseDeclarationAcceptance } fr
 import { jsonResponse, requireUserSession } from './user-auth'
 
 export default async function personalUseDeclarationHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   const auth = await requireUserSession(req)
   if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
 

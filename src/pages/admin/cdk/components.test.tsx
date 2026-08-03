@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminCdkDetail } from '../contracts'
 import { CdkDetailDialog } from './components'
 
+const requestAdminOperationReason = vi.hoisted(() => vi.fn())
+vi.mock('../../../lib/admin-operation-reason', () => ({ requestAdminOperationReason }))
+
 const detail: AdminCdkDetail = {
   code_hash: 'hash-1',
   cdk_id: 'CDK-DETAIL-001',
@@ -34,6 +37,7 @@ beforeEach(() => {
     return window.setTimeout(() => callback(0), 0)
   })
   vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((handle) => window.clearTimeout(handle))
+  requestAdminOperationReason.mockReset().mockResolvedValue('已核验工作区干员')
 })
 
 afterEach(() => {
@@ -79,7 +83,6 @@ describe('CdkDetailDialog', () => {
   it('selects a trusted baseline source and submits only the source and review reason', async () => {
     const user = userEvent.setup()
     const onPatch = vi.fn(async () => undefined)
-    vi.spyOn(window, 'prompt').mockReturnValue('已核验工作区干员')
     render(<DialogHarness onPatch={onPatch} />)
     await user.click(screen.getByRole('button', { name: '打开 CDK 详情' }))
 
@@ -94,12 +97,16 @@ describe('CdkDetailDialog', () => {
       baseline_source: 'workspace',
       reason: '已核验工作区干员',
     })
+    expect(requestAdminOperationReason).toHaveBeenCalledWith(expect.objectContaining({
+      title: '确认更新干员基线',
+      confirmLabel: '应用新基线',
+    }))
   })
 
   it('does not submit a baseline change when the review note is cancelled', async () => {
     const user = userEvent.setup()
     const onPatch = vi.fn(async () => undefined)
-    vi.spyOn(window, 'prompt').mockReturnValue(null)
+    requestAdminOperationReason.mockResolvedValueOnce(null)
     render(<DialogHarness onPatch={onPatch} />)
     await user.click(screen.getByRole('button', { name: '打开 CDK 详情' }))
     await user.click(screen.getByRole('button', { name: '应用新基线' }))

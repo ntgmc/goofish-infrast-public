@@ -40,9 +40,6 @@ const MAX_BATCH_CREATE_COUNT = 100
 const MAX_CDK_GENERATION_ATTEMPTS = 10
 
 export default async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
-    return jsonResponse(null, 204)
-  }
   if (req.method === 'GET') {
     return handleList(req)
   }
@@ -61,7 +58,10 @@ export default async (req: Request): Promise<Response> => {
     const { permission, order_note, count, cdk_type, amount, item_code } = body
     const hashSecret = requireEnv('CDK_HASH_SECRET')
 
-    const authentication = await authenticateAdminRequest(req)
+    const authentication = await authenticateAdminRequest(req, {
+      capability: 'admin_manage',
+      requireRecentLogin: true,
+    })
     if (!authentication.ok) return authentication.response
     const cdkType = (cdk_type ?? 'profile') as CdkType
     if (cdkType === 'profile' && (amount !== undefined || item_code !== undefined)) {
@@ -214,10 +214,13 @@ async function generateUniqueCdk(
 
 async function handleList(req: Request): Promise<Response> {
   try {
-    const authentication = await authenticateAdminRequest(req)
+    const url = new URL(req.url)
+    const authentication = await authenticateAdminRequest(
+      req,
+      url.searchParams.get('view') === 'risk' ? 'risk_view' : 'admin_manage',
+    )
     if (!authentication.ok) return authentication.response
 
-    const url = new URL(req.url)
     const detailCodeHash = url.searchParams.get('code_hash')
     if (detailCodeHash) {
       if (!/^[a-f0-9]{64}$/i.test(detailCodeHash)) {
@@ -265,7 +268,10 @@ async function handlePatch(req: Request): Promise<Response> {
     const body = await getValidatedJson(req, requestSchemas.adminCdkPatch)
     const { code_hash, code_hashes, action, permission, order_note, reason, baseline_source } = body
 
-    const authentication = await authenticateAdminRequest(req)
+    const authentication = await authenticateAdminRequest(req, {
+      capability: 'admin_manage',
+      requireRecentLogin: true,
+    })
     if (!authentication.ok) return authentication.response
     if (code_hashes !== undefined) {
       if (action !== 'revoke' || code_hash !== undefined) {
@@ -471,7 +477,10 @@ async function handleDelete(req: Request): Promise<Response> {
     const body = await getValidatedJson(req, requestSchemas.adminCdkDelete)
     const { code_hash } = body
 
-    const authentication = await authenticateAdminRequest(req)
+    const authentication = await authenticateAdminRequest(req, {
+      capability: 'admin_manage',
+      requireRecentLogin: true,
+    })
     if (!authentication.ok) return authentication.response
     if (!code_hash || !/^[a-f0-9]{64}$/i.test(code_hash)) {
       return jsonResponse({ error: 'Invalid CDK identifier.' }, 400)

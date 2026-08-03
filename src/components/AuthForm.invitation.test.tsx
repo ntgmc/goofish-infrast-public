@@ -65,7 +65,7 @@ describe('AuthForm invitation code', () => {
     render(<AuthForm onAuthenticated={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: '注册' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('settings unavailable')
+    expect(await screen.findByRole('alert')).toHaveTextContent('注册失败')
     expect(screen.getByRole('button', { name: '创建账号' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: '重试' }))
 

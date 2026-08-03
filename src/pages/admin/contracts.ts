@@ -8,6 +8,26 @@ export type Permission = RawPermissionMode
 
 export type GeneratedPermission = ProductPermissionMode
 
+export type AdminCapability =
+  | 'risk_view'
+  | 'risk_review'
+  | 'risk_config'
+  | 'usage_view'
+  | 'user_view'
+  | 'sensitive_data_view'
+  | 'user_manage'
+  | 'user_delete'
+  | 'optimization_view'
+  | 'optimization_manage'
+  | 'admin_manage'
+
+export interface AdminSessionUser {
+  username: string;
+  role: 'risk_viewer' | 'risk_reviewer' | 'security_admin';
+  capabilities: AdminCapability[];
+  authenticated_at: string;
+}
+
 export type CdkStatus = 'unused' | 'claiming' | 'used' | 'frozen' | 'revoked'
 export type CdkType = 'profile' | 'balance' | 'item'
 type ItemCdkCode = 'lifetime_profile_voucher' | 'limited_profile_voucher'
@@ -198,6 +218,16 @@ export interface UsageCdkDistributionItem {
 }
 
 export interface UsageStatsResponse {
+  metrics_version: string;
+  generated_at: string;
+  source: 'raw_events_and_authoritative_account_additions';
+  completeness: {
+    complete: boolean;
+    unknown_status_events: number;
+    retention_days: number;
+    raw_events_truncated: boolean;
+    raw_event_limit: number;
+  };
   totals: UsageTotals;
   days: UsageDay[];
   range: UsageRange;
@@ -291,6 +321,8 @@ export interface AdminOptimizationDeadLetter {
   replayed_job_id: string | null;
   replayed_by: string | null;
   replayed_at: string | null;
+  resolution_reason: string | null;
+  resolved_by: string | null;
   resolved_at: string | null;
   created_at: string;
   updated_at: string;
@@ -335,6 +367,10 @@ export interface AdminOptimizationQueueSnapshot {
   capacity: {
     queue_limit: number;
     worker_concurrency: number;
+    worker_instances: number;
+    source: 'runtime_registry' | 'configured_fallback';
+    heartbeat_interval_ms: number;
+    stale_after_ms: number;
   };
   counts: {
     queued: number;
@@ -434,6 +470,14 @@ export interface AdminProfileSummary {
 export interface AdminUserDetail {
   user: AppUserSummary;
   profiles: AdminProfileSummary[];
+  profile_pagination?: {
+    page: number;
+    page_size: number;
+    returned: number;
+    total: number;
+    total_pages: number;
+    truncated: boolean;
+  };
   personal_use_declarations: Array<{
     profile_id: string | null;
     declaration_id: string;

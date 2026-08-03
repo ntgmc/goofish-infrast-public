@@ -10,6 +10,7 @@ import type { OptimizerFailure } from './optimization/jobs/optimizer-port'
 import { executeOptimizationJobWithPort } from './optimization/jobs/optimizer-dispatcher'
 import { closePool } from './storage/postgres'
 import type { OptimizeJobRecord } from './storage/optimize-job-store'
+import { describeServerError } from './security/error-reporting'
 
 export type OptimizeWorkerData = {
   job: OptimizeJobRecord
@@ -52,7 +53,7 @@ export async function runOptimizeWorkerThread(options: OptimizeWorkerRuntimeOpti
   try {
     await closeDatabase()
   } catch (error) {
-    console.warn('optimize worker pool close skipped:', error)
+    console.warn('optimize worker pool close skipped:', describeServerError(error))
   }
   messagePort?.postMessage(message)
 }

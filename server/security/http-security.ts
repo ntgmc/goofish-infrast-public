@@ -1,4 +1,5 @@
 import type { IncomingMessage } from 'node:http'
+import { isTrustedProxyAddress } from './client-ip'
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -18,6 +19,9 @@ const CONTENT_SECURITY_POLICY = [
   "worker-src 'none'",
   'upgrade-insecure-requests',
 ].join('; ')
+
+const STRICT_STYLE_CONTENT_SECURITY_POLICY = CONTENT_SECURITY_POLICY
+  .replace("style-src 'self' 'unsafe-inline'", "style-src 'self'")
 
 const PERMISSIONS_POLICY = [
   'accelerometer=()',
@@ -41,6 +45,7 @@ const STRICT_TRANSPORT_SECURITY = 'max-age=31536000; includeSubDomains'
 
 const HTTP_SECURITY_HEADERS: Readonly<Record<string, string>> = Object.freeze({
   'Content-Security-Policy': CONTENT_SECURITY_POLICY,
+  'Content-Security-Policy-Report-Only': STRICT_STYLE_CONTENT_SECURITY_POLICY,
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
@@ -67,17 +72,9 @@ export function isSecureWebRequest(req: Request): boolean {
 
 export function isSecureIncomingRequest(req: IncomingMessage): boolean {
   if (Boolean((req.socket as { encrypted?: boolean }).encrypted)) return true
-  if (!isLoopbackAddress(req.socket.remoteAddress)) return false
+  if (!isTrustedProxyAddress(req.socket.remoteAddress)) return false
   const forwardedProto = firstHeaderValue(req.headers['x-forwarded-proto'])
   return forwardedProto?.split(',', 1)[0]?.trim().toLowerCase() === 'https'
-}
-
-function isLoopbackAddress(value: string | undefined): boolean {
-  if (!value) return false
-  const normalized = value.toLowerCase()
-  return normalized === '::1'
-    || normalized.startsWith('127.')
-    || normalized.startsWith('::ffff:127.')
 }
 
 function firstHeaderValue(value: string | string[] | undefined): string | null {

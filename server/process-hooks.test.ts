@@ -4,20 +4,42 @@ const {
   initializeJobProcessing,
   initializeQueueMaintenance,
   initializeBehaviorMaintenance,
+  initializeInventoryWorker,
+  initializeInvitationWorker,
+  initializeWorkerRegistration,
   initializeAuthMaintenance,
   shutdownJobProcessing,
   shutdownQueueMaintenance,
   shutdownBehaviorMaintenance,
+  shutdownInventoryWorker,
+  shutdownInvitationWorker,
+  stopWorkerRegistration,
   shutdownAuthMaintenance,
+  waitQueueMaintenance,
+  waitBehaviorMaintenance,
+  waitInventoryWorker,
+  waitInvitationWorker,
+  waitWorkerRegistration,
 } = vi.hoisted(() => ({
   initializeJobProcessing: vi.fn(async () => undefined),
   initializeQueueMaintenance: vi.fn(async () => undefined),
   initializeBehaviorMaintenance: vi.fn(async () => undefined),
+  initializeInventoryWorker: vi.fn(async () => undefined),
+  initializeInvitationWorker: vi.fn(async () => undefined),
+  initializeWorkerRegistration: vi.fn(async () => undefined),
   initializeAuthMaintenance: vi.fn(async () => undefined),
   shutdownJobProcessing: vi.fn(async () => undefined),
   shutdownQueueMaintenance: vi.fn(),
   shutdownBehaviorMaintenance: vi.fn(),
+  shutdownInventoryWorker: vi.fn(),
+  shutdownInvitationWorker: vi.fn(),
+  stopWorkerRegistration: vi.fn(),
   shutdownAuthMaintenance: vi.fn(),
+  waitQueueMaintenance: vi.fn(async () => undefined),
+  waitBehaviorMaintenance: vi.fn(async () => undefined),
+  waitInventoryWorker: vi.fn(async () => undefined),
+  waitInvitationWorker: vi.fn(async () => undefined),
+  waitWorkerRegistration: vi.fn(async () => undefined),
 }))
 
 vi.mock('./optimize-job-runner', () => ({
@@ -27,10 +49,27 @@ vi.mock('./optimize-job-runner', () => ({
 vi.mock('./optimize-queue-maintenance', () => ({
   initializeOptimizeQueueMaintenance: initializeQueueMaintenance,
   shutdownOptimizeQueueMaintenance: shutdownQueueMaintenance,
+  waitForOptimizeQueueMaintenanceIdle: waitQueueMaintenance,
 }))
 vi.mock('./behavior-risk-maintenance', () => ({
   initializeBehaviorRiskMaintenance: initializeBehaviorMaintenance,
   shutdownBehaviorRiskMaintenance: shutdownBehaviorMaintenance,
+  waitForBehaviorRiskMaintenanceIdle: waitBehaviorMaintenance,
+}))
+vi.mock('./inventory-campaign-worker', () => ({
+  initializeInventoryCampaignWorker: initializeInventoryWorker,
+  shutdownInventoryCampaignWorker: shutdownInventoryWorker,
+  waitForInventoryCampaignWorkerIdle: waitInventoryWorker,
+}))
+vi.mock('./invitation-settlement-worker', () => ({
+  initializeInvitationSettlementWorker: initializeInvitationWorker,
+  shutdownInvitationSettlementWorker: shutdownInvitationWorker,
+  waitForInvitationSettlementWorkerIdle: waitInvitationWorker,
+}))
+vi.mock('./optimize-worker-registration', () => ({
+  initializeOptimizeWorkerRegistration: initializeWorkerRegistration,
+  stopOptimizeWorkerRegistration: stopWorkerRegistration,
+  waitForOptimizeWorkerRegistrationIdle: waitWorkerRegistration,
 }))
 vi.mock('./auth-data-maintenance', () => ({
   initializeAuthDataMaintenance: initializeAuthMaintenance,
@@ -77,14 +116,17 @@ describe('API process hook compositions', () => {
 
     expect(initializeQueueMaintenance).toHaveBeenCalledOnce()
     expect(initializeBehaviorMaintenance).toHaveBeenCalledOnce()
+    expect(initializeInventoryWorker).toHaveBeenCalledOnce()
+    expect(initializeInvitationWorker).toHaveBeenCalledOnce()
     expect(initializeAuthMaintenance).toHaveBeenCalledOnce()
     expect(initializeJobProcessing).toHaveBeenCalledOnce()
+    expect(initializeWorkerRegistration).toHaveBeenCalledOnce()
     expect(initializeQueueMaintenance.mock.invocationCallOrder[0])
       .toBeLessThan(initializeJobProcessing.mock.invocationCallOrder[0]!)
     await combinedProcessHooks.forceDrain()
   })
 
-  it('drains processing before stopping maintenance in the combined lifecycle', async () => {
+  it('stops scheduling before draining processing and waits for background work', async () => {
     const combinedProcessHooks = createCombinedProcessHooks(optimizerPort)
     await combinedProcessHooks.initialize()
     vi.clearAllMocks()
@@ -93,9 +135,14 @@ describe('API process hook compositions', () => {
     expect(shutdownJobProcessing).toHaveBeenCalledWith()
     expect(shutdownQueueMaintenance).toHaveBeenCalledOnce()
     expect(shutdownBehaviorMaintenance).toHaveBeenCalledOnce()
+    expect(shutdownInventoryWorker).toHaveBeenCalledOnce()
+    expect(shutdownInvitationWorker).toHaveBeenCalledOnce()
+    expect(stopWorkerRegistration).toHaveBeenCalledOnce()
     expect(shutdownAuthMaintenance).toHaveBeenCalledOnce()
-    expect(shutdownJobProcessing.mock.invocationCallOrder[0])
-      .toBeLessThan(shutdownQueueMaintenance.mock.invocationCallOrder[0]!)
+    expect(shutdownQueueMaintenance.mock.invocationCallOrder[0])
+      .toBeLessThan(shutdownJobProcessing.mock.invocationCallOrder[0]!)
+    expect(waitWorkerRegistration).toHaveBeenCalledOnce()
+    expect(waitQueueMaintenance).toHaveBeenCalledOnce()
     expect(getRegisteredOptimizerPort()).toBeNull()
   })
 
@@ -107,9 +154,11 @@ describe('API process hook compositions', () => {
 
     expect(shutdownJobProcessing).toHaveBeenCalledWith(0)
     expect(shutdownQueueMaintenance).toHaveBeenCalledOnce()
+    expect(shutdownInventoryWorker).toHaveBeenCalledOnce()
+    expect(shutdownInvitationWorker).toHaveBeenCalledOnce()
     expect(shutdownAuthMaintenance).toHaveBeenCalledOnce()
-    expect(shutdownJobProcessing.mock.invocationCallOrder[0])
-      .toBeLessThan(shutdownQueueMaintenance.mock.invocationCallOrder[0]!)
+    expect(shutdownQueueMaintenance.mock.invocationCallOrder[0])
+      .toBeLessThan(shutdownJobProcessing.mock.invocationCallOrder[0]!)
     expect(getRegisteredOptimizerPort()).toBeNull()
   })
 

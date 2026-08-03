@@ -111,6 +111,17 @@ const expectedRevisionSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEG
 const adminPermissionSchema = z.enum(
   listAdminIssuablePermissions() as [ProductPermissionMode, ...ProductPermissionMode[]],
 )
+const adminOperationReasonSchema = z.string().trim().min(2).max(500)
+const adminTargetUserShape = {
+  user_id: optionalString(128),
+  email: optionalString(AUTH_EMAIL_MAX_LENGTH),
+  reason: adminOperationReasonSchema,
+}
+const adminTargetProfileShape = {
+  ...adminTargetUserShape,
+  profile_id: shortString(128),
+  expected_updated_at: z.string().datetime(),
+}
 
 export const requestSchemas = {
   depotValue: depotValueRequestSchema,
@@ -166,7 +177,10 @@ export const requestSchemas = {
     baseline_source: z.enum(['latest', 'workspace', 'next_import']).optional(),
   }),
   adminCdkDelete: strict({ code_hash: shortString(64) }),
-  adminOptimization: strict({ action: shortString(32), id: shortString(128), reason: shortString(500) }),
+  adminOptimization: z.discriminatedUnion('action', [
+    strict({ action: z.literal('replay'), id: shortString(128), reason: adminOperationReasonSchema }),
+    strict({ action: z.literal('discard'), id: shortString(128), reason: adminOperationReasonSchema }),
+  ]),
   adminInvitationSettings: strict({
     enabled: z.boolean().optional(),
     daily_inviter_reward_limit: z.number().int().min(1).max(1000).optional(),
@@ -227,24 +241,62 @@ export const requestSchemas = {
     })).max(100),
   }),
   adminUserCreate: strict({
-    root_password: optionalUnknown,
-    username: optionalUnknown,
-    password: optionalUnknown,
+    root_password: shortString(512),
+    username: z.string().trim().min(3).max(32),
+    password: z.string().min(8).max(128),
     role: z.enum(['risk_viewer', 'risk_reviewer', 'security_admin']).optional(),
+    replace_existing: z.boolean().optional(),
+    reason: z.string().trim().min(2).max(500),
   }),
-  adminUserDelete: strict({ root_password: optionalUnknown, username: optionalUnknown }),
-  adminUserPatch: strict({
-    action: shortString(64),
-    user_id: optionalString(128),
-    email: optionalString(AUTH_EMAIL_MAX_LENGTH),
-    confirm_email: optionalString(AUTH_EMAIL_MAX_LENGTH),
-    new_password: z.string().max(AUTH_PASSWORD_MAX_LENGTH).optional(),
-    profile_id: optionalString(128),
-    display_name: optionalString(40),
-    note: optionalString(500),
-    status: optionalString(32),
-    permission: optionalString(32),
+  adminUserDelete: strict({
+    root_password: shortString(512),
+    username: z.string().trim().min(3).max(32),
+    reason: z.string().trim().min(2).max(500),
   }),
+  adminUserPatch: z.discriminatedUnion('action', [
+    strict({
+      ...adminTargetUserShape,
+      action: z.literal('reset_password'),
+      new_password: z.string().min(AUTH_PASSWORD_MIN_LENGTH).max(AUTH_PASSWORD_MAX_LENGTH),
+    }),
+    strict({ ...adminTargetUserShape, action: z.literal('freeze_account') }),
+    strict({ ...adminTargetUserShape, action: z.literal('unfreeze_account') }),
+    strict({
+      ...adminTargetUserShape,
+      action: z.literal('delete_account'),
+      confirm_email: z.string().email().max(AUTH_EMAIL_MAX_LENGTH),
+    }),
+    strict({
+      ...adminTargetProfileShape,
+      action: z.literal('update_profile'),
+      display_name: optionalString(40),
+      note: optionalString(500),
+    }),
+    strict({
+      ...adminTargetProfileShape,
+      action: z.literal('set_profile_status'),
+      status: z.enum(['active', 'frozen', 'revoked']),
+    }),
+    strict({
+      ...adminTargetProfileShape,
+      action: z.literal('set_profile_permission'),
+      permission: adminPermissionSchema,
+    }),
+    strict({
+      ...adminTargetProfileShape,
+      action: z.literal('upgrade_preview_profile'),
+      permission: adminPermissionSchema,
+    }),
+    strict({
+      ...adminTargetProfileShape,
+      action: z.literal('clear_profile_skland_binding'),
+    }),
+    strict({
+      ...adminTargetProfileShape,
+      action: z.literal('clear_profile_workspace'),
+      expected_workspace_updated_at: z.string().datetime().nullable(),
+    }),
+  ]),
   announcement: strict({
     banner: z.unknown().nullable(),
     announcements: z.array(z.unknown()).max(100),
@@ -252,7 +304,6 @@ export const requestSchemas = {
   }),
   usageStats: strict({
     event: shortString(64),
-    visitor_id: optionalString(128),
     announcement_id: optionalString(120),
     announcement_kind: optionalString(32),
     announcement_version: optionalString(64),
@@ -538,18 +589,15 @@ const SKLAND_PATHS: Record<string, z.ZodType> = {
   '/api/user/skland/login/confirm': requestSchemas.sklandConfirmation,
   '/api/user/skland/credential/preview': requestSchemas.sklandCredential,
   '/api/user/skland/account/select': requestSchemas.sklandSelection,
-  '/api/user/skland/pending/cancel': requestSchemas.sklandPendingCancel,
   '/api/user/skland/import/refresh': requestSchemas.sklandProfile,
   '/api/user/skland/free-preview/login/complete': requestSchemas.freePreviewScanComplete,
   '/api/user/skland/free-preview/login/confirm': requestSchemas.freePreviewConfirmation,
   '/api/user/skland/free-preview/credential/preview': requestSchemas.freePreviewCredential,
   '/api/user/skland/free-preview/account/select': requestSchemas.freePreviewSelection,
-  '/api/user/skland/free-preview/pending/cancel': requestSchemas.profilelessSklandPendingCancel,
   '/api/user/skland/lifetime-voucher/login/complete': requestSchemas.lifetimeVoucherScanComplete,
   '/api/user/skland/lifetime-voucher/login/confirm': requestSchemas.lifetimeVoucherConfirmation,
   '/api/user/skland/lifetime-voucher/credential/preview': requestSchemas.lifetimeVoucherCredential,
   '/api/user/skland/lifetime-voucher/account/select': requestSchemas.lifetimeVoucherSelection,
-  '/api/user/skland/lifetime-voucher/pending/cancel': requestSchemas.profilelessSklandPendingCancel,
 }
 
 const ROUTE_POLICIES = new Map<string, RoutePolicy>([
@@ -660,4 +708,13 @@ export function getRoutePolicy(pathname: string): RoutePolicy | null {
 
 export function getAllowedMethods(policy: RoutePolicy): string[] {
   return Object.keys(policy.methods).sort()
+}
+
+export function getDeclaredApiPolicyRoutes(): string[] {
+  return [
+    ...ROUTE_POLICIES.keys(),
+    '/api/user/onboarding-tasks/:code/claim',
+    '/api/optimization/jobs/:jobId',
+    '/api/optimization/jobs/:jobId/cancel',
+  ].sort()
 }

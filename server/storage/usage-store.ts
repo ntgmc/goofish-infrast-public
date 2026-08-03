@@ -1,5 +1,14 @@
 import { query } from './postgres'
 
+const USAGE_RETENTION_DAYS = 180
+const USAGE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000
+const USAGE_CLEANUP_BATCH_SIZE = 2_000
+const USAGE_METRICS_VERSION = '2026-08-03.v2'
+const USAGE_STATS_RAW_EVENT_LIMIT = 100_000
+
+let nextUsageCleanupAt = 0
+let usageCleanupPromise: Promise<void> | null = null
+
 export type UsageEventName =
   | 'tool_visit'
   | 'free_preview'
@@ -96,7 +105,8 @@ export async function getAnnouncementEventCounts(
         and active.announcement_version = events.record_json->>'announcement_version'
       where events.event in ('announcement_impression', 'announcement_read')
         and events.visitor_id is not null
-        and coalesce(events.record_json->>'status', 'success') = 'success'
+        and events.record_json->>'status' = 'success'
+        and events.expires_at > now()
       group by events.record_json->>'announcement_id'`,
     [announcements.map((item) => item.id), announcements.map((item) => item.updated_at)],
   )
@@ -209,6 +219,16 @@ interface UsageCdkDistributionItem {
 }
 
 export interface UsageStats {
+  metrics_version: string
+  generated_at: string
+  source: 'raw_events_and_authoritative_account_additions'
+  completeness: {
+    complete: boolean
+    unknown_status_events: number
+    retention_days: number
+    raw_events_truncated: boolean
+    raw_event_limit: number
+  }
   totals: UsageDayStats
   days: UsageDayStats[]
   range: UsageRange
@@ -240,7 +260,9 @@ export interface UsageEventStore {
 export function createPostgresUsageEventStore(): UsageEventStore {
   const list = async (prefix: string) => {
     const result = await query<{ record_json: UsageEventRecord }>(
-      'select record_json from usage_events where key like $1 order by created_at asc',
+      `select record_json from usage_events
+       where key like $1 and expires_at > now()
+       order by created_at asc`,
       [`${prefix}%`],
     )
     return result.rows.map((row) => row.record_json)
@@ -250,11 +272,19 @@ export function createPostgresUsageEventStore(): UsageEventStore {
     const result = await query<{ record_json: UsageEventRecord }>(
       `select record_json
        from usage_events
-       where key like $1 and date between $2 and $3
-       order by created_at asc`,
-      [`${prefix}%`, startDate, endDate],
+       where key like $1 and date between $2 and $3 and expires_at > now()
+       order by created_at desc
+       limit $4`,
+      [`${prefix}%`, startDate, endDate, USAGE_STATS_RAW_EVENT_LIMIT + 1],
     )
-    return result.rows.map((row) => row.record_json)
+    const truncated = result.rows.length > USAGE_STATS_RAW_EVENT_LIMIT
+    return {
+      events: result.rows
+        .slice(0, USAGE_STATS_RAW_EVENT_LIMIT)
+        .map((row) => row.record_json)
+        .reverse(),
+      truncated,
+    }
   }
 
   const listAccountAdditions = async (startDate: string, endDate: string): Promise<UsageAccountAdditionStats[]> => {
@@ -297,7 +327,8 @@ export function createPostgresUsageEventStore(): UsageEventStore {
          and created_at >= $2
          and created_at < $3
          and record_json->>'profile_id' = $4
-         and coalesce(record_json->>'status', 'success') = 'success'`,
+         and record_json->>'status' = 'success'
+         and expires_at > now()`,
       [event, startAt, endAt, profileId],
     )
     return Number(result.rows[0]?.count ?? 0)
@@ -310,7 +341,8 @@ export function createPostgresUsageEventStore(): UsageEventStore {
        where event = $1
          and created_at >= $2
          and created_at < $3
-         and coalesce(record_json->>'status', 'success') = 'success'
+         and record_json->>'status' = 'success'
+         and expires_at > now()
          and record_json->>'estimate_bucket' = $4
          and record_json ? 'compute_duration_ms'`,
       ['schedule_generate', startAt, endAt, bucket],
@@ -327,22 +359,22 @@ export function createPostgresUsageEventStore(): UsageEventStore {
 
   return {
     set: async (key, record) => {
+      await maybeCleanupExpiredUsageEvents()
+      const expiresAt = new Date(
+        Date.parse(record.created_at) + USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+      ).toISOString()
       await query(
-        `insert into usage_events (key, event, visitor_id, date, created_at, profile_id, record_json)
-         values ($1, $2, $3, $4, $5, $6, $7::jsonb)
-         on conflict (key) do update set
-          event = excluded.event,
-          visitor_id = excluded.visitor_id,
-          date = excluded.date,
-          created_at = excluded.created_at,
-          profile_id = excluded.profile_id,
-          record_json = excluded.record_json`,
+        `insert into usage_events
+          (key, event, visitor_id, date, created_at, expires_at, profile_id, record_json)
+         values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+         on conflict (key) do nothing`,
         [
           key,
           record.event,
           record.visitor_id,
           record.date,
           record.created_at,
+          expiresAt,
           record.profile_id ?? null,
           JSON.stringify(record),
         ],
@@ -351,11 +383,15 @@ export function createPostgresUsageEventStore(): UsageEventStore {
     getStats: async (dates) => {
       const startDate = dates[0] ?? ''
       const endDate = dates[dates.length - 1] ?? ''
-      const [events, accountAdditions] = await Promise.all([
-        startDate && endDate ? listRange('events/', startDate, endDate) : list('events/'),
+      const [eventRange, accountAdditions] = await Promise.all([
+        startDate && endDate
+          ? listRange('events/', startDate, endDate)
+          : list('events/').then((events) => ({ events, truncated: false })),
         startDate && endDate ? listAccountAdditions(startDate, endDate) : Promise.resolve([]),
       ])
-      return buildUsageStats(events, dates, accountAdditions)
+      return buildUsageStats(eventRange.events, dates, accountAdditions, {
+        rawEventsTruncated: eventRange.truncated,
+      })
     },
     list,
     countSuccessfulByProfileInRange,
@@ -367,6 +403,7 @@ export function buildUsageStats(
   events: UsageEventRecord[],
   dates: string[],
   accountAdditions?: UsageAccountAdditionStats[],
+  options: { rawEventsTruncated?: boolean } = {},
 ): UsageStats {
   const normalizedDates = dates.filter(Boolean)
   const range: UsageRange = {
@@ -385,6 +422,7 @@ export function buildUsageStats(
   const scheduleDurationsByDate = new Map<string, number[]>()
   const cdkDistribution = new Map<string, UsageCdkDistributionItem>()
   const recentFailures: UsageFailureSample[] = []
+  const unknownStatusEvents = events.filter((event) => event.status === undefined).length
 
   for (const event of events) {
     applyEventToStats(totals, event, totalVisitors)
@@ -449,6 +487,16 @@ export function buildUsageStats(
   })
 
   return {
+    metrics_version: USAGE_METRICS_VERSION,
+    generated_at: new Date().toISOString(),
+    source: 'raw_events_and_authoritative_account_additions',
+    completeness: {
+      complete: unknownStatusEvents === 0 && options.rawEventsTruncated !== true,
+      unknown_status_events: unknownStatusEvents,
+      retention_days: USAGE_RETENTION_DAYS,
+      raw_events_truncated: options.rawEventsTruncated === true,
+      raw_event_limit: USAGE_STATS_RAW_EVENT_LIMIT,
+    },
     totals,
     days,
     range,
@@ -593,20 +641,13 @@ function addCdkDistribution(cdkDistribution: Map<string, UsageCdkDistributionIte
 
 function buildFunnel(totals: UsageDayStats): UsageFunnelStep[] {
   const steps: Array<{ key: UsageFunnelStep['key']; label: string; count: number }> = [
-    { key: 'free_preview', label: '免费预览', count: totals.free_previews },
-    { key: 'register', label: 'Register', count: totals.registers },
-    { key: 'cdk_redeem', label: 'Redeem CDK', count: totals.cdk_redeems },
-    { key: 'schedule_generate', label: 'Generate schedule', count: totals.schedule_generates },
+    { key: 'free_preview', label: '免费预览事件量', count: totals.free_previews },
+    { key: 'register', label: '注册事件量', count: totals.registers },
+    { key: 'cdk_redeem', label: 'CDK 兑换事件量', count: totals.cdk_redeems },
+    { key: 'schedule_generate', label: '排班生成事件量', count: totals.schedule_generates },
   ]
 
-  return steps.map((step, index) => {
-    const previous = index === 0 ? step.count : steps[index - 1]?.count ?? 0
-    return {
-      ...step,
-      conversion_rate: index === 0 ? 100 : rate(step.count, previous),
-      dropoff: index === 0 ? 0 : Math.max(0, previous - step.count),
-    }
-  })
+  return steps.map((step) => ({ ...step, conversion_rate: 0, dropoff: 0 }))
 }
 
 function buildLatencyStats(
@@ -618,7 +659,7 @@ function buildLatencyStats(
     average_ms: average(durations),
     p50_ms: percentile(durations, 50),
     p95_ms: percentile(durations, 95),
-    max_ms: durations.length > 0 ? Math.max(...durations) : 0,
+    max_ms: durations.reduce((maximum, duration) => Math.max(maximum, duration), 0),
     sample_count: durations.length,
     days: dates.map((date) => {
       const dayDurations = durationsByDate.get(date) ?? []
@@ -665,7 +706,7 @@ function toFailureSample(event: UsageEventRecord): UsageFailureSample {
 }
 
 function isSuccess(event: UsageEventRecord): boolean {
-  return event.status !== 'failure'
+  return event.status === 'success'
 }
 
 function isFailure(event: UsageEventRecord): boolean {
@@ -694,4 +735,21 @@ function rate(count: number, total: number): number {
 
 function roundToTenth(value: number): number {
   return Math.round(value * 10) / 10
+}
+
+async function maybeCleanupExpiredUsageEvents(now = Date.now()): Promise<void> {
+  if (now < nextUsageCleanupAt) return
+  if (usageCleanupPromise) return usageCleanupPromise
+  nextUsageCleanupAt = now + USAGE_CLEANUP_INTERVAL_MS
+  usageCleanupPromise = query(
+    `with expired as (
+       select key from usage_events where expires_at <= now()
+       order by expires_at asc limit $1
+     )
+     delete from usage_events events using expired where events.key = expired.key`,
+    [USAGE_CLEANUP_BATCH_SIZE],
+  ).then(() => undefined).finally(() => {
+    usageCleanupPromise = null
+  })
+  return usageCleanupPromise
 }

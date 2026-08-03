@@ -15,6 +15,8 @@ import {
   formatOptimizeJobHardTimeout,
   getOptimizeGlobalWorkerConcurrency,
   getOptimizeJobMaxAttempts,
+  getOptimizeWorkerConcurrency,
+  getOptimizeWorkerConfiguration,
 } from './optimize-job-config'
 import {
   calculateOptimizeExecutionDeadlineAtMs,
@@ -34,11 +36,13 @@ import {
   type OptimizeJobStore,
 } from './storage/optimize-job-store'
 import { processPendingOptimizationJobEffects } from './optimization/jobs/job-effects'
+import { describeServerError } from './security/error-reporting'
 
 const DEFAULT_LOCK_TTL_MS = 60_000
 const DEFAULT_HEARTBEAT_MS = 15_000
 const DEFAULT_QUEUE_POLL_MS = 1_000
 const DEFAULT_SHUTDOWN_GRACE_MS = 60_000
+const FORCED_RELEASE_DEADLINE_MS = 5_000
 
 type WorkerResultMessage =
   | { type: 'succeeded'; result: unknown }
@@ -53,6 +57,7 @@ type ActiveAttempt = {
   heartbeatTimer: ReturnType<typeof setInterval>
   hardTimeout: ReturnType<typeof setTimeout>
   heartbeatBusy: boolean
+  leaseRenewalEnabled: boolean
   settling: boolean
   progressUpdates: Promise<void>
 }
@@ -77,6 +82,8 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 export async function initializeOptimizeJobProcessing(): Promise<void> {
   if (!canRunOptimizeWorker() || initialized) return
   requireRegisteredOptimizerPort()
+  const configuration = getOptimizeWorkerConfiguration()
+  console.info('[optimize-worker-config]', configuration)
   initialized = true
   accepting = true
   try {
@@ -95,11 +102,11 @@ export async function initializeOptimizeJobProcessing(): Promise<void> {
 function handleOptimizeJobProcessingRequest(): void {
   if (!canRunOptimizeWorker()) return
   if (!initialized) {
-    void initializeOptimizeJobProcessing().catch((error) => console.error('optimize queue initialization failed:', error))
+    void initializeOptimizeJobProcessing().catch((error) => console.error('optimize queue initialization failed:', describeServerError(error)))
     return
   }
   if (!accepting) return
-  void pumpQueue().catch((error) => console.error('optimize queue pump failed:', error))
+  void pumpQueue().catch((error) => console.error('optimize queue pump failed:', describeServerError(error)))
 }
 
 function handleOptimizeJobCancellationRequest(jobId: string): void {
@@ -109,16 +116,22 @@ function handleOptimizeJobCancellationRequest(jobId: string): void {
 }
 
 export async function shutdownOptimizeJobProcessing(graceMs = shutdownGraceMs()): Promise<void> {
+  const boundedGraceMs = Math.max(0, graceMs)
+  const gracefulDrainDeadlineAt = Date.now() + boundedGraceMs
+  const deadlineAt = gracefulDrainDeadlineAt + FORCED_RELEASE_DEADLINE_MS
   accepting = false
   stopDispatcherTimer()
-  if (pumpPromise) await Promise.race([pumpPromise.catch(() => undefined), delay(graceMs)])
+  if (pumpPromise) await waitUntil(pumpPromise.catch(() => undefined), gracefulDrainDeadlineAt)
 
   if (activeAttempts.size > 0) {
-    await Promise.race([waitForIdle(), delay(graceMs)])
+    await waitUntil(waitForIdle(), gracefulDrainDeadlineAt)
   }
 
   const remaining = [...activeAttempts.values()]
-  await Promise.allSettled(remaining.map((attempt) => interruptForShutdown(attempt)))
+  if (remaining.length > 0) {
+    await waitUntil(Promise.allSettled(remaining.map((attempt) => interruptForShutdown(attempt))), deadlineAt)
+  }
+  initialized = false
 }
 
 export function getOptimizeJobProcessingState(): {
@@ -235,6 +248,7 @@ function spawnClaimedWorker(job: OptimizeJobRecord, lockToken: string): void {
     heartbeatTimer: undefined as unknown as ReturnType<typeof setInterval>,
     hardTimeout: undefined as unknown as ReturnType<typeof setTimeout>,
     heartbeatBusy: false,
+    leaseRenewalEnabled: true,
     settling: false,
     progressUpdates: Promise.resolve(),
   }
@@ -267,7 +281,7 @@ function spawnClaimedWorker(job: OptimizeJobRecord, lockToken: string): void {
 }
 
 async function heartbeat(attempt: ActiveAttempt): Promise<void> {
-  if (attempt.settling || attempt.heartbeatBusy || activeAttempts.get(attempt.job.id) !== attempt) return
+  if (!attempt.leaseRenewalEnabled || attempt.heartbeatBusy || activeAttempts.get(attempt.job.id) !== attempt) return
   attempt.heartbeatBusy = true
   try {
     const nextLease = lockExpiresAt()
@@ -283,7 +297,7 @@ async function heartbeat(attempt: ActiveAttempt): Promise<void> {
     }
     attempt.leaseDeadlineMs = Date.parse(nextLease)
   } catch (error) {
-    console.warn('optimize worker heartbeat skipped:', error)
+    console.warn('optimize worker heartbeat skipped:', describeServerError(error))
     if (Date.now() + heartbeatMs() >= attempt.leaseDeadlineMs) {
       await stopAndRetry(attempt, 'lease_lost', '任务执行租约无法安全续期。')
     }
@@ -298,7 +312,7 @@ function queueWorkerProgress(attempt: ActiveAttempt, stage: OptimizeCalculationS
     .then(async () => {
       await updateAttemptStage(getOptimizeJobStore(), attempt.job, attempt.lockToken, stage)
     })
-    .catch((error) => console.warn('optimize worker progress update skipped:', error))
+    .catch((error) => console.warn('optimize worker progress update skipped:', describeServerError(error)))
 }
 
 async function settleWorkerMessage(
@@ -307,9 +321,15 @@ async function settleWorkerMessage(
 ): Promise<void> {
   if (attempt.settling || activeAttempts.get(attempt.job.id) !== attempt) return
   attempt.settling = true
-  clearAttemptTimers(attempt)
+  clearTimeout(attempt.hardTimeout)
   try {
-    await attempt.progressUpdates
+    const progressFlushed = await waitUntil(
+      attempt.progressUpdates,
+      Date.now() + progressFlushTimeoutMs(),
+    )
+    if (!progressFlushed) {
+      console.warn('[optimize-worker] progress flush deadline reached; continuing lock-owned settlement')
+    }
     const current = await getOptimizeJobStore().getJob(attempt.job.id)
     if (current?.cancel_requested_at) {
       await attempt.worker.terminate()
@@ -330,6 +350,7 @@ async function settleWorkerMessage(
       await settleOptimizerFailure(getOptimizeJobStore(), attempt.job, attempt.lockToken, failure)
     }
   } finally {
+    stopAttemptLeaseRenewal(attempt)
     finishAttempt(attempt)
   }
 }
@@ -337,7 +358,7 @@ async function settleWorkerMessage(
 async function stopAndCancel(attempt: ActiveAttempt): Promise<void> {
   if (attempt.settling || activeAttempts.get(attempt.job.id) !== attempt) return
   attempt.settling = true
-  clearAttemptTimers(attempt)
+  stopAttemptLeaseRenewal(attempt)
   try {
     await attempt.worker.terminate()
     await getOptimizeJobStore().cancelAttempt(
@@ -347,7 +368,7 @@ async function stopAndCancel(attempt: ActiveAttempt): Promise<void> {
       attempt.lockToken,
     )
   } catch (error) {
-    console.error('optimize worker cancellation settlement failed:', error)
+    console.error('optimize worker cancellation settlement failed:', describeServerError(error))
   } finally {
     finishAttempt(attempt)
   }
@@ -361,7 +382,7 @@ async function stopAndRetry(
 ): Promise<void> {
   if (attempt.settling || activeAttempts.get(attempt.job.id) !== attempt) return
   attempt.settling = true
-  clearAttemptTimers(attempt)
+  stopAttemptLeaseRenewal(attempt)
   try {
     if (terminate) await attempt.worker.terminate()
     const current = await getOptimizeJobStore().getJob(attempt.job.id)
@@ -383,7 +404,7 @@ async function stopAndRetry(
       errorMessage,
     )
   } catch (error) {
-    console.error('optimize worker retry settlement failed:', error)
+    console.error('optimize worker retry settlement failed:', describeServerError(error))
   } finally {
     finishAttempt(attempt)
   }
@@ -392,7 +413,7 @@ async function stopAndRetry(
 async function interruptForShutdown(attempt: ActiveAttempt): Promise<void> {
   if (attempt.settling || activeAttempts.get(attempt.job.id) !== attempt) return
   attempt.settling = true
-  clearAttemptTimers(attempt)
+  stopAttemptLeaseRenewal(attempt)
   try {
     await attempt.worker.terminate()
     const current = await getOptimizeJobStore().getJob(attempt.job.id)
@@ -407,7 +428,7 @@ async function interruptForShutdown(attempt: ActiveAttempt): Promise<void> {
       await releaseInterrupted(getOptimizeJobStore(), attempt.job, attempt.lockToken)
     }
   } catch (error) {
-    console.error('optimize worker shutdown release failed:', error)
+    console.error('optimize worker shutdown release failed:', describeServerError(error))
   } finally {
     finishAttempt(attempt)
   }
@@ -422,7 +443,8 @@ function finishAttempt(attempt: ActiveAttempt): void {
   if (accepting) handleOptimizeJobProcessingRequest()
 }
 
-function clearAttemptTimers(attempt: ActiveAttempt): void {
+function stopAttemptLeaseRenewal(attempt: ActiveAttempt): void {
+  attempt.leaseRenewalEnabled = false
   clearInterval(attempt.heartbeatTimer)
   clearTimeout(attempt.hardTimeout)
 }
@@ -453,7 +475,7 @@ function shouldRunInline(): boolean {
 }
 
 function workerConcurrency(): number {
-  return positiveInteger(process.env.OPTIMIZE_WORKER_CONCURRENCY, 1, 1)
+  return getOptimizeWorkerConcurrency()
 }
 
 function lockTtlMs(): number {
@@ -473,6 +495,10 @@ function queuePollMs(): number {
 
 function shutdownGraceMs(): number {
   return positiveInteger(process.env.OPTIMIZE_SHUTDOWN_GRACE_MS, DEFAULT_SHUTDOWN_GRACE_MS, 1_000)
+}
+
+function progressFlushTimeoutMs(): number {
+  return Math.min(5_000, Math.max(250, Math.floor(heartbeatMs() / 3)))
 }
 
 function positiveInteger(value: string | undefined, fallback: number, minimum: number): number {
@@ -500,6 +526,15 @@ function delay(ms: number): Promise<void> {
     const timer = setTimeout(resolveDelay, ms)
     timer.unref?.()
   })
+}
+
+async function waitUntil(promise: Promise<unknown>, deadlineAt: number): Promise<boolean> {
+  const remainingMs = deadlineAt - Date.now()
+  if (remainingMs <= 0) return false
+  return Promise.race([
+    promise.then(() => true, () => true),
+    delay(remainingMs).then(() => false),
+  ])
 }
 
 function claimNext(store: OptimizeJobStore, lockToken: string): Promise<OptimizeJobRecord | null> {
@@ -530,7 +565,7 @@ async function completeAttempt(store: OptimizeJobStore, job: OptimizeJobRecord, 
   const completed = await store.completeAttempt(job.id, job.attempt_count, processWorkerId, lockToken, result)
   if (completed) {
     await processPendingOptimizationJobEffects(job.id).catch((error) => {
-      console.warn('optimization job completion effects remain pending:', error)
+      console.warn('optimization job completion effects remain pending:', describeServerError(error))
     })
   }
   return completed

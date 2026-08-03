@@ -1,17 +1,33 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 
-const { queryMock } = vi.hoisted(() => ({
-  queryMock: vi.fn(),
-}))
+const { queryMock, clientQueryMock, connectMock, releaseMock } = vi.hoisted(() => {
+  const queryMock = vi.fn()
+  return {
+    queryMock,
+    clientQueryMock: vi.fn((statement: string | { text: string; values?: unknown[] }, values?: unknown[]) => (
+      typeof statement === 'string'
+        ? queryMock(statement, values)
+        : queryMock(statement.text, statement.values)
+    )),
+    connectMock: vi.fn(),
+    releaseMock: vi.fn(),
+  }
+})
 
 vi.mock('./postgres', () => ({
+  getPool: () => ({ connect: connectMock }),
   query: queryMock,
 }))
 
 import {
+  DATABASE_SCHEMA_CHECKSUM,
+  DATABASE_SCHEMA_MINIMUM_APP_VERSION,
+  DATABASE_SCHEMA_VERSION,
   ensureDatabaseSchema,
+  getRuntimeDatabaseSchemaStatus,
   migrateDatabaseSchema,
+  resetRuntimeDatabaseSchemaStateForTesting,
   resolveDatabaseSchemaMode,
   validateRuntimeDatabaseSchema,
 } from './schema'
@@ -21,11 +37,17 @@ const originalNodeEnv = process.env.NODE_ENV
 
 beforeEach(() => {
   queryMock.mockImplementation(successfulSchemaQuery)
+  releaseMock.mockReset()
+  clientQueryMock.mockClear()
+  connectMock.mockReset()
+  connectMock.mockResolvedValue({ query: clientQueryMock, release: releaseMock })
+  resetRuntimeDatabaseSchemaStateForTesting()
 })
 
 afterEach(() => {
   vi.useRealTimers()
   queryMock.mockReset()
+  resetRuntimeDatabaseSchemaStateForTesting()
   restoreEnvironment('APP_ROLE', originalAppRole)
   restoreEnvironment('NODE_ENV', originalNodeEnv)
 })
@@ -35,7 +57,12 @@ describe('database schema ownership', () => {
     await migrateDatabaseSchema()
 
     const statements = queryMock.mock.calls.map(([statement]) => String(statement))
-    const schemaStatements = statements.slice(0, -2)
+    const schemaStatements = statements.filter((statement) => (
+      !statement.includes('goofish_schema_migrations')
+      && !statement.includes('pg_advisory_')
+      && !statement.startsWith('set statement_timeout')
+      && !statement.includes('from personal_use_declaration_versions')
+    ))
     const combinedSchema = schemaStatements.join('\n')
     expect(schemaStatements.length).toBeGreaterThan(10)
     expect(schemaStatements.every((statement) => !statement.includes('goofish:migration-phase'))).toBe(true)
@@ -74,8 +101,22 @@ describe('database schema ownership', () => {
     expect(combinedSchema).not.toMatch(/trimmed_workspace_history AS/)
     expect(combinedSchema).toMatch(/select 1 from optimize_jobs job/)
     expect(combinedSchema).not.toMatch(/\boptimization_jobs\b/)
-    expect(statements.at(-2)).toMatch(/insert into personal_use_declaration_versions/i)
-    expect(statements.at(-1)).toMatch(/select display_version, effective_date::text, content_text, content_hash/i)
+    expect(statements).toEqual(expect.arrayContaining([
+      expect.stringMatching(/select pg_advisory_lock/i),
+      expect.stringMatching(/create table if not exists goofish_schema_migrations/i),
+      expect.stringMatching(/insert into goofish_schema_migrations/i),
+      expect.stringMatching(/insert into personal_use_declaration_versions/i),
+      expect.stringMatching(/select display_version, effective_date::text, content_text, content_hash/i),
+      expect.stringMatching(/status = 'completed'/i),
+      expect.stringMatching(/select pg_advisory_unlock/i),
+    ]))
+    expect(queryMock.mock.calls.some(([, values]) => (
+      Array.isArray(values)
+      && values.includes(DATABASE_SCHEMA_VERSION)
+      && values.includes(DATABASE_SCHEMA_CHECKSUM)
+      && values.includes(DATABASE_SCHEMA_MINIMUM_APP_VERSION)
+    ))).toBe(true)
+    expect(releaseMock).toHaveBeenCalledOnce()
   })
 
   it('retries only the migration phase that deadlocked', async () => {
@@ -124,8 +165,10 @@ describe('database schema ownership', () => {
     await ensureDatabaseSchema()
     await ensureDatabaseSchema()
 
-    expect(queryMock).toHaveBeenCalledTimes(3)
-    const [statement, values] = queryMock.mock.calls[1]
+    const [statement, values] = queryMock.mock.calls.find(([candidate]) => (
+      String(candidate).includes('information_schema.columns')
+      && String(candidate).includes('actual.column_name is null')
+    ))!
     expect(statement).toContain('information_schema.columns')
     expect(statement).not.toMatch(/\b(?:alter|create|drop|truncate)\b/i)
     expect(JSON.parse(values[0])).toEqual(expect.arrayContaining([
@@ -141,11 +184,16 @@ describe('database schema ownership', () => {
 
   it('reports an actionable error when the worker schema is incompatible', async () => {
     process.env.APP_ROLE = 'worker'
-    queryMock.mockResolvedValue({
-      rows: [
-        { table_name: 'optimize_job_attempts', column_name: 'heartbeat_at' },
-        { table_name: 'optimize_jobs', column_name: 'cancel_requested_at' },
-      ],
+    queryMock.mockImplementation(async (statement: string) => {
+      if (statement.includes('actual.column_name is null')) {
+        return {
+          rows: [
+            { table_name: 'optimize_job_attempts', column_name: 'heartbeat_at' },
+            { table_name: 'optimize_jobs', column_name: 'cancel_requested_at' },
+          ],
+        }
+      }
+      return successfulSchemaQuery(statement)
     })
 
     await expect(validateRuntimeDatabaseSchema()).rejects.toThrow(
@@ -158,7 +206,10 @@ describe('database schema ownership', () => {
     process.env.APP_ROLE = 'worker'
     await validateRuntimeDatabaseSchema()
 
-    const workerRequirements = JSON.parse(queryMock.mock.calls[0][1][0])
+    const workerRequirementsCall = queryMock.mock.calls.find(([statement]) => (
+      String(statement).includes('actual.column_name is null')
+    ))!
+    const workerRequirements = JSON.parse(workerRequirementsCall[1][0])
     expect(workerRequirements).toEqual(expect.arrayContaining([
       { table_name: 'optimize_jobs', column_name: 'execution_stage' },
       { table_name: 'optimize_job_attempts', column_name: 'heartbeat_at' },
@@ -175,7 +226,10 @@ describe('database schema ownership', () => {
     process.env.APP_ROLE = 'api'
     await validateRuntimeDatabaseSchema()
 
-    const apiRequirements = JSON.parse(queryMock.mock.calls[0][1][0])
+    const apiRequirementsCall = queryMock.mock.calls.find(([statement]) => (
+      String(statement).includes('actual.column_name is null')
+    ))!
+    const apiRequirements = JSON.parse(apiRequirementsCall[1][0])
     expect(apiRequirements).toEqual(expect.arrayContaining([
       { table_name: 'feature_settings', column_name: 'key' },
       { table_name: 'feature_settings', column_name: 'record_json' },
@@ -194,6 +248,22 @@ describe('database schema ownership', () => {
     expect(resolveDatabaseSchemaMode({ APP_ROLE: 'api', NODE_ENV: 'development' })).toBe('migrate')
     expect(resolveDatabaseSchemaMode({ APP_ROLE: 'all', NODE_ENV: 'test' })).toBe('migrate')
   })
+
+  it('caches development migration and validation in one process', async () => {
+    process.env.APP_ROLE = 'api'
+    process.env.NODE_ENV = 'development'
+
+    await ensureDatabaseSchema()
+    await ensureDatabaseSchema()
+
+    const statements = queryMock.mock.calls.map(([statement]) => String(statement))
+    expect(statements.filter((statement) => statement.includes('CREATE TABLE IF NOT EXISTS cdk_records'))).toHaveLength(1)
+    expect(getRuntimeDatabaseSchemaStatus()).toMatchObject({
+      version: DATABASE_SCHEMA_VERSION,
+      checksum: DATABASE_SCHEMA_CHECKSUM,
+      minimumAppVersion: DATABASE_SCHEMA_MINIMUM_APP_VERSION,
+    })
+  })
 })
 
 function restoreEnvironment(name: 'APP_ROLE' | 'NODE_ENV', value: string | undefined): void {
@@ -202,6 +272,16 @@ function restoreEnvironment(name: 'APP_ROLE' | 'NODE_ENV', value: string | undef
 }
 
 function successfulSchemaQuery(statement: string): { rows: unknown[] } {
+  if (statement.includes('from goofish_schema_migrations')) {
+    if (!statement.includes('minimum_app_version')) return { rows: [] }
+    return {
+      rows: [{
+        checksum: DATABASE_SCHEMA_CHECKSUM,
+        minimum_app_version: DATABASE_SCHEMA_MINIMUM_APP_VERSION,
+        status: 'completed',
+      }],
+    }
+  }
   if (statement.includes('from personal_use_declaration_versions')) {
     return {
       rows: [{

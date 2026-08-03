@@ -1,29 +1,24 @@
 import { processInventoryCampaignBatch } from './storage/admin-inventory-store'
+import { createBackgroundWorker } from './background-worker-runtime'
 
 const CAMPAIGN_INTERVAL_MS = 2_000
-let timer: ReturnType<typeof setInterval> | null = null
-let running = false
+const controller = createBackgroundWorker({
+  name: 'inventory_campaign',
+  intervalMs: CAMPAIGN_INTERVAL_MS,
+  idleIntervalMs: 10_000,
+  run: async () => {
+    return processInventoryCampaignBatch(100)
+  },
+})
 
 export async function initializeInventoryCampaignWorker(): Promise<void> {
-  if (timer) return
-  await runBatch()
-  timer = setInterval(() => void runBatch(), CAMPAIGN_INTERVAL_MS)
-  timer.unref?.()
+  await controller.initialize()
 }
 
 export function shutdownInventoryCampaignWorker(): void {
-  if (timer) clearInterval(timer)
-  timer = null
+  controller.stop()
 }
 
-async function runBatch(): Promise<void> {
-  if (running) return
-  running = true
-  try {
-    await processInventoryCampaignBatch(100)
-  } catch (error) {
-    console.warn('inventory campaign batch skipped:', error)
-  } finally {
-    running = false
-  }
+export function waitForInventoryCampaignWorkerIdle(): Promise<void> {
+  return controller.waitForIdle()
 }

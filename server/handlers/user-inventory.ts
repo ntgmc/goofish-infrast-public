@@ -13,7 +13,6 @@ import { getReorderCheckQuotas } from '../optimization/jobs/entitlements'
 import { buildAuthPayload, jsonResponse, requireUserSession } from './user-auth'
 
 export default async function userInventoryHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   try {
     const auth = await requireUserSession(req)
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)

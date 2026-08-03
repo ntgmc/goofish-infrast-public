@@ -17,7 +17,7 @@ describe('optimize worker health server', () => {
     const response = await fetch(url(server, '/health/live'))
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       ok: true,
       role: 'worker',
       state: 'draining',
@@ -59,6 +59,19 @@ describe('optimize worker health server', () => {
     expect(checkDatabase).not.toHaveBeenCalled()
   })
 
+  it('reports degraded readiness when a required responsibility is unhealthy', async () => {
+    const server = await startServer('ready', true, true, undefined, false)
+    const response = await fetch(url(server, '/health/ready'))
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      responsibilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'behavior_risk', healthy: false }),
+      ]),
+    })
+  })
+
   it('rejects unknown routes', async () => {
     const server = await startServer('ready', true, true)
     const response = await fetch(url(server, '/metrics'))
@@ -73,6 +86,7 @@ async function startServer(
   checkDatabase: () => Promise<{ ok: true } | { ok: false; error: string }> = async () => databaseOk
     ? { ok: true as const }
     : { ok: false as const, error: 'unavailable' },
+  responsibilitiesHealthy = true,
 ): Promise<Server> {
   const server = createOptimizeWorkerHealthServer(
     () => lifecycle,
@@ -85,6 +99,20 @@ async function startServer(
         workerId: 'secret-worker-id',
       }),
       checkDatabase,
+      getResponsibilities: () => ['optimize_queue', 'inventory_campaign', 'invitation_settlement', 'behavior_risk', 'worker_registration'].map((name) => ({
+        name,
+        initialized: true,
+        healthy: responsibilitiesHealthy || name !== 'behavior_risk',
+        running: false,
+        started_at: '2026-08-03T00:00:00.000Z',
+        last_started_at: '2026-08-03T00:00:00.000Z',
+        last_success_at: '2026-08-03T00:00:00.000Z',
+        last_error_at: null,
+        last_error: null,
+        next_run_at: null,
+        consecutive_failures: 0,
+        skipped_overlaps: 0,
+      })),
     },
   )
   await new Promise<void>((resolveListen, rejectListen) => {
