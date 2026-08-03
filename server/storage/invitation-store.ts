@@ -617,13 +617,16 @@ export async function replayInvitationSettlement(
       attempt_count: number
       last_error: string | null
       dead_lettered_at: string | null
+      legacy_snapshot_unavailable: boolean
     }>(
-      `select status, attempt_count, last_error, dead_lettered_at::text
+      `select status, attempt_count, last_error, dead_lettered_at::text, legacy_snapshot_unavailable
          from invitations where id = $1 for update`,
       [invitationId],
     )
     const current = before.rows[0]
-    if (!current || (current.status !== 'failed' && current.status !== 'dead_letter')) return false
+    if (!current
+      || current.legacy_snapshot_unavailable
+      || (current.status !== 'failed' && current.status !== 'dead_letter')) return false
     const nowIso = now.toISOString()
     await client.query(
       `update invitations
