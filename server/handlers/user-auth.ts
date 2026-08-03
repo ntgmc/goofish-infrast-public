@@ -852,7 +852,7 @@ function scheduleInvitationSettlement(userId: string): void {
 
 export async function getActiveAnnouncements(): Promise<Announcement[]> {
   const store = createPostgresAnnouncementStore(ANNOUNCEMENT_KEY)
-  const value = await store.get()
+  const { data: value } = await store.get()
   if (!value || typeof value !== 'object' || !Array.isArray((value as { announcements?: unknown }).announcements)) return []
   return ((value as { announcements: unknown[] }).announcements)
     .filter((item): item is Announcement => isAnnouncement(item) && item.kind === 'popup' && item.active)
