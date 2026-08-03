@@ -106,11 +106,19 @@ export async function loginAdminRequest(
   }
 }
 
-export async function authenticateAdminRequest(
+export function authenticateAdminRequest(req: Request, now?: Date): Promise<AdminAuthenticationResult>
+export function authenticateAdminRequest(
   req: Request,
   requiredCapability?: AdminCapability,
-  now = new Date(),
+  now?: Date,
+): Promise<AdminAuthenticationResult>
+export async function authenticateAdminRequest(
+  req: Request,
+  capabilityOrNow?: AdminCapability | Date,
+  explicitNow = new Date(),
 ): Promise<AdminAuthenticationResult> {
+  const requiredCapability = capabilityOrNow instanceof Date ? undefined : capabilityOrNow
+  const now = capabilityOrNow instanceof Date ? capabilityOrNow : explicitNow
   const originFailure = unsafeOriginFailure(req)
   if (originFailure) return { ok: false, response: originFailure }
 

@@ -1188,8 +1188,9 @@ async function assertAdminAuthenticationRateLimits() {
   globalThis.__authSecurityAdminUpgradeModes = new Map()
   const adminAuth = await bundleModule('server/handlers/admin-auth.ts', 'admin-auth', [adminAuthPlugin()])
   const adminSessionHandler = await bundleModule('server/handlers/admin-session.ts', 'admin-session', [adminAuthPlugin()])
-  const created = await adminAuth.createAdminUser('security_admin', 'correct-admin-password')
+  const created = await adminAuth.createAdminUser('security_admin', 'correct-admin-password', 'security_admin')
   assert.equal(created.ok, true)
+  assert.equal(created.user.role, 'security_admin')
 
   const loginTime = new Date('2026-07-10T00:00:00.000Z')
   const login = await adminAuth.loginAdminRequest(
@@ -1218,11 +1219,16 @@ async function assertAdminAuthenticationRateLimits() {
   const successfulResults = await Promise.all(successfulRequests.map((request) => (
     adminAuth.authenticateAdminRequest(request, new Date('2026-07-10T00:01:00.000Z'))
   )))
-  assert(successfulResults.every((result) => result.ok && result.username === 'security_admin'))
+  assert(successfulResults.every((result) => (
+    result.ok
+      && result.username === 'security_admin'
+      && result.role === 'security_admin'
+      && JSON.stringify(result.capabilities) === JSON.stringify(['risk_view', 'risk_review', 'risk_config'])
+  )))
   assert.equal(
     globalThis.__authSecurityAdminGets,
-    getsBeforeSessionRequests,
-    'authenticated admin requests should not query password records',
+    getsBeforeSessionRequests + successfulRequests.length,
+    'authenticated admin requests should resolve the current administrator role once per request',
   )
 
   const legacyHeaders = await adminAuth.authenticateAdminRequest(adminLegacyHeaderRequest(

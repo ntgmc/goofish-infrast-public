@@ -25,6 +25,20 @@ beforeEach(() => {
 })
 
 describe('admin risk capabilities', () => {
+  it('keeps the legacy second-argument authentication time compatible', async () => {
+    const now = new Date('2026-08-01T01:00:00.000Z')
+    mocks.getAdminUser.mockResolvedValue(adminUser(2, 'risk_viewer'))
+
+    const result = await authenticateAdminRequest(adminRequest(), now)
+
+    expect(result).toMatchObject({ ok: true, role: 'risk_viewer' })
+    expect(mocks.authenticateAndTouch).toHaveBeenCalledWith(
+      expect.any(String),
+      now.toISOString(),
+      new Date(now.getTime() - 30 * 60 * 1000).toISOString(),
+    )
+  })
+
   it('denies a viewer review capability and writes a denial audit', async () => {
     mocks.getAdminUser.mockResolvedValue(adminUser(2, 'risk_viewer'))
 
