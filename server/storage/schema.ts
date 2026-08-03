@@ -2239,7 +2239,10 @@ export async function migrateDatabaseSchema(): Promise<void> {
   const client = await getPool().connect()
   let migrationStarted = false
   try {
-    await client.query(`set statement_timeout = '${MIGRATION_STATEMENT_TIMEOUT_MS}ms'`)
+    await client.query(
+      "select set_config('statement_timeout', $1, false)",
+      [`${MIGRATION_STATEMENT_TIMEOUT_MS}ms`],
+    )
     await client.query('select pg_advisory_lock($1)', [MIGRATION_ADVISORY_LOCK_KEY])
     await ensureMigrationLedger(client)
 
