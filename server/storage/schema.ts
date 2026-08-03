@@ -4,6 +4,7 @@ import { resolveAppRole, type AppRole } from '../process-role'
 import { getPool, query } from './postgres'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
+import databaseSchemaContract from '../database-schema-contract.json'
 
 const MIGRATION_PHASE_SEPARATOR = '-- goofish:migration-phase'
 const RETRIABLE_MIGRATION_CODES = new Set(['40P01', '40001', '55P03'])
@@ -11,8 +12,8 @@ const MIGRATION_PHASE_MAX_ATTEMPTS = 5
 const MIGRATION_RETRY_BASE_MS = 1_000
 const MIGRATION_ADVISORY_LOCK_KEY = 774_006_153
 const MIGRATION_STATEMENT_TIMEOUT_MS = 300_000
-export const DATABASE_SCHEMA_VERSION = '2026-08-03.2'
-export const DATABASE_SCHEMA_MINIMUM_APP_VERSION = '2.0.0'
+export const DATABASE_SCHEMA_VERSION = databaseSchemaContract.version
+export const DATABASE_SCHEMA_MINIMUM_APP_VERSION = databaseSchemaContract.minimum_app_version
 const PERSONAL_USE_DECLARATION_ACTION_SQL = PERSONAL_USE_DECLARATION_ACTIONS
   .map((action) => `'${action}'`)
   .join(', ')

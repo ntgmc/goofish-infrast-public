@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
+import { access } from 'node:fs/promises'
 import test from 'node:test'
 
 import { isDocumentationFile, isDocumentationOnly } from './build-relevance-lib.mjs'
+import {
+  BUILD_RELEVANT_FILES,
+  BUILD_RELEVANT_PREFIXES,
+  BUILD_RELEVANT_SCRIPTS,
+} from './build-relevance-config.mjs'
 
 test('classifies documentation and README paths', () => {
   assert.equal(isDocumentationFile('README.md'), true)
@@ -22,4 +28,9 @@ test('requires every changed file to be documentation', () => {
   assert.equal(isDocumentationOnly(['README.md', 'src/App.tsx']), false)
   assert.equal(isDocumentationOnly(['README.md', 'docs/worker-deploy.md']), false)
   assert.equal(isDocumentationOnly([]), false)
+})
+
+test('keeps every repository-local build relevance path anchored to an existing file or directory', async () => {
+  for (const path of [...BUILD_RELEVANT_FILES, ...BUILD_RELEVANT_SCRIPTS]) await access(path)
+  for (const prefix of BUILD_RELEVANT_PREFIXES) await access(prefix.replace(/\/$/, ''))
 })

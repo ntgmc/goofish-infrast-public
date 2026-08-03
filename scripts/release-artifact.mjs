@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { validateChangelogEnvelope } from './changelog-lib.mjs'
 import { ARTIFACT_KINDS, isAllowedArtifactPath, requireArtifactKind } from './release-artifact-config.mjs'
 import { containsPrivateOptimizerSourcePath } from './private-optimizer-sources.mjs'
+import { atomicWriteFile } from './atomic-write.mjs'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const root = resolve(process.env.RELEASE_ROOT || repositoryRoot)
@@ -32,11 +33,15 @@ async function createReleaseManifest(kind) {
 
   const files = await collectArtifactHashes(root, kind, false)
   assertArtifactFiles(kind, files)
-  if (kind === 'public') await assertPublicArtifactDoesNotLeakPrivateSources(root, files)
+  if (kind === 'public') {
+    await assertPublicArtifactDoesNotLeakPrivateSources(root, files)
+    await assertPublicRuntimeContract(root)
+  }
   const manifest = {
-    schema_version: 2,
+    schema_version: 3,
     artifact_kind: kind,
     target_sha: targetSha,
+    deployable: buildMeta.source_mode === 'full',
     built_at: buildMeta.generated_at,
     build_context: buildMeta.build_context,
     build_meta: buildMeta,
@@ -63,12 +68,15 @@ async function writeDecision(deployable, explicitSha) {
 async function verifyReleaseManifest(kind) {
   const targetSha = requireSha(argumentsMap.sha || process.env.TARGET_SHA)
   const manifest = JSON.parse(await readFile(join(root, 'build-manifest.json'), 'utf8'))
-  if (manifest.schema_version !== 2) throw new Error('unsupported build manifest schema')
+  if (manifest.schema_version !== 3) throw new Error('unsupported build manifest schema')
   if (manifest.artifact_kind !== kind) {
     throw new Error(`artifact kind mismatch: expected ${kind}, received ${manifest.artifact_kind || 'missing'}`)
   }
   if (manifest.target_sha !== targetSha) throw new Error(`artifact target SHA mismatch: ${manifest.target_sha || 'missing'}`)
   if (manifest.build_meta?.git_sha !== targetSha) throw new Error('artifact build metadata SHA mismatch')
+  if (manifest.deployable !== (manifest.build_meta?.source_mode === 'full')) {
+    throw new Error('artifact deployability does not match efficiency data source mode')
+  }
   if (manifest.built_at !== manifest.build_meta?.generated_at || manifest.build_context !== manifest.build_meta?.build_context) {
     throw new Error('artifact manifest build metadata mismatch')
   }
@@ -87,7 +95,10 @@ async function verifyReleaseManifest(kind) {
   for (const path of expectedPaths) {
     if (actualFiles[path] !== expectedFiles[path]) throw new Error(`artifact hash mismatch: ${path}`)
   }
-  if (kind === 'public') await assertPublicArtifactDoesNotLeakPrivateSources(root, actualFiles)
+  if (kind === 'public') {
+    await assertPublicArtifactDoesNotLeakPrivateSources(root, actualFiles)
+    await assertPublicRuntimeContract(root)
+  }
   process.stdout.write(`Verified ${kind} release artifact for ${targetSha}\n`)
 }
 
@@ -125,6 +136,23 @@ async function assertPublicArtifactDoesNotLeakPrivateSources(base, files) {
   }
 }
 
+async function assertPublicRuntimeContract(base) {
+  const [packageJson, packageLock, sbom] = await Promise.all([
+    readFile(join(base, 'package.json'), 'utf8').then(JSON.parse),
+    readFile(join(base, 'package-lock.json'), 'utf8').then(JSON.parse),
+    readFile(join(base, 'release-sbom.cdx.json'), 'utf8').then(JSON.parse),
+  ])
+  if (!String(packageJson.engines?.node ?? '').includes('24')) throw new Error('public artifact must declare the Node 24 runtime')
+  if (packageLock.lockfileVersion < 3 || !packageLock.packages?.['']) throw new Error('public artifact requires an npm lockfileVersion 3 root package')
+  for (const dependency of ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'pg', 'qrcode']) {
+    if (!packageJson.dependencies?.[dependency]) throw new Error(`public runtime dependency is not declared: ${dependency}`)
+    if (!packageLock.packages[`node_modules/${dependency}`]?.version) throw new Error(`public runtime dependency is not locked: ${dependency}`)
+  }
+  if (sbom.bomFormat !== 'CycloneDX' || sbom.specVersion !== '1.6' || !Array.isArray(sbom.components) || sbom.components.length === 0) {
+    throw new Error('public release SBOM is missing or invalid')
+  }
+}
+
 function isPrivatePublicMapReference(value) {
   const normalized = String(value).replaceAll('\\', '/')
   if (containsPrivateOptimizerSourcePath(normalized)) return true
@@ -152,7 +180,7 @@ async function readChangelogEnvelope(releaseRoot, targetSha, buildMeta) {
 
   if (!notes.trim().startsWith('#')) throw new Error('release changelog notes must start with a Markdown heading')
   validateChangelogEnvelope(envelope)
-  if (!envelope.candidate) return envelope
+  if (!envelope.candidate) throw new Error('release artifacts require a candidate changelog')
 
   const release = envelope.release
   if (release.targetSha !== targetSha) throw new Error('release changelog target SHA mismatch')
@@ -248,5 +276,6 @@ function resolveNpmVersion() {
 }
 
 async function writeJson(path, value) {
-  await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
+  await atomicWriteFile(path, `${JSON.stringify(value, null, 2)}\n`)
+  JSON.parse(await readFile(path, 'utf8'))
 }

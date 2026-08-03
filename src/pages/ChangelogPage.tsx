@@ -58,7 +58,7 @@ export default function ChangelogPage() {
                       <section key={section.id} className="py-5 first:pt-0 last:pb-0">
                         <h3 className="text-base font-semibold text-ink-primary">{resolveSectionTitle(section)}</h3>
                         <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-7 text-ink-secondary marker:text-brand-300">
-                          {section.items.map((item) => <li key={item}>{item}</li>)}
+                          {section.items.map((item, itemIndex) => <li key={`${section.id}:${itemIndex}`}>{item}</li>)}
                         </ul>
                       </section>
                     ))}

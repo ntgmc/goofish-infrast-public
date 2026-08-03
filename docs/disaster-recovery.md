@@ -18,6 +18,20 @@ Create `/etc/goofish-infrast-v1/backup.env` from
 is an age public recipient only. The matching age private key must never be
 placed on the production server or in the bucket.
 
+Create a dedicated Ed25519 signing key for backup manifests. Configure its
+private path as `BACKUP_MANIFEST_SIGNING_KEY` on the backup host and publish the
+public key in an OpenSSH allowed-signers file under the identity
+`goofish-backup:<environment>`. Recovery hosts receive only that allowed-signers
+file through a separately controlled channel. Set `BACKUP_ENVIRONMENT` and pin
+`BACKUP_EXPECTED_DATABASE_FINGERPRINT` after reviewing the non-secret
+host/port/database/user fingerprint emitted by `scripts/write-pg-service.mjs`.
+The signing key and database password are written only to mode-0600 files; the
+PostgreSQL URL is never passed in a process argument.
+Also set `BACKUP_GIT_SHA` to the deployed full commit SHA when `APP_DIR` is not
+a Git checkout. A backup fails before dumping unless the expected fingerprint
+matches and `goofish_schema_migrations` records the release schema as completed
+with a SHA-256 checksum.
+
 Generate the age identity offline, record its public-key fingerprint, then split
 the private key using 2-of-2 Shamir secret sharing. Each of two named recovery
 custodians stores one encrypted offline share and the fingerprint. Recovery
@@ -35,10 +49,14 @@ sudo systemctl start goofish-backup.service
 sudo systemctl list-timers goofish-backup.timer
 ```
 
-The health-check endpoint receives a heartbeat only after both encrypted objects
-have been uploaded and remotely verified. Configure its expected period to 24
-hours and alert after 26 hours. Treat any failed unit, missed heartbeat, or
-backup older than 24 hours as P0 until a new verified backup exists.
+Each daily or monthly set contains an encrypted dump, encrypted runtime config,
+a signed JSON manifest, and its signature. The manifest binds the environment,
+Git SHA, database fingerprint, schema version, object paths, exact sizes, and
+SHA-256 digests. The health-check endpoint receives a heartbeat only after all
+four objects match their local size and digest. Configure its expected period
+to 24 hours and alert after 26 hours. Treat any failed unit, invalid signature,
+missed heartbeat, or backup older than 24 hours as P0 until a new verified set
+exists.
 
 ## Restore Drill
 
@@ -50,18 +68,30 @@ age identity only on that recovery host, use a tmpfs `RESTORE_TMPDIR`, then run:
 BACKUP_S3_REMOTE=s3-encrypted:goofish-production-backup \
 RESTORE_DATABASE_URL=postgresql://goofish_restore:...@127.0.0.1:5432/goofish_restore \
 RESTORE_AGE_IDENTITY=/run/recovery/age-identity.txt \
+RESTORE_MANIFEST_ALLOWED_SIGNERS=/run/recovery/backup-allowed-signers \
 scripts/restore-postgres.sh \
-  --database-object daily/2026-07-14T021700Z.dump.age \
-  --config-object daily/2026-07-14T021700Z.config.tar.age \
-  --confirm-restore
+  --manifest-object daily/2026-07-14T021700Z.manifest.json \
+  --environment production \
+  --expected-target-fingerprint <reviewed-target-sha256> \
+  --change-id INCIDENT-2026-001 \
+  --confirm-empty-target
 ```
+
+The script verifies the manifest signature before downloading its paired
+objects, checks both ciphertext digests, holds a host maintenance lock, rejects
+active connections, and refuses any target that already has user tables. It
+does not support `pg_restore --clean` or in-place replacement. Restore into a
+new database, verify it, and switch traffic through a separately reviewed
+change. A production database with existing data must never be made eligible by
+weakening these checks.
 
 The configuration archive is extracted for review only. Do not overwrite
 production configuration automatically. Restore the reviewed EnvironmentFile,
-systemd unit, and Nginx configuration to a fresh host, deploy the recorded Git
-commit, then run `npm run check:migration` and verify `/api/health` reports
-PostgreSQL storage. Record elapsed time and require it to stay within the
-four-hour RTO.
+systemd unit, and Nginx configuration to a fresh host, verify the public
+artifact attestation, deploy the Git commit recorded in the signed manifest,
+then run `npm run check:migration` and verify `/api/health` reports the expected
+API build metadata and PostgreSQL schema identity. Record elapsed time and
+require it to stay within the four-hour RTO.
 
 Validate a historical CDK, a historical signed license, a current free-preview
 claim, a stored depot sample removal path, and a stored Skland credential. Do

@@ -50,16 +50,33 @@ export const CHANGELOG_RELEASES = selectPublicChangelogReleases([
 ])
 
 export function selectPublicChangelogReleases(releases: readonly ChangelogRelease[]): readonly ChangelogRelease[] {
-  return sortChangelogReleases(releases).filter((release) => release.sections.some((section) => section.items.length > 0))
+  return sortChangelogReleases(releases)
 }
 
 export function sortChangelogReleases(releases: readonly ChangelogRelease[]): readonly ChangelogRelease[] {
   const byId = new Map<string, ChangelogRelease>()
+  const byVersion = new Map<string, ChangelogRelease>()
   for (const release of releases) {
-    if (!byId.has(release.id)) byId.set(release.id, release)
+    const sameId = byId.get(release.id)
+    if (sameId && !isSameRelease(sameId, release)) {
+      throw new Error(`Conflicting changelog release id: ${release.id}`)
+    }
+    if (!sameId) byId.set(release.id, release)
+
+    if (release.version) {
+      const sameVersion = byVersion.get(release.version)
+      if (sameVersion && !isSameRelease(sameVersion, release)) {
+        throw new Error(`Conflicting changelog release version: ${release.version}`)
+      }
+      if (!sameVersion) byVersion.set(release.version, release)
+    }
   }
 
   return [...byId.values()].sort(compareChangelogReleaseOrder)
+}
+
+function isSameRelease(left: ChangelogRelease, right: ChangelogRelease): boolean {
+  return JSON.stringify(left) === JSON.stringify(right)
 }
 
 function compareChangelogReleaseOrder(left: ChangelogRelease, right: ChangelogRelease): number {

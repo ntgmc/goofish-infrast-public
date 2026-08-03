@@ -22,7 +22,11 @@ describe('service health lifecycle', () => {
     for (const path of ['/api/health', '/api/health/ready']) {
       const response = await routeRequest(new Request(`http://localhost${path}`))
       expect(response.status).toBe(503)
-      await expect(response.json()).resolves.toMatchObject({ ok: false, state: 'draining' })
+      await expect(response.json()).resolves.toMatchObject({
+        ok: false,
+        state: 'draining',
+        build_meta: { frontend_version: expect.any(String), backend_version: expect.any(String) },
+      })
     }
   })
 

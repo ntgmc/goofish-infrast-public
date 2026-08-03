@@ -16,7 +16,7 @@ await build({
   outdir: 'server/dist',
   bundle: true,
   platform: 'node',
-  target: 'node20',
+  target: 'node24',
   format: 'esm',
   sourcemap: true,
   external: ['@aws-sdk/client-sesv2', '@node-rs/argon2', 'pg', 'qrcode'],

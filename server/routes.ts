@@ -44,6 +44,7 @@ import { applyHttpSecurityHeaders, isSecureWebRequest } from './security/http-se
 import { getServiceLifecycleState, isServiceReady } from './lifecycle'
 import { getAccountDeletionConfigurationHealth } from './account-data-lifecycle'
 import { getRuntimeDatabaseSchemaStatus } from './storage/schema'
+import { APP_BUILD_META } from '../src/lib/build-meta'
 
 type ApiHandler = (req: Request) => Promise<Response>
 
@@ -181,6 +182,7 @@ async function handleReadiness(): Promise<Response> {
     return jsonResponse({
       ok: false,
       state,
+      build_meta: APP_BUILD_META,
       storage: {
         type: 'postgres',
         ok: false,
@@ -196,6 +198,7 @@ async function handleReadiness(): Promise<Response> {
     {
       ok,
       state,
+      build_meta: APP_BUILD_META,
       storage: {
         type: 'postgres',
         ok: storageOk,

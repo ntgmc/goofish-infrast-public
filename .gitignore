@@ -5,6 +5,7 @@ server/handlers/.generated/
 src/lib/.generated/
 changelog-release.json
 changelog-release.md
+release-sbom.cdx.json
 .cache/
 .idea/
 *.pyc

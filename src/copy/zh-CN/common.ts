@@ -54,7 +54,7 @@ export const commonCopy = {
   // src/components/BrandLogo.tsx
   components_BrandLogo_001: "MAA 基建排班优化器",
   // src/components/BuildMetaStrip.tsx
-  components_BuildMetaStrip_001: "当前规则数据更新于 ",
+  components_BuildMetaStrip_001: "当前构建生成于 ",
   // src/components/BuildMetaStrip.tsx
   components_BuildMetaStrip_002: "版本",
   // src/components/BuildMetaStrip.tsx
@@ -62,9 +62,23 @@ export const commonCopy = {
   // src/components/BuildMetaStrip.tsx
   components_BuildMetaStrip_004: "前端",
   // src/components/BuildMetaStrip.tsx
-  components_BuildMetaStrip_005: "服务",
+  components_BuildMetaStrip_005: "预期服务",
   // src/components/BuildMetaStrip.tsx
   components_BuildMetaStrip_006: "来源摘要",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_007: "规则数据更新于",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_008: "实际服务",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_009: "未知",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_010: "正在检查",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_011: "不可达",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_012: "版本一致",
+  // src/components/BuildMetaStrip.tsx
+  components_BuildMetaStrip_013: "版本漂移",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_001: "龙门币",
   // src/components/ConfigEditor.tsx

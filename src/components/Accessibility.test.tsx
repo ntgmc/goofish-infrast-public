@@ -205,7 +205,7 @@ describe('mobile touch targets', () => {
   it('uses document flow on mobile, fixed desktop positioning, and a compact version badge', () => {
     render(<BuildMetaStrip placement="corner" />)
 
-    const status = screen.getByText(/当前规则数据更新于/)
+    const status = screen.getByText(/当前构建生成于/)
     const strip = status.parentElement
     const summary = screen.getByText('版本')
     expect(strip?.className).toContain('relative')
