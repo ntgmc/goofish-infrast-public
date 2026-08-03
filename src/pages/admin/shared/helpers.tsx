@@ -213,6 +213,16 @@ export function normalizeUsageStats(value: Partial<UsageStatsResponse>): UsageSt
   const totals = normalizeUsageTotals(value.totals)
   const days = Array.isArray(value.days) ? value.days.map(normalizeUsageDay) : []
   return {
+    metrics_version: typeof value.metrics_version === 'string' ? value.metrics_version : 'unknown',
+    generated_at: typeof value.generated_at === 'string' ? value.generated_at : '',
+    source: 'raw_events_and_authoritative_account_additions',
+    completeness: {
+      complete: value.completeness?.complete === true,
+      unknown_status_events: normalizeCount(value.completeness?.unknown_status_events),
+      retention_days: normalizeCount(value.completeness?.retention_days),
+      raw_events_truncated: value.completeness?.raw_events_truncated === true,
+      raw_event_limit: normalizeCount(value.completeness?.raw_event_limit),
+    },
     totals,
     days,
     range: normalizeUsageRange(value.range, days),
@@ -529,6 +539,10 @@ export function buildCurrentOpsReport(
 ) {
   return {
     generated_at: new Date().toISOString(),
+    metrics_version: usage.metrics_version,
+    statistics_generated_at: usage.generated_at,
+    source: usage.source,
+    completeness: usage.completeness,
     range: usage.range,
     totals: usage.totals,
     days: usage.days,
@@ -567,6 +581,10 @@ export function buildCurrentOpsReport(
 export function buildCurrentOpsReportCsv(report: ReturnType<typeof buildCurrentOpsReport>): string {
   const rows: string[][] = [
     ['section', 'key', 'label', 'date', 'value', 'extra'],
+    ['metadata', 'metrics_version', 'Metrics version', '', report.metrics_version, ''],
+    ['metadata', 'statistics_generated_at', 'Statistics generated at', report.statistics_generated_at, '', 'timezone=UTC'],
+    ['metadata', 'source', 'Source', '', report.source, ''],
+    ['metadata', 'complete', 'Complete', '', String(report.completeness.complete), `unknown_status_events=${report.completeness.unknown_status_events};retention_days=${report.completeness.retention_days};raw_events_truncated=${report.completeness.raw_events_truncated};raw_event_limit=${report.completeness.raw_event_limit}`],
     ['range', 'from', 'From', '', report.range.from, ''],
     ['range', 'to', 'To', '', report.range.to, ''],
     ['range', 'days', 'Days', '', String(report.range.days), ''],
@@ -581,7 +599,7 @@ export function buildCurrentOpsReportCsv(report: ReturnType<typeof buildCurrentO
     }
   }
   for (const item of report.funnel) {
-    rows.push(['funnel', item.key, item.label, '', String(item.count), `conversion=${item.conversion_rate};dropoff=${item.dropoff}`])
+    rows.push(['event_counts', item.key, item.label, '', String(item.count), 'independent_event_total'])
   }
   for (const item of report.failure_reasons) {
     rows.push(['failure_reasons', item.reason_code, item.reason_code, item.last_seen_at ?? '', String(item.count), `percentage=${item.percentage}`])

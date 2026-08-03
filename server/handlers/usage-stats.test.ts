@@ -1,4 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const authenticateAdminRequest = vi.hoisted(() => vi.fn())
+vi.mock('./admin-auth', () => ({ authenticateAdminRequest }))
 import usageStatsHandler, { getScheduleGenerateDurationStatsByBucket, recordUsageEvent, setUsageEventStoreForTesting } from './usage-stats'
 import {
   buildUsageStats,
@@ -10,7 +13,25 @@ afterEach(() => {
   setUsageEventStoreForTesting(null)
 })
 
+beforeEach(() => {
+  authenticateAdminRequest.mockReset().mockResolvedValue({ ok: true, username: 'usage-viewer' })
+})
+
 describe('usage stats handler', () => {
+  it('requires the dedicated usage capability for administrator reports', async () => {
+    const store: UsageEventStore = {
+      set: async () => undefined,
+      list: async () => [],
+      getStats: async (dates) => buildUsageStats([], dates),
+    }
+    setUsageEventStoreForTesting(store)
+
+    const response = await usageStatsHandler(new Request('http://localhost/api/admin/usage-stats?range=7d'))
+
+    expect(response.status).toBe(200)
+    expect(authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'usage_view')
+  })
+
   it('upserts queue effects by a deterministic idempotency key', async () => {
     const records = new Map<string, UsageEventRecord>()
     const store: UsageEventStore = {
@@ -30,39 +51,59 @@ describe('usage stats handler', () => {
   })
 
   it('records public tool visits for the dashboard aggregates', async () => {
-    const records: UsageEventRecord[] = []
+    const records = new Map<string, UsageEventRecord>()
     const store: UsageEventStore = {
-      set: async (_key, record) => {
-        records.push(record)
+      set: async (key, record) => {
+        records.set(key, record)
       },
-      list: async () => records,
-      getStats: async (dates) => buildUsageStats(records, dates),
+      list: async () => [...records.values()],
+      getStats: async (dates) => buildUsageStats([...records.values()], dates),
     }
     setUsageEventStoreForTesting(store)
 
     const response = await usageStatsHandler(new Request('http://localhost/api/usage-stats', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event: 'tool_visit', visitor_id: 'tool-visitor_12345' }),
+      body: JSON.stringify({ event: 'tool_visit' }),
     }))
 
     expect(response.status).toBe(200)
+    expect(response.headers.get('Set-Cookie')).toContain('maa_usage_visitor=')
     await expect(response.json()).resolves.toEqual({ ok: true })
-    expect(records).toHaveLength(1)
+    expect(records.size).toBe(1)
 
-    const [record] = records
+    const [record] = records.values()
     if (!record) throw new Error('Expected tool visit to be stored.')
     expect(record).toMatchObject({
       event: 'tool_visit',
-      visitor_id: 'tool-visitor_12345',
+      visitor_id: expect.stringMatching(/^[A-Za-z0-9_-]{32}$/),
       status: 'success',
     })
+
+    const visitorCookie = response.headers.get('Set-Cookie')?.split(';')[0] ?? ''
+    const duplicate = await usageStatsHandler(new Request('http://localhost/api/usage-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', cookie: visitorCookie },
+      body: JSON.stringify({ event: 'tool_visit' }),
+    }))
+    expect(duplicate.status).toBe(200)
+    expect(records.size).toBe(1)
 
     const stats = await store.getStats([record.date])
     expect(stats.totals.visits).toBe(1)
     expect(stats.totals.unique_visitors).toBe(1)
     expect(stats.days).toHaveLength(1)
     expect(stats.days[0]).toMatchObject({ visits: 1, unique_visitors: 1 })
+  })
+
+  it('rejects client-supplied visitor identities at the strict public boundary', async () => {
+    const response = await usageStatsHandler(new Request('http://localhost/api/usage-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'tool_visit', visitor_id: 'spoofed-visitor' }),
+    }))
+
+    expect(response.status).toBe(400)
   })
 
   it('deduplicates versioned announcement impressions by visitor', async () => {
@@ -75,26 +116,40 @@ describe('usage stats handler', () => {
     setUsageEventStoreForTesting(store)
     const body = JSON.stringify({
       event: 'announcement_impression',
-      visitor_id: 'tool-visitor_12345',
       announcement_id: 'announcement-1',
       announcement_kind: 'popup',
       announcement_version: '2026-07-31T12:00:00.000Z',
       source: 'popup_impression',
     })
 
+    let visitorCookie = ''
     for (let index = 0; index < 2; index += 1) {
       const response = await usageStatsHandler(new Request('http://localhost/api/usage-stats', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(visitorCookie && { cookie: visitorCookie }),
+        },
+        body,
       }))
       expect(response.status).toBe(200)
+      visitorCookie ||= response.headers.get('Set-Cookie')?.split(';')[0] ?? ''
     }
 
     expect(records.size).toBe(1)
     expect([...records.values()][0]).toMatchObject({
-      visitor_id: 'tool-visitor_12345',
+      visitor_id: expect.stringMatching(/^[A-Za-z0-9_-]{32}$/),
       announcement_id: 'announcement-1',
       announcement_version: '2026-07-31T12:00:00.000Z',
     })
+
+    const readResponse = await usageStatsHandler(new Request('http://localhost/api/usage-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', cookie: visitorCookie },
+      body: body.replace('announcement_impression', 'announcement_read'),
+    }))
+    expect(readResponse.status).toBe(200)
+    expect(records.size).toBe(2)
   })
 
   it('uses authoritative CDK redemptions and free preview account additions for dashboard trends', () => {

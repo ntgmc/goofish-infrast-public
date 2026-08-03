@@ -19,18 +19,34 @@ import { GeneratedPermission, AdminSection, UsageRangeKey, permissionLabels, sec
 import { useAdminController } from './useAdminController'
 import { PaginationControls } from './shared/PaginationControls'
 import { AdminToast } from './shared/AdminToast'
+import type { AdminCapability } from './contracts'
+
+function canAccessAdminSection(section: AdminSection, capabilities: AdminCapability[]): boolean {
+  if (section === 'overview') return capabilities.includes('usage_view') || capabilities.includes('risk_view')
+  if (section === 'risk') return capabilities.includes('risk_view')
+  if (section === 'users') return capabilities.includes('user_view')
+  if (section === 'queue') return capabilities.includes('optimization_view')
+  return capabilities.includes('admin_manage')
+}
 
 export default function AdminDashboardView() {
   const location = useLocation()
   const navigate = useNavigate()
   const activeSection = resolveAdminSection(location.pathname)
   const setActiveSection = (section: AdminSection) => navigate(adminPath(section))
-  const { cdkSearchInput, setCdkSearchInput, setCdkPage, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, setUserPage, setUserPageSize, userPagination, usersLoading, setRiskPage, setRiskPageSize, riskPagination, riskLoading, permission, cdkType, setCdkType, setCdkTypeFilter, balanceAmount, setBalanceAmount, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, announcementDraftStatus, announcementDraftSavedAt, announcementDraftRestored, announcementDraftConflict, announcementDraftError, announcementDraftDirty, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, selectedUserBalance, setSelectedUserBalance, userBalanceLoading, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, clearNotice, summary, cdkOpsSummary, cdkFilters, visibleRecords, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleDiscardAnnouncementDraft, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, reorderAnnouncements, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleLoadMoreUserBalance, handleAdjustUserBalance, handleViewProfileOperators, handleDownloadProfileOperators, handleDownloadUserWorkspaces, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser } = useAdminController()
+  const { adminCapabilities, lastSuccessfulSyncAt, overviewPartialFailure, cdkSearchInput, setCdkSearchInput, setCdkPage, setCdkPageSize, cdkPagination, cdkLoading, userSearchInput, setUserSearchInput, setUserPage, setUserPageSize, userPagination, usersLoading, setRiskPage, setRiskPageSize, riskPagination, riskLoading, permission, cdkType, setCdkType, setCdkTypeFilter, balanceAmount, setBalanceAmount, adminUsername, loginUser, setLoginUser, loginPassword, setLoginPassword, authenticated, sessionChecking, setStatusFilter, setPermission, setPermissionFilter, setRiskFilter, setGeneratedFilter, appUsers, usageRange, setUsageRange, usageRangeFrom, setUsageRangeFrom, usageRangeTo, setUsageRangeTo, usageStats, banner, announcements, announcementStats, announcementDraftStatus, announcementDraftSavedAt, announcementDraftRestored, announcementDraftConflict, announcementDraftError, announcementDraftDirty, riskSettings, orderNote, setOrderNote, cdkCount, setCdkCount, generatedCodes, selectedCdkHashes, setSelectedCdkHashes, selectedCdkDetail, setSelectedCdkDetail, selectedUserDetail, setSelectedUserDetail, selectedUserBalance, setSelectedUserBalance, userBalanceLoading, operatorDataByProfileId, setOperatorDataByProfileId, expandedOperatorProfileId, setExpandedOperatorProfileId, resetUserEmail, setResetUserEmail, resetPassword, setResetPassword, loginFieldErrors, setLoginFieldErrors, resetFieldErrors, setResetFieldErrors, loading, busyAction, error, notice, clearNotice, summary, cdkOpsSummary, cdkFilters, visibleRecords, riskRecords, loadDashboard, handleLogin, handleLogout, handleExportUsageReport, handleGenerateCdk, handleCopyGeneratedCdks, handleDownloadGeneratedCdks, handleSaveAnnouncement, handleDiscardAnnouncementDraft, handleSaveRiskSettings, updateBanner, addAnnouncement, updateAnnouncement, deleteAnnouncement, reorderAnnouncements, patchCdk, deleteCdk, loadCdkDetail, handleUpdateCdkNote, handleSetCdkPermission, handleBulkRevoke, loadUserDetail, handleLoadMoreUserBalance, handleAdjustUserBalance, handleViewProfileOperators, handleDownloadProfileOperators, handleDownloadUserWorkspaces, handleUpdateProfile, handleSetProfileStatus, handleSetProfilePermission, handleUpgradePreviewProfile, handleClearProfileSklandBinding, handleClearProfileWorkspace, handleResetUserPassword, handleFreezeAppUser, handleUnfreezeAppUser, handleDeleteAppUser } = useAdminController()
+  const visibleSections = (Object.keys(sectionLabels) as AdminSection[])
+    .filter((section) => canAccessAdminSection(section, adminCapabilities))
+  const canManageAdmins = adminCapabilities.includes('admin_manage')
 
   if (!activeSection) return <Navigate to={fallbackAdminPath()} replace />
 
   if (sessionChecking) {
     return <SessionLoader label="正在检查管理员会话…" />
+  }
+
+  if (authenticated && !canAccessAdminSection(activeSection, adminCapabilities)) {
+    return <Navigate to={adminPath('overview')} replace />
   }
 
   if (!authenticated) {
@@ -97,7 +113,11 @@ export default function AdminDashboardView() {
       )
     }
 
-  const syncStatus = `最近同步 ${loading ? '进行中' : formatDate(new Date().toISOString())}`
+  const syncStatus = loading
+    ? '正在同步数据'
+    : lastSuccessfulSyncAt
+      ? `最近成功同步 ${formatDate(lastSuccessfulSyncAt)}${overviewPartialFailure ? '（部分数据失败）' : ''}`
+      : '尚未完成成功同步'
 
   return (
       <div className="tool-shell">
@@ -108,7 +128,7 @@ export default function AdminDashboardView() {
           </div>
           <LayoutGroup id="admin-desktop">
             <nav className="mt-8 space-y-1">
-              {(Object.keys(sectionLabels) as AdminSection[]).map((section) => (
+              {visibleSections.map((section) => (
                 <button key={section} type="button" onClick={() => setActiveSection(section)} aria-current={activeSection === section ? 'page' : undefined} className="tool-nav-link w-full px-3 text-left">
                   {activeSection === section && <MotionNavIndicator layoutId="admin-active" />}
                   <span className="relative z-10">{sectionLabels[section]}</span>
@@ -131,7 +151,7 @@ export default function AdminDashboardView() {
                   className="min-w-0 flex-1 justify-between"
                   metadata={{ title: adminUsername ?? '', description: syncStatus }}
                   items={[
-                    ...(Object.keys(sectionLabels) as AdminSection[]).map((section) => ({
+                    ...visibleSections.map((section) => ({
                       type: 'button' as const,
                       id: section,
                       label: sectionLabels[section],
@@ -140,7 +160,7 @@ export default function AdminDashboardView() {
                     })),
                     { type: 'separator' as const, id: 'actions' },
                     { type: 'button' as const, id: 'refresh', label: '刷新数据', onSelect: () => void loadDashboard() },
-                    { type: 'link' as const, id: 'settings', label: '账号设置', to: '/admin/setup' },
+                    ...(canManageAdmins ? [{ type: 'link' as const, id: 'settings', label: '账号设置', to: '/admin/setup' }] : []),
                     { type: 'button' as const, id: 'logout', label: '退出登录', intent: 'danger' as const, onSelect: handleLogout },
                   ]}
                 />
@@ -156,7 +176,7 @@ export default function AdminDashboardView() {
               <div className="flex flex-wrap gap-2">
                 <ThemeSwitcher />
                 <button type="button" onClick={() => void loadDashboard()} className="tool-secondary-action">刷新数据</button>
-                <Link to="/admin/setup" className="tool-primary-action">账号设置</Link>
+                {canManageAdmins && <Link to="/admin/setup" className="tool-primary-action">账号设置</Link>}
               </div>
             </div>
           </header>
@@ -224,6 +244,18 @@ export default function AdminDashboardView() {
                     </button>
                   </div>
                 </div>
+                {usageStats && (
+                  <div className={usageStats.completeness.complete ? 'tool-alert' : 'tool-alert tool-alert--warning'} role="status">
+                    <p className="font-medium">
+                      统计日期按 UTC 自然日，原始事件保留 {usageStats.completeness.retention_days || '-'} 天；指标版本 {usageStats.metrics_version}。
+                    </p>
+                    <p className="mt-1 text-xs">
+                      数据生成时间：{usageStats.generated_at || '-'}。{usageStats.completeness.complete
+                        ? '当前范围内未发现状态缺失事件。'
+                        : `当前范围数据不完整：${usageStats.completeness.unknown_status_events} 条事件缺少状态${usageStats.completeness.raw_events_truncated ? `，且原始事件超过 ${usageStats.completeness.raw_event_limit} 条读取上限` : ''}；成功率与失败分析仅供参考。`}
+                    </p>
+                  </div>
+                )}
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <Metric label="免费预览新增" value={summary.freePreviews} />
                   <Metric label="注册数" value={summary.registers} />
@@ -522,6 +554,7 @@ export default function AdminDashboardView() {
                     onViewOperators={handleViewProfileOperators}
                     onDownloadOperators={handleDownloadProfileOperators}
                     onDownloadWorkspaces={handleDownloadUserWorkspaces}
+                    onLoadProfilePage={(page) => loadUserDetail(selectedUserDetail.user, page)}
                     onAdjustBalance={handleAdjustUserBalance}
                     onLoadMoreBalance={handleLoadMoreUserBalance}
                     onFreezeUser={handleFreezeAppUser}

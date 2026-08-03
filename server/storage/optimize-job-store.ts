@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg'
 import type { FreeScheduleEntitlement, OptimizeCalculationStage, OptimizeResult, ReorderCheckResult, WorkspaceResultHistoryItem } from '../../src/lib/types'
 import { formatOptimizeJobHardTimeout, getOptimizeGlobalWorkerConcurrency, getOptimizeJobHardTimeoutMs } from '../optimize-job-config'
 import { query, withTransaction } from './postgres'
+import { recordAdminOperationAuditInTransaction } from './admin-operation-audit-store'
 import { ensureDatabaseSchema } from './schema'
 import { getShanghaiMonthKey, getShanghaiNextMonthStart, REORDER_CHECK_MONTHLY_LIMIT } from '../reorder-check-policy'
 import {
@@ -162,9 +163,18 @@ export interface OptimizationDeadLetterRecord {
   replayed_job_id: string | null
   replayed_by: string | null
   replayed_at: string | null
+  resolution_reason: string | null
+  resolved_by: string | null
   resolved_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface OptimizationDeadLetterResolution {
+  actorUsername: string
+  reason: string
+  requestId: string
+  clientIp?: string | null
 }
 
 export interface OptimizationDeadLetterDetail extends OptimizationDeadLetterRecord {
@@ -2021,7 +2031,10 @@ export async function getOptimizationDeadLetterDetail(id: string): Promise<Optim
   return { ...fromDeadLetterRow(letter), payload_json }
 }
 
-export async function replayOptimizationDeadLetter(id: string, replayedBy: string): Promise<OptimizeJobRecord | null> {
+export async function replayOptimizationDeadLetter(
+  id: string,
+  resolution: OptimizationDeadLetterResolution,
+): Promise<OptimizeJobRecord | null> {
   await ensureSchema()
   return withTransaction(async (client) => {
     const deadLetter = await client.query<OptimizationDeadLetterRow>(
@@ -2071,10 +2084,23 @@ export async function replayOptimizationDeadLetter(id: string, replayedBy: strin
     }
     await client.query(
       `update optimization_dead_letters set status = 'replayed', replay_count = replay_count + 1,
-         replayed_job_id = $2, replayed_by = $3, replayed_at = $4, resolved_at = $4, updated_at = $4
+         replayed_job_id = $2, replayed_by = $3, replayed_at = $4,
+         resolution_reason = $5, resolved_by = $3, resolved_at = $4, updated_at = $4
        where id = $1`,
-      [id, replayedId, replayedBy, now],
+      [id, replayedId, resolution.actorUsername, now, resolution.reason],
     )
+    await recordAdminOperationAuditInTransaction(client, {
+      actorUsername: resolution.actorUsername,
+      action: 'optimization_dead_letter.replay',
+      targetType: 'optimization_dead_letter',
+      targetId: id,
+      reason: resolution.reason,
+      requestId: resolution.requestId,
+      clientIp: resolution.clientIp,
+      before: { status: letter.status, replay_count: letter.replay_count, job_id: letter.job_id },
+      after: { status: 'replayed', replay_count: letter.replay_count + 1, replayed_job_id: replayedId },
+      createdAt: now,
+    })
     return inserted.rows[0] ? fromRow(inserted.rows[0]) : null
   })
 }
@@ -2114,15 +2140,41 @@ function isLegacyStandaloneSuggestionJob(source: string, payload: unknown): bool
     && (request as Record<string, unknown>).suggestions_only === true)
 }
 
-export async function discardOptimizationDeadLetter(id: string): Promise<boolean> {
+export async function discardOptimizationDeadLetter(
+  id: string,
+  resolution: OptimizationDeadLetterResolution,
+): Promise<boolean> {
   await ensureSchema()
   const now = new Date().toISOString()
-  const result = await query(
-    `update optimization_dead_letters set status = 'discarded', resolved_at = $2, updated_at = $2
-     where id = $1 and status = 'pending_review'`,
-    [id, now],
-  )
-  return Boolean(result.rowCount)
+  return withTransaction(async (client) => {
+    const selected = await client.query<OptimizationDeadLetterRow>(
+      'select * from optimization_dead_letters where id = $1 for update',
+      [id],
+    )
+    const letter = selected.rows[0] ? fromDeadLetterRow(selected.rows[0]) : null
+    if (!letter || letter.status !== 'pending_review') return false
+    const result = await client.query(
+      `update optimization_dead_letters
+          set status = 'discarded', resolution_reason = $2, resolved_by = $3,
+              resolved_at = $4, updated_at = $4
+        where id = $1 and status = 'pending_review'`,
+      [id, resolution.reason, resolution.actorUsername, now],
+    )
+    if (result.rowCount !== 1) return false
+    await recordAdminOperationAuditInTransaction(client, {
+      actorUsername: resolution.actorUsername,
+      action: 'optimization_dead_letter.discard',
+      targetType: 'optimization_dead_letter',
+      targetId: id,
+      reason: resolution.reason,
+      requestId: resolution.requestId,
+      clientIp: resolution.clientIp,
+      before: { status: letter.status, replay_count: letter.replay_count, job_id: letter.job_id },
+      after: { status: 'discarded', replay_count: letter.replay_count },
+      createdAt: now,
+    })
+    return true
+  })
 }
 
 type OptimizationDeadLetterRow = Omit<OptimizationDeadLetterRecord,

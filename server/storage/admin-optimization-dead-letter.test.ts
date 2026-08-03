@@ -51,7 +51,7 @@ describe('admin optimization dead-letter detail', () => {
       .mockResolvedValueOnce({ rows: [deadLetterDetailRow()] })
       .mockResolvedValueOnce({ rows: [deadLetteredJobRow(source, payloadJson)] })
 
-    await expect(replayOptimizationDeadLetter('letter-1', 'ops')).resolves.toBeNull()
+    await expect(replayOptimizationDeadLetter('letter-1', resolution())).resolves.toBeNull()
     expect(clientQueryMock).toHaveBeenCalledTimes(2)
     expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes('insert into optimize_jobs'))).toBe(false)
   })
@@ -68,11 +68,12 @@ describe('admin optimization dead-letter detail', () => {
       return { rows: [] }
     })
 
-    await expect(replayOptimizationDeadLetter('letter-1', 'ops')).resolves.toMatchObject({
+    await expect(replayOptimizationDeadLetter('letter-1', resolution())).resolves.toMatchObject({
       id: 'job-replayed',
       status: 'queued',
     })
     expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes("'reorder_check', 'reserved', 'optimization_job'"))).toBe(true)
+    expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes('insert into admin_operation_audit'))).toBe(true)
   })
 
   it('rejects reorder dead-letter replay when the current-month quota is full', async () => {
@@ -81,7 +82,7 @@ describe('admin optimization dead-letter detail', () => {
       .mockResolvedValueOnce({ rows: [deadLetteredJobRow('reorder_check', { version: 3, kind: 'reorder_check' })] })
       .mockResolvedValueOnce({ rows: [{ count: '2' }] })
 
-    await expect(replayOptimizationDeadLetter('letter-1', 'ops')).rejects.toEqual(
+    await expect(replayOptimizationDeadLetter('letter-1', resolution())).rejects.toEqual(
       new OptimizeJobAdmissionError('reorder_check_quota_exceeded', 429, '本月重排检测次数已用完。'),
     )
     expect(clientQueryMock.mock.calls.some(([sql]) => String(sql).includes('insert into optimize_jobs'))).toBe(false)
@@ -105,6 +106,8 @@ function deadLetterDetailRow() {
     replayed_job_id: null,
     replayed_by: null,
     replayed_at: null,
+    resolution_reason: null,
+    resolved_by: null,
     resolved_at: null,
     created_at: '2026-07-19T10:00:00.000Z',
     updated_at: '2026-07-19T10:00:00.000Z',
@@ -114,6 +117,15 @@ function deadLetterDetailRow() {
       effectiveConfig: { controlCenterLevel: 5 },
       operators: [{ name: '能天使', elite: 2 }],
     },
+  }
+}
+
+function resolution() {
+  return {
+    actorUsername: 'ops',
+    reason: '工单 OPS-102 确认安全重放',
+    requestId: 'request-1',
+    clientIp: '127.0.0.1',
   }
 }
 

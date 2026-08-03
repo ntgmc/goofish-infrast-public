@@ -2,6 +2,10 @@ import { createHash, createHmac } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { query, withTransaction } from './postgres'
 import { ensureDatabaseSchema } from './schema'
+import {
+  recordAdminOperationAuditInTransaction,
+  type AdminOperationAuditInput,
+} from './admin-operation-audit-store'
 import { markPersonalUseDeclarationAcceptancesDeleted } from './personal-use-declaration-store'
 import type { PasswordAlgorithm, PasswordHashRecord } from '../security/password'
 import type {
@@ -326,7 +330,28 @@ export async function listUserAccounts(): Promise<UserAccountRecord[]> {
 
 export async function saveUserAccount(user: UserAccountRecord): Promise<void> {
   await ensureSchema()
-  await query(
+  await saveUserAccountWithClient({ query }, user)
+}
+
+export async function saveUserAccountByAdmin(
+  user: UserAccountRecord,
+  options: { revokeSessions: boolean; audit: AdminOperationAuditInput },
+): Promise<void> {
+  await ensureSchema()
+  await withTransaction(async (client) => {
+    await saveUserAccountWithClient(client, user)
+    if (options.revokeSessions) {
+      await client.query('delete from user_sessions where user_id = $1', [user.id])
+    }
+    await recordAdminOperationAuditInTransaction(client, options.audit)
+  })
+}
+
+async function saveUserAccountWithClient(
+  client: Pick<PoolClient, 'query'>,
+  user: UserAccountRecord,
+): Promise<void> {
+  await client.query(
     `insert into user_accounts
       (id, email, password_hash, salt, iterations, permission, status, cdk_key, cdk_code_hash, cdk_order_hash, email_verified_at, record_json, created_at, updated_at)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14)
@@ -362,9 +387,12 @@ export async function saveUserAccount(user: UserAccountRecord): Promise<void> {
   )
 }
 
-export async function deleteUserAccount(userId: string): Promise<void> {
+export async function deleteUserAccount(userId: string, audit?: AdminOperationAuditInput): Promise<void> {
   await ensureSchema()
-  await withTransaction((client) => deleteUserAccountInTransaction(client, userId))
+  await withTransaction(async (client) => {
+    await deleteUserAccountInTransaction(client, userId)
+    if (audit) await recordAdminOperationAuditInTransaction(client, audit)
+  })
 }
 
 export async function deleteUserAccountInTransaction(client: PoolClient, userId: string): Promise<void> {
@@ -589,6 +617,7 @@ export interface UpdateUserPasswordAtomicallyInput {
   updatedAt: Date
   resetTokenHash?: string
   keepSessionTokenHash?: string
+  adminAudit?: Omit<AdminOperationAuditInput, 'after'>
 }
 
 export type UpdateUserPasswordAtomicallyResult =
@@ -675,6 +704,18 @@ export async function updateUserPasswordAtomically(
       } else {
         await client.query('delete from user_sessions where user_id = $1', [input.userId])
       }
+      if (input.adminAudit) {
+        await recordAdminOperationAuditInTransaction(client, {
+          ...input.adminAudit,
+          after: {
+            id: updated.rows[0].record_json.id,
+            email: updated.rows[0].record_json.email,
+            status: updated.rows[0].record_json.status,
+            password_changed: true,
+            updated_at: updated.rows[0].record_json.updated_at,
+          },
+        })
+      }
       return { ok: true, user: updated.rows[0].record_json }
     })
   } catch (error) {
@@ -714,7 +755,72 @@ export async function getProfileForUser(userId: string, profileId: string): Prom
 
 export async function saveUserProfile(profile: UserGameAccountRecord): Promise<void> {
   await ensureSchema()
-  await query(
+  await saveUserProfileWithClient({ query }, profile)
+}
+
+export class AdminProfileMutationConflictError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AdminProfileMutationConflictError'
+  }
+}
+
+export async function saveUserProfileByAdmin(
+  profile: UserGameAccountRecord,
+  options: {
+    expectedUpdatedAt: string
+    linkedCdkPermission?: UserGameAccountRecord['permission']
+    resetLinkedCdkOperatorBaselineReason?: string
+    workspace?: UserWorkspaceRecord
+    expectedWorkspaceUpdatedAt?: string | null
+    audit: AdminOperationAuditInput
+  },
+): Promise<void> {
+  await ensureSchema()
+  await withTransaction(async (client) => {
+    const selectedProfile = await client.query<{ record_json: UserGameAccountRecord }>(
+      'select record_json from user_game_accounts where id = $1 for update',
+      [profile.id],
+    )
+    const currentProfile = selectedProfile.rows[0]?.record_json
+    if (!currentProfile || currentProfile.user_id !== profile.user_id) {
+      throw new AdminProfileMutationConflictError('账号档案不存在或归属已变化。')
+    }
+    if (currentProfile.updated_at !== options.expectedUpdatedAt) {
+      throw new AdminProfileMutationConflictError('账号档案已被其他请求修改，请刷新后重试。')
+    }
+
+    if (options.linkedCdkPermission !== undefined && profile.cdk_key) {
+      await updateLinkedCdkPermissionInTransaction(client, profile.cdk_key, options.linkedCdkPermission)
+    }
+    if (options.resetLinkedCdkOperatorBaselineReason !== undefined && profile.cdk_key) {
+      await resetLinkedCdkOperatorBaselineInTransaction(
+        client,
+        profile.cdk_key,
+        options.resetLinkedCdkOperatorBaselineReason,
+        profile.updated_at,
+      )
+    }
+    await saveUserProfileWithClient(client, profile)
+    if (options.workspace) {
+      const currentWorkspace = await getProfileWorkspaceForUpdateInTransaction(client, profile.id)
+      if (
+        options.expectedWorkspaceUpdatedAt !== undefined
+        && (currentWorkspace?.updated_at ?? null) !== options.expectedWorkspaceUpdatedAt
+      ) {
+        throw new AdminProfileMutationConflictError('账号工作区已被其他请求修改，请刷新后重试。')
+      }
+      await saveProfileWorkspaceWithClient(client, options.workspace)
+    }
+    await recordAdminOperationAuditInTransaction(client, options.audit)
+  })
+}
+
+async function saveUserProfileWithClient(
+  client: Pick<PoolClient, 'query'>,
+  profile: UserGameAccountRecord,
+): Promise<void> {
+  await client.query(
     `insert into user_game_accounts
       (id, user_id, cdk_key, cdk_code_hash, cdk_order_hash, permission, status, display_name, note, kind, archived_at, record_json, created_at, updated_at)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14)
@@ -747,6 +853,91 @@ export async function saveUserProfile(profile: UserGameAccountRecord): Promise<v
       profile.updated_at,
     ],
   )
+}
+
+async function updateLinkedCdkPermissionInTransaction(
+  client: PoolClient,
+  key: string,
+  permission: UserGameAccountRecord['permission'],
+): Promise<void> {
+  const selected = await client.query<{ cdk_type: string; status: string }>(
+    'select cdk_type, status from cdk_records where key = $1 for update',
+    [key],
+  )
+  const record = selected.rows[0]
+  if (!record) return
+  if (record.cdk_type !== 'profile' || record.status === 'revoked') {
+    throw new AdminProfileMutationConflictError('关联 CDK 已撤销或类型不支持权限同步。')
+  }
+  const updated = await client.query(
+    `update cdk_records
+        set permission = $2,
+            record_json = jsonb_set(record_json, '{permission}', to_jsonb($2::text), true),
+            record_revision = record_revision + 1,
+            updated_at = now()
+      where key = $1 and cdk_type = 'profile' and status <> 'revoked'`,
+    [key, permission],
+  )
+  if (updated.rowCount !== 1) {
+    throw new AdminProfileMutationConflictError('关联 CDK 权限同步冲突，请刷新后重试。')
+  }
+}
+
+async function resetLinkedCdkOperatorBaselineInTransaction(
+  client: PoolClient,
+  key: string,
+  reason: string,
+  at: string,
+): Promise<void> {
+  const selected = await client.query<{ status: string; record_json: Record<string, unknown> }>(
+    'select status, record_json from cdk_records where key = $1 for update',
+    [key],
+  )
+  const row = selected.rows[0]
+  if (!row) return
+  if (row.status !== 'used' && row.status !== 'frozen') {
+    throw new AdminProfileMutationConflictError('关联 CDK 状态不允许重置干员基线。')
+  }
+  const previousBaseline = asAuditRecord(row.record_json.baseline_operator_fingerprint)
+  const previousLatest = asAuditRecord(row.record_json.latest_operator_fingerprint)
+  const currentEvents = Array.isArray(row.record_json.risk_events)
+    ? row.record_json.risk_events
+    : []
+  const next = {
+    ...row.record_json,
+    risk_events: [...currentEvents, {
+      at,
+      type: 'admin_operator_baseline_reset',
+      reason,
+      detail: {
+        reviewed: false,
+        source: 'next_import',
+        previous_baseline_hash: previousBaseline?.hash ?? null,
+        previous_baseline_owned_count: previousBaseline?.owned_count ?? null,
+        previous_latest_hash: previousLatest?.hash ?? null,
+        previous_latest_owned_count: previousLatest?.owned_count ?? null,
+        selected_fingerprint_hash: null,
+        selected_owned_count: null,
+      },
+    }].slice(-20),
+  }
+  delete next.baseline_operator_fingerprint
+  delete next.latest_operator_fingerprint
+  const updated = await client.query(
+    `update cdk_records
+        set record_json = $2::jsonb, record_revision = record_revision + 1, updated_at = now()
+      where key = $1 and status in ('used', 'frozen')`,
+    [key, JSON.stringify(next)],
+  )
+  if (updated.rowCount !== 1) {
+    throw new AdminProfileMutationConflictError('关联 CDK 干员基线重置冲突，请刷新后重试。')
+  }
+}
+
+function asAuditRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
 }
 
 export async function updateUserProfileMetadata(
@@ -1018,16 +1209,16 @@ export async function listAdminUserAccountsPage(options: {
   const values: unknown[] = []
   let where = ''
   if (options.search) {
-    values.push(`%${options.search.toLowerCase()}%`)
-    where = `where lower(user_accounts.email) like $1
-      or lower(user_accounts.id) like $1
+    values.push(`%${escapeLikePattern(options.search.toLowerCase())}%`)
+    where = `where lower(user_accounts.email) like $1 escape '!'
+      or lower(user_accounts.id) like $1 escape '!'
       or exists (
         select 1 from user_game_accounts profile
         where profile.user_id = user_accounts.id
           and (
-            lower(profile.display_name) like $1
-            or lower(profile.id) like $1
-            or lower(coalesce(profile.cdk_order_hash, '')) like $1
+            lower(profile.display_name) like $1 escape '!'
+            or lower(profile.id) like $1 escape '!'
+            or lower(coalesce(profile.cdk_order_hash, '')) like $1 escape '!'
           )
       )`
   }
@@ -1036,6 +1227,9 @@ export async function listAdminUserAccountsPage(options: {
     values,
   )
   const total = Number(countResult.rows[0]?.total ?? 0)
+  if (!Number.isSafeInteger(total) || total < 0) {
+    throw new Error('Admin user count exceeds the supported safe integer range.')
+  }
   const totalPages = total === 0 ? 0 : Math.ceil(total / options.pageSize)
   const page = totalPages === 0 ? 1 : Math.min(options.page, totalPages)
   values.push(options.pageSize, (page - 1) * options.pageSize)
@@ -1057,6 +1251,10 @@ export async function listAdminUserAccountsPage(options: {
     page,
     totalPages,
   }
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[!%_]/g, (character) => `!${character}`)
 }
 
 export async function updateProfileWorkspaceAtomically(

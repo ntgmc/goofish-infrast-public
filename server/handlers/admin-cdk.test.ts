@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   generateCdk: vi.fn(),
   hashCdk: vi.fn(),
   getCdk: vi.fn(),
+  listAdminPage: vi.fn(),
   createCdkBatch: vi.fn(),
   deleteUnusedCdk: vi.fn(),
   mutateCdk: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('./license-utils', () => ({
   getCdkItemExpiresAt: (record: { item_expires_at?: string | null }) => record.item_expires_at ?? null,
   getCdkRecordStore: vi.fn(async () => ({
     get: mocks.getCdk,
+    listAdminPage: mocks.listAdminPage,
     createBatch: mocks.createCdkBatch,
     deleteUnused: mocks.deleteUnusedCdk,
     mutate: mocks.mutateCdk,
@@ -77,6 +79,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.authenticateAdminRequest.mockResolvedValue({ ok: true })
   mocks.getCdk.mockResolvedValue(record)
+  mocks.listAdminPage.mockResolvedValue({ records: [], page: 1, total: 0 })
   mocks.generateCdk.mockReturnValue('ITEM-CDK-CODE')
   mocks.hashCdk.mockReturnValue(codeHash)
   mocks.createCdkBatch.mockResolvedValue(undefined)
@@ -113,6 +116,7 @@ describe('admin CDK operator baseline controls', () => {
       { source: 'workspace', available: true, owned_count: 1, updated_at: '2026-01-03T00:00:00.000Z' },
       { source: 'next_import', available: true, owned_count: null, updated_at: null },
     ])
+    expect(mocks.authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'admin_manage')
   })
 
   it('rebuilds the workspace fingerprint on the server before selecting it', async () => {
@@ -180,6 +184,10 @@ describe('admin item CDK generation', () => {
         balance_amount: null,
       }),
     }])
+    expect(mocks.authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), {
+      capability: 'admin_manage',
+      requireRecentLogin: true,
+    })
   })
 
   it('rejects mixed item and balance payloads', async () => {
@@ -191,6 +199,15 @@ describe('admin item CDK generation', () => {
     expect(response.status).toBe(400)
     expect(await response.json()).toMatchObject({ code: 'cdk_payload_mismatch' })
     expect(mocks.createCdkBatch).not.toHaveBeenCalled()
+  })
+})
+
+describe('admin CDK capability gates', () => {
+  it('keeps the dedicated risk listing behind risk_view', async () => {
+    const response = await adminCdkHandler(new Request('http://localhost/api/admin/cdk?view=risk&page=1&page_size=25'))
+
+    expect(response.status).toBe(200)
+    expect(mocks.authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'risk_view')
   })
 })
 

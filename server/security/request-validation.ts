@@ -68,8 +68,12 @@ export async function validateAndStoreJsonBody(
   validatedBodies.set(req, { schema, value: result.data })
 }
 
-export async function getValidatedJson<S extends z.ZodType>(req: Request, schema: S): Promise<z.output<S>> {
-  if (!validatedBodies.has(req)) await validateAndStoreJsonBody(req, schema, 'standard', false)
+export async function getValidatedJson<S extends z.ZodType>(
+  req: Request,
+  schema: S,
+  enforceSchema = false,
+): Promise<z.output<S>> {
+  if (!validatedBodies.has(req)) await validateAndStoreJsonBody(req, schema, 'standard', enforceSchema)
   const entry = validatedBodies.get(req)
   if (!entry || entry.schema !== schema) {
     throw new Error('Validated request body is unavailable or uses the wrong schema')

@@ -38,6 +38,7 @@ import {
   type UserAccountRecord,
   type UserGameAccountRecord,
   type UserSessionRecord,
+  type UpdateUserPasswordAtomicallyInput,
 } from '../storage/user-store'
 import { getProfileCapacityLimits } from '../storage/inventory-store'
 import { createPostgresAnnouncementStore } from '../storage/announcement-store'
@@ -356,6 +357,7 @@ export async function changeUserPassword(
 export async function resetUserPasswordByAdmin(
   user: UserAccountRecord,
   newPasswordValue: unknown,
+  adminAudit?: UpdateUserPasswordAtomicallyInput['adminAudit'],
 ): Promise<
   | { ok: true; user: UserAccountRecord }
   | { ok: false; status: number; message: string; code?: 'password_update_conflict' }
@@ -376,6 +378,7 @@ export async function resetUserPasswordByAdmin(
     expectedPasswordHash: user.password_hash,
     replacement,
     updatedAt: new Date(),
+    adminAudit,
   })
   if (!updated.ok) {
     return {

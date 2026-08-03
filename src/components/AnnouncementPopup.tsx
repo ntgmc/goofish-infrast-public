@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react
 import { Link } from 'react-router'
 import type { Announcement } from '../lib/types'
 import { apiJson, apiVoid } from '../lib/api-client'
-import { getOrCreateToolVisitorId } from '../lib/usage-tracking'
 import type { UserAnnouncementRead } from '../lib/types'
 import AnnouncementMarkdown from './AnnouncementMarkdown'
 import { AnimatedPresenceRegion } from './MotionPrimitives'
@@ -232,7 +231,6 @@ async function reportAnnouncementEvent(
       keepalive: true,
       json: {
         event,
-        visitor_id: getOrCreateToolVisitorId(),
         announcement_id: announcement.id,
         announcement_kind: announcement.kind,
         announcement_version: announcement.updated_at,

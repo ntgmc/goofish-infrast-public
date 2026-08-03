@@ -14,7 +14,7 @@ import { refreshBrevoOfficialQuotaIfStale } from '../brevo-quota'
 export default async function adminRegistrationSettingsHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return jsonResponse(null, 204)
   try {
-    const authentication = await authenticateAdminRequest(req)
+    const authentication = await authenticateAdminRequest(req, 'admin_manage')
     if (!authentication.ok) return authentication.response
     if (req.method === 'GET') {
       const settings = await getRegistrationSettings()

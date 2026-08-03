@@ -16,7 +16,14 @@ export default async (req: Request): Promise<Response> => {
       const login = await loginAdminRequest(req, body.username, body.password)
       if (!login.ok) return login.response
       return jsonResponse(
-        { user: { username: login.username } },
+        {
+          user: {
+            username: login.username,
+            role: login.role,
+            capabilities: login.capabilities,
+            authenticated_at: login.authenticated_at,
+          },
+        },
         200,
         {
           'Set-Cookie': login.cookie,
@@ -29,7 +36,14 @@ export default async (req: Request): Promise<Response> => {
       const authentication = await authenticateAdminRequest(req)
       if (!authentication.ok) return authentication.response
       return jsonResponse(
-        { user: { username: authentication.username } },
+        {
+          user: {
+            username: authentication.username,
+            role: authentication.role,
+            capabilities: authentication.capabilities,
+            authenticated_at: authentication.authenticated_at,
+          },
+        },
         200,
         { 'Cache-Control': 'no-store' },
       )

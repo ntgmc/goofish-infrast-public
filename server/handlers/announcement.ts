@@ -72,7 +72,7 @@ async function handlePublicGet(req: Request): Promise<Response> {
 }
 
 async function handleAdminGet(req: Request): Promise<Response> {
-  const authentication = await authenticateAdminRequest(req)
+  const authentication = await authenticateAdminRequest(req, 'admin_manage')
   if (!authentication.ok) return authentication.response
 
   const { data, revision } = await readAnnouncementDocument()
@@ -84,7 +84,7 @@ async function handleAdminGet(req: Request): Promise<Response> {
 }
 
 async function handleAdminPut(req: Request): Promise<Response> {
-  const authentication = await authenticateAdminRequest(req)
+  const authentication = await authenticateAdminRequest(req, 'admin_manage')
   if (!authentication.ok) return authentication.response
 
   const body = await getValidatedJson(req, requestSchemas.announcement)

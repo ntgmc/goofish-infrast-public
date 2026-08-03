@@ -221,10 +221,16 @@ CREATE TABLE IF NOT EXISTS usage_events (
   visitor_id TEXT,
   date DATE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '180 days'),
   record_json JSONB NOT NULL
 );
+ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+UPDATE usage_events SET expires_at = created_at + interval '180 days' WHERE expires_at IS NULL;
+ALTER TABLE usage_events ALTER COLUMN expires_at SET DEFAULT (now() + interval '180 days');
+ALTER TABLE usage_events ALTER COLUMN expires_at SET NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_usage_events_date ON usage_events(date);
 CREATE INDEX IF NOT EXISTS idx_usage_events_event ON usage_events(event);
+CREATE INDEX IF NOT EXISTS idx_usage_events_expires_at ON usage_events(expires_at);
 CREATE INDEX IF NOT EXISTS idx_usage_events_announcement_version
   ON usage_events ((record_json->>'announcement_id'), (record_json->>'announcement_version'), event)
   WHERE record_json ? 'announcement_id';
@@ -325,11 +331,15 @@ CREATE TABLE IF NOT EXISTS optimization_dead_letters (
   replayed_job_id TEXT,
   replayed_by TEXT,
   replayed_at TIMESTAMPTZ,
+  resolution_reason TEXT,
+  resolved_by TEXT,
   resolved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   UNIQUE (job_id)
 );
+ALTER TABLE optimization_dead_letters ADD COLUMN IF NOT EXISTS resolution_reason TEXT;
+ALTER TABLE optimization_dead_letters ADD COLUMN IF NOT EXISTS resolved_by TEXT;
 CREATE INDEX IF NOT EXISTS idx_optimization_dead_letters_status_created_at
   ON optimization_dead_letters(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_optimization_dead_letters_profile_created_at
@@ -349,10 +359,40 @@ CREATE TABLE IF NOT EXISTS admin_users (
   password_hash TEXT NOT NULL,
   salt TEXT NOT NULL,
   iterations INTEGER NOT NULL,
+  disabled BOOLEAN NOT NULL DEFAULT FALSE,
   record_json JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS disabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS admin_operation_audit (
+  id TEXT PRIMARY KEY,
+  actor_username TEXT NOT NULL,
+  action TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  reason TEXT NOT NULL CHECK (length(trim(reason)) >= 2),
+  request_id TEXT NOT NULL,
+  client_ip TEXT,
+  before_json JSONB,
+  after_json JSONB,
+  created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_operation_audit_actor_created
+  ON admin_operation_audit(actor_username, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_operation_audit_target_created
+  ON admin_operation_audit(target_type, target_id, created_at DESC);
+CREATE OR REPLACE FUNCTION reject_admin_operation_audit_mutation()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'admin_operation_audit is append-only';
+END;
+$$;
+DROP TRIGGER IF EXISTS admin_operation_audit_append_only ON admin_operation_audit;
+CREATE TRIGGER admin_operation_audit_append_only
+BEFORE UPDATE OR DELETE ON admin_operation_audit
+FOR EACH ROW EXECUTE FUNCTION reject_admin_operation_audit_mutation();
 
 CREATE TABLE IF NOT EXISTS admin_sessions (
   id TEXT PRIMARY KEY,
@@ -2105,6 +2145,7 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'commercial_account_limits',
   'user_notifications',
   'inventory_admin_operations',
+  'admin_operation_audit',
 ])
 
 export type DatabaseSchemaMode = 'migrate' | 'validate'

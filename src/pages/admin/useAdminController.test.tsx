@@ -16,6 +16,7 @@ const adminApi = vi.hoisted(() => ({
   json: vi.fn(),
   void: vi.fn(),
 }))
+const requestAdminOperationReason = vi.hoisted(() => vi.fn())
 
 vi.mock('../../lib/admin-api-client', () => ({
   ADMIN_SESSION_EXPIRED_EVENT: 'goofish:admin-session-expired',
@@ -23,24 +24,52 @@ vi.mock('../../lib/admin-api-client', () => ({
   adminApiJson: adminApi.json,
   adminApiVoid: adminApi.void,
 }))
+vi.mock('../../lib/admin-operation-reason', () => ({ requestAdminOperationReason }))
 
 let serverAnnouncements: AnnouncementAdminResponse
 let sessionUsername: string
 let failAnnouncementGet: boolean
 let failAnnouncementPut: boolean
+let failCdkPageGet: boolean
+let usageVisits: number
+let deferredUsageResponses: Array<ReturnType<typeof deferred<unknown>>>
 
 describe('useAdminController announcement drafts', () => {
   beforeEach(() => {
     window.localStorage.clear()
     vi.stubGlobal('confirm', vi.fn(() => true))
+    vi.stubGlobal('prompt', vi.fn(() => '工单 OPS-103 管理员操作'))
+    requestAdminOperationReason.mockReset().mockResolvedValue('工单 OPS-103 管理员操作')
     serverAnnouncements = createServerAnnouncements()
     sessionUsername = 'alice'
     failAnnouncementGet = false
     failAnnouncementPut = false
+    failCdkPageGet = false
+    usageVisits = 0
+    deferredUsageResponses = []
     adminApi.blob.mockReset().mockResolvedValue(new Blob(['workspace export'], { type: 'application/json' }))
     adminApi.void.mockReset().mockResolvedValue(undefined)
     adminApi.json.mockReset().mockImplementation(async (url: string, init?: { method?: string; json?: unknown }) => {
-      if (url === '/api/admin/session') return { user: { username: sessionUsername } }
+      if (url === '/api/admin/session') return {
+        user: {
+          username: sessionUsername,
+          role: 'security_admin',
+          capabilities: [
+            'risk_view',
+            'risk_review',
+            'risk_config',
+            'usage_view',
+            'user_view',
+            'sensitive_data_view',
+            'user_manage',
+            'user_delete',
+            'optimization_view',
+            'optimization_manage',
+            'admin_manage',
+          ],
+          authenticated_at: '2026-08-03T00:00:00.000Z',
+        },
+      }
       if (url === '/api/admin/announcement') {
         if (init?.method === 'PUT') {
           if (failAnnouncementPut) throw new Error('发布服务不可用')
@@ -56,9 +85,16 @@ describe('useAdminController announcement drafts', () => {
         if (!init?.method && failAnnouncementGet) throw new Error('线上公告加载失败')
         return serverAnnouncements
       }
-      if (url.startsWith('/api/admin/usage-stats')) return {}
+      if (url.startsWith('/api/admin/usage-stats')) {
+        const pending = deferredUsageResponses.shift()
+        if (pending) return pending.promise
+        return { totals: { visits: usageVisits } }
+      }
       if (url === '/api/admin/risk-settings') return {}
-      if (url.startsWith('/api/admin/cdk')) return {}
+      if (url.startsWith('/api/admin/cdk')) {
+        if (failCdkPageGet && url.includes('page=')) throw new Error('CDK 列表刷新失败')
+        return {}
+      }
       if (url.startsWith('/api/admin/users')) return {}
       throw new Error(`Unexpected admin API request: ${url}`)
     })
@@ -183,6 +219,7 @@ describe('useAdminController announcement drafts', () => {
       json: expect.objectContaining({
         action: 'clear_profile_skland_binding',
         profile_id: 'profile-1',
+        reason: '工单 OPS-103 管理员操作',
       }),
     }))
   })
@@ -272,11 +309,86 @@ describe('useAdminController announcement drafts', () => {
       json: { action: 'revoke', code_hashes: [firstHash, secondHash] },
     })
   })
+
+  it('keeps successful overview blocks when another block fails', async () => {
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    usageVisits = 42
+    failAnnouncementGet = true
+
+    await act(async () => result.current.loadDashboard())
+
+    expect(result.current.usageStats?.totals.visits).toBe(42)
+    expect(result.current.banner.title).toBe('线上横幅')
+    expect(result.current.overviewPartialFailure).toBe(true)
+    expect(result.current.lastSuccessfulSyncAt).not.toBeNull()
+    expect(result.current.error).toContain('部分概览数据刷新失败')
+    expect(result.current.error).toContain('线上公告加载失败')
+  })
+
+  it('does not let an older overview response overwrite a newer range response', async () => {
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    const older = deferred<unknown>()
+    const newer = deferred<unknown>()
+    deferredUsageResponses.push(older, newer)
+
+    let olderLoad!: Promise<void>
+    let newerLoad!: Promise<void>
+    act(() => {
+      olderLoad = result.current.loadDashboard()
+      newerLoad = result.current.loadDashboard()
+    })
+    await act(async () => {
+      newer.resolve({ totals: { visits: 22 } })
+      await newerLoad
+    })
+    await act(async () => {
+      older.resolve({ totals: { visits: 11 } })
+      await olderLoad
+    })
+
+    expect(result.current.usageStats?.totals.visits).toBe(22)
+  })
+
+  it('reports a successful user mutation separately from a failed background refresh', async () => {
+    const { result } = renderHook(() => useAdminController())
+    await waitForHydration(result)
+    failCdkPageGet = true
+    const target = {
+      id: 'user-1',
+      email: 'user@example.test',
+      status: 'active',
+    } as Parameters<typeof result.current.handleFreezeAppUser>[0]
+
+    await act(async () => result.current.handleFreezeAppUser(target))
+
+    expect(adminApi.json).toHaveBeenCalledWith('/api/admin/users', expect.objectContaining({
+      method: 'PATCH',
+      json: expect.objectContaining({
+        action: 'freeze_account',
+        reason: '工单 OPS-103 管理员操作',
+      }),
+    }))
+    expect(result.current.notice).toContain('已冻结账号：user@example.test')
+    expect(result.current.notice).toContain('操作已成功，但部分数据刷新失败')
+    expect(result.current.error).toContain('CDK 列表刷新失败')
+  })
 })
 
 async function waitForHydration(result: { current: ReturnType<typeof useAdminController> }) {
   await waitFor(() => expect(result.current.authenticated).toBe(true))
   await waitFor(() => expect(result.current.banner.title).toBe('线上横幅'))
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
 }
 
 function formEvent(): FormEvent {

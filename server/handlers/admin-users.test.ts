@@ -11,8 +11,10 @@ const mocks = vi.hoisted(() => ({
   listProfilesForUser: vi.fn(),
   listProfileWorkspaces: vi.fn(),
   resetUserPasswordByAdmin: vi.fn(),
-  saveUserProfile: vi.fn(),
-  setOperatorBaselineByAdmin: vi.fn(),
+  saveUserAccountByAdmin: vi.fn(),
+  saveUserProfileByAdmin: vi.fn(),
+  listCdkRecordsByKeys: vi.fn(),
+  recordAdminOperationAudit: vi.fn(),
 }))
 
 vi.mock('./admin-auth', () => ({
@@ -35,11 +37,10 @@ vi.mock('./license-utils', () => ({
     status,
     headers: { 'Content-Type': 'application/json' },
   }),
-  setOperatorBaselineByAdmin: mocks.setOperatorBaselineByAdmin,
 }))
 
 vi.mock('../storage/user-store', () => ({
-  deleteSessionsForUser: vi.fn(),
+  AdminProfileMutationConflictError: class AdminProfileMutationConflictError extends Error {},
   deleteUserAccount: vi.fn(),
   emptyWorkspace: vi.fn(),
   getUserByEmail: vi.fn(),
@@ -51,10 +52,13 @@ vi.mock('../storage/user-store', () => ({
   listProfileWorkspaces: mocks.listProfileWorkspaces,
   listAdminUserAccountsPage: vi.fn(),
   normalizeProfileKind: vi.fn(() => 'cdk'),
-  saveProfileWorkspace: vi.fn(),
-  saveUserProfile: mocks.saveUserProfile,
-  saveUserAccount: vi.fn(),
+  saveUserProfileByAdmin: mocks.saveUserProfileByAdmin,
+  saveUserAccountByAdmin: mocks.saveUserAccountByAdmin,
   toPublicProfile: (profile: unknown) => profile,
+}))
+vi.mock('../storage/cdk-store', () => ({ listCdkRecordsByKeys: mocks.listCdkRecordsByKeys }))
+vi.mock('../storage/admin-operation-audit-store', () => ({
+  recordAdminOperationAudit: mocks.recordAdminOperationAudit,
 }))
 
 vi.mock('./user-auth', () => ({ resetUserPasswordByAdmin: mocks.resetUserPasswordByAdmin }))
@@ -108,16 +112,18 @@ const cdk = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.authenticateAdminRequest.mockResolvedValue({ ok: true })
+  mocks.authenticateAdminRequest.mockResolvedValue({ ok: true, username: 'operator' })
   mocks.getUserById.mockResolvedValue(user)
   mocks.getProfileById.mockResolvedValue(profile)
   mocks.getProfileWorkspace.mockResolvedValue(null)
   mocks.getCdk.mockResolvedValue(cdk)
-  mocks.setOperatorBaselineByAdmin.mockResolvedValue({ ...cdk, baseline_operator_fingerprint: undefined, latest_operator_fingerprint: undefined })
-  mocks.saveUserProfile.mockResolvedValue(undefined)
+  mocks.saveUserProfileByAdmin.mockResolvedValue(undefined)
+  mocks.saveUserAccountByAdmin.mockResolvedValue(undefined)
+  mocks.listCdkRecordsByKeys.mockResolvedValue(new Map([[profile.cdk_key, cdk]]))
+  mocks.recordAdminOperationAudit.mockResolvedValue(undefined)
   mocks.resetUserPasswordByAdmin.mockResolvedValue({ ok: true, user })
   mocks.listProfilesForUser.mockImplementation(async () => [
-    mocks.saveUserProfile.mock.calls.at(-1)?.[0] ?? profile,
+    mocks.saveUserProfileByAdmin.mock.calls.at(-1)?.[0] ?? profile,
   ])
   mocks.listProfileWorkspaces.mockResolvedValue(new Map())
 })
@@ -183,6 +189,7 @@ describe('admin user workspace export', () => {
     expect(body.profiles[0]?.workspace).not.toHaveProperty('free_preview_normalized_activity_id')
     expect(JSON.stringify(body)).not.toContain('encrypted-secret')
     expect(JSON.stringify(body)).not.toContain('internal-activity-marker')
+    expect(mocks.authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), 'sensitive_data_view')
   })
 
   it('exports an empty profile list without querying workspaces individually', async () => {
@@ -217,35 +224,86 @@ describe('admin user workspace export', () => {
   })
 })
 
+describe('admin user profile pagination', () => {
+  it('loads only the requested profile page with fixed batch query counts', async () => {
+    const profiles = Array.from({ length: 1_000 }, (_, index) => ({
+      ...profile,
+      id: `profile-${String(index + 1).padStart(4, '0')}`,
+      cdk_key: null,
+      cdk_code_hash: null,
+    }))
+    mocks.listProfilesForUser.mockResolvedValue(profiles)
+    mocks.listProfileWorkspaces.mockResolvedValue(new Map())
+    mocks.listCdkRecordsByKeys.mockResolvedValue(new Map())
+
+    const response = await adminUsersHandler(new Request(
+      `http://localhost/api/admin/users?user_id=${user.id}&profile_page=10&profile_page_size=100`,
+    ))
+    const body = await response.json() as { detail: { profiles: typeof profiles; profile_pagination: Record<string, number | boolean> } }
+
+    expect(response.status).toBe(200)
+    expect(body.detail.profiles).toHaveLength(100)
+    expect(body.detail.profiles[0]?.id).toBe('profile-0901')
+    expect(body.detail.profile_pagination).toEqual({
+      page: 10,
+      page_size: 100,
+      total: 1_000,
+      total_pages: 10,
+      returned: 100,
+      truncated: true,
+    })
+    const expectedIds = profiles.slice(900).map((item) => item.id)
+    expect(mocks.listProfileWorkspaces).toHaveBeenCalledOnce()
+    expect(mocks.listProfileWorkspaces).toHaveBeenCalledWith(expectedIds)
+    expect(mocks.listCdkRecordsByKeys).toHaveBeenCalledOnce()
+    expect(mocks.listCdkRecordsByKeys).toHaveBeenCalledWith([])
+    expect(mocks.getProfileWorkspace).not.toHaveBeenCalled()
+    expect(mocks.getCdk).not.toHaveBeenCalled()
+  })
+
+  it('rejects unsafe profile page values before querying profile data', async () => {
+    const response = await adminUsersHandler(new Request(
+      `http://localhost/api/admin/users?user_id=${user.id}&profile_page=999999999999999999999`,
+    ))
+
+    expect(response.status).toBe(400)
+    expect(mocks.listProfilesForUser).not.toHaveBeenCalled()
+  })
+})
+
 describe('admin user Skland binding reset', () => {
-  it('resets the linked CDK baseline before clearing the binding', async () => {
+  it('clears the binding and linked CDK baseline in one storage transaction', async () => {
     const response = await adminUsersHandler(clearBindingRequest())
 
     expect(response.status).toBe(200)
-    expect(mocks.setOperatorBaselineByAdmin).toHaveBeenCalledWith(cdk, expect.objectContaining({
-      source: 'next_import',
-      unfreeze: false,
-      eventType: 'admin_operator_baseline_reset',
-      reviewed: false,
-    }))
-    expect(mocks.saveUserProfile).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mocks.saveUserProfileByAdmin).toHaveBeenCalledWith(expect.objectContaining({
       skland_binding: null,
       skland_pending_binding: null,
       skland_risk: null,
+    }), expect.objectContaining({
+      expectedUpdatedAt: profile.updated_at,
+      resetLinkedCdkOperatorBaselineReason: expect.stringContaining('管理员清除森空岛绑定'),
+      audit: expect.objectContaining({
+        actorUsername: 'operator',
+        action: 'profile.clear_profile_skland_binding',
+        reason: '工单 OPS-100 清理失效绑定',
+      }),
     }))
-    expect(mocks.setOperatorBaselineByAdmin.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.saveUserProfile.mock.invocationCallOrder[0],
-    )
+    expect(mocks.authenticateAdminRequest).toHaveBeenCalledWith(expect.any(Request), {
+      capability: 'user_manage',
+      requireRecentLogin: true,
+    })
   })
 
-  it('keeps the binding when the active CDK baseline cannot be reset', async () => {
-    mocks.setOperatorBaselineByAdmin.mockResolvedValue(null)
+  it('returns a conflict without retrying when the atomic profile mutation fails', async () => {
+    const ConflictError = (await import('../storage/user-store')).AdminProfileMutationConflictError
+    mocks.saveUserProfileByAdmin.mockRejectedValue(new ConflictError('关联 CDK 干员基线重置冲突，请刷新后重试。'))
 
     const response = await adminUsersHandler(clearBindingRequest())
 
     expect(response.status).toBe(409)
-    await expect(response.json()).resolves.toEqual({ error: '重置关联 CDK 的干员基线失败，绑定未清除。' })
-    expect(mocks.saveUserProfile).not.toHaveBeenCalled()
+    await expect(response.json()).resolves.toEqual({ error: '关联 CDK 干员基线重置冲突，请刷新后重试。' })
+    expect(mocks.saveUserProfileByAdmin).toHaveBeenCalledOnce()
   })
 
   it('clears a binding without touching CDK storage when the profile has no CDK', async () => {
@@ -254,9 +312,9 @@ describe('admin user Skland binding reset', () => {
     const response = await adminUsersHandler(clearBindingRequest())
 
     expect(response.status).toBe(200)
-    expect(mocks.getCdk).not.toHaveBeenCalled()
-    expect(mocks.setOperatorBaselineByAdmin).not.toHaveBeenCalled()
-    expect(mocks.saveUserProfile).toHaveBeenCalled()
+    expect(mocks.saveUserProfileByAdmin).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({
+      resetLinkedCdkOperatorBaselineReason: expect.any(String),
+    }))
   })
 })
 
@@ -276,6 +334,7 @@ describe('admin user password reset', () => {
         action: 'reset_password',
         user_id: user.id,
         new_password: 'StrongReplacementPassword!2026',
+        reason: '工单 OPS-101 重置用户密码',
       }),
     }))
 
@@ -295,6 +354,8 @@ function clearBindingRequest() {
       action: 'clear_profile_skland_binding',
       user_id: user.id,
       profile_id: profile.id,
+      expected_updated_at: profile.updated_at,
+      reason: '工单 OPS-100 清理失效绑定',
     }),
   })
 }

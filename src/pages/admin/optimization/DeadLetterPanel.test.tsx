@@ -4,14 +4,15 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AdminOptimizationDeadLetter, AdminOptimizationDeadLetterDetail } from '../contracts'
 
-const { adminApiJson } = vi.hoisted(() => ({ adminApiJson: vi.fn() }))
-vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson }))
+const { adminApiBlob, adminApiJson } = vi.hoisted(() => ({ adminApiBlob: vi.fn(), adminApiJson: vi.fn() }))
+vi.mock('../../../lib/admin-api-client', () => ({ adminApiBlob, adminApiJson }))
 
 import DeadLetterPanel from './DeadLetterPanel'
 
 describe('DeadLetterPanel', () => {
   beforeEach(() => {
     adminApiJson.mockReset()
+    adminApiBlob.mockReset().mockResolvedValue(new Blob(['{}'], { type: 'application/json' }))
     adminApiJson.mockImplementation(async (url: string) => {
       if (url.includes('view=dead_letter')) return { dead_letter: detail() }
       return { dead_letters: [record()] }
@@ -23,9 +24,18 @@ describe('DeadLetterPanel', () => {
 
     expect(await screen.findByText(/任务 job-1/)).toBeInTheDocument()
     expect(screen.queryByText('申请的基建配置')).not.toBeInTheDocument()
-    const download = screen.getByRole('link', { name: '下载完整任务载荷 JSON' })
-    expect(download).toHaveAttribute('href', '/api/admin/optimization?view=dead_letter_download&id=letter-1')
-    expect(download).toHaveAttribute('download')
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:dead-letter')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    fireEvent.click(screen.getByRole('button', { name: '下载完整任务载荷 JSON' }))
+    expect(adminApiBlob).toHaveBeenCalledWith(
+      '/api/admin/optimization?view=dead_letter_download&id=letter-1',
+      { fallbackMessage: '下载完整任务载荷失败' },
+    )
+    expect(await screen.findByRole('button', { name: '下载完整任务载荷 JSON' })).toBeEnabled()
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+    expect(click).toHaveBeenCalledOnce()
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:dead-letter')
 
     fireEvent.click(screen.getByRole('button', { name: '查看申请配置和干员数据' }))
 
@@ -69,6 +79,8 @@ function record(overrides: Partial<AdminOptimizationDeadLetter> = {}): AdminOpti
     replayed_job_id: null,
     replayed_by: null,
     replayed_at: null,
+    resolution_reason: null,
+    resolved_by: null,
     resolved_at: null,
     created_at: '2026-07-19T10:00:00.000Z',
     updated_at: '2026-07-19T10:00:00.000Z',

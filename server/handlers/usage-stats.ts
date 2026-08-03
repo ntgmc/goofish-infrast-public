@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { authenticateAdminRequest } from './admin-auth'
 import { jsonResponse } from './license-utils'
 import {
@@ -9,12 +9,17 @@ import {
   type UsageEventStore,
 } from '../storage/usage-store'
 import { requestSchemas } from '../security/request-policy'
-import { getValidatedJson } from '../security/request-validation'
+import { getValidatedJson, RequestInputError } from '../security/request-validation'
+import { getRequestClientIp } from '../security/client-ip'
 
 const EVENT_PREFIX = 'events/'
 const VALID_VISITOR_ID = /^[A-Za-z0-9_-]{8,128}$/
 const VALID_RANGE_VALUES = new Set(['7d', '14d', '30d'])
 const MAX_CUSTOM_RANGE_DAYS = 90
+const USAGE_VISITOR_COOKIE = 'maa_usage_visitor'
+const USAGE_VISITOR_MAX_AGE_SECONDS = 180 * 24 * 60 * 60
+const USAGE_EVENT_BUCKET_MS = 10 * 60 * 1000
+const DEVELOPMENT_USAGE_SECRET = randomBytes(32).toString('base64url')
 
 type UsageEventInput = string | null | Partial<Pick<
   UsageEventRecord,
@@ -45,13 +50,16 @@ export default async (req: Request): Promise<Response> => {
 
   try {
     if (req.method === 'POST' && !isAdminRoute) {
-      return handlePublicPost(req)
+      return await handlePublicPost(req)
     }
     if (req.method === 'GET' && isAdminRoute) {
-      return handleAdminGet(req)
+      return await handleAdminGet(req)
     }
     return jsonResponse({ error: 'Method not allowed' }, 405)
   } catch (error) {
+    if (error instanceof RequestInputError) {
+      return jsonResponse({ error: error.message, code: error.code, issues: error.issues }, error.status)
+    }
     console.error('usage stats error:', error)
     return jsonResponse({ error: 'Internal server error' }, 500)
   }
@@ -93,38 +101,110 @@ export async function recordUsageEvent(event: UsageEventName, input: UsageEventI
 }
 
 async function handlePublicPost(req: Request): Promise<Response> {
-  const body = await getValidatedJson(req, requestSchemas.usageStats)
+  const body = await getValidatedJson(req, requestSchemas.usageStats, true)
+  const visitor = resolveUsageVisitor(req)
   if (body.event === 'announcement_impression' || body.event === 'announcement_read') {
     const announcementId = normalizeNullableString(body.announcement_id, 120)
     const announcementVersion = normalizeIsoString(body.announcement_version)
-    const visitorId = normalizeNullableString(body.visitor_id, 128)
-    if (!announcementId || !announcementVersion || !visitorId || !VALID_VISITOR_ID.test(visitorId)) {
+    if (!announcementId || !announcementVersion) {
       return jsonResponse({ error: 'Invalid announcement event identity.' }, 400)
     }
     await recordUsageEvent(body.event, {
-      visitor_id: visitorId,
+      visitor_id: visitor.id,
       status: 'success',
       reason_code: 'ok',
       announcement_id: announcementId,
       announcement_version: announcementVersion,
       ...(normalizeAnnouncementKind(body.announcement_kind) && { announcement_kind: normalizeAnnouncementKind(body.announcement_kind) as string }),
-      source: normalizePublicAnnouncementSource(body.source),
-    }, `${visitorId}:${announcementId}:${announcementVersion}`)
-    return jsonResponse({ ok: true })
+      source: `${normalizePublicAnnouncementSource(body.source)}:signed_visitor`,
+    }, `${body.event}:${visitor.id}:${announcementId}:${announcementVersion}`)
+    return publicUsageResponse(visitor.cookie)
   }
   if (body.event !== 'tool_visit') {
     return jsonResponse({ error: 'Unsupported usage event.' }, 400)
   }
-  if (typeof body.visitor_id !== 'string' || !VALID_VISITOR_ID.test(body.visitor_id)) {
-    return jsonResponse({ error: 'Invalid visitor id.' }, 400)
-  }
+  const bucket = Math.floor(Date.now() / USAGE_EVENT_BUCKET_MS)
+  const networkBucket = usageHmac(`event-bucket:${getRequestClientIp(req)}:${visitor.id}:${bucket}`)
+  await recordUsageEvent('tool_visit', {
+    visitor_id: visitor.id,
+    status: 'success',
+    source: 'public_signed_visitor',
+  }, `tool_visit:${networkBucket}`)
+  return publicUsageResponse(visitor.cookie)
+}
 
-  await recordUsageEvent('tool_visit', { visitor_id: body.visitor_id, status: 'success' })
-  return jsonResponse({ ok: true })
+function publicUsageResponse(cookie: string | null): Response {
+  return jsonResponse({ ok: true }, 200, cookie ? { 'Set-Cookie': cookie } : undefined)
+}
+
+function resolveUsageVisitor(req: Request, now = new Date()): { id: string; cookie: string | null } {
+  const secrets = usageSecrets()
+  const raw = readCookie(req.headers.get('cookie'), USAGE_VISITOR_COOKIE)
+  const existing = raw ? verifyUsageVisitorCookie(raw, secrets, now) : null
+  if (existing && existing.secretIndex === 0) return { id: existing.id, cookie: null }
+  const id = existing?.id ?? randomBytes(24).toString('base64url')
+  const issuedAt = Math.floor(now.getTime() / 1000)
+  const payload = `${id}.${issuedAt}`
+  const signature = signUsageVisitorCookie(secrets[0], payload)
+  return {
+    id,
+    cookie: `${USAGE_VISITOR_COOKIE}=${payload}.${signature}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${USAGE_VISITOR_MAX_AGE_SECONDS}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`,
+  }
+}
+
+function verifyUsageVisitorCookie(
+  value: string,
+  secrets: string[],
+  now: Date,
+): { id: string; secretIndex: number } | null {
+  const [id, issuedAtValue, signature, ...extra] = value.split('.')
+  if (extra.length > 0 || !id || !issuedAtValue || !signature) return null
+  if (!VALID_VISITOR_ID.test(id) || !/^\d{1,12}$/.test(issuedAtValue)) return null
+  const issuedAtMs = Number(issuedAtValue) * 1000
+  if (!Number.isSafeInteger(issuedAtMs)
+    || issuedAtMs > now.getTime() + 5 * 60 * 1000
+    || issuedAtMs < now.getTime() - USAGE_VISITOR_MAX_AGE_SECONDS * 1000) return null
+  const payload = `${id}.${issuedAtValue}`
+  const secretIndex = secrets.findIndex((secret) => safeEqual(signature, signUsageVisitorCookie(secret, payload)))
+  return secretIndex >= 0 ? { id, secretIndex } : null
+}
+
+function usageSecrets(): string[] {
+  const current = process.env.USAGE_VISITOR_SECRET?.trim()
+    || process.env.MAA_ADMIN_SECRET?.trim()
+    || (process.env.NODE_ENV === 'production' ? '' : DEVELOPMENT_USAGE_SECRET)
+  if (!current) throw new Error('USAGE_VISITOR_SECRET or MAA_ADMIN_SECRET is required for public usage events')
+  const previous = process.env.USAGE_VISITOR_SECRET_PREVIOUS?.trim()
+    || process.env.MAA_ADMIN_SECRET_PREVIOUS?.trim()
+  return previous && previous !== current ? [current, previous] : [current]
+}
+
+function signUsageVisitorCookie(secret: string, payload: string): string {
+  return createHmac('sha256', secret).update(`usage-visitor-cookie:${payload}`).digest('base64url')
+}
+
+function usageHmac(value: string): string {
+  return createHmac('sha256', usageSecrets()[0]).update(`usage-event:${value}`).digest('hex')
+}
+
+function safeEqual(left: string, right: string): boolean {
+  const leftBytes = Buffer.from(left)
+  const rightBytes = Buffer.from(right)
+  return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes)
+}
+
+function readCookie(header: string | null, name: string): string | null {
+  const match = (header ?? '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))
+  if (!match?.[1]) return null
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return null
+  }
 }
 
 async function handleAdminGet(req: Request): Promise<Response> {
-  const authentication = await authenticateAdminRequest(req)
+  const authentication = await authenticateAdminRequest(req, 'usage_view')
   if (!authentication.ok) return authentication.response
 
   const store = await getUsageEventStore()
@@ -249,6 +329,10 @@ function csvResponse(csv: string, filename: string): Response {
 function toUsageStatsCsv(stats: Awaited<ReturnType<UsageEventStore['getStats']>>): string {
   const rows: string[][] = [
     ['section', 'key', 'label', 'date', 'value', 'extra'],
+    ['metadata', 'metrics_version', 'Metrics version', '', stats.metrics_version, ''],
+    ['metadata', 'generated_at', 'Generated at', stats.generated_at, '', 'timezone=UTC'],
+    ['metadata', 'source', 'Source', '', stats.source, ''],
+    ['metadata', 'complete', 'Complete', '', String(stats.completeness.complete), `unknown_status_events=${stats.completeness.unknown_status_events};retention_days=${stats.completeness.retention_days};raw_events_truncated=${stats.completeness.raw_events_truncated};raw_event_limit=${stats.completeness.raw_event_limit}`],
     ['range', 'from', 'From', '', stats.range.from, ''],
     ['range', 'to', 'To', '', stats.range.to, ''],
     ['range', 'days', 'Days', '', String(stats.range.days), ''],
@@ -264,7 +348,7 @@ function toUsageStatsCsv(stats: Awaited<ReturnType<UsageEventStore['getStats']>>
     }
   }
   for (const item of stats.funnel) {
-    rows.push(['funnel', item.key, item.label, '', String(item.count), `conversion=${item.conversion_rate};dropoff=${item.dropoff}`])
+    rows.push(['event_counts', item.key, item.label, '', String(item.count), 'independent_event_total'])
   }
   for (const item of stats.failure_reasons) {
     rows.push(['failure_reasons', item.reason_code, item.reason_code, item.last_seen_at ?? '', String(item.count), `percentage=${item.percentage}`])
@@ -329,7 +413,7 @@ export async function countSuccessfulUsageEventsForProfileInRange(
   return events.filter((record) => (
     record.event === event
     && record.profile_id === profileId
-    && record.status !== 'failure'
+    && record.status === 'success'
     && record.created_at >= startAt
     && record.created_at < endAt
   )).length
@@ -348,7 +432,7 @@ export async function getScheduleGenerateDurationStatsByBucket(
   const durations = events
     .filter((record) =>
       record.event === 'schedule_generate'
-      && record.status !== 'failure'
+      && record.status === 'success'
       && record.estimate_bucket === bucket
       && record.created_at >= startAt
       && record.created_at < endAt
